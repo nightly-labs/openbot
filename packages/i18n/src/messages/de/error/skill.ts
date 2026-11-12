@@ -48,9 +48,15 @@ export const messages = {
     "{name} wurde vor der Einführung der genauen Versionserfassung installiert. Aktualisiere oder repariere sie vor dem Veröffentlichen.",
   "error.skill.tooManySkills": "Ein Agent kann bis zu {limit} Fähigkeiten haben.",
   "error.skill.unmanagedExists": "Unter {path} existiert bereits eine nicht verwaltete Fähigkeit.",
+  "error.skill.managedSlug":
+    "OpenBot gibt jedem Agenten eine eigene Fähigkeit {slug}. Gib dieser Fähigkeit einen anderen Namen.",
   "error.skill.templateMarkdownTooLarge":
     "{name}: SKILL.md ist größer als 64 KB. Kürze die Datei vor dem Veröffentlichen.",
   "error.skill.localNoRevisions": "Die lokale Fähigkeit hat keine veröffentlichten Überarbeitungen.",
+  "error.skill.localNotFound":
+    "Diese lokale Fähigkeit gibt es nicht. Prüfe ihre ID in der Liste der lokalen Fähigkeiten.",
+  "error.skill.localRevisionNotFound":
+    "Diese lokale Fähigkeit hat keine Überarbeitung {revision}. Die neueste Überarbeitung ist {latest}.",
   "error.skill.localNameTaken":
     "Eine lokale Fähigkeit mit diesem Namen existiert bereits. Überarbeite sie stattdessen.",
   "error.skill.localKeepName": "Behalte den Namen der Fähigkeit bei der Überarbeitung bei.",

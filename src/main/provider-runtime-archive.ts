@@ -134,10 +134,11 @@ export const extractZipFiles = Effect.fn("ProviderArchive.extractZipFiles")(func
     (handle) => runtimeIO(() => handle.close()).pipe(Effect.orDie),
   );
 });
+/** Extracts the entries under `root`, or under any of the roots in a list. `""` extracts each entry. */
 export const extractZipTree = Effect.fn("ProviderArchive.extractZipTree")(function* (
   archive: string,
   destination: string,
-  root: string,
+  root: string | readonly string[],
   message: string,
 ): Effect.fn.Return<void, ProviderRuntimeFailure> {
   yield* Effect.acquireUseRelease(
@@ -160,12 +161,13 @@ export const extractZipTree = Effect.fn("ProviderArchive.extractZipTree")(functi
   );
 });
 
-function isZipTreeName(name: string, root: string): boolean {
+function isZipTreeName(name: string, root: string | readonly string[]): boolean {
   if (name.includes("\0") || name.includes("\\")) return false;
   const parts = name.replace(/\/$/u, "").split("/");
+  const roots: readonly string[] = typeof root === "string" ? [root] : root;
   // A `:` names an NTFS stream on Windows, which would write beside the file rather than into it.
   return (
-    (root === "" || parts[0] === root) &&
+    (roots.includes("") || roots.includes(parts[0] ?? "")) &&
     parts.every((part) => part && part !== "." && part !== ".." && !part.includes(":"))
   );
 }
@@ -217,10 +219,12 @@ const readZipDirectoryEffect = Effect.fn("ProviderArchive.readZipDirectory")(fun
     offset += 46 + nameBytes + extraBytes + commentBytes;
     // Unix is host 3; its mode is the high half of the external attributes. A link or device is
     // refused here, as `assertSafeArchive` refuses one in a tarball. A name that ends in `/` is a
-    // folder, and holds no data.
+    // folder, and holds no data. A mode with no type bits is a file: the Antigravity CLI 1.5.x
+    // Windows zip stores `antigravity.exe` as 0600 only, and unzip tools read it as a file.
     const folder = entry.name.endsWith("/");
     const type = folder ? ZIP_UNIX_DIRECTORY : ZIP_UNIX_REGULAR_FILE;
-    if (madeBy === 3 && unixMode !== 0 && (unixMode & ZIP_UNIX_TYPE_MASK) !== type) {
+    const unixType = unixMode & ZIP_UNIX_TYPE_MASK;
+    if (madeBy === 3 && unixType !== 0 && unixType !== type) {
       return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.archiveSpecialFile")) });
     }
     if (folder && entry.bytes !== 0)

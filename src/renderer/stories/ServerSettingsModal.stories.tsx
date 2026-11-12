@@ -2,15 +2,19 @@ import {
   type AgentAccessChange,
   type AgentAccessSnapshot,
   type BrowserProfileSummary,
+  type BrowserProxyComputer,
+  type BrowserProxySummary,
   type HostStatus,
   type HostUpdateStatus,
   type McpServerConfig,
   type McpSignInState,
   type McpTestResult,
   nextBrowserProfileHue,
+  parseBrowserProxyAddress,
   type ServerAuditEntry,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { Toaster } from "@openbot/ui";
 import { createSignal, createStore } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
@@ -143,6 +147,22 @@ export const ActionError: Story = {
   args: {
     loadError: "The server did not respond. Check the connection and try again.",
   },
+};
+
+/** The browser client: the owner sees company sign-in, but setup needs the desktop app. */
+export const RemoteOwnerInBrowser: Story = {
+  args: {
+    server: remoteServer,
+    hostStatus: null,
+    initialSection: "members",
+    onDownloadDesktopApp: fn(),
+  },
+  render: (args) => (
+    <>
+      <ServerSettingsStory settings={args} />
+      <Toaster />
+    </>
+  ),
 };
 
 export const RemoteAdministrator: Story = {
@@ -329,14 +349,60 @@ const STORY_BROWSER_PROFILES: BrowserProfileSummary[] = [
   { id: "1b2c3d4e5f60718293a4b5c6d7e8f90a", name: "Personal", hue: 150, agentIds: [], tabCount: 0 },
 ];
 
+/** One proxy that Client A uses. */
+const STORY_BROWSER_PROXIES: BrowserProxySummary[] = [
+  {
+    id: "5c6d7e8f90a1b2c3d4e5f60718293a4b",
+    scheme: "socks5",
+    host: "home.example.net",
+    port: 1080,
+    username: "agent",
+    hasPassword: true,
+    profileIds: ["0a1b2c3d4e5f60718293a4b5c6d7e8f9"],
+    failure: null,
+  },
+];
+
+/** The computer of another member, which Client B uses. */
+const STORY_BROWSER_COMPUTERS: BrowserProxyComputer[] = [
+  {
+    id: "7e8f90a1b2c3d4e5f60718293a4b5c6d",
+    memberId: "member-ada",
+    name: "Ada Lovelace",
+    online: true,
+    mine: false,
+    profileIds: ["f9e8d7c6b5a4938271605f4e3d2c1b0a"],
+    failure: null,
+  },
+];
+
+/** This app as a client of the server: it can share its connection, and it does not yet. */
+interface StoryComputers {
+  computers: readonly BrowserProxyComputer[];
+  sharing: boolean;
+}
+
 /** Profiles in memory, so add, rename, color, clear and delete change the list as the host does. */
-function storyBrowserProfiles(initial: readonly BrowserProfileSummary[]): ServerBrowserProfilesOptions {
+function storyBrowserProfiles(
+  initial: readonly BrowserProfileSummary[],
+  initialProxies: readonly BrowserProxySummary[] = [],
+  initialComputers?: StoryComputers,
+): ServerBrowserProfilesOptions {
   // Five agents in all: the ones that no named profile has use the shared profile.
   const [state, setState] = createStore<{
     profiles: BrowserProfileSummary[] | undefined;
     sharedAgentIds: string[] | undefined;
+    proxies: BrowserProxySummary[] | undefined;
+    computers: BrowserProxyComputer[] | undefined;
+    sharing: boolean | undefined;
   }>({
     profiles: initial.map((profile) => ({ ...profile, agentIds: [...profile.agentIds] })),
+    proxies: initialProxies.map((proxy) => ({ ...proxy, profileIds: [...proxy.profileIds] })),
+    computers: (initialComputers?.computers ?? []).map((computer) => ({
+      ...computer,
+      profileIds: [...computer.profileIds],
+    })),
+    sharing: initialComputers?.sharing,
     sharedAgentIds: ["chief", "research", "sales", "writer", "support"].filter(
       (agentId) => !initial.some((profile) => profile.agentIds.includes(agentId)),
     ),
@@ -394,8 +460,68 @@ function storyBrowserProfiles(initial: readonly BrowserProfileSummary[]): Server
           draft.sharedAgentIds?.push(...(draft.profiles?.[index]?.agentIds ?? []));
           draft.profiles?.splice(index, 1);
         }),
+      saveProxy: async (input) => {
+        const parsed = parseBrowserProxyAddress(input.address);
+        if (parsed === null) throw new Error(sourceText("error.backend.browserProxyAddressInvalid"));
+        const { scheme, host, port, username, password } = parsed;
+        const id = input.proxyId ?? crypto.randomUUID().replaceAll("-", "");
+        setState((draft) => {
+          const proxies = draft.proxies ?? [];
+          const existing = proxies.find((proxy) => proxy.id === id);
+          const fields = {
+            scheme,
+            host,
+            port,
+            username,
+            hasPassword: password !== null || (existing?.hasPassword === true && input.keepPassword === true),
+          };
+          if (existing) Object.assign(existing, fields);
+          else proxies.push({ id, ...fields, profileIds: [], failure: null });
+          draft.proxies = proxies;
+          if (input.assignTo !== undefined) assignStoryProxy(draft, input.assignTo, id);
+        });
+      },
+      removeProxy: async (proxyId) =>
+        setState((draft) => {
+          draft.proxies = draft.proxies?.filter((proxy) => proxy.id !== proxyId);
+          draft.computers = draft.computers?.filter((computer) => computer.id !== proxyId);
+        }),
+      setProfileProxy: async (profileId, proxyId) => setState((draft) => assignStoryProxy(draft, profileId, proxyId)),
+      setSharing: async (sharing, assignTo) =>
+        setState((draft) => {
+          draft.sharing = sharing;
+          const computers = draft.computers ?? [];
+          let mine = computers.find((computer) => computer.mine);
+          if (sharing && !mine) {
+            mine = {
+              id: crypto.randomUUID().replaceAll("-", ""),
+              memberId: "member-you",
+              name: "You",
+              online: true,
+              mine: true,
+              profileIds: [],
+              failure: null,
+            };
+            computers.push(mine);
+          }
+          if (mine) mine.online = sharing;
+          draft.computers = computers;
+          if (mine && assignTo !== undefined) assignStoryProxy(draft, assignTo, mine.id);
+        }),
     },
   };
+}
+
+/** A profile uses at most one proxy or computer. */
+function assignStoryProxy(
+  draft: { proxies: BrowserProxySummary[] | undefined; computers: BrowserProxyComputer[] | undefined },
+  profileId: string,
+  proxyId: string | null,
+): void {
+  for (const proxy of [...(draft.proxies ?? []), ...(draft.computers ?? [])]) {
+    proxy.profileIds = proxy.profileIds.filter((id) => id !== profileId);
+    if (proxy.id === proxyId) proxy.profileIds.push(profileId);
+  }
 }
 
 /** The named browser profiles of this computer: a color, a name, and one menu for each profile. */
@@ -403,6 +529,83 @@ export const BrowserProfiles: Story = {
   args: { initialSection: "browser-profiles" },
   render: (args) => (
     <ServerSettingsStory settings={{ ...args, browserProfiles: storyBrowserProfiles(STORY_BROWSER_PROFILES) }} />
+  ),
+};
+
+/** Saved proxies above the profiles. Client A uses one; each profile row menu has a Proxy submenu. */
+export const BrowserProfilesWithProxies: Story = {
+  args: { initialSection: "browser-profiles" },
+  render: (args) => (
+    <ServerSettingsStory
+      settings={{ ...args, browserProfiles: storyBrowserProfiles(STORY_BROWSER_PROFILES, STORY_BROWSER_PROXIES) }}
+    />
+  ),
+};
+
+/** The proxy of Client A does not answer. */
+export const BrowserProfilesProxyFailing: Story = {
+  args: { initialSection: "browser-profiles" },
+  render: (args) => (
+    <ServerSettingsStory
+      settings={{
+        ...args,
+        browserProfiles: storyBrowserProfiles(
+          STORY_BROWSER_PROFILES,
+          STORY_BROWSER_PROXIES.map((proxy): BrowserProxySummary => ({ ...proxy, failure: "unreachable" })),
+        ),
+      }}
+    />
+  ),
+};
+
+/** The proxy of Client A refuses the saved sign-in. */
+export const BrowserProfilesProxySignInRefused: Story = {
+  args: { initialSection: "browser-profiles" },
+  render: (args) => (
+    <ServerSettingsStory
+      settings={{
+        ...args,
+        browserProfiles: storyBrowserProfiles(
+          STORY_BROWSER_PROFILES,
+          STORY_BROWSER_PROXIES.map((proxy): BrowserProxySummary => ({ ...proxy, failure: "signIn" })),
+        ),
+      }}
+    />
+  ),
+};
+
+/**
+ * A joined server: Client B uses the computer of another member, and the Proxy submenu of each
+ * profile can add this computer after a question.
+ */
+export const BrowserProfilesWithComputers: Story = {
+  args: { initialSection: "browser-profiles" },
+  render: (args) => (
+    <ServerSettingsStory
+      settings={{
+        ...args,
+        browserProfiles: storyBrowserProfiles(STORY_BROWSER_PROFILES, STORY_BROWSER_PROXIES, {
+          computers: STORY_BROWSER_COMPUTERS,
+          sharing: false,
+        }),
+      }}
+    />
+  ),
+};
+
+/** The computer of the member that Client B uses is offline, so its pages do not load. */
+export const BrowserProfilesComputerOffline: Story = {
+  args: { initialSection: "browser-profiles" },
+  render: (args) => (
+    <ServerSettingsStory
+      settings={{
+        ...args,
+        browserProfiles: storyBrowserProfiles(STORY_BROWSER_PROFILES, [], {
+          computers: STORY_BROWSER_COMPUTERS.map((computer) => ({ ...computer, online: false })),
+          sharing: false,
+        }),
+      }}
+    />
   ),
 };
 

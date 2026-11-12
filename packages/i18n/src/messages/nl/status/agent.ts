@@ -17,6 +17,8 @@ export const messages = {
   "status.agent.channelRoutineCreated": "{agent} heeft de routine {routine} gemaakt. {person} vroeg erom.",
   "status.agent.channelRoutineUpdated": "{agent} heeft de routine {routine} gewijzigd. {person} vroeg erom.",
   "status.agent.channelRoutineDeleted": "{agent} heeft de routine {routine} verwijderd. {person} vroeg erom.",
+  "status.agent.channelTaskCancelled":
+    "{agent} heeft de taak ‘{task}’ en de subtaken geannuleerd. {person} vroeg erom.",
   "status.agent.screenCaptureScreen": "Het hoofdscherm vastleggen en de afbeelding naar het model van de agent sturen.",
   "status.agent.screenCaptureChannel":
     "De afbeelding verschijnt in het kanaal {channel}, en elk lid van deze server dat het kanaal leest, kan haar zien.",
@@ -28,6 +30,17 @@ export const messages = {
     "Het schermgebied op {x}, {y}, {width} × {height} punten vastleggen en de afbeelding naar het model van de agent sturen.",
   "status.agent.vaultCardFill":
     "De opgeslagen kaart {card} invullen op {site}. Na je goedkeuring kunnen agents deze kaart op deze site invullen zonder goedkeuring. Verwijder de site in Serverinstellingen > Kluis.",
+  "status.agent.reportProblem":
+    "Dit wordt een openbare GitHub-issue, met de appversie en je systeem. Je naam is niet zichtbaar.",
+  "status.agent.sendIdea": "Dit wordt een openbaar GitHub-issue. Je naam wordt niet getoond.",
+  "status.agent.feedbackRecentErrors": "Recente fouten in de chat:",
+  "status.agent.feedbackSameAs": "Wordt toegevoegd aan issue #{issue}",
+  "status.agent.feedbackSent": "Naar het OpenBot-team gestuurd: {title}",
+  "status.agent.serverInstallCommand":
+    "Een eenmalige opdracht maken die OpenBot op een andere computer installeert als de server {name} en die aanmeldt bij je account. De agent voert hem daar uit.",
+  "status.agent.serverInstallCard": "Installatieopdracht voor de server {name}",
+  "status.agent.feedbackSending": "Je feedback wordt naar het OpenBot-team gestuurd…",
+  "status.agent.workflowDelete": "Verwijder de workflow {title} met zijn runs en versies. Zijn open stappen stoppen.",
   "status.agent.vaultCardFillFrames": "De kaartvelden staan in frames van {origins}.",
   "status.agent.screenCaptureProgress": "Vraagt om het scherm vast te leggen…",
   "status.agent.screenCaptureReviewing": "Bekijkt de schermopname…",
@@ -58,7 +71,21 @@ export const messages = {
   "status.agent.changesReviewing": "Bekijkt de aangebrachte wijzigingen…",
   "status.agent.agentCoordinating": "Stemt af met een andere agent…",
   "status.agent.agentResponseReviewing": "Bekijkt het antwoord van de andere agent…",
+  "status.agent.commandRunningUnnamed": "Een opdracht wordt uitgevoerd…",
   "status.agent.toolStepWorking": "Werkt de volgende toolondersteunde stap af…",
+  "status.agent.webSearching": "Zoekt op het web naar ‘{query}’…",
+  "status.agent.urlFetching": "Opent {host}…",
+  "status.agent.fileReading": "Leest {name}…",
+  "status.agent.filesReading": "Leest bestanden…",
+  "status.agent.filesListing": "Bekijkt {path}…",
+  "status.agent.filesLooking": "Bekijkt bestanden…",
+  "status.agent.textSearching": "Zoekt naar ‘{query}’…",
+  "status.agent.filesSearchingText": "Doorzoekt de bestanden…",
+  "status.agent.folderSizesMeasuring": "Meet de mapgroottes…",
+  "status.agent.diskSpaceChecking": "Controleert de vrije schijfruimte…",
+  "status.agent.processesChecking": "Controleert de actieve processen…",
+  "status.agent.gitChecking": "Controleert de Git-repository…",
+  "status.agent.commandRunning": "Voert {program} uit…",
   "status.agent.memoryChanges": "Geheugen: {saved} opgeslagen, {updated} bijgewerkt, {forgotten} vergeten.",
   "status.agent.memoryChangesWithConflicts":
     "Geheugen: {saved} opgeslagen, {updated} bijgewerkt, {forgotten} vergeten, {notChanged} niet gewijzigd omdat een andere thread ze eerst heeft gewijzigd.",
@@ -74,6 +101,9 @@ export const messages = {
   "status.agent.vaultUpdated": "Gewijzigd in de Kluis: {name}",
   "status.agent.vaultDeleted": "Verwijderd uit de Kluis: {name}",
   "status.agent.vaultSave": "Opslaan in de Kluis",
+  "status.agent.apiKeyScope.label": "Opslaan voor",
+  "status.agent.apiKeyScope.vault": "Alle agents (Kluis)",
+  "status.agent.apiKeyScope.agent": "Alleen deze agent",
   "status.agent.vaultExpiryHint": "MM/JJ",
   "status.agent.vaultField.website": "Website",
   "status.agent.vaultField.username": "Gebruikersnaam of e-mail",
@@ -94,5 +124,7 @@ export const messages = {
   "status.agent.vaultField.email": "E-mailadres",
   "status.agent.nextStepContinues": "De agent stopte vóór de volgende stap en gaat verder ({current} van {limit}).",
   "status.agent.planContinues": "Het plan heeft open stappen. De agent gaat verder ({current} van {limit}).",
+  "status.agent.compactionContinues":
+    "De verbinding viel weg terwijl de agent zijn context comprimeerde. De agent gaat verder.",
   "status.agent.branchTitle": "Afgetakte chat",
 } as const satisfies PartialTranslation<typeof source>;

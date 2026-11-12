@@ -20,6 +20,7 @@ function sameSteps(left: readonly AgentStep[], right: readonly AgentStep[]): boo
       const other = right[index];
       if (other?.id !== step.id || other.kind !== step.kind) return false;
       if (step.kind === "memory" && other.kind === "memory" && other.change.action !== step.change.action) return false;
+      if (step.kind === "progress" && other.kind === "progress" && other.error !== step.error) return false;
       return stepText(other) === stepText(step);
     })
   );
@@ -107,6 +108,7 @@ function storedSpans(
       const subagent = subagentTitles.get(step.id);
       const command = step.command?.trim().split("\n", 1)[0];
       const span: TraceSpan = { id, parentId: "turn", name: labels.progress(text), kind: "tool", failed, start, end };
+      if (failed && step.error) span.error = step.error;
       if (step.recipientAgentIds?.length) {
         span.kind = "handoff";
         span.name = labels.message(labels.agentNames(step.recipientAgentIds));
@@ -150,7 +152,20 @@ function guessedSpans(timed: readonly TimedStep[], lastEnd: number, labels: Trac
         end,
       });
     } else if (step.kind === "progress") {
-      spans.push({ id: step.id, parentId: "turn", name: labels.progress(step.text), kind: "tool", start: at, end });
+      const span: TraceSpan = {
+        id: step.id,
+        parentId: "turn",
+        name: labels.progress(step.text),
+        kind: "tool",
+        start: at,
+        end,
+      };
+      // Only a failed tool step has an error.
+      if (step.error) {
+        span.failed = true;
+        span.error = step.error;
+      }
+      spans.push(span);
     }
   }
   return spans;
@@ -181,6 +196,7 @@ export function createTurnSteps(deps: {
     const memory = new Map<string, AgentMessage>();
     const subagents = new Map<string, AgentMessage>();
     const answers = new Map<string, string>();
+    const silent = new Set<string>();
     const answerTimes = new Map<string, string>();
     const startTimes = new Map<string, string>();
     const traces = new Map<string, ConversationTurnTrace>();
@@ -201,7 +217,7 @@ export function createTurnSteps(deps: {
       else if (isTurnAnswer(message) && !answers.has(turnId)) {
         answers.set(turnId, message.id);
         if (message.createdAt) answerTimes.set(turnId, message.createdAt);
-      }
+      } else if (silentAgentAnswer(message)) silent.add(turnId);
     }
     // The caches keep only what the chat still holds, so another page or chat frees them.
     const thoughtIds = new Set([...thinking.values()].flatMap((message) => message.itemIds ?? []));
@@ -209,7 +225,7 @@ export function createTurnSteps(deps: {
     const lines = deps.lines() ?? {};
     for (const turnId of lists.keys())
       if (!thinking.has(turnId) && !memory.has(turnId) && !lines[turnId] && !traces.has(turnId)) lists.delete(turnId);
-    return { thinking, memory, subagents, answers, answerTimes, startTimes, traces, sent, replies };
+    return { thinking, memory, subagents, answers, silent, answerTimes, startTimes, traces, sent, replies };
   });
 
   /** The thoughts and the progress lines of a turn, each with its time, in time order. */
@@ -228,7 +244,7 @@ export function createTurnSteps(deps: {
     }
     const lines = deps.lines()?.[turnId] ?? [];
     for (const line of lines) {
-      timed.push({ step: { id: line.id, kind: "progress", text: line.text }, at: line.at });
+      timed.push({ step: { id: line.id, kind: "progress", text: line.text, error: line.error }, at: line.at });
     }
     // After a restart the progress lines are gone. The stored trace keeps the text and start of each
     // tool step, so the turn keeps its steps.
@@ -236,7 +252,10 @@ export function createTurnSteps(deps: {
       for (const step of sources().traces.get(turnId)?.steps ?? []) {
         const at = Date.parse(step.startedAt);
         if (step.kind !== "tool" || !step.text?.trim() || !Number.isFinite(at)) continue;
-        timed.push({ step: { id: `${turnId}:trace:${step.id}`, kind: "progress", text: step.text }, at });
+        timed.push({
+          step: { id: `${turnId}:trace:${step.id}`, kind: "progress", text: step.text, error: step.error },
+          at,
+        });
       }
     }
     // A stable sort keeps the thoughts in their order when they share a time.
@@ -290,11 +309,18 @@ export function createTurnSteps(deps: {
     return { timed, stored, ran, answerAt, turnStart, turnEnd };
   }
 
-  /** The finished turn whose steps show above this message: the first answer of the turn. */
+  /**
+   * The finished turn whose steps show above this message: the first answer of the turn. A turn with
+   * no answer, such as a stopped one, shows them on its thinking row. A turn that ends with no text on
+   * purpose shows none.
+   */
   const turnOfAnswer = createMemo(() => {
     const active = deps.activeTurnId();
+    const { answers, silent, thinking } = sources();
     const turns = new Map<string, string>();
-    for (const [turnId, messageId] of sources().answers) if (turnId !== active) turns.set(messageId, turnId);
+    for (const [turnId, messageId] of answers) if (turnId !== active) turns.set(messageId, turnId);
+    for (const [turnId, message] of thinking)
+      if (turnId !== active && !answers.has(turnId) && !silent.has(turnId)) turns.set(message.id, turnId);
     return turns;
   });
 
@@ -316,7 +342,7 @@ export function createTurnSteps(deps: {
       const turns = turnIds.filter((turnId) => !answers.has(turnId));
       return turns.length === 0 ? NO_STEPS : turns.flatMap(stepsOf);
     },
-    /** The steps above an answer, or undefined for a message that has none. */
+    /** The steps above an answer or on the thinking row of a turn with no answer, or undefined for a message that has none. */
     stepsAbove(messageId: string | undefined): AgentStep[] | undefined {
       const turnId = messageId === undefined ? undefined : turnOfAnswer().get(messageId);
       const steps = stepsOf(turnId);

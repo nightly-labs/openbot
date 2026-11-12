@@ -5,6 +5,8 @@ import { Effect } from "effect";
 import {
   agentProviderDescriptor,
   agentProviderName,
+  type DownloadableProviderId,
+  isDownloadableProvider,
   isManagedRuntimeProvider,
   type ManagedProviderId,
 } from "@openbot/contracts/agent-providers";
@@ -12,10 +14,12 @@ import {
   type AgentProviderId,
   type ConnectProviderAccountInput,
   isProviderAccountId,
+  MAX_PROVIDER_ACCOUNTS,
   PROVIDER_ACCOUNT_LABEL_MAX_LENGTH,
   type RemoveProviderAccountInput,
   type RenameProviderAccountInput,
   type ResetProviderUsageInput,
+  type SetProviderAccountPoolInput,
   type SetProviderApiKeyInput,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
@@ -147,6 +151,9 @@ export function providerIpcHandlers({
       removeProviderAccount: payloadHandler(parseRemoveProviderAccountInput, ({ provider, accountId }) =>
         runCauseEffect(service.removeProviderAccount(provider, accountId)),
       ),
+      setProviderAccountPool: payloadHandler(parseSetProviderAccountPoolInput, ({ provider, enabled, leftOut }) =>
+        runCauseEffect(service.setProviderAccountPool(provider, enabled, leftOut)),
+      ),
       signOutProvider: payloadHandler(parseProviderId, (provider) => runCauseEffect(service.signOutProvider(provider))),
       providerUsageResets: payloadHandler(parseProviderId, (provider) =>
         runCauseEffect(service.providerUsageResets(provider)),
@@ -162,8 +169,10 @@ export function providerIpcHandlers({
     },
     providerRuntimes: {
       getStatus: handler(() => providerRuntimes.getStatus()),
-      download: payloadHandler(parseManagedProviderId, (parsed) => runCauseEffect(providerRuntimes.download(parsed))),
-      cancel: payloadHandler(parseManagedProviderId, (parsed) => runCauseEffect(providerRuntimes.cancel(parsed))),
+      download: payloadHandler(parseDownloadableProviderId, (parsed) =>
+        runCauseEffect(providerRuntimes.download(parsed)),
+      ),
+      cancel: payloadHandler(parseDownloadableProviderId, (parsed) => runCauseEffect(providerRuntimes.cancel(parsed))),
       measureDownload: payloadHandler(parseManagedProviderId, (parsed) =>
         runCauseEffect(providerRuntimes.measureDownload(parsed)),
       ),
@@ -198,9 +207,16 @@ export function parseProviderApiKeyInput(value: unknown): SetProviderApiKeyInput
   return { provider, key: value.key.trim() };
 }
 
-export function parseManagedProviderId(value: unknown): ManagedProviderId {
+function parseManagedProviderId(value: unknown): ManagedProviderId {
   const provider = parseProviderId(value);
   if (!isManagedRuntimeProvider(provider)) throw new Error("OpenBot does not manage this provider's CLI.");
+  return provider;
+}
+
+/** A managed runtime, or a provider that OpenBot installs with the provider's own installer. */
+export function parseDownloadableProviderId(value: unknown): DownloadableProviderId {
+  const provider = parseProviderId(value);
+  if (!isDownloadableProvider(provider)) throw new Error("OpenBot does not manage this provider's CLI.");
   return provider;
 }
 
@@ -209,7 +225,7 @@ function parseRefreshProvidersInput(value: unknown): { automatic: boolean } {
   return { automatic: value.automatic };
 }
 
-function parseProviderUseInput(value: unknown): { provider: AgentProviderId; on: boolean } {
+export function parseProviderUseInput(value: unknown): { provider: AgentProviderId; on: boolean } {
   if (!isDynamicRecord(value) || typeof value.on !== "boolean") throw new Error("Invalid provider switch.");
   const provider = parseProviderId(value.provider);
   if (provider === "acp") throw new Error("Custom agents do not have a built-in provider switch.");
@@ -227,6 +243,19 @@ export function parseConnectProviderAccountInput(value: unknown): ConnectProvide
 export function parseRemoveProviderAccountInput(value: unknown): RemoveProviderAccountInput {
   if (!isDynamicRecord(value)) throw new Error("Invalid provider account.");
   return { provider: parseProviderId(value.provider), accountId: requireString(value.accountId, "accountId") };
+}
+
+/** The pool switch of a provider and the accounts that the pool leaves out. */
+export function parseSetProviderAccountPoolInput(value: unknown): SetProviderAccountPoolInput {
+  if (
+    !isDynamicRecord(value) ||
+    typeof value.enabled !== "boolean" ||
+    !Array.isArray(value.leftOut) ||
+    value.leftOut.length > MAX_PROVIDER_ACCOUNTS ||
+    !value.leftOut.every(isProviderAccountId)
+  )
+    throw new Error("Invalid provider account pool.");
+  return { provider: parseProviderId(value.provider), enabled: value.enabled, leftOut: value.leftOut };
 }
 
 /** The provider's own sign-in (`default`) or an account after the first. */

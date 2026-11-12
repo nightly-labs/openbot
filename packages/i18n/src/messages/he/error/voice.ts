@@ -1,0 +1,44 @@
+import type { PartialTranslation } from "../../../message";
+import type { messages as source } from "../../en/error/voice";
+
+export const messages = {
+  // Voice transcription errors.
+  "error.voice.downloadFailed": "לא ניתן להוריד את מודל הקול. יש לנסות שוב.",
+  "error.voice.downloadStopped": "הורדת מודל הקול הופסקה.",
+  "error.voice.removeBusy": "יש להמתין לסיום תמלול הקול ואז להסיר את המודל.",
+  "error.voice.removeFailed": "לא ניתן להסיר את מודל הקול. יש לנסות שוב.",
+  "error.voice.runtimeUnavailable": "תמלול קול מקומי אינו זמין בפלטפורמה הזו.",
+  "error.voice.modelUnavailable": "מודל הקול אינו זמין.",
+  "error.voice.transcriptionTimedOut": "תמלול הקול חרג מהזמן המותר.",
+  "error.voice.prepareRequired": "תמלול קול מקומי אינו זמין. יש להריץ `bun run voice:prepare` ולהפעיל מחדש את OpenBot.",
+  "error.voice.transcriptionFailed": "OpenBot לא הצליח לתמלל את ההקלטה הזו.",
+  "error.voice.cloud.keyRequired": "יש להוסיף מפתח API של {provider} בהגדרות ← קול.",
+  "error.voice.cloud.keyRejected": "{provider} לא קיבל את מפתח ה-API. יש לבדוק את המפתח בהגדרות ← קול.",
+  "error.voice.cloud.quotaExceeded": "המכסה שלך ב-{provider} נוצלה במלואה.",
+  "error.voice.cloud.rateLimited": "{provider} עמוס. יש לנסות שוב בעוד רגע.",
+  "error.voice.cloud.termsRequired": "יש לאשר את התנאים של ElevenLabs בחשבון ElevenLabs ולנסות שוב.",
+  "error.voice.cloud.streamEnded": "זרם ההכתבה הסתיים. יש להקליט שוב.",
+  "error.voice.cloud.tooLong": "ההקלטה ארוכה מדי.",
+  "error.voice.cloud.keySaveFailed": "לא ניתן לשמור את מפתח ה-API של {provider}.",
+  "error.voice.speech.runtimeUnavailable": "דיבור מקומי אינו זמין בפלטפורמה הזו.",
+  "error.voice.speech.modelRequired": "יש להוריד את מודל הדיבור בהגדרות ← קול.",
+  "error.voice.speech.timedOut": "הקראת התשובה חרגה מהזמן המותר.",
+  "error.voice.speech.failed": "OpenBot לא הצליח להקריא את התשובה.",
+  "error.voice.recordingNotKept": "OpenBot לא הצליח לשמור את הקלטת הקול.",
+  "error.voice.live.timedOut": "הקול החי של Codex לא התחיל בזמן. יש לנסות שוב.",
+  "error.voice.live.failed": "הקול החי נעצר: {reason}",
+  "error.voice.live.disconnected": "הקול החי התנתק.",
+  "error.voice.live.hostFailed":
+    "Codex בשרת לא הצליח להפעיל את הקול החי. בקשו מהבעלים לעדכן את Codex במחשב הזה ולהיכנס עם ChatGPT, ואז נסו שוב.",
+  "error.voice.live.signIn": "יש להתחבר ל-Codex עם חשבון ChatGPT כדי להשתמש בקול חי.",
+  "error.voice.live.unavailable": "OpenAI לא הצליחה להפעיל קול חי. הבעיה היא בצד של OpenAI. יש לנסות שוב מאוחר יותר.",
+  "error.voice.live.refused":
+    "OpenAI סירבה להפעיל קול חי. יש לנסות שוב מאוחר יותר, או לכבות את הקול החי בהגדרות כדי לדבר בקול.",
+  "error.voice.live.off": "הקול החי של Codex כבוי. אפשר להפעיל אותו בהגדרות ← קול.",
+  // The user's own voice server.
+  "error.voice.server.routeOff": "שרת הקול לא הוגדר לכך. יש לבדוק את הגדרות ← קול.",
+  "error.voice.server.keyRefused": "{host} דחה את מפתח ה-API.",
+  "error.voice.server.invalidAnswer": "{host} לא שלח תשובה תואמת OpenAI.",
+  "error.voice.server.invalidAudio": "{host} שלח אודיו ש-OpenBot לא יכול להשמיע. יש להשתמש בשרת ששולח WAV.",
+  "error.voice.server.tooLarge": "התשובה מ-{host} גדולה מדי.",
+} as const satisfies PartialTranslation<typeof source>;

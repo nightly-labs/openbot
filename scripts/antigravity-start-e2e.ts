@@ -22,7 +22,7 @@ import { ConversationRuntime } from "../src/backend/agent/conversation-runtime";
 import { ProviderRuntime } from "../src/backend/agent/provider-runtime";
 import type { AgentClient, AgentProvider } from "../src/backend/agent-client";
 import { AgentStore } from "../src/backend/agent-store";
-import { type AgentCliInfo, ANTIGRAVITY_MANIFEST } from "../src/backend/cli";
+import type { AgentCliInfo } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import {
@@ -41,18 +41,26 @@ const FIRST_INSTALL_START_TIMEOUT_MS = 4_000;
 const FIRST_INSTALL_UNPACK_MS = 6_000;
 /** The long start timeout of the saved-key case, whose server never answers `authenticate`. */
 const KEY_AUTH_START_TIMEOUT_MS = 2_000;
+/** The Antigravity CLI version that the fake prints. */
+const FAKE_VERSION = "1.5.4";
 
 // `FAKE_AGY_MODE`: `hang` never answers, `crash` exits at its first request, and `slow` unpacks for
 // `FAKE_AGY_UNPACK_MS` before it reads a request, then answers as an ACP server with one model.
 // While the file `FAKE_AGY_HOLD` exists, a `session/new` after the first one, as the catalogue
 // refresh of a started process sends, waits for that file to go and writes its pid to `<file>.held`.
 // With `FAKE_AGY_KEY_AUTH=hang`, `initialize` offers the Gemini API key sign-in and `authenticate` never answers.
-// With `FAKE_AGY_SIGN_IN=wait`, `initialize` offers the Google sign-in, and `authenticate` prints Google's page, as
-// the real server does, and never answers.
+// With `FAKE_AGY_SIGN_IN=wait`, `initialize` offers the Google sign-in, and `authenticate` gives Google's page to
+// the `open` (macOS) or `xdg-open` (Linux) command on PATH, as Antigravity CLI 1.5.4 does, and never answers. The
+// fake runs only OpenBot's own opener, the first entry on PATH, so that no real browser opens.
+// `--version` prints the version, as the CLI does, and starts nothing.
 const FAKE_AGY = `#!/usr/bin/env node
 const fs = require("node:fs");
 const path = require("node:path");
 const NL = String.fromCharCode(10);
+if (process.argv[2] === "--version") {
+  process.stdout.write("${FAKE_VERSION}" + NL);
+  process.exit(0);
+}
 const temp = process.env.TMP || process.env.TEMP || process.env.TMPDIR;
 const unpacked = path.join(temp, "_MEI" + process.pid.toString(16));
 fs.mkdirSync(unpacked, { recursive: true });
@@ -75,7 +83,10 @@ function handle(message) {
   }
   if (message.method === "authenticate" && process.env.FAKE_AGY_KEY_AUTH === "hang") return;
   if (message.method === "authenticate" && process.env.FAKE_AGY_SIGN_IN === "wait") {
-    process.stderr.write("Open the following link to authenticate the ACP server: https://accounts.google.com/o/oauth2/v2/auth?state=fake" + NL);
+    const opener = path.join((process.env.PATH || "").split(path.delimiter)[0] || "", process.platform === "darwin" ? "open" : "xdg-open");
+    if (path.basename(path.dirname(opener)).startsWith("openbot-sign-in-") && fs.existsSync(opener)) {
+      require("node:child_process").spawn(opener, ["https://accounts.google.com/o/oauth2/auth?state=fake"], { stdio: "ignore" });
+    } else process.stderr.write("OpenBot's opener is not first on PATH." + NL);
     return;
   }
   if (message.method === "session/new") {
@@ -174,6 +185,8 @@ const root = await mkdtemp(join(tmpdir(), "openbot-antigravity-start-e2e-"));
 const log = join(root, "agy.jsonl");
 const report: Report = { passed: false };
 process.env.FAKE_AGY_LOG = log;
+// The driver reads and writes the sign-in in the Gemini home. Keep it off the user's `~/.gemini`.
+process.env.GEMINI_HOME = join(root, "gemini");
 
 async function starts(): Promise<StartEntry[]> {
   const text = await readFile(log, "utf8").catch(() => "");
@@ -262,21 +275,20 @@ function antigravityRow(providers: ProviderRuntime) {
   return providers.status().providers?.find((row) => row.id === ("antigravity" satisfies AgentProvider));
 }
 
-/** Writes the fake server as a managed install of version 1.2.1 under `installRoot`. */
+/** Writes the fake CLI as a managed install of version `FAKE_VERSION` under `installRoot`. */
 async function installFakeAgy(installRoot: string): Promise<string> {
-  const path = join(installRoot, "1.2.1", "bin", "agy_acp_server");
-  await mkdir(join(installRoot, "1.2.1", "bin"), { recursive: true });
-  await writeFile(join(installRoot, "1.2.1", ANTIGRAVITY_MANIFEST), JSON.stringify({ version: "1.2.1" }));
+  const path = join(installRoot, FAKE_VERSION, "bin", "antigravity");
+  await mkdir(join(installRoot, FAKE_VERSION, "bin"), { recursive: true });
   await writeFile(path, FAKE_AGY);
   await chmod(path, 0o755);
   return path;
 }
 
-const executable = join(root, "agy", "1.2.1", "bin", "agy_acp_server");
-const firstInstallExecutable = join(root, "agy-first-install", "1.2.1", "bin", "agy_acp_server");
+const executable = join(root, "agy", FAKE_VERSION, "bin", "antigravity");
+const firstInstallExecutable = join(root, "agy-first-install", FAKE_VERSION, "bin", "antigravity");
 try {
   await installFakeAgy(join(root, "agy"));
-  const cli: AgentCliInfo = { executable, version: "1.2.1", source: "managed" };
+  const cli: AgentCliInfo = { executable, version: FAKE_VERSION, source: "managed" };
 
   // 1. A process that is stopped while it unpacks: its folder is in OpenBot's root and is removed.
   process.env.FAKE_AGY_MODE = "hang";

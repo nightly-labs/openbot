@@ -91,11 +91,11 @@ jobs:
           else
             echo "docs=false" >> "$GITHUB_OUTPUT"
           fi
-          lane_unless desktop '^(apps/(auth-api|mobile|site-router|status)|docker|remote)/'
+          lane_unless desktop '^(apps/(auth-api|mobile|mobile-updates|site-router|status)|docker|remote)/'
           lane api '^(apps/(auth-api|site-router)|src/renderer|resources)/|^(apps/mobile/)?CHANGELOG\.md$'
           lane remote '^(remote|scripts)/'
           lane storybook '^(src|apps/(auth-api|status)|\.storybook|resources|marketplace|build)/'
-          lane surfaces '^(apps/(mobile|site-router|status)|remote|scripts)/'
+          lane surfaces '^(apps/(mobile|mobile-updates|site-router|status)|remote|scripts)/'
           cat "$GITHUB_OUTPUT"
 
   check:
@@ -150,6 +150,10 @@ jobs:
             if: env.CODE == 'true'
             run: bun run check:agent-context
 
+          - name: Check translated What's new notes
+            if: env.CODE == 'true'
+            run: bun scripts/whats-new-translations.ts
+
   browser:
     # The smoke test starts the real Electron binary and opens windows, so it
     # needs a display. Ubuntu runners have none, so it runs under xvfb, where
@@ -187,6 +191,9 @@ jobs:
 
       - name: Run the browser dialogs E2E
         run: xvfb-run -a bun run test:browser-dialogs
+
+      - name: Run the browser fingerprint E2E
+        run: xvfb-run -a bun run test:browser-fingerprint
 
       - name: Run the browser ambiguous targets E2E
         run: xvfb-run -a bun run test:browser-ambiguous-targets
@@ -338,6 +345,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:sign-in-relay-replay
 
+      - name: Run the MCP member access E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:mcp-member-access
+
       - name: Run the server mute and unmute E2E test
         if: ${{ !cancelled() }}
         run: bun run test:server-mute
@@ -357,6 +368,10 @@ jobs:
       - name: Run the notification summary E2E test
         if: ${{ !cancelled() }}
         run: bun run test:notification-summary
+
+      - name: Run the side thread notification and Live Activity link E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:thread-notifications
 
       - name: Run the routine pause and resume E2E test
         if: ${{ !cancelled() }}
@@ -386,6 +401,22 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:messaging-discord-access
 
+      - name: Run the Discord embeds E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:messaging-discord-embeds
+
+      - name: Run the place history E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:messaging-place-history
+
+      - name: Run the Telegram answer mentions E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:messaging-telegram-mentions
+
+      - name: Run the Slack ping reply E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:messaging-slack-ping-reply
+
       - name: Run the turn input E2E test
         if: ${{ !cancelled() }}
         run: bun run test:turn-input
@@ -414,13 +445,33 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:provider-exit-session
 
+      - name: Run the ACP subagent card E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:acp-subagents
+
+      - name: Run the Codex subagent steps E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:codex-subagent-steps
+
+      - name: Run the subagent status and failure alert E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:subagent-status
+
       - name: Run the hung Codex app-server E2E test
         if: ${{ !cancelled() }}
         run: bun run test:codex-hung-app-server
 
+      - name: Run the Codex mid-turn compaction E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:codex-midturn-compaction
+
       - name: Run the Codex missing rollout backfill E2E test
         if: ${{ !cancelled() }}
         run: bun run test:codex-missing-rollout
+
+      - name: Run the Codex idle thread release E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:codex-idle-thread-release
 
       - name: Run the Codex usage metering E2E test
         if: ${{ !cancelled() }}
@@ -429,6 +480,10 @@ jobs:
       - name: Run the Codex usage reset E2E test
         if: ${{ !cancelled() }}
         run: bun run test:codex-usage-reset
+
+      - name: Run the Codex warning banner E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:codex-warning-banner
 
       - name: Run the usage read pacing E2E test
         if: ${{ !cancelled() }}
@@ -450,6 +505,26 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:agent-channel-manage
 
+      - name: Run the agent channel creation E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:agent-channel-create
+
+      - name: Run the Library folders agent tool E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:library-folders
+
+      - name: Run the agent workflow gate E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:agent-workflow-gate
+
+      - name: Run the pinned message agent tool E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:pinned-message-agent-tool
+
+      - name: Run the messaging owner card E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:messaging-owner-card
+
       - name: Run the agent profile accounts E2E test
         if: ${{ !cancelled() }}
         run: bun run test:agent-profile-accounts
@@ -461,6 +536,14 @@ jobs:
       - name: Run the Claude usage after a resume E2E test
         if: ${{ !cancelled() }}
         run: bun run test:claude-usage-resume
+
+      - name: Run the Claude background hold at low memory E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:claude-background-hold
+
+      - name: Run the Claude turn context after a runtime refresh E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:claude-turn-context
 
       - name: Run the Claude late steer E2E test
         if: ${{ !cancelled() }}
@@ -474,6 +557,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:backup-model-failover
 
+      - name: Run the Codex empty lead turn E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:codex-empty-lead-turn
+
       - name: Run the ZIP attachment E2E test
         if: ${{ !cancelled() }}
         run: bun run test:zip-attachments
@@ -486,6 +573,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:svg-attachments
 
+      - name: Run the any file attachment E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:any-file-attachments
+
+      - name: Run the channel notifications and channel settings E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:channel-notifications
+
       - name: Run the agent MCP server tools E2E test
         if: ${{ !cancelled() }}
         run: bun run test:agent-mcp-tools
@@ -493,6 +588,10 @@ jobs:
       - name: Run the MCP sign-in client refusal E2E test
         if: ${{ !cancelled() }}
         run: bun run test:mcp-sign-in-client-refused
+
+      - name: Run the MCP sign-in client metadata document E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:mcp-sign-in-client-metadata-document
 
       - name: Run the unreadable MCP server row E2E test
         if: ${{ !cancelled() }}
@@ -514,6 +613,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:antigravity-usage-metering
 
+      - name: Run the Gemini quota failover E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:antigravity-quota-failover
+
+      - name: Run the Gemini Windows zip E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:antigravity-windows-zip
+
       - name: Run the workflow model steps E2E test
         if: ${{ !cancelled() }}
         run: bun run test:workflow-model-steps
@@ -521,6 +628,26 @@ jobs:
       - name: Run the workflow Discord E2E test
         if: ${{ !cancelled() }}
         run: bun run test:workflow-discord
+
+      - name: Run the workflow Telegram E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-telegram
+
+      - name: Run the workflow Slack E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-slack
+
+      - name: Run the workflow channel output E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-channel-output
+
+      - name: Run the workflow agent tools E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-agent-tools
+
+      - name: Run the workflow join E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-join
 
       - name: Run the Discord files to GitHub E2E test
         if: ${{ !cancelled() }}
@@ -534,6 +661,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:claude-api-key
 
+      - name: Run the Claude stored sign-in E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:claude-stored-sign-in
+
       - name: Run the Cursor usage E2E test
         if: ${{ !cancelled() }}
         run: bun run test:cursor-usage
@@ -546,9 +677,25 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:pi-sign-in-watch
 
+      - name: Run the provider launch order E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:provider-launch-order
+
       - name: Run the agent API key E2E test
         if: ${{ !cancelled() }}
         run: bun run test:agent-api-keys
+
+      - name: Run the remote connect analytics E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:remote-connect-analytics
+
+      - name: Run the memory review E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:memory-review
+
+      - name: Run the local skill revision E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:skill-revision
 
       - name: Upload the reports
         if: always()
@@ -560,11 +707,13 @@ jobs:
             .openbot-build/team-session-revoke-e2e/
             .openbot-build/sign-in-relay-paste-e2e/
             .openbot-build/sign-in-relay-replay-e2e/
+            .openbot-build/mcp-member-access-e2e/
             .openbot-build/server-mute-e2e/
             .openbot-build/desktop-notifications-e2e/
             .openbot-build/push-notification-away-e2e/
             .openbot-build/computer-activity-e2e/
             .openbot-build/notification-summary-e2e/
+            .openbot-build/thread-notifications-e2e/
             .openbot-build/routine-pause-resume-e2e/
             .openbot-build/routine-timezone-move-e2e/
             .openbot-build/routine-overnight-window-e2e/
@@ -572,14 +721,23 @@ jobs:
             .openbot-build/agent-hide-restore-e2e/
             .openbot-build/messaging-pause-resume-e2e/
             .openbot-build/messaging-discord-access-e2e/
+            .openbot-build/messaging-discord-embeds-e2e/
+            .openbot-build/messaging-place-history-e2e/
+            .openbot-build/messaging-telegram-mentions-e2e/
+            .openbot-build/messaging-slack-ping-reply-e2e/
             .openbot-build/turn-input-e2e/
             .openbot-build/zero-filled-settings-e2e/
             .openbot-build/provider-update-busy-e2e/
             .openbot-build/provider-update-after-app-upgrade-e2e/
             .openbot-build/provider-runtime-remove-e2e/
             .openbot-build/provider-exit-session-e2e/
+            .openbot-build/acp-subagents-e2e/
+            .openbot-build/codex-subagent-steps-e2e/
+            .openbot-build/subagent-status-e2e/
             .openbot-build/codex-hung-app-server-e2e/
+            .openbot-build/codex-midturn-compaction-e2e/
             .openbot-build/codex-missing-rollout-e2e/
+            .openbot-build/codex-idle-thread-release-e2e/
             .openbot-build/codex-usage-metering-e2e/
             .openbot-build/codex-usage-reset-e2e/
             .openbot-build/usage-read-pacing-e2e/
@@ -587,36 +745,57 @@ jobs:
             .openbot-build/routine-report-failure-e2e/
             .openbot-build/agent-webhook-routine-e2e/
             .openbot-build/agent-channel-manage-e2e/
+            .openbot-build/agent-channel-create-e2e/
+            .openbot-build/library-folders-e2e/
+            .openbot-build/agent-workflow-gate-e2e/
+            .openbot-build/pinned-message-agent-tool-e2e/
+            .openbot-build/messaging-owner-card-e2e/
             .openbot-build/agent-profile-accounts-e2e/
             .openbot-build/browser-profile-agents-e2e/
             .openbot-build/claude-usage-resume-e2e/
+            .openbot-build/claude-background-hold-e2e/
+            .openbot-build/claude-turn-context-e2e/
             .openbot-build/claude-late-steer-e2e/
             .openbot-build/provider-session-reuse-e2e/
             .openbot-build/backup-model-failover-e2e/
+            .openbot-build/codex-empty-lead-turn-e2e/
             .openbot-build/zip-attachment-e2e/
             .openbot-build/mp4-attachment-e2e/
             .openbot-build/svg-attachment-e2e/
+            .openbot-build/any-file-attachment-e2e/
             .openbot-build/agent-mcp-tools-e2e/
             .openbot-build/mcp-server-unreadable-row-e2e/
             .openbot-build/agent-update-agents-e2e/
             .openbot-build/antigravity-usage-e2e/
             .openbot-build/antigravity-accounts-e2e/
             .openbot-build/antigravity-usage-metering-e2e/
+            .openbot-build/antigravity-quota-failover-e2e/
             .openbot-build/workflow-model-steps-e2e/
             .openbot-build/workflow-discord-e2e/
+            .openbot-build/workflow-telegram-e2e/
+            .openbot-build/workflow-slack-e2e/
+            .openbot-build/workflow-channel-output-e2e/
+            .openbot-build/workflow-agent-tools-e2e/
+            .openbot-build/workflow-join-e2e/
             .openbot-build/discord-github-files-e2e/
             .openbot-build/opencode-usage-metering-e2e/
             .openbot-build/claude-api-key-e2e/
+            .openbot-build/claude-stored-sign-in-e2e/
             .openbot-build/cursor-usage-e2e/
             .openbot-build/opencode-go-usage-e2e/
             .openbot-build/pi-sign-in-watch-e2e/
+            .openbot-build/provider-launch-order-e2e/
             .openbot-build/agent-api-keys-e2e/
+            .openbot-build/remote-connect-analytics-e2e/
+            .openbot-build/memory-review-e2e/
+            .openbot-build/skill-revision-e2e.json
           if-no-files-found: ignore
 
   provider-fakes-e2e:
     # Runs the real ACP provider drivers (custom agents, OpenCode, Cline) over fake agents from
     # `scripts/provider-fakes/`. The fakes speak ACP on stdio as the released CLIs do, or replay a
     # recorded transcript of a released CLI, so the job needs no provider account, network or display.
+    # It also runs the agent database host start test, which starts the real host with Node.
     name: Provider fakes E2E
     needs: detect
     if: needs.detect.outputs.desktop == 'true'
@@ -675,6 +854,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:acp-turn-stall
 
+      - name: Run the agent database host start E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:agent-database-host-start
+
       - name: Run the ACP instructions once E2E test
         if: ${{ !cancelled() }}
         run: bun run test:acp-instructions-once
@@ -687,9 +870,21 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:grok-steer
 
+      - name: Run the Grok question E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:grok-question
+
+      - name: Run the Grok partial model list E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:grok-partial-model-list
+
       - name: Run the Pi steer E2E test
         if: ${{ !cancelled() }}
         run: bun run test:pi-steer
+
+      - name: Run the Pi idle release E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:pi-idle-release
 
       - name: Run the Muse instructions once E2E test
         if: ${{ !cancelled() }}
@@ -752,10 +947,14 @@ jobs:
             .openbot-build/acp-flavor-e2e/
             .openbot-build/acp-mcp-server-names-e2e/
             .openbot-build/acp-turn-stall-e2e/
+            .openbot-build/agent-database-host-start-e2e/
             .openbot-build/acp-instructions-once-e2e/
             .openbot-build/acp-audio-input-e2e/
             .openbot-build/grok-steer-e2e/
+            .openbot-build/grok-question-e2e/
+            .openbot-build/grok-partial-model-list-e2e/
             .openbot-build/pi-steer-e2e/
+            .openbot-build/pi-idle-release-e2e/
             .openbot-build/muse-instructions-once-e2e/
             .openbot-build/provider-conformance-e2e/
             .openbot-build/opencode-expired-key-e2e/
@@ -807,6 +1006,9 @@ jobs:
           - name: Typecheck site router
             run: bun run typecheck:sites
 
+          - name: Typecheck mobile update server
+            run: bun run typecheck:updates
+
           - name: Typecheck remote API
             run: bun run typecheck:remote
 
@@ -856,6 +1058,97 @@ jobs:
           name: mobile-share-sender-e2e
           path: .openbot-build/mobile-share-sender-e2e/report.json
           if-no-files-found: ignore
+
+  mobile-ota-e2e:
+    # Runs the update server of the mobile app on a local bucket and the real publish commands, then
+    # asks for updates as a phone does. It needs no device and no external service.
+    name: Mobile update server E2E
+    needs: detect
+    if: needs.detect.outputs.surfaces == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: ignore-scripts
+
+      - name: Run the mobile update server E2E test
+        run: bun run test:mobile-ota
+
+      # The release notes of an update, and the store release steps that must ignore its section.
+      # The notes test makes commits in a temporary repository.
+      - name: Run the mobile OTA release notes E2E test
+        env:
+          GIT_AUTHOR_NAME: ci
+          GIT_AUTHOR_EMAIL: ci@example.invalid
+          GIT_COMMITTER_NAME: ci
+          GIT_COMMITTER_EMAIL: ci@example.invalid
+        run: bun run test:mobile-ota-notes
+
+      - name: Run the mobile release announcement E2E test
+        run: bun run test:mobile-release-announcement
+
+      - name: Upload the mobile update E2E reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mobile-ota-e2e
+          path: |
+            .openbot-build/mobile-ota-e2e/report.json
+            .openbot-build/mobile-ota-release-notes-e2e.json
+            .openbot-build/mobile-release-announcement-e2e.json
+          if-no-files-found: ignore
+
+  mobile-runtime:
+    # Says when a pull request makes a new native runtime version of the mobile app. Such a change
+    # reaches phones only with a store build, and after it `main` cannot go over the air to the
+    # current store build. It is a notice, not a required check: `bun run mobile:ota:publish`
+    # refuses such a commit in any case. See apps/mobile/README.md#over-the-air-updates.
+    name: Mobile runtime version
+    needs: detect
+    if: github.event_name == 'pull_request' && needs.detect.outputs.surfaces == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The merge commit and the base branch commit, its first parent.
+          fetch-depth: 2
+
+      # Most pull requests change no file that the native build reads. They need no comparison.
+      - name: Find changes that can reach the native build
+        id: inputs
+        shell: bash
+        run: |
+          if git diff --name-only --no-renames HEAD^1 HEAD | grep -Eq '^(apps/mobile/(app\.json|app\.config\.js|eas\.json|package\.json|fingerprint\.config\.js|\.gitignore|modules/|plugins/|certs/|assets/|src/features/share/extension/)|patches/|bun\.lock$|scripts/mobile-share-sender\.ts$)'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Mobile runtime: no change. No file that the native build reads changed." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Set up Bun
+        if: steps.inputs.outputs.changed == 'true'
+        uses: ./.github/actions/setup-bun
+        with:
+          install: ignore-scripts
+
+      - name: Install the base commit
+        if: steps.inputs.outputs.changed == 'true'
+        shell: bash
+        run: |
+          git worktree add --detach "$RUNNER_TEMP/base" HEAD^1
+          cd "$RUNNER_TEMP/base"
+          bun install --frozen-lockfile --ignore-scripts
+
+      - name: Compare the runtime versions
+        if: steps.inputs.outputs.changed == 'true'
+        run: bun scripts/mobile-ota.ts compare-runtime --base-dir "$RUNNER_TEMP/base"
 
   api:
     # `check:api` ends with `api:build:check`, the preview build of the Worker. For a pull request
@@ -939,7 +1232,7 @@ jobs:
     # fails this one.
     name: All required checks pass
     if: always()
-    needs: [detect, check, browser, tests-desktop, signal-e2e, automation-cli-e2e, team-api-routes-e2e, reverse-actions-e2e, provider-fakes-e2e, surfaces, mobile-share-sender-e2e, api, storybook]
+    needs: [detect, check, browser, tests-desktop, signal-e2e, automation-cli-e2e, team-api-routes-e2e, reverse-actions-e2e, provider-fakes-e2e, surfaces, mobile-share-sender-e2e, mobile-ota-e2e, api, storybook]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -1023,6 +1316,7 @@ jobs:
           APNS_PRIVATE_KEY: ${{ secrets.APNS_PRIVATE_KEY }}
           APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}
           FCM_SERVICE_ACCOUNT: ${{ secrets.FCM_SERVICE_ACCOUNT }}
+          COMPANY_SIGN_IN_SECRET: ${{ secrets.COMPANY_SIGN_IN_SECRET }}
         run: |
           secrets_path="$RUNNER_TEMP/openbot-worker-secrets.json"
           umask 077
@@ -1068,6 +1362,14 @@ jobs:
             }
             const githubAppKey = process.env.OPENBOT_GITHUB_APP_PRIVATE_KEY?.trim();
             if (githubAppKey) optional.GITHUB_APP_PRIVATE_KEY = githubAppKey;
+            // Company sign-in stays off until it is set. It encrypts the stored client secrets, so it never changes.
+            const companySignInSecret = process.env.COMPANY_SIGN_IN_SECRET?.trim();
+            if (companySignInSecret) {
+              if (new TextEncoder().encode(companySignInSecret).byteLength < 32) {
+                throw new Error("COMPANY_SIGN_IN_SECRET must have at least 32 bytes.");
+              }
+              optional.COMPANY_SIGN_IN_SECRET = companySignInSecret;
+            }
             // The Android notification relay stays off until the Firebase service account key is set.
             const fcmServiceAccount = process.env.FCM_SERVICE_ACCOUNT?.trim();
             if (fcmServiceAccount) {

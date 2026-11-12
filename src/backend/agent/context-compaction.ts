@@ -22,8 +22,13 @@ interface ThreadContextBudget {
   lastCompactedTokens: number | null;
   /** Compactions in a row after which the session still filled `INEFFECTIVE_COMPACTION_SHARE` of its window. */
   ineffectiveCompactions: number;
-  /** A rotation made this session, so its first usage tells whether the rotation helped. */
-  rotated: boolean;
+  /** Compactions in a row that the provider ran or refused and that did not complete. */
+  failedCompactions: number;
+  /**
+   * A compaction or a rotation ended and no usage came since, so the next usage tells whether it
+   * helped. A new turn does not end the wait: a turn that fails after retries reports no usage (#4819).
+   */
+  awaitingUsage: boolean;
 }
 
 const logger = createOpenBotLogger("context-compaction");
@@ -32,11 +37,27 @@ const CONTEXT_COMPACTION_THRESHOLD = 0.8;
 /**
  * A session that a compaction leaves at this share of its window holds mostly what no compaction
  * removes: tool schemas, instructions, and the newest messages. Codex compacted such a session five
- * times in five minutes, and each tool result was cut off (#3905).
+ * times in five minutes, and each tool result was cut off (#3905). A session left at the threshold or
+ * above compacts again after a small growth or a retry, so a share between the threshold and 90%
+ * compacted it without end (#5150). A session left just below the threshold reached it again after
+ * one turn: one chat compacted 25 times in 27 minutes.
  */
-const INEFFECTIVE_COMPACTION_SHARE = 0.9;
+const INEFFECTIVE_COMPACTION_SHARE = CONTEXT_COMPACTION_THRESHOLD - 0.1;
 /** After this many such compactions in a row, OpenBot stops asking for more and tells the user. */
 const INEFFECTIVE_COMPACTION_LIMIT = 2;
+/**
+ * After this many failed compactions in a row, OpenBot stops asking for more and tells the user. A
+ * failed compaction leaves the session full, and each one sends the whole session to the model: one
+ * session compacted every 19 seconds for 7 hours and used up the plan limit.
+ */
+const FAILED_COMPACTION_LIMIT = 2;
+
+/** Whether OpenBot asks for no more automatic compactions of this session. "Compact now" still works. */
+function stopped(budget: ThreadContextBudget): boolean {
+  return (
+    budget.ineffectiveCompactions >= INEFFECTIVE_COMPACTION_LIMIT || budget.failedCompactions >= FAILED_COMPACTION_LIMIT
+  );
+}
 /**
  * A provider that retries a request of a session at this share of its window can be refused for the
  * request size, and it sends the same request again until the turn fails (#4374). The next turn of
@@ -114,8 +135,11 @@ export class ContextCompaction {
   readonly #rotatesSession: ContextCompactionOptions["rotatesSession"];
   readonly #isStopping: () => boolean;
   readonly #budgets = new Map<string, ThreadContextBudget>();
-  /** The agent of each provider thread that compacts, and the client that runs it once `request` sends it. */
-  readonly #compacting = new Map<string, { agentId: string; client: AgentClient | null }>();
+  /**
+   * The agent of each provider thread that compacts, and the client that runs it once `request` sends it.
+   * `turnId`: the turn whose end made the `reserve` hold, until `request` takes the hold.
+   */
+  readonly #compacting = new Map<string, { agentId: string; client: AgentClient | null; turnId: string | null }>();
   readonly #refusals = new Map<string, RefusalHold>();
   readonly #timeoutMs: number;
   /** How long a started compaction runs before OpenBot stops it. */
@@ -124,6 +148,11 @@ export class ContextCompaction {
   readonly #graceMs: number;
   readonly #display = new Map<string, Omit<AgentContextState, "agentId" | "threadId">>();
   readonly #awaitingPostCompaction = new Set<string>();
+  /**
+   * Sessions in a compaction whose usage OpenBot compares: until it ends, Codex 0.167.0 reports an
+   * estimate of its result, which can be much smaller than the next request (#6845).
+   */
+  readonly #estimating = new Set<string>();
   readonly #durations = new Map<string, number>();
   readonly #changed: () => void;
   readonly #compacted: (threadId: string) => void;
@@ -143,6 +172,11 @@ export class ContextCompaction {
     this.#rotateSession = options.rotateSession;
     this.#rotatesSession = options.rotatesSession;
     this.#isStopping = options.isStopping;
+  }
+
+  /** How long a started compaction runs before OpenBot stops it. */
+  get runTimeoutMs(): number {
+    return this.#runTimeoutMs;
   }
 
   /** Only personal sessions appear in the desktop snapshot; execution threads remain separate. */
@@ -247,6 +281,8 @@ export class ContextCompaction {
       delete compaction.afterTokens;
     } else if (before !== undefined) compaction.beforeTokens = before;
     this.#awaitingPostCompaction.delete(threadId);
+    if (tokenComparison === "context" && status === "running") this.#estimating.add(threadId);
+    else this.#estimating.delete(threadId);
     if (tokenComparison === "context" && status === "completed" && compaction.afterTokens === undefined)
       this.#awaitingPostCompaction.add(threadId);
     if (status === "completed" && previous?.status === "running")
@@ -285,6 +321,11 @@ export class ContextCompaction {
     const contextWindow = finiteNumberOrNull(usage?.modelContextWindow);
     if (usedTokens === null || usedTokens < 0 || contextWindow === null || contextWindow <= 0) return;
 
+    // Only the next request tells whether the compaction helped. The estimate reset the count of
+    // compactions that left the session almost full, so each turn compacted again. The display still
+    // shows it.
+    if (this.#estimating.has(threadId)) return;
+
     const budget = this.#budgets.get(threadId) ?? {
       usedTokens,
       contextWindow,
@@ -293,26 +334,31 @@ export class ContextCompaction {
       compactionTurnId: null,
       lastCompactedTokens: null,
       ineffectiveCompactions: 0,
-      rotated: false,
+      failedCompactions: 0,
+      awaitingUsage: false,
     };
     budget.usedTokens = usedTokens;
     budget.contextWindow = contextWindow;
     this.#budgets.set(threadId, budget);
-    // `observeUsage` runs next and takes the mark, so the first usage after a compaction is read here.
-    const afterCompaction = budget.rotated || this.#awaitingPostCompaction.has(threadId);
-    budget.rotated = false;
+    // The display mark also covers a compaction that ended in this turn before the session had a
+    // budget. `observeUsage` runs next and takes that mark, so it is read here first.
+    const afterCompaction = budget.awaitingUsage || this.#awaitingPostCompaction.has(threadId);
+    budget.awaitingUsage = false;
     if (afterCompaction) this.#checkCompaction(budget, agentId);
 
     const pressured = usedTokens / contextWindow >= CONTEXT_COMPACTION_THRESHOLD;
     if (!pressured) {
       budget.pending = false;
       budget.lastCompactedTokens = null;
-      budget.ineffectiveCompactions = 0;
+      budget.failedCompactions = 0;
+      // A session that a compaction left just below the threshold keeps its count. One that became
+      // smaller in another way, such as with fewer tools, compacts again.
+      if (usedTokens / contextWindow < INEFFECTIVE_COMPACTION_SHARE) budget.ineffectiveCompactions = 0;
       return;
     }
     if (budget.phase !== "idle") return;
-    // Another compaction leaves the same fixed part, so it costs a turn and removes nothing.
-    if (budget.ineffectiveCompactions >= INEFFECTIVE_COMPACTION_LIMIT) {
+    // Another compaction leaves the same fixed part, or fails again, so it costs a turn and removes nothing.
+    if (stopped(budget)) {
       budget.pending = false;
       return;
     }
@@ -334,7 +380,9 @@ export class ContextCompaction {
       !budget ||
       budget.contextWindow <= 1 ||
       budget.usedTokens / budget.contextWindow < RETRY_COMPACTION_SHARE ||
-      budget.ineffectiveCompactions >= INEFFECTIVE_COMPACTION_LIMIT
+      stopped(budget) ||
+      // Nothing tells yet whether the last compaction helped. Each turn compacted again (#4819).
+      budget.awaitingUsage
     )
       return false;
     if (budget.phase === "idle") budget.pending = true;
@@ -354,7 +402,7 @@ export class ContextCompaction {
       budget.pending ||
       budget.phase !== "idle" ||
       budget.contextWindow <= 1 ||
-      budget.ineffectiveCompactions >= INEFFECTIVE_COMPACTION_LIMIT ||
+      stopped(budget) ||
       // The usage is from before the last compaction: the provider reports the new size later.
       (budget.lastCompactedTokens !== null && budget.usedTokens <= budget.lastCompactedTokens)
     )
@@ -396,6 +444,16 @@ export class ContextCompaction {
       );
   }
 
+  /** Counts a compaction that did not complete, and tells the user once the count reaches the limit. */
+  #countFailure(threadId: string, agentId: string): void {
+    const budget = this.#budgets.get(threadId);
+    if (!budget) return;
+    budget.failedCompactions += 1;
+    logger.warn("A compaction failed.", { failedCompactions: budget.failedCompactions });
+    if (budget.failedCompactions === FAILED_COMPACTION_LIMIT)
+      this.#emitError("context_compaction_stopped", sourceText("error.backend.contextCompactionStopped"), agentId);
+  }
+
   contextInputCharacters(threadId: string): number {
     const budget = this.#budgets.get(threadId);
     // A session that `#rotate` started holds a window of 1 until its first usage report: no window is
@@ -403,8 +461,11 @@ export class ContextCompaction {
     return budget && budget.contextWindow > 1 ? Math.min(120_000, Math.floor(budget.contextWindow * 2)) : 120_000;
   }
 
-  /** `manual`: the user asked, so the thread compacts below the threshold too. */
-  reserve(agentId: string, threadId: string, manual = false): boolean {
+  /**
+   * `manual`: the user asked, so the thread compacts below the threshold too.
+   * `turnId`: the turn whose end reserves, so that only that turn can drop the hold.
+   */
+  reserve(agentId: string, threadId: string, manual = false, turnId: string | null = null): boolean {
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     const mode = agent ? this.#providers.clientForAgent(agent)?.contextCompaction : undefined;
     if (!agent || !compactsOnRequest(mode)) return false;
@@ -414,9 +475,18 @@ export class ContextCompaction {
       return false;
     }
     budget.phase = "requested";
-    this.#compacting.set(threadId, { agentId, client: null });
+    this.#compacting.set(threadId, { agentId, client: null, turnId });
     this.observeCompaction(threadId, "running");
     return true;
+  }
+
+  /**
+   * Ends a hold that `reserve` made at the end of this turn and that `request` did not take: the work
+   * between them failed. Only `request` arms a deadline, so the hold stayed until a restart (#4960).
+   */
+  dropReservation(agentId: string, threadId: string, turnId: string): void {
+    const compaction = this.#compacting.get(threadId);
+    if (compaction?.turnId === turnId && compaction.agentId === agentId) this.#abandon(agentId, threadId);
   }
 
   readonly request = Effect.fn("ContextCompaction.request")(function* (
@@ -424,6 +494,8 @@ export class ContextCompaction {
     agentId: string,
     threadId: string,
   ) {
+    const reservation = this.#compacting.get(threadId);
+    if (reservation) reservation.turnId = null;
     const budget = this.#budgets.get(threadId);
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     const client = agent ? this.#providers.clientForAgent(agent) : null;
@@ -442,7 +514,7 @@ export class ContextCompaction {
       return;
     }
 
-    this.#compacting.set(threadId, { agentId, client });
+    this.#compacting.set(threadId, { agentId, client, turnId: null });
     // A `request` compaction runs inside the request, so it starts now and the request waits as long.
     const runsInRequest = client.contextCompaction === "request";
     this.#armDeadline(agentId, threadId, client, runsInRequest ? this.#runTimeoutMs : this.#timeoutMs);
@@ -471,6 +543,8 @@ export class ContextCompaction {
             if (budget.phase === "running" || budget.phase === "stopping") return;
             budget.lastCompactedTokens = budget.usedTokens;
             this.#emitError("context_compaction_failed", failure.cause, agentId);
+            // After the deadline abandoned it, the phase is idle and the deadline counted it.
+            if (budget.phase === "requested") this.#countFailure(threadId, agentId);
             this.observeCompaction(threadId, "failed");
             this.#release(agentId, threadId);
             this.#scheduleDrain(agentId);
@@ -509,15 +583,20 @@ export class ContextCompaction {
     if (!budget) return;
     budget.pending = false;
     budget.lastCompactedTokens = budget.usedTokens;
+    budget.awaitingUsage = true;
   }
 
   finish(agentId: string, threadId: string, status: string): void {
     const budget = this.#budgets.get(threadId);
+    // Not in `markCompacted`: Codex can complete the compaction item and still fail the turn.
+    if (budget && status === "completed") budget.failedCompactions = 0;
     if (budget && status !== "completed") {
       budget.lastCompactedTokens = budget.usedTokens;
-      // A compaction that the deadline stopped was already reported as timed out.
-      if (budget.phase !== "stopping")
+      // A compaction that the deadline stopped was already reported as timed out, and counted.
+      if (budget.phase !== "stopping") {
         this.#emitError("context_compaction_failed", `Codex context compaction ended with status ${status}.`, agentId);
+        this.#countFailure(threadId, agentId);
+      }
     }
     this.observeCompaction(threadId, status === "completed" ? "completed" : "failed");
     this.#release(agentId, threadId);
@@ -530,6 +609,7 @@ export class ContextCompaction {
     const displayed = this.#display.delete(threadId);
     this.#durations.delete(threadId);
     this.#awaitingPostCompaction.delete(threadId);
+    this.#estimating.delete(threadId);
     if (displayed) this.#emitChanged();
     this.#clearTimer(threadId);
   }
@@ -592,6 +672,7 @@ export class ContextCompaction {
     this.#display.clear();
     this.#durations.clear();
     this.#awaitingPostCompaction.clear();
+    this.#estimating.clear();
   }
 
   /**
@@ -638,6 +719,7 @@ export class ContextCompaction {
       Effect.catch((failure) =>
         Effect.sync(() => {
           this.#emitError("context_compaction_failed", failure.cause, agentId);
+          this.#countFailure(threadId, agentId);
           return undefined;
         }),
       ),
@@ -661,7 +743,8 @@ export class ContextCompaction {
         compactionTurnId: null,
         lastCompactedTokens: compactedTokens,
         ineffectiveCompactions: this.#budgets.get(threadId)?.ineffectiveCompactions ?? 0,
-        rotated: true,
+        failedCompactions: 0,
+        awaitingUsage: true,
       });
     // A session that was not replaced keeps its budget; the growth rule stops an immediate retry.
     const budget = this.#budgets.get(threadId);
@@ -683,7 +766,11 @@ export class ContextCompaction {
         "Codex context compaction timed out; queued work will continue.",
         agentId,
       );
+      this.#countFailure(threadId, agentId);
       const budget = this.#budgets.get(threadId);
+      // As after the other failures, the growth rule stops an immediate retry. Without it, the next
+      // message asked for a new compaction while Codex still ran the one that ignored the stop.
+      if (budget) budget.lastCompactedTokens = budget.usedTokens;
       const turnId = budget?.compactionTurnId;
       if (budget?.phase === "running" && turnId) this.#stop(agentId, threadId, client, turnId);
       else this.#abandon(agentId, threadId);

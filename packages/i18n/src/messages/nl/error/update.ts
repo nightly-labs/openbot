@@ -26,6 +26,8 @@ export const messages = {
     "Er draait nog een ander OpenBot-proces in dit gebruikersaccount. Stop het en installeer de update dan opnieuw.",
   "error.update.siblingCheckFailed":
     "Kan andere OpenBot-sessies niet controleren. Probeer het opnieuw voordat je installeert.",
+  "error.update.readOnlyLocation":
+    "OpenBot kan vanaf deze locatie geen updates installeren. Sluit OpenBot af. Sleep OpenBot in de Finder naar de map Apps (staat het er al, sleep het er dan uit en weer in). Open OpenBot daarna en installeer de update opnieuw.",
   "error.update.remoteDisabled": "Updates door serverbeheerders staan uit op deze computer.",
   "error.update.restartStarted": "OpenBot herstart al om de update te installeren.",
   "error.update.alreadyRestarting": "OpenBot herstart al.",

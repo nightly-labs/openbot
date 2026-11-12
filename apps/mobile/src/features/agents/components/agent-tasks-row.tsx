@@ -1,8 +1,10 @@
 import { useNavigation } from "expo-router";
 import { StackActions } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
+import ListChecks from "lucide-react-native/icons/list-checks";
 import { useOpenAgentTasks } from "@/features/chat/components/use-open-agent-tasks";
 import { SettingsRow } from "@/features/settings/components/settings-content";
+import { RowIcon } from "@/features/settings/components/settings-row-icon";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { haptics } from "@/shared/lib/haptics";
@@ -25,7 +27,8 @@ export function AgentTasksRow({ agent }: { agent: MobileAgent }) {
   if (!supported || !sheetStack) return null;
   return (
     <SettingsRow
-      supportingText={open.length > 0 ? format.number(open.length) : undefined}
+      leading={<RowIcon icon={ListChecks} />}
+      value={open.length > 0 ? format.number(open.length) : undefined}
       onPress={() => {
         void haptics.impact("soft");
         sheetStack.dispatch(StackActions.replace(TASKS_ROUTE, { serverId: agent.serverId, agentId: agent.id }));

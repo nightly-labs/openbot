@@ -6,8 +6,10 @@ import { useThemeColor } from "heroui-native/hooks";
 import { useEffect } from "react";
 import { View } from "react-native";
 
+import { useTextScale } from "@/features/settings/model/text-size-store";
 import type { SheetFormFieldProps } from "@/shared/components/sheet-form-field.types";
 import { APP_FONT } from "@/shared/lib/app-font";
+import { layoutDirection, textDirection } from "@/shared/lib/text-direction";
 
 export function SheetFormField({
   autoCapitalize,
@@ -15,12 +17,14 @@ export function SheetFormField({
   autoFocus,
   editable,
   hint,
+  error,
   trailing,
   inputMode,
   isRequired = false,
   label,
   maxLength,
   multiline = false,
+  tall = false,
   appearance = "default",
   hideLabel = false,
   textAlign,
@@ -31,12 +35,16 @@ export function SheetFormField({
   secureTextEntry,
   value,
 }: SheetFormFieldProps) {
-  const [foreground, muted, border] = useThemeColor(["foreground", "muted", "border"]);
+  const [foreground, muted, border, danger] = useThemeColor(["foreground", "muted", "border", "danger"]);
+  // The SwiftUI field is not a React Native `Text`, so it takes the text size of the app here.
+  const textScale = useTextScale();
   const nativeValue = useNativeState(value);
   useEffect(() => {
     nativeValue.set(value);
   }, [nativeValue, value]);
-  const height = multiline ? 108 : 54;
+  const lines = multiline ? (tall ? 14 : 4) : 1;
+  // A tall field takes the height of its lines, so the lines fill it.
+  const height = tall && multiline ? undefined : multiline ? 108 : 54;
 
   return (
     <View className="gap-2">
@@ -49,22 +57,28 @@ export function SheetFormField({
       <View
         className="bg-grouped"
         style={{
-          borderColor: border,
+          borderColor: error ? danger : border,
           borderCurve: "continuous",
           borderRadius: 16,
-          borderWidth: appearance === "soft" ? 0 : 1,
+          borderWidth: appearance === "soft" && !error ? 0 : 1,
           height,
           overflow: "hidden",
           flexDirection: "row",
           alignItems: "center",
         }}
       >
-        <Host ignoreSafeArea="all" style={{ height, flex: 1 }}>
+        <Host
+          ignoreSafeArea="all"
+          matchContents={height === undefined ? { vertical: true } : undefined}
+          style={{ height, flex: 1 }}
+        >
           <TextInput
             modifiers={[accessibilityLabel(label)]}
             multiline={multiline}
-            numberOfLines={multiline ? 4 : 1}
-            textAlign={textAlign}
+            numberOfLines={lines}
+            // SwiftUI aligns to the leading or trailing side of the layout. Text in the other
+            // direction than the layout goes to the trailing side.
+            textAlign={textAlign ?? (textDirection(value, layoutDirection()) === layoutDirection() ? "left" : "right")}
             autoCapitalize={autoCapitalize}
             autoCorrect={autoCorrect}
             autoFocus={autoFocus}
@@ -76,8 +90,10 @@ export function SheetFormField({
             returnKeyType={returnKeyType}
             secureTextEntry={secureTextEntry}
             selectionColor={foreground}
-            style={{ height, paddingHorizontal: 16 }}
-            textStyle={{ color: String(foreground), fontFamily: APP_FONT, fontSize: 16 }}
+            style={
+              height === undefined ? { paddingHorizontal: 16, paddingVertical: 12 } : { height, paddingHorizontal: 16 }
+            }
+            textStyle={{ color: String(foreground), fontFamily: APP_FONT, fontSize: 16 * textScale }}
             value={nativeValue}
             onChangeText={onChangeText}
             onSubmitEditing={onSubmitEditing}
@@ -85,6 +101,13 @@ export function SheetFormField({
         </Host>
         {trailing}
       </View>
+      {error ? (
+        <View className="px-4">
+          <Typography.Paragraph type="body-xs" accessibilityRole="alert" className="text-danger-text">
+            {error}
+          </Typography.Paragraph>
+        </View>
+      ) : null}
       {hint ? (
         <View className="px-1">
           <Typography.Paragraph type="body-xs" className="text-text-secondary">

@@ -46,7 +46,8 @@ export async function runBitwardenBrowserSmoke(browser: BrowserHost): Promise<vo
           username: "fixture@example.test",
           password: PASSWORD,
           totp: "fixture-seed",
-          uris: [{ uri: ORIGIN, match: 0 }],
+          // A sibling host with no scheme and the default rule: Bitwarden matches the registrable domain.
+          uris: [{ uri: "accounts.openbot.test", match: null }],
         },
       };
       return JSON.stringify(args[1] === "items" ? [item] : item);

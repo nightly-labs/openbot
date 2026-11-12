@@ -102,9 +102,8 @@ export function StoredFile({
   onChanged: () => void;
 }) {
   const { t, format } = useText();
-  const { deleteStoredFile } = useMobileWorkspaceActions();
   const danger = useThemeColor("danger");
-  const [deleting, setDeleting] = useState(false);
+  const { deleting, confirmDelete } = useStoredFileDelete(serverId, file, onChanged);
   const image = showsAsImage(file);
   const missing = file.status === "missing";
   const attachment = useAttachmentFile(serverId, file, image && !missing);
@@ -117,6 +116,45 @@ export function StoredFile({
   ]
     .filter(Boolean)
     .join(" · ");
+
+  return (
+    <SettingsRow
+      disclosure={false}
+      disabled={deleting}
+      leading={<AttachmentThumbnail name={file.name} uri={image ? attachment.uri : null} />}
+      supportingText={attachment.busy || preview.opening ? t("mobile.agent.files.downloading") : details}
+      trailing={
+        canDelete ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t(missing ? "mobile.agent.files.removeNamed" : "mobile.agent.files.deleteNamed", {
+              name: file.name,
+            })}
+            accessibilityState={{ disabled: deleting }}
+            disabled={deleting}
+            hitSlop={8}
+            onPress={confirmDelete}
+          >
+            <Trash2 size={18} color={String(danger)} />
+          </Pressable>
+        ) : undefined
+      }
+      onPress={missing ? undefined : preview.kind ? preview.open : attachment.share}
+    >
+      <Typography numberOfLines={1}>{file.name}</Typography>
+    </SettingsRow>
+  );
+}
+
+/**
+ * Asks before it deletes a stored file from the host, or removes the record of a file that is gone.
+ * It measures again after the deletion, whether it succeeded or not.
+ */
+export function useStoredFileDelete(serverId: string, file: StoredFileRow, onChanged: () => void) {
+  const { t } = useText();
+  const { deleteStoredFile } = useMobileWorkspaceActions();
+  const [deleting, setDeleting] = useState(false);
+  const missing = file.status === "missing";
 
   function confirmDelete() {
     Alert.alert(
@@ -155,31 +193,5 @@ export function StoredFile({
     );
   }
 
-  return (
-    <SettingsRow
-      disclosure={false}
-      disabled={deleting}
-      leading={<AttachmentThumbnail name={file.name} uri={image ? attachment.uri : null} />}
-      supportingText={attachment.busy || preview.opening ? t("mobile.agent.files.downloading") : details}
-      trailing={
-        canDelete ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t(missing ? "mobile.agent.files.removeNamed" : "mobile.agent.files.deleteNamed", {
-              name: file.name,
-            })}
-            accessibilityState={{ disabled: deleting }}
-            disabled={deleting}
-            hitSlop={8}
-            onPress={confirmDelete}
-          >
-            <Trash2 size={18} color={String(danger)} />
-          </Pressable>
-        ) : undefined
-      }
-      onPress={missing ? undefined : preview.kind ? preview.open : attachment.share}
-    >
-      <Typography numberOfLines={1}>{file.name}</Typography>
-    </SettingsRow>
-  );
+  return { deleting, confirmDelete };
 }

@@ -111,7 +111,8 @@ A socket with a Discord route gets a `discord-session` token and the list of the
 bearer of its calls to `POST /v1/discord/api`: post, edit or delete a message, add or remove a
 reaction, read the messages after one message, read a member or channel name, list the guild's roles, answer a button press,
 and upload one file of at most 10 MB. Signal makes each call with the bot token, only in a guild that
-is routed to that socket, and only in a channel of that guild. No post can ping anyone. The token is
+is routed to that socket, and only in a channel of that guild. Only a new text post can ping, and only
+a user that it mentions, never a role or `@everyone`. The token is
 valid while the socket is open.
 
 So the answers and files of Discord conversations pass through Signal. Signal does not store them or
@@ -161,7 +162,9 @@ until the host sends `queued-delivery-ack`. While a host has kept events, Signal
 again once a minute, because a start can fail after the account service answered. A host that
 sent no key gets nothing kept. A restart of Signal loses the queue and the keys: until a sleeping
 host connects again, its events start it but are not kept. Signal remembers at most 100,000 keys
-and 100,000 route answers, and drops the oldest first. Signal names the
+and 100,000 route answers, and drops the oldest first. A generic webhook for a route with no socket
+starts a sleeping hosted server too, at most once in 30 minutes for each host, but Signal keeps
+nothing and answers 503: only the host can check the signature, and the sender sends again. Signal names the
 `ingress-queue` capability in `ready` only when the account service answered `/v2/remote/route-wake`
 when Signal started: only then does a hosted server with a live connection sleep. Deploy the account
 service before Signal.
@@ -171,7 +174,10 @@ service before Signal.
 - Linux with Docker Engine and Docker Compose.
 - A static public IPv4 address.
 - `signal.openbot.run` and `turn.openbot.run` records in DNS only mode.
-- Open ports TCP 443, TCP/UDP 3478, TCP 5349 and UDP 49152-65535.
+- Open ports TCP 443, TCP/UDP 3478, TCP 5349 and UDP 16384-65535 (the coturn relay range). With
+  ufw: `ufw allow 16384:65535/udp comment 'OpenBot TURN relay UDP'`. coturn uses host networking,
+  so ufw applies to it. Without this rule, the firewall drops the first packets that a peer sends to
+  a relay address, and relay connections become slow or fail.
 - A Cloudflare token scoped to DNS edit for the `openbot.run` zone.
 
 The `signal.openbot.run` and `turn.openbot.run` records must be in **DNS only** mode. Do not enable the
@@ -181,6 +187,18 @@ If you already run a reverse proxy on port `443`, set `REMOTE_SIGNAL_BIND_ADDRES
 `REMOTE_SIGNAL_PUBLIC_PORT=8081`, `REMOTE_SIGNAL_PORT=8081` and `REMOTE_TLS_DISABLED=true`. The reverse proxy
 must terminate TLS and forward the WebSocket to `http://127.0.0.1:8081`. Also set
 `REMOTE_TRUST_PROXY=true` so the IP limits use the client address from `X-Forwarded-For`.
+
+Each Signal socket uses two Nginx connections: one from the client and one to Signal. The Nginx
+default of 768 connections for each worker holds only about 12,000 sockets on a 32-core machine, less
+than one machine must hold after a failover. Set these in `/etc/nginx/nginx.conf`, and add `reuseport`
+to the `listen 443` lines of the Signal server, so that new sockets go to all workers:
+
+```nginx
+worker_rlimit_nofile 65535;
+events {
+  worker_connections 8192;
+}
+```
 
 The configuration in `nginx/signal.openbot.run.conf` uses the certificate from the ACME volume. Install
 `openbot-remote-nginx-reload.path` and `openbot-remote-nginx-reload.service` into `/etc/systemd/system/` as
@@ -269,8 +287,17 @@ Signal picks then, and restarts ICE. `/metrics` shows the last probe of each
 relay as `openbot_remote_turn_relay_available{host="<relay>"}`. `/health/turn` still reports only the
 relay of `TURN_HOST`; the Signal on the machine of each other relay reports that relay.
 
-Production uses `turn2.openbot.run` on the standby host as the second relay; see
-[the deployment procedure](../docs/remote-session-deployment.md#standby-signal).
+Each allocation uses one UDP port of the relay range (`min-port` to `max-port` in
+`coturn/turnserver.conf`), also for a client that connects over TCP or TLS. So the range limits the
+allocations of one relay: 16384-65535 gives 49,152 ports, and `total-quota` (40,000) stays below it.
+A browser allocates for each network interface and for each TURN URL (UDP, TCP and TLS), on both
+peers, also when the connection does not use the relay. Production had about 4 allocations for each
+peer connection. When the relay is full, coturn refuses each new allocation with 486, and every
+connection that needs a relay fails. The `signal_capacity` analytics event shows the allocations of
+each relay every 5 minutes.
+
+Production uses `turn2.openbot.run` on the second Signal machine as the second relay; see
+[the deployment procedure](../docs/remote-session-deployment.md#second-signal-machine).
 
 Current hosts advertise `multiplex: true` and support independent device sessions at the same time.
 Reconnecting one session replaces only that session's Signal socket. Disconnecting or revoking one device

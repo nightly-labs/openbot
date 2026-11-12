@@ -135,12 +135,12 @@ function ThreadTab(props: {
         }}
       >
         <span class="agent-threads-tab-icon">
-          <ThreadTabIcon status={props.thread.status} />
+          <ThreadTabIcon status={props.thread.status} unread={props.thread.unread} />
         </span>
         <X class="agent-threads-tab-x" />
       </span>
       <ThreadTitle class="agent-threads-tab-title" title={props.thread.title} />
-      <ThreadStatusText status={props.thread.status} />
+      <ThreadStatusText status={props.thread.status} unread={props.thread.unread} />
     </SlidingTabs.Trigger>
   );
 }
@@ -692,6 +692,7 @@ export function ThreadTabs(props: ThreadHeaderProps) {
             }
             class="agent-threads-rename"
             size="sm"
+            dir="auto"
             aria-label={t("conversation.threads.name")}
             maxlength={INPUT_LIMITS.agentTaskTitle}
             defaultValue={edit().title}

@@ -38,7 +38,9 @@ export const messages = {
   "account.usage.window.minutes": "{minutes} 分钟",
   "account.usage.window.cursorModels": "Cursor 模型",
   "account.usage.window.otherModels": "其他模型",
+  "account.usage.window.total": "总计",
   "account.usage.window.group": "{group} · {window}",
+  "account.usage.window.remaining": "剩余 {percent}",
   "account.update.failedRetry": "更新失败，请重试。",
   "account.update.managedByHost": "由主机管理",
   "account.update.restart": "重启",
@@ -63,6 +65,8 @@ export const messages = {
   "account.login.connectingDescription": "正在启动账号服务，通常只需片刻。",
   "account.login.unavailableDescription": "OpenBot 目前无法连接账号服务。",
   "account.login.signInDescription": "用邮箱登录或创建账号，我们会给你发送一次性验证码。",
+  "account.login.keyringChangedDescription":
+    "系统密钥环丢失了你上次的登录。OpenBot 现在把登录信息保存在这台电脑上的专用文件中。请再登录一次。",
   "account.login.codeAccepted": "验证码已通过。",
   "account.login.codeSent": "我们已向 {email} 发送验证码。",
   "account.login.connectingSecurely": "正在安全连接…",

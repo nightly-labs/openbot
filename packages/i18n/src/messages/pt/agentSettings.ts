@@ -83,7 +83,7 @@ export const messages = {
   "agentSettings.backupModels.intro":
     "Quando {model} atinge o limite de uso antes de {name} começar a escrever, {name} pergunta qual modelo você quer usar.",
   "agentSettings.backupModels.introAutomatic":
-    "Quando {model} atinge o limite de uso ou falha por um erro do provedor antes de {name} começar a escrever, {name} troca para o primeiro modelo disponível na ordem.",
+    "Quando {model} atinge o limite de uso, {name} troca para o primeiro modelo disponível na ordem. {name} também troca quando {model} falha por um erro do provedor antes de {name} começar a escrever.",
   "agentSettings.backupModels.ask": "Perguntar antes de trocar",
   "agentSettings.backupModels.order": "Ordem",
   "agentSettings.backupModels.listLabel": "Modelos de reserva, em ordem",
@@ -96,7 +96,7 @@ export const messages = {
   "agentSettings.backupModels.unavailable": "Indisponível agora · ignorado",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.note":
-    "{name} nunca troca depois de começar a escrever. Volta para {model} quando o limite termina, ou 10 minutos após um erro do provedor.",
+    "Quando um limite de uso para {name} depois de começar a trabalhar, {name} continua o mesmo trabalho no primeiro modelo disponível da ordem. Volta para {model} quando o limite termina, ou 10 minutos após um erro do provedor.",
   "agentSettings.groups.brain": "Cérebro",
   "agentSettings.groups.knows": "Sabe",
   "agentSettings.groups.does": "Faz",
@@ -127,6 +127,9 @@ export const messages = {
   "agentSettings.avatar.resetToId": "Redefinir com base no ID",
   "agentSettings.avatar.shape": "Forma",
   "agentSettings.avatar.shuffle": "Rosto aleatório",
+  "agentSettings.avatar.style": "Estilo do avatar",
+  "agentSettings.avatar.stylePlush": "Pelúcia",
+  "agentSettings.avatar.styleFlat": "Plano",
   "agentSettings.avatar.shapes": "Formas do avatar",
   "agentSettings.avatar.shapeOption": "Forma {number}",
   "agentSettings.avatar.eyes": "Olhos",
@@ -141,10 +144,6 @@ export const messages = {
   "agentSettings.avatar.processFailed": "Não foi possível processar o avatar do agente.",
   "agentSettings.runtime.model": "Modelo do agente",
   "agentSettings.runtime.modelUnavailable": "Os modelos ficam disponíveis após a conexão de uma CLI de agente.",
-  "agentSettings.runtime.reasoning": "Raciocínio",
-  "agentSettings.runtime.reasoningLabel": "Nível de raciocínio do agente",
-  "agentSettings.runtime.selectReasoning": "Selecionar raciocínio",
-  "agentSettings.runtime.reasoningSetByProvider": "Pelo {provider}",
   "agentSettings.runtime.access": "Acesso",
   "agentSettings.runtime.accessLabel": "Acesso do agente",
   "agentSettings.runtime.busyMessage": "Durante o trabalho",
@@ -184,6 +183,15 @@ export const messages = {
     "O agente esquece este chat. As mensagens continuam visíveis acima de um separador. As instruções, o modelo, as ferramentas, as memórias, o espaço de trabalho e o navegador não mudam.",
   "agentSettings.newChat.confirm": "Iniciar novo chat",
   "agentSettings.newChat.failed": "Não foi possível iniciar um novo chat.",
+  "agentSettings.deleteHistory.title": "Excluir histórico",
+  "agentSettings.deleteHistory.description":
+    "As mensagens deste chat são excluídas e o agente as esquece. A configuração continua.",
+  "agentSettings.deleteHistory.button": "Excluir",
+  "agentSettings.deleteHistory.confirmTitle": "Excluir o histórico do chat com {name}?",
+  "agentSettings.deleteHistory.confirmDescription":
+    "Todas as mensagens e arquivos deste chat são excluídos do OpenBot e o agente os esquece. Não é possível desfazer. Threads paralelas, instruções, modelo, ferramentas, memórias, espaço de trabalho e navegador não mudam.",
+  "agentSettings.deleteHistory.confirm": "Excluir histórico",
+  "agentSettings.deleteHistory.failed": "Não foi possível excluir o histórico.",
   "agentSettings.fullAccess.title": "Dar acesso completo a este agente?",
   "agentSettings.fullAccess.askTitle": "Deixar este agente trabalhar fora do espaço de trabalho?",
   "agentSettings.fullAccess.description":
@@ -219,8 +227,7 @@ export const messages = {
   "agentSettings.agentNewChat.description":
     "Permite que o agente inicie um novo chat quando o chat dele ficar longo. Ele salva notas antes.",
   "agentSettings.quickAcknowledgement.title": "Mostrar o plano antes de tarefas longas",
-  "agentSettings.quickAcknowledgement.description":
-    "Antes de uma tarefa longa, o agente mostra o plano. Ele começa após 10 s ou quando você toca em Iniciar.",
+  "agentSettings.quickAcknowledgement.description": "Antes de uma tarefa longa, o agente mostra o plano.",
   "agentSettings.browserProfile.label": "Perfil do navegador",
   "agentSettings.browserProfile.shared": "Compartilhado",
   "agentSettings.browserProfile.agent": "Somente este agente",

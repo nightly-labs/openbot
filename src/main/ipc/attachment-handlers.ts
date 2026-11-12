@@ -2,6 +2,7 @@
 // Every path here crosses to the local filesystem, so the parsers are the boundary.
 
 import { createHash, randomUUID } from "node:crypto";
+import { constants } from "node:fs";
 import { chmod, copyFile, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import {
@@ -23,9 +24,11 @@ import {
   type ImportAttachmentsInput,
   LOCAL_SERVER_ID,
   type OpenAttachmentInput,
+  type OpenStoredFileInput,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
+  TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY,
   TEAM_EML_ATTACHMENTS_CAPABILITY,
   TEAM_MEDIA_ATTACHMENTS_CAPABILITY,
   TEAM_MP4_ATTACHMENTS_CAPABILITY,
@@ -164,24 +167,27 @@ export function attachmentIpcHandlers({
           serverId === LOCAL_SERVER_ID || remoteServers.supportsCapability(serverId, TEAM_MP4_ATTACHMENTS_CAPABILITY);
         const supportsSvg =
           serverId === LOCAL_SERVER_ID || remoteServers.supportsCapability(serverId, TEAM_SVG_ATTACHMENTS_CAPABILITY);
-        const options: OpenDialogOptions = {
-          properties: ["openFile", "multiSelections"],
-          filters:
-            filter === "images"
-              ? [{ name: translate("dialog.filter.images"), extensions: [...IMAGE_ATTACHMENT_EXTENSIONS] }]
-              : [
-                  {
-                    name: translate("dialog.filter.supportedFiles"),
-                    extensions: supportedAttachmentExtensions({
-                      eml: supportsEml,
-                      media: supportsMedia,
-                      zip: supportsZip,
-                      mp4: supportsMp4,
-                      svg: supportsSvg,
-                    }),
-                  },
-                ],
-        };
+        const supportsAnyFile =
+          serverId === LOCAL_SERVER_ID ||
+          remoteServers.supportsCapability(serverId, TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY);
+        const options: OpenDialogOptions = { properties: ["openFile", "multiSelections"] };
+        // A host that takes any file gets no file filter, so the dialog shows every file.
+        if (filter === "images") {
+          options.filters = [{ name: translate("dialog.filter.images"), extensions: [...IMAGE_ATTACHMENT_EXTENSIONS] }];
+        } else if (!supportsAnyFile) {
+          options.filters = [
+            {
+              name: translate("dialog.filter.supportedFiles"),
+              extensions: supportedAttachmentExtensions({
+                eml: supportsEml,
+                media: supportsMedia,
+                zip: supportsZip,
+                mp4: supportsMp4,
+                svg: supportsSvg,
+              }),
+            },
+          ];
+        }
         const result = mainWindow
           ? await dialog.showOpenDialog(mainWindow, options)
           : await dialog.showOpenDialog(options);
@@ -296,7 +302,9 @@ export function attachmentIpcHandlers({
       previewWorkspaceFile: scopedHandler(parsePreviewWorkspaceFile, {
         local: async (parsed) => {
           const generation = filePreviewPages.generation;
-          const workspaceFile = await runCauseEffect(service.resolveLocalWorkspaceFile(parsed.agentId, parsed.path));
+          const workspaceFile = await runCauseEffect(
+            service.resolveLocalWorkspaceFile(parsed.agentId, parsed.path, { exactPath: parsed.exactPath === true }),
+          );
           return runCauseEffect(
             localFilePreview(workspaceFile.path, workspaceFile.name, workspaceFile.size, generation, parsed.maxBytes),
           );
@@ -319,17 +327,22 @@ export type OpenAttachmentDependencies = Pick<AttachmentIpcDependencies, "getMai
 
 /**
  * Opens, reveals or saves one sent or generated file of the local host or a joined server. The
- * chat and the storage surfaces both reach a file by its attachment id, so they share this.
+ * chat and the storage surfaces both reach a file by its attachment id, so they share this. Only the
+ * storage surface sends `save`.
  */
 export function openAttachmentForServer(
   { mailbox, remoteServers, getMainWindow, translate }: OpenAttachmentDependencies,
   serverId: string,
-  input: OpenAttachmentInput,
+  input: Omit<OpenAttachmentInput, "action"> & { action: OpenStoredFileInput["action"] },
 ): Promise<void> {
   return routeToServer<void>(serverId, {
     local: async () => {
       const attachment = await runCauseEffect(mailbox.resolveAttachment(input.attachmentId));
       if (!attachment) throw new Error(sourceText("error.attachment.unavailable"));
+      if (input.action === "save") {
+        await saveInDownloads(attachment.name, (path) => copyFile(attachment.path, path, constants.COPYFILE_EXCL));
+        return;
+      }
       if (input.action === "download") {
         const safeId = basename(input.attachmentId).replace(/[^a-z0-9_-]/gi, "-") || "attachment";
         const suggestedName = basename(attachment.name) || `attachment-${safeId}`;
@@ -348,11 +361,16 @@ export function openAttachmentForServer(
       const downloaded = await runCauseEffect(
         remoteServers.downloadAttachment(input.attachmentId, target, false, input.size),
       ).catch((error: unknown) => {
-        if (error instanceof AttachmentDownloadStopped) return null;
+        // A stopped save wrote no file, so the batch must count it as a failure.
+        if (error instanceof AttachmentDownloadStopped && input.action !== "save") return null;
         throw error;
       });
       if (!downloaded) return;
       const suggestedName = basename(downloaded.name) || `attachment-${input.attachmentId}`;
+      if (input.action === "save") {
+        await saveInDownloads(suggestedName, (path) => writeFile(path, downloaded.bytes, { mode: 0o600, flag: "wx" }));
+        return;
+      }
       if (input.action === "download") {
         const filePath = await chooseSavePath(getMainWindow(), translate, suggestedName);
         if (!filePath) return;
@@ -412,6 +430,29 @@ function safeFileName(name: string): string {
   );
 }
 
+// The most numbered names that a save tries before it fails.
+const SAVE_NAME_ATTEMPTS = 1000;
+
+// Writes a file into the Downloads folder with no dialog. The renderer names only the attachment, and
+// main chooses the folder and makes the name safe. `write` must fail with EEXIST when the path exists,
+// so a file that is there already is never replaced: the new file gets " (2)", " (3)", and so on.
+async function saveInDownloads(name: string, write: (path: string) => Promise<void>): Promise<void> {
+  const safeName = safeFileName(name) || "attachment";
+  const extension = extname(safeName);
+  const stem = safeName.slice(0, safeName.length - extension.length);
+  const folder = app.getPath("downloads");
+  for (let attempt = 1; ; attempt++) {
+    const path = join(folder, attempt === 1 ? safeName : `${stem} (${attempt})${extension}`);
+    try {
+      await write(path);
+      return;
+    } catch (error) {
+      const exists = error instanceof Error && "code" in error && error.code === "EEXIST";
+      if (!exists || attempt >= SAVE_NAME_ATTEMPTS) throw error;
+    }
+  }
+}
+
 // Returns the chosen path, or undefined when the user cancelled.
 async function chooseSavePath(
   mainWindow: BrowserWindow | null,
@@ -445,7 +486,6 @@ const uploadRemotePaths = Effect.fn("AttachmentIpc.uploadRemotePaths")(function*
       serverId,
       paths.map((path) => basename(path)),
     );
-    for (const path of paths) assertSupportedAttachmentName(basename(path));
   });
   const files = yield* Effect.forEach(
     paths,
@@ -500,7 +540,7 @@ const uploadRemoteImports = Effect.fn("AttachmentIpc.uploadRemoteImports")(funct
 });
 
 /**
- * Checks the names and sizes, then uploads every file at once, as one import. With `requestId`, the
+ * Checks the sizes, then uploads every file at once, as one import. With `requestId`, the
  * import reports the bytes of a single file; several files at once would mix their progress.
  */
 function uploadRemoteFiles(
@@ -511,7 +551,6 @@ function uploadRemoteFiles(
 ) {
   const progressId = files.length === 1 ? requestId : undefined;
   return remoteDecode(() => {
-    for (const file of files) assertSupportedAttachmentName(file.name);
     if (files.some((file) => file.bytes.byteLength > ATTACHMENT_LIMITS.fileBytes)) {
       throw new Error(sourceText("error.attachment.fileTooLarge"));
     }
@@ -529,11 +568,22 @@ function uploadRemoteFiles(
   );
 }
 
+/** A host without `any-file-attachments` refuses a name with no known type. */
+function assertRemoteAttachmentNames(
+  remoteServers: AttachmentIpcDependencies["remoteServers"],
+  serverId: string,
+  names: readonly string[],
+): void {
+  if (remoteServers.supportsCapability(serverId, TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY)) return;
+  for (const name of names) assertSupportedAttachmentName(name);
+}
+
 function assertRemoteAttachmentSupport(
   remoteServers: AttachmentIpcDependencies["remoteServers"],
   serverId: string,
   names: readonly string[],
 ): void {
+  assertRemoteAttachmentNames(remoteServers, serverId, names);
   if (
     names.some((name) =>
       MEDIA_ATTACHMENT_EXTENSIONS.some((extension) => extension === attachmentFileExtension(name)),

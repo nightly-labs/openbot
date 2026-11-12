@@ -22,18 +22,24 @@ import {
   type ChannelSummary,
   type ClientAgentSummary,
   decodeChannelSummaries,
+  type HiddenAgentsSnapshot,
   IPC_ENDPOINTS,
   LOCAL_SERVER_ID,
   latestTurnAnswer,
   type ServerNotificationLevel,
   type SpeechModelStatus,
+  type VoiceLiveEvent,
   type VoiceModelStatus,
   type VoiceServerSettings,
   type VoiceStreamTranscript,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidden-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
-import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import {
+  AGENT_HIDDEN_WORK_CAPABILITY,
+  TEAM_CHANNEL_ATTENTION_CAPABILITY,
+} from "@openbot/contracts/team-protocol/current";
 import type { MachineAlertEvent } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import type { AppFormat, AppTranslate } from "@openbot/i18n";
 import { redactText } from "@openbot/logging";
@@ -41,6 +47,7 @@ import {
   type AgentNotificationChannel,
   agentEventAgentId,
   agentEventCanNotify,
+  agentEventNeedsUser,
   agentEventRequestThread,
   notificationForAgentEvent,
   notificationForUsageLimit,
@@ -65,15 +72,21 @@ import {
 } from "./desktop-notifications";
 import type { HostService } from "./host-service";
 import { withLocalHostSummary } from "./ipc/team-handlers";
-import { decodeAgentSummaries } from "./remote-agent-decoding";
+import { decodeAgentSummaries, decodeHiddenAgentsFromHost } from "./remote-agent-decoding";
 import type { RemoteServerManager } from "./remote-server-manager";
 import { sendToRenderer } from "./renderer-ipc";
+
+/** The level at which an event notifies, from the levels of the agents and the agents that the user hid. */
+type NotifyLevel = (
+  agentLevels: ReadonlyMap<string, ServerNotificationLevel> | null,
+  hiddenAgentIds?: ReadonlySet<string> | null,
+) => ServerNotificationLevel | null;
 
 export interface RendererForwarderDependencies {
   getMainWindow: () => BrowserWindow | null;
   /** Each chat window shows a live chat, so it gets the chat, server and provider events too. */
   getChatWindows: () => BrowserWindow[];
-  getAgentService: () => Pick<AgentService, "listAgents"> | null;
+  getAgentService: () => Pick<AgentService, "listAgents" | "listHiddenAgents"> | null;
   getHostService: () => HostService | null;
   getHostAnalytics: () => HostAnalytics | null;
   getRemoteServerManager: () => Pick<
@@ -85,6 +98,7 @@ export interface RendererForwarderDependencies {
     | "notificationLevels"
     | "cachedNotificationLevels"
     | "knownNotificationLevels"
+    | "supportsCapability"
   > | null;
   /** The level that the user chose for each agent of this computer's server. */
   ownAgentNotificationLevels: () => ReadonlyMap<string, ServerNotificationLevel>;
@@ -321,6 +335,24 @@ export function createRendererForwarders({
   }
 
   /**
+   * The agents of a server that the user hid. Only a host with `agent-hidden-work` keeps them at work,
+   * so only that host gets a request. A failed read gives none: the event then notifies at its level.
+   */
+  function userHiddenAgentIds(serverId: string): ReadonlySet<string> | Promise<ReadonlySet<string>> {
+    const ids = (snapshot: HiddenAgentsSnapshot | undefined) =>
+      new Set(snapshot?.agents.map((agent) => agent.agentId) ?? []);
+    if (serverId === LOCAL_SERVER_ID) return ids(getAgentService()?.listHiddenAgents());
+    const remoteManager = getRemoteServerManager();
+    if (!remoteManager?.supportsCapability(serverId, AGENT_HIDDEN_WORK_CAPABILITY)) return ids(undefined);
+    return runCauseEffect(
+      remoteManager.request(serverId, AGENT_HIDDEN_ROUTES.read, decodeHiddenAgentsFromHost, {
+        method: "POST",
+        body: {},
+      }),
+    ).then(ids, () => ids(undefined));
+  }
+
+  /**
    * The notifications that wait for an answer, by request. An answer on any device withdraws its
    * notification. A request whose notification is still being built has no notification yet, and an
    * answer that arrives then removes the entry, so the notification is not shown.
@@ -336,19 +368,25 @@ export function createRendererForwarders({
     if (notification) closeRetainedNotification(notification);
   }
 
-  async function notifyAgentEvent(serverId: string, event: AgentEvent): Promise<void> {
-    withdrawResolvedNotification(serverId, event);
+  async function notifyAgentEvent(serverId: string, received: AgentEvent): Promise<void> {
+    withdrawResolvedNotification(serverId, received);
+    // A turn of a side thread that is not a routine thread shows no desktop notification, as before.
+    // The phone notifies about it (`PushNotificationService`).
+    if (received.type === "thread-turn-completed" && !received.routine) return;
+    // A routine thread's turn notifies as a turn of the chat does. Its answer is in the routine thread.
+    const routineTaskId = received.type === "thread-turn-completed" ? received.taskId : null;
+    const event = received.type === "thread-turn-completed" ? received.turn : received;
     // Most events stream while an agent works. Only these can notify, so the others skip the server list.
-    if (!agentEventCanNotify(event) && event.type !== "usage-limit-reached") return;
+    if (!agentEventCanNotify(event) && event.type !== "usage-limit-reached" && event.type !== "subagent-failed") return;
     // Like Discord, nothing pops up while the user is looking at the app. The level is read again
     // after the lookup, with the rest, because the user can change it while the lookup runs.
-    const notifyLevel = (agentLevels: ReadonlyMap<string, ServerNotificationLevel> | null) => {
+    const notifyLevel: NotifyLevel = (agentLevels, hiddenAgentIds = null) => {
       const window = getMainWindow();
       const server = getRemoteServerManager()
         ?.list()
         .find((candidate) => candidate.id === serverId);
       if (!window || window.isDestroyed() || appFocused(window) || !server) return null;
-      return desktopAgentEventLevel(event, server, desktopNotificationsEnabled(), agentLevels);
+      return desktopAgentEventLevel(event, server, desktopNotificationsEnabled(), agentLevels, hiddenAgentIds);
     };
     // The level also rules out an event before the remote lookups. The level of an agent can let more
     // through than the server level, so this first check uses the most open one.
@@ -356,11 +394,11 @@ export function createRendererForwarders({
     const mostOpen = agentId === null ? null : new Map([[agentId, "all" as const]]);
     if (!notifyLevel(mostOpen) || !Notification.isSupported()) return;
     const requestKey = notificationRequestKey(serverId, event);
-    if (!requestKey) return showAgentNotification(serverId, event, notifyLevel, null);
+    if (!requestKey) return showAgentNotification(serverId, event, notifyLevel, null, routineTaskId);
     // A shown notification of the same request stays until the new one replaces it.
     if (!requestNotifications.has(requestKey)) requestNotifications.set(requestKey, null);
     try {
-      await showAgentNotification(serverId, event, notifyLevel, requestKey);
+      await showAgentNotification(serverId, event, notifyLevel, requestKey, null);
     } finally {
       // Nothing was shown, or the lookup failed.
       if (requestNotifications.get(requestKey) === null) requestNotifications.delete(requestKey);
@@ -370,13 +408,16 @@ export function createRendererForwarders({
   async function showAgentNotification(
     serverId: string,
     event: AgentEvent,
-    notifyLevel: (agentLevels: ReadonlyMap<string, ServerNotificationLevel> | null) => ServerNotificationLevel | null,
+    notifyLevel: NotifyLevel,
     requestKey: string | null,
+    routineTaskId: string | null,
   ): Promise<void> {
     const preview = notificationPreviewEnabled();
     const answer =
       preview && event.type === "turn-completed" && event.status === "completed"
-        ? turnAnswer(serverId, event.agentId, event.turnId)
+        ? routineTaskId
+          ? routineTurnAnswer(event.agentId, routineTaskId, event.turnId)
+          : turnAnswer(serverId, event.agentId, event.turnId)
         : null;
     const agentLookup = notificationAgents(serverId);
     const agents = agentLookup instanceof Promise ? await agentLookup : agentLookup;
@@ -384,7 +425,18 @@ export function createRendererForwarders({
     const lookup = eventChannel(serverId, event);
     const channel = lookup instanceof Promise ? await lookup : lookup;
     const levelLookup = agentNotificationLevels(serverId);
-    const level = notifyLevel(levelLookup instanceof Promise ? await levelLookup : levelLookup);
+    const levels = levelLookup instanceof Promise ? await levelLookup : levelLookup;
+    const open = notifyLevel(levels);
+    // A hidden agent changes only the level "all" of an event that does not wait for the user (see
+    // `agentNotificationLevel`), so only that event reads the hidden agents of a remote server.
+    const hiddenLookup =
+      open === "all" && event.type !== "usage-limit-reached" && !agentEventNeedsUser(event)
+        ? userHiddenAgentIds(serverId)
+        : null;
+    const level =
+      hiddenLookup === null
+        ? open
+        : notifyLevel(levels, hiddenLookup instanceof Promise ? await hiddenLookup : hiddenLookup);
     const content = !level
       ? null
       : event.type === "usage-limit-reached"
@@ -450,6 +502,18 @@ export function createRendererForwarders({
     const answer = loaded && latestTurnAnswer(loaded.messages, turnId)?.text;
     // A routine Test run shows the no-update marker in the chat, but it is not news to show.
     return answer && !isNoUpdateAnswer(answer) ? answer : null;
+  }
+
+  /** The answer of a turn in a routine thread of this computer, or null as for `turnAnswer`. */
+  function routineTurnAnswer(agentId: string, taskId: string, turnId: string): string | null {
+    try {
+      const snapshot = getHostService()?.readAgentTask(agentId, taskId);
+      const answer = snapshot && latestTurnAnswer(snapshot.messages, turnId)?.text;
+      return answer && !isNoUpdateAnswer(answer) ? answer : null;
+    } catch {
+      // The routine and its thread were deleted after the turn.
+      return null;
+    }
   }
 
   /** A workflow step that waits for the user, or a workflow output. A click shows the main window. */
@@ -549,6 +613,12 @@ export function createRendererForwarders({
     for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.voice.streamTranscript, transcript);
   }
 
+  /** `memberId` is null for a session of this computer. A member's session never goes to these windows. */
+  function forwardVoiceLiveEvent(event: VoiceLiveEvent, memberId: string | null = null): void {
+    if (memberId !== null) return;
+    for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.voice.liveEvent, event);
+  }
+
   function forwardProviderRuntimeStatus(snapshot: import("@openbot/contracts/ipc").ProviderRuntimeSnapshot): void {
     for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.providerRuntimes.event, snapshot);
   }
@@ -569,6 +639,9 @@ export function createRendererForwarders({
 
   function forwardBitwardenConnectorStatus(status: import("@openbot/contracts/ipc").BitwardenConnectorStatus): void {
     for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.bitwardenConnector.changed, status);
+  }
+  function forwardPasswordManagerStatus(status: import("@openbot/contracts/ipc").PasswordManagerStatus): void {
+    for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.passwordManagers.changed, status);
   }
 
   function forwardVaultState(state: import("@openbot/contracts/ipc").VaultState): void {
@@ -643,6 +716,7 @@ export function createRendererForwarders({
     forwardUpdatePreference,
     forwardVoiceModelStatus,
     forwardVoiceStreamTranscript,
+    forwardVoiceLiveEvent,
     forwardSpeechModelStatus,
     forwardVoiceServerSettings,
     forwardProviderRuntimeStatus,
@@ -650,6 +724,7 @@ export function createRendererForwarders({
     forwardLinkAccountStatus,
     forwardOnePasswordConnectorStatus,
     forwardBitwardenConnectorStatus,
+    forwardPasswordManagerStatus,
     forwardVaultState,
     forwardHostStatus,
     forwardRemoteDesktopSessions,

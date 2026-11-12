@@ -6,9 +6,12 @@
 //   a missing one, and `session/load` of a missing session answers null. Each session it opens has `modes`.
 //   It lists its provider as an auth method only when it is signed in, and its stderr is a Python log.
 // - `FAKE_SIGNED_OUT=1` refuses each new session, as an agent does before its sign-in. Hermes refuses
-//   it with "Internal error", and writes the cause only to stderr.
+//   it with "Internal error", and writes the cause only to stderr. Devin CLI 3000.11.234 opens the
+//   session, and lists no model in it.
 // - `FAKE_MODEL_SET=kimi` gives no configuration options. `session/set_model` changes the model and
-//   then fails, as Kimi CLI 1.52.0 does when its config.toml is protected.
+//   then fails, as Kimi CLI 1.52.0 does when its config.toml is protected. `FAKE_MODEL_SET=mistral`
+//   changes the model with `session/set_config_option` and then fails, as Mistral Vibe 3.1.0 does when
+//   its config.toml is protected. A signed-out Mistral Vibe refuses each new session for its missing key.
 // A prompt with the text `wait` runs until the client cancels it. Each other prompt answers at once.
 import {
   type AcpError,
@@ -37,6 +40,18 @@ const MISSING_ERRORS: Readonly<Partial<Record<string, (sessionId: string) => Acp
   antigravity: (sessionId) => ({ code: -32002, message: "Resource not found", data: { sessionId } }),
   // Kimi CLI 1.52.0.
   kimi: () => ({ code: -32602, message: "Invalid params", data: { session_id: "Session not found" } }),
+  // Devin CLI 3000.11.234.
+  devin: () => ({
+    code: -32016,
+    message: "Session not found",
+    data: { "cognition.ai/errorKind": "session_not_found", "cognition.ai/retryable": false },
+  }),
+  // Mistral Vibe 3.1.0.
+  mistral: (sessionId) => ({
+    code: -32602,
+    message: `Session not found: ${sessionId}`,
+    data: { session_id: sessionId },
+  }),
   // Cursor.
   cursor: (sessionId) => ({
     code: -32602,
@@ -46,6 +61,8 @@ const MISSING_ERRORS: Readonly<Partial<Record<string, (sessionId: string) => Acp
 };
 
 const hermes = process.env.FAKE_MISSING === "hermes";
+const devin = process.env.FAKE_MISSING === "devin";
+const mistral = process.env.FAKE_MISSING === "mistral";
 /** What Hermes 0.21.5 lists: its provider while that provider's credential resolves, and its terminal setup. */
 const HERMES_AUTH_METHODS = [
   { id: "nous", name: "nous runtime credentials" },
@@ -54,6 +71,7 @@ const HERMES_AUTH_METHODS = [
 const missingError = MISSING_ERRORS[process.env.FAKE_MISSING ?? "protocol"];
 const signedOut = process.env.FAKE_SIGNED_OUT === "1";
 const kimiModelSet = process.env.FAKE_MODEL_SET === "kimi";
+const mistralModelSet = process.env.FAKE_MODEL_SET === "mistral";
 const models = new Map<string, string>();
 /** The `wait` prompt of each session that waits for its cancel. */
 const waiting = new Map<string, () => void>();
@@ -116,8 +134,15 @@ serveFakeAcpAgent(
         peer.fail(request, { code: -32603, message: "Internal error" });
         return;
       }
+      if (signedOut && devin) {
+        count += 1;
+        const sessionId = `s-${process.pid}-${count}`;
+        peer.reply(request, { sessionId, configOptions: [], models: { availableModels: [], currentModelId: "" } });
+        return;
+      }
       if (signedOut) {
-        peer.fail(request, { code: -32000, message: "Authentication required" });
+        const message = mistral ? "Missing API key for mistral provider." : "Authentication required";
+        peer.fail(request, { code: -32000, message });
         return;
       }
       count += 1;
@@ -129,7 +154,13 @@ serveFakeAcpAgent(
       const { sessionId = "", configId, value = "" } = request.params;
       logEntry({ event: "set", sessionId, configId, value });
       if (configId === "model") models.set(sessionId, value);
-      peer.reply(request, { configOptions: setup(sessionId).configOptions });
+      if (mistralModelSet)
+        peer.fail(request, {
+          code: -32602,
+          message: "Layer 'user-toml': cannot write config file at /home/user/.vibe/config.toml",
+          data: null,
+        });
+      else peer.reply(request, { configOptions: setup(sessionId).configOptions });
     },
     "session/set_model": (request, peer) => {
       const { sessionId = "", modelId = "" } = request.params;

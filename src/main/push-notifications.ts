@@ -1,6 +1,8 @@
 import {
   type AgentEvent,
   type AgentSummary,
+  type AgentTurnCompletedEvent,
+  type ConversationMessage,
   latestTurnAnswer,
   type ServerNotificationLevel,
 } from "@openbot/contracts/ipc";
@@ -12,6 +14,7 @@ import {
   type NotificationSound,
 } from "@openbot/contracts/notification-relay";
 import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { PUSH_NOTIFICATION_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/push-notification-threads-v1";
 import { resolveLocale, translateFor } from "@openbot/i18n";
 import { redactText, toLogValue } from "@openbot/logging";
 import {
@@ -35,6 +38,7 @@ import {
 } from "@openbot/team-client/push-notification-seal";
 import { Effect, Exit, Fiber, Result, Schema, Scope } from "effect";
 import { isNoUpdateAnswer } from "../backend/agent/routine-quiet-runs";
+import type { AgentService } from "../backend/agent-service";
 import type { PushNotificationStore, PushTarget, StoredPushRegistration } from "./push-notification-store";
 import type { TeamApiAgents } from "./team-api/dependencies";
 import { markerExclusionsForCapabilities } from "./team-api/request-helpers";
@@ -73,7 +77,8 @@ export type NotificationRelayRequest =
 type PushNotificationAgents = Pick<
   TeamApiAgents,
   "on" | "off" | "listAgents" | "readConversationPageFor" | "getRuntimeSnapshot" | "listConversationReads"
->;
+> &
+  Pick<AgentService, "readTask">;
 
 interface PushNotificationOptions {
   agents: PushNotificationAgents;
@@ -97,7 +102,11 @@ interface PushNotificationOptions {
     server: ServerNotificationLevel | null;
     agents: ReadonlyMap<string, ServerNotificationLevel>;
   };
-  /** Whether the member is at the computer of this host, where the desktop app shows the event. */
+  /**
+   * Whether the member is at the computer of this host, where the desktop app shows the event. For a
+   * side thread turn that is not a routine's, `event` is the `thread-turn-completed` event, as the
+   * desktop gets it.
+   */
   atHostComputer(memberId: string, event: AgentEvent): boolean;
   /**
    * Whether the session's phone shows a Live Activity of this host that shows this event, in place of
@@ -128,6 +137,11 @@ interface PushNotificationViewer {
 export interface PushNotificationSubject {
   agentId: string;
   kind: PushNotificationKind;
+  /**
+   * `true` for the end of a turn in a side thread. The Live Activity shows the replies and the failed
+   * turn of the agent's own chat only, so it does not show this event.
+   */
+  sideThread?: boolean;
 }
 
 interface HeldEvent {
@@ -155,6 +169,11 @@ interface Registration {
  * desktop app or the computer that it runs on, and no answer to a message while an iPhone shows the Live Activity, which shows the
  * answer. The agent name and the text are sealed for the phone, so the account service, Apple and
  * Google see the token, the time, and sealed bytes only.
+ *
+ * The end of a turn in a side thread notifies too, and the notification names that thread, so a tap
+ * opens it. A routine thread notifies each phone, as a routine run in the agent's chat did. Another
+ * side thread notifies only a phone that can open it (`push-notification-threads-v1`) and that did not
+ * turn these notifications off.
  *
  * The phones are kept in a file, so they get notifications after this computer restarts, also when
  * they do not connect again. The account service sends nothing for a session that has ended.
@@ -222,9 +241,11 @@ export class PushNotificationService {
     const { memberId, protocol, capabilities } = viewer;
     const previous = this.#registrations.get(sessionId);
     // The request came over the connection of this session, so it is open.
-    if (!this.#add({ sessionId, memberId, protocol, capabilities: [...capabilities], ...target }, true, previous)) {
-      throw new Error("The notification secret is not valid.");
-    }
+    // The frozen registration does not carry the thread choice, so a phone that registers again keeps it.
+    const threadReplies = previous?.stored.threadReplies;
+    const threadChoice = threadReplies === undefined ? {} : { threadReplies };
+    const stored = { sessionId, memberId, protocol, capabilities: [...capabilities], ...threadChoice, ...target };
+    if (!this.#add(stored, true, previous)) throw new Error("The notification secret is not valid.");
     const registration = this.#registrations.get(sessionId);
     // The app on screen showed the kept events. A phone that goes away gets those it did not see.
     if (registration && target.value.away) this.#scheduleFlush(registration);
@@ -237,6 +258,19 @@ export class PushNotificationService {
       }
     }
     this.#listen();
+    this.#save();
+  }
+
+  /**
+   * The phone of the session says whether it takes a notification for the end of a turn in a side
+   * thread (`push-notification-threads-v1`). The choice stays with the registration of the session. A
+   * session without a registration has nothing to keep.
+   */
+  setThreadReplies(sessionId: string, replies: boolean): void {
+    const registration = this.#registrations.get(sessionId);
+    if (!this.#running || !registration) return;
+    if (registration.stored.threadReplies === replies) return;
+    registration.stored = { ...registration.stored, threadReplies: replies };
     this.#save();
   }
 
@@ -300,17 +334,34 @@ export class PushNotificationService {
    */
   #deliver = Effect.fn("PushNotifications.deliver")(function* (
     this: PushNotificationService,
-    event: AgentEvent,
+    received: AgentEvent,
     only?: Registration,
   ) {
-    const subject = eventSubject(event);
+    // A side thread's turn notifies as a turn of the chat does. Its answer is in that thread.
+    const thread = received.type === "thread-turn-completed" ? received : null;
+    const event = thread ? thread.turn : received;
+    const subject = eventSubject(event, thread !== null);
     if (!subject) return;
     const now = this.#now();
+    // The desktop notifies about a routine thread turn as about a turn of the chat. It does not notify
+    // about the turn of another side thread.
+    const desktopNotifies = !thread || thread.routine;
     const targets = (only ? [only] : [...this.#registrations.values()]).filter((registration) => {
       const { value, memberId, protocol, sessionId } = registration.stored;
+      // A routine run notified from the agent's chat before each routine had a thread, so each phone
+      // still gets it. A phone gets the turns of the other side threads only when a tap can open the
+      // thread, and while the member did not turn them off on that phone. Such a turn is not kept
+      // either: it would take the place of an event that the phone can get.
+      if (
+        thread &&
+        !thread.routine &&
+        (!registration.capabilities.has(PUSH_NOTIFICATION_THREADS_CAPABILITY) ||
+          registration.stored.threadReplies === false)
+      )
+        return false;
       // While the app is on screen, it shows the event itself.
       if (!value.away && registration.connected) {
-        if (!only) this.#hold(registration, event, now);
+        if (!only) this.#hold(registration, received, now);
         return false;
       }
       if (value.mutedUntil !== null && value.mutedUntil * 1_000 > now) return false;
@@ -320,12 +371,22 @@ export class PushNotificationService {
       }
       if (this.#options.hiddenAgentIds(protocol, registration.capabilities, memberId).has(subject.agentId))
         return false;
-      // A member at a desktop app sees the event there, and the phone would only repeat it.
-      const used = this.#lastUseElsewhere(memberId, sessionId);
-      return !((used !== null && now - used < this.#awayAfterMs) || this.#options.atHostComputer(memberId, event));
+      // A member at a desktop app sees the event there, and the phone would only repeat it. No desktop
+      // notifies about a side thread turn that is not a routine's. So for it, input on the computer in
+      // another app does not count: only the use of OpenBot does, and the host computer gets the
+      // event as its desktop gets it, which shows it only in a window with focus.
+      const used = desktopNotifies
+        ? this.#lastUseElsewhere(memberId, sessionId)
+        : this.#options.lastUseElsewhere(memberId, sessionId);
+      return !(
+        (used !== null && now - used < this.#awayAfterMs) ||
+        this.#options.atHostComputer(memberId, desktopNotifies ? event : received)
+      );
     });
     if (!targets.length) return;
     const agents = this.#options.agents.listAgents();
+    // An agent that the user hid notifies only when it waits for the user, as on desktop.
+    const userHidden = agents.some((agent) => agent.id === subject.agentId && agent.hiddenAt !== undefined);
     // A prompt, an approval or a takeover on a channel thread names the channel, as on desktop.
     const requestThread = agentEventRequestThread(event);
     const channel = requestThread ? (this.#options.channelForThread?.(requestThread) ?? null) : null;
@@ -335,7 +396,12 @@ export class PushNotificationService {
       const { value, memberId, sessionId } = stored;
       const translate = translateFor(resolveLocale("system", value.locale));
       const chosen = this.#options.memberLevels?.(memberId);
-      const level = agentNotificationLevel(chosen?.server ?? value.level, chosen?.agents ?? null, subject.agentId);
+      const level = agentNotificationLevel(
+        chosen?.server ?? value.level,
+        chosen?.agents ?? null,
+        subject.agentId,
+        userHidden,
+      );
       // A phone from before channel-attention-v1 has no channel view, so its title names the agent only.
       const eventChannel = registration.capabilities.has(TEAM_CHANNEL_ATTENTION_CAPABILITY) ? channel : null;
       // The fixed text, as the desktop shows it without a preview.
@@ -357,7 +423,7 @@ export class PushNotificationService {
         if (stored.value.token === null) continue;
       }
       if (value.preview && subject.kind === "reply" && event.type === "turn-completed" && answer === undefined) {
-        answer = yield* this.#answer(event, memberId, agents);
+        answer = yield* this.#answer(event, memberId, agents, thread?.taskId ?? null);
       }
       // The desktop builds the same preview: the answer, the question, or the action to approve,
       // with its secrets redacted.
@@ -385,18 +451,27 @@ export class PushNotificationService {
     }
   });
 
-  /** The answer of a turn in the agent's own chat, or `null` when it has none. */
+  /** The answer of a turn in the agent's own chat or in a side thread, or `null` when it has none. */
   #answer = Effect.fn("PushNotifications.answer")(function* (
     this: PushNotificationService,
-    event: Extract<AgentEvent, { type: "turn-completed" }>,
+    event: AgentTurnCompletedEvent,
     memberId: string,
     agents: readonly AgentSummary[],
+    taskId: string | null,
   ) {
-    if (agents.find((agent) => agent.id === event.agentId)?.threadId !== event.threadId) return null;
-    const page = yield* this.#options.agents
-      .readConversationPageFor(event.agentId, memberId, undefined, ANSWER_PAGE_SIZE)
-      .pipe(Effect.catch(() => Effect.succeed(null)));
-    const text = page ? latestTurnAnswer(page.messages, event.turnId)?.text : undefined;
+    let messages: ConversationMessage[] | null = null;
+    if (taskId) {
+      messages = yield* Effect.try(() => this.#options.agents.readTask(event.agentId, taskId).messages).pipe(
+        // The thread was deleted after the turn, as when its routine was deleted.
+        Effect.catch(() => Effect.succeed(null)),
+      );
+    } else if (agents.find((agent) => agent.id === event.agentId)?.threadId === event.threadId) {
+      const page = yield* this.#options.agents
+        .readConversationPageFor(event.agentId, memberId, undefined, ANSWER_PAGE_SIZE)
+        .pipe(Effect.catch(() => Effect.succeed(null)));
+      messages = page?.messages ?? null;
+    }
+    const text = messages ? latestTurnAnswer(messages, event.turnId)?.text : undefined;
     // A routine Test run shows the no-update marker in the chat, but it is not news.
     return text && !isNoUpdateAnswer(text) ? text : null;
   });
@@ -558,7 +633,8 @@ function heldEventUnseen(
   reads: ReturnType<PushNotificationAgents["listConversationReads"]>,
   agents: readonly AgentSummary[],
 ): boolean | null {
-  if (event.type === "error") return null;
+  // As for a reply in another thread of the chat below.
+  if (event.type === "error" || event.type === "thread-turn-completed") return null;
   if (event.type !== "turn-completed") return true;
   if (event.status !== "completed") {
     return snapshot.failedTurns.some((failed) => failed.agentId === event.agentId && failed.turnId === event.turnId);
@@ -582,12 +658,15 @@ function heldRequest(event: AgentEvent): { agentId: string; requestId: string | 
   }
 }
 
-/** The agent and the kind of an event that can notify. `notificationForAgentEvent` decides the rest. */
-function eventSubject(event: AgentEvent): PushNotificationSubject | null {
+/**
+ * The agent and the kind of an event that can notify. `notificationForAgentEvent` decides the rest.
+ * `sideThread` is true for the turn of a `thread-turn-completed` event.
+ */
+function eventSubject(event: AgentEvent, sideThread: boolean): PushNotificationSubject | null {
   if (!agentEventCanNotify(event)) return null;
   switch (event.type) {
     case "turn-completed":
-      return { agentId: event.agentId, kind: event.status === "completed" ? "reply" : "failed" };
+      return { agentId: event.agentId, kind: event.status === "completed" ? "reply" : "failed", sideThread };
     case "prompt":
       return { agentId: event.agentId, kind: "input" };
     case "approval":

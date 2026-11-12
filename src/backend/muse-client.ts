@@ -12,7 +12,9 @@ import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
 import { Effect, Exit, Fiber, Option, Schema, Scope } from "effect";
+import { shownFailureDetail } from "./acp-flavor";
 import { secretElicitationField } from "./agent/prompts";
+import { TurnContext } from "./agent/turn-context";
 import { type AgentClient, type AgentProvider, type DiagnosticOrigin, RequestTimeoutError } from "./agent-client";
 import { type AgentCliInfo, cliPathEnvironment, cliSpawnTarget } from "./cli";
 import { runCauseEffect } from "./effect-boundary";
@@ -28,7 +30,7 @@ import {
   mcpAgentParam,
   usableMcpServers,
 } from "./mcp-provider-shapes";
-import { mcpSecretValues, redactMcpValues } from "./mcp-redaction";
+import { isInheritedProfileValue, mcpSecretValues, redactMcpValues } from "./mcp-redaction";
 import {
   MuseApproval,
   MuseItem,
@@ -115,6 +117,9 @@ interface MuseThread {
 export class MuseAgentClient extends EventEmitter<ClientEvents> implements AgentClient {
   readonly contextCompaction = "events";
   readonly provider: AgentProvider = "muse";
+  /** The memories and section-mates go with the turns, so a memory change sends no instructions again. */
+  readonly turnContext = true;
+  readonly #turnContext = new TurnContext();
   readonly #cli: AgentCliInfo;
   readonly #options: MuseProviderOptions;
   readonly #bridge = new LocalMcpBridge();
@@ -199,6 +204,7 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
     yield* this.#read("view/unsubscribe", { sessionId: id });
     thread.mcp.close();
     this.#threads.delete(id);
+    this.#turnContext.forget(id);
   });
 
   readonly request = Effect.fn("MuseAgentClient.request")(function* <T>(
@@ -489,6 +495,7 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
     if (held) {
       // The next turn carries changed instructions.
       held.instructions = getString(params, "developerInstructions") ?? held.instructions;
+      this.#turnContext.set(id, params, true);
       return { thread: { id } };
     }
     const cwd = yield* providerSync(() => requiredString(params, "cwd"));
@@ -513,7 +520,7 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
     const setup = Effect.gen({ self: this }, function* () {
       const resolved = yield* usableMcpServers(
         agentMcpServers(
-          this.#options.profileGeneration ? [] : (this.#options.mcpServers?.() ?? []),
+          this.#options.profileGeneration ? [] : (this.#options.mcpServers?.(mcpAgentParam(params)) ?? []),
           computerUseParam(params),
         ),
         this.#options.mcpToolRuntimes?.(),
@@ -523,7 +530,9 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
       for (const secret of mcpSecretValues(resolved.map((server) => server.config))) this.#secrets.add(secret);
       const handoff = acpMcpServers(resolved);
       for (const server of [...handoff.servers, ...bridge.servers]) {
-        for (const entry of "headers" in server ? server.headers : server.env) this.#secrets.add(entry.value);
+        for (const entry of "headers" in server ? server.headers : server.env) {
+          if (!isInheritedProfileValue(entry.name, entry.value)) this.#secrets.add(entry.value);
+        }
       }
       this.#options.reportMcpDrops?.(this.provider, handoff.dropped);
       const mcpServers = Object.fromEntries(
@@ -572,6 +581,7 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
       }).pipe(Effect.flatMap((value) => this.#decode(MuseSession, value)));
       if (response.session.sessionId !== id)
         return yield* providerFailure(new Error(sourceText("error.provider.museSessionMismatch")));
+      this.#turnContext.set(id, params, resume);
       return { thread: { id } };
     });
     return yield* setup.pipe(
@@ -622,8 +632,16 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
     if (model && model !== "default")
       yield* this.#command("session/setModel", { sessionId: thread.id, model: { modelId: model, providerId: "meta" } });
     const input = compact ? [] : yield* musePrompt(params);
-    // The session keeps the instructions in its context until a compaction replaces them.
-    if (!compact && thread.instructions && thread.instructionsSent !== thread.instructions) {
+    // The session keeps the instructions in its context until a compaction replaces them. With the
+    // instructions again, the memories and section-mates go in full too.
+    const sendInstructions = !compact && thread.instructions && thread.instructionsSent !== thread.instructions;
+    if (sendInstructions) this.#turnContext.resend(thread.id);
+    // A slash command gets no blocks: the agent reads a command only at the start of the input.
+    const first = input[0];
+    const command = first?.type === "text" && first.text?.startsWith("/") === true;
+    if (!compact)
+      input.unshift(...this.#turnContext.take(thread.id, command).map((text) => ({ type: "text" as const, text })));
+    if (sendInstructions) {
       input.unshift({ type: "text", text: thread.instructions });
       thread.instructionsSent = thread.instructions;
     }
@@ -729,7 +747,10 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
     if (!turn) return;
     thread.turn = null;
     // The session may not have kept the input of a turn that failed.
-    if (status === "failed" && !turn.compact) thread.instructionsSent = null;
+    if (status === "failed" && !turn.compact) {
+      thread.instructionsSent = null;
+      this.#turnContext.resend(thread.id);
+    }
     for (const controller of thread.approvals.values()) controller.abort();
     thread.approvals.clear();
     this.#emit("turn/completed", { threadId: thread.id, turn: { id: turn.id, status } });
@@ -833,7 +854,10 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
     if (method === "item/started" || method === "item/updated" || method === "item/completed") {
       const event = yield* this.#decode(Schema.Struct({ item: MuseItem }), params);
       this.#publish(thread, event.item);
-      if (event.item.kind === "compaction" && event.item.status === "completed") thread.instructionsSent = null;
+      if (event.item.kind === "compaction" && event.item.status === "completed") {
+        thread.instructionsSent = null;
+        this.#turnContext.resend(thread.id);
+      }
       if (thread.turn?.compact && event.item.kind === "compaction" && event.item.status !== "inProgress")
         this.#finish(
           thread,
@@ -884,13 +908,17 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
       const history = yield* this.#history(thread.id);
       for (const item of history) this.#publish(thread, item);
       if (terminal.terminal === "failed") {
+        const message = this.#redact(
+          terminal.error?.message ?? terminal.reason ?? sourceText("error.provider.museTurnFailed"),
+        );
         this.#emit("error", {
           threadId: thread.id,
           turnId: terminal.turnId,
           error: {
-            message: this.#redact(
-              terminal.error?.message ?? terminal.reason ?? sourceText("error.provider.museTurnFailed"),
-            ),
+            // Meta refuses a model this way also where Muse is not offered (#5983).
+            message: /\bmodel\b.{0,80}\bdoes not exist or you lack access\b/iu.test(message)
+              ? sourceText("error.provider.museModelUnavailable", { detail: shownFailureDetail(message) })
+              : message,
           },
           willRetry: false,
         });

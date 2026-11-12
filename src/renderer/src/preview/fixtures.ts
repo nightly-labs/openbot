@@ -184,6 +184,7 @@ export const STORY_MODELS: ClientAgentModelOption[] = [
     defaultReasoningEffort: "high",
     supportedReasoningEfforts: ["medium", "high", "xhigh"],
     fastServiceTier: "priority",
+    ultrafastServiceTier: "ultrafast",
   },
   {
     provider: "claude",
@@ -227,6 +228,14 @@ export const STORY_MODELS: ClientAgentModelOption[] = [
   },
   {
     provider: "grok",
+    id: "grok-4.7",
+    name: "Grok 4.7",
+    description: "Discovered from Grok CLI over ACP.",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["low", "medium", "high"],
+  },
+  {
+    provider: "grok",
     id: "grok-4.6",
     name: "Grok 4.6",
     description: "Discovered from Grok CLI over ACP.",
@@ -245,7 +254,7 @@ export const STORY_MODELS: ClientAgentModelOption[] = [
     provider: "antigravity",
     id: "gemini-3.1-pro",
     name: "Gemini 3.1 Pro",
-    description: "Discovered from the Antigravity ACP server.",
+    description: "Discovered from the Antigravity CLI.",
     defaultReasoningEffort: "high",
     supportedReasoningEfforts: ["low", "high"],
   },

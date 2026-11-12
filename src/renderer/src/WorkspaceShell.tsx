@@ -7,8 +7,9 @@ import {
   serverWorkspacePhase,
 } from "@openbot/ui/features/servers/ServerConnectionNotice";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import { useAccountUsagePolling } from "./features/account/account-usage-polling";
+import { AgentDockHost, useAgentDockPlacement } from "./features/agent-dock/AgentDockHost";
 import { useAgents } from "./features/agents/agents-context";
 import { WorkspaceAgentSetup } from "./features/agents/WorkspaceAgentSetup";
 import { useChannels } from "./features/channels/channels-context";
@@ -19,6 +20,7 @@ import { useDirectMessages } from "./features/conversation/direct-messages-conte
 import { WorkspaceConversation } from "./features/conversation/WorkspaceConversation";
 import { WorkspaceDirectConversation } from "./features/conversation/WorkspaceDirectConversation";
 import { useCustomAgentUsagePolling } from "./features/custom-agents/custom-agent-usage-polling";
+import { serverHasStorage } from "./features/files/storage-usage";
 import { WorkspaceServerOnboarding } from "./features/onboarding/WorkspaceServerOnboarding";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
 import { WorkspaceRoutineFlows } from "./features/routine-flows/WorkspaceRoutineFlows";
@@ -63,7 +65,16 @@ import { WorkspaceOverlays } from "./WorkspaceOverlays";
  * closes the page, as each row calls `showAgents`. The other pages of the rail - schedule, usage or settings - sit outside that
  * group and inert it.
  */
-export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
+export function WorkspaceShell(props: {
+  account: () => CentralAuthUser;
+  /**
+   * The startup splash covers the window and does not let heavy views mount yet. The first load then
+   * shows no screen of its own, only its toast, and the chat waits to mount.
+   */
+  behindSplash?: () => boolean;
+  /** The first load does not cover the window any more, so the startup splash can go. */
+  onStartupReady?: () => void;
+}) {
   const platform = usePlatform();
   /** A window that main opened for one chat shows that chat alone, with no rail and no sidebar. */
   const chatWindow = platform.chatWindow !== null;
@@ -87,6 +98,9 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
     refreshServers,
   } = useServers();
   const { remoteDesktopWorkspaceVisible } = useRemoteDesktop();
+  const agentDockPlacement = useAgentDockPlacement();
+  /* The dock in the window keeps a column at the right edge, so it does not cover the panes. */
+  const windowAgentDock = () => agentDockPlacement() === "window" && activeServer() !== undefined;
   const { agentSetupOpen, serverOnboardingOpen, activeAgent, agentList, agentListSettled } = useAgents();
   const { conversations, retryConversation } = useConversation();
   const activeConversation = () => conversations[activeAgent()?.id ?? ""];
@@ -133,14 +147,17 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
       if (unsupported) usage.closeUsage();
     },
   );
-  /** The list stays while a connection screen covers the page: the screen does not span the sidebar. */
-  const tasksAgentsHidden = () =>
-    middlePane() === "tasks" &&
-    !windowPage.tasksAgentsOpen() &&
-    scope.loaded() &&
-    !scope.connection.panelsFailed &&
-    !blockedRemoteServer();
-
+  /** The Library follows a server switch too. An older joined server has no storage routes and no Library button. */
+  createEffect(
+    () => {
+      const server = activeServer();
+      if (usage.state.serverId === null || usage.state.view !== "library") return false;
+      return !!server?.compatibility?.hostAppVersion && !serverHasStorage(server);
+    },
+    (unsupported) => {
+      if (unsupported) usage.closeUsage();
+    },
+  );
   const blockedRemoteServer = createMemo(() => {
     const server = activeServer();
     // A hosted server that sleeps or wakes keeps the workspace on screen. The next input wakes it.
@@ -173,6 +190,16 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
     if (issue) return { message: sourceText(issue.message), reference: issue.reference ?? null };
     return scope.connection.failed ? scope.connection.failure : null;
   };
+  // A remote connection can read online while the host does not answer it. Each read then failed after
+  // the same wait (#5912). The check replaces the connection only when the host does not answer.
+  const checkRemoteConnection = () => {
+    const server = activeServer();
+    if (server?.kind === "remote" && server.state === "online") void retryServerConnection(server.id);
+  };
+  const retryConversationLoad = () => {
+    checkRemoteConnection();
+    retryConversation();
+  };
   const retry = () => {
     const server = activeServer();
     if (!serversLoaded()) {
@@ -180,8 +207,10 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
       return;
     }
     if (!server) return;
-    if (server.state === "online") scope.retry();
-    else void retryServerConnection(server.id);
+    if (server.state === "online") {
+      checkRemoteConnection();
+      scope.retry();
+    } else void retryServerConnection(server.id);
   };
   // The main window shows the toasts and prompts of the servers once.
   if (!chatWindow)
@@ -196,6 +225,80 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
           }
         : null;
     });
+
+  const connectionShown = () =>
+    (!serversLoaded() || !scope.connection.synced || (remote() && !scope.loaded())) && !blockedRemoteServer();
+  const connectionPhase = () =>
+    serverWorkspacePhase({
+      hostedSleep: activeServer()?.hostedSleep,
+      updating: activeServer()?.hostRestart?.state === "restarting",
+      blocked: serversLoadFailed(),
+      waiting: scope.connection.failed,
+      loading: activeServer()?.state === "online",
+      hasContent: scope.connection.synced,
+    });
+  // The first load covers the whole window. A server that is offline, sleeps, fails or waits shows its
+  // screen in the pane only, so the user can select another server from the rail.
+  const fullWindowLoading = () =>
+    connectionShown() &&
+    !scope.connection.synced &&
+    (connectionPhase() === "loading" || connectionPhase() === "connecting") &&
+    (!serversLoaded() ||
+      activeServer()?.state === "online" ||
+      activeServer()?.state === "connecting" ||
+      // Main reports a remote server as offline before its first connection; only a reported issue ends the cover.
+      (activeServer()?.state === "offline" && !activeServer()?.issue));
+  // The full-window screen stays after the load ends, so its crew hop out before it goes. A new
+  // first load after its exit mounts a new screen.
+  const [loadingCover, setLoadingCover] = createSignal(false);
+  const [coverOpen, setCoverOpen] = createSignal(false);
+  // The chat is the heaviest view to mount. It waits while a loading screen moves its crew, so they do
+  // not stutter, and mounts while the screen fades.
+  const chatHeld = () => !!props.behindSplash?.() || (loadingCover() && !coverOpen());
+  createEffect(
+    // The landing demo loads its mock data at once, so it shows no loading screen.
+    () => !platform.landingPreview && fullWindowLoading() && !loadingCover() && !props.behindSplash?.(),
+    (show) => {
+      if (!show) return;
+      setCoverOpen(false);
+      setLoadingCover(true);
+    },
+  );
+  createEffect(
+    () => (fullWindowLoading() ? undefined : props.onStartupReady),
+    (onStartupReady) => {
+      onStartupReady?.();
+    },
+  );
+  const connectionNotice = (cover = false, screen = true) => (
+    <ServerConnectionNotice
+      screen={screen}
+      name={activeServer()?.name ?? ""}
+      initial={cover || !scope.connection.synced}
+      ready={cover ? !fullWindowLoading() : undefined}
+      onExited={cover ? () => setLoadingCover(false) : undefined}
+      onMountViews={cover ? () => setCoverOpen(true) : undefined}
+      issue={activeServer()?.hostedIssue ?? null}
+      start={activeServer()?.hostedStart ?? null}
+      detail={connectionFailure()?.message ?? null}
+      reference={connectionFailure()?.reference ?? null}
+      updateVersion={activeServer()?.hostRestart?.version ?? null}
+      phase={connectionPhase()}
+      fullWindow={fullWindowLoading()}
+      remainingSeconds={
+        scope.connection.recovery.phase === "waiting" || scope.connection.recovery.phase === "cooldown"
+          ? scope.connection.recovery.remainingSeconds
+          : 0
+      }
+      busy={
+        activeServer()?.state === "connecting" ||
+        (activeServer()?.state === "online" && scope.connection.recovery.phase === "connecting")
+      }
+      onRetry={retry}
+      onManage={() => settings.openAppSettings(null, "hosted-servers")}
+      upsell={offlineUpsell()}
+    />
+  );
 
   const remoteHosts = (): HostRestartView[] =>
     servers().flatMap((server) =>
@@ -224,57 +327,28 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
       <div class="app-window">
         <WorkspacePageRail hidden={chatWindow || remoteDesktopWorkspaceVisible()} />
         <WorkspaceFrame
-          class={chatWindow ? "app-frame-chat-window" : undefined}
+          class={chatWindow ? "app-frame-chat-window" : windowAgentDock() ? "app-frame-agent-dock" : undefined}
           compact={layout.leftPanelCompact()}
-          initialLoading={!serversLoaded() || !scope.connection.hasContent}
+          initialLoading={!serversLoaded() || !scope.connection.synced}
           connection={
             <>
-              <Show
-                when={
-                  (!serversLoaded() || !scope.connection.hasContent || (remote() && !scope.loaded())) &&
-                  !blockedRemoteServer()
-                }
-              >
-                <ServerConnectionNotice
-                  name={activeServer()?.name ?? ""}
-                  initial={!scope.connection.hasContent}
-                  issue={activeServer()?.hostedIssue ?? null}
-                  start={activeServer()?.hostedStart ?? null}
-                  detail={connectionFailure()?.message ?? null}
-                  reference={connectionFailure()?.reference ?? null}
-                  updateVersion={activeServer()?.hostRestart?.version ?? null}
-                  phase={serverWorkspacePhase({
-                    hostedSleep: activeServer()?.hostedSleep,
-                    updating: activeServer()?.hostRestart?.state === "restarting",
-                    blocked: serversLoadFailed(),
-                    waiting: scope.connection.failed,
-                    loading: activeServer()?.state === "online",
-                    hasContent: scope.connection.hasContent,
-                  })}
-                  remainingSeconds={
-                    scope.connection.recovery.phase === "waiting" || scope.connection.recovery.phase === "cooldown"
-                      ? scope.connection.recovery.remainingSeconds
-                      : 0
-                  }
-                  busy={
-                    activeServer()?.state === "connecting" ||
-                    (activeServer()?.state === "online" && scope.connection.recovery.phase === "connecting")
-                  }
-                  onRetry={retry}
-                  onManage={() => settings.openAppSettings(null, "hosted-servers")}
-                  upsell={offlineUpsell()}
-                />
-              </Show>
+              <Show when={connectionShown() && !fullWindowLoading()}>{connectionNotice()}</Show>
               <Show when={scope.loaded() && agentChatOpen() && !serverOnboardingOpen()}>
                 <ConversationLoadNotice
                   name={activeAgent()?.name ?? ""}
                   loading={!activeConversation()?.loaded && activeConversation()?.loading === true}
                   error={activeConversation()?.loadError ?? null}
-                  onRetry={retryConversation}
+                  onRetry={retryConversationLoad}
                 />
               </Show>
               <Show when={scope.loaded() && scope.connection.panelsFailed}>
-                <ServerPanelLoadNotice busy={scope.connection.panelsLoading} onRetry={() => void scope.retryPanels()} />
+                <ServerPanelLoadNotice
+                  busy={scope.connection.panelsLoading}
+                  onRetry={() => {
+                    checkRemoteConnection();
+                    void scope.retryPanels();
+                  }}
+                />
               </Show>
             </>
           }
@@ -282,7 +356,6 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
           blockedServer={blockedRemoteServer()}
           onRetryServer={retryServerConnection}
           windowPage={windowPage.page()}
-          sidebarHidden={tasksAgentsHidden()}
           left={
             <Show when={!chatWindow}>
               <WorkspaceServerRail />
@@ -295,6 +368,7 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
               <WorkspaceOverlays account={props.account} />
               <Show when={!chatWindow}>
                 <ServerUpdateDialogHost hosts={remoteHosts()} />
+                <AgentDockHost />
               </Show>
             </>
           }
@@ -305,8 +379,6 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
                 serverId={serverId()}
                 hostName={servers().find((server) => server.id === serverId())?.name ?? t("app.page.serverFallback")}
                 onBack={usage.closeUsage}
-                agentsOpen={!tasksAgentsHidden()}
-                onToggleAgents={() => windowPage.setTasksAgentsOpen(tasksAgentsHidden())}
               />
             )}
           </Show>
@@ -320,7 +392,7 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
           <Show when={activePeopleEnabled() && middlePane() === "direct" && activeDirectMember()?.id} keyed>
             <Show when={activeDirectMember()}>{(member) => <WorkspaceDirectConversation member={member()} />}</Show>
           </Show>
-          <Show when={agentChatOpen()}>
+          <Show when={agentChatOpen() && !chatHeld()}>
             <WorkspaceConversation account={props.account} />
           </Show>
           <Show when={middlePane() === "routines"}>
@@ -330,6 +402,10 @@ export function WorkspaceShell(props: { account: () => CentralAuthUser }) {
             <WorkspaceChannelConversation account={props.account} />
           </Show>
         </WorkspaceFrame>
+        <Show when={loadingCover()}>{connectionNotice(true)}</Show>
+        <Show when={fullWindowLoading() && !loadingCover() && props.behindSplash?.()}>
+          {connectionNotice(true, false)}
+        </Show>
       </div>
     </ConnectorsProvider>
   );

@@ -10,8 +10,12 @@ import type { RemoteWorkflowError } from "./remote-service-effects";
 import type { HostPhase } from "@openbot/contracts/ipc";
 import { runCauseEffect } from "../backend/effect-boundary";
 
-const CHECK_INTERVAL_MS = 60_000;
-const START_RETRY_DELAYS_MS = [30_000, 60_000, 2 * 60_000, 5 * 60_000, 10 * 60_000];
+/**
+ * The check only reads the host phase. It is short because a device that woke a hosted server waits
+ * for this retry when the first start fails. The delays between starts keep the account server load low.
+ */
+const CHECK_INTERVAL_MS = 5_000;
+const START_RETRY_DELAYS_MS = [10_000, 30_000, 60_000, 2 * 60_000, 5 * 60_000, 10 * 60_000];
 const RETRY_PHASES: ReadonlySet<HostPhase> = new Set(["error", "idle", "unconfigured"]);
 
 export interface HostedServerStartRetryOptions {

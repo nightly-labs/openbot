@@ -10,21 +10,22 @@
 import type { ChannelSummary } from "@openbot/contracts/ipc";
 import { Badge, buttonVariants, ContextMenu } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createSignal, Show } from "solid-js";
+import { createMemo, createSignal, Show } from "solid-js";
 import { useText } from "../../text";
 import { ChannelAvatar } from "../channels/ChannelAvatar";
 import { SidebarAgentIndicator, SidebarWaitChip, SidebarWaitTooltip } from "./SidebarAgentIndicator";
 import { SidebarChannelContextMenu, SidebarDeletedChannelContextMenu } from "./SidebarChannelContextMenu";
+import { sidebarUnreadBadge } from "./sidebar-agent-states";
 import { sidebarAgentStateLabel, sidebarMessageTime } from "./sidebar-filtering";
 import { useSidebarScope } from "./sidebar-scope";
 
-/** `waiting` is set by the "Needs you" group, as on `SidebarAgentRow`. */
+/** `waiting` is set by the "Needs you" and "Unread" groups, as on `SidebarAgentRow`. */
 export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?: boolean }) {
   const {
     dragOffset,
     draggedChatId,
     endChatDragging,
-    layoutMutable,
+    chatsDraggable,
     props,
     sidebarClickIsSuppressed,
     startChatDragging,
@@ -32,12 +33,13 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
   const { t, format } = useText();
   const active = () => props.activeChannelId === rowProps.channel.id;
   const channelWait = () => props.channelWaits?.[rowProps.channel.id];
+  const badgeState = createMemo(() => sidebarUnreadBadge(rowProps.channel.unreadCount, channelWait()));
   const wait = () => (rowProps.waiting ? channelWait() : undefined);
   const waitLabel = () => {
     const current = channelWait();
     return current ? `. ${sidebarAgentStateLabel(current, t, format)}` : "";
   };
-  const draggable = () => !rowProps.channel.archived && layoutMutable() && !props.compact && !rowProps.waiting;
+  const draggable = () => !rowProps.channel.archived && chatsDraggable() && !props.compact && !rowProps.waiting;
   const [menuOpen, setMenuOpen] = createSignal(false);
   const title = () => rowProps.channel.title.trim();
   // A row from a saved frame has no last message yet: it shows no preview and no time until the list loads.
@@ -84,27 +86,16 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
             icon={rowProps.channel.icon}
             imageUrl={rowProps.channel.imageUrl}
           />
-          <Show
-            when={channelWait()}
-            fallback={
-              <Show when={rowProps.channel.unreadCount > 0}>
-                <Badge class="person-unread-badge" variant="primary-light" aria-hidden="true">
-                  {Math.min(rowProps.channel.unreadCount, 99)}
-                </Badge>
-              </Show>
-            }
-          >
-            <SidebarAgentIndicator state={channelWait} />
-          </Show>
+          <SidebarAgentIndicator state={badgeState} />
         </span>
         <span class="agent-row-copy">
           <span class="agent-row-heading">
             <span class="agent-row-title">
-              <strong>{rowProps.channel.name}</strong>
+              <strong dir="auto">{rowProps.channel.name}</strong>
               <Show when={title()}>
                 {(label) => (
                   <Badge class="agent-role-badge" title={label()}>
-                    <span>{label()}</span>
+                    <span dir="auto">{label()}</span>
                   </Badge>
                 )}
               </Show>
@@ -113,7 +104,9 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
               {(current) => <SidebarWaitChip reason={current().reason} />}
             </Show>
           </span>
-          <span class="agent-row-preview">{preview()}</span>
+          <span class="agent-row-preview" dir="auto">
+            {preview()}
+          </span>
         </span>
         <Show when={rowProps.channel.unreadCount > 0}>
           <span class="sr-only">{t("sidebar.channel.unread", { count: rowProps.channel.unreadCount })}</span>

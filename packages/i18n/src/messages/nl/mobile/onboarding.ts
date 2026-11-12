@@ -63,6 +63,7 @@ export const messages = {
   "mobile.onboarding.task.creating": "Aanmaken…",
   "mobile.onboarding.task.withoutTask": "Maak zonder taak",
   "mobile.onboarding.task.failed": "Kan de agent niet maken. Probeer opnieuw.",
+  "mobile.onboarding.task.sendFailed": "Je eerste taak is niet verzonden. Stuur hem in de chat.",
   "mobile.onboarding.idea.builder1": "Maak een kleine webapp voor een takenlijst.",
   "mobile.onboarding.idea.builder2": "Leg uit hoe Git-branches werken, met voorbeelden.",
   "mobile.onboarding.idea.builder3": "Schrijf een script dat mijn foto’s op datum sorteert.",

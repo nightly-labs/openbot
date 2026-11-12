@@ -1,4 +1,5 @@
-import type { VaultItemSummary } from "@openbot/contracts/ipc";
+import type { VaultItemSummary, VaultTwoStepCodes } from "@openbot/contracts/ipc";
+import { parseTwoStepKey, twoStepCode, twoStepRemainingMs } from "@openbot/contracts/two-step-code";
 import { VaultPanel } from "@openbot/ui/features/vault/VaultPanel";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
@@ -11,6 +12,7 @@ const ITEMS: VaultItemSummary[] = [
     username: "ada@example.com",
     notes: "",
     hasPassword: true,
+    hasTwoStep: true,
   },
   {
     id: "login-linear",
@@ -19,8 +21,17 @@ const ITEMS: VaultItemSummary[] = [
     username: "ada",
     notes: "Team workspace",
     hasPassword: true,
+    hasTwoStep: true,
   },
-  { id: "login-router", kind: "login", website: "192.168.1.1", username: "admin", notes: "", hasPassword: false },
+  {
+    id: "login-router",
+    kind: "login",
+    website: "192.168.1.1",
+    username: "admin",
+    notes: "",
+    hasPassword: false,
+    hasTwoStep: false,
+  },
   {
     id: "card-company",
     kind: "card",
@@ -70,6 +81,29 @@ const ITEMS: VaultItemSummary[] = [
   { id: "key-stripe", kind: "apiKey", name: "STRIPE_SECRET_KEY", notes: "", hasKey: true },
 ];
 
+/** Demo keys. In the app, main makes the codes and the keys never come to the window. */
+const DEMO_KEYS: Readonly<Record<string, string>> = {
+  "login-github": "JBSWY3DPEHPK3PXP",
+  "login-linear": "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+};
+
+async function demoCodes(): Promise<VaultTwoStepCodes> {
+  const at = Date.now();
+  const codes = await Promise.all(
+    Object.entries(DEMO_KEYS).map(async ([id, text]) => {
+      const key = parseTwoStepKey(text);
+      if (!key) throw new Error(`Invalid demo key for ${id}.`);
+      return {
+        id,
+        code: await twoStepCode(key, at),
+        period: key.period,
+        remainingMs: twoStepRemainingMs(key.period, at),
+      };
+    }),
+  );
+  return { codes };
+}
+
 const meta = {
   title: "Settings/VaultPanel",
   component: VaultPanel,
@@ -81,6 +115,7 @@ const meta = {
     onReveal: fn(async () => "correct-horse-battery"),
     onCopy: fn(async () => undefined),
     onCopyText: fn(async () => undefined),
+    onCodes: fn(demoCodes),
     onImportCsv: fn(async () => ({ imported: 3, skipped: 1, state: { status: "ready" as const, items: ITEMS } })),
     onReset: fn(async () => undefined),
   },
@@ -105,10 +140,14 @@ export const Unreadable: Story = { args: { state: { status: "unreadable", items:
 /** A joined server, for its owner or admin: the New item menu has no CSV import. */
 export const JoinedServer: Story = { args: { onImportCsv: undefined } };
 
+/** A joined server without `vault-v3`: it cannot keep two-step keys, so logins show no code. */
+export const JoinedServerWithoutTwoStep: Story = { args: { onImportCsv: undefined, onCodes: undefined } };
+
 /** A joined server without `vault-v2`: it cannot keep API keys, so the kind and its tab are not offered. */
 export const OlderJoinedServer: Story = {
   args: {
     onImportCsv: undefined,
+    onCodes: undefined,
     apiKeys: false,
     state: { status: "ready", items: ITEMS.filter((item) => item.kind !== "apiKey") },
   },

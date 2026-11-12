@@ -1,7 +1,9 @@
-import { Badge, Button, Check, Lock } from "@openbot/ui";
-import { createUniqueId, Match, Show, Switch } from "solid-js";
+import { Button, Lock } from "@openbot/ui";
+import type { JSX } from "@solidjs/web";
+import { Match, Show, Switch } from "solid-js";
 import { useText } from "../../text";
 import { PluginIcon } from "../marketplace/PluginIcon";
+import { UiBlockCard } from "./ui-blocks/UiBlockCard";
 
 /**
  * Where the sign-in is. `signed-in`: the agent can test the server again. `sent`: the user told it
@@ -28,55 +30,59 @@ export interface McpSignInCardProps {
  */
 export function McpSignInCard(props: McpSignInCardProps) {
   const { t } = useText();
-  const titleId = createUniqueId();
+  const sent = () => props.state === "sent";
+  const canContinue = () => props.state === "signed-in" && props.onContinue !== undefined;
+  const canSignIn = () => props.state !== "unavailable" && props.onSignIn !== undefined;
+  const status = () => (sent() ? "answered" : "pending");
+  const outcome = () => (sent() ? t("chat.mcpSignIn.signedIn") : undefined);
+
+  function actionButtons(): JSX.Element | undefined {
+    if (!canContinue() && !canSignIn()) return undefined;
+    return (
+      <Switch>
+        <Match when={canContinue()}>
+          <Button
+            type="button"
+            size="sm"
+            aria-label={t("chat.mcpSignIn.continueNamed", { name: props.name })}
+            onClick={() => props.onContinue?.()}
+          >
+            {t("chat.mcpSignIn.continue")}
+          </Button>
+        </Match>
+        <Match when={canSignIn()}>
+          <Button
+            type="button"
+            variant={props.state === "signed-in" ? "outline" : "default"}
+            size="sm"
+            aria-label={t("chat.mcpSignIn.signInNamed", { name: props.name })}
+            onClick={() => props.onSignIn?.()}
+          >
+            {t("chat.mcpSignIn.signIn")}
+          </Button>
+        </Match>
+      </Switch>
+    );
+  }
+
   return (
-    <article class="conversation-interaction-card marketplace-suggestion" aria-labelledby={titleId}>
-      <header class="marketplace-suggestion-header">
-        <PluginIcon iconUrl={null} fallback="plugin" class="marketplace-suggestion-icon" />
-        <div class="marketplace-suggestion-heading">
-          <h3 id={titleId} class="marketplace-suggestion-title">
-            {props.name}
-          </h3>
-          <span class="marketplace-suggestion-description">{props.address}</span>
-        </div>
-        <div class="marketplace-suggestion-action" role="status">
-          <Switch>
-            <Match when={props.state === "sent"}>
-              <Badge variant="success-light" class="marketplace-suggestion-done">
-                <Check aria-hidden="true" />
-                {t("chat.mcpSignIn.signedIn")}
-              </Badge>
-            </Match>
-            <Match when={props.state === "signed-in" && props.onContinue}>
-              <Button
-                type="button"
-                size="sm"
-                aria-label={t("chat.mcpSignIn.continueNamed", { name: props.name })}
-                onClick={() => props.onContinue?.()}
-              >
-                {t("chat.mcpSignIn.continue")}
-              </Button>
-            </Match>
-            <Match when={props.state !== "unavailable" && props.onSignIn}>
-              <Button
-                type="button"
-                variant={props.state === "signed-in" ? "outline" : "default"}
-                size="sm"
-                aria-label={t("chat.mcpSignIn.signInNamed", { name: props.name })}
-                onClick={() => props.onSignIn?.()}
-              >
-                {t("chat.mcpSignIn.signIn")}
-              </Button>
-            </Match>
-          </Switch>
-        </div>
-      </header>
+    <UiBlockCard
+      class="marketplace-suggestion"
+      status={status()}
+      outcome={outcome()}
+      outcomeBadge
+      inlineActions
+      title={props.name}
+      subtitle={props.address}
+      icon={<PluginIcon iconUrl={null} fallback="plugin" class="ui-block-icon marketplace-suggestion-icon" />}
+      actions={actionButtons()}
+    >
       <Show when={props.state === "unavailable" && props.unavailableText}>
         <p class="marketplace-suggestion-unavailable">
           <Lock aria-hidden="true" />
           {props.unavailableText}
         </p>
       </Show>
-    </article>
+    </UiBlockCard>
   );
 }

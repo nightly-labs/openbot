@@ -46,6 +46,7 @@ export function hostedServerIpcHandlers({
         (value) => requireString(value, "serverId", INPUT_LIMITS.identifier),
         (serverId) => runCauseEffect(hostedServers.restart(serverId)),
       ),
+      createServerClaim: handler(() => runCauseEffect(hostedServers.createServerClaim())),
     },
   };
 }

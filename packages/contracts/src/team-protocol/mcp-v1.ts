@@ -88,6 +88,8 @@ const configFields: Fields = {
   headers: list(pair, 32),
 };
 const config: Decoder = (value) => record(value, configFields);
+/** One configuration as this contract bounds it. `mcp-many-servers-v1` reads a longer list of them. */
+export const mcpServerConfigWire: Decoder = config;
 const configs: Decoder = list(config, 32);
 // A test is a question, not a record: it answers what one connection found and nothing is stored.
 const testResult: Decoder = (value) => record(value, { toolCount: count, error: nullable(string(2_000)) });

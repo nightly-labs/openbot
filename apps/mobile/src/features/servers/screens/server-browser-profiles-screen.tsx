@@ -5,6 +5,8 @@ import { BrowserProfileDot } from "@/features/servers/components/browser-profile
 import { HeaderAddAction } from "@/features/servers/components/header-add-action";
 import { type BrowserProfileStack, openBrowserProfilePage } from "@/features/servers/model/browser-profile-pages";
 import { useServerBrowserProfiles } from "@/features/servers/model/use-server-browser-profiles";
+import { useBrowserProxyChoices, useServerBrowserProxies } from "@/features/servers/model/use-server-browser-proxies";
+import { BrowserProxiesSection } from "@/features/servers/screens/server-browser-proxy-screen";
 import {
   SettingsContent,
   SettingsNote,
@@ -29,8 +31,9 @@ export function useBrowserProfileUsage() {
 
 /**
  * Server settings > Browser profiles of a joined server (`browser-profiles-v1`): the shared profile,
- * then each named profile with its color, agents and open tabs. The header "+" adds a profile, and a
- * profile opens its page. A change made on the desktop or another device shows at once.
+ * then each named profile with its color, agents, open tabs and proxy, then the saved proxies when
+ * the host has `browser-proxies-v1`. The header "+" adds a profile, and a profile opens its page. A
+ * change made on the desktop or another device shows at once.
  */
 export function ServerBrowserProfilesScreen() {
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
@@ -47,6 +50,14 @@ function BrowserProfilesList({ serverId, stack }: { serverId: string; stack: Bro
   const { t, errorMessage } = useText();
   const usage = useBrowserProfileUsage();
   const { available, query, profiles, sharedAgentIds } = useServerBrowserProfiles(serverId);
+  const proxies = useServerBrowserProxies(serverId);
+  const proxyChoices = useBrowserProxyChoices(proxies.list);
+  /** "2 agents · 1 open tab · proxy.example.com" for a profile with a proxy. */
+  const profileUsage = (profile: { id: string; agentIds: readonly string[]; tabCount: number }) => {
+    const text = usage(profile.agentIds.length, profile.tabCount);
+    const proxy = proxyChoices.find((choice) => choice.profileIds.includes(profile.id));
+    return proxy ? t("mobile.server.browserProxies.profileUsage", { usage: text, proxy: proxy.name }) : text;
+  };
   if (!available || !profiles || !sharedAgentIds)
     return (
       <SettingsContent>
@@ -100,13 +111,14 @@ function BrowserProfilesList({ serverId, stack }: { serverId: string; stack: Bro
           <SettingsRow
             key={profile.id}
             leading={<BrowserProfileDot hue={profile.hue} />}
-            supportingText={usage(profile.agentIds.length, profile.tabCount)}
+            supportingText={profileUsage(profile)}
             onPress={() => openBrowserProfilePage(stack, serverId, { profileId: profile.id })}
           >
             <Typography.Paragraph numberOfLines={1}>{profile.name}</Typography.Paragraph>
           </SettingsRow>
         ))}
       </SettingsSection>
+      <BrowserProxiesSection serverId={serverId} stack={stack} />
     </SettingsContent>
   );
 }

@@ -1,0 +1,30 @@
+import type { PartialTranslation } from "../../message";
+import type { messages as source } from "../en/common";
+
+export const messages = {
+  "common.cancel": "ביטול",
+  "common.save": "שמירה",
+  "common.close": "סגירה",
+  "common.delete": "מחיקה",
+  "common.remove": "הסרה",
+  "common.edit": "עריכה",
+  "common.rename": "שינוי שם",
+  "common.retry": "ניסיון חוזר",
+  "common.copy": "העתקה",
+  "common.copied": "הועתק",
+  "common.done": "סיום",
+  "common.back": "חזרה",
+  "common.continue": "המשך",
+  "common.add": "הוספה",
+  "common.create": "יצירה",
+  "common.open": "פתיחה",
+  "common.search": "חיפוש",
+  "common.noMatches": "אין תוצאות",
+  "common.loading": "טוען…",
+  "common.saving": "שומר…",
+  "common.tryAgain": "ניסיון נוסף",
+  "common.connecting": "מתחבר…",
+  "common.download": "הורדה",
+  "common.removing": "מסיר…",
+  "common.sending": "שולח…",
+} as const satisfies PartialTranslation<typeof source>;

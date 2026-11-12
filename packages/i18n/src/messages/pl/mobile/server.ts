@@ -4,7 +4,6 @@ import type { messages as source } from "../../en/mobile/server";
 export const messages = {
   "mobile.server.drawer.local": "Lokalne",
   "mobile.server.drawer.remote": "Zdalne",
-  "mobile.server.drawer.routines": "Rutyny",
   "mobile.server.drawer.usage": "Użycie",
   "mobile.server.drawer.editOrder": "Zmień kolejność",
   "mobile.server.drawer.leaveFailed": "Nie udało się opuścić serwera {name}",
@@ -26,6 +25,14 @@ export const messages = {
     other: "{count} członka",
   },
   "mobile.server.drawer.doneEditing": "Zakończ zmianę kolejności",
+  "mobile.server.drawer.editSidebar": "Edytuj pasek boczny",
+  "mobile.server.drawer.unpinTool": "Odepnij",
+  "mobile.server.drawer.pinToolNamed": "Przypnij {name}",
+  "mobile.server.drawer.unpinToolNamed": "Odepnij {name}",
+  "mobile.server.drawer.unpinnedTool": "{name}, odpięte",
+  "mobile.server.drawer.toolsHint":
+    "Przeciągnij uchwyty, aby przenieść narzędzia. Odpięte narzędzia widać tylko podczas edycji. Kolejność jest zapisana na tym urządzeniu.",
+  "mobile.server.drawer.doneEditingSidebar": "Zakończ edycję",
   "mobile.server.drawer.join": "Dołącz do serwera",
   "mobile.server.drawer.add": "Dodaj serwer",
   "mobile.server.drawer.settings": "Ustawienia",
@@ -362,6 +369,8 @@ export const messages = {
   "mobile.server.route.invite": "Zaproś osoby",
   "mobile.server.route.member": "Członek",
   "mobile.server.route.timezone": "Strefa czasowa",
+  "mobile.server.route.personality": "Osobowość agenta",
+  "mobile.server.route.agents": "Agenci",
   "mobile.server.settings.storage": "Pamięć dyskowa",
   "mobile.server.route.storage": "Pamięć dyskowa",
   "mobile.server.route.storageFiles": "Wszystkie pliki",
@@ -404,8 +413,22 @@ export const messages = {
   "mobile.server.storage.clearFailed": "Nie udało się wyczyścić danych",
   "mobile.server.storage.clearFailedBody": "OpenBot nie mógł wyczyścić tych danych na serwerze.",
   "mobile.server.storage.noFiles": "Na tym serwerze nie ma zapisanych plików.",
+  "mobile.server.library.type.all": "Wszystkie",
+  "mobile.server.library.type.images": "Obrazy",
+  "mobile.server.library.type.documents": "Dokumenty",
+  "mobile.server.library.type.code": "Kod",
+  "mobile.server.library.type.spreadsheets": "Arkusze",
+  "mobile.server.library.type.media": "Audio i wideo",
+  "mobile.server.library.type.other": "Inne",
+  "mobile.server.library.fileType": "Typ pliku",
+  "mobile.server.library.emptyTitle": "Nie ma jeszcze plików",
+  "mobile.server.library.emptyBody": "Tu pojawiają się pliki, które załączasz, i pliki tworzone przez agentów.",
+  "mobile.server.library.noMatches": "Brak pasujących plików",
+  "mobile.server.library.showInChat": "Pokaż w czacie",
+  "mobile.server.library.share": "Udostępnij",
   "mobile.server.route.providers": "Dostawcy",
   "mobile.server.route.provider": "Dostawca",
+  "mobile.server.route.providerModels": "Modele",
   "mobile.server.route.mcp": "Serwery MCP",
   "mobile.server.route.mcpServer": "Serwer MCP",
   "mobile.server.members.rowLabel": "{name}, {role}",
@@ -428,7 +451,6 @@ export const messages = {
     "Ta osoba straci dostęp do serwera {server}. Aby dołączyć ponownie, potrzebuje nowego zaproszenia.",
   "mobile.server.members.expires": "Wygasa",
   "mobile.server.members.revokeInvitation": "Unieważnij zaproszenie",
-  "mobile.server.settings.status": "Stan",
   "mobile.server.settings.yourRole": "Twoja rola",
   "mobile.server.settings.memberCount": {
     one: "{count} z {limit}",
@@ -438,8 +460,9 @@ export const messages = {
   },
   "mobile.server.settings.aiSection": "AI i narzędzia",
   "mobile.server.settings.dataSection": "Dane",
-  "mobile.server.settings.maintenanceSection": "Konserwacja",
-  "mobile.server.settings.general": "Ogólne",
+  "mobile.server.settings.peopleSection": "Osoby",
+  "mobile.server.settings.moveSection": "Import i przeniesienie",
+  "mobile.server.settings.serverSection": "Serwer",
   "mobile.server.settings.timezone": "Strefa czasowa",
   "mobile.server.settings.timezoneAutomatic": "Automatyczna",
   "mobile.server.settings.timezoneSystem": "Strefa serwera: {zone}",
@@ -480,6 +503,40 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "Nie udało się zapisać limitu wspomnień. Spróbuj ponownie.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Zaktualizuj OpenBot na tym serwerze, aby zmienić tu jego limit wspomnień.",
+  "mobile.server.settings.memoryReview": "Przegląd wspomnień",
+  "mobile.server.settings.memoryReviewDescription":
+    "Jak często agenci na tym serwerze zapisują w tle trwałe fakty ze swoich czatów.",
+  "mobile.server.settings.memoryReviewOff": "Wyłączony",
+  "mobile.server.settings.memoryReviewTurns": {
+    one: "Co {count} turę",
+    few: "Co {count} tury",
+    many: "Co {count} tur",
+    other: "Co {count} tury",
+  },
+  "mobile.server.settings.memoryReviewLoadFailed": "Nie udało się wczytać ustawienia przeglądu wspomnień.",
+  "mobile.server.settings.skillLearning": "Uczenie się umiejętności",
+  "mobile.server.settings.skillLearningDescription":
+    "Czy agenci na tym serwerze zapisują to, czego się nauczą, jako umiejętności.",
+  "mobile.server.settings.skillLearningAutomatic": "Automatycznie",
+  "mobile.server.settings.skillLearningAsk": "Najpierw zapytaj",
+  "mobile.server.settings.skillLearningOff": "Wyłączone",
+  "mobile.server.settings.skillLearningLoadFailed": "Nie udało się wczytać ustawienia uczenia się umiejętności.",
+  "mobile.server.settings.browsingMemory": "Ucz się z mojego przeglądania",
+  "mobile.server.settings.browsingMemoryDescription":
+    "Gdy sterujesz przeglądarką agenta, agent uczy się działania stron z używanych przez Ciebie stron i przycisków. Wpisany tekst nie jest zapisywany.",
+  "mobile.server.settings.browsingMemoryLoadFailed": "Nie udało się wczytać ustawienia przeglądania.",
+  "mobile.server.settings.learningSaveFailed": "Nie udało się zapisać tego ustawienia. Spróbuj ponownie.",
+  "mobile.server.settings.learningUnsupported": "Zaktualizuj OpenBot na tym serwerze, aby zmienić tu to ustawienie.",
+  "mobile.server.settings.responseStyleDescription":
+    "Naturalny: agenci wysyłają krótkie aktualizacje podczas pracy, a czat je pokazuje. Klasyczny: agenci odpowiadają raz, gdy skończą.",
+  "mobile.server.settings.responseStyleNatural": "Naturalny",
+  "mobile.server.settings.responseStyleClassic": "Klasyczny",
+  "mobile.server.settings.personalityLoadFailed": "Nie udało się wczytać osobowości serwera.",
+  "mobile.server.settings.personalitySaveFailed": "Nie udało się zapisać stylu odpowiedzi. Spróbuj ponownie.",
+  "mobile.server.settings.personalityUnsupported":
+    "Zaktualizuj OpenBot na tym serwerze, aby zmienić tu jego styl odpowiedzi.",
+  "mobile.server.settings.agentsUnavailable":
+    "Połącz się z tym serwerem jako właściciel lub administrator, aby zmienić ustawienia agentów.",
   "mobile.server.route.browserProfiles": "Profile przeglądarki",
   "mobile.server.browserProfiles.unavailable":
     "Tylko właściciel lub administrator serwera online może zarządzać jego profilami przeglądarki.",
@@ -530,15 +587,74 @@ export const messages = {
   "mobile.server.browserProfiles.deleteBody":
     "To usuwa logowania, pliki cookie i dane witryn profilu. Jego otwarte karty zostaną zamknięte.",
   "mobile.server.browserProfiles.deleteAgents": "Ci agenci przejdą do profilu wspólnego: {agents}.",
+  "mobile.server.browserProxies.unsupported":
+    "Zaktualizuj OpenBot na tym serwerze, aby zarządzać tu jego serwerami proxy.",
+  "mobile.server.browserProxies.loading": "Wczytywanie serwerów proxy…",
+  "mobile.server.browserProxies.loadFailed": "OpenBot nie mógł wczytać serwerów proxy.",
+  "mobile.server.browserProxies.saveFailed": "OpenBot nie mógł zmienić serwera proxy.",
+  "mobile.server.browserProxies.title": "Serwery proxy",
+  "mobile.server.browserProxies.sectionHint":
+    "Profil z serwerem proxy otwiera strony przez ten serwer proxy. Członek udostępnia komputer z aplikacji OpenBot na komputer.",
+  "mobile.server.browserProxies.limit": "Serwer może mieć najwyżej {limit} serwerów proxy.",
+  "mobile.server.browserProxies.add": "Dodaj proxy",
+  "mobile.server.browserProxies.new": "Nowe proxy",
+  "mobile.server.browserProxies.menu": "Proxy",
+  "mobile.server.browserProxies.automatic": "Automatycznie",
+  "mobile.server.browserProxies.profileHint":
+    "„Automatycznie” używa ustawień proxy komputera, na którym działa serwer.",
+  "mobile.server.browserProxies.profileUsage": "{usage} · {proxy}",
+  "mobile.server.browserProxies.summary": "{scheme} · port {port} · {profiles}",
+  "mobile.server.browserProxies.computerSummary": "{state} · {profiles}",
+  "mobile.server.browserProxies.profiles": {
+    one: "{count} profil",
+    few: "{count} profile",
+    many: "{count} profili",
+    other: "{count} profilu",
+  },
+  "mobile.server.browserProxies.online": "Online",
+  "mobile.server.browserProxies.offline": "{name} jest offline",
+  "mobile.server.browserProxies.failing": "{name} nie odpowiada",
+  "mobile.server.browserProxies.signInRefused": "{name} odrzucił logowanie",
+  "mobile.server.browserProxies.yourComputer": "Twój komputer",
+  "mobile.server.browserProxies.memberComputer": "Komputer użytkownika {name}",
+  "mobile.server.browserProxies.unknownComputer": "Komputer członka",
+  "mobile.server.browserProxies.gone": "Tego serwera proxy nie ma już na serwerze.",
+  "mobile.server.browserProxies.editTitle": "Zmienić {name}?",
+  "mobile.server.browserProxies.address": "Adres",
+  "mobile.server.browserProxies.addressPlaceholder": "socks5://user:password@host:1080",
+  "mobile.server.browserProxies.addressHint":
+    "Użyj socks5, http lub https. Nazwa użytkownika i hasło są opcjonalne. Hasło pozostaje zaszyfrowane na komputerze, na którym działa serwer.",
+  "mobile.server.browserProxies.addressInvalid":
+    "To nie jest adres serwera proxy. Użyj socks5://host:1080, http://user:password@host:3128 lub host:port:user:password.",
+  "mobile.server.browserProxies.computerHint":
+    "Strony profili, które używają tego komputera, przechodzą przez jego połączenie internetowe, gdy jego członek udostępnia go w aplikacji OpenBot na komputer. Komputer otwiera tylko publiczne adresy internetowe.",
+  "mobile.server.browserProxies.profilesTitle": "Profile",
+  "mobile.server.browserProxies.delete": "Usuń proxy",
+  "mobile.server.browserProxies.deleteHint": "Usunięcie przełącza profile tego serwera proxy na „Automatycznie”.",
+  "mobile.server.browserProxies.deleteUsed": {
+    one: "{count} profil używa tego serwera proxy. Przełączy się na „Automatycznie”.",
+    few: "{count} profile używają tego serwera proxy. Przełączą się na „Automatycznie”.",
+    many: "{count} profili używa tego serwera proxy. Przełączą się na „Automatycznie”.",
+    other: "{count} profilu używa tego serwera proxy. Przełączą się na „Automatycznie”.",
+  },
+  "mobile.server.browserProxies.deleteUnused": "Żaden profil nie używa tego serwera proxy.",
+  "mobile.server.browserProxies.closesTabs": {
+    one: "Zamknie się {count} otwarta karta.",
+    few: "Zamkną się {count} otwarte karty.",
+    many: "Zamknie się {count} otwartych kart.",
+    other: "Zamknie się {count} otwartej karty.",
+  },
+  "mobile.server.browserProxies.changeTitle": "Zmienić serwer proxy profilu {name}?",
+  "mobile.server.browserProxies.change": "Zmień serwer proxy",
+  "mobile.server.browserProxies.choiceHint":
+    "„Automatycznie” używa ustawień proxy komputera, na którym działa serwer. Zmiana zamyka otwarte karty profilu.",
+  "mobile.server.browserProxies.shareHint":
+    "Aby użyć swojego komputera, udostępnij go w aplikacji OpenBot na komputer.",
   "mobile.server.route.connectors": "Konektory",
-  "mobile.server.settings.connectors": "Konektory",
   "mobile.server.connectors.unavailable":
     "Połącz się z tym serwerem jako właściciel lub administrator, aby zarządzać jego konektorami.",
   "mobile.server.connectors.unsupported": "Zaktualizuj OpenBot na tym serwerze, aby zarządzać tutaj jego konektorami.",
   "mobile.server.connectors.loading": "Wczytywanie konektorów…",
-  "mobile.server.connectors.onServer": "Na serwerze {name}",
-  "mobile.server.connectors.notSetUp": "Nieskonfigurowany",
-  "mobile.server.connectors.available": "Dostępne",
   "mobile.server.connectors.localOnly": "Tylko aplikacja na komputer",
   "mobile.server.connectors.statusConnected": "Połączono",
   "mobile.server.connectors.statusAttention": "Wymaga uwagi",
@@ -558,9 +674,6 @@ export const messages = {
   "mobile.server.connectors.addAgent": "Dodaj agenta",
   "mobile.server.connectors.later": "Później",
   "mobile.server.connectors.bitwarden.title": "Bitwarden",
-  "mobile.server.connectors.bitwarden.summary":
-    "Wypełnia loginy w przeglądarce z Bitwarden. Skonfiguruj go w aplikacji na komputer.",
-  "mobile.server.connectors.bitwarden.hostSummary": "Wypełnia loginy w przeglądarce z Bitwarden lub Vaultwarden",
   "mobile.server.connectors.bitwarden.description":
     "Wypełniaj loginy w przeglądarce na {host} z Bitwarden lub Vaultwarden.",
   "mobile.server.connectors.bitwarden.howItWorks":
@@ -587,7 +700,6 @@ export const messages = {
   "mobile.server.connectors.bitwarden.disconnectBody":
     "{host} usuwa klucz API i hasło główne. Agenci na {host} nie mogą już wypełniać danych logowania z Bitwarden.",
   "mobile.server.connectors.github.title": "GitHub",
-  "mobile.server.connectors.github.summary": "Repozytoria, zgłoszenia i pull requesty dla każdego agenta",
   "mobile.server.connectors.github.description":
     "Każdy agent na serwerze {host} może używać twoich repozytoriów, zgłoszeń i pull requestów z GitHub oraz gh i git.",
   "mobile.server.connectors.github.unavailable": "OpenBot na tym serwerze nie może połączyć z GitHub.",
@@ -623,7 +735,6 @@ export const messages = {
   "mobile.server.connectors.github.disconnectBody":
     "To usunie logowanie @{login} z serwera {host}, a każdy agent straci narzędzia GitHub, gh i git. Potem otworzy się GitHub, gdzie możesz cofnąć dostęp dla OpenBot.",
   "mobile.server.connectors.onePassword.title": "1Password",
-  "mobile.server.connectors.onePassword.summary": "Udostępniony sejf do logowania w przeglądarce OpenBot",
   "mobile.server.connectors.onePassword.description":
     "Udostępnij OpenBot na serwerze {host} osobny sejf 1Password przez konto usługi, aby agenci na serwerze {host} mogli logować się na strony w jego przeglądarce.",
   "mobile.server.connectors.onePassword.howItWorks":
@@ -647,18 +758,58 @@ export const messages = {
   "mobile.server.connectors.onePassword.disconnectTitle": "Odłączyć 1Password?",
   "mobile.server.connectors.onePassword.disconnectBody":
     "{host} zapomina token. Sejf i konto usługi zostają w 1Password; usuń je tam, jeśli już ich nie potrzebujesz.",
+  "mobile.server.connectors.protonPass.title": "Proton Pass",
+  "mobile.server.connectors.protonPass.description":
+    "Udostępnij jeden sejf Proton Pass OpenBotowi na {host}, aby agenci na {host} mogli logować się do stron w jego przeglądarce.",
+  "mobile.server.connectors.protonPass.keyHelp":
+    "W Proton Pass utwórz klucz dostępu, który może czytać tylko sejf udostępniony OpenBotowi, i wklej go tutaj. {host} przechowuje klucz; ten telefon nie.",
+  "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.passwordManager.unavailable": "{name} nie jest dostępny na tym serwerze.",
+  "mobile.server.connectors.passwordManager.howItWorks":
+    "Zaloguj się do {name} na tym telefonie. Potem {host} tworzy udostępniony sejf i klucz dostępu tylko do odczytu dla niego, i przechowuje tylko ten klucz. Agenci nigdy nie widzą hasła.",
+  "mobile.server.connectors.passwordManager.connect": "Połącz {name}",
+  "mobile.server.connectors.passwordManager.connecting": "Łączenie…",
+  "mobile.server.connectors.passwordManager.useKey": "Użyj klucza dostępu",
+  "mobile.server.connectors.passwordManager.key": "Klucz dostępu",
+  "mobile.server.connectors.passwordManager.connectWithKey": "Połącz kluczem",
+  "mobile.server.connectors.passwordManager.signInTitle": "Zaloguj się do {name}",
+  "mobile.server.connectors.passwordManager.signInFooter":
+    "Zaloguj się na stronie {name}. Ta strona zmieni się po zalogowaniu.",
+  "mobile.server.connectors.passwordManager.signInWaiting": "{host} pobiera stronę logowania…",
+  "mobile.server.connectors.passwordManager.openSignIn": "Otwórz stronę logowania",
+  "mobile.server.connectors.passwordManager.copyLink": "Kopiuj link",
+  "mobile.server.connectors.passwordManager.extraPassword": "Dodatkowe hasło",
+  "mobile.server.connectors.passwordManager.extraPasswordHint":
+    "{name} prosi o dodatkowe hasło. Trafia ono do {host} jeden raz; ten telefon go nie przechowuje.",
+  "mobile.server.connectors.passwordManager.extraPasswordWrong":
+    "Dodatkowe hasło jest nieprawidłowe. Spróbuj ponownie.",
+  "mobile.server.connectors.passwordManager.continue": "Dalej",
+  "mobile.server.connectors.passwordManager.setupBody": "{host} tworzy udostępniony sejf…",
+  "mobile.server.connectors.passwordManager.vaultTitle": "Udostępniony sejf",
+  "mobile.server.connectors.passwordManager.vaultFooter":
+    "Przenieś login do tego sejfu w {name}, aby agenci mogli się nim logować. Usuń go, aby przestać.",
+  "mobile.server.connectors.passwordManager.loginCount": {
+    one: "{count} login",
+    few: "{count} loginy",
+    many: "{count} loginów",
+    other: "{count} loginu",
+  },
+  "mobile.server.connectors.passwordManager.keyTitle": "Klucz dostępu",
+  "mobile.server.connectors.passwordManager.keyReadOnly": "Tylko do odczytu",
+  "mobile.server.connectors.passwordManager.keyExpires": "Tylko do odczytu. Wygasa {date}.",
+  "mobile.server.connectors.passwordManager.keyExpired": "Wygasł {date}",
+  "mobile.server.connectors.passwordManager.plan":
+    "Narzędzie wiersza poleceń {name} wymaga płatnego planu. Zmień plan konta, a potem połącz ponownie.",
+  "mobile.server.connectors.passwordManager.expiredTitle": "Klucz {name} wygasł",
+  "mobile.server.connectors.passwordManager.expiredBody":
+    "Agenci na {host} nie mogą logować się udostępnionymi loginami, dopóki nie połączysz ponownie.",
+  "mobile.server.connectors.passwordManager.disconnect": "Odłącz {name}",
+  "mobile.server.connectors.passwordManager.disconnectTitle": "Odłączyć {name}?",
+  "mobile.server.connectors.passwordManager.disconnectBody":
+    "{host} usuwa swój klucz dostępu. Sejf i jego loginy zostają na Twoim koncie {name}.",
   "mobile.server.connectors.slack.title": "Slack",
-  "mobile.server.connectors.slack.summary": "Ludzie oznaczają @OpenBot w Slacku",
   "mobile.server.connectors.slack.description":
     "Ludzie oznaczają @OpenBot w Slacku lub wysyłają mu wiadomość prywatną. Slack Orchestrator pyta odpowiedniego agenta i odpowiada.",
-  "mobile.server.connectors.slack.connected": "{workspace} · odpowiada Slack Orchestrator",
-  "mobile.server.connectors.slack.noAgent": "{workspace} · żaden agent jeszcze nie odpowiada",
-  "mobile.server.connectors.slack.many": {
-    one: "{count} obszar roboczy · odpowiada Slack Orchestrator",
-    few: "{count} obszary robocze · odpowiada Slack Orchestrator",
-    many: "{count} obszarów roboczych · odpowiada Slack Orchestrator",
-    other: "{count} obszaru roboczego · odpowiada Slack Orchestrator",
-  },
   "mobile.server.connectors.slack.attention": {
     one: "{count} obszar roboczy wymaga uwagi",
     few: "{count} obszary robocze wymagają uwagi",
@@ -704,17 +855,8 @@ export const messages = {
     "Ten nowy agent odpowiada na wszystko, co ludzie wysyłają do @OpenBot w obszarze roboczym {workspace}.",
   "mobile.server.connectors.slack.installFailed": "Slack nie ukończył instalacji. Spróbuj ponownie.",
   "mobile.server.connectors.discord.title": "Discord",
-  "mobile.server.connectors.discord.summary": "Ludzie oznaczają @OpenBot na serwerze Discord",
   "mobile.server.connectors.discord.description":
     "Ludzie oznaczają @OpenBot na kanale serwera Discord. Discord Orchestrator pyta odpowiedniego agenta i odpowiada.",
-  "mobile.server.connectors.discord.connected": "{workspace} · odpowiada Discord Orchestrator",
-  "mobile.server.connectors.discord.noAgent": "{workspace} · żaden agent jeszcze nie odpowiada",
-  "mobile.server.connectors.discord.many": {
-    one: "{count} serwer Discord · odpowiada Discord Orchestrator",
-    few: "{count} serwery Discord · odpowiada Discord Orchestrator",
-    many: "{count} serwerów Discord · odpowiada Discord Orchestrator",
-    other: "{count} serwera Discord · odpowiada Discord Orchestrator",
-  },
   "mobile.server.connectors.discord.attention": {
     one: "{count} serwer Discord wymaga uwagi",
     few: "{count} serwery Discord wymagają uwagi",
@@ -761,21 +903,8 @@ export const messages = {
     "Ten nowy agent odpowiada na wszystko, co ludzie wysyłają do @OpenBot w obszarze roboczym {workspace}.",
   "mobile.server.connectors.discord.installFailed": "Discord nie ukończył autoryzacji. Spróbuj ponownie.",
   "mobile.server.connectors.telegram.title": "Telegram",
-  "mobile.server.connectors.telegram.summary": "Dodaj bota OpenBot do czatu Telegram",
   "mobile.server.connectors.telegram.description":
     "Dodaj bota OpenBot do grupy Telegram lub otwórz z nim czat prywatny. Telegram Orchestrator pyta odpowiedniego agenta i odpowiada.",
-  "mobile.server.connectors.telegram.connected": {
-    one: "{count} czat · odpowiada Telegram Orchestrator",
-    few: "{count} czaty · odpowiada Telegram Orchestrator",
-    many: "{count} czatów · odpowiada Telegram Orchestrator",
-    other: "{count} czatu · odpowiada Telegram Orchestrator",
-  },
-  "mobile.server.connectors.telegram.noAgent": {
-    one: "{count} czat · żaden agent jeszcze nie odpowiada",
-    few: "{count} czaty · żaden agent jeszcze nie odpowiada",
-    many: "{count} czatów · żaden agent jeszcze nie odpowiada",
-    other: "{count} czatu · żaden agent jeszcze nie odpowiada",
-  },
   "mobile.server.connectors.telegram.attention": {
     one: "{count} czat wymaga uwagi",
     few: "{count} czaty wymagają uwagi",
@@ -818,6 +947,114 @@ export const messages = {
   "mobile.server.connectors.telegram.disconnectKept": "Rozmowy i Telegram Orchestrator zostają w OpenBot.",
   "mobile.server.connectors.telegram.disconnectDeleted":
     "To ostatni czat, więc Telegram Orchestrator i jego rozmowy zostaną usunięte z OpenBot.",
+  "mobile.server.connectors.whatsapp.title": "WhatsApp",
+  "mobile.server.connectors.whatsapp.description":
+    "Połącz numer WhatsApp z tym serwerem. WhatsApp Orchestrator pyta odpowiedniego agenta i odpowiada.",
+  "mobile.server.connectors.whatsapp.attention": {
+    one: "{count} numer wymaga uwagi",
+    few: "{count} numery wymagają uwagi",
+    many: "{count} numerów wymaga uwagi",
+    other: "{count} numeru wymaga uwagi",
+  },
+  "mobile.server.connectors.whatsapp.numbersTitle": "Numery",
+  "mobile.server.connectors.whatsapp.linkNumber": "Połącz numer",
+  "mobile.server.connectors.whatsapp.ownNumberNote":
+    "Do OpenBot trafiają wiadomości z twojego czatu „Wiadomość do siebie” i od osób, którym pozwolisz.",
+  "mobile.server.connectors.whatsapp.dedicatedNote":
+    "Do OpenBot trafiają wiadomości od osób, którym pozwolisz. Inne osoby dostają kod, który mają ci przekazać.",
+  "mobile.server.connectors.whatsapp.helpLoggedOut":
+    "WhatsApp usunął ten serwer z połączonych urządzeń. Połącz numer ponownie.",
+  "mobile.server.connectors.whatsapp.helpError":
+    "OpenBot nie może połączyć się z WhatsApp na tym numerze. Połącz ponownie lub odłącz numer.",
+  "mobile.server.connectors.whatsapp.retryAt": "WhatsApp poprosił OpenBot o czekanie. Kolejna próba o {time}.",
+  "mobile.server.connectors.whatsapp.linkAgain": "Połącz od nowa",
+  "mobile.server.connectors.whatsapp.ownNumber": "Numer prywatny",
+  "mobile.server.connectors.whatsapp.ownNumberDescription":
+    "Pisać mogą tylko twój czat „Wiadomość do siebie” i osoby, którym pozwolisz. Wyłącz dla numeru tylko dla OpenBot.",
+  "mobile.server.connectors.whatsapp.workingMessage": "Wiadomość „Pracuję nad tym…”",
+  "mobile.server.connectors.whatsapp.workingMessageDescription":
+    "OpenBot wysyła ją, gdy agent pracuje, a potem zastępuje odpowiedzią. Wyłącz, aby wysyłać tylko odpowiedź.",
+  "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
+  "mobile.server.connectors.whatsapp.orchestratorDescription":
+    "Ten agent odbiera wiadomości do OpenBot ze wszystkich twoich połączonych numerów. Na krótkie odpowiada sam, inną pracę przekazuje odpowiedniemu agentowi i odpowiada w WhatsApp.",
+  "mobile.server.connectors.whatsapp.orchestratorNone":
+    "Dodaj WhatsApp Orchestrator, inaczej WhatsApp nie dostanie odpowiedzi.",
+  "mobile.server.connectors.whatsapp.addAgent": "Dodaj WhatsApp Orchestrator",
+  "mobile.server.connectors.whatsapp.note":
+    "Na numerze prywatnym pisz w czacie „Wiadomość do siebie”. Osoby, którym pozwolisz, piszą na ten numer.",
+  "mobile.server.connectors.whatsapp.linkTitle": "Połącz WhatsApp",
+  "mobile.server.connectors.whatsapp.linkDescription":
+    "Wybierz numer, a potem połącz ten serwer w WhatsApp na telefonie.",
+  "mobile.server.connectors.whatsapp.codeOnly":
+    "Na telefonie połącz za pomocą kodu parowania. Aby zeskanować kod QR, użyj OpenBot na komputerze.",
+  "mobile.server.connectors.whatsapp.kindLabel": "Numer",
+  "mobile.server.connectors.whatsapp.kindPersonal": "Mój numer prywatny",
+  "mobile.server.connectors.whatsapp.kindPersonalDescription":
+    "OpenBot odpowiada tylko w twoim czacie „Wiadomość do siebie” i osobom, którym pozwolisz.",
+  "mobile.server.connectors.whatsapp.kindDedicated": "Numer tylko dla OpenBot",
+  "mobile.server.connectors.whatsapp.kindDedicatedDescription":
+    "Nieznane osoby dostają kod, który mają ci przekazać. Zatwierdzasz je tutaj.",
+  "mobile.server.connectors.whatsapp.phoneLabel": "Numer telefonu",
+  "mobile.server.connectors.whatsapp.phoneDescription": "Z kodem kraju, np. +44 7700 900123.",
+  "mobile.server.connectors.whatsapp.phoneInvalid": "Wpisz numer telefonu z kodem kraju.",
+  "mobile.server.connectors.whatsapp.getCode": "Pobierz kod",
+  "mobile.server.connectors.whatsapp.starting": "Pobieranie kodu z WhatsApp…",
+  "mobile.server.connectors.whatsapp.codeStepDevices":
+    "W WhatsApp otwórz Połączone urządzenia i naciśnij Połącz urządzenie",
+  "mobile.server.connectors.whatsapp.codeStepPhone": "Naciśnij Połącz za pomocą numeru telefonu",
+  "mobile.server.connectors.whatsapp.codeStepType": "Wpisz ten kod na telefonie",
+  "mobile.server.connectors.whatsapp.codeLabel": "Kod parowania {code}",
+  "mobile.server.connectors.whatsapp.copyCode": "Kopiuj kod",
+  "mobile.server.connectors.whatsapp.codeWaiting": "Czekanie na telefon.",
+  "mobile.server.connectors.whatsapp.failedTitle": "Nie udało się połączyć WhatsApp",
+  "mobile.server.connectors.whatsapp.failedTimeout": "Kod wygasł, zanim telefon go użył.",
+  "mobile.server.connectors.whatsapp.failedRefused":
+    "WhatsApp odrzucił połączenie. Odczekaj kilka minut i spróbuj ponownie.",
+  "mobile.server.connectors.whatsapp.failedBusy": "Trwa inne łączenie. Poczekaj, aż się skończy, i spróbuj ponownie.",
+  "mobile.server.connectors.whatsapp.failedUnavailable":
+    "OpenBot nie może połączyć się z WhatsApp. Sprawdź połączenie z internetem.",
+  "mobile.server.connectors.whatsapp.tryAgain": "Ponów",
+  "mobile.server.connectors.whatsapp.agentStepDescription":
+    "Ten nowy agent odpowiada na wiadomości do OpenBot na numerze {number} i na każdym numerze, który połączysz później.",
+  "mobile.server.connectors.whatsapp.doneTitle": "OpenBot jest połączony z numerem {number}",
+  "mobile.server.connectors.whatsapp.done": "Gotowe",
+  "mobile.server.connectors.whatsapp.disconnectTitle": "Odłączyć {number}?",
+  "mobile.server.connectors.whatsapp.disconnectBody":
+    "OpenBot wyloguje się z WhatsApp na numerze {number}. Jeśli OpenBot był wyłączony, usuń też urządzenie w WhatsApp > Połączone urządzenia.",
+  "mobile.server.connectors.whatsapp.disconnectEffect":
+    "Ludzie nie będą już mogli kontaktować się z twoimi agentami przez numer {number}.",
+  "mobile.server.connectors.whatsapp.removeEffectKept": "Rozmowy i WhatsApp Orchestrator zostają w OpenBot.",
+  "mobile.server.connectors.whatsapp.removeEffectDeleted":
+    "To ostatni numer, więc WhatsApp Orchestrator i jego rozmowy zostaną usunięte z OpenBot.",
+  "mobile.server.connectors.whatsapp.keep": "Nie odłączaj",
+  "mobile.server.connectors.whatsapp.sendersTitle": "Kto może pisać na {number}",
+  "mobile.server.connectors.whatsapp.sendersDescription": "Te kontakty i grupy mogą zlecać pracę twoim agentom.",
+  "mobile.server.connectors.whatsapp.sendersEmpty": "Tylko ty możesz pisać. Dodaj kontakt lub grupę.",
+  "mobile.server.connectors.whatsapp.sendersLimit": "Numer może dopuścić maksymalnie {count} kontaktów i grup.",
+  "mobile.server.connectors.whatsapp.senderGroup": "Grupa",
+  "mobile.server.connectors.whatsapp.removeSender": "Usuń",
+  "mobile.server.connectors.whatsapp.addContact": "Dodaj kontakt",
+  "mobile.server.connectors.whatsapp.addGroup": "Dodaj grupę",
+  "mobile.server.connectors.whatsapp.contactTitle": "Dodaj kontakt",
+  "mobile.server.connectors.whatsapp.contactDescription": "Ta osoba może zlecać pracę twoim agentom z WhatsApp.",
+  "mobile.server.connectors.whatsapp.contactName": "Nazwa",
+  "mobile.server.connectors.whatsapp.contactNameDescription": "Opcjonalnie. Bez nazwy lista pokazuje numer telefonu.",
+  "mobile.server.connectors.whatsapp.add": "Dodaj",
+  "mobile.server.connectors.whatsapp.groupTitle": "Dodaj grupę",
+  "mobile.server.connectors.whatsapp.groupDescription": "Osoby w tej grupie mogą zlecać pracę twoim agentom.",
+  "mobile.server.connectors.whatsapp.groupSearch": "Szukaj grup",
+  "mobile.server.connectors.whatsapp.groupsLoading": "Odczytywanie grup…",
+  "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot nie mógł odczytać grup",
+  "mobile.server.connectors.whatsapp.groupsEmpty": "Ten numer nie należy do żadnej grupy.",
+  "mobile.server.connectors.whatsapp.groupsNoMatch": "Żadna grupa nie ma tej nazwy.",
+  "mobile.server.connectors.whatsapp.groupAdded": "Dodano",
+  "mobile.server.connectors.whatsapp.requestsTitle": "Prośby do numeru {number}",
+  "mobile.server.connectors.whatsapp.requestsDescription":
+    "Te osoby napisały na ten numer i dostały kod. Zatwierdź osobę tylko wtedy, gdy podała ci ten sam kod.",
+  "mobile.server.connectors.whatsapp.requestsEmpty": "Brak próśb.",
+  "mobile.server.connectors.whatsapp.requestDetail": "Kod {code} · {number}",
+  "mobile.server.connectors.whatsapp.approve": "Zatwierdź",
+  "mobile.server.connectors.whatsapp.deny": "Odrzuć",
   "mobile.server.settings.providers": "Dostawcy",
   "mobile.server.settings.providersConnected": {
     one: "{count} połączony",
@@ -841,7 +1078,6 @@ export const messages = {
   "mobile.server.providers.actionFailed": "OpenBot nie mógł wykonać tej czynności. Spróbuj ponownie.",
   "mobile.server.providers.openFailed": "Nie udało się otworzyć strony logowania.",
   "mobile.server.providers.copyFailed": "Nie udało się skopiować kodu.",
-  "mobile.server.providers.onHost": "Ten dostawca działa na komputerze tego serwera.",
   "mobile.server.providers.statusLabel": "Stan",
   "mobile.server.providers.account": "Konto",
   "mobile.server.providers.version": "Wersja",
@@ -858,6 +1094,8 @@ export const messages = {
   "mobile.server.providers.copy": "Kopiuj",
   "mobile.server.providers.copyCode": "Kopiuj kod",
   "mobile.server.providers.paste": "Wklej",
+  "mobile.server.providers.codeStepChatgpt":
+    "W ChatGPT na komputerze otwórz ustawienia bezpieczeństwa i włącz logowanie kodem urządzenia dla Codex. Na koncie służbowym włącza je administrator obszaru roboczego.",
   "mobile.server.providers.codeStepCopy": "Skopiuj kod.",
   "mobile.server.providers.codeStepEnter": "Otwórz stronę logowania i wpisz kod.",
   "mobile.server.providers.codeStepReturn": "Wróć do OpenBot. Logowanie zakończy się samo.",
@@ -881,7 +1119,6 @@ export const messages = {
   "mobile.server.providers.relayNoState": "Strony logowania z serwera nie można tu bezpiecznie dokończyć.",
   "mobile.server.providers.download": "Pobierz",
   "mobile.server.providers.update": "Aktualizuj",
-  "mobile.server.providers.updateHint": "Dostępna jest wersja {version}.",
   "mobile.server.providers.retry": "Ponów",
   "mobile.server.providers.cancelDownload": "Anuluj pobieranie",
   "mobile.server.providers.checkUpdates": "Sprawdź aktualizacje",
@@ -919,6 +1156,91 @@ export const messages = {
   "mobile.server.providers.status.ready": "Zainstalowano",
   "mobile.server.providers.status.notInstalled": "Nie zainstalowano",
   "mobile.server.providers.status.checking": "Sprawdzanie",
+  "mobile.server.providers.pool": "Łącz konta w pulę",
+  "mobile.server.providers.poolHint":
+    "Agenci używają jednego konta, aż zbliży się do limitu użycia, a potem konta, którego limit odnowi się najwcześniej.",
+  "mobile.server.providers.accountsPooledHint":
+    "Agenci współdzielą te konta. Nowe konto loguje się na swojej stronie na tym telefonie.",
+  "mobile.server.providers.accountsPooledOnComputer":
+    "Agenci współdzielą te konta. Dodaj konto w OpenBot na komputerze.",
+  "mobile.server.providers.inUse": "W użyciu",
+  "mobile.server.providers.notInPool": "Poza pulą",
+  "mobile.server.providers.leaveOutOfPool": "Wyłącz z puli",
+  "mobile.server.providers.putBackInPool": "Przywróć do puli",
+  "mobile.server.providers.models": "Modele",
+  "mobile.server.providers.modelsCount": "{shown} z {total}",
+  "mobile.server.providers.modelsTitle": "Modele: {name}",
+  "mobile.server.providers.modelsSearch": "Szukaj modeli",
+  "mobile.server.providers.modelsSelectAll": "Zaznacz wszystkie",
+  "mobile.server.providers.modelsDeselectAll": "Odznacz wszystkie",
+  "mobile.server.providers.modelsOptions": "Opcje modeli",
+  "mobile.server.providers.modelsSectionSelected": "Zaznaczone",
+  "mobile.server.providers.modelsSectionOther": "Inne modele",
+  "mobile.server.providers.modelsReset": "Przywróć domyślne",
+  "mobile.server.providers.modelsSelected": "Wybrane: {shown} z {total}.",
+  "mobile.server.providers.modelsHint":
+    "Wybór modelu na tym serwerze pokazuje wybrane modele. Agenci nadal mogą używać każdego modelu.",
+  "mobile.server.providers.modelsNoMatch": "Żaden model nie pasuje do wyszukiwania.",
+  "mobile.server.providers.modelsNone": "Ten dostawca nie ma modeli.",
+  "mobile.server.providers.modelsLoading": "Wczytywanie modeli…",
+  "mobile.server.providers.modelsLoadFailed": "Nie udało się wczytać modeli tego dostawcy.",
+  "mobile.server.providers.modelsFailed": "Nie udało się zmienić modeli. Spróbuj ponownie.",
+  "mobile.server.providers.promptCache": "Pamięć podręczna promptów",
+  "mobile.server.providers.promptCacheHint":
+    "Jak długo Claude trzyma kontekst agenta w pamięci podręcznej między turami. Zmiana działa po ponownym uruchomieniu Claude.",
+  "mobile.server.providers.promptCacheDefault": "Domyślne Claude Code",
+  "mobile.server.providers.promptCacheHour": "1 godzina",
+  "mobile.server.providers.promptCacheLoadFailed":
+    "Nie udało się wczytać czasu pamięci podręcznej promptów tego serwera.",
+  "mobile.server.providers.compactWindow": "Kompaktuj czaty przy",
+  "mobile.server.providers.compactWindowHint":
+    "Claude Code streszcza starsze tury czatu, gdy czat osiągnie ten rozmiar. Mniej to szybsze i tańsze tury. Więcej zachowuje więcej szczegółów. Model z mniejszym oknem kompaktuje przy własnym limicie.",
+  "mobile.server.providers.compactWindowDefault": "Domyślne Claude Code",
+  "mobile.server.providers.compactWindowTokens": "{size} tokenów",
+  "mobile.server.providers.compactWindowLoadFailed": "Nie udało się wczytać rozmiaru kompaktowania tego serwera.",
+  "mobile.server.providers.disconnect": "Rozłącz",
+  "mobile.server.providers.disconnectTitle": "Rozłączyć {name}?",
+  "mobile.server.providers.disconnectBody":
+    "OpenBot wylogowuje {provider} na serwerze. Agenci czekają, aż ponownie połączysz {provider}.",
+  "mobile.server.providers.resetUsage": "Zresetuj użycie",
+  "mobile.server.providers.resettingUsage": "Resetowanie…",
+  "mobile.server.providers.resetUsageTitle": "Zresetować użycie {name}?",
+  "mobile.server.providers.resetUsageBody":
+    "To zużywa jeden kredyt resetu. Zużyte limity tego konta zaczynają się od nowa. Nie można tego cofnąć.",
+  "mobile.server.providers.resetUsageHint": "Kredyty resetu: {available}.",
+  "mobile.server.providers.resetUsageDone": "Limity użycia {name} zaczynają się od nowa.",
+  "mobile.server.providers.resetUsageNothing": "{name} nie ma zużytego limitu. Nie użyto kredytu.",
+  "mobile.server.providers.resetUsageNoCredit": "{name} nie ma już kredytów resetu.",
+  "mobile.server.providers.resetUsageAlreadyRedeemed": "Ten kredyt {name} został już użyty.",
+  "mobile.server.providers.resetUsageFailed": "Nie udało się zresetować użycia. Spróbuj ponownie.",
+  "mobile.server.providers.sectionSignIn": "Logowanie",
+  "mobile.server.providers.signInBrowser": "Zaloguj się w przeglądarce",
+  "mobile.server.providers.disconnectBlocked": "{agents} nie będą działać, dopóki nie zalogujesz się ponownie.",
+  "mobile.server.providers.sectionRuntime": "Środowisko uruchomieniowe",
+  "mobile.server.providers.updateTo": "Zaktualizuj do {version}",
+  "mobile.server.providers.versionInstalledByUser": "{version} · zainstalowana przez Ciebie",
+  "mobile.server.providers.versionDownloaded": "{version} · pobrana przez OpenBot",
+  "mobile.server.providers.keyFree": "Darmowy",
+  "mobile.server.providers.keyOptional": "Opcjonalnie. Klucz dodaje płatne modele.",
+  "mobile.server.providers.geminiKeyInUse":
+    "Gemini używa tego klucza, a nie Twojego planu Google AI. Użycie planu nie jest pokazywane.",
+  "mobile.server.providers.claudeKeyInUse":
+    "Anthropic pobiera opłaty z kredytu API klucza, a nie z Twojego planu Claude. Wybierz konto klucza API w menu modeli agenta. Gdy Claude nie jest zalogowany, wszyscy agenci używają klucza.",
+  "mobile.server.providers.codexKeyInUse":
+    "ChatGPT używa tego klucza, a nie Twojego planu ChatGPT. OpenAI nalicza opłatę za każde żądanie na klucz. Użycie planu nie jest pokazywane.",
+  "mobile.server.providers.codexKeyAlternative":
+    "Lub zaloguj się kluczem API OpenAI. OpenAI nalicza opłatę za każde żądanie na klucz.",
+  "mobile.server.providers.sectionUse": "Użycie",
+  "mobile.server.providers.unused": "Żaden agent go nie używa",
+  "mobile.server.providers.usedByCount": {
+    one: "Używa go 1 agent",
+    few: "Używa go {count} agentów",
+    many: "Używa go {count} agentów",
+    other: "Używa go {count} agenta",
+  },
+  "mobile.server.providers.defaultForNew": "Domyślny dla nowych agentów",
+  "mobile.server.providers.startsWith": "Nowi agenci startują z {name}.",
+  "mobile.server.providers.connectFirst": "Najpierw połącz {name}.",
   "mobile.server.settings.mcp": "Serwery MCP",
   "mobile.server.settings.mcpCount": {
     one: "{count} serwer",
@@ -929,6 +1251,8 @@ export const messages = {
   "mobile.server.mcp.unsupported": "Zaktualizuj OpenBot na tym serwerze, aby zarządzać tutaj jego serwerami MCP.",
   "mobile.server.mcp.unavailable":
     "Połącz się z tym serwerem jako właściciel lub administrator, aby zarządzać jego serwerami MCP.",
+  "mobile.server.mcp.accessUnsupported":
+    "Zaktualizuj OpenBot na tym serwerze, aby wybrać, kto dostaje jego serwery MCP.",
   "mobile.server.mcp.description":
     "Serwery MCP dają agentom tego serwera więcej narzędzi. Agenci Claude i Codex dostają tylko serwery z tej listy.",
   "mobile.server.mcp.loading": "Wczytywanie serwerów MCP…",
@@ -1006,12 +1330,40 @@ export const messages = {
   "mobile.server.mcp.removeBody":
     "Agenci tego serwera przestają dostawać jego narzędzia. Ustawienia nie są zachowywane.",
   "mobile.server.mcp.remove": "Usuń serwer MCP",
+  "mobile.server.mcp.access.title": "Dostęp",
+  "mobile.server.mcp.access.agents": "Agenci",
+  "mobile.server.mcp.access.agentsOf": "Agenci, którzy mogą używać {name}",
+  "mobile.server.mcp.access.allAgents": "Wszyscy agenci",
+  "mobile.server.mcp.access.allAgentsHint": "Wszyscy agenci obejmuje też każdego agenta dodanego później.",
+  "mobile.server.mcp.access.noAgents": "Brak agentów",
+  "mobile.server.mcp.access.someAgents": "{count} z {total}",
+  "mobile.server.mcp.access.use": "Może używać",
+  "mobile.server.mcp.access.fromEveryone": "Jak Wszyscy",
+  "mobile.server.mcp.access.level": "Dostęp {role} do {name}",
+  "mobile.server.mcp.access.hint":
+    "Członek dostaje najwyższy poziom z Wszyscy i swoich ról. Właściciele, administratorzy i osoba, która dodała serwer, zawsze mogą nim zarządzać.",
+  "mobile.server.mcp.access.loadFailed": "Nie udało się wczytać, kto dostaje ten serwer MCP.",
+  "mobile.server.mcp.access.unavailable":
+    "Tylko właściciel lub administrator serwera online może wybrać, kto dostaje ten serwer MCP.",
   "mobile.server.usage.agents": "Agenci",
   "mobile.server.usage.agentLine": "Tokeny: {tokens} · {cost} · {percent}",
   "mobile.server.usage.noAgents": "Brak zarejestrowanego użycia agentów w tym okresie.",
   "mobile.server.usage.unsupported":
     "Ten host nie obsługuje analityki użycia. Zaktualizuj hosta, aby korzystać z tego widoku.",
   "mobile.server.usage.planLimitsNote": "Bieżące limity każdego dostawcy. Zakres poniżej ich nie zmienia.",
+  "mobile.server.machine.title": "Maszyna",
+  "mobile.server.machine.cpu": "CPU",
+  "mobile.server.machine.memory": "Pamięć",
+  "mobile.server.machine.disk": "Dysk",
+  "mobile.server.machine.cores": {
+    one: "{cores} rdzeń",
+    few: "{cores} rdzenie",
+    many: "{cores} rdzeni",
+    other: "{cores} rdzenia",
+  },
+  "mobile.server.machine.sizeDetail": "{used} z {total}",
+  "mobile.server.machine.unknown": "Niedostępne",
+  "mobile.server.machine.unsupported": "Ten host nie podaje użycia swojej maszyny. Zaktualizuj hosta, aby je zobaczyć.",
   "mobile.server.planLimits.title": "Limity planu",
   "mobile.server.planLimits.button": "Limity planu: {summary}",
   "mobile.server.planLimits.left": "Pozostało {percent}%",
@@ -1144,7 +1496,7 @@ export const messages = {
   "mobile.server.sites.openFailed": "Nie udało się otworzyć witryny.",
   "mobile.server.sites.unsupported": "Zaktualizuj OpenBot na tym serwerze, aby zobaczyć tutaj jego witryny.",
   "mobile.server.sites.offline": "Połącz się z tym serwerem, aby zobaczyć jego witryny.",
-  "mobile.server.route.roles": "Role",
+  "mobile.server.route.roles": "Uprawnienia",
   "mobile.server.route.role": "Rola",
   "mobile.server.roles.description":
     "Wybierz agentów, z których mogą korzystać członkowie. Właściciele i administratorzy mogą korzystać ze wszystkich agentów.",
@@ -1179,6 +1531,10 @@ export const messages = {
     other: "{count} członka",
   },
   "mobile.server.roles.agentLevel": "Dostęp roli {role} do agenta {agent}",
+  "mobile.server.roles.changeInEveryone": "Zmień w roli Wszyscy",
+  "mobile.server.roles.setAll": "Ustaw wszystkie",
+  "mobile.server.roles.setAllLabel": "Ustaw wszystkie: dostęp roli {role} do wszystkich agentów",
+  "mobile.server.roles.mixed": "Różne",
   "mobile.server.roles.delete": "Usuń rolę",
   "mobile.server.roles.deleteTitle": "Usunąć rolę {name}?",
   "mobile.server.roles.deleteBody": "Członkowie z tą rolą stracą agentów, których im daje.",
@@ -1291,7 +1647,7 @@ export const messages = {
   "mobile.server.import.reading": "Odczytywanie eksportu…",
   "mobile.server.import.sending": "Wysyłanie eksportu… {percent}%",
   "mobile.server.import.chooseNote":
-    "Najpierw umieść plik na tym telefonie, na przykład w Plikach. Musi mieć mniej niż 100 MB. Zobaczysz jego agentów, zanim cokolwiek się zmieni.",
+    "Najpierw umieść plik na tym telefonie, na przykład w Plikach. Zobaczysz jego agentów, zanim cokolwiek się zmieni.",
   "mobile.server.import.readFailed": "Nie udało się odczytać eksportu.",
   "mobile.server.import.reviewTitle": "Eksport: {source}",
   "mobile.server.import.exported": "Wyeksportowano {date}",

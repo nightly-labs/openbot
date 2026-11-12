@@ -4,11 +4,13 @@
  * the same id the layout used - see `SIDEBAR_DRAG_SELECTORS`.
  */
 
-import { Badge, Button } from "@openbot/ui";
-import { For, Show } from "solid-js";
+import { Button } from "@openbot/ui";
+import { createMemo, For, Show } from "solid-js";
 import { useText } from "../../text";
 import { TeamPersonAvatar, teamMemberName } from "../team/TeamPersonAvatar";
+import { SidebarAgentIndicator } from "./SidebarAgentIndicator";
 import { SidebarSectionHeader } from "./SidebarSectionHeader";
+import { sidebarUnreadBadge } from "./sidebar-agent-states";
 import { sidebarMessageTime } from "./sidebar-filtering";
 import { useSidebarScope } from "./sidebar-scope";
 
@@ -49,6 +51,7 @@ export function SidebarPeopleSection(sectionProps: { sectionId: string }) {
             <For each={orderedPeople()}>
               {(member) => {
                 const thread = () => directThreadByMember().get(member.id);
+                const unreadBadge = createMemo(() => sidebarUnreadBadge(thread()?.unreadCount ?? 0));
                 return (
                   /* biome-ignore lint/a11y/noStaticElementInteractions: Native drag belongs to the wrapper around the accessible button. */
                   <div
@@ -88,11 +91,7 @@ export function SidebarPeopleSection(sectionProps: { sectionId: string }) {
                     >
                       <span class="agent-row-avatar">
                         <TeamPersonAvatar member={member} motion="hover" />
-                        <Show when={(thread()?.unreadCount ?? 0) > 0}>
-                          <Badge class="person-unread-badge" variant="primary-light" aria-hidden="true">
-                            {Math.min(thread()?.unreadCount ?? 0, 99)}
-                          </Badge>
-                        </Show>
+                        <SidebarAgentIndicator state={unreadBadge} />
                       </span>
                       <span class="agent-row-copy">
                         <span class="agent-row-heading">

@@ -95,6 +95,11 @@ export const ORDER_METADATA = {
 export const LICENSE_INCLUDED_USERS = 2;
 /** The largest license that the app sells. A larger team contacts sales. */
 export const LICENSE_MAX_USERS = 10;
+/**
+ * The active hosted sites that a license gives for each user. The sites are one pool for the owner's
+ * servers that have no plan, so more servers do not give more sites.
+ */
+export const LICENSE_SITES_PER_USER = 3;
 /** The license terms allow this many devices for each user. The app does not count them. */
 export const LICENSE_DEVICES_PER_USER = 3;
 /** Yearly billing takes this share off a license. The bundle discount comes off after it. */
@@ -113,6 +118,7 @@ export const LICENSE_STARTER_MONTHLY: Readonly<Record<BillingCurrency, number>> 
   eur: 1_000,
   usd: 1_200,
   pln: 4_000,
+  brl: 4_200,
 };
 
 /** The monthly price of the Team license: the base for the included users, then each extra user. */
@@ -120,6 +126,7 @@ export const LICENSE_PRICES: Readonly<Record<BillingCurrency, LicensePrice>> = {
   eur: { base: 2_500, extraUser: 1_500 },
   usd: { base: 3_000, extraUser: 1_800 },
   pln: { base: 10_000, extraUser: 6_000 },
+  brl: { base: 15_000, extraUser: 9_000 },
 };
 
 function percentOff(amount: number, percent: number): number {
@@ -146,37 +153,44 @@ export const LICENSE_PLAN_PRICES: Readonly<Record<LicensePlanKey, Readonly<Recor
     eur: { base: 1_000, extraUser: 0 },
     usd: { base: 1_200, extraUser: 0 },
     pln: { base: 4_000, extraUser: 0 },
+    brl: { base: 4_200, extraUser: 0 },
   },
   starter_year: {
     eur: { base: 9_600, extraUser: 0 },
     usd: { base: 11_520, extraUser: 0 },
     pln: { base: 38_400, extraUser: 0 },
+    brl: { base: 40_320, extraUser: 0 },
   },
   starter_bundle_month: {
     eur: { base: 900, extraUser: 0 },
     usd: { base: 1_080, extraUser: 0 },
     pln: { base: 3_600, extraUser: 0 },
+    brl: { base: 3_780, extraUser: 0 },
   },
   starter_bundle_year: {
     eur: { base: 8_640, extraUser: 0 },
     usd: { base: 10_368, extraUser: 0 },
     pln: { base: 34_560, extraUser: 0 },
+    brl: { base: 36_288, extraUser: 0 },
   },
   team_month: LICENSE_PRICES,
   team_year: {
     eur: { base: 24_000, extraUser: 14_400 },
     usd: { base: 28_800, extraUser: 17_280 },
     pln: { base: 96_000, extraUser: 57_600 },
+    brl: { base: 144_000, extraUser: 86_400 },
   },
   team_bundle_month: {
     eur: { base: 2_250, extraUser: 1_350 },
     usd: { base: 2_700, extraUser: 1_620 },
     pln: { base: 9_000, extraUser: 5_400 },
+    brl: { base: 13_500, extraUser: 8_100 },
   },
   team_bundle_year: {
     eur: { base: 21_600, extraUser: 12_960 },
     usd: { base: 25_920, extraUser: 15_552 },
     pln: { base: 86_400, extraUser: 51_840 },
+    brl: { base: 129_600, extraUser: 77_760 },
   },
 };
 

@@ -4,8 +4,16 @@ import type { messages as source } from "../../en/error/agent";
 export const messages = {
   "error.agent.historyUnavailable":
     "El historial no está disponible para esta solicitud. Vuelve a leer el historial reciente o usa channel_history para el trabajo en canales.",
+  "error.agent.historyArgumentsInvalid":
+    "Argumentos de historial incorrectos: {detail} Corrige los argumentos y vuelve a intentarlo. openbot.tool_describe da el esquema.",
   "error.agent.toolRequestInvalid":
     "Los argumentos de descubrimiento de herramientas no son válidos. Usa el esquema declarado y un nombre de herramienta cualificado original.",
+  "error.agent.toolCallArgumentsNotObject":
+    "La herramienta no se ejecutó. En tool_call, arguments debe ser un objeto JSON, no texto. Envía la llamada de nuevo con arguments como objeto.",
+  "error.agent.toolCallDiscoveryTool":
+    "La herramienta no se ejecutó. tool_call no puede ejecutar openbot.tool_search ni openbot.tool_describe. Llámalas directamente con los mismos argumentos.",
+  "error.agent.routineScheduleArgumentsInvalid":
+    "La programación de la rutina no es válida: {detail} Corrige la programación y vuelve a intentarlo. openbot.tool_describe da el esquema.",
   "error.agent.approvalWhileDeleting": "No se puede conceder la aprobación mientras se elimina el agente.",
   "error.agent.accessLocalOnly": "El acceso del agente solo se puede cambiar en el equipo que lo ejecuta.",
   "error.agent.duplicateCleanupFailed": "No se pudo duplicar el agente ni eliminar la copia incompleta.",
@@ -48,6 +56,8 @@ export const messages = {
     "No hay ningún modelo de {provider} disponible ahora. Llama a list_models para ver los modelos disponibles.",
   "error.agent.reasoningEffortUnsupported":
     "El modelo «{model}» no admite el nivel de razonamiento «{effort}». Niveles admitidos: {efforts}.",
+  "error.agent.reasoningEffortNotConfigurable":
+    "El modelo «{model}» no tiene ajuste de nivel de razonamiento, así que no puedes cambiarlo.",
   "error.agent.noStartingModelInSettings":
     "{provider} no tiene ningún modelo disponible, y ningún otro proveedor conectado tiene uno. Inicia sesión en un proveedor o cambia el proveedor predeterminado en Ajustes del servidor → Proveedores.",
   "error.agent.noStartingModel":
@@ -60,6 +70,8 @@ export const messages = {
     "Espera a que terminen el turno activo y la cola antes de iniciar un nuevo chat.",
   "error.agent.waitBeforeCompactContext":
     "Espera a que terminen el turno activo y la cola antes de compactar el contexto.",
+  "error.agent.waitBeforeDeleteHistory":
+    "Espera a que terminen el turno activo y la cola antes de eliminar el historial.",
   "error.agent.compactContextUnavailable": "Este agente no puede compactar su contexto ahora.",
   "error.agent.unknown": "Agente desconocido: {id}",
   "error.agent.onlyUserWidensSettings":
@@ -79,6 +91,8 @@ export const messages = {
   "error.agent.endpointRemoved": "Se eliminó el endpoint que usaba este agente. Elige otro modelo para él.",
   "error.agent.turnStalled":
     "{provider} dejó de responder, así que OpenBot terminó este turno. Envía el mensaje de nuevo o elige otro modelo.",
+  "error.agent.compactionConnectionLost":
+    "La conexión se detuvo mientras el agente compactaba su contexto, así que la tarea se detuvo. Comprueba tu conexión a internet y envía un mensaje para continuar.",
   "error.agent.selectedGone": "El agente seleccionado ya no existe.",
   "error.agent.profileEndpointsChanged":
     "Los endpoints personalizados cambiaron durante la generación. Inténtalo de nuevo.",
@@ -109,6 +123,10 @@ export const messages = {
   "error.agent.quickAcknowledgementLocalOnly": "Solo el equipo que ejecuta el agente puede cambiar este ajuste.",
   "error.agent.sideQuestionBusy": "Hay demasiadas preguntas aparte en curso. Inténtalo de nuevo en breve.",
   "error.agent.sideQuestionFailed": "El agente no pudo responder la pregunta aparte. Inténtalo de nuevo.",
+  "error.agent.webSearchSignIn": "La búsqueda web necesita iniciar sesión en Codex con una cuenta de ChatGPT.",
+  "error.agent.webSearchBusy":
+    "Hay demasiadas búsquedas y preguntas secundarias en curso. Inténtalo de nuevo en breve.",
+  "error.agent.webSearchFailed": "La búsqueda web no terminó. Inténtalo de nuevo.",
   "error.agent.busyMessageModeLocalOnly":
     "El comportamiento de los mensajes mientras trabaja el agente solo se puede configurar en el equipo que lo ejecuta.",
   "error.agent.backupModelsLocalOnly":

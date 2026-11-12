@@ -1,3 +1,4 @@
+import { agentMentionRank } from "@openbot/contracts/agent-mention-rank";
 import type {
   ChannelSummary,
   ConversationFileSearchResult,
@@ -195,9 +196,13 @@ export function mobileSearchView({
   const agentsById = new Map(agents.map((agent) => [agent.id, agent]));
   const channelsById = new Map(channels.map((channel) => [channel.id, channel]));
 
+  // A name match first, as in an `@` mention; a match only in the last message goes last. Array sort
+  // is stable, so agents of one rank keep the list order.
   const agentResults = agents
     .filter((agent) => matches(normalized, [agent.name, agent.title, agent.description, agent.preview]))
-    .map((agent): MobileSearchResult => ({ kind: "agent", id: `agent:${agent.id}`, agent }));
+    .map((agent) => ({ agent, rank: agentMentionRank(agent, normalized) ?? Number.MAX_VALUE }))
+    .sort((left, right) => left.rank - right.rank)
+    .map(({ agent }): MobileSearchResult => ({ kind: "agent", id: `agent:${agent.id}`, agent }));
   const channelResults = channels
     .filter((channel) => matches(normalized, [channel.name, channel.title]))
     .map((channel): MobileSearchResult => ({ kind: "channel", id: `channel:${channel.id}`, channel }));

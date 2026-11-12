@@ -1,8 +1,10 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { z } from "zod";
+import { CHANNEL_REPLY_CHARACTERS, CHANNEL_REPLY_LIMIT } from "./channel-replies";
 import {
   routineInstructionZodSchema,
   routineLimitPolicyZodSchema,
+  routineMissedPolicyUpdateZodSchema,
   routineMissedPolicyZodSchema,
   routineScheduleZodSchema,
 } from "./routine-tool-schema";
@@ -38,7 +40,7 @@ export const CHANNEL_TOOL_DEFINITIONS: readonly { name: string; description: str
   {
     name: "channel_assign",
     description:
-      "Assign one specific subtask to another channel member. You stay the owner: integrate the result and report to the user. End your turn while waiting for required results. Use only inside a channel task; for direct teammate work outside a channel use openbot.send_message.",
+      "Give a subtask to another member only when the person asks for that member or for help, or a part needs their role. You stay the owner: integrate the result and report. End your turn to wait for needed results. In a channel task only; else use openbot.send_message.",
     shape: handoff,
   },
   {
@@ -54,9 +56,22 @@ export const CHANNEL_TOOL_DEFINITIONS: readonly { name: string; description: str
     shape: { text: z.string().min(1).max(INPUT_LIMITS.messageText) },
   },
   {
+    name: "channel_reply",
+    description: `Reply in the shared chat to a message of another channel member, in a short message, when you must ask it a question, agree on something with it, or correct it before you can finish. That member gets one turn to answer, and you continue this task with its answer: end your turn after the call. Use channel_assign for work. A request allows ${CHANNEL_REPLY_LIMIT} member replies, and none after your result. Do not reply only to thank or acknowledge, or when you can answer the person without it.`,
+    shape: {
+      messageId: z.string().min(1).max(INPUT_LIMITS.identifier),
+      text: z.string().min(1).max(CHANNEL_REPLY_CHARACTERS),
+    },
+  },
+  {
+    name: "channel_cancel",
+    description: `Cancel a run that you own when a person asks to drop that work. Give the taskId of its request message or of a subtask: the whole run ends, with its running and queued subtasks. Messages stay. Not for the run of your current task. ${PERSON_ONLY}`,
+    shape: { taskId: z.string().min(1).max(INPUT_LIMITS.identifier) },
+  },
+  {
     name: "channel_remember",
-    description:
-      "Save one short, durable fact about this channel that every member should keep. Save the same text again to correct it. This writes immediately.",
+    // The advertised schema has no maxLength, so the limit is in the description.
+    description: `Save one durable fact for every channel member to keep, up to ${INPUT_LIMITS.agentMemoryText} characters. Save the same text again to correct it. This writes immediately.`,
     shape: { text: z.string().min(1).max(INPUT_LIMITS.agentMemoryText) },
   },
   {
@@ -109,7 +124,7 @@ export const CHANNEL_TOOL_DEFINITIONS: readonly { name: string; description: str
       schedule: routineScheduleZodSchema.optional(),
       active: z.boolean().optional(),
       limitPolicy: routineLimitPolicyZodSchema.optional(),
-      missedPolicy: routineMissedPolicyZodSchema.optional(),
+      missedPolicy: routineMissedPolicyUpdateZodSchema.optional(),
     },
   },
   {

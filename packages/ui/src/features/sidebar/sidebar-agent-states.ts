@@ -17,7 +17,10 @@ export interface SidebarAgentStatesInput {
   agentIds: readonly string[];
   activeTurns: Record<string, string | null>;
   queues: Record<string, QueueSnapshot>;
+  /** The unread replies of each agent's own chat. */
   unreadReplies: Record<string, number>;
+  /** The unread agent messages of each agent's open side threads, such as a routine's thread. */
+  unreadThreadReplies?: Record<string, number>;
   recentReplies: Record<string, boolean>;
   pendingPrompts: Record<string, SidebarAttention | undefined>;
   pendingApprovals: Record<string, SidebarApproval | undefined>;
@@ -60,6 +63,10 @@ export function isAgentWorking(
  * mark outranks a generic working mark, and either outranks unread replies, because that count is
  * about to change again.
  *
+ * The unread count is that of the agent's own chat. Side threads, such as a routine's thread, add
+ * only a mark with no number (count 0): a routine that runs each hour would raise a count that
+ * opening the chat cannot clear.
+ *
  * One routine mark per agent. Several routine deliveries share it; `count` is how many are in the
  * phase the mark shows. A paused schedule is not a delivery, so it does not mark the row.
  *
@@ -74,7 +81,8 @@ export function computeSidebarAgentStates(input: SidebarAgentStatesInput): Recor
     else if (isAgentWorking(agentId, input.activeTurns, input.queues)) states[agentId] = { kind: "working" };
     else if ((input.unreadReplies[agentId] ?? 0) > 0) {
       states[agentId] = { kind: "unread", count: input.unreadReplies[agentId] ?? 1 };
-    } else if (input.recentReplies[agentId]) states[agentId] = { kind: "responded" };
+    } else if ((input.unreadThreadReplies?.[agentId] ?? 0) > 0) states[agentId] = { kind: "unread", count: 0 };
+    else if (input.recentReplies[agentId]) states[agentId] = { kind: "responded" };
   }
   return states;
 }
@@ -197,4 +205,12 @@ export function sidebarChannelWaits(input: SidebarChannelWaitsInput): Record<str
 
 function threadKey(agentId: string, threadId: string): string {
   return `${agentId}\n${threadId}`;
+}
+
+/**
+ * The badge of a channel or a person: a wait first, then the unread count, which shows as the felt
+ * count of an agent row. The count stops at 99.
+ */
+export function sidebarUnreadBadge(unreadCount: number, wait?: SidebarAgentState): SidebarAgentState | undefined {
+  return wait ?? (unreadCount > 0 ? { kind: "unread", count: Math.min(unreadCount, 99) } : undefined);
 }

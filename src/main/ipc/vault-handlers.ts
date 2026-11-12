@@ -1,27 +1,39 @@
 // The Vault of this computer, for Server settings of the local server. Main opens the CSV file dialog
 // and writes the clipboard, so a copied secret does not pass through the renderer. The `host*`
-// endpoints do the same for one server: a joined server answers through `vault-v2`, or through
-// `vault-v1` without API keys when it is older.
+// endpoints do the same for one server: a joined server answers through `vault-v3`, through `vault-v2`
+// without two-step keys, or through `vault-v1` without API keys when it is older. `hostImportCsv` opens
+// the file dialog on this computer and sends the text to a host that serves `vault-import-v1`.
 
 import { readFile, stat } from "node:fs/promises";
 import {
+  decodeHostVaultCodes,
+  decodeHostVaultImport,
   decodeHostVaultSecret,
   decodeHostVaultState,
+  type VaultImportResult,
   type VaultSaveInput,
   type VaultSecretRequest,
 } from "@openbot/contracts/ipc";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
+import {
+  VAULT_IMPORT_CAPABILITY,
+  VAULT_IMPORT_CSV_LIMIT,
+  VAULT_IMPORT_ROUTES,
+} from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY, VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY, VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
+import { VAULT_V3_CAPABILITY, VAULT_V3_ROUTES } from "@openbot/contracts/team-protocol/vault-v3";
+import { twoStepKeySecret } from "@openbot/contracts/two-step-code";
 import type { AppTranslate } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
-import { registerSecretValue } from "@openbot/logging";
+import { registerSecretValue, registerSecretValues } from "@openbot/logging";
 import type { Effect } from "effect";
 import { type BrowserWindow, clipboard, dialog, type OpenDialogOptions } from "electron";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import type { RemoteWorkflowError } from "../remote-service-effects";
+import { parseLoginCsv } from "../vault-csv";
 import { decodeVaultSaveInput, decodeVaultSecretRequest } from "../vault-inputs";
 import { VAULT_CSV_LIMIT, type VaultService } from "../vault-service";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
@@ -55,11 +67,13 @@ export function vaultIpcHandlers({
     decode: ResponseDecoder<T>,
     body: VaultSaveInput | VaultSecretRequest | { id: string } | Record<string, never> = {},
   ): Promise<T> {
-    const routes = remoteServers.supportsCapability(serverId, VAULT_V2_CAPABILITY)
-      ? VAULT_V2_ROUTES
-      : remoteServers.supportsCapability(serverId, VAULT_CAPABILITY)
-        ? VAULT_ROUTES
-        : null;
+    const routes = remoteServers.supportsCapability(serverId, VAULT_V3_CAPABILITY)
+      ? VAULT_V3_ROUTES
+      : remoteServers.supportsCapability(serverId, VAULT_V2_CAPABILITY)
+        ? VAULT_V2_ROUTES
+        : remoteServers.supportsCapability(serverId, VAULT_CAPABILITY)
+          ? VAULT_ROUTES
+          : null;
     if (!routes) throw new Error(sourceText("error.team.vaultUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, routes[route], decode, { method: "POST", body }));
   }
@@ -83,6 +97,43 @@ export function vaultIpcHandlers({
     return result.canceled || !result.filePaths[0] ? null : result.filePaths[0];
   };
 
+  /** The text of the CSV file that the user chose, or null when the dialog was closed. */
+  const readCsv = async (limit: number): Promise<string | null> => {
+    const path = await chooseCsv();
+    if (!path) return null;
+    const info = await stat(path);
+    if (!info.isFile()) throw new Error(sourceText("error.vault.csvInvalid"));
+    if (info.size > limit) throw new Error(sourceText("error.vault.csvTooLarge"));
+    return readFile(path, "utf8");
+  };
+
+  /**
+   * The passwords and two-step keys of the export cross this computer on their way to the host, so
+   * they are redacted here as well. A file that is not a password export stops here, with the
+   * sentence that the host would send.
+   */
+  const remoteImportCsv = async (serverId: string): Promise<VaultImportResult> => {
+    if (!remoteServers.supportsCapability(serverId, VAULT_IMPORT_CAPABILITY))
+      throw new Error(sourceText("error.team.vaultUnsupported"));
+    // Each character takes at least one byte, so a larger file cannot fit.
+    const csv = await readCsv(VAULT_IMPORT_CSV_LIMIT * 4);
+    if (csv === null) return null;
+    if (csv.length > VAULT_IMPORT_CSV_LIMIT) throw new Error(sourceText("error.vault.csvTooLarge"));
+    const { logins } = parseLoginCsv(csv);
+    registerSecretValues(
+      logins.map((login) => login.password),
+      { allowShort: true },
+    );
+    registerSecretValues(logins.flatMap(({ twoStepKey }) => [twoStepKey, twoStepKeySecret(twoStepKey) ?? ""]));
+    const { imported, skipped } = await runCauseEffect(
+      remoteServers.request(serverId, VAULT_IMPORT_ROUTES.import, decodeHostVaultImport, {
+        method: "POST",
+        body: { csv },
+      }),
+    );
+    return { imported, skipped, state: await post(serverId, "list", decodeHostVaultState) };
+  };
+
   return {
     vault: {
       list: handler(() => vault.state()),
@@ -93,14 +144,18 @@ export function vaultIpcHandlers({
         clipboard.writeText(vault.reveal(request));
       }),
       importCsv: handler(async () => {
-        const path = await chooseCsv();
-        if (!path) return null;
-        const info = await stat(path);
-        if (!info.isFile()) throw new Error(sourceText("error.vault.csvInvalid"));
-        if (info.size > VAULT_CSV_LIMIT) throw new Error(sourceText("error.vault.csvTooLarge"));
-        return runCauseEffect(vault.importCsv(await readFile(path, "utf8")));
+        const csv = await readCsv(VAULT_CSV_LIMIT);
+        return csv === null ? null : runCauseEffect(vault.importCsv(csv));
+      }),
+      hostImportCsv: scopedQueryHandler({
+        local: async () => {
+          const csv = await readCsv(VAULT_CSV_LIMIT);
+          return csv === null ? null : runCauseEffect(vault.importCsv(csv));
+        },
+        remote: remoteImportCsv,
       }),
       reset: handler(() => runCauseEffect(vault.reset())),
+      codes: handler(() => runCauseEffect(vault.codes())),
       hostList: scopedQueryHandler({
         local: () => vault.state(),
         remote: (serverId) => post(serverId, "list", decodeHostVaultState),
@@ -113,6 +168,8 @@ export function vaultIpcHandlers({
             registerSecretValue(input.password, { allowShort: true });
           if (input.kind === "card" && input.number !== null) registerSecretValue(input.number);
           if (input.kind === "apiKey" && input.key !== null) registerSecretValue(input.key, { allowShort: true });
+          const twoStepKey = input.kind === "login" && input.twoStepKey ? twoStepKeySecret(input.twoStepKey) : null;
+          if (twoStepKey) registerSecretValue(twoStepKey);
           return post(serverId, "save", decodeHostVaultState, input);
         },
       }),
@@ -131,6 +188,19 @@ export function vaultIpcHandlers({
         remote: async (request, serverId) => {
           clipboard.writeText(await remoteReveal(request, serverId));
         },
+      }),
+      // A host without `vault-v3` keeps no two-step keys, so it has no codes.
+      hostCodes: scopedQueryHandler({
+        local: () => runCauseEffect(vault.codes()),
+        remote: (serverId) =>
+          remoteServers.supportsCapability(serverId, VAULT_V3_CAPABILITY)
+            ? runCauseEffect(
+                remoteServers.request(serverId, VAULT_V3_ROUTES.codes, decodeHostVaultCodes, {
+                  method: "POST",
+                  body: {},
+                }),
+              )
+            : Promise.resolve({ codes: [] }),
       }),
       hostReset: scopedQueryHandler({
         local: () => runCauseEffect(vault.reset()),

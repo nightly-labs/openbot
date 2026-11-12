@@ -89,11 +89,15 @@ export interface AcpConfigurationOptions {
   processWideModel?: boolean;
   /** `AcpFlavor.modelSetUnsaved`. */
   modelSetUnsaved?: ((error: RequestError) => boolean) | undefined;
+  /** `AcpFlavor.configSetUnsaved`. */
+  configSetUnsaved?: ((error: RequestError) => boolean) | undefined;
   /**
    * `AcpFlavor.closeKeepsSession` with `session/resume`: a closed session keeps its resources until
    * the process ends, so each discovery resumes the probe session of the process, not a new one.
    */
   keepProbeSession?: () => boolean;
+  /** `AcpFlavor.probeCloseDelayMs`. */
+  probeCloseDelayMs?: number | undefined;
 }
 
 /** Owns ACP model discovery and setting translation. The client owns sessions and their state. */
@@ -130,7 +134,10 @@ export class AcpConfiguration {
               this.#probe = { connection, sessionId: probe.sessionId };
             })
           : Effect.forkIn(
-              providerCall(() => connection.closeSession({ sessionId: probe.sessionId })).pipe(Effect.ignore),
+              closeLater(
+                providerCall(() => connection.closeSession({ sessionId: probe.sessionId })).pipe(Effect.ignore),
+                this.options.probeCloseDelayMs,
+              ),
               this.options.scope(),
               { startImmediately: true },
             ).pipe(Effect.asVoid),
@@ -419,7 +426,7 @@ export class AcpConfiguration {
         if (this.#modelSetsInFlight > 0) this.#modelSetsOverlapped = true;
         this.#modelSetsInFlight += 1;
       }
-      const request = this.#timed("session/set_config_option", () =>
+      const request = this.#setConfigOption(thread, option.id, selected, () =>
         connection.setSessionConfigOption({
           sessionId: thread.id,
           configId: option.id,
@@ -527,7 +534,7 @@ export class AcpConfiguration {
     ) {
       return yield* providerFailure(new Error(sourceText("error.provider.sessionSettingInvalid")));
     }
-    const response = yield* this.#timed("session/set_config_option", () =>
+    const response = yield* this.#setConfigOption(thread, configId, value, () =>
       typeof value === "boolean"
         ? this.#connection(thread).setSessionConfigOption({ sessionId: thread.id, configId, value, type: "boolean" })
         : this.#connection(thread).setSessionConfigOption({ sessionId: thread.id, configId, value }),
@@ -535,6 +542,29 @@ export class AcpConfiguration {
     thread.configOptions = response.configOptions;
     return sessionSettingsSnapshot(thread.configOptions);
   });
+
+  /**
+   * A `session/set_config_option`. After a failure that `configSetUnsaved` accepts, the session
+   * already has the value and only its save as the default failed, so the option changes here.
+   */
+  #setConfigOption(
+    thread: AcpConfigurationState,
+    configId: string,
+    value: AgentSessionSettingValue,
+    request: () => Promise<{ configOptions: SessionConfigOption[] }>,
+  ): Effect.Effect<{ configOptions: SessionConfigOption[] }, ProviderClientOperationError> {
+    return this.#timed("session/set_config_option", request).pipe(
+      Effect.catch((failure) => {
+        const unsaved = this.options.configSetUnsaved;
+        if (!(failure.cause instanceof RequestError && unsaved?.(failure.cause))) return Effect.fail(failure);
+        logger.warn("An agent changed a session setting but did not save it as its default.", {
+          provider: this.options.provider,
+          configId,
+        });
+        return Effect.succeed({ configOptions: withCurrentValue(thread.configOptions, configId, value) });
+      }),
+    );
+  }
 
   /**
    * A configuration request, which fails at the request timeout. A turn sends these before its
@@ -549,6 +579,24 @@ export class AcpConfiguration {
       }),
     );
   }
+}
+
+/** `close` after `delayMs`, or at once without a delay. */
+function closeLater<A, E>(close: Effect.Effect<A, E>, delayMs: number | undefined): Effect.Effect<A, E> {
+  return delayMs ? Effect.sleep(delayMs).pipe(Effect.andThen(close)) : close;
+}
+
+/** The options with the current value of one option changed, when the value has its type. */
+function withCurrentValue(
+  options: readonly SessionConfigOption[],
+  configId: string,
+  value: AgentSessionSettingValue,
+): SessionConfigOption[] {
+  return options.map((option) => {
+    if (option.id !== configId) return option;
+    if (option.type === "boolean") return typeof value === "boolean" ? { ...option, currentValue: value } : option;
+    return typeof value === "string" ? { ...option, currentValue: value } : option;
+  });
 }
 
 /** Permission and secret controls stay outside the generic settings path. */
@@ -836,10 +884,10 @@ function parseModelParameters(value: string): { base: string; params: Map<string
   if (open <= 0 || !value.endsWith("]")) return null;
   const params = new Map<string, string>();
   for (const pair of value.slice(open + 1, -1).split(",")) {
-    if (!pair) continue;
+    if (!pair.trim()) continue;
     const separator = pair.indexOf("=");
     if (separator <= 0) return null;
-    params.set(pair.slice(0, separator), pair.slice(separator + 1));
+    params.set(pair.slice(0, separator).trim(), pair.slice(separator + 1).trim());
   }
   return { base: value.slice(0, open), params };
 }

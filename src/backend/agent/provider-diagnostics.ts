@@ -8,9 +8,9 @@
  * list. That belongs in the log, not in an error the user is asked to read.
  *
  * OpenBot's own bridge servers carry its name, and stay visible: a failure there is a failure of
- * this app. So does a server this app configured - the user asked for it here, and the reason it
- * does not start is something only they can fix. `configuredNames` is what separates the two: a
- * server the user configured in their own provider files is still nobody's failure but theirs.
+ * this app. A server this app configured is an MCP line too. The caller finds that server and
+ * reports it as the server's failure, not the provider's: the user asked for it here, and only they
+ * can fix it.
  *
  * Grok's CLI also loads the servers in `~/.claude.json`, `~/.cursor/mcp.json` and `.mcp.json`. One
  * there that asks for OAuth ends its transport with the `rmcp` worker's own sentence,
@@ -19,10 +19,22 @@
  * error" toast (#1199). The worker's sentence is matched as it stands, because no other part of a
  * provider writes it.
  */
-export function isMcpSubsystemDiagnostic(message: string, configuredNames: readonly string[] = []): boolean {
+export function isMcpSubsystemDiagnostic(message: string): boolean {
   if (/openbot/i.test(message)) return false;
-  if (configuredNames.some((name) => name && message.includes(name))) return false;
   return /\b(mcp|rmcp)\b|\bworker quit with (?:fatal|join error|reason):/i.test(message);
+}
+
+/**
+ * Whether an MCP diagnostic says that the server refused the provider for want of a sign-in.
+ *
+ * Grok's `rmcp` worker writes `AuthRequired(…)` for an http server that answers 401 with an OAuth
+ * challenge. Other CLIs write the status next to `HTTP` or `status`, or the word. A bare `401` is
+ * not enough: a port, an id or a line number can be 401.
+ */
+export function isMcpSignInDiagnostic(message: string): boolean {
+  return /\bAuthRequired\b|\bunauthori[sz]ed\b|\bnot authenticated\b|\b(?:HTTP|status(?:\s+code)?)\W{0,3}401\b/i.test(
+    message,
+  );
 }
 
 /**
@@ -155,6 +167,20 @@ export function isUsageReadDiagnostic(message: string): boolean {
 }
 
 /**
+ * Whether a provider diagnostic is Grok's own record of a `git` command that could not start.
+ *
+ * Grok's CLI runs `git` to read the repository state, and logs `ERROR git_cli: Command::output()
+ * FAILED (spawn error) error=program not found` on stderr when `git` is not on the PATH, as on a
+ * Windows computer without Git. Grok continues without the repository state. The user met the line
+ * as a "Grok error" toast with nothing failing (#4789). It belongs in the log.
+ *
+ * Only a spawn failure counts. A `git` command that ran and failed stays visible.
+ */
+export function isGitSpawnDiagnostic(message: string): boolean {
+  return /\bERROR\s+git_cli:\s+Command::output\(\) FAILED \(spawn error\)/.test(message);
+}
+
+/**
  * Whether a provider diagnostic is the ACP SDK's own copy of an error that the agent also answered.
  *
  * The TypeScript ACP SDK that a Node agent is built on writes `Error handling request`, the whole
@@ -206,6 +232,25 @@ export function isGlogBelowErrorDiagnostic(message: string): boolean {
 }
 
 /**
+ * A Rust log record whose own level is below error, as in
+ * `2026-11-04T23:00:00.123456Z  INFO devin::acp: request failed, will retry` (`tracing`) or
+ * `[2026-11-04T23:00:00Z INFO  devin::acp] …` (`env_logger`).
+ *
+ * ACP gives stderr to the agent for its logs; a failure reaches OpenBot as an answer or as the exit.
+ * Devin CLI 3000.11.234 writes its info records to stderr, and a word such as "failed" in one let it
+ * through as a provider error (#5064). The level of the record decides instead.
+ *
+ * Only a record that opens with the level, after an optional timestamp, counts. An `ERROR` record,
+ * or text without a level - a Rust panic included - stays visible.
+ */
+const RUST_LOG_RECORD =
+  /^\[?(?:\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\s+)?(?:TRACE|DEBUG|INFO|WARN)\s/u;
+
+export function isRustLogBelowErrorDiagnostic(message: string): boolean {
+  return RUST_LOG_RECORD.test(message);
+}
+
+/**
  * The timestamp a CLI's log formatter writes before a record, as in
  * `2026-09-23T06:57:23.278161Z ERROR …`. It is removed from what the renderer shows: it is not
  * something to act on, and it makes every repeat of one failure a new message.
@@ -235,12 +280,15 @@ export function isUsageLimitDiagnostic(message: string): boolean {
 
 /**
  * Whether a provider says that a plan window is spent, a limit that resets by itself: "You've hit
- * your session limit · resets 8:40pm", "You've hit your usage limit. Try again at 10:34 AM.",
+ * your session limit · resets 8:40pm", "You've hit your 5-hour limit · resets 8:40pm" (#6906),
+ * "You've hit your usage limit. Try again at 10:34 AM.",
  * "You've reached your weekly usage limit for your plan. Your limit resets at …". The OpenCode Go
  * plan's rolling, weekly and monthly windows name no reset: `429: {"type":"GoUsageLimitError",
  * "message":"Go usage limit exceeded"}` (#4256). The z.ai GLM Coding Plan writes "Usage limit reached
  * for 5 hour. Your limit will reset at 2026-11-02 17:37:38" and "Weekly/Monthly Limit Exhausted. Your
- * limit will reset at …" (#4469). Its reset names no zone, so it is not read. A spent credit
+ * limit will reset at …" (#4469). Its reset names no zone, so it is not read. Grok's free tier
+ * writes "subscription:free-usage-exhausted: You've used all the included free usage for model …
+ * Usage resets over a rolling 24-hour window" (#4869). A spent credit
  * balance or quota does not reset, so it is not one: holding work for it would wait forever and hide
  * the provider's reason. A short request-rate throttle says "rate limit".
  */
@@ -248,11 +296,12 @@ export function isPlanLimitDiagnostic(message: string): boolean {
   // Codex offers credits next to the reset on Plus and Pro: "… to purchase more credits or try again at 3:00 PM."
   if (isBalanceDiagnostic(message) && !/\btry again at\b/iu.test(message)) return false;
   return (
-    /\bhit your (?:(?:session|weekly|usage|plan|opus|sonnet) )*limit\b/iu.test(message) ||
+    /\bhit your (?:(?:session|weekly|usage|plan|opus|sonnet|\d+-hour) )*limit\b/iu.test(message) ||
     /\b(?:session|weekly) (?:usage )?limit\b.{0,80}\b(?:reached|resets?)\b/iu.test(message) ||
     /\b(?:GoUsageLimitError|Go usage limit exceeded)\b/u.test(message) ||
     /\busage limit reached for \d+ ?hours?\b/iu.test(message) ||
-    /\b(?:daily|weekly|monthly) limit exhausted\b/iu.test(message)
+    /\b(?:daily|weekly|monthly) limit exhausted\b/iu.test(message) ||
+    /\bsubscription:free-usage-exhausted\b/u.test(message)
   );
 }
 
@@ -282,4 +331,46 @@ export function providerResetDelayMs(message: string): number | null {
 /** Whether a provider's text names money or a quota, which no wait gives back. */
 export function isBalanceDiagnostic(message: string): boolean {
   return /\b(?:credits?|balance|quota|billing)\b/iu.test(message);
+}
+
+/**
+ * Whether a model endpoint refused an image in the request because a side is too short. The image
+ * stays in the provider session, which sends it on each turn, so each turn fails the same way until
+ * a new session (#6188). xAI writes "Image dimensions 6x8 are too small. Both width and height must
+ * be at least 8 pixels.", vLLM's Qwen vision models "height:22 or width:1568 must be larger than
+ * factor:28", and DashScope "The image length and width do not meet the model restrictions".
+ */
+export function isImageTooSmallDiagnostic(message: string): boolean {
+  return (
+    /\bimage\b[^.\n]{0,80}\btoo small\b/iu.test(message) ||
+    (/\bimage\b/iu.test(message) &&
+      /\b(?:height|width)\b[^.\n]{0,60}\bmust be at least \d+ ?(?:px|pixels?)\b/iu.test(message)) ||
+    /\bmust be larger than factor\b/iu.test(message) ||
+    /\bimage length and width do not meet the model restrictions\b/iu.test(message)
+  );
+}
+
+/**
+ * Whether a model endpoint refused an image in the request because it is too large. As for a too
+ * small image, the provider session keeps the image and sends it on each turn, so each turn fails
+ * the same way until a new session (#6429). A model behind OpenCode writes "Inline image exceeds
+ * maximum dimensions of 1024px on its longest side.", and Anthropic "At least one of the image
+ * dimensions exceed max allowed size for many-image requests: 2000 pixels".
+ */
+export function isImageTooLargeDiagnostic(message: string): boolean {
+  return /\bimage\b[^.\n]{0,80}\bexceeds? (?:the )?max(?:imum)? (?:allowed size|dimensions?)\b/iu.test(message);
+}
+
+/**
+ * Whether a model endpoint refused the request because it holds more images than the endpoint
+ * accepts in one request. The provider session sends each image of the chat again on each turn, so
+ * each turn fails the same way until a new session (#6702). vLLM and Venice write "At most 10
+ * image(s) may be provided in one request.", OpenCode's gateway "Too many images in request: 31 >
+ * 30", and other endpoints "Request contains 52 images, exceeding the maximum of 50 allowed per
+ * request". A daily quota of images is not a count in one request, so it does not match.
+ */
+export function isImageCountDiagnostic(message: string): boolean {
+  return /\b(?:at most|a maximum of) \d+ image(?:s|\(s\))? may be provided\b|\btoo many images in (?:the |this |one )?(?:request|prompt|message)\b|\b\d+ images\b[^.\n]{0,40}\bexceed\w* (?:the )?maximum of \d+(?! ?(?:[kmg]i?b|bytes?|px|pixels?)\b)(?: images| allowed)?\b/iu.test(
+    message,
+  );
 }

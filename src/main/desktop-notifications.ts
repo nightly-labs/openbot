@@ -27,18 +27,22 @@ export function desktopShowsAgentEvent(
 /**
  * The level that the desktop notifies a server's event at, or null when it stays quiet: the level that
  * the user chose for the agent, or else the server level. A usage limit is about the account, so the
- * level of an agent does not silence it.
+ * level of an agent does not silence it. A failed subagent notifies at "all", as a failed turn does.
+ * An agent in `hiddenAgentIds` is one that the user hid (see `agentNotificationLevel`).
  */
 export function desktopAgentEventLevel(
   event: AgentEvent,
   server: Pick<ServerSummary, "notificationsMuted" | "notificationLevel"> | undefined,
   enabled: boolean,
   agentLevels: ReadonlyMap<string, ServerNotificationLevel> | null,
+  hiddenAgentIds: ReadonlySet<string> | null = null,
 ): ServerNotificationLevel | null {
   if (!enabled || !server || server.notificationsMuted || server.notificationLevel === "nothing") return null;
   if (event.type === "usage-limit-reached") return server.notificationLevel;
-  if (!agentEventCanNotify(event)) return null;
-  const level = agentNotificationLevel(server.notificationLevel, agentLevels, agentEventAgentId(event));
+  if (!agentEventCanNotify(event) && event.type !== "subagent-failed") return null;
+  const agentId = agentEventAgentId(event);
+  const hidden = agentId !== null && hiddenAgentIds?.has(agentId) === true;
+  const level = agentNotificationLevel(server.notificationLevel, agentLevels, agentId, hidden);
   return level === "all" || (level === "needs-me" && agentEventNeedsUser(event)) ? level : null;
 }
 

@@ -1,5 +1,6 @@
 import type { AgentApproval, AgentContextState, AgentEvent, AgentTask } from "@openbot/contracts/ipc";
 import { isAgentTaskActive, taskApproval } from "@openbot/team-client/agent-tasks";
+import type { AgentThreadOlderMessages } from "@openbot/ui/features/conversation/threads/AgentThreadView";
 import {
   activeThreadId,
   type ThreadListsInput,
@@ -42,10 +43,10 @@ export interface ConversationThreadsInput {
   /** Missing when the host cannot compact a side thread. */
   onCompactContext?: ((taskId: string) => Promise<void>) | undefined;
   /**
-   * Opens the agent's own chat at a message, as a search result does. Without it, a click on
-   * "Branched from" opens the agent's own chat at its latest message.
+   * Opens the agent's own chat at a message, as a search result does. Resolves false when the chat does
+   * not have the message. Without it, a click on "Branched from" opens the agent's own chat at its latest message.
    */
-  onOpenMainMessage?: ((messageId: string) => void) | undefined;
+  onOpenMainMessage?: ((messageId: string) => Promise<boolean>) | undefined;
 }
 
 /** The threads of one agent, for the conversation. Read it in a memo: it reads the thread state. */
@@ -67,6 +68,7 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
           : ofTaskThread(task, takeovers) !== undefined
             ? "takeover"
             : undefined,
+    unread: (task) => tasks.unreadCount(task),
   };
   const lists = threadLists({ ...listInput, open: tabs.openIds(agentId), draft: tabs.hasDraft(agentId) });
   const activeId = activeThreadId(lists.tabs, tabs.activeId(agentId));
@@ -78,6 +80,15 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
         : list.find((task) => task.id === activeId);
   const approval = open ? taskApproval(open, approvals) : undefined;
   const editable = tasks.editable();
+  const olderMessages = (taskId: string): AgentThreadOlderMessages | undefined => {
+    const older = tasks.olderMessages(taskId);
+    return older ? { loading: older.loading, onLoad: () => void tasks.loadOlderMessages(agentId, taskId) } : undefined;
+  };
+  const newerMessages = (taskId: string): AgentThreadOlderMessages | undefined => {
+    const newer = tasks.newerMessages(taskId);
+    return newer ? { loading: newer.loading, onLoad: () => void tasks.loadLatest(agentId, taskId) } : undefined;
+  };
+  const focus = tabs.messageFocus();
   /** A thread in the side panel, with the actions of its own message box. */
   const sideThread = (id: string): SideThread | undefined => {
     const task = list.find((entry) => entry.id === id);
@@ -86,8 +97,12 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
     return {
       task,
       conversation: tasks.conversation(task.id),
+      olderMessages: olderMessages(task.id),
+      newerMessages: newerMessages(task.id),
+      focusMessage: focus?.taskId === task.id ? focus : undefined,
       approval: sideApproval,
-      onSend: (text, attachmentDraftIds) => tabs.send(agentId, task.id, text, attachmentDraftIds),
+      onSend: (text, attachmentDraftIds, replyToMessageId) =>
+        tabs.send(agentId, task.id, text, attachmentDraftIds, replyToMessageId),
       onStop: () => tasks.stopTask(agentId, task.id),
       onRead: (messageId) => tasks.markTaskRead(agentId, task.id, messageId),
       onRespondApproval: (decision, options) =>
@@ -113,7 +128,7 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
         deleted: false,
         onOpen: () => {
           tabs.open(agentId, MAIN_THREAD_ID);
-          input.onOpenMainMessage?.(sourceMessageId);
+          void input.onOpenMainMessage?.(sourceMessageId);
         },
       };
     const title = list.find((entry) => entry.id === sourceTaskId)?.title ?? branch.sourceTitle;
@@ -124,7 +139,6 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
       onOpen: () => void tabs.openAt(agentId, sourceTaskId, sourceMessageId),
     };
   };
-  const focus = tabs.messageFocus();
   return {
     header: {
       ...lists,
@@ -150,13 +164,19 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
       onMove: (id, index) => tabs.moveSide(agentId, id, index),
     },
     open,
+    tasks: list,
     limit: snapshot?.limit ?? 1,
     running: list.filter(isAgentTaskActive).length,
     conversation: open ? tasks.conversation(open.id) : undefined,
+    olderMessages: open ? olderMessages(open.id) : undefined,
+    newerMessages: open ? newerMessages(open.id) : undefined,
     approval,
     acceptsFiles: tasks.filesAccepted(),
-    onSend: (text, attachmentDraftIds) =>
-      open ? tabs.send(agentId, open.id, text, attachmentDraftIds) : tabs.sendDraft(agentId, text, attachmentDraftIds),
+    acceptsReplies: tasks.repliable(),
+    onSend: (text, attachmentDraftIds, replyToMessageId) =>
+      open
+        ? tabs.send(agentId, open.id, text, attachmentDraftIds, replyToMessageId)
+        : tabs.sendDraft(agentId, text, attachmentDraftIds),
     onStop: () => {
       if (open) tasks.stopTask(agentId, open.id);
     },
@@ -170,13 +190,71 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
     },
     onCompactContext: open && onCompactContext ? () => onCompactContext(open.id) : undefined,
     // Only this computer moves a queued message to a new thread.
-    onRunQueuedMessage: tasks.local() ? (deliveryId) => void tabs.runQueuedMessage(agentId, deliveryId) : undefined,
+    onRunQueuedMessage: tasks.queuedMessageMovable()
+      ? (deliveryId) => void tabs.runQueuedMessage(agentId, deliveryId)
+      : undefined,
+    queueActions: tasks.queueActions()
+      ? {
+          cancel: (deliveryId) => tasks.cancelQueuedMessage(agentId, deliveryId),
+          steer: (task, deliveryId) => {
+            if (task.activeTurnId) tasks.steerQueuedMessage(agentId, task.id, deliveryId, task.activeTurnId);
+          },
+          reorder: (taskId, deliveryIds) => tasks.reorderQueue(agentId, taskId, deliveryIds),
+        }
+      : undefined,
     onBranch: tasks.canBranch()
       ? (sourceTaskId, messageId) => tabs.branch(agentId, sourceTaskId, messageId)
       : undefined,
+    onDeleteMessage: tasks.canDeleteMessage()
+      ? (taskId, messageId) => tasks.deleteTaskMessage(agentId, taskId, messageId)
+      : undefined,
     branchSource,
+    routineThread: (routineId) => {
+      const task = routineTask(list, routineId);
+      return task ? () => tabs.open(agentId, task.id) : undefined;
+    },
+    onOpenRoutineThread: async (routineId) => {
+      const listed = () => routineTask(tasks.snapshot(agentId)?.tasks ?? [], routineId);
+      if (!listed()) await tasks.loadTasks(agentId);
+      const task = listed();
+      if (task) tabs.open(agentId, task.id);
+      return task !== undefined;
+    },
+    onOpenRoutineRun: async (routineId, messageId) => {
+      // An archived thread of the routine keeps its runs too. `openAt` restores it.
+      const listed = () =>
+        (tasks.snapshot(agentId)?.tasks ?? [])
+          .filter((task) => task.routineId === routineId)
+          .sort((left, right) => Number(left.state === "closed") - Number(right.state === "closed"));
+      if (listed().length === 0) await tasks.loadTasks(agentId);
+      for (const task of listed()) {
+        if (!(await tasks.taskHasMessage(agentId, task.id, messageId))) continue;
+        await tabs.openAt(agentId, task.id, messageId);
+        await tasks.loadMessage(agentId, task.id, messageId).catch(() => false);
+        return true;
+      }
+      return false;
+    },
     focusMessage: focus && list.some((task) => task.id === focus.taskId) ? focus : null,
+    onOpenMessage: async (taskId, messageId) => {
+      if (taskId === null) {
+        tabs.open(agentId, MAIN_THREAD_ID);
+        return (await input.onOpenMainMessage?.(messageId)) ?? false;
+      }
+      // A deleted thread that waits for the end of its Undo time does not open.
+      if (tabs.hidden().has(taskId)) return false;
+      // The part around the message loads first, so a pin of a deleted message or thread opens no tab.
+      if (!(await tasks.loadMessage(agentId, taskId, messageId).catch(() => false))) return false;
+      // The thread scrolls to the message when its row shows. A restore that fails shows its own error.
+      await tabs.openAt(agentId, taskId, messageId);
+      return true;
+    },
   };
+}
+
+/** The open side thread where the routine runs. */
+function routineTask(list: readonly AgentTask[], routineId: string): AgentTask | undefined {
+  return list.find((task) => task.routineId === routineId && task.state !== "closed");
 }
 
 type TaskThread = { agentId: string; threadId: string };

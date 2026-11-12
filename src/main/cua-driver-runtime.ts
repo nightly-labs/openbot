@@ -335,10 +335,10 @@ export class CuaDriverRuntime {
   /**
    * The address the agents are handed: OpenBot's own while it listens, the daemon's own otherwise.
    *
-   * The tap forwards every request unchanged, so the agent gets the same tools either way - and a
-   * tap that failed to listen costs the rim its answer, never the agent its tools. What it does
-   * cost is the JSON copy the tap adds to each tool answer, which a provider that shows the model
-   * only the result text needs to read window ids and snapshot ids.
+   * The tap forwards every request unchanged, so a tap that failed to listen costs the rim its
+   * answer, never the agent a tool that works. What it does cost is the JSON copy the tap adds to
+   * each tool answer, which a provider that shows the model only the result text needs to read
+   * window ids and snapshot ids, and the removal of the driver's cursor tools from the tool list.
    */
   tapAddress(): string {
     return this.#tap.address ?? this.socketPath();

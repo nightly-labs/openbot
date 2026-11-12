@@ -25,6 +25,8 @@ export interface PendingSend {
   /** The host's id for the message, once it answered. The pending row stays until that row is drawn. */
   messageId: string | null;
   error: string | null;
+  /** The support reference of the failure, so a reason that says little can still be traced. */
+  errorReference: string | null;
   /** The host drops a second send with the same `clientMessageId`, so Retry cannot store it twice. */
   retrySafe: boolean;
   /** What the user said, for a voice message: a local draft that Retry sends again and Dismiss discards. */
@@ -88,14 +90,15 @@ export function createPendingSendStore() {
     if (next?.state !== "waiting" || !deliver) return;
     next.state = "sending";
     next.error = null;
+    next.errorReference = null;
     publish(key);
     void deliver({ ...next })
       .catch((error: unknown) => {
         // An error with no message of its own leaves the reason empty; the status label says enough.
-        const { t, errorMessage } = currentText();
+        const { t, errorDetails } = currentText();
         const fallback = t("chat.send.failed");
-        const message = errorMessage(error, fallback);
-        return { error: message === fallback ? null : message };
+        const details = errorDetails(error, fallback);
+        return { error: details.message === fallback ? null : details.message, reference: details.reference };
       })
       .then((result) => {
         // Dismissed while in flight: nothing is left to update.
@@ -114,6 +117,7 @@ export function createPendingSendStore() {
         } else {
           next.state = "failed";
           next.error = result.error;
+          next.errorReference = result.reference ?? null;
         }
         publish(key);
         pump(key);
@@ -137,6 +141,7 @@ export function createPendingSendStore() {
       state: "waiting",
       messageId: null,
       error: null,
+      errorReference: null,
     };
     deliverers.set(send.clientMessageId, deliver);
     queues.set(key, [...(queues.get(key) ?? []), send]);
@@ -156,6 +161,7 @@ export function createPendingSendStore() {
     }
     send.state = "waiting";
     send.error = null;
+    send.errorReference = null;
     publish(key);
     pump(key);
   }
@@ -222,5 +228,7 @@ export function pendingSendMessage(send: PendingSend): AgentMessage {
     createdAt: send.createdAt,
     replyToMessageId: send.draft.replyToMessageId,
     attachments: send.draft.attachments,
+    // The user's own message rises into the chat when it is sent, as Grok Bot's does. Each id enters once.
+    animate: true,
   };
 }

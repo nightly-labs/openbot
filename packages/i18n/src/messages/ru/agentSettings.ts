@@ -105,7 +105,7 @@ export const messages = {
   "agentSettings.backupModels.intro":
     "Если {model} достигнет лимита использования до того, как {name} начнёт писать, {name} спросит вас, какую модель использовать.",
   "agentSettings.backupModels.introAutomatic":
-    "Если {model} достигнет лимита использования или завершится с ошибкой провайдера до того, как {name} начнёт писать, {name} переключится на первую доступную модель по порядку.",
+    "Если {model} достигнет лимита использования, {name} переключится на первую доступную модель по порядку. {name} также переключится, если {model} завершится с ошибкой провайдера до того, как {name} начнёт писать.",
   "agentSettings.backupModels.ask": "Спрашивать перед переключением",
   "agentSettings.backupModels.order": "Порядок",
   "agentSettings.backupModels.listLabel": "Резервные модели по порядку",
@@ -118,7 +118,7 @@ export const messages = {
   "agentSettings.backupModels.unavailable": "Сейчас недоступна · пропущена",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.note":
-    "После начала ответа {name} не переключает модель. Когда лимит закончится или через 10 минут после ошибки провайдера, {name} вернётся к {model}.",
+    "Если лимит использования остановит {name} после начала работы, {name} продолжит ту же работу на первой доступной модели из списка. Когда лимит закончится или через 10 минут после ошибки провайдера, {name} вернётся к {model}.",
   "agentSettings.groups.brain": "Мозг",
   "agentSettings.groups.knows": "Знает",
   "agentSettings.groups.does": "Делает",
@@ -151,6 +151,9 @@ export const messages = {
   "agentSettings.avatar.resetToId": "Сбросить до ID",
   "agentSettings.avatar.shape": "Форма",
   "agentSettings.avatar.shuffle": "Случайное лицо",
+  "agentSettings.avatar.style": "Стиль аватара",
+  "agentSettings.avatar.stylePlush": "Плюш",
+  "agentSettings.avatar.styleFlat": "Плоский",
   "agentSettings.avatar.shapes": "Формы аватара",
   "agentSettings.avatar.shapeOption": "Форма {number}",
   "agentSettings.avatar.eyes": "Глаза",
@@ -166,10 +169,6 @@ export const messages = {
 
   "agentSettings.runtime.model": "Модель агента",
   "agentSettings.runtime.modelUnavailable": "Модели станут доступны после подключения CLI агента.",
-  "agentSettings.runtime.reasoning": "Рассуждение",
-  "agentSettings.runtime.reasoningLabel": "Уровень рассуждения агента",
-  "agentSettings.runtime.selectReasoning": "Выберите уровень рассуждения",
-  "agentSettings.runtime.reasoningSetByProvider": "Как в {provider}",
   "agentSettings.runtime.access": "Доступ",
   "agentSettings.runtime.accessLabel": "Доступ агента",
   "agentSettings.runtime.busyMessage": "Во время работы",
@@ -211,6 +210,15 @@ export const messages = {
     "Агент забудет этот чат. Сообщения останутся видны над разделителем. Инструкции, модель, инструменты, память, рабочее пространство и браузер не изменятся.",
   "agentSettings.newChat.confirm": "Начать новый чат",
   "agentSettings.newChat.failed": "Не удалось начать новый чат.",
+  "agentSettings.deleteHistory.title": "Удалить историю",
+  "agentSettings.deleteHistory.description":
+    "Сообщения этого чата удаляются, и агент их забывает. Его настройки остаются.",
+  "agentSettings.deleteHistory.button": "Удалить",
+  "agentSettings.deleteHistory.confirmTitle": "Удалить историю чата с {name}?",
+  "agentSettings.deleteHistory.confirmDescription":
+    "Все сообщения и файлы этого чата будут удалены из OpenBot, и агент их забудет. Это нельзя отменить. Побочные ветки, инструкции, модель, инструменты, воспоминания, рабочая папка и браузер не изменятся.",
+  "agentSettings.deleteHistory.confirm": "Удалить историю",
+  "agentSettings.deleteHistory.failed": "Не удалось удалить историю.",
 
   "agentSettings.fullAccess.title": "Дать этому агенту полный доступ?",
   "agentSettings.fullAccess.askTitle": "Разрешить этому агенту работать за пределами рабочего пространства?",
@@ -268,8 +276,7 @@ export const messages = {
   "agentSettings.agentNewChat.description":
     "Агент может начать новый чат, когда его чат становится длинным. Сначала он сохраняет заметки.",
   "agentSettings.quickAcknowledgement.title": "Показывать план перед долгими задачами",
-  "agentSettings.quickAcknowledgement.description":
-    "Перед долгой задачей агент показывает свой план. Он начинает через 10 с или когда вы нажимаете «Начать».",
+  "agentSettings.quickAcknowledgement.description": "Перед долгой задачей агент показывает свой план.",
   "agentSettings.browserProfile.label": "Профиль браузера",
   "agentSettings.browserProfile.shared": "Общий",
   "agentSettings.browserProfile.agent": "Только этот агент",

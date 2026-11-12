@@ -10,6 +10,8 @@ import type {
   ConversationSearchPage,
   ConversationSnapshot,
   HostedSiteConversationEventStatus,
+  MessagePinner,
+  SentMessageStats,
 } from "@openbot/contracts/ipc";
 import { AgentHistoryQueries, type AgentHistorySelection } from "./database/agent-history-queries";
 import { type AgentModelChange, AgentRoster } from "./database/agent-roster";
@@ -17,6 +19,7 @@ import { AgentUsage } from "./database/agent-usage";
 import { type ConversationMarkerExclusions, ConversationQueries } from "./database/conversation-queries";
 import { ConversationWriter } from "./database/conversation-writer";
 import { DatabaseCore, type OrchestrationEventInput } from "./database/database-core";
+import { deletedThreadMessageIds, threadMessageIds } from "./database/deleted-thread-messages";
 import {
   type ActiveHostedSiteConversationEvent,
   HostedSiteEventLog,
@@ -27,6 +30,15 @@ import {
   type MailboxProjectionChanges,
   type MailboxProjectionState,
 } from "./database/mailbox-projection";
+import {
+  type PinnedThreadMessage,
+  pinnedThreadMessageCount,
+  pinnedThreadMessages,
+  pinThreadMessage,
+  threadMessagePinner,
+  threadMessagesContaining,
+  unpinThreadMessage,
+} from "./database/pinned-thread-messages";
 import {
   type ProviderHistoryImportState,
   type ProviderHistorySessionInput,
@@ -184,8 +196,8 @@ export class OpenBotDatabase {
     return this.#conversations.readConversation(agentId, threadId);
   }
 
-  readTurnAssistantMessages(agentId: string, threadId: string, turnId: string): ConversationMessage[] {
-    return this.#conversations.readTurnAssistantMessages(agentId, threadId, turnId);
+  readTurnAssistantMessages(agentId: string, turnId: string): ConversationMessage[] {
+    return this.#conversations.readTurnAssistantMessages(agentId, turnId);
   }
 
   readActiveTurnId(agentId: string, threadId: string | null): string | null {
@@ -211,6 +223,10 @@ export class OpenBotDatabase {
     return this.#agentHistory.read(agentId, threadId, selection);
   }
 
+  readTurnTrace(threadId: string, turnId: string) {
+    return this.#agentHistory.turnTrace(threadId, turnId);
+  }
+
   readConversationMessages(
     agentId: string,
     threadId: string | null,
@@ -225,6 +241,18 @@ export class OpenBotDatabase {
     activeTurnId: string | null,
   ): ConversationMessage[] {
     return this.#conversations.readConversationRecoveryMessages(agentId, threadId, activeTurnId);
+  }
+
+  conversationCursorAt(threadId: string, messageId: string): string | null {
+    return this.#conversations.conversationCursorAt(threadId, messageId);
+  }
+
+  conversationCountBefore(threadId: string, messageId: string, options: ConversationMarkerExclusions = {}): number {
+    return this.#conversations.conversationCountBefore(threadId, messageId, options);
+  }
+
+  conversationHasAfter(threadId: string, messageId: string, options: ConversationMarkerExclusions = {}): boolean {
+    return this.#conversations.conversationHasAfter(threadId, messageId, options);
   }
 
   readConversationPage(
@@ -257,6 +285,10 @@ export class OpenBotDatabase {
 
   searchConversationFiles(query: string, cursor?: string, requestedLimit = 50): ConversationFileSearchPage {
     return this.#conversations.searchConversationFiles(query, cursor, requestedLimit);
+  }
+
+  readSentMessageStats(): SentMessageStats {
+    return this.#conversations.readSentMessageStats();
   }
 
   persistConversation(
@@ -304,8 +336,53 @@ export class OpenBotDatabase {
     eventType: string;
     detail?: unknown;
     commandId?: string;
+    /** The shown messages that a person deletes. No later write or replay brings them back. */
+    deletedMessageIds?: readonly string[];
   }): number {
     return this.#conversationWrites.persistConversationChanges(input);
+  }
+
+  /** Deletes every shown message of a thread, for "Delete history". No later write or replay brings one back. */
+  deleteThreadHistory(input: { agentId: string; threadId: string }): number {
+    return this.#conversationWrites.deleteThreadHistory(input);
+  }
+
+  /** The ids of the shown messages of a thread, in no order. */
+  threadMessageIds(threadId: string): string[] {
+    return threadMessageIds(this.connection, threadId);
+  }
+
+  /** The ids of the messages that a person deleted from this thread. */
+  deletedConversationMessageIds(threadId: string): Set<string> {
+    return deletedThreadMessageIds(this.connection, threadId);
+  }
+
+  /** The pinned messages of these threads that are still shown, the newest pin first, at most `limit`. */
+  pinnedThreadMessages(threadIds: readonly string[], limit: number): PinnedThreadMessage[] {
+    return pinnedThreadMessages(this.connection, threadIds, limit);
+  }
+
+  pinnedThreadMessageCount(threadId: string): number {
+    return pinnedThreadMessageCount(this.connection, threadId);
+  }
+
+  /** Who pinned this message of the thread, or null when it is not pinned. */
+  threadMessagePinner(threadId: string, messageId: string): MessagePinner | null {
+    return threadMessagePinner(this.connection, threadId, messageId);
+  }
+
+  /** Pins a shown message of a thread. The caller has checked that the thread holds the message. */
+  pinThreadMessage(threadId: string, messageId: string, pinnedAt: string, pinnedBy: MessagePinner): void {
+    pinThreadMessage(this.connection, threadId, messageId, pinnedAt, pinnedBy);
+  }
+
+  unpinThreadMessage(threadId: string, messageId: string): void {
+    unpinThreadMessage(this.connection, threadId, messageId);
+  }
+
+  /** The newest shown messages of a thread whose text contains `quote`, the newest first. */
+  threadMessagesContaining(threadId: string, quote: string, limit: number): ConversationMessage[] {
+    return threadMessagesContaining(this.connection, threadId, quote, limit);
   }
 
   upsertProviderHistoryMessage(input: {
@@ -449,6 +526,18 @@ export class OpenBotDatabase {
 
   activeProviderSession(threadId: string, provider: AgentProviderId): ProviderSession | null {
     return this.#sessions.activeProviderSession(threadId, provider);
+  }
+
+  /** Whether the thread has an event of this type. The `orchestration_events_thread_type` index answers it. */
+  threadHasEvent(threadId: string, eventType: string): boolean {
+    return (
+      this.connection
+        .prepare(
+          `SELECT 1 FROM orchestration_events
+           WHERE aggregate_type = 'thread' AND aggregate_id = ? AND event_type = ? LIMIT 1`,
+        )
+        .get(threadId, eventType) !== undefined
+    );
   }
 
   listProviderSessions(threadId: string): ProviderSession[] {

@@ -123,6 +123,15 @@ export function SelectItem(props: SelectItemProps): JSX.Element {
   );
 }
 
+export type SelectSectionProps = PolymorphicProps<"li", SelectPrimitive.SelectSectionProps<"li">> &
+  Pick<ComponentProps<"li">, "class" | "children">;
+
+/** The name of a group of options, above its options. Use it in the `sectionComponent` of a `Select`. */
+export function SelectSection(props: SelectSectionProps): JSX.Element {
+  const others = omit(props, "class");
+  return <SelectPrimitive.Section class={cx("ui-select-section", props.class)} {...others} />;
+}
+
 /** "new_york", "new york" and "America/New-York" match each other. */
 const searchText = (text: string) =>
   text
@@ -131,10 +140,10 @@ const searchText = (text: string) =>
     .trim();
 
 /**
- * Makes the current value the active row when the list opens, as `Select` does: it scrolls into
- * view, the arrow keys move from it, and Enter keeps it.
+ * Makes the current value the active row when a combobox list opens, as `Select` does: it scrolls
+ * into view, the arrow keys move from it, and Enter keeps it. Put it inside `Combobox.Root`.
  */
-function ActiveCurrentRow(props: { key: string }) {
+export function ActiveCurrentRow(props: { key: string }) {
   const context = useComboboxContext();
   onSettled(() => context.listState().selectionManager().setFocusedKey(props.key));
   return null;

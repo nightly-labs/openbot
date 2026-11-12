@@ -1,7 +1,7 @@
 import { HeaderHeightContext } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
-import { type PropsWithChildren, type ReactNode, useContext, useState } from "react";
-import { Pressable, View } from "react-native";
+import { type PropsWithChildren, type ReactNode, type RefObject, useContext, useRef, useState } from "react";
+import { Pressable, View, type ViewInstance } from "react-native";
 import Animated, {
   cubicBezier,
   Extrapolation,
@@ -14,6 +14,8 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
+import { AndroidBlurTarget, AndroidHeaderBlur } from "@/shared/components/android-header-blur";
+import { ANDROID_BLUR } from "@/shared/components/glass-capsule";
 import { SheetScrollEdgeEffect } from "@/shared/components/sheet-scroll-edge-effect";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useBarTop } from "@/shared/lib/native-bar";
@@ -175,8 +177,9 @@ export function LargeTitle({
 
 /**
  * The scroll edge effect under the transparent native bar, and the small title that comes into the
- * bar when the big title scrolls under it. The native bar buttons stay native above it. Android has
- * no blur: as the top fade of the design, the surface is solid under the bar and fades out below it.
+ * bar when the big title scrolls under it. The native bar buttons stay native above it. Android 12 and
+ * later blur `blurTarget` under the bar, and the blur fades out toward the bottom of the bar. Without a target, or on earlier
+ * versions, the surface is solid under the bar and fades out below it, as the top fade of the design.
  * `children` draw over the edge effect and under the small title.
  */
 export function LargeTitleBar({
@@ -186,6 +189,7 @@ export function LargeTitleBar({
   insetLeft = isAndroid ? ANDROID_BAR_TITLE_INSET : BAR_TITLE_INSET,
   insetRight = isAndroid ? ANDROID_BAR_TITLE_INSET : BAR_TITLE_INSET,
   surface = "canvas",
+  blurTarget,
   children,
 }: PropsWithChildren<{
   scroll: LargeTitleScroll;
@@ -195,6 +199,8 @@ export function LargeTitleBar({
   insetLeft?: number;
   insetRight?: number;
   surface?: "canvas" | "sheet";
+  /** Android: the scrolling content, in an `AndroidBlurTarget`, that blurs under the bar. */
+  blurTarget?: RefObject<ViewInstance | null>;
 }>) {
   const insets = useSafeAreaInsets();
   const reduced = useReducedMotion();
@@ -232,7 +238,9 @@ export function LargeTitleBar({
   );
   return (
     <>
-      {isAndroid ? (
+      {isAndroid && ANDROID_BLUR && blurTarget ? (
+        <AndroidHeaderBlur target={blurTarget} height={scroll.headerHeight} surface={surface} shape="screen" />
+      ) : isAndroid ? (
         <>
           <View
             pointerEvents="none"
@@ -308,27 +316,30 @@ export function LargeTitleScrollView({
 }: PropsWithChildren<{ title: string; caption?: string; contentContainerClassName?: string }>) {
   const scroll = useLargeTitleScroll();
   const insets = useSafeAreaInsets();
+  const blurTarget = useRef<ViewInstance>(null);
   return (
     <View className="flex-1 bg-sheet">
-      <Animated.ScrollView
-        className="flex-1"
-        // The side insets (the iPhone Duo rail, the landscape cutout) go outside the scroll view. With
-        // `always`, iOS would also inset the content by them, and the content would go off the other side.
-        style={{ marginLeft: insets.left, marginRight: insets.right }}
-        alwaysBounceVertical={false}
-        contentInsetAdjustmentBehavior={scroll.ownsInset ? "never" : "always"}
-        contentContainerClassName="pb-safe-offset-5"
-        // Without a content inset from iOS, the content starts below the transparent header.
-        contentContainerStyle={scroll.ownsInset ? { paddingTop: scroll.headerHeight } : undefined}
-        keyboardShouldPersistTaps="handled"
-        scrollEventThrottle={16}
-        showsVerticalScrollIndicator={false}
-        onScroll={scroll.onScroll}
-      >
-        <LargeTitle scroll={scroll} title={title} caption={caption} />
-        <View className={contentContainerClassName}>{children}</View>
-      </Animated.ScrollView>
-      <LargeTitleBar scroll={scroll} title={title} surface="sheet" />
+      <AndroidBlurTarget target={blurTarget} surface="sheet">
+        <Animated.ScrollView
+          className="flex-1"
+          // The side insets (the iPhone Duo rail, the landscape cutout) go outside the scroll view. With
+          // `always`, iOS would also inset the content by them, and the content would go off the other side.
+          style={{ marginLeft: insets.left, marginRight: insets.right }}
+          alwaysBounceVertical={false}
+          contentInsetAdjustmentBehavior={scroll.ownsInset ? "never" : "always"}
+          contentContainerClassName="pb-safe-offset-5"
+          // Without a content inset from iOS, the content starts below the transparent header.
+          contentContainerStyle={scroll.ownsInset ? { paddingTop: scroll.headerHeight } : undefined}
+          keyboardShouldPersistTaps="handled"
+          scrollEventThrottle={16}
+          showsVerticalScrollIndicator={false}
+          onScroll={scroll.onScroll}
+        >
+          <LargeTitle scroll={scroll} title={title} caption={caption} />
+          <View className={contentContainerClassName}>{children}</View>
+        </Animated.ScrollView>
+      </AndroidBlurTarget>
+      <LargeTitleBar scroll={scroll} title={title} surface="sheet" blurTarget={blurTarget} />
     </View>
   );
 }

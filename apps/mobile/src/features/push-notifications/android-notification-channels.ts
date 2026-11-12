@@ -9,7 +9,8 @@ import { currentText } from "@/shared/lib/text";
  * of the sound that the host sent. Both use these ids.
  */
 export function androidChannelId(sound: NotificationSound | null): string {
-  return `openbot.sound.${sound ?? "none"}`;
+  if (sound === null || sound === "default") return `openbot.sound.${sound ?? "none"}`;
+  return `openbot.sound.${sound}.v2`;
 }
 
 /**
@@ -39,6 +40,11 @@ const SOUND_LABELS = {
  */
 export async function createAndroidChannels(): Promise<void> {
   const { t } = currentText();
+  // Release builds up to 1.4.5 had no sound files, so the first channels of the sounds play the
+  // Android notification sound. A channel keeps its sound, so the sounds have new channels.
+  for (const sound of Object.keys(SOUND_FILES)) {
+    await Notifications.deleteNotificationChannelAsync(`openbot.sound.${sound}`);
+  }
   for (const sound of NOTIFICATION_SOUNDS) {
     await Notifications.setNotificationChannelAsync(androidChannelId(sound), {
       name: t("mobile.settings.notifications.channel", { sound: t(SOUND_LABELS[sound]) }),

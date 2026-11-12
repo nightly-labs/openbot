@@ -1,6 +1,7 @@
 import { CHAT_VISUAL_ITEM_TYPE_PREFIX } from "@openbot/contracts/chat-visual";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
+  AGENT_WELCOME_ITEM_TYPE,
   type AgentSummary,
   type AskSideQuestionInput,
   CONVERSATION_PLAN_ITEM_TYPE,
@@ -16,9 +17,9 @@ const MESSAGE_CHARACTERS = INPUT_LIMITS.sideQuestionEarlierText;
 const CHAT_CHARACTERS = 60_000;
 const EARLIER_CHARACTERS = 60_000;
 
-/** Indented JSON for a prompt block, with `<` escaped as `tagSafe` does. */
+/** Compact JSON for a prompt block, with `<` escaped as `tagSafe` does. Indents only add tokens. */
 export function promptJson(value: unknown): string {
-  return tagSafe(JSON.stringify(value, null, 2));
+  return tagSafe(JSON.stringify(value));
 }
 
 /** A message that a person or the agent wrote in the chat, not a tool step or a status line. */
@@ -29,6 +30,8 @@ function chatMessage(message: ConversationMessage): boolean {
     message.itemType !== "commentary" &&
     message.itemType !== "question_prompt" &&
     message.itemType !== "agent_attachment" &&
+    // The user did not write a new agent's setup message, and does not see it.
+    message.itemType !== AGENT_WELCOME_ITEM_TYPE &&
     !message.itemType?.startsWith(CHAT_VISUAL_ITEM_TYPE_PREFIX) &&
     message.itemType !== CONVERSATION_PLAN_ITEM_TYPE &&
     message.itemType !== CONVERSATION_SUBAGENTS_ITEM_TYPE &&
@@ -37,12 +40,16 @@ function chatMessage(message: ConversationMessage): boolean {
 }
 
 /** The chat messages that fit the budget, newest last, each with the name of its writer. */
-export function chatTranscript(agent: AgentSummary, messages: readonly ConversationMessage[]) {
+export function chatTranscript(
+  agent: Pick<AgentSummary, "name">,
+  messages: readonly ConversationMessage[],
+  budget = CHAT_CHARACTERS,
+) {
   const entries: { from: string; text: string }[] = [];
   let characters = 0;
   for (const message of [...messages].filter(chatMessage).reverse()) {
     const text = message.text.slice(0, MESSAGE_CHARACTERS);
-    if (characters + text.length > CHAT_CHARACTERS) break;
+    if (characters + text.length > budget) break;
     characters += text.length;
     const from =
       message.author === "user"

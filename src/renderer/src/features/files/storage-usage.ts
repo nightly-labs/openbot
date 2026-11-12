@@ -1,15 +1,20 @@
+import { HOSTED_SERVER_BASE_IMAGE_GB } from "@openbot/contracts/hosted-servers";
 import {
   type ClearableStorageCategory,
   type GetStorageUsageInput,
   type ServerSummary,
   STORAGE_CAPABILITY,
+  type StorageDisk,
   type StorageUsage,
 } from "@openbot/contracts/ipc";
+import { STORAGE_CHANNEL_CAPABILITY } from "@openbot/contracts/team-protocol/storage-channel-v1";
 import { classifyFailure } from "@openbot/telemetry";
+import type { AgentProfile } from "@openbot/ui/data";
 import type { StoredFileAction, StoredFileRow } from "@openbot/ui/features/files/files-view";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createStore, untrack } from "solid-js";
+import { type Accessor, createEffect, createSignal, createStore, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
+import { toAgentProfile } from "../../app-message-projection";
 import { serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import { type FilesPort, filesPort } from "./files-port";
 
@@ -18,9 +23,66 @@ export function serverHasStorage(server: ServerSummary | undefined): server is S
   return Boolean(server && (server.kind === "local" || serverSupportsCapability(server, STORAGE_CAPABILITY)));
 }
 
+/** This computer, or a joined server that serves the files of one channel (`storage-channel-v1`). */
+export function serverHasChannelStorage(server: ServerSummary | undefined): server is ServerSummary {
+  return Boolean(server && (server.kind === "local" || serverSupportsCapability(server, STORAGE_CHANNEL_CAPABILITY)));
+}
+
+const GB = 1024 ** 3;
+
+/**
+ * The disk of a hosted server holds its base image (the system and the preinstalled tools) and the
+ * files of its users. The plan storage counts only the files of its users.
+ */
+const HOSTED_BASE_IMAGE_BYTES = HOSTED_SERVER_BASE_IMAGE_GB * GB;
+
+/** The plan storage in GB of a hosted server, or null for a server that is not hosted. */
+export function hostedPlanStorageGb(server: ServerSummary | undefined): number | null {
+  return server?.hosted === true && server.storageGb !== undefined ? server.storageGb : null;
+}
+
+/**
+ * The disk of a hosted server against its plan: the total is the plan storage, and the free space is
+ * what the plan has left after the files of its users. The free space is never more than the disk has.
+ */
+export function planDisk(disk: StorageDisk, storageGb: number): StorageDisk {
+  const { freeBytes, totalBytes } = disk;
+  if (freeBytes === null || totalBytes === null) return disk;
+  const planBytes = storageGb * GB;
+  const userBytes = Math.max(0, totalBytes - freeBytes - HOSTED_BASE_IMAGE_BYTES);
+  return { freeBytes: Math.max(0, Math.min(freeBytes, planBytes - userBytes)), totalBytes: planBytes };
+}
+
 /** Every member reads storage; the host lets only an owner or admin delete or clear. */
 export function canManageStorage(server: ServerSummary): boolean {
   return serverRoleCanAdminister(server);
+}
+
+/**
+ * The agents of one server, to name the rows of its storage. They are read for that server, because a
+ * storage view can be open for a server that is not the selected one. Undefined until the list of
+ * that server arrives, so a file is not taken as a file of a deleted agent before it.
+ */
+export function createServerAgents(
+  serverId: () => string,
+  calls: () => FilesPort = filesPort,
+): Accessor<AgentProfile[] | undefined> {
+  const [agents, setAgents] = createSignal<AgentProfile[] | undefined>(undefined);
+  createEffect(serverId, (id) => {
+    setAgents(undefined);
+    let current = true;
+    untrack(calls)
+      .agent.listAgents(id)
+      .then((list) => {
+        if (current) setAgents(list.map(toAgentProfile));
+      })
+      // Without names the rows still show their chats and sizes; the storage read reports its own failure.
+      .catch(() => undefined);
+    return () => {
+      current = false;
+    };
+  });
+  return agents;
 }
 
 /** One storage scope of one server. Settings can be open for a server that is not the selected one. */
@@ -150,6 +212,54 @@ export function createStorageUsage(target: () => StorageTarget | null, calls: ()
     }
   }
 
+  /**
+   * Runs `run` on the files one at a time and tells `onProgress` how many are done. Resolves with the
+   * number of files that failed.
+   */
+  async function eachFile(
+    files: readonly StoredFileRow[],
+    run: (file: StoredFileRow, serverId: string) => Promise<void>,
+    onProgress: ((done: number) => void) | undefined,
+  ): Promise<number> {
+    const current = target();
+    if (!current) return files.length;
+    let failed = 0;
+    for (const [index, file] of files.entries()) {
+      try {
+        await run(file, current.serverId);
+      } catch {
+        failed += 1;
+      }
+      onProgress?.(index + 1);
+    }
+    return failed;
+  }
+
+  /**
+   * Deletes the files one at a time, so a host with `storage-v1` needs no new route, and scans once at
+   * the end. Resolves with the number of files that could not be deleted.
+   */
+  async function deleteFiles(files: readonly StoredFileRow[], onProgress?: (done: number) => void): Promise<number> {
+    try {
+      return await eachFile(
+        files,
+        (file, serverId) => calls().storage.deleteFile({ fileId: file.id }, serverId),
+        onProgress,
+      );
+    } finally {
+      await refresh(true);
+    }
+  }
+
+  /** Puts the files in the Downloads folder with no dialog. Resolves with the number that could not be saved. */
+  function saveFiles(files: readonly StoredFileRow[], onProgress?: (done: number) => void): Promise<number> {
+    return eachFile(
+      files,
+      (file, serverId) => calls().storage.openFile({ fileId: file.id, action: "save" }, serverId),
+      onProgress,
+    );
+  }
+
   /** Null while nothing went wrong. A host that answered null predates `storage-v1`. */
   function error(): string | null {
     if (state.error) return state.error;
@@ -162,7 +272,7 @@ export function createStorageUsage(target: () => StorageTarget | null, calls: ()
     return state.loaded ? "ready" : "scanning";
   }
 
-  return { state, error, scanState, refresh, clear, fileAction };
+  return { state, error, scanState, refresh, clear, fileAction, deleteFiles, saveFiles };
 }
 
 export type StorageUsageResource = ReturnType<typeof createStorageUsage>;

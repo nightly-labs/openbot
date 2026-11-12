@@ -25,6 +25,7 @@ import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import { AVATAR_IMAGE_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { type CreateAgentInput, type DuplicateAgentResult, WORKFLOWS_USAGE_ID } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_WELCOME_CAPABILITY } from "@openbot/contracts/team-protocol/agent-welcome-v1";
 import {
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SECRET_VAULT_ROUTES,
@@ -39,7 +40,7 @@ import { ForbiddenAttentionAnswer, InactiveAttentionRequest } from "../../backen
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { parseSidebarLayoutAction } from "../ipc/agent-inputs";
 import type { ModelVisibility } from "../model-visibility";
-import type { TeamApiAgents, TeamApiOptions, TeamApiSidebarLayout } from "./dependencies";
+import type { TeamApiAgents, TeamApiLibraryFolders, TeamApiOptions, TeamApiSidebarLayout } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import {
@@ -63,6 +64,7 @@ import { routeAgentConversation } from "./route-agent-conversation";
 import { routeAgentMemories } from "./route-agent-memories";
 import { routeAgentQueue } from "./route-agent-queue";
 import { routeAgentRoutines } from "./route-agent-routines";
+import { searchPageWithinFrame } from "./route-thread-message-search";
 
 export interface AgentRouteDependencies {
   // The whole service, unlike every other module here, because this one forwards it to four
@@ -70,6 +72,8 @@ export interface AgentRouteDependencies {
   agents: TeamApiAgents;
   skills?: TeamApiOptions["skills"];
   sidebarLayout: Pick<TeamApiSidebarLayout, "getSnapshot" | "mutate" | "removeAgent" | "withProfileAssignment">;
+  /** The Library folders of this host: a deleted agent takes its folders with it. */
+  libraryFolders?: Pick<TeamApiLibraryFolders, "removeAgent"> | undefined;
   duplicateAgent: (agentId: string, operationId: string) => Effect.Effect<DuplicateAgentResult, AgentDuplicationFailed>;
   /** `model-visibility-v1`: the models that the model picker of this server shows. */
   visibleModels?: Pick<ModelVisibility, "picker">;
@@ -77,7 +81,7 @@ export interface AgentRouteDependencies {
 
 export async function routeAgents(
   context: TeamApiRequestContext,
-  { agents, skills, sidebarLayout, duplicateAgent, visibleModels }: AgentRouteDependencies,
+  { agents, skills, sidebarLayout, libraryFolders, duplicateAgent, visibleModels }: AgentRouteDependencies,
 ): Promise<RouteOutcome> {
   const { method, url, request, response, member, capabilities, json, empty } = context;
   const hidden = hiddenProviderAgentIds(agents.listAgents(), context.protocol);
@@ -129,7 +133,8 @@ export async function routeAgents(
       !agents.listAgents().some((agent) => agent.id === input.agentId)
     )
       throw new HttpError(404, sourceText("error.team.agentNotFound"));
-    const report = agents.getHostAnalytics(input);
+    // The frozen host analytics wire has no skills: only the local Usage page shows them.
+    const { skills: _localOnly, ...report } = agents.getHostAnalytics(input);
     return json(
       200,
       workflows ? report : { ...report, agents: report.agents.filter((row) => row.agentId !== WORKFLOWS_USAGE_ID) },
@@ -165,14 +170,14 @@ export async function routeAgents(
     if (!query.trim() || query.length > INPUT_LIMITS.messageText) {
       throw new HttpError(400, sourceText("error.team.searchQueryRequired"));
     }
+    // A query parameter is part of the released URL, and the versioned adapters translate JSON
+    // bodies only. `botId` is what every shipped client sends and what every shipped host reads.
+    const agentId = url.searchParams.get("botId") ?? undefined;
+    const cursor = url.searchParams.get("cursor") ?? undefined;
     return json(
       200,
-      agents.searchConversationMessages(
-        query,
-        // A query parameter is part of the released URL, and the versioned adapters translate JSON
-        // bodies only. `botId` is what every shipped client sends and what every shipped host reads.
-        url.searchParams.get("botId") ?? undefined,
-        url.searchParams.get("cursor") ?? undefined,
+      searchPageWithinFrame(
+        (limit) => agents.searchConversationMessages(query, agentId, cursor, limit),
         pageLimit(url),
       ),
     );
@@ -219,7 +224,12 @@ export async function routeAgents(
     requireCompatibleDefault();
     const input = agentCreate(await readJson(request));
     requireVisibleProvider(input);
-    return json(201, await runCauseEffect(agents.createAgent(input, undefined, undefined, memberSender(member))));
+    // A client with `agent-welcome-v1` sends a setup message for the new agent, not a message from the member.
+    const welcome = capabilities.has(AGENT_WELCOME_CAPABILITY);
+    return json(
+      201,
+      await runCauseEffect(agents.createAgent(input, undefined, undefined, memberSender(member), welcome)),
+    );
   }
 
   const agentMatch = url.pathname.match(/^\/v1\/agents\/([^/]+)(?:\/(.*))?$/);
@@ -263,6 +273,7 @@ export async function routeAgents(
         throw new HttpError(403, sourceText("error.team.membersCannotDeleteAgents"));
       await runCauseEffect(agents.deleteAgent(agentId));
       await runCauseEffect(sidebarLayout.removeAgent(agentId));
+      if (libraryFolders) await runCauseEffect(libraryFolders.removeAgent(agentId));
       return empty(204);
     }
     if (action === "avatar") {

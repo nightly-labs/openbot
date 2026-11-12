@@ -7,6 +7,7 @@ import {
   type WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
 import type { MessageImageFile } from "@openbot/ui/features/conversation/MarkdownMessageText";
+import { isSidePanelPane } from "@openbot/ui/features/conversation/SidePanel";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onCleanup, type Store, type StoreSetter, untrack } from "solid-js";
 import { createScopeGuard } from "../../../scope-lifetime";
@@ -22,6 +23,7 @@ import type {
   SidePanelPane,
 } from "../conversation-types";
 import { agentSkillsMode } from "../installed-skills-source";
+import { SHARED_FOLDER_PATH } from "../message-image-files";
 import { filePreviewQuoteId } from "../quoted-text";
 import { conversationOwnerId } from "./composer-store";
 
@@ -36,13 +38,34 @@ export interface RoutineSettingsRequest {
   nonce: number;
 }
 
-/** The panes of one agent's side panel. The panel keeps them while it is closed. */
+/** A file or folder with a tab in the side panel. */
+interface SidePanelFile {
+  /** See `filePreviewKey`. */
+  key: string;
+  name: string;
+  folder: boolean;
+  source: SidebarFilePreview["source"];
+}
+
+/** The panes and files of one agent's side panel. The panel keeps them while it is closed. */
 export interface SidePanelState {
   panes: readonly SidePanelPane[];
-  /** The pane on screen, or the last one before the panel closed. */
+  /** The pane on screen, or the last one before the panel closed. Null while a file shows. */
   selected: SidePanelPane | null;
+  /** The open files, in tab order. */
+  files: readonly SidePanelFile[];
+  /** The key of the file on screen, or of the last one before the panel closed. Null while a pane shows. */
+  file: string | null;
   maximized: boolean;
 }
+
+/**
+ * Where a file opens. A link in the chat opens the file in a new tab. A link or folder entry in the
+ * shown file or folder opens in its tab, as a link in a browser tab does. A file that has a tab
+ * always opens in that tab. A click on a tab reads its file again in that tab; when the tab closes
+ * before the read ends, the file does not show.
+ */
+type FileTabPlace = "tab" | "here" | "open";
 
 /** The side panel of each agent, the subagent in its Subagent pane, and the side thread that it shows. */
 export interface SidePanelsState {
@@ -59,29 +82,7 @@ const FILE_PREVIEW_REFRESH_MS = 750;
  */
 const FILE_PREVIEW_REFRESH_BYTES = 8 * 1024 * 1024;
 
-const SIDE_PANEL_EMPTY: SidePanelState = { panes: [], selected: null, maximized: false };
-
-/** The panel mode of each pane. */
-export const SIDE_PANEL_MODES = {
-  browser: "browser",
-  files: "files",
-  settings: "settings",
-  question: "question",
-  voice: "voice",
-  subagent: "subagent",
-} as const satisfies Record<SidePanelPane, RightPanelMode>;
-
-function isSidePanelPane(value: string): value is SidePanelPane {
-  return value in SIDE_PANEL_MODES;
-}
-
-/** The pane that shows a panel mode, or null for a mode outside the side panel. */
-function paneOfMode(mode: RightPanelMode): SidePanelPane | null {
-  for (const [pane, paneMode] of Object.entries(SIDE_PANEL_MODES)) {
-    if (paneMode === mode && isSidePanelPane(pane)) return pane;
-  }
-  return null;
-}
+const SIDE_PANEL_EMPTY: SidePanelState = { panes: [], selected: null, files: [], file: null, maximized: false };
 
 export interface PanelsStoreDeps {
   props: ConversationProps;
@@ -136,7 +137,10 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     return (agentId && panels.side[agentId]) || SIDE_PANEL_EMPTY;
   };
   const sidePanelOpen = () =>
-    activeRightPanel() === "side-panel" || activeRightPanel() === "thread" || paneOfMode(activeRightPanel()) !== null;
+    activeRightPanel() === "side-panel" ||
+    activeRightPanel() === "thread" ||
+    activeRightPanel() === "file-preview" ||
+    isSidePanelPane(activeRightPanel());
   function updateSidePanel(agentId: string, update: (state: SidePanelState) => SidePanelState) {
     setPanels((draft) => {
       draft.side[agentId] = update(draft.side[agentId] ?? SIDE_PANEL_EMPTY);
@@ -155,8 +159,42 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     const panes = state.panes.filter((item) => item !== pane);
     const selected =
       state.selected === pane ? (panes[Math.min(Math.max(index, 0), panes.length - 1)] ?? null) : state.selected;
-    updateSidePanel(agentId, () => ({ panes, selected, maximized: panes.length > 0 && state.maximized }));
+    updateSidePanel(agentId, () => ({
+      ...state,
+      panes,
+      selected,
+      maximized: panes.length + state.files.length > 0 && state.maximized,
+    }));
     return selected;
+  }
+  /** Removes the tab of a file. Returns the key of the file to show in its place, or null when no file tab stays. */
+  function removeSidePanelFile(key: string): string | null {
+    const agentId = conversationOwnerId(deps.props);
+    if (!agentId) return null;
+    const state = panels.side[agentId] ?? SIDE_PANEL_EMPTY;
+    const index = state.files.findIndex((item) => item.key === key);
+    const files = state.files.filter((item) => item.key !== key);
+    const file = state.file === key ? (files[Math.min(Math.max(index, 0), files.length - 1)]?.key ?? null) : state.file;
+    updateSidePanel(agentId, () => ({
+      ...state,
+      files,
+      file,
+      maximized: state.panes.length + files.length > 0 && state.maximized,
+    }));
+    return file;
+  }
+
+  /** Puts a file tab at `index` of the file tabs. */
+  function moveSidePanelFile(key: string, index: number) {
+    const agentId = conversationOwnerId(deps.props);
+    if (!agentId) return;
+    updateSidePanel(agentId, (state) => {
+      const file = state.files.find((item) => item.key === key);
+      if (!file) return state;
+      const files = state.files.filter((item) => item !== file);
+      files.splice(Math.min(Math.max(index, 0), files.length), 0, file);
+      return { ...state, files };
+    });
   }
   const settingsOpen = () => activeRightPanel() === "settings";
   const filesOpen = () => activeRightPanel() === "files";
@@ -175,21 +213,23 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
 
   function setActiveRightPanel(mode: RightPanelMode, agentId = conversationOwnerId(deps.props)) {
     if (!agentId) return;
+    // A file read that is still running must not replace what the panel shows now.
+    if (mode !== "file-preview") deps.invalidateFilePreviewGeneration();
     if (mode !== "settings") {
       setSkillSettingsRequest(null);
       setInstructionsSettingsRequest(null);
       setRoutineSettingsRequest((current) => (current?.agentId === agentId ? null : current));
     }
     deps.setRightPanels((current) => (current[agentId] === mode ? current : { ...current, [agentId]: mode }));
-    const pane = paneOfMode(mode);
-    if (pane)
+    if (isSidePanelPane(mode))
       updateSidePanel(agentId, (state) => ({
         ...state,
-        panes: state.panes.includes(pane) ? state.panes : [...state.panes, pane],
-        selected: pane,
+        panes: state.panes.includes(mode) ? state.panes : [...state.panes, mode],
+        selected: mode,
+        file: null,
       }));
     else if (mode === "side-panel" || mode === "thread")
-      updateSidePanel(agentId, (state) => ({ ...state, selected: null }));
+      updateSidePanel(agentId, (state) => ({ ...state, selected: null, file: null }));
     else if (mode === "none" && panels.side[agentId]?.maximized) {
       updateSidePanel(agentId, (state) => ({ ...state, maximized: false }));
     }
@@ -236,9 +276,12 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     setRoutineSettingsRequest(null);
   }
 
-  function openRoutineRunMessage(messageId: string): void {
+  /** Opens the message of a routine run: in the routine's side thread when the run ran there, else in the chat. */
+  async function openRoutineRunMessage(messageId: string, routineId?: string): Promise<void> {
     setActiveRightPanel("none");
-    void deps.props.onOpenSearchMessage?.(messageId);
+    const threads = deps.props.threads;
+    if (routineId && threads && (await threads.onOpenRoutineRun(routineId, messageId).catch(() => false))) return;
+    await deps.props.onOpenSearchMessage?.(messageId);
   }
 
   function showBrowserPip() {
@@ -264,7 +307,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
    * uses. The bytes come from `previewUrl` rather than the preview IPC, because an attachment is
    * named by its id and has no path on the agent's computer.
    */
-  async function previewAttachment(attachment: AttachmentSummary) {
+  async function previewAttachment(attachment: AttachmentSummary, place: FileTabPlace = "tab") {
     const ownerAgentId = conversationOwnerId(deps.props);
     if (!ownerAgentId || !canPreviewAttachment(attachment)) return;
     const target = { agentId: ownerAgentId, serverId: deps.props.server?.id ?? "local" };
@@ -274,8 +317,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       const preview = await (deps.props.runtime?.previewAttachment?.(attachment) ?? attachmentFilePreview(attachment));
       if (generation !== deps.currentFilePreviewGeneration() || conversationOwnerId(deps.props) !== ownerAgentId)
         return;
-      deps.setSidebarFilePreview({ ownerAgentId, source: { kind: "attachment", attachment }, preview });
-      setActiveRightPanel("file-preview", ownerAgentId);
+      showSidebarFile({ ownerAgentId, source: { kind: "attachment", attachment }, preview }, place);
     } catch (error) {
       if (generation !== deps.currentFilePreviewGeneration()) return;
       deps.setComposerError(errorMessage(error, t("attachment.error.preview", { name: attachment.name })), target);
@@ -310,7 +352,8 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     attachmentFiles.open(attachment, action);
   }
 
-  function openSharedFile(path: string) {
+  /** `fallback` opens another target when nothing exists at `path`, in place of the error. */
+  function openSharedFile(path: string, place: FileTabPlace = "tab", fallback?: () => void) {
     const ownerAgentId = conversationOwnerId(deps.props);
     if (!ownerAgentId) return;
     const serverId = deps.props.server?.id ?? "local";
@@ -329,14 +372,16 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
             releaseFilePreviewPage(preview.pageUrl);
             return;
           }
-          deps.setSidebarFilePreview({ ownerAgentId, source: { kind: "shared", path }, preview });
-          setActiveRightPanel("file-preview", ownerAgentId);
+          showSidebarFile({ ownerAgentId, source: { kind: "shared", path }, preview }, place);
         },
         (error) => {
           if (!scopeActive() || generation !== deps.currentFilePreviewGeneration()) return;
           const showError = () => {
             if (!scopeActive() || generation !== deps.currentFilePreviewGeneration()) return;
-            deps.setComposerError(filePreviewError(error, path), target);
+            // The fallback is for the conversation that was open at the click.
+            if (fallback) {
+              if (conversationOwnerId(deps.props) === ownerAgentId) fallback();
+            } else deps.setComposerError(filePreviewError(error, path), target);
           };
           // A link can name a folder. A local one is shown in the file manager; when that fails too,
           // the preview error stays. A remote or web host cannot show a folder on this computer.
@@ -353,10 +398,22 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
    * A chip can name a folder as well as a file. When the file preview fails, the folder listing is
    * tried; when that fails too, the preview error stays, because it names the path the agent wrote.
    * `agentId` is the agent whose workspace holds the path; in a channel, the agent that wrote it.
+   * `attachment` is the file of the same turn that the chip names. It opens when the path does not.
+   * `fallback` opens another target when the attachment does not open either, in place of the error.
    */
-  function openWorkspaceFile(path: string, folder?: string, agentId = deps.props.agent?.id) {
+  function openWorkspaceFile(
+    path: string,
+    folder?: string,
+    agentId = deps.props.agent?.id,
+    place: FileTabPlace = "tab",
+    attachment?: AttachmentSummary,
+    fallback?: () => void,
+  ) {
     const ownerAgentId = conversationOwnerId(deps.props);
     if (!agentId || !ownerAgentId) return;
+    // Agents also write a shared file as `Shared/…`, as the host reads it. It opens from the shared
+    // folder when the workspace has nothing at that path (#5657).
+    const next = SHARED_FOLDER_PATH.test(path) ? () => openSharedFile(path, place, fallback) : fallback;
     const serverId = deps.props.server?.id ?? "local";
     const target = { agentId: ownerAgentId, serverId };
     const generation = deps.nextFilePreviewGeneration();
@@ -372,18 +429,24 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
           releaseFilePreviewPage(preview.pageUrl);
           return;
         }
-        deps.setSidebarFilePreview({ ownerAgentId, source: { kind: "workspace", agentId, path, folder }, preview });
-        setActiveRightPanel("file-preview", ownerAgentId);
+        showSidebarFile({ ownerAgentId, source: { kind: "workspace", agentId, path, folder }, preview }, place);
       },
       (error) =>
         agent.listWorkspaceDirectory({ agentId, path }).then(
           (directory) => {
             if (!current()) return;
-            showWorkspaceFolder(ownerAgentId, agentId, path, directory);
+            showWorkspaceFolder(ownerAgentId, agentId, path, directory, place);
           },
           () => {
             if (!scopeActive() || generation !== deps.currentFilePreviewGeneration()) return;
-            deps.setComposerError(filePreviewError(error, path), target);
+            if (!attachment || !canPreviewAttachment(attachment)) {
+              if (next) {
+                if (current()) next();
+              } else deps.setComposerError(filePreviewError(error, path), target);
+              return;
+            }
+            // The attachment is of the conversation that was open at the click.
+            if (current()) void previewAttachment(attachment, place);
           },
         ),
     );
@@ -395,8 +458,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     return source?.kind === "workspace" || source?.kind === "workspace-folder" ? source.agentId : deps.props.agent?.id;
   }
 
-  function openWorkspaceFolder(path: string) {
-    const agentId = previewWorkspaceAgentId();
+  function openWorkspaceFolder(path: string, agentId = previewWorkspaceAgentId(), place: FileTabPlace = "here") {
     const ownerAgentId = conversationOwnerId(deps.props);
     if (!agentId || !ownerAgentId) return;
     const target = { agentId: ownerAgentId, serverId: deps.props.server?.id ?? "local" };
@@ -408,7 +470,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
         (directory) => {
           if (generation !== deps.currentFilePreviewGeneration() || conversationOwnerId(deps.props) !== ownerAgentId)
             return;
-          showWorkspaceFolder(ownerAgentId, agentId, path, directory);
+          showWorkspaceFolder(ownerAgentId, agentId, path, directory, place);
         },
         (error) => {
           if (generation !== deps.currentFilePreviewGeneration()) return;
@@ -417,14 +479,65 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       );
   }
 
-  function showWorkspaceFolder(ownerAgentId: string, agentId: string, path: string, directory: WorkspaceDirectory) {
-    deps.setSidebarFilePreview({
-      ownerAgentId,
-      source: { kind: "workspace-folder", agentId, path },
-      preview: null,
-      directory,
+  function showWorkspaceFolder(
+    ownerAgentId: string,
+    agentId: string,
+    path: string,
+    directory: WorkspaceDirectory,
+    place: FileTabPlace,
+  ) {
+    showSidebarFile(
+      { ownerAgentId, source: { kind: "workspace-folder", agentId, path }, preview: null, directory },
+      place,
+    );
+  }
+
+  /** Shows a file or folder in the side panel, in its tab. See `FileTabPlace`. */
+  function showSidebarFile(file: SidebarFilePreview, place: FileTabPlace) {
+    const { ownerAgentId, source } = file;
+    const key = filePreviewKey(source);
+    if (place === "open" && !(panels.side[ownerAgentId] ?? SIDE_PANEL_EMPTY).files.some((item) => item.key === key)) {
+      // The tab closed during the read. No panel shows the page, so main must not keep it.
+      releaseFilePreviewPage(file.preview?.pageUrl);
+      return;
+    }
+    const tab: SidePanelFile = {
+      key,
+      name: file.directory?.name ?? file.preview?.name ?? key,
+      folder: source.kind === "workspace-folder",
+      source,
+    };
+    updateSidePanel(ownerAgentId, (state) => {
+      const files = [...state.files];
+      const index = files.findIndex((item) => item.key === key);
+      const here = place === "here" ? files.findIndex((item) => item.key === state.file) : -1;
+      if (index >= 0) files[index] = tab;
+      else if (here >= 0) files[here] = tab;
+      else files.push(tab);
+      return { ...state, files, file: key, selected: null };
     });
+    deps.setSidebarFilePreview(file);
     setActiveRightPanel("file-preview", ownerAgentId);
+  }
+
+  /** Shows the file of a tab. The shown file shows at once; another file is read again. */
+  function openSidePanelFile(key: string) {
+    const ownerAgentId = conversationOwnerId(deps.props);
+    const tab = sidePanel().files.find((item) => item.key === key);
+    if (!ownerAgentId || !tab) return;
+    const shown = deps.sidebarFilePreview();
+    if (shown?.ownerAgentId === ownerAgentId && filePreviewKey(shown.source) === key) {
+      // A read that is still running must not replace the tab that you selected.
+      deps.invalidateFilePreviewGeneration();
+      updateSidePanel(ownerAgentId, (state) => ({ ...state, file: key, selected: null }));
+      setActiveRightPanel("file-preview", ownerAgentId);
+      return;
+    }
+    const source = tab.source;
+    if (source.kind === "attachment") void previewAttachment(source.attachment, "open");
+    else if (source.kind === "shared") openSharedFile(source.path, "open");
+    else if (source.kind === "workspace") openWorkspaceFile(source.path, source.folder, source.agentId, "open");
+    else openWorkspaceFolder(source.path, source.agentId, "open");
   }
 
   /**
@@ -433,7 +546,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
    */
   function openWorkspaceFolderEntry(path: string) {
     const file = deps.sidebarFilePreview();
-    openWorkspaceFile(path, file?.directory?.path, previewWorkspaceAgentId());
+    openWorkspaceFile(path, file?.directory?.path, previewWorkspaceAgentId(), "here");
   }
 
   /**
@@ -515,10 +628,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
    */
   function previewFileKey(): string | undefined {
     const source = deps.sidebarFilePreview()?.source;
-    if (!source) return undefined;
-    if (source.kind === "attachment") return `attachment\u0000${source.attachment.id}`;
-    if (source.kind === "shared") return `shared\u0000${source.path}`;
-    return `${source.kind}\u0000${source.agentId}\u0000${source.path}`;
+    return source ? filePreviewKey(source) : undefined;
   }
 
   /** The quote id of the file that the side panel shows. See `filePreviewQuoteId`. */
@@ -541,7 +651,8 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
 
   function openSidebarFileBack() {
     const path = sidebarFileBack();
-    if (path !== null) openWorkspaceFolder(path);
+    // Back shows the folder in the tab of the shown file.
+    if (path !== null) openWorkspaceFolder(path, previewWorkspaceAgentId(), "here");
   }
 
   function openSidebarFileExternally() {
@@ -588,10 +699,10 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     void request.catch((error) => deps.setComposerError(errorMessage(error, t("attachment.error.download")), target));
   }
 
-  function closeSidebarFilePreview() {
+  /** Drops the shown file, so that no read that is still running shows it again. */
+  function clearSidebarFilePreview() {
     deps.invalidateFilePreviewGeneration();
     deps.setSidebarFilePreview(null);
-    setActiveRightPanel("none");
   }
 
   return {
@@ -611,6 +722,9 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     sidePanelOpen,
     setSidePanelMaximized,
     removeSidePanelPane,
+    removeSidePanelFile,
+    moveSidePanelFile,
+    openSidePanelFile,
     filePreviewOpen,
     setActiveRightPanel,
     openRoutineSettings,
@@ -636,8 +750,15 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     downloadSidebarFile,
     downloadMessageImageFile,
     revealSidebarFile,
-    closeSidebarFilePreview,
+    clearSidebarFilePreview,
   };
+}
+
+/** Names a file or folder. The same file read again keeps its key. */
+function filePreviewKey(source: SidebarFilePreview["source"]): string {
+  if (source.kind === "attachment") return `attachment\u0000${source.attachment.id}`;
+  if (source.kind === "shared") return `shared\u0000${source.path}`;
+  return `${source.kind}\u0000${source.agentId}\u0000${source.path}`;
 }
 
 function filePreviewError(error: unknown, path: string): string {

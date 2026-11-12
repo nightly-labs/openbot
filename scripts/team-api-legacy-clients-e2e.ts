@@ -206,6 +206,9 @@ const agentBrowser: AgentBrowserHost = {
   endControl: () => {},
   close: () => Effect.void,
   clearAgentSession: () => Effect.void,
+  shareTab: () => undefined,
+  unshareThread: () => undefined,
+  agentTab: () => null,
 };
 /** The owners of each tab that the Team API asked the browser to open. */
 const openedTabOwners: { ownerThreadId: string | null; ownerAgentId: string | null }[] = [];
@@ -221,6 +224,8 @@ const teamBrowser: TeamApiBrowser = {
   reload: unused,
   stop: unused,
   takeUserControl: unused,
+  startTeach: unused,
+  stopTeach: () => [],
   releaseUserControl: () => {},
   releaseUserControlHeldBy: () => {},
   close: unused,

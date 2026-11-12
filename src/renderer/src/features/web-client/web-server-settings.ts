@@ -22,6 +22,7 @@ import {
   mcpSignInStatus,
   removeMcpServer as removeMcpServerRequest,
   removeMcpSignInApp as removeMcpSignInAppRequest,
+  rotateHostKey as rotateHostKeyRequest,
   saveMcpServer as saveMcpServerRequest,
   saveMcpSignInApp as saveMcpSignInAppRequest,
   setMcpServerEnabled as setMcpServerEnabledRequest,
@@ -34,7 +35,7 @@ import { currentText } from "@openbot/ui/text";
 import { Effect } from "effect";
 import { createEffect, createStore, untrack } from "solid-js";
 import { mcpSignInRecord } from "../servers/mcp-servers";
-import { serverCanAdminister, serverRoleCanAdminister } from "../servers/server-capabilities";
+import { serverCanAdminister, serverRoleCanAdminister, serverRotatesHostKey } from "../servers/server-capabilities";
 import { webMcpRelay } from "./web-mcp-relay";
 import type { WebAdminRuntime } from "./web-runtime";
 
@@ -199,6 +200,17 @@ export function createWebServerSettings(options: {
     await refresh();
   }
 
+  /**
+   * Changes the server key through `host-key-rotation-v1`, which only the owner may use. As on the
+   * desktop, the server list is read again, because only its signed handover makes the new key trusted.
+   */
+  async function rotateHostKey(): Promise<void> {
+    const { server, admin } = requireAdmin();
+    if (!serverRotatesHostKey(server)) throw new Error(currentText().t("server.settings.hostKeyOwnerOnly"));
+    await runTeamEffect(rotateHostKeyRequest(admin.request).pipe(Effect.mapError((error) => error.cause)));
+    await options.refreshHosts();
+  }
+
   async function mutateTeam<T>(mutate: (admin: WebAdminRuntime) => Promise<T>): Promise<T> {
     const result = await mutate(requireAdmin().admin);
     await refresh();
@@ -306,6 +318,7 @@ export function createWebServerSettings(options: {
     setOpen,
     refresh,
     saveIdentity,
+    rotateHostKey,
     createInvite: (input: { role: "admin" | "member"; email?: string; permanent?: boolean }): Promise<InviteSummary> =>
       mutateTeam((admin) => admin.team.createInvite(input)),
     updateMember: async (input: UpdateTeamMemberInput): Promise<void> => {

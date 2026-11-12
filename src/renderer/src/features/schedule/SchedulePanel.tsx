@@ -13,6 +13,7 @@ import { createEffect, createMemo, createSignal, createStore, onSettled } from "
 import { useNavigation } from "../../navigation";
 import { useAgents } from "../agents/agents-context";
 import { useChannels } from "../channels/channels-context";
+import { createPageHeaderFrame } from "../window/page-header-frame";
 import { useWindowPage } from "../window/window-page-context";
 import { desktopScheduleSource, type ScheduleSource } from "./schedule-port";
 
@@ -199,6 +200,7 @@ export function ScheduleView(props: ScheduleViewProps) {
     return () => window.clearInterval(clock);
   });
 
+  const headerFrame = createPageHeaderFrame();
   return (
     <div class="schedule-pane">
       <RoutineCalendar
@@ -218,6 +220,7 @@ export function ScheduleView(props: ScheduleViewProps) {
         onRetry={() => void load()}
         onCreateRoutine={props.onCreateRoutine}
         onBack={props.onBack}
+        frame={headerFrame()}
       />
     </div>
   );

@@ -1,5 +1,6 @@
 /**
- * Cursor speed rows, copied from the desktop picker. The phone does not import that picker.
+ * Cursor speed rows. Grammar matches `packages/ui/src/components/ProviderModelPicker.tsx`
+ * (`cursorModelSelected`, `cursorModelParameters`). Mobile cannot import that picker module.
  * A catalog id such as `composer-2.5[context=256k,fast=true]` is the base model plus parameters.
  */
 
@@ -26,7 +27,10 @@ export function cursorModelSpeedLabel(name: string, id: string, fastLabel: strin
   let context: string | null = null;
   let fast = false;
   for (const pair of params.split(",")) {
-    const [key, value = ""] = pair.split("=");
+    const [rawKey, rawValue = ""] = pair.split("=");
+    if (!rawKey) continue;
+    const key = rawKey.trim();
+    const value = rawValue.trim();
     if (key === "context" && /^\d+(?:\.\d+)?[km]$/iu.test(value)) context = value;
     else if (key === "fast") fast = value === "true";
   }
@@ -39,12 +43,12 @@ function cursorModelParameters(value: string): { base: string; params: Map<strin
   if (open <= 0 || !value.endsWith("]")) return null;
   const params = new Map<string, string>();
   for (const pair of value.slice(open + 1, -1).split(",")) {
-    if (!pair) continue;
+    if (!pair.trim()) continue;
     const separator = pair.indexOf("=");
     if (separator <= 0) return null;
-    const key = pair.slice(0, separator);
+    const key = pair.slice(0, separator).trim();
     if (key === "reasoning" || key === "effort") continue;
-    params.set(key, pair.slice(separator + 1));
+    params.set(key, pair.slice(separator + 1).trim());
   }
   return { base: value.slice(0, open), params };
 }

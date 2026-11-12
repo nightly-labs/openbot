@@ -29,4 +29,5 @@ export const messages = {
   "error.host.tenantShutdownTimeout": "Upłynął limit czasu zamykania tenantów. Nie rozpoczęto zastępowania aplikacji.",
   "error.host.tenantHealthMissing":
     "Po ponownym uruchomieniu brakuje raportów stanu tenantów lub wskazują one problem. Sprawdź sesje tenantów przed kolejną aktualizacją.",
+  "error.host.personalityInvalid": "Ten styl odpowiedzi jest nieznany.",
 } as const satisfies PartialTranslation<typeof source>;

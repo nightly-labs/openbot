@@ -9,6 +9,10 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "{name} ajanının durdurulan görevini yeniden ata",
   "channel.stoppedTask.reassign": "Yeniden ata",
   "channel.stoppedTask.cancel": "Görevi iptal et",
+  "channel.stoppedTask.assignmentLoop":
+    "{names} bu görevi birbirine çok fazla kez aktardı. Döngüyü önlemek için durduruldu.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "Üyeler bu görevi birbirine çok fazla kez aktardı. Döngüyü önlemek için durduruldu.",
   "channel.conversation.noMembers": "Çalışmayı başlatmak için kanal ayarlarından ajan ekleyin.",
   "channel.conversation.archivedNotice": "Silinmiş kanal. Yalnızca önizleme.",
   "channel.composer.label": "Kanala mesaj",
@@ -20,7 +24,30 @@ export const messages = {
   "channel.settings.isolated": "Bellekleri bu kanalda tut",
   "channel.settings.isolatedDescription":
     "Ajanlar burada öğrendiklerini kanal belleği olarak kaydeder. Diğer sohbetleri bunları görmez.",
+  "channel.settings.browser": "Tarayıcı",
+  "channel.settings.browserEveryone": "Tüm üyeler",
+  "channel.settings.browserNone": "Hiç kimse",
   "channel.settings.memoryCount": { one: "{count} kayıtlı", other: "{count} kayıtlı" },
+  "channel.settings.newConversation.title": "Yeni konuşma",
+  "channel.settings.newConversation.description": "Üyeler önceki mesajları unutur. Kanal ayarları kalır.",
+  "channel.settings.newConversation.button": "Başlat",
+  "channel.settings.newConversation.confirmTitle": "{name} içinde yeni bir konuşma başlatılsın mı?",
+  "channel.settings.newConversation.confirmDescription":
+    "Üyeler bu kanalın önceki mesajlarını unutur. Mesajlar bir ayırıcının üstünde görünür kalır. Üyeler, talimatlar, anılar ve rutinler değişmez.",
+  "channel.settings.newConversation.confirm": "Yeni konuşma başlat",
+  "channel.settings.newConversation.failed": "Yeni konuşma başlatılamadı.",
+  "channel.settings.compact.title": "Bağlamı sıkıştır",
+  "channel.settings.compact.description":
+    "Üyeler kanal oturumlarının kısa bir özetini tutar ve daha az token kullanır.",
+  "channel.settings.compact.failed": "Kanal bağlamı sıkıştırılamadı.",
+  "channel.settings.deleteHistory.title": "Geçmişi sil",
+  "channel.settings.deleteHistory.description": "Mesajlar silinir ve üyeler onları unutur. Kanal kurulumu kalır.",
+  "channel.settings.deleteHistory.button": "Sil",
+  "channel.settings.deleteHistory.confirmTitle": "{name} geçmişi silinsin mi?",
+  "channel.settings.deleteHistory.confirmDescription":
+    "Bu kanalın tüm mesajları ve dosyaları OpenBot'tan silinir ve üyeler onları unutur. Bu işlem geri alınamaz. Üyeler, talimatlar, anılar, rutinler ve görevler değişmez.",
+  "channel.settings.deleteHistory.confirm": "Geçmişi sil",
+  "channel.settings.deleteHistory.failed": "Geçmiş silinemedi.",
   "channel.settings.routines": "Rutinler",
   "channel.settings.routineCount": { one: "{count} yapılandırılmış", other: "{count} yapılandırılmış" },
   "channel.create.close": "Yeni kanalı kapat",

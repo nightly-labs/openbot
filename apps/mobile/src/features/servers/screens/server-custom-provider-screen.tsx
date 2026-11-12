@@ -8,6 +8,7 @@ import Bot from "lucide-react-native/icons/bot";
 import Globe from "lucide-react-native/icons/globe";
 import HardDrive from "lucide-react-native/icons/hard-drive";
 import PackageSearch from "lucide-react-native/icons/package-search";
+import Trash2 from "lucide-react-native/icons/trash";
 import { useEffect, useRef, useState } from "react";
 import { Alert, View } from "react-native";
 import { useCSSVariable } from "uniwind";
@@ -32,6 +33,7 @@ import {
   SettingsRow,
   SettingsSection,
 } from "@/features/settings/components/settings-content";
+import { RowIcon } from "@/features/settings/components/settings-row-icon";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
@@ -474,6 +476,7 @@ function SavedCustomProvider({
         <SettingsRow
           disclosure={false}
           disabled={action.pending}
+          leading={<RowIcon icon={Trash2} tone="danger" />}
           onPress={() =>
             Alert.alert(
               t("mobile.server.customProviders.removeTitle", { name: provider.name }),

@@ -9,7 +9,7 @@ import { Button, Input, TextQuote } from "@openbot/ui";
 import { clamp } from "@openbot/ui/utils";
 import { Portal } from "@solidjs/web";
 import type { Element as SolidElement } from "solid-js";
-import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show } from "solid-js";
 import { useText } from "../../text";
 
 const MESSAGE_TEXT_SELECTOR = "[data-selection-message-id]";
@@ -18,6 +18,8 @@ const MESSAGE_TEXT_SELECTOR = "[data-selection-message-id]";
  * `data-selection-file-lines` marks text that is the file source, so a selection gives its lines.
  */
 const FILE_TEXT_SELECTOR = "[data-selection-file-quote]";
+/** A view with its own selection actions, such as a side thread. The actions around it leave its text alone. */
+const SCOPE_SELECTOR = "[data-selection-scope]";
 const INTERACTIVE_SELECTOR =
   'a, button, input, textarea, select, [contenteditable="true"], [role="button"], .message-citation';
 const HIGHLIGHT_NAME = "openbot-message-selection";
@@ -88,6 +90,23 @@ export function selectionActionsPosition(
   return { top: clamp(idealTop, VIEWPORT_MARGIN, maximumTop), left, placement };
 }
 
+/**
+ * Closes the selection action that shows. A press in a page frame reaches only that page, so the
+ * window listeners of the other actions, in the app or in a different page, do not see it.
+ */
+let closeShownAction: (() => void) | undefined;
+
+/** Makes `close` the one selection action that shows, and closes the action that showed before. */
+export function showSelectionAction(close: () => void): void {
+  if (closeShownAction !== close) closeShownAction?.();
+  closeShownAction = close;
+}
+
+/** Forgets `close` when its action goes away. */
+export function releaseSelectionAction(close: () => void): void {
+  if (closeShownAction === close) closeShownAction = undefined;
+}
+
 export function MessageSelectionActions(props: {
   contextKey: string | undefined;
   disabled: boolean;
@@ -95,12 +114,16 @@ export function MessageSelectionActions(props: {
   /** Puts the selected text in the composer as a quote. Without it, the toolbar has no Quote action. */
   onQuote?: ((messageId: string, text: string) => void) | undefined;
   quoteShortcut?: QuoteShortcutModifier;
+  /** The `data-selection-scope` element whose text these actions take. Without it, they take the text outside each scope. */
+  scope?: HTMLElement | undefined;
 }) {
   const [selection, setSelection] = createSignal<MessageTextSelection | null>(null);
   const [fallbackHighlight, setFallbackHighlight] = createSignal(false);
   let lastContextKey: string | undefined;
 
   const clearSelection = () => {
+    // The highlight has one name for all actions, so only the actions that hold a selection clear it.
+    if (!selection()) return;
     setSelection(null);
     clearPersistentHighlight();
   };
@@ -126,10 +149,11 @@ export function MessageSelectionActions(props: {
       return;
     }
     const next = messageTextSelection(window.getSelection());
-    if (!next) {
+    if (!next || selectionScope(next.range.startContainer) !== (props.scope ?? null)) {
       clearSelection();
       return;
     }
+    showSelectionAction(clearSelection);
     setSelection(next);
   };
 
@@ -151,7 +175,8 @@ export function MessageSelectionActions(props: {
   createEffect(
     () => selection(),
     (active) => {
-      clearPersistentHighlight();
+      // The cleanup clears the highlight of the previous selection. Without a selection, the highlight
+      // can be of other actions, such as those of a side thread, so it stays.
       if (!active) {
         setFallbackHighlight(false);
         return;
@@ -175,7 +200,9 @@ export function MessageSelectionActions(props: {
     };
     const onKeyUp = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        dismiss();
+        // Escape in a text field closes its own list. The caret there is the document selection.
+        if (event.target instanceof HTMLElement && event.target.isContentEditable) clearSelection();
+        else dismiss();
         return;
       }
       if (event.target instanceof Element && event.target.closest(".selection-actions-layer")) return;
@@ -195,7 +222,8 @@ export function MessageSelectionActions(props: {
       window.removeEventListener("pointerup", onPointerUp);
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("keydown", onKeyDown);
-      clearPersistentHighlight();
+      releaseSelectionAction(clearSelection);
+      if (selection()) clearPersistentHighlight();
     };
   });
 
@@ -236,6 +264,12 @@ export function SelectionActionsBar(props: {
   let content: HTMLDivElement | undefined;
   let animationFrame: number | undefined;
   let previousSelectionKey = "";
+  // Counts selection changes. A send that ends after one applies its result to no selection.
+  let selectionGeneration = 0;
+  // A new mouse selection dismisses this bar on `pointerdown` and mounts a new one on `pointerup`.
+  onCleanup(() => {
+    selectionGeneration += 1;
+  });
 
   const hasPrompt = createMemo(() => prompt().trim().length > 0);
   const selectionBody = (instruction: string) =>
@@ -305,6 +339,7 @@ export function SelectionActionsBar(props: {
         setExpanded(false);
         setMode("idle");
         setLastInstruction("");
+        selectionGeneration += 1;
       }
       previousSelectionKey = key;
       schedulePosition();
@@ -358,12 +393,18 @@ export function SelectionActionsBar(props: {
     setLastInstruction(normalized);
     setExpanded(false);
     setMode("sending");
+    const generation = selectionGeneration;
+    let sent: boolean;
     try {
-      if (await props.onSend(props.selection.messageId, body)) props.onDismiss();
-      else setMode("error");
+      sent = await props.onSend(props.selection.messageId, body);
     } catch {
-      setMode("error");
+      sent = false;
     }
+    // The user selected other text while it sent: the bar now belongs to that selection, or a new bar
+    // shows it. The late reply must not dismiss that selection.
+    if (generation !== selectionGeneration) return;
+    if (sent) props.onDismiss();
+    else setMode("error");
   };
 
   return (
@@ -493,23 +534,7 @@ export function SelectionActionsBar(props: {
                 </Show>
                 <Show when={props.onQuote}>
                   {(onQuote) => (
-                    <Button
-                      variant="ghost"
-                      type="button"
-                      class="selection-actions-control"
-                      aria-label={t("chat.selection.quote")}
-                      aria-keyshortcuts={props.quoteShortcut === "meta" ? "Meta+Shift+Period" : "Control+Shift+Period"}
-                      title={t(
-                        props.quoteShortcut === "meta"
-                          ? "chat.selection.quoteShortcutMac"
-                          : "chat.selection.quoteShortcutOther",
-                      )}
-                      onPointerDown={(event) => event.preventDefault()}
-                      onClick={() => onQuote()()}
-                    >
-                      <TextQuote class="selection-actions-icon" aria-hidden="true" />
-                      <span class="selection-actions-label">{t("chat.selection.quote")}</span>
-                    </Button>
+                    <QuoteSelectionButton quoteShortcut={props.quoteShortcut} onQuote={() => onQuote()()} />
                   )}
                 </Show>
                 <PresetButton
@@ -596,12 +621,43 @@ function PresetButton(props: { label: string; icon: SolidElement; onSelect: () =
   );
 }
 
+/** The Quote action of a selection toolbar. A press keeps the selection, so the click can quote it. */
+export function QuoteSelectionButton(props: { quoteShortcut: QuoteShortcutModifier | undefined; onQuote: () => void }) {
+  const { t } = useText();
+  return (
+    <Button
+      variant="ghost"
+      type="button"
+      class="selection-actions-control"
+      aria-label={t("chat.selection.quote")}
+      aria-keyshortcuts={props.quoteShortcut === "meta" ? "Meta+Shift+Period" : "Control+Shift+Period"}
+      title={t(
+        props.quoteShortcut === "meta" ? "chat.selection.quoteShortcutMac" : "chat.selection.quoteShortcutOther",
+      )}
+      onPointerDown={(event) => event.preventDefault()}
+      onClick={() => props.onQuote()}
+    >
+      <TextQuote class="selection-actions-icon" aria-hidden="true" />
+      <span class="selection-actions-label">{t("chat.selection.quote")}</span>
+    </Button>
+  );
+}
+
 /* The Quote button, so the presets do not clip it. */
 const QUOTE_ACTION_WIDTH = 84;
 
-function isQuoteShortcut(event: KeyboardEvent, modifier: QuoteShortcutModifier): boolean {
+/** ⌘⇧. on macOS, Ctrl+Shift+. elsewhere. A key that a visual reply page gives to the app counts too. */
+export function isQuoteShortcut(
+  event: Pick<KeyboardEvent, "metaKey" | "ctrlKey" | "shiftKey" | "altKey" | "code">,
+  modifier: QuoteShortcutModifier,
+): boolean {
   const modifierDown = modifier === "meta" ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
   return modifierDown && event.shiftKey && !event.altKey && event.code === "Period";
+}
+
+function selectionScope(node: Node): HTMLElement | null {
+  const element = node instanceof HTMLElement ? node : node.parentElement;
+  return element?.closest<HTMLElement>(SCOPE_SELECTOR) ?? null;
 }
 
 function messageTextBlock(node: Node): HTMLElement | null {

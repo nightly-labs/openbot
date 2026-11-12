@@ -1,0 +1,33 @@
+{
+  "slug": "semrush",
+  "name": "Semrush",
+  "tagline": "SEO and traffic data",
+  "description": "Semrush lets agents read keyword, domain, backlink, and traffic data with the Semrush account of the signed-in user. Requests use the API units of that account.",
+  "category": "research",
+  "creatorName": "Semrush",
+  "iconUrl": "https://www.semrush.com/__static__/apple-touch-icon.fe16ae843d17.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-competitors", "text": "Which domains compete with notion.so in organic search?" },
+    { "id": "prompt-long-tail", "text": "Find long-tail keywords about running shoes that have low difficulty." },
+    { "id": "prompt-backlinks", "text": "Compare the backlink profiles of asana.com and monday.com." }
+  ],
+  "apps": [
+    {
+      "id": "app-semrush-mcp",
+      "name": "Semrush",
+      "description": "Keyword, domain, backlink, and traffic data, over Semrush's MCP server with browser sign-in.",
+      "iconUrl": "https://www.semrush.com/__static__/apple-touch-icon.fe16ae843d17.png",
+      "server": {
+        "name": "semrush",
+        "transport": "http",
+        "url": "https://mcp.semrush.com/v2/mcp",
+        "auth": [{ "id": "semrush-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.semrush.com",
+  "privacyPolicyUrl": "https://www.semrush.com/company/legal/privacy-policy/",
+  "termsUrl": "https://www.semrush.com/company/legal/terms-of-service/",
+  "skills": []
+}

@@ -138,6 +138,8 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
 
   snapshot(): HostUpdateStatus {
     const status = this.#updater.getStatus();
+    // `stagedVersion` stays local: released `host-update-v1` has no field for it. The member's check
+    // (`check`) still gets a release in its staged rollout.
     const schedule = this.#schedule;
     return {
       phase: status.phase,

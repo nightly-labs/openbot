@@ -6,6 +6,8 @@
 // does not list it gets a secret client, and the refusal must say that the server did not accept
 // OpenBot, not the SDK's "Existing OAuth client information is required" text.
 // Make lists only `client_secret_post` and refuses a registration that names no method it lists.
+// RevenueCat (#4884) registers only the clients it approved and answers every other registration
+// with 400 `invalid_client`: the refusal must say so, not quote "The client is not registered.".
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
@@ -36,6 +38,8 @@ interface FakeServer {
   tokenRequestsWithSecret: boolean[];
   /** One entry for each `tools/list` that carried the token. */
   toolLists: boolean[];
+  /** One entry for each authorization page that the sign-in opened. */
+  pagesOpened: string[];
   close: () => Promise<void>;
 }
 
@@ -45,6 +49,7 @@ interface Case {
   registrations: (string | null)[];
   tokenRequestsWithSecret: boolean[];
   toolLists: boolean[];
+  pagesOpened: number;
   storedClient: boolean;
   signedIn: boolean;
   failures: string[];
@@ -65,10 +70,20 @@ function json(response: ServerResponse, status: number, value: unknown, headers:
 
 /**
  * `secretAccepted` is Make: the token endpoint takes the secret in the body. Without it, the server
- * is Railway and refuses every secret it issued.
+ * is Railway and refuses every secret it issued. `registrationRefused` is RevenueCat: no
+ * registration is accepted.
  */
-async function fakeServer(authMethods: string[], secretAccepted: boolean): Promise<FakeServer> {
-  const state: Omit<FakeServer, "url" | "close"> = { registrations: [], tokenRequestsWithSecret: [], toolLists: [] };
+async function fakeServer(
+  authMethods: string[],
+  secretAccepted: boolean,
+  registrationRefused: boolean,
+): Promise<FakeServer> {
+  const state: Omit<FakeServer, "url" | "close"> = {
+    registrations: [],
+    tokenRequestsWithSecret: [],
+    toolLists: [],
+    pagesOpened: [],
+  };
   let base = "";
   const server: Server = createServer((request, response) => {
     void (async () => {
@@ -92,6 +107,12 @@ async function fakeServer(authMethods: string[], secretAccepted: boolean): Promi
         const id = `e2e-client-${state.registrations.length}`;
         // RFC 7591: a registration that names no method asks for `client_secret_basic`.
         const method = asked.token_endpoint_auth_method ?? "client_secret_basic";
+        // RevenueCat's answer, word for word.
+        if (registrationRefused)
+          return json(response, 400, {
+            error: "invalid_client",
+            error_description: "The client is not registered. Contact support if you need to register a new client.",
+          });
         if (!authMethods.includes(method))
           return json(response, 400, {
             code: "SC400",
@@ -188,9 +209,9 @@ async function runCase(
   name: string,
   authMethods: string[],
   attempts: number,
-  { storedDiscovery = false, secretAccepted = false } = {},
+  { storedDiscovery = false, secretAccepted = false, registrationRefused = false } = {},
 ): Promise<Case> {
-  const server = await fakeServer(authMethods, secretAccepted);
+  const server = await fakeServer(authMethods, secretAccepted, registrationRefused);
   const records = new Map<string, McpOAuthRecord>();
   if (storedDiscovery)
     records.set(server.url, {
@@ -207,6 +228,7 @@ async function runCase(
     },
     // The browser: the authorization server sends the grant straight back.
     openExternal: async (page) => {
+      server.pagesOpened.push(page);
       const state = new URL(page).searchParams.get("state");
       assert.ok(state, "the page has a state");
       setTimeout(() => oauth.receiveAuthorizationCode(state, "e2e-grant"), 50);
@@ -228,6 +250,7 @@ async function runCase(
       registrations: [...server.registrations],
       tokenRequestsWithSecret: [...server.tokenRequestsWithSecret],
       toolLists: [...server.toolLists],
+      pagesOpened: server.pagesOpened.length,
       storedClient: records.get(server.url)?.client !== undefined,
       signedIn: oauth.signedIn(server.url),
       failures: [],
@@ -305,6 +328,25 @@ async function main(): Promise<void> {
     );
     check(makeCached, makeCached.signedIn, "no token is stored after the sign-in");
     report.cases.push(makeCached);
+
+    // RevenueCat refuses the registration with 400 `invalid_client`. In each attempt, the SDK
+    // registers once more after it drops the credentials, both times as a public client. Then the
+    // probe says that the server does not accept OpenBot.
+    const revenueCat = await runCase("registration-refused-invalid-client", ["client_secret_basic", "none"], 2, {
+      registrationRefused: true,
+    });
+    const registrationRefused = sourceText("error.backend.mcpRegistrationRefused");
+    for (const [index, attempt] of revenueCat.attempts.entries())
+      check(revenueCat, attempt.error === registrationRefused, `attempt ${index + 1} reported: ${attempt.error}`);
+    check(
+      revenueCat,
+      revenueCat.registrations.join() === "none,none,none,none",
+      `the registrations were ${revenueCat.registrations.join()}`,
+    );
+    check(revenueCat, revenueCat.pagesOpened === 0, "a sign-in page opened with no registered client");
+    check(revenueCat, !revenueCat.storedClient, "a client is stored after a refused registration");
+    check(revenueCat, !revenueCat.signedIn, "a token is stored after a refused registration");
+    report.cases.push(revenueCat);
   } catch (error) {
     report.failures.push(error instanceof Error ? error.message : String(error));
   }

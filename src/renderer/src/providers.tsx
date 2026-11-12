@@ -1,3 +1,4 @@
+import { isKeyOnlyProvider } from "@openbot/contracts/agent-providers";
 import {
   type AgentProviderId,
   type AgentStatus,
@@ -8,6 +9,9 @@ import {
   type ProviderRuntimeDownload,
 } from "@openbot/contracts/ipc";
 import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/claude-api-key-v1";
+import { CODEX_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/codex-api-key-v1";
+import { CUSTOM_PROVIDER_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
+import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import {
   type ProviderAccountRelay,
   providerAccountRelay,
@@ -15,15 +19,18 @@ import {
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDER_SIGN_OUT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
+import { PROVIDER_USE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-use-v1";
 import { classifyFailure } from "@openbot/telemetry";
 import { toast } from "@openbot/ui";
 import type { ProviderAccountActions } from "@openbot/ui/components/provider-accounts";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, flush, onSettled } from "solid-js";
+import { createEffect, createMemo, createSignal, flush, onSettled, untrack } from "solid-js";
 import { type DesktopAnalyticsProperties, desktopAnalytics } from "./analytics";
 import { appPort } from "./app-port";
 import { useAgents } from "./features/agents/agents-context";
 import { conversationPort } from "./features/conversation/conversation-port";
+import { hostCustomAgentsApi } from "./features/custom-agents/custom-agents-port";
+import { createCustomAgentsStore } from "./features/custom-agents/stores/custom-agents-store";
 import { useCustomProviders } from "./features/custom-providers/custom-providers-context";
 import { hostCustomProvidersApi } from "./features/custom-providers/custom-providers-port";
 import { createCustomProvidersStore } from "./features/custom-providers/stores/custom-providers-store";
@@ -80,6 +87,7 @@ const Providers = createSimpleContext({
     );
     // A boolean, so that a server-list update that keeps the capability does not rebuild the keys.
     const hostReadsClaudeKey = createMemo(() => serverSupportsCapability(activeServer(), CLAUDE_API_KEY_CAPABILITY));
+    const hostReadsCodexKey = createMemo(() => serverSupportsCapability(activeServer(), CODEX_API_KEY_CAPABILITY));
     /** The provider keys of the computer the providers run on. A saved key is recorded, never its value. */
     const providerKeys = createMemo(() => {
       const serverId = providerAdminServerId();
@@ -87,12 +95,15 @@ const Providers = createSimpleContext({
       return {
         ...api,
         readsClaudeKey: !serverId || hostReadsClaudeKey(),
+        readsCodexKey: !serverId || hostReadsCodexKey(),
         setProviderApiKey: async (input: { provider: AgentProviderId; key: string }) => {
           const analytics = desktopAnalytics.scope();
           const tracked = { provider: input.provider, action: "api_key_saved", method: "api_key" } as const;
           try {
             const result = await api.setProviderApiKey(input);
             analytics.track("provider_action", { ...tracked, result: "succeeded" });
+            // The host downloads Pi for the key when it has none. A joined host sends no event for it.
+            if (isKeyOnlyProvider(input.provider)) runtimes.refreshProviderRuntimes();
             return result;
           } catch (error) {
             analytics.track("provider_action", { ...tracked, result: "failed", failure_code: "update_failed" });
@@ -105,6 +116,22 @@ const Providers = createSimpleContext({
     const hostCustomProviders = createCustomProvidersStore(() => {
       const serverId = providerAdminServerId();
       return serverId ? hostCustomProvidersApi(providerAdmin, serverId) : undefined;
+    });
+    /**
+     * The joined server whose custom ACP agents this window manages: the account administers it and
+     * the host serves `custom-agents-v1`. The agents of this computer are in `useCustomAgents`.
+     */
+    const customAgentsServerId = createMemo(() => remoteAdminServer(activeServer(), "custom-agents-v1")?.id);
+    const hostCustomAgents = createCustomAgentsStore(() => {
+      const serverId = customAgentsServerId();
+      return serverId ? hostCustomAgentsApi(serverId) : undefined;
+    });
+    createEffect(customAgentsServerId, (serverId) => {
+      // Each server has its own list, so a switch empties it and drops the previous server's answers.
+      hostCustomAgents.resetCustomAgents();
+      // As for this computer's list: a failure leaves it empty, and the Settings registry lists again
+      // after an install.
+      if (serverId) void hostCustomAgents.refreshCustomAgents().catch(() => undefined);
     });
     const localCustomProviders = useCustomProviders();
     /**
@@ -119,10 +146,21 @@ const Providers = createSimpleContext({
       if (providerAdminServerId()) return hostCustomProviders.customProviders();
       return undefined;
     }
-    createEffect(providerAdminServerId, (serverId) => {
-      // As for this computer's list: a failure leaves it empty, and nothing retries it from here.
-      if (serverId) void hostCustomProviders.refreshCustomProviders().catch(() => undefined);
-    });
+    // Read again when the host's capabilities arrive: the `custom-provider-edit-v1` list has the
+    // header names that Edit needs, and a list read before it has none.
+    const hostEditsCustomProviders = createMemo(() =>
+      serverSupportsCapability(activeServer(), CUSTOM_PROVIDER_EDIT_CAPABILITY),
+    );
+    createEffect(
+      () => {
+        const serverId = providerAdminServerId();
+        return serverId ? `${serverId}:${hostEditsCustomProviders()}` : undefined;
+      },
+      (key) => {
+        // As for this computer's list: a failure leaves it empty, and nothing retries it from here.
+        if (key) void hostCustomProviders.refreshCustomProviders().catch(() => undefined);
+      },
+    );
     /** Connect attempts still waiting for the status that says how they ended. */
     const pendingProviderConnections = new Map<
       AgentProviderId,
@@ -266,11 +304,50 @@ const Providers = createSimpleContext({
     }
 
     /**
-     * Restarts a provider of this computer after its turns end. A joined host has no such action:
-     * its provider API has no restart, so the caller offers none there.
+     * The joined server whose host's provider switch this window uses (`provider-use-v1`). The released
+     * status routes leave out `off`, so the host's off providers come from this route.
+     */
+    const providerUseServerId = createMemo(() => remoteAdminServer(activeServer(), PROVIDER_USE_CAPABILITY)?.id);
+    /** The off providers of that host, with the server they are of, so another server's list is not shown. */
+    const [hostProviderUse, setHostProviderUse] = createSignal<{ serverId: string; off: AgentProviderId[] }>();
+    /** Changes on each read and switch, so an older answer does not replace a newer list. */
+    let providerUseVersion = 0;
+    /**
+     * Reads the off providers of the host again. Another admin can change them, so the Providers
+     * section reads them each time it is shown. A failure keeps the last list.
+     */
+    function refreshHostProviderUse(): void {
+      const serverId = providerUseServerId();
+      if (!serverId) return;
+      const version = ++providerUseVersion;
+      void providersPort()
+        .providerAdmin.providerUse(serverId)
+        .then((off) => {
+          if (version === providerUseVersion) setHostProviderUse({ serverId, off });
+        })
+        .catch(() => undefined);
+    }
+    // A failure shows each provider as on until the next read.
+    createEffect(providerUseServerId, () => untrack(refreshHostProviderUse));
+    /** The off providers of the active joined server's host, or undefined for this computer and an older host. */
+    function hostOffProviders(): AgentProviderId[] | undefined {
+      const serverId = providerUseServerId();
+      const use = hostProviderUse();
+      return serverId && use?.serverId === serverId ? use.off : undefined;
+    }
+
+    /**
+     * Turns a provider off or on, on this computer or on a joined server's host with `provider-use-v1`.
+     * A provider of this computer restarts after its turns end.
      */
     async function setProviderOn(provider: AgentProviderId, on: boolean): Promise<void> {
       const server = activeServer();
+      if (server && server.kind !== "local" && server.id === providerUseServerId()) {
+        const version = ++providerUseVersion;
+        const off = await providersPort().providerAdmin.setProviderUse({ provider, on }, server.id);
+        if (version === providerUseVersion) setHostProviderUse({ serverId: server.id, off });
+        return;
+      }
       if (server?.kind !== "local") return;
       const status = await providersPort().setProviderOn({ provider, on });
       if (activeServer()?.id === server.id) flush(() => applyAgentStatus(status));
@@ -299,6 +376,10 @@ const Providers = createSimpleContext({
     const usageResetServerId = createMemo(() => remoteAdminServer(activeServer(), PROVIDER_USAGE_RESET_CAPABILITY)?.id);
     /** The joined server whose host signs its own provider sign-ins out (`provider-sign-out-v1`). */
     const signOutServerId = createMemo(() => remoteAdminServer(activeServer(), PROVIDER_SIGN_OUT_CAPABILITY)?.id);
+    /** The joined server whose host pools its accounts (`provider-account-pool-v1`). */
+    const accountPoolServerId = createMemo(
+      () => remoteAdminServer(activeServer(), PROVIDER_ACCOUNT_POOL_CAPABILITY)?.id,
+    );
 
     /**
      * The accounts of the providers of this computer, or of a joined server's host that serves
@@ -335,6 +416,12 @@ const Providers = createSimpleContext({
           ...(signOutServerId() === hostServerId
             ? { signOut: (provider: AgentProviderId) => changed(providerAdmin().signOut(provider, hostServerId)) }
             : {}),
+          ...(accountPoolServerId() === hostServerId
+            ? {
+                setPool: (provider: AgentProviderId, enabled: boolean, leftOut: readonly string[]) =>
+                  changed(providerAdmin().setAccountPool({ provider, enabled, leftOut: [...leftOut] }, hostServerId)),
+              }
+            : {}),
         };
       }
       if (activeServer()?.kind !== "local") return undefined;
@@ -358,6 +445,8 @@ const Providers = createSimpleContext({
         usageResets: (provider) => providersPort().providerUsageResets(provider),
         resetUsage: (provider, accountId) => providersPort().resetProviderUsage({ provider, accountId }),
         signOut: (provider) => apply(providersPort().signOutProvider(provider)),
+        setPool: (provider, enabled, leftOut) =>
+          apply(providersPort().setProviderAccountPool({ provider, enabled, leftOut: [...leftOut] })),
         local: true,
       };
     });
@@ -510,8 +599,13 @@ const Providers = createSimpleContext({
     return {
       ...runtimes,
       providerAdminServerId,
+      providerUseServerId,
+      hostOffProviders,
+      refreshHostProviderUse,
       providerKeys,
       hostCustomProviders,
+      customAgentsServerId,
+      hostCustomAgents,
       activeCustomProviders,
       refreshingProviders,
       applyAgentStatus,

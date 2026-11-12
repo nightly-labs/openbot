@@ -9,6 +9,10 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "Réattribuer la tâche arrêtée de {name}",
   "channel.stoppedTask.reassign": "Réattribuer",
   "channel.stoppedTask.cancel": "Annuler la tâche",
+  "channel.stoppedTask.assignmentLoop":
+    "{names} se sont passé cette tâche trop de fois. Elle a été arrêtée pour éviter une boucle.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "Les membres se sont passé cette tâche trop de fois. Elle a été arrêtée pour éviter une boucle.",
   "channel.conversation.noMembers": "Ajoutez des agents dans les réglages du canal pour commencer le travail.",
   "channel.conversation.archivedNotice": "Canal supprimé. Aperçu uniquement.",
   "channel.composer.label": "Message au canal",
@@ -20,7 +24,32 @@ export const messages = {
   "channel.settings.isolated": "Garder les souvenirs dans ce canal",
   "channel.settings.isolatedDescription":
     "Les agents enregistrent ce qu’ils apprennent ici comme souvenirs du canal. Leurs autres discussions ne les voient pas.",
+  "channel.settings.browser": "Navigateur",
+  "channel.settings.browserEveryone": "Tous les membres",
+  "channel.settings.browserNone": "Personne",
   "channel.settings.memoryCount": { one: "{count} enregistré", other: "{count} enregistrés" },
+  "channel.settings.newConversation.title": "Nouvelle conversation",
+  "channel.settings.newConversation.description":
+    "Les membres oublient les messages précédents. Les réglages du canal restent.",
+  "channel.settings.newConversation.button": "Démarrer",
+  "channel.settings.newConversation.confirmTitle": "Démarrer une nouvelle conversation dans {name} ?",
+  "channel.settings.newConversation.confirmDescription":
+    "Les membres oublient les messages précédents de ce canal. Les messages restent visibles au-dessus d’un séparateur. Les membres, les instructions, les souvenirs et les routines ne changent pas.",
+  "channel.settings.newConversation.confirm": "Démarrer une nouvelle conversation",
+  "channel.settings.newConversation.failed": "Impossible de démarrer une nouvelle conversation.",
+  "channel.settings.compact.title": "Compacter le contexte",
+  "channel.settings.compact.description":
+    "Les membres gardent un court résumé de leur session du canal et utilisent moins de jetons.",
+  "channel.settings.compact.failed": "Impossible de compacter le contexte du canal.",
+  "channel.settings.deleteHistory.title": "Supprimer l’historique",
+  "channel.settings.deleteHistory.description":
+    "Les messages sont supprimés et les membres les oublient. La configuration du canal reste.",
+  "channel.settings.deleteHistory.button": "Supprimer",
+  "channel.settings.deleteHistory.confirmTitle": "Supprimer l’historique de {name} ?",
+  "channel.settings.deleteHistory.confirmDescription":
+    "Tous les messages et fichiers de ce canal sont supprimés d’OpenBot et les membres les oublient. Cette action est irréversible. Les membres, les instructions, les mémoires, les routines et les tâches ne changent pas.",
+  "channel.settings.deleteHistory.confirm": "Supprimer l’historique",
+  "channel.settings.deleteHistory.failed": "Impossible de supprimer l’historique.",
   "channel.settings.routines": "Routines",
   "channel.settings.routineCount": { one: "{count} configurée", other: "{count} configurées" },
   "channel.create.close": "Fermer le nouveau canal",

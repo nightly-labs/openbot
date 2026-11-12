@@ -1,6 +1,6 @@
 import { BloubBot } from "@norbert_bodziony/bloub";
 import { bloubAvatarProfile } from "@openbot/brand/bloub-avatar";
-import type { AvatarHue } from "@openbot/contracts/ipc";
+import type { AvatarColor, AvatarHue } from "@openbot/contracts/ipc";
 import { render } from "@solidjs/web";
 import { flush } from "solid-js";
 
@@ -11,15 +11,21 @@ import { flush } from "solid-js";
  */
 export type AvatarMotion = "hover" | "always" | "idle";
 export {
+  AVATAR_COLOR_CHOICES,
   AVATAR_EXPRESSIONS,
   AVATAR_HUE_CHOICES,
-  avatarCandidateSeeds,
+  AVATAR_STYLES,
+  type AvatarColorChoice,
+  type AvatarStyle,
+  avatarDefaultSeed,
   avatarHeadColor,
   avatarHueForColor,
   avatarHueSwatch,
   avatarSeedForFace,
+  avatarStyleForSeed,
   type BloubAvatarProfile,
   bloubAvatarProfile,
+  isAvatarColorChoice,
   SUPPORTED_AVATAR_SILHOUETTES,
   type SupportedAvatarSilhouetteId,
 } from "@openbot/brand/bloub-avatar";
@@ -31,9 +37,13 @@ export {
   type ShapeSafeStateId,
 } from "@openbot/brand/bloub-avatar-motion";
 
-export function createStaticAvatarSvg(seed: string, hue: AvatarHue | null): SVGSVGElement {
+export function createStaticAvatarSvg(
+  seed: string,
+  hue: AvatarHue | null,
+  color: AvatarColor | null = null,
+): SVGSVGElement {
   const host = document.createElement("span");
-  const dispose = mountStaticAvatar(host, seed, hue);
+  const dispose = mountStaticAvatar(host, seed, hue, color);
   const svg = host.querySelector("svg");
   if (!svg) {
     dispose();
@@ -48,8 +58,13 @@ export function createStaticAvatarSvg(seed: string, hue: AvatarHue | null): SVGS
   return result;
 }
 
-function mountStaticAvatar(host: HTMLElement, seed: string, hue: AvatarHue | null): () => void {
-  const profile = bloubAvatarProfile(seed, hue);
+function mountStaticAvatar(
+  host: HTMLElement,
+  seed: string,
+  hue: AvatarHue | null,
+  color: AvatarColor | null,
+): () => void {
+  const profile = bloubAvatarProfile(seed, hue, color);
   const dispose = render(
     () => (
       <BloubBot

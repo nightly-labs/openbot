@@ -1,0 +1,33 @@
+{
+  "slug": "atlan",
+  "name": "Atlan",
+  "tagline": "Data catalog and lineage",
+  "description": "Atlan lets agents search data assets, read lineage and ownership, and update asset metadata with the signed-in user's permissions. Each user signs in to their own Atlan account through the browser.",
+  "category": "data-analytics",
+  "creatorName": "Atlan",
+  "iconUrl": "https://atlan.com/favicon-96x96.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-find-table", "text": "Which table holds the certified revenue numbers?" },
+    { "id": "prompt-lineage", "text": "Show the upstream lineage of the monthly churn dashboard." },
+    { "id": "prompt-owner", "text": "Who owns the orders table, and which dashboards use it?" }
+  ],
+  "apps": [
+    {
+      "id": "app-atlan-mcp",
+      "name": "Atlan",
+      "description": "Asset search, lineage, and metadata, over Atlan's MCP server with browser sign-in.",
+      "iconUrl": "https://atlan.com/favicon-96x96.png",
+      "server": {
+        "name": "atlan",
+        "transport": "http",
+        "url": "https://mcp.atlan.com/mcp",
+        "auth": [{ "id": "atlan-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://atlan.com",
+  "privacyPolicyUrl": "https://atlan.com/privacy-policy/",
+  "termsUrl": "https://atlan.com/terms/"
+}

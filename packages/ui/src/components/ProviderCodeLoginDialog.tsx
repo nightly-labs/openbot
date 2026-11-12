@@ -128,6 +128,8 @@ export interface ProviderCodeLoginDialogProps {
   onOpenVerificationUrl: (url: string) => void;
   /** Gives up: closes the dialog and abandons the code. */
   onCancel: () => void;
+  /** A step before the code, such as a provider setting that the code needs (ChatGPT). */
+  setupStep?: string | undefined;
   /** Sends the code a `paste` sign-in's page showed. */
   onSubmitCode?: (code: string) => void;
   /** Opens the page of a `relay` sign-in, after the user checked its host name. */
@@ -211,6 +213,13 @@ export function ProviderCodeLoginDialog(props: ProviderCodeLoginDialogProps) {
                     />
 
                     <ol class="provider-code-login-steps">
+                      <Show when={props.setupStep}>
+                        {(step) => (
+                          <li>
+                            <Text as="span">{step()}</Text>
+                          </li>
+                        )}
+                      </Show>
                       <li>
                         <Text as="span">{t("provider.codeLogin.open")}</Text>{" "}
                         <Button

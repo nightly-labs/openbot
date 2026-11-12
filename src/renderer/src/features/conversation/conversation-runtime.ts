@@ -6,16 +6,23 @@ import type {
   FilePreview,
   OpenBotDesktopApi,
   ResetAgentSessionSettingInput,
+  SaveSkillSuggestionInput,
+  SaveSkillSuggestionResult,
   SetAgentSessionSettingInput,
+  TestRoutineInput,
 } from "@openbot/contracts/ipc";
 import type { AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
-import type { AgentSkillCalls } from "../../skills-port";
+import type { AgentSkillCalls, SkillCatalogCalls } from "../../skills-port";
 import type { AgentTemplatePublishCalls } from "../agent-templates/agent-templates-port";
 import type { BrowserProfileCalls } from "../browser/browser-profiles-port";
+import type { FilesPort } from "../files/files-port";
+import type { AgentFoldersApi, AgentInstructionsApi } from "./agent-folders-port";
 import type { SharedTableCalls } from "./conversation-port";
 import type { ConversationProps } from "./conversation-types";
+import type { AgentMemoriesApi } from "./memories-port";
 import type { EventRoutinesApi } from "./routine-webhooks-api";
-import type { AgentRoutinesApi } from "./routines-port";
+import type { AgentRoutinesApi, RoutineResultsCalls } from "./routines-port";
+import type { CodexLivePort } from "./stores/codex-live-conversation-store";
 
 export interface ConversationRuntime {
   agent: Pick<
@@ -54,6 +61,8 @@ export interface ConversationRuntime {
     | "stop"
     | "releaseControl"
     | "setVisible"
+    | "startTeach"
+    | "stopTeach"
     | "takeControl"
   >;
   voice: Pick<
@@ -72,6 +81,15 @@ export interface ConversationRuntime {
   openUrl: OpenBotDesktopApi["openUrl"];
   /** Asks the connected host a side question. Absent, the host does not serve `side-question-v1`. */
   askSideQuestion?: ((input: AskSideQuestionInput) => Promise<string>) | undefined;
+  /**
+   * Codex live voice of the connected host. Absent, the host does not serve `live-voice-v1` or the
+   * user did not turn live voice on in this browser.
+   */
+  liveVoice?: CodexLivePort | undefined;
+  /** The marketplace skills catalog that gives the agent's skills their descriptions and icons. */
+  skillCatalog?: SkillCatalogCalls | undefined;
+  /** Save on a skill question. Absent, the host does not serve `skill-learning-v1`. */
+  saveSkillSuggestion?: ((input: SaveSkillSuggestionInput) => Promise<SaveSkillSuggestionResult>) | undefined;
   previewAttachment?: (attachment: AttachmentSummary) => Promise<FilePreview>;
   /** Loads attachment images and media for a client that gets no `previewUrl`. */
   attachmentMedia?: AttachmentMediaSource;
@@ -89,6 +107,20 @@ export interface ConversationRuntime {
   browserProfiles?: BrowserProfileCalls | undefined;
   /** The agent routine calls of a client without the desktop port. */
   routines?: AgentRoutinesApi | undefined;
+  /** An agent's memories, for a client without the desktop port. Any member who can open the agent reads them. */
+  agentMemories?: AgentMemoriesApi | undefined;
+  /** An agent's folders on a host that serves `agent-folders-v1` to this owner or admin. */
+  agentFolders?: AgentFoldersApi | undefined;
+  /** An agent's instruction file on a host that serves `agent-instructions-v1` to this owner or admin. */
+  agentInstructions?: AgentInstructionsApi | undefined;
+  /** Routine destinations on a host that serves `routine-results-v1` to this owner or admin. */
+  routineResultCalls?: RoutineResultsCalls | undefined;
+  /** The run command of a routine, from a host that serves `routine-run-command-v1` to this owner or admin. */
+  routineRunCommand?: ((input: TestRoutineInput) => Promise<string>) | undefined;
+  /** The memory cap of a host that serves `agent-memory-limit-v1` to this owner or admin. */
+  agentMemoryLimit?: (() => Promise<number>) | undefined;
+  /** The stored files of a host that serves `storage-v1`, for the Files pane and Agent settings > Files. */
+  storageCalls?: FilesPort | undefined;
   /**
    * The user's own notification level of each agent, for a client without the desktop port. Any member
    * can call it. The caller asks only a server that serves `agent-notification-levels-v1`.

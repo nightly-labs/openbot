@@ -22,6 +22,7 @@ import type { PromptAnswerOptions } from "./features/conversation/conversation-t
 import type { TurnStepLines } from "./features/conversation/turn-step-lines";
 import { useDynamicIsland } from "./features/dynamic-island/dynamic-island-context";
 import { useServers } from "./features/servers/servers-context";
+import { queuedDeliveriesInOrder } from "./queue-reconciliation";
 import { createScopeGuard } from "./scope-lifetime";
 import { createSimpleContext } from "./simple-context";
 import { turnsPort } from "./turns-port";
@@ -82,7 +83,7 @@ const Turns = createSimpleContext({
     const seed = dynamicIslandCoordinator.serverState(scopeServerId);
     const [activeTurns, setActiveTurns] = createSignal<Record<string, string | null>>(seed?.activeTurns ?? {});
     const [turnProgress, setTurnProgress] = createSignal<
-      Record<string, { turnId: string; detail: string } | undefined>
+      Record<string, { turnId: string; detail: string; running?: boolean; activity?: string } | undefined>
     >(seed?.turnProgress ?? {});
     // Every progress line of the newest turns, by turn, for the steps under the activity line.
     const [turnStepLines, setTurnStepLines] = createSignal<TurnStepLines>({});
@@ -92,8 +93,12 @@ const Turns = createSimpleContext({
     // The context of each side thread, by thread id. Only a runtime snapshot of the local host carries it.
     const [threadContextStates, setThreadContextStates] = createSignal<Record<string, AgentContextState>>({});
     const [usageLimits, setUsageLimits] = createSignal<Record<string, number | null>>({});
+    // The turn of each agent whose subagents still run, also after the turn ended. Only a runtime snapshot of the local host carries it.
+    const [subagentTurns, setSubagentTurns] = createSignal<Record<string, string>>({});
     // Each provider account and model that a usage limit holds, also with no agent on it.
     const [usageLimitedModels, setUsageLimitedModels] = createSignal<AgentModelChoice[]>([]);
+    // Each provider account and model that a provider error holds, so that a switch passes over it.
+    const [failedModels, setFailedModels] = createSignal<AgentModelChoice[]>([]);
     // The holds whose ask card the user closed with "Wait", by agent, with the reset of that hold.
     const [waitedUsageLimits, setWaitedUsageLimits] = createSignal<Record<string, number | null>>({});
     const [queues, setQueues] = createSignal<Record<string, QueueSnapshot>>(seed?.queues ?? {});
@@ -401,6 +406,8 @@ const Turns = createSimpleContext({
       const serverId = activeServerId();
       void turnsPort()
         .agent.cancelWait({ agentId: agent.id, waitId })
+        // A joined server sends no event when a wait closes, so the list is read again.
+        .then(() => loadWaits(agent.id, serverId))
         .catch((error) => appendUiError(agent.id, error, currentText().t("app.errorStatus.waitCancel"), serverId));
     }
 
@@ -423,6 +430,51 @@ const Turns = createSimpleContext({
           if (delivery && delivery.status !== "queued") return;
           appendUiError(agent.id, error, currentText().t("app.errorStatus.steer"), serverId);
         });
+    }
+
+    /**
+     * For an agent whose provider cannot steer: puts a queued message first and stops the running
+     * turn, so the message runs as the next turn. A message just sent is not in the queue snapshot
+     * yet; it is last in the queue, so first is still the correct place.
+     * Channel and messaging work that waits keeps its place before the message: it reserved the agent first.
+     */
+    function sendQueuedMessageNow(deliveryId: string) {
+      const agent = activeAgent();
+      const turnId = agent ? activeTurns()[agent.id] : null;
+      if (!agent || !turnId) return;
+      const queued = queuedDeliveriesInOrder(queues()[agent.id]);
+      // An edited message keeps its place, and the queue starts nothing while it is first. A stop would
+      // then end the turn and start nothing, so the message waits as it did.
+      const head = queued[0];
+      if (head?.editing && head.id !== deliveryId) return;
+      const serverId = activeServerId();
+      const analytics = desktopAnalytics.scope();
+      const ids = queued.map((delivery) => delivery.id);
+      const port = turnsPort().agent;
+      const failed = (error: unknown, status: string) => {
+        analytics.track("queue_action", { action: "send_now", result: "failed", failure_code: "send_now_failed" });
+        appendUiError(agent.id, error, status, serverId);
+      };
+      const reorder =
+        ids[0] === deliveryId
+          ? Promise.resolve(true)
+          : port
+              .reorderQueue({ agentId: agent.id, deliveryIds: [deliveryId, ...ids.filter((id) => id !== deliveryId)] })
+              .then(
+                () => true,
+                (error: unknown) => {
+                  failed(error, currentText().t("app.errorStatus.reorder"));
+                  return false;
+                },
+              );
+      void reorder.then((moved) => {
+        // A turn that ended in the meantime has nothing to stop: the message runs next already.
+        if (!moved || activeTurns()[agent.id] !== turnId) return;
+        return port
+          .interrupt({ agentId: agent.id, turnId })
+          .then(() => analytics.track("queue_action", { action: "send_now", result: "succeeded" }))
+          .catch((error: unknown) => failed(error, currentText().t("app.errorStatus.stop")));
+      });
     }
 
     async function updateQueuedMessage(
@@ -527,8 +579,12 @@ const Turns = createSimpleContext({
       setThreadContextStates,
       usageLimits,
       setUsageLimits,
+      subagentTurns,
+      setSubagentTurns,
       usageLimitedModels,
       setUsageLimitedModels,
+      failedModels,
+      setFailedModels,
       waitedUsageLimits,
       setWaitedUsageLimits,
       queues,
@@ -561,6 +617,7 @@ const Turns = createSimpleContext({
       cancelQueuedMessage,
       cancelWait,
       steerQueuedMessage,
+      sendQueuedMessageNow,
       updateQueuedMessage,
       reorderQueue,
       stopActiveTurn,

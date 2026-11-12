@@ -5,6 +5,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.databaseIntegrity": "OpenBot database failed its integrity check.",
   "error.backend.webhookRouteLimit": "A host can have at most {limit} webhook routines.",
   "error.backend.webhookSettingsInvalid": "Check the webhook settings and try again.",
+  "error.backend.webhookSenderSecretInvalid":
+    "Paste the complete signing secret from the sender. It has 16 to 1024 characters and no spaces.",
   "error.backend.webhookRouteUnavailable":
     "The public webhook route is not ready. Check the host connection and try again.",
   "error.backend.webhookTestUnavailable":
@@ -45,6 +47,9 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserNavigateUnsupported":
     "This remote host does not support address-bar navigation in an existing tab.",
   "error.backend.browserUserControlBusy": "This browser tab waits for a secret. Answer the secret request first.",
+  "error.backend.browserTeachBusy": "Another person controls this browser tab. Try again when they finish.",
+  "error.backend.browserTeachUnavailable": "This browser tab has no agent that can learn a task.",
+  "error.backend.browserTeachUnsupported": "This remote host does not support the recording of a task.",
   "error.backend.browserUserControlUnsupported": "This remote host does not support taking control of a browser tab.",
   "error.backend.browserSignInUnsupported": "This remote host cannot take a sign-in from this computer.",
   "error.backend.browserSignInOpenFailed": "OpenBot could not open the sign-in window.",
@@ -57,6 +62,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.channelLeadModelUnavailable": "The channel lead model is unavailable.",
   "error.backend.contextCompactionIneffective":
     "Compaction does not make this chat smaller: after two compactions it still uses {percent}% of the model's context window, so OpenBot stops compacting it. Tools and instructions use most of the window. Turn off the MCP servers or computer use that this agent does not need, or select a model with a larger window. Then start a new chat.",
+  "error.backend.contextCompactionStopped":
+    "Two compactions of this chat failed in a row, so OpenBot stops compacting it automatically. Each try sends the whole chat to the model and uses your plan limit. Select Compact now to try again, or start a new chat.",
   "error.backend.providerRetrying":
     "The provider failed this request {attempts} times and tries again. If the agent does not continue, stop the turn.",
   "error.backend.providerRetryingLargeContext":
@@ -67,6 +74,14 @@ export const messages = defineMessages("error.backend", {
     "The channel has an unconfirmed assignment start. Check its outcome before deleting it.",
   "error.backend.channelNotFound": "Channel not found.",
   "error.backend.channelMemberUnavailable": "A channel member is unavailable.",
+  "error.backend.channelInstructionsTooLong":
+    "Shorten the instructions to 2,000 characters. Longer instructions are not saved.",
+  "error.backend.channelWaitBeforeNewConversation":
+    "Wait until the work in this channel stops, then start a new conversation.",
+  "error.backend.channelWaitBeforeCompact": "Wait until the work in this channel stops, then compact it.",
+  "error.backend.channelWaitBeforeDeleteHistory": "Wait until the work in this channel stops, then delete its history.",
+  "error.backend.channelCompactUnavailable":
+    "No member of this channel can compact its context now. A member must answer in the channel first, and its provider must support compaction.",
   "error.backend.channelArchived": "Restore this channel before sending messages or changing tasks.",
   "error.backend.channelReferenceUnavailable": "The referenced channel message is unavailable.",
   "error.backend.channelTaskNotFound": "Channel task not found.",
@@ -138,9 +153,19 @@ export const messages = defineMessages("error.backend", {
     "Mailbox state is corrupt or from a newer OpenBot version; refusing to overwrite it.",
   "error.backend.recipientDeleting": "The recipient is being deleted. Retry after deletion finishes.",
   "error.backend.recipientHidden": "This agent is hidden. Restore it to send messages.",
+  "error.backend.agentIdUnknown": "No agent has the id {id}. Get the ids from openbot.list_agents, then try again.",
+  "error.backend.agentIdNear":
+    "No agent has the id {id}. Agent {name} has the id {nearId}, which is almost the same. If you mean that agent, try again with its id.",
+  "error.backend.replyReferenceUnknown":
+    "replyToMessageId {id} names no message. Use the Message ID of the message that you answer, or leave replyToMessageId out.",
+  "error.backend.replyReferenceRequests": "Messages from these recipients in this turn: {ids}.",
   "error.backend.attachBetween": "Attach between 1 and {limit} files.",
   "error.backend.attachmentNotFile": "Attachment is not a file: {path}",
   "error.backend.generatedImageTooLarge": "Generated image exceeds the 100 MB limit.",
+  "error.backend.generatedVideoTooLarge": "Generated video exceeds the 100 MB limit.",
+  "error.backend.videoGenerationFailed": "Video generation failed.",
+  "error.backend.videoGenerationNoVideo": "Video generation did not return a video.",
+  "error.backend.videoGenerationInterrupted": "Video generation was interrupted.",
   "error.backend.attachmentNotRegularFile": "Only regular files can be attached: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot could not copy {name}.",
   "error.backend.routineNameRequired": "A routine name is required.",
@@ -191,9 +216,14 @@ export const messages = defineMessages("error.backend", {
   "error.backend.agentWaitRoutineGone": "This agent has no routine with this id.",
   "error.backend.agentWaitNoRoutine":
     "Only a run of one of your routines wakes a wait, and you have no routine. Create one with openbot.create_routine, then open the wait.",
-  "error.backend.agentWaitRemoteUnsupported": "Open waits are only available for agents on this computer.",
   "error.backend.markUnreadRemoteUnsupported":
     "Marking a message unread is only available for agents on this computer.",
+  "error.backend.messageDeleteUnsupported": "Deleting messages is not supported by this server.",
+  "error.backend.messageDeleteNotFound": "This message is not in the chat.",
+  "error.backend.messageDeleteBusy": "This message is part of a running turn. Delete it when the turn ends.",
+  "error.backend.messageDeleteForbidden": "You can delete only the messages that you sent.",
+  "error.backend.messagePinNotFound": "The message to pin is not in this chat.",
+  "error.backend.messagePinLimit": "This chat has 50 pinned messages. Unpin one before you pin another.",
   "error.backend.routineFlowHandoffFailed": "The routine could not pass the work on to this agent.",
   "error.backend.mcpServerLimit": "OpenBot keeps up to {limit} MCP servers.",
   "error.backend.mcpServerNameTaken": "An MCP server named {name} already exists.",
@@ -219,13 +249,23 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpSignInResponseTimedOut": "The sign-in response did not arrive in time.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot could not read the sign-in information of this server. Check the server address and try again.",
+  "error.backend.mcpSignInAnswerUnreadable":
+    "The sign-in server sent an answer that OpenBot cannot read. If the service gives you an API key or a token, add it to the settings of this server, then test the connection again.",
   "error.backend.mcpServerExited":
     "The server stopped before it answered. Run the command in a terminal to see its error.",
   "error.backend.mcpServerFailedToStart": "The server did not start: {reason}",
+  "error.backend.mcpToolSchemaRefused":
+    "Its tool {tool} has an input format that this provider cannot read. Agents on other providers still get the server.",
+  "error.backend.mcpServerSignInForProvider":
+    "{provider} could not use the MCP server {name}, because the server asks for a sign-in. Open the MCP settings and choose Sign in.",
+  "error.backend.mcpServerFailedForProvider":
+    "{provider} could not start the MCP server {name}. Open the MCP settings and choose Test connection to see the cause.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot could not start its local sign-in connection for this server. Restart OpenBot, then try again.",
   "error.backend.mcpOAuthSignInNeeded":
     "The sign-in to this MCP server has ended. The user must sign in to it again in OpenBot.",
+  "error.backend.mcpOAuthRequestRefused":
+    "The MCP server refused this request, but the sign-in to it is still active. Possibly the account cannot use this tool, or the sign-in did not give all the necessary access. The user can examine the plan and the access of the account at the service, or sign in to the server again in OpenBot and allow all the access that it asks for.",
   "error.backend.mcpServerUnreachable": "OpenBot could not reach the server. Check the URL and your network.",
   "error.backend.mcpLocalServerOff":
     "No server answers at {address} on this computer. Start the server, or turn it on in the app that runs it, then try again.",
@@ -249,6 +289,13 @@ export const messages = defineMessages("error.backend", {
   "error.backend.sectionNameTooLong": "Section name is too long.",
   "error.backend.sidebarFolderTooDeep": "Folders can go only three levels deep.",
   "error.backend.sidebarFolderMoveInvalid": "This folder cannot move there.",
+  "error.backend.libraryFolderName": "A folder name must have 1 to {limit} characters.",
+  "error.backend.libraryFolderLimit": "A server can have up to {limit} Library folders.",
+  "error.backend.libraryFolderFileLimit": "Too many files are in Library folders.",
+  "error.backend.libraryFolderTooDeep": "Library folders can go only {limit} levels deep.",
+  "error.backend.libraryFolderGone": "The folder does not exist or is already deleted.",
+  "error.backend.libraryFolderOtherAgent": "A file can go only into a folder of its agent.",
+  "error.backend.libraryFolderMoveInvalid": "This folder cannot go there.",
   "error.backend.sectionNameDuplicate": "Section names must be unique.",
   "error.backend.directMessageRequired": "Write a message first.",
   "error.backend.directMessageTooLong": "A direct message can have up to {limit} characters.",
@@ -298,6 +345,18 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserProfileNameTaken": "A browser profile with this name already exists.",
   "error.backend.browserSessionInUse": "A tab still uses this browser session. Try again.",
   "error.backend.browserProfileLimit": "You can have up to {limit} browser profiles.",
+  "error.backend.browserProxyNotFound": "This proxy no longer exists.",
+  "error.backend.browserProxyAddressInvalid":
+    "Type a proxy address such as socks5://host:1080 or http://user:password@host:3128.",
+  "error.backend.browserProxyLimit": "You can have up to {limit} proxies.",
+  "error.backend.browserProxyTaken": "A proxy with this address already exists.",
+  "error.backend.browserProxyChanged": "This proxy changed after you opened it. Look at it again, then try again.",
+  "error.backend.browserProxyUnreachable": "The proxy {name} does not answer, so the page did not open.",
+  "error.backend.browserProxySignInRefused": "The proxy {name} refused the sign-in, so the page did not open.",
+  "error.backend.browserProxyComputerUnreachable":
+    "The computer that this profile uses does not answer, so the page did not open.",
+  "error.backend.browserCertificateUntrusted":
+    "The security certificate of this site is not trusted, so the page did not open.",
   "error.backend.browserLowMemory":
     "This server is low on memory, so the browser cannot open another tab. Close a tab, or wait for other agents to finish.",
   "error.backend.browserOpenFailed": "Unable to open {url}: {reason}",
@@ -320,6 +379,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserInputProtected": "Browser input is protected during authentication.",
   "error.backend.browserTypingFocusMoved":
     "The page moved focus away from the target before typing. Nothing was typed. Take a fresh snapshot.",
+  "error.backend.browserTypingFocusMovedWhileTyping":
+    "The page moved focus away before all the text was typed. Only the first part of the text is in the field. Take a fresh snapshot and check the field before you type again.",
   "error.backend.browserTypingSubmitSkipped":
     "The text is in the field, but the page moved focus away, so Enter was not sent. Do not type the text again. Take a fresh snapshot.",
   "error.backend.mcpServerHttpCredentials": "The server answered {status}. Check the API key or other credentials.",

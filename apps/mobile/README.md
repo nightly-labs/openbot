@@ -39,12 +39,6 @@ Expo modules by default, so a patch to Expo Swift code needs `expo.autolinking.i
 extend `NativeMethods`, which React Native 0.87 removed from its types, so `MaskedView` was not a
 valid JSX component. Remove the patch when a release fixes the types.
 
-react-native-uitextview 2.7.1 is patched in `patches/react-native-uitextview@2.7.1.patch` so the
-native selectable message text applies the same baseline offset as React Native `Text`. React Native
-centers each line in its `lineHeight`. Without the offset, the text view drew each line at the bottom
-of its line box, so iOS message bubbles had more space above the text than below it. Remove the
-patch when a release applies the offset.
-
 react-native-screens 4.30.0 is patched in `patches/react-native-screens@4.30.0.patch` so the full
 screen swipe back of a chat waits for a gesture handler pan in the top screen to fail. The swipe back
 starts anywhere in the chat, and a swipe to the right on a message bubble still replies. Without
@@ -60,7 +54,8 @@ Keyboard Controller 1.22.7 is the version that Expo SDK 58 pins for Expo Go. Cus
 standalone apps must be rebuilt after adding this native dependency; a JavaScript reload alone
 cannot add it to an existing binary. All channels use the fingerprint runtime policy, so these
 updates cannot target older app-version `1.0.0` binaries without Keyboard Controller. Build and
-distribute a binary with the new fingerprint before publishing compatible OTA updates.
+distribute a binary with the new fingerprint before publishing compatible OTA updates. See
+[over-the-air updates](#over-the-air-updates).
 
 Run commands from the repository root:
 
@@ -194,7 +189,7 @@ When no agents have loaded and the selected server is connecting or offline, the
 already loaded remain visible during reconnection.
 
 The phone keeps an encrypted copy of the agents, hidden agents, sections, latest chat pages,
-capabilities and last drawer values (`drawer-snapshot.ts`) of each server (`workspace-cache.ts`),
+channels with the latest 50 messages of each opened channel, capabilities and last drawer values (`drawer-snapshot.ts`) of each server (`workspace-cache.ts`),
 and writes it when a server load ends and when the app goes to the background. It also keeps the
 last server list of the account service. After a start, the servers of that list connect at once,
 before the account service answers; a server whose key is not the key that the phone trusts waits
@@ -335,7 +330,9 @@ bun run mobile:doctor
 
 ## EAS
 
-The project is linked to EAS and has development, preview, and production build profiles in `eas.json`.
+The project is linked to EAS and has development, preview, and production build profiles in `eas.json`. EAS gives the
+build credentials, the build numbers and the public values of each environment. The app does not use
+EAS Update: see [over-the-air updates](#over-the-air-updates).
 
 ```bash
 cd apps/mobile
@@ -427,14 +424,39 @@ version in `app.json`, `package.json` and `bun.lock`. Merge that change to `main
 
 The new section is `## [x.y.z] - In review`, and `/changelog` does not show it. Apple and Google
 review a build on their own, and each can take days. When testers can install the build from one
-store, run `bun run mobile:release:published ios` or `bun run mobile:release:published android`.
-It writes today's date for that store, for example `## [x.y.z] - 2026-10-14 (Android)`. Merge that
-change to `main`, and the site shows the version with that store, and the other store as "In review".
-When the other store makes the build available, run the command again with that store. The heading
-becomes `## [x.y.z] - 2026-10-14 (Android), 2026-10-16 (iOS)`, or `## [x.y.z] - 2026-10-14` when
-both dates are the same. Use `both` when the two stores make the build available on the same day.
+store, run `bun run mobile:release` and select 3, or `bun run mobile:release:published ios` (or
+`android`). It writes today's date for that store, for example `## [x.y.z] - 2026-10-14 (Android)`,
+and raises that store's `cloudServers` and `browser` flags and newest version in
+`apps/auth-api/src/server/mobile-features-config.ts`. Merge that change to `main`. After the Worker
+deploy, the site shows the version with that store, the other store as "In review", and Discord gets
+the post of that store. When the other store makes the build available, do the same for that store.
+The heading becomes `## [x.y.z] - 2026-10-14 (Android), 2026-10-16 (iOS)`, or `## [x.y.z] - 2026-10-14`
+when both dates are the same. Use `both` when the two stores make the build available on the same day.
 For an older version, add `--version x.y.z`. A new `mobile:release:*` stops while no store has the
 current version.
+
+A store that will never ship a version, because a newer one replaced it, is skipped:
+`## [x.y.z] - 2026-11-01 (iOS), Skipped (Android)`. `/changelog` shows it as skipped, and Discord gets
+no post. When you mark a newer version as available, the menu asks to mark the older versions that
+the store still reviews as skipped (`--skip-older` on the command). Menu step 4 marks a version as
+skipped by hand, or as in review again.
+
+### Release menu
+
+`bun run mobile:release` shows the state of the newest versions on each store and their posts, and
+one menu for each step. Press a digit; Enter selects the first choice, and 0 goes back.
+
+1. Prepare a new version (`prepare-release.ts --mobile`).
+2. Build and send to TestFlight or Google Play (dispatches `release-ios.yml` or `release-android.yml` on `main`).
+3. Mark a version as available in a store, with its flags and the skip of older versions.
+4. Mark a version as skipped, or in review again.
+5. Write the Discord highlights.
+6. Show the live state: the flags and `/changelog` of production, and the posts that are due or wait.
+
+A step that changes files needs a clean working tree. It makes a branch from the `main` of GitHub,
+commits (the pre-commit hook runs), pushes, opens the pull request with the release title and body,
+and goes back to your branch. It can also turn on auto-merge. The menu never merges by itself.
+
 The signed `.ipa` is saved as a GitHub Actions artifact for seven days before upload. If upload
 fails, download that artifact and retry with Transporter to avoid rebuilding. Re-running the full
 workflow creates a new build number.
@@ -505,30 +527,50 @@ See [Fastlane Google Play upload](https://docs.fastlane.tools/actions/upload_to_
 
 ### Discord announcement
 
-Each mobile version gets one post in the OpenBot Discord, when the second store has it. Android is
-often available hours or days before iOS, so the post waits for both. The source is
-`apps/mobile/CHANGELOG.md`, not the stores. The `Announce mobile release on Discord` workflow
-(`mobile-release-announcement.yml`) runs on each push to `main` that changes the file. When the
-push gives a version its second store date, for example
-`## [x.y.z] - 2026-10-14 (Android), 2026-10-16 (iOS)`, it posts the message. The desktop release
+Each store gets its own post in the OpenBot Discord when users of that store can see the version.
+The source is `apps/mobile/CHANGELOG.md`; the gate is production. The `Announce mobile release on
+Discord` workflow (`mobile-release-announcement.yml`) runs after each CI run on `main`, at minutes
+17 and 47 of each hour, and on a manual dispatch. It posts a version for a store only when the
+account Worker lists the version in `/v1/mobile/changelog?platform=<store>` and gives it the newest
+version and the flags of `apps/auth-api/src/server/mobile-features-config.ts` in
+`/v1/mobile/features`. Thus the post never comes before the deploy of the flags, the browser and
+`/changelog`. A newer push to `main` cancels an older CI run, and that does not lose a post: the next
+deploy or the schedule sends it.
+
+A tag `mobile-announced/v<version>/<store>` records each post. The workflow creates the tag, then
+posts; a failed post removes the tag, so the next run tries again. A version with a tag gets no post
+again. Only the newest dated version of each store gets a post, from 1.4.7 on. The desktop release
 has its own post and its own workflow (`docs/RELEASING.md#discord-announcement`).
 
-Before the second store has the build, select the 3 to 5 changes in the version section that have
+| Event | Title | Line under the title |
+| --- | --- | --- |
+| The first store | `OpenBot vx.y.z is out on iOS` | `The Android version comes out later.` |
+| The second store | `OpenBot vx.y.z is out on Android` | `It is already out on iOS.` |
+| Both stores in the same run | `OpenBot vx.y.z is out on iOS and Android` | none |
+| The other store skipped the version | `OpenBot vx.y.z is out on iOS` | none |
+
+The message mentions the `Mobile Release Pings` role, then has the title, the highlights, and one
+line of links to each store that has the version and to `Full Changelog`, the version on the Mobile
+tab of `/changelog`. It notifies only that role.
+
+Before the first store has the build, select the 3 to 5 changes in the version section that have
 the largest effect on users, and write them with the version in `apps/mobile/release-announcement.json`:
 
 ```json
 { "version": "x.y.z", "highlights": ["...", "...", "..."] }
 ```
 
-Use the highlight rules of the desktop announcement. Replace the highlights of the previous version;
-the file holds only one version. Run `bun scripts/discord-mobile-release-announcement.ts check x.y.z`
-to see the message. `bun run mobile:release:published` stops when it gives the version its second
-store and the file is not ready, and the Changelog workflow stops such a pull request.
+Use the highlight rules of the desktop announcement. Both posts of a version use the same file.
+Replace the highlights of the previous version; the file holds only one version. Run
+`bun scripts/discord-mobile-release-announcement.ts check x.y.z` to see the posts.
+`bun run mobile:release` and `bun run mobile:release:published` stop while the file is not ready,
+and the Changelog workflow stops a pull request that adds a store date before the file is ready.
 
-The message mentions the `Mobile Release Pings` role, then has the title
-`OpenBot vx.y.z is out on iOS and Android`, the highlights, and one line of links:
-`iOS · Android · Full Changelog`. The last link opens the version on the Mobile tab of
-`/changelog`. It notifies only that role.
+`bun scripts/discord-mobile-release-announcement.ts plan` shows the posts that are due and why the
+others wait. To post a version again, or an older one, run
+`gh workflow run mobile-release-announcement.yml --ref main -f version=x.y.z -f stores=ios -f again=true`.
+For a post that you sent by hand, run
+`bun scripts/discord-mobile-release-announcement.ts mark-posted x.y.z ios`, so the workflow does not send it again.
 
 One-time setup:
 
@@ -539,11 +581,186 @@ One-time setup:
    `DISCORD_MOBILE_RELEASE_WEBHOOK_URL`. It can be the same channel as the desktop post.
 3. In Discord, turn on Developer Mode, open Server Settings > Roles, right-click `Mobile Release Pings`
    and select Copy Role ID. Add the ID as the environment variable `DISCORD_MOBILE_RELEASE_ROLE_ID`.
+4. A tag ruleset must let GitHub Actions create and delete tags that start with `mobile-announced/`.
 
-A failed post does not change the release: re-run the `Post on Discord` job. A re-run after a
-successful post posts the message again. To post a version again, or one that a push did not post,
-run `gh workflow run mobile-release-announcement.yml --ref main -f version=x.y.z`. Both stores must
-have the version in `apps/mobile/CHANGELOG.md`, and the file must be for that version.
+## Over-the-air updates
+
+An over-the-air (OTA) update sends a new JavaScript bundle to the phones that have a store binary.
+It needs no store review. The phones get it from OpenBot's own update server,
+[`apps/mobile-updates`](../mobile-updates/README.md) at `https://updates.openbot.run`, not from EAS
+Update. `expo-updates` is the client in the app.
+
+Version 1.4.8 and earlier binaries ask Expo's server and get no update. A binary cannot change its
+update server, so only a newer store version can get one.
+
+### What an update can change
+
+An update can change the TypeScript of `apps/mobile/src` and of the workspace packages that the app
+imports, and the images and fonts that this code imports.
+
+An update cannot change native code or native settings. Each binary has a runtime version: the
+fingerprint, a hash of all that the native build reads (`fingerprint.config.js`). A phone asks only
+for updates of its own runtime version, and the publish command refuses a commit whose runtime
+version no store build has. A change to one of these makes a new runtime version and thus needs a
+store build:
+
+- `app.json` (also `version`), `app.config.js`, `eas.json`, `.gitignore` and the `scripts` of
+  `apps/mobile/package.json`. Put a new script in the root `package.json`.
+- `modules/`, `plugins/`, `certs/`, `assets/sounds`, and the assets that `app.json` names.
+- A native dependency, and a file in the root `patches/` folder.
+- The share extension code (`src/features/share/extension/share-sender.ts`).
+
+`mobile:release:patch` changes `version`, so it starts a new runtime version. An update goes only to
+the store version that `app.json` has now.
+
+On a pull request, the CI job `Mobile runtime version` says when the change makes a new runtime
+version. After such a change is on `main`, `main` cannot go to the current store build as an update.
+
+### Commands
+
+Run them from the repository root. The publish, rollout and rollback commands start the
+`Mobile OTA update` workflow for the current branch, so push the branch first.
+
+| Command | Use |
+| --- | --- |
+| `bun run mobile:ota:check` | Shows the runtime version of this checkout and the store builds that can get it. It changes nothing. |
+| `bun run mobile:ota:publish -- --platform all --message "Fix the chat scroll"` | Publishes the current branch to all phones of the store builds that can get it. `--platform ios` or `android` selects one platform. `--rollout 10` gives it to 10% of the phones. `--dry-run` runs the checks and the guard, and publishes nothing. |
+| `bun run mobile:ota:rollout -- --platform all --rollout 50` | Changes the percentage of phones that get the current update. |
+| `bun run mobile:ota:rollback -- --platform all` | Takes the current update back. Phones get the earlier update again, or with `--to-embedded` the bundle in their binary. |
+| `bun run mobile:ota:status` | Shows what the update server gives the phones of each store build. It changes nothing. |
+| `bun run mobile:release:ota -- --base <store build tag> --platform all` | Writes the release notes of an update. See [the notes of an update](#release-notes-of-an-update). |
+
+Add `--channel preview` to send an update to internal builds of the `preview` profile only. Such a
+build has no tag, so the guard does not stop this publish: build the preview binary from the same
+commit, or from a commit with the same runtime version (`mobile:ota:check` prints it).
+
+### Publish a fix
+
+1. Merge the fix to `main` with its note file in `changelog.d`.
+2. Run `bun run mobile:ota:check`. When it names the store builds, `main` has no native change since
+   those builds, and all of `main` can go out.
+3. Run `bun run mobile:ota:publish -- --platform all --message "<what the update does>"`.
+4. Follow the workflow in GitHub Actions. It runs the mobile lint, typecheck and tests, the guard,
+   `expo export`, and the upload. Its summary names each update ID and the store builds that get it.
+5. Write the notes with `bun run mobile:release:ota`, and merge that change.
+
+When step 2 says that the checkout needs a store build, `main` has a native change. Then:
+
+1. Make a branch from the commit of the store build. `mobile:ota:check` prints the command, such as
+   `git switch -c mobile-hotfix/1.5.0 <commit>`. Each store build has a tag
+   `mobile-build/<platform>/<version>/<build>/<runtime version>`.
+2. Cherry-pick only the fix. Do not pick a commit that needs native code that the store build does
+   not have: the guard cannot see that the JavaScript calls a module that is not in the binary.
+3. Push the branch and publish from it, as above. The workflow runs only on `main` and on
+   `mobile-hotfix/*` branches.
+
+iOS and Android can have store builds from different commits. Publish each platform from a commit
+that its store build accepts.
+
+### Rollout and rollback
+
+- A rollout change and a rollback do not use the runtime version of the branch. They find the store
+  builds of each platform that have an update now, from the `mobile-build/` tags. So they work from
+  `main` also after a native change, and `--platform all` changes each platform that has an update
+  and names a platform that has none. When two store versions of one platform have an update, or for
+  a build with no tag such as a `preview` build, name the binary: `--platform ios --runtime <version>`.
+  `bun run mobile:ota:status` prints the runtime version of each store build.
+- With `--rollout`, each install has a fixed place, so the same phones stay in the rollout while the
+  percentage grows. The other phones keep the earlier update.
+- A phone does not go back to an older update. So a rollback publishes the earlier bundle again as a
+  new update. With no earlier update, or with `--to-embedded`, the server sends a signed instruction
+  to use the bundle in the binary. A second rollback always returns to the bundle in the binary.
+- A phone takes a rollback as it takes an update: the header comes, and **Update** restarts the app.
+  Without the tap, the next cold start uses the earlier bundle. At a cold start, `expo-updates` on
+  Android reports no pending update for a rollback, so the app fetches it again to show the header.
+- `mobile:ota:rollout` and `mobile:ota:rollback` work from each branch and from a checkout that is
+  not up to date. They run the workflow on `main`.
+- If an update stops at launch, `expo-updates` starts the bundle in the binary and reports the update
+  as failed. The server does not send that update to that phone again.
+- A change reaches all phones after 30 seconds at the latest, which is the cache time of the server.
+
+### How a phone gets an update
+
+The app asks the server at a cold start, and again when it comes back to the foreground, at most
+one time in 15 minutes (`src/features/app-update/model/app-update.ts`). The cold start counts as a
+check, so to see a new update or a rollback at once, close the app fully and open it. It downloads a new bundle in
+the background. The home header then shows **A new OpenBot is ready**, and **Update** restarts the
+app with the new bundle. Without the tap, the next cold start uses it. The bundle is about 25 MB;
+the server sends it compressed, and the phone downloads only the assets that it does not have.
+
+**Settings → About** shows the short update ID after the version and build, and the support log
+names the bundle, the channel and the runtime version.
+
+### Release notes of an update
+
+An update keeps the store version, so its notes get a section with a fourth number: `1.5.0.1` is the
+first update of `1.5.0`.
+
+```bash
+bun run mobile:release:ota -- --base <store build tag or commit> --platform all
+```
+
+`--base` is the tag or commit of the store build, such as a `mobile-build/` tag. Name only the
+platforms whose store has the version: the command stops for a platform that still reviews it, and
+its heading then needs that platform when the store has the version.
+
+The command moves only the note files in `changelog.d` that are new since `--base` into that section.
+The guard has shown that this range has no native change, so no line in it needs a new binary. The
+other files stay for the next store version. See
+[the notes of OTA updates](changelog.d/README.md#ota-updates).
+
+### Rules
+
+- An update must not write data that the bundle in the binary cannot read. A rollback, or a start
+  after a failed update, runs that older bundle with the data that the update wrote. This is true
+  for `SecureStore` keys, files in the cache and the workspace copy.
+- New code that needs a native module must check that the module is there, or use a feature flag of
+  the app version (`useMobileFeature`), so that it does nothing in an older binary.
+- `scripts/mobile-ota.ts` exports with `EXPO_NO_BUNDLE_SPLITTING=1`. Without it, `expo export` of
+  Expo CLI 58 stops at the DOM components with `Asset not found: _expo/static/js/web/__common-…js`.
+  The DOM components of an update are thus one file each, and those in a binary are split. Check the
+  previews of a chat (diagram, PDF, spreadsheet, HTML page, audio) on a phone after a change to a
+  DOM component.
+- Do not change `updates.url`, the certificate or the key ID. Binaries with the old values would get
+  no update.
+
+### One-time setup of over-the-air updates
+
+1. The update server: see [its README](../mobile-updates/README.md#deployment).
+2. In GitHub repository settings, the `release-mobile-ota` environment has the deployment branches
+   `main` and `mobile-hotfix/*`. Add required reviewers there if a second person must approve each
+   publish.
+3. Environment secrets of `release-mobile-ota`:
+   - `MOBILE_OTA_PRIVATE_KEY`: the PEM text of the update signing key.
+   - `MOBILE_OTA_R2_ACCESS_KEY_ID` and `MOBILE_OTA_R2_SECRET_ACCESS_KEY`: an R2 API token with
+     **Object Read & Write** for the bucket `openbot-mobile-updates` only. The token in Cloudflare
+     is `openbot-mobile-ota-publish`. The access key ID is the ID of the token, and the secret
+     access key is the SHA-256 of its value.
+   - `EXPO_TOKEN`: the same token as in `release-ios`. The workflow reads the public values of the
+     EAS environment with it, such as the OpenPanel client. It does not use EAS Update.
+   The workflow also reads the repository variable `CLOUDFLARE_ACCOUNT_ID`.
+4. The release workflows make the `mobile-build/` tags. No tag rule may stop GitHub Actions from
+   making them.
+
+The signing key pair comes from `expo-updates codesigning:generate`. The certificate
+`certs/certificate.pem` is public and in each binary; it is valid until November 2046. The private
+key is only in the GitHub secret and in the backup of the developer who made it: it is never in the
+repository or in Cloudflare. If the key is lost, no update can go to the binaries that have this
+certificate. Then make a new pair, replace the certificate, and release a store build.
+
+### Check before a store release
+
+The release workflows stop when the binary does not have the update server, the channel, the
+certificate, or the runtime version of its commit (`mobile-ota.ts verify-build`). A wrong value in a
+released binary needs a new store build to correct, so also test an update before the store review
+of the first version that uses this server, and after a change to `updates` in `app.json`:
+
+1. Install the build from TestFlight and from the Play internal track.
+2. Publish a small visible change with `--rollout 100`. Only the phones with this new build get it.
+3. Open the app, leave it and come back after 15 minutes, or close and open it two times. Confirm
+   the home header, the restart, the change, and the update ID in **Settings → About**.
+4. Open a chat with a diagram, a PDF and an HTML page, to check the DOM components of the update.
+5. Run `bun run mobile:ota:rollback -- --platform all` and confirm that the change goes away.
 
 ## OpenPanel product analytics
 
@@ -623,7 +840,7 @@ where available, `duration_ms`. Failure codes are fixed categories, never raw er
 | `hosted_server_plans_action` | Hosted server plans sheet `viewed` and `closed`, or a server in setup opened (`setup_opened`); `entry_point` is `drawer` or `onboarding` when known. The mobile sheet has no purchase |
 | `onboarding_step` | First-run `step` (`hello`, `server`, `agent`, `look`, `name`, `role`, `task`, `ready`) with `action` `viewed`, `next`, `back` or `skipped` |
 | `onboarding_completed` | First run ended; `skipped` is true when the user skipped it |
-| `notification_settings_action` | Notifications turned on or off, preview or Live Activities switched (`enabled`), or the phone's permission prompt answered (`permission` is `granted`, `denied` or `undetermined`) |
+| `notification_settings_action` | Notifications turned on or off, preview, thread replies or Live Activities switched (`enabled`), or the phone's permission prompt answered (`permission` is `granted`, `denied` or `undetermined`) |
 | `live_activity_action` | The app started or ended a Live Activity; updates are not counted |
 | `voice_conversation_action` | Voice mode `start`, or `end` with its duration and `turn_count`; `server_kind=remote` |
 | `voice_turn` | One dictation session: result, listening time in `audio_duration_seconds`, time from stop to final text in `duration_ms`, and `transcription` (`local` or `cloud`) when known; no words |

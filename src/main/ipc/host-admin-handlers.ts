@@ -17,18 +17,27 @@ import {
   type AgentProviderRef,
   decodeAgentAccessSnapshot,
   decodeHostAgentMemoryLimit,
+  decodeHostBrowsingMemory,
   decodeHostMemoryReview,
+  decodeHostPersonality,
+  decodeHostSkillLearning,
   decodeHostTimezoneSettings,
   decodeHostUpdateStatus,
   decodeMachineAlertSettings,
   decodePromptCacheTtlSetting,
   decodeProviderModelVisibility,
   decodeServerAuditLog,
+  type HostPersonality,
   type HostUpdateSettingsChange,
   type HostUpdateStatus,
   hostAgentMemoryLimit,
+  hostBrowsingMemory,
   hostMemoryReview,
+  hostSkillLearning,
+  isClaudeCompactWindowTokens,
   isPromptCacheTtl,
+  isSkillLearningMode,
+  LEGACY_RESPONSE_STYLE,
   LOCAL_SERVER_ID,
   type MachineAlertSettings,
   type PromptCacheTtl,
@@ -49,8 +58,30 @@ import {
   AGENT_MEMORY_LIMIT_CAPABILITY,
   AGENT_MEMORY_LIMIT_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
+import {
+  BROWSING_MEMORY_CAPABILITY,
+  BROWSING_MEMORY_ROUTES,
+} from "@openbot/contracts/team-protocol/browsing-memory-v1";
+import {
+  CLAUDE_COMPACT_WINDOW_CAPABILITY,
+  CLAUDE_COMPACT_WINDOW_ROUTES,
+  decodeClaudeCompactWindowResponse,
+} from "@openbot/contracts/team-protocol/claude-compact-window-v1";
+import {
+  CLAUDE_USER_SETUP_CAPABILITY,
+  CLAUDE_USER_SETUP_ROUTES,
+  decodeClaudeUserSetupResponse,
+} from "@openbot/contracts/team-protocol/claude-user-setup-v1";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { HOST_ADMIN_CAPABILITY, HOST_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/host-admin-v1";
+import {
+  HOST_KEY_ROTATION_CAPABILITY,
+  HOST_KEY_ROTATION_ROUTES,
+} from "@openbot/contracts/team-protocol/host-key-rotation-v1";
+import {
+  HOST_PERSONALITY_CAPABILITY,
+  HOST_PERSONALITY_ROUTES,
+} from "@openbot/contracts/team-protocol/host-personality-v1";
 import { HOST_TIMEZONE_CAPABILITY, HOST_TIMEZONE_ROUTES } from "@openbot/contracts/team-protocol/host-timezone-v1";
 import { HOST_UPDATE_CAPABILITY, HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
 import {
@@ -67,10 +98,14 @@ import {
   PROMPT_CACHE_TTL_ROUTES,
 } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
 import { SERVER_AUDIT_CAPABILITY, SERVER_AUDIT_ROUTES } from "@openbot/contracts/team-protocol/server-audit-v1";
+import { SKILL_LEARNING_CAPABILITY, SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { type AgentAccessStore, agentAccessSnapshot } from "../agent-access-store";
 import type { AgentMemoryLimitSetting } from "../agent-memory-limit-preference-store";
+import type { BrowsingMemoryPreferenceStore } from "../browsing-memory-preference-store";
+import type { ClaudeCompactWindowControl } from "../claude-compact-window-preference-store";
+import type { ClaudeUserSetupControl } from "../claude-user-setup-preference-store";
 import type { HostService } from "../host-service";
 import type { MachineAlertMonitor } from "../machine-alerts";
 import type { MemoryReviewPreferenceStore } from "../memory-review-preference-store";
@@ -79,7 +114,9 @@ import type { PromptCacheTtlPreferenceStore } from "../prompt-cache-ttl-preferen
 import { acceptEmpty, decodeHostReleaseStatusFromHost, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import type { ServerAuditStore } from "../server-audit-store";
+import { parseServerPersonality, type ServerPersonalityPreferenceStore } from "../server-personality-preference-store";
 import { parseServerTimezone, type ServerTimezonePreferenceStore } from "../server-timezone-preference-store";
+import type { SkillLearningPreferenceStore } from "../skill-learning-preference-store";
 import { parseAgentMemoryLimitPreference, parseHostUpdateSettings, parseMemoryReviewPreference } from "./app-inputs";
 import type { IpcGroupHandlers } from "./define-ipc-group";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
@@ -99,13 +136,18 @@ interface HostAdminRemoteServers {
 }
 
 interface HostAdminIpcDependencies {
-  host: Pick<HostService, "updateIdentity">;
+  host: Pick<HostService, "updateIdentity" | "rotateIdentityKey">;
   remoteServers: HostAdminRemoteServers;
   serverTimezone: Pick<ServerTimezonePreferenceStore, "get" | "set">;
+  serverPersonality: Pick<ServerPersonalityPreferenceStore, "get" | "set">;
   agentMemoryLimit: AgentMemoryLimitSetting;
   memoryReview: MemoryReviewPreferenceStore;
+  skillLearning: SkillLearningPreferenceStore;
+  browsingMemory: BrowsingMemoryPreferenceStore;
   machineAlerts: Pick<MachineAlertMonitor, "alerts" | "setAlerts" | "canBeResponsible">;
   promptCacheTtl: Pick<PromptCacheTtlPreferenceStore, "get" | "set">;
+  claudeUserSetup: ClaudeUserSetupControl;
+  claudeCompactWindow: ClaudeCompactWindowControl;
   modelVisibility: Pick<ModelVisibility, "settings" | "set">;
   agentAccess: Pick<AgentAccessStore, "levels" | "set">;
   serverAudit: Pick<ServerAuditStore, "read">;
@@ -117,7 +159,7 @@ interface HostAdminIpcDependencies {
 }
 
 // The user of this computer owns its server, so the roles give them every agent.
-const LOCAL_OWNER = { id: "local-owner", role: "owner" } as const;
+export const LOCAL_OWNER = { id: "local-owner", role: "owner" } as const;
 
 /** The body of a `host-update-v1` route: `start` carries the mode, `settings` the switches. */
 type HostUpdateBody = Record<string, never> | { restart: UpdateRestartMode } | HostUpdateSettingsChange;
@@ -126,10 +168,15 @@ export function hostAdminIpcHandlers({
   host,
   remoteServers,
   serverTimezone,
+  serverPersonality,
   agentMemoryLimit,
   memoryReview,
+  skillLearning,
+  browsingMemory,
   machineAlerts,
   promptCacheTtl,
+  claudeUserSetup,
+  claudeCompactWindow,
   modelVisibility,
   agentAccess,
   serverAudit,
@@ -154,6 +201,9 @@ export function hostAdminIpcHandlers({
       throw new Error(sourceText("error.team.hostTimezoneUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, route, decodeHostTimezoneSettings, { method: "POST", body }));
   }
+  function remotePersonality(serverId: string, route: string, body: Record<string, never> | HostPersonality) {
+    return runCauseEffect(remoteServers.request(serverId, route, decodeHostPersonality, { method: "POST", body }));
+  }
   function remoteMemoryLimit(serverId: string, route: string, body: { limit?: number }) {
     if (!remoteServers.supportsCapability(serverId, AGENT_MEMORY_LIMIT_CAPABILITY))
       throw new Error(sourceText("error.team.agentMemoryLimitUnsupported"));
@@ -163,6 +213,16 @@ export function hostAdminIpcHandlers({
     if (!remoteServers.supportsCapability(serverId, MEMORY_REVIEW_CAPABILITY))
       throw new Error(sourceText("error.team.memoryReviewUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, route, decodeHostMemoryReview, { method: "POST", body }));
+  }
+  function remoteSkillLearning(serverId: string, route: string, body: { mode?: string }) {
+    if (!remoteServers.supportsCapability(serverId, SKILL_LEARNING_CAPABILITY))
+      throw new Error(sourceText("error.team.skillLearningUnsupported"));
+    return runCauseEffect(remoteServers.request(serverId, route, decodeHostSkillLearning, { method: "POST", body }));
+  }
+  function remoteBrowsingMemory(serverId: string, route: string, body: { enabled?: boolean }) {
+    if (!remoteServers.supportsCapability(serverId, BROWSING_MEMORY_CAPABILITY))
+      throw new Error(sourceText("error.team.browsingMemoryUnsupported"));
+    return runCauseEffect(remoteServers.request(serverId, route, decodeHostBrowsingMemory, { method: "POST", body }));
   }
   function remoteMachineAlerts(serverId: string, route: string, body: MachineAlertSettings | Record<string, never>) {
     if (!remoteServers.supportsCapability(serverId, MACHINE_RESOURCES_CAPABILITY))
@@ -174,6 +234,20 @@ export function hostAdminIpcHandlers({
       throw new Error(sourceText("error.team.promptCacheTtlUnsupported"));
     return runCauseEffect(
       remoteServers.request(serverId, route, decodePromptCacheTtlSetting, { method: "POST", body }),
+    );
+  }
+  function remoteClaudeUserSetup(serverId: string, route: string, body: { enabled?: boolean }) {
+    if (!remoteServers.supportsCapability(serverId, CLAUDE_USER_SETUP_CAPABILITY))
+      throw new Error(sourceText("error.team.claudeUserSetupUnsupported"));
+    return runCauseEffect(
+      remoteServers.request(serverId, route, decodeClaudeUserSetupResponse, { method: "POST", body }),
+    );
+  }
+  function remoteClaudeCompactWindow(serverId: string, route: string, body: { tokens?: number | null }) {
+    if (!remoteServers.supportsCapability(serverId, CLAUDE_COMPACT_WINDOW_CAPABILITY))
+      throw new Error(sourceText("error.team.claudeCompactWindowUnsupported"));
+    return runCauseEffect(
+      remoteServers.request(serverId, route, decodeClaudeCompactWindowResponse, { method: "POST", body }),
     );
   }
   function remoteModelVisibility(
@@ -229,6 +303,26 @@ export function hostAdminIpcHandlers({
           return runCauseEffect(remoteServers.refreshIdentity(serverId));
         },
       }),
+      rotateHostKey: scopedQueryHandler({
+        local: async () => {
+          await runCauseEffect(host.rotateIdentityKey());
+        },
+        // Owner only: the host refuses an admin or a member with 403.
+        remote: async (serverId) => {
+          if (!remoteServers.supportsCapability(serverId, HOST_KEY_ROTATION_CAPABILITY))
+            throw new Error(sourceText("error.team.hostKeyRotationUnsupported"));
+          await runCauseEffect(
+            remoteServers.request(serverId, HOST_KEY_ROTATION_ROUTES.rotate, acceptEmpty, {
+              method: "POST",
+              body: {},
+            }),
+          );
+          // The answer does not make the new key trusted. The directory carries the handover that the
+          // previous key signed, and this read follows it. The key is changed, so a failed read is not
+          // a failure of the change: the next read follows it.
+          await runCauseEffect(remoteServers.refreshIdentity(serverId)).catch(() => undefined);
+        },
+      }),
       getReleaseStatus: scopedQueryHandler({
         local: localUpdate,
         remote: (serverId) =>
@@ -281,6 +375,22 @@ export function hostAdminIpcHandlers({
         local: (timezone) => runCauseEffect(serverTimezone.set(timezone)),
         remote: (timezone, serverId) => remoteTimezone(serverId, HOST_TIMEZONE_ROUTES.update, { timezone }),
       }),
+      // A host before host-personality-v1 uses the classic prompt.
+      getPersonality: scopedQueryHandler({
+        local: () => serverPersonality.get(),
+        remote: async (serverId) =>
+          remoteServers.supportsCapability(serverId, HOST_PERSONALITY_CAPABILITY)
+            ? remotePersonality(serverId, HOST_PERSONALITY_ROUTES.settings, {})
+            : { responseStyle: LEGACY_RESPONSE_STYLE },
+      }),
+      setPersonality: scopedHandler(parseServerPersonality, {
+        local: (personality) => runCauseEffect(serverPersonality.set(personality)),
+        remote: (personality, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, HOST_PERSONALITY_CAPABILITY))
+            throw new Error(sourceText("error.team.hostPersonalityUnsupported"));
+          return remotePersonality(serverId, HOST_PERSONALITY_ROUTES.update, personality);
+        },
+      }),
       getAgentMemoryLimit: scopedQueryHandler({
         local: () => hostAgentMemoryLimit(agentMemoryLimit.get()),
         remote: (serverId) => remoteMemoryLimit(serverId, AGENT_MEMORY_LIMIT_ROUTES.settings, {}),
@@ -300,6 +410,26 @@ export function hostAdminIpcHandlers({
         local: async (interval) =>
           hostMemoryReview(await runCauseEffect(memoryReview.set(parseMemoryReviewPreference({ interval })))),
         remote: (interval, serverId) => remoteMemoryReview(serverId, MEMORY_REVIEW_ROUTES.update, { interval }),
+      }),
+      getSkillLearning: scopedQueryHandler({
+        local: () => hostSkillLearning(skillLearning.get()),
+        remote: (serverId) => remoteSkillLearning(serverId, SKILL_LEARNING_ROUTES.settings, {}),
+      }),
+      // The host checks the value against its own choices, so a remote value is any short text.
+      setSkillLearning: scopedHandler(parseSkillLearningText, {
+        local: async (mode) => {
+          if (!isSkillLearningMode(mode)) throw new Error("Skill learning mode is required.");
+          return hostSkillLearning(await runCauseEffect(skillLearning.set({ mode })));
+        },
+        remote: (mode, serverId) => remoteSkillLearning(serverId, SKILL_LEARNING_ROUTES.update, { mode }),
+      }),
+      getBrowsingMemory: scopedQueryHandler({
+        local: () => hostBrowsingMemory(browsingMemory.get()),
+        remote: (serverId) => remoteBrowsingMemory(serverId, BROWSING_MEMORY_ROUTES.settings, {}),
+      }),
+      setBrowsingMemory: scopedHandler(parseBrowsingMemoryEnabled, {
+        local: async (enabled) => hostBrowsingMemory(await runCauseEffect(browsingMemory.set({ enabled }))),
+        remote: (enabled, serverId) => remoteBrowsingMemory(serverId, BROWSING_MEMORY_ROUTES.update, { enabled }),
       }),
       getMachineAlerts: scopedQueryHandler({
         local: () => machineAlerts.alerts(),
@@ -321,6 +451,23 @@ export function hostAdminIpcHandlers({
       setPromptCacheTtl: scopedHandler(parsePromptCacheTtl, {
         local: (ttl) => runCauseEffect(promptCacheTtl.set(ttl)),
         remote: (ttl, serverId) => remotePromptCacheTtl(serverId, PROMPT_CACHE_TTL_ROUTES.update, { ttl }),
+      }),
+      getClaudeUserSetup: scopedQueryHandler({
+        local: () => claudeUserSetup.get(),
+        remote: (serverId) => remoteClaudeUserSetup(serverId, CLAUDE_USER_SETUP_ROUTES.settings, {}),
+      }),
+      setClaudeUserSetup: scopedHandler(parseClaudeUserSetup, {
+        local: (enabled) => runCauseEffect(claudeUserSetup.set(enabled)),
+        remote: (enabled, serverId) => remoteClaudeUserSetup(serverId, CLAUDE_USER_SETUP_ROUTES.update, { enabled }),
+      }),
+      getClaudeCompactWindow: scopedQueryHandler({
+        local: () => claudeCompactWindow.get(),
+        remote: (serverId) => remoteClaudeCompactWindow(serverId, CLAUDE_COMPACT_WINDOW_ROUTES.settings, {}),
+      }),
+      setClaudeCompactWindow: scopedHandler(parseClaudeCompactWindow, {
+        local: (tokens) => runCauseEffect(claudeCompactWindow.set(tokens)),
+        remote: (tokens, serverId) =>
+          remoteClaudeCompactWindow(serverId, CLAUDE_COMPACT_WINDOW_ROUTES.update, { tokens }),
       }),
       getModelVisibility: scopedHandler(parseProviderModelVisibilityProvider, {
         local: (provider) => runCauseEffect(modelVisibility.settings(provider)),
@@ -387,6 +534,16 @@ function wireIdentity(input: UpdateHostIdentityInput) {
   };
 }
 
+function parseClaudeUserSetup(value: unknown): boolean {
+  if (typeof value !== "boolean") throw new Error("Invalid Claude setup setting.");
+  return value;
+}
+
+function parseClaudeCompactWindow(value: unknown): number | null {
+  if (!isClaudeCompactWindowTokens(value)) throw new Error("Invalid Claude compaction size.");
+  return value;
+}
+
 function parsePromptCacheTtl(value: unknown): PromptCacheTtl {
   if (!isPromptCacheTtl(value)) throw new Error("Prompt cache time is required.");
   return value;
@@ -395,6 +552,16 @@ function parsePromptCacheTtl(value: unknown): PromptCacheTtl {
 function parseMemoryReviewCount(value: unknown): number {
   if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0)
     throw new Error("Memory review interval is required.");
+  return value;
+}
+
+function parseSkillLearningText(value: unknown): string {
+  if (typeof value !== "string" || !value || value.length > 32) throw new Error("Skill learning mode is required.");
+  return value;
+}
+
+function parseBrowsingMemoryEnabled(value: unknown): boolean {
+  if (typeof value !== "boolean") throw new Error("Browsing memory setting is required.");
   return value;
 }
 

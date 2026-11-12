@@ -7,6 +7,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import type { AppFormat, AppTranslate } from "@openbot/i18n";
 import {
+  ArrowLeftRight,
   ArrowRight,
   Bot,
   Brain,
@@ -40,6 +41,7 @@ export interface InstanceExportOptions {
   agentIds: string[];
   includeFiles: boolean;
   includeSettings: boolean;
+  includeHistory?: boolean;
 }
 
 export interface InstanceTransferViewProps {
@@ -53,7 +55,10 @@ export interface InstanceTransferViewProps {
   exportWarnings: string[];
   exportError: string | null;
   onExport: (options: InstanceExportOptions) => void;
-  onShowExport: () => void;
+  /** The server can put the chat history in the file. */
+  historyAvailable?: boolean | undefined;
+  /** Shows the saved file in its folder. Absent in a browser, which saves to its own download folder. */
+  onShowExport?: (() => void) | undefined;
   onExportAgain: () => void;
   importPhase: InstanceImportPhase;
   preview: InstanceTransferPreview | null;
@@ -65,6 +70,8 @@ export interface InstanceTransferViewProps {
   onImportDone: () => void;
   /** Absent for a joined server: its providers are signed in on that computer. */
   onSignIn?: ((provider: AgentProviderId) => void) | undefined;
+  /** Opens the dialog that copies agents to another server. Absent when there is no other server. */
+  onCopy?: (() => void) | undefined;
 }
 
 /**
@@ -119,6 +126,15 @@ export function InstanceTransferView(props: InstanceTransferViewProps) {
             <span class="instance-transfer-tile-title">{t("settings.transfer.new.title")}</span>
             <span class="instance-transfer-tile-text">{t("settings.transfer.new.text")}</span>
           </Button>
+          <Show when={props.onCopy}>
+            {(copy) => (
+              <Button type="button" variant="outline" class="instance-transfer-tile" onClick={() => copy()()}>
+                <ArrowLeftRight class="instance-transfer-tile-icon" aria-hidden="true" />
+                <span class="instance-transfer-tile-title">{t("settings.transfer.copy.tileTitle")}</span>
+                <span class="instance-transfer-tile-text">{t("settings.transfer.copy.tileText")}</span>
+              </Button>
+            )}
+          </Show>
         </div>
         <NotMoved />
       </Show>
@@ -140,6 +156,7 @@ function ExportScreen(props: InstanceTransferViewProps) {
   const [choosing, setChoosing] = createSignal(false);
   const [files, setFiles] = createSignal(true);
   const [settings, setSettings] = createSignal(true);
+  const [history, setHistory] = createSignal(true);
   const agents = () => props.summary?.agents ?? [];
   const selected = createMemo(() => agents().filter((agent) => !excluded().has(agent.id)));
   const busy = () => props.exportPhase === "exporting";
@@ -167,7 +184,7 @@ function ExportScreen(props: InstanceTransferViewProps) {
       <h3 class="agent-import-heading">{t("settings.transfer.export.title")}</h3>
       {/* Outside the summary, so a summary that fails is shown and not left loading. */}
       <Show when={props.exportError}>
-        {(error) => <Alert title={t("settings.transfer.export.failed")} description={error()} />}
+        {(error) => <TransferAlert title={t("settings.transfer.export.failed")} description={error()} />}
       </Show>
       <Show when={props.summary} fallback={<p class="agent-import-lede">{t("settings.transfer.loading")}</p>}>
         <SetupSummary totals={totals()} label={t("settings.transfer.summary.label")} />
@@ -188,6 +205,16 @@ function ExportScreen(props: InstanceTransferViewProps) {
             label={t("settings.transfer.export.settings")}
             description={t("settings.transfer.export.settingsDescription")}
           />
+          <Show when={props.historyAvailable}>
+            <SwitchField
+              class="settings-modal-row"
+              checked={history()}
+              disabled={busy()}
+              onChange={setHistory}
+              label={t("settings.transfer.export.history")}
+              description={t("settings.transfer.export.historyDescription")}
+            />
+          </Show>
         </ItemGroup>
         <Button
           type="button"
@@ -232,6 +259,7 @@ function ExportScreen(props: InstanceTransferViewProps) {
                 agentIds: selected().map((agent) => agent.id),
                 includeFiles: files(),
                 includeSettings: settings(),
+                ...(props.historyAvailable && history() ? { includeHistory: true } : {}),
               })
             }
           >
@@ -244,7 +272,12 @@ function ExportScreen(props: InstanceTransferViewProps) {
   );
 }
 
-function ExportSaved(props: { fileName: string | null; warnings: string[]; onShow: () => void; onAgain: () => void }) {
+function ExportSaved(props: {
+  fileName: string | null;
+  warnings: string[];
+  onShow: (() => void) | undefined;
+  onAgain: () => void;
+}) {
   const { t } = useText();
   return (
     <>
@@ -256,7 +289,7 @@ function ExportSaved(props: { fileName: string | null; warnings: string[]; onSho
         <p class="storage-message-description">{props.fileName}</p>
       </Show>
       <Show when={props.warnings.length > 0}>
-        <Notes title={t("settings.transfer.result.warnings")} notes={props.warnings} />
+        <TransferNotes title={t("settings.transfer.result.warnings")} notes={props.warnings} />
       </Show>
       <ol class="agent-import-steps">
         <li class="agent-import-step">
@@ -279,10 +312,14 @@ function ExportSaved(props: { fileName: string | null; warnings: string[]; onSho
         </li>
       </ol>
       <div class="agent-import-actions instance-transfer-start">
-        <Button type="button" variant="secondary" onClick={() => props.onShow()}>
-          <FolderOpen class="files-button-icon" aria-hidden="true" />
-          {t("settings.transfer.export.show")}
-        </Button>
+        <Show when={props.onShow}>
+          {(show) => (
+            <Button type="button" variant="secondary" onClick={() => show()()}>
+              <FolderOpen class="files-button-icon" aria-hidden="true" />
+              {t("settings.transfer.export.show")}
+            </Button>
+          )}
+        </Show>
         <Button type="button" variant="ghost" onClick={() => props.onAgain()}>
           {t("settings.transfer.export.again")}
         </Button>
@@ -299,7 +336,7 @@ function ImportScreen(props: InstanceTransferViewProps) {
         <h3 class="agent-import-heading">{t("settings.transfer.import.title")}</h3>
         <p class="agent-import-lede">{t("settings.transfer.import.lede")}</p>
         <Show when={props.importError}>
-          {(error) => <Alert title={t("settings.transfer.import.openFailed")} description={error()} />}
+          {(error) => <TransferAlert title={t("settings.transfer.import.openFailed")} description={error()} />}
         </Show>
         <div class="agent-import-actions instance-transfer-start">
           <Button
@@ -365,10 +402,10 @@ function ImportReview(props: {
       <p class="storage-summary-caption">{source()}</p>
       <SetupSummary totals={totals()} label={t("settings.transfer.summary.label")} />
       <Show when={props.error}>
-        {(error) => <Alert title={t("settings.transfer.import.failed")} description={error()} />}
+        {(error) => <TransferAlert title={t("settings.transfer.import.failed")} description={error()} />}
       </Show>
       <Show when={props.preview.warnings.length > 0}>
-        <Notes title={t("settings.transfer.import.warnings")} notes={props.preview.warnings} />
+        <TransferNotes title={t("settings.transfer.import.warnings")} notes={props.preview.warnings} />
       </Show>
       <Show when={props.preview.agents.length > 0}>
         <AgentChecklist
@@ -467,13 +504,13 @@ function ImportResult(props: {
         </section>
       </Show>
       <Show when={props.result.skipped.length > 0}>
-        <Notes
+        <TransferNotes
           title={t("settings.transfer.result.notImported")}
           notes={props.result.skipped.map((entry) => `${entry.name}: ${entry.reason}`)}
         />
       </Show>
       <Show when={props.result.warnings.length > 0}>
-        <Notes title={t("settings.transfer.result.warnings")} notes={props.result.warnings} />
+        <TransferNotes title={t("settings.transfer.result.warnings")} notes={props.result.warnings} />
       </Show>
       <div class="agent-import-actions instance-transfer-start">
         <Button type="button" variant="secondary" onClick={() => props.onDone()}>
@@ -585,12 +622,13 @@ function AgentChecklist(props: {
   );
 }
 
-function NotMoved() {
+/** What a transfer leaves on the old server. The copy dialog names it with its own word. */
+export function NotMoved(props: { text?: "settings.transfer.notMovedSecrets" | "settings.transfer.copy.notCopied" }) {
   const { t } = useText();
   return (
     <p class="instance-transfer-not-moved">
       <Lock class="instance-transfer-not-moved-icon" aria-hidden="true" />
-      <span>{t("settings.transfer.notMoved")}</span>
+      <span>{t(props.text ?? "settings.transfer.notMovedSecrets")}</span>
     </p>
   );
 }
@@ -612,7 +650,7 @@ function BackButton(props: { onBack: () => void; disabled: boolean }) {
   );
 }
 
-function Alert(props: { title: string; description: string }) {
+export function TransferAlert(props: { title: string; description: string }) {
   return (
     <div class="storage-message" role="alert">
       <TriangleAlert class="storage-message-icon" aria-hidden="true" />
@@ -624,7 +662,7 @@ function Alert(props: { title: string; description: string }) {
   );
 }
 
-function Notes(props: { title: string; notes: readonly string[] }) {
+export function TransferNotes(props: { title: string; notes: readonly string[] }) {
   const { sourceText } = useText();
   return (
     <div class="storage-message">

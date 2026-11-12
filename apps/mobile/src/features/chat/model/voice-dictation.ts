@@ -23,8 +23,27 @@ export function applyDictationResult(
   return { committed: text ? [...transcript.committed, text] : transcript.committed, interim: "" };
 }
 
+/** The scripts that write no space between words, and their full-width punctuation, such as "。". */
+const NO_SPACE_SCRIPT =
+  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\u3000-\u303f\uff01-\uff60]/u;
+
+/**
+ * Joins segments with a space, except between two characters of a script that writes none. The
+ * phone's recognizer, Qwen3-ASR and ElevenLabs can each end a Chinese segment at a pause.
+ */
+export function joinSegments(segments: readonly string[]): string {
+  let text = "";
+  for (const segment of segments) {
+    const next = segment.trim();
+    if (!next) continue;
+    const joint = text && !(NO_SPACE_SCRIPT.test(text.at(-1) ?? "") && NO_SPACE_SCRIPT.test(next[0] ?? ""));
+    text = joint ? `${text} ${next}` : `${text}${next}`;
+  }
+  return text;
+}
+
 export function spokenText(transcript: DictationTranscript): string {
-  return [...transcript.committed, transcript.interim].filter(Boolean).join(" ");
+  return joinSegments([...transcript.committed, transcript.interim]);
 }
 
 /** The draft the user sees: what was there before the mic, then the speech. */

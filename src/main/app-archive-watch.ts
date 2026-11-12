@@ -13,9 +13,9 @@ import type { AppTranslate } from "@openbot/i18n";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Option, Schema } from "effect";
 import { dialog, shell } from "electron";
+import { DOWNLOAD_URL } from "./download-url";
 
 const logger = createOpenBotLogger("app-archive");
-const DOWNLOAD_URL = "https://openbot.run/download";
 // A copy of the archive writes for some seconds. Check once the writes stop.
 const SETTLE_MS = 2_000;
 

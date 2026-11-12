@@ -8,6 +8,7 @@ import {
   type ListEventRoutineRunsInput,
   type ListEventRoutinesInput,
   type SaveEventRoutineInput,
+  type SetWebhookSecretInput,
 } from "@openbot/contracts/ipc-events";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
@@ -40,6 +41,12 @@ export function parseEventRoutineRef(value: unknown): EventRoutineRef {
   return { id: requiredString(input.id, 128), owner: owner(input.owner) };
 }
 
+/** The host checks the secret itself; this parser only bounds its size. */
+export function parseSetWebhookSecret(value: unknown): SetWebhookSecretInput {
+  const input = record(value);
+  return { id: requiredString(input.id, 128), owner: owner(input.owner), secret: requiredString(input.secret, 1024) };
+}
+
 export function parseSaveEventRoutine(value: unknown): SaveEventRoutineInput {
   const input = record(value);
   const { trigger } = input;
@@ -51,6 +58,7 @@ export function parseSaveEventRoutine(value: unknown): SaveEventRoutineInput {
   if (input.missedPolicy !== undefined && input.missedPolicy !== "skip" && input.missedPolicy !== "run-once") {
     throw invalidEventInput();
   }
+  if (input.runIn !== undefined && input.runIn !== "chat" && input.runIn !== "thread") throw invalidEventInput();
   return {
     ...(input.id === undefined ? {} : { id: requiredString(input.id, 128) }),
     owner: owner(input.owner),
@@ -69,6 +77,7 @@ export function parseSaveEventRoutine(value: unknown): SaveEventRoutineInput {
           },
     ...(input.limitPolicy === undefined ? {} : { limitPolicy: input.limitPolicy }),
     ...(input.missedPolicy === undefined ? {} : { missedPolicy: input.missedPolicy }),
+    ...(input.runIn === undefined ? {} : { runIn: input.runIn }),
   };
 }
 

@@ -34,4 +34,21 @@ export const messages = {
   "error.connector.bitwardenCliInstallFailed":
     "このサーバーに Bitwarden CLI をインストールできませんでした。ネットワーク接続を確認してから、もう一度接続してください。",
   "error.connector.bitwardenFileUnreadable": "Bitwarden の接続ファイルを読み取れません。",
+  "error.connector.passwordManagerUnknown": "OpenBot はこのパスワードマネージャーに対応していません。",
+  "error.connector.passwordManagerMethod": "このパスワードマネージャーはこの方法では接続できません。",
+  "error.connector.passwordManagerNoSignIn": "サインインページが開いていません。もう一度接続してください。",
+  "error.connector.protonPassFailed": "Proton Pass に接続できませんでした。もう一度接続してください。",
+  "error.connector.protonPassCliInstallFailed":
+    "Proton Pass CLI をインストールできませんでした。ネットワーク接続を確認してから、もう一度接続してください。",
+  "error.connector.protonPassPlan":
+    "ご利用の Proton プランでは Proton Pass CLI を使用できません。プランを変更してから、もう一度接続してください。",
+  "error.connector.protonPassExpired": "Proton Pass へのアクセスが終了しました。もう一度接続してください。",
+  "error.connector.protonPassKeyInvalid": "pst_ で始まる Proton Pass のアクセスキーを入力してください。",
+  "error.connector.protonPassExtraPassword": "追加パスワードが正しくありません。もう一度入力してください。",
+  "error.connector.protonPassExtraPasswordNotAsked": "Proton Pass は追加パスワードを求めていません。",
+  "error.connector.protonPassFileUnreadable": "Proton Pass の接続ファイルを読み取れません。",
+  "error.connector.protonPassSignInTimeout":
+    "Proton へのサインインに時間がかかりすぎました。もう一度接続してください。",
+  "error.connector.protonPassSetupFailed":
+    "Proton Pass で保管庫 Shared with OpenBot またはそのアクセスキーを作成できませんでした。もう一度接続してください。",
 } as const satisfies PartialTranslation<typeof source>;

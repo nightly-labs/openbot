@@ -189,7 +189,9 @@ before remote changes. Test deployments do not send account analytics.
 `GITHUB_APP_PRIVATE_KEY` is the OpenBot GitHub App's private key as a PKCS #8 PEM. GitHub gives a
 PKCS #1 key; convert it with `openssl pkcs8 -topk8 -nocrypt -in <key>.pem`. With the key, the
 Worker gives the desktop installation tokens, so GitHub shows `openbotgit[bot]` as the author of an
-agent's work. With no key, the desktop acts as the signed-in user. In GitHub Actions the secret is
+agent's work. The key also lets `POST /v1/feedback` open an approved bug report or feature idea from the app as
+an issue in `nightly-labs/openbot`, for any signed-in account, three times a minute (`FEEDBACK_RATE_LIMITER`) and 10 times a UTC day (`feedback_daily_counts` in D1). The Worker does not store or log the text. With `sameAs`, the report is a comment on that open app issue. Before the card, `POST /v1/feedback/similar` finds open app issues with a similar title, three times a minute for each account (the same limiter, with its own key); the title is in the body, so Workers Logs do not keep it. With no key, the route answers 503, the app
+gives the GitHub form link instead, and the desktop acts as the signed-in user. In GitHub Actions the secret is
 `OPENBOT_GITHUB_APP_PRIVATE_KEY`, because GitHub refuses secret names that start with `GITHUB_`.
 Secrets are never passed as process arguments. The other values are Worker
 variables. The SMTP connection uses TLS from the start and accepts only port 465.
@@ -197,6 +199,12 @@ variables. The SMTP connection uses TLS from the start and accepts only port 465
 GitHub Actions reads the remote-control secrets, `SKILLS_ADMIN_TOKEN`, `SITE_REPORT_HASH_SECRET`, and the optional
 `SITE_OPERATIONS_ADMIN_TOKEN` and `SERVER_CLAIMS_ADMIN_TOKEN` from the `cloudflare-production` Environment. It includes
 them in Wrangler's temporary runtime secrets file.
+
+`COMPANY_SIGN_IN_SECRET` (at least 32 random bytes) turns on company sign-in (OpenID Connect and
+SCIM). It encrypts each company's client secret in D1, so never change or lose it: with another
+value, each company must enter its client secret again. Without it, company sign-in answers 503 and
+everyone signs in with an email code. GitHub Actions reads it from the `cloudflare-production`
+Environment; a local deployment reads it from the encrypted `.env.production`.
 
 `SERVER_CLAIMS_ADMIN_TOKEN` lets an operator sign a new server in for a user without an email code: see
 [server claims](../../docs/self-hosted-server.md#sign-in-with-a-server-claim). Without it, the endpoint answers 401.
@@ -223,6 +231,18 @@ answers 429 `email_delivery_rate_limited` instead of 502, for a sign-in code and
 for a team invitation. The message is never sent in that case, so the app can
 ask again later. Namecheap Private Email allows 500 messages an hour for each
 mailbox, and every sign-in code and invitation spends that same quota.
+
+Production has a fallback: the `EMAIL_FALLBACK` `send_email` binding of Cloudflare Email Service.
+When SMTP surely did not send a message (a sender limit, a refusal of the sender or the message, or
+a connection that stopped before `DATA`), the Worker sends the same message through Cloudflare. It
+does not fall back after `smtp_delivery_unknown`, an invalid input or configuration, or a refused
+recipient. The fallback uses only the time left in the 25-second delivery budget of a sign-in code,
+and it does not start with less than 2 seconds left, as after three SMTP timeouts. When
+Cloudflare also fails, the answer stays the SMTP failure, so a sender limit keeps its 429. Each
+fallback sends an `email_fallback_sent` analytics event. Before the first deploy with the binding,
+onboard `openbot.run` in the Cloudflare dashboard under Email Sending, and keep
+`allowed_sender_addresses` equal to `EMAIL_FROM` and `EMAIL_LICENSE_FROM`. The preview and test
+Workers have no fallback.
 
 The contact form on `/contact` posts to `/v1/contact`. The Worker sends each message to
 `EMAIL_FROM` through SMTP, with the visitor's address in `Reply-To`, and stores nothing.
@@ -255,9 +275,11 @@ code.
 
 `/v1/sites` takes two optional headers: `OpenBot-Host-Id` and `OpenBot-Host-Token`, the machine token
 of a registered server. With them, a request sees only that server's sites, and a new site counts
-against the server plan's limit. A wrong token gets 401 `host_unauthorized`. Without them, a new site
-goes into the account's unlinked bucket of one site; `GET /v1/sites?scope=unlinked` lists only that
-bucket. `GET /v1/sites` returns `{ sites, limit, used }`.
+against the server's limit: a `server_site_limits` row, else its plan's limit, else the account's shared
+pool (3 sites for each license user, else 1), within an account cap of 300. A wrong token gets 401
+`host_unauthorized`. Without them, a new site goes into the account's unlinked bucket of one site;
+`GET /v1/sites?scope=unlinked` lists only that bucket. `GET /v1/sites` returns `{ sites, limit, used }`, plus an optional `limitReason`: `shared` for a
+server in the shared pool, `account` when the account cap is full.
 
 ## Authentication data retention
 
@@ -301,6 +323,12 @@ ticket names `REMOTE_SIGNAL_URL`, as before.
   until it sends that home's URL as `failedSignalUrl`. Session tickets of the host name the same
   home. Other host tickets (ingress, the webhook relay, released hosts) and hosts with no home use
   `REMOTE_SIGNAL_URL`, which stays the entry Signal.
+- `REMOTE_SIGNAL_HOME_LOCATIONS`: the place of each home, as `id=latitude:longitude,...`, for example
+  `a=60.17:24.94,us=37.34:-121.89`. Empty means no places. Otherwise it must name each home of
+  `REMOTE_SIGNAL_HOMES` one time, or each ticket request fails with `503 remote_not_configured`. With
+  places, a host gets one of the homes at most 1000 km farther from it than the nearest home, from the
+  Cloudflare request location. A host keeps its home while that home is near; otherwise it moves at its
+  next ticket. The variable has no effect when `REMOTE_SIGNAL_HOMES` is empty.
 - `REMOTE_AUTH_WEBHOOK_URLS`: each Signal that gets the auth events, as `url,url`. Empty means
   `REMOTE_AUTH_WEBHOOK_URL` only. The outbox deletes an event when each URL accepted it, and sends it
   again only to the URLs that failed.

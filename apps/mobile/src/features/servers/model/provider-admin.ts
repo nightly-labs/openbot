@@ -3,29 +3,37 @@ import {
   type AcpRegistryInstallInput,
   type AcpRegistryOperation,
   AGENT_PROVIDERS,
+  type AgentModelId,
   type AgentProviderId,
   type AgentProviderStatus,
   type AgentStatus,
   agentProviderDescriptor,
   agentProviderName,
+  type ClaudeCompactWindowSetting,
   type CustomAgentResult,
   type CustomAgentSummary,
   type CustomProviderResult,
   type CustomProviderSummary,
+  type DownloadableProviderId,
   decodeRegistryEntries,
   decodeRegistryInstallResult,
   decodeRegistryOperations,
   type HostProviderAccounts,
+  INSTALLER_PROVIDERS,
   isAgentStatus,
   isKeyOnlyProvider,
   isLocalOnlyProvider,
   loopbackCallback,
   MANAGED_RUNTIME_PROVIDERS,
-  type ManagedProviderId,
+  type PromptCacheTtl,
+  type PromptCacheTtlSetting,
   type ProviderApiKeyStatus,
   type ProviderCodeLoginStart,
+  type ProviderModelVisibility,
   type ProviderRuntimeSnapshot,
   type ProviderRuntimeStatus,
+  type ProviderUsageResetOutcome,
+  type ProviderUsageResets,
   type SaveCustomAgentInput,
   type SaveCustomProviderInput,
   type SignInRelayStatus,
@@ -33,14 +41,22 @@ import {
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { ACP_REGISTRY_CAPABILITY, ACP_REGISTRY_ROUTES } from "@openbot/contracts/team-protocol/acp-registry-v1";
+import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/claude-api-key-v1";
+import { CLAUDE_COMPACT_WINDOW_CAPABILITY } from "@openbot/contracts/team-protocol/claude-compact-window-v1";
+import { CODEX_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/codex-api-key-v1";
 import { CUSTOM_AGENTS_CAPABILITY } from "@openbot/contracts/team-protocol/custom-agents-v1";
 import {
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
+import { MODEL_VISIBILITY_CAPABILITY } from "@openbot/contracts/team-protocol/model-visibility-v1";
+import { PROMPT_CACHE_TTL_CAPABILITY } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
+import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import { providerAccountRelay } from "@openbot/contracts/team-protocol/provider-account-relays";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDER_DEFAULT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-default-v1";
+import { PROVIDER_SIGN_OUT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-sign-out-v1";
+import { PROVIDER_USAGE_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
 import {
   PROVIDERS_ADMIN_CODE_SIGN_IN_PROVIDERS,
   PROVIDERS_ADMIN_ROUTES,
@@ -78,20 +94,30 @@ import {
   deleteCustomAgent,
   deleteCustomProvider,
   downloadProviderRuntime,
+  getHostClaudeCompactWindow,
+  getHostModelVisibility,
+  getHostPromptCacheTtl,
   getHostProviderDefault,
   getProviderApiKeyState,
   getProviderRuntimes,
   type HostProviderDefault,
   listCustomAgents,
   listCustomProviders,
-  listProviderAccounts,
+  listProviderAccountsWithModels,
+  providerUsageResets,
   removeProviderAccount,
   renameProviderAccount,
+  resetProviderUsage,
   saveCustomAgent,
   saveCustomProvider,
+  setHostClaudeCompactWindow,
+  setHostModelVisibility,
+  setHostPromptCacheTtl,
   setHostProviderDefault,
+  setProviderAccountPool,
   setProviderApiKey,
   signInRelayStatus,
+  signOutProvider,
   startProviderAccountSignInRelay,
   startProviderCodeLogin,
   startProviderSignInRelay,
@@ -145,10 +171,12 @@ function providerSignInMethod(provider: AgentProviderId, capabilities: readonly 
   return capabilities.includes(SIGN_IN_RELAY_CAPABILITY) && isOneOf(SIGN_IN_RELAY_PROVIDERS, provider) ? "relay" : null;
 }
 
-function runtimeProviders(capabilities: readonly string[]): readonly ManagedProviderId[] {
+function runtimeProviders(capabilities: readonly string[]): readonly DownloadableProviderId[] {
   // `providers-v8` lists every runtime of the host as a row; a row that a host before Kimi does not
   // send reads as not downloaded, and the page lists that provider only when the host status names it.
-  if (capabilities.includes(PROVIDERS_V8_CAPABILITY)) return MANAGED_RUNTIME_PROVIDERS;
+  // An installer provider has a row only while the host can install it, so the row shows Download
+  // only then.
+  if (capabilities.includes(PROVIDERS_V8_CAPABILITY)) return [...MANAGED_RUNTIME_PROVIDERS, ...INSTALLER_PROVIDERS];
   if (capabilities.includes(PROVIDERS_V5_CAPABILITY)) return PROVIDERS_V5_RUNTIME_PROVIDERS;
   if (capabilities.includes(PROVIDERS_V4_CAPABILITY)) return PROVIDERS_V4_RUNTIME_PROVIDERS;
   if (capabilities.includes(PROVIDERS_RUNTIMES_V2_CAPABILITY)) return V2_RUNTIME_PROVIDERS;
@@ -156,13 +184,55 @@ function runtimeProviders(capabilities: readonly string[]): readonly ManagedProv
 }
 
 /**
- * The providers whose API key the host saves: OpenCode Go, Muse and Gemini from `providers-v5`, and
- * Inception, DeepSeek and OpenRouter from `providers-v8`.
+ * The other way in that the provider page offers, as the desktop ⋯ menu of a joined server does: the
+ * relayed page, when Connect is the host's code route.
+ */
+function providerSignInAlternative(provider: AgentProviderId, capabilities: readonly string[]): "relay" | null {
+  return providerSignInMethod(provider, capabilities) === "code" &&
+    capabilities.includes(SIGN_IN_RELAY_CAPABILITY) &&
+    isOneOf(SIGN_IN_RELAY_PROVIDERS, provider)
+    ? "relay"
+    : null;
+}
+
+/**
+ * The providers whose API key the host saves: OpenCode Go, Muse and Gemini from `providers-v5`,
+ * Inception, DeepSeek and OpenRouter from `providers-v8`, and Claude and ChatGPT when the host reads
+ * their key (`claude-api-key-v1`, `codex-api-key-v1`). An older host stores such a key and never
+ * reads it.
  */
 function providerHasApiKey(provider: AgentProviderId, capabilities: readonly string[]): boolean {
   if (provider === "opencode") return true;
+  if (provider === "claude") return capabilities.includes(CLAUDE_API_KEY_CAPABILITY);
+  if (provider === "codex") return capabilities.includes(CODEX_API_KEY_CAPABILITY);
   if (isKeyOnlyProvider(provider)) return capabilities.includes(PROVIDERS_V8_CAPABILITY);
   return capabilities.includes(PROVIDERS_V5_CAPABILITY) && (provider === "muse" || provider === "antigravity");
+}
+
+/**
+ * The providers whose CLI signs its own sign-in out (`signOut` in `src/backend/provider-drivers.ts`),
+ * as the desktop page offers Disconnect. Muse is left out: its key state decides, and a joined
+ * server's desktop page does not offer it either.
+ */
+const SIGN_OUT_PROVIDERS: readonly AgentProviderId[] = [
+  "claude",
+  "codex",
+  "grok",
+  "cursor",
+  "devin",
+  "copilot",
+  "mistral",
+  "antigravity",
+];
+
+/** Whether the phone can sign the host's own sign-in of the provider out. A saved key keeps it connected. */
+export function providerSignOutOffered(row: ProviderRow): boolean {
+  return (
+    isOneOf(SIGN_OUT_PROVIDERS, row.id) &&
+    row.status?.state === "available" &&
+    row.status.connectionState !== "connecting" &&
+    !row.status.apiKeyInUse
+  );
 }
 
 export interface ProviderRow {
@@ -170,10 +240,12 @@ export interface ProviderRow {
   name: string;
   status: AgentProviderStatus | undefined;
   /** Absent when the host's route set does not download this provider. */
-  runtime: (ProviderRuntimeStatus & { provider: ManagedProviderId }) | undefined;
+  runtime: (ProviderRuntimeStatus & { provider: DownloadableProviderId }) | undefined;
   /** Installed, idle, and the host has a different version. */
   updatable: boolean;
   signIn: ProviderSignInMethod | null;
+  /** A second sign-in that differs from `signIn`, or null. */
+  alternativeSignIn: "relay" | null;
   apiKey: boolean;
 }
 
@@ -219,6 +291,7 @@ export function providerRows(
             availableVersion !== runtime.version,
         ),
         signIn: providerSignInMethod(provider, capabilities),
+        alternativeSignIn: providerSignInAlternative(provider, capabilities),
         apiKey: providerHasApiKey(provider, capabilities),
       };
     });
@@ -294,7 +367,10 @@ export function relayPage(
 /**
  * The Providers admin of one host (`providers-v1` to `providers-v5` and `providers-v8`,
  * `sign-in-relay-v1`, `provider-default-v1`, `custom-provider-harness-v1`, `provider-accounts-v1`,
- * the account relays, `acp-registry-v1` and `custom-agents-v1`), with the newest route set that the host serves. The
+ * the account relays, `acp-registry-v1`, `custom-agents-v1`, `model-visibility-v1`,
+ * `prompt-cache-ttl-v1`, `claude-compact-window-v1`, `provider-sign-out-v1`, `provider-usage-reset-v1` and
+ * `provider-account-pool-v1`), with the newest
+ * route set that the host serves. The
  * host checks the role on every route.
  */
 export function createProviderAdmin(request: TeamApiRequest, capabilities: readonly string[]) {
@@ -332,11 +408,11 @@ export function createProviderAdmin(request: TeamApiRequest, capabilities: reado
     capabilities,
     readStatus: (): Promise<AgentStatus> => request("GET", TEAM_API_ROUTES.agents.status, decodeAgentStatus),
     readRuntimes: (): Promise<ProviderRuntimeSnapshot> => runTeamRequest(getProviderRuntimes(request, runtimeRoutes)),
-    download: (provider: ManagedProviderId) =>
+    download: (provider: DownloadableProviderId) =>
       runTeamRequest(downloadProviderRuntime(request, provider, runtimeRoutes)),
     /** The host asks for the newest version of each runtime that it manages. */
     checkUpdates: () => runTeamRequest(checkProviderRuntimeUpdates(request, runtimeRoutes)),
-    cancelDownload: (provider: ManagedProviderId) =>
+    cancelDownload: (provider: DownloadableProviderId) =>
       runTeamRequest(cancelProviderRuntime(request, provider, runtimeRoutes)),
     startCodeSignIn: (provider: AgentProviderId): Promise<ProviderCodeLoginStart> =>
       runTeamRequest(startProviderCodeLogin(request, provider, signInRoutes)),
@@ -383,11 +459,21 @@ export function createProviderAdmin(request: TeamApiRequest, capabilities: reado
     /**
      * The accounts of the host's providers (`provider-accounts-v1`), or null when the host has none. A
      * new account signs in on the page that the host relays (`provider-account-relay-v1` or `-v2`); the
-     * released `sign-in-relay-v1` routes then run the flow, as Connect does.
+     * released `sign-in-relay-v1` routes then run the flow, as Connect does. With
+     * `provider-account-pool-v1`, the list also has the pools that are on.
      */
     accounts: has(PROVIDER_ACCOUNTS_CAPABILITY)
       ? {
-          list: (): Promise<HostProviderAccounts> => runTeamRequest(listProviderAccounts(request)),
+          list: (): Promise<HostProviderAccounts> =>
+            runTeamRequest(listProviderAccountsWithModels(request, false, has(PROVIDER_ACCOUNT_POOL_CAPABILITY))),
+          /**
+           * Turns the pool of the provider's accounts on or off (`provider-account-pool-v1`), or null on
+           * an older host. `leftOut` is the full list of the accounts that the pool does not use.
+           */
+          setPool: has(PROVIDER_ACCOUNT_POOL_CAPABILITY)
+            ? (provider: AgentProviderId, enabled: boolean, leftOut: readonly string[]): Promise<void> =>
+                runTeamRequest(setProviderAccountPool(request, { provider, enabled, leftOut: [...leftOut] }))
+            : null,
           rename: (provider: AgentProviderId, accountId: string, label: string | null): Promise<void> =>
             runTeamRequest(renameProviderAccount(request, { provider, accountId, label })),
           remove: (provider: AgentProviderId, accountId: string): Promise<void> =>
@@ -430,6 +516,50 @@ export function createProviderAdmin(request: TeamApiRequest, capabilities: reado
             request("POST", ACP_REGISTRY_ROUTES.cancel, ignore, { registryId }),
           remove: (registryId: string): Promise<void> =>
             request("POST", ACP_REGISTRY_ROUTES.remove, ignore, { registryId }),
+        }
+      : null,
+    /**
+     * Every model of a provider and the ones the model picker of the server shows
+     * (`model-visibility-v1`), or null. `shown: null` gives each model back the host's default.
+     */
+    models: has(MODEL_VISIBILITY_CAPABILITY)
+      ? {
+          read: (provider: AgentProviderId): Promise<ProviderModelVisibility> =>
+            runTeamRequest(getHostModelVisibility(request, provider)),
+          set: (provider: AgentProviderId, shown: AgentModelId[] | null): Promise<ProviderModelVisibility> =>
+            runTeamRequest(setHostModelVisibility(request, { provider, shown })),
+        }
+      : null,
+    /** How long Claude keeps the prompt cache of the host's agents (`prompt-cache-ttl-v1`), or null. */
+    promptCache: has(PROMPT_CACHE_TTL_CAPABILITY)
+      ? {
+          read: (): Promise<PromptCacheTtlSetting> => runTeamRequest(getHostPromptCacheTtl(request)),
+          set: (ttl: PromptCacheTtl): Promise<PromptCacheTtlSetting> =>
+            runTeamRequest(setHostPromptCacheTtl(request, ttl)),
+        }
+      : null,
+    /**
+     * The size at which Claude Code compacts the chats of the host's agents (`claude-compact-window-v1`),
+     * or null. `tokens: null` is Claude Code's own size for each model.
+     */
+    compactWindow: has(CLAUDE_COMPACT_WINDOW_CAPABILITY)
+      ? {
+          read: (): Promise<ClaudeCompactWindowSetting> => runTeamRequest(getHostClaudeCompactWindow(request)),
+          set: (tokens: number | null): Promise<ClaudeCompactWindowSetting> =>
+            runTeamRequest(setHostClaudeCompactWindow(request, tokens)),
+        }
+      : null,
+    /** Signs the host's own sign-in of a provider out (`provider-sign-out-v1`), or null. Its agents wait. */
+    signOut: has(PROVIDER_SIGN_OUT_CAPABILITY)
+      ? (provider: AgentProviderId): Promise<void> => runTeamRequest(signOutProvider(request, provider))
+      : null,
+    /** The usage reset credits of the host's accounts, and the spend of one (`provider-usage-reset-v1`), or null. */
+    usageResets: has(PROVIDER_USAGE_RESET_CAPABILITY)
+      ? {
+          list: (provider: AgentProviderId): Promise<ProviderUsageResets[]> =>
+            runTeamRequest(providerUsageResets(request, provider)),
+          reset: (provider: AgentProviderId, accountId: string): Promise<ProviderUsageResetOutcome> =>
+            runTeamRequest(resetProviderUsage(request, { provider, accountId })),
         }
       : null,
     /** Null when the host does not serve `provider-default-v1`. */

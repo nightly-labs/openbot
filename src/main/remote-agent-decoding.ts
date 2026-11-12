@@ -6,13 +6,16 @@ import {
   decodeInstalledSkills,
   decodeProviderUsageResetOutcome,
   decodeProviderUsageResets,
+  type HostDefaultProvider,
   type HostProviderAccounts,
   isAgentHostSettings,
   isAgentNotificationLevelsSnapshot,
   isAgentSessionSettings,
   isAgentTask,
+  isAgentTaskPage,
   isAgentTaskReadState,
   isAgentTasksSnapshot,
+  isAgentTaskWindow,
   isConversationSnapshot,
   isHiddenAgentsSnapshot,
   isSidebarPinsSnapshot,
@@ -27,8 +30,10 @@ import type {
   AgentFolderChange,
   AgentMemory,
   AgentNewChatSettings,
+  AgentProviderId,
   AgentStatus,
   AgentSummary,
+  AgentTaskReadState,
   ClientAgentModelOption,
   ClientAgentSummary,
   DraftAttachment,
@@ -42,14 +47,18 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   isAccountUsage,
+  isAgentColors,
   isAgentExclusionChange,
   isAgentFolderBrowse,
   isAgentFolderChange,
   isAgentFolderList,
   isAgentInstructionsFile,
   isAgentMemory,
+  isAgentModel,
+  isAgentProvider,
   isAgentStatus,
   isAttachmentSummary,
+  isChatColors,
   isClientAgentModelOption,
   isClientAgentSummary,
   isQueuedMessageReceipt,
@@ -63,8 +72,13 @@ import {
 import { decodeRecord, guardedDecoder, guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { isAgentThreadBranchLinks } from "@openbot/contracts/team-protocol/agent-thread-branches-v1";
+import { isAgentThreadQueues } from "@openbot/contracts/team-protocol/agent-thread-queue-v1";
+import { isAgentUsageLimits } from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
+import { decodeProviderUseResponse } from "@openbot/contracts/team-protocol/provider-use-v1";
 
 export const decodeAgentHostSettingsFromHost = guardedDecoder(isAgentHostSettings, "agent host settings response");
+export const decodeRemoteAgentColors = guardedDecoder(isAgentColors, "agent colors response");
+export const decodeRemoteChatColors = guardedDecoder(isChatColors, "chat colors response");
 export const decodeHiddenAgentsFromHost = guardedDecoder(isHiddenAgentsSnapshot, "hidden agents response");
 export const decodeSidebarPinsFromHost = guardedDecoder(isSidebarPinsSnapshot, "pinned chats response");
 export const decodeAgentNotificationLevelsFromHost = guardedDecoder(
@@ -74,8 +88,16 @@ export const decodeAgentNotificationLevelsFromHost = guardedDecoder(
 export const decodeRemoteAgentTasks = guardedDecoder(isAgentTasksSnapshot, "remote agent tasks");
 export const decodeRemoteAgentTask = guardedDecoder(isAgentTask, "remote agent task");
 export const decodeRemoteAgentThreadBranches = guardedDecoder(isAgentThreadBranchLinks, "remote thread branches");
+export const decodeRemoteAgentThreadQueues = guardedDecoder(isAgentThreadQueues, "remote thread queues");
+export const decodeRemoteAgentUsageLimits = guardedDecoder(isAgentUsageLimits, "remote usage limits");
 export const decodeRemoteTaskConversation = guardedDecoder(isConversationSnapshot, "remote task conversation");
+export const decodeRemoteTaskPage = guardedDecoder(isAgentTaskPage, "remote thread page");
+export const decodeRemoteTaskWindow = guardedDecoder(isAgentTaskWindow, "remote thread part");
 export const decodeRemoteTaskReadState = guardedDecoder(isAgentTaskReadState, "remote thread read state");
+const decodeTaskReadStates = guardedListDecoder(isAgentTaskReadState, "remote thread read states");
+export function decodeRemoteTaskReadStates(value: unknown): AgentTaskReadState[] {
+  return decodeTaskReadStates(decodeRecord(value, "remote thread reads").reads);
+}
 
 export function decodeDraftAttachment(value: unknown): DraftAttachment {
   if (!isAttachmentSummary(value)) throw new Error("Invalid attachment.");
@@ -192,6 +214,23 @@ export function decodeHostProviderAccountsFromHost(value: unknown): HostProvider
   return decodeHostProviderAccounts(value);
 }
 
+/** The `provider-use-v1` off list, as the web client also reads it: an unknown provider is left out. */
+export function decodeProviderUseFromHost(value: unknown): AgentProviderId[] {
+  return decodeProviderUseResponse(value);
+}
+
+/**
+ * The `provider-default-v1` snapshot. A newer host can name a provider that this build does not know,
+ * which reads as none, and its model with it.
+ */
+export function decodeHostDefaultProviderFromHost(value: unknown): HostDefaultProvider {
+  const { provider, model } = decodeRecord(value, "default provider");
+  if (provider !== null && !isString(provider)) throw new Error("Invalid default provider.");
+  if (!isAgentProvider(provider)) return { preferredProvider: null, preferredModel: null };
+  if (model !== null && !isAgentModel(model)) throw new Error("Invalid default model.");
+  return { preferredProvider: provider, preferredModel: model };
+}
+
 /** The `provider-usage-reset-v1` list: an unknown provider is left out. */
 export function decodeProviderUsageResetsFromHost(value: unknown): ProviderUsageResets[] {
   if (!isDynamicRecord(value)) throw new Error("Invalid provider usage resets.");
@@ -278,8 +317,9 @@ export function decodeAgentAnalyticsFromHost(value: unknown) {
   return decodeAgentAnalytics(value);
 }
 
+/** A remote report has no skills: the frozen wire has no such field, so one that a host sends is not read. */
 export function decodeHostAnalyticsFromHost(value: unknown) {
-  return decodeHostAnalytics(value);
+  return decodeHostAnalytics(isDynamicRecord(value) ? { ...value, skills: undefined } : value);
 }
 
 export function decodeAgentSessionSettingsFromHost(value: unknown): AgentSessionSettings {

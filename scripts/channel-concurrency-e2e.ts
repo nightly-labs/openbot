@@ -5,9 +5,9 @@
 //
 // It checks that the host advertises the channel capabilities, that a channel that was archived
 // stays archived and that restore opens it, that two agents work in two channels at the same time,
-// and that channel work holds only the agent that does it: the agent's own chat waits and names the
-// channel, another agent's chat runs, and the agent's task runs beside its channel turn. It makes
-// its own two channels and deletes them at the end.
+// and that channel work runs in its own lane: the agent's own chat starts beside its channel turn
+// with no hold, another agent's chat runs, and the agent's task runs beside its channel turn. It
+// makes its own two channels and deletes them at the end.
 // Writes .openbot-build/channel-concurrency-e2e/report.json.
 import assert from "node:assert/strict";
 import { agentProviderDescriptor } from "@openbot/contracts/agent-providers";
@@ -28,7 +28,7 @@ interface Report {
   archivedAtStart?: string[];
   restore?: { archived: boolean; restored: boolean };
   parallel?: { first: { owner: string | null; state: string }; second: { owner: string | null; state: string } };
-  ownChatHold?: { status: string | null; hold: unknown };
+  ownChatBesideChannelTurn?: { busy: boolean; hold: unknown; channelTaskState: string };
   otherAgentRan?: { agentId: string; busy: boolean };
   taskBesideChannelTurn?: { state: string; channelTaskState: string };
   passed: boolean;
@@ -84,16 +84,24 @@ try {
     second: { owner: secondTask.ownerAgentId, state: secondTask.state },
   };
 
-  // 4. The agent's own chat waits for its channel work, and says which channel holds it.
+  // 4. The agent's own chat starts beside its channel turn, and names no hold (#4761).
   await client.sendToAgent(a.id, SHORT_PROMPT);
-  const held = await waitFor(
+  const [ownChat, duringOwnChat] = await waitFor(
     page,
-    "the agent's own chat names the channel",
-    () => client.queue(a.id),
-    (snapshot) => snapshot.hold?.channelId === first.id,
+    "the agent's own chat starts during its channel turn",
+    () => Promise.all([client.queue(a.id), client.read(first.id)]),
+    ([snapshot]) => queueBusy(snapshot) || snapshot.deliveries.every((item) => item.status === "completed"),
   );
-  report.ownChatHold = { status: held.deliveries.at(-1)?.status ?? null, hold: held.hold };
-  assert.ok(!queueBusy(held), "The agent's own chat started while its channel turn ran.");
+  report.ownChatBesideChannelTurn = {
+    busy: queueBusy(ownChat),
+    hold: ownChat.hold ?? null,
+    channelTaskState: duringOwnChat.tasks.find((item) => item.id === firstTask.id)?.state ?? "missing",
+  };
+  assert.equal(ownChat.hold ?? null, null, "The agent's own chat names a hold during its channel turn.");
+  assert.ok(
+    runningTask(duringOwnChat, a.id),
+    "The channel turn ended before the own chat started; use a longer prompt.",
+  );
 
   // 5. Another agent's chat is not held by that channel work.
   const idle = agents.find((agent) => agent.id === b.id);

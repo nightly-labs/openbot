@@ -9,8 +9,15 @@ const LOCAL_IDENTITY_KEYS = [
   "REMOTE_TICKET_PUBLIC_JWKS",
   "REMOTE_AUTH_WEBHOOK_SECRET",
   "SITE_REPORT_HASH_SECRET",
+  "COMPANY_SIGN_IN_SECRET",
   "SKILLS_ADMIN_TOKEN",
 ] as const;
+
+/**
+ * Manual harness tests read these with `dotenvx run`. Provider CLIs read them from the environment
+ * too, so the dev stack must not pass them on: a dev thread would spend the shared token budget.
+ */
+const MANUAL_TEST_KEYS = new Set(["INCEPTION_API_KEY"]);
 
 export function withoutDecryptionKeys(environment: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return Object.fromEntries(Object.entries(environment).filter(([key]) => !key.startsWith("DOTENV_")));
@@ -22,11 +29,12 @@ export async function loadSharedDevelopmentEnvironment(
 ): Promise<Record<string, string>> {
   const privateKey = environment.DOTENV_PRIVATE_KEY_DEV;
   if (!privateKey?.trim()) return {};
-  return decryptEnvironment(
+  const values = await decryptEnvironment(
     join(projectRoot, "apps/auth-api/.env.dev"),
     { DOTENV_PRIVATE_KEY_DEV: privateKey },
     "Cannot decrypt shared development settings. Check the development key.",
   );
+  return Object.fromEntries(Object.entries(values).filter(([key]) => !MANUAL_TEST_KEYS.has(key)));
 }
 
 async function decryptEnvironment(
@@ -140,7 +148,7 @@ export function requireDevelopmentValues(environment: NodeJS.ProcessEnv, names: 
 }
 
 const ACCOUNT_SETTINGS =
-  /^(?:STRIPE_|BOAT_|HOSTED_SERVERS_|HOSTED_SERVER_TEMPLATE$|EMAIL_|SITE_REPORT_HASH_SECRET$|SKILLS_ADMIN_TOKEN$|APNS_|FCM_|GITHUB_APP_|GITHUB_WEBHOOK_SECRET$|SLACK_|DISCORD_|TELEGRAM_|REMOTE_TICKET_|REMOTE_AUTH_WEBHOOK_SECRET$|OPENPANEL_)/u;
+  /^(?:STRIPE_|BOAT_|HOSTED_SERVERS_|HOSTED_SERVER_TEMPLATE$|EMAIL_|SITE_REPORT_HASH_SECRET$|COMPANY_SIGN_IN_SECRET$|SKILLS_ADMIN_TOKEN$|APNS_|FCM_|GITHUB_APP_|GITHUB_WEBHOOK_SECRET$|SLACK_|DISCORD_|TELEGRAM_|REMOTE_TICKET_|REMOTE_AUTH_WEBHOOK_SECRET$|OPENPANEL_)/u;
 const SIGNAL_SETTINGS = new Set([
   "REMOTE_TICKET_PUBLIC_JWKS",
   "REMOTE_TICKET_PUBLIC_KEYS",

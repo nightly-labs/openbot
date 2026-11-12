@@ -1,5 +1,11 @@
-import type { AppBehaviorPreference, AppBehaviorPreferenceChange } from "@openbot/contracts/ipc";
-import { isDynamicRecord } from "@openbot/contracts/runtime-values";
+import {
+  type AppBehaviorPreference,
+  type AppBehaviorPreferenceChange,
+  DEFAULT_QUIT_GUARD,
+  QUIT_GUARDS,
+  type QuitGuard,
+} from "@openbot/contracts/ipc";
+import { isDynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Effect, Result, Semaphore } from "effect";
 import { isMissingFileError } from "../backend/file-errors";
@@ -9,17 +15,18 @@ import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } f
 const logger = createOpenBotLogger("app-behavior");
 
 /**
- * How OpenBot starts and stops on this computer, and if it keeps the computer awake.
+ * How OpenBot starts and stops on this computer, if it keeps the computer awake, and when `Cmd + Q`
+ * on a Mac needs a hold or a second press.
  *
  * The keep-running choice is stored here, because main reads it each time the main window closes.
  * On macOS it is the menu bar choice, stored as `menuBar`, and it is on unless the user turned it
  * off. Older versions wrote `keepRunningInBackground: false` on macOS when they saved a keep-awake
  * choice, but they did not offer the switch there, so that value is not a choice of the user.
- * The keep-awake choices are stored in the same file, and each write keeps all of them. The launch-at-login
+ * The keep-awake choices and the quit guard are stored in the same file, and each write keeps all of them. The launch-at-login
  * choice is not stored: the operating system holds it, and the user can change it there.
  *
  * A file that is missing or unreadable as JSON reads as the defaults, and so does a switch that it
- * does not have: all off, except the menu bar on macOS. Writes of the file
+ * does not have: all off, except the menu bar on macOS, and the quit guard is "working". Writes of the file
  * and of the login item are chained for the reason `update-preference-store.ts` chains its own: on
  * Linux, a removal of the autostart entry must not finish before an earlier write of it.
  */
@@ -33,9 +40,12 @@ export class AppBehaviorService {
   readonly #menuBar: boolean;
   /** False on Linux, where Electron does not report a change of the power source, and on a server. */
   readonly #offersKeepAwake: boolean;
+  /** Only the Mac desktop app guards `Cmd + Q`. */
+  readonly #offersQuitGuard: boolean;
   #keepRunningInBackground = false;
   #keepAwake = false;
   #keepAwakeOnBattery = false;
+  #quitGuard: QuitGuard = DEFAULT_QUIT_GUARD;
   #writes = Semaphore.makeUnsafe(1);
   readonly #listeners = new Set<() => void>();
 
@@ -45,6 +55,7 @@ export class AppBehaviorService {
     offersBackground: boolean;
     menuBar: boolean;
     offersKeepAwake: boolean;
+    offersQuitGuard: boolean;
   }) {
     this.#path = input.path;
     this.#loginItem = input.loginItem;
@@ -52,6 +63,7 @@ export class AppBehaviorService {
     this.#menuBar = input.menuBar;
     this.#keepRunningInBackground = input.menuBar;
     this.#offersKeepAwake = input.offersKeepAwake;
+    this.#offersQuitGuard = input.offersQuitGuard;
   }
 
   load(): Effect.Effect<void, PreferenceFileFailure> {
@@ -65,6 +77,7 @@ export class AppBehaviorService {
                   : parsed.keepRunningInBackground === true,
                 keepAwake: parsed.keepAwake === true,
                 keepAwakeOnBattery: parsed.keepAwakeOnBattery === true,
+                quitGuard: isOneOf(QUIT_GUARDS, parsed.quitGuard) ? parsed.quitGuard : DEFAULT_QUIT_GUARD,
               }
             : null,
         ),
@@ -74,6 +87,7 @@ export class AppBehaviorService {
           this.#keepRunningInBackground = loaded.success.keepRunningInBackground;
           this.#keepAwake = loaded.success.keepAwake;
           this.#keepAwakeOnBattery = loaded.success.keepAwakeOnBattery;
+          this.#quitGuard = loaded.success.quitGuard;
         }
       } else if (!isMissingFileError(loaded.failure.cause) && !(loaded.failure.cause instanceof SyntaxError))
         return yield* loaded.failure;
@@ -95,12 +109,18 @@ export class AppBehaviorService {
     return this.#offersKeepAwake && this.#keepAwakeOnBattery;
   }
 
+  /** Read on each press of `Cmd + Q`. */
+  get quitGuard(): QuitGuard {
+    return this.#offersQuitGuard ? this.#quitGuard : DEFAULT_QUIT_GUARD;
+  }
+
   readonly get = Effect.fn("AppBehavior.get")(function* (this: AppBehaviorService) {
     const preference: AppBehaviorPreference = {
       launchAtLogin: yield* this.#readLoginItem(),
       keepRunningInBackground: this.#offersBackground ? this.#keepRunningInBackground : null,
       keepAwake: this.#offersKeepAwake ? this.#keepAwake : null,
       keepAwakeOnBattery: this.#offersKeepAwake ? this.#keepAwakeOnBattery : null,
+      quitGuard: this.#offersQuitGuard ? this.#quitGuard : null,
     };
     return preference;
   });
@@ -132,7 +152,13 @@ export class AppBehaviorService {
     const keepRunningInBackground = this.#offersBackground ? change.keepRunningInBackground : undefined;
     const keepAwake = this.#offersKeepAwake ? change.keepAwake : undefined;
     const keepAwakeOnBattery = this.#offersKeepAwake ? change.keepAwakeOnBattery : undefined;
-    if (keepRunningInBackground !== undefined || keepAwake !== undefined || keepAwakeOnBattery !== undefined) {
+    const quitGuard = this.#offersQuitGuard ? change.quitGuard : undefined;
+    if (
+      keepRunningInBackground !== undefined ||
+      keepAwake !== undefined ||
+      keepAwakeOnBattery !== undefined ||
+      quitGuard !== undefined
+    ) {
       yield* this.#writes.withPermit(
         Effect.uninterruptible(
           Effect.suspend(() => {
@@ -140,17 +166,19 @@ export class AppBehaviorService {
               keepRunningInBackground: keepRunningInBackground ?? this.#keepRunningInBackground,
               keepAwake: keepAwake ?? this.#keepAwake,
               keepAwakeOnBattery: keepAwakeOnBattery ?? this.#keepAwakeOnBattery,
+              quitGuard: quitGuard ?? this.#quitGuard,
             };
-            const { keepRunningInBackground: running, ...awake } = next;
+            const { keepRunningInBackground: running, ...others } = next;
             const file = this.#menuBar
-              ? { menuBar: running, ...awake }
-              : { keepRunningInBackground: running, ...awake };
+              ? { menuBar: running, ...others }
+              : { keepRunningInBackground: running, ...others };
             return writePreferenceFile(this.#path, { version: 1, ...file }).pipe(
               Effect.tap(() =>
                 Effect.sync(() => {
                   this.#keepRunningInBackground = next.keepRunningInBackground;
                   this.#keepAwake = next.keepAwake;
                   this.#keepAwakeOnBattery = next.keepAwakeOnBattery;
+                  this.#quitGuard = next.quitGuard;
                 }),
               ),
             );
@@ -167,7 +195,7 @@ export class AppBehaviorService {
     return this.#loginItem ? this.#writes.withPermit(Effect.uninterruptible(this.#loginItem.refresh())) : Effect.void;
   }
 
-  /** Called when the keep-running or a keep-awake choice is saved. */
+  /** Called when the keep-running choice, a keep-awake choice or the quit guard is saved. */
   subscribe(listener: () => void): () => void {
     this.#listeners.add(listener);
     return () => {

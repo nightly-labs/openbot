@@ -12,12 +12,18 @@ import { noteChatOpened } from "@/features/quick-actions/model/recent-agents";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
 export function AgentChatScreen() {
   const { t } = useText();
   const leaveChat = useLeaveChat();
 
-  const { agentId, messageId } = useLocalSearchParams<{ agentId: string; messageId?: string }>();
+  // `focusAt` changes when a pinned message opens again, so the chat goes to it again.
+  const { agentId, messageId, focusAt } = useLocalSearchParams<{
+    agentId: string;
+    messageId?: string;
+    focusAt?: string;
+  }>();
   const foreground = useThemeColor("foreground");
   const insets = useSafeAreaInsets();
   const resolvedAgentId = Array.isArray(agentId) ? agentId[0] : agentId;
@@ -37,7 +43,8 @@ export function AgentChatScreen() {
   if (agent) {
     return (
       <MobileChatView
-        key={`${agent.serverId}:${agent.id}`}
+        // A new message, such as the source of a branch, opens the chat again at that message.
+        key={`${agent.serverId}:${agent.id}:${resolvedMessageId ?? ""}:${focusAt ?? ""}`}
         agent={agent}
         focusMessageId={resolvedMessageId || undefined}
         onLeave={leaveChat}
@@ -64,7 +71,7 @@ export function AgentChatScreen() {
           leaveChat();
         }}
       >
-        <ArrowLeft color={String(foreground)} size={20} strokeWidth={2} />
+        <ArrowLeft color={String(foreground)} size={20} strokeWidth={2} style={MIRROR_IN_RTL} />
         <Typography.Paragraph weight="semibold">{t("mobile.chat.agentUnavailable.goBack")}</Typography.Paragraph>
       </Pressable>
     </View>

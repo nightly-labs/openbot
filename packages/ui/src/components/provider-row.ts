@@ -1,4 +1,4 @@
-import { agentProviderDescriptor, isKeyOnlyProvider } from "@openbot/contracts/agent-providers";
+import { agentProviderDescriptor, isInstallerProvider, isKeyOnlyProvider } from "@openbot/contracts/agent-providers";
 import type {
   AgentProviderId,
   AgentProviderState,
@@ -176,8 +176,12 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
    * action checks for one.
    */
   // A provider that is off gets no update offer from main, so a check there could only say "up to date".
+  // An installer provider updates itself: OpenBot runs its installer once and checks no versions.
   const updateOffered = () =>
-    Boolean(host.onUpdateProvider) && !off() && (runtimeStatus()?.phase === "ready" || updatable());
+    Boolean(host.onUpdateProvider) &&
+    !off() &&
+    !isInstallerProvider(option().id) &&
+    (runtimeStatus()?.phase === "ready" || updatable());
   const restartOffered = () =>
     Boolean(host.onRestartProvider) && (option().restartPending || (available() && !connecting()));
   const diagnosticsOffered = () => Boolean(option().lastError && option().diagnostics);
@@ -219,7 +223,8 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
    * stays reachable in every state, Connected included: a refused key must stay replaceable and
    * removable. A released host stores a Gemini key but never reads it, so only this computer offers it.
    * Claude's key works the same way. Its row has a key status only where the host reads the key.
-   * Codex's key is a login on this computer, so its row has a key status only here.
+   * Codex's key is a login on the host, so its row has a key status only where the host makes that
+   * login: this computer, or a joined server with `codex-api-key-v1`.
    */
   const apiKeyOffered = () =>
     Boolean(host.onSignInProvider) &&

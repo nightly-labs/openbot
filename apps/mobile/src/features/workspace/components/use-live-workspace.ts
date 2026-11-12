@@ -22,6 +22,13 @@ export function useAgentUnread(agentId: string) {
   return useSyncExternalStore(liveState.subscribe, select);
 }
 
+/** The host's unread message count of this agent's own chat. Re-renders only when it changes. */
+export function useAgentUnreadCount(agentId: string) {
+  const liveState = useMobileWorkspaceSelector(selectLiveState);
+  const select = useCallback(() => liveState.get().unreadCounts[agentId] ?? 0, [liveState, agentId]);
+  return useSyncExternalStore(liveState.subscribe, select);
+}
+
 /** The agents with unread messages, on every server. Re-renders only when that list changes. */
 export function useUnreadAgentIds() {
   const liveState = useMobileWorkspaceSelector(selectLiveState);
@@ -33,6 +40,13 @@ export function useUnreadAgentIds() {
 export function useUnreadCounts() {
   const liveState = useMobileWorkspaceSelector(selectLiveState);
   const select = useCallback(() => liveState.get().unreadCounts, [liveState]);
+  return useSyncExternalStore(liveState.subscribe, select);
+}
+
+/** The first unread message of this agent's chat, from the host. Re-renders only when it changes. */
+export function useAgentFirstUnreadMessageId(agentId: string) {
+  const liveState = useMobileWorkspaceSelector(selectLiveState);
+  const select = useCallback(() => liveState.get().firstUnreadMessageIds[agentId] ?? null, [liveState, agentId]);
   return useSyncExternalStore(liveState.subscribe, select);
 }
 

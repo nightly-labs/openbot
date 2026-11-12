@@ -1,5 +1,5 @@
 // Electron side of `scripts/linux-gpu-fallback-e2e.ts`. It starts the GPU mode as `src/main/index.ts`
-// does and opens a window with a blurred backdrop.
+// does and opens a window with a blurred backdrop. It reports the WebGL renderer of the page.
 // It writes the state to `--ready-file` when the page has loaded. A "quit" line or the end of stdin
 // quits the app, so the app also quits when the test stops.
 import { writeFileSync } from "node:fs";
@@ -39,6 +39,15 @@ void app.whenReady().then(async () => {
         "<div style='margin:40px;height:200px;backdrop-filter:blur(24px)'>GPU fallback</div></body>",
     )}`,
   );
+  // The renderer name shows if WebGL runs on the GPU driver or on SwiftShader, or is null without WebGL.
+  const webglRenderer: string | null = await window.webContents.executeJavaScript(
+    `(() => {
+      const gl = document.createElement("canvas").getContext("webgl");
+      if (!gl) return null;
+      const info = gl.getExtension("WEBGL_debug_renderer_info");
+      return String(info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
+    })()`,
+  );
   writeFileSync(
     argument("ready-file"),
     JSON.stringify({
@@ -46,6 +55,7 @@ void app.whenReady().then(async () => {
       mode,
       hardwareAccelerationEnabled: app.isHardwareAccelerationEnabled(),
       gpuCompositing: app.getGPUFeatureStatus().gpu_compositing,
+      webglRenderer,
     }),
   );
   process.stdin.setEncoding("utf8");

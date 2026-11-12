@@ -6,7 +6,7 @@ import {
   type VirtualItem,
   Virtualizer,
 } from "@tanstack/virtual-core";
-import { createEffect, createSignal, createStore, onSettled, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, onSettled, untrack } from "solid-js";
 
 interface ChatVirtualizerOptions<TScrollElement extends Element, TItemElement extends Element> {
   count: () => number;
@@ -17,6 +17,11 @@ interface ChatVirtualizerOptions<TScrollElement extends Element, TItemElement ex
   scrollMargin: () => number;
   /** Whether the reader is following new messages instead of reading older ones. */
   stickToLatest?: () => boolean;
+  /**
+   * Moves a following reader to the end, for a chat that animates the move. With it the virtualizer
+   * does not jump to the end itself when a row is added or grows.
+   */
+  followLatest?: (element: TScrollElement) => void;
   onChange?: (virtualizer: Virtualizer<TScrollElement, TItemElement>) => void;
 }
 
@@ -38,6 +43,12 @@ export interface ChatVirtualizer<TItemElement extends Element> {
 }
 
 const STATIC_CHAT_LIMIT = 100;
+/**
+ * A virtual chat draws all its rows again when it becomes static. A send adds a row and a reply can
+ * remove one, so a chat near the limit would change mode at each turn: the chat stops for a moment
+ * and leaves the end. It becomes static again only when it is this many rows below the limit.
+ */
+const STATIC_CHAT_RETURN = 10;
 const SCROLL_END_THRESHOLD = 80;
 
 export function createChatVirtualizer<TScrollElement extends Element, TItemElement extends Element>(
@@ -66,6 +77,17 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
     observeElementOffset,
     measureElement: (element, entry, instance) => {
       syncScrollEndThreshold(instance);
+      // A new row gets its ResizeObserver size before paint. A read of its height when it mounts
+      // lays out the page again while the chat still renders. The size that the virtualizer has now
+      // changes nothing, so the first real size stays a first measurement.
+      if (!entry) {
+        const index = instance.indexFromElement(element);
+        return (
+          instance.itemSizeCache.get(instance.options.getItemKey(index)) ??
+          instance.measurementsCache[index]?.size ??
+          instance.options.estimateSize(index)
+        );
+      }
       return measureRowElement(element, entry, instance);
     },
     scrollToFn: (offset, scroll, instance) => {
@@ -74,6 +96,10 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
         // Rows end above the activity line. An estimate correction that follows the last row
         // leaves that line below the view, then the chat's own follow pulls back to the real
         // bottom, and the two move the chat up and down while a turn runs.
+        if (options.followLatest) {
+          options.followLatest(element);
+          return;
+        }
         elementScroll(element.scrollHeight - element.clientHeight, { ...scroll, adjustments: 0 }, instance);
         return;
       }
@@ -85,13 +111,17 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
     scrollEndThreshold: SCROLL_END_THRESHOLD,
     initialRect: { width: 1, height: 600 },
   });
+  const virtualized = createMemo((previous?: boolean) => {
+    const count = options.count();
+    return previous ? count > STATIC_CHAT_LIMIT - STATIC_CHAT_RETURN : count > STATIC_CHAT_LIMIT;
+  });
   let refreshQueued = false;
 
   const refresh = (): void => {
     const measured = [...virtualizer.getVirtualItems()];
     const count = options.count();
     const items =
-      count <= STATIC_CHAT_LIMIT || measured.length === 0
+      !untrack(virtualized) || measured.length === 0
         ? fallbackItems(count, options.estimateSize, options.getItemKey, options.scrollMargin())
         : measured;
     const activeKeys = new Set(items.map((item) => item.key));
@@ -140,6 +170,10 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
         syncScrollEndThreshold(virtualizer);
         virtualizer.setOptions({
           ...virtualizer.options,
+          // A reader who does not follow is never at the end (see `syncScrollEndThreshold`). Without a
+          // follow behavior, the virtualizer does not lay out the page to read where the end is.
+          // A chat that follows the end itself gets no jump from here either.
+          followOnAppend: options.followLatest || options.stickToLatest?.() === false ? false : "auto",
           count,
           getScrollElement: options.getScrollElement,
           estimateSize: options.estimateSize,
@@ -168,7 +202,7 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
       return virtualItems();
     },
     getTotalSize: totalSize,
-    isVirtualized: () => options.count() > STATIC_CHAT_LIMIT,
+    isVirtualized: virtualized,
     measureElement: (element) => {
       if (!element) {
         virtualizer.measureElement(null);

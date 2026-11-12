@@ -3,10 +3,13 @@
 // agent (`provider-fakes/agents/stall.ts`) and a short stall limit:
 // - a silent prompt fails with the stall message, and the next turn opens the session again;
 // - a stall on a custom endpoint's model names the endpoint, not OpenCode (#3234);
+// - a custom endpoint with a longer limit of its own is not ended at the agent's limit (#3823);
 // - an open tool call longer than the limit is not a stall;
 // - a stop of a prompt that ignores `session/cancel` ends the turn as interrupted;
 // - OpenCode answer text streams before the prompt answers;
 // - Antigravity, whose prompt stays open for background tasks, is not ended as stalled;
+// - an Antigravity prompt that gets no update at all is sent again once on a resumed session, a second
+//   silent prompt fails the turn, and a prompt that is quiet after its first update goes on (#4846);
 // - an agent that cannot load a session keeps it after a stop that OpenBot ends.
 // `bun run test:acp-turn-stall`. Writes .openbot-build/acp-turn-stall-e2e/report.json.
 import assert from "node:assert/strict";
@@ -27,6 +30,7 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/acp-turn-stall-e2e")
 const STALL_MS = 1_500;
 const TOOL_MS = STALL_MS * 3;
 const CHUNK_GAP_MS = 500;
+const FIRST_UPDATE_MS = 1_000;
 
 interface LogEntry {
   event: string;
@@ -39,10 +43,14 @@ interface Report {
   stall?: { status: string | null; error: string | null; elapsedMs: number; cancelSent: boolean };
   afterStall?: { status: string | null; sessionRestored: boolean };
   endpointStall?: { status: string | null; error: string | null };
+  slowEndpoint?: { status: string | null; reply: string; elapsedMs: number };
   tool?: { status: string | null; elapsedMs: number };
   stop?: { status: string | null; elapsedMs: number; next: string | null };
   stream?: { deltaBeforeCompletion: boolean; reply: string };
   antigravity?: { stalled: boolean; stopStatus: string | null };
+  lostPrompt?: { status: string | null; reply: string; prompts: number; cancels: number; resumes: number };
+  lostTwice?: { status: string | null; error: string | null; elapsedMs: number; next: string | null };
+  quiet?: { status: string | null; reply: string; prompts: number };
   /** `sessionsOpened` counts only the sessions opened after the stop. */
   noLoad?: { stopStatus: string | null; next: string | null; sessionsOpened: number; loads: number };
   failure?: string;
@@ -58,6 +66,7 @@ async function open(
   log: string,
   env: Readonly<Record<string, string>> = {},
   customEndpoint?: (modelId: string | null) => AcpCustomEndpoint | null,
+  firstUpdateMs?: number,
 ): Promise<AgentClient> {
   const executable = join(root, provider, "bin", provider);
   await installFakeAgent(executable, "stall", {
@@ -74,6 +83,7 @@ async function open(
     signInMessage: "Sign in to the fake agent.",
     turnStallMs: STALL_MS,
     ...(customEndpoint ? { customEndpoint } : {}),
+    ...(firstUpdateMs ? { firstUpdateMs } : {}),
   });
   clients.push(client);
   client.start();
@@ -148,6 +158,21 @@ try {
     "A stall on a custom endpoint names the endpoint.",
   );
 
+  // A slow endpoint, such as a local model that reads a long prompt, has a longer limit of its own.
+  const slow = await open(
+    "opencode",
+    OPENCODE_ACP_FLAVOR,
+    join(root, "slow-endpoint.jsonl"),
+    { FAKE_QUIET_MS: String(STALL_MS * 2) },
+    () => ({ name: "My Lab", hasCredentials: false, stallMs: STALL_MS * 10 }),
+  );
+  const slowThread = await startThread(slow, { cwd: workspace });
+  const slowTurn = await timed(() => runTurn(slow, slowThread, { text: "quiet", timeoutMs: STALL_MS * 10 }));
+  report.slowEndpoint = { status: slowTurn.value.status, reply: slowTurn.value.reply, elapsedMs: slowTurn.elapsedMs };
+  assert.equal(slowTurn.value.status, "completed", "A slow endpoint turn is not ended at the agent's limit.");
+  assert.equal(slowTurn.value.reply, "working, done", "The slow endpoint's answer is complete.");
+  assert.ok(slowTurn.elapsedMs >= STALL_MS * 2, "The endpoint was silent for longer than the agent's limit.");
+
   // An open tool call is work, not a stall, also when it takes longer than the limit.
   const tool = await timed(() => runTurn(client, thread, { text: "tool" }));
   report.tool = { status: tool.value.status, elapsedMs: tool.elapsedMs };
@@ -199,6 +224,68 @@ try {
   report.antigravity = { stalled: antigravityStalled, stopStatus: antigravityStop.status };
   assert.equal(antigravityStalled, false, "A silent Antigravity prompt is not ended as stalled.");
   assert.equal(antigravityStop.status, "interrupted", "A stop still ends the Antigravity turn.");
+
+  // An Antigravity prompt that gets no update at all is lost, not a background task. It is sent again
+  // once, after `session/cancel` and a `session/resume` that rebuilds the harness, as a stop does.
+  const firstLog = join(root, "antigravity-first.jsonl");
+  const first = await open(
+    "antigravity",
+    ANTIGRAVITY_ACP_FLAVOR,
+    firstLog,
+    { FAKE_RESUME: "1", FAKE_QUIET_MS: String(FIRST_UPDATE_MS * 3) },
+    undefined,
+    FIRST_UPDATE_MS,
+  );
+  const lostThread = await startThread(first, { cwd: workspace });
+  const lostSession = lostThread.split(":").at(-1);
+  const lost = await runTurn(first, lostThread, { text: "hang-once", timeoutMs: FIRST_UPDATE_MS * 10 });
+  const lostEntries = (await readJsonl<LogEntry>(firstLog)).filter((entry) => entry.sessionId === lostSession);
+  report.lostPrompt = {
+    status: lost.status,
+    reply: lost.reply,
+    prompts: lostEntries.filter((entry) => entry.event === "prompt").length,
+    cancels: lostEntries.filter((entry) => entry.event === "cancel").length,
+    resumes: lostEntries.filter((entry) => entry.event === "session/resume").length,
+  };
+  assert.equal(lost.status, "completed", "A lost Antigravity prompt completes when it is sent again.");
+  assert.equal(lost.reply, "ok", "The answer to the prompt sent again is the turn's answer.");
+  assert.equal(report.lostPrompt.prompts, 2, "The lost prompt is sent again once.");
+  assert.equal(report.lostPrompt.cancels, 1, "The lost prompt is cancelled before it is sent again.");
+  assert.equal(report.lostPrompt.resumes, 1, "The session is resumed before the prompt is sent again.");
+
+  // A prompt that is silent again fails the turn, and the next prompt works.
+  const twiceThread = await startThread(first, { cwd: workspace });
+  const twice = await timed(() => runTurn(first, twiceThread, { text: "hang", timeoutMs: FIRST_UPDATE_MS * 20 }));
+  const afterTwice = await runTurn(first, twiceThread);
+  report.lostTwice = {
+    status: twice.value.status,
+    error: twice.value.error,
+    elapsedMs: twice.elapsedMs,
+    next: afterTwice.status,
+  };
+  assert.equal(twice.value.status, "failed", "A prompt that is silent twice fails the turn.");
+  assert.equal(
+    twice.value.error,
+    sourceText("error.agent.turnStalled", { provider: "Gemini" }),
+    "The failure tells the user to send the message again.",
+  );
+  assert.ok(twice.elapsedMs >= FIRST_UPDATE_MS * 2, "Each prompt gets the whole limit.");
+  assert.equal(afterTwice.status, "completed", "The next prompt after the failure completes.");
+
+  // A prompt that sent its first update and is quiet longer than the limit is working, not lost.
+  const quietThread = await startThread(first, { cwd: workspace });
+  const quietSession = quietThread.split(":").at(-1);
+  const quiet = await runTurn(first, quietThread, { text: "quiet", timeoutMs: FIRST_UPDATE_MS * 20 });
+  report.quiet = {
+    status: quiet.status,
+    reply: quiet.reply,
+    prompts: (await readJsonl<LogEntry>(firstLog)).filter(
+      (entry) => entry.event === "prompt" && entry.sessionId === quietSession,
+    ).length,
+  };
+  assert.equal(quiet.status, "completed", "A quiet prompt after its first update completes.");
+  assert.equal(quiet.reply, "working, done", "The quiet prompt's answer is whole.");
+  assert.equal(report.quiet.prompts, 1, "A quiet prompt is not sent again.");
 
   // An agent with no session/load or resume cannot give a session back. A stop that OpenBot ends
   // keeps the session, so the next turn does not replace it and lose its context.

@@ -1,8 +1,8 @@
 // Checks each http MCP server in the Marketplace catalog against the live server, with no account
 // and no key. A server with no sign-in must answer `initialize`. A server with a `link` sign-in must
 // refuse it with a Bearer challenge, and its metadata must offer what `McpOAuth` needs: dynamic
-// registration and S256 PKCE. Metadata goes through `secureOAuthFetch`, so the app's https, size,
-// time, redirect and private-network rules apply. The script never registers a client and never
+// registration or a client metadata document, and S256 PKCE. Metadata goes through
+// `secureOAuthFetch`, so the app's https, size, time, redirect and private-network rules apply. The script never registers a client and never
 // sends a credential.
 //
 // It needs the network and the vendors' servers, so it is a manual run, not a CI gate.
@@ -52,7 +52,8 @@ interface LinkDetails {
   challenge: string;
   resourceMetadataUrl: string | null;
   issuer: string;
-  registrationEndpoint: string;
+  registrationEndpoint: string | null;
+  clientIdMetadataDocument: boolean;
   revocation: boolean;
 }
 
@@ -183,7 +184,17 @@ async function checkLink(url: string, requests: string[]): Promise<LinkDetails> 
   check(issuer, "the protected-resource metadata names no authorization server");
   const metadata = await discoverAuthorizationServerMetadata(issuer, { fetchFn: oauthFetch });
   check(metadata, `no authorization server metadata at ${issuer}`);
-  check(metadata.registration_endpoint, "no registration_endpoint: the user would need a sign-in app");
+  const clientIdMetadataDocument = metadata.client_id_metadata_document_supported === true;
+  check(
+    metadata.registration_endpoint || clientIdMetadataDocument,
+    "no registration_endpoint and no client metadata document: the user would need a sign-in app",
+  );
+  // The document names a public client, so the token endpoint must take `none`.
+  const methods = metadata.token_endpoint_auth_methods_supported;
+  check(
+    metadata.registration_endpoint || methods?.includes("none"),
+    "the client metadata document needs the none token endpoint auth method",
+  );
   check(metadata.code_challenge_methods_supported?.includes("S256"), "S256 PKCE is not listed");
   check(metadata.response_types_supported.includes("code"), "response type code is not supported");
 
@@ -204,7 +215,8 @@ async function checkLink(url: string, requests: string[]): Promise<LinkDetails> 
     challenge,
     resourceMetadataUrl: resourceMetadataUrl?.toString() ?? null,
     issuer,
-    registrationEndpoint: metadata.registration_endpoint,
+    registrationEndpoint: metadata.registration_endpoint ?? null,
+    clientIdMetadataDocument,
     revocation: revocation !== undefined,
   };
 }

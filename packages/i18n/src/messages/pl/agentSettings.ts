@@ -104,7 +104,7 @@ export const messages = {
   "agentSettings.backupModels.intro":
     "Gdy {model} osiągnie limit użycia, zanim {name} zacznie pisać, {name} zapyta cię, którego modelu użyć.",
   "agentSettings.backupModels.introAutomatic":
-    "Gdy {model} osiągnie limit użycia lub zawiedzie z powodu błędu dostawcy, zanim {name} zacznie pisać, {name} przełączy się na pierwszy dostępny model w kolejności.",
+    "Gdy {model} osiągnie limit użycia, {name} przełączy się na pierwszy dostępny model w kolejności. {name} przełączy się też, gdy {model} zawiedzie z powodu błędu dostawcy, zanim {name} zacznie pisać.",
   "agentSettings.backupModels.ask": "Pytaj przed przełączeniem",
   "agentSettings.backupModels.order": "Kolejność",
   "agentSettings.backupModels.listLabel": "Modele zapasowe w kolejności",
@@ -117,7 +117,7 @@ export const messages = {
   "agentSettings.backupModels.unavailable": "Chwilowo niedostępny · pominięto",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.note":
-    "{name} nigdy się nie przełącza po tym, jak zacznie pisać. Wraca do modelu {model}, gdy limit się skończy, lub 10 minut po błędzie dostawcy.",
+    "Gdy limit użycia zatrzyma agenta {name} po rozpoczęciu pracy, {name} kontynuuje tę samą pracę na pierwszym dostępnym modelu z kolejności. Wraca do modelu {model}, gdy limit się skończy, lub 10 minut po błędzie dostawcy.",
   "agentSettings.groups.brain": "Mózg",
   "agentSettings.groups.knows": "Wie",
   "agentSettings.groups.does": "Robi",
@@ -148,6 +148,9 @@ export const messages = {
   "agentSettings.avatar.resetToId": "Przywróć twarz z ID",
   "agentSettings.avatar.shape": "Kształt",
   "agentSettings.avatar.shuffle": "Losowa twarz",
+  "agentSettings.avatar.style": "Styl awatara",
+  "agentSettings.avatar.stylePlush": "Pluszowy",
+  "agentSettings.avatar.styleFlat": "Płaski",
   "agentSettings.avatar.shapes": "Kształty awatara",
   "agentSettings.avatar.shapeOption": "Kształt {number}",
   "agentSettings.avatar.eyes": "Oczy",
@@ -162,10 +165,6 @@ export const messages = {
   "agentSettings.avatar.processFailed": "Nie udało się przetworzyć awatara agenta.",
   "agentSettings.runtime.model": "Model agenta",
   "agentSettings.runtime.modelUnavailable": "Modele będą dostępne po połączeniu CLI agenta.",
-  "agentSettings.runtime.reasoning": "Rozumowanie",
-  "agentSettings.runtime.reasoningLabel": "Poziom rozumowania agenta",
-  "agentSettings.runtime.selectReasoning": "Wybierz rozumowanie",
-  "agentSettings.runtime.reasoningSetByProvider": "Wg {provider}",
   "agentSettings.runtime.access": "Dostęp",
   "agentSettings.runtime.accessLabel": "Dostęp agenta",
   "agentSettings.runtime.busyMessage": "Podczas pracy",
@@ -204,6 +203,15 @@ export const messages = {
     "Agent zapomni ten czat. Wiadomości pozostaną widoczne nad separatorem. Instrukcje, model, narzędzia, wspomnienia, obszar roboczy i przeglądarka się nie zmienią.",
   "agentSettings.newChat.confirm": "Rozpocznij nowy czat",
   "agentSettings.newChat.failed": "Nie udało się rozpocząć nowego czatu.",
+  "agentSettings.deleteHistory.title": "Usuń historię",
+  "agentSettings.deleteHistory.description":
+    "Wiadomości tego czatu znikają, a agent o nich zapomina. Jego konfiguracja zostaje.",
+  "agentSettings.deleteHistory.button": "Usuń",
+  "agentSettings.deleteHistory.confirmTitle": "Usunąć historię czatu z {name}?",
+  "agentSettings.deleteHistory.confirmDescription":
+    "Wszystkie wiadomości i pliki tego czatu znikną z OpenBot, a agent o nich zapomni. Nie można tego cofnąć. Wątki poboczne, instrukcje, model, narzędzia, wspomnienia, przestrzeń robocza i przeglądarka się nie zmienią.",
+  "agentSettings.deleteHistory.confirm": "Usuń historię",
+  "agentSettings.deleteHistory.failed": "Nie udało się usunąć historii.",
   "agentSettings.fullAccess.title": "Dać temu agentowi pełny dostęp?",
   "agentSettings.fullAccess.askTitle": "Pozwolić temu agentowi pracować poza obszarem roboczym?",
   "agentSettings.fullAccess.description":
@@ -259,8 +267,7 @@ export const messages = {
   "agentSettings.agentNewChat.description":
     "Agent może rozpocząć nowy czat, gdy jego czat staje się długi. Najpierw zapisuje notatki.",
   "agentSettings.quickAcknowledgement.title": "Pokaż plan przed długimi zadaniami",
-  "agentSettings.quickAcknowledgement.description":
-    "Przed długim zadaniem agent pokazuje swój plan. Zaczyna po 10 s lub po naciśnięciu Start.",
+  "agentSettings.quickAcknowledgement.description": "Przed długim zadaniem agent pokazuje swój plan.",
   "agentSettings.browserProfile.label": "Profil przeglądarki",
   "agentSettings.browserProfile.shared": "Wspólny",
   "agentSettings.browserProfile.agent": "Tylko ten agent",

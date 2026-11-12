@@ -6,6 +6,8 @@ export const messages = {
   "error.backend.databaseIntegrity": "OpenBot のデータベースが整合性チェックに失敗しました。",
   "error.backend.webhookRouteLimit": "1 つのホストの Webhook ルーティンは最大 {limit} 個です。",
   "error.backend.webhookSettingsInvalid": "Webhook の設定を確認して、もう一度お試しください。",
+  "error.backend.webhookSenderSecretInvalid":
+    "送信元の署名シークレットをすべて貼り付けてください。16〜1024 文字で、空白は含みません。",
   "error.backend.webhookRouteUnavailable":
     "公開 Webhook ルートの準備ができていません。ホストの接続を確認して、もう一度お試しください。",
   "error.backend.browserViewRemoteOnly": "ライブブラウザービューはリモートホスト専用です。",
@@ -45,6 +47,10 @@ export const messages = {
     "このリモートホストは、既存のタブでのアドレスバーによる移動に対応していません。",
   "error.backend.browserUserControlBusy":
     "このブラウザーのタブはシークレットを待っています。先にシークレットの要求に応答してください。",
+  "error.backend.browserTeachBusy":
+    "別のユーザーがこのブラウザーのタブを操作しています。操作が終わってからもう一度お試しください。",
+  "error.backend.browserTeachUnavailable": "このブラウザーのタブには、タスクを学習できるエージェントがありません。",
+  "error.backend.browserTeachUnsupported": "このリモートホストは、タスクの記録に対応していません。",
   "error.backend.browserUserControlUnsupported":
     "このリモートホストは、ブラウザーのタブの操作の引き継ぎに対応していません。",
   "error.backend.browserSignInUnsupported": "このリモートホストはこのコンピューターからのサインインを受け取れません。",
@@ -58,6 +64,8 @@ export const messages = {
   "error.backend.channelLeadModelUnavailable": "チャンネルリードのモデルを使用できません。",
   "error.backend.contextCompactionIneffective":
     "圧縮してもこのチャットは小さくなりません。2回圧縮しても、モデルのコンテキストウィンドウの{percent}%を使っているため、OpenBotは自動圧縮を止めます。ウィンドウの大部分はツールと指示が使っています。このエージェントに不要なMCPサーバーやコンピューター操作をオフにするか、より大きなウィンドウのモデルを選んでください。その後、新しいチャットを開始してください。",
+  "error.backend.contextCompactionStopped":
+    "このチャットの圧縮が2回続けて失敗したため、OpenBot は自動圧縮を停止します。試行のたびにチャット全体がモデルに送信され、プランの上限を消費します。もう一度試すには「今すぐ圧縮」を選択するか、新しいチャットを開始してください。",
   "error.backend.providerRetrying":
     "プロバイダーでこのリクエストが{attempts}回失敗し、再試行しています。エージェントが続かない場合は、ターンを停止してください。",
   "error.backend.providerRetryingLargeContext":
@@ -68,6 +76,15 @@ export const messages = {
     "チャンネルに開始が未確認の割り当てがあります。削除する前に結果を確認してください。",
   "error.backend.channelNotFound": "チャンネルが見つかりません。",
   "error.backend.channelMemberUnavailable": "チャンネルのメンバーを使用できません。",
+  "error.backend.channelInstructionsTooLong":
+    "指示を2,000文字以内に短くしてください。これより長い指示は保存されません。",
+  "error.backend.channelWaitBeforeNewConversation":
+    "このチャンネルの作業が終わるまで待ってから、新しい会話を始めてください。",
+  "error.backend.channelWaitBeforeCompact": "このチャンネルの作業が終わるまで待ってから、圧縮してください。",
+  "error.backend.channelWaitBeforeDeleteHistory":
+    "このチャンネルの作業が終わるまで待ってから、履歴を削除してください。",
+  "error.backend.channelCompactUnavailable":
+    "今はこのチャンネルのどのメンバーもコンテキストを圧縮できません。メンバーがまずチャンネルで回答し、そのプロバイダーが圧縮に対応している必要があります。",
   "error.backend.channelArchived":
     "メッセージを送信したりタスクを変更したりする前に、このチャンネルを復元してください。",
   "error.backend.channelReferenceUnavailable": "参照先のチャンネルメッセージを使用できません。",
@@ -147,9 +164,17 @@ export const messages = {
     "メールボックスの状態が破損しているか、新しいバージョンの OpenBot のものです。上書きしません。",
   "error.backend.recipientDeleting": "受信者を削除中です。削除が終わってから再試行してください。",
   "error.backend.recipientHidden": "このエージェントは非表示です。メッセージを送るには元に戻してください。",
+  "error.backend.agentIdUnknown":
+    "ID {id} のエージェントはありません。openbot.list_agents で ID を取得してから、もう一度お試しください。",
+  "error.backend.agentIdNear":
+    "ID {id} のエージェントはありません。エージェント {name} の ID {nearId} がほぼ同じです。このエージェントのことなら、その ID でもう一度お試しください。",
   "error.backend.attachBetween": "1 〜 {limit} 個のファイルを添付してください。",
   "error.backend.attachmentNotFile": "添付ファイルがファイルではありません: {path}",
   "error.backend.generatedImageTooLarge": "生成された画像が 100 MB の上限を超えています。",
+  "error.backend.generatedVideoTooLarge": "生成された動画が 100 MB の上限を超えています。",
+  "error.backend.videoGenerationFailed": "動画の生成に失敗しました。",
+  "error.backend.videoGenerationNoVideo": "動画の生成で動画が返されませんでした。",
+  "error.backend.videoGenerationInterrupted": "動画の生成が中断されました。",
   "error.backend.attachmentNotRegularFile": "添付できるのは通常のファイルだけです: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot は {name} をコピーできませんでした。",
   "error.backend.routineNameRequired": "ルーティン名が必要です。",
@@ -205,10 +230,15 @@ export const messages = {
   "error.backend.agentWaitRoutineGone": "このエージェントにはこの ID のルーティンがありません。",
   "error.backend.agentWaitNoRoutine":
     "待機を再開できるのは自分のルーティンの実行だけですが、ルーティンがありません。openbot.create_routine でルーティンを作成してから、待機を開いてください。",
-  "error.backend.agentWaitRemoteUnsupported":
-    "開いている待機は、このコンピューター上のエージェントでのみ使用できます。",
   "error.backend.markUnreadRemoteUnsupported":
     "メッセージを未読にする操作は、このコンピューター上のエージェントでのみ使用できます。",
+  "error.backend.messageDeleteUnsupported": "このサーバーはメッセージの削除に対応していません。",
+  "error.backend.messageDeleteNotFound": "このメッセージはチャットにありません。",
+  "error.backend.messageDeleteBusy": "このメッセージは実行中のターンの一部です。ターンが終わってから削除してください。",
+  "error.backend.messageDeleteForbidden": "削除できるのは自分が送信したメッセージだけです。",
+  "error.backend.messagePinNotFound": "このメッセージはチャットにありません。",
+  "error.backend.messagePinLimit":
+    "このチャットにはピン留めしたメッセージが50件あります。別のメッセージをピン留めする前に、1件解除してください。",
   "error.backend.routineFlowHandoffFailed": "ルーティンはこのエージェントに作業を渡せませんでした。",
   "error.backend.mcpServerLimit": "OpenBot に保存できる MCP サーバーは {limit} 個までです。",
   "error.backend.mcpServerNameTaken": "{name} という名前の MCP サーバーはすでに存在します。",
@@ -236,9 +266,17 @@ export const messages = {
   "error.backend.mcpSignInResponseTimedOut": "サインインの応答が時間内に届きませんでした。",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot はこのサーバーのサインイン情報を読み取れませんでした。サーバーアドレスを確認して再試行してください。",
+  "error.backend.mcpSignInAnswerUnreadable":
+    "サインインサーバーから OpenBot が読み取れない応答が返されました。サービスから API キーまたはトークンが提供されている場合は、このサーバーの設定に追加してから、もう一度接続をテストしてください。",
   "error.backend.mcpServerExited":
     "サーバーは応答する前に停止しました。ターミナルでコマンドを実行してエラーを確認してください。",
   "error.backend.mcpServerFailedToStart": "サーバーが起動しませんでした: {reason}",
+  "error.backend.mcpToolSchemaRefused":
+    "このサーバーのツール {tool} の入力形式を、このプロバイダーは読み取れません。ほかのプロバイダーのエージェントは引き続きこのサーバーを使えます。",
+  "error.backend.mcpServerSignInForProvider":
+    "{provider} は MCP サーバー {name} を使用できませんでした。サーバーがサインインを求めています。MCP 設定を開いて「サインイン」を選択してください。",
+  "error.backend.mcpServerFailedForProvider":
+    "{provider} は MCP サーバー {name} を起動できませんでした。MCP 設定を開いて「接続をテスト」を選択すると、原因を確認できます。",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot はこのサーバーのローカルサインイン接続を開始できませんでした。OpenBot を再起動してから、もう一度お試しください。",
   "error.backend.mcpOAuthSignInNeeded":
@@ -267,6 +305,13 @@ export const messages = {
   "error.backend.sectionNameTooLong": "セクション名が長すぎます。",
   "error.backend.sidebarFolderTooDeep": "フォルダーは3階層までです。",
   "error.backend.sidebarFolderMoveInvalid": "このフォルダーはそこへ移動できません。",
+  "error.backend.libraryFolderName": "フォルダー名は 1〜{limit} 文字にしてください。",
+  "error.backend.libraryFolderLimit": "1 つのサーバーに置けるライブラリのフォルダーは {limit} 個までです。",
+  "error.backend.libraryFolderFileLimit": "ライブラリのフォルダーにあるファイルが多すぎます。",
+  "error.backend.libraryFolderTooDeep": "ライブラリのフォルダーは {limit} 階層までです。",
+  "error.backend.libraryFolderGone": "フォルダーが存在しないか、すでに削除されています。",
+  "error.backend.libraryFolderOtherAgent": "ファイルは、そのエージェントのフォルダーにのみ入れられます。",
+  "error.backend.libraryFolderMoveInvalid": "このフォルダーはそこへ移動できません。",
   "error.backend.sectionNameDuplicate": "セクション名は重複しないようにしてください。",
   "error.backend.directMessageRequired": "先にメッセージを入力してください。",
   "error.backend.directMessageTooLong": "ダイレクトメッセージは {limit} 文字までです。",
@@ -311,6 +356,19 @@ export const messages = {
   "error.backend.browserProfileNameTaken": "この名前のブラウザープロファイルはすでにあります。",
   "error.backend.browserSessionInUse": "このブラウザーセッションはまだタブで使われています。もう一度お試しください。",
   "error.backend.browserProfileLimit": "ブラウザープロファイルは {limit} 個まで作成できます。",
+  "error.backend.browserProxyNotFound": "このプロキシはもう存在しません。",
+  "error.backend.browserProxyAddressInvalid":
+    "socks5://host:1080 や http://user:password@host:3128 のようなプロキシアドレスを入力してください。",
+  "error.backend.browserProxyLimit": "プロキシは {limit} 個まで作成できます。",
+  "error.backend.browserProxyTaken": "このアドレスのプロキシはすでに存在します。",
+  "error.backend.browserProxyChanged":
+    "このプロキシは開いた後に変更されました。もう一度確認してから、やり直してください。",
+  "error.backend.browserProxyUnreachable": "プロキシ {name} が応答しないため、ページを開けませんでした。",
+  "error.backend.browserProxySignInRefused": "プロキシ {name} がサインインを拒否したため、ページを開けませんでした。",
+  "error.backend.browserProxyComputerUnreachable":
+    "このプロファイルが使うコンピューターが応答しないため、ページを開けませんでした。",
+  "error.backend.browserCertificateUntrusted":
+    "このサイトのセキュリティ証明書が信頼されていないため、ページを開けませんでした。",
   "error.backend.browserLowMemory":
     "このサーバーはメモリーが不足しているため、ブラウザーで新しいタブを開けません。タブを閉じるか、ほかのエージェントの作業が終わるまでお待ちください。",
   "error.backend.browserOpenFailed": "{url} を開けません: {reason}",

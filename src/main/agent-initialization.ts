@@ -8,7 +8,8 @@ export class AgentInitializationGate<E> {
 
   /**
    * `initialize` runs `rosterLoaded` when the agents are loaded. The steps after it, such as the
-   * routine sweeps, do not change the roster, so the agent list does not wait for them.
+   * provider starts and the routine sweeps, do not change the roster, so the agent list does not
+   * wait for them.
    */
   constructor(initialize: (rosterLoaded: Effect.Effect<void>) => Effect.Effect<void, E>) {
     this.#initialize = initialize;

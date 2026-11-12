@@ -63,6 +63,7 @@ export const messages = {
   "mobile.onboarding.task.creating": "Creazione…",
   "mobile.onboarding.task.withoutTask": "Crea senza attività",
   "mobile.onboarding.task.failed": "Impossibile creare l'agente. Riprova.",
+  "mobile.onboarding.task.sendFailed": "La prima attività non è stata inviata. Inviala nella chat.",
   "mobile.onboarding.idea.builder1": "Crea una piccola web app per una lista di cose da fare.",
   "mobile.onboarding.idea.builder2": "Spiegami come funzionano i branch di Git, con degli esempi.",
   "mobile.onboarding.idea.builder3": "Scrivi uno script che ordini le mie foto per data.",

@@ -126,22 +126,31 @@ function usageRow(
       resetsAtLabel: formatUsageReset(window.resetsAt, text),
     };
   };
-  const reported = limit ? reportedUsageWindows(limit) : [];
+  // Cursor's total comes first, as the Cursor CLI shows it, and the two windows of its plan follow.
+  const cursorTotal = provider === "cursor" ? limit?.tertiary : undefined;
+  const reported = limit
+    ? cursorTotal
+      ? [cursorTotal, ...reportedUsageWindows({ primary: limit.primary, secondary: limit.secondary })]
+      : reportedUsageWindows(limit)
+    : [];
   const ownWindows = reported.map((window) =>
     windowRow(
       window,
       // Cursor's two windows share one billing cycle and differ by the models they cover. One
-      // window alone is the whole plan.
-      provider === "cursor" && limit?.primary && limit.secondary
-        ? text.t(window === limit?.primary ? "account.usage.window.cursorModels" : "account.usage.window.otherModels")
-        : usageWindowLabel(window.windowDurationMins, text),
+      // window alone, with no total, is the whole plan.
+      window === cursorTotal
+        ? text.t("account.usage.window.total")
+        : provider === "cursor" && (cursorTotal || (limit?.primary && limit.secondary))
+          ? text.t(window === limit?.primary ? "account.usage.window.cursorModels" : "account.usage.window.otherModels")
+          : usageWindowLabel(window.windowDurationMins, text),
     ),
   );
   // Antigravity limits each group of models apart, such as Gemini 4 Argon: one line per group, by
-  // Google's name. The ring stays on the reading's own windows, the "Gemini Models" group.
+  // Google's name. The ring stays on the reading's own windows, the "Gemini Models" group. One group
+  // alone also shows its name: on a plan with no Gemini group, it is "Claude and GPT models".
   const groups = limit?.groups ?? [];
   const windows =
-    groups.length > 1
+    groups.length > 0
       ? groups.flatMap((group) => {
           const groupWindows = reportedUsageWindows(group);
           return groupWindows.map((window) =>
@@ -158,8 +167,16 @@ function usageRow(
         })
       : ownWindows;
   // OpenCode's third window is a list line only: `secondary` already holds the long window that stops
-  // work first, and the ring has two tracks.
-  const ringWindows = ownWindows.filter((_, index) => reported[index] !== limit?.tertiary);
+  // work first, and the ring has two tracks. Cursor's ring shows its total, or a window that is used up:
+  // the models of that window stop while the total still has some left.
+  const cursorSpent = ownWindows.filter(
+    (_, index) => cursorTotal && reported[index] !== cursorTotal && (reported[index]?.usedPercent ?? 0) >= 100,
+  );
+  const ringWindows = cursorTotal
+    ? cursorSpent.length
+      ? cursorSpent
+      : ownWindows.filter((_, index) => reported[index] === cursorTotal)
+    : ownWindows.filter((_, index) => reported[index] !== limit?.tertiary);
   // The shortest window comes first, so on a tie the shorter window stops work first.
   const binding = ringWindows.reduce<AccountUsageWindowRow | null>(
     (lowest, window) => (lowest === null || window.remainingPercent < lowest.remainingPercent ? window : lowest),

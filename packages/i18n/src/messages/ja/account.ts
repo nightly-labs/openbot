@@ -38,7 +38,9 @@ export const messages = {
   "account.usage.window.minutes": "{minutes} 分",
   "account.usage.window.cursorModels": "Cursor モデル",
   "account.usage.window.otherModels": "その他のモデル",
+  "account.usage.window.total": "合計",
   "account.usage.window.group": "{group} · {window}",
+  "account.usage.window.remaining": "残り {percent}",
   "account.update.failedRetry": "アップデートに失敗しました。もう一度お試しください。",
   "account.update.managedByHost": "ホストが管理しています",
   "account.update.restart": "再起動",
@@ -64,6 +66,8 @@ export const messages = {
   "account.login.unavailableDescription": "OpenBot は現在アカウントサービスに接続できません。",
   "account.login.signInDescription":
     "メールアドレスでサインイン、またはアカウントを作成できます。ワンタイムコードをお送りします。",
+  "account.login.keyringChangedDescription":
+    "システムのキーリングが前回のサインインを失いました。OpenBot は今後、このコンピューター上の専用ファイルにサインインを保存します。もう一度サインインしてください。",
   "account.login.codeAccepted": "コードが承認されました。",
   "account.login.codeSent": "{email} にコードを送信しました。",
   "account.login.connectingSecurely": "安全に接続しています…",

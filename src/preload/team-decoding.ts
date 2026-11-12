@@ -15,7 +15,10 @@ import {
   type HostStatus,
   type InvitePreview,
   type InviteSummary,
+  isAvatarColor,
+  isRemoteControlAccess,
   REMOTE_DESKTOP_ERROR_CODES,
+  type RemoteControlPolicy,
   type RemoteDesktopConnectResult,
   type RemoteDesktopDisplay,
   type RemoteDesktopSession,
@@ -110,6 +113,12 @@ export function decodeHostStatus(value: unknown): HostStatus {
     remoteDesktopMaxSessions: requiredNumber(status, "remoteDesktopMaxSessions"),
     message: nullableString(status, "message"),
   };
+}
+
+export function decodeRemoteControlPolicy(value: unknown): RemoteControlPolicy {
+  const policy = decodeRecord(value, "remote control policy");
+  if (!isRemoteControlAccess(policy.access)) throw new Error("Invalid remote control access.");
+  return { access: policy.access, askOnHost: requiredBoolean(policy, "askOnHost") };
 }
 
 export function decodeTeamMember(value: unknown): TeamMemberSummary {
@@ -273,6 +282,8 @@ function server(summary: DynamicRecord): ServerSummary {
     hostedStart,
     memberLimit,
     hosted,
+    restartAvailable,
+    storageGb,
     keyChangedAt,
     thisComputer,
   } = summary;
@@ -284,6 +295,10 @@ function server(summary: DynamicRecord): ServerSummary {
     throw new Error("Invalid memberLimit.");
   }
   if (hosted !== undefined && !isBoolean(hosted)) throw new Error("Invalid hosted.");
+  if (restartAvailable !== undefined && !isBoolean(restartAvailable)) throw new Error("Invalid restartAvailable.");
+  if (storageGb !== undefined && !(isNumber(storageGb) && Number.isSafeInteger(storageGb) && storageGb >= 1)) {
+    throw new Error("Invalid storageGb.");
+  }
   if (
     keyChangedAt !== undefined &&
     !(isNumber(keyChangedAt) && Number.isSafeInteger(keyChangedAt) && keyChangedAt >= 0)
@@ -318,6 +333,8 @@ function server(summary: DynamicRecord): ServerSummary {
     ...(hostedStart === undefined ? {} : { hostedStart: decodeHostedStart(hostedStart) }),
     ...(memberLimit === undefined ? {} : { memberLimit }),
     ...(hosted === undefined ? {} : { hosted }),
+    ...(restartAvailable === undefined ? {} : { restartAvailable }),
+    ...(storageGb === undefined ? {} : { storageGb }),
     ...(keyChangedAt === undefined ? {} : { keyChangedAt }),
     ...(thisComputer === undefined ? {} : { thisComputer }),
   };
@@ -379,10 +396,11 @@ function optionalReadState(conversation: DynamicRecord): { readState?: DirectCon
 }
 
 function teamMember(member: DynamicRecord): TeamMemberSummary {
-  const { avatarUrl } = member;
+  const { avatarUrl, chatColor } = member;
   if (avatarUrl !== undefined && avatarUrl !== null && !isString(avatarUrl)) {
     throw new Error("Invalid avatarUrl.");
   }
+  if (chatColor !== undefined && !isAvatarColor(chatColor)) throw new Error("Invalid chatColor.");
   return {
     id: requiredString(member, "id"),
     username: requiredString(member, "username"),
@@ -392,6 +410,7 @@ function teamMember(member: DynamicRecord): TeamMemberSummary {
     role: teamRole(member.role),
     createdAt: requiredString(member, "createdAt"),
     disabled: requiredBoolean(member, "disabled"),
+    ...(chatColor === undefined ? {} : { chatColor }),
   };
 }
 

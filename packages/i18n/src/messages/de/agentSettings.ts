@@ -84,7 +84,7 @@ export const messages = {
   "agentSettings.backupModels.intro":
     "Wenn {model} sein Nutzungslimit erreicht, bevor {name} zu schreiben beginnt, fragt {name} dich, welches Modell verwendet werden soll.",
   "agentSettings.backupModels.introAutomatic":
-    "Wenn {model} sein Nutzungslimit erreicht oder mit einem Anbieterfehler scheitert, bevor {name} zu schreiben beginnt, wechselt {name} zum ersten verfügbaren Modell in der Reihenfolge.",
+    "Wenn {model} sein Nutzungslimit erreicht, wechselt {name} zum ersten verfügbaren Modell in der Reihenfolge. {name} wechselt auch, wenn {model} mit einem Anbieterfehler scheitert, bevor {name} zu schreiben beginnt.",
   "agentSettings.backupModels.ask": "Vor dem Wechsel fragen",
   "agentSettings.backupModels.order": "Reihenfolge",
   "agentSettings.backupModels.listLabel": "Ersatzmodelle in Reihenfolge",
@@ -97,7 +97,7 @@ export const messages = {
   "agentSettings.backupModels.unavailable": "Gerade nicht verfügbar · übersprungen",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
   "agentSettings.backupModels.note":
-    "{name} wechselt nie, nachdem das Schreiben begonnen hat. Wenn das Limit endet oder 10 Minuten nach einem Anbieterfehler, kehrt {name} zu {model} zurück.",
+    "Stoppt ein Nutzungslimit {name} nach Beginn der Arbeit, setzt {name} dieselbe Arbeit mit dem ersten verfügbaren Modell der Reihenfolge fort. Wenn das Limit endet oder 10 Minuten nach einem Anbieterfehler, kehrt {name} zu {model} zurück.",
   "agentSettings.groups.brain": "Gehirn",
   "agentSettings.groups.knows": "Wissen",
   "agentSettings.groups.does": "Aufgaben",
@@ -128,6 +128,9 @@ export const messages = {
   "agentSettings.avatar.resetToId": "Auf ID zurücksetzen",
   "agentSettings.avatar.shape": "Form",
   "agentSettings.avatar.shuffle": "Zufälliges Gesicht",
+  "agentSettings.avatar.style": "Avatar-Stil",
+  "agentSettings.avatar.stylePlush": "Plüsch",
+  "agentSettings.avatar.styleFlat": "Flach",
   "agentSettings.avatar.shapes": "Avatar-Formen",
   "agentSettings.avatar.shapeOption": "Form {number}",
   "agentSettings.avatar.eyes": "Augen",
@@ -142,10 +145,6 @@ export const messages = {
   "agentSettings.avatar.processFailed": "Der Agentenavatar konnte nicht verarbeitet werden.",
   "agentSettings.runtime.model": "Agentenmodell",
   "agentSettings.runtime.modelUnavailable": "Modelle sind verfügbar, sobald sich eine Agenten-CLI verbindet.",
-  "agentSettings.runtime.reasoning": "Denkleistung",
-  "agentSettings.runtime.reasoningLabel": "Denkleistungsstufe des Agenten",
-  "agentSettings.runtime.selectReasoning": "Denkleistung auswählen",
-  "agentSettings.runtime.reasoningSetByProvider": "Von {provider}",
   "agentSettings.runtime.access": "Zugriff",
   "agentSettings.runtime.accessLabel": "Agentenzugriff",
   "agentSettings.runtime.busyMessage": "Während der Arbeit",
@@ -185,6 +184,15 @@ export const messages = {
     "Der Agent vergisst diesen Chat. Die Nachrichten bleiben über einer Trennlinie sichtbar. Anweisungen, Modell, Werkzeuge, Erinnerungen, Arbeitsbereich und Browser bleiben unverändert.",
   "agentSettings.newChat.confirm": "Neuen Chat starten",
   "agentSettings.newChat.failed": "Ein neuer Chat konnte nicht gestartet werden.",
+  "agentSettings.deleteHistory.title": "Verlauf löschen",
+  "agentSettings.deleteHistory.description":
+    "Die Nachrichten dieses Chats werden gelöscht, und der Agent vergisst sie. Seine Einrichtung bleibt.",
+  "agentSettings.deleteHistory.button": "Löschen",
+  "agentSettings.deleteHistory.confirmTitle": "Chatverlauf mit {name} löschen?",
+  "agentSettings.deleteHistory.confirmDescription":
+    "Alle Nachrichten und Dateien dieses Chats werden aus OpenBot gelöscht, und der Agent vergisst sie. Das lässt sich nicht rückgängig machen. Nebenthreads, Anweisungen, Modell, Tools, Erinnerungen, Arbeitsbereich und Browser ändern sich nicht.",
+  "agentSettings.deleteHistory.confirm": "Verlauf löschen",
+  "agentSettings.deleteHistory.failed": "Der Verlauf konnte nicht gelöscht werden.",
   "agentSettings.fullAccess.title": "Diesem Agenten vollen Zugriff geben?",
   "agentSettings.fullAccess.askTitle": "Diesen Agenten außerhalb seines Arbeitsbereichs arbeiten lassen?",
   "agentSettings.fullAccess.description":
@@ -231,8 +239,7 @@ export const messages = {
   "agentSettings.agentNewChat.description":
     "Der Agent darf einen neuen Chat starten, wenn sein Chat lang wird. Er speichert vorher Notizen.",
   "agentSettings.quickAcknowledgement.title": "Plan vor langen Aufgaben zeigen",
-  "agentSettings.quickAcknowledgement.description":
-    "Vor einer langen Aufgabe zeigt der Agent seinen Plan. Er beginnt nach 10 s oder wenn du auf Start drückst.",
+  "agentSettings.quickAcknowledgement.description": "Vor einer langen Aufgabe zeigt der Agent seinen Plan.",
   "agentSettings.browserProfile.label": "Browser-Profil",
   "agentSettings.browserProfile.shared": "Gemeinsam",
   "agentSettings.browserProfile.agent": "Nur dieser Agent",

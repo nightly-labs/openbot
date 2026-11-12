@@ -59,16 +59,30 @@ export const messages = {
   "error.team.providersUnsupported": "Esta conexão não oferece suporte às configurações de provedores.",
   "error.team.providerNotManaged": "O OpenBot não gerencia a CLI deste provedor.",
   "error.team.channelsUnsupported": "Esta conexão não oferece suporte a chats em canais.",
+  "error.team.channelContextUnsupported": "Esta conexão não suporta uma nova conversa nem compactação em um canal.",
   "error.team.channelPictureUnsupported": "Esta conexão não oferece suporte a imagens de canal.",
   "error.team.channelDeleteUnsupported": "Esta conexão não oferece suporte à exclusão de canais.",
+  "error.team.historyDeleteUnsupported": "Esta conexão não oferece suporte à exclusão do histórico.",
   "error.team.channelTaskCancelUnsupported": "Esta conexão não oferece suporte ao cancelamento de tarefas de canais.",
   "error.team.membersCannotDeleteChannels": "Membros não podem excluir canais.",
+  "error.team.membersCannotDeleteChannelHistory": "Membros não podem excluir o histórico do canal.",
   "error.team.membersCannotArchiveChannels": "Membros não podem arquivar canais.",
   "error.team.membersCannotRestoreChannels": "Membros não podem restaurar canais.",
   "error.team.sharedDataUnsupported": "Esta conexão não oferece suporte a dados compartilhados.",
   "error.team.agentInstallUnsupported": "Esta conexão não oferece suporte à adição de agentes.",
   "error.team.agentHideUnsupported": "Esta conexão não oferece suporte à ocultação de agentes.",
+  "error.team.agentColorsUnsupported": "Esta conexão não oferece suporte a cores de agentes.",
+  "error.team.chatColorsUnsupported": "Esta conexão não oferece suporte a cores de chat.",
+  "error.team.routineRunPlaceUnsupported": "Esta conexão não pode alterar onde uma rotina é executada.",
+  "error.team.routinesOnceUnsupported": "Esta conexão não pode salvar rotinas que são executadas uma vez.",
+  "error.team.routineRunCommandUnsupported": "Esta conexão não pode fornecer o comando de execução de uma rotina.",
+  "error.team.threadQueueUnsupported": "Esta conexão não pode mostrar a fila de uma thread paralela.",
+  "error.team.usageLimitUnsupported": "Esta conexão não pode mostrar nem alterar os limites de uso dos agentes.",
+  "error.team.hermesImportUnsupported": "Esta conexão não pode importar perfis do Hermes do servidor.",
+  "error.team.providerDetectionUnsupported":
+    "Esta conexão não pode encontrar os servidores de modelos e os agentes do servidor.",
   "error.team.sidebarFoldersUnsupported": "Esta conexão não oferece suporte a pastas dentro de pastas.",
+  "error.team.libraryFoldersUnsupported": "Esta conexão não oferece suporte a pastas da Biblioteca.",
   "error.team.agentNotificationLevelsUnsupported":
     "Este servidor não pode guardar seu próprio nível de notificações para cada agente. Atualize o OpenBot no computador que o executa.",
   "error.team.sidebarPinsUnsupported":
@@ -78,9 +92,13 @@ export const messages = {
   "error.team.agentUpdateUnsupported": "Esta conexão não oferece suporte à atualização de agentes.",
   "error.team.contextResetUnsupported": "Esta conexão não oferece suporte ao início de um novo chat.",
   "error.team.contextCompactUnsupported": "Esta conexão não permite compactar o contexto.",
+  "error.team.messageDeleteUnsupported": "Esta conexão não permite excluir mensagens.",
   "error.team.workspaceDirectoryUnsupported": "Esta conexão não oferece suporte à exibição de pastas.",
   "error.team.conversationFileSearchUnsupported": "Esta conexão não oferece suporte à pesquisa de arquivos.",
+  "error.team.threadMessageSearchUnsupported": "Esta conexão não oferece suporte à pesquisa em threads paralelas.",
   "error.team.sideQuestionUnsupported": "Esta conexão não oferece suporte a perguntas à parte.",
+  "error.team.liveVoiceUnsupported":
+    "Este servidor não oferece suporte à voz ao vivo do Codex. Atualize o OpenBot no computador que o executa.",
   "error.team.routineFlowsUnsupported":
     "Este servidor não oferece suporte a fluxos de rotinas. Atualize o OpenBot no computador que o executa.",
   "error.team.routineCanvasTooLarge":
@@ -105,7 +123,11 @@ export const messages = {
   "error.team.agentFoldersUnsupported": "Esta conexão não oferece suporte às pastas dos agentes.",
   "error.team.folderUnavailable": "Esta pasta não está disponível no computador host.",
   "error.team.memoryReviewUnsupported": "Esta conexão não oferece suporte à revisão de memórias.",
+  "error.team.skillLearningUnsupported": "Esta conexão não oferece suporte ao aprendizado de habilidades.",
+  "error.team.browsingMemoryUnsupported": "Esta conexão não oferece suporte a aprender com a navegação.",
   "error.team.promptCacheTtlUnsupported": "Esta conexão não oferece suporte à duração do cache de prompts.",
+  "error.team.claudeUserSetupUnsupported": "Esta conexão não suporta a opção de configuração do Claude Code.",
+  "error.team.claudeCompactWindowUnsupported": "Esta conexão não oferece suporte ao tamanho de compactação do Claude.",
   "error.team.modelVisibilityUnsupported": "Esta conexão não oferece suporte à lista de modelos.",
   "error.team.providerDefaultUnsupported": "Esta conexão não oferece suporte ao provedor padrão.",
   "error.team.attachmentNameRequired": "É necessário informar um nome seguro para o anexo.",
@@ -115,6 +137,8 @@ export const messages = {
   "error.team.browserViewUnavailable": "A visualização ao vivo do navegador está indisponível.",
   "error.team.browserSessionNotFound": "Sessão de visualização do navegador não encontrada.",
   "error.team.mcpUnsupported": "Esta conexão não oferece suporte a servidores MCP.",
+  "error.team.mcpServerListNeedsUpdate":
+    "Atualize o OpenBot neste dispositivo para usar mais de {limit} servidores MCP neste servidor.",
   "error.team.storageUnsupported": "Esta conexão não oferece suporte a armazenamento.",
   "error.team.machineResourcesUnsupported": "Esta conexão não oferece suporte ao uso da máquina.",
   "error.team.machineAlertMemberInvalid":
@@ -140,6 +164,8 @@ export const messages = {
   "error.team.secureAuthUnsupported": "Este cliente não oferece suporte à autenticação segura.",
   "error.team.agentSettingsUnsupported": "Esta conexão não oferece suporte às configurações de agentes.",
   "error.team.adminRequired": "É necessário acesso de administrador.",
+  "error.team.mcpAccessStale": "Alguém alterou o acesso a este servidor MCP. Faça a alteração novamente.",
+  "error.team.mcpServerNotYours": "Só a pessoa que adicionou este servidor MCP, ou um administrador, pode alterá-lo.",
   "error.team.ownerRequired": "Só o proprietário deste servidor pode fazer isso.",
   "error.team.requestTooLarge": "O corpo da solicitação é muito grande.",
   "error.team.signInRelayUnsupported":
@@ -153,4 +179,12 @@ export const messages = {
   "error.team.signInRelayUsed": "Este login já foi enviado.",
   "error.team.signInRelayMismatch": "Este endereço não é deste login.",
   "error.team.signInRelayLinkUnknown": "Nenhum agente deste servidor mostrou este link de login.",
+  "error.team.hostPersonalityUnsupported": "Esta conexão não suporta a personalidade do servidor.",
+  "error.team.agentWaitsUnsupported": "Esta conexão não suporta esperas abertas.",
+  "error.team.messagePinsUnsupported": "Esta conexão não oferece suporte a mensagens fixadas.",
+  "error.team.queuedMessageThreadUnsupported":
+    "Esta conexão não suporta executar uma mensagem na fila como um novo tópico.",
+  "error.team.backgroundProcessesUnsupported": "Esta conexão não suporta processos em segundo plano.",
+  "error.team.providerUseUnsupported": "Esta conexão não suporta ativar e desativar provedores.",
+  "error.team.providerUseInvalid": "Este provedor não tem um interruptor de ativação.",
 } as const satisfies PartialTranslation<typeof source>;

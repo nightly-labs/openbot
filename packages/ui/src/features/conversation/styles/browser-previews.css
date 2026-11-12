@@ -3,27 +3,10 @@
   display: none;
 }
 
-.browser-preview-header {
-  display: flex;
-  height: var(--left-header-height, 38px);
-  flex: 0 0 auto;
-  align-items: center;
-  gap: var(--openbot-space-1);
-  padding: 0 var(--openbot-space-3);
-  color: var(--openbot-text-secondary);
-}
-
-.browser-preview-header > span {
-  flex: 1;
-  font-size: var(--openbot-text-sm);
-}
-
-.browser-preview-header > .ui-button,
 .browser-preview-close {
   border-radius: var(--openbot-radius-sm);
 }
 
-.browser-preview-header > .ui-button:focus-visible,
 .browser-preview-close:focus-visible {
   outline: 1px solid var(--openbot-text-muted);
   outline-offset: 1px;
@@ -33,12 +16,6 @@
 .browser-preview-sidebar .ui-button:active:not(:disabled):not([data-disabled]) {
   background: var(--openbot-bg-control-active);
   color: var(--openbot-text-primary);
-}
-
-.browser-preview-header > .ui-button > svg {
-  width: var(--openbot-icon-sm);
-  height: var(--openbot-icon-sm);
-  stroke-width: var(--openbot-icon-stroke);
 }
 
 .browser-preview-list {
@@ -60,7 +37,7 @@
   width: var(--openbot-icon-lg);
   height: var(--openbot-icon-lg);
   color: var(--openbot-text-muted);
-  stroke-width: var(--openbot-icon-stroke);
+  stroke-width: var(--openbot-icon-stroke-lg);
 }
 
 .browser-preview-list > .browser-empty-state > svg {
@@ -150,7 +127,7 @@
 .browser-preview-close {
   position: absolute;
   top: var(--openbot-space-2);
-  right: var(--openbot-space-2);
+  inset-inline-end: var(--openbot-space-2);
   opacity: 0;
 }
 
@@ -166,7 +143,7 @@
 }
 
 /* The code or the password the agent asks for: the site, the value and Submit. The inner parts are glass
-   in both variants; the timeline card keeps its frame, and the island has a denser glass of its own, so that
+   in both variants; the timeline card is a block, and the island has a denser glass of its own, so that
    the page under it does not show through as dark shapes behind the code. */
 .browser-secret-card {
   --otp-slot-border: var(--openbot-glass-border);
@@ -174,12 +151,22 @@
   --otp-slot-filled-background: var(--openbot-glass-surface-hover);
   --otp-slot-shadow: inset 0 1px 0 var(--openbot-glass-highlight);
 
-  display: grid;
-  gap: var(--openbot-space-4);
   color: var(--openbot-text-primary);
 }
 
+/* The site is never cut: the user checks it before the value goes there. */
+.browser-secret-card .ui-block-subtitle {
+  overflow-wrap: anywhere;
+}
+
+.browser-secret-fields {
+  display: grid;
+  min-width: 0;
+}
+
 .browser-secret-card[data-variant="island"] {
+  display: grid;
+  gap: var(--openbot-space-4);
   box-sizing: border-box;
   width: min(100%, 420px);
   min-width: 0;
@@ -199,7 +186,7 @@
 
 .browser-secret-close {
   flex: none;
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 
 .browser-secret-icon {
@@ -278,7 +265,7 @@
 /* Under the label, past the box. */
 .browser-secret-save-hint {
   margin: 0;
-  padding-left: calc(var(--openbot-icon-sm) + var(--openbot-space-1-5));
+  padding-inline-start: calc(var(--openbot-icon-sm) + var(--openbot-space-1-5));
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
 }
@@ -305,6 +292,11 @@
   gap: var(--openbot-space-1-5);
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
+}
+
+/* The note keeps a readable width; the buttons go to the next row first. */
+.browser-secret-card .ui-block-card-footer > .browser-secret-private {
+  flex: 1 1 12rem;
 }
 
 .browser-secret-glyph-sm {

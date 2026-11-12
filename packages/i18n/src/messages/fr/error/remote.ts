@@ -9,6 +9,8 @@ export const messages = {
   "error.remote.desktopTestUnavailable": "Le test du bureau à distance n’est pas disponible.",
   "error.remote.controlUnavailable": "Le contrôle à distance n’est pas disponible.",
   "error.remote.controlSessionNotFound": "Session de contrôle à distance introuvable.",
+  "error.remote.controlNotAllowed": "Le propriétaire de cet ordinateur ne permet pas à votre rôle de le contrôler.",
+  "error.remote.controlDeclined": "La personne devant cet ordinateur n’a pas autorisé le contrôle à distance.",
   "error.remote.testRuntimeUpdate": "Mettez à jour le runtime macOS du bureau à distance pour lancer ce test.",
   "error.remote.testOtherSessions": "Terminez les autres sessions de bureau à distance avant de lancer un test.",
   "error.remote.testPermissions":
@@ -191,12 +193,14 @@ export const messages = {
   "error.remote.hostNotRegistered": "Cet hôte n’est plus enregistré auprès du service OpenBot.",
   "error.remote.membershipEnded":
     "Vous n’êtes plus membre de cet hôte. Demandez une nouvelle invitation au propriétaire.",
+  "error.remote.membershipChanged": "Quelqu’un a modifié ce membre au même moment. Rechargez les membres et réessayez.",
   "error.remote.accountSessionInactive": "Votre connexion n’est plus active. Reconnectez-vous.",
   "error.remote.hostOtherAccount": "Cet hôte appartient à un autre compte.",
   "error.remote.remoteNotConfigured": "Les connexions à distance ne sont pas configurées sur ce service OpenBot.",
   "error.remote.hostRefused": "L’hôte a refusé la demande ({status}).",
   "error.remote.formUnavailable": "Ce formulaire n’est plus disponible.",
   "error.remote.hostedServerRemoval": "Utilisez « Facturation » pour supprimer un serveur hébergé.",
+  "error.remote.hostRemoved": "Le propriétaire a retiré ce serveur du compte.",
   "error.remote.channelsUnsupported": "Mettez à jour ce serveur de bureau pour utiliser les canaux.",
   "error.remote.channelDeleteUnsupported": "Mettez à jour ce serveur de bureau pour supprimer des canaux.",
   "error.remote.historyRefreshFailed":

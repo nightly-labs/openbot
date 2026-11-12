@@ -1,4 +1,5 @@
 import type { ChannelSummary } from "@openbot/contracts/ipc";
+import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { createRemoteConnectionRecovery, type RemoteRecoveryStatus } from "@openbot/team-client/remote-recovery";
@@ -93,6 +94,8 @@ const ServerScope = createSimpleContext({
       applyStoredAgents,
       applyFrameAgents,
       applyUserHiddenAgents,
+      applyOwnAgentLevels,
+      ownAgentLevelsApplied,
       userHiddenAgents,
     } = useAgents();
     const {
@@ -118,6 +121,8 @@ const ServerScope = createSimpleContext({
     const [frameChannels, setFrameChannels] = createSignal<ChannelSummary[]>([]);
     const [connection, setConnection] = createStore<{
       hasContent: boolean;
+      /** The workspace was ready once. A saved frame sets `hasContent` before that, so the startup screen waits for this. */
+      synced: boolean;
       loading: boolean;
       sequence: number | undefined;
       failed: boolean;
@@ -128,6 +133,7 @@ const ServerScope = createSimpleContext({
       recovery: RemoteRecoveryStatus;
     }>({
       hasContent: false,
+      synced: false,
       loading: true,
       sequence: undefined,
       failed: false,
@@ -137,13 +143,24 @@ const ServerScope = createSimpleContext({
       recovery: { phase: "connecting", attempt: 0, remainingSeconds: 0 },
     });
     const selectedServer = () => servers().find((candidate) => candidate.id === activeServerId());
-    const transportReady = () => selectedServer()?.kind !== "remote" || selectedServer()?.state === "online";
+    // Main refuses a remote request until it knows the account. A load started before then fails, and
+    // the workspace shows that failure for a moment when the account comes.
+    const transportReady = () =>
+      selectedServer()?.kind !== "remote" ||
+      (selectedServer()?.state === "online" && centralAuth().status !== "loading");
     const loaded = () =>
       connection.hasContent &&
       !connection.loading &&
       connection.sequence === selectedServer()?.connectionSequence &&
       connection.recovery.phase === "online" &&
       transportReady();
+    // Only a reconnect shows the notice over the workspace. The first load keeps the startup screen.
+    createEffect(loaded, (ready) => {
+      if (ready)
+        setConnection((draft) => {
+          draft.synced = true;
+        });
+    });
     const recovery = createRemoteConnectionRecovery(
       loadWorkspace,
       (error) => {
@@ -269,6 +286,18 @@ const ServerScope = createSimpleContext({
             })
             .catch(failed),
         );
+      }
+      // The user's own level of each agent, for the mute item of the agent menu and for the sounds.
+      // A read that fails keeps the menu as it is: an event or the next load gives the levels.
+      if (server && serverSupportsCapability(server, AGENT_NOTIFICATION_LEVELS_CAPABILITY)) {
+        const appliedBefore = ownAgentLevelsApplied();
+        void serversPort()
+          .agent.listAgentNotificationLevels(server.id)
+          .then((value) => {
+            // A write or an event during the read is newer than its answer.
+            if (isCurrent() && ownAgentLevelsApplied() === appliedBefore) applyOwnAgentLevels(value);
+          })
+          .catch(() => undefined);
       }
       if (supportsBrowser(server)) {
         const applyDisplayState = beginBrowserLoad();

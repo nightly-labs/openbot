@@ -33,10 +33,20 @@ declare class SpeechModule extends NativeModule<SpeechEvents> {
   /** Stops the part that plays and drops the parts that wait. */
   stop(): void;
   /**
+   * Plays every part at this speed, also the part that plays now. 1 is normal speed; the pitch stays
+   * the same. Optional: an app binary from before it does not have it.
+   */
+  setSpeed?(speed: number): void;
+  /**
    * Loads Parakeet from its model directory. The same directory keeps the loaded model. Optional: an
    * app binary from before speech recognition does not have it.
    */
   loadRecognizer?(directory: string, threads: number): Promise<void>;
+  /**
+   * Loads Qwen3-ASR from its model directory, in place of a loaded Parakeet. Optional: an app binary
+   * from before Qwen3-ASR does not have it.
+   */
+  loadQwenRecognizer?(directory: string, threads: number): Promise<void>;
   unloadRecognizer?(): Promise<void>;
   /** Opens the microphone. The microphone permission must be granted first. */
   startCapture?(mode: CaptureMode): Promise<void>;
@@ -49,6 +59,12 @@ declare class SpeechModule extends NativeModule<SpeechEvents> {
    * from before it does not have it. No-op on Android.
    */
   allowHapticsWhileRecording?(): void;
+  /**
+   * GPT live voice: `true` plays the WebRTC call on the loudspeaker, or on a connected headset, with
+   * echo cancellation on; `false` gives the audio back after the call. Optional: an app binary from
+   * before it does not have it.
+   */
+  setCallAudio?(active: boolean): void;
 }
 
 /**

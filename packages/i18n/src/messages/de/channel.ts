@@ -9,6 +9,10 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "Gestoppte Aufgabe von {name} neu zuweisen",
   "channel.stoppedTask.reassign": "Neu zuweisen",
   "channel.stoppedTask.cancel": "Aufgabe abbrechen",
+  "channel.stoppedTask.assignmentLoop":
+    "{names} haben diese Aufgabe zu oft untereinander weitergegeben. Sie wurde gestoppt, um eine Schleife zu verhindern.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "Die Mitglieder haben diese Aufgabe zu oft untereinander weitergegeben. Sie wurde gestoppt, um eine Schleife zu verhindern.",
   "channel.conversation.noMembers": "Füge in den Kanaleinstellungen Agenten hinzu, um mit der Arbeit zu beginnen.",
   "channel.conversation.archivedNotice": "Gelöschter Kanal. Nur Vorschau.",
   "channel.composer.label": "Nachricht an den Kanal",
@@ -20,10 +24,35 @@ export const messages = {
   "channel.settings.isolated": "Erinnerungen in diesem Kanal behalten",
   "channel.settings.isolatedDescription":
     "Agenten speichern, was sie hier lernen, als Kanalerinnerungen. Ihre anderen Chats sehen sie nicht.",
+  "channel.settings.browser": "Browser",
+  "channel.settings.browserEveryone": "Alle Mitglieder",
+  "channel.settings.browserNone": "Niemand",
   "channel.settings.memoryCount": {
     one: "{count} gespeichert",
     other: "{count} gespeichert",
   },
+  "channel.settings.newConversation.title": "Neue Unterhaltung",
+  "channel.settings.newConversation.description":
+    "Die Mitglieder vergessen die früheren Nachrichten. Die Kanaleinstellungen bleiben.",
+  "channel.settings.newConversation.button": "Starten",
+  "channel.settings.newConversation.confirmTitle": "Eine neue Unterhaltung in {name} starten?",
+  "channel.settings.newConversation.confirmDescription":
+    "Die Mitglieder vergessen die früheren Nachrichten dieses Kanals. Die Nachrichten bleiben über einer Trennlinie sichtbar. Mitglieder, Anweisungen, Erinnerungen und Routinen ändern sich nicht.",
+  "channel.settings.newConversation.confirm": "Neue Unterhaltung starten",
+  "channel.settings.newConversation.failed": "Die neue Unterhaltung konnte nicht gestartet werden.",
+  "channel.settings.compact.title": "Kontext komprimieren",
+  "channel.settings.compact.description":
+    "Die Mitglieder behalten eine kurze Zusammenfassung ihrer Kanalsitzung und verbrauchen weniger Tokens.",
+  "channel.settings.compact.failed": "Der Kanalkontext konnte nicht komprimiert werden.",
+  "channel.settings.deleteHistory.title": "Verlauf löschen",
+  "channel.settings.deleteHistory.description":
+    "Die Nachrichten werden gelöscht, und die Mitglieder vergessen sie. Die Kanaleinrichtung bleibt.",
+  "channel.settings.deleteHistory.button": "Löschen",
+  "channel.settings.deleteHistory.confirmTitle": "Verlauf von {name} löschen?",
+  "channel.settings.deleteHistory.confirmDescription":
+    "Alle Nachrichten und Dateien dieses Kanals werden aus OpenBot gelöscht, und die Mitglieder vergessen sie. Das lässt sich nicht rückgängig machen. Mitglieder, Anweisungen, Erinnerungen, Routinen und Aufgaben ändern sich nicht.",
+  "channel.settings.deleteHistory.confirm": "Verlauf löschen",
+  "channel.settings.deleteHistory.failed": "Der Verlauf konnte nicht gelöscht werden.",
   "channel.settings.routines": "Routinen",
   "channel.settings.routineCount": {
     one: "{count} eingerichtet",

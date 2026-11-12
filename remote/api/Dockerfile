@@ -11,6 +11,7 @@ COPY packages/logging/package.json ./packages/logging/package.json
 COPY packages/telemetry/package.json ./packages/telemetry/package.json
 COPY packages/user-errors/package.json ./packages/user-errors/package.json
 COPY packages/team-client/package.json ./packages/team-client/package.json
+COPY packages/whatsapp/package.json ./packages/whatsapp/package.json
 COPY remote/api/package.json ./remote/api/package.json
 RUN bun install --production --ignore-scripts --frozen-lockfile --filter @openbot/remote-api
 

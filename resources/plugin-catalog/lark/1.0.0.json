@@ -1,0 +1,33 @@
+{
+  "slug": "lark",
+  "name": "Lark",
+  "tagline": "Docs and team messaging",
+  "description": "Lark lets agents search, read, create, and comment on docs, read group chats and messages, and find users in the signed-in Lark workspace. Each user signs in to their own Lark account through the browser.",
+  "category": "documents",
+  "creatorName": "Lark Technologies",
+  "iconUrl": "https://www.larksuite.com/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-find-doc", "text": "Find the latest product roadmap doc and summarize it." },
+    { "id": "prompt-chat-summary", "text": "Summarize today's messages in the project group chat." },
+    { "id": "prompt-draft-doc", "text": "Create a doc with meeting notes from these bullet points." }
+  ],
+  "apps": [
+    {
+      "id": "app-lark-mcp",
+      "name": "Lark",
+      "description": "Docs, group chats, and user search, over Lark's MCP server with browser sign-in.",
+      "iconUrl": "https://www.larksuite.com/favicon.ico",
+      "server": {
+        "name": "lark",
+        "transport": "http",
+        "url": "https://mcp.larksuite.com/mcp",
+        "auth": [{ "id": "lark-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.larksuite.com",
+  "privacyPolicyUrl": "https://www.larksuite.com/en_us/privacy-policy",
+  "termsUrl": "https://www.larksuite.com/en_us/user-terms-of-service",
+  "skills": []
+}

@@ -41,14 +41,42 @@ adding a module or moving ownership between workspaces.
 
 - Workspaces, conversations, attachments, browser data, and team data stay on the computer that
   runs OpenBot. Providers, visited pages, and plugins can use the network. Exception: a signed-in
-  phone keeps an encrypted, read-only copy of the agents, sections, recent chats and drawer values of
-  its servers (`apps/mobile/src/features/workspace/model/workspace-cache.ts`). The copy stays on that phone,
-  the host stays the source of truth, and sign-out, session expiry and server removal delete it.
+  phone keeps an encrypted, read-only copy of the agents, sections, recent chats, channels and drawer
+  values of its servers (`apps/mobile/src/features/workspace/model/workspace-cache.ts`). The copy stays
+  on that phone, the host stays the source of truth, and sign-out, session expiry and server removal delete it.
+  A desktop or browser client also keeps a copy of the agent and channel pictures that it loaded from a
+  joined server (`src/main/remote-picture-cache.ts`,
+  `src/renderer/src/features/web-client/web-agent-pictures.ts`), so the saved workspace shows the agent
+  pictures while the host is offline. Sign-out, server removal and the end of access delete it.
 - Cloudflare holds accounts, avatars, host configuration, memberships, invitations, and logical
-  sessions; it does not hold chats, files, or commands.
+  sessions; it does not hold chats, files, or commands. It also holds the signed JavaScript bundles
+  of mobile over-the-air updates (`apps/mobile-updates`), which are public code and have no user data.
 - The user's SQLite database is the source of truth, not a remote cache.
 - Agents keep their workspace, thread, and identity across provider switches and restarts.
   Do not reset an agent to simplify state.
+
+## Joined servers
+
+Many users run OpenBot only on a joined server: a VPS, a hosted server, or another member's computer.
+A feature for agents, chats, channels, routines or server settings must work there as it does on
+this computer. Make it local only when it needs this computer itself: its files and folders, its
+windows, its OS dialogs or its native notifications.
+
+- Ship the remote path in the same change as the local one: the host route in `src/main/team-api/`,
+  a new optional capability in `packages/contracts/src/team-protocol/` (see
+  [packages/contracts/AGENTS.md](packages/contracts/AGENTS.md)), the `remote` branch of the IPC
+  handler, and each client: the desktop with a joined server, the web client
+  (`src/renderer/src/features/web-client/`), and mobile (`apps/mobile`) when the action fits a phone.
+- Do not add a `remote` branch that always throws or returns empty data, or a `kind === "local"`
+  gate, for a feature that can work on a server. When a part must stay local, write the reason at
+  the gate and in the PR.
+- Gate the client on the host capability. Hide the action while the host does not have it; do not
+  show an action that then fails. An older host keeps working without the feature.
+- Test the host route through the Team API (as `scripts/team-api-routes-e2e.ts` does), not only the
+  local IPC path.
+- A server installs a staged release only at its next boot, or when an owner, an admin or a permitted
+  member installs it in Server Settings > Updates. When a feature needs the new host, the release
+  notes say that the server must also be on the new version.
 
 ## Effect
 
@@ -133,7 +161,10 @@ and the separate Node and Bun type environments. Read them when changing checks 
 State which surfaces a change touches. Check all affected consumers and reverse actions.
 
 - Desktop renderer (`src/renderer`), mobile (`apps/mobile`), public web (`apps/auth-api`; no separate
-  landing app), hosted-site routing (`apps/site-router`), and Signal (`remote/api`).
+  landing app), hosted-site routing (`apps/site-router`), the mobile update server
+  (`apps/mobile-updates`), and Signal (`remote/api`).
+- Joined servers: the desktop with a joined server, the web client (`openbot.run/app`), and mobile.
+  See [Joined servers](#joined-servers).
 - IPC contracts (`packages/contracts`) and their preview implementation
   (`src/renderer/src/preview/mock-openbot.ts`).
 - Reverse actions: snooze/unsnooze, pause/resume, revoke/reconnect, mute/unmute.
@@ -165,6 +196,11 @@ State which surfaces a change touches. Check all affected consumers and reverse 
   has no `.env.keys`; use the one in the main checkout. Never print the token: do not use
   `dotenvx get` or `echo`. Ask before a change that deletes data or affects production users.
   Deploy scripts remove the token, so Wrangler deploys keep the developer's `wrangler login`.
+- For provider harness tests and smoke checks, `apps/auth-api/.env.dev` holds `INCEPTION_API_KEY`
+  (Inception Labs, OpenAI-compatible, `https://api.inceptionlabs.ai/v1`, models such as `mercury-3`).
+  Load it with `bunx @dotenvx/dotenvx@2.38.2 run -f apps/auth-api/.env.dev -fk <root>/.env.keys --
+  <command>`; `bun run dev` does not pass it on. Never print it. Ask before a benchmark or a run of many
+  turns: the token budget is small.
 
 See [account service setup](apps/auth-api/README.md) for loading and deployment details.
 
@@ -263,10 +299,9 @@ They describe the enforced syntax, fixture behavior, and reasons for removed rul
 ## Pull requests
 
 - Open a PR only when asked.
-- Write the PR body from `.github/PULL_REQUEST_TEMPLATE.md`. Do not add the Contributor Assignment
-  Agreement box: organization members and users with write access do not sign. The `CLA` workflow
-  adds the box only for an author who must sign. Only the human author can sign it: tick that box
-  only after their explicit approval in this conversation.
+- Write the PR body from `.github/PULL_REQUEST_TEMPLATE.md`. Organization members and users with
+  write access do not sign the Contributor License Agreement. An author who must sign sends a signed
+  PDF by email. Never sign, fill in, or send the agreement for the author.
 - For UI changes, show before and after. State the model and harness in the PR body.
   Do not commit screenshots or other PR review image assets to the repository.
 - Do not run wider checks locally before a PR. Report focused checks and leave broad checks to CI.

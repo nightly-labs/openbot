@@ -10,13 +10,13 @@ import Share from "lucide-react-native/icons/share";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useWindowDimensions, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import { useUniwind } from "uniwind";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { MAX_FRAME_WIDTH } from "../model/attachment-frame";
 import { useAudioWaveform, WAVEFORM_BARS } from "../model/audio-waveforms";
+import { playbackTime } from "../model/playback-time";
 import type { AttachmentTint } from "./chat-attachment";
-import { playbackTime, runFileAction } from "./chat-video.native";
+import { runFileAction } from "./chat-video.native";
 import { useHistoryShown } from "./use-history-shown";
 import { useListSettled } from "./use-list-settled";
 import { useMediaFile } from "./use-media-file";
@@ -142,15 +142,10 @@ function AudioCard({
 }: AudioAttachmentProps & { query: MediaFileQuery; uri: string | null; player: VideoPlayer | null }) {
   const text = useText();
   const { t, format, sourceText } = text;
-  const [muted, themeAccentForeground, foreground] = useThemeColor(["muted", "accent-foreground", "foreground"]);
-  const { theme } = useUniwind();
-  // On the agent color the icon is white in dark mode, and dark in light mode, as the user's
-  // messages are. Without agent colors the button has the chat background and the text color.
-  const accentForeground = tint
-    ? theme === "dark"
-      ? String(themeAccentForeground)
-      : tint.foreground
-    : String(foreground);
+  const [muted, foreground] = useThemeColor(["muted", "foreground"]);
+  // On the message color the icon has the text color of the user's messages, which reads on that
+  // color. Without a message color the button has the chat background and the text color.
+  const accentForeground = tint ? tint.foreground : String(foreground);
   const { width } = useWindowDimensions();
   const playback = usePlayback(player);
   const waveform = useAudioWaveform(`${serverId}:${attachment.id}`, uri);
@@ -444,7 +439,8 @@ function AudioWaveform({
           else if (nativeEvent.actionName === "decrement") onStep(-1);
         }}
         className="min-w-0 flex-1 flex-row items-center justify-between"
-        style={{ height: WAVE_HEIGHT + 4 }}
+        // A recording plays left to right in every language, as the touch position counts it.
+        style={{ height: WAVE_HEIGHT + 4, direction: "ltr" }}
         onLayout={(event) => setTrackWidth(Math.round(event.nativeEvent.layout.width))}
       >
         {bars.map(({ peak, place }) => {

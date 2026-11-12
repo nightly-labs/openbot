@@ -4,7 +4,9 @@ import {
   DEFAULT_APP_APPEARANCE,
   DEFAULT_TRANSPARENT_WINDOW,
   isAppAppearance,
+  isAppFontFamily,
   isAppThemePaletteId,
+  isChatBackgroundColor,
   type SetAppAppearancePreferenceInput,
   sameThemePalettes,
 } from "@openbot/contracts/ipc";
@@ -15,7 +17,16 @@ import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } f
 import { readThemePalettes, watchThemePalettes } from "./theme-palette-files";
 
 /** What the file holds. The palettes are not saved: they are read from their own files. */
-type StoredAppearancePreference = Pick<AppAppearancePreference, "appearance" | "transparentWindow" | "palette"> & {
+type StoredAppearancePreference = Pick<
+  AppAppearancePreference,
+  | "appearance"
+  | "transparentWindow"
+  | "palette"
+  | "chatBackgroundLight"
+  | "chatBackgroundDark"
+  | "interfaceFont"
+  | "codeFont"
+> & {
   /**
    * False until the user picks a theme in Settings: a light, dark or system choice, or a palette.
    * While it is false, `palette` is the palette that shows: the first one, also one that appears after
@@ -30,6 +41,10 @@ const DEFAULT_PREFERENCE: StoredAppearancePreference = {
   appearance: DEFAULT_APP_APPEARANCE,
   transparentWindow: DEFAULT_TRANSPARENT_WINDOW,
   palette: null,
+  chatBackgroundLight: null,
+  chatBackgroundDark: null,
+  interfaceFont: null,
+  codeFont: null,
   themeChosen: false,
 };
 
@@ -38,7 +53,10 @@ const DEFAULT_PREFERENCE: StoredAppearancePreference = {
  * appearance this build does not offer reads as a chosen Dark: a lost choice must not stop the app
  * from starting, and must not let a palette replace it. A file with no `transparentWindow` reads as
  * an opaque window. A file with no `palette`, which every file before palettes is, reads as no
- * palette, and one with no `themeChosen` as a chosen theme: the user saved it.
+ * palette, and one with no `themeChosen` as a chosen theme: the user saved it. A file with no chat
+ * background, or with a value that is not a color, reads as the color of the theme. A file with no
+ * font, which every file before the font choice is, or with a name that cannot go into a CSS font
+ * list, reads as the default font.
  */
 const readAppearancePreference = Effect.fn("AppearancePreference.read")(function* (path: string) {
   const read = yield* Effect.result(
@@ -49,6 +67,10 @@ const readAppearancePreference = Effect.fn("AppearancePreference.read")(function
         appearance: parsed.appearance,
         transparentWindow: parsed.transparentWindow === true,
         palette: isAppThemePaletteId(parsed.palette) ? parsed.palette : null,
+        chatBackgroundLight: isChatBackgroundColor(parsed.chatBackgroundLight) ? parsed.chatBackgroundLight : null,
+        chatBackgroundDark: isChatBackgroundColor(parsed.chatBackgroundDark) ? parsed.chatBackgroundDark : null,
+        interfaceFont: isAppFontFamily(parsed.interfaceFont) ? parsed.interfaceFont : null,
+        codeFont: isAppFontFamily(parsed.codeFont) ? parsed.codeFont : null,
         themeChosen: parsed.themeChosen !== false,
       };
     }),
@@ -57,6 +79,13 @@ const readAppearancePreference = Effect.fn("AppearancePreference.read")(function
   return isMissingFileError(read.failure.cause)
     ? { ...DEFAULT_PREFERENCE }
     : { ...DEFAULT_PREFERENCE, themeChosen: true };
+});
+
+/** The saved transparent window choice, read before the service exists, so the first window is built with it. */
+export const readSavedTransparentWindow = Effect.fn("AppearancePreference.readTransparentWindow")(function* (
+  path: string,
+) {
+  return (yield* readAppearancePreference(path)).transparentWindow;
 });
 
 const writeAppearancePreference = Effect.fn("AppearancePreference.write")(function* (
@@ -102,6 +131,10 @@ export class AppearanceService {
       transparentWindow: this.#supportsTransparentWindow && this.#preference.transparentWindow,
       palette,
       palettes: this.#palettes.map((item) => ({ ...item, colors: { ...item.colors } })),
+      chatBackgroundLight: this.#preference.chatBackgroundLight,
+      chatBackgroundDark: this.#preference.chatBackgroundDark,
+      interfaceFont: this.#preference.interfaceFont,
+      codeFont: this.#preference.codeFont,
     };
   }
 

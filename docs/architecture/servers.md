@@ -30,7 +30,17 @@ codec in `team-protocol/storage-v1.ts`. The host advertises it only when its sto
 exists. Every member reads usage; delete and clear need an owner or admin (`requireAdmin`), and the
 renderer hides those controls from a member. The wire carries no absolute paths, and workspace and
 download files travel only as category totals. A host without the capability reads as null, and the
-surface asks for an update; a change is refused before any request.
+surface asks for an update; a change is refused before any request. The desktop Library page and
+the phone Library (the server drawer) read the same `host` scope. The file types, the type filter
+and the order of both are in `@openbot/team-client/stored-files`.
+
+The optional `storage-channel-v1` capability adds `POST /v1/storage/channel-files`
+(`team-protocol/storage-channel-v1.ts`), with `channelId` and an optional `force`. It answers the file
+rows of the `channel` scope: the files of that channel's messages, with the message that carries each
+one. Every member who sees the channel can read them, as the channel routes decide; a channel that the
+member cannot see, or that the host does not have, gets 404. A delete stays on
+`/v1/storage/delete-file`, for an owner or an admin. The channel Files pane is shown only on a host
+with the capability.
 
 The optional `storage-disk-v1` capability adds `POST /v1/storage/disk` (`team-protocol/storage-disk-v1.ts`).
 It answers the free and total bytes of the disk that holds the host data, from one `statfs` call
@@ -40,6 +50,25 @@ start, every five minutes, and when Server settings closes. Under 10% free (at m
 says "Storage almost full" and can be closed until the next level; under 2% free (at most 1 GB) it
 is red and cannot be closed. "Free up space" opens Server settings › Storage. A host without the
 capability shows no card.
+
+The optional `library-folders-v1` capability (`team-protocol/library-folders-v1.ts`, protocol 9 only)
+adds `POST /v1/library-folders` and `POST /v1/library-folders/actions` for the folders of the Library
+page. Each agent has folders for its files, five levels in all, and a file is in one folder of its
+agent or in none. The folders are a layout over the stored files: a change moves, copies and deletes
+no file. The host keeps them in `openbot-library-folders-v1.json` in its user data
+(`src/backend/library-folders-store.ts`), and `src/main/library-folders-service.ts` applies each change
+for the `storage:getLibraryFolders` and `storage:changeLibraryFolders` IPC of this computer and for the
+route, so a joined server uses the same rules. The service reads the agent of a file from the `host`
+scan, and scans one more time when the kept scan result does not have the file. Every member reads
+the folders of each agent that they can see. A member changes the folders of an agent only with `chat`
+access to it, and gets 403 without it; an owner or an admin changes all folders. A member gets no folder of an agent that they cannot see or that the host no longer
+has, and no file that is in one, as in `storage-v1`. An action that names an agent that they cannot see, a folder of one or a file in
+one gets 404. A refused change is 404 for
+an agent, a folder or a file that the host does not have, and 400 for each other rule. Each route
+answers the full snapshot that the member can see. There is no event: a client reads the snapshot
+again. The read is a passive route. A deleted agent loses its folders, and a file that an owner or
+admin deletes leaves its folder. A host without the capability reads as null, and a change is refused
+before any request. The instance transfer does not carry the folders.
 
 The optional `machine-resources-v1` capability (`team-protocol/machine-resources-v1.ts`) adds the
 machine part at the top of Server settings › Storage, for an owner or admin only. `POST
@@ -73,13 +102,46 @@ A hosted site belongs to the server that published it (`hosted_sites.server_id`,
 stays the accountable owner, for abuse reports, blocks and account deletion. The desktop sends
 `OpenBot-Host-Id` and `OpenBot-Host-Token` (the machine token of `/v2/remote/hosts/register`) on each
 `/v1/sites` request when it is a registered server. The Worker checks the hash and that the host owner
-is the request user; a wrong token is refused with 401, never counted as unlinked. The active-site
-limit comes from the server's plan (`siteLimitForPlan`: none 1, Starter 3, Standard 10, Pro 50). A
-request with no server headers creates only into the account's unlinked bucket (limit 1,
-`server_id IS NULL`); with no `?scope=unlinked`, it still lists and deletes every site of the account,
+is the request user; a wrong token is refused with 401, never counted as unlinked. A server with a
+custom limit (see below) or an entitled plan (`siteLimitForPlan`: Starter 3, Standard 10, Pro 50) has its
+own active-site limit. The other servers of the account share one pool: 3 sites for each user of an
+entitled license (`LICENSE_SITES_PER_USER`), else 1 (`HOSTED_SITE_SHARED_FREE_LIMIT`). The pool is for
+the account, not for each server, so more self-hosted servers do not give more sites. An account has at
+most 300 active sites on its pool and plan servers (`HOSTED_SITE_LIMITS.accountSites`); sites on a
+custom-limit server do not count, so staff can lift the cap for one customer with a custom row. A
+license that lapses gives the free pool again and deletes nothing. A request with no server headers creates only into the account's
+unlinked bucket (limit 1, `server_id IS NULL`); with no `?scope=unlinked`, it still lists and deletes every site of the account,
 the released meaning of `/v1/sites`. Replace and delete in a server scope refuse a site of another
-bucket with 409 `site_other_server`. A downgrade deletes nothing: a server above its limit cannot
+bucket with 409 `site_other_server`. Every slot count is one SQL condition (`bucketHasRoomSql`,
+`holdsSiteSlotSql`) inside the insert or update that creates or activates the site, so two requests
+cannot take the same last slot, and each count reads the `hosted_sites_owner_status` index. A server's
+list returns its own sites as `used`, and as `limit` the sites it can have now: its own sites plus the
+free slots of its bucket and of the account cap. This keeps the meaning of the frozen `hosted-sites-v1`
+list. The optional `limitReason` tells why that limit can be lower than the bucket's own limit:
+`shared` for a server in the shared pool, `account` when the account cap is full. The desktop uses it
+only for the text of a `site_limit` error; the Team API list does not send it. A server that adopts unlinked sites at registration takes only the free slots of its bucket.
+A downgrade deletes nothing: a server above its limit cannot
 create a site, but it can replace one, and the extra sites end at their expiry. Removing a server moves its sites to the owner's unlinked bucket, so the owner's desktop can still delete them. A registered server updates a site that it published before registration in the unlinked scope.
+
+A row in the D1 table `server_site_limits` (`0048`) replaces the plan's site limit for one server, such
+as an enterprise customer's, from 1 to 1000. It has the rules of `server_member_limits` (see
+[hosted servers](../hosted-servers.md)): the row names the owner account and applies only while that
+account owns the server, it stays when the owner registers the host again, and it stops when the
+account is deleted. The unlinked bucket has no custom limit. No route writes the row; add, change or
+delete it by hand (`openbot-auth-test` for the test Worker):
+
+```sh
+bunx wrangler d1 execute openbot-auth --cwd apps/auth-api --remote --command \
+  "INSERT INTO server_site_limits(server_id, owner_user_id, site_limit, created_at, updated_at)
+   SELECT host_id, owner_user_id, 200, unixepoch() * 1000, unixepoch() * 1000
+     FROM remote_hosts WHERE host_id = '<server id>'
+   ON CONFLICT(server_id) DO UPDATE SET owner_user_id = excluded.owner_user_id,
+     site_limit = excluded.site_limit, updated_at = excluded.updated_at"
+```
+
+For a hosted server that has not published its host, read the owner from `hosted_servers`. Delete the
+row to go back to the plan's limit. A lower limit deletes no site, as a downgrade does. Clients see the
+new limit in the next `GET /v1/sites`.
 
 `hostedSites.list` and `hostedSites.delete` IPC are server-scoped; publish and replace stay local. The
 optional `hosted-sites-v1` capability exposes `POST /v1/hosted-sites/list` for every member and
@@ -116,12 +178,26 @@ refuses with 409 while a turn runs or a message waits, or when the provider cann
 The progress and the result arrive in the `compaction` of `context-usage-v1`. Protocol 9 only. The web
 client shows no context meter, so it does not use the capability.
 
+### Delete history and channel context
+
+`chat-history-v1` (`team-protocol/chat-history-v1.ts`) adds `POST /v1/agent-history/delete` with
+`{ agentId }`, and `POST /v1/channels/context/clear`, `/v1/channels/context/compact` and
+`/v1/channels/history/delete` with `{ channelId }`. They run the same host operations as "Delete
+history" in agent settings, and "New conversation", "Compact now" and "Delete history" in channel
+settings. A member with manage access to the agent deletes its history. A member who sees a channel
+starts a new conversation or compacts it; only an owner or admin deletes the channel history, and the
+desktop hides that row from a member. A host without the capability does not show the rows. Protocol
+9 only.
+
 ### Workspace folders
 
 `workspace-directory-v1` adds `POST /v1/workspace-directory` with `{ agentId, path }`. Any member who
 can see the agent can send it, as with `GET /v1/workspace-files`. The host answers the folder entries
 (name, path, kind, size, modification time), at most 500, directories first. The path must stay inside
-the agent workspace; a symbolic link that leaves it is not listed. A missing path answers 404 with a
+the agent workspace; a symbolic link that leaves it is not listed. `GET /v1/workspace-files` keeps the same
+limit for a member. An owner or admin reads a file as the local desktop user does: also outside the
+workspace when the agent has no workspace limit, so a phone can open a file that an agent wrote to
+`~/Desktop`. A missing path answers 404 with a
 message that names the path and the workspace. A client without the capability shows the file preview
 error. The desktop lists a local folder without the containment when the agent has no workspace limit.
 
@@ -147,6 +223,29 @@ member. The capability is advertised only to protocol 7
 clients. The desktop on a joined server and the web client show the side question only when the host
 advertises it.
 
+### Live voice
+
+`live-voice-v1` (`team-protocol/live-voice-v1.ts`) lets a member talk to an agent of the host by Codex
+live voice. `POST /v1/live-voice/start` takes `{ agentId, sdp, voice? }`: the client's WebRTC offer of
+one audio track and the `oai-events` data channel. The host starts a Codex process with its own Codex
+sign-in, or the Codex account of the agent, and answers `{ sessionId, sdp }` with the answer of OpenAI.
+Audio goes between the client and OpenAI, never through the host. The member must be able to chat with
+the agent, because each spoken request goes to the agent as the member's message. The start needs an
+open event connection of the same logical session, or it answers 409. A missing Codex sign-in, a
+timeout or a refused call also answers 409 with a sentence for the member. Any other failure answers
+500, and its reason stays in the host log; the phone shows `error.voice.live.hostFailed` for it.
+
+Each member has at most one session; a new start ends the earlier one of that member, and the local
+user's session stays. The host sends the `live-voice` event (transcript parts and the end) only to the
+connections of that member. `POST /v1/live-voice/stop` with `{ sessionId }` stops a session of the
+caller only. The host also stops it when the last event connection of the logical session that started
+it closes. The capability is advertised only to protocol 9 clients. The desktop on a joined server
+uses live voice only when the host advertises it and the user turned it on in Settings → Voice;
+otherwise the voice transcribes. The mobile app uses it in the voice conversation of an agent chat
+when the host advertises it, the user turned on GPT live voice in Settings → Voice, and the app binary
+has WebRTC (`react-native-webrtc`); otherwise the phone's own voice conversation runs. The phone sends
+a voice name only when it is one of the contract. The web client does not use it yet.
+
 ### Agent import from a joined server
 
 `agent-import-v1` lets any member, not only an owner or admin, import a Grok Bot export into the host.
@@ -162,6 +261,20 @@ gets the existing skill and the result warns. `POST /v1/agent-import/discard` re
 desktop, main opens the dialog, reads the file and sends it (`agent-import:choose` is server-scoped);
 the web client uses the browser chooser and ships the export skill in its bundle.
 
+`agent-import-v2` (protocol 9 only) removes the 100 MB limit: the client sends the export in parts.
+`POST /v1/agent-import/v2/open` takes `{ size }` and answers `{ uploadId }`; the host refuses a size
+that its free disk space cannot hold (`error.import.uploadDiskSpace`). `POST /v1/agent-import/v2/chunk?upload=<id>&offset=<n>`
+takes the next part, at most 8 MiB, as the raw body, and answers `{ received }`; the offset must be the
+bytes the host has, so a part is never written twice or out of order. `POST /v1/agent-import/v2/stage`
+takes `{ uploadId }` and answers the v1 preview; `apply` and `discard` stay the v1 routes. Every part
+is far under the 100 MB WebRTC file limit, so the transport does not change. The upload holds one of the
+four upload slots, the same member keeps one upload or export, and an upload that gets no part for
+10 minutes is released. A complete upload has the limits of a local import (200,000 files, no byte
+limit, and the free disk space check of each agent's files). Desktop main reads the file one part at a
+time; the web client slices the `File`, and the phone reads parts with an `expo-file-system` file
+handle. A client sends v1 to an older host, and refuses a file over 100 MB there with
+`error.import.remoteZipTooLargeOldHost`.
+
 ### Instance transfer with a joined server
 
 `instance-transfer-v1` moves a server's agents and server settings to or from an OpenBot transfer file
@@ -175,12 +288,52 @@ removes it. `POST /v1/instance-transfer/stage` takes the raw `.zip` and answers 
 avatars, under a token that only the caller can apply or discard; an upload nobody applies is removed
 after 30 minutes. `POST /v1/instance-transfer/apply` takes `{ token, keys, includeSettings, timezone }`
 and answers the new agents by id and name, which the client reads with the agent list.
-`POST /v1/instance-transfer/discard` releases the token. On desktop, main opens both dialogs and moves
+`POST /v1/instance-transfer/discard` releases the token. `instance-transfer-v1` export has no chat
+history; the desktop export screen offers "Include chat history" only for this computer's server and
+a host with `instance-transfer-chunks-v1`. On desktop, main opens both dialogs and moves
 the file (`instance-transfer:*` is server-scoped). The web client does not show the Transfer section: its
 downloads are limited to 10 MB.
 
+`instance-transfer-chunks-v1` moves the same file in parts of 8 MiB (`INSTANCE_TRANSFER_CHUNK_BYTES`),
+so a file can be up to the 2 GB limit of a computer's own server. It is protocol 9 only, and the
+desktop app uses it when the host has both capabilities; the phone stays on `instance-transfer-v1`.
+The rules for an owner or admin are the same, and each upload or export id is bound to the member
+who started it: another member's id gets the same error as an id that does not exist.
+`POST /v1/instance-transfer-chunks/upload/begin` takes `{ size, sha256 }`, checks the size and the free
+disk space of the host (the size and 256 MiB), creates `<uploadId>.part` with mode 0600 and answers
+`{ uploadId, chunkBytes, received }`. The same member with the same size and SHA-256 gets the same
+upload again with the parts that the host has, so a client that failed sends only the rest. A member
+has one upload: a new file ends the one before. `POST /v1/instance-transfer-chunks/upload/chunk` takes
+`uploadId`, `index` and the part's `sha256` in the query and the raw part as the body, checks its length
+and SHA-256 and writes it at `index * chunkBytes`. `POST /v1/instance-transfer-chunks/upload/finish`
+checks that every part is there and the SHA-256 of the whole file, renames it to `.zip` and stages it
+as `stage` does, with the local limits. It answers the `stage` preview; `apply` and `discard` of
+`instance-transfer-v1` take its token. `POST /v1/instance-transfer-chunks/upload/abort` ends an upload.
+`POST /v1/instance-transfer-chunks/export/begin` takes the `export` input with an optional
+`includeHistory`, which `instance-transfer-v1` export drops, writes the file with the local
+limits and answers `{ exportId, size, sha256, chunkBytes, chunks, warnings }`, where `chunks` is the
+SHA-256 of each part and `warnings` is what a local export would show. `POST /v1/instance-transfer-chunks/export/chunk` takes `{ exportId, index }` and sends that
+byte range as an attachment. `POST /v1/instance-transfer-chunks/export/done` removes the file. An
+upload or export with no request for 30 minutes is removed. The desktop client reads and writes one
+part at a time, checks each part it gets, and sends or reads a part again up to three times when the
+connection fails; it does not send a part again when the host refuses it. A download appears only
+when it is complete.
+
+Server settings > Transfer > Copy to another server joins the two directions in one step, on the
+desktop only. It shows when the user administers two or more servers with `instance-transfer-v1`,
+this computer's included. `instance-transfer:copy` is scoped to the destination and takes
+`{ fromServerId, agentIds }`. Main exports the agents of the source with their workspace files and
+without chat history or server settings to a temporary file. As in a file export, the file also has
+the channels that have a selected agent as a member and the Shared folder. Each apply adds the
+channels again as new channels. Main then stages the file at the destination, applies all of its
+agents, and removes the file. Each side uses the routes above, in parts when its host has
+`instance-transfer-chunks-v1`, so a host needs no new route; a destination with only
+`instance-transfer-v1` takes at most 100 MB, the Shared folder included. An agent whose name is already on the destination is
+added beside it. The browser client has no copy: it connects to one host at a time.
+
 After a restart, the first upload or export removes old files from `instance-transfer-uploads/`,
-including unfinished `.part` files, before it writes a new file. Concurrent uploads and exports wait
+including unfinished `.part` files and the parts of `instance-transfer-chunks-v1`, before it writes a
+new file. Concurrent uploads and exports wait
 for this cleanup. If cleanup fails, the operation fails; the next upload or export retries it.
 Later operations keep the current process's files. Local files selected by the user are kept.
 
@@ -256,9 +409,12 @@ account and server (`pinnedWorkflows`); the host does not know them.
 The phone also uses the version, single-step and stop-step routes, and `workflows-github-v1`, as a
 joined desktop does. An owner or admin adds and changes a GitHub trigger or output there
 (`apps/mobile/src/features/workflows/model/workflow-github.ts` reads and writes the same fields as
-the desktop cards); a member reads them, the event history and the item of a run. Discord triggers
-and outputs show read-only on the phone, because only the computer that runs OpenBot has the Discord
-servers, channels and roles.
+the desktop cards); a member reads them, the event history and the item of a run. With
+`workflows-chats-v1` and `routine-results-v1`, an owner or admin also adds and changes Telegram and
+Slack triggers and outputs (`apps/mobile/src/features/workflows/components/workflow-chat-fields.tsx`).
+The chats, workspaces and channels come from the routine-results options, so the fields are the same
+as on the desktop cards. Discord triggers and outputs show read-only on the phone, because no route
+sends the Discord roles.
 
 ### History extent
 
@@ -286,6 +442,10 @@ in words on a block that has one, is for the owner and admins only; the host ans
 403. A secret form value goes to the agent in the tool result. The stored block and the prompt
 resolution leave it out. The provider transcript of the tool call can keep it, and the agent can
 repeat it in a reply or a thought, which the conversation stores as any other message.
+
+The `ask_ui` tool gives agents only the `confirm` block, to approve an action or a draft; a question
+with options goes to `ask_user`. The contract and every client keep `choice` and `form`: OpenBot
+builds forms itself, such as the API key and Vault cards, and older messages hold both.
 
 `agent-task-ui-blocks-v1` (`team-protocol/agent-task-ui-blocks-v1.ts`) adds the same `uiBlock`, with
 the same normalization and wire budget, to the task conversations of `agent-tasks-v1`: the response
@@ -324,6 +484,21 @@ whenever it is present, and a list that the contract refuses fails closed. The h
 through `clampConversationSubagents`, so only known keys go out, and the lists of one page share a
 wire budget, newest first. The task conversations of `agent-tasks-v1` do not carry it. The WebRTC
 host peer encodes the local response and the events again with the same option.
+
+### Video generation
+
+`video-generation-v1` (protocol 9 only) carries the request of a video that an agent made with a
+tool (see `VideoGenerationInfo` in `packages/contracts/src/ipc-conversation-messages.ts` and
+`team-protocol/video-generation-v1.ts`). It adds `videoGeneration` beside the frozen keys of a
+message in `GET /v1/agents/:id/conversation` and `conversation-page` (messages and references), and
+in the `conversation` and `conversation-page` events, as `subagents-v1` does. The host adds it only
+for a connection that advertises the capability. A released client reads the `video_generation`
+message as its fallback: the mp4 in `attachments`, with no prompt or aspect ratio. A host without
+the capability never sends `videoGeneration`, so a client keeps it whenever it is present, and a
+value that `isVideoGenerationInfo` refuses fails closed. Only known keys go out, and the values of
+one page share a wire budget, newest first. Channel messages and the task conversations of
+`agent-tasks-v1` do not carry it. The WebRTC host peer encodes the local response and the events
+again with the same option.
 
 ### Prompt multi-select
 
@@ -405,6 +580,13 @@ state, and each answering with the held tab ids. While a person holds a tab, the
 browser tool calls on it wait until the release. The host refuses a take while a secret request is
 active on the tab, and releases the holds of a session when it ends. Each change sends
 `browser-user-control-changed { tabIds }`.
+
+`browser-teach-v1` (protocol 9 only) lets a member show a task in an agent's tab that they can see:
+`POST /v1/browser/teach/start` (`{ tabId }`, answers `{}`) takes the tab for the member and starts
+the recording, and `POST /v1/browser/teach/stop` (`{ tabId, save }`) gives the tab back and answers
+`{ steps }`, at most 200. Only the session that started the recording can end it; another session
+gets no step and changes nothing. A client shows the action only when the host also has
+`browser-user-control-v1`.
 
 `browser-page-state-v1` adds `POST /v1/browser/page-state` (empty body) and `POST /v1/browser/stop`
 (`{ tabId }`). Both answer with `{ tabs: [{ tabId, canGoBack, canGoForward }] }`, and each change
@@ -497,8 +679,8 @@ the host computer needs no report: the host reads `powerMonitor` itself (`hostCo
 An owner or admin of a joined server manages its host through optional `POST /v1/admin/...` routes.
 Each capability has a frozen codec in `team-protocol/<name>-v1.ts`, registered in
 `team-protocol/optional-routes.ts`, and both transports use it. Every route calls `requireAdmin`,
-except those that also answer a member: `/v1/browser/tab-profiles`, `storage-disk-v1` and
-`agent-fast-mode-v1`. The
+except those that also answer a member: `/v1/browser/tab-profiles`, `storage-disk-v1`,
+`storage-channel-v1`, `library-folders-v1` and `agent-fast-mode-v1`. The
 host advertises a capability only when its `TeamApiAdmin` member exists.
 
 | Capability | Grants | IPC group |
@@ -513,6 +695,8 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `agent-folders-v1` | The folders that an agent can change besides its workspace, and the folders in them that it must not change: read, add, remove, exclude, include. Lists the folders in one host folder (no files, no hidden folders, at most 500), with the home folder and at most 32 disks, so that a phone or the desktop app of a member can pick one. The host checks each folder as the desktop folder picker does (`src/main/agent-folders.ts`). Protocol 9 only | `agentFolders` |
 | `agent-instructions-v1` | Read and save the instruction file at the root of an agent's workspace (`AGENTS.md`, or `CLAUDE.md` in an older workspace). A save sends the text that the edit started from; the host refuses it with 409 when the file changed. The workspace path does not cross the wire, and a client cannot show the file in its file manager. Protocol 9 only | `agentInstructions` |
 | `browser-profiles-v1` | Named browser profiles of the host: list, create, rename, recolor, clear, delete, and the profile of each agent. One route, `/v1/browser/tab-profiles`, also answers a member: the profile label of each tab that the member can see. Cookies and site data stay on the host. Advertised when the host has `browserProfiles` | `agentAdmin` |
+| `browser-proxies-v1` | Saved proxies of the host's named browser profiles: list, save, delete, and the proxy of each named profile (`/v1/admin/browser-proxies`, `/save`, `/delete`, `/v1/admin/browser-profiles/proxy`). The list also has the computers of members, and `/computer` adds the computer of the member who sends it; no member can add the computer of another. A password goes to the host only in a save request and never comes back. Advertised when the host has `browserProfiles` | `agentAdmin` |
+| `browser-egress-v1` | The data channel `openbot.browser-egress.v1`, which a desktop client opens only while its member shares the internet connection of that computer with the server. Only the host opens streams: each is one TCP connection of a browser profile with that member's computer as its proxy. The client connects only to a public internet address that it resolved itself, on any port. At most 256 streams, 256 KiB of credit for each stream. A lost egress channel never closes the connection. Advertised when the host has `browserProfiles` | the member's own computer |
 | `browser-profiles-events-v1` | One event with no data, `browser-profiles-changed`, after each change of the named browser profiles or of an agent's profile. A client reads the `browser-profiles-v1` routes again. Advertised when the host has `browserProfiles` | `browserProfiles` |
 | `skills-admin-v1` | List, install, remove, enable skills by marketplace id | `agentAdmin` |
 | `shared-tables-v1` | List and delete shared tables | `sharedTables` |
@@ -521,24 +705,34 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `agent-publish-v1` | Preview, publish and unpublish an agent's share link. The host builds the template, checks it for secrets and publishes it with its own account; the client sends only the share card | `agentAdmin` |
 | `providers-v1` | Code sign-in, provider API keys, managed runtimes, custom endpoints | `providerAdmin` |
 | `instance-transfer-v1` | Export and import the server's agents and server settings as a transfer file | `instanceTransfer` |
+| `instance-transfer-chunks-v1` | Send and get the transfer file of `instance-transfer-v1` in parts of 8 MiB, up to 2 GB; `apply` and `discard` of `instance-transfer-v1` take the token of an upload | `instanceTransfer` |
 | `providers-v3` | Code sign-in for Codex, Claude and Grok; send the code a Claude sign-in page shows | `providerAdmin` |
 | `providers-v4` | Code or link sign-in and managed runtimes, Cursor and Cline included | `providerAdmin` |
 | `custom-provider-harness-v1` | List, add and remove custom endpoints as `providers-v1` does; each endpoint in a response names its harness (`opencode` or `pi`). A save names no harness: a new endpoint runs on OpenCode | `providerAdmin` |
+| `custom-provider-edit-v1` | List, add, edit and remove custom endpoints. A list names each endpoint's harness and header names. An edit changes the name, address, models, key and headers; no key keeps the saved key, and `value: null` keeps a saved header value. The host keeps the harness and the limits of each kept model. Protocol 9 only | `providerAdmin` |
 | `custom-agents-v1` | List, add, replace and remove the host's custom ACP agents. The host starts each command on its computer. An environment value goes only in a save body; a response names the variables only, and `value: null` keeps a saved value. Protocol 9 only | `providerAdmin` |
 | `claude-api-key-v1` | No routes. The host saves an Anthropic API key for Claude through the `providers-v1` key routes | `providerAdmin` |
+| `codex-api-key-v1` | No routes. The host logs Codex in with an OpenAI API key sent through the `apiKeySet` route of `providers-v1`, `-v5` or `-v8` | `providerAdmin` |
 | `provider-usage-reset-v1` | Read the usage reset credits of each provider account on the host, and spend one. Only Codex gives credits | `providerAdmin` |
 | `provider-sign-out-v1` | Sign the host's own Claude or Codex sign-in out. The host's other accounts stay | `providerAdmin` |
 | `host-admin-v1` | Server name and logo | `hostAdmin` |
 | `host-update-v1` | Check for, download and restart into an app update; cancel a restart that waits | `hostAdmin` |
 | `host-timezone-v1` | Read and set the server timezone | `hostAdmin` |
+| `host-personality-v1` | Read (any member) and set (owner or admin) the response style of the agents | `hostAdmin` |
 | `host-key-rotation-v1` | Change the host's key. Owner only: an admin gets 403 | none: only the mobile app sends it |
 | `local-servers-v1` | List the servers that the desktop app runs on the host computer, create one, and delete one. Owner only: an admin gets 403. Only the desktop app's own server advertises it | none: only the mobile app sends it |
 | `agent-memory-limit-v1` | Read and set how many memories each agent keeps | `hostAdmin` |
 | `memory-review-v1` | Read and set how often the host's agents review their memories in the background, or Off | `hostAdmin` |
+| `browsing-memory-v1` | Read and set whether the host records what a person does in an agent's browser tab that they hold, for the memory review of that agent. Protocol 9 only | `hostAdmin` |
+| `browser-teach-v1` | Start and stop the recording of a task that a member shows in an agent's browser tab. The steps go only to the session that started it. Protocol 9 only | none: each member, for a tab they can see |
+| `skill-learning-v1` | Read and set whether the memory reviews of the host's agents save the skills they learn, ask first, or do not look for skills. Sends the skill name of a skill question in chat messages, and saves that skill on Save (any member with chat level). Protocol 9 only | `hostAdmin`, `agent.saveSkillSuggestion` |
 | `agent-notification-levels-v1` | Read and set the member's own notification level of the server and of each agent | none: each member, own levels only |
 | `sidebar-pins-v1` | Read, replace and seed the member's own ordered list of pinned agents and channels | none: each member, own pins only |
+| `live-voice-v1` | Start and stop Codex live voice with an agent, with the host's Codex sign-in; the `live-voice` event goes to the member who started it. Protocol 9 only | none: each member who can chat with the agent |
 | `machine-resources-v1` | Read the disk, memory and CPU use of the host machine; read and set the alert levels and the owner or admin who gets the `machine-alert` event | `storage`, `hostAdmin` |
 | `prompt-cache-ttl-v1` | Read and set how long Claude keeps the prompt cache of the host's agents | `hostAdmin` |
+| `claude-compact-window-v1` | Read and set the size at which Claude Code compacts the chats of the host's agents. Protocol 9 only | `hostAdmin` |
+| `provider-account-models-v1` | Read the models that each account after the first of the host's providers serves and the provider's own sign-in does not, for the model picker of that account. Protocol 9 only | `hostAdmin` |
 | `model-visibility-v1` | Read every model of one provider of the host, and set which of them the model picker shows. Every member reads which models the picker folds under Older models or labels New. Protocol 9 only | `hostAdmin` |
 | `provider-default-v1` | Read and set the provider that a new agent of the host starts on | none: only the mobile app sends it |
 | `agent-access-v1` | Read and set the roles that give members access to agents (see [Roles](#roles)) | `hostAdmin` |
@@ -548,12 +742,14 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `routine-recovery-v1` | Read and set a routine's missed-run policy; read its runs with the missed occurrences | `events` |
 | `routine-results-v1` | List the messaging connections and their places; read and set where an agent routine sends its answers. Deliveries stay on the host | none: only the mobile app sends it |
 | `webhook-tests-v1` | Send one signed test event to a webhook routine | `events` |
+| `webhook-sender-secret-v1` | Set a webhook routine's signing secret to a secret that the sender made | `events` |
 | `vault-v1` | The host's Vault: list, add, change and delete logins, cards and contact info; show one saved password, card number or security code; reset a Vault that the host cannot read. No CSV import. A change sends `vault-changed` with no data, so a client reads the list again | `vault` |
 | `vault-v2` | All of `vault-v1`, under `/v1/admin/vault/v2/`, and API keys as a fourth item kind: list each key's variable name and notes, add, change and delete keys, and show one saved key. The host leaves API keys out of every `vault-v1` answer, and `vault-v1` cannot delete or show one, so an older client keeps a valid list. It uses the `vault-changed` event of `vault-v1` | `vault` |
+| `vault-v3` | All of `vault-v2`, under `/v1/admin/vault/v3/`, and a two-step (TOTP) key on a login: list items carry `hasTwoStep`, save adds, replaces or removes the key (absent keeps it, empty removes it), and `codes` answers the current code of each login with a key. No route answers with a key. `vault-v1` and `vault-v2` lists leave out `hasTwoStep`, and their save keeps the saved key. It uses the `vault-changed` event of `vault-v1` | `vault` |
 | `vault-import-v1` | A CSV password export that an owner or admin sends as text, at most 256 KiB, below the JSON body limit. The host adds its logins as from its own file dialog and answers only the counts. The iPhone app uses it; the phone never calls the `vault-v1` reveal or reset | none: only the mobile app sends it |
 
 These IPC groups take a required server id and route with `scopedHandler`. A key travels only towards
-the host; no response carries one, except the `vault-v1` and `vault-v2` reveal: it answers the one secret that the
+the host; no response carries one, except the `vault-v1`, `vault-v2` and `vault-v3` reveal: it answers the one secret that the
 admin asked to show or copy. `providers-v1` has no progress event, so the renderer reads runtime
 status again every second while a host download runs. Publishing, macOS permissions, the browser
 sign-in and folder import stay on the host.
@@ -593,6 +789,14 @@ call first, then from the sender's last message in that turn, then from this set
 zone stays in memory only, so after a restart a queued message uses the server timezone. Agent import
 and instance transfer use it in place of the system zone. A change does not move existing routines.
 
+`host-personality-v1` reads and sets how the agents of a server talk while they work
+(`openbot-server-personality-v1.json`, Server settings → Personality). `natural`, the default, tells
+the agents to send short updates between their steps, and the chat shows them as messages.
+`classic` keeps the earlier prompt, and the chat keeps those updates in the steps. Any member reads
+the style, so each client knows what to show; only an owner or admin changes it. A change unloads the
+agents' threads, so the next turn uses the new prompt. A host without the capability reads as
+`classic`. Other clients see a change when they open the server again.
+
 `host-key-rotation-v1` lets the owner change the host's key from another device, with the same steps
 as Server settings → General → Server key on the host computer (`HostService.rotateIdentityKey`).
 The host makes the new key, signs one handover with the current and the new key, and answers with the
@@ -618,6 +822,38 @@ background memory reviews of the host's agents (`openbot-memory-review-v1.json`;
 other values. The agent service reads the value at each use, so a change applies from the next turn.
 Server settings → General → Agents → Memory review sets it for this computer
 (`hostAdmin.setMemoryReview`, local handler) and for a joined server.
+
+`skill-learning-v1` reads and sets what the background memory reviews of the host's agents do when a
+chat teaches an agent a skill (`openbot-skill-learning-v1.json`; `automatic`, the default, writes
+and installs the skill for that agent; `ask` asks the user in the chat first; `off` does neither).
+The snapshot gives the mode and the modes that the host permits; the host refuses other values. A
+client shows an unknown mode from a later host as its raw value. The agent service reads the value
+at each review. Server settings → General → Agents → Skill learning sets it for this computer
+(`hostAdmin.setSkillLearning`, local handler) and for a joined server.
+
+`browsing-memory-v1` reads and sets "Learn from my browsing" (`openbot-browsing-memory-v1.json`,
+`{ enabled }`, off by default) at `POST /v1/admin/host/browsing-memory` and
+`POST /v1/admin/host/browsing-memory/update` (owner or admin). While it is on, the host records the
+pages and the controls that a person uses in an agent tab that they hold, and the next memory review
+of that agent reads them (see [browser.md](browser.md)). Turning it off deletes the recorded steps.
+A connection without the capability gets `error.team.browsingMemoryUnsupported`. Server settings →
+General → Agents → Learn from my browsing sets it for this computer (`hostAdmin.setBrowsingMemory`,
+local handler) and for a joined server.
+
+The capability also carries the skill question card (see [providers.md](providers.md#skill-suggestions)).
+A skill question message (`itemType` `skill-suggestion:*`) gets `skillSuggestion: { name }` on the
+wire. The frozen protocol 9 projection drops it, so the host adds it after the projection, for a
+connection that advertises the capability only: in HTTP bodies, WebSocket events, and WebRTC bodies
+and event frames (`withSkillSuggestionNames`, `addSkillSuggestionNames`), as `ui-block-vault-v1`
+does for Vault requests. The filtered conversation cache key includes the capability. The team
+client (`remote-peer.ts`, web) and the desktop joined-server transports
+(`team-webrtc-client-transport.ts` for a host on protocol 9, `remote-server-http.ts` and
+`remote-server-event-stream.ts` when they advertise the capability) copy the key back after the
+frozen decode.
+`POST /v1/skill-suggestions/save` (`{ agentId, messageId }` → `{ saved }`) saves the skill of that
+question with the host's background writer. A member needs chat level on the agent: a viewer gets
+403, and a hidden or missing agent 404. `saved: false` means the host saved nothing; the client then
+sends the user's yes. The desktop handler asks a joined host only when it advertises the capability.
 
 `agent-notification-levels-v1` reads and sets the notification levels that the signed-in member chose
 on this server, for all of their devices: the level of the whole server (`server`, `null` until they
@@ -669,6 +905,17 @@ in the Claude settings or `CLAUDE_CODE_PROMPT_CACHE_TTL` on the host still wins.
 the next Claude process, not to a running one; an idle thread starts a new process when it resumes.
 The Cache section of the Claude page in Server settings → Providers sets it for this computer and
 for a joined server.
+
+`claude-compact-window-v1` reads and sets the size at which Claude Code compacts the chats of the
+host's agents (`openbot-claude-compact-window-v1.json`; `tokens` is a whole number from 100,000 to
+1,000,000, or `null`, the default). With a size the host starts each Claude process with
+`CLAUDE_CODE_AUTO_COMPACT_WINDOW` set to it. Claude Code reads this variable before the
+`autoCompactWindow` of the Claude settings, and lowers it to the context window of a smaller model.
+With `null` it sets nothing, so Claude Code uses its own size for each model, and the Claude settings
+and the environment of the host still apply. An environment value of the agent still wins. Automatic
+compaction stays on. A change applies to the next Claude process, not to a running one. The Context
+section of the Claude page in Server settings → Providers sets it for this computer, for a joined
+server, on the web client and in the mobile app.
 
 `model-visibility-v1` reads every model that one provider of the host lists, and sets which of them
 the model picker shows. The file `openbot-model-visibility-v1.json` keeps, for each provider, only the
@@ -725,6 +972,16 @@ agent already uses the key. A removed key removes its account and moves its agen
 A removed account with a saved key comes back at the next account check. An added account never gets
 the key. An older host saved the key but did not use it, so a client shows the Claude key only when
 the host advertises the capability.
+
+`codex-api-key-v1` has no routes. It tells a client that the host logs Codex in with an OpenAI API
+key that the released `apiKeySet` route of `providers-v1`, `-v5` or `-v8` sends for `codex`, as
+`codex login --with-api-key` does on this computer. Codex keeps the key in its own login, not in the
+OpenBot key store. The released agent status does not carry the login type, so `apiKeyState` for
+`codex` answers from that login: `saved` while Codex runs on a key. `apiKeyClear` does not remove the
+login, as on this computer. OpenAI bills each request to the key. The ChatGPT sign-in and the sign-out
+replace the key.
+An older host saved the key but did not use it, so a client shows the Codex key for a joined server
+only when the host advertises the capability.
 
 `host-update-v1` runs the same update as the host's own Settings. `src/main/requested-update.ts`
 keeps the schedule in memory: who asked, and whether the restart waits until
@@ -830,6 +1087,87 @@ over the Team API (`getHostAuditLog`) each time it opens, and keeps no copy.
 
 Known limits: a host with no account directory records no join from a local-store invite, and the log
 has no page or date filter.
+
+### Company sign-in
+
+Company sign-in connects one server to the company's OpenID Connect provider (Entra ID, Okta, Google
+Workspace or another one). The account service does all provider work
+(`apps/auth-api/src/server/company-sign-in.ts`); the host and the clients see only OpenBot sessions.
+Migration `0047_company_sign_in.sql` adds the tables. SAML is not supported.
+
+Setup is desktop only: Server settings → Members → Company sign-in (`ServerCompanySignInSection.tsx`),
+for the owner. The owner routes are `/v2/remote/hosts/:hostId/company-sign-in`, `.../test` and
+`.../scim-token`. The dialog sends the issuer, the client ID, the client secret and the domains, and
+starts a test sign-in at the provider. Only a test that passes saves the values. The rules:
+
+- A domain belongs to the first server whose test passes with it. Public mail domains (`gmail.com`
+  and others) are refused.
+- A production account service also needs the TXT record `_openbot.<domain>` with the value of the
+  server. A development API does not check DNS.
+- The issuer field also accepts the metadata URL (the issuer with `/.well-known/openid-configuration`)
+  and an Entra ID tenant domain. The discovery document can give an issuer on the same origin, such as
+  the tenant ID form; that issuer is saved and checked in tokens. Entra ID `common` and
+  `organizations` are refused, because their issuer is a placeholder that no token has.
+- All Google accounts have the issuer `https://accounts.google.com`. For it, the token must also have
+  an `hd` claim (the Workspace domain) that is one of the domains. A personal Google account with a
+  company email has no `hd`, and is refused.
+- The client secret is encrypted with `COMPANY_SIGN_IN_SECRET` (32 bytes or more). Never change this
+  value: it makes the saved secrets unreadable. Without it, the routes answer 503
+  `company_sign_in_not_configured`, and everyone signs in with an email code.
+- When the connection is on, an email code for its domains answers 409 `company_sign_in_required`,
+  and the client goes to company sign-in.
+
+Sign-in routes are `/v1/auth/company/start`, `/callback` and `/exchange`. The flow uses PKCE twice:
+once between the account service and the provider, and once between the app and the account service.
+
+- Desktop (`src/main/company-sign-in-browser.ts`): the main process opens a loopback listener on
+  `127.0.0.1`, opens the provider page in the user's browser, and gets a one-time code (2 minutes)
+  at the listener. It exchanges the code and its verifier for an account session.
+- Web `/app`: `POST /api/browser/company/start` keeps the state and the verifier in the HttpOnly
+  `__Host-openbot-company` cookie (10 minutes) and opens the provider in the same tab.
+  `GET /api/browser/company/return` exchanges the code, sets the `__Host-openbot-web` session cookie,
+  and answers 303 to `/app`. The cookie stops a login CSRF.
+- Phone (`signInMobileWithCompany` in `apps/mobile/src/features/auth/api/mobile-auth.ts`): the start
+  names the return `openbot://company-sign-in` (`MOBILE_COMPANY_SIGN_IN_RETURN`), which only a
+  sign-in start accepts, not a test. `openAuthSessionAsync` opens the provider page and takes the
+  return, and `+native-intent.tsx` ignores another copy of the link. The app gives the code, its
+  verifier and its device to `POST /v1/mobile-auth/company/exchange`, which makes a mobile session
+  (`mobile_auth_sessions`, no host) and replaces the earlier session of that device. The stored
+  session has the marker `signIn: "company"`. A custom scheme is not private on Android, so the
+  verifier, not the link, proves the app.
+
+The provider's subject is linked to an account (`company_sign_in_identities`). A first sign-in uses
+the account with the same email, or makes a new one. When the ID token has no `email`, the service
+uses `preferred_username` (Entra ID). A claim `email_verified: false` is refused.
+
+A person who finishes company sign-in joins the server as `member` with no invitation
+(`RemoteControlPlane.joinByCompanySignIn`). The join uses the same seat checks as an invitation: the
+member limit of the server and the license users of the owner. The rules:
+
+- A revoked membership (the owner removed the person, or the person left) stays revoked at sign-in.
+- With no free seat, the sign-in still gives a session, the join does not occur, and the Worker logs
+  a warning with the host ID.
+- A join ends the earlier remote sessions of the person on that server and sends
+  `account-servers-changed`, so the clients of the person show the server.
+
+SCIM 2.0 (`/scim/v2/Users`, `company-sign-in-scim.ts`) supports what Entra ID and Okta send: list
+with the filter `userName eq "…"`, create, read, and PATCH, PUT and DELETE of `active`. The bearer
+token starts with `obscim_`, shows once, and D1 keeps only its hash. Other attributes belong to the
+OpenBot account and do not change. `active` accepts the strings `"True"` and `"False"`. Off, and
+DELETE, end every session of the account, spend its open email and company sign-in codes, and revoke the membership. A
+create for a person who exists sets `active` as a PATCH does. Off → on joins the person again,
+also after that revocation. A repeated on does not change a membership that the owner revoked.
+
+The daily retention task removes flows after 10 minutes, and codes after they expire or are used.
+
+Known limits:
+
+- The local development host reads its members from its team file, not from D1, so the desktop
+  Members list in `bun run dev` does not show a company sign-in join. Check D1 or the
+  `/v2/remote/hosts` list of the person.
+- The mobile app signs in with a company account, but has no setup.
+- No full sign-in with a real Entra ID tenant has been made. Discovery, the authorize parameters and
+  the token request were checked against the live Microsoft endpoints with a fake application.
 
 ### Webhook routines
 
@@ -1026,23 +1364,36 @@ the server as a joined server with `thisComputer: true`. `kind` stays `"remote"`
 - **Connection entry.** The server is an HTTPS entry in `openbot-remote-servers-v1.json`. The
   directory sync keeps it. While the child is stopped, the entry has the address
   `http://127.0.0.1:0` and no token, so a client never reaches an old port.
-- **Lifetime.** The child ends when its stdin closes. Teardown step 57 stops all children before
-  the joined-server connections close (step 60). The sibling scan before an update leaves out the
-  child PIDs. After an unexpected exit, the desktop starts the child again after 5 seconds, at most
-  3 times in 10 minutes. The owner password is registered for redaction and is never logged.
+- **Lifetime.** The child ends when its control pipe closes: stdin, or fd 3 on Windows, where
+  Electron replaces `process.stdin` with a stream that only ends (#4868). Teardown step 57 stops
+  all children before the joined-server connections close (step 60). The sibling scan before an
+  update leaves out the child PIDs. After an unexpected exit, the desktop starts the child again
+  after 5 seconds, at most 3 times in 10 minutes. The owner password is registered for redaction
+  and is never logged.
 - **Delete.** The desktop stops the child, removes the entry, and moves both folders to the trash
   with `shell.trashItem`. It never deletes them.
-- **Rename.** The `host-admin` identity route, as on any joined server that the user owns.
+- **Rename.** The `host-admin` identity route, as on any joined server that the user owns. The child has
+  no account session, so it skips the account owner check and the account steps (`passwordOwner`) (#5092).
 - **Account.** While the desktop app is signed in, `LocalServers` registers each running server for
   the account (`centralAuth.registerRemoteHost`), with the child's key, its name, and its owner member
   as the owner membership. The ready line carries that member id. The desktop app keeps the machine
-  token with its session and writes it to the child's standard input, one JSON line
+  token with its session and writes it to the child's control pipe, one JSON line
   (`local-server-child.ts`). The child keeps it in memory only (`CentralAuthManager.useHostCredential`)
   and calls `HostService.publishLocalServer`: it gets Signal tickets, meets devices, and sends push
   notifications and Live Activity updates with that token, as a published host does. Its Team API
   stays on loopback for the desktop app. A device ticket names the child's owner member, so the
   owner's phone acts as the owner. A sign-out or another account sends `unpublish`. A sign-in, and
   each start, registers again. A start on this computer does not wait for the account service.
+- **Members and invitations.** The child has no account session, so the desktop app sends the member
+  and invitation calls of a registered server to the account service with its own session
+  (`RemoteTeamDirectory`, `isRegisteredThisComputer`), as for a WebRTC server. Before the
+  registration, they go to the child's Team API, which lists its owner. Invited people join over WebRTC.
+  The child reads its members through the desktop app: it writes the line
+  `OPENBOT_LOCAL_SERVER_REQUEST members` to stdout, and the desktop app answers on the control pipe
+  with `members` (the account directory) or `members-unavailable` (not registered, or the read
+  failed). After the desktop app changes or removes a member, it writes `members` without a request,
+  and the child syncs it and closes the sessions that the directory no longer allows. The sync keeps
+  the child's owner row (`passwordOwner`), because the desktop app logs in with its username.
 - **Directory.** The account then lists the server. `reconcileWebRtcHosts` leaves out every server
   that `setThisComputerServers` names, so the desktop app keeps its loopback entry. Other computers
   and phones of the account list it as a WebRTC server.
@@ -1066,12 +1417,11 @@ Limits:
   they type a name.
 - A child server is reached as a joined server. Features behind `kind === "local"`, such as
   Computer Use, voice and the local browser dock, work only as far as the Team API carries them.
-- While the desktop app is signed out, only this computer can connect.
-- Only the owner connects from other devices. The account service accepts invitations for the
-  server, but the child does not sync members from the account directory. Not confirmed: how a
-  member that joins with an invitation is shown.
+- While the desktop app is signed out or closed, only this computer can connect: members reach the
+  server only while the desktop app runs and is signed in.
 - The child has no account session, so an owner that ends a device's session from the child's Server
-  settings does not end it on the account service. The account has the name of the child's last start.
+  settings does not end it on the account service. The account has the name of the child's last start,
+  and no logo of the child.
 - The provider CLI sign-ins in the home folder (`~/.codex`, `~/.claude`) and `~/.agents/skills` are
   shared with the other servers.
 - Not confirmed: the memory of each child, the agent browser in a child with no window, and which
@@ -1227,7 +1577,8 @@ A client that comes back to a joined server shows the workspace of its last load
 and replaces it when the host answers (`src/renderer/src/features/servers/remote-workspace-frame.ts`).
 
 - The frame holds the agent summaries, the model options, the sidebar layout, the hidden agents, the
-  channel rows and, on the web, the agent that was open. It holds no message text: the `preview` of
+  channel rows and, on the web, the agent that was open and the ids of the 4 agents opened last. It
+  holds no message text: the `preview` of
   each agent is removed before the write, and a channel keeps its name, title, members and lead
   agent, with no last message, instructions or counts. It does not hold capabilities, status,
   queues or conversations. The channel rows stop the agents below them from moving down when the
@@ -1241,7 +1592,18 @@ and replaces it when the host answers (`src/renderer/src/features/servers/remote
   from the host, so no host request starts before the connection.
 - Web applies the frame in `connectWorkspace` when it does not keep a loaded workspace of the same
   host. It does not seed capabilities, so the capability-gated reads wait for the connection, and
-  agent avatars load only when the host is online. The web connect starts before the frame renders.
+  an agent avatar with no saved copy loads only when the host is online. The web connect starts
+  before the frame renders.
+- The frame names each picture by a host URL, which only the host can answer. Each client thus keeps
+  a copy of the pictures that it loaded, and shows the agent pictures while the host is offline. The
+  frame keeps no channel picture URL, so a channel copy only saves a download while the host is online. Desktop keeps agent
+  and channel pictures on disk in the main process (`src/main/remote-picture-cache.ts`, folder
+  `remote-pictures` in `userData`, one account, 400 pictures for each server). Web keeps agent
+  pictures in the browser's Cache storage
+  (`src/renderer/src/features/web-client/web-agent-pictures.ts`). A picture URL names a version, so
+  a new picture is a miss and replaces the copy. Sign-out, a change of account, server removal and
+  the end of access (`authentication_required`, a revoked session) delete the copies; a download
+  that started before the delete stores nothing.
 - A frame agent's row shows no preview: the last message is not known, so it does not say that
   there are no messages. Until the host lists channels, the sidebar sets `channelPreviewsPending`,
   and a channel row with no last message shows no preview and no time.
@@ -1252,7 +1614,9 @@ and replaces it when the host answers (`src/renderer/src/features/servers/remote
 - Both clients write the frame after the workspace read and after the panels read, and again when
   the user hides, restores or moves an agent, and when the channel rows change. The web also writes
   the open agent when it changes. An agent that the user opens during the frame stays open after
-  the load.
+  the load. After the open agent loads, the web reads the latest page of up to 3 of the agents opened
+  last, one at a time, so that the first switch to one shows its messages at once. It does not read
+  an agent that already has a kept page.
 - While the frame shows, the composer says that the client connects, and the setup prompts wait
   for the host's status, so a frame does not show "Complete provider setup".
 - The host answers `GET /v1/agents` when its agents are loaded (`AgentInitializationGate.awaitRoster`).

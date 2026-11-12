@@ -85,7 +85,8 @@ comes from the change in each process's CPU time between two listings, so a comm
 and ends between two samples, such as a short tool run, is not counted. The main event loop uses
 `monitorEventLoopDelay`, less its 20 ms timer interval.
 Database time comes from `AgentDatabaseSupervisor`, from the send of a statement to its answer or to
-the end of the host; the host process is not changed. Renderer and child process exits other than a
+the end of the host. The supervisor sends a statement only after the host reports ready, so the
+start of the host process is not counted. Renderer and child process exits other than a
 clean exit are written to the trace as `crash` spans at once, and counted at the next sample. A
 utility process with the reason `killed` is neither: OpenBot stops these processes itself. An exit in
 the last minute before a quit is not counted: a stop signal can end the child processes before the
@@ -98,6 +99,36 @@ main log holds every line of the `main` logger, redacted, in two files of 1 MB. 
 keeps local crash dumps in `app.getPath("crashDumps")` and never uploads them. A process that ends
 with no `exit` span and no dump was stopped from outside OpenBot (#2675).
 
+`run-marker.ts` keeps `openbot-run-marker-v1.json` in the user data folder of the process that holds
+the single-instance lock. It writes `running` at the start, the time of the last sign of life once a
+minute and at sleep and wake, `quitting` with the reason in `recordExit`, `quit_timeout` before the
+shutdown deadline exit, and `clean` after `teardown.runAll()`. It adds no teardown step, so the
+ordinals do not change. The writes are synchronous, so a late write cannot replace a later state. At
+the next start, `RunMarker.start` reads the file before it writes the new one. A `running`,
+`quitting` or `quit_timeout` file is an unclean exit, except a quit for `update` or `session_end`
+and a run that saw the `powerMonitor` `shutdown` event. It counts the `.dmp` files in
+`crashDumps` with a time after that run's last sign of life, by name and time only, and compares
+that time with the boot time. `HostAnalytics` sends the result once as `system_unclean_exit` and
+keeps it in memory only. `scripts/unclean-exit-e2e.ts` kills the dev app's main process, quits
+it with SIGTERM, and checks the event and the marker on each start. `bun run dev:stop` sends SIGKILL
+to the process group after 3 s, so a dev stop can count as `quitting`.
+
+`start-attempts.ts` keeps `openbot-start-attempts-v1.json` beside the run marker. It counts the
+starts of one app version that did not finish. It writes `starting` before the database host and
+the migrations, and clears the attempt when the main window has loaded with the database open. A
+start error, an uncaught exception before that point, and a `starting` attempt with a new `.dmp`
+file in `crashDumps` count as a failure. A quit (`recordExit` writes `quitting`), an OS shutdown or
+restart (the `powerMonitor` event, or a boot time after the attempt) with no error and no dump, and a
+kill from outside (no dump) do not count and keep the count. A new version starts from zero. After 3 failures in a row,
+the desktop shows `start-recovery-window.ts` before the start continues. The window has its own
+in-memory session, no preload and no IPC: the page is a `data:` URL whose links go to fixed
+`https://openbot.invalid/recovery/<action>` URLs, and `will-navigate` stops each navigation and runs
+only an exact action URL. After a failed start, macOS gets the in-memory default
+`ApplePersistenceIgnoreState`: else AppKit asks with a modal alert, before `ready`, whether to reopen
+the windows, and the start waits for that answer. A server or a hosted server shows no window; it
+logs the loop and starts as before. `scripts/start-recovery-e2e.ts` forces crashes and a hang with
+`OPENBOT_E2E_FORCE_START_FAILURE`, which a packaged app ignores.
+
 The pure part (`resource-summary.ts`) keeps each day as sparse histograms with two significant digits,
 peaks and counters, so p95 stays exact enough without a sample list. The summary file holds the
 current day and the last closed day; it is written at most every 15 minutes, at a day change and at
@@ -105,7 +136,38 @@ shutdown, and a damaged file starts a new day. `HostAnalytics.checkResources()` 
 as `system_resources` and marks it handled in the file before the send, so a crash cannot send it
 twice. The file keeps the handled day for the diagnostics export until a newer day replaces it.
 Nothing leaves the process with a PID, a command or a path: the summary keys are group names,
-provider ids and reason words, and the analytics allowlist checks each value again.
+provider ids and reason words, and the analytics allowlist checks each value again. The day also
+keeps the phase of the longest main-loop delay (`mainLoopPeak`, optional so older files still
+decode; the phase is any string in the file and the event drops a value outside its enum), and
+child exits by process type. A minute with a delay of 1 s or more writes a `stall` span to the
+trace.
+
+At each sample, `ResourceMonitor` reads the heaps of the app window renderers from main through
+`webContents.debugger`: it attaches, sends `Runtime.getHeapUsage` and `Memory.getDOMCounters`, and
+detaches, with a 2 s deadline for each renderer process. The page runs no script for this, and
+`performance.memory` is not used because Blink rounds it and caches it for minutes. A renderer can
+answer with any number, so a schema with bounds decodes the answer. A window that is loading, has
+another debugger session or does not answer gives the sample no heap figures, because a part of the
+sum would be too low. The renderer needs no channel or preload change.
+
+App windows (`src/renderer/src/renderer-timing.ts`) count long tasks and input delays with
+`PerformanceObserver` and send the counts at most once a minute over `app:report-renderer-timing`.
+The main handler decodes bounded counts only; `ResourceMonitor` buffers them and adds them to the day
+at the next sample. The same channel carries the main window's `workspaceReady` flag:
+`StartupTiming` (`src/main/startup-timing.ts`) reads the time on the main clock and sends one
+`system_startup` per main process from the `openbot:*` startup marks. It keeps the last start in
+`startup-history.json` to tell a cold start from a warm one. Turn timing comes from the drain
+scheduler and `TurnLifecycle`, which keep the queue pick, the provider start and the first output of
+each turn until `HostAnalytics` takes them at `turn-completed`.
+
+`RemoteConnectTrace` (`src/main/remote-connect-trace.ts`) times each connection to a remote host for
+the trace file and gives `HostAnalytics` one summary, sent as `system_remote_connect`: when an attempt
+makes its first request, and for the first failed attempt after a connection or a cancel. Later
+failures are counted in the next connection. An attempt is keyed by the id that `begin` returns, so
+an old attempt that ends late does not change a newer one. The host id stays in memory and is never
+sent. `RemoteServerManager` adds the time since its hosted start request. The account service times
+the hosted start itself: `start_requested_at` on `hosted_servers` holds the request time, and the
+first observation of a usable sandbox clears it and sends the `ready` action once.
 
 ## Agent usage analytics
 
@@ -124,7 +186,7 @@ count. The last request counts, also in a session from before migration 15. An u
 `last` or no turn ID establishes a baseline.
 Claude uses per-model query totals and a separate counter identity for each query process. ACP usage
 is optional. Missing fields remain unknown. ACP usage is a session total, with one counter for each
-session, except from Antigravity: 1.4.3 sends the tokens of one prompt, so each prompt result has its
+session, except from Antigravity: from 1.4.3 it sends the tokens of one prompt, so each prompt result has its
 own counter, and its `thoughtTokens` count as output. Completed assistant messages exclude commentary and tool
 output. Only post-install messages enter activity counts.
 

@@ -6,8 +6,10 @@
 
 import {
   type AgentTask,
+  type AgentTaskPage,
   type AgentTaskReadState,
   type AgentTasksSnapshot,
+  type AgentTaskWindow,
   type AgentWaitsSnapshot,
   type AttachmentDownloadProgress,
   type AttachmentImportProgress,
@@ -21,8 +23,10 @@ import {
   type DraftAttachment,
   type FilePreview,
   isAgentTask,
+  isAgentTaskPage,
   isAgentTaskReadState,
   isAgentTasksSnapshot,
+  isAgentTaskWindow,
   isAgentWaitsSnapshot,
   isAttachmentSummary,
   isConversationMessage,
@@ -31,8 +35,10 @@ import {
   isConversationWithReadState,
   isFilePreviewKind,
   isFilePreviewPageUrl,
+  isPinnedMessagesSnapshot,
   isQueuedMessageReceipt,
   isQueueSnapshot,
+  type PinnedMessagesSnapshot,
   type QueuedMessageReceipt,
   type QueueSnapshot,
 } from "@openbot/contracts/ipc";
@@ -199,9 +205,23 @@ export function decodeWaits(value: unknown): AgentWaitsSnapshot {
   return value;
 }
 
+export function decodePinnedMessages(value: unknown): PinnedMessagesSnapshot {
+  if (!isPinnedMessagesSnapshot(value)) {
+    throw new Error("Invalid pinned messages response.");
+  }
+  return value;
+}
+
 export function decodeAgentTaskReadState(value: unknown): AgentTaskReadState {
   if (!isAgentTaskReadState(value)) {
     throw new Error("Invalid thread read state.");
+  }
+  return value;
+}
+
+export function decodeAgentTaskReadStates(value: unknown): AgentTaskReadState[] {
+  if (!Array.isArray(value) || !value.every(isAgentTaskReadState)) {
+    throw new Error("Invalid thread read states.");
   }
   return value;
 }
@@ -223,6 +243,20 @@ export function decodeAgentTask(value: unknown): AgentTask {
 export function decodeTaskConversation(value: unknown): ConversationSnapshot {
   if (!isConversationSnapshot(value)) {
     throw new Error("Invalid task conversation response.");
+  }
+  return value;
+}
+
+export function decodeTaskPage(value: unknown): AgentTaskPage {
+  if (!isAgentTaskPage(value)) {
+    throw new Error("Invalid task page response.");
+  }
+  return value;
+}
+
+export function decodeTaskWindow(value: unknown): AgentTaskWindow {
+  if (!isAgentTaskWindow(value)) {
+    throw new Error("Invalid task part response.");
   }
   return value;
 }

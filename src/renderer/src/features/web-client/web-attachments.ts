@@ -1,6 +1,7 @@
 import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import { CHAT_VISUAL_PAGE_LIMIT, isChatVisualMimeType } from "@openbot/contracts/chat-visual";
 import { type AttachmentSummary, type FilePreview, filePreviewKindForFile } from "@openbot/contracts/ipc";
+import { base64ToBytes } from "@openbot/team-client/base64";
 import { currentText } from "@openbot/ui/text";
 import { createWebFileSaver } from "./web-file-download";
 import type { WebFile, WebWorkspaceRuntime } from "./web-runtime";
@@ -74,7 +75,7 @@ async function readVisualPage(
 }
 
 function filePreview(file: WebFile): FilePreview {
-  const bytes = Uint8Array.from(atob(file.base64), (char) => char.charCodeAt(0));
+  const bytes = base64ToBytes(file.base64);
   return {
     name: file.name,
     size: bytes.byteLength,

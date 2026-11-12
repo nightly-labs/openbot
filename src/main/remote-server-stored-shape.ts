@@ -51,6 +51,10 @@ export interface StoredRemoteServer {
   memberLimit?: number;
   /** A hosted server, from the account server's host list. */
   hosted?: boolean;
+  /** False for a hosted server that the account service cannot restart, from the account server's host list. */
+  restartAvailable?: boolean;
+  /** The plan storage in GB of a hosted server, from the account server's host list. */
+  storageGb?: number;
 }
 
 // An entry this build cannot read, and where it sat in `servers`. The slot is named by the entry
@@ -78,6 +82,9 @@ export interface StoredRemoteServers {
   hiddenHostIds: string[];
   mutedServerIds: string[];
   serverNotifications: Record<string, StoredServerNotifications>;
+  // The joined servers that may send browser connections through this computer (`browser-egress-v1`).
+  // An older build drops this key on its next write; that turns sharing off, never on.
+  browserEgressServerIds: string[];
   // Entries kept verbatim for whoever can read them, each with the slot it occupied. In memory only:
   // `serializeStoredRemoteServers` puts them back in `servers`, because a key of its own would be
   // invisible to the older build that is the whole reason for keeping them -- and puts them back
@@ -98,6 +105,7 @@ export function emptyStoredRemoteServers(): StoredRemoteServers {
     hiddenHostIds: [],
     mutedServerIds: [],
     serverNotifications: {},
+    browserEgressServerIds: [],
     unreadableServers: [],
     unreadableActiveServerId: null,
   };
@@ -141,6 +149,9 @@ export function readStoredRemoteServers(value: unknown): StoredRemoteServers | n
     hiddenHostIds,
     mutedServerIds: Array.isArray(value.mutedServerIds) ? value.mutedServerIds.filter(isString) : [],
     serverNotifications: readServerNotifications(value.serverNotifications),
+    browserEgressServerIds: Array.isArray(value.browserEgressServerIds)
+      ? value.browserEgressServerIds.filter(isString)
+      : [],
     unreadableServers,
     unreadableActiveServerId: !selectable && preservedActive ? value.activeServerId : null,
   };
@@ -169,6 +180,7 @@ export function serializeStoredRemoteServers(state: StoredRemoteServers): {
   hiddenHostIds: string[];
   mutedServerIds: string[];
   serverNotifications: Record<string, StoredServerNotifications>;
+  browserEgressServerIds: string[];
 } {
   const readableIds = new Set(state.servers.map((server) => server.id));
   // A preserved entry whose id a readable server now holds is written where that server sits, so the
@@ -203,6 +215,7 @@ export function serializeStoredRemoteServers(state: StoredRemoteServers): {
     hiddenHostIds: state.hiddenHostIds,
     mutedServerIds: state.mutedServerIds,
     serverNotifications: state.serverNotifications,
+    browserEgressServerIds: state.browserEgressServerIds,
   };
 }
 
@@ -260,11 +273,13 @@ function readStoredRemoteServer(value: unknown): StoredRemoteServer | null {
     role: value.role,
     ...(value.transport === undefined ? {} : { transport: value.transport }),
     // A bad limit drops only the limit: the next host list writes it again.
-    ...(isMemberLimit(value.memberLimit) ? { memberLimit: value.memberLimit } : {}),
+    ...(isPositiveInteger(value.memberLimit) ? { memberLimit: value.memberLimit } : {}),
     ...(isBoolean(value.hosted) ? { hosted: value.hosted } : {}),
+    ...(isBoolean(value.restartAvailable) ? { restartAvailable: value.restartAvailable } : {}),
+    ...(isPositiveInteger(value.storageGb) ? { storageGb: value.storageGb } : {}),
   };
 }
 
-function isMemberLimit(value: unknown): value is number {
+function isPositiveInteger(value: unknown): value is number {
   return isNumber(value) && Number.isSafeInteger(value) && value >= 1;
 }
