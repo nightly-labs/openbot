@@ -493,10 +493,12 @@ export function AgentEventBridge() {
         return;
       }
       flush(() => handleAgentEvent(event));
-      // The main window also gets each event, so a chat window does not play or read it a second time.
+      // A reading belongs to the window the user dictated in: its dictated messages are kept in that
+      // window alone, so the other windows have nothing to read and a chat window reads here too.
+      readDictatedReplies(event, activeServerId());
+      // The main window also gets each event, so a chat window does not play its sound a second time.
       if (platform.chatWindow) return;
       playAgentEventSound(event);
-      readDictatedReplies(event, activeServerId());
     });
     // After a reload, a question that still waits is only in the runtime snapshot. Main drops
     // events while the page loads, so read the snapshot once here.
