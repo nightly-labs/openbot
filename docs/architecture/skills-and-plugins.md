@@ -149,7 +149,11 @@ register a value of 8 or more characters for log redaction when the call arrives
 the Vault registers a shorter value when it saves it. Both work only when a
 person's message in this computer's OpenBot chat started the turn, as for workflow changes: an
 external chat, a team member, a routine, another agent, or a web page cannot replace a key or a
-password. They return no secret. `save_api_key` replaces a Vault key with the same name and deletes
+password. In a channel task, `save_api_key` saves only a value that the request of the root task holds
+as a whole token of 8 or more characters, when this computer's user wrote that request
+(`ChannelService.localRequestHolds`, #6369), and only under a name that the agent has no key for
+yet: the agent also reads the lead's and the other members' words there. Otherwise, it tells the
+agent to call `request_api_key`, whose form works in a channel and can replace a key. They return no secret. `save_api_key` replaces a Vault key with the same name and deletes
 the calling agent's own key with that name, because the agent's own key wins in `list_api_keys`.
 Another agent's own key with that name stays and still wins for that agent. The value is in the provider's
 transcript because the agent sent it; OpenBot keeps no tool arguments in its trace. An agent cannot
