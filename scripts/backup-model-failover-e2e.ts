@@ -9,7 +9,8 @@
 //   3. A turn that did nothing yet runs again on the backup model, with a note and no error.
 //   4. read_agent shows the backup model, and the model to go back to with the provider error as cause.
 //   5. After a restart, the agent goes back to its own model, with a note.
-// Also checks continuation after a usage limit interrupts partial work.
+// Also checks continuation after a usage limit interrupts partial work: on a backup, or at the reset
+// when no backup is ready (#6423).
 // `bun run test:backup-model-failover`. Writes .openbot-build/backup-model-failover-e2e/report.json.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -46,6 +47,8 @@ const claudeExecutable = join(root, "claude");
 const codexExecutable = join(root, "codex");
 const codexLog = join(root, "codex-turns.jsonl");
 const workLog = join(root, "work.jsonl");
+// While this file exists, the plan window has reset: the stand-ins refuse no turn for a usage limit.
+const planReset = join(root, "plan-reset");
 const CODEX_MODEL = defaultProviderModel("codex");
 const PRIMARY: AgentModelId = defaultProviderModel("claude");
 const BACKUP: AgentModelId = PRIMARY === "claude-sonnet-5-5" ? "claude-opus-5-5" : "claude-sonnet-5-5";
@@ -120,7 +123,7 @@ const turn = (message) => {
   const acts = input.includes("act-then-fail");
   fs.appendFileSync(${JSON.stringify(turnLog)}, JSON.stringify({ model, failed: fails, input }) + "\\n");
   if ((input.includes("usage-work") || input.includes("usage-chain") || input.includes("usage-exhausted")) &&
-      (model === ${JSON.stringify(PRIMARY)} || input.includes("usage-exhausted"))) {
+      (model === ${JSON.stringify(PRIMARY)} || input.includes("usage-exhausted")) && !fs.existsSync(${JSON.stringify(planReset)})) {
     if (!input.includes("usage-chain-empty")) assistant("Checkpoint saved. Only the final step remains.");
     result({ is_error: true, result: "You've hit your limit. Try again later." });
     return;
@@ -201,7 +204,7 @@ const answer = (request) => {
       const input = JSON.stringify(params.input);
       const current = input.split("--- current message ---").at(-1);
       turn.input = current;
-      const limited = current.includes("usage-");
+      const limited = current.includes("usage-") && !fs.existsSync(${JSON.stringify(planReset)});
       const caseId = /case:([a-z-]+)/.exec(current)?.[1] ?? "no-case";
       fs.appendFileSync(${JSON.stringify(codexLog)}, JSON.stringify({ model: params.model, threadId: thread.id, turnId: turn.id, input, limited }) + "\\n");
       reply({ turn });
@@ -479,6 +482,37 @@ async function send(agentId: string, text: string, sourcePaths?: string[]) {
     return value === "completed" || value === "failed" ? value : null;
   });
   return { deliveryId, status, error: mailbox.getDelivery(deliveryId)?.delivery.error ?? null };
+}
+
+/** Sends a message that a plan limit stops after work, and waits until it waits in the queue to continue. */
+async function sendUntilHeld(agentId: string, text: string) {
+  const receipt = await runCauseEffect(service.sendMessage({ agentId, text, attachmentDraftIds: [] }));
+  const deliveryId = receipt.deliveries[0]?.id;
+  assert.ok(deliveryId, "The message has a delivery.");
+  const continuation = await waitFor(`"${text}" to wait for the reset`, () => {
+    const context = mailbox.getDelivery(deliveryId);
+    assert.notEqual(context?.delivery.status, "failed", `"${text}" did not fail: ${context?.delivery.error}`);
+    return context?.delivery.status === "queued" ? context.resumeAfterUsageLimit : undefined;
+  });
+  return { deliveryId, previousTurns: continuation.previousTurnIds.length };
+}
+
+/**
+ * Ends the plan window: the stand-ins refuse no more turns, and a restart clears the limit, which the
+ * service keeps in memory only. Waits for the held delivery to end.
+ */
+async function endPlanLimit(deliveryId: string) {
+  await writeFile(planReset, "");
+  try {
+    await restart();
+    const status = await waitFor("the held work to end", () => {
+      const value = mailbox.getDelivery(deliveryId)?.delivery.status;
+      return value === "completed" || value === "failed" ? value : null;
+    });
+    return { deliveryId, status, error: mailbox.getDelivery(deliveryId)?.delivery.error ?? null };
+  } finally {
+    await rm(planReset, { force: true });
+  }
 }
 
 /** The name the service lists for a model, which the switch notes show. */
@@ -781,17 +815,29 @@ try {
     });
   }
 
-  await check("without a backup, partial work fails without replay", async () => {
+  await check("without a backup, partial work waits for the reset and continues (#6423)", async () => {
     await restart();
     const agent = await createCodex("No fallback", { automatic: true, order: [] });
+    const since = events.length;
     const before = turns().length;
     const beforeCodex = readLog<CodexTurn>(codexLog).length;
-    const outcome = await send(agent.id, "usage-partial case:stopped");
-    assert.equal(outcome.status, "failed");
+    const held = await sendUntilHeld(agent.id, "usage-partial case:stopped");
     assert.equal(turns().length, before, "No backup runs.");
-    assert.equal(readLog<CodexTurn>(codexLog).length, beforeCodex + 1, "The original action is not replayed.");
+    assert.equal(readLog<CodexTurn>(codexLog).length, beforeCodex + 1, "Nothing runs before the reset.");
     assert.equal(agentOf(agent.id).provider, "codex");
-    return outcome;
+    const outcome = await endPlanLimit(held.deliveryId);
+    assert.equal(outcome.status, "completed", `The work continues after the reset: ${outcome.error}`);
+    const ran = readLog<CodexTurn>(codexLog).slice(beforeCodex);
+    assert.equal(ran.length, 2);
+    assert.ok(ran[1]?.input.includes("Continue the unfinished task"), "The reset turn continues the work.");
+    assert.ok(ran[1]?.input.includes("checkpoint-result=stopped"), "The continuation keeps the earlier work.");
+    assert.equal(
+      readLog<{ caseId: string; step: string }>(workLog).filter((step) => step.caseId === "stopped").length,
+      1,
+      "The original action is not replayed.",
+    );
+    assert.deepEqual(errorsFor(agent.id, since), [], "A usage limit that waits shows no failure.");
+    return { held, outcome };
   });
 
   await check("ask before switching continues partial work on the saved backup", async () => {
@@ -815,13 +861,12 @@ try {
     return { outcome, backups: backups.map((turn) => turn.model) };
   });
 
-  await check("an exhausted backup chain ends without cycling", async () => {
+  await check("an exhausted backup chain waits for the reset without cycling", async () => {
     await restart();
     const agent = await createCodex("Exhausted", automaticBackups);
     const before = turns().length;
     const beforeCodex = readLog<CodexTurn>(codexLog).length;
-    const outcome = await send(agent.id, "usage-exhausted case:exhausted");
-    assert.equal(outcome.status, "failed");
+    const held = await sendUntilHeld(agent.id, "usage-exhausted case:exhausted");
     assert.deepEqual(
       turns()
         .slice(before)
@@ -829,7 +874,12 @@ try {
       [PRIMARY, BACKUP],
     );
     assert.equal(readLog<CodexTurn>(codexLog).length, beforeCodex + 1);
-    return outcome;
+    const outcome = await endPlanLimit(held.deliveryId);
+    assert.equal(outcome.status, "completed", `The work continues after the reset: ${outcome.error}`);
+    const reset = [...turns().slice(before + 2), ...readLog<CodexTurn>(codexLog).slice(beforeCodex + 1)];
+    assert.equal(reset.length, 1, "One turn continues the work at the reset.");
+    assert.ok(reset[0]?.input.includes("Continue the unfinished task"), "The reset turn continues the work.");
+    return { held, outcome };
   });
 
   await check("Stop ends an active task without starting a backup", async () => {
