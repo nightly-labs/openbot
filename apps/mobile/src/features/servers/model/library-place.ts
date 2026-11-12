@@ -20,7 +20,7 @@ export type LibraryPlace =
   | { kind: "agent"; agentId: string }
   | { kind: "folder"; agentId: string; folderId: string };
 
-export const ALL_FILES: LibraryPlace = { kind: "all" };
+const ALL_FILES: LibraryPlace = { kind: "all" };
 
 /**
  * The place of each server, kept while the app runs. The Library and the folder sheet read and set it,

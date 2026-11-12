@@ -107,7 +107,7 @@ async function changeFolders(
  * the folders again while the Library shows them. `files` are the files of the host scan: a folder
  * change needs the agent of each file, as on the host.
  */
-export function useLibraryFolders(serverId: string, files: readonly StoredFileRow[] | undefined) {
+function useLibraryFolders(serverId: string, files: readonly StoredFileRow[] | undefined) {
   const available = useMobileWorkspaceSelector((workspace) => workspace.canOrganizeLibrary(serverId));
   const follows = useMobileWorkspaceSelector((workspace) => workspace.followsLibraryFolders(serverId));
   const agents = useMobileWorkspaceSelector((workspace) => workspace.agents);
