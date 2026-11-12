@@ -348,7 +348,7 @@ export function ServerGeneralSection({ serverId }: { serverId: string }) {
   const limit = memoryLimit.data;
 
   function chooseLimit(next: number) {
-    if (saving || next === limit?.limit) return;
+    if (saving || memoryLimitRow !== "enabled" || next === limit?.limit) return;
     void haptics.selection();
     setSaving(true);
     setError(null);
@@ -392,7 +392,7 @@ export function ServerGeneralSection({ serverId }: { serverId: string }) {
               />
             ) : undefined
           }
-          disabled={!zone}
+          disabled={!zone || timezoneRow === "disabled"}
           onPress={() => router.push({ pathname: "/server-settings/timezone", params: { serverId } })}
         >
           <Typography.Paragraph>{t("mobile.server.settings.timezone")}</Typography.Paragraph>
@@ -421,7 +421,7 @@ export function ServerGeneralSection({ serverId }: { serverId: string }) {
                 options={(limit.choices.includes(limit.limit) ? limit.choices : [limit.limit, ...limit.choices]).map(
                   (choice) => ({ value: choice, label: String(choice) }),
                 )}
-                enabled={!saving}
+                enabled={!saving && memoryLimitRow === "enabled"}
                 dark={theme === "dark"}
                 label={t("mobile.server.settings.memoryLimit")}
                 onChange={chooseLimit}
