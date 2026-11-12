@@ -25,6 +25,7 @@ import {
 import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import { type BusyMessageMode, isBusyMessageMode } from "./ipc-queue";
 import { isBoolean, isDynamicRecord, isOneOf } from "./runtime-values";
+import { AGENT_DEFAULTS_MAX_AGENTS } from "./team-protocol/agent-defaults-v1";
 
 export interface AgentAdminSettings {
   access: AgentAccess;
@@ -489,7 +490,7 @@ export function parseSetAgentDefaultChoiceInput(value: unknown): SetAgentDefault
   if (
     !isDynamicRecord(value) ||
     !Array.isArray(value.agentIds) ||
-    value.agentIds.length > 1_000 ||
+    value.agentIds.length > AGENT_DEFAULTS_MAX_AGENTS ||
     !value.agentIds.every(isIdentifier) ||
     !isOneOf(AGENT_DEFAULT_SETTING_KEYS, value.setting) ||
     !isOneOf(AGENT_DEFAULT_CHOICES, value.choice)

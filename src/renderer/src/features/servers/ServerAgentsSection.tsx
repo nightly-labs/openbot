@@ -105,6 +105,8 @@ export function createServerAgentsSection(
   let writeGeneration = 0;
   /** The changes in flight. A read that ends during a change can be older than the change, so it is dropped. */
   let writes = 0;
+  /** A change failed while another was in flight: read again when the last one ends. */
+  let reloadAfterWrites = false;
 
   const available = () =>
     Boolean(props.agentDefaults) &&
@@ -188,9 +190,6 @@ export function createServerAgentsSection(
       if (draft.overview) change(draft.overview);
     });
     send()
-      .finally(() => {
-        writes--;
-      })
       .then(
         (overview) => {
           if (current !== writeGeneration || serverId !== props.server.id) return;
@@ -200,9 +199,17 @@ export function createServerAgentsSection(
         },
         (error: unknown) => {
           showSaveFailure(error);
-          if (serverId === props.server.id) load(serverId);
+          reloadAfterWrites = true;
         },
-      );
+      )
+      .finally(() => {
+        writes--;
+        // The host has the true values after a failure. A read while other changes run is dropped,
+        // so it starts when the last change ends.
+        if (writes > 0 || !reloadAfterWrites) return;
+        reloadAfterWrites = false;
+        if (serverId === props.server.id) load(serverId);
+      });
   }
 
   function updateDefaults(input: UpdateAgentDefaultsInput): void {

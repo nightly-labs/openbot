@@ -2114,7 +2114,6 @@ export const IPC_ENDPOINTS = {
     updateAgentBrowserProfile: scopedRequest<UpdateAgentBrowserProfileInput, AgentBrowserProfile>()(
       "agent:admin:update-browser-profile",
     ),
-    // Saved proxies of the named browser profiles: `browser-proxies-v1` on a joined server.
     // Settings › Agents: the agent defaults of a computer. `agent-defaults-v1` on a joined server.
     getAgentDefaultsOverview: scopedQuery<AgentDefaultsOverview, "required">()("agent:admin:get-agent-defaults"),
     updateAgentDefaultsOverview: scopedRequest<UpdateAgentDefaultsInput, AgentDefaultsOverview, "required">()(
@@ -2123,6 +2122,7 @@ export const IPC_ENDPOINTS = {
     setAgentDefaultChoice: scopedRequest<SetAgentDefaultChoiceInput, AgentDefaultsOverview, "required">()(
       "agent:admin:set-agent-default-choice",
     ),
+    // Saved proxies of the named browser profiles: `browser-proxies-v1` on a joined server.
     listBrowserProxies: scopedQuery<BrowserProxyList | null>()("agent:admin:list-browser-proxies"),
     saveBrowserProxy: scopedRequest<SaveBrowserProxyInput, BrowserProxySummary>()("agent:admin:save-browser-proxy"),
     deleteBrowserProxy: scopedRequest<DeleteBrowserProxyInput, void>()("agent:admin:delete-browser-proxy"),

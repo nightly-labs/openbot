@@ -47,8 +47,10 @@ function limitChoices(limit: number): number[] {
 }
 
 function delayText({ t, format }: MobileText, ms: number): string {
-  const minutes = Math.floor(ms / 60_000);
-  const seconds = Math.round((ms % 60_000) / 1_000);
+  // Round to whole seconds first, so 119.6 s shows as 2 min and not as 1 min 60 s.
+  const total = Math.round(ms / 1_000);
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
   if (minutes === 0) return t("mobile.settings.agents.planStart.seconds", { seconds: format.number(seconds) });
   if (seconds === 0) return t("mobile.settings.agents.planStart.minutes", { minutes: format.number(minutes) });
   return t("mobile.settings.agents.planStart.minutesSeconds", {

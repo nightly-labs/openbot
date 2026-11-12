@@ -76,14 +76,17 @@ export function createAgentDefaultsSettings({
   }: UpdateAgentDefaultsInput) {
     const previous = agentDefaults.get();
     const modeChanged = mode !== undefined && mode !== busyMessageMode.get().mode;
-    if (modeChanged) yield* rewrap(busyMessageMode.set({ mode }));
     const next = { ...previous, ...changes };
     // The spread keeps the key order of `previous`, so the two texts differ only when a value changed.
     const defaultsChanged = JSON.stringify(next) !== JSON.stringify(previous);
-    if (defaultsChanged) yield* rewrap(agentDefaults.set(next));
+    if (!modeChanged && !defaultsChanged) return read();
     // The agents that follow a changed default get it at once, as after a change in the local window.
-    // The `agents-changed` event also tells the open Settings of each device to read the defaults again.
-    if (modeChanged || defaultsChanged) agents.agentDefaultsChanged(previous);
+    // The `agents-changed` event also tells the open Settings of each device to read the defaults again,
+    // also after a failed second write, when the first write is already saved.
+    yield* Effect.gen(function* () {
+      if (modeChanged && mode !== undefined) yield* rewrap(busyMessageMode.set({ mode }));
+      if (defaultsChanged) yield* rewrap(agentDefaults.set(next));
+    }).pipe(Effect.ensuring(Effect.sync(() => agents.agentDefaultsChanged(previous))));
     return read();
   });
 
