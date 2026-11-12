@@ -333,7 +333,11 @@ customer_units() {
   for file in /etc/systemd/system/*.wants/*@?*; do
     [ -L "$file" ] || continue
     name=${file##*/}
-    case $name in getty@* | serial-getty@* | autovt@* | openbot* | ascii-* | ariana-* | sunshine*) continue ;; esac
+    # `wg-quick@wg0` is the private network of boat (10.77.0.0/16) in each sandbox since 2026-11-09.
+    case $name in getty@* | serial-getty@* | autovt@* | wg-quick@wg0.service | openbot* | ascii-* | ariana-* | sunshine*)
+      continue
+      ;;
+    esac
     echo "$name"
   done
   return 0
