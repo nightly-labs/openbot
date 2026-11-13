@@ -447,11 +447,14 @@ export const OPENBOT_ACP_CLIENT_CAPABILITIES = {
 
 export const OPENBOT_ACP_CLIENT_INFO = { name: "openbot", title: "OpenBot", version: "0.1.0" } as const;
 
-/** Each check answers false when it cannot tell. */
+/** Each check answers that it found no refusal when it cannot tell. */
 export interface AcpSavedSignInCheck {
-  /** Whether the agent's server refuses the saved sign-in, after a turn with no answer. */
-  refusedAfterEmptyAnswer(): Effect.Effect<boolean>;
-  /** Whether a refusal that `refusedAfterEmptyAnswer` found holds for the saved sign-in still. */
+  /**
+   * Whether the agent's server refuses the saved sign-in, after a turn with no answer: `lasting`
+   * when the refusal holds until a new sign-in, `turn` when it is sure for this turn only, or null.
+   */
+  refusedAfterEmptyAnswer(): Effect.Effect<"lasting" | "turn" | null>;
+  /** Whether a `lasting` refusal holds for the saved sign-in still. */
   refusedAtStart(): Effect.Effect<boolean>;
 }
 
@@ -2517,12 +2520,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         response.stopReason === "end_turn" && !turn.receivedOutput && !turn.answerOptional && !turn.stopped
           ? (this.#flavor.emptyAnswerFailure?.(turn, this.#label) ?? null)
           : null;
-      if (emptyAnswerFailure !== null) {
-        if (yield* this.options.savedSignInCheck?.refusedAfterEmptyAnswer() ?? Effect.succeed(false)) {
-          if (thread.activeTurn !== turn || turn.completing) return;
-          logger.warn("An ACP agent's server refused its saved sign-in.", { provider: this.provider });
+      const savedSignInCheck = emptyAnswerFailure === null ? undefined : this.options.savedSignInCheck;
+      const refusal = savedSignInCheck ? yield* savedSignInCheck.refusedAfterEmptyAnswer() : null;
+      if (savedSignInCheck && (thread.activeTurn !== turn || turn.completing)) return;
+      // A stop during the check ends the turn as interrupted, below.
+      if (emptyAnswerFailure !== null && !turn.stopped) {
+        if (refusal !== null) {
+          logger.warn("An ACP agent's server refused its saved sign-in.", { provider: this.provider, refusal });
           turn.failureCause = "authentication";
           yield* this.#completeTurn(thread, turn, "failed", this.options.signInMessage);
+          if (refusal === "turn") return;
           // The next process starts signed out, so the provider offers its sign-in.
           this.#signedIn = false;
           yield* this.#endAgentProcess(this.options.signInMessage);

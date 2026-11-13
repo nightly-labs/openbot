@@ -7,10 +7,12 @@
 // answer, and the user could not see that a new sign-in was necessary.
 //
 // After such a turn, OpenBot asks Kimi's API for the models with the saved token, as the CLI does
-// after its sign-in (`GET <base_url>/models`). A 401 means that the server refuses the sign-in. Any
+// after its sign-in (`GET <base_url>/models`). A 401 means that the server refuses the token. Any
 // other answer, or no answer, keeps the turn's own message. The CLI keeps the refused token, and its
-// next process opens sessions again. Thus this module keeps the refusal for that token. A new
-// sign-in writes a new token, and that clears the refusal.
+// next process opens sessions again. Thus this module keeps the refusal for that token, and a new
+// sign-in, which writes a new token, clears it. It keeps only the refusal of a token that has not
+// expired. An expired token is refused also when its refresh failed for a short time only, such as
+// with no network, and the next turn can refresh it.
 
 import { createHash } from "node:crypto";
 import { Effect, Option, Schema } from "effect";
@@ -59,15 +61,17 @@ export function kimiSavedSignInCheck(env: () => NodeJS.ProcessEnv): AcpSavedSign
     refusedAfterEmptyAnswer: () =>
       Effect.gen(function* () {
         const signIn = yield* readKimiSavedSignIn(true, env());
-        if (Option.isNone(signIn)) return false;
-        if ((yield* modelsStatus(signIn.value)) !== 401) return false;
+        if (Option.isNone(signIn) || !signIn.value.managed) return null;
+        if ((yield* modelsStatus(signIn.value)) !== 401) return null;
+        const { expiresAt } = signIn.value;
+        if (expiresAt !== null && expiresAt * 1_000 <= Date.now()) return "turn" as const;
         refusedSignIns.set(signIn.value.path, tokenHash(signIn.value));
-        return true;
-      }).pipe(Effect.catch(() => Effect.succeed(false))),
+        return "lasting" as const;
+      }).pipe(Effect.catch(() => Effect.succeed(null))),
     refusedAtStart: () =>
       readKimiSavedSignIn(true, env()).pipe(
         Effect.map((signIn) => {
-          if (Option.isNone(signIn)) return false;
+          if (Option.isNone(signIn) || !signIn.value.managed) return false;
           const refused = refusedSignIns.get(signIn.value.path);
           if (refused === undefined) return false;
           if (refused === tokenHash(signIn.value)) return true;

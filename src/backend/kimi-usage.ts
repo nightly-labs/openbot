@@ -96,7 +96,7 @@ function apiUrl(baseUrl: string): string | null {
 
 const KimiToken = Schema.Struct({
   access_token: Schema.NonEmptyString,
-  refresh_token: Schema.optional(Schema.String),
+  refresh_token: Schema.optional(Schema.NullOr(Schema.String)),
   expires_at: Schema.optional(Schema.Finite),
 });
 
@@ -107,6 +107,8 @@ const readText = (path: string) =>
 
 /** The CLI's saved sign-in: its token file, its token, and the API address that the token is for. */
 export interface KimiSavedSignIn {
+  /** False when `config.toml` names no token for the managed provider: the CLI then does not use this token. */
+  readonly managed: boolean;
   readonly path: string;
   readonly apiUrl: string;
   readonly accessToken: string;
@@ -136,6 +138,7 @@ export const readKimiSavedSignIn = Effect.fn("Kimi.readSavedSignIn")(function* (
   const token = Schema.decodeUnknownOption(Schema.fromJsonString(KimiToken))(text.value);
   if (Option.isNone(token)) return Option.none<KimiSavedSignIn>();
   return Option.some<KimiSavedSignIn>({
+    managed: provider.key !== null,
     path,
     apiUrl: url,
     accessToken: token.value.access_token,
