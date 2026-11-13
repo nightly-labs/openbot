@@ -47,6 +47,14 @@ jobs:
       - name: Set up Bun
         uses: ./.github/actions/setup-bun
 
+      # e2e needs Node.js 24.8.0 or newer. The runner's tool cache can hold an older 24.x, and
+      # `.nvmrc` (24) then selects it.
+      - name: Set up the newest Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          check-latest: true
+
       - name: Run the live provider test
         env:
           PROVIDER: ${{ inputs.provider }}
