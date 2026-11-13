@@ -25,6 +25,7 @@ export const messages = {
   "prompt.approval.allow": "允许",
   "prompt.approval.alwaysAllow": "始终允许",
   "prompt.approval.deny": "拒绝",
+  "prompt.approval.cut": "此卡片只显示请求的开头。你现在可以拒绝。完整请求加载后会显示“允许”。",
   "prompt.approval.report.bugHeadline": "发现了问题？我们来修复它。",
   "prompt.approval.report.ideaHeadline": "有想法？我们来实现它。",
   "prompt.approval.report.dontSend": "暂不",

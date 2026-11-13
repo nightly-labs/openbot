@@ -412,7 +412,14 @@ export const messages = {
   "mobile.chat.approval.effect.permissions":
     "“İzin ver”, {name} ajanına {server} üzerinde bu izinleri verir. “Reddet” mevcut izinleri korur.",
   "mobile.chat.approval.partial":
-    "Bu istek telefonda gösterilemeyecek kadar uzun. İzin vermek için {server} üzerinde OpenBot'u açın. Burada reddedebilirsiniz.",
+    "{server}, bu isteğin yalnızca başını telefona gönderiyor. İzin vermek için {server} üzerindeki OpenBot'u güncelleyin veya bu sohbeti OpenBot masaüstü uygulamasında açın. Burada reddedebilirsiniz.",
+  "mobile.chat.approval.loading": "Tam istek yükleniyor…",
+  "mobile.chat.approval.loadFailed": "Tam istek yüklenemedi. Burada reddedebilirsiniz.",
+  "mobile.chat.approval.retry": "Tekrar dene",
+  "mobile.chat.approval.report.bugHeadline": "Bir hata mı buldun? Hadi düzeltelim.",
+  "mobile.chat.approval.report.ideaHeadline": "Bir fikrin mi var? Hadi hayata geçirelim.",
+  "mobile.chat.approval.report.dontSend": "Şimdi değil",
+  "mobile.chat.approval.report.send": "OpenBot ekibine gönder",
   "mobile.chat.approval.allow": "İzin ver",
   "mobile.chat.approval.deny": "Reddet",
   "mobile.chat.approval.reconnect": "Bu isteği yanıtlamak için {server} sunucusuna bağlanın.",

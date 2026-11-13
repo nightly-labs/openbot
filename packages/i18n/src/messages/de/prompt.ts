@@ -25,6 +25,8 @@ export const messages = {
   "prompt.approval.allow": "Erlauben",
   "prompt.approval.alwaysAllow": "Immer erlauben",
   "prompt.approval.deny": "Ablehnen",
+  "prompt.approval.cut":
+    "Diese Karte zeigt nur den Anfang der Anfrage. Du kannst sie jetzt ablehnen. Erlauben erscheint, wenn die vollständige Anfrage geladen ist.",
   "prompt.approval.report.bugHeadline": "Einen Fehler gefunden? Lass ihn uns beheben.",
   "prompt.approval.report.ideaHeadline": "Eine Idee? Lass sie uns umsetzen.",
   "prompt.approval.report.dontSend": "Nicht jetzt",

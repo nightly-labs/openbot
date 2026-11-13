@@ -1027,6 +1027,10 @@ export function ChatView({
       workspace().respondToApproval(target.serverId, { requestId: approval.requestId, decision }),
     [workspace, target.serverId],
   );
+  const loadWholeApproval = useCallback(
+    (approval: PendingApproval) => workspace().readWholeApproval(target.serverId, approval),
+    [workspace, target.serverId],
+  );
   const react = useCallback(
     (message: ChatBubbleMessage, emoji: string | null) =>
       workspace().setMessageReaction(target.id, target.serverId, hostMessageIds.get(message.id) ?? message.id, emoji),
@@ -1157,6 +1161,8 @@ export function ChatView({
               browserRequests={chatBrowserRequests}
               serverName={server?.name ?? ""}
               onRespondApproval={respondToApproval}
+              readsWholeApprovals={workspace().readsWholeApprovals(target.serverId)}
+              onLoadWholeApproval={loadWholeApproval}
               foreground={foreground}
               messages={messages}
               messageAliases={messageAliases}

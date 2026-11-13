@@ -551,6 +551,12 @@ export class AttentionRegistry {
     );
   }
 
+  /** The whole copy of one pending approval, as its `approval` event carried it. The snapshot has a cut copy. */
+  pendingApproval(requestId: RequestId): AgentApproval | undefined {
+    const pending = this.#approvals.get(requestId);
+    return pending ? structuredClone(pending.approval) : undefined;
+  }
+
   hasAttentionFor(agentId: string): boolean {
     return (
       [...this.#prompts.values()].some((pending) => pending.agentId === agentId) ||

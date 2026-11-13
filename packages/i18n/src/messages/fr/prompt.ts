@@ -25,6 +25,8 @@ export const messages = {
   "prompt.approval.allow": "Autoriser",
   "prompt.approval.alwaysAllow": "Toujours autoriser",
   "prompt.approval.deny": "Refuser",
+  "prompt.approval.cut":
+    "Cette carte n’affiche que le début de la demande. Vous pouvez la refuser maintenant. Autoriser apparaît quand la demande complète est chargée.",
   "prompt.approval.report.bugHeadline": "Un bug ? Corrigeons-le.",
   "prompt.approval.report.ideaHeadline": "Une idée ? Concrétisons-la.",
   "prompt.approval.report.dontSend": "Pas maintenant",

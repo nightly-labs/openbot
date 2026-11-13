@@ -25,6 +25,8 @@ export const messages = {
   "prompt.approval.allow": "허용",
   "prompt.approval.alwaysAllow": "항상 허용",
   "prompt.approval.deny": "거부",
+  "prompt.approval.cut":
+    "이 카드에는 요청의 앞부분만 표시돼요. 지금 거부할 수 있어요. 전체 요청을 불러오면 허용 버튼이 표시돼요.",
   "prompt.approval.report.bugHeadline": "버그를 찾으셨나요? 고쳐 봅시다.",
   "prompt.approval.report.ideaHeadline": "아이디어가 있나요? 실현해 봅시다.",
   "prompt.approval.report.dontSend": "나중에",

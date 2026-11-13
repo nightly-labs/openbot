@@ -25,6 +25,8 @@ export const messages = {
   "prompt.approval.allow": "אישור",
   "prompt.approval.alwaysAllow": "אישור תמיד",
   "prompt.approval.deny": "דחייה",
+  "prompt.approval.cut":
+    "הכרטיס מציג רק את תחילת הבקשה. אפשר לדחות אותה עכשיו. כפתור האישור יופיע כשהבקשה המלאה תיטען.",
   "prompt.approval.report.bugHeadline": "מצאת באג? בוא נתקן אותו.",
   "prompt.approval.report.ideaHeadline": "יש לך רעיון? בוא נגשים אותו.",
   "prompt.approval.report.dontSend": "לא עכשיו",

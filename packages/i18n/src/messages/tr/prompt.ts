@@ -25,6 +25,8 @@ export const messages = {
   "prompt.approval.allow": "İzin ver",
   "prompt.approval.alwaysAllow": "Her zaman izin ver",
   "prompt.approval.deny": "Reddet",
+  "prompt.approval.cut":
+    "Bu kart isteğin yalnızca başını gösteriyor. Şimdi reddedebilirsiniz. Tam istek yüklendiğinde İzin ver görünür.",
   "prompt.approval.report.bugHeadline": "Bir hata mı buldun? Hadi düzeltelim.",
   "prompt.approval.report.ideaHeadline": "Bir fikrin mi var? Hadi hayata geçirelim.",
   "prompt.approval.report.dontSend": "Şimdi değil",

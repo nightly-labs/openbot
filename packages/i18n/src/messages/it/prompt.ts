@@ -25,6 +25,8 @@ export const messages = {
   "prompt.approval.allow": "Consenti",
   "prompt.approval.alwaysAllow": "Consenti sempre",
   "prompt.approval.deny": "Nega",
+  "prompt.approval.cut":
+    "Questa scheda mostra solo l’inizio della richiesta. Puoi rifiutarla ora. Consenti appare quando la richiesta completa è caricata.",
   "prompt.approval.report.bugHeadline": "Hai trovato un bug? Risolviamolo.",
   "prompt.approval.report.ideaHeadline": "Hai un'idea? Realizziamola.",
   "prompt.approval.report.dontSend": "Non ora",

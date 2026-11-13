@@ -24,6 +24,8 @@ export const messages = defineMessages("prompt", {
   "prompt.approval.allow": "Allow",
   "prompt.approval.alwaysAllow": "Always allow",
   "prompt.approval.deny": "Deny",
+  "prompt.approval.cut":
+    "This card shows only the start of the request. You can deny it now. Allow shows when the full request loads.",
   "prompt.approval.report.bugHeadline": "Found a bug? Let's get it fixed.",
   "prompt.approval.report.ideaHeadline": "Have an idea? Let's make it real.",
   "prompt.approval.report.dontSend": "Not now",

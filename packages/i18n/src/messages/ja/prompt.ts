@@ -25,6 +25,8 @@ export const messages = {
   "prompt.approval.allow": "許可",
   "prompt.approval.alwaysAllow": "常に許可",
   "prompt.approval.deny": "拒否",
+  "prompt.approval.cut":
+    "このカードにはリクエストの冒頭だけが表示されています。今すぐ拒否できます。リクエスト全体が読み込まれると「許可」が表示されます。",
   "prompt.approval.report.bugHeadline": "バグを見つけましたか？直しましょう。",
   "prompt.approval.report.ideaHeadline": "アイデアがありますか？形にしましょう。",
   "prompt.approval.report.dontSend": "今はしない",

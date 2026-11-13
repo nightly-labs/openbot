@@ -178,6 +178,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "이 서버의 어떤 에이전트도 이 로그인 링크를 표시하지 않았어요.",
   "error.team.hostPersonalityUnsupported": "이 연결은 서버 성격을 지원하지 않아요.",
   "error.team.agentWaitsUnsupported": "이 연결에서는 열린 대기를 지원하지 않아요.",
+  "error.team.pendingApprovalUnsupported": "이 연결에서는 승인 요청 전체를 읽을 수 없어요.",
   "error.team.messagePinsUnsupported": "이 연결은 고정된 메시지를 지원하지 않습니다.",
   "error.team.queuedMessageThreadUnsupported": "이 연결에서는 대기 중인 메시지를 새 스레드로 실행할 수 없어요.",
   "error.team.backgroundProcessesUnsupported": "이 연결에서는 백그라운드 프로세스를 지원하지 않아요.",

@@ -25,6 +25,8 @@ export const messages = {
   "prompt.approval.allow": "Разрешить",
   "prompt.approval.alwaysAllow": "Всегда разрешать",
   "prompt.approval.deny": "Отклонить",
+  "prompt.approval.cut":
+    "На этой карточке только начало запроса. Отклонить его можно сейчас. Кнопка «Разрешить» появится, когда загрузится полный запрос.",
   "prompt.approval.report.bugHeadline": "Нашли ошибку? Давайте исправим.",
   "prompt.approval.report.ideaHeadline": "Есть идея? Давайте воплотим.",
   "prompt.approval.report.dontSend": "Не сейчас",

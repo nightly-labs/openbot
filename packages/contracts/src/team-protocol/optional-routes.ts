@@ -92,6 +92,7 @@ import { MESSAGE_PINS_CODECS } from "./message-pins-v1";
 import { MODEL_VISIBILITY_CODECS } from "./model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_CODECS } from "./onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CODECS } from "./password-managers-v1";
+import { PENDING_APPROVAL_CODECS } from "./pending-approval-v1";
 import { PROMPT_CACHE_TTL_CODECS } from "./prompt-cache-ttl-v1";
 import { PROVIDER_ACCOUNT_MODELS_CODECS } from "./provider-account-models-v1";
 import { PROVIDER_ACCOUNT_POOL_CODECS } from "./provider-account-pool-v1";
@@ -230,6 +231,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...PROVIDER_DETECTION_CODECS,
   ...AGENT_QUEUE_TASK_CODECS,
   ...AGENT_WAITS_CODECS,
+  ...PENDING_APPROVAL_CODECS,
   ...MESSAGE_PINS_CODECS,
   ...ROUTINE_FLOWS_CODECS,
   ...ROUTINE_RECOVERY_CODECS,
