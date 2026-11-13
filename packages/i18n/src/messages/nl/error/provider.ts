@@ -344,6 +344,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "Alleen HTTPS-inloglinks kunnen in de browser worden geopend.",
   "error.provider.geminiKeyRefused":
     "Gemini heeft de opgeslagen API-sleutel geweigerd. Vervang of verwijder de sleutel in Instellingen en verbind opnieuw.",
+  "error.provider.geminiAccountSettingsUnreadable":
+    "Gemini kan het instellingenbestand van dit account niet openen en kan dus niet inloggen. Verwijder dit account en voeg het opnieuw toe.",
+  "error.provider.geminiSettingsUnreadable":
+    "Gemini kan zijn instellingenbestand op deze computer niet openen en kan dus niet inloggen. Sluit de andere apps die Gemini gebruiken en sluit en open OpenBot daarna opnieuw.",
   "error.provider.geminiVerificationRequired":
     "Google moet je account verifiëren voordat Gemini kan antwoorden. Verifieer je Google-account in een browser en stuur je bericht daarna opnieuw.",
   "error.provider.keyProviderRefused":

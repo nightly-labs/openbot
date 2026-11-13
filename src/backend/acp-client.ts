@@ -525,6 +525,11 @@ export interface AcpProviderOptions {
    */
   savedKeyRefusedMessage?: () => string | null;
   /**
+   * The message for a refused sign-in that a new sign-in cannot repair, or `null`. Such a refusal
+   * must say what to do: the sign-in succeeds, and the next process is refused again.
+   */
+  authBlockedMessage?: () => string | null;
+  /**
    * Reads optional identity fields that ACP does not define. A provider extension failing must not
    * turn a working authenticated process into a signed-out one, so account/read falls back to null
    * fields when this hook cannot answer.
@@ -1422,6 +1427,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (isAuthenticationError(error)) {
         const keyRefused = this.options.savedKeyRefusedMessage?.();
         if (keyRefused) return yield* providerFailure(new ProviderSignInError({ message: keyRefused }));
+        const blocked = this.options.authBlockedMessage?.();
+        if (blocked) return yield* providerFailure(new Error(blocked));
         // The agent's own words, which the row does not show (#3796).
         logger.warn("An ACP agent reported no sign-in.", {
           provider: this.provider,
@@ -1849,6 +1856,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             if (this.#flavor.authRequiredSignsOut && error instanceof RequestError && error.code === -32000) {
               const keyRefused = this.options.savedKeyRefusedMessage?.();
               if (keyRefused) return yield* providerFailure(new ProviderSignInError({ message: keyRefused }));
+              // A refusal that a sign-in cannot repair ends the client too, so the row shows it.
+              const blocked = this.options.authBlockedMessage?.();
+              if (blocked) {
+                this.emit("exit", new Error(blocked));
+                return yield* providerFailure(new Error(blocked));
+              }
               this.#signedIn = false;
               this.emit("exit", new Error(this.options.signInMessage));
             }

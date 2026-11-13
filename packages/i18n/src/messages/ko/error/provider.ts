@@ -341,6 +341,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "브라우저에서는 HTTPS 로그인 링크만 열 수 있어요.",
   "error.provider.geminiKeyRefused":
     "Gemini가 저장된 API 키를 거부했어요. 설정에서 키를 교체하거나 제거한 후 다시 연결하세요.",
+  "error.provider.geminiAccountSettingsUnreadable":
+    "Gemini가 이 계정의 설정 파일을 열 수 없어서 로그인할 수 없어요. 이 계정을 제거한 후 다시 추가하세요.",
+  "error.provider.geminiSettingsUnreadable":
+    "Gemini가 이 컴퓨터에서 설정 파일을 열 수 없어서 로그인할 수 없어요. Gemini를 사용하는 다른 앱을 종료한 후 OpenBot을 종료하고 다시 여세요.",
   "error.provider.geminiVerificationRequired":
     "Gemini가 답하려면 Google에서 계정을 인증해야 해요. 브라우저에서 Google 계정을 인증한 후 메시지를 다시 보내세요.",
   "error.provider.keyProviderRefused":

@@ -306,6 +306,10 @@ export const messages = {
   "error.provider.acpSignInMethodMissing": "该服务商在这台电脑上不提供该登录方式。请更新服务商后重试。",
   "error.provider.httpsSignInLinkOnly": "只有 HTTPS 登录链接才能在浏览器中打开。",
   "error.provider.geminiKeyRefused": "Gemini 拒绝了已保存的 API 密钥。请在设置中更换或移除该密钥，然后重新连接。",
+  "error.provider.geminiAccountSettingsUnreadable":
+    "Gemini 无法打开此账号的设置文件，因此无法登录。请移除此账号，然后重新添加。",
+  "error.provider.geminiSettingsUnreadable":
+    "Gemini 无法打开此电脑上的设置文件，因此无法登录。请退出其他使用 Gemini 的应用，然后退出并重新打开 OpenBot。",
   "error.provider.geminiVerificationRequired":
     "Gemini 回答前，Google 需要验证你的账号。在浏览器中验证你的 Google 账号，然后重新发送消息。",
   "error.provider.keyProviderRefused": "{provider} 拒绝了已保存的 API 密钥。请在设置中更换或移除该密钥，然后重试。",
