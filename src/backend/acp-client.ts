@@ -1769,14 +1769,13 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               );
             }
             if (resume && requestedThreadId) {
+              const restored = this.#restoreSessionEffect(
+                connection,
+                { sessionId: requestedThreadId, cwd, ...directories, mcpServers, ...meta },
+                this.#supportsSessionResume ? "resume" : "load",
+              );
               const response = providerResult(
-                yield* Effect.result(
-                  this.#restoreSessionEffect(
-                    connection,
-                    { sessionId: requestedThreadId, cwd, ...directories, mcpServers, ...meta },
-                    this.#supportsSessionResume ? "resume" : "load",
-                  ),
-                ),
+                yield* Effect.result(sessionTransport ? restored : this.#whileProcessWrites(restored)),
               );
               id = requestedThreadId;
               configOptions = response.configOptions ?? [];
@@ -3204,6 +3203,39 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     yield* this.#endAgentProcess(sourceText("error.provider.acpUnresponsive", { provider: this.#label }));
     return true;
   });
+
+  /**
+   * Fails a session open (`session/resume`, `session/load`) that waits while the agent's process
+   * writes nothing at all for the stall limit (`ACP_TURN_STALL_MS`), and ends that process, so the
+   * next message opens the session on a new one. The request had no limit, so a Grok process that
+   * stopped left the next message waiting with no error until the user ended the process (#8246).
+   *
+   * A process that still writes, such as one that replays a long session, has no limit, as before.
+   * So does one that runs a tool call or waits for the user in another session, as in `#watchStall`:
+   * an agent can answer the open only after that. A session's own process is not watched here.
+   */
+  #whileProcessWrites<A>(request: Effect.Effect<A, ProviderClientOperationError>) {
+    const limit = this.options.turnStallMs ?? ACP_TURN_STALL_MS;
+    const startedAt = Date.now();
+    const busy = () =>
+      [...this.#threads.ids()].some((id) => {
+        const thread = this.#threads.get(id);
+        const turn = thread?.transport ? null : thread?.activeTurn;
+        return turn ? turn.toolItems.size > 0 || turn.waitingOnUser > 0 : false;
+      });
+    const silent = Effect.gen({ self: this }, function* () {
+      for (;;) {
+        const silentFor = Date.now() - Math.max(startedAt, this.#transport.lastOutputAt);
+        if (silentFor >= limit && !busy()) break;
+        yield* Effect.sleep(silentFor < limit ? limit - silentFor : limit);
+      }
+      const message = sourceText("error.provider.acpUnresponsive", { provider: this.#label });
+      this.emit("diagnostic", `${this.#label} wrote nothing for ${limit} ms while a session opened.`);
+      yield* this.#endAgentProcess(message);
+      return yield* providerFailure(new TimeoutError(message));
+    });
+    return Effect.raceFirst(request, silent);
+  }
 
   /** Ends the agent's own process with this message. The runtime starts a new one. */
   #endAgentProcess(message: string): Effect.Effect<void> {
