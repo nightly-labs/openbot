@@ -61,6 +61,11 @@ export interface AgentProviderStatus {
    * apart, and only the provider that resolved a CLI reports one at all.
    */
   cliSource?: "system" | "managed";
+  /**
+   * The version of the other CLI the user can run instead (`chooseInstalledCli`): the one they
+   * installed while OpenBot's copy runs, or OpenBot's newer copy while theirs runs by their choice.
+   */
+  otherCliVersion?: string;
   /** A restart the user asked for waits for the provider's turns to end. New turns wait for it. */
   restartPending?: boolean;
   /**
@@ -165,6 +170,7 @@ function isAgentProviderStatus(value: unknown): value is AgentProviderStatus {
     (value.signInPending === undefined || typeof value.signInPending === "boolean") &&
     (value.checkError === undefined || isNullableBoundedString(value.checkError, INPUT_LIMITS.messageText)) &&
     (value.cliSource === undefined || isBoundedString(value.cliSource, INPUT_LIMITS.identifier)) &&
+    (value.otherCliVersion === undefined || isBoundedString(value.otherCliVersion, 160)) &&
     (value.off === undefined || typeof value.off === "boolean") &&
     (value.restartPending === undefined || typeof value.restartPending === "boolean") &&
     (value.endpointsPending === undefined || typeof value.endpointsPending === "boolean") &&
@@ -218,7 +224,7 @@ export interface AccountUsageWindow {
   resetsAt: number | null;
 }
 
-function isAccountUsageWindow(value: unknown): value is AccountUsageWindow {
+export function isAccountUsageWindow(value: unknown): value is AccountUsageWindow {
   return (
     isDynamicRecord(value) &&
     isFiniteNumber(value.usedPercent) &&
@@ -250,7 +256,7 @@ export interface AccountUsageLimit {
    * OpenCode: the weekly or monthly window that `secondary` does not hold. `secondary` is the one that
    * stops work first, so only the usage list shows this one. Cursor: the total of a plan split into
    * Cursor's own models (`primary`) and the others (`secondary`), which the ring shows. No usage limit
-   * check reads this field. The Team API does not send it.
+   * check reads this field. The Team API sends it only to a peer with `usage-tertiary-v1`.
    */
   tertiary?: AccountUsageWindow;
   /**
@@ -351,6 +357,14 @@ export interface SetProviderApiKeyInput {
 export interface ConnectProviderAccountInput {
   provider: AgentProviderId;
   accountId: string | null;
+}
+
+/**
+ * Gives a provider account its API key: a new account when `accountId` is null, or a new key for one
+ * that exists. For a provider whose accounts are keys (`accountSignIn: "key"`).
+ */
+export interface ConnectProviderAccountKeyInput extends ConnectProviderAccountInput {
+  key: string;
 }
 
 /** A null label returns the account to its email. */

@@ -5,6 +5,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentSummary,
   AgentTemplateSkill,
+  GithubSkillSource,
   InstalledSkill,
   InstallSkillInput,
   MarketplaceAgentSkill,
@@ -21,8 +22,11 @@ import {
   AGENT_TEMPLATE_LIMITS,
   decodeMarketplaceSkillDetail,
   decodeMarketplaceSkillPage,
+  isGithubSkillId,
+  isOtherGithubCommit,
   isSkillCategory,
   marketplaceQueryParams,
+  parseGithubSkillId,
   SKILL_DESCRIPTION_MAX_LENGTH,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
@@ -34,6 +38,7 @@ import { isHeldTargetError, writeFileAtomically } from "../backend/atomic-json-f
 import { causeHelpers } from "../backend/effect-boundary";
 import { toArrayBuffer } from "./agent-marketplace-service";
 import type { CentralAuthManager } from "./central-auth-manager";
+import type { GithubSkillSourceReader } from "./github-skill-source";
 import { type LocalSkillLibrary, quotedSkillMarkdown } from "./local-skill-library";
 import { listManagedSkillsForChat, MANAGED_SKILL_FOLDERS, MANAGED_SKILL_SLUGS } from "./managed-skill-service";
 import { listFolderSkills, listHomeFolderSkills } from "./skill-folder-discovery";
@@ -43,6 +48,7 @@ import {
   inspectArchive,
   inspectSkillMarkdown,
   normalizedFiles,
+  readSkillArchive,
 } from "./skill-package";
 
 const DRAFT_LIFETIME_MS = 30 * 60 * 1000;
@@ -96,7 +102,16 @@ export class SkillMarketplaceService {
     private readonly refreshAgentRuntime: (agentId: string) => Effect.Effect<void, AgentLifecycleFailed> = () =>
       Effect.void,
     readonly localLibrary?: LocalSkillLibrary,
+    private readonly github?: GithubSkillSourceReader,
   ) {}
+
+  /** The skills under a link to a public GitHub repository, folder or `SKILL.md`, at one commit. */
+  readGithub(link: string): Effect.Effect<GithubSkillSource, SkillMarketplaceFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<GithubSkillSource, SkillMarketplaceFailure> {
+      const github = yield* skillSync(() => this.requireGithub());
+      return yield* github.read(link).pipe(toSkillMarketplaceFailure);
+    });
+  }
 
   list(query: MarketplaceSkillQuery = {}): Effect.Effect<MarketplaceSkillPage, SkillMarketplaceFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<MarketplaceSkillPage, SkillMarketplaceFailure> {
@@ -119,6 +134,9 @@ export class SkillMarketplaceService {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<MarketplaceSkillDetail, SkillMarketplaceFailure> {
       if (skillId.startsWith("local-skill-"))
         return yield* this.requireLocalLibrary().get(skillId).pipe(toSkillMarketplaceFailure);
+      /* The client keeps the detail of each GitHub skill from its read, and never asks for it here. */
+      if (isGithubSkillId(skillId))
+        return yield* new SkillMarketplaceFailure({ cause: new Error(sourceText("error.skill.notFound")) });
       const detail = yield* this.auth
         .requestAuthorized(`/v1/skills/${encodeURIComponent(skillId)}`, { method: "GET" }, decodeMarketplaceSkillDetail)
         .pipe(toSkillMarketplaceFailure);
@@ -205,8 +223,11 @@ export class SkillMarketplaceService {
       const installed: InstalledSkill[] = [];
       for (const entry of Object.values(lock.skills)) {
         let availableVersion = entry.version;
-        const newest = yield* Effect.result(this.#availableVersion(entry.skillId));
-        if (Result.isSuccess(newest)) availableVersion = newest.success;
+        // A skill from GitHub names its commit: a newer commit is another id, so it has no update.
+        const newest = isGithubSkillId(entry.skillId)
+          ? undefined
+          : yield* Effect.result(this.#availableVersion(entry.skillId));
+        if (newest && Result.isSuccess(newest)) availableVersion = newest.success;
         const state = yield* installedState(agent.workspacePath, entry);
         installed.push(
           toInstalledSkill(
@@ -219,6 +240,14 @@ export class SkillMarketplaceService {
       }
       installed.push(...(yield* listFolderSkills(agent, lockedSlugs(lock)).pipe(toSkillMarketplaceFailure)));
       return installed.sort((a, b) => a.name.localeCompare(b.name));
+    });
+  }
+
+  /** The ids of the skills in the agent's lock file, without reading the catalog. */
+  lockedSkillIds(agentId: string): Effect.Effect<string[], SkillMarketplaceFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<string[], SkillMarketplaceFailure> {
+      const agent = yield* skillSync(() => this.requireAgent(agentId));
+      return Object.keys((yield* readLock(agent.workspacePath)).skills);
     });
   }
 
@@ -264,6 +293,16 @@ export class SkillMarketplaceService {
 
   install(input: InstallSkillInput): Effect.Effect<InstalledSkill, SkillMarketplaceFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<InstalledSkill, SkillMarketplaceFailure> {
+      // The id of a skill from GitHub pins its commit, so the install writes the files that the user read.
+      const address = parseGithubSkillId(input.skillId);
+      if (address) {
+        const agent = yield* skillSync(() => this.requireAgent(input.agentId));
+        const github = yield* skillSync(() => this.requireGithub());
+        const { detail, bundle } = yield* github.download(address).pipe(toSkillMarketplaceFailure);
+        return yield* this.installResolved(agent, detail, bundle, input.replaceModified);
+      }
+      if (isGithubSkillId(input.skillId))
+        return yield* new SkillMarketplaceFailure({ cause: new Error(sourceText("error.skill.notFound")) });
       // A pinned version is served by the versions endpoint, which a local skill has no entry in: a
       // local skill is held on this computer and has no published version to ask for.
       if (input.versionId) {
@@ -318,6 +357,10 @@ export class SkillMarketplaceService {
         if (entry.enabled === false) continue;
         if (entry.skillId.startsWith("local-skill-"))
           return yield* new SkillMarketplaceFailure({ cause: new Error(sourceText("error.skill.publishLocalFirst")) });
+        if (isGithubSkillId(entry.skillId))
+          return yield* new SkillMarketplaceFailure({
+            cause: new Error(sourceText("error.skill.publishGithub", { name: entry.name })),
+          });
         result.push(yield* this.publishedReferenceEffect(agent, entry));
       }
       return result.sort((a, b) => a.name.localeCompare(b.name));
@@ -336,7 +379,8 @@ export class SkillMarketplaceService {
       const result: AgentTemplateSkill[] = [];
       for (const entry of Object.values(lock.skills)) {
         if (entry.enabled === false) continue;
-        if (entry.skillId.startsWith("local-skill-")) {
+        // A skill from GitHub is not in the catalog, so the template carries its text, as a local one.
+        if (entry.skillId.startsWith("local-skill-") || isGithubSkillId(entry.skillId)) {
           const [directory] = targetDirectories(agent.workspacePath, entry.slug);
           result.push(yield* embeddedSkill(join(directory, "SKILL.md"), entry.name));
         } else result.push({ kind: "marketplace", ...(yield* this.publishedReferenceEffect(agent, entry)) });
@@ -458,15 +502,25 @@ export class SkillMarketplaceService {
       const archive = yield* skillSync(() => inspectArchive(bundle));
       if (archive.slug !== detail.slug)
         return yield* new SkillMarketplaceFailure({ cause: new Error(sourceText("error.skill.metadataMismatch")) });
-      const files = yield* skillSync(() => normalizedFiles(bundle));
+      const { files, executable } = yield* skillSync(() => readSkillArchive(bundle));
       const children = packChildren(detail.slug, files);
       const folders = skillFolders(detail.slug, files, children);
+      const executableFolders = skillFolders(
+        detail.slug,
+        Object.fromEntries([...executable].map((name) => [name, true])),
+        children,
+      );
       for (const folder of folders.keys()) yield* assertSkillPaths(agent.workspacePath, folder);
       const lock = yield* readLock(agent.workspacePath);
-      const existing = lock.skills[detail.id];
+      // The same GitHub folder at another commit: this install replaces it.
+      const replacedId = githubPredecessor(lock, detail.id);
+      const existing = lock.skills[detail.id] ?? (replacedId ? lock.skills[replacedId] : undefined);
       if (
         Object.values(lock.skills).some(
-          (entry) => entry.skillId !== detail.id && entryFolders(entry).some((folder) => folders.has(folder)),
+          (entry) =>
+            entry.skillId !== detail.id &&
+            entry.skillId !== replacedId &&
+            entryFolders(entry).some((folder) => folders.has(folder)),
         )
       )
         return yield* new SkillMarketplaceFailure({ cause: new Error(sourceText("error.skill.folderTaken")) });
@@ -513,7 +567,11 @@ export class SkillMarketplaceService {
           (stayDisabled
             ? [disabledDirectory(agent.workspacePath, folder)]
             : targetDirectories(agent.workspacePath, folder)
-          ).map((target) => ({ target, files: folderFiles })),
+          ).map((target) => ({
+            target,
+            files: folderFiles,
+            executable: new Set(Object.keys(executableFolders.get(folder) ?? {})),
+          })),
         ),
       );
       // A skill that a new version of the pack no longer has goes with it.
@@ -532,9 +590,11 @@ export class SkillMarketplaceService {
         ...(stayDisabled ? { enabled: false } : {}),
         ...(children.length > 0 ? { folders: children } : {}),
       };
+      if (replacedId) delete lock.skills[replacedId];
       lock.skills[detail.id] = entry;
       yield* writeLock(agent.workspacePath, lock);
-      if (!detail.id.startsWith("local-skill-"))
+      // Only a catalog skill has an install count.
+      if (!detail.id.startsWith("local-skill-") && !isGithubSkillId(detail.id))
         yield* this.auth
           .requestAuthorized(
             `/v1/skills/${encodeURIComponent(detail.id)}/install`,
@@ -608,10 +668,11 @@ export class SkillMarketplaceService {
               });
           }
         }
-        const writes: Array<{ target: string; files: Record<string, Uint8Array> }> = [];
+        const writes: SkillFolderWrite[] = [];
         for (const folder of folders) {
-          const files = yield* readSkillFiles(disabledDirectory(agent.workspacePath, folder));
-          for (const target of targetDirectories(agent.workspacePath, folder)) writes.push({ target, files });
+          const { files, executable } = yield* readSkillFiles(disabledDirectory(agent.workspacePath, folder));
+          for (const target of targetDirectories(agent.workspacePath, folder))
+            writes.push({ target, files, executable });
         }
         yield* replaceTargets(writes);
         for (const folder of folders)
@@ -671,6 +732,11 @@ export class SkillMarketplaceService {
     const agent = this.listAgents().find((candidate) => candidate.id === agentId);
     if (!agent) throw new Error(sourceText("error.skill.chooseLocalAgent"));
     return agent;
+  }
+
+  private requireGithub(): GithubSkillSourceReader {
+    if (!this.github) throw new Error(sourceText("error.skill.githubUnavailable"));
+    return this.github;
   }
 
   requireLocalLibrary(): LocalSkillLibrary {
@@ -754,6 +820,11 @@ const removeFolder = Effect.fn("SkillMarketplace.removeFolder")(function* (
     yield* skillIO(() => rm(target, { recursive: true, force: true }));
 });
 
+/** The lock key of the same GitHub skill folder at another commit, if the agent has one. */
+function githubPredecessor(lock: SkillsLock, skillId: string): string | undefined {
+  return Object.keys(lock.skills).find((key) => isOtherGithubCommit(skillId, key));
+}
+
 function toInstalledSkill(
   entry: LockEntry,
   availableVersion: number,
@@ -809,6 +880,7 @@ function parseSkillMarkdownDescription(text: string): string | undefined {
 
 const readSkillFiles = Effect.fn("SkillMarketplace.readFiles")(function* (root: string) {
   const files: Record<string, Uint8Array> = {};
+  const executable = new Set<string>();
   const visit = (directory: string): Effect.Effect<void, SkillMarketplaceFailure> =>
     Effect.gen(function* () {
       for (const entry of yield* skillIO(() => readdir(directory, { withFileTypes: true }))) {
@@ -816,12 +888,15 @@ const readSkillFiles = Effect.fn("SkillMarketplace.readFiles")(function* (root: 
         if (entry.isSymbolicLink())
           return yield* new SkillMarketplaceFailure({ cause: new Error(sourceText("error.skill.symlinks")) });
         if (entry.isDirectory()) yield* visit(path);
-        else if (entry.isFile())
-          files[relative(root, path).replaceAll("\\", "/")] = new Uint8Array(yield* skillIO(() => readFile(path)));
+        else if (entry.isFile()) {
+          const name = relative(root, path).replaceAll("\\", "/");
+          files[name] = new Uint8Array(yield* skillIO(() => readFile(path)));
+          if ((yield* skillIO(() => lstat(path))).mode & 0o111) executable.add(name);
+        }
       }
     });
   yield* visit(root);
-  return files;
+  return { files, executable };
 });
 
 /**
@@ -842,19 +917,26 @@ const renameSkillFolder = Effect.fn("SkillMarketplace.renameFolder")(function* (
   }
 });
 
+/** The files of one skill folder, and the names of the ones that are executable. */
+interface SkillFolderWrite {
+  target: string;
+  files: Record<string, Uint8Array>;
+  executable: ReadonlySet<string>;
+}
+
 /** Writes every target, or on a failure puts back each one it already replaced. */
 const replaceTargets = Effect.fn("SkillMarketplace.replaceTargets")(function* (
-  writes: ReadonlyArray<{ target: string; files: Record<string, Uint8Array> }>,
+  writes: ReadonlyArray<SkillFolderWrite>,
 ) {
   const completed: Array<{ target: string; backup: string | null }> = [];
   const outcome = yield* Effect.result(
     Effect.gen(function* () {
-      for (const { target, files } of writes) {
+      for (const { target, files, executable } of writes) {
         yield* skillIO(() => mkdir(dirname(target), { recursive: true, mode: 0o700 }));
         const stage = `${target}.openbot-stage-${randomUUID()}`;
         const backup = (yield* pathExists(target)) ? `${target}.openbot-backup-${randomUUID()}` : null;
         yield* Effect.gen(function* () {
-          yield* writeFiles(stage, files);
+          yield* writeFiles(stage, files, executable);
           if (backup) yield* renameSkillFolder(target, backup);
           const moved = yield* Effect.result(renameSkillFolder(stage, target));
           if (Result.isFailure(moved)) {
@@ -892,13 +974,15 @@ const replaceTargets = Effect.fn("SkillMarketplace.replaceTargets")(function* (
 const writeFiles = Effect.fn("SkillMarketplace.writeFiles")(function* (
   root: string,
   files: Record<string, Uint8Array>,
+  executable: ReadonlySet<string>,
 ) {
   for (const [name, bytes] of Object.entries(files)) {
     const path = resolve(root, name);
     if (!path.startsWith(`${resolve(root)}/`) && !path.startsWith(`${resolve(root)}\\`))
       return yield* new SkillMarketplaceFailure({ cause: new Error("Unsafe skill path.") });
     yield* skillIO(() => mkdir(dirname(path), { recursive: true, mode: 0o700 }));
-    yield* skillIO(() => writeFile(path, bytes, { mode: 0o600 }));
+    // A script keeps its execute bit, so the agent can run it as the skill says (#7746).
+    yield* skillIO(() => writeFile(path, bytes, { mode: executable.has(name) ? 0o700 : 0o600 }));
   }
 });
 

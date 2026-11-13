@@ -134,7 +134,7 @@
         "@config-plugins/react-native-webrtc": "15.0.2",
         "@expo/metro-runtime": "~58.0.15",
         "@expo/ui": "~58.0.22",
-        "@legendapp/list": "3.6.0",
+        "@legendapp/list": "3.7.2",
         "@noble/hashes": "catalog:",
         "@norbert_bodziony/bloub": "catalog:",
         "@openbot/brand": "workspace:*",
@@ -1077,7 +1077,7 @@
 
     "@koromix/koffi-win32-x64": ["@koromix/koffi-win32-x64@3.3.5", "", { "os": "win32", "cpu": "x64" }, "sha512-U3X9aeh8mVoZhNipOnQcxEPNL3urT1ehdg7MIrE3OAgATaBwHoEWhf5Hg9V0+bRtvzdc79qCctL2pXINwYAtNQ=="],
 
-    "@legendapp/list": ["@legendapp/list@3.6.0", "", { "dependencies": { "use-sync-external-store": "^1.5.0" }, "peerDependencies": { "react": "*", "react-dom": "*", "react-native": "*" }, "optionalPeers": ["react-dom", "react-native"] }, "sha512-ndGQjSYdA32LWErJYbXEm4+eta+4bo0NxQO7eA3Xcvh0rXSb1mTGPbUtUkpea5w4MYciLKaE+0hoPxlMcaMtrw=="],
+    "@legendapp/list": ["@legendapp/list@3.7.2", "", { "dependencies": { "use-sync-external-store": "^1.5.0" }, "peerDependencies": { "react": "*", "react-dom": "*", "react-native": "*" }, "optionalPeers": ["react-dom", "react-native"] }, "sha512-StFy5qjOHHuxHKjenwLq500S/z+zuF43hj8iqXhX9EMtzeOagPfsnMRWphvBG4CYBvMTX6VzgLjN5BzzwY1jDA=="],
 
     "@malept/cross-spawn-promise": ["@malept/cross-spawn-promise@2.0.0", "", { "dependencies": { "cross-spawn": "^7.0.1" } }, "sha512-1DpKU0Z5ThltBwjNySMC14g0CkbyhCaz9FkhxqNsZI6uAPJXFS8cMXlBKo26FJ8ZuW6S9GCMcR9IO5k2X5/9Fg=="],
 

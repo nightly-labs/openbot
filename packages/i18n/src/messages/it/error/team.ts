@@ -82,6 +82,8 @@ export const messages = {
   "error.team.routineRunCommandUnsupported":
     "Questa connessione non può fornire il comando di esecuzione di una routine.",
   "error.team.threadQueueUnsupported": "Questa connessione non può mostrare la coda di un thread secondario.",
+  "error.team.hostTurnLimitsUnsupported":
+    "Questa connessione non può mostrare né modificare i limiti dei thread del server.",
   "error.team.usageLimitUnsupported":
     "Questa connessione non può mostrare né modificare i limiti di utilizzo degli agenti.",
   "error.team.hermesImportUnsupported": "Questa connessione non può importare profili Hermes dal server.",
@@ -123,6 +125,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "La modifica dell'identità del server non è supportata da questa connessione.",
   "error.team.hostUpdateUnsupported": "Gli aggiornamenti dell'host non sono supportati da questa connessione.",
   "error.team.hostTimezoneUnsupported": "Questa connessione non supporta il fuso orario del server.",
+  "error.team.hostRestartUnsupported": "Questa connessione non supporta il riavvio del server.",
   "error.team.hostKeyRotationUnsupported": "Questa connessione non supporta il cambio della chiave del server.",
   "error.team.localServersUnsupported": "Questa connessione non supporta i server su questo computer.",
   "error.team.routineResultsUnsupported": "Questa connessione non supporta le destinazioni delle routine.",
@@ -190,6 +193,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "Nessun agente su questo server ha mostrato questo link di accesso.",
   "error.team.hostPersonalityUnsupported": "Questa connessione non supporta la personalità del server.",
   "error.team.agentWaitsUnsupported": "Questa connessione non supporta le attese aperte.",
+  "error.team.pendingApprovalUnsupported": "Questa connessione non permette di leggere un'approvazione completa.",
   "error.team.messagePinsUnsupported": "Questa connessione non supporta i messaggi fissati.",
   "error.team.queuedMessageThreadUnsupported":
     "Questa connessione non supporta l’esecuzione di un messaggio in coda come nuovo thread.",

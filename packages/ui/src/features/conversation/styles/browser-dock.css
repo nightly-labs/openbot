@@ -20,19 +20,20 @@
 /*
  * The dock over a browser page: the island for what the agent does, the queue, and the composer of the
  * tab's agent. Each part is glass. The layers are local to the dock: the copies of a motion go under the
- * composer, the sent text goes over it, and the island is on top. The dock is at the bottom of the page on
- * the end side, so the middle of the page, where most controls are, stays clear.
+ * composer, the sent text goes over it, and the island is on top. The dock is at the bottom centre of the
+ * page. The user can hide the box to reach the page under it.
  */
 .browser-dock {
   position: absolute;
   bottom: var(--openbot-space-4);
-  inset-inline-end: var(--openbot-space-4);
+  left: 50%;
   display: flex;
-  width: min(560px, calc(100% - 2 * var(--openbot-space-4)));
+  width: min(640px, calc(100% - 2 * var(--openbot-space-6)));
   flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
   gap: var(--openbot-space-2);
   isolation: isolate;
+  translate: -50% 0;
 }
 
 .browser-dock-glass {
@@ -252,9 +253,9 @@
 }
 
 /*
- * The user hid the box: a tab with the agent stays at the bottom edge, at the end of the box, clear of the
- * page. It has the height, the bottom line and the avatar inset of the field, so the glass of the field
- * shrinks into it and grows out of it.
+ * The user hid the box: a tab with the agent stays at the bottom edge, in the middle of the box. It has the
+ * height, the bottom line and the avatar inset of the field, so the glass of the field shrinks into it and
+ * grows out of it.
  */
 /* While the copy of its glass moves, the field draws no glass of its own. */
 .browser-dock[data-glassless] .browser-dock-composer {
@@ -272,6 +273,7 @@
   position: absolute;
   bottom: 0;
   overflow: hidden;
+  width: fit-content;
   max-width: min(360px, 100%);
   height: auto;
   box-sizing: border-box;
@@ -282,8 +284,9 @@
   font-size: var(--openbot-text-sm);
   font-weight: inherit;
   gap: var(--openbot-space-2);
-  inset-inline-end: 0;
+  inset-inline: 0;
   line-height: 1;
+  margin-inline: auto;
   white-space: nowrap;
 }
 
@@ -361,7 +364,7 @@
  * without this the box would get narrow too, so the field would grow into the wrong place.
  */
 .browser-dock:is([data-tucked], [data-phase="showing"]) {
-  width: var(--browser-dock-open-width, min(560px, calc(100% - 2 * var(--openbot-space-4))));
+  width: var(--browser-dock-open-width, min(640px, calc(100% - 2 * var(--openbot-space-6))));
   /* The page under the hidden box gets the clicks where no overlay shrinks, as over a remote live view. */
   pointer-events: none;
 }

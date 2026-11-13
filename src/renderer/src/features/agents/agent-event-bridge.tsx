@@ -30,7 +30,7 @@ import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 import { useSidebar } from "../sidebar/sidebar-context";
 import { readDictatedReplies } from "../speech/speech-replies";
-import { claimErrorToast, providerErrorTitle, readableAgentError } from "./agent-error-text";
+import { agentErrorDetails, claimErrorToast, providerErrorTitle, readableAgentError } from "./agent-error-text";
 import { createAgentEventSounds } from "./agent-event-sounds";
 import {
   attentionAgentId,
@@ -291,13 +291,14 @@ export function AgentEventBridge() {
           return next === snapshot ? current : { ...current, [event.agentId]: next };
         });
         // Only the wait of this turn's thread: another thread of the agent can still wait for the user.
+        // A detached question outlives its turn: the host keeps it until the user answers.
         setPendingPrompts((current) => {
           const key = attentionKey(event.agentId, event.threadId);
           const pending = current[key];
           const submittedRequestKey = submittedPromptRequests()[event.agentId];
           if (
             pending?.type === "prompt" &&
-            promptRequestKey(pending.turnId, pending.requestId) === submittedRequestKey
+            (pending.detached || promptRequestKey(pending.turnId, pending.requestId) === submittedRequestKey)
           ) {
             return current;
           }
@@ -420,8 +421,14 @@ export function AgentEventBridge() {
             provider && event.model ? currentText().t("agent.error.run", { provider, model: event.model }) : provider;
           // Google asks the user to verify the account in a browser before Gemini answers (#2419).
           const link = event.link;
+          // The general sentence hides the cause, so the user can copy it into a report (#6410).
+          const details = agentErrorDetails(event.message, message);
           setConversationErrorRuns((current) => {
-            if (run || link) return { ...current, [key]: { message, run, ...(link ? { link } : {}) } };
+            if (run || link || details)
+              return {
+                ...current,
+                [key]: { message, run, ...(link ? { link } : {}), ...(details ? { details } : {}) },
+              };
             if (!(key in current)) return current;
             const { [key]: _replaced, ...next } = current;
             return next;

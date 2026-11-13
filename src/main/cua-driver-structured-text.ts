@@ -46,13 +46,11 @@ const BASE64_TEXT = /^[A-Za-z0-9+/]+={0,2}$/u;
  * One daemon answer line with the copy added, or `null` to pass the line on unchanged.
  *
  * The line is the daemon's own answer to a `call`: `{"ok":true,"result":{content, isError,
- * structuredContent}}`. A refusal or a failed tool result gets its reason in the structured result;
- * see `refusalWithMessage` and `withErrorReason`. Anything else - an answer with no structured result, a line that is not
- * JSON - is `null`.
+ * structuredContent}}`, as `parseAnswerLine` reads it. A refusal or a failed tool result gets its
+ * reason in the structured result; see `refusalWithMessage` and `withErrorReason`. Anything else -
+ * an answer with no structured result - is `null`.
  */
-export function rewriteCallAnswer(line: string): string | null {
-  const parsed = parseAnswerLine(line);
-  if (!parsed) return null;
+export function rewriteCallAnswer(parsed: DynamicRecord): string | null {
   if (parsed.ok === false) return refusalWithMessage(parsed);
   if (parsed.ok !== true) return null;
   const copied = withStructuredText(parsed.result);

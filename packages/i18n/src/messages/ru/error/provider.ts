@@ -211,6 +211,8 @@ export const messages = {
     "Провайдер моделей OpenCode сообщил о некорректном запросе на загрузку. Выберите другую модель и продолжайте. Проверьте сохранённые регулярные задачи, прежде чем создавать их заново.\n{detail}",
   "error.provider.opencodeUnreadableContent":
     "Эта модель не может прочитать файл или изображение в этом чате. Выберите модель, которая читает файлы, затем отправьте сообщение ещё раз.",
+  "error.provider.opencodeContextTooSmall":
+    "Этот чат не помещается в контекстное окно модели. В Ollama или LM Studio загрузите модель с большей длиной контекста и укажите такое же окно в настройках её провайдера в OpenBot. Или выберите модель побольше.",
   "error.provider.opencodeFreeLimit":
     "Бесплатные модели OpenCode исчерпали лимит использования. Этот лимит общий для всех бесплатных моделей. Чтобы продолжить, вставьте ключ OpenCode Go в настройках OpenCode или выберите модель другого провайдера.",
   "error.provider.opencodeProviderFailed":
@@ -297,6 +299,10 @@ export const messages = {
   "error.provider.hermesVersionUnreadable": "Не удаётся прочитать версию Hermes Agent.",
   "error.provider.hermesSignIn":
     "Войдите через Nous Portal или выполните `hermes setup` в терминале, чтобы использовать Hermes.",
+  "error.provider.hermesTurnFailed":
+    "Hermes не смог завершить этот ход. Если в его ответе указана причина, следуйте ему. Если нет, возможно, MCP-сервер этого агента недоступен: проверьте его в разделе Настройки сервера › MCP и отправьте сообщение ещё раз.",
+  "error.provider.copilotThinkingRejected":
+    "GitHub Copilot не смог использовать эту модель: модель не приняла его настройку размышлений. Выберите другую модель для этого агента и отправьте сообщение ещё раз.",
   "error.provider.usageLimitReached": "Аккаунт достиг лимита использования.",
   "error.provider.claudeContextFull":
     "Этот чат стал слишком длинным для Claude. OpenBot начал новую сессию Claude Code с историей чата. Повторите попытку.",
@@ -332,6 +338,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "В браузере можно открыть только ссылки для входа по HTTPS.",
   "error.provider.geminiKeyRefused":
     "Gemini отклонил сохранённый ключ API. Замените или удалите ключ в настройках, затем подключитесь снова.",
+  "error.provider.geminiAccountSettingsUnreadable":
+    "Gemini не может открыть файл настроек этого аккаунта, поэтому не может войти. Удалите этот аккаунт и добавьте его снова.",
+  "error.provider.geminiSettingsUnreadable":
+    "Gemini не может открыть свой файл настроек на этом компьютере, поэтому не может войти. Закройте другие приложения, которые используют Gemini, затем закройте и снова откройте OpenBot.",
   "error.provider.geminiVerificationRequired":
     "Google нужно подтвердить ваш аккаунт, прежде чем Gemini сможет ответить. Подтвердите аккаунт Google в браузере, затем отправьте сообщение снова.",
   "error.provider.keyProviderRefused":
@@ -393,6 +403,13 @@ export const messages = {
   "error.provider.accountDefault": "Первый аккаунт {provider} нельзя удалить.",
   "error.provider.accountUsesKey":
     "Этот аккаунт {provider} использует сохранённый API-ключ и не имеет входа. Измените ключ в Настройки сервера → Провайдеры.",
+  "error.provider.accountNeedsKey":
+    "Новому аккаунту {provider} нужен API-ключ. Обновите OpenBot на этом устройстве, затем добавьте аккаунт ещё раз.",
+  "error.provider.accountKeyRefused": "{provider} не принял этот API-ключ. Проверьте ключ и попробуйте ещё раз.",
+  "error.provider.accountKeyUnreachable":
+    "OpenBot не смог связаться с {provider}, чтобы проверить API-ключ. Проверьте подключение к интернету и попробуйте ещё раз.",
+  "error.provider.accountKeySignedOut":
+    "{provider} больше не принимает API-ключ этого аккаунта. Укажите для аккаунта новый ключ.",
   "error.provider.accountInUse": "Агент с этим аккаунтом сейчас работает. Попробуйте ещё раз, когда агент остановится.",
   "error.provider.accountsReadOnly":
     "Не удаётся прочитать сохранённые аккаунты провайдеров. Обновите OpenBot, прежде чем их менять.",

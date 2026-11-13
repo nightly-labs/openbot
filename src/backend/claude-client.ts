@@ -423,6 +423,8 @@ interface ActiveTurn {
   /** The segment published last, which a message contradicting it can still put right. */
   lastNarration: { id: string; text: string } | null;
   narrationCount: number;
+  /** A Stop hook blocked the held reply. The next message is the redo, so it closes the step (#8080). */
+  stopHookBlocked: boolean;
   thinking: string;
   thinkingStarted: boolean;
   /**
@@ -550,6 +552,9 @@ const CLAUDE_STOP_CONFIRM_MS = 10_000;
 
 /** How many message uuids a process keeps to give a message that runs again a new one (#6676). */
 const TAKEN_PROMPT_LIMIT = 1_000;
+
+/** The start of the user message in which Claude Code gives a blocking Stop hook's reason to the model. */
+const CLAUDE_STOP_HOOK_FEEDBACK = "Stop hook feedback:\n";
 
 interface ClaudeStreamMessage {
   type: string;
@@ -1675,6 +1680,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       publishedText: "",
       lastNarration: null,
       narrationCount: 0,
+      stopHookBlocked: false,
       thinking: "",
       thinkingStarted: false,
       thinkingBlocks: new Map<string, string>(),
@@ -1921,6 +1927,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       const delta = isRecord(event) ? event.delta : null;
       const block = isRecord(event) ? event.content_block : null;
       if (isRecord(event) && event.type === "message_start") {
+        this.#closeBlockedReply(runtime);
         runtime.streamMessage = { id: getString(event.message, "id"), thinkingBlocks: new Map<number, string>() };
       } else if (
         isRecord(event) &&
@@ -1976,6 +1983,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       if (message.error === "authentication_failed") turn.authenticationFailed = true;
       if (message.error === "billing_error") turn.billingFailed = true;
       if (message.error && message.error !== "max_output_tokens") return;
+      // Without stream events, the redo's first message is the first sign of it.
+      this.#closeBlockedReply(runtime);
       const thinking = messageThinking(message.message);
       /* The message's own order is all there is to say what came before its thinking. Text the
          message placed there is narration, and only that much may go. */
@@ -2026,6 +2035,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     if (message.type === "user") {
       const turn = runtime.activeTurn;
       if (!turn) return;
+      /* A blocking Stop hook gives its reason to Claude in this message, and Claude writes the reply
+         again with no tool call between. The blocked text is not the answer. It stays the answer only
+         when no redo comes, as when the hook also ends the turn. */
+      if (!message.parent_tool_use_id && messageText(message.message).startsWith(CLAUDE_STOP_HOOK_FEEDBACK))
+        turn.stopHookBlocked = true;
       for (const { id: toolCallId, text, isError } of messageToolResults(message.message)) {
         // A subagent's task ids are its own, so only the main agent's results name a plan task.
         if (!message.parent_tool_use_id) {
@@ -2404,6 +2418,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         item: { id: last.id, type: "agentMessage", phase: "commentary", text: corrected },
       },
     });
+  }
+
+  /** Move a reply that a Stop hook blocked to the thinking disclosure, as a tool call would, before its redo. */
+  #closeBlockedReply(runtime: ThreadRuntime): void {
+    const turn = runtime.activeTurn;
+    if (!turn?.stopHookBlocked) return;
+    turn.stopHookBlocked = false;
+    this.#reconcileText(runtime, [...turn.assistantMessages.values()].join(""));
+    this.#flushNarration(runtime);
   }
 
   /** Publish held text as the thinking disclosure, which is what a step boundary proves it was. */

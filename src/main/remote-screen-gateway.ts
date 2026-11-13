@@ -559,6 +559,9 @@ export class RemoteScreenGateway {
     yield* this.#confirm(input).pipe(
       Effect.andThen(
         this.#ensureRuntime().pipe(
+          // `mapError` does not see a defect, such as a cleanup step that fails during the start. Without
+          // this, the member gets a 500 with no reason, and the host diagnostics get nothing.
+          Effect.catchDefect((defect) => Effect.fail(new RemoteWorkflowError({ cause: defect }))),
           Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause: this.#runtimeStartRefusal(cause) })),
         ),
       ),

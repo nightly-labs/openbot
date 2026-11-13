@@ -9,6 +9,8 @@ export const messages = {
   "status.agent.modelSwitchedForLimit": "Osiągnięto limit użycia. Przełączono na {model}.",
   "status.agent.modelReturnedAfterLimit": "Limit użycia już nie obowiązuje. Przełączono z powrotem na {model}.",
   "status.agent.modelSwitchedForError": "Błąd dostawcy. Przełączono na {model}.",
+  "status.agent.modelSwitchedForSpentBalance":
+    "{previous} nie ma już kredytów. Przełączono na {model}. Aby znowu go używać, dodaj kredyty, a potem go wybierz.",
   "status.agent.modelReturnedAfterError": "Po błędzie dostawcy przełączono z powrotem na {model}.",
   "status.agent.marketplaceSuggested": "Zaproponowano aplikację z Marketplace: {app}.",
   "status.agent.channelMemberAdded": "Agent {agent} dodał {member} do kanału. Prośba od: {person}.",

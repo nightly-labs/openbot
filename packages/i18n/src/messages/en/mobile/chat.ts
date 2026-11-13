@@ -405,7 +405,14 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.approval.effect.permissions":
     "Allow gives {name} these permissions on {server}. Deny keeps the current permissions.",
   "mobile.chat.approval.partial":
-    "This request is too long to show on the phone. To allow it, open OpenBot on {server}. You can deny it here.",
+    "{server} sends only the start of this request to the phone. To allow it, update OpenBot on {server}, or open this chat in the OpenBot desktop app. You can deny it here.",
+  "mobile.chat.approval.loading": "Loading the full request…",
+  "mobile.chat.approval.loadFailed": "Could not load the full request. You can deny it here.",
+  "mobile.chat.approval.retry": "Try again",
+  "mobile.chat.approval.report.bugHeadline": "Found a bug? Let's get it fixed.",
+  "mobile.chat.approval.report.ideaHeadline": "Have an idea? Let's make it real.",
+  "mobile.chat.approval.report.dontSend": "Not now",
+  "mobile.chat.approval.report.send": "Send to the OpenBot team",
   "mobile.chat.approval.allow": "Allow",
   "mobile.chat.approval.deny": "Deny",
   "mobile.chat.approval.reconnect": "Connect to {server} to answer this request.",

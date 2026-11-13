@@ -384,7 +384,14 @@ export const messages = {
   "mobile.chat.approval.effect.permissions":
     "Toestaan geeft {name} deze machtigingen op {server}. Weigeren behoudt de huidige machtigingen.",
   "mobile.chat.approval.partial":
-    "Dit verzoek is te lang om op de telefoon te tonen. Open OpenBot op {server} om het toe te staan. Je kunt het hier weigeren.",
+    "{server} stuurt alleen het begin van dit verzoek naar de telefoon. Werk OpenBot op {server} bij of open deze chat in de OpenBot-desktopapp om het toe te staan. Je kunt het hier weigeren.",
+  "mobile.chat.approval.loading": "Volledig verzoek laden…",
+  "mobile.chat.approval.loadFailed": "Het volledige verzoek kon niet worden geladen. Je kunt het hier weigeren.",
+  "mobile.chat.approval.retry": "Opnieuw",
+  "mobile.chat.approval.report.bugHeadline": "Een bug gevonden? Laten we hem oplossen.",
+  "mobile.chat.approval.report.ideaHeadline": "Een idee? Laten we het waarmaken.",
+  "mobile.chat.approval.report.dontSend": "Niet nu",
+  "mobile.chat.approval.report.send": "Naar het OpenBot-team sturen",
   "mobile.chat.approval.allow": "Toestaan",
   "mobile.chat.approval.deny": "Weigeren",
   "mobile.chat.approval.reconnect": "Maak verbinding met {server} om dit verzoek te beantwoorden.",

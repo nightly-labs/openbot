@@ -71,6 +71,8 @@ export const messages = {
     "A compactação não reduz este chat: após duas compactações, ele ainda usa {percent}% da janela de contexto do modelo, por isso o OpenBot para de compactá-lo. Ferramentas e instruções usam a maior parte da janela. Desative os servidores MCP ou o uso do computador de que este agente não precisa, ou escolha um modelo com uma janela maior. Depois, inicie um novo chat.",
   "error.backend.contextCompactionStopped":
     'Duas compactações seguidas deste chat falharam, então o OpenBot para de compactá-lo automaticamente. Cada tentativa envia o chat inteiro ao modelo e consome o limite do seu plano. Selecione "Compactar agora" para tentar de novo ou inicie um novo chat.',
+  "error.backend.providerModelAtCapacity":
+    "O modelo está no limite da capacidade. O provedor vai tentar de novo em alguns minutos. Para continuar agora, pare o turno e escolha outro modelo.",
   "error.backend.providerRetrying":
     "O provedor falhou nesta solicitação {attempts} vezes e tenta novamente. Se o agente não continuar, pare o turno.",
   "error.backend.providerRetryingLargeContext":
@@ -365,6 +367,8 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "O proxy {name} recusou o início de sessão, por isso a página não abriu.",
   "error.backend.browserProxyComputerUnreachable":
     "O computador que este perfil usa não responde, por isso a página não abriu.",
+  "error.backend.browserProxyComputerLocalAddress":
+    "O computador que este perfil usa abre apenas sites públicos. Ele não abre endereços de uma rede local, por isso a página não abriu.",
   "error.backend.browserCertificateUntrusted":
     "O certificado de segurança deste site não é confiável, por isso a página não abriu.",
   "error.backend.browserLowMemory":

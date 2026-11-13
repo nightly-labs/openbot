@@ -709,6 +709,47 @@ const HIGGSFIELD: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/higgsfield",
 };
 
+const SUNRA: MarketplacePluginDetail = {
+  id: "plugin-sunra",
+  slug: "sunra",
+  name: "Sunra",
+  tagline: "AI images, videos, audio and 3D",
+  description:
+    "Sunra lets agents make images, videos, audio and 3D models with models such as GPT Image, Nano Banana, Seedream, FLUX, Seedance, Kling and Veo, check the credit balance, and read the results. Results go to a project in the user's Sunra account. Each user signs in to their own Sunra account through the browser. Sunra first quotes the cost of each generation, and spends credits of that account only after it is confirmed.",
+  category: "design",
+  creatorName: "Sunra",
+  iconUrl: "https://sunra.ai/apple-icon.png",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-balance", text: "How many Sunra credits do I have?" },
+    { id: "prompt-poster", text: "Make a Sunra poster of a night market in the rain, in portrait format." },
+    { id: "prompt-clip", text: "Make a 5-second Sunra video of a paper boat on a river. Tell me the cost first." },
+  ],
+  apps: [
+    {
+      id: "app-sunra-mcp",
+      name: "Sunra",
+      description:
+        "Image, video, audio and 3D generation, credits and results, over Sunra's MCP server with browser sign-in.",
+      iconUrl: "https://sunra.ai/apple-icon.png",
+      server: {
+        name: "sunra",
+        transport: "http",
+        url: "https://mcp.sunra.ai",
+        auth: [{ id: "sunra-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://sunra.ai",
+  privacyPolicyUrl: "https://sunra.ai/privacy",
+  termsUrl: "https://sunra.ai/terms",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-11-10T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/sunra",
+};
+
 const ELEVENLABS: MarketplacePluginDetail = {
   id: "plugin-elevenlabs",
   slug: "elevenlabs",
@@ -1755,6 +1796,46 @@ const POSTIZ: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/postiz",
 };
 
+const TRYPOST: MarketplacePluginDetail = {
+  id: "plugin-trypost",
+  slug: "trypost",
+  name: "TryPost",
+  tagline: "Social media scheduling",
+  description:
+    "TryPost lets agents list your connected channels, and draft, schedule, queue and publish posts on X, LinkedIn, Instagram, Facebook, TikTok, YouTube, Threads, Bluesky, Mastodon, Pinterest and more. Agents can also read analytics, manage ideas and approvals, and set posting times. Sign in to your TryPost account through the browser and choose a workspace. Agents can publish a post immediately, so review each post before you approve it.",
+  category: "automation",
+  creatorName: "TryPost",
+  iconUrl: "https://app.trypost.it/images/integrations/openbot.png",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-week", text: "Which posts are scheduled for this week?" },
+    { id: "prompt-draft", text: "Draft a LinkedIn post about our new release, but do not schedule it." },
+    { id: "prompt-analytics", text: "Which of my posts from last month had the most engagement?" },
+  ],
+  apps: [
+    {
+      id: "app-trypost-mcp",
+      name: "TryPost",
+      description: "Channels, posts, queue, ideas and analytics, over TryPost's MCP server with browser sign-in.",
+      iconUrl: "https://app.trypost.it/images/integrations/openbot.png",
+      server: {
+        name: "trypost",
+        transport: "http",
+        url: "https://app.trypost.it/mcp/trypost",
+        auth: [{ id: "trypost-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://trypost.it",
+  privacyPolicyUrl: "https://trypost.it/en/privacy",
+  termsUrl: "https://trypost.it/en/terms",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-11-10T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/trypost",
+};
+
 const COMPOSIO: MarketplacePluginDetail = {
   id: "plugin-composio",
   slug: "composio",
@@ -2049,6 +2130,47 @@ const PLUGIN_2CHAT: MarketplacePluginDetail = {
   featured: false,
   updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/2chat",
+};
+
+const ADOBE_ANALYTICS: MarketplacePluginDetail = {
+  id: "plugin-adobe-analytics",
+  slug: "adobe-analytics",
+  name: "Adobe Analytics",
+  tagline: "Web analytics reports and segments",
+  description:
+    "Adobe Analytics lets agents find report suites, dimensions, metrics, segments and Workspace projects, and run ranked and trended reports. Each user signs in with their own Adobe ID through the browser and selects an organization. An Adobe administrator must first give the account MCP Read-only Access or MCP Full Access. With MCP Full Access, agents can also create and update segments, calculated metrics, date ranges and Workspace projects.",
+  category: "data-analytics",
+  creatorName: "Adobe",
+  iconUrl: "https://www.adobe.com/favicon.ico",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-top-pages", text: "Which pages had the most visits last week?" },
+    { id: "prompt-trend", text: "Show the daily orders for this month and compare them with last month." },
+    { id: "prompt-segment", text: "Which segments do we have for mobile visitors, and how are they defined?" },
+  ],
+  apps: [
+    {
+      id: "app-adobe-analytics-mcp",
+      name: "Adobe Analytics",
+      description:
+        "Report suites, reports, segments and Workspace projects, over Adobe's MCP server with browser sign-in.",
+      iconUrl: "https://www.adobe.com/favicon.ico",
+      server: {
+        name: "adobe-analytics",
+        transport: "http",
+        url: "https://aa-mcp.adobe.io/mcp",
+        auth: [{ id: "adobe-analytics-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://business.adobe.com/products/analytics/adobe-analytics.html",
+  privacyPolicyUrl: "https://www.adobe.com/privacy/policy.html",
+  termsUrl: "https://www.adobe.com/legal/terms.html",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-11-10T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/adobe-analytics",
 };
 
 const ADSPIRER: MarketplacePluginDetail = {
@@ -10372,6 +10494,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   FIGMA,
   PAPER,
   HIGGSFIELD,
+  SUNRA,
   ELEVENLABS,
   APPLE_APPS,
   SENTRY,
@@ -10395,6 +10518,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   RESEND,
   OMNISEND,
   POSTIZ,
+  TRYPOST,
   COMPOSIO,
   CLICKUP,
   COINBASE,
@@ -10402,6 +10526,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   PLUGIN_1INCH,
   PLUGIN_21ST,
   PLUGIN_2CHAT,
+  ADOBE_ANALYTICS,
   ADSPIRER,
   AFFINITY,
   AGENTMAIL,

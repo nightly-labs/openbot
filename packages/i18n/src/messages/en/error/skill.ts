@@ -58,4 +58,14 @@ export const messages = defineMessages("error.skill", {
   "error.skill.localMissingSkillFile": "The skill folder needs SKILL.md at its root.",
   "error.skill.pathSymlink": "Skill paths cannot contain symbolic links.",
   "error.skill.folderNotRead": "{provider} does not read {folder}. Copy this folder to {target}.",
+  // Skills from a public GitHub link. {repository} is "owner/name". {folder} is "owner/name/path".
+  "error.skill.githubLinkInvalid": "Paste a link to a GitHub repository or folder.",
+  "error.skill.githubNotFound": "OpenBot cannot open {repository}. The repository is private, or it does not exist.",
+  "error.skill.githubNoSkills": "There is no SKILL.md in {folder}.",
+  "error.skill.githubUnavailable": "OpenBot cannot read GitHub now. Try again later.",
+  "error.skill.githubRateLimited":
+    "GitHub limits how often OpenBot can read it without an account. Try again in one hour.",
+  "error.skill.githubTooLarge": "OpenBot cannot read all files of {repository}. The repository is too large.",
+  "error.skill.githubHostTooOld": "Update this server to add skills from GitHub.",
+  "error.skill.publishGithub": "{name} comes from GitHub. You can publish only the skills that you made.",
 });
