@@ -22,7 +22,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger } from "@openbot/logging";
+import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { type CauseCode, classifyFailure, isCauseCode } from "@openbot/telemetry";
 import { userErrorMessage } from "@openbot/user-errors";
 import { Cause, Deferred, Effect, Exit, Schema, Scope } from "effect";
@@ -1837,7 +1837,9 @@ export class TurnLifecycle {
           // the agent that asked sends the same work again (#8214).
           const noResult = latestAssistant
             ? ""
-            : this.#hooks.redactMcp(noResultNote(snapshot.messages, turnId, trace, subagents?.subagents));
+            : noResultNote(snapshot.messages, turnId, trace, subagents?.subagents, (text) =>
+                redactText(this.#hooks.redactMcp(text)),
+              );
           for (const delivery of deliveries)
             yield* this.#relayAgentResult(agentId, turnId, delivery, deliveries, latestAssistant?.text, noResult);
         }
@@ -2617,15 +2619,17 @@ const NO_RESULT_TEXT_LIMIT = 160;
 /**
  * The answer for a teammate request when the turn ended with no answer, in the reply format. It
  * names the work that the host saw in the turn: the tool steps, the files, and the subagents that
- * still run. A turn with none of these gets `Evidence: none`.
+ * still run. A turn with none of these gets `Evidence: none`. Each value is redacted before it is
+ * cut, because a cut secret no longer matches.
  */
 function noResultNote(
   messages: readonly ConversationMessage[],
   turnId: string,
   trace: ConversationTurnTrace | null,
   subagents: readonly ConversationSubagent[] | undefined,
+  redact: (text: string) => string,
 ): string {
-  const line = (text: string) => text.replace(/\s+/gu, " ").trim().slice(0, NO_RESULT_TEXT_LIMIT);
+  const line = (text: string) => redact(text).replace(/\s+/gu, " ").trim().slice(0, NO_RESULT_TEXT_LIMIT);
   const steps = trace?.steps.filter((step) => step.kind === "tool") ?? [];
   const files = messages
     .filter((message) => message.author === "assistant" && message.turnId === turnId)
