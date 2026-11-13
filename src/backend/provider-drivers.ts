@@ -191,7 +191,7 @@ export function isKeyAccountSupport(support: ProviderAccountSupport | undefined)
 }
 
 /** The stored keys of the provider accounts that are a key (`ProviderKeyAccountSupport`). */
-export interface ProviderAccountKeys {
+interface ProviderAccountKeys {
   get(provider: AgentProviderId, accountId: string): string | null;
   /** Saves the key, or removes it when `key` is null. */
   set(
