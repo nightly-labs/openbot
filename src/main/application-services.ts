@@ -1388,7 +1388,8 @@ export async function createApplicationServices({
     ? join(process.resourcesPath, "agent-runtime", "cpu-limit.cjs")
     : resolve(__dirname, "../../resources/agent-runtime/cpu-limit.cjs");
   // Every provider process also gets the system roots that this process trusts, so a Python agent CLI
-  // reaches an MCP server behind a TLS-inspecting network as OpenBot's test does (#6616).
+  // reaches an MCP server behind a TLS-inspecting network as OpenBot's test does (#6616). Codex reads
+  // the system roots itself, so its driver leaves the file out (#8112).
   const certificateEnvironment = await Effect.runPromise(
     agentCertificateEnvironment(join(app.getPath("userData"), AGENT_CERTIFICATES_FILE)).pipe(
       Effect.catch((error) =>
