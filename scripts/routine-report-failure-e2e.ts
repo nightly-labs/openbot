@@ -281,6 +281,8 @@ const flows = await Effect.runPromise(
     turnAnswer,
     agentName: (agentId) => store.list().find((agent) => agent.id === agentId)?.name ?? agentId,
     sendHandoff: (input) => agents.enqueueRoutineHandoff(input),
+    stopRoutineRun: (input) => agents.stopRoutineRun(input),
+    stopDelivery: () => Effect.void,
     changed: () => {},
   }),
 );

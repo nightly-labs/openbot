@@ -225,6 +225,12 @@ on a joined host.
   same routine and run, but `reconcileDelivery` finds a run only by its own delivery, so the run status
   does not change. A `routine_report_failure` call in a handoff turn fails only that step, through its
   completed delivery's error, and the agents after it are skipped.
+- Stop (`RoutineFlows.stopRun`) ends a run that has not ended. `RoutineScheduler.stopRun` first records
+  the run as cancelled, so the end of its turn cannot change that, then cancels its queued delivery
+  and interrupts its turn, also in the routine's side thread. A turn that cannot be stopped does not
+  keep the run open. Then each running handoff step ends as cancelled and its turn stops, and each
+  agent that has not started is skipped. The canvas shows Stop in place of Run now while the run of the
+  routine in focus works; a joined host needs `routine-flow-stop-v1`.
 - A canvas shows routines of every trigger kind (`routine-flow-routines.ts`). A webhook routine
   carries its endpoint, event type and filters; the details panel saves them, rotates the secret and
   runs a test through the events API, as the routine settings do. On a joined host only an owner or

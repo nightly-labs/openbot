@@ -27,7 +27,7 @@ import { AgentAvatar } from "../agents/AgentAvatar";
 import { DiagramBoard } from "./DiagramBoard";
 import { DiagramBoardEmpty } from "./DiagramBoardEmpty";
 import { DiagramChatPanel } from "./DiagramChatPanel";
-import { DiagramInspector } from "./DiagramInspector";
+import { DiagramInspector, type DiagramRunStop, DiagramStopButton } from "./DiagramInspector";
 import type { DiagramModelChoice, DiagramNewAgentDraft } from "./DiagramNewAgentCard";
 import { DiagramStepIcon } from "./DiagramNodeCard";
 import { diagramRunStepStatus } from "./DiagramRoutineVisuals";
@@ -66,6 +66,11 @@ export interface DiagramViewProps {
   canRemoveNode?: ((nodeId: string) => boolean) | undefined;
   canRemoveEdge?: ((edgeId: string) => boolean) | undefined;
   onRunRoutine?: ((nodeId: string) => void) | undefined;
+  /**
+   * Stops a run of a routine that has not ended. While the run of the routine in focus works, Stop
+   * takes the place of Run now in the header and shows in the panel. Without it, there is no Stop.
+   */
+  onStopRun?: ((routineNodeId: string, runId: string) => Promise<void>) | undefined;
   /** Agents the canvas's right-click menu offers to place where the user clicked. */
   addableAgents?: readonly AgentProfile[] | undefined;
   onPlaceAgent?: ((agentId: string, position: DiagramPoint) => void) | undefined;
@@ -131,6 +136,22 @@ export function DiagramView(props: DiagramViewProps) {
     props.onRunRoutine?.(routineId);
   };
   const runTarget = () => focusRoutineId() ?? routines()[0]?.id;
+  /** The run that a Stop was sent for. It shows as stopping until the run ends. */
+  const [stopping, setStopping] = createSignal<string | null>(null);
+  /** The Stop of the routine's newest run while that run works, or undefined. */
+  const runStop = (routineId: string | null | undefined): DiagramRunStop | undefined => {
+    const stop = props.onStopRun;
+    const run = routineId ? diagramRunOf(props.diagram, routineId) : undefined;
+    if (!stop || !routineId || run?.status !== "running") return undefined;
+    return {
+      stopping: stopping() === run.id,
+      onStop: () => {
+        setStopping(run.id);
+        // A refused Stop can be pressed again; the caller shows why it failed.
+        stop(routineId, run.id).catch(() => setStopping((current) => (current === run.id ? null : current)));
+      },
+    };
+  };
   /**
    * Before its first routine, while it holds at most the owner's own card, the canvas shows how a
    * routine works, and nothing in it to inspect. Agents placed before a routine stay on the board.
@@ -170,13 +191,20 @@ export function DiagramView(props: DiagramViewProps) {
         </Show>
         <h1 class="diagram-view-title">{props.diagram.name}</h1>
         <span class="diagram-view-actions">
-          <Show when={props.onRunRoutine && runTarget()}>
-            {(routineId) => (
-              <Button type="button" size="xs" onClick={() => runRoutine(routineId())}>
-                <Play aria-hidden="true" />
-                {t("diagram.node.runNow")}
-              </Button>
-            )}
+          <Show
+            when={runStop(runTarget())}
+            fallback={
+              <Show when={props.onRunRoutine && runTarget()}>
+                {(routineId) => (
+                  <Button type="button" size="xs" onClick={() => runRoutine(routineId())}>
+                    <Play aria-hidden="true" />
+                    {t("diagram.node.runNow")}
+                  </Button>
+                )}
+              </Show>
+            }
+          >
+            {(stop) => <DiagramStopButton stop={stop()} />}
           </Show>
           <Show when={!empty()}>
             <Button
@@ -288,6 +316,7 @@ export function DiagramView(props: DiagramViewProps) {
             onFocusRoutine={setPicked}
             onEditTask={props.onEditTask}
             webhooks={props.webhooks}
+            runStop={runStop(focusRoutineId())}
           />
         </Show>
       </div>

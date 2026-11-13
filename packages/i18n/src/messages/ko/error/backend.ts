@@ -114,6 +114,7 @@ export const messages = {
   "error.backend.memoryOperationFailed": "메모리 작업에 실패했어요. 다시 시도해 주세요.",
   "error.backend.memoryGone": "이 메모리는 더 이상 없어요.",
   "error.backend.routineGone": "이 루틴은 더 이상 없어요.",
+  "error.backend.routineRunGone": "이 루틴 실행은 더 이상 없어요.",
   "error.backend.turnNotStarted": "제공자가 이 턴을 시작하지 않았어요.",
   "error.backend.routineResultConnectionOff": "이 메시징 연결이 꺼져 있거나 제거되었어요. 다른 위치를 선택하세요.",
   "error.backend.routineResultNoDelivery": "이 실행에는 다시 보낼 답변이 없어요.",
