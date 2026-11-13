@@ -65,6 +65,7 @@ import { SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-le
 import { SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { STORAGE_CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/storage-channel-v1";
 import { STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-disk-v1";
+import { STORAGE_USER_FILES_ROUTES } from "@openbot/contracts/team-protocol/storage-user-files-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import { VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
@@ -128,6 +129,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   PUSH_NOTIFICATION_THREADS_ROUTES.set,
   STORAGE_ROUTES.usage,
   STORAGE_DISK_ROUTES.disk,
+  STORAGE_USER_FILES_ROUTES.disk,
   LIBRARY_FOLDERS_ROUTES.read,
   STORAGE_CHANNEL_ROUTES.files,
   MACHINE_RESOURCES_ROUTES.metrics,

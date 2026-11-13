@@ -321,6 +321,10 @@ import { SIDEBAR_PINS_CAPABILITY, SIDEBAR_PINS_ROUTES } from "@openbot/contracts
 import { SKILL_LEARNING_CAPABILITY, SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { SKILLS_ADMIN_CAPABILITY, SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { STORAGE_DISK_CAPABILITY, STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-disk-v1";
+import {
+  STORAGE_USER_FILES_CAPABILITY,
+  STORAGE_USER_FILES_ROUTES,
+} from "@openbot/contracts/team-protocol/storage-user-files-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import {
   THREAD_MESSAGE_SEARCH_CAPABILITY,
@@ -2528,6 +2532,12 @@ try {
         Effect.sync(() => {
           record("disk");
           return { freeBytes: 2 * 1024 ** 3, totalBytes: 64 * 1024 ** 3 };
+        }),
+      // As a hosted server: the host measures the files of its user (`du`) for the plan storage.
+      diskUse: () =>
+        Effect.sync(() => {
+          record("diskUse");
+          return { freeBytes: 2 * 1024 ** 3, totalBytes: 64 * 1024 ** 3, userBytes: 5 * 1024 ** 3 };
         }),
     },
     // The real host service over a fake status: only the models and pool routes run in this run.
@@ -6950,6 +6960,46 @@ try {
       "the disk route ignores a path in the body and reads the disk of the OpenBot data",
       withBody.status === 200 && isDeepStrictEqual(withBody.body, expected) && callsOf("disk").length === 3,
       summary(withBody),
+    );
+  }
+
+  // ---- Disk space and the files of the server's user (storage-user-files-v1) ----
+  {
+    const unsupported = await call("POST", STORAGE_USER_FILES_ROUTES.disk, {
+      token: bobToken,
+      json: {},
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    check(
+      "the user-files route without the capability gets 400 storageUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.storageUnsupported")) && callsOf("diskUse").length === 0,
+      summary(unsupported),
+    );
+    const userFiles = { protocol: TEAM_PROTOCOL_V9, capabilities: [STORAGE_USER_FILES_CAPABILITY] };
+    // Every signed-in member reads it: the clients show the plan storage that is left to each member.
+    const member = await call("POST", STORAGE_USER_FILES_ROUTES.disk, { ...userFiles, token: bobToken, json: {} });
+    const owner = await call("POST", STORAGE_USER_FILES_ROUTES.disk, { ...userFiles, token: adaToken, json: {} });
+    const expected = { freeBytes: 2 * 1024 ** 3, totalBytes: 64 * 1024 ** 3, userBytes: 5 * 1024 ** 3 };
+    check(
+      "a member and the owner read the free, total and user-file bytes of the host disk",
+      member.status === 200 &&
+        owner.status === 200 &&
+        isDeepStrictEqual(member.body, expected) &&
+        isDeepStrictEqual(owner.body, expected) &&
+        callsOf("diskUse").length === 2,
+      [summary(member), summary(owner)],
+    );
+    // The frozen storage-disk-v1 reply does not get the new field.
+    const old = await call("POST", STORAGE_DISK_ROUTES.disk, {
+      ...userFiles,
+      capabilities: [STORAGE_DISK_CAPABILITY, STORAGE_USER_FILES_CAPABILITY],
+      token: bobToken,
+      json: {},
+    });
+    check(
+      "the storage-disk-v1 reply keeps its two fields when the peer also has storage-user-files-v1",
+      old.status === 200 && isDeepStrictEqual(old.body, { freeBytes: 2 * 1024 ** 3, totalBytes: 64 * 1024 ** 3 }),
+      summary(old),
     );
   }
 

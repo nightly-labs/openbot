@@ -162,7 +162,8 @@ agent deletion removes it. A duplicate agent starts with no usage history.
 Authenticated members of a host team can also see that host's storage through the Team API: how
 much disk space each location, agent and chat uses, and the name, size, type, date and chat title of
 each sent or generated file. They can also read the free and total size of the disk that holds the
-host's OpenBot data. The response contains no file paths, and workspace and download files
+host's OpenBot data, and, on a hosted server, the total size of the files in the home folder and the
+temporary folders of the server's user. The response contains no file paths, and workspace and download files
 are counted only as totals. Only owners and admins can delete a file or clear caches and logs. A
 deleted file is removed from the host's disk; the message that sent it stays and shows that the file
 is not available.

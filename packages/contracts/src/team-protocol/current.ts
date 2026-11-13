@@ -158,6 +158,7 @@ import { SKILLS_ADMIN_CAPABILITY } from "./skills-admin-v1";
 import { SKILLS_EVENTS_CAPABILITY } from "./skills-events-v1";
 import { STORAGE_CHANNEL_CAPABILITY } from "./storage-channel-v1";
 import { STORAGE_DISK_CAPABILITY } from "./storage-disk-v1";
+import { STORAGE_USER_FILES_CAPABILITY } from "./storage-user-files-v1";
 import { TEAM_SUBAGENTS_CAPABILITY } from "./subagents-v1";
 import { THREAD_MESSAGE_SEARCH_CAPABILITY } from "./thread-message-search-v1";
 import { TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY } from "./ui-block-auto-answer-v1";
@@ -377,6 +378,7 @@ export {
   STORAGE_CAPABILITY,
   STORAGE_CHANNEL_CAPABILITY,
   STORAGE_DISK_CAPABILITY,
+  STORAGE_USER_FILES_CAPABILITY,
   TEAM_BROWSER_NAVIGATION_CAPABILITY,
   TEAM_BROWSER_VIEW_CAPABILITY,
   TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
@@ -623,6 +625,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
   HOST_TURN_LIMITS_CAPABILITY,
+  STORAGE_USER_FILES_CAPABILITY,
   WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
 ] as const;
 
@@ -848,6 +851,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY &&
     capability !== TEAM_USAGE_TERTIARY_CAPABILITY &&
     capability !== HOST_TURN_LIMITS_CAPABILITY &&
+    capability !== STORAGE_USER_FILES_CAPABILITY &&
     capability !== WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
 );
 /**
@@ -948,6 +952,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
   HOST_TURN_LIMITS_CAPABILITY,
+  STORAGE_USER_FILES_CAPABILITY,
   WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
@@ -1132,6 +1137,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY &&
       capability !== TEAM_USAGE_TERTIARY_CAPABILITY &&
       capability !== HOST_TURN_LIMITS_CAPABILITY &&
+      capability !== STORAGE_USER_FILES_CAPABILITY &&
       capability !== WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
   );
 }
