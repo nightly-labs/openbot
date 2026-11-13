@@ -516,12 +516,17 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.#clearHostedStart(serverId);
       this.#hostedStartExpired.delete(serverId);
       this.#connections.markConnected(serverId);
-      this.#emitChanged();
       const server = this.#store.find(serverId);
+      const capabilityRead = server ? this.#connections.startCapabilityRead(serverId) : null;
+      this.#emitChanged();
       this.#background(
         this.#owned(
           Effect.gen({ self: this }, function* () {
-            if (server) yield* this.#client.refreshWebRtcCompatibility(server).pipe(Effect.catch(() => Effect.void));
+            if (server && capabilityRead !== null)
+              yield* this.#client.refreshWebRtcCompatibility(server).pipe(
+                Effect.catch(() => Effect.void),
+                Effect.ensuring(Effect.sync(() => this.#connections.endCapabilityRead(serverId, capabilityRead))),
+              );
             this.#connectTrace?.mark(serverId, "compatibility");
             this.#emitChanged();
             yield* Effect.all(
