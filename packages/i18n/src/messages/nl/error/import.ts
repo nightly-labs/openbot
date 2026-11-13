@@ -47,8 +47,14 @@ export const messages = {
   "error.import.remoteZipTooLarge":
     "Om te importeren in een server waaraan je deelneemt, moet de export een .zip van minder dan 100 MB zijn.",
   "error.import.hostBusy": "De server leest andere exports. Probeer het over een paar minuten opnieuw.",
+  "error.import.uploadDiskSpace":
+    "De export heeft {size} GB vrije schijfruimte op de server nodig, en er is {free} GB vrij. Maak ruimte vrij op de server en kies de export dan opnieuw.",
+  "error.import.remoteZipTooLargeOldHost":
+    "Deze server accepteert een export tot 100 MB. Werk OpenBot op de server bij om een grotere export te importeren.",
   "error.import.skillKept":
     "{name}: de server heeft de vaardigheid “{skill}” al, dus de agent gebruikt die vaardigheid. Vraag een beheerder om deze bij te werken.",
+  "error.import.skillRenamed":
+    "{name}: de naam van de vaardigheid “{skill}” lijkt te veel op de naam van een andere vaardigheid, dus deze wordt opgeslagen als “{renamed}”.",
   "error.import.hermesNoProfiles":
     "Deze map heeft geen Hermes-profielen. Kies de Hermes-map, met config.yaml of SOUL.md.",
   "error.import.hermesClosed": "De Hermes-profielen zijn niet meer open. Lees ze opnieuw.",
@@ -74,6 +80,21 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name}: het model “{model}” is hier nog niet beschikbaar, dus de agent gebruikt het standaardmodel. Kies het model opnieuw als de aanbieder klaar is.",
   "error.import.transferSettingSkipped": "{name} is niet geïmporteerd. {reason}",
+  "error.import.transferRunsSkipped": "{name}: de rungeschiedenis van routine “{routine}” is niet geïmporteerd.",
+  "error.import.transferSharedSkillsSkipped":
+    "De gedeelde vaardigheden konden niet worden gelezen, dus ze staan niet in het bestand.",
+  "error.import.transferSharedSkillsNotAdded":
+    "De gedeelde skills in het bestand konden niet aan deze server worden toegevoegd.",
+  "error.import.transferMemberPreferencesSkipped": {
+    one: "De keuzes van {count} lid konden niet worden opgeslagen.",
+    other: "De keuzes van {count} leden konden niet worden opgeslagen.",
+  },
+  "error.import.transferSharedSkillExists":
+    "Er staat al een gedeelde vaardigheid met deze naam en andere bestanden op deze server.",
+  "error.import.transferServerPreferencesSkipped": {
+    one: "{count} servervoorkeur in het bestand is hier niet geldig en wordt daarom niet geïmporteerd.",
+    other: "{count} servervoorkeuren in het bestand zijn hier niet geldig en worden daarom niet geïmporteerd.",
+  },
   "error.import.transferRoutineFlowSkipped": "De import heeft een routineflow weggelaten. {reason}",
   "error.import.transferCustomAgentCommand":
     "{name}: aangepaste agents worden niet geïmporteerd, omdat ze een opdracht uitvoeren. Controleer de opdracht “{command}” en voeg de agent opnieuw toe in Instellingen.",

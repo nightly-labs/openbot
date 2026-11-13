@@ -284,12 +284,12 @@ const readUnitMemory = Effect.fn("ServerMemory.readUnit")(function* () {
   if (max === undefined) return "unknown";
   if (max === "max") return "unlimited";
   const current = Number((yield* memoryIO(() => readFile(`${root}/memory.current`, "utf8"))).trim());
-  // `memory.current` counts the file cache too. The kernel takes the inactive part back before the
-  // OOM killer acts, so it is free memory, as it is in `MemAvailable`.
-  const inactiveFile = /^inactive_file (\d+)$/m.exec(
-    yield* memoryIO(() => readFile(`${root}/memory.stat`, "utf8")),
-  )?.[1];
-  return { max: Number(max), current: current - Number(inactiveFile ?? 0) };
+  // `memory.current` counts the file cache too. The kernel takes it back before the OOM killer acts,
+  // as `MemAvailable` counts it. Half of the active part stays used: it can be code that runs (#7645).
+  const stat = yield* memoryIO(() => readFile(`${root}/memory.stat`, "utf8"));
+  const statBytes = (name: string): number => Number(new RegExp(`^${name} (\\d+)$`, "m").exec(stat)?.[1] ?? 0);
+  const reclaimable = statBytes("inactive_file") + Math.floor(statBytes("active_file") / 2);
+  return { max: Number(max), current: current - reclaimable };
 });
 
 interface ProcessEntry {

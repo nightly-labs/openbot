@@ -330,11 +330,24 @@ export const messages = {
   "server.settings.later": "Depois",
   "server.settings.setUp": "Configurar",
   "server.settings.agents": "Agentes",
+  "server.settings.agentsDescription":
+    "Escolha o que os agentes deste servidor podem fazer quando você não define isso para um agente.",
   "server.settings.timezone": "Fuso horário",
   "server.settings.timezoneDescription":
     "As novas rotinas usam este fuso horário quando a mensagem não informa o fuso horário do remetente.",
   "server.settings.timezoneAutomatic": "Automático ({zone})",
   "server.settings.timezoneLoadFailed": "Não foi possível carregar o fuso horário do servidor.",
+  "server.settings.turnLimit": "Tópicos ao mesmo tempo",
+  "server.settings.turnLimitDescription":
+    "Quantos tópicos de agentes podem ser executados ao mesmo tempo neste servidor. Mais tópicos usam mais memória.",
+  "server.settings.turnLimitAutomatic": "Automático ({count})",
+  "server.settings.turnLimitAutomaticUnlimited": "Automático (sem limite)",
+  "server.settings.turnLimitUnlimited": "Sem limite",
+  "server.settings.turnLimitsLoadFailed": "Não foi possível carregar os limites de tópicos deste servidor.",
+  "server.settings.agentTaskLimit": "Tópicos em paralelo por agente",
+  "server.settings.agentTaskLimitDescription":
+    "Quantos tópicos cada agente sem limite próprio pode executar ao mesmo tempo.",
+  "server.settings.agentTaskLimitDefault": "Padrão ({count})",
   "server.settings.memoryLimit": "Memórias por agente",
   "server.settings.memoryLimitDescription": "Quantas memórias cada agente neste servidor pode manter.",
   "server.settings.memoryLimitLoadFailed": "Não foi possível carregar o limite de memórias deste servidor.",
@@ -350,6 +363,10 @@ export const messages = {
   "server.settings.skillLearningAsk": "Perguntar antes",
   "server.settings.skillLearningOff": "Desativado",
   "server.settings.skillLearningLoadFailed": "Não foi possível carregar a configuração de aprendizado de habilidades.",
+  "server.settings.browsingMemory": "Aprender com minha navegação",
+  "server.settings.browsingMemoryDescription":
+    "Quando você controla o navegador de um agente, o agente aprende como os sites funcionam pelas páginas e botões que você usa. O texto digitado não é guardado.",
+  "server.settings.browsingMemoryLoadFailed": "Não foi possível carregar a configuração de navegação.",
   "server.settings.remoteOnline": "O computador anfitrião está online. Seu proprietário controla a publicação.",
   "server.settings.remoteOffline": "O computador anfitrião está offline. Seu proprietário controla a publicação.",
   "server.settings.reachable": "Acessível online. Só pessoas convidadas podem entrar.",
@@ -367,7 +384,7 @@ export const messages = {
   "server.settings.hostKeyRotated": "Chave do servidor alterada",
   "server.settings.hostKeyChanged": "Última alteração",
   "server.settings.hostKeyChangedDescription": "{date}. A chave anterior e a chave nova assinaram esta alteração.",
-  "server.settings.hostKeyLocalOnly": "Aqui só o servidor deste computador pode alterar a chave.",
+  "server.settings.hostKeyOwnerOnly": "Só o proprietário pode alterar a chave do servidor.",
   "server.settings.removeTitle": "Remover servidor",
   "server.settings.removeDescription":
     "Remova este servidor do serviço de contas para todos os membros. Use quando o computador dele não estiver mais disponível.",

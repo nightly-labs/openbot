@@ -16,7 +16,7 @@ export function createAgentActivity() {
   const { agentList } = useAgents();
   const { activeTurns, subagentTurns, queues, failedTurns, usageLimits, pendingPrompts, pendingApprovals, approvals } =
     useTurns();
-  const { agentUnreadReplies, recentReplies } = useConversation();
+  const { unreadReplies, recentReplies } = useConversation();
   const agentTasks = useAgentTasks();
 
   /* The turn events of a side thread reach only its thread list, so an agent that works in a side
@@ -40,7 +40,8 @@ export function createAgentActivity() {
       agentIds: agentList().map((agent) => agent.id),
       activeTurns: workingTurns(),
       queues: queues(),
-      unreadReplies: agentUnreadReplies(),
+      unreadReplies: unreadReplies(),
+      unreadThreadReplies: agentTasks.unreadTotals(),
       recentReplies: recentReplies(),
       ...agentThreadAttention({ agents: agentList(), pendingPrompts: pendingPrompts(), approvals: approvals() }),
       failedTurns: failedTurns(),

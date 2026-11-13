@@ -1,4 +1,4 @@
-import { isKnownAgentProvider, providerSteersTurns } from "@openbot/contracts/agent-providers";
+import { type AgentProviderId, isKnownAgentProvider, providerSteersTurns } from "@openbot/contracts/agent-providers";
 import { supportedAttachmentExtensions } from "@openbot/contracts/attachment-files";
 import {
   type AccountUsageLimit,
@@ -17,7 +17,7 @@ import {
 } from "@openbot/contracts/team-protocol/current";
 import { sourceText } from "@openbot/i18n/source";
 import { spentUsageWindow } from "@openbot/team-client/plan-limits";
-import { Button, Input } from "@openbot/ui";
+import { Button, CopyButton, Input, toast } from "@openbot/ui";
 import { AwaitingReplies } from "@openbot/ui/features/conversation/AwaitingReplies";
 import { ComposerAddMenu } from "@openbot/ui/features/conversation/ComposerAddMenu";
 import { ComposerAttachmentRow } from "@openbot/ui/features/conversation/ComposerAttachmentRow";
@@ -31,9 +31,9 @@ import {
 } from "@openbot/ui/features/conversation/ComposerNotice";
 import { ComposerReplyPreview } from "@openbot/ui/features/conversation/ComposerReplyPreview";
 import { ComposerSendControl, type ComposerSendVoice } from "@openbot/ui/features/conversation/ComposerSendControl";
+import { ComposerStackCard } from "@openbot/ui/features/conversation/ComposerStackCard";
 import {
   ComposerCompactionNotice,
-  ComposerNewChatButton,
   ContextUsageMeter,
   contextUsageView,
 } from "@openbot/ui/features/conversation/ContextUsage";
@@ -76,6 +76,7 @@ export function ConversationComposer() {
     currentChatErrorReference,
     currentChatErrorRun,
     currentChatErrorLink,
+    currentChatErrorDetails,
     currentDraft,
     dismissCurrentChatErrors,
     installedSkills,
@@ -138,6 +139,8 @@ export function ConversationComposer() {
     providerOffline,
     agentProviderName,
     sideThreadOpen,
+    canTeachBrowserTask,
+    openBrowserTeach,
   } = useConversationViewScope();
   const { t, format, sourceText: localizeSourceText } = useText();
   const messageLabel = () =>
@@ -146,10 +149,11 @@ export function ConversationComposer() {
       : props.agent?.name
         ? t("composer.placeholder.message", { name: props.agent.name })
         : t("composer.placeholder.messageAgent");
-  const [pickerOpen, setPickerOpen] = createSignal(false);
   const [skillPickerRequest, setSkillPickerRequest] = createSignal(0);
   /** A skill belongs to one agent, and a channel message goes to the agents it routes to. */
   const pickSkill = () => (channel ? undefined : () => setSkillPickerRequest((current) => current + 1));
+  /** As for a skill: the task is for one agent. Hidden while the host cannot record the steps. */
+  const teachTask = () => (channel || !canTeachBrowserTask() ? undefined : () => void openBrowserTeach());
   /**
    * The draft goes to the side question, so that the chat gets nothing of it. A draft with attachments
    * stays: the side question cannot send files.
@@ -210,8 +214,6 @@ export function ConversationComposer() {
   const editorLocked = () =>
     !agentReady() &&
     !((props.agent || channel) && (props.agentStatus.phase === "starting" || props.agentStatus.phase === "restarting"));
-  // The mention picker grows out of the same edge as the queue, so only one of them holds it.
-  const queueVisible = () => queuePanelVisible() && !pickerOpen();
   // Each chat gets its own queue panel. One shared panel animated the rows and the height of the
   // previous chat's queue into this one, and the chat jumped while it resized (#3770). The keyed
   // <Show> builds its child again only when the child function takes the key as a parameter.
@@ -219,13 +221,12 @@ export function ConversationComposer() {
     const target = currentConversationTarget(props);
     return target && `${target.serverId}:${target.agentId}`;
   };
-  const awaitingVisible = () => awaitingReplies().length > 0 && !pickerOpen();
+  const awaitingVisible = () => awaitingReplies().length > 0;
   const waitItems = createMemo(() => openWaitItems(props.waits ?? [], props.queue));
-  const waitsVisible = () => waitItems().length > 0 && Boolean(props.onCancelWait) && !pickerOpen();
-  const slotOpen = () => (queueOpen() && !pickerOpen()) || awaitingVisible() || waitsVisible();
+  const waitsVisible = () => waitItems().length > 0 && Boolean(props.onCancelWait);
   // A slot that closes keeps the last rows in place, so the whole panel goes down behind the input in
   // one move, the way it came up. In a slot that stays open, a row that goes leaves on its own.
-  const queueRows = () => (slotOpen() ? presentedQueueDeliveries() : renderedQueueDeliveries());
+  const queueRows = () => (queueOpen() ? presentedQueueDeliveries() : renderedQueueDeliveries());
   // A channel has many speakers, so it has no voice input.
   const voiceAvailable = () => !channel && !props.runtime;
   /** The reply of this agent that is read aloud. The voice pane shows its own. */
@@ -294,6 +295,18 @@ export function ConversationComposer() {
         >
           {t("composer.verifyAccount.action")}
         </Button>
+      );
+    // The general sentence names no cause, so the user can copy the provider's text into a report (#6410).
+    const details = currentChatErrorDetails();
+    if (details)
+      return (
+        <CopyButton
+          value={details}
+          variant="outline"
+          size="sm"
+          label={t("agent.error.copyDetails")}
+          onCopyError={() => toast.error(t("app.clipboard.copyFailed"))}
+        />
       );
     return undefined;
   };
@@ -459,6 +472,31 @@ export function ConversationComposer() {
       <ComposerBody />
     </Show>
   );
+  /** Built again for each provider: a sign-in that failed for one provider says nothing about the next. */
+  function SignInCard(card: { provider: AgentProviderId }) {
+    return (
+      <Show when={card.provider} keyed>
+        {(provider) => (
+          <ComposerSignInNotice
+            provider={provider}
+            onShown={() =>
+              reportNotification({
+                operation: "provider",
+                source: "provider",
+                cause_code: "authentication",
+                severity: "warning",
+                presentation: "banner",
+                provider,
+              })
+            }
+            signingIn={signInRequired()?.connectionState === "connecting"}
+            onSignIn={(provider) => props.onSignInProvider?.(provider)}
+            onSignInWithCode={props.onSignInWithCodeProvider}
+          />
+        )}
+      </Show>
+    );
+  }
   function ComposerBody() {
     return (
       <div class={["composer-wrap", { "conversation-covered": sideThreadOpen() }]} inert={sideThreadOpen()}>
@@ -475,41 +513,43 @@ export function ConversationComposer() {
         </Show>
         {/* One card for everything above the input: see composer-stack.css. */}
         <div class="composer-stack">
+          <ComposerStackCard when={awaitingVisible() && awaitingReplies()}>
+            {(items) => (
+              <AwaitingReplies
+                items={items()}
+                title={channel ? t("chat.awaiting.subtasks") : undefined}
+                onDismiss={dismissAwaitingReplies}
+                onOpenAgent={props.onSelectAgent}
+                // A channel's rows are its sub-tasks, not queued replies.
+                onSteer={props.activeTurnId && !channel && steers() ? props.onSteerQueuedMessage : undefined}
+                onStop={channel && !channel.readOnly() ? channel.stopAwaitingReply : undefined}
+              />
+            )}
+          </ComposerStackCard>
+          <ComposerStackCard when={waitsVisible() && props.onCancelWait && waitItems()}>
+            {(items) => (
+              <OpenWaits
+                items={items()}
+                onCancel={(waitId) => props.onCancelWait?.(waitId)}
+                onShowRequest={
+                  props.onOpenSearchMessage
+                    ? (waitId) => {
+                        const wait = props.waits?.find((entry) => entry.id === waitId);
+                        if (wait) void props.onOpenSearchMessage?.(wait.requestMessageId);
+                      }
+                    : undefined
+                }
+              />
+            )}
+          </ComposerStackCard>
           <div
             class="agent-queue-slot"
-            data-open={slotOpen() ? "true" : "false"}
-            aria-hidden={slotOpen() ? undefined : "true"}
-            inert={slotOpen() ? undefined : true}
+            data-open={queueOpen() ? "true" : "false"}
+            aria-hidden={queueOpen() ? undefined : "true"}
+            inert={queueOpen() ? undefined : true}
           >
             <div class="agent-queue-slot-inner">
-              <Show when={awaitingVisible()}>
-                <AwaitingReplies
-                  items={awaitingReplies()}
-                  title={channel ? t("chat.awaiting.subtasks") : undefined}
-                  onDismiss={dismissAwaitingReplies}
-                  onOpenAgent={props.onSelectAgent}
-                  // A channel's rows are its sub-tasks, not queued replies.
-                  onSteer={props.activeTurnId && !channel && steers() ? props.onSteerQueuedMessage : undefined}
-                  onStop={channel && !channel.readOnly() ? channel.stopAwaitingReply : undefined}
-                />
-              </Show>
-              <Show when={waitsVisible() && props.onCancelWait}>
-                {(cancelWait) => (
-                  <OpenWaits
-                    items={waitItems()}
-                    onCancel={cancelWait()}
-                    onShowRequest={
-                      props.onOpenSearchMessage
-                        ? (waitId) => {
-                            const wait = props.waits?.find((entry) => entry.id === waitId);
-                            if (wait) void props.onOpenSearchMessage?.(wait.requestMessageId);
-                          }
-                        : undefined
-                    }
-                  />
-                )}
-              </Show>
-              <Show when={queueVisible() ? queueOwner() : undefined} keyed>
+              <Show when={queuePanelVisible() ? queueOwner() : undefined} keyed>
                 {(_owner) => (
                   <Loading>
                     <QueuePanel
@@ -539,35 +579,39 @@ export function ConversationComposer() {
               </Show>
             </div>
           </div>
-          <Show when={providerWaitNotice()}>
+          <ComposerStackCard when={providerWaitNotice()}>
             {(notice) => <ComposerNotice title={notice().title} body={notice().body} />}
-          </Show>
-          <Show when={editingDeliveryId()}>
-            <ComposerNotice
-              body={t("composer.queueEdit.body")}
-              action={
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  type="button"
-                  disabled={submitting() || attachmentBusy()}
-                  onClick={() => void cancelQueuedMessageEdit()}
-                >
-                  {t("composer.queueEdit.cancel")}
-                </Button>
-              }
-            />
-          </Show>
-          <Show when={voiceLimitNotice()}>
-            <ComposerNotice
-              body={t("composer.voice.limitReached")}
-              onDismiss={() => {
-                dismissVoiceLimitNotice();
-                setComposerFocusRequest((current) => current + 1);
-              }}
-            />
-          </Show>
-          <Show when={replyTarget()}>
+          </ComposerStackCard>
+          <ComposerStackCard when={editingDeliveryId()}>
+            {() => (
+              <ComposerNotice
+                body={t("composer.queueEdit.body")}
+                action={
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    type="button"
+                    disabled={submitting() || attachmentBusy()}
+                    onClick={() => void cancelQueuedMessageEdit()}
+                  >
+                    {t("composer.queueEdit.cancel")}
+                  </Button>
+                }
+              />
+            )}
+          </ComposerStackCard>
+          <ComposerStackCard when={voiceLimitNotice()}>
+            {() => (
+              <ComposerNotice
+                body={t("composer.voice.limitReached")}
+                onDismiss={() => {
+                  dismissVoiceLimitNotice();
+                  setComposerFocusRequest((current) => current + 1);
+                }}
+              />
+            )}
+          </ComposerStackCard>
+          <ComposerStackCard when={replyTarget()}>
             {(message) => (
               <ComposerReplyPreview
                 message={message()}
@@ -577,8 +621,8 @@ export function ConversationComposer() {
                 onCancel={() => updateCurrentDraft({ replyToMessageId: null })}
               />
             )}
-          </Show>
-          <Show when={providerUpdateRequired()}>
+          </ComposerStackCard>
+          <ComposerStackCard when={providerUpdateRequired()}>
             {(status) => (
               <ComposerUpdateNotice
                 provider={status().id}
@@ -591,29 +635,11 @@ export function ConversationComposer() {
                 }
               />
             )}
-          </Show>
-          {/* Keyed on the provider: a sign-in that failed for one provider says nothing about the next. */}
-          <Show when={signInRequired()?.id} keyed>
-            {(provider) => (
-              <ComposerSignInNotice
-                provider={provider}
-                onShown={() =>
-                  reportNotification({
-                    operation: "provider",
-                    source: "provider",
-                    cause_code: "authentication",
-                    severity: "warning",
-                    presentation: "banner",
-                    provider,
-                  })
-                }
-                signingIn={signInRequired()?.connectionState === "connecting"}
-                onSignIn={(provider) => props.onSignInProvider?.(provider)}
-                onSignInWithCode={props.onSignInWithCodeProvider}
-              />
-            )}
-          </Show>
-          <Show when={usageNotice()}>
+          </ComposerStackCard>
+          <ComposerStackCard when={signInRequired()?.id}>
+            {(shown) => <SignInCard provider={shown()} />}
+          </ComposerStackCard>
+          <ComposerStackCard when={usageNotice()}>
             {(spent) => (
               <ComposerUsageLimitNotice
                 provider={spent().provider}
@@ -639,7 +665,7 @@ export function ConversationComposer() {
                 }
               />
             )}
-          </Show>
+          </ComposerStackCard>
           <Show when={compaction()?.id} keyed>
             {(id) => (
               <ComposerCompactionNotice
@@ -652,7 +678,7 @@ export function ConversationComposer() {
               />
             )}
           </Show>
-          <Show
+          <ComposerStackCard
             when={
               currentChatError() && currentChatError() !== providerUpdateRequired()?.message ? currentChatError() : null
             }
@@ -672,7 +698,7 @@ export function ConversationComposer() {
                 action={errorBannerAction()}
               />
             )}
-          </Show>
+          </ComposerStackCard>
         </div>
         <div
           ref={composerResize.ref}
@@ -743,7 +769,6 @@ export function ConversationComposer() {
               onSubmit={submitComposer}
               onSteer={steerOnTab()}
               sendShortcut={deviceSendShortcut(props.platform)}
-              onPickerOpenChange={setPickerOpen}
               dictation={{ text: voiceLiveText(), final: voicePhase() === "transcribing" }}
               onPasteFiles={(files, selection, text) => pasteFiles(files, selection, undefined, text)}
               onCopyAttachments={(clipboard, text, attachments, remaining) => {
@@ -784,24 +809,12 @@ export function ConversationComposer() {
               attachDisabled={attachmentBusy()}
               onAttach={openAttachmentPicker}
               onPickSkill={pickSkill()}
+              onTeach={teachTask()}
               onSideQuestion={askSideQuestion()}
               onVoice={openVoiceConversation()}
             />
             <div class="composer-primary-actions">
-              <Show
-                when={contextUsageView(context())}
-                fallback={
-                  <Show when={newChat()}>
-                    {(action) => (
-                      <ComposerNewChatButton
-                        agent={action().agent}
-                        start={action().start}
-                        disabled={context()?.compaction?.status === "running"}
-                      />
-                    )}
-                  </Show>
-                }
-              >
+              <Show when={contextUsageView(context())}>
                 {(usage) => (
                   <ContextUsageMeter newChat={newChat()} compact={props.onCompactAgentContext} usage={usage()} />
                 )}

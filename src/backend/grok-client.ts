@@ -11,6 +11,7 @@ import { AcpAgentClient, type AcpHistoryPersistence } from "./acp-client";
 import { GROK_ACP_FLAVOR } from "./acp-flavor";
 import type { GrokCliInfo } from "./cli";
 import { isMissingFileError } from "./file-errors";
+import { MCP_STDIO_PROBE_TIMEOUT_MS } from "./mcp-probe";
 import type { McpDropReporter, McpEndpointSource, McpServerSource, McpToolRuntimeSource } from "./mcp-provider-shapes";
 import { confineSpawnTarget, grokHomeDirectory, grokStatePaths, type ProcessConfinement } from "./process-confinement";
 import { type AccountRateLimitsReadResult, getRecord, getString, isRecord } from "./protocol";
@@ -20,7 +21,8 @@ export class GrokAgentClient extends AcpAgentClient {
   constructor(
     cli: GrokCliInfo,
     requestTimeoutMs = 30_000,
-    profileGeneration = false,
+    /** `"media"`: a profile-generation client that may run only the image and video tools. */
+    profileGeneration: boolean | "media" = false,
     mcpServers: McpServerSource = () => [],
     reportMcpDrops?: McpDropReporter,
     mcpToolRuntimes?: McpToolRuntimeSource,
@@ -38,15 +40,26 @@ export class GrokAgentClient extends AcpAgentClient {
               confineSpawnTarget(target, confinement, grokStatePaths({ ...process.env, ...agentEnvironment?.() })),
           }
         : {}),
-      profileGeneration,
+      profileGeneration: profileGeneration !== false,
+      mediaGeneration: profileGeneration === "media",
       // A profile-generation client asks one question and must not act, so it is given none.
-      mcpServers: profileGeneration ? () => [] : mcpServers,
+      mcpServers: profileGeneration !== false ? () => [] : mcpServers,
       reportMcpDrops,
       mcpToolRuntimes,
       mcpEndpoint,
       argv: [
         "--no-auto-update",
-        ...(profileGeneration ? ["--tools=", "--deny", "*", "--no-subagents", "--disable-web-search"] : []),
+        ...(profileGeneration === "media"
+          ? [
+              "--no-subagents",
+              "--disable-web-search",
+              ...GROK_NON_MEDIA_TOOLS.flatMap((tool) => ["--deny", tool]),
+              "--deny",
+              "mcp__*",
+            ]
+          : profileGeneration
+            ? ["--tools=", "--deny", "*", "--no-subagents", "--disable-web-search"]
+            : []),
         "agent",
         "stdio",
       ],
@@ -54,7 +67,8 @@ export class GrokAgentClient extends AcpAgentClient {
       // Read at each spawn, so a change to the user's `config.toml` applies to the next process.
       extraEnv: () => {
         const environment = { ...agentEnvironment?.() };
-        return { ...grokFeatureEnvironment({ ...process.env, ...environment }), ...environment };
+        const merged = { ...process.env, ...environment };
+        return { ...grokFeatureEnvironment(merged), ...grokMcpStartupEnvironment(merged), ...environment };
       },
       history,
       signInMessage: sourceText("error.provider.grokSignIn"),
@@ -67,6 +81,37 @@ export class GrokAgentClient extends AcpAgentClient {
     });
   }
 }
+
+/**
+ * The built-in tools of Grok CLI 1.0.77 other than its image and video tools (`grok-media.ts`). A
+ * media client denies each by name, and every MCP tool with `mcp__*`: a deny rule wins over an allow
+ * rule, so `--deny *` would also refuse the media tools. A tool that a later CLI adds and that asks first is refused by the client
+ * (`AcpAgentOptions.mediaGeneration`).
+ */
+const GROK_NON_MEDIA_TOOLS = [
+  "run_terminal_command",
+  "read_file",
+  "search_replace",
+  "write",
+  "list_dir",
+  "grep",
+  "kill_command_or_subagent",
+  "get_command_or_subagent_output",
+  "todo_write",
+  "scheduler_create",
+  "scheduler_delete",
+  "scheduler_list",
+  "monitor",
+  "search_tool",
+  "use_tool",
+  "workflow",
+  "enter_plan_mode",
+  "exit_plan_mode",
+  "ask_user_question",
+  "send_feedback",
+  "web_search",
+  "web_fetch",
+] as const;
 
 /**
  * Grok features that OpenBot agents do not use, each with its `config.toml` key and the environment
@@ -103,6 +148,18 @@ function grokFeatureEnvironment(env: NodeJS.ProcessEnv, home = homedir()): Recor
       (feature) => !env[feature.env]?.trim() && !layers.some((layer) => hasConfigKey(layer, feature.key)),
     ).map((feature) => [feature.env, "0"]),
   );
+}
+
+/**
+ * Grok CLI 1.0.77 gives each MCP server 30 s to start, and OpenBot's connection test gives a stdio
+ * server 60 s. A server that started in between passed the test as ready, and Grok left it out of
+ * each session with no error (#8083). These variables set Grok's default for all servers; a server's
+ * own `startup_timeout_sec` in the user's Grok settings still wins. OpenBot sets one only when the
+ * user's environment sets neither. Grok starts the servers in the background, so a turn does not wait.
+ */
+function grokMcpStartupEnvironment(env: NodeJS.ProcessEnv): Record<string, string> {
+  if (env.MCP_TIMEOUT?.trim() || env.GROK_MCP_STARTUP_TIMEOUT_SECS?.trim()) return {};
+  return { GROK_MCP_STARTUP_TIMEOUT_SECS: String(MCP_STDIO_PROBE_TIMEOUT_MS / 1_000) };
 }
 
 /**

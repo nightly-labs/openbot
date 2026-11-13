@@ -46,6 +46,9 @@ export const messages = {
   "error.backend.browserNavigateUnsupported":
     "لا يدعم هذا المضيف البعيد التنقل عبر شريط العنوان في علامة تبويب موجودة.",
   "error.backend.browserUserControlBusy": "علامة تبويب المتصفح هذه تنتظر سرًا. أجب عن طلب السر أولًا.",
+  "error.backend.browserTeachBusy": "يتحكم شخص آخر في علامة تبويب المتصفح هذه. حاول مرة أخرى عندما ينتهي.",
+  "error.backend.browserTeachUnavailable": "لا يوجد لعلامة تبويب المتصفح هذه وكيل يمكنه تعلّم مهمة.",
+  "error.backend.browserTeachUnsupported": "لا يدعم هذا المضيف البعيد تسجيل مهمة.",
   "error.backend.browserUserControlUnsupported": "لا يدعم هذا المضيف البعيد التحكم في علامة تبويب المتصفح.",
   "error.backend.browserSignInUnsupported": "لا يمكن لهذا المضيف البعيد استقبال تسجيل دخول من هذا الحاسوب.",
   "error.backend.browserSignInOpenFailed": "تعذّر على OpenBot فتح نافذة تسجيل الدخول.",
@@ -60,6 +63,8 @@ export const messages = {
     "لا يؤدي الضغط إلى تصغير هذه الدردشة: بعد عمليتي ضغط لا تزال تستخدم {percent}% من نافذة سياق النموذج، لذا يتوقف OpenBot عن ضغطها. تستخدم الأدوات والتعليمات معظم النافذة. أوقف خوادم MCP أو التحكم في الحاسوب التي لا يحتاج إليها هذا الوكيل، أو اختر نموذجًا بنافذة أكبر. ثم ابدأ دردشة جديدة.",
   "error.backend.contextCompactionStopped":
     'فشلت عمليتا ضغط متتاليتان لهذه الدردشة، لذا يتوقف OpenBot عن ضغطها تلقائيًا. كل محاولة ترسل الدردشة كاملة إلى النموذج وتستهلك من حد خطتك. اختر "الضغط الآن" للمحاولة مرة أخرى، أو ابدأ دردشة جديدة.',
+  "error.backend.providerModelAtCapacity":
+    "النموذج بلغ أقصى سعته. سيحاول المزوّد مرة أخرى خلال بضع دقائق. للمتابعة الآن، أوقف الدور واختر نموذجًا آخر.",
   "error.backend.providerRetrying":
     "فشل المزوّد في هذا الطلب {attempts} مرات ويحاول مرة أخرى. إذا لم يتابع الوكيل، فأوقف الدور.",
   "error.backend.providerRetryingLargeContext":
@@ -69,6 +74,7 @@ export const messages = {
   "error.backend.channelUnconfirmedStart": "للقناة بدء تعيين غير مؤكد. تحقق من نتيجته قبل حذفها.",
   "error.backend.channelNotFound": "لم يتم العثور على القناة.",
   "error.backend.channelMemberUnavailable": "أحد أعضاء القناة غير متاح.",
+  "error.backend.channelInstructionsTooLong": "اختصر التعليمات إلى 2000 حرف. لا يتم حفظ التعليمات الأطول.",
   "error.backend.channelWaitBeforeNewConversation": "انتظر حتى يتوقف العمل في هذه القناة، ثم ابدأ محادثة جديدة.",
   "error.backend.channelWaitBeforeCompact": "انتظر حتى يتوقف العمل في هذه القناة، ثم اضغطها.",
   "error.backend.channelWaitBeforeDeleteHistory": "انتظر حتى يتوقف العمل في هذه القناة، ثم احذف سجلها.",
@@ -142,9 +148,17 @@ export const messages = {
   "error.backend.mailboxStateCorrupt": "حالة صندوق البريد تالفة أو من إصدار أحدث من OpenBot؛ تم رفض الكتابة فوقها.",
   "error.backend.recipientDeleting": "يتم حذف المستلم. أعد المحاولة بعد انتهاء الحذف.",
   "error.backend.recipientHidden": "هذا الوكيل مخفي. استعده لإرسال الرسائل.",
+  "error.backend.agentIdUnknown":
+    "لا يوجد وكيل بالمعرّف {id}. احصل على المعرّفات من openbot.list_agents، ثم حاول مرة أخرى.",
+  "error.backend.agentIdNear":
+    "لا يوجد وكيل بالمعرّف {id}. للوكيل {name} المعرّف {nearId}، وهو مشابه جدًا. إذا كنت تقصد هذا الوكيل، فحاول مرة أخرى بمعرّفه.",
   "error.backend.attachBetween": "أرفق من 1 إلى {limit} ملفات.",
   "error.backend.attachmentNotFile": "المرفق ليس ملفًا: {path}",
   "error.backend.generatedImageTooLarge": "تتجاوز الصورة المُنشأة حد 100 MB.",
+  "error.backend.generatedVideoTooLarge": "يتجاوز الفيديو المُنشأ حد 100 MB.",
+  "error.backend.videoGenerationFailed": "فشل إنشاء الفيديو.",
+  "error.backend.videoGenerationNoVideo": "لم يُرجع إنشاء الفيديو أي فيديو.",
+  "error.backend.videoGenerationInterrupted": "تمت مقاطعة إنشاء الفيديو.",
   "error.backend.attachmentNotRegularFile": "يمكن إرفاق الملفات العادية فقط: {name}",
   "error.backend.attachmentCopyFailed": "تعذّر على OpenBot نسخ {name}.",
   "error.backend.routineNameRequired": "يلزم اسم للمهمة الدورية.",
@@ -193,12 +207,13 @@ export const messages = {
   "error.backend.agentWaitRoutineGone": "ليس لدى هذا الوكيل مهمة دورية بهذا المعرّف.",
   "error.backend.agentWaitNoRoutine":
     "لا يوقظ الانتظار إلا تشغيل إحدى مهامك الدورية، وليس لديك أي مهمة دورية. أنشئ واحدة باستخدام openbot.create_routine، ثم افتح الانتظار.",
-  "error.backend.agentWaitRemoteUnsupported": "الانتظارات المفتوحة متاحة فقط للوكلاء على هذا الحاسوب.",
   "error.backend.markUnreadRemoteUnsupported": "تمييز رسالة كغير مقروءة متاح فقط للوكلاء على هذا الحاسوب.",
   "error.backend.messageDeleteUnsupported": "لا يدعم هذا الخادم حذف الرسائل.",
   "error.backend.messageDeleteNotFound": "هذه الرسالة ليست في المحادثة.",
   "error.backend.messageDeleteBusy": "هذه الرسالة جزء من دور قيد التشغيل. احذفها عند انتهاء الدور.",
   "error.backend.messageDeleteForbidden": "يمكنك حذف الرسائل التي أرسلتها فقط.",
+  "error.backend.messagePinNotFound": "هذه الرسالة ليست في المحادثة.",
+  "error.backend.messagePinLimit": "في هذه المحادثة 50 رسالة مثبتة. ألغِ تثبيت واحدة قبل تثبيت أخرى.",
   "error.backend.routineFlowHandoffFailed": "تعذّر على المهمة الدورية تمرير العمل إلى هذا الوكيل.",
   "error.backend.mcpServerLimit": "يحتفظ OpenBot بـ {limit} خوادم MCP كحد أقصى.",
   "error.backend.mcpServerNameTaken": "يوجد بالفعل خادم MCP باسم {name}.",
@@ -224,8 +239,12 @@ export const messages = {
   "error.backend.mcpSignInResponseTimedOut": "لم تصل استجابة تسجيل الدخول في الوقت المحدد.",
   "error.backend.mcpSignInMetadataUnreadable":
     "تعذّر على OpenBot قراءة معلومات تسجيل الدخول لهذا الخادم. تحقق من عنوان الخادم وحاول مرة أخرى.",
+  "error.backend.mcpSignInAnswerUnreadable":
+    "أرسل خادم تسجيل الدخول ردًا لا يستطيع OpenBot قراءته. إذا كانت الخدمة تمنحك مفتاح API أو رمزًا، فأضفه إلى إعدادات هذا الخادم، ثم اختبر الاتصال مرة أخرى.",
   "error.backend.mcpServerExited": "توقف الخادم قبل أن يُجيب. شغّل الأمر في الطرفية لرؤية الخطأ.",
   "error.backend.mcpServerFailedToStart": "لم يبدأ الخادم: {reason}",
+  "error.backend.mcpToolSchemaRefused":
+    "أداته {tool} لها صيغة إدخال لا يستطيع هذا المزوّد قراءتها. الوكلاء على مزوّدين آخرين ما زالوا يحصلون على الخادم.",
   "error.backend.mcpServerSignInForProvider":
     "تعذّر على {provider} استخدام خادم MCP {name}، لأن الخادم يطلب تسجيل الدخول. افتح إعدادات MCP واختر تسجيل الدخول.",
   "error.backend.mcpServerFailedForProvider":
@@ -256,6 +275,13 @@ export const messages = {
   "error.backend.sectionNameTooLong": "اسم القسم طويل جدًا.",
   "error.backend.sidebarFolderTooDeep": "يمكن أن تتداخل المجلدات حتى ثلاثة مستويات فقط.",
   "error.backend.sidebarFolderMoveInvalid": "لا يمكن نقل هذا المجلد إلى هناك.",
+  "error.backend.libraryFolderName": "يجب أن يتكوّن اسم المجلد من 1 إلى {limit} حرفًا.",
+  "error.backend.libraryFolderLimit": "يمكن أن يحتوي الخادم على {limit} من مجلدات المكتبة كحد أقصى.",
+  "error.backend.libraryFolderFileLimit": "عدد الملفات في مجلدات المكتبة كبير جدًا.",
+  "error.backend.libraryFolderTooDeep": "يمكن أن تصل مجلدات المكتبة إلى {limit} مستويات فقط.",
+  "error.backend.libraryFolderGone": "المجلد غير موجود أو حُذف بالفعل.",
+  "error.backend.libraryFolderOtherAgent": "يمكن وضع الملف في مجلد تابع لوكيله فقط.",
+  "error.backend.libraryFolderMoveInvalid": "لا يمكن نقل هذا المجلد إلى هناك.",
   "error.backend.sectionNameDuplicate": "يجب أن تكون أسماء الأقسام فريدة.",
   "error.backend.directMessageRequired": "اكتب رسالة أولًا.",
   "error.backend.directMessageTooLong": "يمكن أن تحتوي الرسالة المباشرة على {limit} حرف كحد أقصى.",
@@ -313,6 +339,8 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "رفض الوكيل {name} تسجيل الدخول، لذلك لم تُفتح الصفحة.",
   "error.backend.browserProxyComputerUnreachable":
     "الكمبيوتر الذي يستخدمه هذا الملف الشخصي لا يستجيب، لذلك لم تُفتح الصفحة.",
+  "error.backend.browserProxyComputerLocalAddress":
+    "الكمبيوتر الذي يستخدمه هذا الملف الشخصي يفتح المواقع العامة فقط. ولا يفتح العناوين على شبكة محلية، لذلك لم تُفتح الصفحة.",
   "error.backend.browserCertificateUntrusted": "شهادة الأمان لهذا الموقع غير موثوقة، لذلك لم تُفتح الصفحة.",
   "error.backend.browserLowMemory":
     "ذاكرة هذا الخادم منخفضة، لذا لا يمكن للمتصفح فتح علامة تبويب أخرى. أغلق علامة تبويب، أو انتظر حتى ينتهي الوكلاء الآخرون.",

@@ -263,28 +263,41 @@ function elicitationFieldResult(
   return { action: "accept", content, _meta: null };
 }
 
+/**
+ * Why the questions make no card, or null when they make one. The text names the question and the
+ * limit, so the agent can correct its call: the advertised schema has no limits (#6268).
+ */
+export function promptQuestionsProblem(questions: AgentPromptQuestion[]): string | null {
+  if (questions.length === 0) return "questions must be a non-empty array of question objects, not text.";
+  if (questions.length > INPUT_LIMITS.promptQuestions)
+    return `questions has ${questions.length} items; the limit is ${INPUT_LIMITS.promptQuestions}.`;
+  const ids = new Set<string>();
+  for (const [index, question] of questions.entries()) {
+    const at = `questions[${index}]`;
+    if (question.id.length === 0 || question.id.length > INPUT_LIMITS.identifier)
+      return `${at}.id must have 1 to ${INPUT_LIMITS.identifier} characters. Leave id out to get one.`;
+    if (ids.has(question.id))
+      return `${at}.id is the id of an earlier question. Give each question a different id, or leave id out.`;
+    ids.add(question.id);
+    if (question.header.length > INPUT_LIMITS.promptHeader)
+      return `${at}.header has ${question.header.length} characters; the limit is ${INPUT_LIMITS.promptHeader}.`;
+    if (question.question.length === 0 || question.question.length > INPUT_LIMITS.promptQuestion)
+      return `${at}.question must have 1 to ${INPUT_LIMITS.promptQuestion} characters.`;
+    if (question.options === null) continue;
+    if (question.options.length > INPUT_LIMITS.promptOptions)
+      return `${at}.options has ${question.options.length} options; the limit is ${INPUT_LIMITS.promptOptions}. Keep the most likely options: the user can also type an answer.`;
+    for (const [position, option] of question.options.entries()) {
+      if (option.label.length === 0 || option.label.length > INPUT_LIMITS.promptOptionLabel)
+        return `${at}.options[${position}].label must have 1 to ${INPUT_LIMITS.promptOptionLabel} characters.`;
+      if (option.description.length > INPUT_LIMITS.promptOptionDescription)
+        return `${at}.options[${position}].description has ${option.description.length} characters; the limit is ${INPUT_LIMITS.promptOptionDescription}.`;
+    }
+  }
+  return null;
+}
+
 export function validPromptQuestions(questions: AgentPromptQuestion[]): boolean {
-  return (
-    questions.length > 0 &&
-    questions.length <= INPUT_LIMITS.promptQuestions &&
-    new Set(questions.map((question) => question.id)).size === questions.length &&
-    questions.every(
-      (question) =>
-        question.id.length > 0 &&
-        question.id.length <= INPUT_LIMITS.identifier &&
-        question.header.length <= INPUT_LIMITS.promptHeader &&
-        question.question.length > 0 &&
-        question.question.length <= INPUT_LIMITS.promptQuestion &&
-        (question.options === null ||
-          (question.options.length <= INPUT_LIMITS.promptOptions &&
-            question.options.every(
-              (option) =>
-                option.label.length > 0 &&
-                option.label.length <= INPUT_LIMITS.promptOptionLabel &&
-                option.description.length <= INPUT_LIMITS.promptOptionDescription,
-            ))),
-    )
-  );
+  return promptQuestionsProblem(questions) === null;
 }
 
 export function questionPromptText(questions: AgentPromptQuestion[], resolution: AgentPromptResolution | null): string {
@@ -324,6 +337,36 @@ export function dynamicPromptResult(answers: Record<string, string[]>): DynamicT
     success: true,
     contentItems: [{ type: "inputText", text: JSON.stringify(answers) }],
   };
+}
+
+/**
+ * The answer for a question that the provider cannot wait for: its call would time out (#6230). The
+ * card stays open, and the user's answer reaches the agent as a new message. Only the model reads it.
+ */
+export function detachedPromptResult(): DynamicToolResult {
+  const value = {
+    status: "waiting",
+    next: "The user has not answered yet. The question stays open in the chat, and the answer arrives as the user's next message, which quotes the question. Do not ask it again. End your turn unless other work does not need the answer.",
+  };
+  return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
+}
+
+/**
+ * The message that carries the answer to a detached question: each answered question as a quote, with
+ * its answer below. It holds no words of its own, so it reads the same in each language.
+ */
+export function lateAnswerText(questions: AgentPromptQuestion[], answers: Record<string, string[]>): string {
+  return questions
+    .flatMap((question) => {
+      const values = answers[question.id] ?? [];
+      if (values.length === 0) return [];
+      const quote = question.question
+        .split("\n")
+        .map((line) => `> ${line}`)
+        .join("\n");
+      return [`${quote}\n\n${values.join(", ")}`];
+    })
+    .join("\n\n");
 }
 
 /** The answer for a question that expired before the user answered it. Only the model reads it. */

@@ -193,6 +193,8 @@ export interface AgentUsageLimitReturn extends AgentModelChoice {
   cause?: string | undefined;
   /** True when fast mode was on at the model the agent left. The return turns it on again. */
   fastMode?: boolean | undefined;
+  /** True when the fast mode at that model was Ultrafast. */
+  ultrafast?: boolean | undefined;
 }
 
 export function isAgentUsageLimitReturn(value: unknown): value is AgentUsageLimitReturn {
@@ -201,7 +203,8 @@ export function isAgentUsageLimitReturn(value: unknown): value is AgentUsageLimi
     isAgentModelChoice(value) &&
     isReasoningEffort(value.reasoningEffort) &&
     (value.cause === undefined || isString(value.cause)) &&
-    (value.fastMode === undefined || isBoolean(value.fastMode))
+    (value.fastMode === undefined || isBoolean(value.fastMode)) &&
+    (value.ultrafast === undefined || isBoolean(value.ultrafast))
   );
 }
 
@@ -330,14 +333,19 @@ export interface AgentSummary {
    */
   fastMode?: boolean;
   /**
+   * With `fastMode`, the agent asks for the Ultrafast tier in place of Fast. Local-only, like `access`.
+   * A model without the tier runs at the standard tier. An older OpenBot ignores it and runs Fast.
+   */
+  ultrafast?: boolean;
+  /**
    * What a message sent while the agent is busy does. Local-only, like `access`. Absent means the
    * app default.
    */
   busyMessageMode?: BusyMessageMode;
   /**
    * How many tasks of the agent run a turn at the same time, 1 to `AGENT_TASK_LIMIT_MAX`. Local-only,
-   * like `access`; an owner or admin of a joined server reads it on `agent-task-limit-v1`. Absent
-   * means `AGENT_TASK_LIMIT_DEFAULT`; see `agentTaskLimit`.
+   * like `access`; an owner or admin of a joined server reads it on `agent-task-limit-v1`.
+   * Absent means the host default (`HostTurnLimits.agentTaskLimit`); see `agentTaskLimit`.
    */
   taskLimit?: number;
   /**
@@ -424,6 +432,7 @@ function hasAgentSummaryFields(value: DynamicRecord): boolean {
     (value.ownBrowserSession === undefined || isBoolean(value.ownBrowserSession)) &&
     (value.browserProfileId === undefined || isBrowserProfileId(value.browserProfileId)) &&
     (value.fastMode === undefined || isBoolean(value.fastMode)) &&
+    (value.ultrafast === undefined || isBoolean(value.ultrafast)) &&
     (value.busyMessageMode === undefined || isBusyMessageMode(value.busyMessageMode)) &&
     (value.taskLimit === undefined || isAgentTaskLimit(value.taskLimit)) &&
     (value.providerAccountId === undefined || isProviderAccountId(value.providerAccountId)) &&
@@ -484,6 +493,8 @@ export interface UpdateAgentInput {
   allowNewChat?: boolean | null;
   quickAcknowledgement?: boolean | null;
   fastMode?: boolean;
+  /** Sent only with `fastMode`; an update with `ultrafast` and no `fastMode` fails. A change of `fastMode` without it turns Ultrafast off. */
+  ultrafast?: boolean;
   /** `null` returns the agent to the app default. */
   busyMessageMode?: BusyMessageMode | null;
   /** `null` returns the agent to the default task limit. */

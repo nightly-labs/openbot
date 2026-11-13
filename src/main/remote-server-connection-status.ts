@@ -14,7 +14,8 @@ import type { ServerCompatibility, ServerConnectionIssue, ServerSummary } from "
 import { TEAM_PROTOCOL_V1, type TeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V3_CAPABILITIES } from "@openbot/contracts/team-protocol/v3";
 import { sourceText } from "@openbot/i18n/source";
-import { referenceFrom } from "@openbot/user-errors";
+import { isSafeConnectionError } from "@openbot/team-client/remote-recovery";
+import { errorReference, referenceFrom } from "@openbot/user-errors";
 import { RemoteProtocolError, RemoteRequestError } from "./remote-server-errors";
 
 // The protocol range this build speaks. Every compatibility record reports it as the local half.
@@ -29,6 +30,8 @@ export interface RemoteServerConnectionStatus {
   // Bumped on every fresh connection. The renderer uses it to tell a reconnect from a still-open
   // connection, so it has to change even when nothing else about the status does.
   connectionSequence: number;
+  // True from a new WebRTC connection until its capability read ends, with or without a result.
+  capabilitiesPending: boolean;
   hostRestart: ServerSummary["hostRestart"];
   /** A hosted server that the account service stopped for no use, or that it starts now. */
   hostedSleep: ServerSummary["hostedSleep"];
@@ -54,11 +57,14 @@ const NO_OUTCOME: RemoteConnectionOutcome = { issue: null, state: null, suspendR
 // way. A function rather than a constant: the issue ends up inside a status record, and one shared
 // object there would be one mutation away from being every server's issue. The caller can give a
 // more exact reference, such as the WebSocket close code.
-export function hostUnreachable(reference = "network/fetch"): RemoteConnectionOutcome {
+export function hostUnreachable(
+  reference = "network/fetch",
+  message = sourceText("error.remote.hostUnreachable"),
+): RemoteConnectionOutcome {
   return {
     issue: {
       code: "network_unavailable",
-      message: sourceText("error.remote.hostUnreachable"),
+      message,
       retryable: true,
       reference,
     },
@@ -66,6 +72,16 @@ export function hostUnreachable(reference = "network/fetch"): RemoteConnectionOu
     suspendReconnect: false,
     hostSupport: null,
   };
+}
+
+/**
+ * A WebRTC attempt to connect that ended with no transport error event, such as a timeout. It stays
+ * a network issue, so the workspace stays on screen and the app tries again. The failure gives the
+ * reference, and also the sentence when it is one of our fixed connection sentences (#6873).
+ */
+export function classifyConnectFailure(failure: unknown): RemoteConnectionOutcome {
+  const message = failure instanceof Error && isSafeConnectionError(failure.message) ? failure.message : undefined;
+  return hostUnreachable(errorReference(failure) ?? "transport/connect_failed", message);
 }
 
 export function classifyRemoteConnectionError(error: unknown): RemoteConnectionOutcome {

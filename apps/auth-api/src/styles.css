@@ -32,7 +32,8 @@
 :root {
   color-scheme: dark;
   --openbot-font-sans:
-    "Inter Variable", "Inter Variable Fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    "Inter Variable", "Inter Variable Fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Arabic",
+    sans-serif;
   --pulse-dur: 1000ms;
   --pulse-count: 1;
   --pulse-min: 0.5;
@@ -1879,6 +1880,59 @@ a {
   width: 15px;
   height: 15px;
   transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+/* A card with two downloads is a box, not a link. Its first link covers the card, so the card
+   opens it as the other cards open theirs. The second link is above that cover. */
+.landing-download-card:has(.landing-download-card-link) {
+  position: relative;
+}
+
+.landing-download-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 28px;
+  margin-top: 28px;
+}
+
+.landing-download-actions .landing-download-action {
+  margin-top: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+/* The radius of `.landing-download-card`. `inherit` would take the radius of the link, which has none. */
+.landing-download-card-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+}
+
+.landing-download-card-link:focus-visible {
+  outline: none;
+}
+
+.landing-download-card-link:focus-visible::after {
+  outline: 3px solid var(--openbot-download-card-focus);
+  outline-offset: 3px;
+}
+
+.landing-download-action-apk {
+  position: relative;
+  z-index: 1;
+}
+
+.landing-download-action-apk:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--openbot-download-card-focus);
+  outline-offset: 4px;
+}
+
+.landing-download-action-icon {
+  width: 15px;
+  height: 15px;
 }
 
 .landing-download-heading[data-revealed="false"],
@@ -4026,6 +4080,16 @@ a {
 
   .landing-download-card[data-state="available"]:hover .landing-download-arrow {
     transform: translate(2px, -2px);
+  }
+
+  /* The pointer is on the APK link, so the card does not show the Google Play link as the target. */
+  .landing-download-card[data-state="available"]:has(.landing-download-action-apk:hover) .landing-download-arrow {
+    transform: none;
+  }
+
+  .landing-download-action-apk:hover {
+    text-decoration: underline;
+    text-underline-offset: 4px;
   }
 
   .landing-footer-social:hover {

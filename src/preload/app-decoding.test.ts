@@ -9,6 +9,7 @@ import type {
   MobileConnectedDevice,
   NotificationOpenedEvent,
   UpdateStatus,
+  WorkflowNotificationOpenedEvent,
 } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
 import {
@@ -20,6 +21,7 @@ import {
   decodeAppLanguagePreference,
   decodeApprovalAutomationPreference,
   decodeAppSetupState,
+  decodeBillingState,
   decodeCentralAuthState,
   decodeChatWindowTargets,
   decodeCustomAgentResult,
@@ -27,6 +29,8 @@ import {
   decodeCustomAgentUsage,
   decodeDetectedModelServers,
   decodeDiscoverModelsResult,
+  decodeHostedServer,
+  decodeInstalledFonts,
   decodeMobileConnectedDevices,
   decodeMobileConnectTicket,
   decodeNotificationOpenedEvent,
@@ -38,6 +42,7 @@ import {
   decodeUpdateStatus,
   decodeVoiceServerProbe,
   decodeVoiceServerSettings,
+  decodeWorkflowNotificationOpenedEvent,
 } from "./app-decoding";
 
 const omarchyPalette = {
@@ -202,6 +207,8 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
       palettes: [],
       chatBackgroundLight: null,
       chatBackgroundDark: null,
+      interfaceFont: null,
+      codeFont: null,
     } satisfies AppAppearancePreference,
   ],
   [
@@ -214,6 +221,8 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
       palettes: [omarchyPalette],
       chatBackgroundLight: null,
       chatBackgroundDark: null,
+      interfaceFont: null,
+      codeFont: null,
     },
   ],
   [
@@ -226,8 +235,25 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
       palettes: [],
       chatBackgroundLight: "#f1f2ff",
       chatBackgroundDark: "#162232",
+      interfaceFont: null,
+      codeFont: null,
     } satisfies AppAppearancePreference,
   ],
+  [
+    "appearance preference with an interface font and a code font",
+    decodeAppAppearancePreference,
+    {
+      appearance: "dark",
+      transparentWindow: false,
+      palette: null,
+      palettes: [],
+      chatBackgroundLight: null,
+      chatBackgroundDark: null,
+      interfaceFont: "Noto Sans Arabic",
+      codeFont: "JetBrains Mono",
+    } satisfies AppAppearancePreference,
+  ],
+  ["installed fonts", decodeInstalledFonts, ["Al Bayan", "DejaVu Sans", "Noto Kufi Arabic"]],
   ["signed out", decodeCentralAuthState, { status: "signed_out" } satisfies CentralAuthState],
   [
     "signed out after a keyring change",
@@ -298,6 +324,11 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
   ],
   ["update status", decodeUpdateStatus, updateStatus],
   ["host-managed update status", decodeUpdateStatus, { ...updateStatus, managedByHost: true } satisfies UpdateStatus],
+  [
+    "update status with a staged release",
+    decodeUpdateStatus,
+    { ...updateStatus, phase: "up-to-date", stagedVersion: "0.68.0" } satisfies UpdateStatus,
+  ],
   ["update preference", decodeUpdatePreference, { autoDownload: true, allowRemoteUpdates: true, autoInstall: false }],
   ["notification preference", decodeNotificationPreference, { desktopNotifications: true, messagePreview: false }],
   [
@@ -309,6 +340,11 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
     "opened channel notification",
     decodeNotificationOpenedEvent,
     { serverId: "local", agentId: "agent-1", threadId: null, channelId: "channel-1" } satisfies NotificationOpenedEvent,
+  ],
+  [
+    "opened workflow notification",
+    decodeWorkflowNotificationOpenedEvent,
+    { serverId: "local", workflowId: "workflow-1" } satisfies WorkflowNotificationOpenedEvent,
   ],
   ["chat windows", decodeChatWindowTargets, [{ serverId: "local", agentId: "agent-1" }]],
   ["detected model servers", decodeDetectedModelServers, [detectedServer]],
@@ -438,6 +474,34 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
     { appearance: "dark", transparentWindow: false, palette: null, palettes: [] },
   ],
   [
+    "appearance preference with no font",
+    decodeAppAppearancePreference,
+    {
+      appearance: "dark",
+      transparentWindow: false,
+      palette: null,
+      palettes: [],
+      chatBackgroundLight: null,
+      chatBackgroundDark: null,
+    },
+  ],
+  [
+    "a font name that ends the CSS string",
+    decodeAppAppearancePreference,
+    {
+      appearance: "dark",
+      transparentWindow: false,
+      palette: null,
+      palettes: [],
+      chatBackgroundLight: null,
+      chatBackgroundDark: null,
+      interfaceFont: 'Arial"; background: url(x)',
+      codeFont: null,
+    },
+  ],
+  ["an installed font with a semicolon", decodeInstalledFonts, ["Arial", "Menlo; color: red"]],
+  ["installed fonts that are not a list", decodeInstalledFonts, "Arial"],
+  [
     "a chat background that is not a hex color",
     decodeAppAppearancePreference,
     {
@@ -470,6 +534,7 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
   ["account sessions that are not a list", decodeAccountSessions, { sessionId: "s" }],
   ["update status in an unknown phase", decodeUpdateStatus, { ...updateStatus, phase: "done" }],
   ["update status with an unknown failure", decodeUpdateStatus, { ...updateStatus, errorCode: "boom" }],
+  ["update status with a staged release that is not text", decodeUpdateStatus, { ...updateStatus, stagedVersion: 68 }],
   ["update preference without a switch", decodeUpdatePreference, null],
   ["notification preference without a switch", decodeNotificationPreference, { desktopNotifications: "yes" }],
   ["opened notification without an agent", decodeNotificationOpenedEvent, { serverId: "local", threadId: null }],
@@ -478,6 +543,7 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
     decodeNotificationOpenedEvent,
     { serverId: "local", agentId: "agent-1", threadId: null, channelId: 7 },
   ],
+  ["opened workflow notification without a workflow", decodeWorkflowNotificationOpenedEvent, { serverId: "local" }],
   ["a chat window without an agent", decodeChatWindowTargets, [{ serverId: "local" }]],
   ["chat windows that are not a list", decodeChatWindowTargets, { serverId: "local", agentId: "agent-1" }],
   // A scan row never carries a credential, so one that does is refused with the whole list.
@@ -567,5 +633,63 @@ describe("pending Marketplace listing", () => {
     ["an id that is not text", { kind: "agent", id: 42 }],
   ])("refuses %s", (_name, value) => {
     expect(decodePendingMarketplaceListing(value)).toBeNull();
+  });
+});
+
+// The storage of a hosted server comes from the account server, and a client shows it as a number of
+// GB. Only a whole number of 1 or more reaches the renderer. Another value is left out, so the server
+// and its plan still show, with the storage of the plan table.
+describe("server storage", () => {
+  const server = {
+    deletionScheduledAt: null,
+    serverId: "server-1",
+    name: "Server",
+    size: "small",
+    plan: "starter",
+    interval: "month",
+    currency: "eur",
+    state: "running",
+    error: null,
+    createdAt: "2026-11-11T12:00:00.000Z",
+    updatedAt: "2026-11-11T12:00:00.000Z",
+  };
+  const plan = {
+    subscriptionId: "sub_1",
+    serverId: "server-1",
+    serverName: "Server",
+    plan: "starter",
+    interval: "month",
+    currency: "eur",
+    amount: 900,
+    status: "active",
+    currentPeriodEnd: null,
+    cancelAtPeriodEnd: false,
+  };
+  const state = (storageGb?: unknown) => ({
+    available: true,
+    hasCustomer: true,
+    servers: [storageGb === undefined ? plan : { ...plan, storageGb }],
+  });
+
+  it("keeps the storage of a hosted server and of a plan", () => {
+    expect(decodeHostedServer({ ...server, storageGb: 25 })).toEqual({ ...server, storageGb: 25 });
+    expect(decodeBillingState(state(25))).toEqual(state(25));
+  });
+
+  it("keeps a server and a plan from an account server that sends no storage", () => {
+    expect(decodeHostedServer(server)).toEqual(server);
+    expect(decodeBillingState(state())).toEqual(state());
+  });
+
+  it.each([
+    ["zero", 0],
+    ["a negative number", -25],
+    ["a fraction", 25.5],
+    ["text", "25"],
+    ["null", null],
+    ["a number that is not safe", 2 ** 60],
+  ])("leaves out a storage that is %s", (_name, storageGb) => {
+    expect(decodeHostedServer({ ...server, storageGb })).toEqual(server);
+    expect(decodeBillingState(state(storageGb))).toEqual(state());
   });
 });

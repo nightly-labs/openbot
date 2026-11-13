@@ -1,10 +1,4 @@
-import type {
-  AgentEvent,
-  AgentTask,
-  AgentTaskBranch,
-  AgentTasksSnapshot,
-  ConversationSnapshot,
-} from "@openbot/contracts/ipc";
+import type { AgentEvent, AgentTask, AgentTasksSnapshot, ConversationSnapshot } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createStore, untrack } from "solid-js";
@@ -39,20 +33,28 @@ interface AgentTasksState {
 }
 
 /**
- * A thread's messages before the loaded ones. The read of a thread gives only its newest messages,
- * so a long thread reads the older ones page by page.
+ * A thread's messages outside the loaded ones. The read of a thread gives only its newest messages,
+ * so a long thread reads the older ones page by page. A jump to an old message reads only the part of
+ * the thread around it: the thread then does not reach its latest message until it reads it again.
  */
 interface TaskHistory {
   /** The server has messages before the oldest loaded one. */
   hasOlder: boolean;
+  /** The loaded messages are a part around an old message: the server has messages after them. */
+  hasNewer: boolean;
   /** A page read is in progress. */
   loading: boolean;
+  /** A read of the latest messages, in the place of the part, is in progress. */
+  loadingLatest?: boolean;
   /** The thread holds pages that it read, before the newest messages. */
   paged: boolean;
 }
 
 /** The most messages that one press of Load older messages reads. */
 const OLDER_PAGE_SIZE = 50;
+
+/** The messages around an old message that a jump reads, the most that the route gives. */
+const AROUND_LIMIT = 100;
 
 /**
  * The most loaded conversations of threads that no tab shows. The conversation of a thread that was
@@ -80,8 +82,8 @@ export interface AgentTasksOptions {
   /** Read on each call: tests and stories replace the port per case. */
   port: () => AgentTasksPort;
   activeAgentId: () => string | undefined;
-  /** The server is this computer. Only this computer moves a queued message to a new thread. */
-  local: () => boolean;
+  /** The server moves a queued message to a new thread: this computer, or the `agent-queue-task-v1` route. */
+  queuedMessageMovable: () => boolean;
   /** The server has side threads: the `agent-tasks-v1` routes. */
   available: () => boolean;
   /** The server renames and deletes side threads: the `agent-threads-v1` routes. */
@@ -101,6 +103,8 @@ export interface AgentTasksOptions {
   messageDeletable: () => boolean;
   /** The server reads the older messages of a side thread: this computer, or the `agent-thread-pages-v1` route. */
   pageable: () => boolean;
+  /** The server reads the part of a side thread around one message: this computer, or the `message-pins-v1` route. */
+  aroundReadable: () => boolean;
   /**
    * A change of this value reads the lists of the active agent and of each agent with a running thread
    * again, for example when the agent starts again.
@@ -118,7 +122,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
   const {
     port,
     activeAgentId,
-    local,
+    queuedMessageMovable,
     available,
     editable,
     readable,
@@ -127,6 +131,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
     repliable,
     messageDeletable,
     pageable,
+    aroundReadable,
   } = options;
   const scopeIsCurrent = createScopeGuard();
   const [state, setState] = createStore<AgentTasksState>({ snapshots: {}, conversations: {}, unread: {}, history: {} });
@@ -141,6 +146,37 @@ export function createAgentTasks(options: AgentTasksOptions) {
   let shown: ReadonlySet<string> = new Set();
   /** The threads with a loaded conversation that no tab shows, the one shown longest ago first. */
   const hidden = new Set<string>();
+  /**
+   * The newest messages of each thread, as the last read or event gave them. When a thread shows a part
+   * around an old message, a change that leaves them the same occurred in the older messages.
+   */
+  const newestMessages = new Map<string, string>();
+
+  /** Keeps the newest messages of a thread. Returns the ones kept before. */
+  function rememberNewest(taskId: string, snapshot: ConversationSnapshot): string | undefined {
+    const before = newestMessages.get(taskId);
+    const newest = snapshot.messages.map((message) => `${message.id}:${message.status}:${message.text.length}`);
+    newestMessages.set(taskId, newest.join());
+    return before;
+  }
+
+  /**
+   * Reads the newest messages of a thread that now shows a part around an old message, and keeps them
+   * only for the comparison. A read of the newest messages in progress no longer replaces the part.
+   */
+  function rememberNewestOf(agentId: string, taskId: string): void {
+    const request = (readRequests.get(taskId) ?? 0) + 1;
+    readRequests.set(taskId, request);
+    const kept = newestMessages.get(taskId);
+    void port()
+      .readTask({ agentId, taskId })
+      .then((snapshot) => {
+        // An event that came in meanwhile gave newer ones.
+        if (scopeIsCurrent() && newestMessages.get(taskId) === kept) rememberNewest(taskId, snapshot);
+      })
+      // Without them, the first change only gives the newest messages.
+      .catch(() => undefined);
+  }
 
   /** Removes the conversations of the hidden threads over the limit, the one shown longest ago first. */
   function dropHiddenConversations(): void {
@@ -185,21 +221,30 @@ export function createAgentTasks(options: AgentTasksOptions) {
   /**
    * Stores a thread list. A conversation of a thread that the list no longer has goes with it. A task
    * without `branch` keeps the link that the stored list has: an `agent-tasks-changed` event of a joined
-   * server does not carry it, and a link does not change.
+   * server does not carry it, and a link does not change. A task without `queue` keeps the stored queue
+   * in the same way, but only the messages that still wait. Returns true when a waiting message changed
+   * and the stored list had a queue: then only a new read of the list gives the full queue.
    */
-  function setSnapshot(snapshot: AgentTasksSnapshot): void {
+  function setSnapshot(snapshot: AgentTasksSnapshot): boolean {
     const ids = new Set(snapshot.tasks.map((task) => task.id));
     // An event handler runs this too: the stored list is input here, not a dependency.
-    const links = untrack(() => {
-      const stored = new Map<string, AgentTaskBranch>();
-      for (const task of state.snapshots[snapshot.agentId]?.tasks ?? []) {
-        if (task.branch) stored.set(task.id, { ...task.branch });
-      }
-      return stored;
+    const stored = untrack(() => {
+      const byId = new Map<string, AgentTask>();
+      for (const task of state.snapshots[snapshot.agentId]?.tasks ?? []) byId.set(task.id, task);
+      return byId;
     });
+    let staleQueue = false;
     const tasks = snapshot.tasks.map((task) => {
-      const branch = task.branch === undefined ? links.get(task.id) : undefined;
-      return branch ? { ...task, branch } : task;
+      const held = stored.get(task.id);
+      if (!held) return task;
+      const next = { ...task };
+      if (task.branch === undefined && held.branch) next.branch = { ...held.branch };
+      if (task.queue === undefined && held.queue) {
+        const waiting = new Set(task.queuedMessages.map((message) => message.deliveryId));
+        next.queue = held.queue.filter((delivery) => waiting.has(delivery.id)).map((delivery) => ({ ...delivery }));
+        if (queuedKey(task) !== queuedKey(held)) staleQueue = true;
+      }
+      return next;
     });
     setState((current) => {
       current.snapshots[snapshot.agentId] = { ...snapshot, tasks };
@@ -211,24 +256,59 @@ export function createAgentTasks(options: AgentTasksOptions) {
         }
       }
     });
+    return staleQueue;
   }
 
-  function applySnapshot(snapshot: AgentTasksSnapshot): void {
+  /** What the waiting messages of a task are, as each list of the task gives them. */
+  function queuedKey(task: AgentTask): string {
+    return JSON.stringify(task.queuedMessages.map((message) => [message.deliveryId, message.text]));
+  }
+
+  function applySnapshot(snapshot: AgentTasksSnapshot): boolean {
     listRequests.set(snapshot.agentId, (listRequests.get(snapshot.agentId) ?? 0) + 1);
-    setSnapshot(snapshot);
+    return setSnapshot(snapshot);
   }
 
   /**
    * Keeps the newest conversation of a task. A delta raises the revision, so an older snapshot loses. A
    * thread that read older pages keeps them. When its first messages leave the newest ones, the thread
-   * has older messages from then on.
+   * has older messages from then on. A part around an old message stays until the newest messages
+   * reach it: then they join, and the thread follows its latest message again. A change outside the
+   * newest messages, such as a delete on another device, reads the part again.
    */
   function applyConversation(taskId: string, snapshot: ConversationSnapshot): void {
     const stored = state.conversations[taskId];
     if (stored && snapshot.revision < stored.revision) return;
+    const before = rememberNewest(taskId, snapshot);
+    const changedOutside =
+      stored !== undefined &&
+      state.history[taskId]?.hasNewer === true &&
+      snapshot.revision > stored.revision &&
+      before === newestMessages.get(taskId);
     setState((current) => {
       const held = current.conversations[taskId];
       const history = current.history[taskId];
+      if (held && history?.hasNewer) {
+        const joined = withOlderMessages(held, snapshot);
+        if (joined) {
+          current.conversations[taskId] = joined;
+          history.hasNewer = false;
+          history.paged = true;
+          return;
+        }
+        // The newest messages hold the whole part: the thread is whole again.
+        const last = held.messages.at(-1);
+        if (!last || snapshot.messages.some((message) => message.id === last.id)) {
+          current.conversations[taskId] = snapshot;
+          history.hasNewer = false;
+          history.paged = false;
+          return;
+        }
+        // A gap stays between the part and the newest messages. The part keeps its messages, and
+        // takes the state of the thread, such as its running turn.
+        current.conversations[taskId] = { ...snapshot, messages: held.messages };
+        return;
+      }
       if (held && history?.paged) {
         const joined = withOlderMessages(held, snapshot);
         current.conversations[taskId] = joined ?? snapshot;
@@ -243,9 +323,41 @@ export function createAgentTasks(options: AgentTasksOptions) {
       const moved = held && first ? held.messages.findIndex((message) => message.id === first.id) > 0 : false;
       if (!moved || !pageable()) return;
       if (history) history.hasOlder = true;
-      else current.history[taskId] = { hasOlder: true, loading: false, paged: false };
+      else current.history[taskId] = { hasOlder: true, hasNewer: false, loading: false, paged: false };
     });
     keepHiddenConversation(taskId);
+    if (changedOutside) void readPartAgain(snapshot.agentId, taskId);
+  }
+
+  /**
+   * Reads again the part around an old message that a thread shows: a message of the part can be
+   * deleted. The read goes around a message of the part that the thread still has. When the thread
+   * has none of them, it shows its latest messages.
+   */
+  async function readPartAgain(agentId: string, taskId: string): Promise<void> {
+    const read = port().readTaskAround;
+    const messages = state.conversations[taskId]?.messages ?? [];
+    if (!read || messages.length === 0) return;
+    const request = (readRequests.get(taskId) ?? 0) + 1;
+    readRequests.set(taskId, request);
+    const current = () => scopeIsCurrent() && readRequests.get(taskId) === request && state.history[taskId]?.hasNewer;
+    const anchors = new Set([messages[Math.floor(messages.length / 2)], messages[0], messages.at(-1)]);
+    try {
+      for (const anchor of anchors) {
+        if (!anchor) continue;
+        const part = await read({ agentId, taskId, messageId: anchor.id, limit: AROUND_LIMIT });
+        if (!current()) return;
+        if (part.conversation.messages.length === 0) continue;
+        setState((draft) => {
+          draft.conversations[taskId] = part.conversation;
+          draft.history[taskId] = { hasOlder: part.hasOlder, hasNewer: part.hasNewer, loading: false, paged: true };
+        });
+        return;
+      }
+      void loadLatest(agentId, taskId);
+    } catch {
+      // The part stays as it was. The next change or "Latest" reads it again.
+    }
   }
 
   /**
@@ -260,7 +372,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
       .then((page) => {
         if (!scopeIsCurrent() || !state.conversations[taskId] || state.history[taskId]) return;
         setState((current) => {
-          current.history[taskId] = { hasOlder: page.hasOlder, loading: false, paged: false };
+          current.history[taskId] = { hasOlder: page.hasOlder, hasNewer: false, loading: false, paged: false };
         });
       })
       // The thread still shows its newest messages.
@@ -306,10 +418,44 @@ export function createAgentTasks(options: AgentTasksOptions) {
     }
   }
 
+  /**
+   * Reads the newest messages of a thread that shows a part around an old message, in the place of
+   * that part. The thread then follows its latest message again.
+   */
+  async function loadLatest(agentId: string, taskId: string): Promise<void> {
+    const history = state.history[taskId];
+    if (!history?.hasNewer || history.loadingLatest) return;
+    const request = (readRequests.get(taskId) ?? 0) + 1;
+    readRequests.set(taskId, request);
+    setState((current) => {
+      const entry = current.history[taskId];
+      if (entry) entry.loadingLatest = true;
+    });
+    try {
+      const snapshot = await port().readTask({ agentId, taskId });
+      if (!scopeIsCurrent() || readRequests.get(taskId) !== request) return;
+      rememberNewest(taskId, snapshot);
+      setState((current) => {
+        current.conversations[taskId] = snapshot;
+        delete current.history[taskId];
+      });
+      readHistory(agentId, taskId, snapshot);
+    } catch (error) {
+      if (!scopeIsCurrent() || readRequests.get(taskId) !== request) return;
+      setState((current) => {
+        const entry = current.history[taskId];
+        if (entry) entry.loadingLatest = false;
+      });
+      const { t, errorMessage } = currentText();
+      actionToast.error(errorMessage(error, t("conversation.threads.error.read")));
+    }
+  }
+
   function applyDelta(event: Extract<AgentTaskEvent, { type: "agent-task-conversation-delta" }>): void {
     const stored = state.conversations[event.taskId];
-    // A task that did not load its conversation reads it whole when it opens.
-    if (!stored || event.revision <= stored.revision) return;
+    // A task that did not load its conversation reads it whole when it opens. A part around an old
+    // message does not hold the streamed message: the conversation of the turn's end comes later.
+    if (!stored || event.revision <= stored.revision || state.history[event.taskId]?.hasNewer) return;
     setState((current) => {
       const conversation = current.conversations[event.taskId];
       if (!conversation) return;
@@ -332,16 +478,17 @@ export function createAgentTasks(options: AgentTasksOptions) {
   }
 
   /**
-   * A list from an event of a joined server has no branch links. When it has a task that the stored list
-   * does not have, the list is read again: the new task can be a branch from another device.
+   * A list from an event of a joined server has no branch links and no full queue. When it has a task
+   * that the stored list does not have, the list is read again: the new task can be a branch from
+   * another device. When a waiting message of a thread changed, the list is read again for its queue.
    */
   function applyTasksChanged(snapshot: AgentTasksSnapshot): void {
     const stored = untrack(() => state.snapshots[snapshot.agentId]);
     const known = stored && untrack(branchable) ? new Set(stored.tasks.map((task) => task.id)) : undefined;
     // Each progress line sends a list too. Only a saved message or an end of a turn changes a count.
     const before = stored ? untrack(() => unreadKey(stored)) : undefined;
-    applySnapshot(snapshot);
-    if (known && snapshot.tasks.some((task) => task.branch === undefined && !known.has(task.id)))
+    const staleQueue = applySnapshot(snapshot);
+    if (staleQueue || (known && snapshot.tasks.some((task) => task.branch === undefined && !known.has(task.id))))
       void loadTasks(snapshot.agentId);
     // The host sends no event when a read mark moves, so a changed list reads the marks again.
     else if (unreadKey(snapshot) !== before) loadUnread(snapshot.agentId);
@@ -461,7 +608,12 @@ export function createAgentTasks(options: AgentTasksOptions) {
     void port()
       .readTask({ agentId, taskId })
       .then((snapshot) => {
-        if (!scopeIsCurrent() || readRequests.get(taskId) !== request) return;
+        if (!scopeIsCurrent()) return;
+        // A part around an old message can take the place of this read. It still compares the next changes with it.
+        if (readRequests.get(taskId) !== request) {
+          rememberNewest(taskId, snapshot);
+          return;
+        }
         applyConversation(taskId, snapshot);
         readHistory(agentId, taskId, snapshot);
       })
@@ -558,6 +710,9 @@ export function createAgentTasks(options: AgentTasksOptions) {
     attachmentDraftIds: string[] = [],
     replyToMessageId: string | null = null,
   ): Promise<boolean> {
+    // The sent message and the answer come after the part around an old message, so the thread shows
+    // its latest messages again.
+    void loadLatest(agentId, taskId);
     const receipt = await runAction(
       () =>
         port().sendToTask({
@@ -673,7 +828,8 @@ export function createAgentTasks(options: AgentTasksOptions) {
    * read at once. A failure keeps the old mark and shows its count again: the next message moves it.
    */
   function markTaskRead(agentId: string, taskId: string, throughMessageId: string): void {
-    if (!readable() || readMarks.get(taskId) === throughMessageId) return;
+    // In a part around an old message, the message in view is not the latest that the person saw.
+    if (!readable() || readMarks.get(taskId) === throughMessageId || state.history[taskId]?.hasNewer) return;
     readMarks.set(taskId, throughMessageId);
     // A list read that started before this mark has the old count.
     nextUnreadRequest(agentId);
@@ -695,14 +851,84 @@ export function createAgentTasks(options: AgentTasksOptions) {
       });
   }
 
-  /** The messages of a thread: the loaded conversation, else a read of it. */
+  /** The newest messages of a thread: the loaded conversation, else a read of it. */
   async function taskMessages(agentId: string, taskId: string): Promise<ConversationSnapshot["messages"]> {
-    return state.conversations[taskId]?.messages ?? (await port().readTask({ agentId, taskId })).messages;
+    const loaded = state.history[taskId]?.hasNewer ? undefined : state.conversations[taskId];
+    return loaded?.messages ?? (await port().readTask({ agentId, taskId })).messages;
   }
 
-  /** Whether a thread has a message. */
+  /**
+   * Loads the messages of a thread around one message, so a jump to an old message can scroll to it.
+   * A loaded message needs no read. Else one read gives the part of the thread around the message: it
+   * joins the loaded messages when they meet, else it takes their place until the thread reads its
+   * latest messages again. A server without that read shows the newest messages only. False when the
+   * thread does not have the message. A store write shows in `state` only after the next flush, so the
+   * answer after a write comes from the messages that were read.
+   */
+  /** The newest read around a message for each thread. */
+  const aroundRequests = new Map<string, number>();
+  async function loadMessage(agentId: string, taskId: string, messageId: string): Promise<boolean> {
+    const has = (messages: readonly { id: string }[]) => messages.some((message) => message.id === messageId);
+    const loaded = () => has(state.conversations[taskId]?.messages ?? []);
+    if (loaded()) return true;
+    const read = port().readTaskAround;
+    if (!read || !aroundReadable()) {
+      if (!state.conversations[taskId]) {
+        const snapshot = await port().readTask({ agentId, taskId });
+        if (!scopeIsCurrent()) return false;
+        applyConversation(taskId, snapshot);
+        readHistory(agentId, taskId, snapshot);
+        return has(snapshot.messages);
+      }
+      return loaded();
+    }
+    // Two fast jumps in one thread: the part of the later jump stays, though its read can end first.
+    const request = (aroundRequests.get(taskId) ?? 0) + 1;
+    aroundRequests.set(taskId, request);
+    const part = await read({ agentId, taskId, messageId, limit: AROUND_LIMIT });
+    if (!scopeIsCurrent() || aroundRequests.get(taskId) !== request || part.conversation.messages.length === 0)
+      return false;
+    // The tab's read of the newest messages can have come in meanwhile, with the message in it.
+    if (loaded()) return true;
+    let replaced = false;
+    setState((current) => {
+      const held = current.conversations[taskId];
+      const history = current.history[taskId];
+      const messages = part.conversation.messages;
+      const last = messages.at(-1)?.id;
+      const meet = held && last ? held.messages.findIndex((message) => message.id === last) : -1;
+      if (held && meet >= 0) {
+        // The loaded messages go on from the part.
+        current.conversations[taskId] = { ...held, messages: [...messages, ...held.messages.slice(meet + 1)] };
+        current.history[taskId] = {
+          hasOlder: part.hasOlder,
+          hasNewer: history?.hasNewer ?? false,
+          loading: false,
+          paged: true,
+        };
+        return;
+      }
+      current.conversations[taskId] = part.conversation;
+      current.history[taskId] = { hasOlder: part.hasOlder, hasNewer: part.hasNewer, loading: false, paged: true };
+      replaced = true;
+    });
+    keepHiddenConversation(taskId);
+    // A read of the newest messages that started before the part no longer replaces it. The next
+    // changes are compared with the newest messages, so a delete in the part reads it again.
+    if (replaced) rememberNewestOf(agentId, taskId);
+    return has(part.conversation.messages);
+  }
+
+  /**
+   * Whether a thread has a message: in its loaded or newest messages, else, where the server can, in a
+   * read of the one message.
+   */
   async function taskHasMessage(agentId: string, taskId: string, messageId: string): Promise<boolean> {
-    return (await taskMessages(agentId, taskId)).some((message) => message.id === messageId);
+    const held = state.conversations[taskId]?.messages.some((message) => message.id === messageId);
+    if (held || (await taskMessages(agentId, taskId)).some((message) => message.id === messageId)) return true;
+    const read = port().readTaskAround;
+    if (!read || !aroundReadable()) return false;
+    return (await read({ agentId, taskId, messageId, limit: 1 })).conversation.messages.length > 0;
   }
 
   /** Moves the read mark of each open thread of an agent with unread messages to its latest message. */
@@ -742,7 +968,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
   return {
     available,
     editable,
-    local,
+    queuedMessageMovable,
     filesAccepted,
     repliable,
     snapshot: (agentId: string): AgentTasksSnapshot | undefined => state.snapshots[agentId],
@@ -753,6 +979,12 @@ export function createAgentTasks(options: AgentTasksOptions) {
       return history?.hasOlder ? { loading: history.loading } : undefined;
     },
     loadOlderMessages,
+    /** The thread shows a part around an old message, and whether it reads its latest messages now. */
+    newerMessages: (taskId: string): { loading: boolean } | undefined => {
+      const history = state.history[taskId];
+      return history?.hasNewer ? { loading: history.loadingLatest === true } : undefined;
+    },
+    loadLatest,
     applyEvent,
     reload,
     loadTasks,
@@ -777,6 +1009,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
     markTaskRead,
     markAllTasksRead,
     taskHasMessage,
+    loadMessage,
     unreadCount,
     unreadTotals,
     loadUnread,

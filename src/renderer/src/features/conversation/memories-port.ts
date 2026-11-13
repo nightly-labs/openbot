@@ -17,7 +17,10 @@ export interface MemoriesPort {
   ownerLabel: string;
   /** The word the page reads in its sentences: "This agent has no saved memories yet." */
   ownerNoun: "agent" | "channel";
-  /** Null when another computer holds the cap: its host refuses a memory past it. */
+  /**
+   * Null when this window does not know the cap, such as for a member of a joined server. Its host
+   * refuses a memory past it.
+   */
   limit: number | null;
   list: () => Promise<MemoryEntry[]>;
   selection?: {

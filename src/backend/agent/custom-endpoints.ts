@@ -7,6 +7,7 @@ import {
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
   defaultProviderModel,
   isCustomProviderHarness,
+  isReasoningEffort,
   PICKER_PROVIDERS,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
@@ -17,6 +18,7 @@ import { causeHelpers } from "../effect-boundary";
 import type { MailboxStore } from "../mailbox-store";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { type ProviderPreference, startingModel } from "./model-choice";
+import { newestOfFamily } from "./provider-models";
 import type { ProviderRuntime } from "./provider-runtime";
 import { providerForAgent } from "./thread-items";
 
@@ -130,6 +132,22 @@ export class CustomEndpoints {
     const separator = modelId.indexOf("/");
     if (separator <= 0) return true;
     return !this.#released[provider].has(modelId.slice(0, separator));
+  }
+
+  /**
+   * Whether a saved endpoint of `harness` waits for a process that reads it. Its models stay out of
+   * the catalogue until then. A removed id does not count: no model of it is to come.
+   */
+  pending(harness: CustomProviderHarness): boolean {
+    for (const providerId of this.#released[harness].keys()) {
+      if (this.#hooks.endpointHarness(providerId) === harness) return true;
+    }
+    return false;
+  }
+
+  /** Whether the endpoint `providerId` of `harness` waits for a process that reads it. */
+  waits(harness: CustomProviderHarness, providerId: string): boolean {
+    return this.#released[harness].has(providerId);
   }
 
   /** The newest revision a spawning process can read, taken when a provider client starts. */
@@ -605,23 +623,63 @@ export class CustomEndpoints {
     models: readonly AgentModelOption[],
     agentIds?: ReadonlySet<string>,
   ): AgentSummary[] {
-    return this.#store.list().filter(
-      (agent) =>
-        providerForAgent(agent) === provider &&
-        (agentIds === undefined || agentIds.has(agent.id)) &&
-        !models.some((model) => model.id === agent.model) &&
+    return this.#store.list().filter((agent) => {
+      if (providerForAgent(agent) !== provider || (agentIds !== undefined && !agentIds.has(agent.id))) return false;
+      const listed = this.#agentModels(provider, agent, models);
+      return (
+        listed !== null &&
+        !listed.some((model) => model.id === agent.model) &&
         // An agent whose endpoint moved waits for `moveAgentsToHarness`, which keeps its model.
-        this.#pendingMove(agent) === null,
+        this.#pendingMove(agent) === null
+      );
+    });
+  }
+
+  /**
+   * The models an agent can run: the catalogue, and then the models that only its account after the
+   * first serves (#5217). Null while that account has not listed models: the catalogue of the own
+   * sign-in is no proof that the account does not serve the agent's model (#8030).
+   */
+  #agentModels(
+    provider: AgentProvider,
+    agent: AgentSummary,
+    models: readonly AgentModelOption[],
+  ): readonly AgentModelOption[] | null {
+    if (!this.#providers.hasProviderAccount(provider, agent.providerAccountId ?? "")) return models;
+    const own = this.#providers.listedAccountModels(provider, agent.providerAccountId);
+    if (!own?.length) return null;
+    return [...models, ...own.filter((model) => !models.some((listed) => listed.id === model.id))];
+  }
+
+  /**
+   * Moves the agents of an account after the first whose model neither the catalogue nor the
+   * account's new list has. The provider's start moves no agent of an account that had not listed
+   * its models yet, so this is where the agents of such an account move.
+   */
+  moveAccountAgentsOffUnlistedModels(provider: AgentProvider, accountId: string): Effect.Effect<void> {
+    return this.runExclusive(() =>
+      Effect.suspend(() => {
+        const agentIds = new Set(
+          this.#store
+            .list()
+            .filter((agent) => providerForAgent(agent) === provider && agent.providerAccountId === accountId)
+            .map((agent) => agent.id),
+        );
+        return agentIds.size ? this.moveAgentsOffUnlistedModels(provider, agentIds) : Effect.void;
+      }),
     );
   }
 
   /**
-   * Moves each agent of `provider` whose model the provider no longer lists to the provider's default,
-   * or to the first model it lists when the default is gone too. A saved model that is a listed model
-   * with one of its efforts (`effortVariant`) moves to that model and effort instead.
+   * Moves each agent of `provider` whose model the provider no longer lists. A saved model that is a
+   * listed model with one of its efforts (`effortVariant`) moves to that model and effort. Else the
+   * agent moves to the newest listed model of the same family (`newestOfFamily`), so Claude Opus 4.6
+   * becomes Claude Opus 5.5 and keeps its effort when the new model has it. Else it moves to the
+   * provider's default, or to the first model it lists when the default is gone too.
    *
    * Only called with a catalogue the provider has just reported, because a stale one is no proof that
-   * a model is gone. The provider stays the same, so the agent keeps its thread, and a running turn
+   * a model is gone, or for the agents of an account after the first that has just listed its own
+   * models (`moveAccountAgentsOffUnlistedModels`). The provider stays the same, so the agent keeps its thread, and a running turn
    * keeps the model it started with. An empty catalogue moves nobody: that is a provider with no
    * usable account, not a provider with no models.
    */
@@ -636,22 +694,33 @@ export class CustomEndpoints {
     const providerFallback = models.find((model) => model.id === defaultProviderModel(provider)) ?? models[0];
     if (!providerFallback) return;
     for (const agent of this.#agentsOffList(provider, models, agentIds)) {
+      const listed = this.#agentModels(provider, agent, models) ?? models;
       // A custom agent is a program of its own, not a model: an agent moves only to another model of
       // the same custom agent. One that listed nothing, or did not answer, keeps its model. The router
       // lists `<agent>/default` for an agent that answered with an empty list, which a slow start
       // gives too, so that model is no proof that the saved one is gone.
-      const variant = provider === "acp" ? null : effortVariant(models, agent.model);
+      const variant = provider === "acp" ? null : effortVariant(listed, agent.model);
+      const family = provider === "acp" || variant ? null : newestOfFamily(listed, agent.model);
       const fallback =
         variant?.model ??
+        family ??
         (provider === "acp"
-          ? models.find((model) => sameCustomAgent(model.id, agent.model) && !isCustomAgentDefaultModel(model.id))
+          ? listed.find((model) => sameCustomAgent(model.id, agent.model) && !isCustomAgentDefaultModel(model.id))
           : providerFallback);
       if (!fallback) continue;
+      // The effort that the saved id names comes first: an id such as `gemini-3.1-pro-high` is from
+      // the time when OpenBot saved each effort as a model, and its stored effort can be another one.
+      const keptEffort =
+        family && family.reasoningEffortConfigurable !== false
+          ? ([effortInModelId(agent.model), agent.reasoningEffort].find(
+              (effort) => effort !== null && family.supportedReasoningEfforts.includes(effort),
+            ) ?? null)
+          : null;
       yield* this.#hooks
         .applyAgentUpdate({
           agentId: agent.id,
           model: fallback.id,
-          reasoningEffort: variant?.effort ?? fallback.defaultReasoningEffort,
+          reasoningEffort: variant?.effort ?? keptEffort ?? fallback.defaultReasoningEffort,
         })
         .pipe(toEndpointChangeFailed)
         .pipe(
@@ -699,7 +768,7 @@ function sameCustomAgent(model: string, agentModel: string): boolean {
  * one of these keeps its model and effort. Only an effort that the listed model offers matches.
  */
 function effortVariant(
-  models: AgentModelOption[],
+  models: readonly AgentModelOption[],
   modelId: string,
 ): { model: AgentModelOption; effort: AgentReasoningEffort } | null {
   for (const model of models) {
@@ -709,6 +778,17 @@ function effortVariant(
     if (effort) return { model, effort };
   }
   return null;
+}
+
+/** The last part of a model id that names an effort, such as `high` for `gemini-3.1-pro-high`. */
+function effortInModelId(modelId: string): AgentReasoningEffort | null {
+  return (
+    modelId
+      .toLowerCase()
+      .split(/[-_]/u)
+      .reverse()
+      .find((part) => isReasoningEffort(part)) ?? null
+  );
 }
 
 export class EndpointChangeFailed extends Schema.TaggedError<EndpointChangeFailed>()("EndpointChangeFailed", {

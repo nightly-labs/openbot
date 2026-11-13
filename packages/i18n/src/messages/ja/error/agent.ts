@@ -4,8 +4,16 @@ import type { messages as source } from "../../en/error/agent";
 export const messages = {
   "error.agent.historyUnavailable":
     "このリクエストでは履歴を利用できません。最近の履歴をもう一度読み取るか、チャンネルの作業には channel_history を使用してください。",
+  "error.agent.historyArgumentsInvalid":
+    "履歴の引数が正しくありません: {detail} 引数を修正して再試行してください。スキーマは openbot.tool_describe で取得できます。",
   "error.agent.toolRequestInvalid":
     "ツール検出の引数が無効です。宣言されたスキーマと、元の修飾されたツール名を使用してください。",
+  "error.agent.toolCallArgumentsNotObject":
+    "ツールは実行されませんでした。tool_call の arguments はテキストではなく JSON オブジェクトにする必要があります。arguments をオブジェクトにして、もう一度呼び出してください。",
+  "error.agent.toolCallDiscoveryTool":
+    "ツールは実行されませんでした。tool_call では openbot.tool_search と openbot.tool_describe を実行できません。同じ引数で直接呼び出してください。",
+  "error.agent.routineScheduleArgumentsInvalid":
+    "ルーティンのスケジュールが無効です: {detail} スケジュールを修正して再試行してください。スキーマは openbot.tool_describe で取得できます。",
   "error.agent.approvalWhileDeleting": "エージェントの削除中は承認できません。",
   "error.agent.accessLocalOnly":
     "エージェントへのアクセスは、そのエージェントを実行しているコンピューターでのみ変更できます。",
@@ -50,6 +58,8 @@ export const messages = {
     "現在 {provider} のモデルを使用できません。list_models を呼び出して、使用できるモデルを確認してください。",
   "error.agent.reasoningEffortUnsupported":
     "モデル「{model}」は推論レベル「{effort}」に対応していません。対応している推論レベル: {efforts}。",
+  "error.agent.reasoningEffortNotConfigurable":
+    "モデル「{model}」には推論レベルの設定がないため、推論レベルを変更できません。",
   "error.agent.noStartingModelInSettings":
     "{provider} に使用できるモデルがなく、サインイン済みのほかのプロバイダーにもありません。プロバイダーにサインインするか、サーバー設定 → プロバイダーでデフォルトのプロバイダーを変更してください。",
   "error.agent.noStartingModel":

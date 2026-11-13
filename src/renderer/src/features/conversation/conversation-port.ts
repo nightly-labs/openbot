@@ -17,6 +17,7 @@ export interface ConversationPort {
     | "deleteConversationMessage"
     | "deleteTable"
     | "listMemories"
+    | "listPinnedMessages"
     | "listRoutines"
     | "listTables"
     | "markConversationRead"
@@ -25,6 +26,7 @@ export interface ConversationPort {
     | "releaseFilePreview"
     | "searchConversationMessages"
     | "sendMessage"
+    | "setMessagePinned"
   >;
   browser: Pick<
     OpenBotDesktopApi["browser"],

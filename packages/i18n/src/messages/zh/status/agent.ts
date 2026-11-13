@@ -8,6 +8,8 @@ export const messages = {
   "status.agent.modelSwitchedForLimit": "额度已用完，已切换到 {model}。",
   "status.agent.modelReturnedAfterLimit": "额度已恢复，已切回 {model}。",
   "status.agent.modelSwitchedForError": "服务商出错，已切换到 {model}。",
+  "status.agent.modelSwitchedForSpentBalance":
+    "{previous} 的额度已用完。已切换到 {model}。要再次使用它，请添加额度，然后选择它。",
   "status.agent.modelReturnedAfterError": "服务商出错后，已切回 {model}。",
   "status.agent.marketplaceSuggested": "推荐了一个市场应用：{app}。",
   "status.agent.channelMemberAdded": "{agent} 已把 {member} 加入该频道，这是 {person} 的请求。",
@@ -26,6 +28,8 @@ export const messages = {
     "在 {site} 上填入已保存的银行卡 {card}。批准后，助手可以在该网站上免批准填入这张卡。可在“服务器设置 > 保险库”中移除该网站。",
   "status.agent.reportProblem": "这会成为一个公开的 GitHub issue，附带应用版本和你的系统信息。不会显示你的名字。",
   "status.agent.sendIdea": "这会成为一个公开的 GitHub issue。不会显示你的名字。",
+  "status.agent.feedbackRecentErrors": "聊天中的最近错误：",
+  "status.agent.feedbackSameAs": "添加到 issue #{issue}",
   "status.agent.feedbackSent": "已发送给 OpenBot 团队：{title}",
   "status.agent.serverInstallCommand":
     "创建一个一次性命令，在另一台计算机上把 OpenBot 安装为服务器 {name}，并登录到你的账户。代理会在那里运行它。",

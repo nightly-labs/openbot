@@ -48,6 +48,10 @@ export const messages = {
     "Cet hôte distant ne prend pas en charge la navigation par la barre d’adresse dans un onglet existant.",
   "error.backend.browserUserControlBusy":
     "Cet onglet du navigateur attend un secret. Répondez d’abord à la demande de secret.",
+  "error.backend.browserTeachBusy":
+    "Une autre personne contrôle cet onglet du navigateur. Réessayez quand elle aura terminé.",
+  "error.backend.browserTeachUnavailable": "Cet onglet du navigateur n’a aucun agent qui peut apprendre une tâche.",
+  "error.backend.browserTeachUnsupported": "Cet hôte distant ne prend pas en charge l’enregistrement d’une tâche.",
   "error.backend.browserUserControlUnsupported":
     "Cet hôte distant ne permet pas de prendre le contrôle d’un onglet du navigateur.",
   "error.backend.browserSignInUnsupported":
@@ -64,6 +68,8 @@ export const messages = {
     "La compaction ne réduit pas ce chat : après deux compactions, il utilise encore {percent} % de la fenêtre de contexte du modèle, donc OpenBot arrête de le compacter. Les outils et les instructions occupent la plus grande partie de la fenêtre. Désactive les serveurs MCP ou le contrôle de l'ordinateur dont cet agent n'a pas besoin, ou choisis un modèle avec une fenêtre plus grande. Puis démarre un nouveau chat.",
   "error.backend.contextCompactionStopped":
     "Deux compactages de suite de cette discussion ont échoué, donc OpenBot ne la compacte plus automatiquement. Chaque essai envoie toute la discussion au modèle et consomme la limite de votre forfait. Sélectionnez « Compacter » pour réessayer, ou démarrez une nouvelle discussion.",
+  "error.backend.providerModelAtCapacity":
+    "Le modèle est saturé. Le fournisseur réessaiera dans quelques minutes. Pour continuer maintenant, arrête le tour et choisis un autre modèle.",
   "error.backend.providerRetrying":
     "Le fournisseur a échoué {attempts} fois sur cette requête et réessaie. Si l'agent ne continue pas, arrête le tour.",
   "error.backend.providerRetryingLargeContext":
@@ -74,6 +80,8 @@ export const messages = {
     "Le canal a un démarrage de tâche non confirmé. Vérifiez son résultat avant de le supprimer.",
   "error.backend.channelNotFound": "Canal introuvable.",
   "error.backend.channelMemberUnavailable": "Un membre du canal est indisponible.",
+  "error.backend.channelInstructionsTooLong":
+    "Raccourcissez les instructions à 2 000 caractères. Les instructions plus longues ne sont pas enregistrées.",
   "error.backend.channelWaitBeforeNewConversation":
     "Attendez la fin du travail dans ce canal, puis démarrez une nouvelle conversation.",
   "error.backend.channelWaitBeforeCompact": "Attendez la fin du travail dans ce canal, puis compactez-le.",
@@ -162,9 +170,17 @@ export const messages = {
   "error.backend.recipientDeleting":
     "Le destinataire est en cours de suppression. Réessayez une fois la suppression terminée.",
   "error.backend.recipientHidden": "Cet agent est masqué. Restaurez-le pour envoyer des messages.",
+  "error.backend.agentIdUnknown":
+    "Aucun agent n’a l’identifiant {id}. Obtenez les identifiants avec openbot.list_agents, puis réessayez.",
+  "error.backend.agentIdNear":
+    "Aucun agent n’a l’identifiant {id}. L’agent {name} a l’identifiant {nearId}, presque identique. S’il s’agit de cet agent, réessayez avec son identifiant.",
   "error.backend.attachBetween": "Joignez entre 1 et {limit} fichiers.",
   "error.backend.attachmentNotFile": "La pièce jointe n’est pas un fichier : {path}",
   "error.backend.generatedImageTooLarge": "L’image générée dépasse la limite de 100 Mo.",
+  "error.backend.generatedVideoTooLarge": "La vidéo générée dépasse la limite de 100 Mo.",
+  "error.backend.videoGenerationFailed": "La génération de la vidéo a échoué.",
+  "error.backend.videoGenerationNoVideo": "La génération de la vidéo n’a renvoyé aucune vidéo.",
+  "error.backend.videoGenerationInterrupted": "La génération de la vidéo a été interrompue.",
   "error.backend.attachmentNotRegularFile": "Seuls les fichiers ordinaires peuvent être joints : {name}",
   "error.backend.attachmentCopyFailed": "OpenBot n’a pas pu copier {name}.",
   "error.backend.routineNameRequired": "Un nom de routine est requis.",
@@ -220,14 +236,15 @@ export const messages = {
   "error.backend.agentWaitRoutineGone": "Cet agent n’a pas de routine avec cet identifiant.",
   "error.backend.agentWaitNoRoutine":
     "Seule une exécution de l’une de vos routines réveille une attente, et vous n’avez aucune routine. Créez-en une avec openbot.create_routine, puis ouvrez l’attente.",
-  "error.backend.agentWaitRemoteUnsupported":
-    "Les attentes ouvertes ne sont disponibles que pour les agents de cet ordinateur.",
   "error.backend.markUnreadRemoteUnsupported":
     "Marquer un message comme non lu n’est disponible que pour les agents de cet ordinateur.",
   "error.backend.messageDeleteUnsupported": "Ce serveur ne permet pas de supprimer des messages.",
   "error.backend.messageDeleteNotFound": "Ce message n’est pas dans le chat.",
   "error.backend.messageDeleteBusy": "Ce message fait partie d’un tour en cours. Supprimez-le à la fin du tour.",
   "error.backend.messageDeleteForbidden": "Vous ne pouvez supprimer que les messages que vous avez envoyés.",
+  "error.backend.messagePinNotFound": "Ce message n’est pas dans la discussion.",
+  "error.backend.messagePinLimit":
+    "Cette discussion contient 50 messages épinglés. Désépinglez-en un avant d’en épingler un autre.",
   "error.backend.routineFlowHandoffFailed": "La routine n’a pas pu transmettre le travail à cet agent.",
   "error.backend.mcpServerLimit": "OpenBot garde jusqu’à {limit} serveurs MCP.",
   "error.backend.mcpServerNameTaken": "Un serveur MCP nommé {name} existe déjà.",
@@ -255,9 +272,13 @@ export const messages = {
   "error.backend.mcpSignInResponseTimedOut": "La réponse à la connexion n’est pas arrivée à temps.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot n’a pas pu lire les informations de connexion de ce serveur. Vérifiez l’adresse du serveur et réessayez.",
+  "error.backend.mcpSignInAnswerUnreadable":
+    "Le serveur de connexion a envoyé une réponse qu’OpenBot ne peut pas lire. Si le service vous donne une clé d’API ou un jeton, ajoutez-le dans les paramètres de ce serveur, puis testez de nouveau la connexion.",
   "error.backend.mcpServerExited":
     "Le serveur s’est arrêté avant de répondre. Exécutez la commande dans un terminal pour voir son erreur.",
   "error.backend.mcpServerFailedToStart": "Le serveur n’a pas démarré : {reason}",
+  "error.backend.mcpToolSchemaRefused":
+    "Son outil {tool} a un format d’entrée que ce fournisseur ne peut pas lire. Les agents des autres fournisseurs reçoivent toujours le serveur.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} n’a pas pu utiliser le serveur MCP {name}, car ce serveur demande une connexion. Ouvrez les réglages MCP et choisissez Se connecter.",
   "error.backend.mcpServerFailedForProvider":
@@ -291,6 +312,13 @@ export const messages = {
   "error.backend.sectionNameTooLong": "Le nom de la section est trop long.",
   "error.backend.sidebarFolderTooDeep": "Les dossiers ne peuvent avoir que trois niveaux.",
   "error.backend.sidebarFolderMoveInvalid": "Ce dossier ne peut pas être déplacé ici.",
+  "error.backend.libraryFolderName": "Le nom d’un dossier doit comporter de 1 à {limit} caractères.",
+  "error.backend.libraryFolderLimit": "Un serveur peut avoir jusqu’à {limit} dossiers de la Bibliothèque.",
+  "error.backend.libraryFolderFileLimit": "Il y a trop de fichiers dans les dossiers de la Bibliothèque.",
+  "error.backend.libraryFolderTooDeep": "Les dossiers de la Bibliothèque ne peuvent avoir que {limit} niveaux.",
+  "error.backend.libraryFolderGone": "Le dossier n’existe pas ou a déjà été supprimé.",
+  "error.backend.libraryFolderOtherAgent": "Un fichier ne peut aller que dans un dossier de son agent.",
+  "error.backend.libraryFolderMoveInvalid": "Ce dossier ne peut pas être déplacé ici.",
   "error.backend.sectionNameDuplicate": "Les noms de section doivent être uniques.",
   "error.backend.directMessageRequired": "Écrivez d’abord un message.",
   "error.backend.directMessageTooLong": "Un message direct peut contenir jusqu’à {limit} caractères.",
@@ -349,6 +377,8 @@ export const messages = {
     "Le proxy {name} a refusé l’identification, la page ne s’est donc pas ouverte.",
   "error.backend.browserProxyComputerUnreachable":
     "L’ordinateur de ce profil ne répond pas, la page ne s’est donc pas ouverte.",
+  "error.backend.browserProxyComputerLocalAddress":
+    "L’ordinateur utilisé par ce profil n’ouvre que des sites publics. Il n’ouvre pas les adresses d’un réseau local, donc la page ne s’est pas ouverte.",
   "error.backend.browserCertificateUntrusted":
     "Le certificat de sécurité de ce site n’est pas fiable, la page ne s’est donc pas ouverte.",
   "error.backend.browserLowMemory":

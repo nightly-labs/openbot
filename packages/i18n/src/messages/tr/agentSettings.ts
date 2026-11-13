@@ -149,8 +149,6 @@ export const messages = {
   "agentSettings.runtime.accessLabel": "Ajan erişimi",
   "agentSettings.runtime.busyMessage": "Çalışırken",
   "agentSettings.runtime.busyMessageLabel": "Ajan çalışırken gönderilen mesajlar",
-  "agentSettings.runtime.taskLimit": "Paralel mesaj dizileri",
-  "agentSettings.runtime.taskLimitLabel": "Aynı anda çalışan mesaj dizileri",
   "agentSettings.runtime.workingDirectory": "Çalışma dizini",
   "agentSettings.runtime.notAvailable": "Henüz kullanılamıyor",
   "agentSettings.runtime.fullAccessNote":
@@ -169,9 +167,6 @@ export const messages = {
   "agentSettings.busyMessage.steer": "Yönlendir",
   "agentSettings.busyMessage.steerUnsupported":
     "{provider} çalışan bir turu yönlendiremez. Çalışırken gönderilen mesajlar kuyrukta bekler.",
-  "agentSettings.taskLimit.default": "Varsayılan ({count})",
-  "agentSettings.taskLimit.oneTurn":
-    "{provider} aynı anda tek tur çalıştırır. Bu ajanın mesaj dizileri birbirini bekler.",
   "agentSettings.notificationLevel.title": "Bana bildir",
   "agentSettings.notificationLevel.server": "Sunucu varsayılanı ({level})",
   "agentSettings.notificationLevel.note":

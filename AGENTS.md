@@ -44,11 +44,39 @@ adding a module or moving ownership between workspaces.
   phone keeps an encrypted, read-only copy of the agents, sections, recent chats, channels and drawer
   values of its servers (`apps/mobile/src/features/workspace/model/workspace-cache.ts`). The copy stays
   on that phone, the host stays the source of truth, and sign-out, session expiry and server removal delete it.
+  A desktop or browser client also keeps a copy of the agent and channel pictures that it loaded from a
+  joined server (`src/main/remote-picture-cache.ts`,
+  `src/renderer/src/features/web-client/web-agent-pictures.ts`), so the saved workspace shows the agent
+  pictures while the host is offline. Sign-out, server removal and the end of access delete it.
 - Cloudflare holds accounts, avatars, host configuration, memberships, invitations, and logical
-  sessions; it does not hold chats, files, or commands.
+  sessions; it does not hold chats, files, or commands. It also holds the signed JavaScript bundles
+  of mobile over-the-air updates (`apps/mobile-updates`), which are public code and have no user data.
 - The user's SQLite database is the source of truth, not a remote cache.
 - Agents keep their workspace, thread, and identity across provider switches and restarts.
   Do not reset an agent to simplify state.
+
+## Joined servers
+
+Many users run OpenBot only on a joined server: a VPS, a hosted server, or another member's computer.
+A feature for agents, chats, channels, routines or server settings must work there as it does on
+this computer. Make it local only when it needs this computer itself: its files and folders, its
+windows, its OS dialogs or its native notifications.
+
+- Ship the remote path in the same change as the local one: the host route in `src/main/team-api/`,
+  a new optional capability in `packages/contracts/src/team-protocol/` (see
+  [packages/contracts/AGENTS.md](packages/contracts/AGENTS.md)), the `remote` branch of the IPC
+  handler, and each client: the desktop with a joined server, the web client
+  (`src/renderer/src/features/web-client/`), and mobile (`apps/mobile`) when the action fits a phone.
+- Do not add a `remote` branch that always throws or returns empty data, or a `kind === "local"`
+  gate, for a feature that can work on a server. When a part must stay local, write the reason at
+  the gate and in the PR.
+- Gate the client on the host capability. Hide the action while the host does not have it; do not
+  show an action that then fails. An older host keeps working without the feature.
+- Test the host route through the Team API (as `scripts/team-api-routes-e2e.ts` does), not only the
+  local IPC path.
+- A server installs a staged release only at its next boot, or when an owner, an admin or a permitted
+  member installs it in Server Settings > Updates. When a feature needs the new host, the release
+  notes say that the server must also be on the new version.
 
 ## Effect
 
@@ -133,7 +161,10 @@ and the separate Node and Bun type environments. Read them when changing checks 
 State which surfaces a change touches. Check all affected consumers and reverse actions.
 
 - Desktop renderer (`src/renderer`), mobile (`apps/mobile`), public web (`apps/auth-api`; no separate
-  landing app), hosted-site routing (`apps/site-router`), and Signal (`remote/api`).
+  landing app), hosted-site routing (`apps/site-router`), the mobile update server
+  (`apps/mobile-updates`), and Signal (`remote/api`).
+- Joined servers: the desktop with a joined server, the web client (`openbot.run/app`), and mobile.
+  See [Joined servers](#joined-servers).
 - IPC contracts (`packages/contracts`) and their preview implementation
   (`src/renderer/src/preview/mock-openbot.ts`).
 - Reverse actions: snooze/unsnooze, pause/resume, revoke/reconnect, mute/unmute.
@@ -170,8 +201,26 @@ State which surfaces a change touches. Check all affected consumers and reverse 
   Load it with `bunx @dotenvx/dotenvx@2.38.2 run -f apps/auth-api/.env.dev -fk <root>/.env.keys --
   <command>`; `bun run dev` does not pass it on. Never print it. Ask before a benchmark or a run of many
   turns: the token budget is small.
+- For development and manual tests, the team has one test Google account. `apps/auth-api/.env.dev`
+  holds `DEV_TEST_GMAIL_ADDRESS` and `DEV_TEST_GMAIL_PASSWORD`. Use it to sign in to Gmail and to
+  third-party services ("Sign in with Google") for development and smoke checks, never for a
+  personal or production account. Load it the same way as `INCEPTION_API_KEY`, and never print it.
+  Its X account uses the same email and password. A Google sign-in from a new browser gets a phone
+  check that only the developer can do. To skip it, load the saved session into a new browser
+  context (Playwright `storageState`) from `~/.config/openbot/test-google-account.storage.json` on
+  the developer's Mac. For the OpenBot browser, open a tab over CDP and set the same cookies with
+  `Network.setCookies` on that tab: agents share that session. If that session has expired, ask the
+  developer to do the phone check, then save the session again.
 
 See [account service setup](apps/auth-api/README.md) for loading and deployment details.
+
+### Leaseweb servers
+
+Take only a Leaseweb VPS that has no reference, and set its reference before any other work on it.
+Never take a VPS that has a reference, also `pool-free`. The reference scheme is in
+[Leaseweb references](docs/hosted-servers.md#leaseweb-references). To set up a VPS as the server of one
+customer, use the [custom-server](.agents/skills/custom-server/SKILL.md) skill. The customer is the
+owner, through a server claim; never sign the server in to an operator account.
 
 ### Local processes
 

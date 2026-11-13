@@ -53,6 +53,7 @@ import { isEmptyStoredFile, parseStoredJson } from "./atomic-json-file";
 import { routineNameInLimit } from "./database/legacy-conversation-message";
 import { mailboxReactionRowKey } from "./database/mailbox-projection";
 import { MailboxDeliveryGate } from "./mailbox-delivery-gate";
+import { runIdOrigins } from "./message-run-ids";
 import { OpenBotDatabase } from "./openbot-database";
 import { isRecord } from "./protocol";
 import { recordRestartActivity } from "./restart-activity";
@@ -288,6 +289,12 @@ export class MailboxStore {
   readonly #deliveryGate = new MailboxDeliveryGate();
   readonly #stagedGeneratedAttachments = new Map<string, StoredGeneratedAttachment>();
   #state: StoredState = structuredClone(EMPTY_STATE);
+  /**
+   * The app start loads the store before the window opens, and the agent service initializes the same
+   * store again. A second load reads every message and delivery again, which stops the main process
+   * for longer as the history grows (#7686).
+   */
+  #initialized = false;
   /** The rows changed, added or removed, since the last committed write. `#persist` writes only these. */
   readonly #changes = {
     messageIds: new Set<string>(),
@@ -306,6 +313,7 @@ export class MailboxStore {
   initialize = Effect.fn("MailboxStore.initialize")(function* (
     this: MailboxStore,
   ): Effect.fn.Return<void, StoredStateFailure> {
+    if (this.#initialized) return;
     try {
       yield* Effect.all(
         [
@@ -347,6 +355,7 @@ export class MailboxStore {
         .resetDrafts(retainedDrafts.map((draft) => draft.id))
         .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
       yield* this.#drainFileDeletionOutboxEffect();
+      this.#initialized = true;
     } catch (cause) {
       return yield* new StoredStateFailure({ cause });
     }
@@ -396,6 +405,32 @@ export class MailboxStore {
     } catch (cause) {
       return yield* new StoredStateFailure({ cause });
     }
+  }, Effect.uninterruptible).bind(this);
+
+  /**
+   * Keeps a draft as a file with no owner agent, as a generated image is kept, and discards the draft.
+   * Answers the new file, `missing` when there is no such draft, or `type` when its type is not in
+   * `types`. A refused draft stays.
+   */
+  keepDraft = Effect.fn("MailboxStore.keepDraft")(function* (
+    this: MailboxStore,
+    id: string,
+    types: ReadonlySet<string>,
+  ): Effect.fn.Return<AttachmentSummary | "missing" | "type", StoredStateFailure> {
+    const draft = this.#state.drafts.find((candidate) => candidate.id === id);
+    if (!draft) return "missing";
+    if (!types.has(draft.mimeType)) return "type";
+    const source = yield* this.#files
+      .resolveDraft(draft)
+      .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+    if (!source) return "missing";
+    const kept = yield* this.storeGeneratedAttachment({
+      sourcePath: source.path,
+      name: source.name,
+      mimeType: source.mimeType,
+    });
+    yield* this.discardDraft(id);
+    return kept;
   }, Effect.uninterruptible).bind(this);
 
   discardDraft = Effect.fn("MailboxStore.discardDraft")(function* (
@@ -1690,16 +1725,17 @@ export class MailboxStore {
   }
 
   /**
-   * The teammate answers that start in the same turn as this delivery. For an answer, these are the
-   * other answers to the same request. For a message from the person, these are the answers that
-   * wait for a slow teammate: the person writes before all answers are in, so they are read now.
+   * The teammate answers that start in the same turn as this answer: the other answers to the same
+   * request. A message from the person takes none. Answers that wait for a slow teammate stay held,
+   * so a turn that the person starts holds only the person's messages, and the tools that only a
+   * person's request can start still work in it (#6525).
    */
   repliesToStartWith(deliveryId: string): DeliveryContext[] {
     const next = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     if (!next) return [];
     const message = this.#requireMessage(next.messageId);
     const requestId = isAnswer(message) ? message.replyToMessageId : null;
-    if (message.sender.kind !== "user" && !requestId) return [];
+    if (!requestId) return [];
     // One turn runs in one lane: the agent's own chat, or the side thread that sent the request.
     const messages = this.#messagesById();
     const lane = this.#laneOf(next, messages);
@@ -1707,7 +1743,6 @@ export class MailboxStore {
       this.#queuedFor(next.recipientAgentId).filter((candidate) => {
         if (candidate.id === next.id || !this.#mayStart(candidate) || this.#laneOf(candidate, messages) !== lane)
           return false;
-        if (!requestId) return this.#isHeldReply(candidate);
         const reply = this.#requireMessage(candidate.messageId, messages);
         return isAnswer(reply) && reply.replyToMessageId === requestId;
       }),
@@ -1815,19 +1850,23 @@ export class MailboxStore {
   }
 
   /**
-   * A queued message from another agent that can steer its recipient's running chat turn. Channel,
-   * messaging and task work runs outside that turn. The answers to a request that went to several
-   * teammates start together in one turn (`#isHeldReply`), so none of them goes into it alone.
+   * What a queued message from another agent does when its recipient runs a chat turn: it `joins`
+   * that turn, or it waits for its `own-turn`. A request asks for work and a result, so it gets its
+   * own turn: in a running turn, its result and the answer to the person would be one message. An
+   * answer, a requested result or a notice only gives information, so it can join. Null for channel,
+   * messaging and task work, which runs outside that turn, and for the answers to a request that went
+   * to several teammates: they start together in one turn (`#isHeldReply`), so none goes in alone.
    */
-  steersChatTurn(deliveryId: string): boolean {
+  chatTurnSteer(deliveryId: string): "joins" | "own-turn" | null {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
-    if (delivery?.status !== "queued") return false;
+    if (delivery?.status !== "queued") return null;
     const message = this.#requireMessage(delivery.messageId);
-    if (message.channelId || message.messaging || message.taskId) return false;
-    return (
-      !isAnswer(message) ||
+    if (message.channelId || message.messaging || message.taskId) return null;
+    if (message.expectsReply !== false) return "own-turn";
+    return !isAnswer(message) ||
       this.#state.deliveries.filter((candidate) => candidate.messageId === message.replyToMessageId).length < 2
-    );
+      ? "joins"
+      : null;
   }
 
   queuedDeliveryIds(agentId: string): string[] {
@@ -1847,7 +1886,10 @@ export class MailboxStore {
     return delivery ? this.#context(delivery) : null;
   }
 
-  /** Provider history can name a continuation turn instead of the original delivery. */
+  /**
+   * Provider history can name a continuation turn instead of the original delivery, or a run of the
+   * delivery in a Claude process that already took its id (#6676).
+   */
   deliveryForProviderMessage(agentId: string, messageId: string): DeliveryContext | null {
     const delivery = this.#state.deliveries.find(
       (candidate) =>
@@ -1857,7 +1899,14 @@ export class MailboxStore {
             (candidate.turnId === messageId || candidate.resumeAfterUsageLimit.previousTurnIds.includes(messageId))) ||
           candidate.planContinuation?.turnIds.includes(messageId) === true),
     );
-    return delivery ? this.#context(delivery) : null;
+    if (delivery) return this.#context(delivery);
+    for (const origin of runIdOrigins(messageId).slice(1)) {
+      const run = this.#state.deliveries.find(
+        (candidate) => candidate.recipientAgentId === agentId && candidate.id === origin,
+      );
+      if (run) return this.#context(run);
+    }
+    return null;
   }
 
   /** The delivery of one message to one recipient. A message reaches each recipient once. */
@@ -1886,6 +1935,46 @@ export class MailboxStore {
         (delivery.status === "starting" || delivery.status === "running") &&
         this.#state.messages.some((message) => message.id === delivery.messageId && message.messagingReturn),
     );
+  }
+
+  /**
+   * Whether a turn of the agent works for an external conversation: on a message from it, on a
+   * request that an agent sent from it, or on a request from a turn that works for it. A steered
+   * request counts: its answer can go back there too.
+   */
+  turnServesExternalChat(agentId: string, turnId: string): boolean {
+    const sourceTurnIds = this.#sourceTurnIds();
+    const messages = this.#messagesById();
+    const seen = new Set<string>();
+    const serves = (agent: string, turn: string, activeOnly: boolean): boolean => {
+      const key = `${agent}:${turn}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return this.#state.deliveries.some((delivery) => {
+        if (delivery.recipientAgentId !== agent) return false;
+        if (activeOnly) {
+          if (delivery.turnId !== turn || (delivery.status !== "starting" && delivery.status !== "running"))
+            return false;
+          // A delivery that ran again has a new turn id. Its earlier turns can have sent the request.
+        } else if (
+          delivery.turnId !== turn &&
+          delivery.resumeAfterUsageLimit?.previousTurnIds.includes(turn) !== true &&
+          delivery.planContinuation?.turnIds.includes(turn) !== true
+        )
+          return false;
+        const message = messages.get(delivery.messageId);
+        if (!message) return false;
+        if (message.messaging || message.messagingReturn) return true;
+        // The turn that sent this request can be complete, so its deliveries count in any status.
+        const sourceTurn = sourceTurnIds.get(message.id);
+        return (
+          message.sender.kind === "agent" &&
+          sourceTurn !== undefined &&
+          serves(message.sender.agentId, sourceTurn, false)
+        );
+      });
+    };
+    return serves(agentId, turnId, true);
   }
 
   findDeliveriesByTurn(agentId: string, turnId: string): DeliveryContext[] {
@@ -2099,6 +2188,7 @@ export class MailboxStore {
     this: MailboxStore,
     deliveryId: string,
     taskOpen: (taskId: string) => boolean,
+    agentExists: (agentId: string) => boolean,
   ): Effect.fn.Return<string | null, StoredStateFailure> {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     const request = delivery && this.#state.messages.find((message) => message.id === delivery.messageId);
@@ -2108,6 +2198,8 @@ export class MailboxStore {
     const originAgentId = this.chainOriginAgentId(request.id);
     if (
       requesterId === teammateId ||
+      // The user deleted the agent that asked. A note for it would make the agent again (#6106).
+      !agentExists(requesterId) ||
       !originAgentId ||
       originAgentId === teammateId ||
       request.expectsReply === false ||
@@ -2164,6 +2256,22 @@ export class MailboxStore {
         message.expectsReply !== false &&
         turnIds.get(message.id) === turnId,
     );
+  }
+
+  /** The routine delivery that started the turn in which this agent sent the request, if any. */
+  routineDeliveryOfRequest(agentId: string, requestMessageId: string): DeliveryContext | null {
+    const request = this.#state.messages.find((message) => message.id === requestMessageId);
+    if (request?.sender.kind !== "agent" || request.sender.agentId !== agentId) return null;
+    const turnId = this.#sourceTurnIds().get(request.id);
+    if (!turnId) return null;
+    // A run that resumed after a usage limit has a new turn id. Its earlier turns can have sent the request.
+    const delivery = this.#state.deliveries.find(
+      (candidate) =>
+        candidate.recipientAgentId === agentId &&
+        (candidate.turnId === turnId || candidate.resumeAfterUsageLimit?.previousTurnIds.includes(turnId) === true) &&
+        this.#state.messages.find((message) => message.id === candidate.messageId)?.sender.kind === "routine",
+    );
+    return delivery ? this.#context(delivery) : null;
   }
 
   markStarting = Effect.fn("MailboxStore.markStarting")(function* (
@@ -2652,6 +2760,39 @@ export class MailboxStore {
     }
   }, Effect.uninterruptible).bind(this);
 
+  /**
+   * A steer that came after the running turn's last request, which the provider answers in a turn of
+   * its own named by the delivery. The message moves to that turn, so the chat shows it above its own
+   * answer and not above the answer of the turn it was sent to (#6673). Its state stays: a delivery
+   * that the earlier turn already ended is not started again, and the new turn ends one that the
+   * earlier turn has not ended yet, because the new turn answers it.
+   */
+  moveSteerToTurn = Effect.fn("MailboxStore.moveSteerToTurn")(function* (
+    this: MailboxStore,
+    agentId: string,
+    turnId: string,
+  ): Effect.fn.Return<boolean, StoredStateFailure> {
+    try {
+      const delivery = this.#state.deliveries.find((candidate) => candidate.id === turnId);
+      if (
+        !delivery ||
+        delivery.recipientAgentId !== agentId ||
+        delivery.steeredAt === undefined ||
+        delivery.turnId === null ||
+        delivery.turnId === turnId ||
+        delivery.status === "queued" ||
+        delivery.status === "cancelled"
+      )
+        return false;
+      delivery.turnId = turnId;
+      this.#changes.deliveryIds.add(delivery.id);
+      this.#persist("delivery.updated");
+      return true;
+    } catch (cause) {
+      return yield* new StoredStateFailure({ cause });
+    }
+  }, Effect.uninterruptible).bind(this);
+
   /** Says why a message sent to steer waits in the queue. A message that has left the queue keeps its state. */
   markSteerFallback = Effect.fn("MailboxStore.markSteerFallback")(function* (
     this: MailboxStore,
@@ -2772,12 +2913,18 @@ export class MailboxStore {
   /**
    * As {@link hasUnfinishedDelivery}, without the work of the agent's tasks, which run in their own
    * threads. Channel work counts only with `includeChannels`: on a provider that runs one turn at a
-   * time, a channel turn holds the agent's own chat too.
+   * time, a channel turn holds the agent's own chat too. The `exceptQueued` deliveries do not count
+   * while they are queued.
    */
-  hasUnfinishedDeliveryOutsideTasks(agentId: string, includeChannels: boolean): boolean {
+  hasUnfinishedDeliveryOutsideTasks(
+    agentId: string,
+    includeChannels: boolean,
+    exceptQueued: readonly string[] = [],
+  ): boolean {
     const messages = this.#messagesById();
     return this.#state.deliveries.some((delivery) => {
       if (delivery.recipientAgentId !== agentId || !isActiveDelivery(delivery)) return false;
+      if (delivery.status === "queued" && exceptQueued.includes(delivery.id)) return false;
       const lane = this.#laneOf(delivery, messages);
       return lane === null || (includeChannels && laneChannelId(lane) !== null);
     });
@@ -3061,11 +3208,22 @@ export class MailboxStore {
     }
   }, Effect.uninterruptible).bind(this);
 
+  /** The content digest of a staged or saved generated attachment, or null for any other file. */
+  generatedAttachmentSha256(attachmentId: string): string | null {
+    return (
+      this.#stagedGeneratedAttachments.get(attachmentId)?.sha256 ??
+      this.#state.generatedAttachments.find((candidate) => candidate.id === attachmentId)?.sha256 ??
+      null
+    );
+  }
+
   storeGeneratedAttachment = Effect.fn("MailboxStore.storeGeneratedAttachment")(function* (
     this: MailboxStore,
     input: {
       sourcePath?: string;
       bytes?: Uint8Array;
+      /** Names the size error. Absent: an image. */
+      kind?: "image" | "video";
       name?: string;
       mimeType?: string;
       ownerAgentId?: string;

@@ -1,0 +1,36 @@
+{
+  "slug": "klaviyo",
+  "name": "Klaviyo",
+  "tagline": "Email and SMS marketing",
+  "description": "Klaviyo lets agents read campaigns, flows, lists, segments, profiles, and performance reports, and draft campaigns in the signed-in Klaviyo account. Each user signs in through the browser with an Owner, Admin, or Manager role.",
+  "category": "productivity",
+  "creatorName": "Klaviyo",
+  "iconUrl": "https://avatars.githubusercontent.com/u/1947230?s=256&v=4",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-campaign-report", "text": "Which email campaigns had the highest revenue last month?" },
+    { "id": "prompt-flows", "text": "Summarize the performance of my welcome and abandoned cart flows." },
+    {
+      "id": "prompt-draft-campaign",
+      "text": "Draft an email campaign for the new summer collection, but do not schedule it."
+    }
+  ],
+  "apps": [
+    {
+      "id": "app-klaviyo-mcp",
+      "name": "Klaviyo",
+      "description": "Campaigns, flows, segments, and reports, over Klaviyo's MCP server with browser sign-in.",
+      "iconUrl": "https://avatars.githubusercontent.com/u/1947230?s=256&v=4",
+      "server": {
+        "name": "klaviyo",
+        "transport": "http",
+        "url": "https://mcp.klaviyo.com/mcp",
+        "auth": [{ "id": "klaviyo-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.klaviyo.com",
+  "privacyPolicyUrl": "https://www.klaviyo.com/legal/privacy-notice",
+  "termsUrl": "https://www.klaviyo.com/legal/terms-of-service"
+}

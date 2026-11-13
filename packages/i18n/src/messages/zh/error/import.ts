@@ -41,7 +41,12 @@ export const messages = {
   "error.import.empty": "该导出为空。",
   "error.import.remoteZipTooLarge": "导入到已加入的服务器时，导出文件必须是小于 100 MB 的 .zip。",
   "error.import.hostBusy": "服务器正在读取其他导出，请几分钟后重试。",
+  "error.import.uploadDiskSpace":
+    "该导出需要服务器上有 {size} GB 可用磁盘空间，目前只有 {free} GB 可用。请先释放服务器空间，然后重新选择导出文件。",
+  "error.import.remoteZipTooLargeOldHost":
+    "此服务器只接受不超过 100 MB 的导出文件。请更新服务器上的 OpenBot，以导入更大的导出文件。",
   "error.import.skillKept": "{name}：服务器已有技能“{skill}”，因该助手会使用该技能。请联系管理员更新它。",
+  "error.import.skillRenamed": "{name}：技能“{skill}”的名称与另一个技能的名称过于相似，因此保存为“{renamed}”。",
   // Hermes Agent import from a folder on this computer.
   "error.import.hermesNoProfiles": "该文件夹中没有 Hermes 配置。请选择包含 config.yaml 或 SOUL.md 的 Hermes 文件夹。",
   "error.import.hermesClosed": "这些 Hermes 配置已不再打开，请重新读取。",
@@ -64,6 +69,18 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name}：模型“{model}”在此处暂不可用，助手将使用默认模型。待其服务商就绪后请重新选择该模型。",
   "error.import.transferSettingSkipped": "{name} 未导入。{reason}",
+  "error.import.transferRunsSkipped": "{name}：自动化任务“{routine}”的运行历史未导入。",
+  "error.import.transferSharedSkillsSkipped": "无法读取共享技能，因此文件中不包含它们。",
+  "error.import.transferSharedSkillsNotAdded": "无法将文件中的共享技能添加到此服务器。",
+  "error.import.transferMemberPreferencesSkipped": {
+    one: "无法保存 {count} 位成员的选择。",
+    other: "无法保存 {count} 位成员的选择。",
+  },
+  "error.import.transferSharedSkillExists": "该服务器上已有同名但文件不同的共享技能。",
+  "error.import.transferServerPreferencesSkipped": {
+    one: "文件中有 {count} 项服务器偏好在此处无效，因此不会导入。",
+    other: "文件中有 {count} 项服务器偏好在此处无效，因此不会导入。",
+  },
   "error.import.transferRoutineFlowSkipped": "导入时略过了一个自动化任务流程。{reason}",
   "error.import.transferCustomAgentCommand":
     "{name}：自定义助手不会导入，因为它们需要运行命令。请检查命令“{command}”，并在设置中重新添加该助手。",

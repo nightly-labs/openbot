@@ -11,6 +11,9 @@ import { contextBridge } from "electron";
  * - Minimized Windows windows report a screen position of -32000.
  * - Electron's `window.chrome` is an empty object, and a `srcdoc` frame read before it loads has
  *   none. Chrome has `loadTimes`, `csi` and `app`.
+ * - On macOS, Electron shows no passkey dialog, so a passkey sign-in waited with nothing on screen
+ *   until the site's time limit (#6507). Such a request now fails at once, as when a person cancels
+ *   Chrome's dialog, and the site offers its other sign-in methods.
  *
  * Electron serializes this function into the page, so it must use nothing from outside its body.
  * Each replaced function reads as native code through `Function.prototype.toString`.
@@ -20,6 +23,7 @@ function matchChromePageValues(): void {
   // the object, so that the frames of one page share one map. A native `toString` throws instead.
   const nativesRequest = "matchChromePageValues:natives";
   const onWindows = navigator.userAgent.includes("Windows");
+  const onMac = navigator.userAgent.includes("Macintosh");
   // The window frame and toolbar of a Chrome window with no bookmarks bar.
   const frameWidth = onWindows ? 16 : 0;
   const toolbarHeight = onWindows ? 87 : 85;
@@ -98,6 +102,57 @@ function matchChromePageValues(): void {
     });
     natives.set(wrapped, `get ${key}`);
     Object.defineProperty(owner, key, { ...descriptor, get: wrapped });
+  };
+
+  // Chromium reaches a security key with no dialog, so a request that can use one keeps the native
+  // path: a site that asks for a security key, or a credential that a security key can hold. A
+  // credential with no transports can be an older security key.
+  const securityKeyTransports = new Set(["usb", "nfc", "ble", "smart-card"]);
+  const opensPasskeyDialog = (options: CredentialRequestOptions | undefined): boolean => {
+    try {
+      const publicKey = options?.publicKey;
+      // Autofill (conditional) requests open no dialog, and an aborted request gets its native error.
+      if (!publicKey || options.mediation === "conditional" || options.signal?.aborted) return false;
+      // TypeScript's DOM types do not have the WebAuthn Level 3 `hints` yet.
+      if ("hints" in publicKey && Array.isArray(publicKey.hints) && publicKey.hints.includes("security-key")) {
+        return false;
+      }
+      return !Array.from(publicKey.allowCredentials ?? []).some((credential) => {
+        const transports = Array.from(credential.transports ?? []);
+        return transports.length === 0 || transports.some((transport) => securityKeyTransports.has(transport));
+      });
+    } catch {
+      // Options that cannot be read get the native error.
+      return false;
+    }
+  };
+
+  const refusePasskeyDialogs = (target: typeof globalThis): void => {
+    // `navigator.credentials` exists only in a secure context.
+    if (!("CredentialsContainer" in target)) return;
+    const prototype = target.CredentialsContainer.prototype;
+    const descriptor = Object.getOwnPropertyDescriptor(prototype, "get");
+    if (!descriptor || typeof descriptor.value !== "function") return;
+    const get = new Proxy(prototype.get, {
+      apply: (method, self: unknown, args: [CredentialRequestOptions?]) => {
+        if (self instanceof target.CredentialsContainer && opensPasskeyDialog(args[0])) {
+          return target.Promise.reject(
+            new target.DOMException(
+              "The operation either timed out or was not allowed. See: https://www.w3.org/TR/webauthn-2/#sctn-privacy-considerations-client.",
+              "NotAllowedError",
+            ),
+          );
+        }
+        try {
+          return method.apply(self, args);
+        } catch (error) {
+          removeTrapFrame(error);
+          throw error;
+        }
+      },
+    });
+    natives.set(get, "get");
+    Object.defineProperty(prototype, "get", { ...descriptor, value: get });
   };
 
   const chromeValues = (target: typeof globalThis) => {
@@ -190,6 +245,7 @@ function matchChromePageValues(): void {
     });
     natives.set(maskedToString, "toString");
     Object.defineProperty(functionPrototype, "toString", { value: maskedToString });
+    if (onMac) refusePasskeyDialogs(target);
 
     const chrome = existing ?? {};
     for (const [key, value] of Object.entries(chromeValues(target))) {

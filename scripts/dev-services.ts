@@ -146,7 +146,7 @@ export function createDevelopmentServiceSpec(
   return {
     name,
     executable: electronVite,
-    args: ["dev", "--watch", "--outDir", outputDirectory, "--entry", join(outputDirectory, "main", "index.js")],
+    args: ["dev", "--watch", "--outDir", outputDirectory, "--entry", join(outputDirectory, "main", "start.js")],
     cwd: projectRoot,
     env: {
       ...childEnvironment,

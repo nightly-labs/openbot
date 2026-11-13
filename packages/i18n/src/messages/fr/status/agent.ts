@@ -9,6 +9,8 @@ export const messages = {
   "status.agent.modelSwitchedForLimit": "Limite d’utilisation atteinte. Passage à {model}.",
   "status.agent.modelReturnedAfterLimit": "Limite d’utilisation terminée. Retour à {model}.",
   "status.agent.modelSwitchedForError": "Erreur du fournisseur. Passage à {model}.",
+  "status.agent.modelSwitchedForSpentBalance":
+    "{previous} n’a plus de crédits. Passage à {model}. Pour l’utiliser à nouveau, ajoutez des crédits, puis sélectionnez-le.",
   "status.agent.modelReturnedAfterError": "Retour à {model} après l’erreur du fournisseur.",
   "status.agent.marketplaceSuggested": "Application de la Marketplace suggérée : {app}.",
   "status.agent.channelMemberAdded": "{agent} a ajouté {member} au canal. {person} l’a demandé.",
@@ -28,6 +30,8 @@ export const messages = {
   "status.agent.reportProblem":
     "Ceci devient une issue GitHub publique, avec la version de l'app et ton système. Ton nom n'apparaît pas.",
   "status.agent.sendIdea": "Ceci devient une issue GitHub publique. Votre nom n'est pas affiché.",
+  "status.agent.feedbackRecentErrors": "Erreurs récentes dans le chat :",
+  "status.agent.feedbackSameAs": "S'ajoute à l'issue #{issue}",
   "status.agent.feedbackSent": "Envoyé à l'équipe OpenBot : {title}",
   "status.agent.serverInstallCommand":
     "Créer une commande à usage unique qui installe OpenBot sur un autre ordinateur comme serveur {name} et le connecte à ton compte. L'agent l'exécute là-bas.",

@@ -81,6 +81,30 @@ const PLUGIN_TEXT = {
       "prompt-save-note": "marketplace.plugin.cobrain.prompt.saveNote",
     },
   },
+  honcho: {
+    tagline: "marketplace.plugin.honcho.tagline",
+    description: "marketplace.plugin.honcho.description",
+    apps: {
+      "app-honcho-mcp": "marketplace.plugin.honcho.app",
+    },
+    prompts: {
+      "prompt-recall": "marketplace.plugin.honcho.prompt.recall",
+      "prompt-save": "marketplace.plugin.honcho.prompt.save",
+      "prompt-preferences": "marketplace.plugin.honcho.prompt.preferences",
+    },
+  },
+  hindsight: {
+    tagline: "marketplace.plugin.hindsight.tagline",
+    description: "marketplace.plugin.hindsight.description",
+    apps: {
+      "app-hindsight-mcp": "marketplace.plugin.hindsight.app",
+    },
+    prompts: {
+      "prompt-recall": "marketplace.plugin.hindsight.prompt.recall",
+      "prompt-retain": "marketplace.plugin.hindsight.prompt.retain",
+      "prompt-reflect": "marketplace.plugin.hindsight.prompt.reflect",
+    },
+  },
   figma: {
     tagline: "marketplace.plugin.figma.tagline",
     description: "marketplace.plugin.figma.description",
@@ -115,6 +139,18 @@ const PLUGIN_TEXT = {
       "prompt-credits": "marketplace.plugin.higgsfield.prompt.credits",
       "prompt-product-shot": "marketplace.plugin.higgsfield.prompt.productShot",
       "prompt-clip": "marketplace.plugin.higgsfield.prompt.clip",
+    },
+  },
+  sunra: {
+    tagline: "marketplace.plugin.sunra.tagline",
+    description: "marketplace.plugin.sunra.description",
+    apps: {
+      "app-sunra-mcp": "marketplace.plugin.sunra.app",
+    },
+    prompts: {
+      "prompt-balance": "marketplace.plugin.sunra.prompt.balance",
+      "prompt-poster": "marketplace.plugin.sunra.prompt.poster",
+      "prompt-clip": "marketplace.plugin.sunra.prompt.clip",
     },
   },
   elevenlabs: {
@@ -321,6 +357,30 @@ const PLUGIN_TEXT = {
       "prompt-draft-campaign": "marketplace.plugin.omnisend.prompt.draftCampaign",
     },
   },
+  postiz: {
+    tagline: "marketplace.plugin.postiz.tagline",
+    description: "marketplace.plugin.postiz.description",
+    apps: {
+      "app-postiz-mcp": "marketplace.plugin.postiz.app",
+    },
+    prompts: {
+      "prompt-channels": "marketplace.plugin.postiz.prompt.channels",
+      "prompt-week": "marketplace.plugin.postiz.prompt.week",
+      "prompt-draft": "marketplace.plugin.postiz.prompt.draft",
+    },
+  },
+  trypost: {
+    tagline: "marketplace.plugin.trypost.tagline",
+    description: "marketplace.plugin.trypost.description",
+    apps: {
+      "app-trypost-mcp": "marketplace.plugin.trypost.app",
+    },
+    prompts: {
+      "prompt-week": "marketplace.plugin.trypost.prompt.week",
+      "prompt-draft": "marketplace.plugin.trypost.prompt.draft",
+      "prompt-analytics": "marketplace.plugin.trypost.prompt.analytics",
+    },
+  },
   composio: {
     tagline: "marketplace.plugin.composio.tagline",
     description: "marketplace.plugin.composio.description",
@@ -505,6 +565,8 @@ const AUTH_TEXT: Readonly<Record<string, AppTextKey>> = {
     "marketplace.plugin.revenuecat.hint.apiKey",
   'In Obsidian, open Settings > Local REST API. Copy the API key and turn on "Enable non-encrypted (HTTP) server".':
     "marketplace.plugin.obsidian.hint.apiKey",
+  "Create a key at app.honcho.dev.": "marketplace.plugin.honcho.hint.apiKey",
+  "Create a key on the Connect page of Hindsight Cloud.": "marketplace.plugin.hindsight.hint.apiKey",
 };
 
 const english = translateFor("en");

@@ -19,6 +19,8 @@ let current: AppAppearancePreference = {
   palettes: [],
   chatBackgroundLight: null,
   chatBackgroundDark: null,
+  interfaceFont: null,
+  codeFont: null,
 };
 const listeners = new Set<() => void>();
 

@@ -49,8 +49,8 @@ export function signInRelayRemote<E>(
 export interface SignInRelayClientDependencies {
   openExternal: (url: string) => Promise<void>;
   language: Pick<LanguageService, "locale" | "translate">;
-  /** The MCP grant listener of this computer, which takes the callbacks on its port by `state`. */
-  ownListener: () => { port: number; path: string } | null;
+  /** The MCP grant listener of this computer, which takes the callbacks on its port and paths by `state`. */
+  ownListener: () => { port: number; paths: readonly string[] } | null;
 }
 
 interface Waiting {
@@ -192,7 +192,7 @@ export class SignInRelayClient {
       );
       const own = self.#dependencies.ownListener();
       const routed =
-        callback !== null && (listener !== null || (own?.port === callback.port && own.path === callback.path));
+        callback !== null && (listener !== null || (own?.port === callback.port && own.paths.includes(callback.path)));
       wait({
         page: { authorizeHost: page.host, listening: routed, pasteable: true },
         url: page.toString(),
@@ -244,9 +244,9 @@ export class SignInRelayClient {
     receive: (query: string) => void,
   ): Promise<LoopbackCallbackServer | null> {
     const own = this.#dependencies.ownListener();
-    if (!callback || (own?.port === callback.port && own.path === callback.path)) return null;
+    if (!callback || (own?.port === callback.port && own.paths.includes(callback.path))) return null;
     return startLoopbackCallbackServer({
-      path: callback.path,
+      paths: [callback.path],
       port: { exact: callback.port },
       language: this.#dependencies.language,
       noPort: () => new Error("The sign-in relay listener was given no port."),

@@ -47,6 +47,10 @@ export const messages = {
   "error.backend.channelDeleteUnsupported": "이 서버는 채널 삭제를 지원하지 않아요.",
   "error.backend.browserNavigateUnsupported": "이 원격 호스트는 기존 탭에서 주소 표시줄 이동을 지원하지 않아요.",
   "error.backend.browserUserControlBusy": "이 브라우저 탭이 비밀 값을 기다리고 있어요. 먼저 비밀 값 요청에 답하세요.",
+  "error.backend.browserTeachBusy":
+    "다른 사용자가 이 브라우저 탭을 제어하고 있습니다. 상대방이 마친 후 다시 시도하세요.",
+  "error.backend.browserTeachUnavailable": "이 브라우저 탭에는 작업을 배울 수 있는 에이전트가 없습니다.",
+  "error.backend.browserTeachUnsupported": "이 원격 호스트는 작업 기록을 지원하지 않습니다.",
   "error.backend.browserUserControlUnsupported": "이 원격 호스트는 브라우저 탭 제어권 가져오기를 지원하지 않아요.",
   "error.backend.browserSignInUnsupported": "이 원격 호스트는 이 컴퓨터에서 로그인을 받을 수 없어요.",
   "error.backend.browserSignInOpenFailed": "OpenBot이 로그인 창을 열 수 없었어요.",
@@ -61,6 +65,8 @@ export const messages = {
     "압축해도 이 채팅이 작아지지 않아요. 두 번 압축한 뒤에도 모델 컨텍스트 창의 {percent}%를 사용해서 OpenBot이 압축을 멈춰요. 창의 대부분은 도구와 지침이 사용해요. 이 에이전트에 필요 없는 MCP 서버나 컴퓨터 사용을 끄거나, 창이 더 큰 모델을 선택하세요. 그런 다음 새 채팅을 시작하세요.",
   "error.backend.contextCompactionStopped":
     '이 채팅의 압축이 두 번 연속 실패하여 OpenBot이 자동 압축을 중지합니다. 시도할 때마다 채팅 전체가 모델로 전송되어 요금제 한도를 사용합니다. 다시 시도하려면 "지금 압축"을 선택하거나 새 채팅을 시작하세요.',
+  "error.backend.providerModelAtCapacity":
+    "모델 용량이 가득 찼습니다. 제공업체가 몇 분 후에 다시 시도합니다. 지금 계속하려면 턴을 중지하고 다른 모델을 선택하세요.",
   "error.backend.providerRetrying":
     "제공자가 이 요청에 {attempts}번 실패해서 다시 시도하고 있어요. 에이전트가 계속하지 않으면 턴을 중지하세요.",
   "error.backend.providerRetryingLargeContext":
@@ -71,6 +77,7 @@ export const messages = {
     "채널에 시작을 확인하지 못한 배정이 있어요. 삭제하기 전에 결과를 확인하세요.",
   "error.backend.channelNotFound": "채널을 찾을 수 없어요.",
   "error.backend.channelMemberUnavailable": "채널 멤버를 사용할 수 없어요.",
+  "error.backend.channelInstructionsTooLong": "지침을 2,000자 이내로 줄이세요. 더 긴 지침은 저장되지 않아요.",
   "error.backend.channelWaitBeforeNewConversation": "이 채널의 작업이 끝날 때까지 기다린 다음 새 대화를 시작하세요.",
   "error.backend.channelWaitBeforeCompact": "이 채널의 작업이 끝날 때까지 기다린 다음 압축하세요.",
   "error.backend.channelWaitBeforeDeleteHistory": "이 채널의 작업이 끝날 때까지 기다린 다음 기록을 삭제하세요.",
@@ -146,9 +153,17 @@ export const messages = {
   "error.backend.mailboxStateCorrupt": "메일함 상태가 손상되었거나 더 새로운 OpenBot 버전의 것이에요. 덮어쓰지 않아요.",
   "error.backend.recipientDeleting": "받는 사람을 삭제하는 중이에요. 삭제가 끝난 후 다시 시도해 주세요.",
   "error.backend.recipientHidden": "이 에이전트는 숨겨져 있어요. 메시지를 보내려면 복원하세요.",
+  "error.backend.agentIdUnknown":
+    "ID가 {id}인 에이전트가 없어요. openbot.list_agents에서 ID를 가져온 후 다시 시도해 주세요.",
+  "error.backend.agentIdNear":
+    "ID가 {id}인 에이전트가 없어요. 에이전트 {name}의 ID {nearId}가 거의 같아요. 이 에이전트를 말한 거라면 해당 ID로 다시 시도해 주세요.",
   "error.backend.attachBetween": "파일을 1개에서 {limit}개 사이로 첨부하세요.",
   "error.backend.attachmentNotFile": "첨부 파일이 파일이 아니에요: {path}",
   "error.backend.generatedImageTooLarge": "생성된 이미지가 100MB 한도를 넘었어요.",
+  "error.backend.generatedVideoTooLarge": "생성된 동영상이 100MB 한도를 넘었어요.",
+  "error.backend.videoGenerationFailed": "동영상을 생성하지 못했어요.",
+  "error.backend.videoGenerationNoVideo": "동영상 생성 결과로 동영상이 오지 않았어요.",
+  "error.backend.videoGenerationInterrupted": "동영상 생성이 중단됐어요.",
   "error.backend.attachmentNotRegularFile": "일반 파일만 첨부할 수 있어요: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot이 {name}을(를) 복사할 수 없었어요.",
   "error.backend.routineNameRequired": "루틴 이름이 필요해요.",
@@ -199,13 +214,15 @@ export const messages = {
   "error.backend.agentWaitRoutineGone": "이 에이전트에는 이 ID의 루틴이 없어요.",
   "error.backend.agentWaitNoRoutine":
     "대기를 깨우는 것은 내 루틴의 실행뿐인데, 루틴이 없어요. openbot.create_routine으로 루틴을 만든 후 대기를 여세요.",
-  "error.backend.agentWaitRemoteUnsupported": "열린 대기는 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",
   "error.backend.markUnreadRemoteUnsupported":
     "메시지를 읽지 않음으로 표시하는 기능은 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",
   "error.backend.messageDeleteUnsupported": "이 서버는 메시지 삭제를 지원하지 않아요.",
   "error.backend.messageDeleteNotFound": "이 메시지는 채팅에 없어요.",
   "error.backend.messageDeleteBusy": "이 메시지는 실행 중인 턴의 일부예요. 턴이 끝나면 삭제하세요.",
   "error.backend.messageDeleteForbidden": "내가 보낸 메시지만 삭제할 수 있어요.",
+  "error.backend.messagePinNotFound": "이 메시지는 채팅에 없습니다.",
+  "error.backend.messagePinLimit":
+    "이 채팅에는 고정된 메시지가 50개 있습니다. 다른 메시지를 고정하려면 먼저 하나를 해제하세요.",
   "error.backend.routineFlowHandoffFailed": "루틴이 이 에이전트에게 작업을 넘기지 못했어요.",
   "error.backend.mcpServerLimit": "OpenBot은 MCP 서버를 최대 {limit}개까지 유지해요.",
   "error.backend.mcpServerNameTaken": "{name}(이)라는 MCP 서버가 이미 있어요.",
@@ -231,8 +248,12 @@ export const messages = {
   "error.backend.mcpSignInResponseTimedOut": "로그인 응답이 제시간에 도착하지 않았어요.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot이 이 서버의 로그인 정보를 읽을 수 없었어요. 서버 주소를 확인한 후 다시 시도해 주세요.",
+  "error.backend.mcpSignInAnswerUnreadable":
+    "로그인 서버가 OpenBot이 읽을 수 없는 응답을 보냈어요. 서비스에서 API 키나 토큰을 제공한다면 이 서버의 설정에 추가한 후 다시 연결을 테스트해 주세요.",
   "error.backend.mcpServerExited": "서버가 응답하기 전에 중지되었어요. 터미널에서 명령을 실행해 오류를 확인하세요.",
   "error.backend.mcpServerFailedToStart": "서버가 시작되지 않았어요: {reason}",
+  "error.backend.mcpToolSchemaRefused":
+    "이 서버의 도구 {tool}의 입력 형식을 이 제공자가 읽을 수 없어요. 다른 제공자의 에이전트는 계속 이 서버를 받아요.",
   "error.backend.mcpServerSignInForProvider":
     "{provider}이(가) MCP 서버 {name}을(를) 사용할 수 없었어요. 서버가 로그인을 요청해요. MCP 설정을 열고 로그인을 선택해 주세요.",
   "error.backend.mcpServerFailedForProvider":
@@ -263,6 +284,13 @@ export const messages = {
   "error.backend.sectionNameTooLong": "섹션 이름이 너무 길어요.",
   "error.backend.sidebarFolderTooDeep": "폴더는 3단계까지만 만들 수 있습니다.",
   "error.backend.sidebarFolderMoveInvalid": "이 폴더는 그곳으로 옮길 수 없습니다.",
+  "error.backend.libraryFolderName": "폴더 이름은 1~{limit}자여야 해요.",
+  "error.backend.libraryFolderLimit": "서버 하나에는 라이브러리 폴더를 최대 {limit}개까지 둘 수 있어요.",
+  "error.backend.libraryFolderFileLimit": "라이브러리 폴더에 파일이 너무 많아요.",
+  "error.backend.libraryFolderTooDeep": "라이브러리 폴더는 {limit}단계까지만 만들 수 있어요.",
+  "error.backend.libraryFolderGone": "폴더가 없거나 이미 삭제되었어요.",
+  "error.backend.libraryFolderOtherAgent": "파일은 해당 에이전트의 폴더에만 넣을 수 있어요.",
+  "error.backend.libraryFolderMoveInvalid": "이 폴더는 그곳으로 옮길 수 없어요.",
   "error.backend.sectionNameDuplicate": "섹션 이름은 고유해야 해요.",
   "error.backend.directMessageRequired": "먼저 메시지를 작성하세요.",
   "error.backend.directMessageTooLong": "다이렉트 메시지는 최대 {limit}자까지 쓸 수 있어요.",
@@ -318,6 +346,8 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "프록시 {name}이(가) 로그인을 거부해 페이지를 열지 못했어요.",
   "error.backend.browserProxyComputerUnreachable":
     "이 프로필이 사용하는 컴퓨터가 응답하지 않아 페이지를 열지 못했어요.",
+  "error.backend.browserProxyComputerLocalAddress":
+    "이 프로필이 사용하는 컴퓨터는 공개 사이트만 열어요. 로컬 네트워크의 주소는 열지 않아 페이지를 열지 못했어요.",
   "error.backend.browserCertificateUntrusted": "이 사이트의 보안 인증서를 신뢰할 수 없어 페이지를 열지 못했어요.",
   "error.backend.browserLowMemory":
     "이 서버의 메모리가 부족해서 브라우저에서 탭을 더 열 수 없어요. 탭을 닫거나 다른 에이전트가 끝날 때까지 기다리세요.",

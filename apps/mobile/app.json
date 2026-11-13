@@ -3,7 +3,7 @@
     "name": "OpenBot",
     "slug": "openbot",
     "platforms": ["ios", "android"],
-    "version": "1.4.8",
+    "version": "1.4.9",
     "orientation": "portrait",
     "icon": "./assets/icons/app-icon.png",
     "scheme": "openbot",
@@ -42,6 +42,8 @@
     "plugins": [
       "./plugins/with-rocketsim",
       "./plugins/with-workspace-bundle-inputs",
+      "./plugins/with-update-channel",
+      "./plugins/with-app-icons",
       "expo-router",
       "expo-video",
       [
@@ -133,12 +135,13 @@
               "supportsText": true,
               "supportsWebUrlWithMaxCount": 1,
               "supportsImageWithMaxCount": 10,
+              "supportsMovieWithMaxCount": 10,
               "supportsFileWithMaxCount": 10
             }
           },
           "android": {
             "enabled": true,
-            "singleShareMimeTypes": ["text/*", "image/*", "application/*"],
+            "singleShareMimeTypes": ["*/*"],
             "multipleShareMimeTypes": ["*/*"]
           }
         }
@@ -230,7 +233,8 @@
           "bundleIdentifier": "run.openbot.mobile.NotificationService",
           "groupIdentifier": "group.run.openbot.mobile"
         }
-      ]
+      ],
+      "./plugins/with-shortcuts"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -247,7 +251,12 @@
       "policy": "fingerprint"
     },
     "updates": {
-      "url": "https://u.expo.dev/eeec730f-c8f4-42c0-a750-64df8af14940"
+      "url": "https://updates.openbot.run/manifest",
+      "codeSigningCertificate": "./certs/certificate.pem",
+      "codeSigningMetadata": {
+        "keyid": "main",
+        "alg": "rsa-v1_5-sha256"
+      }
     }
   }
 }

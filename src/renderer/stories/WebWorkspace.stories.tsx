@@ -225,7 +225,7 @@ const newServerRuntime: WebRuntimeFactory = (accountId, events, accountFetch) =>
     },
     listAgents: async () => (onNewServer() ? [] : base.listAgents()),
     status: async () => (onNewServer() ? status : base.status()),
-    admin: { request, team: team.api.host },
+    admin: { request, download: request, team: team.api.host },
     dispose: async () => {
       team.dispose();
       await base.dispose();
@@ -277,7 +277,7 @@ const threadsRuntime: WebRuntimeFactory = (_accountId, events) => {
   return {
     ...base,
     connect: async (host) => [...(await base.connect(host)), AGENT_TASKS_CAPABILITY, AGENT_THREADS_CAPABILITY],
-    admin: { request, team: mock.api.host },
+    admin: { request, download: request, team: mock.api.host },
   };
 };
 

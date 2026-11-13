@@ -6,8 +6,9 @@ import {
   DEFAULT_PROVIDER_DETECTION_SETTINGS,
   type DetectedAcpAgent,
   type DetectedModelServer,
+  type DiscoverModelsInput,
+  type DiscoverModelsResult,
   detectedModelServerKey,
-  type ProviderDetectionDesktopApi,
   type ProviderDetectionSettings,
 } from "@openbot/contracts/ipc";
 import { checkResult } from "@openbot/ui/features/custom-providers/CustomAgentSettings";
@@ -42,13 +43,28 @@ interface ProviderDetectionState {
   scanned: boolean;
 }
 
+/** The scans and the detection settings of one computer, with its server already chosen. */
+export interface ProviderDetectionCalls {
+  scanModelServers: () => Promise<DetectedModelServer[]>;
+  scanAgents: () => Promise<DetectedAcpAgent[]>;
+  discoverModels: (input: DiscoverModelsInput) => Promise<DiscoverModelsResult>;
+  getSettings: () => Promise<ProviderDetectionSettings>;
+  setSettings: (settings: ProviderDetectionSettings) => Promise<ProviderDetectionSettings>;
+}
+
+type AgentsStore = ReturnType<typeof createCustomAgentsStore>;
+
 interface ProviderDetectionStoreOptions {
-  api: () => ProviderDetectionDesktopApi | undefined;
+  api: () => ProviderDetectionCalls | undefined;
   endpoints: Pick<
     ReturnType<typeof createCustomProvidersStore>,
     "customProviders" | "saveCustomProvider" | "updateCustomProvider"
   >;
-  agents: Pick<ReturnType<typeof createCustomAgentsStore>, "customAgents" | "saveCustomAgent" | "checkCustomAgent">;
+  /**
+   * The custom agents of the same computer. A joined server's host has no trial start in
+   * `custom-agents-v1`, so its agents come without `checkCustomAgent`, and the form has no Check.
+   */
+  agents: Pick<AgentsStore, "customAgents" | "saveCustomAgent"> & Partial<Pick<AgentsStore, "checkCustomAgent">>;
 }
 
 function agentKey(command: string): string {
@@ -106,9 +122,9 @@ function agentRow(found: DetectedAcpAgent, saved: CustomAgentSummary | undefined
 }
 
 /**
- * What this computer found: local model servers and known ACP agent commands, with the saved ones
- * marked, and the settings of where to look. This computer only: a joined server's host is not
- * scanned from here.
+ * What one computer found: local model servers and known ACP agent commands, with the saved ones
+ * marked, and the settings of where to look. `api` names the computer: this one, or a joined
+ * server's host, which scans itself.
  */
 export function createProviderDetectionStore(options: ProviderDetectionStoreOptions) {
   const [state, setState] = createStore<ProviderDetectionState>({
@@ -303,6 +319,12 @@ export function createProviderDetectionStore(options: ProviderDetectionStoreOpti
     return options.endpoints.saveCustomProvider(value.value);
   }
 
+  function agentCheck(): DetectedProviderApi["checkAgent"] {
+    const check = options.agents.checkCustomAgent;
+    if (!check) return undefined;
+    return async (value, savedAgentId) => checkResult(await check(customAgentCheckInput(value, savedAgentId)));
+  }
+
   /** First run scans once, so it has no scan-again control. */
   const firstRunApi: DetectedProviderApi = {
     save,
@@ -319,8 +341,7 @@ export function createProviderDetectionStore(options: ProviderDetectionStoreOpti
       });
       return result.models;
     },
-    checkAgent: async (value, savedAgentId) =>
-      checkResult(await options.agents.checkCustomAgent(customAgentCheckInput(value, savedAgentId))),
+    checkAgent: agentCheck(),
   };
   const api: DetectedProviderApi = { ...firstRunApi, scan: () => void scan() };
 

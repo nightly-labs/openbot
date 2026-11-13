@@ -15,13 +15,15 @@ import type {
   BrowserPreview,
   BrowserProxyFailure,
   BrowserSecretRequest,
+  BrowserSiteMemory,
   BrowserSnapshot,
   BrowserTab,
   BrowserTarget,
+  BrowserTeachStep,
   BrowserViewTarget,
   BrowserVisibilityInput,
 } from "@openbot/contracts/ipc";
-import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { isNumber, isString } from "@openbot/contracts/runtime-values";
 import {
   type BrowserSignInCookie,
   browserSignInCookieFitsHost,
@@ -46,6 +48,7 @@ import {
   type Input,
   Menu,
   type NativeImage,
+  nativeImage,
   type Rectangle,
   type Session,
   session,
@@ -61,6 +64,7 @@ import {
   type BrowserScreencastFrame,
   type BrowserUploadAssignment,
   type BrowserViewportInput,
+  SNAPSHOT_NAVIGATED_MESSAGE,
   type SnapshotReadResult,
 } from "./browser-cdp";
 import { refuseCookieBanners, stopCookieBanners } from "./browser-consent";
@@ -77,8 +81,8 @@ import {
   restoreWebContentsFocus,
   toPublicTab,
 } from "./browser-host-tab";
-import { sessionBrowserUserAgent } from "./browser-identity";
-import { describeBrowserTarget, navigateAndWait } from "./browser-navigation";
+import { BrowserHintRequests, sessionBrowserUserAgent } from "./browser-identity";
+import { describeBrowserTarget, navigateAndWait, waitForLoading } from "./browser-navigation";
 import {
   browserLoadOptions,
   browserRequestHeaders,
@@ -93,6 +97,7 @@ import {
   type BrowserProxyRelay,
   openBrowserProxyRelay,
   type RelayExit,
+  type RelayExitFailure,
   socksExit,
 } from "./browser-profiles/browser-proxy-relay";
 import type { BrowserProxyConnection } from "./browser-profiles/browser-proxy-store";
@@ -134,7 +139,9 @@ import {
   type ActionResultReader,
   BrowserDialogTurn,
   type BrowserFillFieldsResult,
+  BrowserSiteMemories,
   BrowserToolHold,
+  BrowserToolQueueWait,
   BrowserUserControlHeld,
   boundEngineOperation,
   type DialogTabResult,
@@ -171,6 +178,7 @@ import {
   parseBrowserToolArguments,
   parseBrowserToolCall,
 } from "./browser-tools";
+import { readClickTarget } from "./browser-user-click";
 import { runCauseEffect } from "./effect-boundary";
 import {
   BROWSER_STRING_MORE,
@@ -182,6 +190,7 @@ import {
 } from "./model-text-limit";
 import type { DynamicToolCallParams, DynamicToolResult } from "./protocol";
 import { isRecord } from "./protocol";
+import { stepPlace, stepText, type UserBrowsingStep } from "./user-browsing-log";
 import type { VaultCardSecret } from "./vault-items";
 
 interface BrowserHostEvents {
@@ -204,6 +213,11 @@ export interface BrowserSiteVisit {
 }
 
 const MAX_ENCODED_CAPTURE_PIXELS = 4_194_304;
+/**
+ * The shortest side of an image for the model. Some model endpoints refuse an image with a shorter
+ * side, and the image stays in the session, so each later turn fails too (#6188).
+ */
+const MIN_CAPTURE_SIDE = 64;
 /**
  * How long enumerating a tab's documents may take before it is unwound. It runs off a navigation
  * rather than a tool call, so no caller is waiting on it and nothing else supplies a deadline -- but
@@ -233,6 +247,16 @@ const VIEW_CONTEXT_MENU_MS = 1_500;
  * in the tab queue for the action, under the action's own deadline.
  */
 const DIALOG_ACTION_WAIT_MS = 10_000;
+/** How long `open` waits for the load of a redirect before its second read. */
+const OPEN_REDIRECT_WAIT_MS = 5_000;
+/** A site can redirect more than one time before its page stays. */
+const OPEN_REDIRECT_READS = 2;
+/**
+ * How long an agent tool waits for the earlier operations of its tab. One operation takes at most about
+ * a minute: a 30 s action, its read, and the bot check waits. A longer wait means that an operation
+ * cannot finish, such as a command that a page dialog holds.
+ */
+const TOOL_QUEUE_WAIT_MS = 120_000;
 /** The `keyCode` of `sendInputEvent` for a key whose `Input.key` name is different. */
 const FORWARDED_KEY_CODES: Partial<Record<string, string>> = { ArrowLeft: "Left", ArrowRight: "Right" };
 /**
@@ -376,8 +400,18 @@ const BROWSER_WEB_PREFERENCES = {
   backgroundThrottling: false,
 };
 
-/** macOS and Windows draw no page of a minimized or hidden window, so they use `#backgroundWindow`. */
-const USES_BACKGROUND_WINDOW = process.platform === "darwin" || process.platform === "win32";
+/**
+ * macOS, Windows and Linux draw no page of a minimized or hidden window, so they use `#backgroundWindow`.
+ * On Linux this includes the main window of a local server, which is never shown (#6524).
+ */
+const USES_BACKGROUND_WINDOW =
+  process.platform === "darwin" || process.platform === "win32" || process.platform === "linux";
+
+/**
+ * Linux also draws no page of a hidden view, also in a shown window, and it does not apply `setOpacity`.
+ * There the background window is one pixel, and its views stay shown: the window clips them, and they still draw.
+ */
+const SHOWS_VIEWS_IN_BACKGROUND = process.platform === "linux";
 
 /** The window of `BrowserHost.#backgroundWindow`. It has no page of its own. */
 function createBackgroundWindow(): BaseWindow {
@@ -464,7 +498,7 @@ function runBrowserTool<Name extends BrowserToolName>(
 }
 
 const AGENT_CODE_CARD_FILL =
-  "Card fill is unavailable while a script from evaluate can still run in this page or in another open page of this site. Reload this page, close or navigate each other tab where you ran evaluate on this site, take a fresh snapshot, and call fill_card again, or use request_takeover.";
+  "Card fill is unavailable while a script from evaluate can still run in this page or in another open page of this site. Reload this page with navigate direction=reload, not with evaluate or by opening its address again, close or navigate each other tab where you ran evaluate on this site, take a fresh snapshot, and call fill_card again, or use request_takeover.";
 
 /**
  * The origins of the documents in the page. A frame whose renderer is gone, for example after a crash,
@@ -513,8 +547,31 @@ function rejectTakeoverTool(): Effect.Effect<DynamicToolResult, BrowserOperation
   );
 }
 
+/** Where the browser records what a person does in an agent tab that they hold. */
+export interface BrowserUserBrowsing {
+  /** The setting, read at each step. */
+  enabled(): boolean;
+  record(agentId: string, step: Omit<UserBrowsingStep, "at">): void;
+}
+
 /** Who controls a tab: the person at this computer, or one session of a team member. */
 export type BrowserUserControlHolder = { kind: "local" } | { kind: "member"; memberId: string; sessionId: string };
+/** One step of a task that a person shows: a page that loaded or a click on a control. No typed text. */
+export type { BrowserTeachStep };
+
+/** The most steps of one teach recording, as `browser-teach-v1` says. */
+const TEACH_MAX_STEPS = 200;
+/** A teach recording takes no step after this time. */
+const TEACH_MAX_DURATION_MS = 10 * 60 * 1000;
+interface BrowserTeachRecording {
+  holder: BrowserUserControlHolder;
+  startedAt: number;
+  steps: BrowserTeachStep[];
+}
+function sameUserControlHolder(left: BrowserUserControlHolder, right: BrowserUserControlHolder): boolean {
+  if (left.kind === "local" || right.kind === "local") return left.kind === right.kind;
+  return left.sessionId === right.sessionId && left.memberId === right.memberId;
+}
 /** The holds to release when a window, a session or a member ends. */
 export type BrowserUserControlOwner =
   | { kind: "local" }
@@ -557,6 +614,8 @@ export class BrowserHost {
    */
   readonly #proxySignInRefused = new WeakSet<BrowserHostTab>();
   readonly #quitShortcut: (input: Input) => boolean;
+  readonly #siteMemories: (agentId: string, hostname: string) => BrowserSiteMemory[];
+  readonly #userBrowsing: BrowserUserBrowsing | null;
   readonly #downloadsRoot: string;
   readonly #statePath: string;
   readonly #tabs = new Map<string, BrowserHostTab>();
@@ -579,17 +638,24 @@ export class BrowserHost {
   #target: BrowserViewTarget = "main";
   readonly #mountedViews = new Map<WebContentsView, BrowserWindow>();
   /**
-   * macOS and Windows draw no page of a hidden or minimized window. A page that loads there gives
-   * no image, so a snapshot or screenshot waits until its deadline or is empty (#5580, #5991).
-   * While the main window is hidden or minimized, the views of its tabs are in this window: shown,
-   * but transparent, click-through and never focused. `#mountedViews` still names the main window
-   * for them.
+   * macOS, Windows and Linux draw no page of a hidden or minimized window. A page that loads there
+   * gives no image, so a snapshot or screenshot waits until its deadline or is empty (#5580, #5991),
+   * and a live view gets no frame (#6524). While the main window is hidden or minimized, the views of
+   * its tabs are in this window: shown, but transparent (one pixel on Linux), click-through and never
+   * focused. `#mountedViews` still names the main window for them.
    */
   #backgroundWindow: BaseWindow | null = null;
   #mainViewsInBackground = false;
+  /** True while `#syncAttachedView` shows `#attachedView`. On Linux the views in the background window are all shown. */
+  #attachedViewShown = false;
   readonly #takeoverTabIds = new Set<string>();
   /** The tabs that a person controls, with who took each one, so a closed session releases its own. */
   readonly #userControlTabIds = new Map<string, BrowserUserControlHolder>();
+  /**
+   * The tasks that people show now (`browser-teach-v1`), by tab. A recording lives in memory only and
+   * ends with the person's control of the tab.
+   */
+  readonly #teachRecordings = new Map<string, BrowserTeachRecording>();
   /** The agent tool calls that wait for the release of a tab. */
   readonly #userControlWaiters = new Map<string, Set<Deferred.Deferred<void>>>();
   /**
@@ -640,6 +706,13 @@ export class BrowserHost {
       pagePreload?: string;
       /** Shorter sleep timing for `scripts/browser-steps-e2e.ts`. */
       tabSleep?: { sweepMs: number; awakeGraceMs: number };
+      /** The memories of an agent about the site of a page host, which its snapshots show. */
+      siteMemories?: (agentId: string, hostname: string) => BrowserSiteMemory[];
+      /**
+       * Records what a person does in an agent tab that they hold, while "Learn from my browsing" is
+       * on. Omitted, nothing is recorded.
+       */
+      userBrowsing?: BrowserUserBrowsing;
     } = {},
   ) {
     this.#window = window;
@@ -661,6 +734,8 @@ export class BrowserHost {
     this.#onProxyStatusChanged = options.onProxyStatusChanged ?? (() => {});
     this.#computerExit = options.computerExit ?? (() => () => Promise.reject(new Error("No computer exit")));
     this.#quitShortcut = options.quitShortcut ?? (() => false);
+    this.#siteMemories = options.siteMemories ?? (() => []);
+    this.#userBrowsing = options.userBrowsing ?? null;
     this.#webPreferences = browserWebPreferences(options.pagePreload);
     this.#downloadsRoot = downloadsRoot;
     this.#statePath = statePath;
@@ -703,12 +778,9 @@ export class BrowserHost {
 
     const tabs: BrowserHostTab[] = [];
     for (const saved of state.tabs) {
+      // Each saved tab passed the tab limit when it opened, so a restart does not drop one. The reown can
+      // put the tabs of several chats in the agent's main chat, which then lists and closes all of them.
       const stored = reownStoredBrowserTab(saved, agents);
-      const ownerAgentId =
-        stored.ownerAgentId ??
-        agents.find((agent) => agent.threadId === stored.ownerThreadId && stored.ownerThreadId !== null)?.id ??
-        null;
-      if (!this.#hasTabCapacity(stored.ownerThreadId, ownerAgentId)) continue;
       // A tab comes back in the session it opened in, whatever the agent's setting is now. A tab of
       // a deleted profile does not come back: no other session may load its page.
       const tabSession = storedTabSession(stored);
@@ -751,11 +823,13 @@ export class BrowserHost {
     if (!pending) return;
     tab.pendingRestore = undefined;
     tab.sleeping = undefined;
-    // An agent tool can wake a tab that a person holds. The restore is the host's work, so the hold does not stop it.
+    // An agent tool can wake a tab that a person holds. The restore is the host's work, so the hold does
+    // not stop it, and it waits for its turn with no tool limit.
     yield* Effect.forkIn(
       enqueueTabOperation(tab, pending, true).pipe(
         Effect.ignore,
         Effect.provideService(BrowserToolHold, () => false),
+        Effect.provideService(BrowserToolQueueWait, undefined),
       ),
       tab.scope,
       { startImmediately: true },
@@ -836,7 +910,7 @@ export class BrowserHost {
             yield* this.#closeRenderer(tab);
           }),
         true,
-      ).pipe(Effect.ignore),
+      ).pipe(Effect.ignore, Effect.provideService(BrowserToolQueueWait, undefined)),
       tab.scope,
       { startImmediately: true },
     );
@@ -1078,6 +1152,7 @@ export class BrowserHost {
               this.#unmountView(tab.view);
               this.#tabs.delete(tab.id);
               this.#userControlTabIds.delete(tab.id);
+              this.#teachRecordings.delete(tab.id);
               this.#completeUserControlWaiters(tab.id);
               yield* tab.engine.destroy();
               tab.contents.close();
@@ -1104,12 +1179,18 @@ export class BrowserHost {
     }).pipe(Effect.onInterrupt(() => this.close(tab.id).pipe(Effect.ignore)));
   }).bind(this);
 
+  /**
+   * The limit counts the open tabs of the owner thread: the tabs that `list_tabs` of that thread shows
+   * and that it can close. Tabs of the agent's other threads do not count, as the thread cannot see them.
+   */
   #hasTabCapacity(ownerThreadId: string | null, ownerAgentId: string | null): boolean {
-    const tabs = [...this.#tabs.values()].filter((tab) => {
-      if (tab.ownerAgentId && ownerAgentId) return tab.ownerAgentId === ownerAgentId;
-      if (tab.ownerThreadId) return tab.ownerThreadId === ownerThreadId;
-      return tab.ownerAgentId === null && ownerAgentId === null && ownerThreadId === null;
-    });
+    const tabs = [...this.#tabs.values()].filter(
+      (tab) =>
+        !tab.closing &&
+        !tab.contents.isDestroyed() &&
+        tab.ownerThreadId === ownerThreadId &&
+        (tab.ownerAgentId === null || tab.ownerAgentId === ownerAgentId),
+    );
     return tabs.length < INPUT_LIMITS.browserTabs;
   }
 
@@ -1181,8 +1262,10 @@ export class BrowserHost {
         Effect.gen({ self: this }, function* () {
           return yield* untilStopped(
             tab,
+            // A reload gets the page's files from the site again. A site can send a bad file that
+            // the browser keeps for hours (#7772); a normal reload used it again and the page stayed blank.
             navigateAndWait(tab.contents, () => {
-              tab.contents.reload();
+              tab.contents.reloadIgnoringCache();
               return true;
             }),
           );
@@ -1264,6 +1347,7 @@ export class BrowserHost {
       .map((child) => this.close(child.id));
     this.#takeoverTabIds.delete(tabId);
     this.#userControlTabIds.delete(tabId);
+    this.#teachRecordings.delete(tabId);
     this.#completeUserControlWaiters(tabId);
 
     if (this.#activeTabId === tabId) {
@@ -1379,6 +1463,61 @@ export class BrowserHost {
     this.#endUserControl(tabId);
   }
 
+  /**
+   * A person starts to show a task in an agent's tab (`browser-teach-v1`). The person takes the tab,
+   * and each page that loads and each control that they click becomes a step until `stopTeach` or the
+   * end of their control. A tab that another person holds is refused.
+   */
+  readonly startTeach = Effect.fn("BrowserHost.startTeach")(function* (
+    this: BrowserHost,
+    tabId: string,
+    holder: BrowserUserControlHolder,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    const tab = this.#tabs.get(tabId);
+    if (!tab || tab.closing) return yield* browserFailure(new Error(sourceText("error.backend.browserTabNotFound")));
+    if (tab.ownerAgentId === null || tab.privateSession)
+      return yield* browserFailure(new Error(sourceText("error.backend.browserTeachUnavailable")));
+    const held = this.#userControlTabIds.get(tabId);
+    if (held && !sameUserControlHolder(held, holder))
+      return yield* browserFailure(new Error(sourceText("error.backend.browserTeachBusy")));
+    yield* this.takeUserControl(tabId, holder);
+    // The tab can close or change hands while the take waits for its place in the tab queue.
+    const current = this.#userControlTabIds.get(tabId);
+    if (this.#tabs.get(tabId) !== tab || !current || !sameUserControlHolder(current, holder))
+      return yield* browserFailure(new Error(sourceText("error.backend.browserTabNotFound")));
+    this.#teachRecordings.set(tabId, { holder: current, startedAt: Date.now(), steps: [] });
+    const place = stepPlace(tab.contents.getURL());
+    const title = stepText(tab.contents.getTitle());
+    if (place) this.#recordTeachStep(tab, { kind: "page", ...place, ...(title ? { title } : {}) });
+  }).bind(this);
+
+  /**
+   * Ends the recording of a tab and gives the tab back. Only the holder that started the recording
+   * can end it, and gets its steps only with `save`. A call from another holder changes nothing.
+   */
+  stopTeach(tabId: string, holder: BrowserUserControlHolder, save: boolean): BrowserTeachStep[] {
+    const recording = this.#teachRecordings.get(tabId);
+    if (!recording || !sameUserControlHolder(recording.holder, holder)) return [];
+    this.#teachRecordings.delete(tabId);
+    this.releaseUserControl(tabId);
+    return save ? recording.steps : [];
+  }
+
+  /** Adds a step to the recording of the tab. False when the tab has no recording. */
+  #recordTeachStep(tab: BrowserHostTab, step: BrowserTeachStep): boolean {
+    const recording = this.#teachRecordings.get(tab.id);
+    if (!recording) return false;
+    if (tab.secret || tab.privateSession || tab.contents.isDestroyed()) return true;
+    if (recording.steps.length >= TEACH_MAX_STEPS || Date.now() - recording.startedAt > TEACH_MAX_DURATION_MS)
+      return true;
+    const last = recording.steps.at(-1);
+    // A page that is the same as the step before it is not added again; a later title replaces the first.
+    if (step.kind === "page" && last?.kind === "page" && last.host === step.host && last.path === step.path) {
+      if (step.title !== undefined) recording.steps[recording.steps.length - 1] = step;
+    } else recording.steps.push(step);
+    return true;
+  }
+
   /** Releases the tabs of a closed window, session or member. */
   releaseUserControlHeldBy(owner: BrowserUserControlOwner): void {
     for (const [tabId, holder] of [...this.#userControlTabIds]) {
@@ -1435,6 +1574,7 @@ export class BrowserHost {
 
   #endUserControl(tabId: string): void {
     this.#userControlTabIds.delete(tabId);
+    this.#teachRecordings.delete(tabId);
     this.#completeUserControlWaiters(tabId);
     this.#emitChanged();
   }
@@ -1463,8 +1603,9 @@ export class BrowserHost {
     if (args.method !== "password" && args.digits < 4)
       return yield* browserFailure(new Error(sourceText("error.backend.authDigitsRange")));
     if (
-      (args.method === "password" && args.targets.length !== 1) ||
-      (args.targets.length !== 1 && args.targets.length !== args.digits) ||
+      (args.method === "password"
+        ? args.targets.length > 2
+        : args.targets.length !== 1 && args.targets.length !== args.digits) ||
       (args.submission === "click") !== Boolean(args.submitTarget)
     )
       return yield* browserFailure(
@@ -1474,7 +1615,7 @@ export class BrowserHost {
             : args.submission !== "click" && args.submitTarget
               ? "Invalid authentication targets: submitTarget is only for submission=click."
               : args.method === "password"
-                ? "Invalid authentication targets: method=password needs exactly one field target."
+                ? "Invalid authentication targets: method=password needs one field target, or a password and its confirmation field."
                 : `Invalid authentication targets: use one field target for the whole code, or ${args.digits} digit field targets.`,
         ),
       );
@@ -1492,7 +1633,13 @@ export class BrowserHost {
             tab.diagnostics.clearDiagnostics();
             return yield* boundEngineOperation(
               tab,
-              tab.engine.prepareSecret(args.targets, url.origin, args.submission, args.submitTarget),
+              tab.engine.prepareSecret(
+                args.targets,
+                url.origin,
+                args.method === "password",
+                args.submission,
+                args.submitTarget,
+              ),
               10_000,
               "Authentication target resolution timed out.",
               keepQueueBlocked,
@@ -1521,7 +1668,10 @@ export class BrowserHost {
               return yield* browserFailure(new Error(sourceText("error.backend.authExpired")));
             // A connected page can navigate to the secret's site while the card is open.
             yield* browserSync(() => this.#requireIsolatedFromConnectedTabs(tab, url.origin));
-            if (args.method !== "password" && !new RegExp(`^[0-9]{${args.digits}}$`, "u").test(secret))
+            // A saved authenticator code has the length of its key, which a page often does not state.
+            // One field takes the whole code; digit fields keep their count.
+            const length = vault && args.method === "authenticator" && args.targets.length === 1 ? "4,12" : args.digits;
+            if (args.method !== "password" && !new RegExp(`^[0-9]{${length}}$`, "u").test(secret))
               return yield* browserFailure(new Error(sourceText("error.backend.authDigitsRequired")));
             protection.submitted = true;
             this.#invalidateViews(tab);
@@ -1588,9 +1738,7 @@ export class BrowserHost {
                       // blocked until navigation has replaced the document and this operation ends.
                       yield* boundEngineOperation(
                         tab,
-                        navigateAndWait(tab.contents, () =>
-                          tab.contents.loadURL(currentTabUrl(tab), browserLoadOptions()),
-                        ),
+                        reloadWithGet(tab),
                         10_000,
                         "Authentication page reload timed out.",
                         keepQueueBlocked,
@@ -1799,15 +1947,50 @@ export class BrowserHost {
     return connected;
   }
 
-  endTakeover(tabId: string): void {
+  /** `completed`: the person selected Done, so a bot check that was on the page is one they could not pass. */
+  endTakeover(tabId: string, completed = false): void {
     const tab = this.#tabs.get(tabId);
     if (tab) {
       tab.engine.invalidateReferences();
       tab.diagnostics.clearDiagnostics();
+      if (completed && tab.checkOrigin) tab.checkAfterTakeover = tab.checkOrigin;
     }
     this.#takeoverTabIds.delete(tabId);
     this.#syncAttachedView();
     this.#emitChanged();
+    // A failed submission can leave the secret in a page that never loads a new document, such as a
+    // single-page sign-in. Load the page again with GET, as `submit` does, so that the commit ends
+    // the protection. Without it the tab stays hidden and every tool, close included, is refused.
+    const protection = tab?.secret;
+    if (tab && protection?.submitted && !protection.running)
+      Effect.runFork(
+        this.#reloadProtected(tab, protection).pipe(
+          Effect.tapError((error) =>
+            Effect.sync(() =>
+              logger.warn("Unable to reload a protected browser tab after a takeover", { error: toLogValue(error) }),
+            ),
+          ),
+          Effect.ignore,
+          Effect.forkIn(tab.scope, { startImmediately: true }),
+        ),
+      );
+  }
+
+  /** Loads a tab that still holds a submitted secret again with GET. The commit ends the protection. */
+  #reloadProtected(tab: BrowserHostTab, protection: NonNullable<BrowserHostTab["secret"]>) {
+    return this.#enqueue(
+      tab.id,
+      (current) =>
+        Effect.gen(function* () {
+          // A sign-in that the person started in the takeover can still commit a new document,
+          // which ends the protection. Do not cancel that load with the reload.
+          if (current.contents.isLoadingMainFrame())
+            yield* waitForLoading(current.contents, 10_000).pipe(Effect.ignore);
+          if (current.secret !== protection) return;
+          yield* untilStopped(current, reloadWithGet(current));
+        }),
+      true,
+    );
   }
 
   readonly setVisible = Effect.fn("BrowserHost.setVisible")(function* (
@@ -1883,7 +2066,7 @@ export class BrowserHost {
                   return;
                 case "reload":
                   yield* navigateAndWait(tab.contents, () => {
-                    tab.contents.reload();
+                    tab.contents.reloadIgnoringCache();
                     return true;
                   });
               }
@@ -2030,7 +2213,7 @@ export class BrowserHost {
               if (showsCurrentPage(tab, page)) tab.preview = { ...page, frame };
               return frame;
             }),
-          ),
+          ).pipe(Effect.provideService(BrowserToolQueueWait, undefined)),
         );
         if (tab.previewCapture === capture) tab.previewCapture = undefined;
         yield* Deferred.done(frame, result);
@@ -2062,6 +2245,12 @@ export class BrowserHost {
   ): Effect.fn.Return<() => Effect.Effect<void>, BrowserOperationError> {
     const { onCursor, viewport } = options;
     const tab = yield* this.#requireTab(tabId);
+    // The local window shows a protected tab during a takeover. A live view goes to another computer,
+    // so the page loads again first: the secret leaves it, and the person signs in by hand. Without
+    // this the person that the agent waits for cannot see the tab.
+    const protection = tab.secret;
+    if (protection?.submitted && !protection.running && this.#takeoverTabIds.has(tabId))
+      yield* this.#reloadProtected(tab, protection).pipe(Effect.ignore);
     if (tab.secret?.submitted)
       return yield* browserFailure(new Error(sourceText("error.backend.browserViewProtected")));
     yield* browserSync(() => this.#requireNoFilledCard(tab, "Browser view"));
@@ -2167,7 +2356,22 @@ export class BrowserHost {
         const tab = yield* this.#open(args.url, params.threadId, params.ownerAgentId ?? null, false, true);
         this.#controls.updateTab(params, tab.id);
         // The agent reads a page that it opens, so the first snapshot comes with the tab and saves a call.
-        const read = yield* Effect.result(this.#finalStepsSnapshot(params, tab.id));
+        let read = yield* Effect.result(this.#finalStepsSnapshot(params, tab.id));
+        // A page that redirects at once navigates during the first read. The next read waits for
+        // the page that the redirect loads, and saves the agent a call.
+        for (
+          let again = 0;
+          again < OPEN_REDIRECT_READS &&
+          Result.isFailure(read) &&
+          read.failure.cause instanceof Error &&
+          read.failure.cause.message === SNAPSHOT_NAVIGATED_MESSAGE;
+          again += 1
+        ) {
+          const contents = this.#tabs.get(tab.id)?.contents;
+          if (contents?.isLoadingMainFrame())
+            yield* waitForLoading(contents, OPEN_REDIRECT_WAIT_MS).pipe(Effect.ignore);
+          read = yield* Effect.result(this.#finalStepsSnapshot(params, tab.id));
+        }
         if (Result.isSuccess(read)) return snapshotTextResult(read.success);
         const error = read.failure.cause;
         return textResult({
@@ -2383,6 +2587,11 @@ export class BrowserHost {
                   ),
                   this.#rendererGone(tabId),
                 ),
+          currentUrl: () => {
+            const tab = this.#tabs.get(tabId);
+            // A page can put a typed card value in its address, as in the result URL below.
+            return tab ? tab.engine.scrubText(currentTabUrl(tab)) : undefined;
+          },
         });
         // A secret, a typed card, or a person's control keeps the crashed page, and a snapshot of it
         // gets no answer.
@@ -2481,6 +2690,12 @@ export class BrowserHost {
     request_link_payment: rejectTakeoverTool,
   };
 
+  #siteRecall(params: DynamicToolCallParams) {
+    const agentId = params.ownerAgentId;
+    if (!agentId) return undefined;
+    return { turnId: params.turnId, recall: (hostname: string) => this.#siteMemories(agentId, hostname) };
+  }
+
   readonly handleDynamicTool = Effect.fn("BrowserHost.handleDynamicTool")(function* (
     this: BrowserHost,
     params: DynamicToolCallParams,
@@ -2493,7 +2708,9 @@ export class BrowserHost {
     })
       .pipe(
         Effect.provideService(BrowserToolHold, (tabId: string) => this.#heldByUser(tabId)),
+        Effect.provideService(BrowserToolQueueWait, TOOL_QUEUE_WAIT_MS),
         Effect.provideService(BrowserDialogTurn, { threadId: params.threadId, turnId: params.turnId }),
+        Effect.provideService(BrowserSiteMemories, this.#siteRecall(params)),
         Effect.catch((operationFailure) =>
           Effect.sync((): { result: DynamicToolResult } | { heldTabId: string } => {
             const error = operationFailure.cause;
@@ -2652,7 +2869,7 @@ export class BrowserHost {
       undefined,
       (tab, deadline) =>
         Effect.gen({ self: this }, function* () {
-          const operationTimeout = remainingTime(deadline, "Browser navigate timed out.");
+          const operationTimeout = yield* browserSync(() => remainingTime(deadline, "Browser navigate timed out."));
           if (url) {
             const normalizedUrl = yield* browserSync(() => normalizeBrowserUrl(url));
             tab.requestedUrl = normalizedUrl;
@@ -2665,7 +2882,7 @@ export class BrowserHost {
             yield* navigateAndWait(
               tab.contents,
               () => {
-                tab.contents.reload();
+                tab.contents.reloadIgnoringCache();
                 return true;
               },
               operationTimeout,
@@ -2705,7 +2922,7 @@ export class BrowserHost {
         const deadline = Date.now() + timeoutMs;
         // The engine checks this deadline between commands, which a frame that answers none of
         // them never reaches.
-        const waitTimeout = remainingTime(deadline, timeoutMessage);
+        const waitTimeout = yield* browserSync(() => remainingTime(deadline, timeoutMessage));
         yield* boundEngineOperation(
           tab,
           tab.engine.waitFor(condition, waitTimeout),
@@ -2713,7 +2930,8 @@ export class BrowserHost {
           timeoutMessage,
           keepQueueBlocked,
         );
-        return yield* readResult(tab, keepQueueBlocked, remainingTime(deadline, timeoutMessage), timeoutMessage);
+        const readTimeout = yield* browserSync(() => remainingTime(deadline, timeoutMessage));
+        return yield* readResult(tab, keepQueueBlocked, readTimeout, timeoutMessage);
       }),
     );
   });
@@ -2799,17 +3017,23 @@ export class BrowserHost {
         }
       }
     });
+    const outcome = (cause: unknown): BrowserStepOutcome =>
+      cause instanceof BrowserUserControlHeld
+        ? { status: "user_control" }
+        : {
+            status: "error",
+            // run_script raises the message as a script Error, which adds its own "Error: " prefix.
+            error: redactText(cause instanceof Error ? cause.message : String(cause)),
+          };
     return yield* run.pipe(
-      Effect.catch((failure) =>
-        Effect.succeed<BrowserStepOutcome>(
-          failure.cause instanceof BrowserUserControlHeld
-            ? { status: "user_control" }
-            : {
-                status: "error",
-                // run_script raises the message as a script Error, which adds its own "Error: " prefix.
-                error: redactText(failure.cause instanceof Error ? failure.cause.message : String(failure.cause)),
-              },
-        ),
+      Effect.catch((failure) => Effect.succeed(outcome(failure.cause))),
+      // A plain throw in a step is a defect. As a failed tool request, Codex showed only "dynamic tool request
+      // failed", and the agent lost the steps that had run and could repeat them (#6712).
+      Effect.catchDefect((defect) =>
+        Effect.sync(() => {
+          logger.warn("A browser script step failed unexpectedly.", { action: step.action, error: toLogValue(defect) });
+          return outcome(defect);
+        }),
       ),
     );
   });
@@ -2862,7 +3086,10 @@ export class BrowserHost {
         "Browser upload target resolution timed out.",
         keepQueueBlocked,
       ),
-    ).pipe(Effect.provideService(BrowserToolHold, (heldTabId: string) => this.#heldByUser(heldTabId)));
+    ).pipe(
+      Effect.provideService(BrowserToolHold, (heldTabId: string) => this.#heldByUser(heldTabId)),
+      Effect.provideService(BrowserToolQueueWait, TOOL_QUEUE_WAIT_MS),
+    );
   }).bind(this);
 
   readonly destroy = Effect.fn("BrowserHost.destroy")(function* (this: BrowserHost) {
@@ -3115,7 +3342,7 @@ export class BrowserHost {
   }
 
   /** Why a page load through the proxy of a tab failed, from the error that Chromium gives. */
-  #tabProxyFailure(tab: BrowserHostTab, error: BrowserProxyFailure): BrowserProxyFailure {
+  #tabProxyFailure(tab: BrowserHostTab, error: BrowserProxyFailure): RelayExitFailure {
     if (this.#proxySignInRefused.has(tab)) return "signIn";
     // Through a relay, Chromium sees only a failed tunnel. The relay knows whether the proxy refused the sign-in.
     return this.#tabRelay(tab)?.exitFailure() ?? error;
@@ -3139,7 +3366,15 @@ export class BrowserHost {
     const proxyError = proxyErrorInText(String(failure.cause));
     if (proxy === null || proxyError === undefined) return failure;
     if (proxy.kind === "computer")
-      return browserFailure(new Error(sourceText("error.backend.browserProxyComputerUnreachable")));
+      return browserFailure(
+        new Error(
+          sourceText(
+            this.#tabRelay(tab)?.exitFailure() === "address"
+              ? "error.backend.browserProxyComputerLocalAddress"
+              : "error.backend.browserProxyComputerUnreachable",
+          ),
+        ),
+      );
     // The network error of this load came first and recorded why. Chromium commits its error page
     // before the load fails here, and that commit clears the sign-in mark of the tab.
     const reason = this.#proxyFailures.get(proxy.proxyId) ?? this.#tabProxyFailure(tab, proxyError);
@@ -3251,10 +3486,26 @@ export class BrowserHost {
     // Service workers read the process fallback instead of the session, so it changes too.
     app.userAgentFallback = sessionBrowserUserAgent(app.userAgentFallback);
     target.setUserAgent(sessionBrowserUserAgent(target.getUserAgent()), preferredBrowserLanguageCodes());
+    const hintRequests = new BrowserHintRequests();
     target.webRequest.onBeforeSendHeaders((details, callback) => {
+      const contents = details.webContents;
+      const pageUrl =
+        details.resourceType === "mainFrame"
+          ? details.url
+          : contents && !contents.isDestroyed()
+            ? contents.getURL()
+            : "";
       callback({
-        requestHeaders: browserRequestHeaders(details.url, details.requestHeaders),
+        requestHeaders: browserRequestHeaders(
+          details.url,
+          details.requestHeaders,
+          hintRequests.requested(details.url, pageUrl),
+        ),
       });
+    });
+    target.webRequest.onHeadersReceived((details, callback) => {
+      if (details.resourceType === "mainFrame") hintRequests.note(details.url, details.responseHeaders);
+      callback({});
     });
     target.webRequest.onCompleted((details) => {
       const tab = [...this.#tabs.values()].find((candidate) => candidate.contents.id === details.webContentsId);
@@ -3274,8 +3525,11 @@ export class BrowserHost {
     target.webRequest.onErrorOccurred((details) => {
       const tab = [...this.#tabs.values()].find((candidate) => candidate.contents.id === details.webContentsId);
       const proxyError = PROXY_ERRORS.get(details.error);
-      if (tab && details.resourceType === "mainFrame" && proxyError !== undefined)
-        this.#noteProxyLoad(tab, this.#tabProxyFailure(tab, proxyError));
+      if (tab && details.resourceType === "mainFrame" && proxyError !== undefined) {
+        const failure = this.#tabProxyFailure(tab, proxyError);
+        // A computer that refused a local address answered, so its proxy does not fail.
+        this.#noteProxyLoad(tab, failure === "address" ? null : failure);
+      }
       if (!tab || tab.secret) return;
       // The page or a navigation cancelled a subresource request: it did not fail. Live pages cancel
       // many. A cancelled page load can be a blocked navigation, so it stays an error.
@@ -3482,6 +3736,7 @@ export class BrowserHost {
         }),
       ).popup({ window });
     });
+    this.#bindUserBrowsing(tab);
     contents.on("did-start-loading", changed);
     contents.on("dom-ready", () => {
       // Keep page content at the same width when the viewport scrollbar appears or disappears.
@@ -3807,13 +4062,13 @@ export class BrowserHost {
       !targetWindow ||
       targetWindow.isDestroyed()
     ) {
-      this.#attachedView?.setVisible(false);
+      this.#hideAttachedView();
       this.#mainPageListener?.(null);
       return;
     }
 
     if (this.#attachedView !== tab.view) {
-      this.#attachedView?.setVisible(false);
+      this.#hideAttachedView();
       this.#mountView(tab.view, targetWindow);
       this.#attachedView = tab.view;
     } else {
@@ -3833,6 +4088,7 @@ export class BrowserHost {
     });
     tab.view.setBounds(bounds);
     tab.view.setVisible(true);
+    this.#attachedViewShown = true;
     tab.contents.invalidate();
     this.#raisePictureInPictureOverlay();
     this.#mainPageListener?.(this.#target === "main" ? { tabId: tab.id, bounds, zoomFactor } : null);
@@ -3840,6 +4096,21 @@ export class BrowserHost {
       tab.focusOnVisible = false;
       tab.contents.focus();
     }
+  }
+
+  #hideAttachedView(): void {
+    this.#attachedViewShown = false;
+    if (this.#attachedView) this.#hideView(this.#attachedView);
+  }
+
+  /** Hides a view that the panel does not show. On Linux a view in the background window stays shown, or it would not draw. */
+  #hideView(view: WebContentsView): void {
+    view.setVisible(SHOWS_VIEWS_IN_BACKGROUND && this.#inBackgroundWindow(view));
+  }
+
+  /** True when the panel shows the view. On Linux a view in the background window is shown only to draw. */
+  #viewShown(view: WebContentsView): boolean {
+    return SHOWS_VIEWS_IN_BACKGROUND ? view === this.#attachedView && this.#attachedViewShown : view.getVisible();
   }
 
   #raisePictureInPictureOverlay(): void {
@@ -3854,7 +4125,7 @@ export class BrowserHost {
     if (
       this.#tabs.get(tab.id) !== tab ||
       this.#activeTabId !== tab.id ||
-      !tab.view.getVisible() ||
+      !this.#viewShown(tab.view) ||
       tab.contents.isDestroyed()
     ) {
       return;
@@ -3878,11 +4149,11 @@ export class BrowserHost {
     const currentParent = currentWindow && this.#nativeParent(currentWindow);
     if (currentParent && !currentParent.isDestroyed()) currentParent.contentView.removeChildView(view);
     parent.contentView.addChildView(view);
+    this.#mountedViews.set(view, window);
     // Initialize the native viewport before hiding a tab that has never been shown.
     view.setVisible(true);
     view.setBounds(this.#hiddenViewBounds(window));
-    view.setVisible(false);
-    this.#mountedViews.set(view, window);
+    this.#hideView(view);
   }
 
   /**
@@ -3939,27 +4210,52 @@ export class BrowserHost {
     if (background === this.#mainViewsInBackground) return false;
     const from = this.#nativeParent(window);
     if (background) {
-      this.#backgroundWindow ??= createBackgroundWindow();
+      this.#backgroundWindow ??= this.#openBackgroundWindow();
       this.#backgroundWindow.setBounds(this.#backgroundBounds(window));
       this.#backgroundWindow.showInactive();
     }
     this.#mainViewsInBackground = background;
-    const to = this.#nativeParent(window);
-    for (const [view, owner] of this.#mountedViews) {
-      if (owner !== window) continue;
-      if (!from.isDestroyed()) from.contentView.removeChildView(view);
-      to.contentView.addChildView(view);
-    }
+    this.#moveMainViews(from, this.#nativeParent(window), background);
     if (!background) this.#backgroundWindow?.hide();
     return true;
   }
 
   /**
+   * A window manager can close the background window, for example on Wayland (#8027). Its views then
+   * go back to the main window, and the next background sync opens a new background window.
+   */
+  #openBackgroundWindow(): BaseWindow {
+    const background = createBackgroundWindow();
+    background.once("closed", () => {
+      if (this.#backgroundWindow !== background) return;
+      this.#backgroundWindow = null;
+      if (!this.#mainViewsInBackground) return;
+      this.#mainViewsInBackground = false;
+      if (!this.#window.isDestroyed()) this.#moveMainViews(background, this.#window, false);
+    });
+    return background;
+  }
+
+  #moveMainViews(from: BaseWindow, to: BaseWindow, background: boolean): void {
+    for (const [view, owner] of this.#mountedViews) {
+      if (owner !== this.#window) continue;
+      if (!from.isDestroyed()) from.contentView.removeChildView(view);
+      to.contentView.addChildView(view);
+      if (SHOWS_VIEWS_IN_BACKGROUND)
+        view.setVisible(background || (view === this.#attachedView && this.#attachedViewShown));
+    }
+  }
+
+  /**
    * The views keep their bounds, so the background window has the size of the main window's content.
    * A minimized Windows window reports a tiny content size off screen, so there the background window
-   * takes the restored place and covers each view.
+   * takes the restored place and covers each view. On Linux it is one pixel, which clips the shown views.
    */
   #backgroundBounds(window: BrowserWindow): Rectangle {
+    if (SHOWS_VIEWS_IN_BACKGROUND) {
+      const { x, y } = window.getContentBounds();
+      return { x, y, width: 1, height: 1 };
+    }
     if (process.platform !== "win32" || !window.isMinimized()) return window.getContentBounds();
     const { x, y, width, height } = window.getNormalBounds();
     let right = width;
@@ -3988,7 +4284,10 @@ export class BrowserHost {
     const parent = window && this.#nativeParent(window);
     if (parent && !parent.isDestroyed()) parent.contentView.removeChildView(view);
     this.#mountedViews.delete(view);
-    if (this.#attachedView === view) this.#attachedView = null;
+    if (this.#attachedView === view) {
+      this.#attachedView = null;
+      this.#attachedViewShown = false;
+    }
   }
 
   /** Succeeds when the renderer of the tab's page crashes. */
@@ -4153,6 +4452,56 @@ export class BrowserHost {
     return focusedContents && ![...this.#tabs.values()].some((candidate) => candidate.contents === focusedContents)
       ? focusedContents
       : null;
+  }
+
+  /**
+   * The agent whose memory review may read what a person does in this tab now, or null. Only while a
+   * person holds the tab (takeover or Take control), so no step is the agent's. Never a tab with a
+   * secret entry or a private sign-in.
+   */
+  #userBrowsingAgent(tab: BrowserHostTab): string | null {
+    const agentId = tab.ownerAgentId;
+    if (agentId === null || tab.secret || tab.privateSession || tab.contents.isDestroyed()) return null;
+    if (!this.#takeoverTabIds.has(tab.id) && !this.#userControlTabIds.has(tab.id)) return null;
+    return this.#userBrowsing?.enabled() ? agentId : null;
+  }
+
+  /**
+   * Keeps one step of what a person did. A teach recording of the tab takes it; without one it goes to
+   * the browsing steps of the agent, as `#userBrowsingAgent` permits.
+   */
+  #recordUserStep(tab: BrowserHostTab, step: BrowserTeachStep): void {
+    if (this.#recordTeachStep(tab, step)) return;
+    const agentId = this.#userBrowsingAgent(tab);
+    if (agentId !== null) this.#userBrowsing?.record(agentId, step);
+  }
+
+  /** Records the pages that load and the controls that a person clicks, for `#recordUserStep`. */
+  #bindUserBrowsing(tab: BrowserHostTab): void {
+    const contents = tab.contents;
+    const records = () => this.#teachRecordings.has(tab.id) || this.#userBrowsingAgent(tab) !== null;
+    const recordPage = () => {
+      const place = records() ? stepPlace(contents.getURL()) : null;
+      if (!place) return;
+      const title = stepText(contents.getTitle());
+      this.#recordUserStep(tab, { kind: "page", ...place, ...(title ? { title } : {}) });
+    };
+    contents.on("did-finish-load", recordPage);
+    contents.on("page-title-updated", recordPage);
+    contents.on("did-navigate-in-page", (_event, _url, isMainFrame) => {
+      if (isMainFrame) recordPage();
+    });
+    contents.on("input-event", (_event, input) => {
+      if (input.type !== "mouseDown" || !("x" in input) || !("y" in input)) return;
+      const { x, y } = input;
+      if (typeof x !== "number" || typeof y !== "number" || !records()) return;
+      const place = stepPlace(contents.getURL());
+      if (!place) return;
+      void readClickTarget(contents, x, y).then((target) => {
+        // The tab can change hands while the page answers.
+        if (target) this.#recordUserStep(tab, { kind: "click", ...place, ...target });
+      });
+    });
   }
 
   #noteSiteVisit(tab: BrowserHostTab, url: string): void {
@@ -4322,15 +4671,44 @@ function boundedCaptureDataUrl(image: NativeImage): string {
       "Browser screenshot is empty: the page drew no image. This can happen while the OpenBot window is minimized or hidden. If it is, ask the person to open the OpenBot window, then try again.",
     );
   const area = size.width * size.height;
-  if (area <= MAX_ENCODED_CAPTURE_PIXELS) return image.toDataURL();
   const scale = Math.sqrt(MAX_ENCODED_CAPTURE_PIXELS / area);
-  return image
-    .resize({
-      width: Math.max(1, Math.floor(size.width * scale)),
-      height: Math.max(1, Math.floor(size.height * scale)),
-      quality: "good",
-    })
-    .toDataURL();
+  const fitted =
+    area <= MAX_ENCODED_CAPTURE_PIXELS
+      ? image
+      : image.resize({
+          width: Math.max(1, Math.floor(size.width * scale)),
+          height: Math.max(1, Math.floor(size.height * scale)),
+          quality: "good",
+        });
+  const fittedSize = fitted.getSize();
+  if (fittedSize.width < MIN_CAPTURE_SIDE || fittedSize.height < MIN_CAPTURE_SIDE) return paddedCaptureDataUrl(fitted);
+  return fitted.toDataURL();
+}
+
+/**
+ * Extends a small capture to `MIN_CAPTURE_SIDE` on the right and the bottom with its top-left pixel,
+ * the page around an element. The content keeps its scale and position, so a point in the image is
+ * still the same pixel.
+ */
+function paddedCaptureDataUrl(image: NativeImage): string {
+  const encoded = image.toDataURL();
+  // One representation in the encoded pixels: `getSize` gives a 2x capture in half of them.
+  const source = nativeImage.createFromDataURL(encoded);
+  const size = source.getSize();
+  const width = Math.max(MIN_CAPTURE_SIDE, size.width);
+  const height = Math.max(MIN_CAPTURE_SIDE, size.height);
+  if (width === size.width && height === size.height) return encoded;
+  const pixels = source.toBitmap();
+  const padded = Buffer.alloc(width * height * 4);
+  padded.fill(pixels.subarray(0, 4));
+  for (let row = 0; row < size.height; row++)
+    pixels.copy(padded, row * width * 4, row * size.width * 4, (row + 1) * size.width * 4);
+  return nativeImage.createFromBitmap(padded, { width, height }).toDataURL();
+}
+
+/** Loads the current page with GET, so that a form POST is not sent again. */
+function reloadWithGet(tab: BrowserHostTab): Effect.Effect<void, BrowserOperationError> {
+  return navigateAndWait(tab.contents, () => tab.contents.loadURL(currentTabUrl(tab), browserLoadOptions()));
 }
 
 /** A load that `BrowserHost.stop` ended succeeds: the person chose to keep the page as it is. */
@@ -4428,13 +4806,17 @@ function snapshotTextResult(value: SnapshotToolPayload): DynamicToolResult {
  * The model reads many snapshots in a task, so the model text is compact. Each element is one line,
  * which leaves out the JSON keys and the empty defaults. The history leaves out what the model already
  * knows: network requests that succeeded, and its own actions that succeeded with no detail. The
- * snapshot tool description says so.
+ * snapshot tool description says so. Only the snapshot's own elements become lines: a value that a
+ * script returns keeps its `elements` key as it is.
  */
 function snapshotJson(value: SnapshotToolPayload): string {
-  return JSON.stringify(value, function (this: unknown, key, field: unknown) {
-    if (!Array.isArray(field) || !isDynamicRecord(this) || !Array.isArray(this.elements)) return field;
-    return key === "elements" ? field.map(elementLine) : field;
-  });
+  if ("elements" in value) return JSON.stringify(withElementLines(value));
+  if ("snapshot" in value) return JSON.stringify({ ...value, snapshot: withElementLines(value.snapshot) });
+  return JSON.stringify(value);
+}
+
+function withElementLines(snapshot: BrowserSnapshot | ClosedTabResult | DialogTabResult | null | undefined) {
+  return snapshot && "elements" in snapshot ? { ...snapshot, elements: snapshot.elements.map(elementLine) } : snapshot;
 }
 
 /** Tags that the role already implies. The line names a tag only when it adds to the role. */

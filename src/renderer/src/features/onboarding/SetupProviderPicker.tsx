@@ -251,12 +251,32 @@ export function createSetupProviders(
     includeFree() || (selectedProvider() === FREE_PROVIDER && providerSelectedByUser() && !customSelected());
   const providerRows = createMemo(() => {
     const kept = keptProviders();
-    const rows = onboardingProviderRows(providerOptions(), kept ?? [], freeRow());
+    const host = Boolean(props.hostProviders);
+    const rows = onboardingProviderRows(providerOptions(), kept ?? [], freeRow(), host);
     // A saved choice that the row rule hides still shows, after the rows the rule gives.
     const saved = initial?.provider;
     if (kept || !saved || rows.listed.some((option) => option.id === saved)) return rows;
-    return onboardingProviderRows(providerOptions(), [...planRowIds(rows.listed), saved], freeRow());
+    return onboardingProviderRows(providerOptions(), [...planRowIds(rows.listed), saved], freeRow(), host);
   });
+  /**
+   * Whether each provider of a server has reported its state. Until then the row rule can still change
+   * the list. After that the list keeps its rows, as after the first action of the user, so a status
+   * that changes later does not move a row. The setup of this computer keeps the rule, so a CLI that
+   * the user installs during it can still move up.
+   */
+  const providersReported = createMemo(
+    () =>
+      Boolean(props.hostProviders) &&
+      props.agentStatus.phase !== "starting" &&
+      props.agentStatus.phase !== "restarting" &&
+      providerOptions().every((option) => option.state !== "checking"),
+  );
+  createEffect(
+    () => (providersReported() && keptProviders() === null ? planRowIds(providerRows().listed) : null),
+    (rows) => {
+      if (rows) setKeptProviders(rows);
+    },
+  );
   const customInMore = () =>
     Boolean(props.onAddCustomProvider) && (props.customProviders ?? []).length === 0 && !customRevealed();
 
@@ -382,11 +402,14 @@ export function createSetupProviders(
       if (selectedByUser && selected && allOptions.some((provider) => provider.id === selected)) return;
       // A step without the free row does not choose the free provider by itself.
       const options = withFree ? allOptions : allOptions.filter((provider) => provider.id !== FREE_PROVIDER);
-      if (selected && options.some((provider) => provider.id === selected && providerReady(provider))) return;
-      // A signed-in provider comes first, then one whose CLI is on the computer. Free models are the
-      // way in when the user has neither.
+      // A signed-in plan comes first, then one whose CLI is on the computer. Free models are the
+      // way in when the user has neither: they are always ready, so they do not win over a plan.
+      const signedIn = options.find((provider) => provider.state === "available" && !provider.freeModels);
+      const selectedReady = options.some((provider) => provider.id === selected && providerReady(provider));
+      // The free provider that the step chose by itself gives way to a plan that is signed in now.
+      if (selectedReady && !(signedIn && selected === FREE_PROVIDER)) return;
       const ready =
-        options.find((provider) => provider.state === "available") ??
+        signedIn ??
         options.find((provider) => provider.state === "sign-in-required" && !provider.freeModels) ??
         options.find((provider) => providerReady(provider));
       setSelectedProvider(ready?.id ?? null);
@@ -510,12 +533,13 @@ export function createSetupProviders(
     const connection = props.connection;
     const kind = connection?.connectKind(provider);
     if (!connection || !kind || props.refreshingProviders) return true;
+    // The user connects the provider to use it, so it is the choice of the step from now on.
+    chooseProvider(provider);
     // A dialog sign-in reports itself in its dialog. The browser sign-in reports in the row.
     if (kind === "dialog") {
       await start(connection);
       return true;
     }
-    keepProviderRows();
     setError("");
     setProviderErrors((current) => ({ ...current, [provider]: undefined }));
     providersAwaitingFocusRefresh.add(provider);

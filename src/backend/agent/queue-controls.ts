@@ -1,6 +1,7 @@
 import { agentProviderDescriptor } from "@openbot/contracts/agent-providers";
 import type {
   ConversationMessageSender,
+  QueueDelivery,
   QueueSnapshot,
   ReorderQueueInput,
   SteerQueuedMessageInput,
@@ -9,6 +10,7 @@ import type {
 import { QueueEditRejectedError, type QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schema } from "effect";
+import type { AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import type { ChannelAssignment } from "../channel-store";
 import { promptMessage } from "../conversation-snapshots";
@@ -18,6 +20,7 @@ import { decodeRecordResponse } from "../protocol";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { CustomEndpoints } from "./custom-endpoints";
 import { agentNamesById, deliveryPromptInput, type TagReferenceSource } from "./delivery-content";
+import { steerNote } from "./developer-instructions";
 import { type DrainScheduler, REMOVED_ENDPOINT_MESSAGE } from "./drain-scheduler";
 import type { MailboxSync } from "./mailbox-sync";
 import type { ProviderRuntime } from "./provider-runtime";
@@ -286,6 +289,7 @@ export class QueueControls {
     }
     yield* this.#mailbox.markSteering(input.deliveryId, turnId).pipe(toQueueOperationFailed);
     this.#mailboxSync.emitQueue(agent.id);
+    const note = steerNoteFor(providerForAgent(agent), context.delivery.sender, context.delivery.text);
     yield* client
       .request(
         "turn/steer",
@@ -293,14 +297,19 @@ export class QueueControls {
           threadId: session,
           expectedTurnId: turnId,
           clientUserMessageId: input.deliveryId,
-          input: deliveryPromptInput(context, {
-            agentNames: agentNamesById(this.#store.list()),
-            snapshot,
-            routineRun:
-              context.delivery.sender.kind === "routine" ? this.#routines.runForDelivery(input.deliveryId) : null,
-            wokenWaits: context.delivery.sender.kind === "routine" ? this.#routines.wokenWaits(input.deliveryId) : [],
-            tags: this.#hooks.tagReferences(agent.id, publicThreadId),
-          }),
+          input: [
+            // A block of its own, as the turn context blocks are, so history readers remove it.
+            ...(note ? [{ type: "text" as const, text: note }] : []),
+            ...deliveryPromptInput(context, {
+              agentNames: agentNamesById(this.#store.list()),
+              snapshot,
+              routineRun:
+                context.delivery.sender.kind === "routine" ? this.#routines.runForDelivery(input.deliveryId) : null,
+              wokenWaits: context.delivery.sender.kind === "routine" ? this.#routines.wokenWaits(input.deliveryId) : [],
+              answeredRoutine: this.#drain.answeredRoutine(context.delivery),
+              tags: this.#hooks.tagReferences(agent.id, publicThreadId),
+            }),
+          ],
         },
         decodeRecordResponse,
       )
@@ -337,6 +346,24 @@ export class QueueControls {
       this.#conversation.emitConversation(snapshot, "queue.message-steered", { deliveryId: input.deliveryId });
     });
   }, Effect.uninterruptible);
+}
+
+/**
+ * Claude Code and Grok Build tell their model that a message arrived while it worked, and to
+ * continue the turn after it. Grok also reads only the first text block of a steer.
+ */
+const PROVIDERS_THAT_FRAME_STEERS: ReadonlySet<AgentProvider> = new Set(["claude", "grok"]);
+
+/**
+ * The note that goes in front of a steered message, or null when the provider writes its own or the
+ * message is not from a person or a teammate. A routine run's prompt already gives its own task.
+ * A slash command from the user gets none, as at the start of a turn: the agent reads a command
+ * only at the start of the input.
+ */
+export function steerNoteFor(provider: AgentProvider, sender: QueueDelivery["sender"], text: string): string | null {
+  if (PROVIDERS_THAT_FRAME_STEERS.has(provider)) return null;
+  if (sender.kind === "user") return text.startsWith("/") ? null : steerNote("user");
+  return sender.kind === "agent" ? steerNote("teammate") : null;
 }
 
 /** The message cannot steer the running turn, so it stays queued. A refusal, not a failure. */

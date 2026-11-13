@@ -24,6 +24,9 @@ export const messages = {
   "channel.settings.isolated": "Guardar los recuerdos en este canal",
   "channel.settings.isolatedDescription":
     "Los agentes guardan lo que aprenden aquí como recuerdos del canal. Sus otros chats no los ven.",
+  "channel.settings.browser": "Navegador",
+  "channel.settings.browserEveryone": "Todos los miembros",
+  "channel.settings.browserNone": "Nadie",
   "channel.settings.memoryCount": {
     one: "{count} guardado",
     other: "{count} guardados",

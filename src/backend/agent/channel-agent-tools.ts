@@ -106,11 +106,10 @@ const UNKNOWN_CHANNEL = "No channel has that channelId. Call openbot.list_channe
 const OWN_CHANNEL_IN_TASK =
   "update_channel does not change the channel of your current task. For this channel, use channel_add_member, channel_remove_member and channel_set_instructions.";
 
-/** An agent that a channel can take: one that exists and that the user has not hidden. */
+/** An agent that a channel can take: one that exists. */
 function requireAvailable(agents: readonly AgentSummary[], id: string): AgentSummary {
   const agent = agents.find((candidate) => candidate.id === id);
   if (!agent) throw new Error(`No agent has the id ${id}. Get the ids from openbot.list_agents.`);
-  if (agent.hiddenAt !== undefined) throw new Error(`${agent.name} is hidden. Ask the user to show it again first.`);
   return agent;
 }
 

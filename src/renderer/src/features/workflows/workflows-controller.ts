@@ -1,6 +1,7 @@
 import {
   type AgentAccessLevels,
   graphAgentIds,
+  type StoredFileRow,
   type WorkflowDetail,
   type WorkflowGitHubCatalog,
   type WorkflowGitHubHistory,
@@ -57,6 +58,12 @@ const FAILURE_CODES = {
   rotate_webhook_secret: "update_failed",
 } as const satisfies Record<WorkflowAnalyticsAction, string>;
 
+/** A workflow that the page must open, and the call that marks the request as taken. */
+export interface WorkflowRequest {
+  workflowId: () => string | undefined;
+  taken: () => void;
+}
+
 type WorkflowsControllerProps = Omit<WorkflowCanvasProps, "workflow" | "features" | "frame" | "readOnly" | "catalogs">;
 
 /**
@@ -65,9 +72,15 @@ type WorkflowsControllerProps = Omit<WorkflowCanvasProps, "workflow" | "features
  * another device or a restore loads the graph again. The first workflow of the host opens; a host
  * with none gets a new one, as the canvas needs a workflow.
  *
- * `analytics` gives the scope of the account that acts. Stories give none.
+ * `analytics` gives the scope of the account that acts. Stories give none. `requested` names a
+ * workflow to open in place of the first one, such as the one of a clicked notification. A new
+ * request opens its workflow on the open page too.
  */
-export function createWorkflowsController(host: WorkflowHost, analytics?: () => DesktopAnalyticsScope) {
+export function createWorkflowsController(
+  host: WorkflowHost,
+  analytics?: () => DesktopAnalyticsScope,
+  requested?: WorkflowRequest,
+) {
   const { t, errorMessage } = useText();
   /** Reports how a user action ended. No title, text or ID leaves the app. */
   const tracked = async <T>(
@@ -117,6 +130,8 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
   const [discord, setDiscord] = createSignal<readonly WorkflowDiscordServer[]>([]);
   const [telegram, setTelegram] = createSignal<readonly WorkflowTelegramChat[]>([]);
   const [slack, setSlack] = createSignal<readonly WorkflowSlackWorkspace[]>([]);
+  /** The Library pictures that an asset step can use. */
+  const [pictures, setPictures] = createSignal<readonly StoredFileRow[]>([]);
   /** Null while this account manages every agent of the host. */
   const [levels, setLevels] = createSignal<AgentAccessLevels | null>(null);
   const [preview, setPreview] = createSignal<{ versionId: string; graph: WorkflowGraph }>();
@@ -333,6 +348,9 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
     host.slackWorkspaces().then((next) => {
       if (!disposed) setSlack(next);
     }, report);
+    host.pictures().then((next) => {
+      if (!disposed) setPictures(next);
+    }, report);
   };
 
   const refresh = (workflowId: string | null, agentId?: string) => {
@@ -377,9 +395,31 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
   });
   write(async () => {
     const list = await host.workflows.list();
-    const first = list[0] ?? (await host.workflows.create({ title: t("workflow.canvas.untitled") })).summary;
+    // Read after the list, so that a request that comes while the list loads opens.
+    const wanted = untrack(() => requested?.workflowId());
+    if (wanted !== undefined) requested?.taken();
+    const first =
+      list.find((summary) => summary.id === wanted) ??
+      list[0] ??
+      (await host.workflows.create({ title: t("workflow.canvas.untitled") })).summary;
     if (!disposed) await load(first.id);
   });
+  // A request after the first workflow opened. Before that, the first load reads the request. The
+  // list is read again, as a workflow that an agent just made may not be in the library yet.
+  createEffect(
+    () => requested?.workflowId(),
+    (workflowId) => {
+      if (workflowId === undefined || current === "") return;
+      requested?.taken();
+      if (workflowId === current) return;
+      flush();
+      closePreview();
+      write(async () => {
+        const list = await host.workflows.list();
+        if (!disposed && list.some((summary) => summary.id === workflowId)) await load(workflowId);
+      });
+    },
+  );
 
   /**
    * Why the open workflow is read-only, or undefined when this account may change it: it has steps
@@ -568,6 +608,13 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
     },
   };
 
+  /** Sends a picture to the host and puts it first in the Library. The toast shows why it failed. */
+  const uploadPicture = (file: File) =>
+    reported(host.uploadPicture(file)).then((row) => {
+      setPictures((list) => [row, ...list.filter((candidate) => candidate.id !== row.id)]);
+      return row;
+    });
+
   return {
     detail: () => stored()?.detail,
     places,
@@ -575,6 +622,8 @@ export function createWorkflowsController(host: WorkflowHost, analytics?: () => 
     discord,
     telegram,
     slack,
+    pictures,
+    uploadPicture,
     readOnly: () => lock() !== undefined,
     github,
     props,

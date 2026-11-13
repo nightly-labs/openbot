@@ -41,6 +41,7 @@ import {
   SERVER_AUDIT_CODECS,
   SERVER_AUDIT_ROUTES,
 } from "@openbot/contracts/team-protocol/server-audit-v1";
+import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import { TEAM_PROTOCOL_V7 } from "@openbot/contracts/team-protocol/v7";
 import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { sourceText } from "@openbot/i18n/source";
@@ -53,6 +54,7 @@ import { runCauseEffect } from "../src/backend/effect-boundary";
 import { MailboxStore } from "../src/backend/mailbox-store";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { SidebarLayoutStore } from "../src/backend/sidebar-layout-store";
+import { StorageUsageScanner, StorageUsageService } from "../src/backend/storage-usage";
 import type { TeamApiBrowser } from "../src/main/team-api/dependencies";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/agent-access-e2e");
@@ -185,6 +187,8 @@ const teamBrowser: TeamApiBrowser = {
   reload: unused,
   stop: unused,
   takeUserControl: unused,
+  startTeach: unused,
+  stopTeach: () => [],
   releaseUserControl: () => {},
   releaseUserControlHeldBy: () => {},
   close: unused,
@@ -206,6 +210,8 @@ const home = join(root, "home");
 interface Host {
   database: OpenBotDatabase;
   agents: AgentService;
+  mailbox: MailboxStore;
+  storage: StorageUsageService;
   server: InstanceType<typeof TeamApiServer>;
   team: InstanceType<typeof TeamStore>;
   access: InstanceType<typeof AgentAccessStore>;
@@ -240,6 +246,21 @@ async function startHost(): Promise<Host> {
   assert.equal(await runCauseEffect(access.load()), true, "The roles file did not load.");
   if (!team.getIdentity()) await runCauseEffect(team.configure("E2E Host", OWNER.username, OWNER.password));
   const agents = new AgentService({ store: agentStore, mailbox, browser: agentBrowser, sidebarLayout: sidebar });
+  // The real storage service, as the app wires it. This host has no channels.
+  const storageSources = {
+    roots: {
+      database: join(userData, "openbot.db"),
+      downloads: join(root, "downloads"),
+      caches: [join(userData, "remote-attachments")],
+      logs: [join(userData, "logs")],
+      runtimes: join(root, "runtimes"),
+      data: userData,
+    },
+    database: () => database.connection,
+    mailbox,
+    agents: () => agents.listAgents(),
+  };
+  const storage = new StorageUsageService(new StorageUsageScanner(storageSources), storageSources);
   const server = new TeamApiServer({
     store: team,
     agents,
@@ -250,9 +271,10 @@ async function startHost(): Promise<Host> {
     hiddenAgents: agents,
     agentAccess: access,
     serverAudit: audit,
+    storage,
   });
   const port = await Effect.runPromise(server.start());
-  return { database, agents, server, team, access, audit, port };
+  return { database, agents, mailbox, storage, server, team, access, audit, port };
 }
 
 async function stopHost(): Promise<void> {
@@ -260,6 +282,7 @@ async function stopHost(): Promise<void> {
   const stopping = host;
   host = null;
   await Effect.runPromise(stopping.server.stop()).catch(() => undefined);
+  await Effect.runPromise(stopping.storage.dispose()).catch(() => undefined);
   await runCauseEffect(stopping.agents.stop()).catch(() => undefined);
   stopping.database.close();
 }
@@ -370,6 +393,37 @@ async function listedIds(token: string): Promise<string[]> {
   assert.equal(listed.status, 200);
   assert.ok(Array.isArray(listed.body));
   return listed.body.map((agent) => text(record(agent, "agent").id, "agent id")).sort();
+}
+
+/** Stores one file that the user sent to the agent, and gives the id of the file. */
+async function sendFile(agentId: string, name: string): Promise<string> {
+  const { mailbox } = current();
+  const [draft] = await runCauseEffect(
+    mailbox.prepareImportedAttachments([], [{ name, mimeType: "text/plain", bytes: Buffer.from(name) }]),
+  );
+  assert.ok(draft, "The file was not prepared.");
+  const receipt = await runCauseEffect(
+    mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: [agentId], text: name, draftIds: [draft.id] }),
+  );
+  // No provider runs here. A completed delivery leaves the agent idle, so a later step can delete it.
+  for (const delivery of receipt.deliveries) {
+    await runCauseEffect(mailbox.markStarting(delivery.id));
+    await runCauseEffect(mailbox.markRunning(delivery.id, `turn-${delivery.id}`));
+    await runCauseEffect(mailbox.markTerminal(delivery.id, "completed"));
+  }
+  return draft.id;
+}
+
+/** The storage of the host as the Library reads it, through the frozen storage-v1 codec. */
+async function readStorage(token: string, body: JsonObject): Promise<{ status: number; body: JsonObject }> {
+  const response = await call("POST", STORAGE_ROUTES.usage, { token, body, protocol: TEAM_PROTOCOL_V9 });
+  return { status: response.status, body: record(response.body, "storage") };
+}
+
+function rows(body: JsonObject, list: "files" | "agents" | "conversations"): JsonObject[] {
+  const value = body[list];
+  assert.ok(Array.isArray(value), `The storage answer has no ${list}.`);
+  return value.map((row) => record(row, list));
 }
 
 function refusal(body: unknown): string {
@@ -536,6 +590,36 @@ try {
     const response = await call("GET", TEAM_API_ROUTES.agent.conversation(finance), { token: setup.memberToken });
     assert.equal(response.status, 404);
     return { status: response.status };
+  });
+
+  await step("none: the Library of the member has no file of the closed agent", async () => {
+    const closedFile = await sendFile(finance, "finance-report.txt");
+    const openFile = await sendFile(general, "general-notes.txt");
+    const names = (body: JsonObject) =>
+      rows(body, "files")
+        .map((file) => text(file.name, "file name"))
+        .sort();
+    const owner = await readStorage(ownerToken, { scope: "host", force: true });
+    assert.equal(owner.status, 200, `The owner's storage read returned ${owner.status}.`);
+    assert.deepEqual(names(owner.body), ["finance-report.txt", "general-notes.txt"]);
+    const member = await readStorage(setup.memberToken, { scope: "host", force: true });
+    assert.equal(member.status, 200, `The member's storage read returned ${member.status}.`);
+    assert.deepEqual(names(member.body), ["general-notes.txt"], "The member reads a file of the closed agent.");
+    for (const list of ["agents", "conversations"] as const)
+      assert.ok(
+        rows(member.body, list).every((row) => row.agentId !== finance),
+        `The member reads the closed agent in the storage ${list}.`,
+      );
+    const closedScope = await readStorage(setup.memberToken, { scope: "agent", agentId: finance, force: true });
+    assert.equal(closedScope.status, 404, `The storage of the closed agent returned ${closedScope.status}.`);
+    const openScope = await readStorage(setup.memberToken, { scope: "agent", agentId: general, force: true });
+    assert.deepEqual(names(openScope.body), ["general-notes.txt"]);
+    return {
+      owner: names(owner.body),
+      member: names(member.body),
+      closedScope: closedScope.status,
+      files: { closedFile, openFile },
+    };
   });
 
   await step("view: a write is refused with 403, and reading the conversation works", async () => {

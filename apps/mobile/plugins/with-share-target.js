@@ -44,11 +44,24 @@ function changePlist(file, change) {
   fs.writeFileSync(file, plist.build(value));
 }
 
-/** @param {string} output */
+/** The page that this prebuild built. Each target that needs the page gets a copy of it. */
+let builtPage = "";
+
+/**
+ * Writes the page to `output`. The share extension and the shortcuts of the app (`with-shortcuts.js`)
+ * use the same page, so one prebuild builds it once.
+ *
+ * @param {string} output
+ */
 function buildPage(output) {
+  if (builtPage && fs.existsSync(builtPage)) {
+    if (builtPage !== output) fs.copyFileSync(builtPage, output);
+    return;
+  }
   const result = spawnSync("bun", [PAGE_BUILD, output], { stdio: "inherit" });
   if (result.error) throw new Error(`The share extension page needs Bun: ${result.error.message}`);
   if (result.status !== 0) throw new Error("The share extension page did not build.");
+  builtPage = output;
 }
 
 /** @type {import('expo/config-plugins').ConfigPlugin<string>} */
@@ -187,3 +200,4 @@ const withShareTarget = (config, props) => {
 };
 
 module.exports = withShareTarget;
+module.exports.buildPage = buildPage;

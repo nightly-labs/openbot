@@ -15,8 +15,12 @@ import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 
-/** The transfer calls of one server. Main routes them to this computer or to a joined host. */
-export type ServerTransferCalls = OpenBotDesktopApi["instanceTransfer"];
+/**
+ * The transfer calls of one server. On the desktop, main routes them to this computer or to a joined
+ * host. In the browser client they go to the connected host, and a download has no folder to show.
+ */
+export type ServerTransferCalls = Omit<OpenBotDesktopApi["instanceTransfer"], "showExport" | "copy"> &
+  Partial<Pick<OpenBotDesktopApi["instanceTransfer"], "showExport">>;
 
 interface ServerTransferState {
   screen: InstanceTransferScreen;
@@ -108,9 +112,13 @@ export function createServerTransferStore(serverId: string, calls: ServerTransfe
       });
   }
 
-  function showExport(): void {
-    void calls.showExport().catch(report);
-  }
+  // Absent when the calls have no folder to show.
+  const show = calls.showExport;
+  const showExport = show
+    ? (): void => {
+        void show().catch(report);
+      }
+    : undefined;
 
   function exportAgain(): void {
     setState((draft) => {
@@ -142,7 +150,7 @@ export function createServerTransferStore(serverId: string, calls: ServerTransfe
       );
   }
 
-  function importFile(keys: string[], includeSettings: boolean): void {
+  function importFile(keys: string[], includeSettings: boolean, includeServerPreferences = false): void {
     const token = state.preview?.token;
     if (!token) return;
     setState((draft) => {
@@ -150,7 +158,10 @@ export function createServerTransferStore(serverId: string, calls: ServerTransfe
       draft.importError = null;
     });
     void calls
-      .apply({ token, keys, includeSettings }, serverId)
+      .apply(
+        { token, keys, includeSettings, ...(includeServerPreferences ? { includeServerPreferences } : {}) },
+        serverId,
+      )
       .then((result) => {
         desktopAnalytics.track("server_transfer_action", { action: "import", result: "succeeded" });
         setState((draft) => {

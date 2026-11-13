@@ -18,7 +18,8 @@
 /* Keep the face beside the bubble, independent of the author name and footer height. The face is a
    little shorter than a one-line bubble, so it reads at the size of the sidebar faces. */
 .message-entry-with-author,
-.message-author-gutter {
+.message-author-gutter,
+.chat-visual-with-author {
   --message-author-face-size: var(--openbot-space-8);
   --message-author-column: calc(var(--message-author-face-size) + var(--openbot-space-1));
 }
@@ -1364,15 +1365,16 @@ button.chat-action-target:active,
   max-width: var(--message-wide-bubble-width);
 }
 
-.message-entry-agent .ui-bubble:has(.choice-card) {
-  width: min(500px, 100%);
-  max-width: min(500px, 100%);
-}
-
 /* An image keeps its size in a person's bubble too: the bubble does not shrink to the text. */
 .message-entry .ui-bubble:has(.image-generation) {
   width: min(420px, 100%);
   max-width: min(420px, 100%);
+}
+
+/* A video plays in a wider frame than an image. */
+.message-entry .ui-bubble:has(.media-generation) {
+  width: min(480px, 100%);
+  max-width: min(480px, 100%);
 }
 
 .message-entry .ui-bubble:has(.image-gallery) {
@@ -1382,7 +1384,7 @@ button.chat-action-target:active,
 
 .message-entry-agent
   .ui-bubble-variant-ghost:has(
-    :is(.choice-card, .image-generation, .image-gallery, .message-code-block, .message-data-table-scroll)
+    :is(.image-generation, .media-generation, .image-gallery, .message-code-block, .message-data-table-scroll)
   )
   > .ui-bubble-content {
   width: 100%;
@@ -1392,17 +1394,34 @@ button.chat-action-target:active,
   width: 100%;
 }
 
-.image-generation {
+.image-generation,
+.media-generation {
   display: grid;
   min-width: 0;
   justify-items: start;
-  gap: 14px;
+  gap: 10px;
+  margin: 0;
 }
 
 .message-image-attachments {
   display: grid;
   min-width: 0;
   gap: 10px;
+}
+
+.media-generation-stage {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  aspect-ratio: var(--media-generation-ratio);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-control);
+  isolation: isolate;
+}
+
+.image-generation-state {
+  position: absolute;
+  inset: 0;
 }
 
 .image-generation-stage {
@@ -1460,23 +1479,11 @@ button.chat-action-target:active,
   opacity: 0.22;
 }
 
+/* A plain mark, with no ring: the reason shows in the text under the frame. */
 .image-generation-failure-mark {
-  display: grid;
-  width: 54px;
-  height: 54px;
-  place-items: center;
-  border: 2px solid var(--openbot-danger);
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-danger-soft);
-  box-shadow: 0 0 0 5px var(--openbot-danger-soft);
+  width: 28px;
+  height: 28px;
   color: var(--openbot-danger);
-}
-
-/* Was a 40px U+00D7 sized off a type token, which is why the scale carried a step no
- * copy in the app used. */
-.image-generation-failure-mark > svg {
-  width: var(--openbot-control-xl);
-  height: var(--openbot-control-xl);
   stroke-width: var(--openbot-icon-stroke);
 }
 
@@ -1511,30 +1518,49 @@ button.chat-action-target:active,
     image-generation-breathe 1.9s cubic-bezier(0.66, 0, 0.34, 1) infinite;
 }
 
-.image-generation-resolution {
+/* The size and the length that the model was asked for, while it works. */
+.media-generation-chip {
+  display: flex;
   position: absolute;
   z-index: 1;
   top: 8px;
   inset-inline-end: 8px;
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-bg-surface);
-  padding: 2px 7px;
+  padding: 2px 8px;
   color: var(--openbot-text-muted);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--openbot-font-mono);
   font-size: var(--openbot-text-sm);
   white-space: nowrap;
 }
 
-.image-generation-meta {
-  display: flex;
-  width: min(100%, 420px);
-  flex-direction: column;
-  align-items: flex-start;
+.media-generation-chip:empty {
+  display: none;
+}
+
+.image-generation-spec + .image-generation-spec::before {
+  margin-inline: 0.4em;
+  content: "·";
+}
+
+.media-generation-meta {
+  display: grid;
+  width: 100%;
+  min-width: 0;
   gap: 2px;
+  font-size: var(--openbot-text-md);
+  line-height: 18px;
   text-align: start;
 }
 
-.image-generation-label {
+.media-generation-label {
+  color: var(--openbot-text-primary);
+  font-weight: 550;
+}
+
+/* The shimmer says "still working", so it runs only while the model works. It animates
+   `background-position` under `background-clip: text`, a text repaint per frame. */
+.media-generation-label[data-shine] {
   background: linear-gradient(
     90deg,
     var(--openbot-text-primary) 0%,
@@ -1547,35 +1573,32 @@ button.chat-action-target:active,
   background-size: 300% 100%;
   background-clip: text;
   color: transparent;
-  font-size: var(--openbot-text-lg);
-  font-weight: 550;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-}
-
-/* The shimmer says "still working", so it stops once the image has arrived or
-   failed. Left unscoped it also ran on "Image generation failed" and on plain
-   attached images, and it animates `background-position` under
-   `background-clip: text` - a main-thread text repaint per frame that no
-   compositor can take - once per image message, for the life of the thread. */
-.image-generation:not(.image-generation-ready, .image-generation-failed) .image-generation-label {
   animation: image-generation-shine 2.25s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
 }
 
-.image-generation-prompt {
-  overflow: hidden;
+.media-generation-specs {
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-md);
-  line-height: 18px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-weight: 400;
 }
 
-.image-generation-error {
+.media-generation-specs::before {
+  margin-inline: 0.4em;
+  content: "·";
+}
+
+.media-generation-prompt {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.media-generation-error {
   max-width: 100%;
-  color: var(--openbot-danger);
-  font-size: var(--openbot-text-sm);
-  line-height: 17px;
+  color: var(--openbot-danger-text);
 }
 
 .image-generation-preview {
@@ -1599,39 +1622,9 @@ button.chat-action-target:active,
   object-fit: contain;
 }
 
-.image-generation-preview:focus-visible,
-.image-generation-hover-download:focus-visible {
-  outline: 2px solid var(--openbot-border-focus);
+.image-generation-preview:focus-visible {
+  outline: 1px solid var(--openbot-border-focus);
   outline-offset: 2px;
-}
-
-.image-generation-hover-download {
-  position: absolute;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  inset-inline-end: 10px;
-  bottom: 10px;
-  border: 1px solid var(--openbot-border-strong);
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-bg-glass);
-  padding: 5px 10px;
-  color: var(--openbot-text-primary);
-  cursor: pointer;
-  backdrop-filter: blur(12px) saturate(1.15);
-  -webkit-backdrop-filter: blur(12px) saturate(1.15);
-  font-size: var(--openbot-text-sm);
-  font-weight: 650;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(4px);
-  transition:
-    background-color var(--openbot-duration-hover) ease,
-    color var(--openbot-duration-hover) ease,
-    border-color var(--openbot-duration-hover) ease,
-    opacity var(--openbot-duration-hover) ease,
-    transform var(--openbot-duration-hover) ease;
 }
 
 .image-generation-download-icon {
@@ -1640,17 +1633,181 @@ button.chat-action-target:active,
   flex: 0 0 auto;
 }
 
-.image-generation-stage:hover .image-generation-hover-download,
-.image-generation-stage:focus-within .image-generation-hover-download {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0);
+/* Download and open, over the corner of the image. They show on hover and focus, and always on touch.
+   The image has its own colors, so both themes use the light-on-dark media control tokens. */
+.media-generation-actions {
+  display: flex;
+  position: absolute;
+  z-index: 2;
+  top: 8px;
+  inset-inline-end: 8px;
+  gap: 2px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-media-control-surface);
+  padding: 2px;
+  color: var(--openbot-media-control-text);
+  opacity: 0;
+  transition: opacity var(--openbot-duration-hover) ease;
 }
 
-.image-generation-hover-download:hover {
-  border-color: var(--openbot-border-focus);
-  background: var(--openbot-bg-glass);
-  color: var(--openbot-text-primary);
+.image-generation-stage:is(:hover, :focus-within) .media-generation-actions {
+  opacity: 1;
+}
+
+/* The video player: a play button over the frame, and a bar with the position and the actions on a
+   dark fade at the bottom. The video has its own colors, so both themes use the media control tokens. */
+.media-generation-player {
+  position: absolute;
+  inset: 0;
+}
+
+/* A player with full screen is a manual popover. Until it opens, it has none of the browser's popover styles. */
+.media-generation-player[popover]:not(:popover-open) {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
+
+/* Full screen: the video fills the app window. */
+.media-generation-player:popover-open {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  overflow: hidden;
+  border: 0;
+  padding: 0;
+  background: var(--openbot-bg-control);
+  color: inherit;
+  -webkit-app-region: no-drag;
+}
+
+.media-generation-player:popover-open::backdrop {
+  background: transparent;
+}
+
+.media-generation-player video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: var(--openbot-bg-control);
+}
+
+.ui-button.media-generation-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 52px;
+  height: 52px;
+  translate: -50% -50%;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-media-control-surface);
+  color: var(--openbot-media-control-text);
+  transition: background-color var(--openbot-duration-hover) ease;
+}
+
+.ui-button.media-generation-play:hover:not(:disabled) {
+  background: var(--openbot-media-control-surface-hover);
+  color: var(--openbot-media-control-text);
+}
+
+.ui-button.media-generation-play > svg {
+  width: 22px;
+  height: 22px;
+  margin-inline-start: 2px;
+  fill: currentColor;
+}
+
+.media-generation-bar {
+  display: flex;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(to top, var(--openbot-media-control-scrim), var(--openbot-transparent));
+  padding: 28px 8px 6px;
+  color: var(--openbot-media-control-text);
+  opacity: 0;
+  transition: opacity var(--openbot-duration-hover) ease;
+}
+
+.media-generation-player:is(:hover, :focus-within, :not([data-playing])) .media-generation-bar {
+  opacity: 1;
+}
+
+.media-generation-bar .ui-button,
+.media-generation-actions .ui-button {
+  color: var(--openbot-media-control-text);
+}
+
+.media-generation-bar .ui-button:hover:not(:disabled),
+.media-generation-actions .ui-button:hover:not(:disabled) {
+  background: var(--openbot-media-control-hover);
+  color: var(--openbot-media-control-text);
+}
+
+.media-generation-bar .ui-button > svg {
+  width: 16px;
+  height: 16px;
+}
+
+.media-generation-bar .ui-button:first-child > svg {
+  fill: currentColor;
+}
+
+.media-generation-seek {
+  flex: 1;
+  min-width: 0;
+  margin-inline: 4px;
+}
+
+.media-generation-seek .ui-seek-slider-track,
+.media-generation-seek .ui-seek-slider-picture {
+  width: 100%;
+  height: 16px;
+}
+
+.media-generation-seek .ui-seek-slider-thumb {
+  background: var(--openbot-media-control-text);
+}
+
+.media-generation-seek-fill {
+  width: 100%;
+  height: 3px;
+  align-self: center;
+  border-radius: var(--openbot-radius-pill);
+  background: linear-gradient(
+    90deg,
+    var(--openbot-media-control-text) var(--media-generation-seek),
+    var(--openbot-media-control-track) var(--media-generation-seek)
+  );
+  transition: height var(--openbot-duration-hover) ease;
+}
+
+.media-generation-seek .ui-seek-slider-track:hover .media-generation-seek-fill {
+  height: 5px;
+}
+
+.media-generation-time {
+  margin-inline-end: 4px;
+  color: var(--openbot-media-control-muted);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 @keyframes image-generation-morph {

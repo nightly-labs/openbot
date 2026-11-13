@@ -5,6 +5,13 @@ export const messages = {
   "vault.items.title": "פריטים שמורים",
   "vault.items.description":
     "כל סוכן בשרת הזה יכול להשתמש בפריטים האלה. OpenBot מקליד סיסמאות, מספרי כרטיס וקודי אבטחה בעמוד, כך שהסוכנים אינם רואים אותם. סוכנים קוראים מפתחות API מקובץ פרטי ולא מהצ'אט.",
+  "vault.items.scopedDescription":
+    "כל פריט מיועד לסוכנים שבחרת. OpenBot מקליד סיסמאות, מספרי כרטיס וקודי אבטחה בעמוד, כך שהסוכנים אינם רואים אותם. סוכנים קוראים מפתחות API מקובץ ולא מהצ'אט.",
+  "vault.agents.label": "סוכנים",
+  "vault.agents.all": "כל הסוכנים",
+  "vault.agents.some": "{chosen} מתוך {total}",
+  "vault.agents.choose": "בחירת סוכנים עבור {name}: {agents}",
+  "vault.agents.list": "סוכנים שיכולים להשתמש ב-{name}",
   "vault.newItem": "פריט חדש",
   "vault.kind.login": "התחברות",
   "vault.kind.card": "כרטיס",
@@ -121,6 +128,8 @@ export const messages = {
   "vault.request.addLogin": "הוספת התחברות",
   "vault.request.addCard": "הוספת כרטיס",
   "vault.request.addContact": "הוספת כתובת",
+  "vault.request.addApiKey": "הוספת מפתח API",
+  "vault.request.apiKeyPrivate": "נשמר בכספת שלך, לא בצ׳אט.",
   "vault.request.saved": "נשמר בכספת",
   "vault.twoStep.title": "קוד אימות דו־שלבי",
   "vault.twoStep.on": "פועל",

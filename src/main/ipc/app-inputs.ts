@@ -8,6 +8,7 @@ import type {
   AgentMemoryLimitPreference,
   AgentProviderId,
   AppBehaviorPreferenceChange,
+  AppFontFamily,
   AvatarColor,
   BrowserDockAction,
   BrowserDockFrame,
@@ -67,6 +68,7 @@ import {
   isAgentModel,
   isAgentProvider,
   isAppAppearance,
+  isAppFontFamily,
   isAppInterfaceSize,
   isAppLanguage,
   isAppLogoColor,
@@ -208,9 +210,15 @@ function parseChatBackground(value: unknown): ChatBackgroundColor | null {
   return value;
 }
 
+function parseFontFamily(value: unknown): AppFontFamily | null {
+  if (value !== null && !isAppFontFamily(value)) throw new Error("Font is invalid.");
+  return value;
+}
+
 export function parseAppAppearancePreference(input: unknown): SetAppAppearancePreferenceInput {
   if (!isDynamicRecord(input)) throw new Error("Appearance is required.");
-  const { appearance, transparentWindow, palette, chatBackgroundLight, chatBackgroundDark } = input;
+  const { appearance, transparentWindow, palette, chatBackgroundLight, chatBackgroundDark, interfaceFont, codeFont } =
+    input;
   if (appearance !== undefined && !isAppAppearance(appearance)) throw new Error("Appearance is invalid.");
   if (transparentWindow !== undefined && typeof transparentWindow !== "boolean")
     throw new Error("Transparent window must be true or false.");
@@ -221,7 +229,9 @@ export function parseAppAppearancePreference(input: unknown): SetAppAppearancePr
     transparentWindow === undefined &&
     palette === undefined &&
     chatBackgroundLight === undefined &&
-    chatBackgroundDark === undefined
+    chatBackgroundDark === undefined &&
+    interfaceFont === undefined &&
+    codeFont === undefined
   )
     throw new Error("Appearance is required.");
   return {
@@ -230,6 +240,8 @@ export function parseAppAppearancePreference(input: unknown): SetAppAppearancePr
     ...(palette === undefined ? {} : { palette }),
     ...(chatBackgroundLight === undefined ? {} : { chatBackgroundLight: parseChatBackground(chatBackgroundLight) }),
     ...(chatBackgroundDark === undefined ? {} : { chatBackgroundDark: parseChatBackground(chatBackgroundDark) }),
+    ...(interfaceFont === undefined ? {} : { interfaceFont: parseFontFamily(interfaceFont) }),
+    ...(codeFont === undefined ? {} : { codeFont: parseFontFamily(codeFont) }),
   };
 }
 

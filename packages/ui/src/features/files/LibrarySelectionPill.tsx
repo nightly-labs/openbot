@@ -221,6 +221,8 @@ export interface LibrarySelectionPillProps {
   deleteCount: number;
   /** The viewer can delete files. Off for a member of a remote server: the pill has no Delete. */
   canDelete: boolean;
+  /** One more action, such as "Move". It goes between Download and Delete. */
+  move?: JSX.Element;
   onSave: () => void;
   onAskDelete: () => void;
   onCancelDelete: () => void;
@@ -267,6 +269,7 @@ export function LibrarySelectionPill(props: LibrarySelectionPillProps) {
             <Download aria-hidden="true" />
             {t("common.download")}
           </Button>
+          {props.move}
           <Show when={props.canDelete}>
             <Button
               type="button"

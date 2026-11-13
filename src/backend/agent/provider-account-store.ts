@@ -24,6 +24,7 @@ export interface StoredProviderAccount {
 }
 
 const ACCOUNT_ID = /^a[0-9a-f]{16}$/u;
+const POOL_ACCOUNT_ID = /^(?:default|a[0-9a-f]{16})$/u;
 const Provider = Schema.Literals(AGENT_PROVIDERS.filter((provider) => provider !== "acp"));
 const LabelText = Schema.String.check(Schema.isMaxLength(PROVIDER_ACCOUNT_LABEL_MAX_LENGTH));
 const Label = Schema.NullOr(LabelText);
@@ -34,6 +35,20 @@ const ProviderAccountsFile = Schema.Struct({
   ),
   /** The names the user gave the first account of each provider. */
   defaultLabels: Schema.Record(Schema.String, LabelText),
+  /**
+   * The providers whose accounts are pooled, and the accounts each pool leaves out. Optional: a file
+   * of an older build has none, and an older build reads this file and ignores it.
+   */
+  pools: Schema.optionalKey(
+    Schema.Record(
+      Schema.String,
+      Schema.Struct({
+        leftOut: Schema.Array(Schema.String.check(Schema.isPattern(POOL_ACCOUNT_ID))).check(
+          Schema.isMaxLength(MAX_PROVIDER_ACCOUNTS),
+        ),
+      }),
+    ),
+  ),
 });
 type ProviderAccountsFile = typeof ProviderAccountsFile.Type;
 const decodeProviderAccountsFile = Schema.decodeUnknownSync(ProviderAccountsFile);
@@ -93,6 +108,25 @@ export class ProviderAccountStore {
   defaultLabel(provider: AgentProviderId): string | null {
     return this.#file.defaultLabels[provider] ?? null;
   }
+
+  /** The accounts that the provider's pool leaves out, or null while its pool is off. */
+  pool(provider: AgentProviderId): { leftOut: readonly string[] } | null {
+    return this.#file.pools?.[provider] ?? null;
+  }
+
+  readonly setPool = Effect.fn("ProviderAccountStore.setPool")(function* (
+    this: ProviderAccountStore,
+    provider: AccountProvider,
+    pool: { leftOut: readonly string[] } | null,
+  ) {
+    return yield* this.#change((file) => {
+      const { [provider]: _previous, ...pools } = file.pools ?? {};
+      return Effect.succeed({
+        file: { ...file, pools: pool ? { ...pools, [provider]: { leftOut: [...new Set(pool.leftOut)] } } : pools },
+        result: undefined,
+      });
+    });
+  }).bind(this);
 
   /** The folder an account signs in to. Only ids this store made reach a path. */
   home(account: StoredProviderAccount): string {
@@ -180,7 +214,11 @@ export class ProviderAccountStore {
     const home = this.home(account);
     yield* this.#change((file) =>
       Effect.succeed({
-        file: { ...file, accounts: file.accounts.filter((candidate) => candidate.id !== account.id) },
+        file: {
+          ...file,
+          accounts: file.accounts.filter((candidate) => candidate.id !== account.id),
+          ...(file.pools ? { pools: withoutPoolAccount(file.pools, account.id) } : {}),
+        },
         result: undefined,
       }),
     );
@@ -209,4 +247,16 @@ export class ProviderAccountStore {
       }).pipe(Effect.uninterruptible),
     );
   }
+}
+
+function withoutPoolAccount(
+  pools: NonNullable<ProviderAccountsFile["pools"]>,
+  accountId: string,
+): NonNullable<ProviderAccountsFile["pools"]> {
+  return Object.fromEntries(
+    Object.entries(pools).map(([provider, pool]) => [
+      provider,
+      { leftOut: pool.leftOut.filter((id) => id !== accountId) },
+    ]),
+  );
 }

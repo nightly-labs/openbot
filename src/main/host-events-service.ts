@@ -57,6 +57,11 @@ export interface HostWebhookRelay {
   setAccountActive(active: boolean): void;
   /** Applies route changes to the open relay connection. */
   refresh(): void;
+  /**
+   * Registers this host for the account when it has no ID or no machine token, without publishing
+   * it (#6029). A sync calls it once, before the first route that it registers.
+   */
+  ensureHost(): Effect.Effect<void>;
   registerRoute(routeId: string): Effect.Effect<string, { readonly cause: unknown } | WebhookRouteConflict>;
   revokeRoute(routeId: string): Effect.Effect<void, { readonly cause: unknown }>;
 }
@@ -130,9 +135,12 @@ function eventRoutine(owner: EventRoutineOwner, record: OwnedRoutineRecord): Eve
   };
 }
 
-/** A random signing secret. The prefix makes a leaked value easy to recognize and to scan for. */
+/**
+ * A random signing secret. The prefix makes a leaked value easy to recognize and to scan for. Standard
+ * base64, as the Standard Webhooks specification says, so that senders such as PostHog accept it.
+ */
 function newWebhookSecret(): string {
-  return `whsec_${randomBytes(32).toString("base64url")}`;
+  return `whsec_${randomBytes(32).toString("base64")}`;
 }
 
 /** A sender's secret: 16 to 1024 visible ASCII characters, such as `whsec_...` from Svix or a Composio secret. */
@@ -490,6 +498,7 @@ export class HostEventsService implements HostEventsApi {
       }
       const current = yield* eventStep(() => routes.list());
       const updatedOwners = new Map<string, WebhookRouteOwner>();
+      let hostChecked = false;
       for (const route of current) {
         if (!isCurrent()) return true;
         if (this.#options.accountPrincipal() === null) {
@@ -497,6 +506,11 @@ export class HostEventsService implements HostEventsApi {
           return true;
         }
         if (!options.all && route.url !== null) continue;
+        if (!hostChecked) {
+          hostChecked = true;
+          yield* relay.ensureHost();
+          if (!isCurrent()) return true;
+        }
         const ownerKey = `${route.owner.kind}:${route.owner.id}`;
         let { routeId, url } = route;
         let registered = yield* Effect.result(relay.registerRoute(routeId));

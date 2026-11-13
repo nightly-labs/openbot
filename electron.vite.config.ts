@@ -30,6 +30,8 @@ export default defineConfig({
         // when it runs and goes on without them (no thumbnails, link previews or audio waveforms).
         external: ["jimp", "sharp", "audio-decode", "link-preview-js"],
         input: {
+          // The entry (`main` in package.json). It loads `index` and reports a damaged installation.
+          start: resolve("src/main/start.ts"),
           index: resolve("src/main/index.ts"),
           // The database host is its own process. Only node:* and the installed Effect package
           // are runtime imports; the unpacked host must not load the main process bundle.

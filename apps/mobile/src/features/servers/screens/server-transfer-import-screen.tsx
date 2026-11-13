@@ -113,7 +113,14 @@ export function ServerTransferImportScreen() {
     }
   }
 
-  if (phase === "done" && result) return <TransferResult result={result} />;
+  if (phase === "done" && result)
+    return (
+      <TransferResult
+        result={result}
+        title={t("mobile.server.transfer.imported", { count: result.agents.length })}
+        footer={t("mobile.server.transfer.next")}
+      />
+    );
 
   if (preview && phase !== "idle")
     return (
@@ -246,14 +253,20 @@ function TransferReview({
   );
 }
 
-function TransferResult({ result }: { result: RemoteInstanceTransferResult }) {
+/** The agents that an import or a copy added, and what the user must do next. */
+export function TransferResult({
+  result,
+  title,
+  footer,
+}: {
+  result: RemoteInstanceTransferResult;
+  title: string;
+  footer: string;
+}) {
   const { t, sourceText: localize } = useText();
   return (
     <SettingsContent>
-      <SettingsSection
-        title={t("mobile.server.transfer.imported", { count: result.agents.length })}
-        footer={t("mobile.server.transfer.next")}
-      >
+      <SettingsSection title={title} footer={footer}>
         {result.agents.map((agent) => (
           <SettingsRow key={agent.agentId} disclosure={false}>
             <Typography.Paragraph>{agent.name}</Typography.Paragraph>

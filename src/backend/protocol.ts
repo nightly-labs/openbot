@@ -70,17 +70,31 @@ export interface AppServerRequest {
    * as an MCP client whose tool call timed out. An answer after that reaches nobody.
    */
   signal?: AbortSignal;
+  /**
+   * In process only, never on the wire. The provider stops waiting for the answer after a fixed time
+   * that OpenBot cannot extend, such as an MCP client that asked for no progress notifications. A
+   * question that waits longer than this answers the call first and stays open (#6230).
+   */
+  detachAfterMs?: number;
 }
 
 /** The account type of Claude's own sign-in when it runs on the saved key, with no claude.ai account. */
 export const CLAUDE_API_KEY_ACCOUNT_TYPE = "claude-api-key";
 
 /**
- * Whether Codex can run on a login of this type: a ChatGPT plan, or an OpenAI API key that Codex
- * keeps in its own home (`codex login --with-api-key`). Turns on a key use API credits.
+ * The account of a Codex whose selected model provider does not use an OpenAI login
+ * (`requires_openai_auth` is false, the default of a custom provider). Codex then reports no account
+ * and skips its own login screen: the provider's key or gateway authenticates the turns.
+ */
+export const CODEX_MODEL_PROVIDER_ACCOUNT_TYPE = "codex-model-provider";
+
+/**
+ * Whether Codex can run on a login of this type: a ChatGPT plan, an OpenAI API key that Codex
+ * keeps in its own home (`codex login --with-api-key`), or a model provider that needs no OpenAI
+ * login. Turns on a key use API credits.
  */
 export function isCodexLoginType(type: string | undefined): boolean {
-  return type === "chatgpt" || type === "apiKey";
+  return type === "chatgpt" || type === "apiKey" || type === CODEX_MODEL_PROVIDER_ACCOUNT_TYPE;
 }
 
 export interface AccountReadResult {
@@ -294,6 +308,16 @@ export function decodeAccountReadResult(value: unknown): AccountReadResult {
     },
     requiresOpenaiAuth: requiresOpenaiAuth === undefined ? false : recordBoolean(record, "requiresOpenaiAuth"),
   };
+}
+
+/**
+ * The Codex `account/read`. Only an explicit `requiresOpenaiAuth: false` means that the model
+ * provider needs no OpenAI login; a response without the field stays signed out.
+ */
+export function decodeCodexAccountReadResult(value: unknown): AccountReadResult {
+  const result = decodeAccountReadResult(value);
+  if (result.account || decodeRecord(value, "account response").requiresOpenaiAuth !== false) return result;
+  return { account: { type: CODEX_MODEL_PROVIDER_ACCOUNT_TYPE, email: null }, requiresOpenaiAuth: false };
 }
 
 export function decodeAccountLoginStartResult(value: unknown): AccountLoginStartResult {
