@@ -1220,6 +1220,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       apiKeys: options.agentApiKeys ?? null,
       // The turn lifecycle is made later; a request comes only from a running turn, after both exist.
       codexSubagentParent: (childThreadId) => this.#turn.codexSubagentParent(childThreadId),
+      // A routine thread takes runs, not messages, so its questions wait in their calls.
+      lateAnswerTarget: (agentId, publicThreadId) => {
+        if (store.list().find((candidate) => candidate.id === agentId)?.threadId === publicThreadId) return {};
+        const taskId = this.#tasks.taskForThread(publicThreadId);
+        return taskId && !this.#tasks.isRoutineThreadId(publicThreadId) ? { taskId } : null;
+      },
+      sendLateAnswer: (agentId, target, text, sender) =>
+        Effect.runFork(
+          this.sendMessage({ agentId, text, ...target }, sender).pipe(
+            Effect.catch((failure) => Effect.sync(() => this.#emitError("late_answer_failed", failure.cause, agentId))),
+            Effect.forkIn(this.#scope, { startImmediately: true }),
+          ),
+        ),
     });
     this.#duplication = new DuplicationGate({
       store,
@@ -1877,6 +1890,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         listAgents: () => this.listAgents(),
         deleteTasks: (agentId) =>
           Effect.gen({ self: this }, function* () {
+            // A deleted agent takes no message, so its questions that wait for one expire.
+            this.#attention.expireDetached(agentId, null);
             const threadIds = yield* lifecycleStep("list agent tasks", () => this.#tasks.threadIdsForAgent(agentId));
             for (const threadId of threadIds) yield* this.#forgetExecutionThread(threadId);
             yield* lifecycleStep("delete agent tasks", () => this.#tasks.deleteForAgent(agentId));
@@ -5916,6 +5931,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       return found;
     });
     this.#tasks.close(task);
+    // A closed thread takes no message, so a question that waits for one there expires.
+    this.#attention.expireDetached(task.agentId, task.threadId);
     yield* this.#memoryReview.threadClosed(task.agentId, task.threadId);
     // A task lane that waited for a free task can start now.
     this.#drain.scheduleDrain(task.agentId);
@@ -5971,6 +5988,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       if (wasOpen) this.#tasks.close(found);
       return { task: found, wasOpen };
     });
+    // Before the thread's messages go, so the question's card can still record that it expired.
+    this.#attention.expireDetached(task.agentId, task.threadId);
     // A deleted thread is not reviewed: the person discarded it.
     yield* this.#memoryReview.forgetThread(task.agentId, task.threadId);
     yield* this.#returnTaskAnswers(task);

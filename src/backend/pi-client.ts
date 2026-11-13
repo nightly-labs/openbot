@@ -655,7 +655,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
         requestedId ?? randomUUID(),
         getArray(params, "dynamicTools").filter(isNamespace),
         () => thread?.turn?.id ?? null,
-        (call, signal) => this.#callTool(call, signal),
+        (call, signal, detachAfterMs) => this.#callTool(call, signal, detachAfterMs),
       )
       .pipe(toProviderClientOperationError);
     this.#starting.add(rpc);
@@ -1182,8 +1182,9 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     this: PiAgentClient,
     params: { threadId: string; turnId: string; callId: string; namespace: string; tool: string; arguments: unknown },
     signal: AbortSignal,
+    detachAfterMs: number | undefined,
   ): Effect.fn.Return<DynamicToolResult, ProviderClientOperationError> {
-    const result = yield* this.#requests.call("item/tool/call", params, signal);
+    const result = yield* this.#requests.call("item/tool/call", params, signal, detachAfterMs);
     if (!isToolResult(result)) return yield* providerFailure(new Error(sourceText("error.provider.piToolInvalid")));
     return result;
   });
