@@ -6,4 +6,9 @@ export const messages = {
   "window.localHostTitle": "OpenBot – Hôte local",
   "window.localClientTitle": "OpenBot – Client local",
   "window.computerUsePermissionTitle": "Activer Computer Use",
+  "window.controls.label": "Fenêtre",
+  "window.controls.minimize": "Réduire",
+  "window.controls.maximize": "Agrandir",
+  "window.controls.restore": "Restaurer",
+  "window.controls.close": "Fermer",
 } as const satisfies PartialTranslation<typeof source>;

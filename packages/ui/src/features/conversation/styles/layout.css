@@ -6,9 +6,19 @@
   min-width: 0;
   flex-direction: column;
   background: var(--openbot-bg-canvas);
-  transition: padding-inline-end var(--panel-resize-duration, var(--openbot-duration-overlay))
+  /* The header inset moves with the padding, so the header stays clear of the window buttons in each frame. */
+  transition:
+    padding-inline-end var(--panel-resize-duration, var(--openbot-duration-overlay)) cubic-bezier(0.22, 1, 0.36, 1),
+    --conversation-header-end-inset var(--panel-resize-duration, var(--openbot-duration-overlay))
     cubic-bezier(0.22, 1, 0.36, 1);
   --conversation-column-width: clamp(1440px, 65vw, 1920px);
+}
+
+/* Registered as a length, so that it can transition. */
+@property --conversation-header-end-inset {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
 }
 
 /*

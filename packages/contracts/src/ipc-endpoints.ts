@@ -652,6 +652,7 @@ import type {
 } from "./license";
 import type { MarketplaceListingLink } from "./marketplace-links";
 import type { AccountSession, MobileConnectedDevice, MobileConnectLink, MobileConnectTicket } from "./mobile-connect";
+import type { WindowControlsState } from "./window-controls";
 
 declare const payloadType: unique symbol;
 declare const resultType: unique symbol;
@@ -2374,6 +2375,15 @@ export const IPC_ENDPOINTS = {
     disconnect: request<string, void>()("remote-desktop:disconnect"),
     event: event<RemoteDesktopSession[]>()("remote-desktop:event"),
   },
+
+  // The window buttons that the page draws on Windows. Each request acts on the window that sends it.
+  windowControls: {
+    getState: request<undefined, WindowControlsState>()("window-controls:get-state"),
+    minimize: request<undefined, void>()("window-controls:minimize"),
+    toggleMaximize: request<undefined, void>()("window-controls:toggle-maximize"),
+    close: request<undefined, void>()("window-controls:close"),
+    state: event<WindowControlsState>()("window-controls:state"),
+  },
 } as const;
 
 export type IpcEndpoints = typeof IPC_ENDPOINTS;
@@ -2449,6 +2459,7 @@ export const IPC_GROUP_PATHS = {
   host: "host",
   events: "events",
   remoteDesktop: "remoteDesktop",
+  windowControls: "windowControls",
 } as const satisfies { readonly [Group in keyof IpcEndpoints]: string | null };
 
 export type IpcGroupName = keyof IpcEndpoints;

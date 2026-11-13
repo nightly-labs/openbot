@@ -352,6 +352,7 @@ import {
   decodeTeamSessions,
 } from "./team-decoding";
 import { decodeVaultCodes, decodeVaultImportResult, decodeVaultSecret, decodeVaultState } from "./vault-decoding";
+import { decodeWindowControlsState } from "./window-controls-decoding";
 import {
   decodeWorkflowDetail,
   decodeWorkflowGitHubCatalog,
@@ -1642,6 +1643,13 @@ const openbotApi: OpenBotDesktopApi = {
     selectDisplay: decodeVoid,
     disconnect: decodeVoid,
     event: decodeRemoteDesktopSessions,
+  }),
+  windowControls: bridgeGroup(IPC_ENDPOINTS.windowControls, {
+    getState: decodeWindowControlsState,
+    minimize: decodeVoid,
+    toggleMaximize: decodeVoid,
+    close: decodeVoid,
+    state: decodeWindowControlsState,
   }),
 };
 

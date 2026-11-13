@@ -1,4 +1,5 @@
 .conversation-panel.browser-panel-active {
+  --conversation-header-end-inset: var(--browser-panel-width, 380px);
   padding-inline-end: var(--browser-panel-width, 380px);
 }
 

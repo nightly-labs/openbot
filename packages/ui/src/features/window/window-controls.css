@@ -1,0 +1,36 @@
+/* Fixed at the top inline-end corner, as system buttons are, with the size and centre line of the top
+ * row's buttons. The start padding holds the line that the top row draws before them (`window.css`).
+ * They stay usable while a modal dialog turns off pointer events on the page. */
+.window-controls {
+  position: fixed;
+  z-index: calc(var(--openbot-layer-tooltip) - 1);
+  top: calc(20px - var(--openbot-control-sm) / 2);
+  inset-inline-end: var(--openbot-space-2);
+  display: flex;
+  margin: 0;
+  border: 0;
+  gap: var(--openbot-space-0-5);
+  padding-block: 0;
+  padding-inline: calc(var(--openbot-space-2) + 1px) 0;
+  color: var(--openbot-text-muted);
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+}
+
+.window-controls > .ui-icon-button {
+  width: var(--openbot-control-sm);
+  height: var(--openbot-control-sm);
+}
+
+/* Lucide draws its square larger and its cross smaller than its line. These sizes give all three
+ * glyphs about the same 10px box, as system buttons have. */
+.window-controls-box {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+.window-controls-cross {
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
+  stroke-width: var(--openbot-icon-stroke-lg);
+}

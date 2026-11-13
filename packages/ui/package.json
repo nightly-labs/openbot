@@ -401,6 +401,8 @@
     "./features/window/page-header.css": "./src/features/window/page-header.css",
     "./features/window/PageRail": "./src/features/window/PageRail.tsx",
     "./features/window/page-rail.css": "./src/features/window/page-rail.css",
+    "./features/window/WindowControls": "./src/features/window/WindowControls.tsx",
+    "./features/window/window-controls.css": "./src/features/window/window-controls.css",
     "./features/usage/AgentUsageReport": "./src/features/usage/AgentUsageReport.tsx",
     "./features/usage/UsageChart": "./src/features/usage/UsageChart.tsx",
     "./features/usage/UsageMachineMeter": "./src/features/usage/UsageMachineMeter.tsx",

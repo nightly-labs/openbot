@@ -39,6 +39,7 @@ import { notifyTeamTyping } from "./features/team/team-typing";
 import { UpdatesProvider } from "./features/updates/updates-context";
 import { WhatsNewProvider } from "./features/updates/whats-new-context";
 import { UsageProvider } from "./features/usage/usage-context";
+import { DesktopWindowControls } from "./features/window/DesktopWindowControls";
 import { WindowPageProvider } from "./features/window/window-page-context";
 import { I18nProvider } from "./i18n-context";
 import { LayoutProvider } from "./layout";
@@ -104,6 +105,7 @@ export function AppProviders(props: ParentProps<AppProps>): JSX.Element {
       chatWindow={props.chatWindow}
     >
       <I18nProvider>
+        <DesktopWindowControls />
         <AuthProvider>
           <SetupProvider>
             <WhatsNewProvider>

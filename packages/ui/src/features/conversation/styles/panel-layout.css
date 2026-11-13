@@ -9,6 +9,10 @@
   width: calc(100% - var(--settings-panel-width, 360px));
 }
 
+.conversation-panel[data-settings-panel] .conversation-header {
+  --conversation-header-end-inset: var(--settings-panel-width, 360px);
+}
+
 .conversation-panel[data-settings-panel] .chat-search {
   inset-inline-end: calc(var(--settings-panel-width, 360px) + 16px);
   max-width: calc(100% - var(--settings-panel-width, 360px) - 32px);
