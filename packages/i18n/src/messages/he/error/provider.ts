@@ -201,6 +201,8 @@ export const messages = {
     "ספק המודלים של OpenCode דיווח על בקשת העלאה לא תקינה. יש לבחור מודל אחר ולהמשיך. כדאי לבדוק שגרות שמורות לפני שיוצרים אותן שוב.\n{detail}",
   "error.provider.opencodeUnreadableContent":
     "המודל הזה לא יכול לקרוא קובץ או תמונה בצ'אט הזה. יש לבחור מודל שיכול לקרוא קבצים, ואז לשלוח את ההודעה שוב.",
+  "error.provider.opencodeContextTooSmall":
+    "השיחה הזו לא נכנסת בחלון ההקשר של המודל. ב-Ollama או ב-LM Studio, טען את המודל עם אורך הקשר גדול יותר, והזן את אותו חלון בהגדרות הספק שלו ב-OpenBot. או בחר מודל גדול יותר.",
   "error.provider.opencodeFreeLimit":
     "מודלי OpenCode החינמיים הגיעו למגבלת השימוש. כל המודלים החינמיים חולקים את המגבלה הזו. כדי להמשיך, יש להדביק מפתח OpenCode Go בהגדרות OpenCode, או לבחור מודל מספק אחר.",
   "error.provider.opencodeProviderFailed":

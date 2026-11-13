@@ -232,6 +232,8 @@ export const messages = {
     "Le fournisseur de modèles d’OpenCode a signalé une demande d’envoi non valide. Choisissez un autre modèle et continuez. Vérifiez les routines enregistrées avant de les créer à nouveau.\n{detail}",
   "error.provider.opencodeUnreadableContent":
     "Ce modèle ne peut pas lire un fichier ou une image de cette conversation. Choisissez un modèle qui sait lire les fichiers, puis envoyez à nouveau votre message.",
+  "error.provider.opencodeContextTooSmall":
+    "Cette conversation ne tient pas dans la fenêtre de contexte du modèle. Dans Ollama ou LM Studio, chargez le modèle avec un contexte plus long, puis saisissez la même fenêtre dans les réglages de son fournisseur dans OpenBot. Ou choisissez un modèle plus grand.",
   "error.provider.opencodeFreeLimit":
     "Les modèles gratuits d’OpenCode ont atteint leur limite d’utilisation. Tous les modèles gratuits partagent cette limite. Pour continuer, collez une clé OpenCode Go dans les réglages d’OpenCode, ou choisissez un modèle d’un autre fournisseur.",
   "error.provider.opencodeProviderFailed":

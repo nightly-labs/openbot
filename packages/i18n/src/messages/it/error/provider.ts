@@ -219,6 +219,8 @@ export const messages = {
     "Il provider del modello di OpenCode ha segnalato una richiesta di caricamento non valida. Scegli un altro modello e continua. Controlla le routine salvate prima di ricrearle.\n{detail}",
   "error.provider.opencodeUnreadableContent":
     "Questo modello non può leggere un file o un'immagine in questa chat. Scegli un modello che legge i file, poi invia di nuovo il messaggio.",
+  "error.provider.opencodeContextTooSmall":
+    "Questa chat non entra nella finestra di contesto del modello. In Ollama o LM Studio, carica il modello con un contesto più lungo e inserisci la stessa finestra nelle impostazioni del suo provider in OpenBot. Oppure scegli un modello più grande.",
   "error.provider.opencodeFreeLimit":
     "I modelli gratuiti di OpenCode hanno raggiunto il limite di utilizzo. Tutti i modelli gratuiti condividono questo limite. Per continuare, incolla una chiave OpenCode Go nelle impostazioni di OpenCode, oppure scegli un modello di un altro provider.",
   "error.provider.opencodeProviderFailed":
