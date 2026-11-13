@@ -228,6 +228,8 @@ export const messages = {
     "OPENBOT_ANTIGRAVITY_PATH 中的 Gemini 服务器不存在或不可执行。请更正路径或删除该变量，然后重启 OpenBot。",
   "error.provider.antigravityVersionUnreadable": "无法读取 Gemini 服务器版本。",
   "error.provider.antigravitySignIn": "请使用 Google 账号登录以使用 Gemini。",
+  "error.provider.antigravityModelAtCapacity":
+    "Google 目前没有此 Gemini 模型的空闲容量。原因不是你的套餐配额。请几分钟后重试，或改用其他模型。\n{detail}",
   "error.provider.antigravityRateLimited":
     "由于触发速率限制或套餐配额用尽，Gemini 拒绝了该请求。请等待几分钟或改用其他模型后重试。\n{detail}",
   "error.provider.antigravityQuotaReached":

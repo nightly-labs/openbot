@@ -255,6 +255,8 @@ export const messages = {
     "OPENBOT_ANTIGRAVITY_PATH의 Gemini 서버가 없거나 실행할 수 없어요. 경로를 고치거나 변수를 삭제한 다음 OpenBot을 다시 시작하세요.",
   "error.provider.antigravityVersionUnreadable": "Gemini 서버 버전을 읽을 수 없어요.",
   "error.provider.antigravitySignIn": "Gemini를 사용하려면 Google로 로그인하세요.",
+  "error.provider.antigravityModelAtCapacity":
+    "지금 Google에 이 Gemini 모델의 여유 용량이 없어요. 요금제 할당량 때문은 아니에요. 몇 분 후 다시 시도하거나 다른 모델을 선택해 주세요.\n{detail}",
   "error.provider.antigravityRateLimited":
     "속도 제한 또는 요금제 할당량에 도달해서 Gemini가 요청을 거부했어요. 몇 분 기다리거나 다른 모델을 선택한 후 다시 시도해 주세요.\n{detail}",
   "error.provider.antigravityQuotaReached":
