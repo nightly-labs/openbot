@@ -823,7 +823,8 @@ When the CLI cannot open `settings.json`, it has no sign-in method and answers `
 succeeds but cannot save the method, so the next process is refused again (#6200). On that answer
 OpenBot reads the file itself (`antigravitySettingsUnreadable`). Any failure except a missing file fails
 the start with a message that names the action: remove and add the account again, or, for the own
-sign-in, quit the other apps that use Gemini and open OpenBot again. The row is in error, not signed out.
+sign-in, quit the other apps that use Gemini and open OpenBot again. The row is in error, not signed out,
+and keeps that message after the start limit, because a refresh cannot repair it (`#startStoppedMessage`).
 
 Sign in is an ACP `authenticate` call with `oauth-personal`, in a separate process
 (`src/backend/acp-sign-in.ts`). The CLI writes no sign-in link; it runs `open` (macOS) or `xdg-open`
