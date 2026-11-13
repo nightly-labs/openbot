@@ -938,8 +938,8 @@ export function TasksView(props: TasksViewProps) {
       frame={headerFrame()}
       agents={props.agents}
       tasks={tasks()}
-      // A list that did not load keeps its agent out, so a failed load does not show the empty page.
-      // With no agents yet, the agent list did not load.
+      // A failed list is treated as loaded for the page state, while its error is reported by the toast.
+      // An empty agent list is also a valid loaded state.
       loaded={props.agents.every((agent) => state.snapshots[agent.id] !== undefined || state.failedLists[agent.id] === true)}
       agentId={agentId()}
       onAgentChange={(id) => {
