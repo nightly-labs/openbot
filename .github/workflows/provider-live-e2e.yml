@@ -44,6 +44,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # The default clean deletes `.openbot-build/provider-live`: the app profiles with their
+          # sign-in, and the record of an app that an earlier run left.
+          clean: false
 
       - name: Set up Bun
         uses: ./.github/actions/setup-bun

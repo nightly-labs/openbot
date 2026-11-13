@@ -7,6 +7,7 @@
 // `bun run test:provider-live`; `--target=<codex|claude|antigravity>` runs one provider.
 // Writes scripts/provider-live/.e2e/report.json, summary.md, junit.xml and a trace for each test.
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
+import { rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { readDevStackRecords } from "./dev-automation/stack-registry";
 import { withoutElectronRuntimeFlags } from "./electron-spawn-env";
@@ -29,19 +30,26 @@ const environment = withoutElectronRuntimeFlags(process.env);
 
 /** The port of the local account service of this worktree, when it runs and answers. */
 async function accountServicePort(): Promise<number | null> {
-  const stack = readDevStackRecords().find((record) => resolve(record.projectRoot) === ROOT);
-  const port = stack?.ports.find((entry) => entry.name === "api")?.port;
-  if (port === undefined) return null;
-  try {
-    return (await fetch(`http://127.0.0.1:${port}/health/live`)).ok ? port : null;
-  } catch {
-    return null;
+  // A worktree can have more than one stack record, and not each one has the service.
+  for (const record of readDevStackRecords()) {
+    if (resolve(record.projectRoot) !== ROOT) continue;
+    const port = record.ports.find((entry) => entry.name === "api")?.port;
+    if (port === undefined) continue;
+    try {
+      if ((await fetch(`http://127.0.0.1:${port}/health/live`)).ok) return port;
+    } catch {
+      // This record has no live service. The next one can have it.
+    }
   }
+  return null;
 }
 
 function run(command: string, args: string[], env: NodeJS.ProcessEnv = environment): number {
   return spawnSync(command, args, { cwd: ROOT, env, stdio: "inherit" }).status ?? 1;
 }
+
+// A run that stops before e2e must not leave the report of an earlier run.
+rmSync(join(ROOT, "scripts/provider-live/.e2e"), { recursive: true, force: true });
 
 let startedService: ChildProcess | null = null;
 let exitCode = 1;
@@ -70,7 +78,10 @@ try {
     { ...environment, OPENBOT_AUTH_API_URL: `http://127.0.0.1:${port}`, E2E_TELEMETRY_DISABLED: "1" },
   );
 } finally {
-  // Only the service that this run started. `dev:stop` stops the stack of this worktree.
-  if (startedService) run("bun", [join(ROOT, "scripts/dev-stack.ts"), "stop"]);
+  // Only the service that this run started: its process is the supervisor of its stack record.
+  // `stop` with no `--pid` stops each stack of this worktree, also the developer's.
+  if (startedService?.pid !== undefined) {
+    run("bun", [join(ROOT, "scripts/dev-stack.ts"), "stop", `--pid=${startedService.pid}`]);
+  }
 }
 process.exit(exitCode);
