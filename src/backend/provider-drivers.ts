@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { type ClientSideConnection, type InitializeResponse, RequestError } from "@agentclientprotocol/sdk";
@@ -63,6 +63,7 @@ import {
 import { clineFreeModels } from "./cline-free-models";
 import { readCursorUsage } from "./cursor-usage";
 import { CustomAcpAgentsClient, type CustomAgentConfig, type CustomAgentSource } from "./custom-acp-agents-client";
+import { isMissingFileError } from "./file-errors";
 import { GrokAgentClient } from "./grok-client";
 import { hermesSettingsEnvironment } from "./hermes-settings";
 import { isPythonKimiCli, kimiPythonLoginEnv, kimiPythonSavedRegionEnv, type SignInRegion } from "./kimi-region";
@@ -260,7 +261,27 @@ function antigravityKeyOptions(context: ProviderClientContext, agentEnvironment:
         ? providerCall(() => connection.authenticate({ methodId: GEMINI_API_KEY_METHOD })).pipe(Effect.asVoid)
         : Effect.void,
     savedKeyRefusedMessage: () => (key() ? sourceText("error.provider.geminiKeyRefused") : null),
+    authBlockedMessage: () =>
+      antigravitySettingsUnreadable(antigravityAppDataDir({ ...process.env, ...account }))
+        ? sourceText(
+            account ? "error.provider.geminiAccountSettingsUnreadable" : "error.provider.geminiSettingsUnreadable",
+          )
+        : null,
   };
+}
+
+/**
+ * Whether the CLI cannot open its `settings.json`, which names the sign-in method. The CLI then has
+ * no method and refuses each session. A sign-in succeeds, but it cannot save the method, so the next
+ * process is refused again (#6200). A missing file is not a failure: the sign-in writes it.
+ */
+function antigravitySettingsUnreadable(appDataDir: string): boolean {
+  try {
+    readFileSync(join(appDataDir, "settings.json"));
+    return false;
+  } catch (error) {
+    return !isMissingFileError(error);
+  }
 }
 
 /**

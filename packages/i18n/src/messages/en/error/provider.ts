@@ -329,6 +329,10 @@ export const messages = defineMessages("error.provider", {
   "error.provider.httpsSignInLinkOnly": "Only HTTPS sign-in links can open in the browser.",
   "error.provider.geminiKeyRefused":
     "Gemini refused the saved API key. Replace or remove the key in Settings, then connect again.",
+  "error.provider.geminiAccountSettingsUnreadable":
+    "Gemini cannot open the settings file of this account, so it cannot sign in. Remove this account and add it again.",
+  "error.provider.geminiSettingsUnreadable":
+    "Gemini cannot open its settings file on this computer, so it cannot sign in. Quit the other apps that use Gemini, then quit and open OpenBot again.",
   "error.provider.geminiVerificationRequired":
     "Google must verify your account before Gemini can answer. Verify your Google account in a browser, then send your message again.",
   "error.provider.keyProviderRefused":

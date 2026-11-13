@@ -345,6 +345,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "Tarayıcıda yalnızca HTTPS oturum açma bağlantıları açılabilir.",
   "error.provider.geminiKeyRefused":
     "Gemini kayıtlı API anahtarını reddetti. Ayarlar'da anahtarı değiştirin veya kaldırın, ardından yeniden bağlanın.",
+  "error.provider.geminiAccountSettingsUnreadable":
+    "Gemini bu hesabın ayar dosyasını açamıyor, bu yüzden oturum açamıyor. Bu hesabı kaldırın ve yeniden ekleyin.",
+  "error.provider.geminiSettingsUnreadable":
+    "Gemini bu bilgisayarda ayar dosyasını açamıyor, bu yüzden oturum açamıyor. Gemini kullanan diğer uygulamaları kapatın, ardından OpenBot'u kapatıp yeniden açın.",
   "error.provider.geminiVerificationRequired":
     "Gemini'nin yanıt verebilmesi için Google'ın hesabınızı doğrulaması gerekiyor. Google hesabınızı bir tarayıcıda doğrulayın, ardından mesajınızı yeniden gönderin.",
   "error.provider.keyProviderRefused":
