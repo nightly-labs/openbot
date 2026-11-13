@@ -22,7 +22,7 @@ import type { MailboxStore } from "../backend/mailbox-store";
 import { attachmentCorsHeaders, attachmentDocumentHeaders, chatVisualResponse } from "./chat-visual-protocol";
 import { buildContentSecurityPolicy, readSelfHostedSignalOrigin } from "./content-security-policy";
 import { filePreviewPages } from "./file-preview-pages";
-import { fileResponse } from "./file-response";
+import { bytesResponse, fileResponse } from "./file-response";
 import type { RemoteServerManager } from "./remote-server-manager";
 import { parseRemoteAvatarUrl } from "./remote-server-urls";
 import { canCheckRendererPermission, canRequestRendererPermission } from "./renderer-permissions";
@@ -107,8 +107,9 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
       const attachmentId = decodeURIComponent(url.pathname.split("/").filter(Boolean)[0] ?? "");
       if (!serverId || !attachmentId) return new Response("Not found", { status: 404 });
       const attachment = await runCauseEffect(remoteServers.downloadAttachment(attachmentId, serverId, true));
-      return new Response(Buffer.from(attachment.bytes), {
-        headers: {
+      return bytesResponse(
+        attachment.bytes,
+        {
           "Content-Type": attachment.mimeType,
           "Cache-Control": "no-store",
           ...attachmentCorsHeaders(request.headers.get("Origin")),
@@ -116,7 +117,8 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
           "X-Content-Type-Options": "nosniff",
           "Content-Disposition": "inline",
         },
-      });
+        request.headers.get("Range"),
+      );
     } catch (error) {
       // The image shows only a download icon, so the log is the only record of why it failed.
       logger.warn("A remote attachment could not be shown.", { cause: toLogValue(error) });

@@ -19,6 +19,27 @@ function byteRange(header: string | null, size: number): { start: number; end: n
 }
 
 /**
+ * Answers a request from bytes in memory, with the same range rules as `fileResponse`. A file from a joined server
+ * arrives whole, and its `stream` scheme needs the same 206 answers as a file on this computer (#8521).
+ */
+export function bytesResponse(bytes: Uint8Array, headers: Record<string, string>, range: string | null): Response {
+  const requested = byteRange(range, bytes.byteLength);
+  const rangeHeaders = { ...headers, "Accept-Ranges": "bytes" };
+  if (requested === "unsatisfiable") {
+    return new Response(null, {
+      status: 416,
+      headers: { ...rangeHeaders, "Content-Range": `bytes */${bytes.byteLength}` },
+    });
+  }
+  if (!requested) return new Response(Buffer.from(bytes), { headers: rangeHeaders });
+  const { start, end } = requested;
+  return new Response(Buffer.from(bytes.subarray(start, end + 1)), {
+    status: 206,
+    headers: { ...rangeHeaders, "Content-Range": `bytes ${start}-${end}/${bytes.byteLength}` },
+  });
+}
+
+/**
  * Streams a file without keeping its whole contents in memory. Open failures still let the caller answer 404.
  * A caller that gives `range` (the request's `Range` header, or `null`) gets a 206 for one byte range. Electron
  * lets a media element on a `stream` scheme continue from a byte offset, and it trusts the bytes that come back:
