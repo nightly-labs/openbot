@@ -94,11 +94,12 @@ agent session through the core tools, a commit, and a hidden tool, checks each r
 `.openbot-build/pi-agent-smoke/report.json`.
 
 Codex adds its own base prompt, tools, and skill listing to each Codex request.
-`agent/codex-prompt-settings.ts` turns off `features.tool_suggest`, whose `request_plugin_install` waits
-for a plugin install that OpenBot cannot do, and the skills about the Codex app (`CODEX_UNFIT_SKILLS`).
-The thread value of `skills.config` replaces the whole list, so the user's own entries go first and OpenBot
-adds only the skills that no entry names. A feature counts as the user's only when a file layer of
-`config/read` sets it, because the merged `features` table also holds defaults. On Codex 0.166 and GPT-6
+`agent/codex-prompt-settings.ts` turns off `features.tool_suggest` and `features.recommended_plugins`,
+also when the user's `config.toml` turns them on: their `list_available_plugins_to_install` and
+`request_plugin_install` offer Codex plugins and ChatGPT apps that OpenBot cannot install, and the agent
+then tells the user about a prompt that never shows (#8515). It also turns off the skills about the Codex
+app (`CODEX_UNFIT_SKILLS`). The thread value of `skills.config` replaces the whole list, so the user's own
+entries go first and OpenBot adds only the skills that no entry names. On Codex 0.166 and GPT-6
 Luna these settings remove about 1,050 input tokens from each request: `request_plugin_install` about 430
 and the five skills about 620. Skill descriptions (about 2,950 tokens) and image generation (about 600)
 stay, as agent capabilities. `bun run bench:codex-prompt-settings` runs real turns and writes
