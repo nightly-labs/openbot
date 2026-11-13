@@ -33,9 +33,8 @@ export const MOBILE_LATEST_VERSIONS: MobileLatestVersions = {
  * with no Google Play (`apps/auth-api/src/lib/android-apk.ts`). A change of this file on main makes
  * the APK of that version public (the `Publish the Android APK` workflow).
  *
- * `null` hides the APK download. Keep it `null` until `Stage the Android APK` has made a draft
- * release: the first store build with that job did not save the APK (run 43258435511), and with a
- * version here the site would link to a file that is not there. Then set it to the version of the
- * first draft.
+ * `null` hides the APK download. The first APK is build 24 of 1.4.9, staged by hand (run
+ * 43390367490). Each later version needs its draft release before it is marked as available: else
+ * the site links to a file that is not there, and `Publish the Android APK` fails.
  */
-export const ANDROID_APK_FIRST_VERSION: string | null = null;
+export const ANDROID_APK_FIRST_VERSION: string | null = "1.4.9";
