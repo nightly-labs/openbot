@@ -83,11 +83,12 @@ export interface BrowserUploadsOptions {
   attachments: BrowserUploadSources;
   isStopping(): boolean;
   /**
-   * Whether a browser takeover is pending for this agent. Staging runs outside the tab queue and can
-   * take as long as the files are large, so the caller's pre-flight check can be stale by the time
-   * the input is reached -- this is read again inside the queued operation.
+   * Whether a pending browser takeover refuses this upload: it holds the tab, or waits in the chat of
+   * the call. Staging runs outside the tab queue and can take as long as the files are large, so the
+   * caller's pre-flight check can be stale by the time the input is reached -- this is read again
+   * inside the queued operation.
    */
-  hasTakeover(agentId: string): boolean;
+  hasTakeover(agentId: string, threadId: string, tabId: string): boolean;
 }
 
 /** Uploads read from anywhere on the disk; `AttachmentSourceScope` documents what that does and does not widen. */
@@ -161,7 +162,7 @@ export class BrowserUploads {
   readonly #browser: BrowserUploadTarget;
   readonly #attachments: BrowserUploadSources;
   readonly #isStopping: () => boolean;
-  readonly #hasTakeover: (agentId: string) => boolean;
+  readonly #hasTakeover: (agentId: string, threadId: string, tabId: string) => boolean;
   #scope = Scope.makeUnsafe();
   readonly #roots = new Map<string, Map<string, BrowserUploadRoot[]>>();
   readonly #reservations = new Map<string, Map<symbol, BrowserUploadReservation>>();
@@ -310,7 +311,7 @@ export class BrowserUploads {
                     // checked takeover before staging began; a takeover that started during staging would
                     // otherwise let this write files into a page the user is holding, since `BrowserHost`
                     // checks tab ownership and not takeover.
-                    if (this.#hasTakeover(agentId)) {
+                    if (this.#hasTakeover(agentId, params.threadId, tabId)) {
                       reservation.invalidated = true;
                       throw new Error("Browser tools are unavailable during user takeover.");
                     }
