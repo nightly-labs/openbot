@@ -230,6 +230,8 @@ export const messages = {
     "モデルプロバイダー側で障害が発生しました。お使いの接続は原因ではありません。後でもう一度試すか、別のモデルを選んでください。\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "モデルの応答が途中で切れたか、無効でした。メッセージをもう一度送信するか、別のモデルを選んでください。\n{detail}",
+  "error.provider.opencodeReasoningOverlap":
+    "OpenCode はこの推論の強さでこのモデルの推論を読み取れませんでした。推論の強さを下げるか別のモデルを選んでから、メッセージをもう一度送信してください。",
   "error.provider.opencodeNetwork":
     "OpenCode がモデルプロバイダーに接続できませんでした。OpenBot を実行しているコンピューターのネットワーク接続を確認してから、もう一度お試しください。\n{detail}",
   "error.provider.codexStateBusy":

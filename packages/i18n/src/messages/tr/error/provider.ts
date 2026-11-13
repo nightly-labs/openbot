@@ -227,6 +227,8 @@ export const messages = {
     "Model sağlayıcısı kendi tarafında başarısız oldu. Bağlantınız bunun nedeni değildir. Daha sonra tekrar deneyin veya başka bir model seçin.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "Modelin yanıtı yarıda kesildi veya geçerli değildi. Mesajınızı tekrar gönderin veya başka bir model seçin.\n{detail}",
+  "error.provider.opencodeReasoningOverlap":
+    "OpenCode bu efor düzeyinde bu modelin akıl yürütmesini okuyamadı. Daha düşük bir efor ya da başka bir model seçin, sonra mesajınızı yeniden gönderin.",
   "error.provider.opencodeNetwork":
     "OpenCode model sağlayıcısına bağlanamadı. OpenBot'u çalıştıran bilgisayarın ağ bağlantısını kontrol edin, ardından tekrar deneyin.\n{detail}",
   "error.provider.codexStateBusy":

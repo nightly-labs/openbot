@@ -234,6 +234,8 @@ export const messages = {
     "Beim Modellanbieter ist ein Fehler aufgetreten. Deine Verbindung ist nicht die Ursache. Versuche es später erneut oder wähle ein anderes Modell.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "Die Antwort des Modells wurde abgebrochen oder war ungültig. Sende deine Nachricht erneut oder wähle ein anderes Modell.\n{detail}",
+  "error.provider.opencodeReasoningOverlap":
+    "OpenCode konnte das Denken dieses Modells bei diesem Aufwand nicht lesen. Wähle einen geringeren Aufwand oder ein anderes Modell und sende deine Nachricht dann erneut.",
   "error.provider.opencodeNetwork":
     "OpenCode konnte keine Verbindung zum Modellanbieter herstellen. Prüfe die Netzwerkverbindung des Computers, auf dem OpenBot läuft, und versuche es erneut.\n{detail}",
   "error.provider.codexStateBusy":

@@ -138,6 +138,12 @@ function openCodeRequestFailure(
   // OpenCode retries a cut-off reply by itself, and a weak connection can also cut it off (#6872).
   if (isRecord(error.data) && error.data.errorName === "provider.invalid-output")
     return sourceText("error.provider.opencodeIncompleteReply", { detail: shownFailureDetail(redact(reason)) });
+  // OpenCode 2.2.7 stops the turn when a model starts a second reasoning block before the first ends.
+  // A route such as Vercel AI Gateway's does this at a higher effort; a send again fails the same way (#8621).
+  if (/\breasoning start before end\b/u.test(reason)) {
+    log(`OpenCode could not read the model's reasoning stream: ${reason}`);
+    return sourceText("error.provider.opencodeReasoningOverlap");
+  }
   // Before the list: a gateway reports an overflow as `Upstream request failed: <reason>` too.
   if (OPENCODE_CONTEXT_TOO_SMALL.test(reason)) {
     log(`OpenCode request does not fit the model's context window: ${reason}`);
