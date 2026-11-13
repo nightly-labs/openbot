@@ -172,6 +172,30 @@ export function mcpElicitationQuestions(params: unknown): AgentPromptQuestion[] 
   return validPromptQuestions(questions) ? questions : null;
 }
 
+/** Codex's own server for the apps connected on ChatGPT. Its name is not one that the user knows. */
+const CODEX_APPS_MCP_SERVER_NAME = "codex_apps";
+
+/**
+ * The notice for a request that OpenBot declines. It names the server, and for a sign-in it says
+ * where to sign in. Codex asks to reconnect a ChatGPT app with a link, and puts the app name in
+ * `_meta._codex_apps.connector_auth_failure.connector_name`.
+ */
+export function declinedMcpElicitationText(params: unknown): string {
+  const serverName = getString(params, "serverName")?.trim() || null;
+  const signIn = getString(params, "mode") === "url";
+  if (serverName === CODEX_APPS_MCP_SERVER_NAME) {
+    const authFailure = getRecord(getRecord(getRecord(params, "_meta"), "_codex_apps"), "connector_auth_failure");
+    const app = getString(authFailure, "connector_name")?.trim();
+    return signIn && app
+      ? sourceText("error.backend.mcpAppReconnect", { name: app })
+      : sourceText("error.backend.mcpRequestDeclined");
+  }
+  if (!serverName) return sourceText("error.backend.mcpRequestDeclined");
+  return sourceText(signIn ? "error.backend.mcpServerSignInPage" : "error.backend.mcpServerRequestDeclined", {
+    name: serverName === COMPUTER_USE_MCP_SERVER_NAME ? "Computer Use" : serverName,
+  });
+}
+
 /**
  * Codex asks this before it runs an MCP tool, and says so in `_meta`. The marker tells the ask from a
  * plugin's own yes or no, which can carry the same words and the same `persist` list.

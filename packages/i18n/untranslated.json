@@ -146,6 +146,7 @@
     "zh"
   ],
   "error.backend.browserTypingSubmitSkipped": ["de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
+  "error.backend.mcpAppReconnect": ["ar", "de", "es", "fr", "he", "it", "ja", "ko", "nl", "pl", "ru", "tr", "zh"],
   "error.backend.mcpOAuthRequestRefused": [
     "ar",
     "de",
@@ -162,6 +163,23 @@
     "tr",
     "zh"
   ],
+  "error.backend.mcpRequestDeclined": ["ar", "de", "es", "fr", "he", "it", "ja", "ko", "nl", "pl", "ru", "tr", "zh"],
+  "error.backend.mcpServerRequestDeclined": [
+    "ar",
+    "de",
+    "es",
+    "fr",
+    "he",
+    "it",
+    "ja",
+    "ko",
+    "nl",
+    "pl",
+    "ru",
+    "tr",
+    "zh"
+  ],
+  "error.backend.mcpServerSignInPage": ["ar", "de", "es", "fr", "he", "it", "ja", "ko", "nl", "pl", "ru", "tr", "zh"],
   "error.backend.replyReferenceRequests": [
     "ar",
     "de",
