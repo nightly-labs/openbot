@@ -25,7 +25,7 @@ enum ShortcutMessageSender {
   private static let limit: TimeInterval = 24
 
   /// Resumes the caller once: with the result of the send, or when the time ends.
-  private final class Result {
+  private final class Pending {
     private var continuation: CheckedContinuation<ShortcutSendOutcome, Never>?
 
     init(_ continuation: CheckedContinuation<ShortcutSendOutcome, Never>) {
@@ -63,7 +63,7 @@ enum ShortcutMessageSender {
       "timezone": TimeZone.current.identifier,
     ]
     return await withCheckedContinuation { continuation in
-      let result = Result(continuation)
+      let result = Pending(continuation)
       Task { @MainActor in
         let outcome = await sender.send(request)
         // The window stays until the send ends.
