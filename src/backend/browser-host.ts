@@ -585,6 +585,13 @@ export interface BrowserMainPage {
   zoomFactor: number;
 }
 
+/** True while a turn of an agent acts on the tab, or waits between two of its browser calls. */
+function drivenByAgent(state: BrowserControlState, tab: BrowserHostTab): boolean {
+  return state.sessions.some(
+    (session) => session.tabId === tab.id || (session.tabId === null && session.threadId === tab.ownerThreadId),
+  );
+}
+
 export class BrowserHost {
   static readonly CONTROL_IDLE_GRACE_MS = BrowserControlSessions.IDLE_GRACE_MS;
   readonly #window: BrowserWindow;
@@ -761,6 +768,7 @@ export class BrowserHost {
     // Service workers read the process fallback instead of the session, so it changes too.
     app.userAgentFallback = sessionBrowserUserAgent(app.userAgentFallback);
     this.#configureSession(this.#session);
+    this.#controls.onChanged((state) => this.#syncAgentPinchZoom(state));
     this.#idleTabSweep = setInterval(() => {
       void runCauseEffect(this.#sleepIdleTabs()).catch((error) =>
         logger.warn("Unable to sleep browser tabs", { error: toLogValue(error) }),
@@ -4086,6 +4094,21 @@ export class BrowserHost {
     };
   }
 
+  /** The tab is placed from page coordinates, which a pinch of the app page does not change. */
+  #blockMainPinchZoom(blocked: boolean): void {
+    if (!this.#window.isDestroyed()) blockPinchZoom(this.#window.webContents, blocked);
+  }
+
+  /**
+   * An agent clicks and clips a tab in page coordinates, which a pinch zoom moves. A tab that an agent
+   * acts on goes back to no zoom, and the person can pinch it again when the agent stops.
+   */
+  #syncAgentPinchZoom(state: BrowserControlState): void {
+    for (const tab of this.#tabs.values()) {
+      if (!tab.contents.isDestroyed()) blockPinchZoom(tab.contents, drivenByAgent(state, tab));
+    }
+  }
+
   #syncAttachedView(): void {
     const tab = this.#activeTabId ? this.#tabs.get(this.#activeTabId) : null;
     const targetWindow = this.#target === "picture-in-picture" ? this.#pictureInPictureWindow : this.#window;
@@ -4101,7 +4124,7 @@ export class BrowserHost {
     ) {
       this.#hideAttachedView();
       this.#mainPageListener?.(null);
-      blockPinchZoom(this.#window.webContents, false);
+      this.#blockMainPinchZoom(false);
       return;
     }
 
@@ -4131,8 +4154,7 @@ export class BrowserHost {
     tab.contents.invalidate();
     this.#raisePictureInPictureOverlay();
     this.#mainPageListener?.(this.#target === "main" ? { tabId: tab.id, bounds, zoomFactor } : null);
-    // The tab is placed from page coordinates, which a pinch of the app page does not change.
-    blockPinchZoom(this.#window.webContents, this.#target === "main");
+    this.#blockMainPinchZoom(this.#target === "main");
     if (tab.focusOnVisible && !this.#inBackgroundWindow(tab.view)) {
       tab.focusOnVisible = false;
       tab.contents.focus();
@@ -4558,11 +4580,7 @@ export class BrowserHost {
     }
     if (!hostname || tab.visitedHost === hostname) return;
     tab.visitedHost = hostname;
-    const driven = this.#controls
-      .state()
-      .sessions.some(
-        (session) => session.tabId === tab.id || (session.tabId === null && session.threadId === tab.ownerThreadId),
-      );
+    const driven = drivenByAgent(this.#controls.state(), tab);
     const visit: BrowserSiteVisit = {
       tabId: tab.id,
       hostname,
