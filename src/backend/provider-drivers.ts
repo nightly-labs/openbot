@@ -1019,9 +1019,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     // optional OpenCode Go key is pasted into OpenBot instead. Nothing is required to sign in:
     // with no credential at all the CLI still lists the free models and answers a turn.
     signIn: { kind: "external" },
-    // The free tier stays in the picker when discovery fails or answers empty. OpenCode 2.3.0 first
-    // lists the models of its cached catalogue and fetches the new catalogue in the background, so a
-    // model released since the last start came only a few seconds later (#6185).
+    // The free tier stays in the picker when discovery fails or answers empty. OpenCode 2.2.5 and
+    // 2.3.0 first list the models of a cached or built-in catalogue and fetch the new catalogue in the
+    // background, about 3 s later. A first start of 2.2.5 listed 80 of 88 models (#6185).
     catalog: {
       hiddenWhenSignedOut: true,
       partialListAtStart: true,
