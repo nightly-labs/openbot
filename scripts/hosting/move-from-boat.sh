@@ -103,9 +103,9 @@ for browser in $BROWSER_HOMES; do
   done
 done
 unset browser cache
-# The folder in ~/.cache that the move keeps: Playwright does not download its browsers again by
-# itself, so a script of the customer would fail. The export leaves out each other entry of ~/.cache.
-KEPT_CACHES=" ms-playwright "
+# ~/.cache stays in the archive. Not all of it is cache: Poetry keeps its virtual environments there,
+# and Playwright and Puppeteer keep browsers that they do not download again by themselves. On 57 moved
+# servers it had 170 MB for each server (probe of 2026-11-13).
 # The customer can install software outside the home: the service user owns /usr/local and /opt in
 # the sandbox and can use sudo. The move copies what the customer added there, and not what the
 # boat image has. These are the contents of the images in BASE_IMAGES (the value of
@@ -306,18 +306,10 @@ signed_in() {
   return 1
 }
 
-# The tar options that leave out the cache data of the home and the home files of a Hermes of the image
-# that the move does not copy. $1 has one moved tree on each line.
+# The tar options that leave out the home files of a Hermes of the image that the move does not copy.
+# $1 has one moved tree on each line.
 home_exclusions() {
   local trees=$1 path name
-  for path in "$USER_HOME"/.cache/*; do
-    [ -e "$path" ] || [ -L "$path" ] || continue
-    name=${path##*/}
-    # A name with a space or a character of a tar pattern stays in the archive.
-    plain_name "$name" || continue
-    listed "$name" "$KEPT_CACHES" && continue
-    echo "--exclude=./${USER_HOME#/}/.cache/$name"
-  done
   [ -d /usr/local/lib/hermes-agent ] || return 0
   grep -qxF /usr/local/lib/hermes-agent <<<"$trees" && return 0
   for name in $HERMES_IMAGE_HOME; do

@@ -1265,8 +1265,10 @@ still uses the sandbox. The downtime is the export, the copy, the import and the
    - each directory that the customer added in `/opt`, `/usr/local` and `/usr/local/lib`, and each
      npm package for all users. A directory that programs of root read, such as
      `/usr/local/lib/systemd` or `/usr/local/lib/python3.12`, stays out, and the report names it.
-   - each agent CLI of the image (`claude`, `codex`, `pi`) whose sign-in file is in the home. A VPS has
-     none, and OpenBot would ask the customer to download it again.
+   - each agent CLI of the image (`claude`, `codex`, `pi`, `cursor-agent`, `hermes`) whose sign-in
+     file in the home has a sign-in. A VPS has none, and OpenBot would ask the customer to download it
+     again. An empty file, a file with only `{}`, or the `.env` that the image writes for Hermes is not
+     a sign-in.
    - each program in `/usr/local/bin` that the image does not have, each link there into a moved
      directory or into the home, and the crontab of `user`.
    - the names of the apt packages that the customer installed (`~/.base-apt-packages.txt` of the
@@ -1280,9 +1282,24 @@ still uses the sandbox. The downtime is the export, the copy, the import and the
 
    The archive also has the SHA-256 of `openbot.db`, `agent-data.db`, `login.keyring` and
    `keyring-password`, the names of the npm commands and groups of the sandbox, and the Ubuntu
-   version. It does not have `/opt/OpenBot`, `~/.boat`, `~/.boatignore`, `~/.Xauthority*`,
-   `~/.npm/_cacache`, Docker containers and images, or Python packages for all users: the export
-   names them. It prints each moved directory with its size. When the sandbox has another image than
+   version. It does not have:
+   - `/opt/OpenBot`, `~/.boat`, `~/.boatignore`, `~/.ascii`, `~/.config/ascii`, `~/.Xauthority*` and
+     `~/.npm/_cacache`.
+   - the cache folders in each profile of Chromium, Chrome and Brave in `~/.config` (`Cache`,
+     `Code Cache`, `GPUCache`, `GrShaderCache`, `ShaderCache`, the four Dawn caches,
+     `component_crx_cache` and `extensions_crx_cache`). The browser makes them again. Cookies, sign-ins
+     and extensions stay.
+   - when the customer has no Hermes sign-in: the Hermes of the image, `~/.hermes/tools`,
+     `~/.hermes/installs`, `~/.hermes/cache`, and the commands `hermes`, `hermes-acp` and
+     `hermes-agent` in `~/.local/bin` that start it. The settings, sessions and skills in `~/.hermes`
+     stay.
+   - Docker containers and images, and Python packages for all users: the export names them.
+
+   `~/.cache` stays in the archive. Not all of it is cache: Poetry keeps its virtual environments
+   there, and Playwright and Puppeteer keep their browsers there. The export of 2026-11-13 left out
+   each entry of `~/.cache` except `ms-playwright`, for the six servers of that day.
+
+   The export prints each moved directory with its size. When the sandbox has another image than
    these two, it says so: then make sure that no directory of the list is from the image. The
    archive holds the account session and each provider sign-in and key of the customer: copy it only
    over SSH.

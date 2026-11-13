@@ -88,7 +88,6 @@ const SETUP_RETRY_AFTER_MS = 10 * 60_000;
  * the cron marks the setup failed and sets it up again.
  */
 const CREATE_LOST_AFTER_MS = 10 * 60_000;
-/** boat allows 120 characters in a sandbox name. */
 /**
  * The Leaseweb package of each plan in the pool of the operator (docs/hosted-servers.md). A new paid
  * server starts on a free prepared machine of that package, and in a boat sandbox when the pool has none.
@@ -112,6 +111,7 @@ const POOL_CANDIDATES = 3;
  */
 const POOL_FIRST_START_SQL = `(operator_host IS NOT NULL AND observed_state = 'starting' AND last_wake_reason = 'create'
   AND provider_template IS NULL AND retired_sandbox_id IS NULL AND claim_redeemed_at IS NULL)`;
+/** boat allows 120 characters in a sandbox name. */
 const SANDBOX_NAME_MAX_LENGTH = 120;
 /** A server that reports no activity this long stops. The next use starts it again. */
 const IDLE_STOP_AFTER_MS = 15 * 60_000;
@@ -3094,7 +3094,6 @@ function hostedPoolClaim(secret: string, serverId: string, hostId: string) {
   return hmacSha256(secret, `openbot-hosted-pool-claim:v1:${serverId}:${hostId}`);
 }
 
-/** The pool location that is first for a new server. Only the order: a machine in another location is also used. */
 /**
  * The pool locations for a purchase, the best one first. PRIVACY.md names them. A purchase in euros or
  * zlotys gets only a machine in the EU: when the EU has none, the server starts on boat, which is in the
