@@ -4195,8 +4195,10 @@ export class ProviderRuntime implements ProviderPort {
    * same failure can name neither the server nor its URL, such as the `rmcp` worker's `Unexpected
    * content type: … when send initialized notification` (#7895), so `#configuredMcpServerIn` finds
    * no server in it. Codex names a server by its key (`codexMcpServerKey`): the name in the form it
-   * accepts, or that name with `openbot_` in front when the user's own Codex file has the key. A
-   * server from that file, and a built-in server, go to the log only, as from stderr.
+   * accepts, or that name with `openbot_` in front when the user's own Codex file has the key. Each
+   * server of that file goes to Codex turned off (`codexDisabledServers`), so it does not start and
+   * a failure under either key is the failure of OpenBot's server. A key that matches no row, and a
+   * built-in server, go to the log only, as from stderr.
    */
   #reportMcpStartupStatus(client: AgentClient, params: unknown): void {
     const key = getString(params, "name");
