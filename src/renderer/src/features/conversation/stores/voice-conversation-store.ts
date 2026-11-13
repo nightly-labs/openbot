@@ -585,9 +585,10 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
           });
           return;
         }
+        // The recording stays: the user can start to speak while the check runs. At the next quiet
+        // moment, the meter starts a new recording, as for any turn with no speech.
         current.spoke = false;
         current.roomNoise = true;
-        restartRecording(current);
         void resumeReply();
       })
       .catch(() => {})
