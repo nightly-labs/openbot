@@ -79,6 +79,7 @@ import type {
   ProviderCodeLoginStart,
   ProviderUsageResets,
   QueuedMessageReceipt,
+  QueueHold,
   QueueSnapshot,
   ReadAgentTaskAroundInput,
   ReadAgentTaskPageInput,
@@ -1278,7 +1279,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
         // Read late: `channels` is built after this. A channel turn runs beside the agent's own chat,
         // so it holds the chat's queue only on a provider that runs one turn at a time.
-        queueHold: (agentId) => (this.#tasks.oneTurnAtATime(agentId) ? this.channels.queueHold(agentId) : null),
+        queueHold: (agentId) =>
+          (this.#tasks.oneTurnAtATime(agentId) ? this.channels.queueHold(agentId) : null) ??
+          this.#providerRestartHold(agentId),
       },
     });
     this.#reader = new ConversationReader({
@@ -5645,6 +5648,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   listQueue(agentId: string): QueueSnapshot {
     return this.#mailboxSync.queueSnapshot(agentId);
+  }
+
+  /** The provider restart that holds the agent's turns, as `DrainScheduler` holds them. */
+  #providerRestartHold(agentId: string): QueueHold | null {
+    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+    const provider = agent ? providerForAgent(agent) : null;
+    return provider && this.#providers.isReplacingCli(provider) ? { reason: "provider-restart", provider } : null;
   }
 
   listWaits(agentId: string): AgentWaitsSnapshot {

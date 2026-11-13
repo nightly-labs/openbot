@@ -6,6 +6,7 @@ import {
   canPreviewAttachment,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   type QueueSnapshot,
+  queueHoldWorker,
 } from "@openbot/contracts/ipc";
 import {
   TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY,
@@ -557,7 +558,7 @@ export function ConversationComposer() {
                       // Only for an agent that is waiting. When the channel work is this agent's own,
                       // the activity line above already shows it working, and naming it twice reads as
                       // two different waits.
-                      hold={props.queue?.hold?.agentId === props.agent?.id ? null : props.queue?.hold}
+                      hold={queueHoldWorker(props.queue?.hold) === props.agent?.id ? null : props.queue?.hold}
                       agents={props.agents}
                       skills={installedSkills()}
                       editingDeliveryId={editingDeliveryId()}
