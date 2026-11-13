@@ -93,6 +93,19 @@ export class RemoteAttachmentCache {
     );
   });
 
+  /**
+   * Keeps the bytes of a file that this computer sends to the host, so its preview does not download
+   * the same bytes back. Call it before the upload starts: a `forget` or a `clear` during the upload
+   * drops the bytes, as it drops a download that started before it.
+   */
+  holdUpload(serverId: string): (attachmentId: string, attachment: RemoteAttachment) => void {
+    const generation = this.#generation(serverId);
+    return (attachmentId, attachment) => {
+      if (this.#generation(serverId) === generation)
+        this.#store(JSON.stringify([serverId, attachmentId]), serverId, attachment);
+    };
+  }
+
   forget(serverId: string): void {
     this.#generations.set(serverId, (this.#generations.get(serverId) ?? 0) + 1);
     for (const [key, entry] of this.#entries) if (entry.serverId === serverId) this.#delete(key, entry);
