@@ -188,6 +188,7 @@ import {
   jsonStringFit,
   type ModelTextCut,
 } from "./model-text-limit";
+import { allowPinchZoom, blockPinchZoom } from "./pinch-zoom";
 import type { DynamicToolCallParams, DynamicToolResult } from "./protocol";
 import { isRecord } from "./protocol";
 import { stepPlace, stepText, type UserBrowsingStep } from "./user-browsing-log";
@@ -3512,6 +3513,7 @@ export class BrowserHost {
     });
     view.webContents.setAudioMuted(true);
     view.setBackgroundColor("#0b0b0b");
+    allowPinchZoom(view.webContents);
     return view;
   }
 
@@ -4099,6 +4101,7 @@ export class BrowserHost {
     ) {
       this.#hideAttachedView();
       this.#mainPageListener?.(null);
+      blockPinchZoom(this.#window.webContents, false);
       return;
     }
 
@@ -4128,6 +4131,8 @@ export class BrowserHost {
     tab.contents.invalidate();
     this.#raisePictureInPictureOverlay();
     this.#mainPageListener?.(this.#target === "main" ? { tabId: tab.id, bounds, zoomFactor } : null);
+    // The tab is placed from page coordinates, which a pinch of the app page does not change.
+    blockPinchZoom(this.#window.webContents, this.#target === "main");
     if (tab.focusOnVisible && !this.#inBackgroundWindow(tab.view)) {
       tab.focusOnVisible = false;
       tab.contents.focus();
