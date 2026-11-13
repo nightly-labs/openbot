@@ -202,7 +202,9 @@ import type {
 } from "./ipc-app-auth";
 import type { AppBehaviorPreference, AppBehaviorPreferenceChange } from "./ipc-app-behavior";
 import type {
+  AgentApproval,
   ApprovalAutomationPreference,
+  ReadPendingApprovalInput,
   RespondToApprovalInput,
   RespondToBrowserTakeoverInput,
 } from "./ipc-approvals";
@@ -1843,6 +1845,9 @@ export const IPC_ENDPOINTS = {
     compactTaskContext: scopedRequest<AgentTaskInput, void>()("agent:tasks:compact-context"),
     respondToPrompt: scopedRequest<RespondToPromptInput, void>()("agent:respond-to-prompt"),
     respondToApproval: scopedRequest<RespondToApprovalInput, void>()("agent:respond-to-approval"),
+    // The whole copy of an approval that a runtime snapshot cut, or null when the server cannot send it.
+    // A joined server takes it through `pending-approval-v1`.
+    readPendingApproval: scopedRequest<ReadPendingApprovalInput, AgentApproval | null>()("agent:read-pending-approval"),
     respondToBrowserSecret: scopedRequest<LocalBrowserSecretResponse, void>()("agent:respond-to-browser-secret"),
     respondToBrowserTakeover: scopedRequest<RespondToBrowserTakeoverInput, void>()("agent:respond-to-browser-takeover"),
     scopedEvent: event<ScopedAgentEvent>()("agent:event"),

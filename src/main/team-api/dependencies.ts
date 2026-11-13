@@ -189,6 +189,7 @@ type TeamApiAgentMethods = Pick<
   | "compactAgentContext"
   | "compactTaskContext"
   | "agentIdForRequest"
+  | "pendingApproval"
   | "respondToPrompt"
   | "respondToApproval"
   | "respondToBrowserSecret"

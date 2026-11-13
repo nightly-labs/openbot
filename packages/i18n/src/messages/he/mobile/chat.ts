@@ -410,7 +410,14 @@ export const messages = {
   "mobile.chat.approval.effect.permissions":
     "אישור נותן ל-{name} את ההרשאות האלה ב-{server}. דחייה משאירה את ההרשאות הנוכחיות.",
   "mobile.chat.approval.partial":
-    "הבקשה הזו ארוכה מדי להצגה בטלפון. כדי לאשר אותה, יש לפתוח את OpenBot ב-{server}. אפשר לדחות אותה כאן.",
+    "{server} שולח לטלפון רק את תחילת הבקשה. כדי לאשר אותה, יש לעדכן את OpenBot ב-{server}, או לפתוח את הצ׳אט הזה באפליקציית OpenBot למחשב. אפשר לדחות אותה כאן.",
+  "mobile.chat.approval.loading": "טוען את הבקשה המלאה…",
+  "mobile.chat.approval.loadFailed": "לא ניתן לטעון את הבקשה המלאה. אפשר לדחות אותה כאן.",
+  "mobile.chat.approval.retry": "ניסיון חוזר",
+  "mobile.chat.approval.report.bugHeadline": "מצאת באג? בוא נתקן אותו.",
+  "mobile.chat.approval.report.ideaHeadline": "יש לך רעיון? בוא נגשים אותו.",
+  "mobile.chat.approval.report.dontSend": "לא עכשיו",
+  "mobile.chat.approval.report.send": "שליחה לצוות OpenBot",
   "mobile.chat.approval.allow": "אישור",
   "mobile.chat.approval.deny": "דחייה",
   "mobile.chat.approval.reconnect": "יש להתחבר אל {server} כדי להשיב לבקשה הזו.",

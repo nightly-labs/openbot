@@ -374,6 +374,7 @@ import { routeMessagePins } from "./team-api/route-message-pins";
 import { routeModelVisibility } from "./team-api/route-model-visibility";
 import { routeOnePasswordConnector } from "./team-api/route-onepassword-connector";
 import { routePasswordManagers } from "./team-api/route-password-managers";
+import { routePendingApproval } from "./team-api/route-pending-approval";
 import { routePromptCacheTtl } from "./team-api/route-prompt-cache-ttl";
 import {
   routeProviderAccountKeys,
@@ -1301,6 +1302,7 @@ export class TeamApiServer {
       if ((await routeContextReset(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeContextCompact(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeAgentWaits(context, this.#options.agents, hidden)) === "handled") return;
+      if ((await routePendingApproval(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeMessagePins(context, this.#options.agents, this.#options.agentTasks, hidden)) === "handled")
         return;
       if ((await routeMessageDelete(context, this.#options.agents, this.#options.channels, hidden)) === "handled")

@@ -188,6 +188,8 @@ function AgentTaskChat({
     sendAgentTaskMessage,
     respondToTaskPrompt,
     respondToApproval,
+    readsWholeApprovals,
+    readWholeApproval,
     respondToBrowserTakeover,
     respondToBrowserSecret,
     browserViewSupport,
@@ -626,6 +628,8 @@ function AgentTaskChat({
           onRespondApproval={(approval, decision) =>
             respondToApproval(serverId, { requestId: approval.requestId, decision })
           }
+          readsWholeApprovals={readsWholeApprovals(serverId)}
+          onLoadWholeApproval={(approval) => readWholeApproval(serverId, approval)}
           foreground={foreground}
           messages={messages}
           turnSummaries={turnSummaries}

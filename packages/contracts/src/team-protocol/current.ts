@@ -117,6 +117,7 @@ import { MESSAGE_PINS_CAPABILITY } from "./message-pins-v1";
 import { MODEL_VISIBILITY_CAPABILITY } from "./model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "./onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "./password-managers-v1";
+import { PENDING_APPROVAL_CAPABILITY } from "./pending-approval-v1";
 import { PROMPT_CACHE_TTL_CAPABILITY } from "./prompt-cache-ttl-v1";
 import { TEAM_PROMPT_MULTI_SELECT_CAPABILITY } from "./prompt-multi-select-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "./provider-account-keys-v1";
@@ -346,6 +347,7 @@ export {
   MODEL_VISIBILITY_CAPABILITY,
   ONEPASSWORD_CONNECTOR_CAPABILITY,
   PASSWORD_MANAGERS_CAPABILITY,
+  PENDING_APPROVAL_CAPABILITY,
   PROMPT_CACHE_TTL_CAPABILITY,
   PROVIDER_ACCOUNT_RELAY_CAPABILITY,
   PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY,
@@ -631,6 +633,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   HOST_TURN_LIMITS_CAPABILITY,
   STORAGE_USER_FILES_CAPABILITY,
   WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
+  PENDING_APPROVAL_CAPABILITY,
   PROVIDER_ACCOUNT_KEYS_CAPABILITY,
 ] as const;
 
@@ -859,6 +862,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== HOST_TURN_LIMITS_CAPABILITY &&
     capability !== STORAGE_USER_FILES_CAPABILITY &&
     capability !== WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY &&
+    capability !== PENDING_APPROVAL_CAPABILITY &&
     capability !== PROVIDER_ACCOUNT_KEYS_CAPABILITY,
 );
 /**
@@ -962,6 +966,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   HOST_TURN_LIMITS_CAPABILITY,
   STORAGE_USER_FILES_CAPABILITY,
   WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
+  PENDING_APPROVAL_CAPABILITY,
   PROVIDER_ACCOUNT_KEYS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
@@ -1149,6 +1154,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== HOST_TURN_LIMITS_CAPABILITY &&
       capability !== STORAGE_USER_FILES_CAPABILITY &&
       capability !== WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY &&
+      capability !== PENDING_APPROVAL_CAPABILITY &&
       capability !== PROVIDER_ACCOUNT_KEYS_CAPABILITY,
   );
 }

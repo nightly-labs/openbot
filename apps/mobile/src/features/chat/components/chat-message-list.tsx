@@ -288,6 +288,9 @@ interface ChatMessageListProps {
   browserRequests?: readonly BrowserTakeoverRequest[];
   serverName?: string;
   onRespondApproval?: (approval: PendingApproval, decision: ApprovalDecision) => Promise<void>;
+  /** True when the server can send the whole copy of an approval that the phone has only in part. */
+  readsWholeApprovals?: boolean;
+  onLoadWholeApproval?: (approval: PendingApproval) => Promise<void>;
   foreground: ViewStyle["backgroundColor"];
   historyState: "ready" | "connecting" | "waiting" | "loading" | "error";
   /** True while the chat shows the messages that the phone kept and reads its latest page. */
@@ -1300,6 +1303,8 @@ export const ChatMessageList = memo(function ChatMessageList({
   browserRequests = NO_BROWSER_REQUESTS,
   serverName = "",
   onRespondApproval,
+  readsWholeApprovals = false,
+  onLoadWholeApproval,
   foreground,
   historyState,
   catchingUp = false,
@@ -1994,6 +1999,8 @@ export const ChatMessageList = memo(function ChatMessageList({
                               serverName={serverName}
                               canAnswer={canSend}
                               respond={(decision) => onRespondApproval(approval, decision)}
+                              readsWhole={readsWholeApprovals && onLoadWholeApproval !== undefined}
+                              loadWhole={() => onLoadWholeApproval?.(approval) ?? Promise.resolve()}
                             />
                           ))}
                         </View>

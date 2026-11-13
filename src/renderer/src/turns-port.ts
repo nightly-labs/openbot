@@ -17,6 +17,7 @@ export interface TurnsPort {
     | "listQueue"
     | "listRoutines"
     | "listWaits"
+    | "readPendingApproval"
     | "reorderQueue"
     | "respondToApproval"
     | "respondToBrowserTakeover"

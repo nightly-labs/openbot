@@ -11,6 +11,7 @@
 // where each routine runs (`routine-run-place-v1`) over stand-in routine records,
 // a password that an admin saves from the secure card (`browser-secret-vault-v1`),
 // a transfer file larger than one part, sent and read in parts (`instance-transfer-chunks-v1`),
+// the whole copy of a pending approval (`pending-approval-v1`),
 // direct-message isolation, agents hidden from an older
 // protocol, the queue routes, message delete (`message-delete-v1`) under the agent roles, the attachment and file routes with their size limits,
 // a Grok Bot export sent in parts (`agent-import-v2`) to the real import service, and the error
@@ -273,6 +274,10 @@ import {
   PASSWORD_MANAGERS_CODECS,
   PASSWORD_MANAGERS_ROUTES,
 } from "@openbot/contracts/team-protocol/password-managers-v1";
+import {
+  PENDING_APPROVAL_CAPABILITY,
+  PENDING_APPROVAL_ROUTES,
+} from "@openbot/contracts/team-protocol/pending-approval-v1";
 import {
   PROVIDER_ACCOUNT_KEYS_CAPABILITY,
   PROVIDER_ACCOUNT_KEYS_ROUTES,
@@ -1401,6 +1406,24 @@ const fakeAgents: TeamApiAgents = {
     return Effect.void;
   },
   agentIdForRequest: () => undefined,
+  pendingApproval: (requestId) => {
+    record("pendingApproval", requestId);
+    // Longer than a runtime snapshot carries (240 characters), so only this read gives all of it.
+    if (requestId === 7)
+      return {
+        requestId: 7,
+        agentId: "agent-ada",
+        threadId: "thread-ada",
+        turnId: "turn-ada",
+        kind: "permissions",
+        command: `Long report\n\n${"r".repeat(5_000)}`,
+        cwd: null,
+        reason: sourceText("status.agent.reportProblem"),
+        grantRoot: null,
+        permissions: null,
+      };
+    return undefined;
+  },
   respondToPrompt: unused("respondToPrompt"),
   respondToApproval: unused("respondToApproval"),
   respondToBrowserSecret: (input) => Effect.sync(() => record("respondToBrowserSecret", input)),
@@ -10774,6 +10797,83 @@ try {
           ["agent-ada", "wait-closed"],
         ]),
       [summary(cancelled), summary(closed)],
+    );
+  }
+
+  // ---- The whole copy of a pending approval (pending-approval-v1) ----
+  {
+    const capabilities = [PENDING_APPROVAL_CAPABILITY];
+    const v9 = { capabilities, protocol: TEAM_PROTOCOL_V9 };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises pending-approval-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(PENDING_APPROVAL_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(PENDING_APPROVAL_CAPABILITY),
+      summary(compatibility),
+    );
+    const unsupported = await call("POST", PENDING_APPROVAL_ROUTES.read, {
+      token: bobToken,
+      json: { agentId: "agent-ada", requestId: 7 },
+    });
+    const hiddenAgent = await call("POST", PENDING_APPROVAL_ROUTES.read, {
+      token: bobToken,
+      capabilities,
+      protocol: 6,
+      json: { agentId: "agent-pi", requestId: 7 },
+    });
+    const missingAgent = await call("POST", PENDING_APPROVAL_ROUTES.read, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-gone", requestId: 7 },
+    });
+    accessLevels = { revision: 22, everyone: { "agent-ada": "view" }, roles: [] };
+    const viewer = await call("POST", PENDING_APPROVAL_ROUTES.read, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", requestId: 7 },
+    });
+    accessLevels = { revision: 23, everyone: {}, roles: [] };
+    check(
+      "a read without the capability, of a hidden or missing agent, or by a member who can only view is refused",
+      errorIs(unsupported, 400, sourceText("error.team.pendingApprovalUnsupported")) &&
+        errorIs(hiddenAgent, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(missingAgent, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(viewer, 403, sourceText("error.team.agentViewOnly")) &&
+        callsOf("pendingApproval").length === 0,
+      [summary(unsupported), summary(hiddenAgent), summary(missingAgent), summary(viewer)],
+    );
+    const read = await call("POST", PENDING_APPROVAL_ROUTES.read, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", requestId: 7 },
+    });
+    const command = String(field(read.body, "approval", "command"));
+    check(
+      "a member reads the whole copy of a pending approval, with the text that a runtime snapshot cuts",
+      read.status === 200 &&
+        field(read.body, "approval", "requestId") === 7 &&
+        field(read.body, "approval", "agentId") === "agent-ada" &&
+        command.length > 5_000 &&
+        command.endsWith("r".repeat(5_000)),
+      { status: read.status, commandLength: command.length },
+    );
+    const otherAgent = await call("POST", PENDING_APPROVAL_ROUTES.read, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-oc", requestId: 7 },
+    });
+    const closed = await call("POST", PENDING_APPROVAL_ROUTES.read, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", requestId: "request-closed" },
+    });
+    check(
+      "a request of another agent and a request that no longer waits are refused as closed",
+      errorIs(otherAgent, 409, sourceText("error.backend.approvalInactive")) &&
+        errorIs(closed, 409, sourceText("error.backend.approvalInactive")) &&
+        !JSON.stringify(otherAgent.body).includes("r".repeat(100)),
+      [summary(otherAgent), summary(closed)],
     );
   }
 

@@ -184,6 +184,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "Nenhum agente deste servidor mostrou este link de login.",
   "error.team.hostPersonalityUnsupported": "Esta conexão não suporta a personalidade do servidor.",
   "error.team.agentWaitsUnsupported": "Esta conexão não suporta esperas abertas.",
+  "error.team.pendingApprovalUnsupported": "Esta conexão não permite ler uma aprovação completa.",
   "error.team.messagePinsUnsupported": "Esta conexão não oferece suporte a mensagens fixadas.",
   "error.team.queuedMessageThreadUnsupported":
     "Esta conexão não suporta executar uma mensagem na fila como um novo tópico.",
