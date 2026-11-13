@@ -8,12 +8,12 @@ import type { MobileFeatureConfig, MobileLatestVersions } from "@openbot/contrac
  */
 export const MOBILE_FEATURE_CONFIG: MobileFeatureConfig = {
   cloudServers: {
-    ios: { upTo: "1.4.7" },
-    android: { upTo: "1.4.7" },
+    ios: { upTo: "1.4.9" },
+    android: { upTo: "1.4.9" },
   },
   browser: {
-    ios: { upTo: "1.4.7" },
-    android: { upTo: "1.4.7" },
+    ios: { upTo: "1.4.9" },
+    android: { upTo: "1.4.9" },
   },
 };
 
@@ -23,6 +23,16 @@ export const MOBILE_FEATURE_CONFIG: MobileFeatureConfig = {
  * Worker deploy.
  */
 export const MOBILE_LATEST_VERSIONS: MobileLatestVersions = {
-  ios: "1.4.7",
-  android: "1.4.7",
+  ios: "1.4.9",
+  android: "1.4.9",
 };
+
+/**
+ * The first Android version that has its APK on GitHub, from the `Stage the Android APK` workflow.
+ * From this version on, the site offers the APK of the newest Google Play version above, for a phone
+ * with no Google Play (`apps/auth-api/src/lib/android-apk.ts`). A change of this file on main makes
+ * the APK of that version public (the `Publish the Android APK` workflow). 1.4.9 is from before
+ * these workflows. To offer an older version, stage its APK with the first workflow, then lower
+ * this value. `null` hides the APK download.
+ */
+export const ANDROID_APK_FIRST_VERSION: string | null = "1.4.10";

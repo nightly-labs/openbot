@@ -151,6 +151,91 @@ Troubleshooting:
   Omnisend's guide adds a separate server for each brand with a `?brand=` query
   parameter; add it in the MCP servers settings and select Sign in.
 
+## Honcho
+
+The listing connects to Honcho's hosted MCP server at `https://mcp.honcho.dev`
+(<https://honcho.dev/docs/v3/guides/integrations/mcp>). It answers 401 with a
+`Bearer` challenge. The protected-resource metadata names
+`https://api.honcho.dev`, which has dynamic client registration with S256, so the
+user signs in through the browser. Honcho's documentation describes only keys, so
+the listing keeps a key flow: `Authorization: Bearer hch-…` from
+<https://app.honcho.dev>.
+
+The server also reads an optional `X-Honcho-Workspace-ID` header. The listing
+does not ask for it: the sign-in flow cannot send it, and the connect form shows
+every key field as a password. Each workspace tool takes a `workspace_id`, and
+the agent can find one with `list_workspaces`.
+
+A self-hosted Honcho: run the `mcp` package of
+<https://github.com/plastic-labs/honcho> with `HONCHO_API_URL` set to the
+instance, and add `http://127.0.0.1:3000/mcp` in the MCP servers settings.
+
+## Hindsight
+
+The listing connects to the multi-bank address of Hindsight Cloud,
+`https://api.hindsight.vectorize.io/mcp`, and not to `/mcp/{bank_id}`. One
+address serves every user, and the agent gets `list_banks`, `create_bank` and
+`get_bank_stats`. Each tool takes an optional `bank_id`; with none, Hindsight
+uses the bank `default` and makes it on first use.
+
+The address answers 401 with a `Bearer` challenge and has dynamic client
+registration with S256, so the user signs in through the browser and chooses an
+organization. The server has no revocation endpoint. The key flow sends
+`Authorization: Bearer hsk_…` from the Connect page of
+<https://ui.hindsight.vectorize.io>. The optional `X-Bank-Id` header is not in
+the listing, for the same reasons as the Honcho workspace header.
+
+A self-hosted Hindsight serves the same tools at `http://localhost:8888/mcp`,
+with no key by default. Add it in the MCP servers settings.
+
+## Postiz
+
+The listing connects to Postiz's own MCP server at
+`https://mcp.postiz.com/mcp-oauth-dynamic`. Postiz's documentation
+(<https://docs.postiz.com/mcp/setup>) names only `https://mcp.postiz.com/mcp`,
+which takes an API key and has no sign-in. The `-oauth-dynamic` path is the one
+that Postiz's source names for clients that register themselves
+(`libraries/nestjs-libraries/src/chat/start.mcp.ts` in
+<https://github.com/gitroomhq/postiz-app>). It answers 401 with a `Bearer`
+challenge and has dynamic client registration with S256, so the user signs in
+through the browser. Postiz access tokens do not expire, and the server lists no
+`refresh_token` grant.
+
+The same path also takes the API key from Settings › Developers in Postiz as
+`Authorization: Bearer <key>`, so the listing keeps a key flow as a second way
+in. All Postiz cloud plans include API access; there is no free plan.
+
+`schedulePostTool` takes `type` `draft`, `schedule` or `now`; `now` publishes
+immediately.
+
+Troubleshooting:
+
+- "Invalid API Key or OAuth token": the key is wrong or was rotated. Copy it
+  again from Settings › Developers, or sign in instead.
+- A self-hosted Postiz: add an MCP server with the backend address of the
+  instance (`NEXT_PUBLIC_BACKEND_URL`) followed by `/mcp`, and the same
+  `Authorization` header, in the MCP servers settings.
+
+## TryPost
+
+The listing connects to TryPost's own MCP server at `https://app.trypost.it/mcp/trypost`
+(<https://docs.trypost.it/ai/introduction>). It answers 401 with a `Bearer` challenge. The
+protected-resource metadata names `https://app.trypost.it`, which has dynamic client registration
+with S256, so the user signs in through the browser and types no key. On the consent screen, the
+user chooses the workspace that the connection can use. One connection works on one workspace.
+
+TryPost Cloud needs an active subscription for MCP. A self-hosted TryPost does not.
+
+Troubleshooting:
+
+- The server replies 402 with "Active subscription required.": the TryPost Cloud account of the
+  workspace has no active subscription. Subscribe in TryPost, then test the server again.
+- The agent does not see the posts or channels that the user expects: the connection uses another
+  workspace. In the MCP servers settings, select Sign out on the TryPost server, then Sign in, and
+  choose the correct workspace.
+- A self-hosted TryPost: add an MCP server with the address of the instance followed by
+  `/mcp/trypost`, in the MCP servers settings, and select Sign in.
+
 ## ElevenLabs
 
 The listing connects to ElevenLabs' hosted MCP server at `https://api.elevenlabs.io/v1/mcp`
@@ -167,3 +252,23 @@ Troubleshooting:
 
 - The sign-in page refuses the redirect address: another program uses port 28417, so OpenBot
   listens on another port that the document does not list. Close that program and restart OpenBot.
+
+## Sunra
+
+The listing connects to Sunra's hosted MCP server at `https://mcp.sunra.ai`
+(<https://mcp.sunra.ai/.well-known/oauth-authorization-server>). The server uses OAuth 2.1 with
+dynamic client registration and client ID metadata documents, PKCE S256, refresh tokens and the
+scope `mcp`, so the user signs in through the browser and types no key. The connection pays from the
+Sunra workspace that the user selected at sign-in: Personal or a Team. `select_workspace` changes
+it; an agent must not change it without a request from the user.
+
+A create tool (`create_image`, `create_video`, `create_audio`, `create_model3d`) without
+`auto_confirm` only stages the work and returns a quote with `estimated_credits` and a `plan_id`.
+`confirm_execution`, or `auto_confirm` on the create call, spends the credits. The agent reads the
+result with `get_job`.
+
+Troubleshooting:
+
+- "Insufficient credits": the selected workspace has too few credits. Sunra gives free daily
+  credits; top-ups are only for subscribers. See <https://sunra.ai/pricing>.
+- A video generation fails: video models need an active Sunra plan.

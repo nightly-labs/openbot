@@ -1,0 +1,33 @@
+{
+  "slug": "highlevel",
+  "name": "HighLevel",
+  "tagline": "CRM and marketing workspace",
+  "description": "HighLevel lets agents read and update contacts, conversations, opportunities, and calendars in the signed-in HighLevel sub-account. Each user signs in to their own HighLevel account through the browser.",
+  "category": "productivity",
+  "creatorName": "HighLevel",
+  "iconUrl": "https://storage.googleapis.com/msgsndr/knES3eSWYIsc5YSZ3YLl/media/62b48689c85eccb36ca941fc.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-new-leads", "text": "List the contacts that were added this week." },
+    { "id": "prompt-pipeline", "text": "Summarize the opportunities in my sales pipeline by stage." },
+    { "id": "prompt-appointments", "text": "What appointments are booked on my calendar tomorrow?" }
+  ],
+  "apps": [
+    {
+      "id": "app-highlevel-mcp",
+      "name": "HighLevel",
+      "description": "Contact, conversation, opportunity, and calendar access, over HighLevel's MCP server with browser sign-in.",
+      "iconUrl": "https://storage.googleapis.com/msgsndr/knES3eSWYIsc5YSZ3YLl/media/62b48689c85eccb36ca941fc.png",
+      "server": {
+        "name": "highlevel",
+        "transport": "http",
+        "url": "https://services.leadconnectorhq.com/mcp",
+        "auth": [{ "id": "highlevel-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.gohighlevel.com",
+  "privacyPolicyUrl": "https://www.gohighlevel.com/privacy-policy",
+  "termsUrl": "https://www.gohighlevel.com/terms-of-service",
+  "skills": []
+}

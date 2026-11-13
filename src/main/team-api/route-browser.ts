@@ -18,6 +18,11 @@ import {
   decodeBrowserSignInImport,
 } from "@openbot/contracts/team-protocol/browser-sign-in-v1";
 import {
+  BROWSER_TEACH_CAPABILITY,
+  BROWSER_TEACH_MAX_STEPS,
+  BROWSER_TEACH_ROUTES,
+} from "@openbot/contracts/team-protocol/browser-teach-v1";
+import {
   BROWSER_USER_CONTROL_CAPABILITY,
   BROWSER_USER_CONTROL_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-user-control-v1";
@@ -142,6 +147,21 @@ export async function routeBrowser(
         .filter((tab) => tab.userControl && !hidden(tab.id))
         .map((tab) => tab.id),
     });
+  }
+
+  // Behind `browser-teach-v1`. A member shows a task in an agent's tab that they can see. The host
+  // gives the steps only to the session that started the recording.
+  if (method === "POST" && Object.values(BROWSER_TEACH_ROUTES).some((path) => path === url.pathname)) {
+    if (!capabilities.has(BROWSER_TEACH_CAPABILITY))
+      throw new HttpError(400, sourceText("error.backend.browserTeachUnsupported"));
+    const body = await readJson(request);
+    const holder = { kind: "member" as const, memberId: member.id, sessionId };
+    if (url.pathname === BROWSER_TEACH_ROUTES.start) {
+      await runCauseEffect(browser.startTeach(tabId(body), holder));
+      return json(200, {});
+    }
+    if (!isBoolean(body.save)) throw new HttpError(400, "save is required.");
+    return json(200, { steps: browser.stopTeach(tabId(body), holder, body.save).slice(0, BROWSER_TEACH_MAX_STEPS) });
   }
 
   // Behind `browser-page-state`. A stop ends the load now, before the queued tab operations; the

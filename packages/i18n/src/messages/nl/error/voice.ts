@@ -35,5 +35,7 @@ export const messages = {
   "error.voice.live.signIn": "Meld je met je ChatGPT-account aan bij Codex om live spraak te gebruiken.",
   "error.voice.live.unavailable":
     "OpenAI kon live spraak niet starten. Het probleem ligt bij OpenAI. Probeer het later opnieuw.",
+  "error.voice.live.refused":
+    "OpenAI weigerde live spraak te starten. Probeer het later opnieuw, of zet live spraak uit in Instellingen om met je stem te praten.",
   "error.voice.live.off": "Codex live spraak staat uit. Zet het aan in Instellingen → Spraak.",
 } as const satisfies PartialTranslation<typeof source>;

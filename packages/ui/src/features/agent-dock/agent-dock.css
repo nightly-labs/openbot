@@ -229,6 +229,17 @@
   transform: scale(1.12);
 }
 
+/* A dragged seat is lifted above the other seats, which make room for it. */
+.agent-dock-seat[data-dragging] {
+  z-index: 1;
+}
+
+.agent-dock-seat[data-dragging] .agent-dock-seat-button {
+  color: var(--openbot-text-primary);
+  cursor: grabbing;
+  transform: scale(1.12);
+}
+
 .agent-dock-seat-button .agent-avatar {
   /* The plush art sits low in its box. Every app surface lifts it by 14% of the face size. */
   --agent-avatar-optical-offset: calc(40px * -0.14);
@@ -271,6 +282,12 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
+}
+
+/* A Bloub drawing is larger than its avatar box. Without the clip, the last row overflows the list by a
+ * few pixels, so a short list scrolls and shows the bottom fade. The list already cut that part. */
+.agent-dock-add-list > [role="menuitem"] {
+  overflow-y: clip;
 }
 
 .agent-dock-add-list::-webkit-scrollbar {
@@ -608,16 +625,23 @@
   font-size: var(--openbot-text-sm);
 }
 
+/* The composer's wrap places the mention picker above the composer, in the panel. The composer has its
+   own margins, and the editor keeps the dock's height limit. */
+.agent-dock-composer-wrap.composer-wrap {
+  --composer-editor-limit: initial;
+
+  padding: 0;
+}
+
+/* As in the main chat, the picker is 12px narrower on each side than the composer. */
+.agent-dock-composer-wrap .mention-picker {
+  --mention-picker-side-inset: calc(var(--openbot-space-3) + 12px);
+}
+
 /* The app's compact composer, as the side-question and diagram chat panels use it. */
 .agent-dock-composer.composer[data-compact] {
   grid-template-columns: minmax(0, 1fr) auto;
   margin: var(--openbot-space-2) var(--openbot-space-3) var(--openbot-space-3);
-}
-
-/* Panel radius 24 = composer radius 12 + gap 12, so the corners are concentric. A focus halo would
-   make the gap 9 px at the corner; the border alone shows focus. */
-.agent-dock-composer.composer[data-compact]:focus-within {
-  box-shadow: none;
 }
 
 .agent-dock-composer.composer[data-compact] > .composer-input-label {

@@ -117,14 +117,22 @@ because a frame in another process can keep its active element after the page ta
 `bun run test:browser --scenario=typing-focus` covers it and writes
 `.openbot-build/browser-typing-focus.json`.
 The browser session and service-worker fallback remove the `OpenBot/` and `Electron/` user-agent
-tokens. They keep the installed Chromium version and host platform. Requests to `accounts.google.com`
+tokens. They keep the installed Chromium major version and host platform, and give the other version
+parts as `0.0.0` (`Chrome/156.0.0.0`), as Chrome does: some bot checks refuse the full version that
+Electron sends. The `Accept-Language` header adds the base language of each regional language
+(`en-GB,en;q=0.9`), also as Chrome does. Requests to `accounts.google.com`
 keep the `Electron/` token because Google rejects the account identifier step without it. This
 exception does not change the page identity or the identity sent to other sites.
 Electron provides native `navigator.userAgentData` but no client-hint request headers. On HTTPS and
 loopback HTTP, the host supplies the brand list, desktop flag, and platform hints. The brand list must
 be the same as `navigator.userAgentData.brands`, with the GREASE brand and its order (Chromium
 chooses both from the major version). Cloudflare rejects a request whose brands differ from the page.
-It preserves hints supplied by Chromium and does not add high-entropy hints. The focused check is
+It preserves hints supplied by Chromium. As Chrome does, it adds a high-entropy hint (full version,
+platform version, architecture, bitness, model, form factor) only after the response of a page load
+of that origin asks for it with `Accept-CH`, and only on requests from a page of that origin. Each
+value is the one that `getHighEntropyValues()` gives the page. The record is in memory, so the first
+load after a restart is as a first visit. Windows sends no platform version: the page reads a
+contract version that the host cannot compute. The focused check is
 `bun run test:browser --scenario=identity`; add `--google-live` for the Google identifier check.
 The local identity report is `.openbot-build/browser-identity.json`.
 Website popups are adopted into managed `WebContentsView` tabs through Electron's window creation
@@ -168,16 +176,35 @@ Sourcepoint) are not handled. `bun run test:browser --scenario=cookie-banner` co
 Each snapshot also looks for a bot check (`browser-challenge.ts`). It reads the DOM of the main frame
 in an isolated world: vendor markers of the interstitial page (Cloudflare, DataDome, PerimeterX,
 Imperva, Akamai, AWS WAF) and, only on a short page, captcha frames and phrases such as "verify you
-are human". A long page that only mentions a captcha does not count. A check that passes by itself
+are human". A long page that only mentions a captcha does not count. Akamai markers also count only
+on a short page, because Akamai can leave them, hidden, on the normal page after its check passed. A check that passes by itself
 (`non-interactive`) makes the tab read wait: it reads the page again every second for up to 15
 seconds, and stops at once when the tab closes, a person takes control, or the tab holds a secret.
 All reads of one document share the 15 seconds: a read with a shorter timeout, such as `navigate`,
 leaves the rest for the next read and reports `checking`, whose `next` asks for a snapshot. A
 check that stays after the full wait reads as `needs-user` at once.
-The snapshot then has a `challenge` field with `status` (`cleared`, `checking`, `needs-user` or `blocked`), the
-vendor, the wait, and `next`, the step that the agent takes. A check that needs a person asks for
-`request_takeover` (in a routine run, a report). A block asks for a report. Each `next` also tells
-the agent not to solve, reload, or retry the check, so the guidance needs no separate rule. The idea and the vendor
+The snapshot then has a `challenge` field with `status` (`cleared`, `checking`, `click-once`,
+`needs-user` or `blocked`), the vendor, the wait, and `next`, the step that the agent takes. A check
+that needs a person asks for `request_takeover` (in a routine run, a report). A block asks for a
+report. Each `next` also tells the agent not to solve, reload, or retry the check, so the guidance
+needs no separate rule.
+
+Many checks of the Turnstile, reCAPTCHA and hCaptcha widgets pass with one click on their checkbox.
+The script finds the frame of a widget of the normal size in the viewport and gives the checkbox
+point, 28 px from the left edge and in the middle. Turnstile puts its frame in a closed shadow root,
+which the page script cannot see, and its host element is as wide as the form. When the script
+finds a Turnstile response field without a token, the main process finds the frame through CDP:
+`DOM.getFrameOwner` for each child frame, also for frames in other processes, then the frame's
+`src` and its box from `DOM.getBoxModel`. A field without a visible frame (invisible mode) is not a
+check. A Turnstile widget often passes by itself in 1 to 2 seconds, and an early click can look like
+a bot, so the read that would offer its checkbox first waits up to 3 seconds for a token. The first
+read of a document that still needs a person then has `click-once` and a `point` target in place of `needs-user`. The agent clicks it with the
+ordinary `click` tool, so ownership, user control and the cursor stay the same. The next read of
+that document waits up to 6 seconds for the check to pass; a visible image puzzle or a block ends the
+wait at once, because only a person solves a puzzle. Later reads of the document ask for a person
+and do not offer the click again. A widget whose response field has a token passed: neither its
+frame nor the generic phrases count then, because the page keeps its text. The host never solves a
+puzzle and sends no page data to a solver service. The idea and the vendor
 list come from anomalyco/browse; the code is our own.
 
 `bun run bench:browser-tools --tasks=challenge-interstitial,challenge-interactive` measures it with
@@ -187,6 +214,58 @@ clicked "I am human" and read the page again: median 7 tool calls, $0.033 for 5 
 after 4 seconds, the agent opens the page with `navigate`. Before, it waited and read again: median
 4 calls and 129k input tokens. After, `navigate` returned the page behind the check: median 2 calls
 and 75k tokens.
+
+A memory can name a site (`site`, migration 60): a lowercase host without `www.`. The agent sets it
+with `openbot.remember` (a host or a URL), for example how to work a site. A snapshot of a page then
+has `siteMemories`, up to 5 of the agent's memories for the page's host and its parent domains
+(`app.example.com` also shows `example.com`), newest first. A tab shows them one time per host and
+turn, so the next pages of the same site in that turn do not show them again. A secret tab shows none.
+An essential memory is already in the agent's instructions with its site, so a snapshot leaves it out.
+Only a snapshot that reached the agent counts as shown. The host reads them from SQLite
+(`AgentMemoryStore.forHost`); nothing leaves the computer except the snapshot that goes to the
+provider, as for every other snapshot field. The Team API leaves out `site`, so the released memory
+shape stays the same. An instance transfer does not carry the site.
+The background memory review can add or update a memory with a `site` too. Its prompt asks it to keep
+how one site works, as the agent found it in the chat (where a control is, a step that worked after
+one failed), as a site memory, and a class of task as a skill. The review drops a site that is not a
+host and keeps the fact. The browser guidance has no site memory text: the agent context budget
+(`tools/agent-context/budget.json`) leaves no space for it, and the review saves these steps.
+
+"Learn from my browsing" (Server settings → General → Agents, off by default, `browsing-memory-v1`)
+lets the review also learn from what a person does in an agent's tab. `BrowserHost` records steps only
+while a person holds the tab (takeover or Take control), so no step is the agent's own. It skips a
+secret tab, a private sign-in, a tab without an owner agent, and a page that is not http(s). A step is
+a page that loads (host, path and title, without the query or the hash; `stepPlace` replaces a
+path part that looks like a code, such as a reset token, with `:id`) or a press on a control
+(`input-event` mouseDown; `browser-user-click.ts` reads the role and the name in isolated world 1020,
+with a 1 second limit). A press outside a control, on a password field, or on a field whose
+`autocomplete` is a password, a one-time code or a card value, gives no step. A field gives its label,
+never its value; key presses are never read. `UserBrowsingLog` keeps the steps in
+`openbot-browsing-steps-v1.json` (no migration), the newest 80 per agent. The next memory review of the
+agent reads all of them in a `<user_browsing>` block, with secrets redacted, and deletes the steps
+that it read after its result decodes. A step that no review read goes after 30 days (at start and at
+each change). Turning the setting off deletes the file, and deleting an agent deletes its steps. Only
+the review reads the steps; the agent has no tool to search them. Browsing alone does not start a
+review: the steps wait for the next review of that chat. `bun scripts/browser-user-control-e2e.ts`
+covers the capture rules in Electron, and `bun run test:memory-review` covers the review.
+
+"Teach a task" (composer `+` menu, `browser-teach-v1`) uses the same step recorder for a task that a
+person shows on purpose. It does not depend on the setting above. The menu item opens the full view
+with a teach bar above the page (`BrowserTeachBar`) and no dock; "Start recording" in the bar calls
+`startTeach`. `BrowserHost.startTeach` gives the
+agent's tab to the person and keeps the steps in memory for that tab, not in `UserBrowsingLog`: at
+most 200 steps and 10 minutes, with the same rules for a page and a press. The bar then shows the
+time on a button that saves the recording, a discard button, and a frame around the page. `stopTeach` gives the tab back; only the
+holder that started the recording can end it, and it gets the steps only with `save`. The recording
+also ends, with no steps, when the control of the tab ends. On Save the client sends a short
+user message that asks for a skill and a plain answer, with the numbered steps in an attached text
+file `recorded-task.txt` (`browser-teach-message.ts`, `sendCardFile`), and closes the full view so that
+the chat shows. The request is in the message, not in the file: an agent does not obey a file. A
+recording with no step after its first page sends nothing and shows a toast. When the chat cannot
+send, the steps go to the draft as text. The host stores no step. The
+menu item is not in a channel and not on mobile: a task of many steps on a web page does not fit a
+phone. `bun scripts/browser-user-control-e2e.ts` covers the recording, and
+`bun run test:team-api-routes` covers the routes.
 
 When the first read of a snapshot finds a loading marker that a person can see (`aria-busy="true"`,
 or a class that contains `skeleton` or `shimmer`), the snapshot waits in the page until the markers
@@ -416,6 +495,10 @@ whose profile no longer exists fails with `browserProfileMissing`; it never fall
 `#configureSession` applies the same user agent, headers, permissions and download policy to every
 partition. Shutdown and `flushPersistentStorage` flush every persistent partition.
 
+A reload, by the person or by an agent, uses `reloadIgnoringCache`: it gets the files of the page
+from the site again. A site can send a bad file that the browser keeps for hours, and a normal
+reload used that file again (#7772). Opening an address keeps the saved files.
+
 `src/main/browser-profile-service.ts` owns the operations: list, create (name of 1 to 60
 characters, unique, at most 100 profiles), update (name or color), clear data, delete, and assign.
 Clear and delete close the tabs in the partition before they clear its storage and cache. Delete also
@@ -620,11 +703,13 @@ resolves fields before consent and checks the document and origin again before e
 stops recording, suppresses page diagnostics, blocks inspection and capture, rejects remote input,
 and invalidates existing live-view streams. Capture protection remains after same-document navigation
 or an uncertain submission. After a completed submit action without document replacement, the host
-waits up to five seconds, then empties the filled fields. When every field is empty and an automation-world scan finds the
+waits up to five seconds, then empties the filled fields and their `value` attributes, which React
+keeps in step with the value. When every field is empty and an automation-world scan finds the
 value in no title, URL, text node, value, or attribute, including open shadow roots, it keeps the
 document so a single-page sign-in can show its next step, and blocks evaluation and recording in the
 opener group until a main-frame navigation, which also clears history. Otherwise it loads the current
 URL with GET to replace the document without replaying a form POST. Failure retains protection and falls back to takeover. A new document releases it and
 clears navigation history; manual takeover
 completion alone cannot release it. Secrets are not retried. Authentication inside unsupported frames,
-unclear OAuth account selection, CAPTCHA, passkeys, and payment confirmation use takeover.
+unclear OAuth account selection, CAPTCHA (after the one checkbox click that a snapshot offers),
+passkeys, and payment confirmation use takeover.

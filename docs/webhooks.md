@@ -29,7 +29,8 @@ and the secret stay the same. Only a person's message can start these tools: a r
 another agent's message cannot make or change a webhook routine.
 
 To replace the secret, make a new one in the routine editor and update the sender. The old secret
-stops working immediately. A secret has the format `whsec_<43 base64url characters>`.
+stops working immediately. A secret has the format `whsec_<44 base64 characters>`, as the
+[Standard Webhooks](https://www.standardwebhooks.com/) specification says.
 
 When you change the routine to **Schedule**, or delete the routine, its URL stops working. If you
 change it back to **Webhook**, the routine gets a new URL and a new secret.
@@ -131,7 +132,8 @@ if (response.status !== 200 && response.status !== 202) {
 
 A `202` response does not mean that the run is complete. Look at the routine history for the run
 result. The relay does not keep requests while the host is offline. If you do not retry, the event
-is lost.
+is lost. When the host is a hosted server that sleeps, the `503` also starts it, so retry: a hosted
+server is usually online again within a few minutes.
 
 ### Retries and duplicates
 
@@ -168,6 +170,8 @@ you cannot give them the OpenBot secret:
 Svix also sends these headers with the `svix-` prefix. OpenBot accepts both names. The signed bytes
 are `<webhook-id>.<webhook-timestamp>.<body>`. The HMAC key is the base64 data after `whsec_` in the
 secret, as the specification says, or the complete secret as UTF-8 text, as Composio uses it.
+A secret that an older OpenBot version made is base64url (`-` and `_`, no `=`). Standard Webhooks
+senders need base64, so make a new secret in the routine editor and copy it into the sender.
 
 The body must be a JSON object with a `type` string. OpenBot reads the request as follows:
 

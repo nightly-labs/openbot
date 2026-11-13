@@ -7,6 +7,7 @@ apps/
   auth-api/          Public web and /app browser entry, accounts, memberships, connection tickets, and billing
   discord-app/       Developer Portal settings of the OpenBot Discord app (no code)
   mobile/            Expo React Native client for remote team hosts
+  mobile-updates/    Cloudflare Worker that gives the mobile app its over-the-air updates from private R2 storage
   site-router/       Cloudflare Worker that serves published sites from private R2 storage
   slack-app/         Slack CLI projects with the OpenBot Slack app manifests (production, development)
   status/            Public status page on GitHub Pages, and the check and webhook scripts of its workflow

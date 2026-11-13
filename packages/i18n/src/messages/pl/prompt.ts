@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/prompt";
 
 export const messages = {
-  "prompt.inputRequired": "Wymagana odpowiedź",
   "prompt.question.label": "Pytania agenta",
   "prompt.question.cancelled": "Pytania anulowane",
   "prompt.question.expired": "Pytania wygasły",
@@ -12,15 +11,12 @@ export const messages = {
   "prompt.question.next": "Dalej",
   "prompt.question.cancel": "Anuluj pytania",
   "prompt.question.privatePlaceholder": "Wpisz prywatną odpowiedź",
-  "prompt.customPlaceholder": "Wpisz własną odpowiedź",
   "prompt.question.customAnswerFor": "Własna odpowiedź na: {question}",
   "prompt.question.skip": "Pomiń",
   "prompt.question.chooseAll": "Wybierz wszystkie pasujące.",
   "prompt.question.somethingElse": "Coś innego",
   "prompt.question.emptyTitle": "Brak oczekujących pytań.",
   "prompt.question.emptyBody": "Agent będzie kontynuować, gdy będzie potrzebować kolejnej decyzji.",
-  "prompt.choice.hint": "Wybierz, co pasuje, lub wpisz własną odpowiedź.",
-  "prompt.choice.customLabel": "Własna odpowiedź",
   "prompt.approval.answerFailed": "Nie udało się odpowiedzieć na tę prośbę o zatwierdzenie. Spróbuj ponownie.",
   "prompt.approval.grantFailed": "Nie udało się zapisać stałego zatwierdzenia. Spróbuj ponownie.",
   "prompt.approval.label": "Zatwierdzenie agenta",

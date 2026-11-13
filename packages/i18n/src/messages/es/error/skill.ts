@@ -48,6 +48,9 @@ export const messages = {
   "error.skill.managedSlug": "OpenBot da a cada agente su propia habilidad {slug}. Ponle otro nombre a esta habilidad.",
   "error.skill.templateMarkdownTooLarge": "{name}: SKILL.md supera los 64 KB. Acórtalo antes de publicar.",
   "error.skill.localNoRevisions": "La habilidad local no tiene revisiones publicadas.",
+  "error.skill.localNotFound": "Esta habilidad local no existe. Comprueba su ID en la lista de habilidades locales.",
+  "error.skill.localRevisionNotFound":
+    "Esta habilidad local no tiene la revisión {revision}. Su última revisión es {latest}.",
   "error.skill.localNameTaken": "Ya existe una habilidad local con este nombre. Modifícala en su lugar.",
   "error.skill.localKeepName": "Mantén el nombre de la habilidad al modificarla.",
   "error.skill.localRelativeFolder":
@@ -57,4 +60,14 @@ export const messages = {
   "error.skill.localMissingSkillFile": "La carpeta de habilidades necesita SKILL.md en su raíz.",
   "error.skill.pathSymlink": "Las rutas de habilidades no pueden contener enlaces simbólicos.",
   "error.skill.folderNotRead": "{provider} no lee {folder}. Copia esta carpeta a {target}.",
+  "error.skill.githubLinkInvalid": "Pega un enlace a un repositorio o carpeta de GitHub.",
+  "error.skill.githubNotFound": "OpenBot no puede abrir {repository}. El repositorio es privado o no existe.",
+  "error.skill.githubNoSkills": "No hay ningún SKILL.md en {folder}.",
+  "error.skill.githubUnavailable": "OpenBot no puede leer GitHub ahora. Inténtalo de nuevo más tarde.",
+  "error.skill.githubRateLimited":
+    "GitHub limita la frecuencia con la que OpenBot puede leerlo sin una cuenta. Inténtalo de nuevo en una hora.",
+  "error.skill.githubTooLarge":
+    "OpenBot no puede leer todos los archivos de {repository}. El repositorio es demasiado grande.",
+  "error.skill.githubHostTooOld": "Actualiza este servidor para añadir habilidades desde GitHub.",
+  "error.skill.publishGithub": "{name} viene de GitHub. Solo puedes publicar las habilidades que creaste tú.",
 } as const satisfies PartialTranslation<typeof source>;

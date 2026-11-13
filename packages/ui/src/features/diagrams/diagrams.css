@@ -1404,6 +1404,8 @@
 /* The chat composer's compact row, without its attach button: the editor and the send button. */
 .diagram-chat-composer.composer[data-compact] {
   grid-template-columns: minmax(0, 1fr) auto;
+  /* A draft with more lines takes its room from the messages; the input does not get shorter. */
+  flex-shrink: 0;
   margin: var(--openbot-space-2);
 }
 

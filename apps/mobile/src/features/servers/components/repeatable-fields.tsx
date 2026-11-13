@@ -1,9 +1,11 @@
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
+import Plus from "lucide-react-native/icons/plus";
 import X from "lucide-react-native/icons/x";
 import { type ReactNode, useRef, useState } from "react";
 import { type TextInputProps, View } from "react-native";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
+import { RowIcon } from "@/features/settings/components/settings-row-icon";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { haptics } from "@/shared/lib/haptics";
 
@@ -63,7 +65,12 @@ function RepeatableRow({
 /** The last row of a list field. */
 function RepeatableAddRow({ label, disabled, onPress }: { label: string; disabled: boolean; onPress: () => void }) {
   return (
-    <SettingsRow disclosure={false} disabled={disabled} onPress={onPress}>
+    <SettingsRow
+      disclosure={false}
+      disabled={disabled}
+      leading={<RowIcon icon={Plus} tone="accent" />}
+      onPress={onPress}
+    >
       <Typography.Paragraph className="text-accent">{label}</Typography.Paragraph>
     </SettingsRow>
   );

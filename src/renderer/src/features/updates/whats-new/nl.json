@@ -1,5 +1,134 @@
 [
   {
+    "version": "0.69.0",
+    "date": "2026-11-12",
+    "notices": [
+      "Verborgen agents blijven nu werken. OpenBot heeft de routines uitgezet van agents die je vóór deze versie hebt verborgen, dus zet de routines aan die je wilt."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Zet een bericht in de chat van een agent vast: klik er met de rechtermuisknop op en kies Vastmaken. De knop voor vastgemaakte berichten in de chatkop toont de vastgemaakte berichten van alle chats van de agent.",
+          "De Bibliotheek heeft mappen en drie weergaven. Een agent kan ook de bestanden die hij bijvoegt opslaan in een map die je kiest.",
+          "Een taak aanleren: kies Een taak aanleren in het menu +, en doe daarna de taak in de browser van de agent. De agent slaat de stappen op als vaardigheid.",
+          "Bundel de accounts van een aanbieder in Instellingen. Agents gebruiken één account tot het bijna een gebruikslimiet bereikt, en daarna het volgende account.",
+          "Voeg vaardigheden toe vanuit GitHub: plak de link van een openbare repository in het zoekveld voor vaardigheden in de Marktplaats.",
+          "Serverinstellingen → Overdracht kan een volledige kopie van een server exporteren, en agents in één stap naar een andere server kopiëren.",
+          "Demp een agent via zijn menu in de zijbalk. Een gedempte agent stuurt geen meldingen en speelt geen geluid af."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Een bericht dat je naar een agent stuurt terwijl hij werkt, stuurt nu de lopende beurt bij. Om het zoals voorheen in de wachtrij te zetten, zet je Stuur agents bij terwijl ze werken uit in Instellingen → Agents.",
+          "Een verborgen agent blijft werken. Hij voert zijn routines uit en staat in Heeft je nodig als hij op je antwoord wacht.",
+          "De geopende server staat als logo onderaan de paginabalk. De knop Nieuw staat aan het einde van het zoekveld van de zijbalk.",
+          "OpenBot gebruikt Electron 45.3.0 met Chromium 156, en meer sites met een botcontrole laden in de browser van de agent."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot start sneller, vooral op Windows, en een trage computer blijft bruikbaar na de start.",
+          "OpenBot blijft reageren na een herstart als je veel taken of threads hebt.",
+          "Op Linux en Windows voltooit OpenBot zijn afsluiting wanneer je het hoofdvenster sluit.",
+          "Routines draaien op tijd nadat de klok van de computer is gecorrigeerd.",
+          "Tekst die je uit een chat kopieert, heeft niet langer lege regels aan het begin of het einde."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.68.0",
+    "date": "2026-11-11",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Kanaalinstellingen hebben een instelling Browser. Kies of elk lid, één lid of niemand de browser in het kanaal mag gebruiken.",
+          "Het zijpaneel van een kanaal heeft een paneel Browser en een paneel Bestanden. Ze tonen de tabbladen van de leden van het kanaal en de bestanden die in het kanaal zijn verstuurd.",
+          "Klik met de rechtermuisknop op het Dynamic Island of het agentdock om het te verbergen. Je kunt een agent ook naar een nieuwe plek op het dock slepen en de grootte van het dock wijzigen in Instellingen.",
+          "Je kunt de groep Ongelezen in de zijbalk uitzetten. Klik met de rechtermuisknop op de kop Ongelezen, of zet Chats sorteren op Handmatig.",
+          "Als een nieuwe versie 3 keer na elkaar niet kan starten, opent een herstelvenster. Je kunt het opnieuw proberen, de vorige versie downloaden of diagnostiek exporteren."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Een nieuwe versie gaat nu eerst naar ongeveer 1 op de 10 computers, en ongeveer een dag later naar alle computers. Om hem meteen te krijgen, selecteer je Zoeken naar updates.",
+          "Agents stellen vragen met opties in het vraagvenster. Kaarten met knoppen zijn alleen voor goedkeuringen."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Een chat die je hebt gelezen, blijft niet langer in de groep Ongelezen. Ongelezen zijthreads, zoals de thread van een routine, houden een agent daar niet langer vast.",
+          "Op Windows maken het agentdock en het Dynamic Island de muisaanwijzer niet langer traag in alle apps terwijl veel agents werken.",
+          "Een team stopt niet langer wanneer de leider zijn beurt eindigt zonder antwoord nadat zijn teamgenoten hebben gerapporteerd.",
+          "Een Claude-chat die te lang was geworden, start nu een nieuwe sessie met de chatgeschiedenis. Eerder mislukte elk bericht met \"Prompt is too long\".",
+          "Wanneer een Claude-account zijn limiet van 5 uur bereikt, gaat de agent naar zijn reservemodel of wacht hij tot de limiet is gereset.",
+          "Een agent kan een browserscreenshot als bestand opslaan en aan zijn antwoord toevoegen."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.67.1",
+    "date": "2026-11-10",
+    "notices": [],
+    "groups": [
+      {
+        "type": "fixed",
+        "items": [
+          "Gemini installeert en werkt weer bij op Windows. In 0.67.0 stopte het met een fout over een link of een speciaal bestand.",
+          "Een agent die een bericht stuurt naar een bezige teamgenoot, weet nu of het bericht in de lopende taak van die teamgenoot is terechtgekomen. Wacht het bericht, dan kan de agent je vertellen waarom.",
+          "Tijdens Computerbesturing zeggen agents niet meer dat hun cursor niet beschikbaar is. OpenBot tekent de cursor waar de agent klikt, scrolt of beweegt."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.67.0",
+    "date": "2026-11-10",
+    "notices": [
+      "Na deze update staat de Snelle modus uit voor elke Claude-agent. Gebruikte je die, zet hem dan weer aan in de modelkiezer."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Voeg met één opdracht een server toe op je eigen Linux-computer of VPS, of vraag een agent om hem daar via SSH te installeren.",
+          "Serverinstellingen → Overdracht kan nu de chatgeschiedenis, de kanalen en de workflows naar de nieuwe server verplaatsen.",
+          "Op Linux blijven het Dynamic Island en het agentdock boven andere vensters, net als op een Mac.",
+          "Zet in de modelkiezer de Snelle modus aan voor een Claude-agent, of kies Ultrasnel voor een Codex-agent.",
+          "Agents bewaren wat ze over een site leren als herinnering bij die site, en herhalen geen stappen die mislukten.",
+          "De catalogus Apps heeft 207 nieuwe apps, zoals monday.com, Miro, Dropbox en Zapier. Je verbindt ze door in de browser in te loggen."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Chats met ongelezen antwoorden staan bovenaan, in een groep Ongelezen. Kies Chats sorteren in het menu van de chatlijst om de volgorde te wijzigen.",
+          "Op een server waarvan je lid bent, zoals een VPS, hebben de desktop-app en de browser-app nu de meeste functies van deze computer.",
+          "Agents voegen OpenBot toe als co-auteur van hun git-commits. Jij blijft de auteur. Zet het uit in Jouw instellingen → Agents.",
+          "Agents voeren browsertaken uit in minder stappen en met ongeveer 18% minder tokens.",
+          "Gemini draait nu op de Antigravity CLI. Je Google-login blijft."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Een Claude-agent die je stopt, stopt nu binnen ongeveer 10 seconden, en de berichten in zijn wachtrij starten.",
+          "Op Windows kunnen agents de browser gebruiken terwijl het OpenBot-venster geminimaliseerd is of in het systeemvak staat.",
+          "Op macOS sluit “Herstarten om bij te werken” OpenBot niet meer af wanneer het vanaf de schijfkopie draait. Het vraagt je om OpenBot naar de map Apps te verplaatsen.",
+          "In een spraakgesprek stopt een kuch of een toetsaanslag het antwoord van de agent niet meer."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.66.0",
     "date": "2026-11-09",
     "notices": [],

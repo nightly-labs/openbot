@@ -39,6 +39,13 @@ interface PendingRequest {
 const STOPPED_MESSAGE =
   "That statement ran longer than allowed and was stopped. Nothing it was writing was saved. Narrow the query, add an index, or work in smaller batches.";
 
+/**
+ * A write can commit in the host before its reply reaches this process, so a write that passes the
+ * deadline may be saved. Saying it was not saved made agents write the same rows again (#6311).
+ */
+const WRITE_STOPPED_MESSAGE =
+  "That statement ran longer than allowed and was stopped. It may have been saved before it stopped: read the rows it writes before you run it again. Narrow the query, add an index, or work in smaller batches.";
+
 const EXITED_MESSAGE = "The database process stopped unexpectedly. Try the call again.";
 
 /** No statement was sent, so the statement itself is not the cause and the caller must not change it. */
@@ -153,7 +160,9 @@ export class AgentDatabaseSupervisor {
 
     this.#inFlight = next;
     const generation = this.#generation;
-    this.#deadline = setTimeout(() => this.#discardHost(generation, STOPPED_MESSAGE), this.#statementDeadlineMs);
+    const stopped =
+      next.request.kind === "statement" && next.request.mode === "write" ? WRITE_STOPPED_MESSAGE : STOPPED_MESSAGE;
+    this.#deadline = setTimeout(() => this.#discardHost(generation, stopped), this.#statementDeadlineMs);
     this.#deadline.unref();
     this.#sentAt = performance.now();
     host.send(next.request);

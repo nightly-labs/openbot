@@ -11,11 +11,16 @@ type RoutineRunMarker = RoutineRunMarkerModel;
 
 interface IndexedTransition extends RoutineRunMarkerTransition {
   index: number;
+  message: AgentMessage;
+  marker: RoutineRunMarker;
 }
 
 /**
  * Reduces the durable transition log to one visible summary for each routine run.
  * The stored messages stay unchanged, so the summary can be rebuilt after refresh or pagination.
+ *
+ * The summary shows the latest state at the place where the run starts. The messages of the run
+ * follow that row, so a later state does not move them below turns that came after them (#6118).
  */
 export function summarizeRoutineRunMessages(messages: readonly AgentMessage[]): AgentMessage[] {
   const transitionsByRun = new Map<string, IndexedTransition[]>();
@@ -24,22 +29,28 @@ export function summarizeRoutineRunMessages(messages: readonly AgentMessage[]): 
     const marker = routineRunMarker(message);
     if (!marker) return;
     const transitions = transitionsByRun.get(marker.runId) ?? [];
-    transitions.push({ index, status: marker.status, timestamp: marker.timestamp });
+    transitions.push({ index, status: marker.status, timestamp: marker.timestamp, message, marker });
     transitionsByRun.set(marker.runId, transitions);
   });
 
   return messages.flatMap((message, index) => {
     const marker = routineRunMarker(message);
     if (!marker) return [message];
-    const transitions = transitionsByRun.get(marker.runId);
-    if (!transitions || transitions.length === 1) return [message];
+    const transitions = transitionsByRun.get(marker.runId) ?? [];
     const latest = transitions.at(-1);
-    if (latest?.index === index) {
+    if (!latest || transitions.length === 1) return [message];
+    if (transitions[0]?.index === index) {
+      const { createdAt: _latestCreatedAt, ...latestRow } = latest.message;
       return [
         {
-          ...message,
+          ...latestRow,
+          // The row keeps the id, time and place of the first state, so it stays the same row while
+          // the run changes state, and the day separators match its place.
+          id: message.id,
+          time: message.time,
+          ...(message.createdAt === undefined ? {} : { createdAt: message.createdAt }),
           actionMarker: {
-            ...marker,
+            ...latest.marker,
             previousTransitions: transitions.slice(0, -1).map(({ status, timestamp }) => ({ status, timestamp })),
           },
         },

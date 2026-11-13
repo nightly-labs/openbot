@@ -26,7 +26,10 @@ export interface AgentRemovalHooks {
   deleteTasks(agentId: string): Effect.Effect<void, AgentRemovalFailed>;
   /** Ends the agent's background memory review, so that it does not write to a deleted agent. */
   cancelMemoryReview(agentId: string): Effect.Effect<void>;
-  /** Stops the agent's own provider process, which runs in its workspace. */
+  /**
+   * Stops the agent's own provider process, which runs in its workspace. On Windows it also stops the
+   * shared OpenCode process when no turn uses it, because that process watches the folder (#7029).
+   */
   stopAgentProcess(agentId: string): Effect.Effect<void, AgentRemovalFailed>;
   /** The provider's shared client, which can hold a session of the agent that the conversation does not list. */
   currentClient(provider: AgentProvider): AgentClient | null;
@@ -242,6 +245,8 @@ export class AgentRemoval {
       }),
     );
     yield* this.closeBrowserTabs(agent);
+    // Again: until its tab closed, a tab that the user held could record a browsing step for the agent.
+    yield* this.#hooks.cancelMemoryReview(agent.id);
     // Nobody can use the sign-ins of a deleted agent again.
     const cleared = yield* Effect.result(this.#browser.clearAgentSession(agent.id));
     if (Result.isFailure(cleared))

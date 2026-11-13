@@ -42,7 +42,7 @@ export interface ChatAttachment extends RemoteFileUpload {
 }
 
 /** Longer pasted or shared text goes in as a text file, not into the composer. */
-const LARGE_TEXT_LENGTH = 4_000;
+export const LARGE_TEXT_LENGTH = 4_000;
 
 function base64(bytes: Uint8Array) {
   let binary = "";
@@ -188,7 +188,15 @@ export function useChatAttachments(
   }
   function photoName(asset: ImagePicker.ImagePickerAsset) {
     const extension = asset.uri.split(".").at(-1)?.toLowerCase();
-    return asset.fileName && isSupportedAttachmentName(asset.fileName) ? asset.fileName : `photo.${extension ?? "jpg"}`;
+    const video = asset.type === "video";
+    return asset.fileName && isSupportedAttachmentName(asset.fileName)
+      ? asset.fileName
+      : `${video ? "video" : "photo"}.${extension ?? (video ? "mov" : "jpg")}`;
+  }
+  /** The library offers videos only to a host that takes MOV or MP4, as the desktop picker filter does. */
+  function libraryMediaTypes(): ImagePicker.MediaType[] {
+    const accepted = support?.();
+    return !accepted || accepted.media || accepted.mp4 || accepted.anyFile ? ["images", "videos"] : ["images"];
   }
   /** Swap one file in place. The rest keep their order, and a cancelled picker changes nothing. */
   async function replaceItem(id: string) {
@@ -253,7 +261,7 @@ export function useChatAttachments(
   async function choosePhotos() {
     if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error(limitMessage());
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
+      mediaTypes: libraryMediaTypes(),
       allowsMultipleSelection: true,
       quality: 1,
       preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
@@ -289,16 +297,17 @@ export function useChatAttachments(
   }
   /**
    * Adds what another app shared. Long text becomes a file, as a paste does. Each file is read on its
-   * own, so a refused file does not stop the others, and one alert names each refused file.
+   * own, so a refused file does not stop the others, and one alert names each refused file. It gives
+   * the files after the read, and whether a file was refused.
    */
   async function addShared(
     text: string,
     files: readonly { uri: string; name: string }[],
     onText: (text: string) => void,
-  ) {
+  ): Promise<{ items: readonly ChatAttachment[]; refused: boolean }> {
     const large = text.length > LARGE_TEXT_LENGTH;
     if (text && !large) onText(text);
-    if (!large && files.length === 0) return;
+    if (!large && files.length === 0) return { items: itemsRef.current, refused: false };
     const failures: unknown[] = [];
     beginPreparing();
     try {
@@ -328,6 +337,7 @@ export function useChatAttachments(
       endPreparing();
     }
     if (failures.length > 0) reportFailures(failures);
+    return { items: itemsRef.current, refused: failures.length > 0 };
   }
   const busyRef = useRef(false);
   function report(operation: () => Promise<void>) {

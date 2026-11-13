@@ -87,6 +87,9 @@ export const messages = {
   "sitePage.pricing.enterprise.body":
     "Daha büyük sunucular, {count} üyeden fazlası veya ihtiyacınız olan her şey. Kurumsal destekle.",
   "sitePage.pricing.enterprise.contact": "Satış ekibine ulaşın",
+  "sitePage.pricing.consent.statement": "{policy}, {terms} kabul ettiğimi beyan ederim.",
+  "sitePage.pricing.consent.policy": "Gizlilik politikasını",
+  "sitePage.pricing.consent.terms": "koşulları ve cayma hakkını",
   "sitePage.marketplace.agents.title": "Ajanlar — OpenBot Pazaryeri",
   "sitePage.marketplace.agents.description":
     "Başkalarının OpenBot'ta yaptığı ajanlar. Birini becerileri ve rutinleriyle birlikte OpenBot'a ekle.",

@@ -23,6 +23,11 @@ const config: KnipConfig = {
   ignoreBinaries: [
     // Opens the interactive provider sign-in CLI on Linux.
     "xterm",
+    // Read and forget the SSH host keys of a reinstalled pool machine, and read the operator keys of the
+    // SSH agent, in `leaseweb-pool.ts`.
+    "ssh-keygen",
+    "ssh-keyscan",
+    "ssh-add",
     // Builds the remote desktop runtime.
     "cmake",
     // Rewrite and inspect macOS dylib load paths.
@@ -38,6 +43,8 @@ const config: KnipConfig = {
     "cloudflared",
     // Copies a profile database read-only for the agent threads upgrade E2E script.
     "sqlite3",
+    // Extracts the signed `.app` from a release ZIP, with its links and signature, in the release upgrade E2E script.
+    "ditto",
     // Speaks the English samples of the macOS dictation smoke test.
     "say",
     // Finds the child processes of the dev app in the channel E2E scripts.
@@ -123,6 +130,10 @@ const config: KnipConfig = {
     // The wrangler plugin of knip reads `main` from wrangler.jsonc.
     "apps/site-router": {
       project: ["src/**/*.ts"],
+    },
+    "apps/mobile-updates": {
+      entry: ["scripts/*.ts"],
+      project: ["src/**/*.ts", "scripts/**/*.ts"],
     },
     "apps/mobile": {
       entry: [

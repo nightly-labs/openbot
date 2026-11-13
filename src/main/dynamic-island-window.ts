@@ -19,6 +19,7 @@ import type { BrowserWindow, Display, Rectangle } from "electron";
 import { causeHelpers } from "../backend/effect-boundary";
 import type { CriticalAction } from "./dynamic-island-actions";
 import { readDynamicIslandPreference, writeDynamicIslandPreference } from "./dynamic-island-preference-store";
+import { letPointerThrough, type PointerForwardingGate } from "./pointer-forwarding-gate";
 import { sendToRenderer } from "./renderer-ipc";
 
 const logger = createOpenBotLogger("dynamic-island-window");
@@ -71,6 +72,10 @@ export interface DynamicIslandWindowControllerOptions {
   presentMainWindow: (window: BrowserWindow) => void;
   performHaptic: () => void;
   performCriticalAction: (action: CriticalAction) => Effect.Effect<void, DynamicIslandFailed>;
+  /** Shows the menu of a right-click on the island, outside a text field. */
+  showContextMenu?: (window: BrowserWindow) => void;
+  /** Windows: forwards the pointer moves to an island window only while the cursor is on it. */
+  pointerForwarding?: PointerForwardingGate | null;
   logger?: Logger;
 }
 
@@ -131,16 +136,36 @@ export class DynamicIslandWindowController {
 
   /** Writes run in the order of the calls; each one reconciles the windows before the next. */
   setPreference(preference: DynamicIslandPreference): Effect.Effect<DynamicIslandPreference, DynamicIslandFailed> {
+    return this.#updatePreference(() => preference);
+  }
+
+  /** `change` reads the preference only after the writes before it end, so it does not undo one of them. */
+  #updatePreference(
+    change: (current: DynamicIslandPreference) => DynamicIslandPreference,
+  ): Effect.Effect<DynamicIslandPreference, DynamicIslandFailed> {
     return this.#preferenceMutation.withPermit(
       Effect.gen({ self: this }, function* () {
-        const savedPreference = yield* writeDynamicIslandPreference(this.#options.preferencePath, preference).pipe(
-          toDynamicIslandFailed,
-        );
+        const savedPreference = yield* writeDynamicIslandPreference(
+          this.#options.preferencePath,
+          change(this.#preference),
+        ).pipe(toDynamicIslandFailed);
         this.#preference = savedPreference;
         yield* this.reconcileWindow();
         this.publishPreference();
         return { ...savedPreference };
       }),
+    );
+  }
+
+  /**
+   * Turns the island off from its own menu, as the switch in Settings does. The main window gets the
+   * saved preference, so its Settings do not turn the island on again with the next change.
+   */
+  hide(): Effect.Effect<DynamicIslandPreference, DynamicIslandFailed> {
+    return this.#updatePreference((current) => ({ ...current, enabled: false })).pipe(
+      Effect.tap((saved) =>
+        Effect.sync(() => sendToRenderer(this.#options.getMainWindow(), IPC_ENDPOINTS.dynamicIsland.preference, saved)),
+      ),
     );
   }
 
@@ -170,7 +195,7 @@ export class DynamicIslandWindowController {
     this.#cancelCollapse(displayId);
     if (interactive && bounds) window.setBounds(bounds, false);
     if (this.#options.windowKind === "x11") this.#applyShape(displayId, window);
-    else window.setIgnoreMouseEvents(!interactive, { forward: true });
+    else letPointerThrough(this.#options.pointerForwarding, window, !interactive);
     // On macOS, focusability also allows the panel to become a main window in AltTab. The panel is
     // focusable only while a text field on it needs key input. A panel becomes key without
     // activating the app, so the main window stays where it is.
@@ -410,7 +435,7 @@ export class DynamicIslandWindowController {
       // Until the island renderer reports its shape, no part of the window takes the pointer or shows.
       window.setShape([]);
     } else {
-      window.setIgnoreMouseEvents(true, { forward: true });
+      letPointerThrough(this.#options.pointerForwarding, window, true);
     }
     window.setFocusable(false);
     window.webContents.on("did-finish-load", () => {
@@ -428,6 +453,10 @@ export class DynamicIslandWindowController {
       this.#show(window);
     });
     window.on("blur", () => this.setInteractive(window.webContents.id, false));
+    window.webContents.on("context-menu", (_event, params) => {
+      if (params.isEditable || this.#windows.get(display.id) !== window || window.isDestroyed()) return;
+      this.#options.showContextMenu?.(window);
+    });
     // macOS moves a window off a display that goes away, for example when the displays sleep, and
     // can do it after the last display event. The island then stays on the wrong display, under the
     // island of that display (#4594). Put it back at the top of its own display.

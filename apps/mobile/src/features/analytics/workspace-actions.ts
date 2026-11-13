@@ -20,8 +20,8 @@ export function trackWorkspaceActions(
       run("agent_action", { action: "update", ...agentProperties(input.agentId) }, () =>
         workspace.updateAgent(input, serverId),
       ),
-    deleteAgent: (id) =>
-      run("agent_action", { action: "delete", ...agentProperties(id) }, () => workspace.deleteAgent(id)),
+    deleteAgent: (id, serverId) =>
+      run("agent_action", { action: "delete", ...agentProperties(id) }, () => workspace.deleteAgent(id, serverId)),
     duplicateAgent: (id) =>
       run("agent_action", { action: "duplicate", ...agentProperties(id) }, () => workspace.duplicateAgent(id)),
     sendMessage: (id, text, attachments = [], reply = null, server, clientMessageId) =>

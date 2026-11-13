@@ -322,9 +322,9 @@ export interface ConversationUiBlock {
    */
   vault?: UiBlockVaultRequest;
   /**
-   * The block is the form of `request_api_key` with the choice of who can use the key: the app draws
-   * the field `UI_API_KEY_SCOPE_FIELD_ID` small, next to the submit button. Only the host sets it. Not
-   * on the `ui-blocks-v1` wire: a remote client shows the field in the form.
+   * The block is the form of `request_api_key`. With the field `UI_API_KEY_SCOPE_FIELD_ID`, which
+   * chooses who can use the key, the app draws a Vault card that opens the Vault dialog. Only the host
+   * sets it. Not on the `ui-blocks-v1` wire: a remote client shows the form.
    */
   apiKey?: true;
 }

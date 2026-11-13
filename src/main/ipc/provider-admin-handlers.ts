@@ -13,6 +13,8 @@ import {
   type AgentStatus,
   decodeCustomProviderResult,
   decodeCustomProviderSummaries,
+  decodeHostProviderAccountModels,
+  decodeHostProviderAccountPools,
   decodeHostProviderAccountUsage,
   decodeProviderApiKeyStatus,
   decodeProviderCodeLoginStart,
@@ -24,6 +26,7 @@ import {
   type PasteProviderRelaySignInInput,
   type ProviderRelaySignInStatus,
   type SubmitProviderCodeLoginInput,
+  withHostProviderAccountModels,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
@@ -36,6 +39,14 @@ import {
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
+import {
+  PROVIDER_ACCOUNT_MODELS_CAPABILITY,
+  PROVIDER_ACCOUNT_MODELS_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-models-v1";
+import {
+  PROVIDER_ACCOUNT_POOL_CAPABILITY,
+  PROVIDER_ACCOUNT_POOL_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import { providerAccountRelay } from "@openbot/contracts/team-protocol/provider-account-relays";
 import {
   PROVIDER_ACCOUNTS_CAPABILITY,
@@ -58,6 +69,7 @@ import {
   PROVIDER_USAGE_RESET_CAPABILITY,
   PROVIDER_USAGE_RESET_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
+import { PROVIDER_USE_CAPABILITY, PROVIDER_USE_ROUTES } from "@openbot/contracts/team-protocol/provider-use-v1";
 import { PROVIDERS_ADMIN_CAPABILITY, PROVIDERS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/providers-v1";
 import {
   PROVIDERS_RUNTIMES_V2_CAPABILITY,
@@ -86,6 +98,7 @@ import {
   decodeHostProviderAccountsFromHost,
   decodeProviderUsageResetOutcomeFromHost,
   decodeProviderUsageResetsFromHost,
+  decodeProviderUseFromHost,
 } from "../remote-agent-decoding";
 import { acceptEmpty, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
@@ -101,9 +114,11 @@ import {
   parseConnectProviderAccountInput,
   parseDownloadableProviderId,
   parseProviderApiKeyInput,
+  parseProviderUseInput,
   parseRemoveProviderAccountInput,
   parseRenameProviderAccountInput,
   parseResetProviderUsageInput,
+  parseSetProviderAccountPoolInput,
   signInCodexWithApiKey,
 } from "./provider-handlers";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
@@ -252,6 +267,16 @@ export function providerAdminIpcHandlers({
   }
 
   /**
+   * The on/off switch of a joined server's host's built-in providers, which only a host with
+   * `provider-use-v1` serves. This computer's own switch is `providers.setProviderOn`.
+   */
+  function providerUse(serverId: string, path: string, body: unknown) {
+    if (!remoteServers.supportsCapability(serverId, PROVIDER_USE_CAPABILITY))
+      throw new Error(sourceText("error.team.providerUseUnsupported"));
+    return runCauseEffect(remoteServers.request(serverId, path, decodeProviderUseFromHost, { method: "POST", body }));
+  }
+
+  /**
    * The usage reset credits of a joined server's host's accounts, which only a host with
    * `provider-usage-reset-v1` spends. This computer's own go through `providers`.
    */
@@ -366,7 +391,49 @@ export function providerAdminIpcHandlers({
       cancelHostSignIn: hostSignIn((provider, serverId) =>
         remoteChange(serverId, PROVIDER_HOST_SIGN_IN_ROUTES.cancel, { provider }),
       ),
-      accounts: accountsQuery(PROVIDER_ACCOUNTS_ROUTES.list, decodeHostProviderAccountsFromHost),
+      // A host with `provider-account-models-v1` also gives the models of each account after the
+      // first. When that read fails, the accounts come without them, as from an older host.
+      accounts: scopedQueryHandler({
+        local: () => Promise.reject(new Error(sourceText("error.team.providersUnsupported"))),
+        remote: (serverId) => {
+          requireAccounts(serverId);
+          const list = remoteServers.request(
+            serverId,
+            PROVIDER_ACCOUNTS_ROUTES.list,
+            decodeHostProviderAccountsFromHost,
+            {
+              method: "POST",
+              body: {},
+            },
+          );
+          const models = remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_MODELS_CAPABILITY)
+            ? remoteServers
+                .request(serverId, PROVIDER_ACCOUNT_MODELS_ROUTES.list, decodeHostProviderAccountModels, {
+                  method: "POST",
+                  body: {},
+                })
+                .pipe(Effect.orElseSucceed(() => null))
+            : Effect.succeed(null);
+          // A host with `provider-account-pool-v1` also gives its pools. When that read fails, the
+          // accounts come without them, as from an older host.
+          const pools = remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_POOL_CAPABILITY)
+            ? remoteServers
+                .request(serverId, PROVIDER_ACCOUNT_POOL_ROUTES.list, decodeHostProviderAccountPools, {
+                  method: "POST",
+                  body: {},
+                })
+                .pipe(Effect.orElseSucceed(() => null))
+            : Effect.succeed(null);
+          return runCauseEffect(
+            Effect.all([list, models, pools], { concurrency: "unbounded" }).pipe(
+              Effect.map(([accounts, extra, pooled]) => {
+                const withModels = extra ? withHostProviderAccountModels(accounts, extra) : accounts;
+                return pooled ? { ...withModels, pools: pooled } : withModels;
+              }),
+            ),
+          );
+        },
+      }),
       accountUsage: accountsQuery(PROVIDER_ACCOUNTS_ROUTES.usage, decodeHostProviderAccountUsage),
       startAccountSignIn: accountsRequest(
         parseConnectProviderAccountInput,
@@ -387,6 +454,19 @@ export function providerAdminIpcHandlers({
       ),
       renameAccount: accountsRequest(parseRenameProviderAccountInput, PROVIDER_ACCOUNTS_ROUTES.rename, acceptEmpty),
       removeAccount: accountsRequest(parseRemoveProviderAccountInput, PROVIDER_ACCOUNTS_ROUTES.remove, acceptEmpty),
+      setAccountPool: scopedHandler(parseSetProviderAccountPoolInput, {
+        local: () => Promise.reject(new Error(sourceText("error.team.providersUnsupported"))),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_POOL_CAPABILITY))
+            throw new Error(sourceText("error.team.providersUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, PROVIDER_ACCOUNT_POOL_ROUTES.update, acceptEmpty, {
+              method: "POST",
+              body: input,
+            }),
+          );
+        },
+      }),
       hostDefaultProvider: scopedQueryHandler({
         local: () => Promise.reject(new Error(sourceText("error.team.providerDefaultUnsupported"))),
         remote: (serverId) => hostDefaultProvider(serverId, PROVIDER_DEFAULT_ROUTES.settings, {}),
@@ -398,6 +478,14 @@ export function providerAdminIpcHandlers({
             provider: input.preferredProvider,
             model: input.preferredModel,
           }),
+      }),
+      providerUse: scopedQueryHandler({
+        local: () => Promise.reject(new Error(sourceText("error.team.providerUseUnsupported"))),
+        remote: (serverId) => providerUse(serverId, PROVIDER_USE_ROUTES.list, {}),
+      }),
+      setProviderUse: scopedHandler(parseProviderUseInput, {
+        local: () => Promise.reject(new Error(sourceText("error.team.providerUseUnsupported"))),
+        remote: (input, serverId) => providerUse(serverId, PROVIDER_USE_ROUTES.set, input),
       }),
       usageResets: usageResetRequest(
         parseProviderId,

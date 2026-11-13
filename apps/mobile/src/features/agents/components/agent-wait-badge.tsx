@@ -112,3 +112,28 @@ export function AgentWaitingGroupHeader({ count }: { count: number }) {
     </View>
   );
 }
+
+/**
+ * The heading of the "Unread" group of the `unread-group` order. As on the desktop, the count is
+ * neutral: the warning colour stays for "Needs you".
+ */
+export function AgentUnreadGroupHeader({ count }: { count: number }) {
+  const { t, format } = useText();
+  return (
+    <View
+      accessible
+      accessibilityRole="header"
+      accessibilityLabel={t("mobile.agent.list.unreadGroup.label", { count })}
+      className="flex-row items-center gap-1.5 px-5 pt-5 pb-1.5"
+    >
+      <Typography.Paragraph className="font-medium text-muted" style={typeScale.caption}>
+        {t("mobile.agent.list.unreadGroup.title")}
+      </Typography.Paragraph>
+      <View className="h-5 min-w-5 items-center justify-center rounded-full bg-default px-1.5">
+        <Typography.Paragraph className="font-semibold text-muted" style={typeScale.small}>
+          {format.number(count)}
+        </Typography.Paragraph>
+      </View>
+    </View>
+  );
+}

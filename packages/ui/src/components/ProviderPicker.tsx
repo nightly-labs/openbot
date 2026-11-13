@@ -5,6 +5,7 @@ import type {
   AgentProviderState,
   AgentProviderStatus,
   CustomProviderSummary,
+  ProviderAccountPool,
   ProviderApiKeyStatus,
   ProviderRuntimeStatus,
 } from "@openbot/contracts/ipc";
@@ -96,6 +97,8 @@ export interface ProviderPickerOption {
   runtimeStatus?: ProviderRuntimeStatus | undefined;
   /** The CLI that the provider ran last: the one the user installed, or the one OpenBot downloaded. */
   cliSource?: AgentProviderStatus["cliSource"];
+  /** The other CLI the user can run instead: theirs while OpenBot's copy runs, or the newer copy. */
+  otherCliVersion?: string | undefined;
   /**
    * Whether the provider's key is saved: the optional OpenCode key, a Gemini key in use, or a Claude
    * key on a host that reads it. Absent while unknown, so the row shows no badge rather than a
@@ -130,6 +133,8 @@ export interface ProviderPickerOption {
    * `accountActions`, a connected row offers Add account, and lists them from the second one on.
    */
   accounts?: readonly ProviderPickerAccount[] | undefined;
+  /** The pool of `accounts`. Absent while the pool is off. */
+  accountPool?: ProviderAccountPool | undefined;
 }
 
 export interface ProviderPickerProps {

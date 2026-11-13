@@ -1,0 +1,36 @@
+{
+  "slug": "brightdata",
+  "name": "Bright Data",
+  "tagline": "Web search and scraping",
+  "description": "Bright Data lets agents search the web, read pages as Markdown, and collect structured data from public sites through Bright Data's unblocking and browser infrastructure. Each user signs in to their own Bright Data account through the browser, and requests use that account's quota.",
+  "category": "research",
+  "creatorName": "Bright Data",
+  "iconUrl": "https://brightdata.com/wp-content/themes/brightdata/assets/images/favicon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-search", "text": "Search the web for recent reviews of this product and summarize them." },
+    { "id": "prompt-scrape", "text": "Read this page as Markdown and list the prices it shows." },
+    {
+      "id": "prompt-compare",
+      "text": "Collect the public pricing pages of these three competitors and compare the plans."
+    }
+  ],
+  "apps": [
+    {
+      "id": "app-brightdata-mcp",
+      "name": "Bright Data",
+      "description": "Web search, page scraping, and structured web data, over Bright Data's MCP server with browser sign-in.",
+      "iconUrl": "https://brightdata.com/wp-content/themes/brightdata/assets/images/favicon.png",
+      "server": {
+        "name": "brightdata",
+        "transport": "http",
+        "url": "https://mcp.brightdata.com/mcp",
+        "auth": [{ "id": "brightdata-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://brightdata.com",
+  "privacyPolicyUrl": "https://brightdata.com/privacy",
+  "termsUrl": "https://brightdata.com/license"
+}

@@ -13,6 +13,7 @@
 import type { ServerCompatibility, ServerConnectionIssue, ServerSummary } from "@openbot/contracts/ipc";
 import {
   checkingCompatibility,
+  classifyConnectFailure,
   classifyRemoteConnectionError,
   classifyTransportError,
   hostUnreachable,
@@ -189,6 +190,11 @@ export class RemoteServerConnections {
   // caller can fold it into one emission with whatever else the failure changed.
   reportUnreachable(serverId: string, reference?: string): void {
     this.#apply(serverId, hostUnreachable(reference), null);
+  }
+
+  // A WebRTC attempt to connect that failed with no transport error event. Silent, as above.
+  reportConnectFailure(serverId: string, failure: unknown): void {
+    this.#apply(serverId, classifyConnectFailure(failure), null);
   }
 
   forget(serverId: string): void {

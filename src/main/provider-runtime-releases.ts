@@ -21,10 +21,10 @@ import { ProviderRuntimeFailure, runtimeIO, runtimeSync } from "./provider-runti
  * users with the next OpenBot release. Providers ship faster than that, so the update offer now
  * follows upstream. The lock still names the version a first install uses when no source answers.
  *
- * Every download keeps a hash from its source: GitHub's asset `digest` for Codex, Pi, Kimi, Copilot
- * and Mistral, the Meta and Cognition manifests for Muse and Devin, and npm's `dist.integrity` for
- * Claude, OpenCode and Cline. x.ai publishes no hash for Grok, so a Grok release is trusted on TLS alone, and so are
- * Antigravity and Cursor from the ACP registry. Bun is a tool runtime rather than a provider, and
+ * Every download keeps a hash from its source: GitHub's asset `digest` for Codex, Pi, Kimi, Copilot,
+ * Mistral and Antigravity, the Meta and Cognition manifests for Muse and Devin, and npm's
+ * `dist.integrity` for Claude, OpenCode and Cline. x.ai publishes no hash for Grok, so a Grok release
+ * is trusted on TLS alone, and so is Cursor from the ACP registry. Bun is a tool runtime rather than a provider, and
  * stays on the lock.
  */
 
@@ -68,20 +68,31 @@ const ACP_REGISTRY_TARGETS: Record<RuntimeTarget, string> = {
   "win32-x64": "windows-x86_64",
 };
 
+/** Google's name for each target in an Antigravity CLI asset, such as `agy_cli_mac_arm64.tar.gz`. */
+const ANTIGRAVITY_TARGETS: Record<RuntimeTarget, string> = {
+  "darwin-arm64": "mac_arm64",
+  "darwin-x64": "mac_x64",
+  "linux-x64": "linux_x64",
+  "linux-arm64": "linux_arm64",
+  "win32-x64": "windows_x64",
+};
+
 /**
  * The spec of the asset `assetName` in the latest release of the GitHub repository `repo`, with the
- * asset's `digest` and size. The tag is `v` and the version, and an asset name can contain the version.
+ * asset's `digest` and size. The tag is `tagPrefix` and the version, and an asset name can contain
+ * the version.
  */
 const latestGitHubAsset = Effect.fn("ProviderRelease.github")(function* (
   fetch: Fetch,
   repo: string,
   assetNameOf: (version: string) => string,
   pinned: RuntimeSpec,
+  tagPrefix: "v" | "" = "v",
 ) {
   const release = yield* fetchJsonEffect(fetch, `https://api.github.com/repos/${repo}/releases/latest`, {
     Accept: "application/vnd.github+json",
   });
-  const version = isString(release.tag_name) ? versionFromTag(release.tag_name, "v") : null;
+  const version = isString(release.tag_name) ? versionFromTag(release.tag_name, tagPrefix) : null;
   const assetName = version ? assetNameOf(version) : null;
   const asset = Array.isArray(release.assets)
     ? release.assets.find((entry: unknown) => isDynamicRecord(entry) && entry.name === assetName)
@@ -101,7 +112,7 @@ const latestGitHubAsset = Effect.fn("ProviderRelease.github")(function* (
     source: "latest" as const,
     version,
     packageVersion: version,
-    url: `https://github.com/${repo}/releases/download/v${version}/${assetName}`,
+    url: `https://github.com/${repo}/releases/download/${tagPrefix}${version}/${assetName}`,
     archiveDigest: { algorithm: "sha256" as const, hex: asset.digest.slice(7) },
     downloadBytes: asset.size,
   };
@@ -316,48 +327,15 @@ const LATEST_RELEASES: Record<
       downloadBytes: yield* downloadSizeEffect(fetch, url),
     };
   }),
-  /**
-   * Google publishes the server in the ACP registry, with no hash, so the latest release is trusted
-   * on TLS alone, like Grok's. The download must stay on Google's release path and keep the layout
-   * the pinned version has: a changed command means a changed archive, which staging would refuse.
-   */
-  antigravity: Effect.fn("ProviderRelease.antigravity")(function* ({
-    target,
-    lock,
-    fetch,
-  }: LatestReleaseContext): Effect.fn.Return<RuntimeSpec, ProviderRuntimeFailure> {
-    const pinned = providerRuntimeDescriptor("antigravity").spec(target, lock);
-    const agent = yield* fetchJsonEffect(fetch, lock.antigravity.registry);
-    const version = isString(agent.version) ? agent.version : null;
-    const binary = isDynamicRecord(agent.distribution) ? agent.distribution.binary : null;
-    const entry = isDynamicRecord(binary) ? binary[ACP_REGISTRY_TARGETS[target]] : null;
-    const artifact = lock.antigravity.artifacts[target];
-    const url = isDynamicRecord(entry) && isString(entry.archive) ? entry.archive : null;
-    const expectedUrl = version
-      ? `${lock.antigravity.distribution}/${artifact.platformDirectory}/${artifact.asset.replace(
-          `-${lock.antigravity.version}-`,
-          `-${version}-`,
-        )}`
-      : null;
-    if (
-      !(version && VERSION.test(version) && url !== null && url === expectedUrl) ||
-      !isDynamicRecord(entry) ||
-      entry.cmd !== `./${artifact.executable}`
-    ) {
-      return yield* new ProviderRuntimeFailure({
-        cause: new Error(sourceText("error.provider.antigravityReleaseShape")),
-      });
-    }
-    return {
-      ...pinned,
-      version,
-      packageVersion: version,
-      source: "latest",
-      url,
-      archiveDigest: null,
-      downloadBytes: yield* downloadSizeEffect(fetch, url),
-    };
-  }),
+  // Google tags each Antigravity CLI release with the version alone, such as `1.5.4`.
+  antigravity: ({ target, lock, fetch }) =>
+    latestGitHubAsset(
+      fetch,
+      "google-antigravity/antigravity-cli",
+      () => `agy_cli_${ANTIGRAVITY_TARGETS[target]}.${target === "win32-x64" ? "zip" : "tar.gz"}`,
+      providerRuntimeDescriptor("antigravity").spec(target, lock),
+      "",
+    ),
   /**
    * Cursor publishes the CLI in the ACP registry, with no hash, so the latest release is trusted on
    * TLS alone. The registry names the date; the build, a date and a commit, is only in the URL. The
@@ -503,8 +481,8 @@ function sha512Hex(integrity: string): string | null {
   return match?.[1] ? Buffer.from(match[1], "base64").toString("hex") : null;
 }
 
-/** Codex tags each release `rust-v<version>`, and Pi tags it `v<version>`. */
-function versionFromTag(tag: string, prefix: "rust-v" | "v"): string | null {
+/** Codex tags each release `rust-v<version>`, Pi tags it `v<version>`, and Antigravity `<version>`. */
+function versionFromTag(tag: string, prefix: "rust-v" | "v" | ""): string | null {
   const version = tag.startsWith(prefix) ? tag.slice(prefix.length) : "";
   return VERSION.test(version) ? version : null;
 }

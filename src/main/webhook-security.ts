@@ -84,16 +84,20 @@ export function verifyWebhookSignature(secret: string, input: WebhookSignatureIn
 
 /**
  * The HMAC keys of a Standard Webhooks secret. The specification decodes the base64 after `whsec_`;
- * Composio uses the whole secret as UTF-8. Both keys need the secret, so accepting either is as safe.
+ * Composio uses the whole secret as UTF-8. Older hosts made `whsec_` secrets in base64url; a sender
+ * signs with the same bytes after the user converts such a secret to base64, so that key also counts.
+ * All keys need the secret, so accepting any of them is as safe.
  */
 function standardWebhookKeys(secret: string): Buffer[] {
   const keys = [Buffer.from(secret, "utf8")];
   if (secret.startsWith(STANDARD_WEBHOOK_SECRET_PREFIX)) {
     const encoded = secret.slice(STANDARD_WEBHOOK_SECRET_PREFIX.length);
-    const decoded = Buffer.from(encoded, "base64");
-    // Node skips characters that are not base64, so only an exact round trip is the sender's key.
-    if (decoded.byteLength >= STANDARD_WEBHOOK_MINIMUM_KEY_BYTES && decoded.toString("base64") === encoded)
-      keys.push(decoded);
+    for (const encoding of ["base64", "base64url"] as const) {
+      const decoded = Buffer.from(encoded, encoding);
+      // Node skips characters that are not base64, so only an exact round trip is the sender's key.
+      if (decoded.byteLength >= STANDARD_WEBHOOK_MINIMUM_KEY_BYTES && decoded.toString(encoding) === encoded)
+        keys.push(decoded);
+    }
   }
   return keys;
 }

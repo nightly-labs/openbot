@@ -33,7 +33,7 @@ export function useProfileActivity() {
     () => (report.data ? profileStats(report.data, serverAgents) : null),
     [report.data, serverAgents],
   );
-  return { server, online, report, stats };
+  return { server, online, report, stats, range };
 }
 
 export type ProfileActivity = ReturnType<typeof useProfileActivity>;

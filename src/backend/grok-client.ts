@@ -20,7 +20,8 @@ export class GrokAgentClient extends AcpAgentClient {
   constructor(
     cli: GrokCliInfo,
     requestTimeoutMs = 30_000,
-    profileGeneration = false,
+    /** `"media"`: a profile-generation client that may run only the image and video tools. */
+    profileGeneration: boolean | "media" = false,
     mcpServers: McpServerSource = () => [],
     reportMcpDrops?: McpDropReporter,
     mcpToolRuntimes?: McpToolRuntimeSource,
@@ -38,15 +39,26 @@ export class GrokAgentClient extends AcpAgentClient {
               confineSpawnTarget(target, confinement, grokStatePaths({ ...process.env, ...agentEnvironment?.() })),
           }
         : {}),
-      profileGeneration,
+      profileGeneration: profileGeneration !== false,
+      mediaGeneration: profileGeneration === "media",
       // A profile-generation client asks one question and must not act, so it is given none.
-      mcpServers: profileGeneration ? () => [] : mcpServers,
+      mcpServers: profileGeneration !== false ? () => [] : mcpServers,
       reportMcpDrops,
       mcpToolRuntimes,
       mcpEndpoint,
       argv: [
         "--no-auto-update",
-        ...(profileGeneration ? ["--tools=", "--deny", "*", "--no-subagents", "--disable-web-search"] : []),
+        ...(profileGeneration === "media"
+          ? [
+              "--no-subagents",
+              "--disable-web-search",
+              ...GROK_NON_MEDIA_TOOLS.flatMap((tool) => ["--deny", tool]),
+              "--deny",
+              "mcp__*",
+            ]
+          : profileGeneration
+            ? ["--tools=", "--deny", "*", "--no-subagents", "--disable-web-search"]
+            : []),
         "agent",
         "stdio",
       ],
@@ -67,6 +79,37 @@ export class GrokAgentClient extends AcpAgentClient {
     });
   }
 }
+
+/**
+ * The built-in tools of Grok CLI 1.0.77 other than its image and video tools (`grok-media.ts`). A
+ * media client denies each by name, and every MCP tool with `mcp__*`: a deny rule wins over an allow
+ * rule, so `--deny *` would also refuse the media tools. A tool that a later CLI adds and that asks first is refused by the client
+ * (`AcpAgentOptions.mediaGeneration`).
+ */
+const GROK_NON_MEDIA_TOOLS = [
+  "run_terminal_command",
+  "read_file",
+  "search_replace",
+  "write",
+  "list_dir",
+  "grep",
+  "kill_command_or_subagent",
+  "get_command_or_subagent_output",
+  "todo_write",
+  "scheduler_create",
+  "scheduler_delete",
+  "scheduler_list",
+  "monitor",
+  "search_tool",
+  "use_tool",
+  "workflow",
+  "enter_plan_mode",
+  "exit_plan_mode",
+  "ask_user_question",
+  "send_feedback",
+  "web_search",
+  "web_fetch",
+] as const;
 
 /**
  * Grok features that OpenBot agents do not use, each with its `config.toml` key and the environment

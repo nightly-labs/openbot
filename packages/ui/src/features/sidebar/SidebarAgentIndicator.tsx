@@ -136,8 +136,12 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
       }
       leaving = undefined;
       if (current?.count !== undefined && next.count !== undefined && leavingBadge === undefined) {
-        setPreviousCount(current.count);
-        setPhase(untrack(phase) === "bump" ? "bump-b" : "bump");
+        /* A count that goes to 0 is a read chat with a side thread still unread, not a new reply: the
+           digits go and the pill narrows, with no bounce. */
+        if (next.count > 0) {
+          setPreviousCount(current.count);
+          setPhase(untrack(phase) === "bump" ? "bump-b" : "bump");
+        } else setPreviousCount(null);
         if (badge && fromWidth !== undefined && pillWidth !== undefined && fromWidth !== pillWidth) {
           resize = badge.animate([{ width: `${fromWidth}px` }, { width: `${pillWidth}px` }], SIDEBAR_BADGE_RESIZE);
         }
@@ -228,7 +232,9 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
                 </span>
               )}
             </Show>
-            <span class={["agent-row-unread-count", rollClass("in")]}>{count()}</span>
+            <Show when={count() > 0}>
+              <span class={["agent-row-unread-count", rollClass("in")]}>{count()}</span>
+            </Show>
           </Show>
         </span>
       )}

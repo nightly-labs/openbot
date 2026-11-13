@@ -34,6 +34,8 @@ export default function ChannelInfoLayout() {
       <Stack.Screen name="memory" options={{ title: t("mobile.channel.route.memory") }} />
       <Stack.Screen name="routines" options={{ title: t("mobile.channel.route.routines") }} />
       <Stack.Screen name="routine" options={{ title: t("mobile.channel.route.routine") }} />
+      <Stack.Screen name="picture" options={{ title: t("mobile.channel.picture.title") }} />
+      <Stack.Screen name="crop-photo" options={{ title: t("mobile.app.route.cropPhoto") }} />
     </Stack>
   );
 }

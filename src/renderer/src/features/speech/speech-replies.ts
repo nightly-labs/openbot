@@ -16,7 +16,9 @@ import {
   playSpokenReply,
   readAloud,
   recordingSummary,
+  releaseSpeech,
   resumeSpeech,
+  type SpeechAgent,
   type SpeechSource,
   seekSpeech,
   setUpcomingReading,
@@ -57,8 +59,7 @@ interface DictatedMessage {
 /** What started a reading: a voice conversation, its progress updates, a dictated message, or the Read aloud control. */
 type SpeechTrigger = "voice_conversation" | "progress_update" | "dictation" | "read_aloud";
 
-/** An agent on one server. Agent ids repeat across servers. */
-export type SpeechAgent = Pick<SpeechSource, "serverId" | "agentId">;
+export type { SpeechAgent };
 
 function agentKey(agent: SpeechAgent): string {
   return `${agent.serverId}\n${agent.agentId}`;
@@ -70,8 +71,13 @@ const dictated = new Map<string, DictatedMessage>();
 let spoken: SpeechAgent | undefined;
 /** The replies whose answer loads now. Dropping one before it loads keeps it from being read. */
 const loading = new Set<SpeechAgent>();
-/** Told when the reply to a dictated message was read, was not read, or will not come. */
+/**
+ * Told when the reply to a dictated message was read, was not read, or will not come. A reply that
+ * `dropDictatedReply` dropped tells nothing: the listener can wait already for the next reply.
+ */
 const replyEndListeners = new Set<(agent: SpeechAgent) => void>();
+/** How many times the reply of each agent was dropped, by `agentKey`. */
+const drops = new Map<string, number>();
 /** The readings of replies, in order: the progress updates of a turn come before its answer. */
 let readings: Promise<void> = Promise.resolve();
 /** Changes when the user stops the readings, so the readings that wait are not read. */
@@ -190,6 +196,8 @@ export function forgetDictatedMessage(agent: SpeechAgent): void {
 /** The reply to the dictated message of this agent is not read, also when its turn started. */
 export function dropDictatedReply(agent: SpeechAgent): void {
   const key = agentKey(agent);
+  drops.set(key, (drops.get(key) ?? 0) + 1);
+  releaseSpeech(agent, false);
   dictated.delete(key);
   for (const item of loading) if (agentKey(item) === key) loading.delete(item);
   if (isSpoken(agent)) stopSpokenReply();
@@ -221,6 +229,15 @@ export function onDictatedReplyEnd(listener: (agent: SpeechAgent) => void): () =
 
 function replyEnded(agent: SpeechAgent): void {
   for (const listener of replyEndListeners) listener(agent);
+}
+
+/** Calls `replyEnded` later, unless the reply is dropped before. */
+function replyEndedUnlessDropped(agent: SpeechAgent): () => void {
+  const key = agentKey(agent);
+  const before = drops.get(key);
+  return () => {
+    if (drops.get(key) === before) replyEnded(agent);
+  };
 }
 
 /**
@@ -281,7 +298,7 @@ export function readDictatedReplies(event: AgentEvent, serverId: string): void {
   dictated.delete(key);
   if (event.status === "completed" && !event.quiet) void readReply(agent, event.turnId, message);
   // The progress updates of the turn play to their end before the pane listens again.
-  else void afterReadings(async () => {}).finally(() => replyEnded(agent));
+  else void afterReadings(async () => {}).finally(replyEndedUnlessDropped(agent));
 }
 
 function readProgressUpdates(messages: readonly ConversationMessage[], agent: SpeechAgent): void {
@@ -315,6 +332,7 @@ function readProgressUpdates(messages: readonly ConversationMessage[], agent: Sp
 async function readReply(agent: SpeechAgent, turnId: string, message: DictatedMessage): Promise<void> {
   const port = speechPort();
   const own = { ...agent };
+  const ended = replyEndedUnlessDropped(agent);
   loading.add(own);
   try {
     if (!message.always && !(await port.voice.getSpeechSettings()).readReplies) return;
@@ -342,7 +360,7 @@ async function readReply(agent: SpeechAgent, turnId: string, message: DictatedMe
     reportReadFailure(error);
   } finally {
     loading.delete(own);
-    replyEnded(agent);
+    ended();
   }
 }
 

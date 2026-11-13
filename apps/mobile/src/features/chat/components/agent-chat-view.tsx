@@ -22,16 +22,19 @@ import {
   latestReadBoundaryMessage,
   projectChatMessages,
   withFailureReasons,
+  withQuestionContext,
 } from "../model/chat-messages";
 import { requestComposerFocus, requestComposerText } from "../model/composer-requests";
 import { messageActionsOpen } from "../model/message-actions-sheet";
 import { useAgentMentionReferences } from "../model/use-agent-mention-references";
 import { useAgentMentionSkills } from "../model/use-agent-mention-skills";
+import { useProgressUpdates } from "../model/use-progress-updates";
 import { MAIN_THREAD_ID, useChatThreadMenu } from "./chat-thread-menu";
 import { ChatView } from "./chat-view";
 import { useBranchThread } from "./use-branch-thread";
 import { useChatQueue } from "./use-chat-queue";
 import { useMessageDelete } from "./use-message-delete";
+import { useMessagePins } from "./use-message-pins";
 import { useOpenAgentTasks } from "./use-open-agent-tasks";
 import { useQuestionPrompt } from "./use-question-prompt";
 
@@ -83,9 +86,14 @@ export function MobileChatView({
   const mentionAgents = useMemo(() => serverAgents.filter((item) => item.id !== agent.id), [serverAgents, agent.id]);
   const memberId = server?.membershipId ?? null;
   const accountUserId = useMobileSession().session?.user.id ?? null;
+  const progressUpdates = useProgressUpdates(agent.serverId, serverAgents, agent.id);
   const projected = useMemo(
-    () => projectChatMessages(conversation?.messages ?? [], memberId, accountUserId),
-    [conversation?.messages, memberId, accountUserId],
+    () =>
+      withQuestionContext(
+        projectChatMessages(conversation?.messages ?? [], memberId, accountUserId, progressUpdates),
+        conversation?.activeTurnId,
+      ),
+    [conversation?.messages, conversation?.activeTurnId, memberId, accountUserId, progressUpdates],
   );
   const references = useMemo(
     () => projectChatMessages(Object.values(conversation?.references ?? {}), memberId, accountUserId),
@@ -93,6 +101,17 @@ export function MobileChatView({
   );
   const tasks = useOpenAgentTasks(agent.serverId, agent.id);
   const threadMenu = useChatThreadMenu(agent, MAIN_THREAD_ID);
+  // The pins of the agent's own chat, on a host with `message-pins-v1`.
+  const pins = useMessagePins(agent.serverId, agent.id);
+  const pinnedMessageIds = useMemo(
+    () => new Set(pins.pins.filter((pin) => pin.taskId === null).map((pin) => pin.messageId)),
+    [pins.pins],
+  );
+  const setPinned = pins.setPinned;
+  const togglePin = useCallback(
+    (messageId: string, pinned: boolean) => setPinned(null, messageId, pinned),
+    [setPinned],
+  );
   const liveActivity = openTurnActivity(useAgentActivity(agent.id), conversation);
   const threadId = conversation?.threadId ?? null;
   // A turn on another thread, such as channel work, is not this chat's work, as on desktop. A host
@@ -358,6 +377,8 @@ export function MobileChatView({
       deletesAnyMessage={messageDelete.deletesAny}
       markUnread={canMarkUnreadFrom ? markUnread : undefined}
       markUnreadMessageIds={markUnreadMessageIds}
+      togglePin={pins.enabled ? togglePin : undefined}
+      pinnedMessageIds={pinnedMessageIds}
       unreadLineMessageIds={unreadLineMessageIds}
       sendToChannel={sendToChannel}
       questionForm={questionForm}

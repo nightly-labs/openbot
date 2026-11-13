@@ -59,3 +59,51 @@ export function placeTurnRowsByTime(rows: readonly AgentMessage[], turns: readon
   for (const { row } of timed.slice(next)) placed.push(row);
   return placed;
 }
+
+/**
+ * Puts the updates that an agent wrote after a message steered into its turn under that message.
+ * The rows of a turn show where its first update is, so a reply to a steer showed above the steer
+ * (#7717). As in the shared order (`sortConversationMessages`), a turn goes by time from its second
+ * message on: such an update goes before the first newer row of its turn, or after the turn's last
+ * row. The steps row goes under the last update that moves. All other rows keep their place.
+ */
+export function placeUpdatesAfterSteers(rows: AgentMessage[], turns: readonly AgentMessage[][]): AgentMessage[] {
+  const inputTimes = new Map<string, string[]>();
+  for (const row of rows) {
+    const input = row.author === "you" || row.exchange?.direction === "incoming";
+    if (!row.turnId || !row.createdAt || !input) continue;
+    const times = inputTimes.get(row.turnId) ?? [];
+    times.push(row.createdAt);
+    inputTimes.set(row.turnId, times);
+  }
+  const moved = new Map<string, { row: AgentMessage; at: string }[]>();
+  for (const turn of turns) {
+    const turnId = turn[0]?.turnId;
+    const steerAt = turnId ? inputTimes.get(turnId)?.sort()[1] : undefined;
+    if (!turnId || steerAt === undefined) continue;
+    const later = turn.flatMap((row) =>
+      row.kind !== "thinking" && row.createdAt && row.createdAt >= steerAt ? [{ row, at: row.createdAt }] : [],
+    );
+    const last = later.at(-1);
+    if (!last) continue;
+    const steps = turn.at(-1);
+    if (steps?.kind === "thinking") later.push({ row: steps, at: last.at });
+    moved.set(turnId, later);
+  }
+  if (moved.size === 0) return rows;
+  const movedRows = new Set([...moved.values()].flat().map(({ row }) => row));
+  const kept = rows.filter((row) => !movedRows.has(row));
+  const lastOfTurn = new Map(kept.flatMap((row, index) => (row.turnId ? [[row.turnId, index] as const] : [])));
+  const placed: AgentMessage[] = [];
+  for (const [index, row] of kept.entries()) {
+    const waiting = row.turnId ? moved.get(row.turnId) : undefined;
+    const createdAt = row.createdAt;
+    if (waiting && createdAt) {
+      const newer = waiting.findIndex(({ at }) => at >= createdAt);
+      placed.push(...waiting.splice(0, newer < 0 ? waiting.length : newer).map((update) => update.row));
+    }
+    placed.push(row);
+    if (waiting && lastOfTurn.get(row.turnId ?? "") === index) placed.push(...waiting.splice(0).map(({ row }) => row));
+  }
+  return placed;
+}

@@ -86,6 +86,10 @@ try {
   const hooks = {
     listAgents: () => store.list(),
     listModels: () => models,
+    agentModels: () => models,
+    providerAccounts: () => undefined,
+    // No provider rows: each listed model can run.
+    providerStatuses: () => [],
     // The tool mock refuses a model change while the agent has a turn, so the call reports that agent.
     updateAgent: (input: UpdateAgentInput, initiatingAgentId: string) =>
       busyAgentIds.has(input.agentId) && input.model !== undefined

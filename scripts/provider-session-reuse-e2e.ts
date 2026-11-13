@@ -47,7 +47,7 @@ const codexLog = join(root, "codex.jsonl");
 const codexConfig = join(root, "codex-mcp-servers.json");
 const mcpScript = join(root, "echo-mcp.js");
 const agyInstall = join(root, "antigravity");
-const fakeAgy = join(agyInstall, "bin", "agy_acp_server");
+const fakeAgy = join(agyInstall, "1.5.4", "bin", "antigravity");
 const agyLog = join(root, "agy.jsonl");
 const groupSocket = join(root, "group.sock");
 const CLAUDE_MODEL = defaultProviderModel("claude");
@@ -55,6 +55,8 @@ const CLAUDE_MODEL = defaultProviderModel("claude");
 // Before the service modules load: the stores and the CLI search read these.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
+// Bun's homedir does not follow HOME, and the Antigravity driver reads and writes the sign-in here.
+process.env.GEMINI_HOME = join(home, ".gemini");
 process.env.OPENBOT_CLAUDE_PATH = claudeExecutable;
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
 process.env.OPENBOT_ANTIGRAVITY_PATH = fakeAgy;
@@ -207,10 +209,14 @@ process.stdin.on("data", (chunk) => {
 });
 `;
 
-/** An Antigravity ACP server with the methods that the service calls. It logs each prompt. */
+/** An Antigravity CLI 1.5.4 with the methods that the service calls. It logs each prompt. */
 const FAKE_AGY = `#!/usr/bin/env node
 const fs = require("node:fs");
 const NL = String.fromCharCode(10);
+if (process.argv[2] === "--version") {
+  process.stdout.write("1.5.4" + NL);
+  process.exit(0);
+}
 ${START_GROUP_CHILD}
 const log = (entry) => fs.appendFileSync(${JSON.stringify(agyLog)}, JSON.stringify({ pid: process.pid, ...entry }) + NL);
 const write = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + NL);
@@ -586,8 +592,7 @@ const runGroupCase = (
 await writeFile(claudeExecutable, STAND_IN_CLAUDE, { mode: 0o755 });
 await writeFile(fakeCodex, FAKE_CODEX, { mode: 0o755 });
 await writeFile(mcpScript, "process.stdin.resume();\n");
-await mkdir(join(agyInstall, "bin"), { recursive: true });
-await writeFile(join(agyInstall, "antigravity-package.json"), `${JSON.stringify({ version: "1.4.3" })}\n`);
+await mkdir(join(agyInstall, "1.5.4", "bin"), { recursive: true });
 await writeFile(fakeAgy, FAKE_AGY, { mode: 0o755 });
 
 try {

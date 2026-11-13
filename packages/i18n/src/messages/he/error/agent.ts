@@ -4,7 +4,15 @@ import type { messages as source } from "../../en/error/agent";
 export const messages = {
   "error.agent.historyUnavailable":
     "ההיסטוריה אינה זמינה לבקשה הזו. יש לקרוא שוב את ההיסטוריה האחרונה, או להשתמש ב-channel_history לעבודה בערוץ.",
+  "error.agent.historyArgumentsInvalid":
+    "ארגומנטים שגויים להיסטוריה: {detail} תקן את הארגומנטים ונסה שוב. openbot.tool_describe מחזיר את הסכמה.",
   "error.agent.toolRequestInvalid": "ארגומנטים לא תקינים לגילוי כלים. יש להשתמש בסכימה המוצהרת ובשם כלי מקורי מלא.",
+  "error.agent.toolCallArgumentsNotObject":
+    "הכלי לא רץ. ב-tool_call, arguments חייב להיות אובייקט JSON ולא טקסט. יש לשלוח את הקריאה שוב עם arguments כאובייקט.",
+  "error.agent.toolCallDiscoveryTool":
+    "הכלי לא רץ. tool_call לא יכול להריץ את openbot.tool_search או את openbot.tool_describe. יש לקרוא להם ישירות עם אותם ארגומנטים.",
+  "error.agent.routineScheduleArgumentsInvalid":
+    "לוח הזמנים של השגרה אינו תקין: {detail} יש לתקן את לוח הזמנים ולנסות שוב. openbot.tool_describe מחזיר את הסכמה.",
   "error.agent.approvalWhileDeleting": "אי אפשר לתת אישור בזמן שהסוכן נמחק.",
   "error.agent.accessLocalOnly": "אפשר לשנות גישה של סוכן רק במחשב שמריץ את הסוכן.",
   "error.agent.duplicateCleanupFailed": "שכפול הסוכן נכשל ולא ניתן היה להסיר את ההעתק החלקי.",
@@ -42,6 +50,7 @@ export const messages = {
     "אין עכשיו מודל זמין של {provider}. אפשר לקרוא ל-list_models כדי לראות את המודלים הזמינים.",
   "error.agent.reasoningEffortUnsupported":
     'המודל "{model}" אינו תומך ברמת החשיבה "{effort}". הרמות הנתמכות: {efforts}.',
+  "error.agent.reasoningEffortNotConfigurable": 'למודל "{model}" אין הגדרה של רמת חשיבה, ולכן אי אפשר לשנות אותה.',
   "error.agent.noStartingModelInSettings":
     "אין מודל זמין ב-{provider}, וגם לאף ספק מחובר אחר אין. יש להתחבר לספק, או לשנות את ספק ברירת המחדל בהגדרות השרת ← ספקים.",
   "error.agent.noStartingModel":
@@ -129,6 +138,8 @@ export const messages = {
   "error.agent.mcpServerNotSaved": "שרת ה-MCP לא הגיב, ולכן לא נשמר. {error}",
   "error.agent.mcpServerKeysMove":
     "שרת ה-MCP {name} מחזיק מפתחות עבור השרת הנוכחי שלו. יש לבקש מהמשתמש לשנות את הכתובת, הפקודה, הארגומנטים או שיטת ההעברה שלו בהגדרות השרת, MCP.",
+  "error.agent.mcpServerBuiltIn":
+    "{name} הוא חלק מ-OpenBot, ולכן כלי ה-MCP לא יכולים לבדוק, להפעיל, לכבות או להסיר אותו. המשתמש שולט בו במחשב שמריץ את OpenBot: חיבור GitHub בחנות, אפליקציות, GitHub, ושליטה במחשב בהגדרות, שליטה במחשב.",
   "error.agent.mcpServerUnknown": "אין שרת MCP בשם {name}. אפשר לקרוא ל-list_mcp_servers כדי לראות את השמות.",
   "error.agent.screenCaptureWindowMissing":
     "החלון הזה אינו פתוח כעת. יש לקרוא ל-list_capture_sources כדי לקבל את מזהי החלונות הנוכחיים.",

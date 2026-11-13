@@ -15,6 +15,7 @@ import {
   IconButton,
   Maximize2,
   PanelRight,
+  Plus,
   X,
 } from "@openbot/ui";
 import { createMemo, For, onCleanup, Show } from "solid-js";
@@ -25,6 +26,7 @@ import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { ChannelAvatar } from "../channels/ChannelAvatar";
 import { ComposerEditor } from "../conversation/ComposerEditor";
+import { createComposerRowsResize } from "../conversation/createComposerRowsResize";
 import { MarkdownMessageText } from "../conversation/MarkdownMessageText";
 import { ComposerVoiceControls, type VoicePhase } from "../conversation/VoiceRecordingMorph";
 import { SidebarWaitIcon } from "../sidebar/SidebarAgentIndicator";
@@ -116,6 +118,8 @@ export function AgentDockChat(props: {
   onSend: () => void;
   onClose: () => void;
   onRemove: () => void;
+  /** Puts a temporary seat on the dock. */
+  onAdd: () => void;
   onOpenInMain: () => void;
   /** The ⋯ menu shows "Open in new window" only when it is set. */
   onOpenWindow?: (() => void) | undefined;
@@ -238,6 +242,9 @@ export function AgentDockChat(props: {
     fades.measure();
     placeThumb();
   });
+  const draftRows = createComposerRowsResize(() =>
+    props.seat.kind === "agent" ? props.seat.agent.id : props.seat.channel.id,
+  );
   onCleanup(() => {
     sizes.disconnect();
     clearTimeout(hideTimer);
@@ -291,10 +298,20 @@ export function AgentDockChat(props: {
                 )}
               </Show>
               <DropdownMenu.Separator />
-              <DropdownMenu.Item onSelectAfterClose={() => props.onRemove()}>
-                <PanelRight aria-hidden="true" />
-                {t("agent.dock.remove")}
-              </DropdownMenu.Item>
+              <Show
+                when={props.seat.temporary}
+                fallback={
+                  <DropdownMenu.Item onSelectAfterClose={() => props.onRemove()}>
+                    <PanelRight aria-hidden="true" />
+                    {t("agent.dock.remove")}
+                  </DropdownMenu.Item>
+                }
+              >
+                <DropdownMenu.Item onSelectAfterClose={() => props.onAdd()}>
+                  <Plus aria-hidden="true" />
+                  {t("agent.dock.add")}
+                </DropdownMenu.Item>
+              </Show>
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
@@ -402,46 +419,51 @@ export function AgentDockChat(props: {
 
       <Show when={props.error}>{(error) => <p class="agent-dock-error">{error()}</p>}</Show>
 
-      <form
-        class="composer agent-dock-composer"
-        data-compact=""
-        onSubmit={(event: SubmitEvent) => {
-          event.preventDefault();
-          submit();
-        }}
-      >
-        <div class="composer-input-label">
-          <ComposerEditor
-            agentId={undefined}
-            agents={props.agents}
-            value={props.draft}
-            placeholder={t("composer.placeholder.message", { name: name() })}
-            ariaLabel={t("composer.placeholder.message", { name: name() })}
-            disabled={transcribing()}
-            focusRequest={props.focusRequest}
-            dictation={{ text: props.voice?.liveText ?? "", final: transcribing() }}
-            onValueChange={(value) => props.onDraftChange(value)}
-            onSubmit={submit}
-          />
-        </div>
-        <div class="composer-primary-actions">
-          <Show when={props.voice} fallback={sendButton()}>
-            {(voice) => (
-              <ComposerVoiceControls
-                phase={voice().phase}
-                levels={voice().levels}
-                elapsedSeconds={voice().elapsedSeconds}
-                modelProgress={voice().modelProgress}
-                blocked={voice().blocked}
-                onStart={() => voice().onStart()}
-                onCancel={() => voice().onCancel()}
-                onFinish={() => voice().onFinish()}
-                send={sendButton()}
-              />
-            )}
-          </Show>
-        </div>
-      </form>
+      {/* The mention picker hangs from the composer inside its `.composer-wrap`. */}
+      <div class="composer-wrap agent-dock-composer-wrap">
+        <form
+          ref={draftRows.form}
+          class="composer agent-dock-composer"
+          data-compact=""
+          data-small=""
+          onSubmit={(event: SubmitEvent) => {
+            event.preventDefault();
+            submit();
+          }}
+        >
+          <div class="composer-input-label" ref={draftRows.label}>
+            <ComposerEditor
+              agentId={undefined}
+              agents={props.agents}
+              value={props.draft}
+              placeholder={t("composer.placeholder.message", { name: name() })}
+              ariaLabel={t("composer.placeholder.message", { name: name() })}
+              disabled={transcribing()}
+              focusRequest={props.focusRequest}
+              dictation={{ text: props.voice?.liveText ?? "", final: transcribing() }}
+              onValueChange={(value) => props.onDraftChange(value)}
+              onSubmit={submit}
+            />
+          </div>
+          <div class="composer-primary-actions">
+            <Show when={props.voice} fallback={sendButton()}>
+              {(voice) => (
+                <ComposerVoiceControls
+                  phase={voice().phase}
+                  levels={voice().levels}
+                  elapsedSeconds={voice().elapsedSeconds}
+                  modelProgress={voice().modelProgress}
+                  blocked={voice().blocked}
+                  onStart={() => voice().onStart()}
+                  onCancel={() => voice().onCancel()}
+                  onFinish={() => voice().onFinish()}
+                  send={sendButton()}
+                />
+              )}
+            </Show>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

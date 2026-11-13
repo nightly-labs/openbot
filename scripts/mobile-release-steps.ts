@@ -15,6 +15,7 @@ import {
   MOBILE_STORE_NAMES,
   MOBILE_VERSION_FILES,
   type MobileStore,
+  otaVersion,
   parseStoreDates,
   releaseNotesProblems,
   SKIPPED,
@@ -36,11 +37,16 @@ export function readText(path: string): string {
   return readFileSync(path, "utf8");
 }
 
-export function appVersion(): string {
-  const appJson = JSON.parse(readText(MOBILE_VERSION_FILES[0]));
+/** The version in `source`, the text of an `app.json`. `name` is the file or the commit that has it. */
+export function appJsonVersion(source: string, name: string = MOBILE_VERSION_FILES[0]): string {
+  const appJson = JSON.parse(source);
   const version = isDynamicRecord(appJson) && isDynamicRecord(appJson.expo) ? appJson.expo.version : undefined;
-  if (!isString(version)) throw new Error(`${MOBILE_VERSION_FILES[0]} has no valid version.`);
+  if (!isString(version)) throw new Error(`${name} has no valid version.`);
   return version;
+}
+
+export function appVersion(): string {
+  return appJsonVersion(readText(MOBILE_VERSION_FILES[0]));
 }
 
 export function today(): string {
@@ -49,8 +55,12 @@ export function today(): string {
 
 const headingPrefix = (version: string) => `## [${version}] - `;
 
-/** The heading state of `version`, and the line it is on. */
+/** The heading state of the store version `version`, and the line it is on. */
 export function versionState(changelog: string, version: string): { index: number; dates: StoreDates } {
+  // No store step applies to an OTA section: no store reviews it, and it is not a newest store version.
+  if (otaVersion(version) !== undefined) {
+    throw new Error(`${version} is an OTA update, not a store version. Name the store version.`);
+  }
   const lines = changelog.split("\n");
   const index = lines.findIndex((line) => line.startsWith(headingPrefix(version)));
   if (index === -1) {
@@ -84,7 +94,11 @@ export function olderInReview(changelog: string, version: string, store: MobileS
   return changelog.split("\n").flatMap((line) => {
     const [, candidate = "", text = ""] = /^## \[([^\]]+)\] - (.+)$/.exec(line) ?? [];
     const dates = parseStoreDates(text);
-    return dates !== undefined && dates[store] === undefined && isNewerMobileVersion(version, candidate)
+    // An OTA section names only the platforms that get the update. No store reviews it.
+    return dates !== undefined &&
+      dates[store] === undefined &&
+      otaVersion(candidate) === undefined &&
+      isNewerMobileVersion(version, candidate)
       ? [candidate]
       : [];
   });
@@ -99,6 +113,8 @@ const LATEST_VERSION = (store: MobileStore) => new RegExp(`(\\n\\s+${store}: ")(
  * feature off for every version. `except` lists stay.
  */
 export function withStoreFeatures(source: string, store: MobileStore, version: string): string {
+  // The newest version is a store version. With an OTA version, each phone would show a store update that no store has.
+  if (otaVersion(version) !== undefined) throw new Error(`${version} is an OTA update, not a store version.`);
   const raise = (_match: string, start: string, current: string, end: string) =>
     `${start}${current !== "0" && isNewerMobileVersion(version, current) ? version : current}${end}`;
   const features = source.replace(QUOTED_VERSION(store), raise);

@@ -15,6 +15,12 @@ export const OPENBOT_ALTERNATE_DOWNLOAD_LINKS = {
   linux: "/download/linux/latest?arch=arm64",
 } as const;
 
+/**
+ * The Android app as an APK, for a phone with no Google Play. It answers only while a version has
+ * an APK (`ANDROID_APK_AVAILABLE` in ./android-apk.ts), so show the link only then.
+ */
+export const OPENBOT_ANDROID_APK_LINK = "/download/android/latest";
+
 /** The pages that describe each installer: requirements, install steps and known limits. */
 export const OPENBOT_DOWNLOAD_PAGE_LINKS = {
   hub: "/download",

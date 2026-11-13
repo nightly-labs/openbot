@@ -41,6 +41,8 @@ const agent: AgentSummary = {
 function instructions(provider: "claude" | "codex"): string {
   return developerInstructions({ ...agent, provider }, "/shared", [], "/automation", DEFAULT_AGENT_DEFAULTS, {
     computerUseInOwnChat: false,
+    // A desktop, where OpenBot draws the agent cursor, so its line is counted.
+    agentCursorDrawn: true,
     sideThread: false,
     passwordVault: false,
     storedMemoryCount: 0,

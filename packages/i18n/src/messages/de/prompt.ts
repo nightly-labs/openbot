@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/prompt";
 
 export const messages = {
-  "prompt.inputRequired": "Eingabe erforderlich",
   "prompt.question.label": "Fragen des Agenten",
   "prompt.question.cancelled": "Fragen abgebrochen",
   "prompt.question.expired": "Fragen abgelaufen",
@@ -12,15 +11,12 @@ export const messages = {
   "prompt.question.next": "Weiter",
   "prompt.question.cancel": "Fragen abbrechen",
   "prompt.question.privatePlaceholder": "Private Antwort eingeben",
-  "prompt.customPlaceholder": "Eigene Antwort eingeben",
   "prompt.question.customAnswerFor": "Eigene Antwort auf: {question}",
   "prompt.question.skip": "Überspringen",
   "prompt.question.chooseAll": "Wähle alles Zutreffende.",
   "prompt.question.somethingElse": "Etwas anderes",
   "prompt.question.emptyTitle": "Keine offenen Fragen.",
   "prompt.question.emptyBody": "Der Agent fährt fort, wenn er eine weitere Entscheidung benötigt.",
-  "prompt.choice.hint": "Wähle eine passende Option oder gib eine eigene Antwort ein.",
-  "prompt.choice.customLabel": "Eigene Antwort",
   "prompt.approval.answerFailed": "Diese Genehmigungsanfrage konnte nicht beantwortet werden. Versuche es erneut.",
   "prompt.approval.grantFailed": "Die dauerhafte Genehmigung konnte nicht gespeichert werden. Versuche es erneut.",
   "prompt.approval.label": "Agentengenehmigung",

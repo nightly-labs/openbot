@@ -1,0 +1,33 @@
+{
+  "slug": "affinity",
+  "name": "Affinity",
+  "tagline": "Relationship CRM for dealmaking",
+  "description": "Affinity lets agents search people, companies, and opportunities, read notes and interaction history, and update lists in the CRM of the signed-in account. Each user signs in to their own Affinity account through the browser.",
+  "category": "productivity",
+  "creatorName": "Affinity",
+  "iconUrl": "https://cdn.prod.website-files.com/69e63af550c7ba21cdac9029/6a4bc0ce05a6646b5e61fbd1_Light.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-who-knows", "text": "Who on my team has the strongest connection to this company?" },
+    { "id": "prompt-pipeline", "text": "Summarize the deals in my pipeline list that had no contact in 30 days." },
+    { "id": "prompt-meeting-prep", "text": "Prepare a brief on this founder from our notes and past emails." }
+  ],
+  "apps": [
+    {
+      "id": "app-affinity-mcp",
+      "name": "Affinity",
+      "description": "CRM search, notes, and list updates, over Affinity's MCP server with browser sign-in.",
+      "iconUrl": "https://cdn.prod.website-files.com/69e63af550c7ba21cdac9029/6a4bc0ce05a6646b5e61fbd1_Light.png",
+      "server": {
+        "name": "affinity",
+        "transport": "http",
+        "url": "https://mcp.affinity.co/mcp",
+        "auth": [{ "id": "affinity-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.affinity.co",
+  "privacyPolicyUrl": "https://www.affinity.co/legal/privacy-policy",
+  "termsUrl": "https://www.affinity.co/legal/terms-of-use"
+}

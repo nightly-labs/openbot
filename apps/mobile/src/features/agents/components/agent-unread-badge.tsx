@@ -17,6 +17,7 @@ const DIGITS = 14 / DESKTOP_AVATAR;
  * digits on a plum felt pill, in the same proportions to the avatar. Its ring has the colour under the
  * avatar, so it cuts the badge out of the face. It takes the place of the wait mark, which outranks it.
  * The count stops at 99. A one-digit count is a round ball; a longer count grows the pill toward the face.
+ * A count of 0 is a ball with no digits: only the agent's side threads have unread messages.
  */
 export function AgentUnreadBadge({
   count,
@@ -50,13 +51,15 @@ export function AgentUnreadBadge({
         backgroundColor: String(plum),
       }}
     >
-      <Typography.Paragraph
-        className="font-extrabold"
-        style={{ color: String(cream), fontSize, lineHeight: felt }}
-        numberOfLines={1}
-      >
-        {format.number(Math.min(count, 99))}
-      </Typography.Paragraph>
+      {count > 0 ? (
+        <Typography.Paragraph
+          className="font-extrabold"
+          style={{ color: String(cream), fontSize, lineHeight: felt }}
+          numberOfLines={1}
+        >
+          {format.number(Math.min(count, 99))}
+        </Typography.Paragraph>
+      ) : null}
     </View>
   );
 }

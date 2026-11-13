@@ -374,6 +374,9 @@ export const messages = {
   "connector.whatsapp.ownNumber": "個人の番号",
   "connector.whatsapp.ownNumberDescription":
     "あなたの「自分にメッセージ」チャットと、許可した人だけが書き込めます。OpenBot 専用の番号ではオフにしてください。",
+  "connector.whatsapp.workingMessage": "「対応しています…」メッセージ",
+  "connector.whatsapp.workingMessageDescription":
+    "エージェントの作業中に OpenBot が送信し、その後、回答に置き換えます。回答だけを送信するにはオフにしてください。",
   "connector.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "connector.whatsapp.orchestratorDescription":
     "このエージェントは、リンクしたすべての番号から OpenBot 宛てのメッセージを受け取ります。短いものには自分で回答し、その他の作業は適切なエージェントに任せて、WhatsApp で回答します。",

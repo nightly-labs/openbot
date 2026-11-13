@@ -10,15 +10,16 @@
  * wants, and it is accepted by every other signed-in listing OpenBot ships.
  *
  * So the deep link stays as the fallback for the rare machine where no loopback port can be bound,
- * and this is what a sign-in registers and sends when it is running. The port is
+ * and for a server whose firewall blocks both loopback names (#7230). This is what a sign-in
+ * registers and sends when it is running. The port is
  * `MCP_OAUTH_REDIRECT_PORT` when it is free, so an administrator can register one exact callback
  * for a sign-in app: many authorization servers compare the port, although RFC 8252 says they must
  * not. When another program holds that port, the operating system gives one, and the registration
  * is remade when the stored one names another address.
  *
  * The grant travels no further than this process. The page the browser is left on says only that
- * the window can be closed - the code is in the request line, and a page that repeated it would
- * put a credential in the browser's history.
+ * the window can be closed - the code is in the request line or the posted form, and a page that
+ * repeated it would put a credential in the browser's history.
  */
 
 import type { LanguageService } from "./language-service";

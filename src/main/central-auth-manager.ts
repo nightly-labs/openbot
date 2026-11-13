@@ -2461,8 +2461,20 @@ export function isHostNotOnAccount(error: unknown): boolean {
   return error instanceof AuthApiError && (error.status === 403 || error.status === 404);
 }
 
-/** A client error that the same request cannot change. A timeout and a rate limit can pass later. */
-function isFinalClientError(error: unknown): boolean {
+/**
+ * The account service refused the request because the account sent too many (429): its error code,
+ * and the seconds until it takes one again, when it says. Null for each other failure.
+ */
+export function authApiRateLimit(error: unknown): { code: string; retryAfterSeconds: number | null } | null {
+  if (!(error instanceof AuthApiError) || error.status !== 429) return null;
+  return { code: error.code, retryAfterSeconds: error.retryAfterSeconds ?? null };
+}
+
+/**
+ * A client error that the same request cannot change, such as a machine token that the account service
+ * no longer accepts (401). A timeout and a rate limit can pass later.
+ */
+export function isFinalClientError(error: unknown): boolean {
   return (
     error instanceof AuthApiError &&
     error.status >= 400 &&

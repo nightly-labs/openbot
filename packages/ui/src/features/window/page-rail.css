@@ -55,6 +55,45 @@
   -webkit-app-region: no-drag;
 }
 
+/* The end of the rail: Marketplace, Help and Settings, then the menu of the open server. */
+.window-rail-end,
+.window-rail-server-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+}
+
+.window-rail-server-slot {
+  -webkit-app-region: no-drag;
+}
+
+.window-rail-server-slot:empty {
+  display: none;
+}
+
+/* A short line sets the server apart from the pages. */
+.window-rail-server-slot::before {
+  width: var(--openbot-space-6);
+  height: 1px;
+  margin-block: var(--openbot-space-0-5);
+  background: var(--openbot-border);
+  content: "";
+}
+
+/* The logo of the open server. The button opens the server menu beside it. */
+.window-rail-button.window-rail-server > .server-menu-mark {
+  width: var(--openbot-space-6);
+  height: var(--openbot-space-6);
+}
+
+/* The dot of a hosted server that sleeps or wakes, at the corner of the logo. */
+.window-rail-button.window-rail-server > .window-rail-server-sleep {
+  position: absolute;
+  inset-block-end: var(--openbot-space-1);
+  inset-inline-end: var(--openbot-space-1);
+}
+
 /* A rail icon is 20px, so it takes the line of the large icons. The line does not change on hover or on
  * the open page; only the color does. */
 .window-rail-button {

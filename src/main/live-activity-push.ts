@@ -51,6 +51,11 @@ export interface LiveActivityPushOptions {
   randomBytes(size: number): Uint8Array;
   /** Whether the member is still a member and not disabled. A removed member gets no more updates. */
   memberActive(memberId: string): boolean;
+  /**
+   * The thread of the side thread of the agent that runs the turn, or null when the turn is of the
+   * agent's own chat. The link of a view that shows this work then opens that thread.
+   */
+  sideThreadOfTurn?(agentId: string, turnId: string): string | null;
   logger?: { warn(message: string, ...values: unknown[]): void };
 }
 
@@ -119,6 +124,11 @@ export class LiveActivityPushService {
     if (previous) this.#clearTimer(previous);
     if (previous && !same) this.#stop(previous);
     const now = this.#now();
+    // A phone that signs in again gets a new session. The registration of the old session has the same
+    // token, so it would send each update to the same activity a second time.
+    const others = [...this.#registrations.values()].filter(
+      (other) => other.sessionId !== sessionId && other.value.token === value.token,
+    );
     const registration: Registration = {
       sessionId,
       viewer,
@@ -131,7 +141,7 @@ export class LiveActivityPushService {
           : new DynamicIslandCoordinator(() => liveActivityIslandText(phoneText(value.locale))),
       expiresAt: now + REGISTRATION_LIFETIME_MS,
       // The same token is the same activity.
-      startedAt: same && previous ? previous.startedAt : now,
+      startedAt: Math.min(same && previous ? previous.startedAt : now, ...others.map((other) => other.startedAt)),
       // The phone shows its own state now, so an alert from before is old.
       alert: null,
       // The request came over the connection of this session, so it is open.
@@ -139,12 +149,13 @@ export class LiveActivityPushService {
       timer: null,
       // The phone showed its own state last. The next update is sent, also when it matches the last one.
       sent: null,
-      timestamp: same && previous ? previous.timestamp : 0,
+      timestamp: Math.max(same && previous ? previous.timestamp : 0, ...others.map((other) => other.timestamp)),
       sending: false,
       failures: 0,
       retryAt: 0,
     };
     this.#registrations.set(sessionId, registration);
+    for (const other of others) this.#stop(other);
     this.#schedule(registration, 0);
     this.#listen();
   }
@@ -237,6 +248,12 @@ export class LiveActivityPushService {
     // Access can end while the phone is away: a removed or disabled member gets no more content.
     if (now >= registration.expiresAt || !this.#options.memberActive(registration.viewer.memberId)) {
       this.#stop(registration);
+      return;
+    }
+    // iOS ended the activity and ignores its updates. The registration stays until it expires, so the
+    // same token that the phone gives again keeps its start.
+    if (now >= registration.startedAt + ACTIVITY_LIFETIME_MS) {
+      this.#schedule(registration, registration.expiresAt - now);
       return;
     }
     if (registration.sending) {
@@ -347,8 +364,17 @@ export class LiveActivityPushService {
         registration.photos.get(agent.id) ?? liveActivityBloubFile(agent.avatarSeed, agent.avatarHue, mood),
       unreadAgents,
       actionKey: registration.keys.action,
+      threadId: this.#threadId(registration, presentation),
       redact: redactText,
     });
+  }
+
+  /** The thread that the links of the view open: the thread of its request, or the side thread that works. */
+  #threadId(registration: Registration, presentation: DynamicIslandPresentation): string | null {
+    const requestThread = registration.coordinator.requestThreadId(presentation);
+    if (requestThread) return requestThread;
+    const working = registration.coordinator.workingTurn(presentation);
+    return working ? (this.#options.sideThreadOfTurn?.(working.agentId, working.turnId) ?? null) : null;
   }
 
   #stop(registration: Registration): void {
@@ -374,11 +400,17 @@ export class LiveActivityPushService {
   }
 }
 
-/** Whether the island view shows the event that `subject` names, so a notification would repeat it. */
+/**
+ * Whether the island view shows the event that `subject` names, so a notification would repeat it.
+ * The view shows the replies and the failed turn of the agent's own chat. The end of a turn in a side
+ * thread is not one of them, so its notification goes out, also while the view shows an older reply
+ * or failure of the same agent.
+ */
 function presentationShows(
   presentation: DynamicIslandPresentation,
-  { agentId, kind }: PushNotificationSubject,
+  { agentId, kind, sideThread }: PushNotificationSubject,
 ): boolean {
+  if (sideThread) return false;
   switch (presentation.mode) {
     case "message":
       return kind === "reply" && presentation.message.agent.id === agentId;

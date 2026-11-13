@@ -1,0 +1,96 @@
+name: Stage the Android APK
+
+# The Android app as an APK, for a phone with no Google Play. The file is the universal APK that
+# Google Play makes from a store bundle, so it has the signature of the app on Google Play.
+# `release-android.yml` calls this workflow after each upload. A manual run stages the APK of a
+# bundle that Google Play already has.
+#
+# This workflow makes nothing public. It saves the APK on a draft GitHub release, which only people
+# who can write to the repository see. `publish-android-apk.yml` makes the draft public when the
+# version is marked as available, and then openbot.run links to it.
+# See apps/mobile/README.md#android-apk.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_code:
+        description: The versionCode of a bundle on Google Play, such as 57.
+        type: string
+        required: true
+      replace:
+        description: Replace the APK of a release that is public already.
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      version_code:
+        description: The versionCode of the bundle that the caller uploaded to Google Play.
+        type: string
+        required: true
+
+permissions: {}
+
+jobs:
+  # One job, and no workflow artifact: each signed-in GitHub user can download the artifacts of a
+  # public repository, and this APK must not be public before the version is. The Google Play key
+  # and the repository token each go to one step only.
+  stage:
+    name: Save the APK on a draft GitHub release
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    environment: release-android
+    # Two runs for one version must not change the same release at the same time.
+    concurrency:
+      group: release-android-apk
+      cancel-in-progress: false
+    permissions:
+      # The draft `android-v<version>` release.
+      contents: write
+    env:
+      CI: "1"
+      FASTLANE_SKIP_UPDATE_CHECK: "1"
+      FASTLANE_HIDE_CHANGELOG: "1"
+      FASTLANE_OPT_OUT_USAGE: "1"
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun and Node
+        uses: ./.github/actions/setup-bun
+        with:
+          install: ignore-scripts
+
+      - name: Set up Ruby for Fastlane
+        uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
+        with:
+          ruby-version: "3.4"
+          bundler: none
+
+      - name: Install Fastlane
+        shell: bash
+        run: |
+          echo "APK_PATH=$RUNNER_TEMP/openbot-play.apk" >> "$GITHUB_ENV"
+          gem install fastlane --version 2.240.1 --no-document
+          fastlane --version
+
+      - name: Download the universal APK
+        working-directory: apps/mobile
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_KEY }}
+          VERSION_CODE: ${{ inputs.version_code }}
+        run: fastlane android apk
+
+      # The script reads the version in the file, checks its signature, and stops when the file is
+      # not the build that was asked for. The runner has the Android SDK and Java.
+      - name: Check the APK and save it as a draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION_CODE: ${{ inputs.version_code }}
+          REPLACE: ${{ inputs.replace == true }}
+        run: |
+          replace=()
+          [[ "$REPLACE" == "true" ]] && replace=(--replace)
+          bun scripts/android-apk-release.ts stage --apk "$APK_PATH" --version-code "$VERSION_CODE" "${replace[@]}"

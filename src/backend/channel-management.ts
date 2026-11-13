@@ -113,7 +113,7 @@ export function channelDraftChange(
   args: DynamicRecord,
   callerAgentId: string,
   agents: readonly AgentSummary[],
-  access: { hidden(agentId: string): boolean; level(agentId: string): AgentAccessLevel },
+  access: { level(agentId: string): AgentAccessLevel },
   workOwners: ReadonlySet<string>,
 ): { draft: ChannelDraft; note: ChannelChangeNote } {
   const draft: ChannelDraft = {
@@ -141,7 +141,6 @@ export function channelDraftChange(
       throw new Error("No agent has that id. Get the id from openbot.list_agents.");
     if (agentAccessRank(access.level(agentId)) < agentAccessRank("chat"))
       throw new Error(`The person who asked cannot chat with ${name}, so it stays out.`);
-    if (access.hidden(agentId)) throw new Error(`${name} is hidden. Ask a person to show it again first.`);
     if (channel.members.length >= INPUT_LIMITS.agents)
       throw new Error(`A channel has at most ${INPUT_LIMITS.agents} members.`);
     return {

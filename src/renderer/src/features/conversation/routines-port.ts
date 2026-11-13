@@ -1,16 +1,20 @@
 // The routines twin of `memories-port.ts`: one settings panel, two owners.
 
-import type {
-  OpenBotDesktopApi,
-  RoutineFields,
-  RoutineLimitPolicy,
-  RoutineMissedPolicy,
-  RoutineResultConnectionOption,
-  RoutineResultDelivery,
-  RoutineResultDestination,
-  RoutineRunFields,
-  RoutineRunPlace,
-  RoutineSchedule,
+import {
+  LOCAL_SERVER_ID,
+  type OpenBotDesktopApi,
+  type RoutineFields,
+  type RoutineLimitPolicy,
+  type RoutineMissedPolicy,
+  type RoutineResultConnectionOption,
+  type RoutineResultDelivery,
+  type RoutineResultDestination,
+  type RoutineResultRoutineInput,
+  type RoutineRunFields,
+  type RoutineRunPlace,
+  type RoutineSchedule,
+  type SetRoutineResultDestinationInput,
+  type TestRoutineInput,
 } from "@openbot/contracts/ipc";
 import type { EventRoutine, EventRoutineOwner, EventRoutineTriggerInput } from "@openbot/contracts/ipc-events";
 import type { EventRoutinesApi, RoutineWebhooksApi } from "./routine-webhooks-api";
@@ -48,8 +52,9 @@ interface RoutineResultsPort {
     routineId: string,
     destination: { connectionId: string; placeId: string; placeName: string } | null,
   ) => Promise<RoutineResultDestination | null>;
-  deliveries: (routineId: string) => Promise<RoutineResultDelivery[]>;
-  resend: (runId: string) => Promise<void>;
+  /** Only on this computer: `routine-results-v1` keeps the deliveries on the host's own computer. */
+  deliveries?: (routineId: string) => Promise<RoutineResultDelivery[]>;
+  resend?: (runId: string) => Promise<void>;
 }
 
 export interface RoutinesPort {
@@ -67,8 +72,9 @@ export interface RoutinesPort {
    */
   missedPolicy: boolean;
   /**
-   * Whether the host saves a one-time schedule. Only this computer's host does: the released Team
-   * API cannot carry the `once` kind, so a remote host hides such routines.
+   * Whether the host saves a one-time schedule: this computer's host, and a remote host with
+   * `routines-once-v1`. The released Team API cannot carry the `once` kind, so an older remote host
+   * hides such routines.
    */
   onceSchedule: boolean;
   /**
@@ -87,16 +93,41 @@ export interface RoutinesPort {
   subscribe: (reload: () => void) => () => void;
   /** Webhook triggers and activity, for a host with event support. */
   events?: { owner: EventRoutineOwner; api: RoutineWebhooksApi };
-  /** Only for an agent on this computer: the released Team API has no routine destinations. */
+  /**
+   * For an agent on this computer, or on a joined server whose host serves `routine-results-v1` to an
+   * owner or admin. The released Team API has no routine destinations.
+   */
   results?: RoutineResultsPort;
 }
 
-function agentRoutineResults(agentId: string): RoutineResultsPort {
+/** `serverId` names a joined server. Without it, the results are this computer's. */
+/**
+ * The `routine-results-v1` calls of a joined server, for a client without the desktop port. It has no
+ * deliveries or second send: the contract keeps them on the host's own computer.
+ */
+export interface RoutineResultsCalls {
+  options: () => Promise<RoutineResultConnectionOption[]>;
+  destination: (input: RoutineResultRoutineInput) => Promise<RoutineResultDestination | null>;
+  setDestination: (input: SetRoutineResultDestinationInput) => Promise<RoutineResultDestination | null>;
+}
+
+function agentRoutineResults(agentId: string, serverId?: string | RoutineResultsCalls): RoutineResultsPort {
+  if (typeof serverId === "object")
+    return {
+      options: () => serverId.options(),
+      destination: (routineId) => serverId.destination({ agentId, routineId }),
+      setDestination: (routineId, destination) => serverId.setDestination({ agentId, routineId, destination }),
+    };
   const api = window.openbot.routineResults;
+  const server = serverId ?? LOCAL_SERVER_ID;
+  const destinations: RoutineResultsPort = {
+    options: () => api.options(server),
+    destination: (routineId) => api.destination({ agentId, routineId }, server),
+    setDestination: (routineId, destination) => api.setDestination({ agentId, routineId, destination }, server),
+  };
+  if (serverId) return destinations;
   return {
-    options: () => api.options(),
-    destination: (routineId) => api.destination({ agentId, routineId }),
-    setDestination: (routineId, destination) => api.setDestination({ agentId, routineId, destination }),
+    ...destinations,
     deliveries: (routineId) => api.deliveries({ agentId, routineId }),
     resend: (runId) => api.resend({ agentId, runId }),
   };
@@ -110,17 +141,29 @@ export type AgentRoutinesApi = Pick<
 
 export function agentRoutinesPort(
   agentId: string,
-  automation = false,
+  /**
+   * Gives the command that runs a routine from a script on the host. Set only when the agent allows
+   * Local scripts: on this computer, or for an owner or admin of a host with `routine-run-command-v1`.
+   */
+  runCommand?: (input: TestRoutineInput) => Promise<string>,
   localHost = false,
   api: AgentRoutinesApi = window.openbot.agent,
   runPlace = localHost,
+  /**
+   * A joined server whose host serves `routine-results-v1` to this owner or admin: its id on desktop,
+   * or the calls of the web client.
+   */
+  resultsServerId?: string | RoutineResultsCalls,
+  /** This computer's host, or a joined host with `routines-once-v1`. */
+  onceSchedule = localHost,
 ): RoutinesPort {
+  const results = localHost || resultsServerId ? agentRoutineResults(agentId, resultsServerId) : undefined;
   return {
     ownerId: agentId,
     ownerNoun: "agent",
     limitPolicy: localHost,
     missedPolicy: localHost,
-    onceSchedule: localHost,
+    onceSchedule,
     runIn: runPlace,
     list: () => api.listRoutines(agentId),
     listRuns: (routineId, limit) => api.listRoutineRuns({ agentId, routineId, limit }),
@@ -140,10 +183,8 @@ export function agentRoutinesPort(
     test: async (routineId) => {
       await api.testRoutine({ agentId, routineId });
     },
-    ...(automation
-      ? { runCommand: (routineId: string) => window.openbot.agent.automationRunCommand({ agentId, routineId }) }
-      : {}),
-    ...(localHost ? { results: agentRoutineResults(agentId) } : {}),
+    ...(runCommand ? { runCommand: (routineId: string) => runCommand({ agentId, routineId }) } : {}),
+    ...(results ? { results } : {}),
     subscribe: (reload) =>
       api.onEvent((event) => {
         if (event.type === "routines-changed" && event.agentId === agentId) reload();
@@ -167,13 +208,15 @@ export function channelRoutinesPort(
   channelId: string,
   api: ChannelRoutinesApi = window.openbot.agent,
   localHost = false,
+  /** This computer's host, or a joined host with `routines-once-v1`. */
+  onceSchedule = localHost,
 ): RoutinesPort {
   return {
     ownerId: channelId,
     ownerNoun: "channel",
     limitPolicy: localHost,
     missedPolicy: localHost,
-    onceSchedule: localHost,
+    onceSchedule,
     runIn: false,
     list: () => api.listChannelRoutines(channelId),
     listRuns: (routineId, limit) => api.listChannelRoutineRuns({ channelId, routineId, limit }),

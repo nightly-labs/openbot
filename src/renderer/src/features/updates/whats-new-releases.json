@@ -1,5 +1,134 @@
 [
   {
+    "version": "0.69.0",
+    "date": "2026-11-12",
+    "notices": [
+      "Hidden agents now keep working. OpenBot turned off the routines of agents that you hid before this version, so turn on the routines that you want."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Pin a message in an agent's chat: right-click it and select Pin. The pin button in the chat header shows the pins of all chats of the agent.",
+          "The Library has folders and three views. An agent can also save the files that it attaches in a folder that you name.",
+          "Teach a task: select Teach a task in the + menu, then do the task in the agent's browser. The agent saves the steps as a skill.",
+          "Pool the accounts of a provider in Settings. Agents use one account until it nears a usage limit, then the next account.",
+          "Add skills from GitHub: paste the link of a public repository into the Marketplace Skills search.",
+          "Server settings > Transfer can export a full copy of a server, and copy agents to another server in one step.",
+          "Mute an agent from its menu in the sidebar. A muted agent sends no notifications and plays no sound."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "A message that you send to an agent while it works now steers the running turn. To queue it as before, turn off Steer agents while they work in Settings > Agents.",
+          "A hidden agent keeps working. It runs its routines, and it shows in Needs you when it waits for your answer.",
+          "The open server shows as a logo at the bottom of the page rail. The New button is at the end of the sidebar search field.",
+          "OpenBot uses Electron 45.3.0 with Chromium 156, and more sites with a bot check load in the agent browser."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot starts faster, most of all on Windows, and a slow computer stays usable after the start.",
+          "OpenBot stays responsive after a restart when you have many tasks or threads.",
+          "On Linux and Windows, OpenBot completes its shutdown when you close the main window.",
+          "Routines run on time after the computer clock is corrected.",
+          "Text that you copy from a chat no longer has empty lines at its start or end."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.68.0",
+    "date": "2026-11-11",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Channel settings have a Browser setting. Choose if every member, one member or no member can use the browser in the channel.",
+          "The channel side panel has a Browser pane and a Files pane. They show the tabs of the channel's members and the files sent in the channel.",
+          "Right-click the Dynamic Island or the agent dock to hide it. You can also drag an agent to a new place on the dock and change the dock size in Settings.",
+          "You can turn off the Unread group in the sidebar. Right-click the Unread heading, or set Sort chats to Manual.",
+          "When a new version cannot start 3 times in a row, a recovery window opens. You can try again, download the previous version or export diagnostics."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "A new version now goes to about 1 in 10 computers first, and to all computers about one day later. To get it at once, select Check for updates.",
+          "Agents ask questions with options in the question prompt. Cards with buttons are only for approvals."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "A chat that you read no longer stays in the Unread group. Unread side threads, such as the thread of a routine, no longer keep an agent there.",
+          "On Windows, the agent dock and the Dynamic Island no longer make the pointer slow in all apps while many agents work.",
+          "A team no longer stops when the lead ends its turn with no answer after its teammates report back.",
+          "A Claude chat that got too long now starts a new session with the chat history. Before, each message failed with \"Prompt is too long\".",
+          "When a Claude account reaches its 5-hour limit, the agent moves to its backup model or waits for the reset.",
+          "An agent can save a browser screenshot as a file and attach it to its reply."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.67.1",
+    "date": "2026-11-10",
+    "notices": [],
+    "groups": [
+      {
+        "type": "fixed",
+        "items": [
+          "Gemini installs and updates on Windows again. In 0.67.0, it stopped with an error about a link or special file.",
+          "An agent that sends a message to a busy teammate now knows if the message went into the teammate's running task. When the message waits, the agent can tell you why.",
+          "During Computer Use, agents no longer say that their cursor is not available. OpenBot draws the cursor where the agent clicks, scrolls or moves."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.67.0",
+    "date": "2026-11-10",
+    "notices": [
+      "Fast mode is off for each Claude agent after this update. If you used it, turn it on again in the model picker."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Add a server on your own Linux computer or VPS with one command, or ask an agent to install it there over SSH.",
+          "Server settings → Transfer can now move the chat history, the channels and the workflows to the new server.",
+          "On Linux, the Dynamic Island and the agent dock stay above other windows, as on a Mac.",
+          "Turn on Fast mode for a Claude agent, or choose Ultrafast for a Codex agent, in the model picker.",
+          "Agents keep what they learn about a site as a memory of that site, and do not repeat steps that failed.",
+          "The Apps catalog has 207 new apps, such as monday.com, Miro, Dropbox and Zapier. You connect them with a browser sign-in."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Chats with unread replies show first, in an Unread group. To change the order, select Sort chats in the menu of the chat list.",
+          "On a joined server, such as a VPS, the desktop app and the browser app now have most of the features of this computer.",
+          "Agents add OpenBot as a co-author to their git commits. You stay the author. Turn it off in Your settings → Agents.",
+          "Agents finish browser tasks with fewer steps and about 18% fewer tokens.",
+          "Gemini now runs on the Antigravity CLI. Your Google sign-in stays."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "A Claude agent that you stop now stops in about 10 seconds, and its queued messages start.",
+          "On Windows, agents can use the browser while the OpenBot window is minimized or in the tray.",
+          "On macOS, Restart to update no longer closes OpenBot when it runs from its disk image. It tells you to move OpenBot to Applications.",
+          "In a voice conversation, a cough or a key press no longer stops the agent's reply."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.66.0",
     "date": "2026-11-09",
     "notices": [],

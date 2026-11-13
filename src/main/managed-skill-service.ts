@@ -130,6 +130,9 @@ const syncTarget = Effect.fn("ManagedSkill.syncTarget")(function* (
   yield* rejectSymlink(marker);
   if (yield* fileExists(target)) {
     if ((yield* optionalText(marker)) !== ownershipContent) return "collision";
+    // Every start comes here for each agent. A write of the same text is a file that an antivirus
+    // scans and a provider's file watcher reports, for no change.
+    if ((yield* optionalText(target)) === content) return "synced";
     yield* atomicWrite(workspaceRoot, target, content);
     return "synced";
   }

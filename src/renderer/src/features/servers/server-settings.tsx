@@ -22,7 +22,12 @@ import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
 import { mcpSignInRecord } from "./mcp-servers";
 import type { ServerSettingsSection } from "./ServerSettingsModal";
-import { serverCanAdminister, serverRoleCanAdminister, serverSupportsCapability } from "./server-capabilities";
+import {
+  serverCanAdminister,
+  serverRoleCanAdminister,
+  serverRotatesHostKey,
+  serverSupportsCapability,
+} from "./server-capabilities";
 import { useServers } from "./servers-context";
 import { serverAdminPort, serversPort } from "./servers-port";
 
@@ -290,11 +295,19 @@ const ServerSettings = createSimpleContext({
       setHostStatus(await serversPort().host.recheckScreenRecording());
     }
 
-    /** Changes the key of the server on this computer. Paired devices follow the signed handover. */
+    /**
+     * Changes the server key: this computer's, or a joined server's through `host-key-rotation-v1`,
+     * which only its owner may use. Paired devices follow the signed handover.
+     */
     async function rotateHostKey(): Promise<void> {
-      if (serverSettingsTarget()?.kind !== "local")
-        throw new Error(currentText().t("server.settings.hostKeyLocalOnly"));
-      setHostStatus(await serversPort().host.rotateIdentityKey());
+      const server = serverSettingsTarget();
+      if (server?.kind === "local") {
+        setHostStatus(await serversPort().host.rotateIdentityKey());
+        return;
+      }
+      if (!serverRotatesHostKey(server)) throw new Error(currentText().t("server.settings.hostKeyOwnerOnly"));
+      await serversPort().hostAdmin.rotateHostKey(server.id);
+      setServers(await serversPort().servers.list());
     }
 
     async function setServerPublished(published: boolean): Promise<void> {
@@ -461,11 +474,17 @@ const ServerSettings = createSimpleContext({
       if (serverSettingsTarget()?.id === server.id) setServerSettingsOpen(false);
     }
 
-    /** Restarts the hosted server, or the server on this computer, that the confirmation from the server menu asks about. */
+    /**
+     * Restarts the server that the confirmation from the server menu asks about: a server on this computer
+     * through its supervisor, a hosted server through the account service, and a self-hosted server
+     * through its own host (`host-restart-v1`).
+     */
     async function restartConfirmedServer(): Promise<void> {
       const server = restartConfirmServer();
       if (!server) throw new Error(currentText().t("server.settings.unavailable"));
       if (server.thisComputer) await serversPort().localServers.restart(server.id);
+      else if (server.hosted !== true && serverSupportsCapability(server, "host-restart-v1"))
+        await serversPort().hostAdmin.restartHost(server.id);
       else await serversPort().hostedServers.restart(server.id);
     }
 

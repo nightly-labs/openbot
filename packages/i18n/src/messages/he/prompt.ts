@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/prompt";
 
 export const messages = {
-  "prompt.inputRequired": "נדרש קלט",
   "prompt.question.label": "שאלות הסוכן",
   "prompt.question.cancelled": "השאלות בוטלו",
   "prompt.question.expired": "תוקף השאלות פג",
@@ -12,15 +11,12 @@ export const messages = {
   "prompt.question.next": "הבא",
   "prompt.question.cancel": "ביטול השאלות",
   "prompt.question.privatePlaceholder": "הזנת תשובה פרטית",
-  "prompt.customPlaceholder": "אפשר להקליד תשובה משלך",
   "prompt.question.customAnswerFor": "תשובה מותאמת עבור: {question}",
   "prompt.question.skip": "דילוג",
   "prompt.question.chooseAll": "יש לבחור את כל האפשרויות המתאימות.",
   "prompt.question.somethingElse": "משהו אחר",
   "prompt.question.emptyTitle": "אין שאלות שממתינות.",
   "prompt.question.emptyBody": "הסוכן ימשיך כשיצטרך החלטה נוספת.",
-  "prompt.choice.hint": "אפשר לבחור מה שמתאים, או להקליד תשובה משלך.",
-  "prompt.choice.customLabel": "תשובה מותאמת",
   "prompt.approval.answerFailed": "לא ניתן להשיב לאישור הזה. יש לנסות שוב.",
   "prompt.approval.grantFailed": "לא ניתן לשמור את האישור הקבוע. יש לנסות שוב.",
   "prompt.approval.label": "אישור הסוכן",

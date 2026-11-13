@@ -19,10 +19,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import type { AgentRuntimeLock } from "../../scripts/agent-runtime-lock";
 import {
-  ANTIGRAVITY_MANIFEST,
-  antigravityHarnessName,
   CURSOR_MANIFEST,
-  parseAntigravityVersion,
   parseBunVersion,
   parseClaudeVersion,
   parseClineVersion,
@@ -34,13 +31,7 @@ import {
 } from "../backend/cli";
 import { sha256File } from "../backend/file-hash";
 import { nativeProviderRuntime } from "./native-provider-runtime";
-import {
-  assertSafeArchive,
-  extractArchive,
-  extractZipFiles,
-  extractZipTree,
-  rejectNonRegularFiles,
-} from "./provider-runtime-archive";
+import { assertSafeArchive, extractArchive, extractZipTree, rejectNonRegularFiles } from "./provider-runtime-archive";
 import { ProviderRuntimeFailure, runtimeIO, runtimeSync } from "./provider-runtime-effects";
 
 export type RuntimeTarget = "darwin-arm64" | "darwin-x64" | "linux-x64" | "linux-arm64" | "win32-x64";
@@ -118,6 +109,11 @@ export interface ProviderRuntimeDescriptor {
   verify(root: string, spec: RuntimeSpec, lock: AgentRuntimeLock): Effect.Effect<void, ProviderRuntimeFailure>;
   /** A file of the install whose text `parseVersion` reads, for a program with no `--version`. */
   readonly versionFile?: string;
+  /**
+   * The program names of older installs whose CLI had another name. Such an install cannot run, but
+   * its version tells the update after an app upgrade that OpenBot installed this provider.
+   */
+  readonly legacyExecutableNames?: readonly string[];
   parseVersion(output: string): string;
 }
 
@@ -584,91 +580,7 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
     }),
     parseVersion: parseGrokVersion,
   },
-  antigravity: {
-    runtime: "antigravity",
-    spec: (target, lock) => {
-      const artifact = lock.antigravity.artifacts[target];
-      return {
-        runtime: "antigravity",
-        target,
-        version: lock.antigravity.version,
-        packageVersion: lock.antigravity.version,
-        source: "lock",
-        url: `${lock.antigravity.distribution}/${artifact.platformDirectory}/${artifact.asset}`,
-        archiveDigest: { algorithm: "sha256", hex: artifact.assetSha256 },
-        downloadBytes: artifact.downloadBytes,
-        installedBytes: artifact.installedBytes,
-        executableName: artifact.executable,
-      };
-    },
-    // The server looks for the harness beside itself, so both go to `bin/`. The zip has no licence
-    // file; the manifest names the terms Google publishes instead.
-    stage: Effect.fn("ProviderRuntime.antigravity.stage")(function* ({
-      spec,
-      downloadedPath,
-      staging,
-      lock,
-    }: ProviderStageContext): Effect.fn.Return<void, ProviderRuntimeFailure> {
-      const bin = join(staging, "bin");
-      const harness = antigravityHarnessName(spec.target);
-      yield* runtimeIO(() => mkdir(bin, { recursive: true }));
-      yield* extractZipFiles(
-        downloadedPath,
-        bin,
-        [spec.executableName, harness],
-        sourceText("error.provider.antigravityArchivePath"),
-      );
-      yield* runtimeIO(() =>
-        writeFile(
-          join(staging, ANTIGRAVITY_MANIFEST),
-          layoutManifest({
-            version: spec.version,
-            target: spec.target,
-            executable: `bin/${spec.executableName}`,
-            harness: `bin/${harness}`,
-            licenseUrl: lock.antigravity.licenseUrl,
-          }),
-        ),
-      );
-      if (spec.target !== "win32-x64") {
-        yield* Effect.all(
-          [
-            runtimeIO(() => chmod(join(bin, spec.executableName), 0o755)),
-            runtimeIO(() => chmod(join(bin, harness), 0o755)),
-          ],
-          { concurrency: "unbounded" },
-        );
-      }
-    }),
-    verify: Effect.fn("ProviderRuntime.antigravity.verify")(function* (
-      root: string,
-      spec: RuntimeSpec,
-      lock: AgentRuntimeLock,
-    ): Effect.fn.Return<void, ProviderRuntimeFailure> {
-      const artifact = lock.antigravity.artifacts[spec.target];
-      const [executable, harness] = yield* Effect.all(
-        [
-          sha256File(join(root, "bin", artifact.executable)).pipe(
-            Effect.mapError(({ cause }) => new ProviderRuntimeFailure({ cause })),
-          ),
-          sha256File(join(root, "bin", artifact.harness)).pipe(
-            Effect.mapError(({ cause }) => new ProviderRuntimeFailure({ cause })),
-          ),
-        ],
-        { concurrency: "unbounded" },
-      );
-      if (executable !== artifact.executableSha256 || harness !== artifact.harnessSha256) {
-        return yield* new ProviderRuntimeFailure({
-          cause: new Error(sourceText("error.provider.antigravityChecksum")),
-        });
-      }
-    }),
-    // The server takes no `--version`: it starts and waits for ACP on stdin. OpenBot writes the
-    // manifest at install. `verify` hashes only the programs, so the version check compares the
-    // manifest with the version that OpenBot wrote, not with the programs.
-    versionFile: ANTIGRAVITY_MANIFEST,
-    parseVersion: parseAntigravityVersion,
-  },
+  antigravity: nativeProviderRuntime("antigravity"),
   cursor: {
     runtime: "cursor",
     spec: (target, lock) => {

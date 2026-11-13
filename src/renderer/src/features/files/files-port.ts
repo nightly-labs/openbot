@@ -14,11 +14,18 @@ export interface FilesPort {
     Partial<
       Pick<
         OpenBotDesktopApi["storage"],
-        "getRemovableRuntimes" | "removeRemovableRuntimes" | "getMachineMetrics" | "getDisk"
+        | "getRemovableRuntimes"
+        | "removeRemovableRuntimes"
+        | "getMachineMetrics"
+        | "getDisk"
+        | "getLibraryFolders"
+        | "changeLibraryFolders"
       >
     >;
   /** The machine alert settings, beside `storage.getMachineMetrics`. */
   hostAdmin?: Pick<OpenBotDesktopApi["hostAdmin"], "getMachineAlerts" | "setMachineAlerts">;
+  /** The programs that agents left running on the server. A client without these calls hides them. */
+  backgroundProcesses?: Pick<OpenBotDesktopApi["backgroundProcesses"], "list" | "stop">;
 }
 
 /** Read on each call: tests and stories replace `window.openbot` per case. */

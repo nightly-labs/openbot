@@ -623,8 +623,10 @@ function tsKey(key: string): string {
   return /^[A-Za-z_$][A-Za-z0-9_$]*$/u.test(key) ? key : JSON.stringify(key);
 }
 
+/** A slug can start with a digit (`21st`), and an identifier cannot. */
 function constName(slug: string): string {
-  return slug.toUpperCase().replace(/[^A-Z0-9]+/gu, "_");
+  const name = slug.toUpperCase().replace(/[^A-Z0-9]+/gu, "_");
+  return /^[0-9]/u.test(name) ? `PLUGIN_${name}` : name;
 }
 
 function renderRendererModule(plugins: PluginDetail[]): string {

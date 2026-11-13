@@ -6,6 +6,7 @@ import { Effect } from "effect";
 import type { LocalMcpSession } from "./local-mcp-bridge";
 import type { ClaudeMcpServer } from "./mcp-provider-shapes";
 import { isInheritedProfileValue } from "./mcp-redaction";
+import { type StdioMcpRelay, startStdioMcpRelay } from "./mcp-stdio-relay";
 import { OPENBOT_DYNAMIC_TOOLS } from "./openbot-tools";
 import { providerCall } from "./provider-client-effects";
 
@@ -20,11 +21,22 @@ import { providerCall } from "./provider-client-effects";
 // which Pi's MCP extension adds later, so the section is removed from each request's copy of the
 // messages instead. Pi's stored prompt keeps it, so Pi sends no section update. A `docs` section with
 // other text, from another extension, stays. A system update that only changes `docs` goes too.
+//
+// Pi loads a folder's `.agents/skills` only after a project trust decision, and RPC mode has no
+// trust prompt, so Pi skipped the skills that OpenBot installs in the agent's workspace (#6315).
+// Pi starts in that workspace, so the extension trusts the folder of the first decision of the
+// process. Pi gives that folder as its real path. A later decision, for a session in another
+// folder, stays Pi's. The decision is not saved in Pi's `trust.json`.
 const EXTENSION = String.raw`export default function (pi) {
   const slot = Symbol.for("openbot.pi.mcpServers");
   globalThis[slot] ??= JSON.parse(process.env.OPENBOT_PI_MCP_SERVERS || "[]");
   delete process.env.OPENBOT_PI_MCP_SERVERS;
   for (const server of globalThis[slot]) pi.registerMcpServer(server.name, server.config);
+  const workspace = Symbol.for("openbot.pi.workspace");
+  pi.on("project_trust", (event) => {
+    globalThis[workspace] ??= event.cwd;
+    return { trusted: event.cwd === globalThis[workspace] ? "yes" : "undecided" };
+  });
   const piDocs = (message) =>
     message.role === "system" && message.sections?.docs?.startsWith?.("<docs>\nPi documentation (read only when ");
   pi.on("context_with_system", (event) => {
@@ -57,11 +69,21 @@ export interface PiMcpExtension {
   close: () => Effect.Effect<void, import("./provider-client-effects").ProviderClientOperationError>;
 }
 
+/**
+ * How a Pi that runs in the Workspace only sandbox gets its stdio servers: OpenBot starts them outside
+ * the sandbox (`startStdioMcpRelay`), with the environment and folder that Pi would give them.
+ */
+export interface PiStdioRelayOptions {
+  environment: Record<string, string>;
+  cwd: string;
+}
+
 /** Owns one temporary, credential-free extension. Pi's own files are never changed. */
 export const createPiMcpExtension = Effect.fn("PiMcp.createExtension")(function* (
   servers: Record<string, ClaudeMcpServer>,
   local: LocalMcpSession,
   directory?: string,
+  relay?: PiStdioRelayOptions,
 ) {
   const root = directory ?? tmpdir();
   yield* providerCall(() => mkdir(root, { recursive: true, mode: 0o700 }));
@@ -90,19 +112,46 @@ export const createPiMcpExtension = Effect.fn("PiMcp.createExtension")(function*
         return [key, `\${${variable}}`];
       }),
     );
+  const relays: StdioMcpRelay[] = [];
+  const closeRelays = Effect.suspend(() => Effect.forEach(relays, (started) => started.close(), { discard: true }));
   // Pi declares a direct tool in each request. Computer use alone has 56 tools, about 24k tokens, so
   // the user's servers wait for Pi's `tool_search`, which records each loaded tool in the session for
   // resume. The OpenBot bridge stays direct: its tool search is the way to every other tool.
   // The system prompt lists each deferred server by its hashed name and its `description`, so the model
   // knows what to search for. Without one, Pi shows the server's instructions after it connects, and
-  // the prompt changes between requests.
-  const entries = Object.entries(servers).map(([name, server]) => ({
-    name: serverName("external", name),
-    config:
-      server.type === "http"
-        ? { ...server, headers: values(server.headers), exposure: "deferred", description: name }
-        : { ...server, env: values(server.env), exposure: "deferred", description: name },
-  }));
+  // the prompt changes between requests. A relayed stdio server keeps its name, so a resumed session
+  // finds its tools (#3343).
+  const entries = yield* Effect.forEach(Object.entries(servers), ([name, server]) =>
+    Effect.gen(function* () {
+      if (server.type === "http")
+        return {
+          name: serverName("external", name),
+          config: { ...server, headers: values(server.headers), exposure: "deferred", description: name },
+        };
+      if (!relay)
+        return {
+          name: serverName("external", name),
+          config: { ...server, env: values(server.env), exposure: "deferred", description: name },
+        };
+      const started = yield* startStdioMcpRelay({
+        command: server.command,
+        args: server.args,
+        env: { ...relay.environment, ...server.env },
+        cwd: server.cwd ?? relay.cwd,
+      });
+      relays.push(started);
+      return {
+        name: serverName("external", name),
+        config: {
+          type: "http",
+          url: started.url,
+          headers: values({ Authorization: `Bearer ${started.token}` }),
+          exposure: "deferred",
+          description: name,
+        },
+      };
+    }),
+  ).pipe(Effect.onError(() => closeRelays.pipe(Effect.orDie)));
   // `hidden` and not `deferred`: a deferred tool adds Pi's `tool_search` and an `<mcp_servers>` line,
   // which take 928 of the 2,686 characters back.
   const bridge = local.servers.map((server) => ({
@@ -118,12 +167,21 @@ export const createPiMcpExtension = Effect.fn("PiMcp.createExtension")(function*
   }));
   environment.OPENBOT_PI_MCP_SERVERS = JSON.stringify([...entries, ...bridge]);
   yield* providerCall(() => writeFile(path, EXTENSION, { mode: 0o600 })).pipe(
-    Effect.onError(() => providerCall(() => rm(folder, { recursive: true, force: true })).pipe(Effect.orDie)),
+    Effect.onError(() =>
+      Effect.andThen(
+        closeRelays,
+        providerCall(() => rm(folder, { recursive: true, force: true })),
+      ).pipe(Effect.orDie),
+    ),
   );
   return {
     path,
     environment,
     secrets,
-    close: () => providerCall(() => rm(folder, { recursive: true, force: true })),
+    close: () =>
+      Effect.andThen(
+        closeRelays,
+        providerCall(() => rm(folder, { recursive: true, force: true })),
+      ),
   } satisfies PiMcpExtension;
 });

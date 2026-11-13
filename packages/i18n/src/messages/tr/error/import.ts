@@ -45,8 +45,14 @@ export const messages = {
   "error.import.remoteZipTooLarge":
     "Katılınan bir sunucuya içe aktarmak için dışa aktarım 100 MB altında bir .zip olmalıdır.",
   "error.import.hostBusy": "Sunucu diğer dışa aktarımları okuyor. Birkaç dakika sonra tekrar deneyin.",
+  "error.import.uploadDiskSpace":
+    "Dışa aktarım sunucuda {size} GB boş disk alanı gerektiriyor ve {free} GB boş. Sunucuda yer açın, ardından dışa aktarımı yeniden seçin.",
+  "error.import.remoteZipTooLargeOldHost":
+    "Bu sunucu en fazla 100 MB'lık bir dışa aktarım kabul ediyor. Daha büyük bir dışa aktarımı içe aktarmak için sunucudaki OpenBot'u güncelleyin.",
   "error.import.skillKept":
     '{name}: sunucu zaten "{skill}" becerisine sahip, bu yüzden ajan bu beceriyi kullanıyor. Bir yöneticiden güncellemesini isteyin.',
+  "error.import.skillRenamed":
+    '{name}: "{skill}" becerisinin adı başka bir becerinin adına çok benziyor, bu yüzden "{renamed}" olarak kaydedildi.',
   "error.import.transferRemoteTooLarge":
     "Katılınan bir sunucu için aktarım dosyası 100 MB'tan küçük olmalıdır. Çalışma alanı dosyalarını kapatın veya daha az ajan dışa aktarın.",
   "error.import.transferNotFile": "Bu dosya bir OpenBot aktarım dosyası değil.",
@@ -60,6 +66,19 @@ export const messages = {
   "error.import.transferModelMissing":
     '{name}: "{model}" modeli burada henüz kullanılamıyor, bu yüzden ajan varsayılan modeli kullanıyor. Sağlayıcısı hazır olduğunda modeli yeniden seçin.',
   "error.import.transferSettingSkipped": "{name} içe aktarılmadı. {reason}",
+  "error.import.transferRunsSkipped": '{name}: "{routine}" rutininin çalıştırma geçmişi içe aktarılmadı.',
+  "error.import.transferSharedSkillsSkipped": "Paylaşılan beceriler okunamadı, bu yüzden dosyada değiller.",
+  "error.import.transferSharedSkillsNotAdded": "Dosyadaki paylaşılan beceriler bu sunucuya eklenemedi.",
+  "error.import.transferMemberPreferencesSkipped": {
+    one: "{count} üyenin seçimleri kaydedilemedi.",
+    other: "{count} üyenin seçimleri kaydedilemedi.",
+  },
+  "error.import.transferSharedSkillExists":
+    "Bu sunucuda bu ada ve farklı dosyalara sahip paylaşılan bir beceri zaten var.",
+  "error.import.transferServerPreferencesSkipped": {
+    one: "Dosyadaki {count} sunucu tercihi burada geçerli değil, bu yüzden içe aktarılmaz.",
+    other: "Dosyadaki {count} sunucu tercihi burada geçerli değil, bu yüzden içe aktarılmaz.",
+  },
   "error.import.transferRoutineFlowSkipped": "İçe aktarma bir rutin akışını dışarıda bıraktı. {reason}",
   "error.import.transferCustomAgentCommand":
     '{name}: özel ajanlar bir komut çalıştırdıkları için içe aktarılmaz. "{command}" komutunu kontrol edin ve ajanı Ayarlar\'da yeniden ekleyin.',

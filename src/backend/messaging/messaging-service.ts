@@ -74,6 +74,7 @@ import {
   type MessagingIngress,
   type MessagingTransport,
   TelegramCallError,
+  WhatsAppRefusedError,
 } from "./messaging-types";
 import { type SlackAppPort, SlackConnect, type SlackConnectFailed } from "./slack/slack-connect";
 import { slackOrchestratorMemories, slackOrchestratorProfile } from "./slack/slack-orchestrator";
@@ -312,6 +313,7 @@ export class MessagingService {
     this.#threads.setHistorySource((link, scope, limit) => this.#recentMessages(link, scope, limit));
     this.#threads.setOutbound({
       places: (connectionId) => this.#outboundPlaces(connectionId),
+      history: (connectionId, placeId, limit) => this.#outboundHistory(connectionId, placeId, limit),
       post: (connectionId, target, markdown, files, embeds) =>
         this.#outboundPost(connectionId, target, markdown, files, embeds),
       discord: (connectionId, send) => this.#outboundDiscord(connectionId, send),
@@ -454,6 +456,16 @@ export class MessagingService {
     yield* whatsapp.setOwnNumber(workspaceId, ownNumber).pipe(toMessagingOperationFailed);
   }).bind(this);
 
+  /** Turns the "Working on it…" post of one WhatsApp number on or off. A request that runs keeps its post. */
+  readonly setWhatsAppWorkingMessage = Effect.fn("MessagingService.setWhatsAppWorkingMessage")(function* (
+    this: MessagingService,
+    workspaceId: string,
+    workingMessage: boolean,
+  ) {
+    const whatsapp = yield* messagingStep(() => this.#requireWhatsApp());
+    yield* whatsapp.setWorkingMessage(workspaceId, workingMessage).pipe(toMessagingOperationFailed);
+  }).bind(this);
+
   /**
    * Unlinks the device from the WhatsApp account (when its socket is open), deletes its keys and stops
    * the connection. As for Telegram, the last number takes the WhatsApp Orchestrator with it. The
@@ -508,6 +520,11 @@ export class MessagingService {
     const updated = this.#threads.store.connection(connectionId);
     if (updated) yield* this.#startConnection(updated);
   }, Effect.uninterruptible);
+
+  /** True for a WhatsApp number whose owner turned off the "Waiting" and "Working on it…" posts. */
+  #withoutStatusPost(live: LiveConnection): boolean {
+    return live.record.platform === "whatsapp" && this.#whatsapp?.workingMessage(live.record.connectionId) === false;
+  }
 
   #requireWhatsApp(): WhatsAppConnect {
     if (!this.#whatsapp) throw new Error(sourceText("error.messaging.whatsappUnsupported"));
@@ -1503,13 +1520,6 @@ export class MessagingService {
       yield* adapter.post(message.target, { text: sourceText(noAgent) }).pipe(toMessagingOperationFailed);
       return;
     }
-    // A hidden agent receives no new messages. The sender learns why, and nothing is queued.
-    if (this.#agents.listAgents().some((agent) => agent.id === agentId && agent.hiddenAt !== undefined)) {
-      yield* adapter
-        .post(message.target, { text: sourceText("error.backend.recipientHidden") })
-        .pipe(toMessagingOperationFailed);
-      return;
-    }
     const staging = join(this.#downloadsRoot, randomUUID());
     yield* Effect.acquireUseRelease(
       Effect.succeed(staging),
@@ -1582,7 +1592,7 @@ export class MessagingService {
             yield* this.#serial(
               result.link.linkId,
               Effect.gen({ self: this }, function* () {
-                if (this.#posts.has(key) || !this.#targets.has(key)) return;
+                if (this.#posts.has(key) || !this.#targets.has(key) || this.#withoutStatusPost(live)) return;
                 const messageId = yield* adapter
                   .post(message.target, { text: sourceText("status.messaging.queued") })
                   .pipe(toMessagingOperationFailed);
@@ -1702,9 +1712,39 @@ export class MessagingService {
   ) {
     const live = this.#live.get(connectionId);
     if (!live?.identity) return { error: MESSAGING_NOT_RUNNING };
+    const whatsApp = live.record.platform === "whatsapp";
     return yield* live.adapter.places().pipe(
-      Effect.map((places) => ({ places })),
+      Effect.map((places) => (whatsApp ? { places, note: WHATSAPP_ALLOWED_PLACES } : { places })),
       Effect.catch((failure) => Effect.succeed({ error: refusal(failure) })),
+    );
+  });
+
+  /**
+   * The newest messages of a place that an agent names, for a `messaging_history` call from any turn.
+   * Only a place that `places` lists is read: a connection's adapter can reach more than its own places.
+   */
+  readonly #outboundHistory = Effect.fn("MessagingService.outboundHistory")(function* (
+    this: MessagingService,
+    connectionId: string,
+    placeId: string,
+    limit: number,
+  ) {
+    const live = this.#live.get(connectionId);
+    if (!live?.identity) return { error: MESSAGING_NOT_RUNNING };
+    const platform = live.record.platform;
+    return yield* Effect.gen(function* () {
+      const place = (yield* live.adapter.places()).find((candidate) => candidate.id === placeId);
+      if (!place)
+        return {
+          error:
+            "This connection has no place with that id. Call openbot.messaging_list_places with the connection for the ids.",
+        };
+      const messages = yield* live.adapter.recent(placeId, null, limit);
+      return { history: { platform, place: place.name, messages } };
+    }).pipe(
+      Effect.catch((failure) =>
+        Effect.succeed({ error: `${refusal(failure)} When the platform limits reads, try again in a minute.` }),
+      ),
     );
   });
 
@@ -1712,13 +1752,18 @@ export class MessagingService {
   readonly #outboundPost = Effect.fn("MessagingService.outboundPost")(function* (
     this: MessagingService,
     connectionId: string,
-    target: MessageTarget,
+    named: MessageTarget,
     markdown: string,
     files: MessagingAnswerFile[] = [],
     embeds: DiscordEmbed[] = [],
   ) {
     const live = this.#live.get(connectionId);
     if (!live?.identity) return { error: MESSAGING_NOT_RUNNING, failure: "not-running" as const };
+    // An agent can write a WhatsApp number as a person types it, not as the place id.
+    const target = {
+      ...named,
+      platformChannelId: live.adapter.placeId?.(named.platformChannelId) ?? named.platformChannelId,
+    };
     const postEmbeds = live.adapter.postEmbeds;
     if (embeds.length && !postEmbeds)
       return { error: "Only a Discord post can have embeds. Post the text alone.", failure: "refused" as const };
@@ -1753,15 +1798,23 @@ export class MessagingService {
         }),
       ),
     );
-    if (!("posted" in posted) || !files.length) return posted;
+    if (!("posted" in posted)) return posted;
     // The text is in the place already, so a failed upload names the files and does not fail the post.
-    const skippedFiles = yield* live.adapter.upload(target, files).pipe(
-      Effect.catch((failure) =>
-        Effect.sync(() => {
-          this.#warn(failure.cause);
-          return files.map((file) => file.name);
-        }),
-      ),
+    const skippedFiles = files.length
+      ? yield* live.adapter.upload(target, files).pipe(
+          Effect.catch((failure) =>
+            Effect.sync(() => {
+              this.#warn(failure.cause);
+              return files.map((file) => file.name);
+            }),
+          ),
+        )
+      : [];
+    const sentFiles = files.map((file) => file.name).filter((name) => !skippedFiles.includes(name));
+    live.adapter.rememberPost?.(
+      target,
+      posted.messageId,
+      sentFiles.length ? `${text}\nFiles: ${sentFiles.join(", ")}` : text,
     );
     return skippedFiles.length ? { ...posted, skippedFiles } : posted;
   });
@@ -1881,6 +1934,15 @@ export class MessagingService {
     }
     if (activity.type === "started") {
       if (!live) return;
+      // The owner turned the post off for this WhatsApp number: the reaction shows that OpenBot read
+      // the message, the answer is the only post, and a reply of "stop" still stops the request.
+      if (!post?.messageId && this.#withoutStatusPost(live)) {
+        // The request is recorded without a post, so a request that a restart ends still gets its end.
+        this.#posts.set(key, { connectionId: live.record.connectionId, target, messageId: null, stopToken: null });
+        this.#status.restored.delete(key);
+        yield* this.#status.save();
+        return;
+      }
       const stopToken = token();
       this.#stops.set(stopToken, {
         linkId: activity.link.linkId,
@@ -1983,8 +2045,11 @@ export class MessagingService {
       else if (placeholder)
         yield* this.#say(adapter, post.target, placeholder, sourceText("status.messaging.noAnswer"));
     }).pipe(
-      Effect.tapError(() =>
+      Effect.tapError((failure) =>
         Effect.gen({ self: this }, function* () {
+          // WhatsApp refuses each new attempt too, and each one counts against the number: give up.
+          if (failure instanceof MessagingOperationFailed && failure.cause instanceof WhatsAppRefusedError)
+            return yield* this.#forgetPost(key, post);
           const failures = (this.#finalFailures.get(key) ?? 0) + 1;
           this.#finalFailures.set(key, failures);
           // An answer goes out in parts, and some of them can be on the platform already, so it is
@@ -2373,9 +2438,35 @@ function redactEmbed(embed: DiscordEmbed): DiscordEmbed {
   };
 }
 
+/**
+ * Why a WhatsApp number lists few places: it lists only the chats that the user allowed, not all its chats.
+ * A personal number always lists "Message yourself", so the list is not empty when the user allowed no chat.
+ */
+const WHATSAPP_ALLOWED_PLACES =
+  "This list has only the WhatsApp chats that the user allowed, not all chats of this number. For a chat that is not in it, tell the user to open Marketplace, then Apps, then WhatsApp, and to use Add contact or Add group for this number.";
+
+/** A WhatsApp number that is not linked, or whose connection is down now: for a post and for its places. */
+const WHATSAPP_NOT_CONNECTED =
+  "WhatsApp is not connected on this number now. Tell the user to open Marketplace, then Apps, then WhatsApp, and to use Reconnect or Link again for this number.";
+
+/** What the user does when OpenBot itself stops a WhatsApp post, by the code of the WhatsApp adapter. */
+const WHATSAPP_LOCAL_REFUSALS = new Map([
+  [
+    "place_not_allowed",
+    "OpenBot sent nothing: the user did not allow this WhatsApp chat. Tell the user to open Marketplace, then Apps, then WhatsApp, and to use Add contact or Add group for this chat. Then the post can go to it.",
+  ],
+  ["not_connected", WHATSAPP_NOT_CONNECTED],
+  ["not_linked", WHATSAPP_NOT_CONNECTED],
+]);
+
 /** The platform's error code, such as Slack's `not_in_channel`, and never its text or a token. */
 function refusal(failure: MessagingAdapterError): string {
   const cause = failure.cause;
+  // A new attempt is refused too, and counts against the number at WhatsApp.
+  if (cause instanceof WhatsAppRefusedError)
+    return `WhatsApp refused the message: ${cause.code}. It was not delivered. Do not post it again: tell the user that WhatsApp did not deliver it.`;
+  const local = cause instanceof Error ? WHATSAPP_LOCAL_REFUSALS.get(cause.message) : undefined;
+  if (local) return local;
   const code =
     cause instanceof SlackApiError || cause instanceof DiscordApiError || cause instanceof TelegramCallError
       ? cause.code

@@ -1,0 +1,33 @@
+{
+  "slug": "eden",
+  "name": "Eden",
+  "tagline": "Creator content and posts",
+  "description": "Eden lets agents research social posts, read cross-platform analytics, and draft and schedule posts, which wait for the user's approval. Each user signs in to their own Eden account through the browser.",
+  "category": "productivity",
+  "creatorName": "Eden",
+  "iconUrl": "https://eden.so/apple-touch-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-trends", "text": "Which posts in my niche performed best this week?" },
+    { "id": "prompt-analytics", "text": "How did my posts perform across platforms last month?" },
+    { "id": "prompt-draft", "text": "Draft three post ideas from this article and save them in Eden." }
+  ],
+  "apps": [
+    {
+      "id": "app-eden-mcp",
+      "name": "Eden",
+      "description": "Post research, analytics, drafts, and scheduling, over Eden's MCP server with browser sign-in.",
+      "iconUrl": "https://eden.so/apple-touch-icon.png",
+      "server": {
+        "name": "eden",
+        "transport": "http",
+        "url": "https://mcp.eden.so/mcp",
+        "auth": [{ "id": "eden-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://eden.so",
+  "privacyPolicyUrl": "https://eden.so/privacy/",
+  "termsUrl": "https://eden.so/terms/"
+}

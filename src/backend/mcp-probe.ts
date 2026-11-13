@@ -6,6 +6,7 @@ import { StreamableHTTPClientTransport, StreamableHTTPError } from "@modelcontex
 import {
   AccessDeniedError,
   InvalidClientError,
+  InvalidClientMetadataError,
   UnauthorizedClientError,
 } from "@modelcontextprotocol/sdk/server/auth/errors.js";
 import type { FetchLike, Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
@@ -18,6 +19,7 @@ import { Effect, Result, Schema } from "effect";
 import { causeHelpers } from "./effect-boundary";
 import {
   isLoopback,
+  MCP_CLIENT_NAME,
   type McpOAuthAuthority,
   type McpSignIn,
   normalizeResource,
@@ -397,7 +399,7 @@ function createTransport(
   }
   return new StdioClientTransport({
     command: server.command ?? config.command,
-    args: config.args,
+    args: server.args,
     // The resolved directory, not the stored one: process creation does not expand a leading `~`,
     // which the form's own example uses.
     ...(server.workingDirectory ? { cwd: server.workingDirectory } : {}),
@@ -607,8 +609,14 @@ function isAccessRefusal(status: number | null): boolean {
  *
  * RevenueCat answers each registration it did not approve with 400 `invalid_client` ("The client
  * is not registered.").
+ *
+ * Omnisend answers each name it did not approve with 400 `invalid_client_metadata` ("unknown
+ * application: OpenBot", #7722). That error also names metadata that OpenBot sent wrong, which the
+ * user cannot change either, but which this sentence would hide: only an answer that names OpenBot
+ * counts.
  */
 function isRegistrationRefusal(error: unknown, signIn: McpSignIn): boolean {
+  if (signIn.registrationUnsupported()) return true;
   const status = signIn.registrationStatus();
   if (isAccessRefusal(status)) return true;
   // The SDK also registers when it drops a client bound to another issuer. `registrationFailed`
@@ -617,7 +625,8 @@ function isRegistrationRefusal(error: unknown, signIn: McpSignIn): boolean {
   if (
     error instanceof AccessDeniedError ||
     error instanceof UnauthorizedClientError ||
-    error instanceof InvalidClientError
+    error instanceof InvalidClientError ||
+    (error instanceof InvalidClientMetadataError && error.message.includes(MCP_CLIENT_NAME))
   )
     return true;
   return isAccessRefusal(httpStatus(error));

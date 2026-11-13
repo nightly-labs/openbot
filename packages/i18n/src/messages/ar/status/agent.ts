@@ -28,6 +28,8 @@ export const messages = {
     "تعبئة البطاقة المحفوظة {card} في {site}. بعد موافقتك، يمكن للوكلاء تعبئة هذه البطاقة في هذا الموقع دون موافقة. أزل الموقع من إعدادات الخادم > الخزنة.",
   "status.agent.reportProblem": "سيصبح هذا مشكلة عامة على GitHub، مع إصدار التطبيق ونظامك. لا يظهر اسمك.",
   "status.agent.sendIdea": "يصبح هذا مشكلة عامة على GitHub. لا يظهر اسمك.",
+  "status.agent.feedbackRecentErrors": "الأخطاء الأخيرة في المحادثة:",
+  "status.agent.feedbackSameAs": "يُضاف إلى المشكلة #{issue}",
   "status.agent.feedbackSent": "أُرسل إلى فريق OpenBot: {title}",
   "status.agent.serverInstallCommand":
     "إنشاء أمر لمرة واحدة يثبّت OpenBot على كمبيوتر آخر كالخادم {name} ويسجّل دخوله إلى حسابك. يشغّله الوكيل هناك.",

@@ -1,0 +1,33 @@
+{
+  "slug": "circleback",
+  "name": "Circleback",
+  "tagline": "Meeting notes and transcripts",
+  "description": "Circleback lets agents search meetings, read notes, transcripts and action items, and look up the people and companies in them. Each user signs in to their own Circleback account through the browser.",
+  "category": "productivity",
+  "creatorName": "Circleback",
+  "iconUrl": "https://circleback.ai/apple-touch-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-last-meeting", "text": "Summarize my last meeting with Acme and its action items." },
+    { "id": "prompt-mentions", "text": "Find where pricing came up in this month's meeting transcripts." },
+    { "id": "prompt-open-items", "text": "Which action items assigned to me are still open?" }
+  ],
+  "apps": [
+    {
+      "id": "app-circleback-mcp",
+      "name": "Circleback",
+      "description": "Meetings, notes, transcripts, and action items, over Circleback's MCP server with browser sign-in.",
+      "iconUrl": "https://circleback.ai/apple-touch-icon.png",
+      "server": {
+        "name": "circleback",
+        "transport": "http",
+        "url": "https://circleback.ai/api/mcp",
+        "auth": [{ "id": "circleback-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://circleback.ai",
+  "privacyPolicyUrl": "https://circleback.ai/privacy",
+  "termsUrl": "https://circleback.ai/terms"
+}

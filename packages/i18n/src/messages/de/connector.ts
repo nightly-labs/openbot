@@ -386,6 +386,9 @@ export const messages = {
   "connector.whatsapp.ownNumber": "Private Nummer",
   "connector.whatsapp.ownNumberDescription":
     "Nur dein Chat „Nachricht an dich selbst“ und die Personen, die du zulässt, können schreiben. Schalte das für eine Nummer nur für OpenBot aus.",
+  "connector.whatsapp.workingMessage": "Nachricht „Wird bearbeitet…“",
+  "connector.whatsapp.workingMessageDescription":
+    "OpenBot sendet sie, während der Agent arbeitet, und ersetzt sie dann durch die Antwort. Schalte sie aus, um nur die Antwort zu senden.",
   "connector.whatsapp.orchestratorTitle": "WhatsApp-Orchestrator",
   "connector.whatsapp.orchestratorDescription":
     "Dieser Agent empfängt die Nachrichten für OpenBot von all deinen verknüpften Nummern. Kurze beantwortet er selbst, andere Aufgaben gibt er an den passenden Agenten weiter und antwortet in WhatsApp.",
