@@ -105,8 +105,16 @@ export interface AcpConfigurationOptions {
 /** The categories of an agent's effort option when its flavor names none. */
 const EFFORT_CATEGORIES: readonly string[] = ["thought_level"];
 
+/**
+ * The option that holds the reasoning effort. An option of another category than `thought_level`
+ * counts only when each of its values is an effort name: Vibe also takes a level of a model's own,
+ * and such an option stays a provider setting, where each of its values can be selected.
+ */
 function isEffortOption(option: SessionConfigOption, categories: readonly string[]): boolean {
-  return option.type === "select" && option.category != null && categories.includes(option.category);
+  if (option.type !== "select" || option.category == null || !categories.includes(option.category)) return false;
+  return (
+    option.category === "thought_level" || selectValues(option).every((entry) => normalizeEffort(entry.value) !== null)
+  );
 }
 
 /** Owns ACP model discovery and setting translation. The client owns sessions and their state. */
@@ -122,7 +130,16 @@ export class AcpConfiguration {
   #probe: { connection: ClientSideConnection; sessionId: string } | null = null;
   /** One kept-probe discovery at a time: two at once would each open a probe, and one is kept. */
   readonly #probeLock = Semaphore.makeUnsafe(1);
-  constructor(private readonly options: AcpConfigurationOptions) {}
+  /** `AcpFlavor.effortCategories`, or the protocol's own. */
+  readonly #effortCategories: readonly string[];
+  constructor(private readonly options: AcpConfigurationOptions) {
+    this.#effortCategories = options.effortCategories ?? EFFORT_CATEGORIES;
+  }
+
+  /** The provider settings of a session: its options other than the model, the effort and the mode. */
+  sessionSettings(options: SessionConfigOption[]): AgentSessionSettingsSnapshot {
+    return sessionSettingsSnapshot(options, this.#effortCategories);
+  }
   readonly discoverModels = Effect.fn("AcpConfiguration.discoverModels")(function* (
     this: AcpConfiguration,
     timeoutMs?: number,
@@ -139,7 +156,7 @@ export class AcpConfiguration {
         this.#modelReasoningEffortsEffect(
           connection,
           probe,
-          modelsFromSessionSetup(probe, this.options.effortCategories),
+          modelsFromSessionSetup(probe, this.#effortCategories),
           deadline,
         ),
       (probe) =>
@@ -287,7 +304,7 @@ export class AcpConfiguration {
       // An unanswered model holds the opening model's options, which say nothing about this model.
       probed.push(
         response
-          ? { ...model, ...reasoningFromConfig(response.configOptions, this.options.effortCategories) }
+          ? { ...model, ...reasoningFromConfig(response.configOptions, this.#effortCategories) }
           : { ...model, reasoningEffortConfigurable: true },
       );
     }
@@ -360,7 +377,7 @@ export class AcpConfiguration {
       const options = thread.configOptions.filter(
         (candidate): candidate is Extract<SessionConfigOption, { type: "select" }> =>
           category === "thought_level"
-            ? isEffortOption(candidate, this.options.effortCategories ?? EFFORT_CATEGORIES)
+            ? isEffortOption(candidate, this.#effortCategories)
             : candidate.category === category && candidate.type === "select",
       );
       // Cline puts a provider option of the model category before its model option. The first option
@@ -472,9 +489,7 @@ export class AcpConfiguration {
     configId: string,
     value: AgentSessionSettingValue,
   ): Effect.fn.Return<AgentSessionSettingsSnapshot, ProviderClientOperationError> {
-    const option = sessionSettingsSnapshot(thread.configOptions, this.options.effortCategories).options.find(
-      (entry) => entry.id === configId,
-    );
+    const option = this.sessionSettings(thread.configOptions).options.find((entry) => entry.id === configId);
     if (!option) return yield* providerFailure(new Error(sourceText("error.provider.sessionSettingUnavailable")));
     if (
       option.type === "boolean"
@@ -489,7 +504,7 @@ export class AcpConfiguration {
         : this.#connection(thread).setSessionConfigOption({ sessionId: thread.id, configId, value }),
     );
     thread.configOptions = response.configOptions;
-    return sessionSettingsSnapshot(thread.configOptions, this.options.effortCategories);
+    return this.sessionSettings(thread.configOptions);
   });
 
   /**

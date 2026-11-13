@@ -31,12 +31,7 @@ import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { type CauseCode, classifyFailure, httpStatusCause, structuredCause } from "@openbot/telemetry";
 import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Exit, Fiber, Result, Scope, Semaphore } from "effect";
-import {
-  AcpConfiguration,
-  type AcpModel,
-  currentModelFromSessionSetup,
-  sessionSettingsSnapshot,
-} from "./acp-configuration";
+import { AcpConfiguration, type AcpModel, currentModelFromSessionSetup } from "./acp-configuration";
 import { AcpConnection, type AcpConnectionOptions } from "./acp-connection";
 import type { AcpCustomEndpoint, AcpFlavor } from "./acp-flavor";
 import {
@@ -913,7 +908,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   ): Effect.fn.Return<AgentSessionSettingsSnapshot, ProviderClientOperationError> {
     yield* this.#threads.wake(threadId).pipe(toProviderClientOperationError);
     const thread = yield* providerSync(() => this.#requireThread(threadId));
-    return sessionSettingsSnapshot(thread.configOptions, this.#flavor.effortCategories);
+    return this.#configuration.sessionSettings(thread.configOptions);
   });
 
   readonly setSessionSetting = Effect.fn("AcpAgentClient.setSessionSetting")(function* (
@@ -938,7 +933,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   #publishSessionSettings(thread: AcpThread): void {
     this.emit("notification", {
       method: "openbot/sessionSettings/updated",
-      params: { threadId: thread.id, ...sessionSettingsSnapshot(thread.configOptions, this.#flavor.effortCategories) },
+      params: { threadId: thread.id, ...this.#configuration.sessionSettings(thread.configOptions) },
     });
   }
 
@@ -2319,9 +2314,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     for (const [configId, value] of Object.entries(overrides ?? {})) {
       if (typeof value !== "boolean" && typeof value !== "string")
         return yield* providerFailure(new Error(sourceText("error.provider.sessionSettingInvalid")));
-      const option = sessionSettingsSnapshot(thread.configOptions, this.#flavor.effortCategories).options.find(
-        (entry) => entry.id === configId,
-      );
+      const option = this.#configuration
+        .sessionSettings(thread.configOptions)
+        .options.find((entry) => entry.id === configId);
       // A provider update can remove an option or choice. Keep the saved override in the
       // store and report the effective value for correction, without blocking the prompt.
       const available =
