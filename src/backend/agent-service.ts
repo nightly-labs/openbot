@@ -3734,6 +3734,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           : previous?.usageLimitReturn?.cause === "provider-error"
             ? "provider-error-ended"
             : "usage-limit-ended",
+        leaving && spentBalance ? previousChoice : undefined,
       );
     const profileChanged = standingProfileChanged(previous, agent, this.#store.agentDefaults());
     const activeSession = this.#store.activeProviderSession(agent.id);
@@ -4184,13 +4185,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   /**
    * A note in the agent's chat that it left its model for a usage limit or a provider error, or went back to it. Each
-   * channel whose work waits for the agent gets the same note.
+   * channel whose work waits for the agent gets the same note. `spent` is the model that the agent left because its
+   * balance is spent: the agent does not go back to it by itself, so the note names it and says what to do (#7965).
    */
-  #appendModelSwitchMarker(agent: AgentSummary, reason: ModelSwitchReason): void {
-    const model =
-      this.#agentModels(agent).find((option) => option.provider === agent.provider && option.id === agent.model)
-        ?.name ?? agent.model;
-    const text = sourceText(MODEL_SWITCH_TEXT[reason], { model });
+  #appendModelSwitchMarker(agent: AgentSummary, reason: ModelSwitchReason, spent?: AgentModelChoice): void {
+    const modelName = (choice: AgentModelChoice) =>
+      this.#agentModels(choice).find((option) => option.provider === choice.provider && option.id === choice.model)
+        ?.name ?? choice.model;
+    const model = modelName(agent);
+    const text = spent
+      ? sourceText("status.agent.modelSwitchedForSpentBalance", { previous: modelName(spent), model })
+      : sourceText(MODEL_SWITCH_TEXT[reason], { model });
     try {
       this.channels.noteModelSwitch(agent.id, text, MODEL_SWITCH_ITEM_TYPES[reason]);
     } catch (error) {
