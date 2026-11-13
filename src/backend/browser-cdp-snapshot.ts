@@ -41,16 +41,25 @@ const MAX_SERIALIZED_SNAPSHOT_BYTES = 128 * 1024;
  * walk that uses it: a walk gets no node with a hidden ancestor, because a shadow root or a frame is
  * queued only from a host that the filter accepted. A skipped subtree counts as one node in the
  * `scanned` count of the walk, so the budget still bounds the work.
+ *
+ * `strict` also skips `aria-hidden`, `inert` and `opacity: 0` subtrees. `drawn` skips only what the page
+ * does not draw, and `drawn-usable` also skips `inert` content, which takes no input. A page can put
+ * these on a container that stays on screen, for example its main container behind a dialog or while
+ * it loads; the fallback pass of a snapshot then reads it (#7770).
  */
-const SKIP_HIDDEN_SUBTREES = `{ acceptNode: node => {
+type HiddenSubtreeRule = "strict" | "drawn" | "drawn-usable";
+
+function skipHiddenSubtrees(rule: HiddenSubtreeRule): string {
+  const strict = rule === "strict";
+  return `{ acceptNode: node => {
   if (node.nodeType !== 1) return NodeFilter.FILTER_ACCEPT;
   // At the budget, the walk's own check gets the next node, stops, and records that it stopped.
   if (scanned >= ${MAX_SNAPSHOT_SCANNED_NODES}) return NodeFilter.FILTER_ACCEPT;
   // The attributes, not the properties: a form control named "hidden" or "inert" replaces the form's property (#7187).
-  let hidden = Element.prototype.hasAttribute.call(node, 'hidden') || Element.prototype.hasAttribute.call(node, 'inert') || String(node.getAttribute('aria-hidden')).toLowerCase() === 'true';
+  let hidden = Element.prototype.hasAttribute.call(node, 'hidden') || (${rule !== "drawn"} && Element.prototype.hasAttribute.call(node, 'inert')) || (${strict} && String(node.getAttribute('aria-hidden')).toLowerCase() === 'true');
   if (!hidden) {
     const style = node.ownerDocument.defaultView?.getComputedStyle(node);
-    hidden = !style || style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || style.opacity === '0';
+    hidden = !style || style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || (${strict} && style.opacity === '0');
   }
   if (hidden) {
     scanned++;
@@ -58,6 +67,9 @@ const SKIP_HIDDEN_SUBTREES = `{ acceptNode: node => {
   }
   return NodeFilter.FILTER_ACCEPT;
 } }`;
+}
+
+const SKIP_HIDDEN_SUBTREES = skipHiddenSubtrees("strict");
 
 const ACTIONABLE_ROLES = new Set([
   "button",
@@ -84,6 +96,8 @@ export interface TargetRecord {
   targetId?: string | undefined;
   element: BrowserElement;
   visibleText: string;
+  /** The fallback pass found it, so an action checks it with the same rules. */
+  drawnOnly?: true;
 }
 
 export interface SnapshotTarget {
@@ -107,18 +121,34 @@ export const collectBoundedSnapshot = Effect.fn("Browser.collectBoundedSnapshot"
   includeText: boolean,
   deadline?: number,
 ) {
+  const strict = yield* collectSnapshotPass(send, captures, revision, includeText, false, deadline);
+  if (!includeText || strict.elements.length > 0 || strict.text) return { ...strict, fallback: false };
+  // Nothing passed the strict rules. A page that is still drawn has put aria-hidden, inert or
+  // opacity 0 on its main container, so read what the page draws (#7770).
+  return { ...(yield* collectSnapshotPass(send, captures, revision, includeText, true, deadline)), fallback: true };
+});
+
+const collectSnapshotPass = Effect.fn("Browser.collectSnapshotPass")(function* (
+  send: SendCommand,
+  captures: SnapshotTarget[],
+  revision: number,
+  includeText: boolean,
+  drawnOnly: boolean,
+  deadline?: number,
+) {
   const targets = new Map<string, TargetRecord>();
   const elements: BrowserElement[] = [];
   const textParts: string[] = [];
   let textLength = 0;
   let hasVisualSurface = false;
   let hasFrame = captures.length > 1;
+  let hasRoot = true;
   let truncated = false;
   for (const capture of captures) {
     yield* browserSync(() => assertBeforeDeadline(deadline));
     if (includeText) {
       const remainingText = Math.max(0, MAX_SNAPSHOT_TEXT - textLength);
-      const summary = yield* collectPageSummaryEffect(send, capture.sessionId, remainingText).pipe(
+      const summary = yield* collectPageSummaryEffect(send, capture.sessionId, remainingText, drawnOnly).pipe(
         Effect.catch(() => Effect.succeed(null)),
       );
       if (summary) {
@@ -129,16 +159,17 @@ export const collectBoundedSnapshot = Effect.fn("Browser.collectBoundedSnapshot"
         truncated ||= summary.truncated;
         hasVisualSurface ||= summary.hasVisualSurface;
         hasFrame ||= summary.hasFrame;
+        if (!capture.sessionId) hasRoot = summary.hasRoot;
       }
     }
     const remainingElements = MAX_SNAPSHOT_ELEMENTS - elements.length;
     if (remainingElements <= 0) continue;
     const candidates =
       capture.sessionId && deadline === undefined
-        ? yield* collectActionableNodesEffect(send, capture, remainingElements).pipe(
+        ? yield* collectActionableNodesEffect(send, capture, remainingElements, drawnOnly).pipe(
             Effect.catch(() => Effect.succeed([])),
           )
-        : yield* collectActionableNodesEffect(send, capture, remainingElements, deadline);
+        : yield* collectActionableNodesEffect(send, capture, remainingElements, drawnOnly, deadline);
     for (const candidate of candidates) {
       const properties = Array.isArray(candidate.ax.properties) ? candidate.ax.properties.filter(isRecord) : [];
       const states = properties
@@ -153,7 +184,7 @@ export const collectBoundedSnapshot = Effect.fn("Browser.collectBoundedSnapshot"
       const element: BrowserElement = {
         ref,
         role: candidate.role,
-        name: axValue(candidate.ax.name).slice(0, 500),
+        name: candidate.name,
         description: axValue(candidate.ax.description).slice(0, 500),
         tag: (stringValue(candidate.node.localName) || stringValue(candidate.node.nodeName)).toLowerCase(),
         value: axValue(candidate.ax.value).slice(0, MAX_SNAPSHOT_ELEMENT_VALUE) || null,
@@ -168,6 +199,7 @@ export const collectBoundedSnapshot = Effect.fn("Browser.collectBoundedSnapshot"
         ...(capture.targetId === undefined ? {} : { targetId: capture.targetId }),
         element,
         visibleText: candidate.visibleText,
+        ...(drawnOnly ? { drawnOnly: true as const } : {}),
       });
       if (elements.length >= MAX_SNAPSHOT_ELEMENTS) break;
     }
@@ -180,6 +212,7 @@ export const collectBoundedSnapshot = Effect.fn("Browser.collectBoundedSnapshot"
     truncated: truncated || text.length > MAX_SNAPSHOT_TEXT || elements.length >= MAX_SNAPSHOT_ELEMENTS,
     hasVisualSurface,
     hasFrame,
+    hasRoot,
   };
 });
 
@@ -187,6 +220,7 @@ const collectPageSummaryEffect = Effect.fn("Browser.collectPageSummary")(functio
   send: SendCommand,
   sessionId: string | undefined,
   maxText: number,
+  drawnOnly: boolean,
 ) {
   const contextId = yield* automationContextId(send, sessionId);
   const result = yield* send(
@@ -215,7 +249,7 @@ const collectPageSummaryEffect = Effect.fn("Browser.collectPageSummary")(functio
           const root = roots.shift();
           if (!root || seen.has(root)) continue;
           seen.add(root);
-          const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, ${SKIP_HIDDEN_SUBTREES});
+          const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, ${skipHiddenSubtrees(drawnOnly ? "drawn" : "strict")});
           let node;
           while ((node = walker.nextNode()) && scanned < maxNodes) {
             scanned++;
@@ -257,7 +291,7 @@ const collectPageSummaryEffect = Effect.fn("Browser.collectPageSummary")(functio
         if (scanned >= maxNodes) truncated = true;
         const text = [...inView.parts, ...outside.parts].join(' ');
         if (text.length > maxText) truncated = true;
-        return { text: text.slice(0, maxText), truncated, hasVisualSurface, hasFrame };
+        return { text: text.slice(0, maxText), truncated, hasVisualSurface, hasFrame, hasRoot: document.documentElement !== null };
       })()`,
       contextId,
       returnByValue: true,
@@ -270,6 +304,7 @@ const collectPageSummaryEffect = Effect.fn("Browser.collectPageSummary")(functio
     truncated: value?.truncated === true,
     hasVisualSurface: value?.hasVisualSurface === true,
     hasFrame: value?.hasFrame === true,
+    hasRoot: value?.hasRoot !== false,
   };
 });
 
@@ -698,6 +733,7 @@ const collectActionableNodesEffect = Effect.fn("Browser.collectActionableNodes")
   send: SendCommand,
   capture: SnapshotTarget,
   limit: number,
+  drawnOnly: boolean,
   deadline?: number,
 ) {
   yield* browserSync(() => assertBeforeDeadline(deadline));
@@ -711,13 +747,14 @@ const collectActionableNodesEffect = Effect.fn("Browser.collectActionableNodes")
     node: CdpResult;
     ax: CdpResult;
     role: string;
+    name: string;
     visibleText: string;
   }> = [];
   const batchSize = MAX_SNAPSHOT_ELEMENTS;
   const collection = yield* send(
     "Runtime.evaluate",
     {
-      expression: actionableNodesExpression(MAX_SNAPSHOT_CANDIDATES),
+      expression: actionableNodesExpression(MAX_SNAPSHOT_CANDIDATES, drawnOnly ? "drawn-usable" : "strict"),
       contextId,
       returnByValue: false,
     },
@@ -771,16 +808,11 @@ const collectActionableNodesEffect = Effect.fn("Browser.collectActionableNodes")
             const axNodes = Array.isArray(partialAxTree.nodes) ? partialAxTree.nodes.filter(isRecord) : [];
             const ax =
               axNodes.find((candidate) => numberValue(candidate.backendDOMNodeId) === backendNodeId) ?? axNodes[0];
-            if (!ax || ax.ignored === true) return null;
-            const role = axValue(ax.role).toLowerCase() || fallbackRole(node);
+            if (!drawnOnly && (!ax || ax.ignored === true)) return null;
+            const visibleText = stringValue(recordValue(visibleTextResult.result)?.value);
+            const { role, name } = controlIdentity(node, ax, visibleText);
             if (!ACTIONABLE_ROLES.has(role)) return null;
-            return {
-              backendNodeId,
-              node,
-              ax,
-              role,
-              visibleText: stringValue(recordValue(visibleTextResult.result)?.value),
-            };
+            return { backendNodeId, node, ax: ax ?? {}, role, name, visibleText };
           }),
         ),
         { concurrency: "unbounded" },
@@ -804,7 +836,7 @@ const collectActionableNodesEffect = Effect.fn("Browser.collectActionableNodes")
   return results;
 });
 
-function actionableNodesExpression(limit: number): string {
+function actionableNodesExpression(limit: number, rule: HiddenSubtreeRule): string {
   return `(() => {
     const roles = new Set(${JSON.stringify([...ACTIONABLE_ROLES])});
     const roots = [document];
@@ -834,7 +866,7 @@ function actionableNodesExpression(limit: number): string {
       const root = roots.shift();
       if (!root || seenRoots.has(root)) continue;
       seenRoots.add(root);
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, ${SKIP_HIDDEN_SUBTREES});
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, ${skipHiddenSubtrees(rule)});
       let node;
       while ((node = walker.nextNode()) && scanned < ${MAX_SNAPSHOT_SCANNED_NODES} && inView.length < limit) {
         scanned++;
@@ -886,7 +918,9 @@ export function boundSerializedSnapshot(snapshot: BrowserSnapshot): void {
 export function fallbackRole(node: CdpResult): string {
   const tag = (stringValue(node.localName) || stringValue(node.nodeName)).toLowerCase();
   const attributes = nodeAttributes(node.attributes);
-  if (attributes.role) return attributes.role.toLowerCase();
+  // The first token of a role list is the role, as in the candidate walk. None and presentation do not apply to a control.
+  const role = (attributes.role ?? "").trim().split(/\s+/u)[0]?.toLowerCase() ?? "";
+  if (role && role !== "none" && role !== "presentation") return role;
   if (tag === "button" || tag === "summary") return "button";
   if (tag === "a") return "link";
   if (tag === "select") return attributes.multiple === undefined ? "combobox" : "listbox";
@@ -896,7 +930,27 @@ export function fallbackRole(node: CdpResult): string {
   if (attributes.type === "radio") return "radio";
   if (attributes.type === "range") return "slider";
   if (attributes.type === "number") return "spinbutton";
+  if (["button", "submit", "reset", "image"].includes(attributes.type ?? "")) return "button";
   return "textbox";
+}
+
+/**
+ * The role and name of a control. The accessibility tree ignores a control in an `aria-hidden`
+ * container, so the fallback pass reads them from the element and its text.
+ */
+export function controlIdentity(
+  node: CdpResult,
+  ax: CdpResult | undefined,
+  visibleText: string,
+): { role: string; name: string } {
+  if (ax && ax.ignored !== true) {
+    return { role: axValue(ax.role).toLowerCase() || fallbackRole(node), name: axValue(ax.name).slice(0, 500) };
+  }
+  const attributes = nodeAttributes(node.attributes);
+  const role = fallbackRole(node);
+  const value = stringValue(node.localName) === "input" && role === "button" ? attributes.value || attributes.alt : "";
+  const name = attributes["aria-label"] || visibleText || value || attributes.placeholder || attributes.title || "";
+  return { role, name: name.slice(0, 500) };
 }
 
 function nodeAttributes(value: unknown): Record<string, string> {

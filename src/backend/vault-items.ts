@@ -1,4 +1,5 @@
-// The cards, contact info and API keys of the Vault, as agents use them. The main process implements
+// The cards, contact info and API keys of the Vault, as agents use them. Each item is for every agent,
+// or for the agents that the user chose; an agent sees, fills and changes only the items it can use. The main process implements
 // this port with the encrypted Vault file. Agents read logins through the `PasswordVault` port instead
 // (`list_logins` / `submit_secret`). Agents can add and change contacts, change the fields of a card
 // that are not secret, and delete items. An agent can save a password, a two-step key or an API key that
@@ -94,7 +95,23 @@ export interface VaultTypedLogin {
   password: string;
 }
 
-/** An API key that an agent saves. The Vault has one key for each name. */
+/** The agent that acts: its id selects the items that it can use, and its name is the `addedBy` of a new item. */
+export interface VaultAgent {
+  id: string;
+  name: string | undefined;
+}
+
+/** An API key that an agent can read. `own` when the key is for this agent only. */
+interface VaultAgentKey {
+  name: string;
+  value: string;
+  own: boolean;
+}
+
+/**
+ * An API key that an agent saves. The Vault has one key for each name for every agent, and one for
+ * each name and agent; the agent's own key wins over the key for every agent.
+ */
 export interface VaultAgentApiKey {
   /** The environment variable name, such as OPENAI_API_KEY. */
   name: string;
@@ -109,42 +126,56 @@ export type VaultEnteredItem = Exclude<VaultSaveInput, { kind: "apiKey" }> & { i
 export interface VaultItems {
   /** Whether the Vault can be read and changed now. It cannot without OS encryption or with a damaged file. */
   ready(): boolean;
-  /** The saved API keys, which `AgentApiKeys` writes to files. None while the Vault is not ready. */
-  apiKeys(): { name: string; value: string }[];
-  /** Whether a card is saved now. Agents are told about card fill only while one is. */
-  hasCards(): boolean;
-  /** Whether contact info is saved now. */
-  hasContacts(): boolean;
-  listForAgent(): { logins: VaultLoginForAgent[]; cards: VaultCardForAgent[]; contacts: VaultContactForAgent[] };
-  /** The values to type for `cardId`, or null when no such card is saved. */
-  cardSecret(cardId: string): VaultCardSecret | null;
+  /**
+   * The API keys that `agentId` can use, which `AgentApiKeys` writes to its files: for each name, the
+   * key for chosen agents that names it, or else the key for every agent. None while the Vault is not ready.
+   */
+  apiKeys(agentId: string): VaultAgentKey[];
+  /** Whether a card that `agentId` can use is saved now. Agents are told about card fill only while one is. */
+  hasCards(agentId: string): boolean;
+  /** Whether contact info that `agentId` can use is saved now. */
+  hasContacts(agentId: string): boolean;
+  listForAgent(agentId: string): {
+    logins: VaultLoginForAgent[];
+    cards: VaultCardForAgent[];
+    contacts: VaultContactForAgent[];
+  };
+  /** The values to type for `cardId`, or null when no such card is saved for `agentId`. */
+  cardSecret(cardId: string, agentId: string): VaultCardSecret | null;
   /** Whether the owner let agents fill `cardId` on the HTTPS `page` into fields of each of `frames`. */
   cardFillApproved(cardId: string, page: string, frames: readonly string[]): boolean;
   /** Keeps the owner's approval to fill `cardId` on `page` into fields of `frames`. */
   approveCardFill(cardId: string, page: string, frames: readonly string[]): Effect.Effect<void, PasswordVaultError>;
-  /** Adds or changes an item. `addedBy` is the agent's name, if known; a new item keeps it. */
+  /** Adds or changes an item that the agent can use. A new item is for every agent, and keeps the agent's name. */
   save(
     change: VaultAgentChange,
-    addedBy: string | undefined,
+    agent: VaultAgent,
   ): Effect.Effect<VaultAgentResult & { created: boolean }, PasswordVaultError>;
-  /** Deletes an item. Null when no item has this id. */
-  delete(id: string): Effect.Effect<VaultAgentResult | null, PasswordVaultError>;
+  /** Deletes an item that `agentId` can use. Null when it has no item with this id. */
+  delete(id: string, agentId: string): Effect.Effect<VaultAgentResult | null, PasswordVaultError>;
   /**
-   * Keeps a typed password. A saved login for the same site and username gets the new password;
-   * `changed` is false when it had the same one.
+   * Keeps a typed password. A saved login that the agent can use, for the same site and username, gets
+   * the new password; `changed` is false when it had the same one. A new login is for every agent.
    */
   saveLogin(
     login: VaultTypedLogin,
-    addedBy: string | undefined,
+    agent: VaultAgent,
   ): Effect.Effect<VaultAgentResult & { created: boolean; changed: boolean }, PasswordVaultError>;
-  /** Adds the API key, or replaces the key of the saved item with its name. */
+  /**
+   * Saves the API key for every agent, or for this agent only when `only`. The key replaces the saved
+   * key of its name and scope. The agent also stops using every other key of the name for chosen
+   * agents, so the new key is the one it reads; such a key that no agent then uses is deleted.
+   */
   saveApiKey(
     apiKey: VaultAgentApiKey,
-    addedBy: string | undefined,
+    agent: VaultAgent,
+    only: boolean,
   ): Effect.Effect<VaultAgentResult & { created: boolean }, PasswordVaultError>;
+  /** Deletes the API key of this name that is for `agentId` only. False when it has none. */
+  removeAgentApiKey(agentId: string, name: string): Effect.Effect<boolean, PasswordVaultError>;
   /**
-   * Adds an item that the user typed. The values are checked as the Vault page checks them; a wrong
-   * value fails with text that the user reads.
+   * Adds an item that the user typed, for every agent. The values are checked as the Vault page checks
+   * them; a wrong value fails with text that the user reads.
    */
-  addEntered(item: VaultEnteredItem, addedBy: string | undefined): Effect.Effect<VaultAgentResult, PasswordVaultError>;
+  addEntered(item: VaultEnteredItem, agent: VaultAgent): Effect.Effect<VaultAgentResult, PasswordVaultError>;
 }

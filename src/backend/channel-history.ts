@@ -8,6 +8,7 @@ import {
   channelRoutingConversationEvent,
   isChannelChangeMarker,
   isContextResetMarker,
+  mcpSignInEvent,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -184,6 +185,8 @@ function conversation(all: ChannelMessage[]): ChannelMessage[] {
     (message) =>
       channelRoutingConversationEvent(message.message) === null &&
       !isChannelChangeMarker(message.message) &&
+      // A Sign in card is for the person, not a member's answer.
+      mcpSignInEvent(message.message) === null &&
       !isMemberThinking(message) &&
       !(
         message.message.itemType === "commentary" &&
@@ -200,6 +203,43 @@ export type ChannelHistoryPage = Pick<
 >;
 
 /**
+ * The fields of a stored message that a history page gives: those that `render` gives the packet,
+ * and the time, state and kind of the row. A stored message also holds the trace of its turn, its
+ * plan and other views for the reader. The page limit counted them, so one long trace filled a page
+ * alone and pushed out the messages around it (#8147). A field that a later change adds stays out.
+ */
+function historyMessage({
+  id,
+  channelId,
+  sequence,
+  author,
+  taskId,
+  superseded,
+  message,
+}: ChannelMessage): ChannelMessage {
+  return {
+    id,
+    channelId,
+    sequence,
+    author,
+    taskId,
+    superseded,
+    message: {
+      id: message.id,
+      author: message.author,
+      text: message.text,
+      createdAt: message.createdAt,
+      status: message.status,
+      itemType: message.itemType,
+      source: message.source,
+      replyToMessageId: message.replyToMessageId,
+      attachments: message.attachments,
+      questionPrompt: message.questionPrompt,
+    },
+  };
+}
+
+/**
  * A `channel_history` page that fits in a tool result. A page of 100 messages had no size limit, and
  * one long result filled the session of the member that read it. The page keeps the newest messages
  * that fit, and `olderCursor` then starts at the oldest one it gives. A message over the message
@@ -211,15 +251,16 @@ export function boundedHistoryPage(page: ChannelHistoryPage): ChannelHistoryPage
 } {
   const cutMessages: { messageId: string; totalCharacters: number }[] = [];
   const cut = (message: ChannelMessage): ChannelMessage => {
-    const text = message.message.text;
-    if (text.length <= HISTORY_MESSAGE_CHARACTERS) return message;
+    const shown = historyMessage(message);
+    const text = shown.message.text;
+    if (text.length <= HISTORY_MESSAGE_CHARACTERS) return shown;
     const head = Math.floor(HISTORY_MESSAGE_CHARACTERS * HISTORY_HEAD_SHARE);
     const tail = HISTORY_MESSAGE_CHARACTERS - head;
     cutMessages.push({ messageId: message.id, totalCharacters: text.length });
     return {
-      ...message,
+      ...shown,
       message: {
-        ...message.message,
+        ...shown.message,
         text: `${text.slice(0, head)}\n[${text.length - head - tail} characters left out. Call channel_history with messageId "${message.id}" and offset ${head} to read them.]\n${text.slice(-tail)}`,
       },
     };
@@ -230,7 +271,7 @@ export function boundedHistoryPage(page: ChannelHistoryPage): ChannelHistoryPage
     const shown = cut(message);
     const length = JSON.stringify(shown).length;
     if (kept.length && size + length > HISTORY_PAGE_CHARACTERS) {
-      if (shown !== message) cutMessages.pop();
+      if (shown.message.text !== message.message.text) cutMessages.pop();
       break;
     }
     kept.unshift(shown);

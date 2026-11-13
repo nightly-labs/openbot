@@ -1,6 +1,6 @@
-import { VaultPanel } from "@openbot/ui/features/vault/VaultPanel";
+import { type VaultAgentChoice, VaultPanel } from "@openbot/ui/features/vault/VaultPanel";
 import { useText } from "@openbot/ui/text";
-import { onSettled, Show } from "solid-js";
+import { createEffect, createSignal, onSettled, Show } from "solid-js";
 import { actionToast } from "../../action-toast";
 import type { LinkAccountStore } from "./stores/link-account-store";
 import type { VaultStore } from "./stores/vault-store";
@@ -14,6 +14,11 @@ export interface ServerVaultOptions {
   twoStep: boolean;
   /** The Link account of this computer. Absent for a joined server: its host has no Link. */
   link?: LinkAccountStore | undefined;
+  /**
+   * The agents of the same server, for the agents of each item. Absent or empty: each item shows no
+   * agents choice, and keeps its saved agents.
+   */
+  listAgents?: (() => Promise<readonly VaultAgentChoice[]>) | undefined;
 }
 
 /**
@@ -22,6 +27,22 @@ export interface ServerVaultOptions {
  */
 export function ServerVaultPanel(props: ServerVaultOptions & { menuMount: HTMLElement | undefined }) {
   const { t, errorMessage } = useText();
+  const [agents, setAgents] = createSignal<readonly VaultAgentChoice[]>([]);
+  let request = 0;
+  createEffect(
+    () => props.listAgents,
+    (listAgents) => {
+      const current = ++request;
+      setAgents([]);
+      // Without the agents, the items keep their saved agents, so a failed read only hides the choice.
+      listAgents?.().then(
+        (list) => {
+          if (current === request) setAgents(list);
+        },
+        () => undefined,
+      );
+    },
+  );
   onSettled(() => {
     const store = props.store;
     const unsubscribe = store.subscribe();
@@ -51,6 +72,7 @@ export function ServerVaultPanel(props: ServerVaultOptions & { menuMount: HTMLEl
         <VaultPanel
           state={vault()}
           apiKeys={props.apiKeys}
+          agents={agents()}
           onCodes={onCodes()}
           onSave={props.store.save}
           onDelete={props.store.remove}

@@ -11,7 +11,8 @@ import { waitForPresentedFrame } from "./browser-smoke-frames";
 const ORIGIN = "https://authentication.openbot.test";
 const ID = "12345678-1234-1234-1234-123456789abc";
 const PASSWORD = "fixture-bitwarden-password";
-const CODE = "739182";
+/** Eight digits, and the page does not say so: the saved code sets the length (#7920). */
+const CODE = "73918246";
 
 /** The page submits only if the browser received the expected fixture value. */
 export function bitwardenLoginFixture(kind: "password" | "authenticator"): Response {
@@ -85,7 +86,6 @@ export async function runBitwardenBrowserSmoke(browser: BrowserHost): Promise<vo
             arguments: {
               tabId: tab.id,
               method,
-              digits: 6,
               targets: [{ kind: "css", selector: "#vault-secret" }],
               submission: "click",
               submitTarget: { kind: "css", selector: "#vault-submit" },
@@ -102,7 +102,7 @@ export async function runBitwardenBrowserSmoke(browser: BrowserHost): Promise<vo
         const snapshot = await runCauseEffect(browser.snapshot(tab.id));
         if (!snapshot.url.endsWith("/complete") || JSON.stringify(snapshot).includes(value))
           throw new Error("Bitwarden sign-in failed or exposed its value.");
-        checks.push(`${method} signs in without exposing the value in the snapshot`);
+        checks.push(`${method} signs in without digits and without exposing the value in the snapshot`);
       } finally {
         await runCauseEffect(browser.close(tab.id));
       }

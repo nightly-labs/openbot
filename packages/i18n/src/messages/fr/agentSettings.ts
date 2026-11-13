@@ -153,8 +153,6 @@ export const messages = {
   "agentSettings.runtime.busyMessage": "Pendant le travail",
   "agentSettings.runtime.busyMessageLabel": "Messages pendant le travail de l’agent",
 
-  "agentSettings.runtime.taskLimit": "Fils en parallèle",
-  "agentSettings.runtime.taskLimitLabel": "Fils exécutés en même temps",
   "agentSettings.runtime.workingDirectory": "Répertoire de travail",
   "agentSettings.runtime.notAvailable": "Pas encore disponible",
   "agentSettings.runtime.fullAccessNote":
@@ -174,9 +172,6 @@ export const messages = {
   "agentSettings.busyMessage.steer": "Orienter",
   "agentSettings.busyMessage.steerUnsupported":
     "{provider} ne peut pas orienter un tour en cours. Les messages envoyés pendant son travail attendent dans la file.",
-  "agentSettings.taskLimit.default": "Par défaut ({count})",
-  "agentSettings.taskLimit.oneTurn":
-    "{provider} exécute un seul tour à la fois. Les fils de cet agent s’attendent les uns les autres.",
   "agentSettings.notificationLevel.title": "Me notifier",
   "agentSettings.notificationLevel.server": "Par défaut du serveur ({level})",
   "agentSettings.notificationLevel.note":

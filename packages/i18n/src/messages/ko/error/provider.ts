@@ -215,6 +215,8 @@ export const messages = {
     "OpenCode의 모델 제공자가 올바르지 않은 업로드 요청이라고 알렸어요. 다른 모델을 선택해 계속하세요. 저장된 루틴을 다시 만들기 전에 확인하세요.\n{detail}",
   "error.provider.opencodeUnreadableContent":
     "이 모델은 이 채팅의 파일이나 이미지를 읽을 수 없어요. 파일을 읽을 수 있는 모델을 선택한 후 메시지를 다시 보내세요.",
+  "error.provider.opencodeContextTooSmall":
+    "이 채팅이 모델의 컨텍스트 창에 맞지 않습니다. Ollama 또는 LM Studio에서 더 큰 컨텍스트 길이로 모델을 불러오고, OpenBot의 제공자 설정에 같은 창을 입력하세요. 또는 더 큰 모델을 선택하세요.",
   "error.provider.opencodeFreeLimit":
     "OpenCode 무료 모델이 사용 한도에 도달했어요. 모든 무료 모델이 이 한도를 함께 사용해요. 계속하려면 OpenCode 설정에 OpenCode Go 키를 붙여넣거나 다른 제공자의 모델을 선택하세요.",
   "error.provider.opencodeProviderFailed":
@@ -300,6 +302,10 @@ export const messages = {
   "error.provider.hermesVersionUnreadable": "Hermes Agent 버전을 읽을 수 없습니다.",
   "error.provider.hermesSignIn":
     "Hermes를 사용하려면 Nous Portal로 로그인하거나 터미널에서 `hermes setup`을 실행하세요.",
+  "error.provider.hermesTurnFailed":
+    "Hermes가 이번 턴을 완료하지 못했습니다. 응답에 이유가 있으면 그 안내를 따르세요. 없으면 이 에이전트의 MCP 서버를 사용할 수 없는 상태일 수 있습니다. 서버 설정 › MCP에서 확인한 다음 메시지를 다시 보내세요.",
+  "error.provider.copilotThinkingRejected":
+    "GitHub Copilot이 이 모델을 사용할 수 없습니다. 모델이 사고 설정을 받아들이지 않았습니다. 이 에이전트에 다른 모델을 선택한 다음 메시지를 다시 보내세요.",
   "error.provider.usageLimitReached": "계정이 사용 한도에 도달했어요.",
   "error.provider.claudeContextFull":
     "이 채팅이 Claude가 처리하기에 너무 길어졌어요. OpenBot이 채팅 기록으로 새 Claude Code 세션을 시작했어요. 다시 시도해 주세요.",
@@ -335,6 +341,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "브라우저에서는 HTTPS 로그인 링크만 열 수 있어요.",
   "error.provider.geminiKeyRefused":
     "Gemini가 저장된 API 키를 거부했어요. 설정에서 키를 교체하거나 제거한 후 다시 연결하세요.",
+  "error.provider.geminiAccountSettingsUnreadable":
+    "Gemini가 이 계정의 설정 파일을 열 수 없어서 로그인할 수 없어요. 이 계정을 제거한 후 다시 추가하세요.",
+  "error.provider.geminiSettingsUnreadable":
+    "Gemini가 이 컴퓨터에서 설정 파일을 열 수 없어서 로그인할 수 없어요. Gemini를 사용하는 다른 앱을 종료한 후 OpenBot을 종료하고 다시 여세요.",
   "error.provider.geminiVerificationRequired":
     "Gemini가 답하려면 Google에서 계정을 인증해야 해요. 브라우저에서 Google 계정을 인증한 후 메시지를 다시 보내세요.",
   "error.provider.keyProviderRefused":
@@ -393,6 +403,14 @@ export const messages = {
   "error.provider.accountDefault": "첫 번째 {provider} 계정은 제거할 수 없어요.",
   "error.provider.accountUsesKey":
     "이 {provider} 계정은 저장된 API 키를 사용하므로 로그인이 없어요. 키는 서버 설정 → 제공자에서 변경하세요.",
+  "error.provider.accountNeedsKey":
+    "새 {provider} 계정에는 API 키가 필요해요. 이 기기의 OpenBot을 업데이트한 후 계정을 다시 추가하세요.",
+  "error.provider.accountKeyRefused":
+    "{provider}에서 이 API 키를 받아들이지 않았어요. 키를 확인한 후 다시 시도해 주세요.",
+  "error.provider.accountKeyUnreachable":
+    "API 키를 확인하려 했지만 OpenBot이 {provider}에 연결하지 못했어요. 인터넷 연결을 확인한 후 다시 시도해 주세요.",
+  "error.provider.accountKeySignedOut":
+    "{provider}에서 이 계정의 API 키를 더 이상 받아들이지 않아요. 계정에 새 키를 입력하세요.",
   "error.provider.accountInUse": "이 계정을 사용하는 에이전트가 작업 중이에요. 에이전트가 멈춘 후 다시 시도해 주세요.",
   "error.provider.accountsReadOnly": "저장된 제공자 계정을 읽을 수 없어요. 변경하기 전에 OpenBot을 업데이트하세요.",
   "error.provider.accountSignedOut": "이 {provider} 계정은 로그아웃되었어요. 다시 로그인하세요.",

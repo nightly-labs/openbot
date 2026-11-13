@@ -8,6 +8,7 @@ import type {
 import type { OpenBotDatabase } from "./openbot-database";
 import {
   type DueRoutine,
+  type ImportedRoutineRun,
   type OwnedRoutine,
   type OwnedRoutineRun,
   type ReceivedWebhookEvent,
@@ -115,6 +116,11 @@ export class AgentRoutineStore extends RoutineStore {
       },
     );
     return routineIds;
+  }
+
+  /** Writes the finished runs that a server transfer brought for one of the agent's routines. */
+  importRuns(agentId: string, routineId: string, runs: readonly ImportedRoutineRun[]): string[] {
+    return this.importRunRows(routineId, agentId, runs);
   }
 
   listRuns(agentId: string, routineId: string, limit = 50, withSkipped = false): RoutineRun[] {

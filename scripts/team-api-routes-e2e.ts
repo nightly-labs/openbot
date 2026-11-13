@@ -6,11 +6,12 @@
 // host's WhatsApp numbers over a stand-in messaging service (`whatsapp-connector-v1`), the
 // host's password managers (`password-managers-v1`) over the real engine with a stand-in Proton
 // Pass driver and the real Bitwarden adapter, the
-// host's Vault (`vault-v1`, its API keys through `vault-v2`, and the CSV import of `vault-import-v1`)
+// host's Vault (`vault-v1`, its API keys through `vault-v2`, the agents of each item through `vault-v4`, and the CSV import of `vault-import-v1`)
 // over the real service and store,
 // where each routine runs (`routine-run-place-v1`) over stand-in routine records,
 // a password that an admin saves from the secure card (`browser-secret-vault-v1`),
 // a transfer file larger than one part, sent and read in parts (`instance-transfer-chunks-v1`),
+// the whole copy of a pending approval (`pending-approval-v1`),
 // direct-message isolation, agents hidden from an older
 // protocol, the queue routes, message delete (`message-delete-v1`) under the agent roles, the attachment and file routes with their size limits,
 // a Grok Bot export sent in parts (`agent-import-v2`) to the real import service, and the error
@@ -96,6 +97,7 @@ import {
   AGENT_BACKUP_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { AGENT_COLORS_CAPABILITY, AGENT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/agent-colors-v1";
+import { AGENT_DEFAULTS_CAPABILITY, AGENT_DEFAULTS_ROUTES } from "@openbot/contracts/team-protocol/agent-defaults-v1";
 import {
   AGENT_FAST_MODE_CAPABILITY,
   AGENT_FAST_MODE_ROUTES,
@@ -126,6 +128,7 @@ import {
   AGENT_QUEUE_TASK_CAPABILITY,
   AGENT_QUEUE_TASK_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-queue-task-v1";
+import { AGENT_SPEED_CAPABILITY, AGENT_SPEED_ROUTES } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import {
   AGENT_TASK_LIMIT_CAPABILITY,
   AGENT_TASK_LIMIT_ROUTES,
@@ -221,20 +224,31 @@ import {
   CUSTOM_PROVIDER_HARNESS_CODECS,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
+import { GITHUB_SKILLS_CAPABILITY, GITHUB_SKILLS_ROUTES } from "@openbot/contracts/team-protocol/github-skills-v1";
 import { HERMES_IMPORT_CAPABILITY, HERMES_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/hermes-import-v1";
 import {
   HOST_KEY_ROTATION_CAPABILITY,
   HOST_KEY_ROTATION_ROUTES,
 } from "@openbot/contracts/team-protocol/host-key-rotation-v1";
+import { HOST_RESTART_CAPABILITY, HOST_RESTART_ROUTES } from "@openbot/contracts/team-protocol/host-restart-v1";
+import {
+  HOST_TURN_LIMITS_CAPABILITY,
+  HOST_TURN_LIMITS_ROUTES,
+} from "@openbot/contracts/team-protocol/host-turn-limits-v1";
 import {
   INSTANCE_TRANSFER_CHUNK_BYTES,
   INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
   INSTANCE_TRANSFER_CHUNKS_ROUTES,
 } from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
 import {
+  INSTANCE_TRANSFER_FULL_COPY_CAPABILITY,
+  INSTANCE_TRANSFER_FULL_COPY_ROUTES,
+} from "@openbot/contracts/team-protocol/instance-transfer-full-copy-v1";
+import {
   INSTANCE_TRANSFER_CAPABILITY,
   INSTANCE_TRANSFER_ROUTES,
 } from "@openbot/contracts/team-protocol/instance-transfer-v1";
+import { LIBRARY_FOLDERS_EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/library-folders-events-v1";
 import {
   LIBRARY_FOLDERS_CAPABILITY,
   LIBRARY_FOLDERS_ROUTES,
@@ -260,6 +274,14 @@ import {
   PASSWORD_MANAGERS_CODECS,
   PASSWORD_MANAGERS_ROUTES,
 } from "@openbot/contracts/team-protocol/password-managers-v1";
+import {
+  PENDING_APPROVAL_CAPABILITY,
+  PENDING_APPROVAL_ROUTES,
+} from "@openbot/contracts/team-protocol/pending-approval-v1";
+import {
+  PROVIDER_ACCOUNT_KEYS_CAPABILITY,
+  PROVIDER_ACCOUNT_KEYS_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import {
   PROVIDER_ACCOUNT_MODELS_CAPABILITY,
   PROVIDER_ACCOUNT_MODELS_ROUTES,
@@ -307,7 +329,12 @@ import { SIDE_QUESTION_CAPABILITY, SIDE_QUESTION_ROUTES } from "@openbot/contrac
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { SIDEBAR_PINS_CAPABILITY, SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { SKILL_LEARNING_CAPABILITY, SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
+import { SKILLS_ADMIN_CAPABILITY, SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { STORAGE_DISK_CAPABILITY, STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-disk-v1";
+import {
+  STORAGE_USER_FILES_CAPABILITY,
+  STORAGE_USER_FILES_ROUTES,
+} from "@openbot/contracts/team-protocol/storage-user-files-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import {
   THREAD_MESSAGE_SEARCH_CAPABILITY,
@@ -323,6 +350,7 @@ import { VAULT_IMPORT_CAPABILITY, VAULT_IMPORT_ROUTES } from "@openbot/contracts
 import { VAULT_CAPABILITY, VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY, VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
 import { VAULT_V3_CAPABILITY, VAULT_V3_ROUTES } from "@openbot/contracts/team-protocol/vault-v3";
+import { VAULT_V4_CAPABILITY, VAULT_V4_ROUTES } from "@openbot/contracts/team-protocol/vault-v4";
 import {
   WHATSAPP_CONNECTOR_CAPABILITY,
   WHATSAPP_CONNECTOR_CODECS,
@@ -357,6 +385,8 @@ import { RoutineResultError } from "../src/backend/routine-results/routine-resul
 import type { OwnedRoutineRecord } from "../src/backend/routine-store";
 import { TeamChatStore } from "../src/backend/team-chat-store";
 import type { AgentAccessState } from "../src/main/agent-access-store";
+import { createAgentDefaultsPreferenceStore } from "../src/main/agent-defaults-preference-store";
+import { createAgentDefaultsSettings } from "../src/main/agent-defaults-settings";
 import { createAgentFolders } from "../src/main/agent-folders";
 import { createAgentHostSettings } from "../src/main/agent-host-settings";
 import { AgentImportService } from "../src/main/agent-import-service";
@@ -366,6 +396,7 @@ import { type BitwardenCliRunner, BitwardenConnectorService } from "../src/main/
 import { BitwardenConnectorStore } from "../src/main/bitwarden-connector-store";
 import { createBrowserProfileService } from "../src/main/browser-profile-service";
 import { BrowsingMemoryPreferenceStore } from "../src/main/browsing-memory-preference-store";
+import { BusyMessageModePreferenceStore } from "../src/main/busy-message-mode-preference-store";
 import {
   claudeCompactWindowControl,
   createClaudeCompactWindowPreferenceStore,
@@ -376,6 +407,8 @@ import {
 } from "../src/main/claude-user-setup-preference-store";
 import { createCustomProviderChanges } from "../src/main/custom-provider-changes";
 import { CustomProviderStore } from "../src/main/custom-provider-store";
+import { githubSkillSource } from "../src/main/github-skill-source";
+import { HostTurnLimitsPreferenceStore } from "../src/main/host-turn-limits-preference-store";
 import {
   INSTANCE_TRANSFER_FORMAT,
   INSTANCE_TRANSFER_MANIFEST,
@@ -392,6 +425,7 @@ import { RemoteRequestError } from "../src/main/remote-server-errors";
 import { RemoteWorkflowError } from "../src/main/remote-service-effects";
 import { SidebarPinStore } from "../src/main/sidebar-pin-store";
 import { SkillLearningPreferenceStore } from "../src/main/skill-learning-preference-store";
+import { SkillMarketplaceFailure, type SkillMarketplaceService } from "../src/main/skill-marketplace-service";
 import type {
   TeamApiAgentAccess,
   TeamApiAgents,
@@ -453,6 +487,13 @@ interface RecordedCall {
 
 mkdirSync(OUT, { recursive: true });
 const root = mkdtempSync(join(tmpdir(), "openbot-team-api-routes-"));
+const agentDefaultsPath = join(root, "agent-defaults.json");
+const agentDefaultsPreferences = createAgentDefaultsPreferenceStore(agentDefaultsPath);
+const busyMessageModePreferences = new BusyMessageModePreferenceStore(join(root, "busy-message-mode.json"));
+// The real turn limits file. The memory of this stand-in host sets an automatic limit of 8.
+const hostTurnLimitsPath = join(root, "host-turn-limits.json");
+const hostTurnLimits = new HostTurnLimitsPreferenceStore(hostTurnLimitsPath, () => 8);
+await runCauseEffect(hostTurnLimits.load());
 const transferUploads = join(root, "user-data", "instance-transfer-uploads");
 const checks: Check[] = [];
 const calls: RecordedCall[] = [];
@@ -527,7 +568,9 @@ function startDisk(volumes: Json | undefined): boolean {
   return list(volumes).some((volume) => field(volume, "path") === root);
 }
 
-// One model with a fast tier and one without: the fast-mode models route lists only the first.
+// A Codex model with fast and Ultrafast tiers, a Codex model without a tier, and a Claude model with a
+// fast tier. The fast-mode models route lists only the first, with no Ultrafast tier; the speed route
+// lists the first and the Claude model.
 const FAST_MODE_MODELS: AgentModelOption[] = [
   {
     provider: "codex",
@@ -537,6 +580,16 @@ const FAST_MODE_MODELS: AgentModelOption[] = [
     defaultReasoningEffort: "medium",
     supportedReasoningEfforts: ["medium"],
     fastServiceTier: "priority",
+    ultrafastServiceTier: "ultrafast",
+  },
+  {
+    provider: "claude",
+    id: "claude-fast",
+    name: "Claude Fast",
+    description: "",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["medium"],
+    fastServiceTier: "fast",
   },
   {
     provider: "codex",
@@ -687,6 +740,10 @@ const ARGON_MODEL: AgentModelOption = {
   supportedReasoningEfforts: ["low", "high"],
   listing: "new",
 };
+/** The key that the fake host's Cursor refuses (`provider-account-keys-v1`). */
+const REFUSED_ACCOUNT_KEY = "key_e2e_refused";
+const ACCOUNT_KEY = "key_e2e_accepted";
+
 /** The fake host's Gemini pool (`provider-account-pool-v1`): off until the pool update route turns it on. */
 let antigravityPool: ProviderAccountPool | undefined;
 function accountModelsStatus(): AgentStatus {
@@ -1349,6 +1406,24 @@ const fakeAgents: TeamApiAgents = {
     return Effect.void;
   },
   agentIdForRequest: () => undefined,
+  pendingApproval: (requestId) => {
+    record("pendingApproval", requestId);
+    // Longer than a runtime snapshot carries (240 characters), so only this read gives all of it.
+    if (requestId === 7)
+      return {
+        requestId: 7,
+        agentId: "agent-ada",
+        threadId: "thread-ada",
+        turnId: "turn-ada",
+        kind: "permissions",
+        command: `Long report\n\n${"r".repeat(5_000)}`,
+        cwd: null,
+        reason: sourceText("status.agent.reportProblem"),
+        grantRoot: null,
+        permissions: null,
+      };
+    return undefined;
+  },
   respondToPrompt: unused("respondToPrompt"),
   respondToApproval: unused("respondToApproval"),
   respondToBrowserSecret: (input) => Effect.sync(() => record("respondToBrowserSecret", input)),
@@ -1908,6 +1983,56 @@ let refuseHostKeyRotation = false;
 /** The servers that the stand-in of `LocalServers` runs. */
 const localServerList: { serverId: string; name: string; published: boolean }[] = [];
 const memoryReview = new MemoryReviewPreferenceStore(memoryReviewFile);
+// The real GitHub skill reader over a fake GitHub: one public repository, `acme/skills`, with two
+// skill folders, a skill folder inside one of them, and a folder with no skill.
+const GITHUB_COMMIT = "0123456789abcdef0123456789abcdef01234567";
+const GITHUB_SKILL_FILES: Record<string, string> = {
+  "skills/pdf/SKILL.md": "---\nname: pdf\ndescription: Read and fill PDF forms.\n---\n\n# PDF\n",
+  "skills/pdf/reference.md": "# Reference\n",
+  "skills/docx/SKILL.md": "---\nname: docx\ndescription: Write Word documents.\n---\n\n# DOCX\n",
+  "skills/docx/nested/SKILL.md": "---\nname: nested\ndescription: A skill inside a skill.\n---\n",
+  "docs/guide.md": "# Guide\n",
+};
+const githubFetches: string[] = [];
+const githubReader = githubSkillSource(async (url) => {
+  githubFetches.push(url);
+  const json = (status: number, body: unknown) =>
+    new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  const commit = /^https:\/\/api\.github\.com\/repos\/acme\/skills\/commits\/(HEAD|main)$/u.exec(url);
+  if (commit) return json(200, { sha: GITHUB_COMMIT, commit: { committer: { date: "2026-11-01T10:00:00Z" } } });
+  if (url === `https://api.github.com/repos/acme/skills/git/trees/${GITHUB_COMMIT}?recursive=1`)
+    return json(200, {
+      tree: Object.entries(GITHUB_SKILL_FILES).map(([path, text]) => ({ type: "blob", path, size: text.length })),
+    });
+  const raw = `https://raw.githubusercontent.com/acme/skills/${GITHUB_COMMIT}/`;
+  const file = url.startsWith(raw) ? GITHUB_SKILL_FILES[url.slice(raw.length)] : undefined;
+  if (file !== undefined) return new Response(file);
+  return json(404, { message: "Not Found" });
+});
+// The host's skill service: the real GitHub read, and an install that records the id it gets.
+const githubSkillsAdmin: Pick<
+  SkillMarketplaceService,
+  "listInstalled" | "install" | "uninstall" | "setEnabled" | "readGithub"
+> = {
+  readGithub: (link) =>
+    githubReader.read(link).pipe(Effect.mapError((error) => new SkillMarketplaceFailure({ cause: error.cause }))),
+  listInstalled: () => Effect.succeed([]),
+  install: (input) =>
+    Effect.sync(() => {
+      record("installSkill", input);
+      return {
+        skillId: input.skillId,
+        slug: "pdf",
+        name: "pdf",
+        installedVersion: 1,
+        availableVersion: 1,
+        state: "installed" as const,
+      };
+    }),
+  uninstall: (input) => Effect.sync(() => record("uninstallSkill", input)),
+  setEnabled: () => Effect.die(new Error("Not used.")),
+};
+
 // The real skill learning store on a temporary file, as the host keeps it.
 const skillLearningFile = join(root, "skill-learning.json");
 const skillLearning = new SkillLearningPreferenceStore(skillLearningFile);
@@ -2041,6 +2166,10 @@ try {
   );
 
   await Effect.runPromise(libraryStore.initialize());
+  // As in application-services: each saved folder change is an agent event (library-folders-events-v1).
+  libraryStore.onChanged(() => {
+    for (const listener of agentEventListeners) listener({ type: "library-folders-changed" });
+  });
   server = new TeamApiServer({
     appVersion: APP_VERSION,
     agentImport,
@@ -2054,6 +2183,7 @@ try {
     chat: new TeamChatStore(database),
     // The real host-settings service, over an agent writer that records each change.
     admin: {
+      skills: githubSkillsAdmin,
       customAgents: {
         list: () => Effect.succeed(customAgentList),
         save: (input) =>
@@ -2114,13 +2244,38 @@ try {
               if (input.quickAcknowledgement === null) delete target.quickAcknowledgement;
               else if (input.quickAcknowledgement !== undefined)
                 target.quickAcknowledgement = input.quickAcknowledgement;
-              if (input.fastMode !== undefined) target.fastMode = input.fastMode;
+              if (input.fastMode !== undefined) {
+                target.fastMode = input.fastMode;
+                // As the agent store: a `fastMode` change without `ultrafast: true` turns Ultrafast off.
+                if (input.fastMode && input.ultrafast) target.ultrafast = true;
+                else delete target.ultrafast;
+              }
               return target;
             }),
           listModels: () => FAST_MODE_MODELS,
         },
         busyMessageMode: { get: () => ({ mode: "queue" }) },
         agentDefaults: { get: () => DEFAULT_AGENT_DEFAULTS },
+      }),
+      // The real preference files in the temporary folder, over agents that record each write.
+      agentDefaults: createAgentDefaultsSettings({
+        agents: {
+          listAgents: () => agents,
+          updateAgent: (input) =>
+            Effect.sync(() => {
+              record("updateAgent", input);
+              const target = agents.find((item) => item.id === input.agentId);
+              if (!target) throw new Error("Agent not found.");
+              if (input.allowAutomation === null) delete target.allowAutomation;
+              else if (input.allowAutomation !== undefined) target.allowAutomation = input.allowAutomation;
+              if (input.busyMessageMode === null) delete target.busyMessageMode;
+              else if (input.busyMessageMode !== undefined) target.busyMessageMode = input.busyMessageMode;
+              return target;
+            }),
+          agentDefaultsChanged: (previous) => record("agentDefaultsChanged", previous),
+        },
+        agentDefaults: agentDefaultsPreferences,
+        busyMessageMode: busyMessageModePreferences,
       }),
       memoryReview,
       skillLearning,
@@ -2136,6 +2291,10 @@ try {
                 return { publicKey: ROTATED_HOST_KEY };
               }),
       },
+      // A stand-in for the server-mode restart, which closes the app under its service manager. This
+      // checks the gate and that a refused request never reaches the host.
+      restart: { request: (memberId) => record("restartHost", memberId) },
+      turnLimits: hostTurnLimits,
       // A stand-in for `LocalServers`; `local-servers-e2e.ts` starts real children. This checks the gate
       // and the wire, and that a refused request never reaches the desktop app.
       localServers: {
@@ -2348,7 +2507,7 @@ try {
     connectors,
     vault,
     // The real transfer service and parts over an empty instance, with its upload folder on disk.
-    instanceTransfer: emptyInstanceTransferService(transferUploads, [transferAgent]),
+    instanceTransfer: emptyInstanceTransferService(transferUploads, [transferAgent], () => store.getOwnerMemberId()),
     browserProfiles,
     machine,
     // The host reads its own Hermes folder: one profile under a token.
@@ -2410,6 +2569,12 @@ try {
           record("disk");
           return { freeBytes: 2 * 1024 ** 3, totalBytes: 64 * 1024 ** 3 };
         }),
+      // As a hosted server: the host measures the files of its user (`du`) for the plan storage.
+      diskUse: () =>
+        Effect.sync(() => {
+          record("diskUse");
+          return { freeBytes: 2 * 1024 ** 3, totalBytes: 64 * 1024 ** 3, userBytes: 5 * 1024 ** 3 };
+        }),
     },
     // The real host service over a fake status: only the models and pool routes run in this run.
     providerAccounts: new ProviderAccountsHost({
@@ -2430,6 +2595,18 @@ try {
         listAgents: () => [],
         updateAgent: unused("providerAccounts.updateAgent"),
         signInProviderAccountOnHost: unused("providerAccounts.signInProviderAccountOnHost"),
+        // As the backend: Cursor refuses one key, and each other key gives an account.
+        connectProviderAccountKey: (provider, accountId, key) => {
+          record("connectProviderAccountKey", { provider, accountId, keyLength: key.length });
+          return key === REFUSED_ACCOUNT_KEY
+            ? Effect.fail(
+                new AgentLifecycleFailed({
+                  operation: "connectProviderAccount",
+                  cause: new Error(sourceText("error.provider.accountKeyRefused", { provider: "Cursor" })),
+                }),
+              )
+            : Effect.sync(accountModelsStatus);
+        },
         renameProviderAccount: unused("providerAccounts.renameProviderAccount"),
         removeProviderAccount: unused("providerAccounts.removeProviderAccount"),
       },
@@ -3330,6 +3507,94 @@ try {
     );
   }
 
+  // ---- Host turn limits (host-turn-limits-v1) ----
+  {
+    const v9 = { capabilities: [HOST_TURN_LIMITS_CAPABILITY], protocol: TEAM_PROTOCOL_V9 };
+    const automatic = { turnLimit: null, automaticTurnLimit: 8, agentTaskLimit: null, defaultAgentTaskLimit: 4 };
+    const adminRead = await call("POST", HOST_TURN_LIMITS_ROUTES.settings, { token: adaToken, json: {}, ...v9 });
+    check(
+      "an admin reads the automatic turn limits of a host with no choice",
+      adminRead.status === 200 && isDeepStrictEqual(adminRead.body, automatic),
+      summary(adminRead),
+    );
+    const unsupported = await call("POST", HOST_TURN_LIMITS_ROUTES.settings, { token: adaToken, json: {} });
+    const memberRead = await call("POST", HOST_TURN_LIMITS_ROUTES.settings, { token: bobToken, json: {}, ...v9 });
+    const memberSet = await call("POST", HOST_TURN_LIMITS_ROUTES.update, {
+      token: bobToken,
+      json: { turnLimit: 32, agentTaskLimit: 8 },
+      ...v9,
+    });
+    check(
+      "a member cannot read or set the turn limits, and a client without host-turn-limits-v1 gets 400",
+      errorIs(unsupported, 400, sourceText("error.team.hostTurnLimitsUnsupported")) &&
+        errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberSet, 403, sourceText("error.team.adminRequired")) &&
+        isDeepStrictEqual(hostTurnLimits.get(), automatic),
+      [summary(unsupported), summary(memberRead), summary(memberSet)],
+    );
+    const outOfRange = await Promise.all(
+      [
+        { turnLimit: 0, agentTaskLimit: null },
+        { turnLimit: 129, agentTaskLimit: null },
+        { turnLimit: "infinite", agentTaskLimit: null },
+        { turnLimit: null, agentTaskLimit: "unlimited" },
+        { turnLimit: null, agentTaskLimit: 65 },
+        { turnLimit: 2.5, agentTaskLimit: null },
+      ].map((json) => call("POST", HOST_TURN_LIMITS_ROUTES.update, { token: adaToken, json, ...v9 })),
+    );
+    check(
+      "the host refuses a turn limit outside 1 to 128 or unlimited, or an agent default outside 1 to 64, and saves nothing",
+      outOfRange.every((reply) => reply.status === 400) &&
+        isDeepStrictEqual(hostTurnLimits.get(), automatic) &&
+        !existsSync(hostTurnLimitsPath),
+      outOfRange.map(summary),
+    );
+    // Above the automatic limit: an owner or admin can choose any value in range.
+    const adminSet = await call("POST", HOST_TURN_LIMITS_ROUTES.update, {
+      token: adaToken,
+      json: { turnLimit: 32, agentTaskLimit: 8 },
+      ...v9,
+    });
+    const reloaded = new HostTurnLimitsPreferenceStore(hostTurnLimitsPath, () => 8);
+    await runCauseEffect(reloaded.load());
+    const chosen = { turnLimit: 32, automaticTurnLimit: 8, agentTaskLimit: 8, defaultAgentTaskLimit: 4 };
+    check(
+      "an admin sets limits above the automatic one, the file keeps them, and agents on the default get 8",
+      adminSet.status === 200 &&
+        isDeepStrictEqual(adminSet.body, chosen) &&
+        isDeepStrictEqual(reloaded.get(), chosen) &&
+        reloaded.agentTaskLimit() === 8,
+      summary(adminSet),
+    );
+    // Unlimited: no total even where the memory sets one.
+    const unlimitedSet = await call("POST", HOST_TURN_LIMITS_ROUTES.update, {
+      token: adaToken,
+      json: { turnLimit: "unlimited", agentTaskLimit: 64 },
+      ...v9,
+    });
+    const reloadedUnlimited = new HostTurnLimitsPreferenceStore(hostTurnLimitsPath, () => 8);
+    await runCauseEffect(reloadedUnlimited.load());
+    const unlimited = { turnLimit: "unlimited", automaticTurnLimit: 8, agentTaskLimit: 64, defaultAgentTaskLimit: 4 };
+    check(
+      "an admin sets no total limit and 64 for each agent, and the file keeps them",
+      unlimitedSet.status === 200 &&
+        isDeepStrictEqual(unlimitedSet.body, unlimited) &&
+        isDeepStrictEqual(reloadedUnlimited.get(), unlimited) &&
+        reloadedUnlimited.turnLimit() === "unlimited",
+      summary(unlimitedSet),
+    );
+    const adminReset = await call("POST", HOST_TURN_LIMITS_ROUTES.update, {
+      token: adaToken,
+      json: { turnLimit: null, agentTaskLimit: null },
+      ...v9,
+    });
+    check(
+      "an admin returns both limits to their defaults",
+      adminReset.status === 200 && isDeepStrictEqual(adminReset.body, automatic),
+      summary(adminReset),
+    );
+  }
+
   // ---- Agent folders (agent-folders-v1) ----
   {
     const capabilities = [AGENT_FOLDERS_CAPABILITY];
@@ -3685,6 +3950,79 @@ try {
       "an admin turns the pool off again",
       offAgain.status === 200 && isDeepStrictEqual(cleared.body, { pools: [] }),
       [summary(offAgain), summary(cleared)],
+    );
+  }
+
+  // ---- Account keys (provider-account-keys-v1) ----
+  {
+    const v9 = { capabilities: [PROVIDER_ACCOUNT_KEYS_CAPABILITY], protocol: TEAM_PROTOCOL_V9 };
+    const connect = PROVIDER_ACCOUNT_KEYS_ROUTES.connect;
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises provider-account-keys-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(PROVIDER_ACCOUNT_KEYS_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(PROVIDER_ACCOUNT_KEYS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const body = { provider: "cursor", accountId: null, key: ACCOUNT_KEY };
+    const unsupported = await call("POST", connect, { token: adaToken, json: body, protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the account key route without the capability gets 400 providersUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.providersUnsupported")),
+      summary(unsupported),
+    );
+    const writes = callsOf("connectProviderAccountKey").length;
+    const member = await call("POST", connect, { token: bobToken, json: body, ...v9 });
+    check(
+      "a member cannot give an account a key, and the host saves nothing",
+      errorIs(member, 403, sourceText("error.team.adminRequired")) &&
+        callsOf("connectProviderAccountKey").length === writes,
+      summary(member),
+    );
+    const noKey = await call("POST", connect, { token: adaToken, json: { ...body, key: "  " }, ...v9 });
+    const badAccount = await call("POST", connect, {
+      token: adaToken,
+      json: { ...body, accountId: "not-an-account" },
+      ...v9,
+    });
+    const longKey = await call("POST", connect, { token: adaToken, json: { ...body, key: "k".repeat(513) }, ...v9 });
+    check(
+      "an empty key, a key that is too long and an account id that is not one get 400, and the host saves nothing",
+      noKey.status === 400 &&
+        badAccount.status === 400 &&
+        longKey.status === 400 &&
+        callsOf("connectProviderAccountKey").length === writes,
+      [summary(noKey), summary(badAccount), summary(longKey)],
+    );
+    const added = await call("POST", connect, { token: adaToken, json: body, ...v9 });
+    const replaced = await call("POST", connect, {
+      token: adaToken,
+      json: { ...body, accountId: ULTRA_ACCOUNT, key: ` ${ACCOUNT_KEY} ` },
+      ...v9,
+    });
+    check(
+      "an admin adds an account from a key and gives an account a new key; the answer holds no key",
+      added.status === 200 &&
+        isDeepStrictEqual(added.body, {}) &&
+        replaced.status === 200 &&
+        isDeepStrictEqual(callsOf("connectProviderAccountKey").slice(writes), [
+          [{ provider: "cursor", accountId: null, keyLength: ACCOUNT_KEY.length }],
+          [{ provider: "cursor", accountId: ULTRA_ACCOUNT, keyLength: ACCOUNT_KEY.length }],
+        ]),
+      [summary(added), summary(replaced)],
+    );
+    const refused = await call("POST", connect, {
+      token: adaToken,
+      json: { ...body, key: REFUSED_ACCOUNT_KEY },
+      ...v9,
+    });
+    check(
+      "a key that the provider refuses fails with the reason, and the answer does not repeat the key",
+      errorIs(refused, 409, sourceText("error.provider.accountKeyRefused", { provider: "Cursor" })) &&
+        !JSON.stringify(refused.body).includes(REFUSED_ACCOUNT_KEY),
+      summary(refused),
     );
   }
 
@@ -4271,6 +4609,173 @@ try {
     );
   }
 
+  // ---- Agent defaults (agent-defaults-v1) ----
+  {
+    const defaultsCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, AGENT_DEFAULTS_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises agent-defaults-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_DEFAULTS_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(AGENT_DEFAULTS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const writes = callsOf("updateAgent").length;
+    const unsupported = await call("POST", AGENT_DEFAULTS_ROUTES.settings, { token: adaToken, json: {} });
+    check(
+      "the agent defaults routes without the capability get 400 agentSettingsUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.agentSettingsUnsupported")),
+      summary(unsupported),
+    );
+    const memberRead = await call("POST", AGENT_DEFAULTS_ROUTES.settings, {
+      token: bobToken,
+      json: {},
+      capabilities: defaultsCapabilities,
+    });
+    const memberUpdate = await call("POST", AGENT_DEFAULTS_ROUTES.update, {
+      token: bobToken,
+      json: { allowAutomation: true },
+      capabilities: defaultsCapabilities,
+    });
+    const memberChoice = await call("POST", AGENT_DEFAULTS_ROUTES.choice, {
+      token: bobToken,
+      json: { agentIds: ["agent-ada"], setting: "allowAutomation", choice: "on" },
+      capabilities: defaultsCapabilities,
+    });
+    check(
+      "a member cannot read or change the agent defaults, and nothing is written",
+      errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberUpdate, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberChoice, 403, sourceText("error.team.adminRequired")) &&
+        callsOf("updateAgent").length === writes &&
+        !existsSync(agentDefaultsPath),
+      [summary(memberRead), summary(memberUpdate), summary(memberChoice)],
+    );
+    const adminRead = await call("POST", AGENT_DEFAULTS_ROUTES.settings, {
+      token: adaToken,
+      json: {},
+      capabilities: defaultsCapabilities,
+    });
+    const readAgents = list(field(adminRead.body, "agents"));
+    check(
+      "an admin reads the host defaults, the steer default and the own values of each agent",
+      adminRead.status === 200 &&
+        isDeepStrictEqual(field(adminRead.body, "defaults"), DEFAULT_AGENT_DEFAULTS) &&
+        field(adminRead.body, "busyMessageMode") === "steer" &&
+        readAgents.some((agent) => field(agent, "agentId") === "agent-ada"),
+      summary(adminRead),
+    );
+    const hiddenRead = await call("POST", AGENT_DEFAULTS_ROUTES.settings, {
+      token: adaToken,
+      json: {},
+      capabilities: defaultsCapabilities,
+      protocol: 6,
+    });
+    check(
+      "the read does not list an agent that the client protocol does not show",
+      hiddenRead.status === 200 &&
+        readAgents.some((agent) => field(agent, "agentId") === "agent-pi") &&
+        !list(field(hiddenRead.body, "agents")).some((agent) => field(agent, "agentId") === "agent-pi"),
+      summary(hiddenRead),
+    );
+    const invalid = await call("POST", AGENT_DEFAULTS_ROUTES.update, {
+      token: adaToken,
+      json: { planStartAfterMs: 1_234 },
+      capabilities: defaultsCapabilities,
+    });
+    check(
+      "the host refuses a plan start time outside the limits, and writes nothing",
+      invalid.status === 400 && !existsSync(agentDefaultsPath) && callsOf("agentDefaultsChanged").length === 0,
+      summary(invalid),
+    );
+    const update = await call("POST", AGENT_DEFAULTS_ROUTES.update, {
+      token: adaToken,
+      json: { allowAutomation: true, planStartAfterMs: null, automationRunsPerHour: 12, busyMessageMode: "queue" },
+      capabilities: defaultsCapabilities,
+    });
+    const stored = existsSync(agentDefaultsPath) ? JSON.parse(readFileSync(agentDefaultsPath, "utf8")) : null;
+    const expectedDefaults = {
+      ...DEFAULT_AGENT_DEFAULTS,
+      allowAutomation: true,
+      planStartAfterMs: null,
+      automationRunsPerHour: 12,
+    };
+    check(
+      "an admin changes the defaults; the host saves them, keeps the other values and tells the agents once",
+      update.status === 200 &&
+        isDeepStrictEqual(field(update.body, "defaults"), expectedDefaults) &&
+        field(update.body, "busyMessageMode") === "queue" &&
+        isDeepStrictEqual(stored, { version: 1, ...expectedDefaults }) &&
+        isDeepStrictEqual(busyMessageModePreferences.get(), { mode: "queue" }) &&
+        isDeepStrictEqual(callsOf("agentDefaultsChanged"), [[DEFAULT_AGENT_DEFAULTS]]),
+      [summary(update), stored],
+    );
+    const limitOnly = await call("POST", AGENT_DEFAULTS_ROUTES.update, {
+      token: adaToken,
+      json: { automationRunsPerHour: 20 },
+      capabilities: defaultsCapabilities,
+    });
+    const sameMode = await call("POST", AGENT_DEFAULTS_ROUTES.update, {
+      token: adaToken,
+      json: { automationRunsPerHour: 20, busyMessageMode: "queue" },
+      capabilities: defaultsCapabilities,
+    });
+    check(
+      "each change tells the agents and the open clients (agents-changed); a request that changes nothing does not",
+      limitOnly.status === 200 &&
+        field(limitOnly.body, "defaults", "automationRunsPerHour") === 20 &&
+        sameMode.status === 200 &&
+        isDeepStrictEqual(callsOf("agentDefaultsChanged"), [[DEFAULT_AGENT_DEFAULTS], [expectedDefaults]]),
+      [summary(limitOnly), summary(sameMode)],
+    );
+    const steer = await call("POST", AGENT_DEFAULTS_ROUTES.choice, {
+      token: adaToken,
+      json: { agentIds: ["agent-ada"], setting: "busyMessageMode", choice: "on" },
+      capabilities: defaultsCapabilities,
+    });
+    const ownAda = (body: Json | undefined) =>
+      list(field(body, "agents")).find((agent) => field(agent, "agentId") === "agent-ada");
+    check(
+      "an admin gives an agent its own steer value through the agent writer",
+      steer.status === 200 &&
+        field(ownAda(steer.body), "busyMessageMode") === "steer" &&
+        isDeepStrictEqual(callsOf("updateAgent").at(-1), [{ agentId: "agent-ada", busyMessageMode: "steer" }]),
+      summary(steer),
+    );
+    const followDefault = await call("POST", AGENT_DEFAULTS_ROUTES.choice, {
+      token: adaToken,
+      json: { agentIds: ["agent-ada"], setting: "busyMessageMode", choice: "default" },
+      capabilities: defaultsCapabilities,
+    });
+    check(
+      "the default choice removes the own value, so the agent follows the default again",
+      followDefault.status === 200 &&
+        field(ownAda(followDefault.body), "busyMessageMode") === null &&
+        isDeepStrictEqual(callsOf("updateAgent").at(-1), [{ agentId: "agent-ada", busyMessageMode: null }]),
+      summary(followDefault),
+    );
+    const before = callsOf("updateAgent").length;
+    const missing = await call("POST", AGENT_DEFAULTS_ROUTES.choice, {
+      token: adaToken,
+      json: { agentIds: ["agent-ada", "agent-none"], setting: "allowAutomation", choice: "off" },
+      capabilities: defaultsCapabilities,
+    });
+    const hiddenChoice = await call("POST", AGENT_DEFAULTS_ROUTES.choice, {
+      token: adaToken,
+      json: { agentIds: ["agent-pi"], setting: "allowAutomation", choice: "off" },
+      capabilities: defaultsCapabilities,
+      protocol: 6,
+    });
+    check(
+      "a choice that names an unknown agent or an agent that the client protocol does not show gets 404 and writes nothing",
+      errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(hiddenChoice, 404, sourceText("error.team.agentNotFound")) &&
+        callsOf("updateAgent").length === before,
+      [summary(missing), summary(hiddenChoice)],
+    );
+  }
+
   // ---- Fast mode (agent-fast-mode-v1) ----
   {
     const fastCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, AGENT_FAST_MODE_CAPABILITY];
@@ -4370,6 +4875,136 @@ try {
     check(
       "a member cannot set the fast mode of an agent that the client protocol does not show",
       errorIs(hiddenSet, 404, sourceText("error.team.agentNotFound")) && callsOf("updateAgent").length === writes + 2,
+      summary(hiddenSet),
+    );
+  }
+
+  // ---- Speed (agent-speed-v1) ----
+  {
+    const speedCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, AGENT_SPEED_CAPABILITY];
+    const fastCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, AGENT_FAST_MODE_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises agent-speed-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_SPEED_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(AGENT_SPEED_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const writes = callsOf("updateAgent").length;
+    const unsupported = await call("POST", AGENT_SPEED_ROUTES.settings, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities: fastCapabilities,
+    });
+    check(
+      "the speed routes without the capability get 400 agentSettingsUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.agentSettingsUnsupported")),
+      summary(unsupported),
+    );
+    const models = await call("POST", AGENT_SPEED_ROUTES.models, {
+      token: bobToken,
+      json: {},
+      capabilities: speedCapabilities,
+    });
+    const fastModels = await call("POST", AGENT_FAST_MODE_ROUTES.models, {
+      token: bobToken,
+      json: {},
+      capabilities: fastCapabilities,
+    });
+    check(
+      "a member reads the models with a fast tier, with the Ultrafast tier and the Claude model; the older route keeps neither",
+      models.status === 200 &&
+        isDeepStrictEqual(models.body, {
+          models: [
+            { provider: "codex", id: "gpt-fast", fastServiceTier: "priority", ultrafastServiceTier: "ultrafast" },
+            { provider: "claude", id: "claude-fast", fastServiceTier: "fast" },
+          ],
+        }) &&
+        isDeepStrictEqual(fastModels.body, {
+          models: [{ provider: "codex", id: "gpt-fast", fastServiceTier: "priority" }],
+        }),
+      [summary(models), summary(fastModels)],
+    );
+    const unknownSpeed = await call("POST", AGENT_SPEED_ROUTES.update, {
+      token: bobToken,
+      json: { agentId: "agent-ada", speed: "turbo" },
+      capabilities: speedCapabilities,
+    });
+    check(
+      "the host refuses a speed that is not standard, fast or ultrafast, and writes nothing",
+      unknownSpeed.status === 400 && callsOf("updateAgent").length === writes,
+      summary(unknownSpeed),
+    );
+    const ultra = await call("POST", AGENT_SPEED_ROUTES.update, {
+      token: bobToken,
+      json: { agentId: "agent-ada", speed: "ultrafast" },
+      capabilities: speedCapabilities,
+    });
+    const readUltra = await call("POST", AGENT_SPEED_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities: speedCapabilities,
+    });
+    const readUltraOld = await call("POST", AGENT_FAST_MODE_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities: fastCapabilities,
+    });
+    check(
+      "a member sets Ultrafast through the agent writer; the speed route reads it, the older route reads fast mode on",
+      ultra.status === 200 &&
+        isDeepStrictEqual(ultra.body, { speed: "ultrafast" }) &&
+        isDeepStrictEqual(readUltra.body, { speed: "ultrafast" }) &&
+        isDeepStrictEqual(readUltraOld.body, { fastMode: true }) &&
+        isDeepStrictEqual(callsOf("updateAgent").at(-1), [{ agentId: "agent-ada", fastMode: true, ultrafast: true }]),
+      [summary(ultra), summary(readUltra), summary(readUltraOld)],
+    );
+    const oldFast = await call("POST", AGENT_FAST_MODE_ROUTES.update, {
+      token: bobToken,
+      json: { agentId: "agent-ada", fastMode: true, ultrafast: true },
+      capabilities: fastCapabilities,
+    });
+    const readFast = await call("POST", AGENT_SPEED_ROUTES.settings, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities: speedCapabilities,
+    });
+    check(
+      "the older fast-mode route sets only Fast, so Ultrafast ends",
+      oldFast.status === 200 &&
+        isDeepStrictEqual(callsOf("updateAgent").at(-1), [{ agentId: "agent-ada", fastMode: true }]) &&
+        isDeepStrictEqual(readFast.body, { speed: "fast" }),
+      [summary(oldFast), summary(readFast)],
+    );
+    const standard = await call("POST", AGENT_SPEED_ROUTES.update, {
+      token: bobToken,
+      json: { agentId: "agent-ada", speed: "standard" },
+      capabilities: speedCapabilities,
+    });
+    const missing = await call("POST", AGENT_SPEED_ROUTES.settings, {
+      token: bobToken,
+      json: { agentId: "agent-none" },
+      capabilities: speedCapabilities,
+    });
+    check(
+      "a member sets Standard, and an unknown agent gets 404",
+      standard.status === 200 &&
+        isDeepStrictEqual(standard.body, { speed: "standard" }) &&
+        isDeepStrictEqual(callsOf("updateAgent").at(-1), [{ agentId: "agent-ada", fastMode: false }]) &&
+        errorIs(missing, 404, sourceText("error.team.agentNotFound")),
+      [summary(standard), summary(missing)],
+    );
+    const hiddenSet = await call("POST", AGENT_SPEED_ROUTES.update, {
+      token: bobToken,
+      json: { agentId: "agent-pi", speed: "fast" },
+      capabilities: speedCapabilities,
+      protocol: 6,
+    });
+    check(
+      "a member cannot set the speed of an agent that the client protocol does not show",
+      errorIs(hiddenSet, 404, sourceText("error.team.agentNotFound")) && callsOf("updateAgent").length === writes + 3,
       summary(hiddenSet),
     );
   }
@@ -5010,6 +5645,108 @@ try {
           [{ agentId: "agent-ada", messageId: "suggestion-2" }],
         ]),
       [summary(saved), summary(notSaved)],
+    );
+  }
+
+  // ---- Skills from GitHub (github-skills-v1) ----
+  {
+    const capabilities = [SKILLS_ADMIN_CAPABILITY, GITHUB_SKILLS_CAPABILITY];
+    const v9 = { protocol: TEAM_PROTOCOL_V9, capabilities };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises github-skills-v1 on protocol 9 only",
+      list(field(compatibility.body, "capabilities")).includes(GITHUB_SKILLS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(GITHUB_SKILLS_CAPABILITY),
+    );
+
+    const read = await call("POST", GITHUB_SKILLS_ROUTES.read, {
+      ...v9,
+      token: adaToken,
+      json: { link: "https://github.com/acme/skills" },
+    });
+    const skills = list(field(read.body, "skills"));
+    const ids = skills.map((skill) => field(skill, "id"));
+    check(
+      "an admin reads a repository link: the host pins the commit and lists each top skill folder once",
+      read.status === 200 &&
+        field(read.body, "owner") === "acme" &&
+        field(read.body, "repo") === "skills" &&
+        field(read.body, "commit") === GITHUB_COMMIT &&
+        field(read.body, "committedAt") === "2026-11-01T10:00:00Z" &&
+        isDeepStrictEqual(ids, [
+          `github:acme/skills@${GITHUB_COMMIT}:skills/docx`,
+          `github:acme/skills@${GITHUB_COMMIT}:skills/pdf`,
+        ]) &&
+        field(skills[1], "description") === "Read and fill PDF forms." &&
+        field(skills[1], "instructions") === "# PDF" &&
+        isDeepStrictEqual(field(skills[1], "files"), ["SKILL.md", "reference.md"]),
+      summary(read),
+    );
+
+    const fetchesBefore = githubFetches.length;
+    const noCapability = await call("POST", GITHUB_SKILLS_ROUTES.read, {
+      protocol: TEAM_PROTOCOL_V9,
+      capabilities: [SKILLS_ADMIN_CAPABILITY],
+      token: adaToken,
+      json: { link: "https://github.com/acme/skills" },
+    });
+    const member = await call("POST", GITHUB_SKILLS_ROUTES.read, {
+      ...v9,
+      token: bobToken,
+      json: { link: "https://github.com/acme/skills" },
+    });
+    check(
+      "without the capability the read gets 400, a member gets 403, and the host does not contact GitHub",
+      errorIs(noCapability, 400, sourceText("error.skill.githubHostTooOld")) &&
+        errorIs(member, 403, sourceText("error.team.adminRequired")) &&
+        githubFetches.length === fetchesBefore,
+      { noCapability: summary(noCapability), member: summary(member) },
+    );
+
+    const missing = await call("POST", GITHUB_SKILLS_ROUTES.read, {
+      ...v9,
+      token: adaToken,
+      json: { link: "https://github.com/acme/private" },
+    });
+    const empty = await call("POST", GITHUB_SKILLS_ROUTES.read, {
+      ...v9,
+      token: adaToken,
+      json: { link: "https://github.com/acme/skills/tree/main/docs" },
+    });
+    const invalid = await call("POST", GITHUB_SKILLS_ROUTES.read, {
+      ...v9,
+      token: adaToken,
+      json: { link: "https://example.com/acme/skills" },
+    });
+    check(
+      "a missing repository, a folder with no SKILL.md and a link that is not GitHub get the admin's reason",
+      errorIs(missing, 409, sourceText("error.skill.githubNotFound", { repository: "acme/private" })) &&
+        errorIs(empty, 409, sourceText("error.skill.githubNoSkills", { folder: "acme/skills/docs" })) &&
+        errorIs(invalid, 409, sourceText("error.skill.githubLinkInvalid")),
+      { missing: summary(missing), empty: summary(empty), invalid: summary(invalid) },
+    );
+
+    const skillId = `github:acme/skills@${GITHUB_COMMIT}:skills/pdf`;
+    const installsBefore = callsOf("installSkill").length;
+    const oldClient = await call("POST", SKILLS_ADMIN_ROUTES.install, {
+      protocol: TEAM_PROTOCOL_V9,
+      capabilities: [SKILLS_ADMIN_CAPABILITY],
+      token: adaToken,
+      json: { agentId: "agent-ada", skillId },
+    });
+    const install = await call("POST", SKILLS_ADMIN_ROUTES.install, {
+      ...v9,
+      token: adaToken,
+      json: { agentId: "agent-ada", skillId },
+    });
+    check(
+      "skills-admin-v1 installs a GitHub skill id only for a client with github-skills-v1",
+      errorIs(oldClient, 400, sourceText("error.skill.githubHostTooOld")) &&
+        install.status === 200 &&
+        field(install.body, "skillId") === skillId &&
+        isDeepStrictEqual(callsOf("installSkill").slice(installsBefore), [[{ agentId: "agent-ada", skillId }]]),
+      { oldClient: summary(oldClient), install: summary(install) },
     );
   }
 
@@ -6344,6 +7081,46 @@ try {
       "the disk route ignores a path in the body and reads the disk of the OpenBot data",
       withBody.status === 200 && isDeepStrictEqual(withBody.body, expected) && callsOf("disk").length === 3,
       summary(withBody),
+    );
+  }
+
+  // ---- Disk space and the files of the server's user (storage-user-files-v1) ----
+  {
+    const unsupported = await call("POST", STORAGE_USER_FILES_ROUTES.disk, {
+      token: bobToken,
+      json: {},
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    check(
+      "the user-files route without the capability gets 400 storageUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.storageUnsupported")) && callsOf("diskUse").length === 0,
+      summary(unsupported),
+    );
+    const userFiles = { protocol: TEAM_PROTOCOL_V9, capabilities: [STORAGE_USER_FILES_CAPABILITY] };
+    // Every signed-in member reads it: the clients show the plan storage that is left to each member.
+    const member = await call("POST", STORAGE_USER_FILES_ROUTES.disk, { ...userFiles, token: bobToken, json: {} });
+    const owner = await call("POST", STORAGE_USER_FILES_ROUTES.disk, { ...userFiles, token: adaToken, json: {} });
+    const expected = { freeBytes: 2 * 1024 ** 3, totalBytes: 64 * 1024 ** 3, userBytes: 5 * 1024 ** 3 };
+    check(
+      "a member and the owner read the free, total and user-file bytes of the host disk",
+      member.status === 200 &&
+        owner.status === 200 &&
+        isDeepStrictEqual(member.body, expected) &&
+        isDeepStrictEqual(owner.body, expected) &&
+        callsOf("diskUse").length === 2,
+      [summary(member), summary(owner)],
+    );
+    // The frozen storage-disk-v1 reply does not get the new field.
+    const old = await call("POST", STORAGE_DISK_ROUTES.disk, {
+      ...userFiles,
+      capabilities: [STORAGE_DISK_CAPABILITY, STORAGE_USER_FILES_CAPABILITY],
+      token: bobToken,
+      json: {},
+    });
+    check(
+      "the storage-disk-v1 reply keeps its two fields when the peer also has storage-user-files-v1",
+      old.status === 200 && isDeepStrictEqual(old.body, { freeBytes: 2 * 1024 ** 3, totalBytes: 64 * 1024 ** 3 }),
+      summary(old),
     );
   }
 
@@ -8196,6 +8973,98 @@ try {
     );
   }
 
+  // ---- The agents of each item in the host's Vault (vault-v4), and vault-v3 on the same host ----
+  {
+    const v3Call = (token: string, path: string, json: unknown = {}) =>
+      call("POST", path, { token, json, capabilities: [VAULT_V3_CAPABILITY] });
+    const v4Call = (token: string, path: string, json: unknown = {}) =>
+      call("POST", path, { token, json, capabilities: [VAULT_V4_CAPABILITY] });
+    const apiKey = {
+      kind: "apiKey",
+      id: null,
+      name: "SCOPED_E2E_KEY",
+      notes: "",
+      key: VAULT_API_KEY,
+      agents: ["agent-a", "agent-b"],
+    };
+    const unsupported = await v3Call(adaToken, VAULT_V4_ROUTES.list);
+    const memberSave = await v4Call(bobToken, VAULT_V4_ROUTES.save, apiKey);
+    const empty = await v4Call(adaToken, VAULT_V4_ROUTES.save, { ...apiKey, agents: [] });
+    check(
+      "the vault-v4 routes need vault-v4 and an owner or admin, and an empty agent list is refused",
+      errorIs(unsupported, 400, sourceText("error.team.vaultUnsupported")) &&
+        errorIs(memberSave, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(empty, 400, sourceText("error.vault.agentsRequired")) &&
+        vault.state().items.length === 0,
+      [summary(unsupported), summary(memberSave), summary(empty)],
+    );
+    const saved = await v4Call(adaToken, VAULT_V4_ROUTES.save, apiKey);
+    const keyId = field(saved.body, "items", 0, "id");
+    check(
+      "an admin saves an API key for two agents; the list carries the agents and no key",
+      saved.status === 200 &&
+        isDeepStrictEqual(field(saved.body, "items", 0, "agents"), ["agent-a", "agent-b"]) &&
+        typeof keyId === "string" &&
+        !saved.text.includes(VAULT_API_KEY),
+      summary(saved),
+    );
+    assert.ok(typeof keyId === "string", "the vault-v4 save did not answer an item id.");
+    const v3List = await v3Call(adaToken, VAULT_V3_ROUTES.list);
+    const v3Save = await v3Call(adaToken, VAULT_V3_ROUTES.save, {
+      kind: "apiKey",
+      id: keyId,
+      name: "SCOPED_E2E_KEY",
+      notes: "Changed from vault-v3",
+      key: null,
+      agents: null,
+    });
+    const v4List = await v4Call(adaToken, VAULT_V4_ROUTES.list);
+    check(
+      "vault-v3 on the same host lists the key without agents, and its save keeps the agents",
+      v3List.status === 200 &&
+        field(v3List.body, "items", 0, "id") === keyId &&
+        field(v3List.body, "items", 0, "agents") === undefined &&
+        v3Save.status === 200 &&
+        field(v3Save.body, "items", 0, "agents") === undefined &&
+        field(v4List.body, "items", 0, "notes") === "Changed from vault-v3" &&
+        isDeepStrictEqual(field(v4List.body, "items", 0, "agents"), ["agent-a", "agent-b"]),
+      [summary(v3List), summary(v3Save), summary(v4List)],
+    );
+    const forAll = await v4Call(adaToken, VAULT_V4_ROUTES.save, {
+      ...apiKey,
+      id: keyId,
+      key: null,
+      agents: null,
+    });
+    const forOne = await v4Call(adaToken, VAULT_V4_ROUTES.save, {
+      ...apiKey,
+      id: keyId,
+      key: null,
+      agents: ["agent-b"],
+    });
+    const kept = await v4Call(adaToken, VAULT_V4_ROUTES.save, {
+      ...apiKey,
+      id: keyId,
+      key: null,
+      agents: undefined,
+    });
+    const reveal = await v4Call(adaToken, VAULT_V4_ROUTES.reveal, { id: keyId, field: "key" });
+    check(
+      "null gives the key to every agent, a list to those agents, and no agents keeps them; the key stays",
+      field(forAll.body, "items", 0, "agents") === undefined &&
+        isDeepStrictEqual(field(forOne.body, "items", 0, "agents"), ["agent-b"]) &&
+        isDeepStrictEqual(field(kept.body, "items", 0, "agents"), ["agent-b"]) &&
+        isDeepStrictEqual(reveal.body, { value: VAULT_API_KEY }),
+      [summary(forAll), summary(forOne), summary(kept), summary(reveal)],
+    );
+    const deleted = await v4Call(adaToken, VAULT_V4_ROUTES.delete, { id: keyId });
+    check(
+      "an admin deletes the key through vault-v4",
+      isDeepStrictEqual(deleted.body, { status: "ready", items: [] }) && vault.state().items.length === 0,
+      summary(deleted),
+    );
+  }
+
   // ---- A transfer file in parts (instance-transfer-chunks-v1), applied with instance-transfer-v1 ----
   {
     const capabilities = [INSTANCE_TRANSFER_CAPABILITY, INSTANCE_TRANSFER_CHUNKS_CAPABILITY];
@@ -8415,6 +9284,134 @@ try {
         uploads().length === 0 &&
         errorIs(afterDone, 400, sourceText("error.import.transferPartsClosed")),
       [summary(done), summary(afterDone)],
+    );
+
+    // instance-transfer-full-copy-v1: each part is a field of its own. The parts are read and the
+    // export ends with the chunks routes.
+    const fullCopyCapabilities = [...capabilities, INSTANCE_TRANSFER_FULL_COPY_CAPABILITY];
+    const fullCopyInput = {
+      ...exportInput,
+      includeFiles: false,
+      includeHistory: false,
+      includeChannelMessages: false,
+      includeServerPreferences: true,
+    };
+    /** The manifest of a whole export that `begin` started, read in parts; the export then ends. */
+    const exportedManifest = async (begin: Awaited<ReturnType<typeof call>>) => {
+      const id = String(field(begin.body, "exportId"));
+      const chunks = field(begin.body, "chunks");
+      const parts = [];
+      for (let index = 0; index < (Array.isArray(chunks) ? chunks.length : 0); index++)
+        parts.push((await readPart(adaToken, id, index)).bytes);
+      await partsCall(adaToken, INSTANCE_TRANSFER_CHUNKS_ROUTES.exportDone, { exportId: id });
+      const entry = unzipSync(Buffer.concat(parts))[INSTANCE_TRANSFER_MANIFEST];
+      return entry ? parseJson(new TextDecoder().decode(entry)) : null;
+    };
+    const withoutCapability = await partsCall(adaToken, INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin, fullCopyInput);
+    const fullCopyMember = await call("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin, {
+      token: bobToken,
+      json: fullCopyInput,
+      capabilities: fullCopyCapabilities,
+    });
+    const { includeServerPreferences: _preferences, ...missingField } = fullCopyInput;
+    const fullCopyMissing = await call("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin, {
+      token: adaToken,
+      json: missingField,
+      capabilities: fullCopyCapabilities,
+    });
+    const fullCopy = await call("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin, {
+      token: adaToken,
+      json: fullCopyInput,
+      capabilities: fullCopyCapabilities,
+    });
+    const fullCopyManifest = fullCopy.status === 200 ? await exportedManifest(fullCopy) : null;
+    const fullCopyPreferences = field(fullCopyManifest, "serverPreferences");
+    // The chunks codec does not know the field, so an older client's export has no server preferences.
+    const chunksExport = await partsCall(adaToken, INSTANCE_TRANSFER_CHUNKS_ROUTES.exportBegin, fullCopyInput);
+    const chunksManifest = chunksExport.status === 200 ? await exportedManifest(chunksExport) : null;
+    // The apply that also replaces the server preferences has the same guards.
+    const applyInput = {
+      token: "no-such-token",
+      keys: [],
+      includeSettings: true,
+      includeServerPreferences: true,
+      timezone: "UTC",
+    };
+    const applyWithout = await partsCall(adaToken, INSTANCE_TRANSFER_FULL_COPY_ROUTES.apply, applyInput);
+    const applyMember = await call("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.apply, {
+      token: bobToken,
+      json: applyInput,
+      capabilities: fullCopyCapabilities,
+    });
+    const applyClosed = await call("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.apply, {
+      token: adaToken,
+      json: applyInput,
+      capabilities: fullCopyCapabilities,
+    });
+    check(
+      "full copy: the apply that replaces the server preferences needs instance-transfer-full-copy-v1 and an owner or admin",
+      errorIs(applyWithout, 400, sourceText("error.team.instanceTransferUnsupported")) &&
+        errorIs(applyMember, 403, sourceText("error.team.adminRequired")) &&
+        applyClosed.status >= 400 &&
+        applyClosed.status !== 403,
+      [summary(applyWithout), summary(applyMember), summary(applyClosed)],
+    );
+
+    // The owner from another computer is the owner: their own notification level is in the file.
+    const ownerCopy = await call("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin, {
+      token: owner.sessionToken,
+      json: fullCopyInput,
+      capabilities: fullCopyCapabilities,
+    });
+    const ownerExportId = String(field(ownerCopy.body, "exportId"));
+    const ownerParts = [];
+    const ownerChunks = field(ownerCopy.body, "chunks");
+    for (let index = 0; index < (Array.isArray(ownerChunks) ? ownerChunks.length : 0); index++) {
+      const response = await fetch(`${base}${INSTANCE_TRANSFER_CHUNKS_ROUTES.exportChunk}`, {
+        method: "POST",
+        headers: {
+          ...protocolHeaders({ token: owner.sessionToken, capabilities }),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ exportId: ownerExportId, index }),
+      });
+      ownerParts.push(new Uint8Array(await response.arrayBuffer()));
+    }
+    await call("POST", INSTANCE_TRANSFER_CHUNKS_ROUTES.exportDone, {
+      token: owner.sessionToken,
+      json: { exportId: ownerExportId },
+      capabilities,
+    });
+    const ownerEntry =
+      ownerParts.length > 0 ? unzipSync(Buffer.concat(ownerParts))[INSTANCE_TRANSFER_MANIFEST] : undefined;
+    const ownerManifest = ownerEntry ? parseJson(new TextDecoder().decode(ownerEntry)) : null;
+    check(
+      "full copy: the owner who exports from another computer gets their own notification level in the file",
+      ownerCopy.status === 200 &&
+        field(field(ownerManifest, "serverPreferences"), "ownerNotificationLevel") === "needs-me" &&
+        uploads().length === 0,
+      [summary(ownerCopy), field(ownerManifest, "serverPreferences")],
+    );
+    check(
+      "full copy: the export start needs instance-transfer-full-copy-v1, an owner or admin and every field; an admin's file has the server preferences without the owner's notification level, and the chunks route leaves them out",
+      errorIs(withoutCapability, 400, sourceText("error.team.instanceTransferUnsupported")) &&
+        errorIs(fullCopyMember, 403, sourceText("error.team.adminRequired")) &&
+        fullCopyMissing.status === 400 &&
+        fullCopy.status === 200 &&
+        field(fullCopyPreferences, "timezone") === "Europe/Warsaw" &&
+        field(fullCopyPreferences, "ownerNotificationLevel") === undefined &&
+        chunksExport.status === 200 &&
+        chunksManifest !== null &&
+        field(chunksManifest, "serverPreferences") === undefined &&
+        uploads().length === 0,
+      [
+        summary(withoutCapability),
+        summary(fullCopyMember),
+        summary(fullCopyMissing),
+        summary(fullCopy),
+        fullCopyPreferences,
+        summary(chunksExport),
+      ],
     );
 
     // The desktop workflow over this host: the three calls of `RemoteServerManager` that it uses go
@@ -9803,6 +10800,126 @@ try {
     );
   }
 
+  // ---- The whole copy of a pending approval (pending-approval-v1) ----
+  {
+    const capabilities = [PENDING_APPROVAL_CAPABILITY];
+    const v9 = { capabilities, protocol: TEAM_PROTOCOL_V9 };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises pending-approval-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(PENDING_APPROVAL_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(PENDING_APPROVAL_CAPABILITY),
+      summary(compatibility),
+    );
+    const unsupported = await call("POST", PENDING_APPROVAL_ROUTES.read, {
+      token: bobToken,
+      json: { agentId: "agent-ada", requestId: 7 },
+    });
+    const hiddenAgent = await call("POST", PENDING_APPROVAL_ROUTES.read, {
+      token: bobToken,
+      capabilities,
+      protocol: 6,
+      json: { agentId: "agent-pi", requestId: 7 },
+    });
+    const missingAgent = await call("POST", PENDING_APPROVAL_ROUTES.read, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-gone", requestId: 7 },
+    });
+    accessLevels = { revision: 22, everyone: { "agent-ada": "view" }, roles: [] };
+    const viewer = await call("POST", PENDING_APPROVAL_ROUTES.read, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", requestId: 7 },
+    });
+    accessLevels = { revision: 23, everyone: {}, roles: [] };
+    check(
+      "a read without the capability, of a hidden or missing agent, or by a member who can only view is refused",
+      errorIs(unsupported, 400, sourceText("error.team.pendingApprovalUnsupported")) &&
+        errorIs(hiddenAgent, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(missingAgent, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(viewer, 403, sourceText("error.team.agentViewOnly")) &&
+        callsOf("pendingApproval").length === 0,
+      [summary(unsupported), summary(hiddenAgent), summary(missingAgent), summary(viewer)],
+    );
+    const read = await call("POST", PENDING_APPROVAL_ROUTES.read, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", requestId: 7 },
+    });
+    const command = String(field(read.body, "approval", "command"));
+    check(
+      "a member reads the whole copy of a pending approval, with the text that a runtime snapshot cuts",
+      read.status === 200 &&
+        field(read.body, "approval", "requestId") === 7 &&
+        field(read.body, "approval", "agentId") === "agent-ada" &&
+        command.length > 5_000 &&
+        command.endsWith("r".repeat(5_000)),
+      { status: read.status, commandLength: command.length },
+    );
+    const otherAgent = await call("POST", PENDING_APPROVAL_ROUTES.read, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-oc", requestId: 7 },
+    });
+    const closed = await call("POST", PENDING_APPROVAL_ROUTES.read, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", requestId: "request-closed" },
+    });
+    check(
+      "a request of another agent and a request that no longer waits are refused as closed",
+      errorIs(otherAgent, 409, sourceText("error.backend.approvalInactive")) &&
+        errorIs(closed, 409, sourceText("error.backend.approvalInactive")) &&
+        !JSON.stringify(otherAgent.body).includes("r".repeat(100)),
+      [summary(otherAgent), summary(closed)],
+    );
+  }
+
+  /**
+   * An event socket of bob. `scope` is the capabilities that its first message sends; null sends no
+   * scope. `arrived` waits for an event that matches, until the deadline.
+   */
+  const openEventSocket = async (scope: readonly string[] | null) => {
+    const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
+      TEAM_PROTOCOL_V1_WEBSOCKET,
+      `openbot-token.${bobToken}`,
+    ]);
+    const events: DynamicRecord[] = [];
+    const waiters = new Set<() => void>();
+    socket.addEventListener("message", (message) => {
+      const value = JSON.parse(String(message.data));
+      if (isDynamicRecord(value)) {
+        events.push(value);
+        for (const wake of waiters) wake();
+      }
+    });
+    await new Promise<void>((resolveOpen, reject) => {
+      socket.addEventListener("open", () => resolveOpen(), { once: true });
+      socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+    });
+    if (scope)
+      socket.send(JSON.stringify({ type: "agent-event-scope", includeConversations: false, capabilities: scope }));
+    /** Whether an event that matches arrives before the deadline. */
+    const arrived = (matches: (event: DynamicRecord) => boolean, deadlineMs: number) =>
+      new Promise<boolean>((resolveArrived) => {
+        if (events.some(matches)) return resolveArrived(true);
+        const timer = setTimeout(() => {
+          waiters.delete(wake);
+          resolveArrived(false);
+        }, deadlineMs);
+        const wake = () => {
+          if (!events.some(matches)) return;
+          clearTimeout(timer);
+          waiters.delete(wake);
+          resolveArrived(true);
+        };
+        waiters.add(wake);
+      });
+    return { socket, events, arrived };
+  };
+
   // ---- Pinned messages of a chat (message-pins-v1) ----
   {
     const capabilities = [MESSAGE_PINS_CAPABILITY];
@@ -9978,44 +11095,6 @@ try {
     );
 
     // A pin change reaches a client with the capability, and no client without it.
-    const openEventSocket = async (scope: readonly string[] | null) => {
-      const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
-        TEAM_PROTOCOL_V1_WEBSOCKET,
-        `openbot-token.${bobToken}`,
-      ]);
-      const events: DynamicRecord[] = [];
-      const waiters = new Set<() => void>();
-      socket.addEventListener("message", (message) => {
-        const value = JSON.parse(String(message.data));
-        if (isDynamicRecord(value)) {
-          events.push(value);
-          for (const wake of waiters) wake();
-        }
-      });
-      await new Promise<void>((resolveOpen, reject) => {
-        socket.addEventListener("open", () => resolveOpen(), { once: true });
-        socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
-      });
-      if (scope)
-        socket.send(JSON.stringify({ type: "agent-event-scope", includeConversations: false, capabilities: scope }));
-      /** Whether an event that matches arrives before the deadline. */
-      const arrived = (matches: (event: DynamicRecord) => boolean, deadlineMs: number) =>
-        new Promise<boolean>((resolveArrived) => {
-          if (events.some(matches)) return resolveArrived(true);
-          const timer = setTimeout(() => {
-            waiters.delete(wake);
-            resolveArrived(false);
-          }, deadlineMs);
-          const wake = () => {
-            if (!events.some(matches)) return;
-            clearTimeout(timer);
-            waiters.delete(wake);
-            resolveArrived(true);
-          };
-          waiters.add(wake);
-        });
-      return { socket, events, arrived };
-    };
     const isPinsChanged = (event: DynamicRecord) => event.type === "message-pins-changed";
     const emitPins = () => {
       for (const listener of agentEventListeners) listener({ type: "message-pins-changed", agentId: "agent-ada" });
@@ -10726,6 +11805,70 @@ try {
     );
   }
 
+  // ---- Server restart (host-restart-v1) ----
+  {
+    const capabilities = [HOST_RESTART_CAPABILITY];
+    const restarts = () => callsOf("restartHost").length;
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises host-restart-v1 to a protocol 9 peer and not to a protocol 8 peer",
+      list(field(compatibility.body, "capabilities")).includes(HOST_RESTART_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(HOST_RESTART_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    // The channel host has no restart: a desktop app is not in server mode.
+    assert.ok(channelHost?.port, "The channel host of the server restart check does not run.");
+    const without = { base: `http://127.0.0.1:${channelHost.port}` };
+    const withoutCompatibility = await call("GET", TEAM_API_ROUTES.compatibility, {
+      ...without,
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    const withoutRestart = await call("POST", HOST_RESTART_ROUTES.restart, {
+      ...without,
+      token: adaToken,
+      json: {},
+      capabilities,
+    });
+    const unsupported = await call("POST", HOST_RESTART_ROUTES.restart, { token: owner.sessionToken, json: {} });
+    check(
+      "a host that is not in server mode does not advertise host-restart-v1, and it and a client without the capability get 400 hostRestartUnsupported",
+      withoutCompatibility.status === 200 &&
+        !list(field(withoutCompatibility.body, "capabilities")).includes(HOST_RESTART_CAPABILITY) &&
+        errorIs(withoutRestart, 400, sourceText("error.team.hostRestartUnsupported")) &&
+        errorIs(unsupported, 400, sourceText("error.team.hostRestartUnsupported")) &&
+        restarts() === 0,
+      [summary(withoutCompatibility), summary(withoutRestart), summary(unsupported)],
+    );
+    const memberRestart = await call("POST", HOST_RESTART_ROUTES.restart, { token: bobToken, json: {}, capabilities });
+    const wrongMethod = await call("GET", HOST_RESTART_ROUTES.restart, { token: adaToken, capabilities });
+    check(
+      "a member cannot restart the server, only POST restarts it, and the host does not restart",
+      errorIs(memberRestart, 403, sourceText("error.team.adminRequired")) &&
+        wrongMethod.status === 404 &&
+        restarts() === 0,
+      [summary(memberRestart), summary(wrongMethod)],
+    );
+    const adminRestart = await call("POST", HOST_RESTART_ROUTES.restart, { token: adaToken, json: {}, capabilities });
+    const ownerRestart = await call("POST", HOST_RESTART_ROUTES.restart, {
+      token: owner.sessionToken,
+      json: {},
+      capabilities,
+    });
+    check(
+      "an admin and the owner each restart the server once, the host knows who asked, and the reply is empty",
+      adminRestart.status === 200 &&
+        isDeepStrictEqual(adminRestart.body, {}) &&
+        ownerRestart.status === 200 &&
+        isDeepStrictEqual(ownerRestart.body, {}) &&
+        restarts() === 2 &&
+        callsOf("restartHost")[0]?.[0] === adaId &&
+        typeof callsOf("restartHost")[1]?.[0] === "string" &&
+        callsOf("restartHost")[1]?.[0] !== adaId,
+      [summary(adminRestart), summary(ownerRestart), callsOf("restartHost")],
+    );
+  }
+
   // ---- Library folders (library-folders-v1) ----
   {
     const use = { protocol: TEAM_PROTOCOL_V9, capabilities: [LIBRARY_FOLDERS_CAPABILITY] };
@@ -11161,6 +12304,53 @@ try {
         isDeepStrictEqual(reopened.getSnapshot(), stored()) &&
         stored().folders.length === 4,
       { revision: stored().revision, folders: stored().folders.length },
+    );
+
+    // library-folders-events-v1: each saved change reaches a client with the capability at once, with
+    // no data, and no client without it. A phone and the web client then read the folders again.
+    const v9Compatibility = list(field(compatibility.body, "capabilities"));
+    const isFoldersChanged = (event: DynamicRecord) => event.type === "library-folders-changed";
+    const withEvents = await openEventSocket([LIBRARY_FOLDERS_EVENTS_CAPABILITY]);
+    const withoutEvents = await openEventSocket(null);
+    // The host reads the scope of a socket from its first message, and no answer says that it did.
+    let changeArrived = false;
+    let eventFolders = 0;
+    for (let attempt = 0; attempt < 20 && !changeArrived; attempt += 1) {
+      const id = `folder-event-${attempt}`;
+      await act(bobToken, { type: "create", id, agentId: "agent-ada", name: `Event ${attempt}` });
+      eventFolders += 1;
+      changeArrived = await withEvents.arrived(isFoldersChanged, 250);
+    }
+    const eventsBeforeDelete = withEvents.events.filter(isFoldersChanged).length;
+    for (let attempt = 0; attempt < eventFolders; attempt += 1)
+      await act(bobToken, { type: "delete", folderId: `folder-event-${attempt}` });
+    const deleteArrived = await withEvents.arrived(
+      () => withEvents.events.filter(isFoldersChanged).length >= eventsBeforeDelete + eventFolders,
+      5_000,
+    );
+    for (const listener of agentEventListeners)
+      listener({ type: "conversation-invalidated", agentId: "agent-ada", revision: 92_000 });
+    const foldersBarrier = await withoutEvents.arrived(
+      (event) => event.type === "conversation-invalidated" && event.revision === 92_000,
+      5_000,
+    );
+    withEvents.socket.close();
+    withoutEvents.socket.close();
+    check(
+      "a folder change reaches a client with library-folders-events-v1 with no data, and no client without it",
+      v9Compatibility.includes(LIBRARY_FOLDERS_EVENTS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(LIBRARY_FOLDERS_EVENTS_CAPABILITY) &&
+        changeArrived &&
+        deleteArrived &&
+        withEvents.events.filter(isFoldersChanged).every((event) => isDeepStrictEqual(Object.keys(event), ["type"])) &&
+        foldersBarrier &&
+        !withoutEvents.events.some(isFoldersChanged) &&
+        stored().folders.length === 4,
+      {
+        with: withEvents.events.filter(isFoldersChanged).length,
+        without: withoutEvents.events.map((event) => event.type),
+        folders: stored().folders.length,
+      },
     );
   }
 

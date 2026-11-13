@@ -56,4 +56,12 @@ export const messages = {
   "error.skill.localMissingSkillFile": "技能文件夹根目录需要 SKILL.md。",
   "error.skill.pathSymlink": "技能路径不能包含符号链接。",
   "error.skill.folderNotRead": "{provider} 不读取 {folder}，请把该文件夹复制到 {target}。",
+  "error.skill.githubLinkInvalid": "粘贴 GitHub 仓库或文件夹的链接。",
+  "error.skill.githubNotFound": "OpenBot 无法打开 {repository}。该仓库是私有的，或者不存在。",
+  "error.skill.githubNoSkills": "{folder} 中没有 SKILL.md。",
+  "error.skill.githubUnavailable": "OpenBot 现在无法读取 GitHub，请稍后再试。",
+  "error.skill.githubRateLimited": "GitHub 限制了 OpenBot 在没有账户时的读取次数，请一小时后再试。",
+  "error.skill.githubTooLarge": "OpenBot 无法读取 {repository} 的所有文件。仓库太大。",
+  "error.skill.githubHostTooOld": "请更新此服务器，以便从 GitHub 添加技能。",
+  "error.skill.publishGithub": "{name} 来自 GitHub。你只能发布自己创建的技能。",
 } as const satisfies PartialTranslation<typeof source>;

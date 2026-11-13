@@ -239,7 +239,7 @@ export const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "submit_secret",
     description:
-      "Request the secret card for the active authentication step discovered in a fresh page snapshot. Identify password, email/SMS code, or authenticator-app code from the page instructions before calling. Select any login-method option first. The user authorizes one fill-and-submit action to the shown HTTPS origin. Never pass a secret as an argument. Use takeover if the method or code length is unclear, for nonnumeric/recovery codes, CAPTCHA, passkeys, or payment confirmation. Fill saved cards with fill_card.",
+      "Request the secret card for the active authentication step found in a fresh page snapshot. Identify password, email/SMS code, or authenticator-app code from the page. Select any login-method option first. The user authorizes one fill-and-submit action to the shown HTTPS origin. Never pass a secret as an argument. Use takeover if the method or (without loginId) code length is unclear, for nonnumeric/recovery codes, CAPTCHA, passkeys, or payment confirmation. Fill saved cards with fill_card.",
     shape: {
       tabId,
       method: z
@@ -252,7 +252,7 @@ export const BROWSER_TOOL_DEFINITIONS = [
         .min(1)
         .max(12)
         .describe(
-          "Only the active step: one password/whole-code field, or all single-digit fields in entry order. Use fresh snapshot refs; exclude username fields.",
+          "Active step only: one password/whole-code field (+ sign-up confirm field), or each single-digit field in order. Fresh snapshot refs; no username field.",
         ),
       digits: z
         .number()
@@ -261,7 +261,7 @@ export const BROWSER_TOOL_DEFINITIONS = [
         .max(12)
         .default(6)
         .describe(
-          "For codes, explicitly supply the required length from page instructions or the count of single-digit fields. Codes require 4–12 digits; do not infer six from the default. For passwords, omit digits or use 0; no digit limit applies to the password.",
+          "For codes, the length from page instructions or the count of single-digit fields, 4–12; do not infer six from the default. Omit it with loginId and one code field: the saved code sets it. For passwords, omit it or use 0.",
         ),
       submission: z
         .enum(["click", "enter", "on_input"])
@@ -286,7 +286,7 @@ export const BROWSER_TOOL_DEFINITIONS = [
         .max(VAULT_TEXT_LIMIT)
         .optional()
         .describe(
-          "For password without loginId: the username or email of this sign-in, as typed on the page. When the user saves the password in the OpenBot Vault from the card, the login gets this username.",
+          "For password without loginId: the username or email of this sign-in, as typed on the page. When the user saves the password to the Vault from the card, the login gets this username.",
         ),
     },
   }),

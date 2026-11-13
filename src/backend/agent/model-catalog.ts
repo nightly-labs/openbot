@@ -6,11 +6,7 @@ import type { AgentClient, AgentProvider } from "./../agent-client";
 import { providerCheckTimeoutMs } from "../disk-restore";
 import { decodeModelListResponse, type ModelListResponse } from "./../protocol";
 import { providerFailure } from "../provider-client-effects";
-import {
-  BUILT_IN_PROVIDER_DRIVERS,
-  type BuiltInProviderDriver,
-  type ProviderClientContext,
-} from "./../provider-drivers";
+import { BUILT_IN_PROVIDER_DRIVERS, type BuiltInProviderDriver } from "./../provider-drivers";
 import {
   compareModelVersions,
   FALLBACK_MODELS,
@@ -31,7 +27,6 @@ export interface ModelCatalogOptions {
   client(provider: AgentProvider): AgentClient | undefined;
   /** True while the provider's row says that the user must sign in. */
   isSignedOut(provider: AgentProvider): boolean;
-  credentials: ProviderClientContext;
   requestTimeoutMs: number;
   /** Keeps a failed model list on the provider row. */
   recordProviderError(provider: AgentProvider, error: unknown): void;
@@ -62,7 +57,6 @@ export class ModelCatalog {
     this: ModelCatalog,
     client: AgentClient,
     catalog: ProviderModelCatalog = {},
-    hasStoredKey = false,
     timeoutMs?: number,
   ) {
     const serverModels = new Map<string, ModelListResponse["data"][number]>();
@@ -121,10 +115,6 @@ export class ModelCatalog {
       const name = modelDisplayName(
         catalog.modelName?.(server.model) || server.displayName?.trim() || fallback?.name || server.model,
       );
-      // Decided here, on the resolved name, so the catalog and the picker's Free badge cannot
-      // disagree about what costs money. With no key stored the same models can only come
-      // from the user's own sign-in, which does buy them.
-      if (hasStoredKey && catalog.usableWithStoredKey?.(server.model, name) === false) continue;
       models.push({
         provider: client.provider,
         id: server.model,
@@ -169,18 +159,13 @@ export class ModelCatalog {
           if (catalog.hiddenWhenSignedOut && signedOut && !client)
             return { provider, models: [], fresh: false, timedOut: false };
           if (!client) return { provider, models: previous, fresh: false, timedOut: false };
-          // Read once per pass, not per model: a stored key cannot change inside one refresh, and
-          // a model is unusable only because OpenBot is what put that key in the environment.
-          const hasStoredKey = Boolean(this.#options.credentials.apiKey(provider));
           const startedAt = performance.now();
           return yield* Effect.gen({ self: this }, function* () {
-            const { models: sorted, listed } = yield* this.read(client, catalog, hasStoredKey);
+            const { models: sorted, listed } = yield* this.read(client, catalog);
             // For a provider with a fallback, a successful but empty response is no more useful to
             // the picker than a timeout: it must not erase the built-in free tier on first
             // discovery. It is not a fresh catalog, so callers must not treat it as proof that
             // this process serves it.
-            // A response that the stored-key filter emptied is a real answer: restoring the last
-            // catalog would bring back the models that the key cannot use.
             logger.info("A provider listed its models.", {
               provider,
               count: sorted.length,
@@ -228,9 +213,8 @@ export class ModelCatalog {
     const client = this.#options.client(provider);
     const catalog = BUILT_IN_PROVIDER_DRIVERS.find((driver) => driver.id === provider)?.catalog ?? {};
     if (!client) return false;
-    const hasStoredKey = Boolean(this.#options.credentials.apiKey(provider));
     const startedAt = performance.now();
-    const result = yield* Effect.result(this.read(client, catalog, hasStoredKey, this.#options.requestTimeoutMs));
+    const result = yield* Effect.result(this.read(client, catalog, this.#options.requestTimeoutMs));
     if (this.#options.client(provider) !== client) return false;
     const durationMs = Math.round(performance.now() - startedAt);
     if (Result.isFailure(result)) {

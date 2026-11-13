@@ -2,6 +2,12 @@ export const IMAGE_ATTACHMENT_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp",
 
 export const MEDIA_ATTACHMENT_EXTENSIONS = ["mp3", "mov"] as const;
 
+/**
+ * Audio that a host with `any-file-attachments` takes as an opaque file, and that the chat still plays
+ * by its name. They are not in `MEDIA_ATTACHMENT_EXTENSIONS`: an older remote host refuses them.
+ */
+const NAMED_AUDIO_EXTENSIONS = ["m4a", "wav", "aac"] as const;
+
 export const ARCHIVE_ATTACHMENT_EXTENSIONS = ["zip"] as const;
 
 /** MP4 came after `media-attachments`, so a remote host advertises it with its own capability. */
@@ -102,6 +108,7 @@ export const ATTACHMENT_FILE_EXTENSIONS = [
 export const OPENABLE_ATTACHMENT_EXTENSIONS = [
   ...IMAGE_ATTACHMENT_EXTENSIONS,
   ...MEDIA_ATTACHMENT_EXTENSIONS,
+  ...NAMED_AUDIO_EXTENSIONS,
   ...MP4_ATTACHMENT_EXTENSIONS,
   "pdf",
   "docx",
@@ -225,6 +232,12 @@ export function attachmentMimeTypeForName(name: string) {
       return "image/avif";
     case "mp3":
       return "audio/mpeg";
+    case "m4a":
+      return "audio/mp4";
+    case "wav":
+      return "audio/wav";
+    case "aac":
+      return "audio/aac";
     case "mov":
       return "video/quicktime";
     case "mp4":

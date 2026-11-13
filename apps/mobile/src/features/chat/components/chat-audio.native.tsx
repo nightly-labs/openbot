@@ -113,8 +113,11 @@ export function ChatAudioAttachment(props: AudioAttachmentProps) {
   const { attachment, serverId } = props;
   const settled = useListSettled();
   const historyShown = useHistoryShown();
-  const query = useMediaFile(serverId, attachment, settled && historyShown);
-  const uri = query.data ?? null;
+  const ready = settled && historyShown;
+  const query = useMediaFile(serverId, attachment, ready);
+  // A file that an earlier card downloaded is there at once. Its player also waits until the chat
+  // shows and the list is not in a fast fling, as the download does.
+  const uri = ready ? (query.data ?? null) : null;
   // The player is made with the file: each player is a native media player, and a card without its
   // file has nothing to play.
   return uri ? (

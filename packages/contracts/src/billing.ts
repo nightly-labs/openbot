@@ -59,7 +59,7 @@ export const BILLING_PLANS: readonly BillingPlan[] = [
 /**
  * The storage of each plan in GB for a hosted server on a machine of the operator (a VPS). That
  * machine has a larger disk than a boat sandbox, and much of it stays free above these numbers. The
- * pricing page and the order form show `BILLING_PLANS`, because a new server starts in a boat sandbox.
+ * pricing page and the order form show `BILLING_PLANS`, because a new server can start in a boat sandbox.
  */
 const OPERATOR_HOST_STORAGE_GB: Readonly<Record<BillingPlanId, number>> = {
   starter: 25,

@@ -361,6 +361,8 @@ export const messages = {
   "chat.video.time": "{elapsed} / {duration}",
   "chat.video.download": "Videoyu indir",
   "chat.video.open": "Videoyu aç",
+  "chat.video.mute": "Videonun sesini kapat",
+  "chat.video.unmute": "Videonun sesini aç",
   "chat.message.you": "Siz",
   "chat.message.agentFallback": "Ajan",
   "chat.message.memberFallback": "Ekip üyesi",

@@ -81,6 +81,10 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    minutes (the Worker stopped during the create call) goes to `error`, and the setup retry below
    applies. When that create call returns later, the Worker deletes the sandbox that no row owns.
 
+   When the pool of the operator has a ready machine for the plan, the Worker makes no sandbox: the
+   server starts on that machine ([A new server on a pool machine](#a-new-server-on-a-pool-machine)),
+   and steps 3 and 5 to 8 of boat (the setup script, the stop and the resume) do not apply to it.
+
    The Worker then names the sandbox `openbot-<plan>-<owner email>-<first 8 characters of the host
    ID>` (`PATCH /sandboxes/:id`), so an operator can find it in the boat dashboard. The email is in
    lowercase, and each group of characters that are not letters or digits becomes one `-`. The name is only a label; a plan change
@@ -675,8 +679,9 @@ The unit (`openbot.service`):
 
 The app (`ServerMemory`) reads the memory every 5 s. The free memory is the smaller of
 `MemAvailable` and the free memory of the unit's cgroup (cgroup v2 `memory.max − memory.current`,
-plus `inactive_file` from `memory.stat`: the kernel takes that file cache back before the OOM killer
-acts). Each turn that started in the last 60 s counts 300 MB more, so routines that start together
+plus `inactive_file` and half of `active_file` from `memory.stat`: the kernel takes that file cache
+back before the OOM killer acts. The other half of the active cache counts as used, because it can
+be program code that runs). Each turn that started in the last 60 s counts 300 MB more, so routines that start together
 do not all pass the check before their processes grow. A start that fails counts nothing.
 
 | Level | When | What happens |
@@ -880,11 +885,59 @@ flag was gone, OpenBot ran, and `openbot.db` passed `quick_check`.
 
 ## Leaseweb VPS
 
-The Worker makes no Leaseweb server: boat is the provider of each new hosted server. A Leaseweb VPS
-runs all the time, so it has no stop and no resume. An operator can move one hosted server at a time
-from boat to a VPS; [Move a server from boat](#move-a-server-from-boat) has the record and the steps.
+The Worker orders no Leaseweb server: the operator buys each VPS and adds it to a pool. A Leaseweb VPS
+runs all the time, so it has no stop and no resume. A new hosted server starts on a ready machine of
+the pool, and in a boat sandbox when the pool has none
+([A new server on a pool machine](#a-new-server-on-a-pool-machine)). An operator can move one hosted
+server at a time from boat to a VPS; [Move a server from boat](#move-a-server-from-boat) has the
+record and the steps.
 For a server that never was on boat, the VPS is a [self-hosted server](self-hosted-server.md) that
-an operator sets up for the customer:
+an operator sets up for the customer. The customer is the owner: the server signs in with a
+[server claim](self-hosted-server.md#sign-in-with-a-server-claim) for the customer's email, never
+with the account of an operator. One command does all the steps below.
+
+Before you start, you need:
+
+- The root `.env.keys` with `DOTENV_PRIVATE_KEY_PRODUCTION`. `apps/auth-api/.env.production` then
+  gives the four Leaseweb keys, `SERVER_CLAIMS_ADMIN_TOKEN` and the Cloudflare token for D1.
+- An SSH key of your computer in `/root/.ssh/authorized_keys` of the core server of the operators.
+- The VPS ID, the owner's email, one short word for the customer (`a-z`, `0-9`), and the server name
+  that the customer sees (6 to 32 characters).
+
+```sh
+env="bunx @dotenvx/dotenvx@2.38.2 run --quiet -f apps/auth-api/.env.production -fk <root>/.env.keys --"
+# 1. Find the VPS just bought: each VPS with no reference on the four accounts.
+$env bun scripts/hosting/leaseweb-pool.ts free
+# 2. The public keys of the operators, which the bootstrap installs.
+ssh <core server> cat /root/.ssh/authorized_keys >operator-keys
+# 3. See the plan, then do it.
+$env bun scripts/hosting/leaseweb-pool.ts custom <VPS ID> --owner=<email> --customer=<word> \
+  --name="<server name>" --keys=operator-keys
+$env bun scripts/hosting/leaseweb-pool.ts custom <VPS ID> --owner=<email> --customer=<word> \
+  --name="<server name>" --keys=operator-keys --apply
+```
+
+When it ends, the owner sees the server in the app, and can invite the other members.
+
+- With no `--apply`, it only shows what it would do. It refuses a VPS with a reference, and a VPS of
+  the hosted pool.
+- A custom VPS never has the reference `pool-free`, and each pool step that changes a machine
+  (`prepare`, `move`, and then `sync`) needs it, so the pool never uses a custom VPS. When `add` and
+  `custom` take the same VPS at the same time, each one reads the reference again, and the one that
+  lost stops.
+- It sets the reference `custom-<NN> <customer> <email>` first, with the next number after the
+  highest on all four accounts, and reads it again (see [Leaseweb references](#leaseweb-references)).
+- It signs in with the root password of the Leaseweb API one time. After the bootstrap, only the
+  operator keys sign in, so `--keys` must have a key of this computer.
+- It makes the claim just before the install, because a claim works for 15 minutes.
+- At the end it runs `leaseweb-bootstrap-e2e.ts`, which restarts the server, and then checks that
+  OpenBot is online and that D1 shows the owner as the active owner of the server.
+- A run that stops can run again with the same arguments: it continues with the same reference,
+  does not install again when the owner is signed in, and stops when another account is signed in.
+- Its output has no email and no key. The report of the checks is in
+  `.openbot-build/leaseweb-bootstrap/`.
+
+The steps of the command:
 
 1. Order a VPS with Ubuntu 24.04 or 26.04. The order takes no SSH key and no user data. The root password
    comes from `GET /publicCloud/v1/vps/{id}/credentials`.
@@ -933,18 +986,42 @@ The X authorization of the virtual display has the hostname in it. After a hostn
 program of a running OpenBot cannot open the display ("Authorization required") until OpenBot
 restarts.
 
-The names of a pool server follow one scheme:
+#### Leaseweb references
+
+The reference tells each operator and each agent which VPS has an owner. All VPS on all four
+Leaseweb accounts use one scheme:
+
+| Reference | Use | Example |
+| --- | --- | --- |
+| None (no reference, or an empty one) | Not used. **Only a VPS with no reference can be taken for a new use.** | |
+| `pool-free` | In the hosted pool, with no server. Only `leaseweb-pool.ts` and [Move a server from boat](#move-a-server-from-boat) use it. | `pool-free` |
+| `<owner email> <first 8 characters of the OpenBot server ID>` | In the hosted pool, with a hosted server. `move` sets it for a moved server, and `sync` for a server that started on the machine. | `jane@example.com 1a2b3c4d` |
+| `custom-<NN> <customer> <owner email>` | A server for one customer, not in the pool. `<NN>` is the next number after the highest on all accounts; `leaseweb-pool.ts custom` sets it. `<customer>` is one word in small letters. | `custom-01 acme jane@example.com` |
+| `openbot-signal-<home>` | A Signal machine (see `docs/remote-session-deployment.md`). | `openbot-signal-us` |
+| `pool-test-<NN>` | A test machine of the operator. | `pool-test-01` |
+
+To take a VPS:
+
+1. List the VPS of each account (`LEASEWEB_API_KEY_NL`, `_DE`, `_US`, `_AU`) and select one with no
+   reference in the location you need.
+2. Set its reference at once, before any other work on it. Then read the VPS again: when the
+   reference is not yours, another operator took it, and you select another one.
+3. Never take a VPS that has a reference, also `pool-free`. A pool VPS leaves the pool only with
+   `leaseweb-pool.ts remove`, by a decision of the operator. `remove` keeps the reference
+   `pool-free`, so the operator then sets the new reference, or clears it with
+   `{"reference": ""}` when the VPS is not used.
+
+`leaseweb-pool.ts add` gives `pool-free` to a VPS with no reference, and refuses a VPS with another
+reference. For a pool VPS, the record of the account service, not the reference, decides which VPS
+is free. The email in the reference goes to Leaseweb, so `PRIVACY.md` must name that before a
+customer server gets one.
+
+A pool VPS and a custom VPS also use these names:
 
 | Name | Value | Example |
 | --- | --- | --- |
-| Leaseweb reference, free server | `pool-free` | `pool-free` |
-| Leaseweb reference, assigned server | `<owner email> <first 8 characters of the OpenBot server ID>` | `jane@example.com 1a2b3c4d` |
 | Linux hostname | `lsw-<Leaseweb VPS ID>`; it never changes | `lsw-12728110` |
 | OpenBot server name | The customer's choice | |
-
-The reference is a label for the operator. The record of the account service, not the reference,
-decides which server is free. The email in the reference goes to Leaseweb, so `PRIVACY.md` must
-name that before a customer server gets one.
 
 The operator keys are a file with one public key for each operator, in the format of
 `authorized_keys`, with no options. The fixed place of the list is `/root/.ssh/authorized_keys` of
@@ -979,11 +1056,95 @@ account: the key of the German account does not list a server in Amsterdam. The 
 account, which has the test VPS in Frankfurt, is `LEASEWEB_API_KEY_DE` in the same file. The keys of
 the accounts that have the Signal machines are `LEASEWEB_API_KEY_US` and `LEASEWEB_API_KEY_AU`.
 
+### A new server on a pool machine
+
+A customer who pays gets a server at once: on a machine of the pool when one is ready, and in a boat
+sandbox when none is. A server that starts on boat moves to a VPS later
+([Move a server from boat](#move-a-server-from-boat)). Developer decision, 2026-11-13.
+
+The Worker cannot connect to a machine, and it has no Leaseweb key. So the machine asks:
+
+1. `leaseweb-pool.ts prepare <VPS ID>... --keys=<file> --apply` installs the newest OpenBot, disabled,
+   on each free machine, as for a move. Then it offers the machine: it makes a random token, stores the
+   SHA-256 of the token in `operator_hosts.assign_token_hash` (migration 0055), and runs
+   `move-from-boat.sh offer leaseweb:<VPS ID>` on the machine with the token on standard input. `offer`
+   refuses a machine that has the data of a server. It writes the token to `/etc/openbot-pool/token`
+   (root only) and starts `openbot-pool-wait.service`.
+2. The unit sends `POST /v2/hosting/pool/assignment` with `{hostId, token}` each 10 seconds. The Worker
+   compares the hash, stores the time in `operator_hosts.seen_at` (at most one write each 60 seconds)
+   and answers `{"state":"waiting"}`. A wrong token gets `401 hosted_pool_token_invalid`; the unit then
+   removes the token and stops. `leaseweb-pool.ts remove` clears the token in D1, so a machine that left
+   the pool gets the same answer and stops asking.
+3. A machine is **ready** when it is in the pool, no server names it, it has a token, and it asked in
+   the last 150 seconds (`POOL_SEEN_WITHIN_MS`).
+4. At the payment, the Worker reads the ready machines with the product of the plan: `VPS01` for
+   Starter, `VPS02` for Standard, `VPS03` for Pro. It never uses a larger or a smaller machine. The
+   currency gives the locations (`poolLocations`): a purchase in `usd` or `brl` gets a machine in
+   `WDC-02`, and one in `AMS-01` when `WDC-02` has none. A purchase in `eur` or `pln` gets only a
+   machine in `AMS-01`, so that its data stays in the EU, as on boat. A machine in each other location
+   gets no new server; `PRIVACY.md` names the locations, so change the two together. In a location,
+   the machine that was added first comes first. One `UPDATE` writes `operator_host` and the hash of a host ID
+   claim, and it changes no row when another server has the machine. So two payments in the same second
+   never get one machine. After three machines that another payment took, the server starts on boat.
+5. The next request of the machine gets `{"state":"assigned","serverId":…,"claim":…}`. The unit runs
+   `openbot-hosted-env` as the service user with the two values (the same helper as in the boat setup
+   script), enables and starts `openbot.service`, then removes the token and disables itself. The
+   answer is the same until OpenBot signs in, so a machine that restarts in this step asks again.
+6. OpenBot redeems the claim (`POST /v2/hosting/claims/redeem`). The Worker then sets the row to
+   `running` and clears the token hash of the machine. From here the server is the same as a moved server: the tables of
+   [Move a server from boat](#move-a-server-from-boat) apply, but it has no `retired_sandbox_id`, so a
+   delete sends no call to boat.
+
+The row of such a server has `operator_host`, no `provider_sandbox_id`, no `provider_template` and no
+`retired_sandbox_id`. Until the sign-in it has `observed_state = 'starting'` and
+`last_wake_reason = 'create'`.
+
+When a step fails, the customer still gets a server:
+
+| Fault | Result |
+| --- | --- |
+| No ready machine of the product, or the pool query fails | The Worker makes the boat sandbox in the same request, as before. |
+| The machine does not start OpenBot, or OpenBot does not sign in, in 4 minutes (`POOL_START_LOST_AFTER_MS`) | The cron takes the server off the machine and makes a boat sandbox for it. The claim of the machine stops working. The machine loses its token, because its disk can have the start of a server; `status` shows it as not ready. Run `prepare --reinstall` for it. |
+| The plan ends before the sign-in | The row gets `error` and no machine. A renewal sets the server up again. |
+| The owner deletes the server before the sign-in | The delete is the usual one. `sync` reinstalls the machine. |
+
+`sync` does not stop or start a server that waits for its first sign-in. For a server that started on
+a machine and signed in, `sync` sets the Leaseweb reference to the owner email and the first 8
+characters of the server ID. The Worker cannot do that: it has no Leaseweb key.
+
+The operator keeps the buffer. `status` shows, for each location and product, the free machines and
+how many are ready, and names each free machine that is not ready. The `hosted_pool_snapshot` event
+has the same number (`ready`). After `sync` reinstalls a machine, run `prepare` for it, so that the
+next customer can get it. A machine that `move` uses loses its token first: `move` stops when a new
+server got the machine in that moment.
+
+A machine of the pool is not the boat image:
+
+- It has no agent CLI for all users (`claude`, `codex`, `pi`) and no `node`. A provider shows that
+  its CLI is not downloaded, and the user downloads it in OpenBot.
+- It has no Docker and no boat desktop. OpenBot uses its own virtual displays.
+- It shows the storage of a moved server (25, 75 and 150 GB), which is more than the plan table of
+  the pricing page.
+- The clients show no restart action, and the server does not stop when it is not in use.
+
+Measured on the test Worker with a real Leaseweb VPS 2 (smoke, 2026-11-13): `prepare` of a clean
+machine takes about 3 minutes. OpenBot on the machine signed in 9 seconds after the payment, and the
+server was online after 13 seconds. A start on boat took 25 seconds to the sign-in. A server whose
+machine did not start OpenBot went to boat 270 seconds after the payment and signed in 15 seconds
+later; the late start of OpenBot on that machine got "The server claim is invalid or used."
+`prepare --reinstall` made that machine ready again in 213 seconds, and after `remove` the unit on
+the machine stopped at its next question.
+
+`bun run test:hosted-pool-assignment` checks the assignment, the request of the machine, the sign-in,
+the two fallbacks to boat and a payment for two servers at the same time, on the real service with
+SQLite, a fake Stripe and a fake boat.
+
 ### Move a server from boat
 
 A move is a manual operator action on one row. The setup of a VPS can take hours, so the Worker
-never waits for one. Move only Standard and Pro servers: Starter servers stay on boat for now
-(developer decision, 2026-11-11). Two columns of `hosted_servers` (migration 0052) hold the record:
+never waits for one. A Starter server moves to a VPS 1, a Standard server to a VPS 2 and a Pro server
+to a VPS 3 (developer decisions, 2026-11-11 and 2026-11-13). Two columns of `hosted_servers`
+(migration 0052) hold the record:
 
 | Column | Value |
 | --- | --- |
@@ -1010,8 +1171,8 @@ writes `observed_state`:
 | The owner deletes the server | Cancels the plan, deletes the sandbox in `retired_sandbox_id`, removes the Remote host, ends the session, and sets `observed_state = 'deleted'`. `operator_host` stays. | Reinstall the VPS, set its reference to `pool-free`, then set `operator_host = NULL`. |
 | boat sends an event for the old sandbox | Finds no row for it. | Nothing. |
 
-The Worker sends no message to the operator. Run `leaseweb-pool.ts sync` each day: it does the
-operator column of the table. See [Reuse a pool machine](#reuse-a-pool-machine).
+The Worker sends no message to the operator, and it connects to no machine. Run
+`leaseweb-pool.ts sync` each day: it does the operator column of the table. See [Reuse a pool machine](#reuse-a-pool-machine).
 
 Never write `desired_state = 'idle'` on such a row: the next client request changes it to `running`,
 and the cron query for a server with a routine does not look at the machine.
@@ -1019,16 +1180,49 @@ and the cron query for a server with a routine does not look at the machine.
 The server on the VPS stays a hosted server (no `/opt/OpenBot/hosted/mode` file), so OpenBot signs
 in, reports its use and installs updates as it did on boat. `provision.sh` installs it and does not
 start it, so the data is in place before the first start. `scripts/hosting/move-from-boat.sh` does
-the parts of a move that run on the two machines, as root. The steps:
+the parts of a move that run on the two machines, as root.
+
+`leaseweb-pool.ts move <server ID> <VPS ID> --apply` does steps 2 to 8 for one server, and writes the
+time of each step and of the downtime. Before the row changes, it checks for a server that is
+`running` or `idle` and a free machine of the pool with the product of the plan, and it takes the
+token of the machine away, so that no new server gets it. After the
+row changes and before the export, it checks the same IDs of `user` on the two machines, an OpenBot
+on the machine that is not older than that of the sandbox, and an ssh from the sandbox to the machine.
+When a step before the export fails, it gives the row back to the sandbox, and the customer sees no
+downtime. After the export starts, it stops and names the step; then finish or roll back by
+hand. It needs `BOAT_API_KEY` in the environment, from `apps/auth-api/.env.dev`:
+
+```bash
+bunx dotenvx run -f apps/auth-api/.env.production -f apps/auth-api/.env.dev -fk <root>/.env.keys -- \
+  bun scripts/hosting/leaseweb-pool.ts move <server ID> <VPS ID> --keys=<operator keys> --apply
+```
+
+Tested on 2026-11-12 with the test Worker: one Standard server from a boat sandbox to a VPS 2 in
+`AMS-01` (OpenBot 0.68.0). The sandbox had an npm package, an apt package, a command in `/opt`, a
+crontab line, an MCP server, an Inception key and sign-in files of Claude and Codex. `prepare` of a
+new VPS took 140 s. The move took 69 s, and the downtime was 49 s: the export and the copy 28 s, the
+import 20 s, the start 2 s. After the move, the web client showed the old chats, the Inception agent
+answered in 3 s, the MCP server listed its tools, and each command, package and crontab line was
+there. A first run waited for a sandbox state that boat does not use; it stopped before the export
+and gave the row back, and the server had no downtime.
+
+The order of the steps keeps the downtime short. The work that does not need the data (the install
+of OpenBot, the bootstrap, the restart and the apt packages of the customer) runs while the customer
+still uses the sandbox. The downtime is the export, the copy, the import and the start. The steps:
 
 1. Deploy the Worker with migration 0052 before the first move. An older Worker does not know the
    two columns, and it can make a new sandbox for a row that has none.
 2. On the VPS, while the customer still uses the sandbox: copy `scripts/hosting` to the VPS and run
    `move-from-boat.sh prepare lsw-<VPS ID> <uid> <gid> <appimage-url> <appimage-sha256> <auth-api-url>`.
-   The IDs are those of `id user` in the sandbox. The release is the one that the sandbox has, or a
-   newer one. The command sets the hostname, makes the user `user` with the home `/home/user`, runs
-   `provision.sh`, and disables `openbot.service`, so a restart does not start OpenBot with no data.
-3. Run `leaseweb-bootstrap.sh` with the operator keys. Restart the VPS one time.
+   The IDs are those of `id user` in the sandbox (1000 and 1000 in the boat image). The release is the
+   one that the sandbox has, or a newer one. The command sets the hostname, makes the user `user`
+   with the home `/home/user`, runs `provision.sh`, and disables `openbot.service`, so a restart does
+   not start OpenBot with no data. `leaseweb-pool.ts prepare <VPS ID>... --keys=<file> --apply` does
+   steps 2 and 3 on free machines before a move, with the newest release.
+3. Run `leaseweb-bootstrap.sh` with the operator keys. Restart the VPS one time. A new or reinstalled
+   VPS has no key of an operator: `leaseweb-pool.ts` then signs in one time with the root password of
+   the Leaseweb API, through `SSH_ASKPASS`, and runs steps 2 and 3 in that session. After the
+   bootstrap, the password login is off.
 4. Write the row, in one statement, before the export:
 
    ```sql
@@ -1036,10 +1230,11 @@ the parts of a move that run on the two machines, as root. The steps:
      provider_sandbox_id = NULL, desired_state = 'running', observed_state = 'running', observed_error = NULL,
      updated_at = <now in ms>
    WHERE server_id = '<server ID>' AND provider_sandbox_id IS NOT NULL AND operator_host IS NULL
-     AND plan IN ('standard', 'pro') AND desired_state IN ('running', 'idle');
+     AND plan = '<plan>' AND desired_state IN ('running', 'idle');
    ```
 
-   The statement changes no row of a server whose plan ended (`stopped`) or whose delete is in
+   `<plan>` is the plan that the machine was selected for, so a plan change in this time stops the
+   move. The statement changes no row of a server whose plan ended (`stopped`) or whose delete is in
    progress (`deleted`): do not move such a server.
 
    From this statement, the Worker sends no call to boat for the server, and the customer still uses
@@ -1055,26 +1250,90 @@ the parts of a move that run on the two machines, as root. The steps:
    first (`PATCH /sandboxes/<sandbox ID>` with `ttlSeconds`). When boat stops the sandbox during the
    export or the copy, start it at boat, delete the archive, and do step 5 again. Not confirmed: the
    lease that a start at boat by hand gives.
-5. On the sandbox: `move-from-boat.sh export <archive>`. The downtime of the customer starts here.
+5. On the sandbox: `move-from-boat.sh packages`, then on the VPS `move-from-boat.sh install-packages`
+   with that output on its standard input. This installs the apt packages of the customer before the
+   downtime. Then on the sandbox: `move-from-boat.sh export <archive>`, or `export -`, which writes the
+   archive to standard output and each message to standard error. `leaseweb-pool.ts move` sends it
+   with `ssh` to a key that the sandbox makes for this move: on the VPS, that key can only run
+   `cat >/root/openbot-move.tar`, and the move removes it after the export. So no archive is on the
+   disk of the sandbox, and the copy has no separate step. The downtime of the customer starts here.
    The command sets `/run/openbot-pre-stop`, stops `openbot.service`, and archives, with numeric
-   owners, the home of `user` and `/srv/openbot-hosted`. The archive has the SHA-256 of `openbot.db`,
-   `agent-data.db`, `login.keyring` and `keyring-password`, and the names of the npm commands and
-   groups of the sandbox. It does not have `/opt/OpenBot`, `~/.boat`, `~/.boatignore`,
-   `~/.Xauthority*` and `~/.npm/_cacache`. The archive holds the account session and each provider
-   sign-in of the customer: copy it only over SSH.
+   owners, the home of `user` and `/srv/openbot-hosted`. The home has each provider sign-in, API key,
+   MCP server and CLI that OpenBot downloaded. The archive also has what the customer installed
+   outside the home, and not what the boat image has (the lists at the top of the script, from image
+   `c4ed68db` and `5f37c910`):
+   - each directory that the customer added in `/opt`, `/usr/local` and `/usr/local/lib`, and each
+     npm package for all users. A directory that programs of root read, such as
+     `/usr/local/lib/systemd` or `/usr/local/lib/python3.12`, stays out, and the report names it.
+   - each agent CLI of the image (`claude`, `codex`, `pi`, `cursor-agent`, `hermes`) whose sign-in
+     file in the home has a sign-in. A VPS has none, and OpenBot would ask the customer to download it
+     again. An empty file, a file with only `{}`, or the `.env` that the image writes for Hermes is not
+     a sign-in.
+   - each program in `/usr/local/bin` that the image does not have, each link there into a moved
+     directory or into the home, and the crontab of `user`.
+   - the names of the apt packages that the customer installed (`~/.base-apt-packages.txt` of the
+     image lists those of the image).
+
+   The move does not copy systemd units or their settings in `/etc`. When the sandbox has a unit of
+   the customer (a unit file in `/etc/systemd/system` of no package, or an enabled template instance
+   such as `syncthing@user`), `packages` names it and the move stops before the downtime. The server
+   stays on boat. On 2026-11-12 an export failed because such a service wrote to the home during the
+   archive.
+
+   The archive also has the SHA-256 of `openbot.db`, `agent-data.db`, `login.keyring` and
+   `keyring-password`, the names of the npm commands and groups of the sandbox, and the Ubuntu
+   version. It does not have:
+   - `/opt/OpenBot`, `~/.boat`, `~/.boatignore`, `~/.ascii`, `~/.config/ascii`, `~/.Xauthority*` and
+     `~/.npm/_cacache`.
+   - the cache folders in each profile of Chromium, Chrome and Brave in `~/.config` (`Cache`,
+     `Code Cache`, `GPUCache`, `GrShaderCache`, `ShaderCache`, the four Dawn caches,
+     `component_crx_cache` and `extensions_crx_cache`). The browser makes them again. Cookies, sign-ins
+     and extensions stay.
+   - when the customer has no Hermes sign-in: the Hermes of the image, `~/.hermes/tools`,
+     `~/.hermes/installs`, `~/.hermes/cache`, and the commands `hermes`, `hermes-acp` and
+     `hermes-agent` in `~/.local/bin` that start it. The settings, sessions and skills in `~/.hermes`
+     stay.
+   - Docker containers and images, and Python packages for all users: the export names them.
+
+   `~/.cache` stays in the archive. Not all of it is cache: Poetry keeps its virtual environments
+   there, and Playwright and Puppeteer keep their browsers there. The export of 2026-11-13 left out
+   each entry of `~/.cache` except `ms-playwright`, for the six servers of that day.
+
+   The export prints each moved directory with its size. When the sandbox has another image than
+   these two, it says so: then make sure that no directory of the list is from the image. The
+   archive holds the account session and each provider sign-in and key of the customer: copy it only
+   over SSH.
 6. On the VPS: `move-from-boat.sh import <archive>`. The command refuses an OpenBot that is older
    than that of the sandbox, restores the archive, and compares the four SHA-256 values. An agent
    of the customer can get root in the sandbox, and the service user has no root on the VPS. So the
-   service user restores the files, and only `/home/user` and `/srv/openbot-hosted`: the archive
-   cannot write a file of root, a setuid file of root or a device. A file that root or another user
-   owned in the sandbox gets the service user as its owner. When the archive has a member that the
-   service user cannot restore, the import fails. Delete each copy of the archive. When the import fails, run `move-from-boat.sh discard lsw-<VPS ID>` and then
-   the import again: `discard` removes the restored data, and it refuses a machine on which OpenBot
-   started.
+   service user restores the files, and only `/home/user`, `/srv/openbot-hosted` and the moved
+   directories. Root makes each moved directory new, owned by `user`; a directory that the VPS has
+   already stays as it is, and the report names it. The archive cannot write a file of root, a setuid
+   file of root or a device. A file that root or another user owned in the sandbox gets the service
+   user as its owner. When the archive has a member that the service user cannot restore, the import
+   fails. Then, as `user`, the import puts the moved commands in `~/.local/bin` (a command that is
+   there already stays) and installs the crontab. When it moved an npm package and the VPS has no
+   `node`, it adds `~/.local/bin/node`, which starts the Bun that OpenBot downloaded to the home: Bun
+   runs a Node script when it starts with the name `node`. OpenBot downloads Bun at its first start
+   and when an MCP server is on; when the sandbox had no Bun, the report says so. As root, the import
+   installs the apt packages of the customer. It does not install a package that changes
+   the firewall, SSH or root access, such as `docker.io` or `ufw`. At the end it names each command in
+   `~/.local/bin` that cannot start here (a missing interpreter, library or link target), each apt
+   package that it could not install, and each item that the export did not copy. Read the report:
+   a program for Ubuntu 24.04 can fail on 26.04, such as a Python virtual environment. Delete each
+   copy of the archive. When the import fails, run `move-from-boat.sh discard lsw-<VPS ID>` and then
+   the import again: `discard` removes the restored data, the moved directories and the crontab (the
+   apt packages stay), and it refuses a machine on which OpenBot started.
+
+   The import also removes the parts of the boat desktop from the home: `~/.ascii` and `~/.config/ascii`
+   (with the token of the desktop), their links in `~/.local/bin`, the `boat` skill of each agent, the
+   `computer` MCP server of the desktop in the Claude, Codex and Pi settings, the boat blocks in the
+   shell files, and the Pi MCP extension when no other MCP server uses it. On the VPS, a Pi that
+   called the desktop waited for it, and its start timed out.
 7. Stop the sandbox at boat. Do not start it again while the VPS runs: two hosts would have one ID.
 8. On the VPS: `move-from-boat.sh start`. It refuses when the import is not complete or when
-   `openbot.db` changed after the import, then enables and starts `openbot.service`. Without the boat
-   desktop, each start waits 120 seconds for display `:0` before OpenBot uses two virtual displays.
+   `openbot.db` changed after the import, then enables and starts `openbot.service`. A machine with
+   no display manager does not wait for the boat desktop: OpenBot uses two virtual displays at once.
    Confirm in the web client that the server is online and that an agent answers. Set the Leaseweb
    reference.
 9. Keep the stopped sandbox for the rollback. A delete of the server by its owner also deletes it.
@@ -1082,10 +1341,9 @@ the parts of a move that run on the two machines, as root. The steps:
 The VPS is not the same machine as the sandbox:
 
 - The boat image has commands that npm installed for all users (`claude`, `codex` and `pnpm` on
-  2026-11-11). The VPS has none, and `import` names each one that is missing. The provider sign-in
-  moves with the home. A provider that used such a command shows that its CLI is not downloaded, and
-  the user downloads it in OpenBot. Not confirmed on a provider that is signed in: the test server
-  had none.
+  2026-11-11). The VPS has none. The move copies the agent CLIs that the customer signed in to, and
+  `import` names each other one that is missing. A provider that used a missing command shows that
+  its CLI is not downloaded, and the user downloads it in OpenBot.
 - `prepare` makes only the primary group of `user`, and the VPS has no Docker. `import` names each
   group that `user` had in the sandbox (`docker` and `ascii-streaming-audio` on 2026-11-11). An
   agent of the customer that used Docker does not have it after the move.
@@ -1099,25 +1357,33 @@ The VPS is not the same machine as the sandbox:
   sends the number in the server list, the hosting list and the billing state from the moment of the
   row `UPDATE`, so the storage meter, the storage alerts, Billing and the plan change offer show it.
   The host reads it at its start, for the instructions of its agents. The pricing page and the order
-  form keep the plan table, because a new server starts in a boat sandbox. A client or a host from
+  form keep the plan table, because a new server can start in a boat sandbox. A client or a host from
   before this number shows the plan table. A rollback gives the server the plan table again, so a
   server that used more on the VPS shows a full disk.
-- The number is not a limit that the machine enforces. The clients count
-  `HOSTED_SERVER_BASE_IMAGE_GB` (22 GB) for the system, so the disk has much more than the user sees:
+- The number is not a limit that the machine enforces. A host with `storage-user-files-v1` measures
+  the files of its user (the home folder, `/tmp` and `/var/tmp`) with `du`, and the clients show the
+  plan minus that number. A host from before that capability gets the boat count: the clients
+  subtract `HOSTED_SERVER_BASE_IMAGE_GB` (22 GB) for the system from the used disk, which on a VPS
+  shows about 5 to 10 GB less free space than is correct, because the system part and the reserved
+  blocks of a VPS are not 22 GB. The disk has much more than the user sees:
 
   | Plan | Machine | Disk | User sees | Disk above that |
   | --- | --- | --- | --- | --- |
+  | Starter | Leaseweb VPS 1 | 100 GB | 25 GB | about 53 GB |
   | Starter (only after a change down from Standard or Pro) | Leaseweb VPS 2 | 200 GB | 25 GB | about 153 GB |
   | Standard | Leaseweb VPS 2 | 200 GB | 75 GB | about 103 GB |
   | Pro | Leaseweb VPS 3 | 300 GB | 150 GB | about 128 GB |
 
   The 200 GB is from the Leaseweb API (`rootDiskSize`, 2026-11-11). The VPS 3 (8 vCPU, 24 GB,
   300 GB) is from the Leaseweb product page; no VPS 3 was bought on 2026-11-11, so its disk is not
-  measured. The system part of a VPS was not measured; the 22 GB is from the boat servers.
+  measured. The VPS 1 (4 vCPU, 6 GB, 100 GB, EUR 4.49 a month in AMS-01) is from the order API
+  (`GET /ordering/v1/products/vps?location=AMS-01`, 2026-11-13); its disk is not measured either. The
+  22 GB is from the boat servers; it is not used for a VPS host with `storage-user-files-v1`.
 - Move a Pro server to a VPS 3. A plan change does not change the machine of a moved server. After a
   change to Pro, a server on a VPS 2 shows 150 GB at once and has about 28 GB of disk above that,
   until the operator moves it to a VPS 3. Nothing tells the operator about the plan change: look for
-  `plan = 'pro'` rows whose machine is a VPS 2.
+  `plan = 'pro'` rows whose machine is a VPS 2. A change up from Starter on a VPS 1 is worse: a
+  Standard server shows 75 GB on a 100 GB disk. Move it to a VPS 2 soon.
 - The clients show the vCPU and the memory of the boat size of the plan (2 and 4 GB, 4 and 8 GB, 8
   and 16 GB) also for a moved server. A VPS has more: the VPS 2 in FRA-01 showed 6 vCPU and 16 GiB.
 - After the owner deletes the server, OpenBot still runs on the VPS with a session that is ended. It
@@ -1127,6 +1393,13 @@ Rollback, while the sandbox exists: run `systemctl disable --now openbot.service
 no restart of the VPS starts a second host. Make sure that the sandbox is stopped at boat. Then give
 the row back to boat. The next client request resumes the sandbox, and the resume starts OpenBot
 there. The work that the server did on the VPS is not in the sandbox.
+
+When the export failed before the import, the sandbox still runs with OpenBot stopped and
+`/run/openbot-pre-stop` set. Delete `/root/openbot-move` and the marker, and start `openbot.service`
+in the sandbox. Delete `/root/openbot-move.tar` on the VPS. Then give the row back with the statement
+below, but with `desired_state` and `observed_state` of before the move. On 2026-11-12 an export of
+24 GB took 9 minutes; a restart timer of boat started OpenBot during it, and tar stopped the export.
+The export now stops that timer.
 
 ```sql
 UPDATE hosted_servers SET provider_sandbox_id = retired_sandbox_id, retired_sandbox_id = NULL,
@@ -1269,7 +1542,7 @@ Not confirmed for Leaseweb:
 ### Reuse a pool machine
 
 A pool machine has one server at a time. When the server ends, the machine gets a new operating
-system and goes back to the pool for the next move. The Worker and the operator share the work:
+system and goes back to the pool for the next new server or the next move. The Worker and the operator share the work:
 
 1. The plan ends. The Worker sets `desired_state = 'stopped'` and `plan_ended_at`. `sync` stops
    OpenBot on the machine. The data stays, so the owner can renew.
@@ -1283,6 +1556,8 @@ system and goes back to the pool for the next move. The Worker and the operator 
    to `pool-free`, and sets `operator_host = NULL` on the deleted row. The machine is free.
    Leaseweb shows the state `RUNNING` for the whole reinstall, so `sync` waits until SSH shows new
    host keys.
+4. `prepare` installs OpenBot on the free machine again and offers it for a new server
+   ([A new server on a pool machine](#a-new-server-on-a-pool-machine)).
 
 A server that ended before migration 0053 gets `plan_ended_at` at the first cron run after the deploy,
 so its 30 days start then.
@@ -1299,9 +1574,11 @@ Then `remove` and `add`.
 | --- | --- |
 | `host_id` | `leaseweb:<VPS ID>`, as in `hosted_servers.operator_host`. |
 | `location` | The Leaseweb data center, such as `AMS-01`. |
-| `product` | `VPS02` or `VPS03`, from the Leaseweb pack. |
+| `product` | `VPS01`, `VPS02` or `VPS03`, from the Leaseweb pack. |
 | `added_at` | When the operator added the machine. |
 | `removed_at` | When the machine left the pool. `NULL` while it is in the pool. |
+| `assign_token_hash` | The SHA-256 of the token with which the machine asks for a new server. `NULL` when the machine is not offered. Migration 0055. |
+| `seen_at` | When the machine asked last. |
 
 `scripts/hosting/leaseweb-pool.ts` does the operator work. It shows what it would do and changes
 nothing without `--apply`. It reads the Leaseweb keys and the Cloudflare token from the environment,
@@ -1314,23 +1591,28 @@ bunx dotenvx run -f apps/auth-api/.env.production -fk <root>/.env.keys -- \
 
 | Command | Work |
 | --- | --- |
-| `status` | Read only. Free machines of each location and product, and the work of `sync`. |
+| `status` | Read only. Free and ready machines of each location and product, each free machine that is not ready, each new server that waits for its sign-in, and the work of `sync`. |
 | `add <VPS ID>...` | Adds bought machines. It reads the location and the product from Leaseweb, and sets the reference `pool-free` when the machine has none. It refuses a machine with another reference. |
 | `remove <VPS ID>...` | Takes a free machine out of the pool, for example before its contract ends. It refuses a machine that a server has. |
-| `sync` | Stops OpenBot where a plan ended, starts it where the owner renewed, and reinstalls each machine of a deleted server. It reinstalls only a machine of the pool. |
+| `sync` | Stops OpenBot where a plan ended, starts it where the owner renewed, and reinstalls each machine of a deleted server. It reinstalls only a machine of the pool. It also sets the reference of each machine on which a new server started. |
+| `prepare <VPS ID>... --keys=<file> [--reinstall]` | Installs the newest release, disabled, on free machines, runs the bootstrap with the operator keys in `<file>`, restarts each machine, and offers it for a new server. A prepared machine with no server data and an older OpenBot gets the newest release (`move-from-boat.sh upgrade`); `move` does the same. A disabled OpenBot does not update itself, so run `prepare` again after each release. A free machine that has the data of a server (a start that failed) is skipped; `--reinstall` erases it first. |
+| `move <server ID> <VPS ID> [--keys=<file>]` | Moves one server from boat to a free machine. See [Move a server from boat](#move-a-server-from-boat). It prepares the machine when necessary. The machine takes no new server from then on. |
 
 `sync` connects as root over SSH with the key of the operator. Not confirmed: SSH from a server of the
-operator. A move still uses [Move a server from boat](#move-a-server-from-boat) on a free machine,
-from step 2.
+operator. One key of the computer that runs `prepare` or `move` must be in `--keys`: the bootstrap
+turns off the password, and the script refuses a list without such a key.
 
-The OpenPanel dashboard "Server pool" (project `openbot`) shows the pool. Each hour, at minute 0, the
+The OpenPanel dashboard "Server pool" (project `openbot`) shows the pool. Each 5 minutes, the
 production Worker sends one `hosted_pool_snapshot` event for each location and product and one with
-`location = all` (see `ANALYTICS.md`). The test Worker has no OpenPanel keys and sends none. The
-snapshot counts each machine in one state:
+`location = all` (see `ANALYTICS.md`). The test Worker has no OpenPanel keys and sends none. Each
+report is a bar with the largest value of the snapshots in the last 30 minutes. Two local patches of
+the OpenPanel dashboard make this work: a bar with the `max` metric reads the value of each minute,
+and a tile with its own 30-minute range keeps it when the dashboard date picker has a longer range.
+A longer interval adds up more than one snapshot. The snapshot counts each machine in one state:
 
 | State | Machine |
 | --- | --- |
-| `free` | No server. Ready for a move. |
+| `free` | No server. Ready for a move. `ready` counts the free machines that a new server can get now. |
 | `to_reinstall` | Its server is deleted. Free after the next `sync`. |
 | `plan_ended` | Its plan ended. Free 30 days after `plan_ended_at`, unless the owner renews. |
 | `cancel_scheduled` | The owner cancelled the plan at the period end, or scheduled a delete. |
@@ -1340,7 +1622,8 @@ snapshot counts each machine in one state:
 A machine whose plan ends at the period end is free 30 days after that end. A plan that ended with a
 subscription that Stripe still retries, or with no subscription, has no date: the cron does not delete
 that server. A server that names a machine that is not in the
-pool is in the group `unknown`: add the machine. `bun run test:hosted-operator-pool` checks the
+pool is in the group `unknown`: add the machine. When `ready` is 0 for a product, the next customer of
+that plan starts on boat. `bun run test:hosted-operator-pool` checks the
 delete, the snapshot and its event on the real service with a fake Stripe and a fake boat.
 
 ## Not confirmed

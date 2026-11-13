@@ -57,17 +57,19 @@ export function browserRequestHeaders(
       }
     }
   }
-  setRequestHeader(headers, "Accept-Language", preferredBrowserLanguages());
   return headers;
 }
 
 /**
- * The `Accept-Language` value. As Chrome does, each language with a region also gives its base
- * language, after the last language of that base: `en-GB` gives `en-GB,en;q=0.9`.
- * `navigator.languages` keeps the list without the added base languages, also as in Chrome.
+ * The languages of the `Accept-Language` header, for `session.setUserAgent`. Chromium adds the
+ * q-values, and sends the header only on a request that has none: a value that the page set stays,
+ * because a site can sign it (#8272). As Chrome does, each language with a region also gives its
+ * base language, after the last language of that base: `en-GB` gives `en-GB,en;q=0.9`.
+ * `navigator.languages` does not read this list, so it has no added base languages, also as in Chrome.
  */
-function preferredBrowserLanguages(): string {
-  const codes = preferredBrowserLanguageCodes().split(",");
+export function preferredBrowserLanguageCodes(): string {
+  const languages = app.getPreferredSystemLanguages();
+  const codes = languages.length > 0 ? languages : [app.getLocale()];
   const base = (code: string) => code.split("-")[0] ?? code;
   const expanded: string[] = [];
   for (const [index, code] of codes.entries()) {
@@ -76,14 +78,7 @@ function preferredBrowserLanguages(): string {
     if (code.includes("-") && (next === undefined || base(next) !== base(code)) && !expanded.includes(base(code)))
       expanded.push(base(code));
   }
-  return expanded
-    .map((language, index) => (index === 0 ? language : `${language};q=${Math.max(1 - index * 0.1, 0.1).toFixed(1)}`))
-    .join(",");
-}
-
-export function preferredBrowserLanguageCodes(): string {
-  const languages = app.getPreferredSystemLanguages();
-  return (languages.length > 0 ? languages : [app.getLocale()]).join(",");
+  return expanded.join(",");
 }
 
 function setRequestHeader(headers: Record<string, string>, name: string, value: string): void {

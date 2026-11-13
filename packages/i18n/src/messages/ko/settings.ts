@@ -146,6 +146,7 @@ export const messages = {
   "settings.planStart.set": "설정",
   "settings.automationLimit.sectionTitle": "한도",
   "settings.automationLimit.sectionDescription": "이 컴퓨터의 모든 에이전트에 적용돼요.",
+  "settings.automationLimit.sectionDescriptionServer": "이 서버의 모든 에이전트에 적용돼요.",
   "settings.automationLimit.title": "시간당 요청",
   "settings.automationLimit.option": "시간당 {limit}회",
   "settings.automationLimit.note":
@@ -267,6 +268,9 @@ export const messages = {
     "독이 숨은 자리에 얇은 띠가 남습니다. 포인터를 가까이 가져가면 독이 나타납니다. 에이전트가 질문하면 띠에 색 물결이 올라갑니다.",
   "settings.agentDock.results.title": "완료된 작업 표시",
   "settings.agentDock.results.description": "에이전트가 완료한 결과가 잠시 독 옆에 표시됩니다.",
+  "settings.agentDock.activeSeats.title": "새 소식이 있는 에이전트 표시",
+  "settings.agentDock.activeSeats.description":
+    "독에 없는 에이전트나 채널도 새 메시지가 있거나 응답을 기다리는 동안 독에 표시됩니다.",
   "settings.agentDock.agents.title": "독의 에이전트",
   "settings.agentDock.agents.description": "{server}의 에이전트입니다. 서버마다 독이 따로 있습니다.",
   "settings.agentDock.agents.empty": "이 서버에는 아직 에이전트가 없습니다.",
@@ -686,10 +690,26 @@ export const messages = {
   "settings.transfer.count.noSettings": "서버 설정 없음",
   "settings.transfer.includeAgent": "{name} 포함",
   "settings.transfer.export.title": "이 서버 내보내기",
-  "settings.transfer.export.files": "워크스페이스 파일 포함",
-  "settings.transfer.export.filesDescription": "에이전트가 만든 파일과 공유 폴더예요. 파일 크기를 줄이려면 꺼 주세요.",
-  "settings.transfer.export.settings": "서버 설정 포함",
-  "settings.transfer.export.settingsDescription": "MCP 서버, 사용자 지정 모델 제공자, 사이드바 섹션, 루틴 흐름이에요.",
+  "settings.transfer.preset.label": "파일에 담을 항목",
+  "settings.transfer.preset.templates": "템플릿",
+  "settings.transfer.preset.everything": "전체",
+  "settings.transfer.meter.files": "/ {total} (워크스페이스 파일)",
+  "settings.transfer.part.agents": "에이전트와 설정",
+  "settings.transfer.part.agentsDescription": "{contents}. 항상 파일에 포함돼요.",
+  "settings.transfer.part.settings": "서버 설정",
+  "settings.transfer.part.chats": "채팅 기록",
+  "settings.transfer.part.chatsDescription":
+    "채팅과 사이드 스레드, 그 파일, 그리고 루틴의 실행 기록이에요. 에이전트가 맥락을 유지한 채 이 채팅을 이어가요.",
+  "settings.transfer.part.channels": "채널 메시지",
+  "settings.transfer.part.channelsDescription":
+    "내보내는 에이전트가 속한 채널의 메시지와 그 파일, 채널 루틴의 실행 기록이에요.",
+  "settings.transfer.part.files": "워크스페이스 파일",
+  "settings.transfer.part.filesDescription": "에이전트가 만든 파일과 공유 폴더예요.",
+  "settings.transfer.part.preferences": "서버 환경설정",
+  "settings.transfer.part.preferencesDescription":
+    "이름, 로고, 시간대, 성격, 에이전트 기본값, 모델 선택, 메모리 및 스킬 설정, 각 사용자의 알림 수준과 고정 항목이에요.",
+  "settings.transfer.export.settingsDescription":
+    "MCP 서버, 사용자 지정 모델 제공자, 사이드바 섹션, 루틴 흐름, 공유 스킬이에요.",
   "settings.transfer.export.chooseAgents": "에이전트 선택({total}개 중 {selected}개)",
   "settings.transfer.export.hideAgents": "에이전트 숨기기",
   "settings.transfer.export.agentsLabel": "내보낼 에이전트",
@@ -716,8 +736,11 @@ export const messages = {
   "settings.transfer.import.agentsLabel": "파일 속 에이전트",
   "settings.transfer.import.nameExists": "이미 사용 중인 이름",
   "settings.transfer.import.settings": "서버 설정 가져오기",
-  "settings.transfer.import.settingsDescription":
-    "이 서버에 없는 MCP 서버, 사용자 지정 모델 제공자, 사이드바 섹션을 추가해요.",
+  "settings.transfer.import.settingsAndPreferences":
+    "이 서버에 없는 MCP 서버, 사용자 지정 모델 제공자, 사이드바 섹션, 공유 스킬을 추가해요.",
+  "settings.transfer.import.preferences": "서버 환경설정 가져오기",
+  "settings.transfer.import.preferencesDescription":
+    "이 서버의 이름, 로고, 환경설정과 각 사람의 알림 수준 및 고정 항목을 파일의 것으로 바꿔요.",
   "settings.transfer.import.submit": { other: "에이전트 {count}개 가져오기" },
   "settings.transfer.import.submitSettings": "서버 설정 가져오기",
   "settings.transfer.import.importing": "가져오는 중…",

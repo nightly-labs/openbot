@@ -23,6 +23,7 @@ import {
   TEAM_PROMPT_MULTI_SELECT_CAPABILITY,
   TEAM_SUBAGENTS_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
+  TEAM_USAGE_TERTIARY_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { toWireAgentKeysObjectForPath } from "@openbot/contracts/team-protocol/current-agent-keys";
@@ -813,6 +814,7 @@ export class TeamWebRtcHostPeer {
             subagents: peerCapabilities.has(TEAM_SUBAGENTS_CAPABILITY),
             promptMultiSelect: peerCapabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
             videoGeneration: peerCapabilities.has(TEAM_VIDEO_GENERATION_CAPABILITY),
+            usageTertiary: peerCapabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
           };
           return yield* remoteDecode(() => ({
             status: response.status,
@@ -903,6 +905,7 @@ export class TeamWebRtcHostPeer {
                 // Only the V8 event reads them.
                 browserSignIn: this.#peerCapabilities.has(BROWSER_SIGN_IN_CAPABILITY),
                 contextUsage: this.#peerCapabilities.has(TEAM_CONTEXT_USAGE_CAPABILITY),
+                usageTertiary: this.#peerCapabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
                 // Only the V7 and V8 events read them.
                 uiBlocks: this.#peerCapabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
                 subagents: this.#peerCapabilities.has(TEAM_SUBAGENTS_CAPABILITY),

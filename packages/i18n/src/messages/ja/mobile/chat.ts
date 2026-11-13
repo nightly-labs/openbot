@@ -408,7 +408,14 @@ export const messages = {
   "mobile.chat.approval.effect.permissions":
     "許可すると {name} に {server} 上のこれらの権限を付与します。拒否すると現在の権限のままです。",
   "mobile.chat.approval.partial":
-    "このリクエストは長すぎるため、スマートフォンでは表示できません。許可するには {server} で OpenBot を開いてください。拒否はここでできます。",
+    "{server} はこのリクエストの冒頭だけをスマートフォンに送ります。許可するには、{server} の OpenBot を更新するか、OpenBot デスクトップアプリでこのチャットを開いてください。拒否はここでできます。",
+  "mobile.chat.approval.loading": "リクエスト全体を読み込み中…",
+  "mobile.chat.approval.loadFailed": "リクエスト全体を読み込めませんでした。拒否はここでできます。",
+  "mobile.chat.approval.retry": "再試行",
+  "mobile.chat.approval.report.bugHeadline": "バグを見つけましたか？直しましょう。",
+  "mobile.chat.approval.report.ideaHeadline": "アイデアがありますか？形にしましょう。",
+  "mobile.chat.approval.report.dontSend": "今はしない",
+  "mobile.chat.approval.report.send": "OpenBot チームに送信",
   "mobile.chat.approval.allow": "許可",
   "mobile.chat.approval.deny": "拒否",
   "mobile.chat.approval.reconnect": "このリクエストに回答するには {server} に接続してください。",

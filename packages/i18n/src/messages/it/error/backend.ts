@@ -65,6 +65,8 @@ export const messages = {
     "La compattazione non riduce questa chat: dopo due compattazioni usa ancora il {percent}% della finestra di contesto del modello, quindi OpenBot smette di compattarla. Strumenti e istruzioni usano la maggior parte della finestra. Disattiva i server MCP o l'uso del computer che questo agente non usa, oppure scegli un modello con una finestra più grande. Poi avvia una nuova chat.",
   "error.backend.contextCompactionStopped":
     "Due compattazioni di fila di questa chat non sono riuscite, quindi OpenBot smette di compattarla automaticamente. Ogni tentativo invia l'intera chat al modello e consuma il limite del tuo piano. Seleziona «Compatta ora» per riprovare, oppure avvia una nuova chat.",
+  "error.backend.providerModelAtCapacity":
+    "Il modello è al limite della capacità. Il provider riproverà tra qualche minuto. Per continuare ora, interrompi il turno e scegli un altro modello.",
   "error.backend.providerRetrying":
     "Il provider non è riuscito a completare questa richiesta {attempts} volte e riprova. Se l'agente non continua, interrompi il turno.",
   "error.backend.providerRetryingLargeContext":
@@ -369,6 +371,8 @@ export const messages = {
     "Il proxy {name} ha rifiutato l’accesso, quindi la pagina non si è aperta.",
   "error.backend.browserProxyComputerUnreachable":
     "Il computer di questo profilo non risponde, quindi la pagina non si è aperta.",
+  "error.backend.browserProxyComputerLocalAddress":
+    "Il computer usato da questo profilo apre solo siti pubblici. Non apre indirizzi di una rete locale, quindi la pagina non si è aperta.",
   "error.backend.browserCertificateUntrusted":
     "Il certificato di sicurezza di questo sito non è attendibile, quindi la pagina non si è aperta.",
   "error.backend.browserLowMemory":

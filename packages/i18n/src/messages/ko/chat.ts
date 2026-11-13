@@ -344,6 +344,8 @@ export const messages = {
   "chat.video.time": "{elapsed} / {duration}",
   "chat.video.download": "동영상 다운로드",
   "chat.video.open": "동영상 열기",
+  "chat.video.mute": "동영상 음소거",
+  "chat.video.unmute": "동영상 음소거 해제",
   "chat.message.you": "나",
   "chat.message.agentFallback": "에이전트",
   "chat.message.memberFallback": "팀 멤버",
