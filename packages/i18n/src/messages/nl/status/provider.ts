@@ -13,8 +13,6 @@ export const messages = {
     "De server van {provider} is bezet of heeft een fout. Poging {attempt} van {maxAttempts}.",
   "status.provider.retryRecovered": "{provider} krijgt weer antwoorden van zijn server.",
   "status.provider.retryNoLimit": "De server van {provider} is bezet of heeft een fout. Poging {attempt}.",
-  "status.provider.noAnswerYet": "{provider} heeft nog niet geantwoord. OpenBot wacht nog.",
-  "status.provider.promptSentAgain": "{provider} gaf geen antwoord, dus OpenBot heeft je bericht opnieuw verzonden.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude antwoordde op de standaardsnelheid. Met een Claude-abonnement gebruikt de snelle modus gebruikstegoed. Schakel het in je Claude-account in.",
   "status.provider.claudeFastModeNotOnPlan":

@@ -12,8 +12,6 @@ export const messages = {
     "{provider} のサーバーが混雑しているか、エラーが発生しています。再試行 {attempt}/{maxAttempts}。",
   "status.provider.retryRecovered": "{provider} がサーバーから再び応答を受け取っています。",
   "status.provider.retryNoLimit": "{provider} のサーバーが混雑しているか、エラーが発生しています。再試行 {attempt}。",
-  "status.provider.noAnswerYet": "{provider} からまだ応答がありません。OpenBot は引き続き待機しています。",
-  "status.provider.promptSentAgain": "{provider} が応答しなかったため、OpenBot はメッセージをもう一度送信しました。",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude は標準の速度で応答しました。Claude サブスクリプションでは、高速モードは使用クレジットを使います。Claude アカウントでオンにしてください。",
   "status.provider.claudeFastModeNotOnPlan":

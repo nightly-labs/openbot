@@ -162,12 +162,6 @@ const ACP_TURN_STALL_MS = 5 * 60_000;
  */
 const ACP_FIRST_UPDATE_MS = 3 * 60_000;
 
-/**
- * How long such a prompt may get no update before the chat says that the agent did not answer yet.
- * The chat showed nothing for the 6 minutes of both prompts, as if the agent was broken (#8238).
- */
-const ACP_NO_ANSWER_NOTICE_MS = 60_000;
-
 /** The result of a prompt that got no update within `ACP_FIRST_UPDATE_MS`. */
 const SILENT_PROMPT = Symbol("silent prompt");
 
@@ -252,7 +246,7 @@ interface AcpTurn {
    * (`AcpFlavor.sdkHarness.retryNotice`), until the answer or the failure text comes.
    */
   retryNotices: string;
-  /** The chat shows that the agent waits for its model. The next output of the turn ends that. */
+  /** The chat shows that the agent tries a model request again. The next output of the turn ends that. */
   waitNotice: boolean;
   /** The prompt told the model not to answer, so an empty turn is a success. */
   answerOptional: boolean;
@@ -2580,17 +2574,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     );
     if (!this.#flavor.promptOpenForBackgroundTasks || !this.#supportsSessionResume) return yield* send;
     const limit = this.options.firstUpdateMs ?? ACP_FIRST_UPDATE_MS;
-    const noticeAt = Math.min(ACP_NO_ANSWER_NOTICE_MS, limit / 2);
-    let noticed = false;
-    const silent = Effect.sleep(noticeAt).pipe(
-      Effect.tap(() =>
-        Effect.sync(() => {
-          if (noticed || turn.answered || turn.stopped) return;
-          noticed = true;
-          this.#showWait(thread, turn, sourceText("status.provider.noAnswerYet", { provider: this.#label }));
-        }),
-      ),
-      Effect.flatMap(() => Effect.sleep(limit - noticeAt)),
+    const silent = Effect.sleep(limit).pipe(
       Effect.flatMap(() => (turn.answered || turn.stopped ? Effect.never : Effect.succeed(SILENT_PROMPT))),
     );
     for (let attempt = 1; ; attempt += 1) {
@@ -2631,18 +2615,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         );
       }
       turn.lastActivityAt = Date.now();
-      this.#showWait(thread, turn, sourceText("status.provider.promptSentAgain", { provider: this.#label }));
     }
   });
-
-  /** Shows in the chat that the turn waits for the agent's model, until the turn's next output. */
-  #showWait(thread: AcpThread, turn: AcpTurn, detail: string): void {
-    turn.waitNotice = true;
-    this.emit("notification", {
-      method: "openbot/turn-progress",
-      params: { threadId: thread.id, turnId: turn.id, detail },
-    });
-  }
 
   /**
    * Rebuilds a session's harness with `session/resume` and `restore`. The session that opens again
@@ -2906,11 +2880,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const attempt = text === null || failureText ? null : (this.#flavor.sdkHarness?.retryNotice?.(text) ?? null);
     if (text !== null && attempt !== null) {
       turn.retryNotices += text;
-      this.#showWait(
-        thread,
-        turn,
-        sourceText("status.provider.retryNoLimit", { provider: this.#label, attempt: String(attempt) }),
-      );
+      turn.waitNotice = true;
+      this.emit("notification", {
+        method: "openbot/turn-progress",
+        params: {
+          threadId: thread.id,
+          turnId: turn.id,
+          detail: sourceText("status.provider.retryNoLimit", { provider: this.#label, attempt: String(attempt) }),
+        },
+      });
       return;
     }
     if (turn.retryNotices && update.sessionUpdate === "agent_message_chunk" && update.content.type === "text") {

@@ -13,8 +13,6 @@ export const messages = {
     "O servidor do {provider} está ocupado ou com erro. Nova tentativa {attempt} de {maxAttempts}.",
   "status.provider.retryRecovered": "{provider} voltou a receber respostas do servidor.",
   "status.provider.retryNoLimit": "O servidor do {provider} está ocupado ou com erro. Nova tentativa {attempt}.",
-  "status.provider.noAnswerYet": "{provider} ainda não respondeu. O OpenBot continua aguardando.",
-  "status.provider.promptSentAgain": "{provider} não respondeu, então o OpenBot enviou sua mensagem novamente.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "O Claude respondeu na velocidade padrão. Com uma assinatura do Claude, o modo rápido usa créditos de uso. Ative-os na sua conta do Claude.",
   "status.provider.claudeFastModeNotOnPlan":

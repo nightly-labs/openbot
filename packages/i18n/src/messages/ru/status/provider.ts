@@ -13,8 +13,6 @@ export const messages = {
     "Сервер {provider} перегружен или вернул ошибку. Повтор {attempt} из {maxAttempts}.",
   "status.provider.retryRecovered": "{provider} снова получает ответы от своего сервера.",
   "status.provider.retryNoLimit": "Сервер {provider} перегружен или вернул ошибку. Повтор {attempt}.",
-  "status.provider.noAnswerYet": "{provider} ещё не ответил. OpenBot продолжает ждать.",
-  "status.provider.promptSentAgain": "{provider} не ответил, поэтому OpenBot отправил ваше сообщение ещё раз.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude ответил на стандартной скорости. С подпиской Claude быстрый режим расходует кредиты использования. Включите их в аккаунте Claude.",
   "status.provider.claudeFastModeNotOnPlan":

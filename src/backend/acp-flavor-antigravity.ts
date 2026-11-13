@@ -44,7 +44,7 @@ const GEMINI_ACCOUNT_LINK = /https:\/\/accounts\.google\.com\/signin\/[^\s<>"'`)
  */
 const GEMINI_WARNING_ANSWER = /^\n\u26A0 /u;
 /**
- * The Antigravity CLI 1.5.6 tries a failed model request again, 8 times in about 2 minutes. Before
+ * The Antigravity CLI 1.5.8 tries a failed model request again, 8 times in about 2 minutes. Before
  * each try it sends "\n⚠ API error (attempt 1): Error 503, Message: ..., Status: UNAVAILABLE,
  * Details: []\n" as answer text. When no try works, "⚠ Agent execution terminated due to error."
  * follows; when one works, the answer of the model follows (#8238).
