@@ -156,7 +156,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     heldWhileWritten(message) &&
     (deps.props.channel
       ? message.senderAgentId !== undefined && channelWriters().has(message.senderAgentId)
-      : !turnSettled());
+      : Boolean(deps.props.activeTurnId) || !turnSettled());
   /* The quiet answers of a teammate update show under its marker, so they have no row of their own. */
   const updateAnswers = createMemo(() => teammateUpdateAnswers(deps.props.messages));
   const foldedAnswerIds = createMemo(
