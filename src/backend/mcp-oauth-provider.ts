@@ -72,6 +72,12 @@ const MCP_CLIENT_METADATA_URL = "https://openbot.run/oauth/mcp-client.json";
 /** The `client_name` that OpenBot registers with. */
 export const MCP_CLIENT_NAME = "OpenBot";
 
+/**
+ * The second path of the loopback grant listener. Dropbox registers only the loopback paths of the
+ * MCP clients that it knows, `/callback` among them, and refuses `/mcp-auth` with a 403 (#8025).
+ */
+export const MCP_OAUTH_CALLBACK_PATH = "/callback";
+
 /** What one server's sign-in leaves behind, and all of it: nothing else is kept between runs. */
 export const mcpOAuthRecordSchema = z.object({
   /**
@@ -942,15 +948,25 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    *
    * A registration that this sign-in keeps in memory while tokens are on file (#6975) is the client
    * that the authorization request names, so its address is the one to send.
+   *
+   * The `/callback` form only when the registration names it and not this run's address: a server
+   * that refused `/mcp-auth` registered it (see `watchRegistration`).
    */
   get redirectUrl(): string {
     const record = this.#record();
-    const { app } = record;
+    const own = this.#options.redirectUrl;
     const client = this.#registeredClient ?? record.client;
+    if (record.app || !client) return own;
     const deepLink = this.#deepLinkRedirectUrl;
-    if (!app && deepLink && client?.redirect_uris.includes(deepLink)) return deepLink;
+    if (deepLink && client.redirect_uris.includes(deepLink)) return deepLink;
     const localhost = this.#localhostRedirectUrl;
-    return localhost && !app && client?.redirect_uris.includes(localhost) ? localhost : this.#options.redirectUrl;
+    if (localhost && client.redirect_uris.includes(localhost)) return localhost;
+    if (client.redirect_uris.includes(own)) return own;
+    for (const address of [own, localhost]) {
+      const callback = address ? callbackRedirectUrl(address) : null;
+      if (callback && registersAddress(client.redirect_uris, callback)) return callback;
+    }
+    return own;
   }
 
   /**
@@ -1070,7 +1086,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       !client.scope ||
       !discovery?.resourceMetadata?.scopes_supported?.length ||
       !scopeWithOfflineAccess(client.scope, discovery.authorizationServerMetadata);
-    if (client.redirect_uris.includes(this.redirectUrl) && scopeAllowed) return client;
+    if (registersAddress(client.redirect_uris, this.redirectUrl) && scopeAllowed) return client;
     return this.#register();
   }
 
@@ -1104,6 +1120,10 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    * form of the same address, which the listener also answers. The MCP authorization specification
    * names `localhost` redirects, and some servers accept only that name (#5584). A `localhost`
    * registration after an unanswered sign-in (#6149) gets the `127.0.0.1` form in the same way.
+   *
+   * A server that refuses a loopback registration with 401 or 403 gets one more with the `/callback`
+   * form of the address it refused, which the listener also answers. Dropbox accepts only the paths
+   * of the MCP clients it knows (#8025). A server that refuses OpenBot itself refuses that one too.
    */
   watchRegistration(fetch: FetchLike): FetchLike {
     return async (input, init) => {
@@ -1117,9 +1137,21 @@ class McpOAuthClientProvider implements OAuthClientProvider {
         if (!(await refusesRedirectAddress(response))) break;
         response = await fetch(input, retry);
       }
+      const callback = response.status === 401 || response.status === 403 ? this.#withCallbackPath(request) : null;
+      if (callback) response = await fetch(input, callback);
       this.#registrationStatus = response.status;
       return response;
     };
+  }
+
+  /** The registration body with the `/callback` form of the loopback address of this run that it sent, or `null`. */
+  #withCallbackPath(init: RequestInit): RequestInit | null {
+    if (typeof init.body !== "string") return null;
+    const body = registrationBodySchema.parse(JSON.parse(init.body));
+    const sent = body.redirect_uris?.length === 1 ? body.redirect_uris[0] : undefined;
+    const own = sent === this.#options.redirectUrl || sent === this.#localhostRedirectUrl;
+    const callback = sent && own ? callbackRedirectUrl(sent) : null;
+    return callback ? { ...init, body: JSON.stringify({ ...body, redirect_uris: [callback] }) } : null;
   }
 
   /**
@@ -1678,6 +1710,31 @@ function localhostRedirectUrl(redirectUrl: string): string | null {
   if (url?.protocol !== "http:" || url.hostname !== "127.0.0.1") return null;
   url.hostname = "localhost";
   return url.href;
+}
+
+/** The `/callback` form of a loopback address, or `null` for any other address and for that form. */
+function callbackRedirectUrl(redirectUrl: string): string | null {
+  const url = URL.parse(redirectUrl);
+  if (url?.protocol !== "http:" || (url.hostname !== "127.0.0.1" && url.hostname !== "localhost")) return null;
+  if (url.pathname === MCP_OAUTH_CALLBACK_PATH) return null;
+  url.pathname = MCP_OAUTH_CALLBACK_PATH;
+  url.search = "";
+  url.hash = "";
+  return url.href;
+}
+
+/**
+ * Whether a registration names `address`. A loopback address also matches its form with no port:
+ * RFC 8252 (7.3) lets the port of a loopback redirect change, and Dropbox registers its loopback
+ * addresses with no port (#8025). Only the port is left out, as OpenClaw does (#170876).
+ */
+function registersAddress(registered: readonly string[], address: string): boolean {
+  if (registered.includes(address)) return true;
+  const url = URL.parse(address);
+  if (url?.protocol !== "http:" || (url.hostname !== "127.0.0.1" && url.hostname !== "localhost") || !url.port)
+    return false;
+  url.port = "";
+  return registered.includes(url.href);
 }
 
 /** `scope` with `offline_access` added, or `null` when `withOfflineAccess` leaves it as it is. */
