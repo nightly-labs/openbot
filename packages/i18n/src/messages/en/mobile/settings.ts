@@ -143,6 +143,8 @@ export const messages = defineMessages("mobile.settings", {
     "Search results and search messages fade in and out with a short blur when they change. When motion is reduced, they only fade. When this is off, they change at once.",
   "mobile.settings.feedback.footer": "Touch feedback for actions in the app on this device.",
   "mobile.settings.feedback.haptics": "Haptics",
+  "mobile.settings.feedback.replies": "Reply haptics",
+  "mobile.settings.feedback.repliesFooter": "Taps while an agent's reply appears in a chat. The other haptics stay on.",
   "mobile.settings.feedback.retry": "Retry saving haptics setting",
   "mobile.settings.liveActivities.title": "Live Activities",
   "mobile.settings.liveActivities.footer":
@@ -225,6 +227,9 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.conversations.largeFiles": "Download large files automatically",
   "mobile.settings.conversations.largeFilesFooter":
     "Images, videos and audio larger than {small} download only when you tap them. Turn this on to download them at once, up to {large}. This can use a lot of mobile data.",
+  "mobile.settings.conversations.fullQualityPhotos": "Send photos at full quality",
+  "mobile.settings.conversations.fullQualityPhotosFooter":
+    "When this is off, the app sends a smaller copy of each photo, up to 2048 pixels on the long side. It arrives faster on a slow connection. Turn this on to send the original photo.",
   "mobile.settings.profile.nameUnsafe": "Remove line breaks and control characters from your name.",
   "mobile.settings.profile.nameLength": "Use 3–20 characters for your display name.",
   "mobile.settings.profile.saveFailed": "Could not save changes. Try again.",

@@ -145,6 +145,9 @@ export const messages = {
     "Quando cambiano, i risultati e i messaggi di ricerca compaiono e scompaiono con una breve sfocatura. Con il movimento ridotto, si dissolvono soltanto. Quando l'opzione è disattivata, cambiano subito.",
   "mobile.settings.feedback.footer": "Feedback al tocco per le azioni nell'app su questo dispositivo.",
   "mobile.settings.feedback.haptics": "Feedback aptico",
+  "mobile.settings.feedback.replies": "Feedback aptico risposte",
+  "mobile.settings.feedback.repliesFooter":
+    "Vibrazioni mentre la risposta di un agente appare in chat. L'altro feedback aptico resta attivo.",
   "mobile.settings.feedback.retry": "Riprova a salvare l'impostazione del feedback aptico",
   "mobile.settings.liveActivities.title": "Live Activity",
   "mobile.settings.liveActivities.footer":
@@ -228,6 +231,9 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Scarica automaticamente i file grandi",
   "mobile.settings.conversations.largeFilesFooter":
     "Immagini, video e audio oltre {small} si scaricano solo quando li tocchi. Attiva questa opzione per scaricarli subito, fino a {large}. Può usare molti dati mobili.",
+  "mobile.settings.conversations.fullQualityPhotos": "Invia le foto alla massima qualità",
+  "mobile.settings.conversations.fullQualityPhotosFooter":
+    "Se è disattivato, l’app invia una copia più piccola di ogni foto, fino a 2048 pixel sul lato lungo. Arriva prima con una connessione lenta. Attivalo per inviare la foto originale.",
   "mobile.settings.profile.nameUnsafe": "Rimuovi dal nome gli a capo e i caratteri di controllo.",
   "mobile.settings.profile.nameLength": "Usa da 3 a 20 caratteri per il nome visualizzato.",
   "mobile.settings.profile.saveFailed": "Impossibile salvare le modifiche. Riprova.",

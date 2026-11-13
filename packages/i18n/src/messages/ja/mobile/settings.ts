@@ -145,6 +145,9 @@ export const messages = {
     "検索結果と検索メッセージは、変わるときに短いぼかしでフェードイン・フェードアウトします。動きを減らしているときはフェードのみです。オフにすると、すぐに切り替わります。",
   "mobile.settings.feedback.footer": "このデバイスでのアプリ操作の触覚フィードバックです。",
   "mobile.settings.feedback.haptics": "触覚フィードバック",
+  "mobile.settings.feedback.replies": "返信の触覚フィードバック",
+  "mobile.settings.feedback.repliesFooter":
+    "チャットにエージェントの返信が表示される間の振動です。ほかの触覚フィードバックはオンのままです。",
   "mobile.settings.feedback.retry": "触覚フィードバックの設定をもう一度保存",
   "mobile.settings.liveActivities.title": "ライブアクティビティ",
   "mobile.settings.liveActivities.footer":
@@ -229,6 +232,9 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "大きなファイルを自動でダウンロード",
   "mobile.settings.conversations.largeFilesFooter":
     "{small} を超える画像、動画、音声は、タップしたときだけダウンロードされます。オンにすると、{large} まですぐにダウンロードします。モバイルデータを多く使う場合があります。",
+  "mobile.settings.conversations.fullQualityPhotos": "写真を元の画質で送信",
+  "mobile.settings.conversations.fullQualityPhotosFooter":
+    "オフの場合、アプリは各写真の小さいコピー(長辺 最大 2048 ピクセル)を送信します。遅い接続でも早く届きます。元の写真を送信するにはオンにしてください。",
   "mobile.settings.profile.nameUnsafe": "名前から改行と制御文字を削除してください。",
   "mobile.settings.profile.nameLength": "表示名は 3〜20 文字にしてください。",
   "mobile.settings.profile.saveFailed": "変更を保存できませんでした。もう一度お試しください。",

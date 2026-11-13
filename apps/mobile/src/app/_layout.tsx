@@ -34,6 +34,7 @@ import { loadLiveActivitiesPreference } from "@/features/settings/model/live-act
 import { loadMessageColor } from "@/features/settings/model/message-color";
 import { useMotionPreferences } from "@/features/settings/model/motion";
 import { loadMotionPreferences } from "@/features/settings/model/motion-storage";
+import { loadPhotoQualityPreference } from "@/features/settings/model/photo-quality";
 import { loadPushNotificationPreference } from "@/features/settings/model/push-notifications";
 import { loadRoutineCollapsePreference } from "@/features/settings/model/routine-collapse";
 import { loadTextSize } from "@/features/settings/model/text-size";
@@ -223,6 +224,7 @@ export default function RootLayout() {
       void loadAppearance().catch(() => undefined);
       void loadHapticsPreference().catch(() => undefined);
       void loadLargeFilePreference().catch(() => undefined);
+      void loadPhotoQualityPreference().catch(() => undefined);
       void loadMessageColor().catch(() => undefined);
       void loadRoutineCollapsePreference().catch(() => undefined);
       void loadChatOrderPreference().catch(() => undefined);

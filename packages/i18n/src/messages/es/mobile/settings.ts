@@ -149,6 +149,9 @@ export const messages = {
     "Los resultados y los mensajes de la búsqueda aparecen y desaparecen con un breve desenfoque cuando cambian. Con el movimiento reducido, solo se desvanecen. Si está desactivado, cambian al instante.",
   "mobile.settings.feedback.footer": "Respuesta táctil para las acciones en la aplicación en este dispositivo.",
   "mobile.settings.feedback.haptics": "Respuesta háptica",
+  "mobile.settings.feedback.replies": "Háptica de respuestas",
+  "mobile.settings.feedback.repliesFooter":
+    "Toques mientras aparece la respuesta de un agente en un chat. La otra háptica sigue activa.",
   "mobile.settings.feedback.retry": "Reintentar guardar el ajuste háptico",
   "mobile.settings.liveActivities.title": "Actividades en directo",
   "mobile.settings.liveActivities.footer":
@@ -232,6 +235,9 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Descargar archivos grandes automáticamente",
   "mobile.settings.conversations.largeFilesFooter":
     "Las imágenes, los vídeos y el audio de más de {small} solo se descargan cuando los tocas. Activa esto para descargarlos al momento, hasta {large}. Puede usar muchos datos móviles.",
+  "mobile.settings.conversations.fullQualityPhotos": "Enviar fotos en calidad completa",
+  "mobile.settings.conversations.fullQualityPhotosFooter":
+    "Si está desactivado, la app envía una copia más pequeña de cada foto, de hasta 2048 píxeles en el lado largo. Llega antes con una conexión lenta. Actívalo para enviar la foto original.",
   "mobile.settings.profile.nameUnsafe": "Elimina los saltos de línea y los caracteres de control de tu nombre.",
   "mobile.settings.profile.nameLength": "Usa entre 3 y 20 caracteres para tu nombre visible.",
   "mobile.settings.profile.saveFailed": "No se pudieron guardar los cambios. Vuelve a intentarlo.",

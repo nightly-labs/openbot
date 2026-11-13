@@ -2393,7 +2393,11 @@ export class TurnLifecycle {
     let message = snapshot.messages.find((candidate) => candidate.id === id);
     if (!message && !this.#runningTurns.has(turnId)) {
       message = this.#store.database.readConversationMessages(agentId, snapshot.threadId, [id])[0];
-      if (!message) return;
+      // A quiet routine run removes the list, but the update still ends the agent's work (#8156).
+      if (!message) {
+        if (this.#trackSubagents(agentId, turnId, subagents)) this.#hooks.emitRuntimeSnapshot();
+        return;
+      }
       snapshot.messages.push(message);
     }
     if (!message) {
