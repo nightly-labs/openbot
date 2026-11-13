@@ -1212,6 +1212,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       // The router is made later; a note comes only from a tool call, after both exist.
       noteVaultChange: (agentId, threadId, turnId, text) => this.#tools.postVaultNote(agentId, threadId, turnId, text),
       apiKeys: options.agentApiKeys ?? null,
+      // The turn lifecycle is made later; a request comes only from a running turn, after both exist.
+      codexSubagentParent: (childThreadId) => this.#turn.codexSubagentParent(childThreadId),
     });
     this.#duplication = new DuplicationGate({
       store,
