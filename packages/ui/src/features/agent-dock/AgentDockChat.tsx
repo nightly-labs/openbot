@@ -15,6 +15,8 @@ import {
   IconButton,
   Maximize2,
   PanelRight,
+  Pin,
+  PinOff,
   Plus,
   X,
 } from "@openbot/ui";
@@ -117,6 +119,10 @@ export function AgentDockChat(props: {
   onDraftChange: (value: string) => void;
   onSend: () => void;
   onClose: () => void;
+  /** True while the chat stays open when the dock window loses the focus. */
+  pinned?: boolean | undefined;
+  /** The header shows "Keep open" only when it is set. */
+  onPinChange?: ((pinned: boolean) => void) | undefined;
   onRemove: () => void;
   /** Puts a temporary seat on the dock. */
   onAdd: () => void;
@@ -279,6 +285,21 @@ export function AgentDockChat(props: {
           <strong>{name()}</strong>
           <span>{subtitle()}</span>
         </div>
+        <Show when={props.onPinChange}>
+          {(change) => (
+            <IconButton
+              label={props.pinned ? t("agent.dock.closeOnLeave") : t("agent.dock.keepOpen")}
+              variant="ghost"
+              class="agent-dock-icon"
+              aria-pressed={props.pinned ? "true" : "false"}
+              onClick={() => change()(!props.pinned)}
+            >
+              <Show when={props.pinned} fallback={<Pin aria-hidden="true" />}>
+                <PinOff aria-hidden="true" />
+              </Show>
+            </IconButton>
+          )}
+        </Show>
         <DropdownMenu.Root placement="bottom-end" gutter={4}>
           <DropdownMenu.Trigger class="agent-dock-icon" aria-label={t("agent.dock.more")}>
             <Ellipsis aria-hidden="true" />

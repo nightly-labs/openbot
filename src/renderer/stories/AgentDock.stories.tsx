@@ -234,6 +234,8 @@ function AgentDockStory(props: { seats: AgentDockSeatRef[]; results?: AgentDockS
           (channel) => !state.seats.includes(agentDockSeatKey({ kind: "channel", id: channel.id })),
         )}
         chat={chat}
+        // As in the dock window, the chat header shows "Keep open".
+        blurRequest={0}
         results={state.results}
         tucked={tucked()}
         onOpenChange={(seat) => {
