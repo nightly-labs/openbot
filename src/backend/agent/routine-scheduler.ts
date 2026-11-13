@@ -22,6 +22,7 @@ import { routineConversationEventItemType, routineRunConversationEventItemType }
 import type { EventRoutine } from "@openbot/contracts/ipc-events";
 import { type DynamicRecord, isBoolean } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import { collapseMissedOccurrences, RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { Effect, Schema } from "effect";
 import { AgentRoutineStore } from "../agent-routine-store";
@@ -111,6 +112,8 @@ export interface RoutineHooks {
   routineDeleted(agentId: string, routineId: string): Effect.Effect<void>;
 }
 
+const logger = createOpenBotLogger("routine-scheduler");
+
 /** Enough for every message a busy host queues between restarts; each entry is a few bytes. */
 const DELIVERY_TIMEZONE_LIMIT = 10_000;
 /**
@@ -169,11 +172,6 @@ export class RoutineScheduler implements RoutineDueSource {
    * routine that is halfway deleted.
    */
   readonly #deletionAgents = new Set<string>();
-  /**
-   * The runs that the user stops now. A turn that ends while its Stop waits ends the run as cancelled,
-   * not as interrupted. Memory only: a restart interrupts every turn anyway.
-   */
-  readonly #stoppingRuns = new Set<string>();
   readonly #timer: RoutineTimer;
   readonly #timezone: () => string;
   readonly #webhookRoutines: (() => WebhookRoutineWriter) | undefined;
@@ -490,35 +488,40 @@ export class RoutineScheduler implements RoutineDueSource {
   }, Effect.uninterruptible);
 
   /**
-   * The user's Stop for one run that has not ended: its turn stops, also in the routine's own side
-   * thread, its queued delivery is cancelled, and the run ends as cancelled. A run that has ended stays
-   * as it is.
+   * The user's Stop for one run that has not ended. The run ends as cancelled first, so the end of its
+   * turn cannot change that. Then its queued delivery is cancelled and its turn stops, also in the
+   * routine's own side thread. A turn that cannot be stopped, such as one whose provider has exited,
+   * does not keep the run open. A run that has ended stays as it is.
    */
   readonly stopRun = Effect.fn("RoutineScheduler.stopRun")(function* (
     this: RoutineScheduler,
     input: { agentId: string; routineId: string; runId: string },
   ) {
-    const live = () =>
-      this.#routines.activeRuns(input.agentId, input.routineId).filter((run) => run.id === input.runId);
-    const runs = yield* routineStep(live);
+    const runs = yield* routineStep(() => {
+      const live = this.#routines.activeRuns(input.agentId, input.routineId).filter((run) => run.id === input.runId);
+      for (const run of live) {
+        this.#transitionRunWithConversation(run, "cancelled");
+        if (run.deliveryId && this.#mailbox.getDelivery(run.deliveryId)?.delivery.status === "queued")
+          this.#mailbox.cancelNow(input.agentId, run.deliveryId);
+      }
+      return live;
+    });
     if (runs.length === 0) return;
-    yield* Effect.acquireUseRelease(
-      Effect.sync(() => this.#stoppingRuns.add(input.runId)),
-      () =>
-        Effect.gen({ self: this }, function* () {
-          yield* this.#interruptRunsEffect(input.agentId, runs);
-          yield* routineStep(() => {
-            for (const run of live()) {
-              if (run.deliveryId && this.#mailbox.getDelivery(run.deliveryId)?.delivery.status === "queued")
-                this.#mailbox.cancelNow(input.agentId, run.deliveryId);
-              this.#transitionRunWithConversation(run, "cancelled");
-            }
-            this.#hooks.emitQueue(input.agentId);
-            this.stateChanged(input.agentId);
-          });
-        }),
-      () => Effect.sync(() => this.#stoppingRuns.delete(input.runId)),
+    yield* this.#interruptRunsEffect(input.agentId, runs).pipe(
+      Effect.catch((failure) =>
+        Effect.sync(() =>
+          logger.warn("A stopped routine run's turn did not stop.", {
+            runId: input.runId,
+            cause: String(failure.cause),
+          }),
+        ),
+      ),
     );
+    yield* routineStep(() => {
+      this.#hooks.emitQueue(input.agentId);
+      this.stateChanged(input.agentId);
+      if (this.#mailbox.nextQueued(input.agentId)) this.#hooks.scheduleDrain(input.agentId);
+    });
   }, Effect.uninterruptible);
 
   readonly test = Effect.fn("RoutineScheduler.test")(function* (
@@ -868,8 +871,7 @@ export class RoutineScheduler implements RoutineDueSource {
     const run = this.#routines.runForDelivery(delivery.id);
     // A run the user stopped stays cancelled when its turn ends after the Stop.
     if (!run || run.status === "cancelled") return false;
-    const ended = routineStatusForDelivery(delivery);
-    const status = this.#stoppingRuns.has(run.id) && ended === "interrupted" ? "cancelled" : ended;
+    const status = routineStatusForDelivery(delivery);
     if (run.status === "needs-attention" && ["starting", "running"].includes(delivery.status)) return false;
     if (run.status === status && run.error === delivery.error) return false;
     if (status === "queued") this.#routines.updateRunStatus(run.id, status, delivery.error);

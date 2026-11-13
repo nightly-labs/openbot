@@ -170,7 +170,7 @@ export async function routeRoutineFlows(
   const requireManage = (agentIds: readonly string[]) => {
     for (const agentId of agentIds) requireAgentLevel(context, agentId, "manage");
   };
-  const requireVisibleFlow = async (ref: { routineId: string } | { linkId: string }) => {
+  const requireVisibleFlow = async (ref: { routineId: string } | { linkId: string } | { runId: string }) => {
     const touched = await run(routineFlows.agentsOf(ref));
     if (!touched?.every((agentId) => !hiddenAgentIds.has(agentId))) agentNotFound();
     requireManage(touched);
@@ -223,7 +223,8 @@ export async function routeRoutineFlows(
       if (!capabilities.has(ROUTINE_FLOW_STOP_CAPABILITY))
         throw new HttpError(400, sourceText("error.team.routineFlowStopUnsupported"));
       const input = parse(parseStopRoutineFlowRun, body);
-      await requireVisibleFlow({ routineId: input.routineId });
+      // Every agent of the run, also one whose link was removed after the run handed work to it.
+      await requireVisibleFlow({ runId: input.runId });
       await run(routineFlows.stopRun(input));
       return json(200, {});
     }

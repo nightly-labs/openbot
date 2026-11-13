@@ -2,6 +2,7 @@
 // It runs no flow, so a step only exists when a story seeds one.
 
 import type { OpenBotDesktopApi, Routine, RoutineFlowLink, RoutineFlowStep, RoutineRun } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 
 interface MockRoutineFlowsSource {
   routines: Map<string, Routine[]>;
@@ -106,7 +107,7 @@ export function mockRoutineFlows(
     // A stopped run ends as cancelled, its open steps with it; a run that has ended stays as it is.
     stopRun: async (input) => {
       const run = source.routineRuns.get(input.routineId)?.find((candidate) => candidate.id === input.runId);
-      if (!run) throw new Error("This routine run no longer exists.");
+      if (!run) throw new Error(sourceText("error.backend.routineRunGone"));
       const now = new Date().toISOString();
       if (run.status === "queued" || run.status === "running" || run.status === "needs-attention")
         Object.assign(run, { status: "cancelled", updatedAt: now });

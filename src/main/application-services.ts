@@ -2192,6 +2192,24 @@ export async function createApplicationServices({
     if (event.type === "agents-changed") Effect.runFork(automation.requestSync());
   });
   teardown.push(TEARDOWN_ORDER.automation, "the automation server", () => Effect.runPromise(automation.stop()));
+  /**
+   * Stops a handoff that a routine flow or a workflow sent: the turn that answers it, else its place
+   * in the queue. A handoff that has ended has nothing to stop.
+   */
+  const stopHandoff = (agentId: string, deliveryId: string) => {
+    const found = mailbox.getDelivery(deliveryId)?.delivery;
+    if (
+      !found ||
+      found.status === "completed" ||
+      found.status === "failed" ||
+      found.status === "interrupted" ||
+      found.status === "cancelled"
+    )
+      return Effect.void;
+    return found.status !== "queued" && found.turnId
+      ? service.interrupt(agentId, found.turnId)
+      : service.cancelQueuedMessage(agentId, deliveryId);
+  };
   // An agent routine's answer handed on from agent to agent; see `routine-flows.ts`.
   const routineFlowRuntime = await Effect.runPromise(
     createRoutineFlows({
@@ -2205,13 +2223,7 @@ export async function createApplicationServices({
       agentName: (agentId) => store.list().find((agent) => agent.id === agentId)?.name ?? agentId,
       sendHandoff: (input) => service.enqueueRoutineHandoff(input),
       stopRoutineRun: (input) => service.stopRoutineRun(input),
-      stopDelivery: (agentId, deliveryId) => {
-        const found = mailbox.getDelivery(deliveryId)?.delivery;
-        if (!found) return Effect.void;
-        return found.status === "running" && found.turnId
-          ? service.interrupt(agentId, found.turnId)
-          : service.cancelQueuedMessage(agentId, deliveryId);
-      },
+      stopDelivery: stopHandoff,
       // An agent event, so this window, joined clients and the web app hear it the same way.
       changed: (agentIds) => {
         for (const agentId of agentIds) service.notifyRoutineFlowsChanged(agentId);
@@ -2248,13 +2260,7 @@ export async function createApplicationServices({
       turnAnswer,
       // A workflow step is a routine handoff whose routine is the workflow.
       sendHandoff: (input) => service.enqueueRoutineHandoff(input),
-      stopDelivery: (agentId, deliveryId) => {
-        const found = mailbox.getDelivery(deliveryId)?.delivery;
-        if (!found) return Effect.void;
-        return found.status === "running" && found.turnId
-          ? service.interrupt(agentId, found.turnId)
-          : service.cancelQueuedMessage(agentId, deliveryId);
-      },
+      stopDelivery: stopHandoff,
       generateText: (request) =>
         service.generateWorkflowText(request).pipe(
           Effect.mapError((failure) => ({
