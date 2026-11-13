@@ -139,6 +139,8 @@ interface PendingStart {
 interface TasksViewState {
   /** The task list of each agent, by agent id. */
   snapshots: Record<string, AgentTasksSnapshot>;
+  /** Agents whose latest task-list request failed. */
+  failedLists: Record<string, boolean>;
   /** The conversation of each opened task, by task id. */
   conversations: Record<string, ConversationSnapshot>;
   /** The unsent text of each task's message box, by task id. */
@@ -174,6 +176,7 @@ function toastError(error: unknown, fallback: AppTextKey): void {
 export function TasksView(props: TasksViewProps) {
   const [state, setState] = createStore<TasksViewState>({
     snapshots: {},
+    failedLists: {},
     conversations: {},
     drafts: {},
     files: {},
@@ -325,6 +328,7 @@ export function TasksView(props: TasksViewProps) {
     const gone = (state.snapshots[snapshot.agentId]?.tasks ?? []).filter((task) => !kept.has(task.id));
     setState((draft) => {
       draft.snapshots[snapshot.agentId] = snapshot;
+      delete draft.failedLists[snapshot.agentId];
       for (const { id } of gone) {
         delete draft.conversations[id];
         delete draft.drafts[id];
@@ -384,6 +388,9 @@ export function TasksView(props: TasksViewProps) {
   /** Reads the task lists of the agents. One toast tells of a failure, not one for each agent. */
   function loadLists(agentIds: readonly string[]): void {
     const serverId = props.serverId;
+    setState((draft) => {
+      for (const id of agentIds) delete draft.failedLists[id];
+    });
     const current = generation;
     const loads = agentIds.map((id) => {
       const request = (listRequests.get(id) ?? 0) + 1;
@@ -395,7 +402,14 @@ export function TasksView(props: TasksViewProps) {
     });
     void Promise.allSettled(loads).then((results) => {
       const failed = results.find((result) => result.status === "rejected");
-      if (failed && current === generation) toastError(failed.reason, "conversation.tasks.error.load");
+      if (failed && current === generation) {
+        setState((draft) => {
+          results.forEach((result, index) => {
+            if (result.status === "rejected") draft.failedLists[agentIds[index]] = true;
+          });
+        });
+        toastError(failed.reason, "conversation.tasks.error.load");
+      }
     });
   }
 
@@ -699,6 +713,7 @@ export function TasksView(props: TasksViewProps) {
     (serverId) => {
       setState((draft) => {
         draft.snapshots = {};
+        draft.failedLists = {};
         draft.conversations = {};
         draft.drafts = {};
         // The old server discarded the files, so the start text no longer names them.
@@ -925,7 +940,7 @@ export function TasksView(props: TasksViewProps) {
       tasks={tasks()}
       // A list that did not load keeps its agent out, so a failed load does not show the empty page.
       // With no agents yet, the agent list did not load.
-      loaded={props.agents.length > 0 && props.agents.every((agent) => state.snapshots[agent.id] !== undefined)}
+      loaded={props.agents.every((agent) => state.snapshots[agent.id] !== undefined || state.failedLists[agent.id] === true)}
       agentId={agentId()}
       onAgentChange={(id) => {
         writeAgentSelection(TASK_AGENT_STORAGE_KEY, props.serverId, id);
