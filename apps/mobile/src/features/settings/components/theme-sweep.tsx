@@ -113,6 +113,7 @@ export function ThemeSweep() {
     // A phone that cannot compile the shader changes the theme at once.
     if (!image || shader) return;
     endThemeSweep();
+    image.dispose();
     reportThemeSweepShown();
   }, [image, shader]);
   if (!image || !shader) return null;
@@ -125,6 +126,9 @@ function SweepCanvas({ image, shader }: { image: SkImage; shader: SkRuntimeEffec
   const down = useThemeSweep((state) => state.down);
   const running = useThemeSweep((state) => state.running);
   const progress = useSharedValue(0);
+
+  // The canvas draws the picture until it unmounts, so it frees the picture then.
+  useEffect(() => () => image.dispose(), [image]);
 
   useEffect(() => {
     // The canvas draws the picture in the frame after it mounts.
@@ -155,7 +159,8 @@ function SweepCanvas({ image, shader }: { image: SkImage; shader: SkRuntimeEffec
       progress: value,
       time: (value * SWEEP_MS) / 1000,
       down: down ? 1 : 0,
-      alpha: 0.8 * smoothstep(0, 0.12, value),
+      // The wash fades in at the start and out at the end, so no tint stays in the corners when the canvas goes.
+      alpha: 0.8 * smoothstep(0, 0.12, value) * (1 - smoothstep(0.85, 1, value)),
     };
   });
 

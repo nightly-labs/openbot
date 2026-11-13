@@ -56,11 +56,16 @@ export function reportThemeSweepShown(): void {
   shown = undefined;
 }
 
-/** Removes the picture. `ThemeSweep` calls this when the sweep ends. */
+/**
+ * Removes the picture. `ThemeSweep` calls this when the sweep ends. The canvas draws the picture on
+ * the UI thread until it unmounts, so the canvas frees the picture, not this function.
+ */
 export function endThemeSweep(): void {
-  const { image } = useThemeSweep.getState();
   useThemeSweep.setState({ image: null, running: false });
-  image?.dispose();
+}
+
+function nextFrame(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
 }
 
 async function canAnimate(): Promise<boolean> {
@@ -70,15 +75,25 @@ async function canAnimate(): Promise<boolean> {
 
 async function capture(): Promise<SkImage | null> {
   if (!native) return null;
-  const bytes = await native.snapshot();
-  return Skia.Image.MakeImageFromEncoded(Skia.Data.fromBytes(bytes));
+  const data = Skia.Data.fromBytes(await native.snapshot());
+  try {
+    return Skia.Image.MakeImageFromEncoded(data);
+  } finally {
+    data.dispose();
+  }
 }
 
 /** Runs `apply`, which changes the theme, behind a wash that moves across the screen. */
 export async function sweepTheme(apply: () => void): Promise<void> {
-  // A newer change ends the sweep on screen. Its picture shows the theme before that sweep.
+  // A newer change ends the sweep on screen. The new picture must not show it, so the old canvas
+  // leaves the screen first.
+  const previous = useThemeSweep.getState().image !== null;
   endThemeSweep();
   shown?.();
+  if (previous) {
+    await nextFrame();
+    await nextFrame();
+  }
   if (!(await canAnimate())) {
     apply();
     return;
