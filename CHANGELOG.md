@@ -76,6 +76,9 @@ All notable changes to OpenBot will be documented here. The project follows
   account after the first uses a Cursor API key, and each agent can use a different account. Before,
   a second Cursor account replaced the first. On a joined server, the server must also be on this
   version.
+- Connect Adobe Analytics from the Apps marketplace with browser sign-in, so agents can find report
+  suites, dimensions, metrics and segments, and run reports. Your Adobe administrator must give your
+  account MCP access first.
 
 ### Changed
 
@@ -111,6 +114,10 @@ All notable changes to OpenBot will be documented here. The project follows
 - The payment page for a license or a server now asks for a billing address and for agreement to the
   Terms of Service. It also has optional fields for your name, a business name and a tax ID.
 - When the main process freezes for 2 seconds or more in two minutes in a row, OpenBot now records which of its functions used the time. The summary stays in `logs/stall-profiles.ndjson`, and its five heaviest functions go out as one analytics event, at most once in 6 hours. It holds function names only, with no paths or data of the user.
+- The app opens as signed in from the saved session and confirms the session in the background. Before, the
+  start waited for the account service to answer.
+- A joined server loads its workspace one time when the app connects. Before, the app loaded all the data
+  two times, which sent about twice the requests to the server.
 
 ### Fixed
 
