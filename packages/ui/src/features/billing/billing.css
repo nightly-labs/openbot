@@ -36,9 +36,7 @@
 }
 
 .billing-server-logo {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--openbot-radius-md);
+  --server-plush-logo-size: 32px;
 }
 
 .billing-server-title {

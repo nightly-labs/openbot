@@ -179,9 +179,14 @@ export function remoteRecoveryMessage(status: RemoteRecoveryStatus, failure?: st
     : sourceText("status.remote.reconnecting", { attempt: status.attempt, count: REMOTE_RETRY_LIMIT });
 }
 
-/** One recovery attempt at a time. Background time never starts network work. */
+/**
+ * One recovery attempt at a time. Background time never starts network work. `connect` gets `check`
+ * on the first attempt after a return to the app while the connection was online: the consumer can
+ * check the connection that it kept instead of loading everything again. A refresh, a lost
+ * connection and a failed check load everything.
+ */
 export function createRemoteConnectionRecovery(
-  connect: () => Promise<void>,
+  connect: (check: boolean) => Promise<void>,
   onError: (error: unknown) => void,
   onStatus: (status: RemoteRecoveryStatus) => void = () => {},
   /** The wait while the host starts, such as a hosted server after a wake. It replaces the backoff. */
@@ -197,6 +202,8 @@ export function createRemoteConnectionRecovery(
   let interrupted = false;
   /** The running attempt checks a connection that was online, such as on a return to the app. */
   let checking = false;
+  /** The next attempt is the first after a return to the app with an online connection. */
+  let checkOnReturn = false;
   let attempt = 0;
   let retryAt: number | null = null;
   /** Chosen when an attempt starts, so its status can show the wait that follows a failure. */
@@ -258,6 +265,8 @@ export function createRemoteConnectionRecovery(
     running = true;
     const checkingConnection = online;
     checking = checkingConnection;
+    const check = checkOnReturn && checkingConnection;
+    checkOnReturn = false;
     retryRequested = false;
     refreshRequested = false;
     interrupted = false;
@@ -267,7 +276,7 @@ export function createRemoteConnectionRecovery(
     // until the transport reports a failure or the read fails.
     if (!online) onStatus({ phase: "connecting", attempt, remainingSeconds: Math.ceil(retryDelay / 1000) });
     yield* Effect.gen(function* () {
-      const result = yield* recoveryCall(connect).pipe(Effect.result);
+      const result = yield* recoveryCall(() => connect(check)).pipe(Effect.result);
       if (Result.isFailure(result)) {
         const error = result.failure;
         if (error instanceof Error && error.message === sourceText("error.remote.appInBackground")) {
@@ -332,12 +341,17 @@ export function createRemoteConnectionRecovery(
         suspended = false;
         if (running) return;
         else if (retryAt !== null) scheduleRetry();
-        else startRun();
+        else {
+          // A refresh asked for while inactive, such as after lost events, still loads everything.
+          checkOnReturn = online && !refreshRequested;
+          startRun();
+        }
       }
     },
     offline(error?: unknown) {
       if (disposed) return;
       online = false;
+      checkOnReturn = false;
       if (error !== undefined) onError(error);
       retryRequested = true;
       // Losing a connection is not a failed reconnection attempt. Neither is losing the connection that
@@ -379,6 +393,7 @@ export function createRemoteConnectionRecovery(
     },
     refresh() {
       if (disposed) return;
+      checkOnReturn = false;
       suspended = false;
       retryAt = null;
       attempt = 0;
@@ -451,6 +466,34 @@ export const resyncRemoteConversations = Effect.fn("RemoteRecovery.resyncConvers
     input.apply(snapshot);
   }
 });
+
+/** A request with a short limit waits at most this long, also while answers to earlier requests arrive. */
+export const REMOTE_REQUEST_MAX_WAIT_MILLISECONDS = 60_000;
+
+/**
+ * Starts the deadline of one request and gives its first timer. Answers come back in order on one
+ * channel, so on a slow path a request waits behind earlier answers while the host works. Thus
+ * `timeoutMs` counts from the send or the last answer on the channel, whichever is later. A host
+ * that stops sends no answers and fails the request after `timeoutMs`, as before. `rearm` keeps
+ * each later timer, so that the caller can clear it. Times are `performance.now()`, which a clock
+ * change does not move.
+ */
+export function startRemoteRequestDeadline(
+  timeoutMs: number,
+  lastAnswerAt: () => number,
+  expire: () => void,
+  rearm: (timer: ReturnType<typeof setTimeout>) => void,
+): ReturnType<typeof setTimeout> {
+  const sentAt = performance.now();
+  const limitAt = sentAt + Math.max(timeoutMs, REMOTE_REQUEST_MAX_WAIT_MILLISECONDS);
+  const check = () => {
+    const now = performance.now();
+    const next = Math.min(Math.max(sentAt, lastAnswerAt()) + timeoutMs, limitAt);
+    if (now >= next) expire();
+    else rearm(setTimeout(check, next - now));
+  };
+  return setTimeout(check, timeoutMs);
+}
 
 /** Bound the reads that make a workspace usable; file transfers and writes retain their own limits. */
 export function remoteWorkspaceReadTimeout(method: string, path: string): number | undefined {

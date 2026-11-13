@@ -89,7 +89,7 @@ The host checks each request in [`mcp-member-access.ts`](../../src/main/team-api
 
 | Part | Rule |
 | --- | --- |
-| Client | The host lets a member in only when the client also sends the capability. A released client stays admin-only. `serverCanManageMcp` decides what the desktop and web clients offer. |
+| Client | The host lets a member in only when the client also sends the capability. A released client stays admin-only. `serverCanManageMcp` decides what the desktop and web clients offer, and `canManageMcpServers` what the phone offers. |
 | Read and add | A member reads the whole list, with its `env` and header values, tests a server, and adds a server, a stdio command too. |
 | Change | A member changes, turns on or off, or removes only a server that the member added. Any other row gets 403 `error.team.mcpServerNotYours`. Owners and admins change every row. |
 | Owners | `McpServerOwnersStore` keeps the member ID of each row that a joined server added, in `openbot-mcp-server-owners-v1.json`. A row with no entry, such as one added on the host, counts as an admin's. A damaged file reads as empty. |
@@ -97,6 +97,39 @@ The host checks each request in [`mcp-member-access.ts`](../../src/main/team-api
 | Providers | Provider sign-ins, account starts and agent links on the relay stay with owners and admins. |
 
 Run `bun run test:mcp-member-access` to check these rules on a real host.
+
+### Who gets each MCP server
+
+A host with `mcp-access-v1` keeps one entry for each MCP server in
+[`mcp-access-store.ts`](../../src/main/mcp-access-store.ts), a preference file with no migration.
+
+| Part | Rule |
+| --- | --- |
+| Agents | `agents: null` gives the server to each agent, also to a new one. A list gives it only to those agents. `AgentService` applies the list when it gives the enabled servers to a provider session. |
+| Members | `everyone` and each role have a level: `none` hides the server and refuses it, `use` gives the rights on a server of another person, `manage` gives the rights of the person who added it. A member gets the highest level. An owner, an admin and the person who added the server always manage. |
+| `none` | The host leaves the server out of the list and out of the sign-in states, and it refuses a change, a test, a sign-in and a sign-in status for the server. The sign-in belongs to the address, so the host also refuses the member each saved row (new or moved), test, sign-in status and sign-in state on that address, the member's own rows included. |
+| Routes | `POST /v1/mcp-access` reads and `POST /v1/mcp-access/set` replaces one entry ([`route-mcp-access.ts`](../../src/main/team-api/route-mcp-access.ts)). Only an owner or admin reads the entries and sets them; a member reads `mine`. |
+| Revision | The snapshot has a `revision`, and a replace names the one that the client read. Each replace adds 1. When another admin saved first, the host answers 409 `error.team.mcpAccessStale` and changes nothing; the client reads again. |
+| Sessions | A replace that changes the agents of a server gives each agent a new provider session. A replace of the levels only does not. |
+| Client | The Marketplace page of a connected app or custom server shows the Agents and Roles sections when `serverCanAdminister(server, "mcp-access-v1")` is true. |
+| Damaged file | Each server is closed to agents and members until an owner or admin saves its access. |
+| Not covered | Access for each tool. The built-in entries (Computer Use, the GitHub connector) have no MCP row, so each agent gets them, also after a damaged file. The MCP management tools of an agent do not apply the agent list. |
+
+Run `bun run test:mcp-member-access` to check the routes and the levels through the Team API.
+
+### How many MCP servers a host keeps
+
+A computer keeps up to 100 MCP servers (`INPUT_LIMITS.mcpServers`). Disabled rows count too. The
+released codecs of `mcp-servers-v1` and `mcp-sign-in-v1` read at most 32 rows in one list, and they
+are frozen. The protocol 9 capability `mcp-many-servers-v1`
+([`mcp-many-servers-v1.ts`](../../packages/contracts/src/team-protocol/mcp-many-servers-v1.ts)) lets a
+list hold 100 rows when both peers send it. The rows and the requests keep their frozen shapes.
+
+| Peer | Rule |
+| --- | --- |
+| Client with the capability | Reads lists of up to 100 rows. |
+| Client without it | Works while the host has 32 rows or fewer. When a route would answer with more, or a save would add the 33rd row, the host refuses it with 409 `error.team.mcpServerListNeedsUpdate` before it changes anything (`requireMcpListFits` in [`route-mcp.ts`](../../src/main/team-api/route-mcp.ts)). |
+| Transfer file | An export can hold up to 100 rows. An app before this change refuses the Settings section of a file with more than 32. |
 
 ### How an agent reaches a signed-in MCP server
 
@@ -510,6 +543,20 @@ pairing requests, and set them, and add the WhatsApp Orchestrator on the host's 
 client uses the same WhatsApp page through `hostWhatsAppPort`
 ([`whatsapp-connector.ts`](../../src/renderer/src/features/connectors/whatsapp-connector.ts)). No route
 carries a stored key; the QR code text holds the one-use secret of its link.
+
+The optional capability `whatsapp-working-message-v1`
+([`whatsapp-working-message-v1.ts`](../../packages/contracts/src/team-protocol/whatsapp-working-message-v1.ts),
+host route [`route-whatsapp-working-message.ts`](../../src/main/team-api/route-whatsapp-working-message.ts))
+reads and sets, for each WhatsApp number, whether OpenBot posts “Working on it…” while the agent
+works. The setting is on by default and is kept with the number's connection values, so it needs no
+migration. With the setting off, `MessagingService` posts no “Waiting” and no “Working on it…” line
+and edits no progress into one: the reaction shows that OpenBot read the message, and the end of the
+request (the answer, or a line such as “Stopped”) is the only post. A reply of `stop` still stops the
+request; in a group, the person replies to their own request, because there is no status post to
+reply to. The released `whatsapp-connector-v1`
+overview cannot carry the value, so a client reads this list and merges it
+(`withWhatsAppWorkingMessages`). A client hides the switch while the host does not have the
+capability. Only protocol 9 peers get it.
 
 The phone uses the same routes in Marketplace › Apps › WhatsApp
 (`apps/mobile/src/features/servers/components/whatsapp-connector-page.tsx`). It links only with a

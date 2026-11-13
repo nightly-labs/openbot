@@ -224,7 +224,10 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     const results = props.port.results;
     if (!results) return;
     try {
-      const [destination, items] = await Promise.all([results.destination(routineId), results.deliveries(routineId)]);
+      const [destination, items] = await Promise.all([
+        results.destination(routineId),
+        results.deliveries?.(routineId) ?? Promise.resolve([]),
+      ]);
       if (draft()?.id !== routineId) return;
       setSavedDestination(destination);
       setDeliveries(items);
@@ -600,11 +603,16 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     }
   }
 
+  /** A joined server keeps the deliveries on its host, so its history has none. */
+  function deliveryHistory() {
+    return props.port.results?.deliveries ? { items: deliveries(), onResend: resendDelivery } : undefined;
+  }
+
   async function resendDelivery(runId: string): Promise<void> {
-    const results = props.port.results;
+    const resend = props.port.results?.resend;
     const routineId = draft()?.id;
-    if (!results || !routineId) return;
-    await results.resend(runId);
+    if (!resend || !routineId) return;
+    await resend(runId);
     await loadResults(routineId);
   }
 
@@ -1173,7 +1181,7 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                 runs={runs()}
                 onOpenRun={props.onOpenRun ? requestOpenRun : undefined}
                 activity={webhookActivity()}
-                deliveries={props.port.results ? { items: deliveries(), onResend: resendDelivery } : undefined}
+                deliveries={deliveryHistory()}
               />
             </div>
           )}

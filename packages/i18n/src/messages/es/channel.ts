@@ -9,7 +9,12 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "Reasignar la tarea detenida de {name}",
   "channel.stoppedTask.reassign": "Reasignar",
   "channel.stoppedTask.cancel": "Cancelar tarea",
+  "channel.stoppedTask.assignmentLoop":
+    "{names} se pasaron esta tarea demasiadas veces. Se detuvo para evitar un bucle.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "Los miembros se pasaron esta tarea demasiadas veces. Se detuvo para evitar un bucle.",
   "channel.conversation.noMembers": "Añade agentes en los ajustes del canal para empezar a trabajar.",
+  "channel.conversation.waitFull": "En espera: {name} empieza cuando termine una tarea en curso",
   "channel.conversation.archivedNotice": "Canal eliminado. Solo vista previa.",
   "channel.composer.label": "Mensaje al canal",
   "channel.composer.placeholder": "Enviar mensaje a {name}",
@@ -20,6 +25,9 @@ export const messages = {
   "channel.settings.isolated": "Guardar los recuerdos en este canal",
   "channel.settings.isolatedDescription":
     "Los agentes guardan lo que aprenden aquí como recuerdos del canal. Sus otros chats no los ven.",
+  "channel.settings.browser": "Navegador",
+  "channel.settings.browserEveryone": "Todos los miembros",
+  "channel.settings.browserNone": "Nadie",
   "channel.settings.memoryCount": {
     one: "{count} guardado",
     other: "{count} guardados",

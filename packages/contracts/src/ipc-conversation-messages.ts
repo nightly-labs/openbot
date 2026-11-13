@@ -14,6 +14,7 @@ import {
 import { type ConversationTurnTrace, isConversationTurnTrace } from "./ipc-conversation-trace";
 import { QUEUE_DELIVERY_STATUSES, type QueueDelivery } from "./ipc-queue";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
+import { type ConversationSkillSuggestion, isConversationSkillSuggestion } from "./skill-suggestion-events";
 import { type ConversationUiBlock, isConversationUiBlock } from "./ui-blocks";
 
 export type ConversationMessageAuthor = "user" | "assistant" | "agent" | "system";
@@ -38,6 +39,33 @@ export function isImageGenerationInfo(value: unknown): value is ImageGenerationI
     (value.prompt === undefined || isString(value.prompt)) &&
     isString(value.resolution) &&
     isImageGenerationAspectRatio(value.aspectRatio) &&
+    (value.error === undefined || isString(value.error))
+  );
+}
+
+/**
+ * A video that an agent made with a tool (Grok `reference_to_video`). The video file is the
+ * message's attachment. The Team API carries it only to a client with the `video-generation-v1`
+ * capability; an older client shows the attachment alone.
+ */
+export interface VideoGenerationInfo {
+  prompt?: string | undefined;
+  aspectRatio: ImageGenerationAspectRatio;
+  /** The length that the agent asked for, in seconds. The player shows the real length. */
+  durationSeconds?: number | undefined;
+  /** The resolution that the agent asked for, such as "720p". */
+  resolution?: string | undefined;
+  error?: string | undefined;
+}
+
+export function isVideoGenerationInfo(value: unknown): value is VideoGenerationInfo {
+  return (
+    isDynamicRecord(value) &&
+    (value.prompt === undefined || isString(value.prompt)) &&
+    isImageGenerationAspectRatio(value.aspectRatio) &&
+    (value.durationSeconds === undefined ||
+      (isNumber(value.durationSeconds) && Number.isFinite(value.durationSeconds) && value.durationSeconds > 0)) &&
+    (value.resolution === undefined || isBoundedString(value.resolution, 40)) &&
     (value.error === undefined || isString(value.error))
   );
 }
@@ -223,6 +251,8 @@ export interface ConversationMessage {
   /** What the user said, on a message that a voice turn sent. The agent got only the text. */
   voiceRecording?: AttachmentSummary | undefined;
   imageGeneration?: ImageGenerationInfo | undefined;
+  /** Set on a `video_generation` message. Absent on a message from an older host. */
+  videoGeneration?: VideoGenerationInfo | undefined;
   delivery?: Pick<QueueDelivery, "id" | "status" | "position"> | undefined;
   exchange?: AgentExchangeSummary | undefined;
   reaction?: MessageReaction | null | undefined;
@@ -244,6 +274,8 @@ export interface ConversationMessage {
   memoryChanges?: ConversationMemoryChange[] | undefined;
   /** Set on an `instructions-change` message. */
   instructionsChange?: AgentInstructionsChange | undefined;
+  /** Set on a `skill-suggestion:*` message: the skill that the review asks to save. */
+  skillSuggestion?: ConversationSkillSuggestion | undefined;
   /**
    * An interactive block from `ask_ui` (see `ui-blocks.ts`). It rides on a `question_prompt` message
    * beside `questionPrompt`. Absent on a message from an older host.
@@ -296,11 +328,13 @@ export function isConversationMessage(value: unknown): value is ConversationMess
         isBoundedString(value.routine.name, INPUT_LIMITS.routineName) &&
         isBoundedString(value.routine.scheduledFor, 160))) &&
     (value.imageGeneration === undefined || isImageGenerationInfo(value.imageGeneration)) &&
+    (value.videoGeneration === undefined || isVideoGenerationInfo(value.videoGeneration)) &&
     (value.questionPrompt === undefined || isConversationQuestionPrompt(value.questionPrompt)) &&
     (value.plan === undefined || isConversationPlan(value.plan)) &&
     (value.subagents === undefined || isConversationSubagents(value.subagents)) &&
     (value.memoryChanges === undefined || isConversationMemoryChanges(value.memoryChanges)) &&
     (value.instructionsChange === undefined || isAgentInstructionsChange(value.instructionsChange)) &&
+    (value.skillSuggestion === undefined || isConversationSkillSuggestion(value.skillSuggestion)) &&
     (value.uiBlock === undefined || isConversationUiBlock(value.uiBlock)) &&
     (value.trace === undefined || isConversationTurnTrace(value.trace))
   );

@@ -105,72 +105,6 @@
   display: contents;
 }
 
-/*
- * The path to an open detail page, such as `Providers › ChatGPT`. It looks as the path of a Marketplace page
- * does. The parent goes back to the section: it is plain text until the pointer is on it, and the margins cancel
- * the padding and border of its chip, so the text stays on the inset.
- */
-.settings-page-path {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: var(--openbot-space-1-5);
-  margin: 0;
-  color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-md);
-  font-weight: var(--openbot-weight-medium);
-  line-height: var(--openbot-leading-md);
-  white-space: nowrap;
-}
-
-.settings-page-path .settings-page-path-parent {
-  flex: 0 1 auto;
-  min-width: 0;
-  margin-inline: calc(-1 * var(--openbot-space-2) - 1px) calc(-1 * var(--openbot-space-1));
-  overflow: hidden;
-  border-color: transparent;
-  background: transparent;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-md);
-  font-weight: var(--openbot-weight-medium);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.settings-page-path .settings-page-path-parent:focus-visible {
-  border-color: var(--openbot-border);
-  background: var(--openbot-bg-control);
-  color: var(--openbot-text-primary);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .settings-page-path .settings-page-path-parent:hover:not(:disabled) {
-    border-color: var(--openbot-border);
-    background: var(--openbot-bg-control);
-    color: var(--openbot-text-primary);
-  }
-}
-
-.settings-page-path-separator {
-  flex: 0 0 auto;
-  width: var(--openbot-icon-sm);
-  height: var(--openbot-icon-sm);
-  color: var(--openbot-text-muted);
-}
-
-/* The separator points to the reading direction. */
-.settings-page-path-separator:dir(rtl) {
-  transform: scaleX(-1);
-}
-
-.settings-page-path-current {
-  min-width: 0;
-  margin: 0;
-  overflow: hidden;
-  font: inherit;
-  text-overflow: ellipsis;
-}
-
 /* The top row has no room for the description of the section, so only screen readers read it. */
 .settings-page-description {
   position: absolute;
@@ -345,7 +279,7 @@
 
 .settings-modal :where(.ui-button-variant-default) {
   background: var(--openbot-accent);
-  color: var(--openbot-text-primary);
+  color: var(--openbot-text-on-accent);
 }
 
 .settings-modal :where(.ui-button-variant-outline, .ui-button-variant-secondary) {
@@ -354,7 +288,7 @@
 
 .settings-modal :where(.ui-button-variant-destructive) {
   background: var(--openbot-danger);
-  color: var(--openbot-text-primary);
+  color: var(--openbot-text-on-accent);
 }
 
 .settings-modal .ui-switch[data-checked] {
@@ -362,7 +296,7 @@
 }
 
 .settings-modal .ui-switch-thumb[data-checked] {
-  background: var(--openbot-text-primary);
+  background: var(--openbot-text-on-accent);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -372,7 +306,7 @@
 
   .settings-modal :where(.ui-button-variant-destructive):hover:not(:disabled):not([data-disabled]) {
     background: var(--openbot-danger-hover);
-    color: var(--openbot-text-primary);
+    color: var(--openbot-text-on-accent);
   }
 }
 

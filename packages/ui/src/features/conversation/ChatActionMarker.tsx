@@ -61,7 +61,7 @@ interface ChatActionMarkerProps {
   onToggleAgentMessage?: ((messageId: string) => void) | undefined;
   /** Draws the text of an open agent message under its marker, by its `messageId`. */
   agentMessageText?: ((messageId: string) => JSX.Element) | undefined;
-  /** The instruction file of a local agent, for View and Undo on its change line. */
+  /** The instruction file of the agent, for View and Undo on its change line. */
   instructions?: AgentInstructionsFileCalls | undefined;
   /** Opens the Instructions page of the agent. Absent where the chat has no settings page for it. */
   onOpenInstructions?: ((agentId: string) => void) | undefined;
@@ -221,7 +221,7 @@ function MarkerGroup(
     summary: (control: MarkerGroupToggle) => JSX.Element;
   },
 ) {
-  const { t, sourceText } = useText();
+  const { t, format, sourceText } = useText();
   const [listExpanded, setListExpanded] = createSignal(false);
   const expanded = () => (props.onToggle ? props.expanded === true : listExpanded());
   // Same exit rule as the routine history: the list stays mounted until its closing animation ends.
@@ -285,7 +285,7 @@ function MarkerGroup(
       </div>
       <span class="sr-only" role="status" aria-live="polite">
         <For each={joinedEntries()} keyed={(entry) => entry.id}>
-          {(entry) => <span>{markerAccessibleLabel(entry().marker, props.agents, t, sourceText)}</span>}
+          {(entry) => <span>{markerAccessibleLabel(entry().marker, props.agents, format.list, t, sourceText)}</span>}
         </For>
       </span>
     </Marker>
@@ -492,7 +492,7 @@ function SingleChatActionMarker(
       class={`chat-action-marker chat-action-marker-${props.marker.kind}`}
       role={props.announce ? "status" : "group"}
       aria-live={props.announce ? "polite" : "off"}
-      aria-label={markerAccessibleLabel(props.marker, props.agents, t, sourceText)}
+      aria-label={markerAccessibleLabel(props.marker, props.agents, format.list, t, sourceText)}
     >
       <div class="chat-action-marker-summary">
         <MarkerContent class="chat-action-marker-content">
@@ -524,9 +524,10 @@ function SingleChatActionMarker(
           </Show>
           <Show when={props.marker.kind === "channel-routing" && props.marker}>
             {(marker) => (
-              <AgentButton
-                agent={props.agents.find((agent) => agent.id === marker().agentId)}
-                fallbackId={marker().agentId}
+              <RoutingTargets
+                agentIds={marker().agentIds}
+                agents={props.agents}
+                list={format.list}
                 onSelectAgent={props.onSelectAgent}
               />
             )}
@@ -545,6 +546,13 @@ function SingleChatActionMarker(
               />
             )}
           </Show>
+          <Show when={skillInstallCount(props.marker)}>
+            {(count) => (
+              <span class="chat-action-marker-label chat-action-run-group-count">
+                {t("chat.marker.agentCount", { count: count() })}
+              </span>
+            )}
+          </Show>
           <Show when={instructionsChange(props.marker, props.instructions)}>
             {(target) => (
               <InstructionsChangeActions
@@ -555,7 +563,14 @@ function SingleChatActionMarker(
               />
             )}
           </Show>
-          <time class="chat-action-marker-time" datetime={props.marker.timestamp}>
+          <time
+            class={
+              skillInstallCount(props.marker)
+                ? "chat-action-marker-time chat-action-run-group-time"
+                : "chat-action-marker-time"
+            }
+            datetime={props.marker.timestamp}
+          >
             {formatMarkerTime(props.marker.timestamp, t, format)}
           </time>
           <Show when={props.marker.kind === "routine-run" && props.marker}>
@@ -840,17 +855,67 @@ function AgentTarget(props: {
   );
 }
 
+const LIST_ITEM_MARKER = /(\u{E000}\d+\u{E001})/u;
+
+/**
+ * The members of a routing row as one list in the interface language ("Chief, Builder and Launch").
+ * The list is written with a marker for each name, so the words and their order stay those of the
+ * locale, and each name stays its own button. A member that joins the row after it shows enters
+ * with the pop of a new message, so the reader sees who was added.
+ */
+function RoutingTargets(props: {
+  agentIds: string[];
+  agents: AgentProfile[];
+  list: AppFormat["list"];
+  onSelectAgent: (agentId: string) => void;
+}) {
+  const shownFirst = new Set(untrack(() => props.agentIds));
+  const parts = () => {
+    const markers = props.agentIds.map((_, index) => `\u{E000}${index}\u{E001}`);
+    return props
+      .list(markers)
+      .split(LIST_ITEM_MARKER)
+      .flatMap((part): Array<{ agentId: string } | { text: string }> => {
+        const agentId = props.agentIds[markers.indexOf(part)];
+        if (agentId) return [{ agentId }];
+        return part ? [{ text: part }] : [];
+      });
+  };
+  return (
+    <span class="chat-action-routing-targets">
+      <For each={parts()}>
+        {(part) =>
+          "agentId" in part ? (
+            <AgentButton
+              agent={props.agents.find((agent) => agent.id === part.agentId)}
+              fallbackId={part.agentId}
+              onSelectAgent={props.onSelectAgent}
+              class={shownFirst.has(part.agentId) ? undefined : "chat-action-target-entering"}
+            />
+          ) : (
+            <span class="chat-action-routing-separator">{part.text}</span>
+          )
+        }
+      </For>
+    </span>
+  );
+}
+
 function AgentButton(props: {
   agent: AgentProfile | undefined;
   fallbackId: string | undefined;
   onSelectAgent: (agentId: string) => void;
+  class?: string | undefined;
 }) {
   const { t } = useText();
   return (
     <Show
       when={props.agent}
       fallback={
-        <span class="chat-action-target chat-action-target-unavailable" title={props.fallbackId}>
+        <span
+          class={`chat-action-target chat-action-target-unavailable${props.class ? ` ${props.class}` : ""}`}
+          title={props.fallbackId}
+        >
           <AgentAvatar class="chat-action-agent-avatar" />
           <span>{t("chat.marker.unavailableAgent")}</span>
         </span>
@@ -860,7 +925,7 @@ function AgentButton(props: {
         <Button
           variant="ghost"
           type="button"
-          class="chat-action-target"
+          class={`chat-action-target${props.class ? ` ${props.class}` : ""}`}
           style={agentTargetStyle(agent())}
           aria-label={t("chat.marker.openChat", { name: agent().name })}
           data-cuelume-tap="navigate"
@@ -969,6 +1034,13 @@ const SKILL_ACTION_LABELS = {
   installed: "chat.marker.skill.installed",
 } as const satisfies Record<Extract<ChatActionMarkerModel, { kind: "skill-lifecycle" }>["action"], AppTextKey>;
 
+/** How many agents got the skill, when the row stands for more than one install. */
+function skillInstallCount(marker: SingleChatActionMarkerModel): number | undefined {
+  if (marker.kind !== "skill-lifecycle") return undefined;
+  const count = marker.installMessageIds?.length ?? 0;
+  return count > 1 ? count : undefined;
+}
+
 /** The change line of a local agent, which can show View and Undo. */
 function instructionsChange(marker: SingleChatActionMarkerModel, calls: AgentInstructionsFileCalls | undefined) {
   if (marker.kind !== "instructions-change" || !marker.agentId || !calls) return undefined;
@@ -991,7 +1063,9 @@ function markerLabel(
     return sourceText(marker.text);
   if (marker.kind === "context-reset") return t("chat.marker.contextReset");
   if (marker.kind === "marketplace-suggestion") return t("chat.marker.marketplaceSuggestion");
+  if (marker.kind === "skill-suggestion") return t("chat.marker.skillSuggestion");
   if (marker.kind === "mcp-sign-in") return t("chat.marker.mcpSignIn");
+  if (marker.kind === "server-install") return t("chat.marker.serverInstall");
   if (marker.kind === "skill-lifecycle") return t(SKILL_ACTION_LABELS[marker.action]);
   if (marker.kind === "agent-message") {
     if (marker.expectsReply)
@@ -1058,6 +1132,7 @@ function agentTargetsStyle(agents: Array<AgentProfile | undefined>): string | un
 function markerAccessibleLabel(
   marker: SingleChatActionMarkerModel,
   agents: AgentProfile[],
+  list: AppFormat["list"],
   t: AppTranslate,
   sourceText: (text: string) => string,
 ): string {
@@ -1067,6 +1142,7 @@ function markerAccessibleLabel(
     marker.kind === "context-reset" ||
     marker.kind === "marketplace-suggestion" ||
     marker.kind === "mcp-sign-in" ||
+    marker.kind === "server-install" ||
     marker.kind === "model-switch" ||
     marker.kind === "channel-change" ||
     marker.kind === "vault-change" ||
@@ -1074,15 +1150,21 @@ function markerAccessibleLabel(
     marker.kind === "instructions-change"
   )
     return label;
-  if (marker.kind === "skill-lifecycle") return t("chat.marker.accessible.named", { label, name: marker.skillName });
+  if (marker.kind === "skill-lifecycle") {
+    const count = skillInstallCount(marker);
+    const named = t("chat.marker.accessible.named", { label, name: marker.skillName });
+    if (!count) return named;
+    return t("chat.marker.accessible.named", { label: named, name: t("chat.marker.agentCount", { count }) });
+  }
+  if (marker.kind === "skill-suggestion") return t("chat.marker.accessible.named", { label, name: marker.skillName });
   const unavailable = t("chat.marker.unavailableAgent");
   if (marker.kind === "agent-message") {
     const agent = counterpartName(marker, agents, t);
     return t("chat.marker.accessible.message", { label, agent, status: t(STATUS_LABELS[marker.status]) });
   }
   if (marker.kind === "channel-routing") {
-    const agent = agents.find((candidate) => candidate.id === marker.agentId)?.name ?? unavailable;
-    return t("chat.marker.accessible.routing", { label, agent });
+    const names = marker.agentIds.map((id) => agents.find((candidate) => candidate.id === id)?.name ?? unavailable);
+    return t("chat.marker.accessible.routing", { label, agent: list(names) });
   }
   if (marker.kind === "hosted-site")
     return t("chat.marker.accessible.named", { label, name: marker.hostname ?? marker.title });

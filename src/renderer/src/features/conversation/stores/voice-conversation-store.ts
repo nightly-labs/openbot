@@ -10,7 +10,7 @@ import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore, onCleanup } from "solid-js";
 import { desktopAnalytics } from "../../../analytics";
 import { encodePcm16, recordingToSamples, recordingToWav } from "../../../voice-recording";
-import { SPEECH_LEVEL_COUNT, speechReading } from "../../speech/speech-playback";
+import { holdSpeech, releaseSpeech, SPEECH_LEVEL_COUNT, speechReading } from "../../speech/speech-playback";
 import { speechPort } from "../../speech/speech-port";
 import {
   dropDictatedReply,
@@ -143,6 +143,17 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   let step: VoiceConversationStep = "starting";
   let muted = false;
   let online = true;
+  /**
+   * The user can speak over the agent: its reply waits, paused, until the turn is transcribed. Only
+   * words stop the reply. A sound with no words, such as a cough, lets it go on.
+   */
+  let held = false;
+  /** The reply ended while it waited, for example a turn with no answer to read. */
+  let heldReplyEnded = false;
+  /** The words of the turn that waits for its reply, to show again when the reply goes on. */
+  let sentHeard = "";
+  /** The generation of the send whose reply the pane waits for. A hold that ends with no words keeps it. */
+  let waitingSend = 0;
   const startedAt = performance.now();
   /** The turns that were sent to the chat. */
   let sentTurns = 0;
@@ -170,7 +181,9 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   }
 
   const stopReplyEnd = onDictatedReplyEnd((agent) => {
-    if (agent.serverId === deps.serverId && agent.agentId === deps.agentId && step === "waiting") resumeListening();
+    if (agent.serverId !== deps.serverId || agent.agentId !== deps.agentId) return;
+    if (held) heldReplyEnded = true;
+    else if (step === "waiting") resumeListening();
   });
 
   /** No reply comes while the server is away, so the pane stops listening until it is back. */
@@ -180,7 +193,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     if (!next) {
       generation += 1;
       releaseTurn();
-      dropDictatedReply(target);
+      dropReply();
       setStep("listening");
       setState((draft) => {
         draft.offline = true;
@@ -295,17 +308,50 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     });
   }
 
-  /** The user spoke over the agent: its reply stops, and what they say is the next turn. */
-  function interruptByVoice(): void {
-    desktopAnalytics.track("voice_conversation_action", {
-      action: "interrupt",
-      server_kind: serverKind,
-      result: "succeeded",
-      trigger: "voice",
-    });
-    // Before the drop, which can end the reply and start a new turn.
-    resumeListening();
+  /** The reply of the agent is not read, or stops. */
+  function dropReply(): void {
+    held = false;
     dropDictatedReply(target);
+  }
+
+  /**
+   * The user can speak over the agent: its reply waits, and the turn listens. The words of the turn
+   * decide if the reply stops.
+   */
+  function holdReply(): void {
+    held = true;
+    heldReplyEnded = false;
+    holdSpeech(target);
+    resumeListening();
+  }
+
+  /** The turn had words, so the user spoke over the agent: its reply stops. */
+  function interruptByVoice(): void {
+    // A reply that ended while the user spoke was not interrupted.
+    if (!heldReplyEnded)
+      desktopAnalytics.track("voice_conversation_action", {
+        action: "interrupt",
+        server_kind: serverKind,
+        result: "succeeded",
+        trigger: "voice",
+      });
+    dropReply();
+  }
+
+  /** The turn had no words: the reply goes on, and the pane waits for it again. */
+  async function resumeReply(): Promise<void> {
+    held = false;
+    releaseSpeech(target, true);
+    if (heldReplyEnded) {
+      await listen();
+      return;
+    }
+    setStep("waiting");
+    setState((draft) => {
+      draft.heard = sentHeard;
+      draft.levels = quietLevels();
+    });
+    await openTurn(generation);
   }
 
   /** Opens the microphone for the next turn. It listens now, or while the agent thinks and speaks. */
@@ -458,7 +504,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
           quietFor = 0;
           if (loudFor >= (replying ? REPLY_SPEECH_START_MS : SPEECH_START_MS) && !current.spoke) {
             current.spoke = true;
-            if (step === "waiting") interruptByVoice();
+            if (step === "waiting") holdReply();
             setState((draft) => {
               draft.error = null;
             });
@@ -526,7 +572,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
         duration_ms: elapsedMs(transcribingAt),
         failure_code: "transcription_failed",
       });
-      await listen();
+      await (held ? resumeReply() : listen());
       setState((draft) => {
         draft.error = voiceTranscriptionError(error);
       });
@@ -541,10 +587,13 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
         duration_ms: transcribedMs,
         failure_code: "no_speech",
       });
-      await listen();
+      await (held ? resumeReply() : listen());
       return;
     }
+    if (held) interruptByVoice();
     setStep("waiting");
+    waitingSend = own;
+    sentHeard = text;
     setState((draft) => {
       draft.heard = text;
       draft.error = null;
@@ -558,7 +607,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     // A send can fail after it is queued, so the wait for the reply ends there too.
     // A later failure, after a Retry, belongs to a turn that is over.
     const notSent = () => {
-      if (disposed || own !== generation || step !== "waiting") return;
+      if (disposed || own !== waitingSend || step !== "waiting") return;
       forgetDictatedMessage(target);
       void listen();
       setState((draft) => {
@@ -671,6 +720,11 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     if (muted) {
       generation += 1;
       releaseTurn();
+      // The turn that could stop the reply ends with no words.
+      if (held) {
+        void resumeReply();
+        return;
+      }
       setState((draft) => {
         draft.heard = "";
         draft.levels = quietLevels();
@@ -687,10 +741,9 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       result: "succeeded",
       trigger: "button",
     });
-    // Before the drop, which can end the reply and start a new turn.
     if (step === "waiting") resumeListening();
     else void listen();
-    dropDictatedReply(target);
+    dropReply();
   }
 
   function dispose(): void {
@@ -707,7 +760,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     generation += 1;
     stopReplyEnd();
     releaseTurn();
-    dropDictatedReply(target);
+    dropReply();
   }
   onCleanup(dispose);
 

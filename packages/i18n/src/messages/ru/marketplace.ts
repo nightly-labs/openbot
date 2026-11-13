@@ -141,6 +141,11 @@ export const messages = {
   "marketplace.app.remove.confirmTitle": "Удалить «{name}»?",
   "marketplace.app.remove.keep": "Оставить",
   "marketplace.app.connection": "Подключение",
+  "marketplace.app.access.use": "Может использовать",
+  "marketplace.app.access.noAgents": "Нет агентов",
+  "marketplace.app.access.agentsOf": "Агенты, которые могут использовать «{name}»",
+  "marketplace.app.access.chooseAgents": "«{name}»: {summary}. Выбрать агентов",
+  "marketplace.app.access.level": "Доступ роли {role} к «{name}»",
   "marketplace.app.setup.account": "Войдите в аккаунт {name} в браузере.",
   "marketplace.app.setup.key": "Нужен ключ API из аккаунта {name}.",
   "marketplace.app.setup.keySaved": "{field} хранится на {host}.",
@@ -148,6 +153,10 @@ export const messages = {
   "marketplace.app.setup.desktop": "Работает в настольном приложении {name} по адресу {address}.",
   "marketplace.app.setup.desktopConnected": "Подключено к {address}.",
   "marketplace.app.setup.open": "Вход и ключ не нужны.",
+  "marketplace.app.blocked.update":
+    "На {host} работает старая версия OpenBot, которая не может подключать приложения. Обновите OpenBot на {host} или попросите владельца обновить его.",
+  "marketplace.app.blocked.member":
+    "Подключать приложения на {host} может только владелец или администратор. Попросите одного из них подключить {name} или обновить OpenBot на {host}, чтобы участники могли подключать приложения.",
   "marketplace.app.connectAgain": "Подключить снова",
   "marketplace.app.automation.askOnInstall": "Запросить доступ у macOS при установке",
   "marketplace.app.automation.title": "Доступ к приложениям Apple",
@@ -217,6 +226,27 @@ export const messages = {
   "marketplace.plugin.cobrain.prompt.searchDecision": "Найдите в моих заметках Cobrain, что мы решили насчёт цен.",
   "marketplace.plugin.cobrain.prompt.saveNote":
     "Сохраните в Cobrain заметку о том, что мы сделали сегодня и что осталось.",
+  "marketplace.plugin.honcho.tagline": "Ваша память во всех ИИ-инструментах",
+  "marketplace.plugin.honcho.description":
+    "Honcho от Plastic Labs даёт агентам долговременную память о вас, которую могут разделять другие подключённые ИИ-инструменты. Агенты сохраняют то, что узнали, а Honcho делает из этого выводы и строит модель ваших предпочтений, целей и способов работы. Агенты задают ему вопросы перед началом работы. У агентов OpenBot есть и своя память; Honcho — это память, которая следует за вами в другие инструменты. Сообщения, которые сохраняют агенты, попадают в ваш аккаунт Honcho.",
+  "marketplace.plugin.honcho.app":
+    "Сохранение и запросы к долговременной памяти в ваших рабочих пространствах Honcho через один MCP-сервер.",
+  "marketplace.plugin.honcho.prompt.recall":
+    "Прежде чем начать, спроси у Honcho, что он знает о том, как я люблю работать.",
+  "marketplace.plugin.honcho.prompt.save": "Сохрани в Honcho решения из этой ветки.",
+  "marketplace.plugin.honcho.prompt.preferences": "Что Honcho говорит о моём стиле письма? Учти это в этом черновике.",
+  "marketplace.plugin.honcho.hint.apiKey": "Создайте ключ на app.honcho.dev.",
+  "marketplace.plugin.hindsight.tagline": "Память, которая учится со временем",
+  "marketplace.plugin.hindsight.description":
+    "Hindsight от Vectorize даёт агентам долговременную память в Hindsight Cloud. Агенты запоминают факты и события, находят их по смыслу, времени и сущности и размышляют над ними, чтобы строить ментальные модели. Воспоминания хранятся в банках, и агенты могут создать банк для каждого проекта или человека. У агентов OpenBot есть и своя память; Hindsight — это память, которую могут разделять другие подключённые ИИ-инструменты. То, что запоминают агенты, попадает в ваш аккаунт Hindsight Cloud.",
+  "marketplace.plugin.hindsight.app":
+    "Запоминание, поиск и осмысление воспоминаний в ваших банках Hindsight Cloud через один MCP-сервер.",
+  "marketplace.plugin.hindsight.prompt.recall":
+    "Прежде чем начать, вспомни из Hindsight, что мы знаем об этом проекте.",
+  "marketplace.plugin.hindsight.prompt.retain": "Запомни в Hindsight решения и открытые вопросы из этой ветки.",
+  "marketplace.plugin.hindsight.prompt.reflect":
+    "Поразмышляй над моими воспоминаниями в Hindsight: какие закономерности ты видишь в моей работе за последний месяц?",
+  "marketplace.plugin.hindsight.hint.apiKey": "Создайте ключ на странице Connect в Hindsight Cloud.",
   "marketplace.plugin.figma.tagline": "Дизайны и прототипы",
   "marketplace.plugin.figma.description":
     "Figma позволяет агентам читать файлы дизайна, изучать компоненты, стили и переменные и передавать спецификации разработчикам. Она подключается к серверу MCP в настольном приложении Figma на этом компьютере. Сервер пока может только читать дизайны; поддержка записи в разработке.",
@@ -246,6 +276,15 @@ export const messages = {
   "marketplace.plugin.higgsfield.prompt.productShot":
     "Сделайте в Higgsfield предметное фото керамической кружки на деревянном столе.",
   "marketplace.plugin.higgsfield.prompt.clip": "Сделайте в Higgsfield 5-секундное видео волн на закате.",
+  "marketplace.plugin.sunra.tagline": "ИИ-изображения, видео, аудио и 3D",
+  "marketplace.plugin.sunra.description":
+    "Sunra позволяет агентам создавать изображения, видео, аудио и 3D-модели с помощью таких моделей, как GPT Image, Nano Banana, Seedream, FLUX, Seedance, Kling и Veo, проверять баланс кредитов и получать результаты. Результаты сохраняются в проекте в аккаунте Sunra пользователя. Каждый пользователь входит в свой аккаунт Sunra в браузере. Sunra сначала называет стоимость каждой генерации и списывает кредиты этого аккаунта только после подтверждения.",
+  "marketplace.plugin.sunra.app":
+    "Создание изображений, видео, аудио и 3D, кредиты и результаты через MCP-сервер Sunra со входом в браузере.",
+  "marketplace.plugin.sunra.prompt.balance": "Сколько у меня кредитов Sunra?",
+  "marketplace.plugin.sunra.prompt.poster": "Сделайте в Sunra постер ночного рынка под дождём в вертикальном формате.",
+  "marketplace.plugin.sunra.prompt.clip":
+    "Сделайте в Sunra 5-секундное видео бумажного кораблика на реке. Сначала скажите, сколько это стоит.",
   "marketplace.plugin.elevenlabs.tagline": "Речь, голоса и голосовые агенты",
   "marketplace.plugin.elevenlabs.description":
     "ElevenLabs позволяет агентам превращать текст в речь, работать с голосами, а также создавать, тестировать и просматривать голосовых агентов ElevenLabs и их разговоры. Созданное аудио приходит как ссылка для скачивания с коротким сроком действия. Каждый пользователь входит в свой аккаунт ElevenLabs в браузере, и каждая генерация расходует кредиты этого аккаунта.",
@@ -391,17 +430,35 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.segment": "Сколько контактов в сегменте VIP и как он изменился за этот месяц?",
   "marketplace.plugin.omnisend.prompt.draftCampaign":
     "Подготовь черновик кампании для новой коллекции, но не отправляй его.",
-  "marketplace.plugin.composio.tagline": "Множество приложений по вашей ссылке Composio",
+  "marketplace.plugin.postiz.tagline": "Планирование публикаций в соцсетях",
+  "marketplace.plugin.postiz.description":
+    "Postiz позволяет агентам показывать ваши каналы в соцсетях, а также готовить черновики, планировать и публиковать посты в более чем 30 сетях, таких как X, LinkedIn, Instagram и TikTok. Агенты также могут загружать медиафайлы и создавать изображения и видео с помощью ИИ. Войдите в аккаунт Postiz в браузере или вставьте API-ключ из Settings › Developers в Postiz. Доступ к API есть во всех облачных тарифах Postiz. Агенты могут опубликовать пост сразу, поэтому проверяйте каждый пост перед одобрением.",
+  "marketplace.plugin.postiz.app":
+    "Каналы, черновики, запланированные посты и медиафайлы через MCP-сервер Postiz со входом в браузере или API-ключом.",
+  "marketplace.plugin.postiz.prompt.channels": "Какие каналы соцсетей подключены к Postiz?",
+  "marketplace.plugin.postiz.prompt.week": "Какие посты запланированы на следующую неделю?",
+  "marketplace.plugin.postiz.prompt.draft":
+    "Подготовь черновик поста в LinkedIn о нашем новом релизе, но не планируй его.",
+  "marketplace.plugin.trypost.tagline": "Планирование публикаций в соцсетях",
+  "marketplace.plugin.trypost.description":
+    "TryPost позволяет агентам просматривать подключённые каналы, а также готовить, планировать, ставить в очередь и публиковать посты в X, LinkedIn, Instagram, Facebook, TikTok, YouTube, Threads, Bluesky, Mastodon, Pinterest и других сетях. Агенты также могут читать аналитику, управлять идеями и согласованиями и задавать время публикаций. Войдите в аккаунт TryPost в браузере и выберите рабочее пространство. Агенты могут опубликовать пост сразу, поэтому проверяйте каждый пост перед одобрением.",
+  "marketplace.plugin.trypost.app":
+    "Каналы, посты, очередь, идеи и аналитика через MCP-сервер TryPost со входом в браузере.",
+  "marketplace.plugin.trypost.prompt.week": "Какие посты запланированы на эту неделю?",
+  "marketplace.plugin.trypost.prompt.draft":
+    "Подготовь черновик поста в LinkedIn о нашем новом релизе, но не планируй его.",
+  "marketplace.plugin.trypost.prompt.analytics":
+    "Какие из моих постов за прошлый месяц получили больше всего вовлечённости?",
+  "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub и ещё более 1000 приложений",
   "marketplace.plugin.composio.description":
-    "Composio подключает агентов к Gmail, Slack, GitHub и сотням других приложений через один сервер MCP. Подключите нужные приложения в своём аккаунте Composio и вставьте сюда его URL MCP и ключ API.",
+    "Composio подключает ваших агентов к Gmail, Slack, GitHub и ещё более чем 1000 приложений через один сервер MCP. Войдите с аккаунтом Composio. Когда агенту нужно приложение, он попросит вас подключить его.",
   "marketplace.plugin.composio.app":
-    "Приложения, которые вы добавили на свой сервер MCP Composio, по ссылке из вашего аккаунта Composio.",
+    "Приложения, которые вы подключаете в аккаунте Composio. Агент попросит подключить приложение, когда оно ему понадобится.",
   "marketplace.plugin.composio.prompt.inbox":
     "Кратко перескажите мои непрочитанные письма и подготовьте ответы на срочные.",
   "marketplace.plugin.composio.prompt.handoff":
     "Опубликуйте краткое описание этого пул-реквеста в канале нашей команды.",
   "marketplace.plugin.composio.prompt.apps": "Какие приложения и действия доступны вам через Composio?",
-  "marketplace.plugin.composio.hint.url": "URL сервера MCP в вашем аккаунте Composio",
   "marketplace.plugin.composio.hint.apiKey":
     "Он находится в аккаунте Composio, в разделе Settings > Sessions & API Key.",
   "marketplace.plugin.neon.tagline": "Проекты, ветки и миграции Postgres",
@@ -514,7 +571,6 @@ export const messages = {
   "marketplace.plugin.huggingface.prompt.dataset": "Найди датасет с временными рядами погоды и покажи его столбцы.",
   "marketplace.auth.apiKey": "API-ключ",
   "marketplace.auth.personalApiKey": "Личный API-ключ",
-  "marketplace.auth.mcpUrl": "URL MCP",
   "marketplace.auth.createKey": "Создать ключ",
   "marketplace.skill.doc": "SKILL.md",
   "marketplace.try.in": "Попробовать в {name}",
@@ -553,6 +609,13 @@ export const messages = {
   "marketplace.skills.origin.local": "Создан на этом компьютере",
   "marketplace.skills.origin.workspace": "В папке этого агента",
   "marketplace.skills.origin.marketplace": "Из каталога · версия {version}",
+  "marketplace.skills.origin.github": "Из GitHub · {repository}",
+  "marketplace.skills.github.search": "Поиск или ссылка на GitHub",
+  "marketplace.skills.github.reading": "Поиск навыков в репозитории",
+  "marketplace.skills.github.trust": "OpenBot не проверял навыки из GitHub. Прочитайте навык, прежде чем добавить его.",
+  "marketplace.skills.github.source": "GitHub · {repository}, коммит {commit}",
+  "marketplace.skills.github.open": "GitHub",
+  "marketplace.skills.github.openName": "Открыть {repository} на GitHub",
   "marketplace.skills.status.notAdded": "Не добавлен",
   "marketplace.skills.status.on": "Включён: {agents}",
   "marketplace.skills.agentCount": {

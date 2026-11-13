@@ -63,11 +63,16 @@ export interface AgentClient {
    */
   holdsBackgroundWork?(externalThreadId: string): Effect.Effect<boolean, ProviderClientOperationError>;
   /**
-   * Hides a thread that a replacement session took over from the provider's own thread list, and
-   * keeps its history readable. Optional, because only a provider that shows its threads to the user
-   * in another app has a list to keep clean.
+   * Hides a thread that a replacement session took over, or that a deleted agent leaves, from the
+   * provider's own thread list, and keeps its history readable. Optional, because only a provider
+   * that shows its threads to the user in another app has a list to keep clean.
    */
   archiveThread?(externalThreadId: string): Effect.Effect<void, ProviderClientOperationError>;
+  /**
+   * Sets the title of a thread in the provider's own thread list. Optional, for the same reason as
+   * `archiveThread`.
+   */
+  nameThread?(externalThreadId: string, name: string): Effect.Effect<void, ProviderClientOperationError>;
   /**
    * Closes each thread that has no turn and can open again from its session, to free its processes
    * and MCP servers when the machine is low on memory. Optional, because a client that runs all its
@@ -162,6 +167,15 @@ export class MissingPiSessionError extends Error {
     this.name = "MissingPiSessionError";
   }
 }
+
+/**
+ * The line that the Go runtime of a CLI writes before it stops with SIGILL on a processor without a
+ * feature that the CLI was built for, such as "This binary was compiled with aes enabled, but this
+ * feature is not available on this processor" (#7111). A SIGILL without it can have another cause,
+ * such as a crash bug or the CPU list of a container (`docs/docker.md`), that a different provider
+ * does not fix.
+ */
+export const PROCESSOR_FEATURE_MISSING = /\bcompiled with \S+ enabled, but this feature is not available\b/iu;
 
 /** What of the CLI's last stderr line a status message carries. The full line is in the log. */
 const EXIT_DETAIL_LIMIT = 300;

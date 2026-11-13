@@ -2,7 +2,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { type ConversationMessage, isQueuedAgentReply, type QueueDelivery } from "@openbot/contracts/ipc";
 import { isQueueEditRejected } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { type MobileTextKey, sourceText } from "@openbot/i18n/mobile";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { replaceEqualDeep, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -15,7 +15,7 @@ import {
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { currentText, useText } from "@/shared/lib/text";
 import { useHiddenReplies } from "../context/queued-messages-context";
-import { awaitingReplies } from "../model/awaiting-replies";
+import { type AwaitingReply, awaitingReplies } from "../model/awaiting-replies";
 import {
   readQueueAttachment,
   removeQueueAttachment,
@@ -113,13 +113,17 @@ export function useChatQueue(
   const { hiddenReplyIds, hideReplies } = useHiddenReplies();
   // A teammate that waits for the person in its own chat says so in its row.
   const waits = useAgentWaits(serverId, online);
-  const waiting = useMemo(
-    () =>
-      awaitingReplies(messages, replies, waits).filter(
-        (row) => !(hiddenReplyIds.has(row.id) && (row.state === "replied" || row.state === "failed")),
-      ),
-    [messages, replies, waits, hiddenReplyIds],
-  );
+  // The conversation is a new array on each streamed chunk. The rows stay the same array while they
+  // say the same, so the controller below, and each part of the screen that reads it, does not
+  // change with each chunk.
+  const lastWaiting = useRef<AwaitingReply[]>([]);
+  const waiting = useMemo(() => {
+    const rows = awaitingReplies(messages, replies, waits).filter(
+      (row) => !(hiddenReplyIds.has(row.id) && (row.state === "replied" || row.state === "failed")),
+    );
+    lastWaiting.current = replaceEqualDeep(lastWaiting.current, rows);
+    return lastWaiting.current;
+  }, [messages, replies, waits, hiddenReplyIds]);
   // Persist typing after a pause, without blocking each key event. The edit identity is
   // persisted synchronously BEFORE requesting the host hold, so a restart can recover it.
   useEffect(() => {

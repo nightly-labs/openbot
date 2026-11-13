@@ -1,9 +1,20 @@
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
-import type { AgentProviderId, ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
-import { isImageGenerationAspectRatio, ROUTINE_QUIET_ANSWER_ITEM_TYPE } from "@openbot/contracts/ipc";
+import type {
+  AgentExchangeSummary,
+  AgentProviderId,
+  ConversationMessage,
+  ConversationSnapshot,
+  QueueDelivery,
+} from "@openbot/contracts/ipc";
+import { AGENT_EXCHANGE_ITEM_TYPE, ROUTINE_QUIET_ANSWER_ITEM_TYPE } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { displayMessageReferences, type TeammatePrompt, teammatePrompts } from "./agent/delivery-content";
-import { imageGenerationFailure, isImageGenerationItem } from "./agent/image-generation";
+import {
+  imageGenerationAspectRatio,
+  imageGenerationFailure,
+  isImageGenerationItem,
+  isVideoGenerationItem,
+} from "./agent/image-generation";
 import type { DeliveryContext } from "./mailbox-store";
 import type { ThreadItem } from "./protocol";
 
@@ -99,9 +110,34 @@ export function messagesFromThreadItems(
         status: failed ? "failed" : providerStatus === "interrupted" ? "interrupted" : "completed",
         itemType: "image_generation",
         imageGeneration: {
-          ...(isString(item.revised_prompt) ? { prompt: item.revised_prompt } : {}),
+          ...(isString(item.revised_prompt)
+            ? { prompt: item.revised_prompt }
+            : isString(item.prompt)
+              ? { prompt: item.prompt }
+              : {}),
           resolution: isString(item.resolution) ? item.resolution : "1024 × 1024",
-          aspectRatio: isImageGenerationAspectRatio(item.aspectRatio) ? item.aspectRatio : "square",
+          aspectRatio: imageGenerationAspectRatio(item) ?? "square",
+          ...(failure ? { error: failure } : {}),
+        },
+      });
+    }
+    if (isVideoGenerationItem(item) && isString(item.id)) {
+      const providerStatus = isString(item.status) ? item.status : turn.status;
+      const failure = imageGenerationFailure(item);
+      messages.push({
+        id: item.id,
+        turnId: turn.id,
+        author: "assistant",
+        text: "",
+        createdAt,
+        status: providerStatus === "failed" ? "failed" : providerStatus === "interrupted" ? "interrupted" : "completed",
+        itemType: "video_generation",
+        // The same values as the live item (`image-gen-runtime.ts`), so a merge keeps them.
+        videoGeneration: {
+          ...(isString(item.prompt) ? { prompt: item.prompt } : {}),
+          aspectRatio: imageGenerationAspectRatio(item) ?? "landscape",
+          ...(typeof item.duration === "number" && item.duration > 0 ? { durationSeconds: item.duration } : {}),
+          ...(isString(item.resolution) && item.resolution.length <= 40 ? { resolution: item.resolution } : {}),
           ...(failure ? { error: failure } : {}),
         },
       });
@@ -161,6 +197,36 @@ export function promptMessage(
     text: delivery?.text ?? row.text,
     createdAt: delivery?.createdAt ?? row.createdAt,
     status: "completed",
+    // Marked as the mailbox marks it: a side thread reads no mailbox copy, and a message between
+    // agents does not make the chat unread (#5794) and shows as an agent message (#5812).
+    ...(delivery?.sender.kind === "agent"
+      ? {
+          itemType: AGENT_EXCHANGE_ITEM_TYPE,
+          exchange: incomingAgentExchange(delivery, delivery.sender.agentId, context?.senderTaskId),
+        }
+      : {}),
+  };
+}
+
+/**
+ * The exchange of a teammate's message, as its mailbox copy gives it. A side thread reads no mailbox
+ * copy, so its row carries this itself; without it the message shows as an ordinary bubble (#5812).
+ * The recipient's own state stays on `delivery`, as in `teammateMessage`.
+ */
+export function incomingAgentExchange(
+  delivery: QueueDelivery,
+  senderAgentId: string,
+  senderTaskId: string | undefined,
+): AgentExchangeSummary {
+  return {
+    direction: "incoming",
+    messageId: delivery.messageId,
+    senderAgentId,
+    recipientAgentIds: [delivery.recipientAgentId],
+    replyToMessageId: delivery.replyToMessageId,
+    deliveries: [],
+    ...(delivery.expectsReply === false ? { expectsReply: false } : {}),
+    ...(senderTaskId ? { senderTaskId } : {}),
   };
 }
 
@@ -187,6 +253,7 @@ function teammateMessage(
     },
     text: teammate.text,
     status: "completed",
+    itemType: AGENT_EXCHANGE_ITEM_TYPE,
   };
 }
 
@@ -244,14 +311,18 @@ function mergeConversationMessages(
   const messages = new Map(stored.map((message) => [message.id, message]));
   for (const message of live) {
     const previous = messages.get(message.id);
+    // The row of a turn start has a short exchange with no deliveries. The stored mailbox copy has them.
+    const exchange = message.exchange?.deliveries.length ? message.exchange : (previous?.exchange ?? message.exchange);
     messages.set(
       message.id,
       previous
         ? {
             ...previous,
             ...message,
+            ...(exchange ? { exchange } : {}),
             attachments: message.attachments ?? previous.attachments,
             imageGeneration: message.imageGeneration ?? previous.imageGeneration,
+            videoGeneration: message.videoGeneration ?? previous.videoGeneration,
           }
         : message,
     );
@@ -455,11 +526,21 @@ function isStoredClaudeNotice(message: ConversationMessage): boolean {
 }
 
 function isProviderAssistantMessage(message: ConversationMessage): boolean {
-  return message.author === "assistant" && Boolean(message.turnId) && Boolean(message.text || message.imageGeneration);
+  return (
+    message.author === "assistant" &&
+    Boolean(message.turnId) &&
+    Boolean(message.text || message.imageGeneration || message.videoGeneration)
+  );
 }
 
 function providerMessageIdentity(message: ConversationMessage): string {
-  return JSON.stringify([message.turnId, message.itemType ?? null, message.text, message.imageGeneration ?? null]);
+  return JSON.stringify([
+    message.turnId,
+    message.itemType ?? null,
+    message.text,
+    message.imageGeneration ?? null,
+    ...(message.videoGeneration ? [message.videoGeneration] : []),
+  ]);
 }
 
 export function newAssistantMessage(id: string, turnId: string): ConversationMessage {

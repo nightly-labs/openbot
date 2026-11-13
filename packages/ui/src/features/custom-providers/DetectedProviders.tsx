@@ -34,6 +34,8 @@ interface DetectedProvidersProps {
   takenProviderIds?: readonly string[] | undefined;
   takenAgentIds?: readonly string[] | undefined;
   disabled?: boolean | undefined;
+  /** The rows are of the joined server's host, not of this computer. */
+  onServer?: boolean | undefined;
   /** After an Add or an Edit, so the host can say when the new models appear. */
   onSaved?: ((kind: DetectedProvider["kind"], restart: CustomProviderRestart | undefined) => void) | undefined;
 }
@@ -43,6 +45,7 @@ export function DetectedProviders(props: DetectedProvidersProps) {
   /** The row whose form is open. Add and Edit open the same filled form. */
   const [setupFor, setSetupFor] = createSignal<DetectedProvider | null>(null);
   const hidden = () => props.detection.hidden ?? 0;
+  const heading = () => t(props.onServer ? "customProvider.detected.titleServer" : "customProvider.detected.title");
 
   const title = (provider: DetectedProvider) =>
     provider.kind === "agent" && provider.version
@@ -58,14 +61,10 @@ export function DetectedProviders(props: DetectedProvidersProps) {
       : t("customProvider.detected.agentDetail", { location: detectedLocation(provider) });
 
   return (
-    <section
-      class="detected-providers"
-      aria-label={t("customProvider.detected.title")}
-      aria-busy={props.detection.scanning ? "true" : "false"}
-    >
+    <section class="detected-providers" aria-label={heading()} aria-busy={props.detection.scanning ? "true" : "false"}>
       <div class="detected-providers-heading">
         <Text variant="label-sm" tone="muted">
-          {t("customProvider.detected.title")}
+          {heading()}
         </Text>
         <Show when={props.detection.scanning}>
           <span class="detected-providers-scanning" role="status">
@@ -175,6 +174,7 @@ export function DetectedProviders(props: DetectedProvidersProps) {
       <DetectedProviderSetup
         provider={setupFor()}
         api={props.api}
+        host={props.onServer}
         takenProviderIds={props.takenProviderIds}
         takenAgentIds={props.takenAgentIds}
         onClose={() => setSetupFor(null)}

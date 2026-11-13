@@ -9,7 +9,11 @@ import { AGENT_TASK_UI_BLOCKS_CAPABILITY } from "@openbot/contracts/team-protoco
 import { browserViewStreamSessionId } from "@openbot/contracts/team-protocol/browser-view-v1";
 import {
   BROWSER_SIGN_IN_CAPABILITY,
+  CHANNEL_BROWSER_CAPABILITY,
   CHANNEL_ISOLATION_CAPABILITY,
+  CHANNEL_PICTURE_CAPABILITY,
+  CHANNEL_SEEN_SUBTASKS_CAPABILITY,
+  CHANNEL_TASK_WAITS_CAPABILITY,
   isAgentProfileRoute,
   supportsTeamSemanticTags,
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
@@ -20,10 +24,18 @@ import {
   TEAM_PROMPT_MULTI_SELECT_CAPABILITY,
   TEAM_SUBAGENTS_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
+  TEAM_USAGE_TERTIARY_CAPABILITY,
+  TEAM_VIDEO_GENERATION_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { toWireAgentKeysObjectForPath } from "@openbot/contracts/team-protocol/current-agent-keys";
+import { MCP_MANY_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-many-servers-v1";
 import { optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
+import {
+  addSkillSuggestionNames,
+  SKILL_LEARNING_CAPABILITY,
+  withSkillSuggestionNames,
+} from "@openbot/contracts/team-protocol/skill-learning-v1";
 import {
   addUiBlockAutoAnswers,
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
@@ -716,6 +728,8 @@ export class TeamWebRtcHostPeer {
                   return JSON.stringify(
                     sideRoute.request(input.path, input.body, {
                       channelIsolation: peerCapabilities.has(CHANNEL_ISOLATION_CAPABILITY),
+                      channelPicture: peerCapabilities.has(CHANNEL_PICTURE_CAPABILITY),
+                      channelBrowser: peerCapabilities.has(CHANNEL_BROWSER_CAPABILITY),
                     }),
                   );
                 const decoded = decodeRequest(input.method, input.path, input.body, {
@@ -786,16 +800,23 @@ export class TeamWebRtcHostPeer {
             };
           }
           // A variable, not a literal: only the V7 and V8 encoders declare `historyExtent`, `uiBlocks`,
-          // `subagents` and `promptMultiSelect`.
+          // `subagents`, `promptMultiSelect` and `videoGeneration`.
           const responseOptions = {
             preserveSemanticTags,
             historyExtent: peerCapabilities.has(TEAM_HISTORY_EXTENT_CAPABILITY),
             channelAttention: peerCapabilities.has(TEAM_CHANNEL_ATTENTION_CAPABILITY),
             channelIsolation: peerCapabilities.has(CHANNEL_ISOLATION_CAPABILITY),
+            channelPicture: peerCapabilities.has(CHANNEL_PICTURE_CAPABILITY),
+            channelBrowser: peerCapabilities.has(CHANNEL_BROWSER_CAPABILITY),
+            channelSeenSubtasks: peerCapabilities.has(CHANNEL_SEEN_SUBTASKS_CAPABILITY),
+            channelTaskWaits: peerCapabilities.has(CHANNEL_TASK_WAITS_CAPABILITY),
+            mcpManyServers: peerCapabilities.has(MCP_MANY_SERVERS_CAPABILITY),
             agentTaskUiBlocks: peerCapabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY),
             uiBlocks: peerCapabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
             subagents: peerCapabilities.has(TEAM_SUBAGENTS_CAPABILITY),
             promptMultiSelect: peerCapabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
+            videoGeneration: peerCapabilities.has(TEAM_VIDEO_GENERATION_CAPABILITY),
+            usageTertiary: peerCapabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
           };
           return yield* remoteDecode(() => ({
             status: response.status,
@@ -886,15 +907,18 @@ export class TeamWebRtcHostPeer {
                 // Only the V8 event reads them.
                 browserSignIn: this.#peerCapabilities.has(BROWSER_SIGN_IN_CAPABILITY),
                 contextUsage: this.#peerCapabilities.has(TEAM_CONTEXT_USAGE_CAPABILITY),
+                usageTertiary: this.#peerCapabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
                 // Only the V7 and V8 events read them.
                 uiBlocks: this.#peerCapabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
                 subagents: this.#peerCapabilities.has(TEAM_SUBAGENTS_CAPABILITY),
                 promptMultiSelect: this.#peerCapabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
+                videoGeneration: this.#peerCapabilities.has(TEAM_VIDEO_GENERATION_CAPABILITY),
               }),
         );
         if (this.#peerCapabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY))
           frame = withUiBlockAutoAnswers(frame, event);
         if (this.#peerCapabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)) frame = withUiBlockVaultRequests(frame, event);
+        if (this.#peerCapabilities.has(SKILL_LEARNING_CAPABILITY)) frame = withSkillSuggestionNames(frame, event);
       } catch {
         return;
       }
@@ -1233,7 +1257,8 @@ class GatewayError extends Error {
 
 /**
  * A response body with the automatic answer of each block, for a peer with `ui-block-auto-answer-v1`,
- * and its Vault request, for a peer with `ui-block-vault-v1`.
+ * its Vault request, for a peer with `ui-block-vault-v1`, and the skill name of each skill question,
+ * for a peer with `skill-learning-v1`.
  */
 function withBlockExtensions(
   capabilities: ReadonlySet<string>,
@@ -1242,5 +1267,6 @@ function withBlockExtensions(
 ): TeamProtocolV2Json {
   if (capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)) addUiBlockAutoAnswers(encoded, source);
   if (capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)) addUiBlockVaultRequests(encoded, source);
+  if (capabilities.has(SKILL_LEARNING_CAPABILITY)) addSkillSuggestionNames(encoded, source);
   return encoded;
 }

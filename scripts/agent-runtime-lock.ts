@@ -19,6 +19,8 @@ const nativeProviderArtifactSchema = z.object({
     "copilot.exe",
     "vibe-acp",
     "vibe-acp.exe",
+    "antigravity",
+    "antigravity.exe",
   ]),
   files: z.record(z.string().min(1), sha256Schema),
 });
@@ -98,26 +100,6 @@ const grokArtifactSchema = z.object({
   installedBytes: z.number().int().positive(),
   executable: z.enum(["grok", "grok.exe"]),
   platformDirectory: z.enum(["linux", "mac", "win"]),
-});
-
-/**
- * Google ships the Antigravity ACP server as one zip per target with two programs in it: the
- * server, and the harness it finds beside itself. Both are hashed, because either one runs.
- */
-const antigravityArtifactSchema = z.object({
-  asset: z
-    .string()
-    .regex(
-      /^agy-acp-server-\d+\.\d+\.\d+-(?:darwin-arm64|darwin-x86_64|linux-x86_64|linux-arm64|windows-x86_64)\.zip$/u,
-    ),
-  assetSha256: sha256Schema,
-  downloadBytes: z.number().int().positive(),
-  installedBytes: z.number().int().positive(),
-  executable: z.enum(["agy_acp_server.par", "agy_acp_server.exe"]),
-  executableSha256: sha256Schema,
-  harness: z.enum(["localharness_external", "localharness_external.exe"]),
-  harnessSha256: sha256Schema,
-  platformDirectory: z.enum(["macos", "linux", "windows"]),
 });
 
 /**
@@ -266,26 +248,12 @@ const agentRuntimeLockSchema = z.object({
     }),
   }),
   /**
-   * The server that signs in with a Google AI Pro or Ultra plan. It is proprietary, so OpenBot
-   * downloads it on the user's computer and does not ship it in a release. The archive has no licence
-   * file: the terms are at `licenseUrl`.
+   * The Antigravity CLI, whose `acp` command is the server that signs in with a Google AI Pro or
+   * Ultra plan. It is proprietary, so OpenBot downloads it on the user's computer and does not ship it
+   * in a release. Each archive holds only the program, `antigravity` or `antigravity.exe`, and no
+   * licence file: the terms are at `licenseUrl`.
    */
-  antigravity: z.object({
-    registry: z.literal(
-      "https://raw.githubusercontent.com/agentclientprotocol/registry/main/antigravity-acp/agent.json",
-    ),
-    distribution: z.literal("https://dl.google.com/agy-extensions/releases"),
-    version: z.string().regex(/^\d+\.\d+\.\d+$/u),
-    license: z.literal("Proprietary"),
-    licenseUrl: z.literal("https://antigravity.google/terms"),
-    artifacts: z.object({
-      "darwin-arm64": antigravityArtifactSchema,
-      "darwin-x64": antigravityArtifactSchema,
-      "linux-x64": antigravityArtifactSchema,
-      "linux-arm64": antigravityArtifactSchema,
-      "win32-x64": antigravityArtifactSchema,
-    }),
-  }),
+  antigravity: nativeProviderLockSchema,
   /**
    * The Cursor CLI, which signs in with a Cursor plan. It is proprietary, so OpenBot downloads it on
    * the user's computer and does not ship it in a release. The terms are at `licenseUrl`. A version is

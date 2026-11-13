@@ -1,0 +1,35 @@
+diff --git a/dist/package/chunks/BloubBot-Bpb4WbeJ.js b/dist/package/chunks/BloubBot-Bpb4WbeJ.js
+index fbd2a5b0df7e5fc8a6283bb4cad189b927374db4..233757dd3d4553f881ae289e655ac313ff10f366 100644
+--- a/dist/package/chunks/BloubBot-Bpb4WbeJ.js
++++ b/dist/package/chunks/BloubBot-Bpb4WbeJ.js
+@@ -1975,10 +1975,10 @@ function pn(u) {
+ 		window.removeEventListener("pointermove", ke), document.removeEventListener("pointerleave", G);
+ 	}
+ 	function Ne(e) {
+-		P = requestAnimationFrame(Ne);
+ 		let t = _e ? Math.min((e - _e) / 1e3, .064) : 0;
+ 		_e = e, I += t;
+-		let n = b.fps && b.fps > 0 ? 1 / b.fps : 0;
++		let n = b.fps && b.fps > 0 ? 1 / b.fps : 0, __frameDelay = I - ge < n ? n - (I - ge) : n;
++		__frameWaiting = n > 0 && __frameDelay > .012, P = __frameWaiting ? setTimeout(__frameResume, (__frameDelay - .008) * 1e3) : requestAnimationFrame(Ne);
+ 		I - ge < n || (ge = I, k() && (I >= F && b.cycle.length ? we((D() + 1) % b.cycle.length) : se(I - ve)), b.follow ? Ae() : b.gaze && je(b.gaze), me(I), b.paused && !b.follow && I >= R && A.quiet(I) && L(!1));
+ 	}
+ 	function q() {
+@@ -2012,11 +2012,15 @@ function pn(u) {
+ 	}, { defer: !0 }), $(() => b.frozenAt, q, { defer: !0 }), p(() => b.follow && b.frozenAt === void 0, (e) => {
+ 		e ? (window.addEventListener("pointermove", ke), document.addEventListener("pointerleave", G)) : (Me(), K());
+ 	});
++	let __frameWaiting = !1;
++	function __frameResume() {
++		__frameWaiting = !1, P = requestAnimationFrame(Ne);
++	}
+ 	function Pe() {
+-		P || typeof requestAnimationFrame > "u" || (_e = 0, P = requestAnimationFrame(Ne));
++		P || typeof requestAnimationFrame > "u" || (_e = 0, __frameWaiting = !1, P = requestAnimationFrame(Ne));
+ 	}
+ 	function Fe() {
+-		P &&= (typeof cancelAnimationFrame < "u" && cancelAnimationFrame(P), 0);
++		P &&= (__frameWaiting ? clearTimeout(P) : typeof cancelAnimationFrame < "u" && cancelAnimationFrame(P), __frameWaiting = !1, 0);
+ 	}
+ 	let [Ie, Le] = h(!0), [Re, ze] = h(!0), [Be, Ve] = h(!1);
+ 	p(() => Be() && b.frozenAt === void 0 && (!b.paused || b.follow || xe()) && (!b.autoPause || Ie() && Re()), (e) => {

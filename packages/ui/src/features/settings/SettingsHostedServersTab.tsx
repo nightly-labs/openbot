@@ -1,4 +1,4 @@
-import { BILLING_PLANS, type BillingPlanId } from "@openbot/contracts/billing";
+import { type BillingPlanId, serverStorageGb } from "@openbot/contracts/billing";
 import {
   HOSTED_SERVER_SIZES,
   type HostedServerState,
@@ -83,8 +83,8 @@ export function SettingsHostedServersTab(props: SettingsHostedServersTabProps) {
       plan: t(PLAN_NAMES[server.plan]),
       vcpu: size.vcpu,
       memory: size.memoryGb,
-      // The plan's storage, as the plan cards show it. The machine disk can be larger.
-      disk: BILLING_PLANS.find((plan) => plan.id === server.plan)?.storageGb ?? size.diskGb,
+      // The storage of the server, not the machine disk, which can be larger.
+      disk: serverStorageGb(server),
     });
   };
 

@@ -3,6 +3,7 @@ import type { messages as source } from "../en/uiBlock";
 
 export const messages = {
   "uiBlock.status.answered": "נענה",
+  "uiBlock.status.waiting": "ממתין לך",
   "uiBlock.outcome.expired": "לא ניתנה תשובה בזמן",
   "uiBlock.outcome.closed": "נסגר בלי תשובה",
   "uiBlock.outcome.autoAnswered": "{outcome} (איש לא ענה בזמן)",
@@ -17,9 +18,6 @@ export const messages = {
   "uiBlock.choice.submit": "שליחה",
   "uiBlock.choice.shortcutHint": "יש ללחוץ על {first} עד {last} כדי לבחור",
   "uiBlock.quick.label": "תשובות מהירות",
-  "uiBlock.quick.textLabel": "תשובה משלך",
-  "uiBlock.quick.textPlaceholder": "או אפשר להקליד תשובה משלך",
-  "uiBlock.quick.send": "שליחה",
   "uiBlock.form.submit": "שליחה",
   "uiBlock.form.required": "שדה חובה",
   "uiBlock.form.choose": "יש לבחור אפשרות",

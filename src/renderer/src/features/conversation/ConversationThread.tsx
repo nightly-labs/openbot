@@ -42,6 +42,7 @@ export function ConversationThread() {
     threadComposer,
     threadQueue,
     threadFocusRequest,
+    messagePins,
     threadVoiceLiveText,
     threadVoiceOwned,
     startThreadVoiceRecording,
@@ -173,6 +174,14 @@ export function ConversationThread() {
     if (!threads.onBranch || !taskId) return undefined;
     return (messageId: string) => void branchThread(taskId, messageId);
   };
+  /** Pin and Unpin on the messages of the open thread. A host that cannot pin has no such item. */
+  const threadPins = (taskId: string | undefined) => {
+    if (!messagePins.available() || !taskId) return undefined;
+    return {
+      isPinned: (messageId: string) => messagePins.isPinned(taskId, messageId),
+      onToggle: (messageId: string, pinned: boolean) => messagePins.set(taskId, messageId, pinned),
+    };
+  };
   /** Deletes a message of the open thread. A new thread has no message to delete. */
   const deleteMessage = (threads: ConversationThreads) => {
     const remove = threads.onDeleteMessage;
@@ -289,6 +298,7 @@ export function ConversationThread() {
             }}
             onStop={() => current().threads.onStop()}
             onOpenLink={(url) => void openExternalMessageUrl(url)}
+            onSelectAgent={props.onSelectAgent}
             onPreview={(attachment) => void previewAttachment(attachment)}
             onAttachmentAction={attachmentAction}
             mediaSource={props.runtime?.attachmentMedia}
@@ -304,6 +314,7 @@ export function ConversationThread() {
             attention={attention()}
             messageCard={mcpSignInCard}
             olderMessages={current().threads.olderMessages}
+            newerMessages={current().threads.newerMessages}
             stepsAbove={turnSteps.stepsAbove}
             factsAbove={turnSteps.factsAbove}
             activeSteps={turnSteps.activeSteps()}
@@ -314,6 +325,7 @@ export function ConversationThread() {
             compactMessageActions={compactMessageActions()}
             onBranch={branch(current().threads)}
             onDeleteMessage={deleteMessage(current().threads)}
+            messagePins={threadPins(current().threads.open?.id)}
             canDeleteMessage={props.canDeleteMessage}
             branchSource={branchSource(current().threads, current().agent.name)}
             focusMessage={focusMessage(current().threads)}

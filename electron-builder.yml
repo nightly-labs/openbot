@@ -106,8 +106,9 @@ mac:
   hardenedRuntime: true
   # macOS 26 shows the catalog that `CFBundleIconName` names, with our own dark version; without it,
   # macOS 26 makes the dark icon a black tile with black eyes. The catalog also has flat images, and
-  # `icon.icns` stays for macOS versions that read only `CFBundleIconFile`. Make the catalog again
-  # with `bun scripts/compile-macos-icon.ts` after a change to the `.icon` file.
+  # `icon.icns` stays for macOS versions that read only `CFBundleIconFile`. Make the catalog, the
+  # `.icns` and the Dock image again with `bun scripts/compile-macos-icon.ts` after a change to the
+  # `.icon` file.
   icon: build/icon-production.icns
   extraResources:
     - from: build/macos/Assets.car

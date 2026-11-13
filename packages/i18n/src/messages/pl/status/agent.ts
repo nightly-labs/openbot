@@ -9,6 +9,8 @@ export const messages = {
   "status.agent.modelSwitchedForLimit": "Osiągnięto limit użycia. Przełączono na {model}.",
   "status.agent.modelReturnedAfterLimit": "Limit użycia już nie obowiązuje. Przełączono z powrotem na {model}.",
   "status.agent.modelSwitchedForError": "Błąd dostawcy. Przełączono na {model}.",
+  "status.agent.modelSwitchedForSpentBalance":
+    "{previous} nie ma już kredytów. Przełączono na {model}. Aby znowu go używać, dodaj kredyty, a potem go wybierz.",
   "status.agent.modelReturnedAfterError": "Po błędzie dostawcy przełączono z powrotem na {model}.",
   "status.agent.marketplaceSuggested": "Zaproponowano aplikację z Marketplace: {app}.",
   "status.agent.channelMemberAdded": "Agent {agent} dodał {member} do kanału. Prośba od: {person}.",
@@ -29,7 +31,12 @@ export const messages = {
   "status.agent.reportProblem":
     "To będzie publiczne zgłoszenie na GitHubie, z wersją aplikacji i Twoim systemem. Twoje imię nie jest widoczne.",
   "status.agent.sendIdea": "To będzie publiczne zgłoszenie na GitHubie. Twoje imię nie będzie widoczne.",
+  "status.agent.feedbackRecentErrors": "Ostatnie błędy w czacie:",
+  "status.agent.feedbackSameAs": "Dodaje do zgłoszenia #{issue}",
   "status.agent.feedbackSent": "Wysłano do zespołu OpenBot: {title}",
+  "status.agent.serverInstallCommand":
+    "Utwórz jednorazowe polecenie, które instaluje OpenBot na innym komputerze jako serwer {name} i loguje go do Twojego konta. Agent uruchamia je tam.",
+  "status.agent.serverInstallCard": "Polecenie instalacji dla serwera {name}",
   "status.agent.feedbackSending": "Wysyłanie opinii do zespołu OpenBot…",
   "status.agent.workflowDelete":
     "Usuń przepływ pracy {title} razem z jego uruchomieniami i wersjami. Jego otwarte kroki zostaną zatrzymane.",
@@ -83,5 +90,6 @@ export const messages = {
     "Wspomnienia: zapisane {saved}, zaktualizowane {updated}, zapomniane {forgotten}, niezmienione {notChanged}, bo inny wątek zmienił je wcześniej.",
   "status.agent.nextStepContinues": "Agent zatrzymał się przed następnym krokiem. Kontynuuje ({current} z {limit}).",
   "status.agent.planContinues": "Plan ma otwarte kroki. Agent kontynuuje ({current} z {limit}).",
+  "status.agent.compactionContinues": "Połączenie przerwało się, gdy agent kompaktował kontekst. Agent kontynuuje.",
   "status.agent.branchTitle": "Odgałęziony czat",
 } as const satisfies PartialTranslation<typeof source>;

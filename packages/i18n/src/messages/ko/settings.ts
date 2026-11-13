@@ -16,6 +16,12 @@ export const messages = {
     "창 뒤에 흐릿한 바탕화면을 표시해요. 웹사이트와 메뉴도 앱 테마를 사용해요.",
   "settings.interfaceSize.title": "인터페이스 크기",
   "settings.interfaceSize.description": "OpenBot의 텍스트와 컨트롤 크기예요.",
+  "settings.interfaceFont.title": "인터페이스 글꼴",
+  "settings.interfaceFont.description": "메뉴, 채팅, 설정의 글꼴이에요.",
+  "settings.interfaceFont.default": "기본값 (Inter)",
+  "settings.codeFont.title": "코드 글꼴",
+  "settings.codeFont.description": "코드, 터미널, 파일 경로의 글꼴이에요.",
+  "settings.codeFont.default": "기본값",
   "settings.logoColor.title": "로고 색상",
   "settings.logoColor.description": "Dock, 작업 표시줄, Dynamic Island에 표시돼요.",
   "settings.logoColor.buildNote": "이 빌드는 자체 로고 색상을 유지해요. 선택한 색상은 릴리스 앱에 적용돼요.",
@@ -89,6 +95,8 @@ export const messages = {
   "settings.externalLinks.fallback.description": "링크를 기본 브라우저에서 열었어요.",
   "settings.sendShortcut.title": "전송 단축키",
   "settings.sendShortcut.description": "이 기기와 브라우저에서 메시지를 보낼 키를 선택해요.",
+  "settings.chatOrder.description":
+    "이 기기의 사이드바에서 읽지 않은 채팅을 표시할 위치를 선택합니다. 수동을 선택하면 읽지 않음 그룹이 꺼집니다.",
   "settings.sendShortcut.enter": "Enter로 전송",
   "settings.sendShortcut.modEnterMac": "⌘Enter로 전송",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter로 전송",
@@ -117,6 +125,10 @@ export const messages = {
   "settings.agentDefaults.setAllLabel": "모든 에이전트에 {setting} 설정",
   "settings.agentDefaults.agentLabel": "{agent}의 {setting}",
   "settings.agentDefaults.loadFailed": "에이전트를 읽을 수 없어요.",
+  "settings.commitCoAuthor.sectionTitle": "Git 커밋",
+  "settings.commitCoAuthor.title": "커밋에 OpenBot 표시",
+  "settings.commitCoAuthor.description":
+    "에이전트가 만든 커밋에 OpenBot을 공동 작성자로 추가해요. 커밋 작성자는 바뀌지 않아요.",
   "settings.planStart.title": "작업 시작",
   "settings.planStart.wait": "시작을 누를 때",
   "settings.planStart.after": "{time} 후",
@@ -134,6 +146,7 @@ export const messages = {
   "settings.planStart.set": "설정",
   "settings.automationLimit.sectionTitle": "한도",
   "settings.automationLimit.sectionDescription": "이 컴퓨터의 모든 에이전트에 적용돼요.",
+  "settings.automationLimit.sectionDescriptionServer": "이 서버의 모든 에이전트에 적용돼요.",
   "settings.automationLimit.title": "시간당 요청",
   "settings.automationLimit.option": "시간당 {limit}회",
   "settings.automationLimit.note":
@@ -195,7 +208,14 @@ export const messages = {
   "settings.soundTheme.play": "{name} 재생",
   "settings.notch.title": "동작",
   "settings.notch.show.title": "MacBook 노치에 상태 표시",
+  "settings.notch.show.titleTopOfScreen": "화면 상단에 상태 표시",
   "settings.notch.show.description": "각 디스플레이 상단에 에이전트 활동과 확인이 필요한 항목을 표시해요.",
+  "settings.notch.xwayland.title": "다시 시작 필요",
+  "settings.notch.xwayland.description":
+    "Wayland에서는 다른 앱 위에 Dynamic Island를 표시하려면 OpenBot이 XWayland를 사용해야 합니다. 그 전까지 아일랜드는 표시되지 않습니다.",
+  "settings.notch.xwayland.unsupported":
+    "XWayland가 없는 Wayland에서는 Dynamic Island를 다른 앱 위에 표시할 수 없습니다.",
+  "settings.notch.xwayland.restart": "다시 시작",
   "settings.notch.idle.title": "대기 상태 아일랜드 표시",
   "settings.notch.idle.description": "활성 상태가 없을 때 OpenBot 로고와 인사말을 표시해요.",
   "settings.notch.displays.title": "추가 디스플레이에 표시",
@@ -220,6 +240,12 @@ export const messages = {
     "'다른 앱 위'를 선택하면 OpenBot이 백그라운드에 있어도 독이 화면에 표시됩니다.",
   "settings.agentDock.placement.screen": "다른 앱 위",
   "settings.agentDock.placement.window": "OpenBot 창 안",
+  "settings.agentDock.xwayland.title": "다시 시작 필요",
+  "settings.agentDock.xwayland.description":
+    "Wayland에서는 다른 앱 위에 독을 표시하려면 OpenBot이 XWayland를 사용해야 합니다. 그 전까지 독은 OpenBot 창 안에 표시됩니다.",
+  "settings.agentDock.xwayland.unsupported":
+    "XWayland가 없는 Wayland에서는 독을 다른 앱 위에 표시할 수 없습니다. OpenBot 창 안에 표시됩니다.",
+  "settings.agentDock.xwayland.restart": "다시 시작",
   "settings.agentDock.display.title": "디스플레이",
   "settings.agentDock.display.description":
     "해당 디스플레이가 연결되어 있지 않으면 독이 OpenBot 창의 디스플레이로 이동합니다.",
@@ -232,10 +258,19 @@ export const messages = {
   "settings.agentDock.edge.description": "독을 위아래로 드래그하면 가장자리를 따라 이동합니다.",
   "settings.agentDock.edge.right": "오른쪽",
   "settings.agentDock.edge.left": "왼쪽",
+  "settings.agentDock.size.title": "독 크기",
+  "settings.agentDock.size.description":
+    "드래그하여 다른 앱 위에 표시되는 독의 크기를 바꿉니다. 기본 창에서는 독이 인터페이스 크기를 따릅니다.",
   "settings.agentDock.autoHide.title": "사용하지 않을 때 숨기기",
   "settings.agentDock.autoHide.description": "독이 가장자리 안으로 들어갑니다. 포인터를 가장자리로 옮기면 나타납니다.",
+  "settings.agentDock.edgeStrip.title": "가장자리에 띠 표시",
+  "settings.agentDock.edgeStrip.description":
+    "독이 숨은 자리에 얇은 띠가 남습니다. 포인터를 가까이 가져가면 독이 나타납니다. 에이전트가 질문하면 띠에 색 물결이 올라갑니다.",
   "settings.agentDock.results.title": "완료된 작업 표시",
   "settings.agentDock.results.description": "에이전트가 완료한 결과가 잠시 독 옆에 표시됩니다.",
+  "settings.agentDock.activeSeats.title": "새 소식이 있는 에이전트 표시",
+  "settings.agentDock.activeSeats.description":
+    "독에 없는 에이전트나 채널도 새 메시지가 있거나 응답을 기다리는 동안 독에 표시됩니다.",
   "settings.agentDock.agents.title": "독의 에이전트",
   "settings.agentDock.agents.description": "{server}의 에이전트입니다. 서버마다 독이 따로 있습니다.",
   "settings.agentDock.agents.empty": "이 서버에는 아직 에이전트가 없습니다.",
@@ -477,6 +512,8 @@ export const messages = {
   "settings.updates.status.ready": "{target}이(가) 준비되었어요. 다시 시작하면 적용돼요.",
   "settings.updates.status.installing": "{target}을(를) 적용하려고 다시 시작하는 중…",
   "settings.updates.status.upToDate": "OpenBot이 안정 채널의 최신 상태예요.",
+  "settings.updates.status.staged":
+    "{target}이(가) 일부 컴퓨터부터 배포되고 있어요. 지금 받으려면 업데이트를 확인하세요.",
   "settings.updates.status.checkFailed": "OpenBot이 업데이트를 확인할 수 없어요. 다시 시도해 주세요.",
   "settings.updates.status.unsupported": "이 빌드에서는 업데이트를 사용할 수 없어요.",
   "settings.updates.actionFailed": "OpenBot을 업데이트할 수 없어요.",
@@ -622,6 +659,8 @@ export const messages = {
   "settings.voice.speech.codexLive.title": "Codex 라이브 음성",
   "settings.voice.speech.codexLive.description":
     "모든 에이전트와의 음성 대화는 Codex 로그인으로 OpenAI 라이브 음성을 사용해요. 음성, 요청, 에이전트의 답변은 OpenAI로 전송돼요.",
+  "settings.voice.speech.codexLive.serverDescription":
+    "모든 에이전트와의 음성 대화는 서버의 Codex 로그인으로 OpenAI 라이브 음성을 사용해요. 음성, 요청, 에이전트의 답변은 OpenAI로 전송돼요.",
   "settings.voice.speech.speed.title": "속도",
   "settings.voice.speech.voice.title": "음성",
   "settings.voice.speech.voice.female": "여성 음성 {number}",
@@ -642,8 +681,6 @@ export const messages = {
   "settings.transfer.old.text": "에이전트와 서버 설정을 파일로 저장해요.",
   "settings.transfer.new.title": "이 서버로 가져오기",
   "settings.transfer.new.text": "파일에서 에이전트와 서버 설정을 추가해요.",
-  "settings.transfer.notMoved":
-    "API 키, 로그인 정보, 커넥터, 앱 환경설정, 채팅 기록은 옮겨지지 않아요. 새 서버에서 다시 설정해 주세요.",
   "settings.transfer.back": "뒤로",
   "settings.transfer.loading": "에이전트를 읽는 중…",
   "settings.transfer.summary.label": "파일에 포함된 내용",
@@ -653,10 +690,26 @@ export const messages = {
   "settings.transfer.count.noSettings": "서버 설정 없음",
   "settings.transfer.includeAgent": "{name} 포함",
   "settings.transfer.export.title": "이 서버 내보내기",
-  "settings.transfer.export.files": "워크스페이스 파일 포함",
-  "settings.transfer.export.filesDescription": "에이전트가 만든 파일과 공유 폴더예요. 파일 크기를 줄이려면 꺼 주세요.",
-  "settings.transfer.export.settings": "서버 설정 포함",
-  "settings.transfer.export.settingsDescription": "MCP 서버, 사용자 지정 모델 제공자, 사이드바 섹션, 루틴 흐름이에요.",
+  "settings.transfer.preset.label": "파일에 담을 항목",
+  "settings.transfer.preset.templates": "템플릿",
+  "settings.transfer.preset.everything": "전체",
+  "settings.transfer.meter.files": "/ {total} (워크스페이스 파일)",
+  "settings.transfer.part.agents": "에이전트와 설정",
+  "settings.transfer.part.agentsDescription": "{contents}. 항상 파일에 포함돼요.",
+  "settings.transfer.part.settings": "서버 설정",
+  "settings.transfer.part.chats": "채팅 기록",
+  "settings.transfer.part.chatsDescription":
+    "채팅과 사이드 스레드, 그 파일, 그리고 루틴의 실행 기록이에요. 에이전트가 맥락을 유지한 채 이 채팅을 이어가요.",
+  "settings.transfer.part.channels": "채널 메시지",
+  "settings.transfer.part.channelsDescription":
+    "내보내는 에이전트가 속한 채널의 메시지와 그 파일, 채널 루틴의 실행 기록이에요.",
+  "settings.transfer.part.files": "워크스페이스 파일",
+  "settings.transfer.part.filesDescription": "에이전트가 만든 파일과 공유 폴더예요.",
+  "settings.transfer.part.preferences": "서버 환경설정",
+  "settings.transfer.part.preferencesDescription":
+    "이름, 로고, 시간대, 성격, 에이전트 기본값, 모델 선택, 메모리 및 스킬 설정, 각 사용자의 알림 수준과 고정 항목이에요.",
+  "settings.transfer.export.settingsDescription":
+    "MCP 서버, 사용자 지정 모델 제공자, 사이드바 섹션, 루틴 흐름, 공유 스킬이에요.",
   "settings.transfer.export.chooseAgents": "에이전트 선택({total}개 중 {selected}개)",
   "settings.transfer.export.hideAgents": "에이전트 숨기기",
   "settings.transfer.export.agentsLabel": "내보낼 에이전트",
@@ -683,8 +736,11 @@ export const messages = {
   "settings.transfer.import.agentsLabel": "파일 속 에이전트",
   "settings.transfer.import.nameExists": "이미 사용 중인 이름",
   "settings.transfer.import.settings": "서버 설정 가져오기",
-  "settings.transfer.import.settingsDescription":
-    "이 서버에 없는 MCP 서버, 사용자 지정 모델 제공자, 사이드바 섹션을 추가해요.",
+  "settings.transfer.import.settingsAndPreferences":
+    "이 서버에 없는 MCP 서버, 사용자 지정 모델 제공자, 사이드바 섹션, 공유 스킬을 추가해요.",
+  "settings.transfer.import.preferences": "서버 환경설정 가져오기",
+  "settings.transfer.import.preferencesDescription":
+    "이 서버의 이름, 로고, 환경설정과 각 사람의 알림 수준 및 고정 항목을 파일의 것으로 바꿔요.",
   "settings.transfer.import.submit": { other: "에이전트 {count}개 가져오기" },
   "settings.transfer.import.submitSettings": "서버 설정 가져오기",
   "settings.transfer.import.importing": "가져오는 중…",
@@ -697,4 +753,23 @@ export const messages = {
   "settings.transfer.result.signInButton": "{provider} 로그인",
   "settings.transfer.result.notImported": "가져오지 않음",
   "settings.transfer.result.warnings": "확인 필요",
+  "settings.transfer.copy.tileTitle": "다른 서버로 복사",
+  "settings.transfer.copy.tileText": "에이전트를 내 다른 서버로 보내요.",
+  "settings.transfer.copy.title": "에이전트를 다른 서버로 복사",
+  "settings.transfer.copy.from": "보낼 곳",
+  "settings.transfer.copy.to": "받을 곳",
+  "settings.transfer.copy.chooseServer": "서버 선택",
+  "settings.transfer.copy.search": "에이전트 검색",
+  "settings.transfer.copy.agentsOn": "{server}의 에이전트",
+  "settings.transfer.copy.all": { other: "모든 에이전트 ({count}개)" },
+  "settings.transfer.copy.noAgents": "이 서버에는 에이전트가 없어요.",
+  "settings.transfer.copy.new": "새로 추가",
+  "settings.transfer.copy.notCopied":
+    "에이전트의 채널과 공유 폴더도 복사돼요. API 키, 로그인, 커넥터, 채팅 기록은 복사되지 않아요. 다른 서버에서 다시 설정하세요.",
+  "settings.transfer.copy.submit": { other: "에이전트 {count}개 복사" },
+  "settings.transfer.copy.copying": "복사하는 중…",
+  "settings.transfer.copy.done": { other: "에이전트 {count}개를 {server}에 복사했어요." },
+  "settings.transfer.copy.open": "{server} 열기",
+  "settings.transfer.copy.loadFailed": "에이전트를 읽지 못했어요",
+  "settings.transfer.copy.failed": "복사를 완료하지 못했어요",
 } as const satisfies PartialTranslation<typeof source>;

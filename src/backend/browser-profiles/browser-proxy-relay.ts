@@ -2,6 +2,7 @@ import { randomBytes, timingSafeEqual } from "node:crypto";
 import { connect, createServer, isIP, type Server, type Socket } from "node:net";
 import type { Duplex } from "node:stream";
 import type { BrowserProxyFailure } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { type BrowserOperationError, browserFailure } from "../browser-effects";
 
@@ -21,6 +22,15 @@ interface RelayTarget {
 
 /** The SOCKS5 proxy refused the saved sign-in, or it does not take a sign-in. */
 class ProxySignInRefused extends Error {}
+
+/** The computer of a member opens only public sites, and the site has no public address. */
+export class RelayAddressRefused extends Error {}
+
+/**
+ * Why a connection through the relay failed. `address`: the exit answered, but it does not open
+ * addresses on a local network. It is not a failure of the proxy.
+ */
+export type RelayExitFailure = BrowserProxyFailure | "address";
 
 /** A connection to a site, and the bytes that came from the site before the relay joined it. */
 interface RelayExitConnection {
@@ -46,9 +56,10 @@ export interface BrowserProxyRelay {
   readonly password: string;
   /**
    * Why the last connection through the relay failed, or null when it connected. Chromium sees only
-   * that the tunnel failed; the relay knows when the proxy refused the sign-in.
+   * that the tunnel failed; the relay knows when the proxy refused the sign-in, or when the computer
+   * of a member refused an address on a local network.
    */
-  readonly exitFailure: () => BrowserProxyFailure | null;
+  readonly exitFailure: () => RelayExitFailure | null;
   /** Stops the relay and closes each connection through it. */
   readonly close: Effect.Effect<void>;
 }
@@ -63,6 +74,11 @@ const MAX_CONNECTIONS = 256;
 const HOP_HEADERS = new Set(["proxy-authorization", "proxy-connection", "connection", "keep-alive"]);
 
 const BAD_GATEWAY = "HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+/** A 502 with a body that tells why the page did not open. */
+function addressRefusedResponse(): string {
+  const body = sourceText("error.backend.browserProxyComputerLocalAddress");
+  return `HTTP/1.1 502 Bad Gateway\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: ${Buffer.byteLength(body)}\r\nConnection: close\r\n\r\n${body}`;
+}
 const BAD_REQUEST = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
 const SIGN_IN_REQUIRED =
   'HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic realm="OpenBot"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n';
@@ -282,7 +298,7 @@ function relayConnection(
   exit: RelayExit,
   authorization: Buffer,
   open: Set<() => void>,
-  noteExit: (failure: BrowserProxyFailure | null) => void,
+  noteExit: (failure: RelayExitFailure | null) => void,
 ): void {
   let head = Buffer.alloc(0);
   const fail = (response: string) => {
@@ -336,8 +352,16 @@ function relayConnection(
       (error: unknown) => {
         open.delete(stop);
         // An attempt that the browser or the relay stopped says nothing about the proxy.
-        if (!attempt.signal.aborted) noteExit(error instanceof ProxySignInRefused ? "signIn" : "unreachable");
-        fail(BAD_GATEWAY);
+        if (!attempt.signal.aborted)
+          noteExit(
+            error instanceof ProxySignInRefused
+              ? "signIn"
+              : error instanceof RelayAddressRefused
+                ? "address"
+                : "unreachable",
+          );
+        // Chromium shows the body of a plain HTTP response as the page, but not of a failed tunnel.
+        fail(error instanceof RelayAddressRefused && !request.tunnel ? addressRefusedResponse() : BAD_GATEWAY);
       },
     );
   };
@@ -352,8 +376,8 @@ export const openBrowserProxyRelay = Effect.fn("openBrowserProxyRelay")(function
   const authorization = Buffer.from(`Basic ${Buffer.from(`${RELAY_USERNAME}:${password}`).toString("base64")}`);
   // A stop function for each browser connection, attempt, and site connection.
   const open = new Set<() => void>();
-  let exitFailure: BrowserProxyFailure | null = null;
-  const noteExit = (failure: BrowserProxyFailure | null) => {
+  let exitFailure: RelayExitFailure | null = null;
+  const noteExit = (failure: RelayExitFailure | null) => {
     exitFailure = failure;
   };
   const server: Server = createServer((client) => {

@@ -307,6 +307,7 @@ export function landingPageText(t: AppTranslate) {
       } satisfies Record<DownloadPlatform, string>,
       phone,
       pages: t("sitePage.landing.download.pages"),
+      apk: t("sitePage.landing.download.apk"),
     },
   };
 }

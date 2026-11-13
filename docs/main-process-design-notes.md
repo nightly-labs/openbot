@@ -78,11 +78,15 @@ There is no configuration for a developer or for a packaged build:
 - A stored registration that names a different address is replaced, but only for the attempt that
   needs the browser. `clientInformation()` in `src/backend/mcp-oauth-provider.ts` answers
   `undefined` when the stored `redirect_uris` do not hold this run's address, which makes the SDK
-  register again. A record that still has a refresh token keeps its client for one pass first: a
-  refresh uses no redirect address, and a refresh token spent against a new `client_id` is refused
-  and costs the user a sign-in. Two attempts never replace the registration: a silent refresh, and
-  the exchange of a grant already in hand, which must use the `client_id` that grant was issued
-  to.
+  register again. Two attempts never replace the registration: a silent refresh, and the exchange
+  of a grant already in hand, which must use the `client_id` that grant was issued to.
+- A sign-in that the user asked for does not refresh. `tokens()` gives the SDK the stored tokens
+  without the refresh token until the grant is in hand, so a token that the server refuses opens
+  the browser. Before, the SDK refreshed it, and a server that had ended the sign-in also refused
+  the new token, so Sign in opened no page (#6975). A stored token that the server accepts still
+  connects with no page. When tokens are on file, a registration that this sign-in makes stays in
+  memory and is written with the tokens of its grant: the stored tokens keep the client that they
+  were issued to, so a cancel or a timeout keeps the stored sign-in usable.
 - `describeUnusableRedirectUrl` refuses an address that cannot receive a grant: an `https` address,
   or a plain-text address that is not on this machine.
 - A registration endpoint that refuses the `127.0.0.1` address with `invalid_redirect_uri` or
@@ -91,6 +95,20 @@ There is no configuration for a developer or for a packaged build:
   servers accept only that name. The listener answers both names. A stored registration that names
   the `localhost` form keeps it: `redirectUrl` in `src/backend/mcp-oauth-provider.ts` sends that
   form at `/authorize` and at `/token`.
+- A firewall can refuse an authorization page that names `127.0.0.1`, in the browser, where the
+  app cannot see it (#6149). So when a sign-in opened the browser and no grant came back (a timeout
+  or a cancel), the next sign-in of that server registers the other name of the same listener.
+  The record is kept in memory, for one attempt. A refusal of that name at registration gets the
+  first name again. Sign-in apps and the client metadata document keep `127.0.0.1`.
+- Some firewalls block both loopback names (TradingView, #7230). After `localhost` gets no grant
+  back, a sign-in in this computer's browser registers `openbot://mcp-auth`, and the next one after
+  that starts again at `127.0.0.1`. A refusal of the deep link at registration gets `127.0.0.1`,
+  and then `localhost`.
+  A relayed sign-in, or one that an in-app tab shows, keeps the two loopback names: the deep link
+  opens only in the browser of the computer that runs OpenBot, and only while the operating system
+  opens `openbot://` in this app (`app.isDefaultProtocolClient`). The deep link is sent only in the
+  attempt that registered it, because builds before the loopback listener registered it too and
+  Canva refuses it at `/authorize`.
 
 ## Remote services and released protocols
 

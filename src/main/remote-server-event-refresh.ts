@@ -18,6 +18,7 @@
 import type {
   AgentColors,
   AgentEvent,
+  AgentRuntimeSnapshot,
   AvatarColor,
   BrowserTab,
   ChatColors,
@@ -25,8 +26,9 @@ import type {
   TeamMemberSummary,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_USAGE_LIMIT_ROUTES, type AgentUsageLimits } from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
 import { Deferred, Effect, Result } from "effect";
-import { decodeAgentSummaries, decodeQueueSnapshot } from "./remote-agent-decoding";
+import { decodeAgentSummaries, decodeQueueSnapshot, decodeRemoteAgentUsageLimits } from "./remote-agent-decoding";
 import { decodeConversationPageFromHost } from "./remote-conversation-decoding";
 import type { RemoteRequestFn } from "./remote-server-client";
 import { addRemotePreviewUrls, pageQuery } from "./remote-server-urls";
@@ -56,6 +58,8 @@ export interface RemoteEventRefreshOptions {
   emit: (serverId: string, event: AgentEvent, bufferedLive?: boolean) => void;
   /** The member chat colours of a server changed, so its presence goes to the renderer again. */
   onMemberChatColors?: (serverId: string) => void;
+  /** Whether the server sends the usage limits of its agents on their own route (`agent-usage-limit-v1`). */
+  hasUsageLimits?: (serverId: string) => boolean;
 }
 
 export class RemoteEventRefresh {
@@ -63,6 +67,7 @@ export class RemoteEventRefresh {
   readonly #hasServer: (serverId: string) => boolean;
   readonly #emit: (serverId: string, event: AgentEvent, bufferedLive?: boolean) => void;
   readonly #onMemberChatColors: (serverId: string) => void;
+  readonly #hasUsageLimits: (serverId: string) => boolean;
   readonly #conversations = new Map<string, ConversationRefresh>();
   readonly #queues = new Map<string, QueueRefresh>();
   readonly #generations = new Map<string, number>();
@@ -81,12 +86,18 @@ export class RemoteEventRefresh {
   // chat colours on their own. Each server keeps its last chat colours to merge them here.
   readonly #agentChatColors = new Map<string, ReadonlyMap<string, AvatarColor>>();
   readonly #memberChatColors = new Map<string, ReadonlyMap<string, AvatarColor>>();
+  // The frozen runtime snapshot has no usage limits, so `agent-usage-limit-v1` sends them on their own
+  // route. Each server keeps its last snapshot and its last usage limits to merge them here.
+  readonly #runtimeSnapshots = new Map<string, AgentRuntimeSnapshot>();
+  readonly #usageLimits = new Map<string, AgentUsageLimits>();
+  readonly #usageLimitReads = new Map<string, QueueRefresh>();
 
   constructor(options: RemoteEventRefreshOptions) {
     this.#request = options.request;
     this.#hasServer = options.hasServer;
     this.#emit = options.emit;
     this.#onMemberChatColors = options.onMemberChatColors ?? (() => undefined);
+    this.#hasUsageLimits = options.hasUsageLimits ?? (() => false);
   }
 
   /**
@@ -120,6 +131,12 @@ export class RemoteEventRefresh {
       this.#emit(serverId, event);
       const state = this.#browserStates.get(serverId);
       if (state) this.#emit(serverId, addRemotePreviewUrls(this.#withBrowserHolds(serverId, state), serverId));
+    } else if (event.type === "runtime-snapshot" && this.#hasUsageLimits(serverId)) {
+      // The snapshot goes out at once with the last usage limits. A changed hold also sends a runtime
+      // snapshot, so the limits are read again after it.
+      this.#runtimeSnapshots.set(serverId, event.snapshot);
+      this.#emitRuntimeSnapshot(serverId, bufferedLive);
+      yield* this.#refreshUsageLimits(serverId);
     } else {
       if (event.type === "browser-changed")
         this.#browserStates.set(serverId, { tabs: event.tabs, activeTabId: event.activeTabId });
@@ -261,6 +278,55 @@ export class RemoteEventRefresh {
     if (roster) this.#emit(serverId, { type: "agents-changed", agents: this.withAgentColors(serverId, roster) });
   }
 
+  /** The last runtime snapshot of the server, with its last usage limits. */
+  #emitRuntimeSnapshot(serverId: string, bufferedLive = false): void {
+    const snapshot = this.#runtimeSnapshots.get(serverId);
+    if (!snapshot) return;
+    const limits = this.#usageLimits.get(serverId);
+    const event = addRemotePreviewUrls(
+      { type: "runtime-snapshot" as const, snapshot: limits ? { ...snapshot, ...limits } : snapshot },
+      serverId,
+    );
+    if (bufferedLive) this.#emit(serverId, event, true);
+    else this.#emit(serverId, event);
+  }
+
+  readonly #refreshUsageLimits = Effect.fn("RemoteEvents.refreshUsageLimits")(function* (
+    this: RemoteEventRefresh,
+    serverId: string,
+  ) {
+    const pending = this.#usageLimitReads.get(serverId);
+    if (pending) {
+      pending.dirty = true;
+      return;
+    }
+    const read = { dirty: false };
+    this.#usageLimitReads.set(serverId, read);
+    yield* Effect.gen({ self: this }, function* () {
+      do {
+        read.dirty = false;
+        const result = yield* this.#request(serverId, AGENT_USAGE_LIMIT_ROUTES.list, decodeRemoteAgentUsageLimits, {
+          method: "POST",
+          body: {},
+        }).pipe(Effect.result);
+        if (Result.isFailure(result)) {
+          if (read.dirty) continue;
+          return;
+        }
+        if (!this.#hasServer(serverId)) return;
+        const previous = this.#usageLimits.get(serverId);
+        this.#usageLimits.set(serverId, result.success);
+        if (JSON.stringify(previous) !== JSON.stringify(result.success)) this.#emitRuntimeSnapshot(serverId);
+      } while (read.dirty);
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          if (this.#usageLimitReads.get(serverId) === read) this.#usageLimitReads.delete(serverId);
+        }),
+      ),
+    );
+  });
+
   #emitRoster(serverId: string, agents: ClientAgentSummary[], bufferedLive = false): void {
     this.#agentRosters.set(serverId, agents);
     const event = { type: "agents-changed" as const, agents: this.withAgentColors(serverId, agents) };
@@ -277,6 +343,9 @@ export class RemoteEventRefresh {
     this.#browserHolds.delete(serverId);
     this.#browserPageStates.delete(serverId);
     this.#browserStates.delete(serverId);
+    this.#runtimeSnapshots.delete(serverId);
+    this.#usageLimits.delete(serverId);
+    this.#usageLimitReads.delete(serverId);
     this.#generations.delete(serverId);
     for (const key of this.#conversations.keys()) {
       if (key.startsWith(`${serverId}\0`)) this.#conversations.delete(key);
@@ -295,6 +364,9 @@ export class RemoteEventRefresh {
     this.#browserHolds.clear();
     this.#browserPageStates.clear();
     this.#browserStates.clear();
+    this.#runtimeSnapshots.clear();
+    this.#usageLimits.clear();
+    this.#usageLimitReads.clear();
     this.#generations.clear();
     this.#conversations.clear();
     this.#queues.clear();

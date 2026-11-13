@@ -22,9 +22,12 @@ import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { type Accessor, createStore, Show, snapshot } from "solid-js";
 import { actionToast } from "../../action-toast";
+import { ServerBrowsingMemorySetting } from "./ServerBrowsingMemorySetting";
 import { ServerMemoryLimitSetting } from "./ServerMemoryLimitSetting";
 import { ServerMemoryReviewSetting } from "./ServerMemoryReviewSetting";
+import { ServerSkillLearningSetting } from "./ServerSkillLearningSetting";
 import { ServerTimezoneSetting } from "./ServerTimezoneSetting";
+import { ServerTurnLimitsSetting } from "./ServerTurnLimitsSetting";
 import { serverCanAdminister } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
 
@@ -102,8 +105,11 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
   /** The host changes its own name and logo; an admin elsewhere asks it to while it is online. */
   const canEditIdentity = () => serverCanAdminister(props.server, "host-admin-v1") && actionsAvailable();
   const canSetTimezone = () => serverCanAdminister(props.server, "host-timezone-v1") && actionsAvailable();
+  const canSetTurnLimits = () => serverCanAdminister(props.server, "host-turn-limits-v1") && actionsAvailable();
   const canSetMemoryLimit = () => serverCanAdminister(props.server, "agent-memory-limit-v1") && actionsAvailable();
   const canSetMemoryReview = () => serverCanAdminister(props.server, "memory-review-v1") && actionsAvailable();
+  const canSetSkillLearning = () => serverCanAdminister(props.server, "skill-learning-v1") && actionsAvailable();
+  const canSetBrowsingMemory = () => serverCanAdminister(props.server, "browsing-memory-v1") && actionsAvailable();
   const trimmedName = () => panels.identity.name.trim();
   const nameError = () => {
     if (!canEditIdentity()) return null;
@@ -118,8 +124,11 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
   const canLeave = () => Boolean(props.onLeaveServer) && !local() && props.server.role !== "owner";
   /** The owner removes the server from the account instead. The host does not need to be online. */
   const canRemove = () => Boolean(props.onRemoveServer) && !local() && props.server.role === "owner";
-  /** The key handover goes through the account service, so the server must be published. */
-  const canRotateKey = () => Boolean(props.onRotateHostKey) && local() && published();
+  /**
+   * The key handover goes through the account service, so this computer's server must be published.
+   * A joined server's owner asks the host while it is online.
+   */
+  const canRotateKey = () => Boolean(props.onRotateHostKey) && (local() ? published() : actionsAvailable());
   /** The last key change that the previous and the new key both signed. Every member sees it. */
   const keyChangedAt = () => props.server.keyChangedAt;
   const identityDirty = () =>
@@ -345,9 +354,7 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
               <ItemActions class="settings-identity-image-control">
                 <Show
                   when={canEditIdentity()}
-                  fallback={
-                    <ServerLogo name={panels.identity.name || props.server.name} url={panels.identity.logoUrl} />
-                  }
+                  fallback={<ServerLogo serverId={props.server.id} url={panels.identity.logoUrl} />}
                 >
                   <div class="settings-identity-image-picker ui-removable-image">
                     <Button
@@ -364,7 +371,7 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
                         when={panels.identity.logoUrl}
                         fallback={<Image class="server-settings-logo-placeholder" aria-hidden="true" />}
                       >
-                        {(logoUrl) => <ServerLogo name={panels.identity.name || props.server.name} url={logoUrl()} />}
+                        {(logoUrl) => <ServerLogo serverId={props.server.id} url={logoUrl()} />}
                       </Show>
                     </Button>
                     <Show when={panels.identity.logoUrl}>
@@ -390,8 +397,11 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
         <Show
           when={
             (canSetTimezone() && props.hostTimezone) ||
+            (canSetTurnLimits() && props.hostTurnLimits) ||
             (canSetMemoryLimit() && props.hostMemoryLimit) ||
-            (canSetMemoryReview() && props.memoryReview)
+            (canSetMemoryReview() && props.memoryReview) ||
+            (canSetSkillLearning() && props.skillLearning) ||
+            (canSetBrowsingMemory() && props.browsingMemory)
           }
         >
           <SettingsSection title={t("server.settings.agents")}>
@@ -399,6 +409,17 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
               <Show when={canSetTimezone() && props.hostTimezone}>
                 {(options) => (
                   <ServerTimezoneSetting
+                    {...options()}
+                    serverId={props.server.id}
+                    disabled={Boolean(busy())}
+                    menuMount={host.menuMount()}
+                    run={run}
+                  />
+                )}
+              </Show>
+              <Show when={canSetTurnLimits() && props.hostTurnLimits}>
+                {(options) => (
+                  <ServerTurnLimitsSetting
                     {...options()}
                     serverId={props.server.id}
                     disabled={Boolean(busy())}
@@ -425,6 +446,27 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
                     serverId={props.server.id}
                     disabled={Boolean(busy())}
                     menuMount={host.menuMount()}
+                    run={run}
+                  />
+                )}
+              </Show>
+              <Show when={canSetSkillLearning() && props.skillLearning}>
+                {(options) => (
+                  <ServerSkillLearningSetting
+                    {...options()}
+                    serverId={props.server.id}
+                    disabled={Boolean(busy())}
+                    menuMount={host.menuMount()}
+                    run={run}
+                  />
+                )}
+              </Show>
+              <Show when={canSetBrowsingMemory() && props.browsingMemory}>
+                {(options) => (
+                  <ServerBrowsingMemorySetting
+                    {...options()}
+                    serverId={props.server.id}
+                    disabled={Boolean(busy())}
                     run={run}
                   />
                 )}

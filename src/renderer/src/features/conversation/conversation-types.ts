@@ -45,6 +45,7 @@ import type { SidebarAgentWait } from "@openbot/ui/features/sidebar/sidebar-agen
 import type { JSX } from "@solidjs/web";
 import type { ConnectorRegistry } from "../connectors/connector-registry";
 import type { ConversationRuntime } from "./conversation-runtime";
+import type { ServerInstallWatch } from "./ServerInstallChatCard";
 import type { TurnStepLines } from "./turn-step-lines";
 
 /**
@@ -108,8 +109,18 @@ export interface ConversationChannelSource {
   readOnly: () => boolean;
   /** The agent that wrote an agent row, with the name the channel keeps for it. */
   author: (message: AgentMessage) => ChatMessageAuthor;
+  /** A person's message that this user sent, not another member's. */
+  ownMessage: (message: AgentMessage) => boolean;
   /** The agents that work now. */
   workers: () => ChannelWorker[];
+  /** The threads of the members in this channel. The Browser pane shows the tabs that they own. */
+  memberThreadIds: () => ReadonlySet<string>;
+  /**
+   * The member thread that a new tab of the Browser pane goes to: the browser member of the Browser
+   * setting, else the lead, else the first member. Null when no member can use the browser here, or
+   * when that member has no thread in the channel yet.
+   */
+  browserOwner: () => { agentId: string; threadId: string } | null;
   /** The turns of the workers that run now, whose steps show under the activity line. */
   workingTurns: () => readonly string[];
   /** The agent that the prompt, approval or takeover on screen comes from. */
@@ -154,6 +165,11 @@ export interface ConversationProps {
   onOpenMcpSignIn?: ((mcpServerId: string, trigger: HTMLElement | null) => void) | undefined;
   /** Whether the server on screen holds a sign-in for an MCP row, as Server settings last read it. */
   mcpSignedIn?: ((mcpServerId: string) => boolean) | undefined;
+  /**
+   * The server list that an install command card watches until its new server is online. Absent where
+   * this client cannot open a server; the card then stays a marker.
+   */
+  serverInstall?: ServerInstallWatch | undefined;
   platform?: import("@openbot/contracts/ipc").AppInfo["platform"] | undefined;
 
   agentStatus: AgentStatus;
@@ -285,6 +301,8 @@ export interface ConversationProps {
   usageLimitAsk?: UsageLimitAskCardProps | undefined;
   /** Whether a usage limit holds this model and account now. Absent for a joined server. */
   usageLimited?: ((choice: AgentModelChoice) => boolean) | undefined;
+  /** Whether a provider error holds this model and account now, for the backup models page. */
+  providerFailed?: ((choice: AgentModelChoice) => boolean) | undefined;
   /** The takeover of the open thread: of a side thread while one is open, else of the agent's own chat. */
   browserTakeover: BrowserTakeoverRequest | undefined;
   /** Opens an agent. With `tabId`, the agent opens at that thread tab, not at the tab it showed last. */
@@ -320,6 +338,11 @@ export interface ConversationProps {
   /** Whether the reader can delete a message. Without it, every finished message can. */
   canDeleteMessage?: ((message: AgentMessage) => boolean) | undefined;
   /**
+   * The pinned messages of the agent's chats on the host. Absent where the host cannot pin: the header
+   * then has no pin button, and the message menu has no Pin item.
+   */
+  messagePins?: ConversationMessagePins | undefined;
+  /**
    * The open channels that a message of this agent chat can go to. Each one opens with the text in its
    * composer. Without it, the message menu has no such item.
    */
@@ -346,8 +369,6 @@ export interface ConversationProps {
   agentAutoApproves?: boolean | undefined;
   /** Whether a joined server's host answered with the agent's backup models: owners and admins only. */
   remoteBackupModelsLoaded?: boolean | undefined;
-  /** Whether a joined server's host answered with the agent's task limit: owners and admins only. */
-  remoteTaskLimitLoaded?: boolean | undefined;
   /** Whether a joined server's host answered with the agent's plan card setting: owners and admins only. */
   remotePlanCardLoaded?: boolean | undefined;
   /** Whether a joined server's host answered with the agent's Computer Use setting: owners and admins only. */
@@ -398,7 +419,8 @@ export interface ConversationProps {
 }
 
 /** `messageId` is the conversation message the host stored: the delivery id of the receipt. */
-export type SendMessageResult = { messageId: string } | { error: string };
+/** `reference`: the failure's support reference, when it has one. */
+export type SendMessageResult = { messageId: string } | { error: string; reference?: string | null };
 
 export interface ComposerDraft {
   text: string;
@@ -450,6 +472,19 @@ export type RightPanelMode =
 export type { SidePanelPane };
 
 /**
+ * Reads and changes the pins of an agent: the pins of all its chats in one list. Each call resolves
+ * with the new list. `subscribe` calls `changed` when a pin of the agent changes on the host, also a
+ * pin of the agent itself, and returns the stop.
+ */
+export interface ConversationMessagePins {
+  list: (agentId: string) => Promise<import("@openbot/contracts/ipc").PinnedMessagesSnapshot>;
+  set: (
+    input: import("@openbot/contracts/ipc").SetMessagePinnedInput,
+  ) => Promise<import("@openbot/contracts/ipc").PinnedMessagesSnapshot>;
+  subscribe: (agentId: string, changed: () => void) => () => void;
+}
+
+/**
  * The threads of the active agent. A side thread is a task of the host; the agent's own chat is the
  * main thread. Each action applies to the open thread.
  */
@@ -469,6 +504,8 @@ export interface ConversationThreads {
   conversation: ConversationSnapshot | undefined;
   /** The open side thread has messages before the loaded ones. */
   olderMessages: AgentThreadOlderMessages | undefined;
+  /** The open side thread shows a part around an old message, and its latest messages are not loaded. */
+  newerMessages: AgentThreadOlderMessages | undefined;
   /** The approval that the open side thread's turn waits for. */
   approval: AgentApproval | undefined;
   /** The thread takes files. Only this computer sends them: `agent-tasks-v1` carries text only. */
@@ -520,6 +557,14 @@ export interface ConversationThreads {
   onOpenRoutineRun: (routineId: string, messageId: string) => Promise<boolean>;
   /** The message that a side thread scrolls to once, after a click on "Branched from". */
   focusMessage: { taskId: string; messageId: string; nonce: number } | null;
+  /**
+   * Opens a chat of the agent at a message and marks it: the agent's own chat when `taskId` is null,
+   * else a side thread, also an archived one. A side thread that does not hold the message reads the
+   * part of the thread around it in one read, before its tab opens. A thread in the side panel stays
+   * there. Resolves false, with no tab change, when the chat does not have the message, the thread is
+   * deleted, or its delete waits for the end of the Undo time.
+   */
+  onOpenMessage: (taskId: string | null, messageId: string) => Promise<boolean>;
 }
 
 /** The actions of the queue of a side thread, as in the agent's own chat. An edit goes through the message box. */
@@ -561,6 +606,10 @@ export interface SideThread {
   conversation: ConversationSnapshot | undefined;
   /** The thread has messages before the loaded ones. */
   olderMessages: AgentThreadOlderMessages | undefined;
+  /** The thread shows a part around an old message, and its latest messages are not loaded. */
+  newerMessages: AgentThreadOlderMessages | undefined;
+  /** The message that the thread scrolls to once, after a pin opened it. */
+  focusMessage: { messageId: string; nonce: number } | undefined;
   approval: AgentApproval | undefined;
   onSend: (text: string, attachmentDraftIds: string[], replyToMessageId?: string | null) => Promise<boolean>;
   onStop: () => void;

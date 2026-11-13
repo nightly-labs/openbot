@@ -10,7 +10,7 @@ import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Effect } from "effect";
 import { app, type BrowserWindow, dialog, shell } from "electron";
 import { runCauseEffect } from "../backend/effect-boundary";
-import { DOWNLOAD_URL } from "./app-archive-watch";
+import { DOWNLOAD_URL } from "./download-url";
 import { readUpdatePreference, UPDATE_PREFERENCE_FILE } from "./update-preference-store";
 import {
   electronUpdaterCacheDirectory,

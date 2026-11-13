@@ -24,6 +24,13 @@ export function slackMrkdwn(markdown: string, userMentions = false): string {
     .join("\n");
 }
 
+/** The users that a post of `markdown` pings: each user mention that `slackMrkdwn` makes live. */
+export function slackPingedUsers(markdown: string): string[] {
+  return [
+    ...new Set(Array.from(slackMrkdwn(markdown, true).matchAll(/<@([UW][A-Z0-9]+)>/g), (match) => match[1] ?? "")),
+  ];
+}
+
 function escapeSlack(text: string): string {
   return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }

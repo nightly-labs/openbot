@@ -10,6 +10,7 @@ import type {
   VoiceLiveStart,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Fiber, Schema } from "effect";
 import type { AgentClient } from "../agent-client";
 import {
@@ -34,16 +35,59 @@ const ANSWER_TIMEOUT_MS = 20_000;
 const REASON_LIMIT = 1_000;
 /** How Codex reports that OpenAI refused the call: `unexpected status 401 Unauthorized: …`. */
 const UNAUTHORIZED = /\bstatus 401\b|\b401 Unauthorized\b/;
+/**
+ * How Codex reports that OpenAI's server has no realtime call for a ChatGPT login:
+ * `unexpected status 404 Not Found: …, url: https://chatgpt.com/backend-api/codex/realtime/calls?…`.
+ */
+const CALL_NOT_FOUND = /\bstatus 404\b[\s\S]*\/realtime\/calls\b/;
+/**
+ * How Codex reports that OpenAI refused the live voice connection. Codex drops OpenAI's reason.
+ * Current Codex: `unexpected status 403 Forbidden: realtime websocket handshake failed`.
+ * Older Codex: `failed to connect realtime websocket: HTTP error: 403 Forbidden`.
+ */
+const FORBIDDEN = /^(?=[\s\S]*\brealtime\b)[\s\S]*(?:\bstatus 403\b|\b403 Forbidden\b)/;
 /** The one tool of the relay thread. Codex calls it for each request that the voice model hands off. */
 const ASK_TOOL = "ask_agent";
+/**
+ * Codex gives the voice at most about 4,000 bytes of a relay reply: about the first 2,000 bytes while
+ * the relay writes them, and the remainder only when the reply is complete. From a longer reply it
+ * removes the middle. The relay also needs many seconds to copy a long answer. So the relay copies
+ * only a short answer, and gives a long one as a summary that reaches the voice complete and in a
+ * few seconds (#6659).
+ *
+ * The longest answer, in UTF-8 bytes, that the relay copies: about 80 English words. Codex also tells
+ * the relay to be concise, so the relay sometimes shortens an answer that has no mark, and then it
+ * does not name the chat. Thus the limit is small: a marked answer always gets a summary that does.
+ */
+const RELAY_VERBATIM_BYTES = 600;
+/** The longest summary of a longer answer, in words. */
+const RELAY_SUMMARY_WORDS = 150;
+/** The first line of a tool result with a longer answer. The relay model does not measure the length reliably. */
+const LONG_ANSWER_MARK = "[long answer]";
 const RELAY_INSTRUCTIONS =
   "You relay requests. For every user request, call ask_agent exactly once with the request verbatim. " +
-  "Then reply with the tool result verbatim and nothing else. Never answer on your own.";
-/** The first message in the voice conversation. The voice model reads it as the user's. */
+  "Never answer on your own. The tool result is the agent's answer, and a voice says your reply aloud. " +
+  `If the first line of the result is ${LONG_ANSWER_MARK}, the answer is too long for the voice: reply with ` +
+  `its most important facts in ${RELAY_SUMMARY_WORDS} words or fewer, in the language of the answer. ` +
+  "Use only facts from the answer, and never add or change one. " +
+  "Write plain sentences without links, lists, formatting or code. " +
+  "End with one sentence that says that the full answer is in the chat. " +
+  "If the result has no such first line, your reply is the complete result, word for word and nothing else: " +
+  "do not shorten it, and do not change its form.";
+/**
+ * The first message in the voice conversation. The voice model reads it as the user's. It is in English,
+ * so without the language rule the voice says its own words, such as an acknowledgment, in English (#6871).
+ */
 const RELAY_VOICE_RULE =
   "From now on, give every request of mine to the background agent, even simple questions and small talk. " +
   "Never answer from your own knowledge. Wait for the agent's result before you give an answer. " +
+  "Say only what the result says, and add no facts of your own. " +
+  "Always speak the language that I speak, also for your own short words such as greetings and acknowledgments. " +
+  "Keep that language when a short or unclear phrase sounds like a different one. " +
+  "If I ask you to speak a different language, use it. " +
   "Do not reply to this message.";
+
+const logger = createOpenBotLogger("live-voice");
 
 class LiveVoiceFailed extends Schema.TaggedError<LiveVoiceFailed>()("LiveVoiceFailed", {
   cause: Schema.Defect(),
@@ -122,9 +166,9 @@ interface PendingAsk {
  *
  * The voice runs on a relay thread of that process, not on the agent's thread. When the voice model
  * hands a request off, the relay calls `ask_agent`, and OpenBot sends the request to the agent as the
- * user's message. The agent's answer goes back to the voice, which speaks it. So the voice does not
- * depend on the agent's provider or model, and a model change does not end it. The chat shows each
- * request and answer as usual.
+ * user's message. The agent's answer goes back to the voice, which speaks it: a short answer as it
+ * is, a long one as a summary. So the voice does not depend on the agent's provider or model, and a
+ * model change does not end it. The chat shows each request and the full answer as usual.
  *
  * One session runs at a time for each owner: the user of this computer, or one member of the server.
  */
@@ -358,14 +402,36 @@ export class LiveVoice {
 
   #startFailure(failure: LiveVoiceFailed): LiveVoiceFailed {
     const message = failure.cause instanceof Error ? failure.cause.message : String(failure.cause);
-    return UNAUTHORIZED.test(message) ? liveFailure(sourceText("error.voice.live.signIn")) : failure;
+    const text = this.#plainText(message);
+    return text ? liveFailure(text) : failure;
   }
 
   #reason(message: string | null): string {
     if (!message) return sourceText("error.voice.live.disconnected");
+    return (
+      this.#plainText(message) ??
+      sourceText("error.voice.live.failed", { reason: this.#hooks.redact(message).slice(0, REASON_LIMIT) })
+    );
+  }
+
+  /**
+   * Plain text for an OpenAI refusal that Codex reports, or null for another error. The log keeps
+   * OpenAI's request details.
+   */
+  #plainText(message: string): string | null {
     // Codex sends an API key login and a missing login to the paid Realtime API, which refuses both.
     if (UNAUTHORIZED.test(message)) return sourceText("error.voice.live.signIn");
-    return sourceText("error.voice.live.failed", { reason: this.#hooks.redact(message).slice(0, REASON_LIMIT) });
+    const key = CALL_NOT_FOUND.test(message)
+      ? "error.voice.live.unavailable"
+      : FORBIDDEN.test(message)
+        ? "error.voice.live.refused"
+        : null;
+    if (!key) return null;
+    logger.warn("OpenAI refused the live voice call.", {
+      text: key,
+      reason: this.#hooks.redact(message).slice(0, REASON_LIMIT),
+    });
+    return sourceText(key);
   }
 
   readonly #stopSession = Effect.fn("LiveVoice.stopSession")(function* (this: LiveVoice, session: LiveSession) {
@@ -398,6 +464,12 @@ export class LiveVoice {
   }
 }
 
+/**
+ * A long answer gets the mark that tells the relay to give a summary of it. A failure does not: the
+ * chat can have no answer for it.
+ */
 function toolResult(reply: LiveVoiceReply): DynamicToolResult {
-  return { contentItems: [{ type: "inputText", text: reply.text }], success: reply.success };
+  const long = reply.success && Buffer.byteLength(reply.text) > RELAY_VERBATIM_BYTES;
+  const text = long ? `${LONG_ANSWER_MARK}\n${reply.text}` : reply.text;
+  return { contentItems: [{ type: "inputText", text }], success: reply.success };
 }

@@ -19,6 +19,11 @@ export const messages = {
   "composer.update.manual": "続行するには、{provider} を実行しているコンピューターで更新してください。",
   "composer.update.pending": "更新中…",
   "composer.update.action": "更新",
+  "composer.usageLimit.credits":
+    "{provider} のプランの上限をすべて使用しました。エージェントは現在クレジットを使用しています。",
+  "composer.usageLimit.creditsResets":
+    "{provider} のプランの上限をすべて使用しました。{reset} にリセットされるまで、エージェントはクレジットを使用します。",
+  "composer.usageLimit.creditsTitle": "クレジットを使用中",
   "composer.usageLimit.resets": "{provider} の上限をすべて使用しました。上限は {reset} にリセットされます。",
   "composer.usageLimit.selectModel":
     "{provider} の上限をすべて使用しました。続行するには別のモデルを選択してください。",
@@ -77,6 +82,7 @@ export const messages = {
   "composer.placeholder.answer": "回答を入力",
   "composer.add.label": "プロンプトに追加",
   "composer.add.files": "ファイルを添付",
+  "composer.add.teach": "タスクを教える",
   "composer.add.skill": "スキルを使う",
   "composer.upload.cancel": "アップロードをキャンセル",
   "composer.upload.uploading": "{name} をアップロード中",
@@ -116,6 +122,10 @@ export const messages = {
   "composer.error.changeModel": "モデルを変更できませんでした。もう一度お試しください。",
   "composer.error.changeEffort": "推論レベルを変更できませんでした。もう一度お試しください。",
   "composer.error.changeFastMode": "高速モードを変更できませんでした。もう一度お試しください。",
+  "composer.fastMode.confirmTitle": "高速モードをオンにしますか？",
+  "composer.fastMode.confirmDescription":
+    "Claude の応答が速くなりますが、トークンあたりの料金が高くなります。Claude サブスクリプションでは、プランの使用量が残っていても、高速モードは常に使用クレジットを使います。",
+  "composer.fastMode.confirm": "オンにする",
   "composer.context.label": "コンテキスト使用率 {percent}",
   "composer.context.labelEstimated": "コンテキスト使用率 約 {percent}",
   "composer.context.labelCompacting": "コンテキストを圧縮しています",

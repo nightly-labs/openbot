@@ -9,6 +9,8 @@ export const messages = {
   "status.agent.modelSwitchedForLimit": "Límite de uso alcanzado. Se cambió a {model}.",
   "status.agent.modelReturnedAfterLimit": "El límite de uso terminó. Se volvió a {model}.",
   "status.agent.modelSwitchedForError": "Error del proveedor. Se cambió a {model}.",
+  "status.agent.modelSwitchedForSpentBalance":
+    "{previous} no tiene créditos. Se cambió a {model}. Para volver a usarlo, añade créditos y luego selecciónalo.",
   "status.agent.modelReturnedAfterError": "Se volvió a {model} tras el error del proveedor.",
   "status.agent.marketplaceSuggested": "Se sugirió una aplicación de Marketplace: {app}.",
   "status.agent.channelMemberAdded": "{agent} agregó a {member} al canal. {person} lo pidió.",
@@ -28,7 +30,12 @@ export const messages = {
   "status.agent.reportProblem":
     "Esto será un issue público en GitHub, con la versión de la app y tu sistema. Tu nombre no aparece.",
   "status.agent.sendIdea": "Esto se convierte en un issue público de GitHub. Tu nombre no se muestra.",
+  "status.agent.feedbackRecentErrors": "Errores recientes en el chat:",
+  "status.agent.feedbackSameAs": "Se añade al issue #{issue}",
   "status.agent.feedbackSent": "Enviado al equipo de OpenBot: {title}",
+  "status.agent.serverInstallCommand":
+    "Crear un comando de un solo uso que instala OpenBot en otro ordenador como el servidor {name} y lo conecta a tu cuenta. El agente lo ejecuta allí.",
+  "status.agent.serverInstallCard": "Comando de instalación para el servidor {name}",
   "status.agent.feedbackSending": "Enviando tus comentarios al equipo de OpenBot…",
   "status.agent.workflowDelete":
     "Eliminar el flujo de trabajo {title} con sus ejecuciones y versiones. Sus pasos abiertos se detienen.",
@@ -81,5 +88,7 @@ export const messages = {
     "Recuerdos: {saved} guardados, {updated} actualizados, {forgotten} olvidados, {notChanged} sin cambios porque otro hilo los cambió antes.",
   "status.agent.nextStepContinues": "El agente se detuvo antes del siguiente paso. Continúa ({current} de {limit}).",
   "status.agent.planContinues": "El plan tiene pasos pendientes. El agente continúa ({current} de {limit}).",
+  "status.agent.compactionContinues":
+    "La conexión se detuvo mientras el agente compactaba su contexto. El agente continúa.",
   "status.agent.branchTitle": "Chat ramificado",
 } as const satisfies PartialTranslation<typeof source>;

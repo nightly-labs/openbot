@@ -10,6 +10,11 @@ import type {
   ProviderModelVisibility,
   ProviderModelVisibilityChange,
 } from "@openbot/contracts/ipc";
+import {
+  isCustomProviderContextWindow,
+  isCustomProviderMaxOutput,
+  OPENCODE_RECOMMENDED_FREE_MODELS,
+} from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Clock, Effect, Result, Semaphore } from "effect";
 import { isMissingFileError } from "../backend/file-errors";
@@ -43,6 +48,13 @@ interface ModelRelease {
   agentReady: boolean;
 }
 
+/** The token limits of a model in the catalog. */
+interface ModelLimits {
+  contextWindow: number;
+  /** Left out when the catalog has none, or has one that leaves no room for the prompt. */
+  maxOutput?: number;
+}
+
 interface ReleaseLookup {
   /** The release of a catalog key, `<service>/<model>`. */
   release(key: string): ModelRelease | undefined;
@@ -50,6 +62,8 @@ interface ReleaseLookup {
   releaseByName(name: string): ModelRelease | undefined;
   /** True when the catalog lists the service, such as `openai`. */
   knowsService(service: string): boolean;
+  /** The limits of a model id of any service, such as a custom endpoint (see `catalogLimits`). */
+  limits(modelId: string): ModelLimits | undefined;
 }
 
 interface Releases {
@@ -57,6 +71,10 @@ interface Releases {
   /** By `modelName`, over all services: the first release date, and agent-ready when one service has it so. */
   names: Map<string, ModelRelease>;
   services: Set<string>;
+  /** By catalog key in lower case. */
+  limits: Map<string, ModelLimits>;
+  /** By `modelName`: the limits that each service gives the model. */
+  nameLimits: Map<string, ModelLimits[]>;
 }
 
 /**
@@ -64,7 +82,9 @@ interface Releases {
  * model ids are `<service>/<model>`, the keys of that file. A provider whose ids are not in it gets
  * no dates, and a long list with no dates shows all its models.
  *
- * Read again only when the file changes. A missing or bad file reads as no dates.
+ * The same file gives the token limits of a model that a custom endpoint lists by name only.
+ *
+ * Read again only when the file changes. A missing or bad file reads as no dates and no limits.
  */
 export class ModelReleaseCatalog {
   readonly #paths: readonly string[];
@@ -94,17 +114,18 @@ export class ModelReleaseCatalog {
     const loaded = this.#loaded;
     if (loaded && loaded.path === newest.path && loaded.modified === newest.modified)
       return releaseLookup(loaded.releases);
-    const releases = yield* Effect.tryPromise(() => readFile(newest.path, "utf8")).pipe(
-      Effect.map((text) => parseReleases(JSON.parse(text))),
-      Effect.orElseSucceed(noReleases),
-    );
+    // The parse is in the try: OpenCode can write the file during the read, and text that is not
+    // JSON then gives no releases, as a file that cannot be read does.
+    const releases = yield* Effect.tryPromise(async () =>
+      parseReleases(JSON.parse(await readFile(newest.path, "utf8"))),
+    ).pipe(Effect.orElseSucceed(noReleases));
     this.#loaded = { ...newest, releases };
     return releaseLookup(releases);
   });
 }
 
 function noReleases(): Releases {
-  return { models: new Map(), names: new Map(), services: new Set() };
+  return { models: new Map(), names: new Map(), services: new Set(), limits: new Map(), nameLimits: new Map() };
 }
 
 /**
@@ -125,7 +146,14 @@ function parseReleases(value: unknown): Releases {
     if (!isDynamicRecord(entry) || !isDynamicRecord(entry.models)) continue;
     releases.services.add(service);
     for (const [model, details] of Object.entries(entry.models)) {
-      if (!isDynamicRecord(details) || !isString(details.release_date)) continue;
+      if (!isDynamicRecord(details)) continue;
+      const limits = listedLimits(details.limit);
+      if (limits) {
+        releases.limits.set(`${service}/${model}`.toLowerCase(), limits);
+        const name = modelName(model);
+        releases.nameLimits.set(name, [...(releases.nameLimits.get(name) ?? []), limits]);
+      }
+      if (!isString(details.release_date)) continue;
       const release: ModelRelease = {
         date: details.release_date,
         family: isString(details.family) ? details.family : "",
@@ -155,8 +183,47 @@ function writesText(modalities: unknown): boolean {
   return modalities.output.includes("text");
 }
 
+/** The `limit` of a catalog model. A value that a custom model cannot store is left out. */
+function listedLimits(limit: unknown): ModelLimits | undefined {
+  if (!isDynamicRecord(limit) || !isCustomProviderContextWindow(limit.context)) return undefined;
+  const contextWindow = limit.context;
+  return isCustomProviderMaxOutput(limit.output) && limit.output < contextWindow
+    ? { contextWindow, maxOutput: limit.output }
+    : { contextWindow };
+}
+
+/** The value that most entries have. The smaller one wins a tie, so a model is not given too much. */
+function mostCommon(values: readonly number[]): number | undefined {
+  const counts = new Map<number, number>();
+  for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
+  return [...counts].sort(([left, leftCount], [right, rightCount]) => rightCount - leftCount || left - right)[0]?.[0];
+}
+
+/**
+ * The limits of a model that an endpoint lists by name only. An id that ends in a catalog key, as
+ * `google/gemini-3.8-flash` and `relay/google/gemini-3.8-flash` do, gets the limits of that key: the
+ * maker's own. Any other id is read by its model name, and gets the context window that most
+ * services give that model, with the max output that most of those services give it.
+ */
+function catalogLimits(modelId: string, releases: Releases): ModelLimits | undefined {
+  const parts = modelId.toLowerCase().split("/");
+  const exact = parts.length > 1 ? releases.limits.get(parts.slice(-2).join("/")) : undefined;
+  if (exact) return exact;
+  const listed = releases.nameLimits.get(modelName(modelId));
+  if (!listed) return undefined;
+  const contextWindow = mostCommon(listed.map((limits) => limits.contextWindow));
+  if (contextWindow === undefined) return undefined;
+  const maxOutput = mostCommon(
+    listed.flatMap((limits) =>
+      limits.contextWindow === contextWindow && limits.maxOutput !== undefined ? [limits.maxOutput] : [],
+    ),
+  );
+  return maxOutput === undefined ? { contextWindow } : { contextWindow, maxOutput };
+}
+
 function releaseLookup(releases: Releases): ReleaseLookup {
   return {
+    limits: (modelId) => catalogLimits(modelId, releases),
     release: (key) => releases.models.get(key),
     releaseByName: (name) => releases.names.get(name),
     knowsService: (service) => releases.services.has(service),
@@ -190,8 +257,88 @@ function matchCatalog(modelId: string, lookup: ReleaseLookup): CatalogMatch {
   return { service, base, release: lookup.release(base) };
 }
 
+type ModelMatch = { id: string; match: CatalogMatch };
+
+/**
+ * The name of a model without its version, and the version. `claude-fable-5-2` gives the shape
+ * `claude-fable-#` and the version `[5, 2]`; `gpt-6.1-sol` gives `gpt-#-sol` and `[6, 1]`, so
+ * `gpt-6-sol` and `gpt-7-sol` have the same shape. A release stamp, such as the `20251001` of
+ * `claude-haiku-4-5-20251001`, names a build of the model, not a version, and is left out.
+ *
+ * A version stands between separators, so the `1` of `deepseek-r1` and the `70` of `llama-3-1-70b`
+ * are not part of one. Each part has at most three digits, so a date such as the `0528` of
+ * `deepseek-r1-0528` is not a version either.
+ */
+function versionedName(match: CatalogMatch): { shape: string; version: number[] } | null {
+  const name = modelName(match.base).replace(/-\d{8}(?=-|$)/gu, "");
+  const version = /(?<=^|-)\d{1,3}(?:-\d{1,3})*(?=-|$)/u.exec(name);
+  if (!version) return null;
+  return {
+    shape: `${match.service}/${name.slice(0, version.index)}#${name.slice(version.index + version[0].length)}`,
+    version: version[0].split("-").map(Number),
+  };
+}
+
+function compareVersions(left: readonly number[], right: readonly number[]): number {
+  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+    const difference = (left[index] ?? 0) - (right[index] ?? 0);
+    if (difference) return difference;
+  }
+  return 0;
+}
+
+/**
+ * Gives a model that the catalog does not have yet the family of the catalogued model that it is a
+ * newer version of. models.dev adds a release some days after a CLI lists it, and until then a new
+ * release such as `claude-fable-5-2`, `gpt-7-sol` or `grok-4.8` was folded under Older models while
+ * the version before it led the list.
+ *
+ * Only an id with the same service and the same text around its version counts, and only when it is
+ * newer than every catalogued model with that shape. The newest of these new versions is dated one
+ * day after the newest model of the family, so it leads the family. Another new version takes the
+ * date of the version before it, so it folds as an older version does. The family is agent-ready
+ * when one of its catalogued models is.
+ */
+function withNewerVersions(matches: readonly ModelMatch[]): ModelMatch[] {
+  const named = matches.map((entry) => ({ entry, name: versionedName(entry.match) }));
+  const shapes = new Map<string, { version: number[]; release: ModelRelease | undefined }[]>();
+  const families = new Map<string, ModelRelease[]>();
+  for (const { entry, name } of named) {
+    const { release, service } = entry.match;
+    if (release?.family) {
+      const key = `${service}/${release.family}`;
+      families.set(key, [...(families.get(key) ?? []), release]);
+    }
+    if (name) shapes.set(name.shape, [...(shapes.get(name.shape) ?? []), { version: name.version, release }]);
+  }
+  return named.map(({ entry, name }) => {
+    if (entry.match.release || !name) return entry;
+    const siblings = shapes.get(name.shape) ?? [];
+    let previous: { version: number[]; release: ModelRelease } | undefined;
+    for (const { version, release } of siblings) {
+      if (!release) continue;
+      if (compareVersions(name.version, version) <= 0) return entry;
+      if (!previous || compareVersions(version, previous.version) > 0) previous = { version, release };
+    }
+    if (!previous) return entry;
+    const family = previous.release.family
+      ? (families.get(`${entry.match.service}/${previous.release.family}`) ?? [previous.release])
+      : [previous.release];
+    const newest = siblings.every(({ version, release }) => release || compareVersions(name.version, version) >= 0);
+    const latest = Date.parse(family.reduce((left, right) => (right.date > left.date ? right : left)).date);
+    if (Number.isNaN(latest)) return entry;
+    const date = newest ? new Date(latest + DAY_MS).toISOString().slice(0, 10) : previous.release.date;
+    const release = {
+      family: previous.release.family,
+      agentReady: family.some((member) => member.agentReady),
+      date,
+    };
+    return { ...entry, match: { ...entry.match, release } };
+  });
+}
+
 /** Each model, less those that the list has a newer model of the same family and service for. */
-function newestOfEachFamily(matches: readonly { id: string; match: CatalogMatch }[]): string[] {
+function newestOfEachFamily(matches: readonly ModelMatch[]): string[] {
   const newest = new Map<string, string>();
   for (const { match } of matches) {
     if (!match.release?.family) continue;
@@ -217,7 +364,7 @@ function newestOfEachFamily(matches: readonly { id: string; match: CatalogMatch 
  * service tier that OpenCode adds to a known service does not show.
  */
 function defaultShownModelIds(models: readonly { id: string }[], lookup: ReleaseLookup): string[] {
-  const matches = models.map((model) => ({ id: model.id, match: matchCatalog(model.id, lookup) }));
+  const matches = withNewerVersions(models.map((model) => ({ id: model.id, match: matchCatalog(model.id, lookup) })));
   if (models.length <= SHORT_LIST) return newestOfEachFamily(matches);
   const catalogued = new Set(matches.filter(({ match }) => match.release).map(({ match }) => match.service));
   // The newest model of each family, for each service.
@@ -246,6 +393,15 @@ function defaultShownModelIds(models: readonly { id: string }[], lookup: Release
     .filter(({ match }) => (match.release ? chosen.has(match.base) : !catalogued.has(match.service)))
     .map(({ id }) => id);
 }
+
+/**
+ * The models that a provider's picker shows in the main list whatever their release date, because a new
+ * agent of that provider starts on the first of them. OpenCode lists more than 100 models, and the
+ * newest families can be other free models, so without this the default would fold under Older models.
+ */
+const RECOMMENDED_MODELS: ReadonlyMap<string, readonly string[]> = new Map([
+  ["opencode", OPENCODE_RECOMMENDED_FREE_MODELS],
+]);
 
 type ModelKey = `${string}\u0000${string}`;
 
@@ -324,6 +480,41 @@ export class ModelVisibility {
   set(change: ProviderModelVisibilityChange): Effect.Effect<ProviderModelVisibility, PreferenceFileFailure> {
     return this.#set(change);
   }
+
+  /** The models that an admin turned off, for each provider, as a server transfer carries them. */
+  hiddenModels(): { provider: string; hidden: string[] }[] {
+    return [...this.#hidden].map(([provider, ids]) => ({ provider, hidden: [...ids] }));
+  }
+
+  /**
+   * Replaces the turned-off models with those of a server transfer. Unlike `set`, it keeps the models
+   * that no provider lists now: on a new server the providers are often not signed in yet.
+   */
+  replaceHidden(
+    models: readonly { provider: string; hidden: readonly string[] }[],
+  ): Effect.Effect<void, PreferenceFileFailure> {
+    return this.#replaceHidden(models);
+  }
+
+  readonly #replaceHidden = Effect.fn("ModelVisibility.replaceHidden")(function* (
+    this: ModelVisibility,
+    models: readonly { provider: string; hidden: readonly string[] }[],
+  ) {
+    const next = new Map<string, ReadonlySet<string>>();
+    for (const entry of models) if (entry.hidden.length > 0) next.set(entry.provider, new Set(entry.hidden));
+    yield* this.#writes.withPermit(
+      Effect.uninterruptible(
+        writePreferenceFile(this.#options.path, encodeHidden(next)).pipe(
+          Effect.tap(() =>
+            Effect.sync(() => {
+              this.#hidden = next;
+            }),
+          ),
+        ),
+      ),
+    );
+    this.#options.modelsChanged();
+  });
 
   /**
    * The models of `models` that the picker lists, in the same order: less those that an admin turned
@@ -425,6 +616,8 @@ export class ModelVisibility {
 
   #providerPicker(provider: string, models: readonly { id: string }[], lookup: ReleaseLookup): ProviderPicker {
     const byDefault = new Set(defaultShownModelIds(models, lookup));
+    const recommended = RECOMMENDED_MODELS.get(provider) ?? [];
+    for (const model of models) if (recommended.includes(model.id.toLowerCase())) byDefault.add(model.id);
     const released = new Map<string, string>();
     for (const model of models) {
       const date = matchCatalog(model.id, lookup).release?.date;

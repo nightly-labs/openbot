@@ -11,11 +11,13 @@
 @import "./styles/routine-calendar.css";
 @import "./styles/chat-action-card.css";
 @import "./styles/marketplace-suggestion.css";
+@import "./styles/server-install-card.css";
 @import "./styles/backup-models.css";
 @import "./styles/task-list.css";
 @import "./styles/subagents.css";
 @import "./styles/awaiting-replies.css";
 @import "./styles/open-waits.css";
+@import "./styles/pinned-messages.css";
 @import "./styles/header-controls.css";
 @import "./styles/timeline.css";
 @import "./styles/scroll-rail.css";

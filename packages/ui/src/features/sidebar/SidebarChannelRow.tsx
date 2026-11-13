@@ -19,13 +19,13 @@ import { sidebarUnreadBadge } from "./sidebar-agent-states";
 import { sidebarAgentStateLabel, sidebarMessageTime } from "./sidebar-filtering";
 import { useSidebarScope } from "./sidebar-scope";
 
-/** `waiting` is set by the "Needs you" group, as on `SidebarAgentRow`. */
+/** `waiting` is set by the "Needs you" and "Unread" groups, as on `SidebarAgentRow`. */
 export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?: boolean }) {
   const {
     dragOffset,
     draggedChatId,
     endChatDragging,
-    layoutMutable,
+    chatsDraggable,
     props,
     sidebarClickIsSuppressed,
     startChatDragging,
@@ -39,7 +39,7 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
     const current = channelWait();
     return current ? `. ${sidebarAgentStateLabel(current, t, format)}` : "";
   };
-  const draggable = () => !rowProps.channel.archived && layoutMutable() && !props.compact && !rowProps.waiting;
+  const draggable = () => !rowProps.channel.archived && chatsDraggable() && !props.compact && !rowProps.waiting;
   const [menuOpen, setMenuOpen] = createSignal(false);
   const title = () => rowProps.channel.title.trim();
   // A row from a saved frame has no last message yet: it shows no preview and no time until the list loads.

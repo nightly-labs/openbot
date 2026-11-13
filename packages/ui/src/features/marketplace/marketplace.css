@@ -191,74 +191,12 @@ body[data-skills-marketplace] :is(.integration-dialog-backdrop, .integration-wiz
 
 /* ---------------------------------------------------------------- heading */
 
-.marketplace-heading {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  gap: var(--openbot-space-1-5);
-  min-width: 0;
-}
-
-.marketplace-title {
-  min-width: 0;
-  margin: 0;
-  overflow: hidden;
-  color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-lg);
-  font-weight: var(--openbot-weight-semibold);
-  line-height: var(--openbot-leading-lg);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/*
- * A parent in the path is plain text until the pointer is on it: then it shows the outline button chip, as the parent
- * in the path did before. The start margin cancels the chip's padding and border, so the text stays on the inset. The
- * end margin cancels less, so the chip does not touch the separator.
- */
-.skills-marketplace .marketplace-crumb-parent {
-  flex: 0 1 auto;
-  min-width: 0;
-  margin-inline: calc(-1 * var(--openbot-space-2) - 1px) calc(-1 * var(--openbot-space-1));
-  overflow: hidden;
-  border-color: transparent;
-  background: transparent;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-md);
-  font-weight: var(--openbot-weight-medium);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.skills-marketplace .marketplace-crumb-parent:focus-visible {
-  border-color: var(--openbot-border);
-  background: var(--openbot-bg-control);
-  color: var(--openbot-text-primary);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .skills-marketplace .marketplace-crumb-parent:hover:not(:disabled) {
-    border-color: var(--openbot-border);
-    background: var(--openbot-bg-control);
-    color: var(--openbot-text-primary);
-  }
-}
-
-.marketplace-crumb-separator {
-  flex: 0 0 auto;
-  width: var(--openbot-icon-sm);
-  height: var(--openbot-icon-sm);
-  color: var(--openbot-text-muted);
-}
-
 /* Right to left, the arrow points the other way. */
-.marketplace-crumb-separator:dir(rtl),
 .marketplace-skill-group-head .ui-button > svg[class~="lucide-chevron-right"]:dir(rtl) {
   transform: scaleX(-1);
 }
 
 /* A title takes focus when its view opens. The focus is for screen readers, not a control. */
-.marketplace-title:focus,
 .skills-marketplace-body h3[tabindex="-1"]:focus {
   outline: none;
 }
@@ -277,6 +215,11 @@ body[data-skills-marketplace] :is(.integration-dialog-backdrop, .integration-wiz
   display: flex;
   align-items: center;
   gap: var(--openbot-space-4);
+}
+
+/* Why an app does not connect here: it wraps, as cut to one line it would lose what to do. */
+.marketplace-app-reason {
+  white-space: normal;
 }
 
 .marketplace-command {
@@ -805,10 +748,35 @@ body[data-skills-marketplace] :is(.integration-dialog-backdrop, .integration-wiz
   gap: var(--openbot-space-2);
 }
 
+/* The head keeps the height of its "See all" button, so the rows do not move when a search hides it. */
 .marketplace-skill-group-head {
   display: flex;
+  min-height: var(--openbot-control-md);
   align-items: center;
   justify-content: space-between;
+  gap: var(--openbot-space-2);
+}
+
+/* OpenBot did not review a skill from GitHub. */
+.marketplace-github-trust {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  margin: 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
+.marketplace-github-trust > svg {
+  width: var(--openbot-space-4);
+  height: var(--openbot-space-4);
+  flex: none;
+  color: var(--openbot-warning-text);
+}
+
+.marketplace-github {
+  display: flex;
+  flex-direction: column;
   gap: var(--openbot-space-2);
 }
 
@@ -1288,6 +1256,83 @@ html:active-view-transition-type(marketplace-swap)::view-transition-new(marketpl
   animation: none;
 }
 
+/* "See all" and back on the Apps tab: the category title and its first rows are on both views, so
+   they move to their new place and do not fade with the page. The rows are the same, so the new row
+   comes in over the old one: an icon that loads late shows the old icon until it is ready. */
+html:active-view-transition-type(marketplace-group)
+  [data-marketplace-shared]
+  :is(.marketplace-app-group-title, .marketplace-browse-title) {
+  view-transition-name: marketplace-group-title;
+}
+
+html:active-view-transition-type(marketplace-group) [data-marketplace-shared] .marketplace-app-row:nth-child(1) {
+  view-transition-name: marketplace-group-row-1;
+}
+
+html:active-view-transition-type(marketplace-group) [data-marketplace-shared] .marketplace-app-row:nth-child(2) {
+  view-transition-name: marketplace-group-row-2;
+}
+
+html:active-view-transition-type(marketplace-group) [data-marketplace-shared] .marketplace-app-row:nth-child(3) {
+  view-transition-name: marketplace-group-row-3;
+}
+
+html:active-view-transition-type(marketplace-group) [data-marketplace-shared] .marketplace-app-row:nth-child(4) {
+  view-transition-name: marketplace-group-row-4;
+}
+
+html:active-view-transition-type(marketplace-group) [data-marketplace-shared] .marketplace-app-row:nth-child(5) {
+  view-transition-name: marketplace-group-row-5;
+}
+
+html:active-view-transition-type(marketplace-group) [data-marketplace-shared] .marketplace-app-row:nth-child(6) {
+  view-transition-name: marketplace-group-row-6;
+}
+
+::view-transition-group(marketplace-group-title),
+::view-transition-group(marketplace-group-row-1),
+::view-transition-group(marketplace-group-row-2),
+::view-transition-group(marketplace-group-row-3),
+::view-transition-group(marketplace-group-row-4),
+::view-transition-group(marketplace-group-row-5),
+::view-transition-group(marketplace-group-row-6) {
+  animation-duration: var(--openbot-duration-overlay);
+  animation-timing-function: var(--openbot-ease-out);
+}
+
+/* The title changes its size: both copies keep their shape and grow from the start edge. */
+::view-transition-old(marketplace-group-title),
+::view-transition-new(marketplace-group-title) {
+  width: auto;
+  height: 100%;
+}
+
+::view-transition-old(marketplace-group-title) {
+  animation: marketplace-skill-blur-out var(--openbot-duration-fast) var(--openbot-ease-out) both;
+}
+
+::view-transition-new(marketplace-group-title) {
+  animation: marketplace-skill-blur-in var(--openbot-duration-normal) var(--openbot-ease-out) both;
+}
+
+::view-transition-old(marketplace-group-row-1),
+::view-transition-old(marketplace-group-row-2),
+::view-transition-old(marketplace-group-row-3),
+::view-transition-old(marketplace-group-row-4),
+::view-transition-old(marketplace-group-row-5),
+::view-transition-old(marketplace-group-row-6) {
+  animation: none;
+}
+
+::view-transition-new(marketplace-group-row-1),
+::view-transition-new(marketplace-group-row-2),
+::view-transition-new(marketplace-group-row-3),
+::view-transition-new(marketplace-group-row-4),
+::view-transition-new(marketplace-group-row-5),
+::view-transition-new(marketplace-group-row-6) {
+  animation: marketplace-skill-blur-in var(--openbot-duration-overlay) var(--openbot-ease-out) both;
+}
+
 /* The crumbs change their last name in place. */
 ::view-transition-old(marketplace-crumbs) {
   animation: marketplace-skill-blur-out var(--openbot-duration-fast) var(--openbot-ease-out) both;
@@ -1342,7 +1387,22 @@ html:active-view-transition-type(marketplace-swap)::view-transition-new(marketpl
   ::view-transition-old(marketplace-page),
   ::view-transition-new(marketplace-page),
   ::view-transition-old(marketplace-crumbs),
-  ::view-transition-new(marketplace-crumbs) {
+  ::view-transition-new(marketplace-crumbs),
+  ::view-transition-group(marketplace-group-title),
+  ::view-transition-old(marketplace-group-title),
+  ::view-transition-new(marketplace-group-title),
+  ::view-transition-group(marketplace-group-row-1),
+  ::view-transition-group(marketplace-group-row-2),
+  ::view-transition-group(marketplace-group-row-3),
+  ::view-transition-group(marketplace-group-row-4),
+  ::view-transition-group(marketplace-group-row-5),
+  ::view-transition-group(marketplace-group-row-6),
+  ::view-transition-new(marketplace-group-row-1),
+  ::view-transition-new(marketplace-group-row-2),
+  ::view-transition-new(marketplace-group-row-3),
+  ::view-transition-new(marketplace-group-row-4),
+  ::view-transition-new(marketplace-group-row-5),
+  ::view-transition-new(marketplace-group-row-6) {
     animation: none;
   }
 }

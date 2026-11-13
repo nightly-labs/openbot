@@ -20,6 +20,11 @@ export const messages = {
   "composer.update.manual": "Werk {provider} bij op de computer waarop het draait om door te gaan.",
   "composer.update.pending": "Bijwerken…",
   "composer.update.action": "Bijwerken",
+  "composer.usageLimit.credits":
+    "Je hebt de volledige planlimiet van {provider} gebruikt. Je agents gebruiken nu je tegoed.",
+  "composer.usageLimit.creditsResets":
+    "Je hebt de volledige planlimiet van {provider} gebruikt. Je agents gebruiken je tegoed tot de limiet {reset} wordt gereset.",
+  "composer.usageLimit.creditsTitle": "Tegoed in gebruik",
   "composer.usageLimit.resets":
     "Je hebt je limiet voor {provider} volledig gebruikt. De limiet wordt op {reset} gereset.",
   "composer.usageLimit.selectModel":
@@ -78,6 +83,7 @@ export const messages = {
   "composer.placeholder.messageAgent": "Bericht aan agent",
   "composer.add.label": "Toevoegen aan prompt",
   "composer.add.files": "Bestanden bijvoegen",
+  "composer.add.teach": "Een taak aanleren",
   "composer.add.skill": "Vaardigheid gebruiken",
   "composer.upload.cancel": "Uploaden annuleren",
   "composer.upload.uploading": "{name} wordt geüpload",
@@ -116,6 +122,10 @@ export const messages = {
   "composer.error.changeModel": "Kan het model niet wijzigen. Probeer het opnieuw.",
   "composer.error.changeEffort": "Kan het denkniveau niet wijzigen. Probeer het opnieuw.",
   "composer.error.changeFastMode": "Kan de snelle modus niet wijzigen. Probeer het opnieuw.",
+  "composer.fastMode.confirmTitle": "Snelle modus inschakelen?",
+  "composer.fastMode.confirmDescription":
+    "Claude antwoordt sneller, maar elk token kost meer. Met een Claude-abonnement gebruikt de snelle modus altijd gebruikstegoed, ook als je abonnement nog gebruik over heeft.",
+  "composer.fastMode.confirm": "Inschakelen",
   "composer.context.label": "Context {percent} vol",
   "composer.context.labelEstimated": "Context ongeveer {percent} vol",
   "composer.context.labelCompacting": "Context comprimeren",

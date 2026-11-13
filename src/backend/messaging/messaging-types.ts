@@ -9,7 +9,7 @@
 // a public endpoint on the host.
 
 import type { MessagingConnectionState, MessagingPlatform } from "@openbot/contracts/ipc";
-import type { DiscordApiRequest, DiscordDelivery } from "@openbot/contracts/signal-protocol/discord-api";
+import type { DiscordApiRequest, DiscordDelivery, DiscordEmbed } from "@openbot/contracts/signal-protocol/discord-api";
 import type {
   TelegramCallMethod,
   TelegramCallParams,
@@ -100,6 +100,8 @@ interface MessageButton {
 export interface MessageBody {
   text: string;
   buttons?: MessageButton[];
+  /** Discord only. */
+  embeds?: DiscordEmbed[];
 }
 
 export type StatusReaction = "received" | "done" | "failed" | "stopped";
@@ -138,6 +140,8 @@ export interface MessagingAdapter {
   identify(): Effect.Effect<ConnectionIdentity, MessagingAdapterError>;
   post(target: MessageTarget, body: MessageBody): Effect.Effect<string, MessagingAdapterError>;
   edit(target: MessageTarget, messageId: string, body: MessageBody): Effect.Effect<void, MessagingAdapterError>;
+  /** Deletes one of OpenBot's posts, for a platform where a quiet answer takes back its status post (Slack, WhatsApp). */
+  remove?(target: MessageTarget, messageId: string): Effect.Effect<void, MessagingAdapterError>;
   /** A post that only `userId` sees. `replyHandle` is the one of the press that it answers, if any. */
   postPrivate(
     target: MessageTarget,
@@ -162,6 +166,17 @@ export interface MessagingAdapter {
     markdown: string,
     replaceMessageId: string | null,
   ): Effect.Effect<string, MessagingAdapterError>;
+  /** `postAnswer` with embeds under the text, which can be empty, for a platform that has them (Discord). */
+  postEmbeds?(
+    target: MessageTarget,
+    markdown: string,
+    embeds: DiscordEmbed[],
+  ): Effect.Effect<string, MessagingAdapterError>;
+  /**
+   * Keeps a post that OpenBot sent on its own, with `messaging_post` or as a routine's answer, as a
+   * message of its place, for a platform whose history this device cannot read (WhatsApp).
+   */
+  rememberPost?(target: MessageTarget, postId: string, text: string): void;
   /** Uploads files to the conversation, and returns the names it did not send. */
   upload(target: MessageTarget, files: MessagingAnswerFile[]): Effect.Effect<string[], MessagingAdapterError>;
   /** Earlier messages of the conversation, oldest first, after `afterId` and before `beforeId`. */
@@ -187,6 +202,11 @@ export interface MessagingAdapter {
   placeName(platformChannelId: string): Effect.Effect<string, MessagingAdapterError>;
   /** The places of this connection that OpenBot can post in now. */
   places(): Effect.Effect<MessagingPlace[], MessagingAdapterError>;
+  /**
+   * The id of a place that an agent named, as `places` lists it, for a platform where one place has
+   * more than one written form (a WhatsApp phone number). The id as it is when no listed place matches.
+   */
+  placeId?(placeId: string): string;
   /** The roles a person can have in this workspace, highest first, for a platform with role lists. */
   roles?(): Effect.Effect<Array<{ id: string; name: string }>, MessagingAdapterError>;
   mention(userId: string): string;
@@ -280,6 +300,16 @@ export class TelegramCallError extends Error {
     super(description);
     this.name = "TelegramCallError";
     this.code = `telegram_${errorCode}`;
+  }
+}
+
+/** A post that WhatsApp's server refused in its ack, such as 463 for a chat it does not let this number start. */
+export class WhatsAppRefusedError extends Error {
+  readonly code: string;
+  constructor(errorCode: string) {
+    super(`WhatsApp refused the message: ${errorCode}`);
+    this.name = "WhatsAppRefusedError";
+    this.code = `whatsapp_${errorCode}`;
   }
 }
 

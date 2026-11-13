@@ -9,6 +9,8 @@ export const messages = {
   "status.agent.modelSwitchedForLimit": "Gebruikslimiet bereikt. Overgeschakeld naar {model}.",
   "status.agent.modelReturnedAfterLimit": "Gebruikslimiet voorbij. Teruggeschakeld naar {model}.",
   "status.agent.modelSwitchedForError": "Fout bij de aanbieder. Overgeschakeld naar {model}.",
+  "status.agent.modelSwitchedForSpentBalance":
+    "{previous} heeft geen tegoed meer. Overgeschakeld naar {model}. Voeg tegoed toe en selecteer het daarna om het weer te gebruiken.",
   "status.agent.modelReturnedAfterError": "Teruggeschakeld naar {model} na de fout bij de aanbieder.",
   "status.agent.marketplaceSuggested": "Een app uit de marktplaats voorgesteld: {app}.",
   "status.agent.channelMemberAdded": "{agent} heeft {member} aan het kanaal toegevoegd. {person} vroeg erom.",
@@ -33,7 +35,12 @@ export const messages = {
   "status.agent.reportProblem":
     "Dit wordt een openbare GitHub-issue, met de appversie en je systeem. Je naam is niet zichtbaar.",
   "status.agent.sendIdea": "Dit wordt een openbaar GitHub-issue. Je naam wordt niet getoond.",
+  "status.agent.feedbackRecentErrors": "Recente fouten in de chat:",
+  "status.agent.feedbackSameAs": "Wordt toegevoegd aan issue #{issue}",
   "status.agent.feedbackSent": "Naar het OpenBot-team gestuurd: {title}",
+  "status.agent.serverInstallCommand":
+    "Een eenmalige opdracht maken die OpenBot op een andere computer installeert als de server {name} en die aanmeldt bij je account. De agent voert hem daar uit.",
+  "status.agent.serverInstallCard": "Installatieopdracht voor de server {name}",
   "status.agent.feedbackSending": "Je feedback wordt naar het OpenBot-team gestuurd…",
   "status.agent.workflowDelete": "Verwijder de workflow {title} met zijn runs en versies. Zijn open stappen stoppen.",
   "status.agent.vaultCardFillFrames": "De kaartvelden staan in frames van {origins}.",
@@ -119,5 +126,7 @@ export const messages = {
   "status.agent.vaultField.email": "E-mailadres",
   "status.agent.nextStepContinues": "De agent stopte vóór de volgende stap en gaat verder ({current} van {limit}).",
   "status.agent.planContinues": "Het plan heeft open stappen. De agent gaat verder ({current} van {limit}).",
+  "status.agent.compactionContinues":
+    "De verbinding viel weg terwijl de agent zijn context comprimeerde. De agent gaat verder.",
   "status.agent.branchTitle": "Afgetakte chat",
 } as const satisfies PartialTranslation<typeof source>;

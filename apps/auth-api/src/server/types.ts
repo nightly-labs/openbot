@@ -57,6 +57,11 @@ export interface WorkerBindings {
    * each ticket names `REMOTE_SIGNAL_URL`.
    */
   REMOTE_SIGNAL_HOMES?: string;
+  /**
+   * The place of each home, as `id=latitude:longitude,id=latitude:longitude`. A host that asks for a
+   * home gets one near the place that Cloudflare gives for its request. Empty = any home.
+   */
+  REMOTE_SIGNAL_HOME_LOCATIONS?: string;
   REMOTE_AUTH_WEBHOOK_URL?: string;
   /** Each Signal that gets the auth events, as `url,url`. Empty = only `REMOTE_AUTH_WEBHOOK_URL`. */
   REMOTE_AUTH_WEBHOOK_URLS?: string;
@@ -386,6 +391,12 @@ export interface AuthRepository {
   createServerClaim(input: {
     claimHash: string;
     email: string;
+    createdAt: number;
+    expiresAt: number;
+  }): Effect.Effect<void, AuthStoreError>;
+  createServerClaimForUser(input: {
+    claimHash: string;
+    userId: string;
     createdAt: number;
     expiresAt: number;
   }): Effect.Effect<void, AuthStoreError>;

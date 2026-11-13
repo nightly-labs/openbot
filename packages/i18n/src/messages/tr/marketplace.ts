@@ -137,6 +137,11 @@ export const messages = {
   "marketplace.app.remove.confirmTitle": "{name} kaldırılsın mı?",
   "marketplace.app.remove.keep": "Koru",
   "marketplace.app.connection": "Bağlantı",
+  "marketplace.app.access.use": "Kullanabilir",
+  "marketplace.app.access.noAgents": "Ajan yok",
+  "marketplace.app.access.agentsOf": "{name} kullanabilen ajanlar",
+  "marketplace.app.access.chooseAgents": "{name}: {summary}. Ajanları seç",
+  "marketplace.app.access.level": "{role} rolünün {name} erişimi",
   "marketplace.app.setup.account": "Tarayıcıda {name} hesabınızla oturum açın.",
   "marketplace.app.setup.key": "{name} hesabınızdan bir API anahtarı gerekir.",
   "marketplace.app.setup.keySaved": "{field}, {host} üzerinde kayıtlı.",
@@ -144,6 +149,10 @@ export const messages = {
   "marketplace.app.setup.desktop": "{name} masaüstü uygulamasında {address} adresinde çalışır.",
   "marketplace.app.setup.desktopConnected": "{address} adresine bağlı.",
   "marketplace.app.setup.open": "Oturum açma veya anahtar gerekmez.",
+  "marketplace.app.blocked.update":
+    "{host} uygulama bağlayamayan eski bir OpenBot sürümü çalıştırıyor. {host} üzerindeki OpenBot'u güncelleyin veya sahibinden güncellemesini isteyin.",
+  "marketplace.app.blocked.member":
+    "{host} üzerinde yalnızca bir sahip veya yönetici uygulama bağlayabilir. Onlardan {name} uygulamasını bağlamalarını ya da üyelerin uygulama bağlayabilmesi için {host} üzerindeki OpenBot'u güncellemelerini isteyin.",
   "marketplace.app.connectAgain": "Tekrar bağlan",
   "marketplace.app.automation.askOnInstall": "Yüklerken macOS'ten erişim iste",
   "marketplace.app.automation.title": "Apple uygulamalarına erişim",
@@ -216,6 +225,27 @@ export const messages = {
   "marketplace.plugin.cobrain.prompt.searchDecision":
     "Fiyatlandırma hakkında ne karar verdiğimizi Cobrain notlarımda ara.",
   "marketplace.plugin.cobrain.prompt.saveNote": "Bugün ne yaptığımızı ve neyin kaldığını Cobrain'e not olarak kaydet.",
+  "marketplace.plugin.honcho.tagline": "Tüm yapay zekâ araçlarında hafızanız",
+  "marketplace.plugin.honcho.description":
+    "Plastic Labs'in Honcho'su, ajanlara sizinle ilgili, bağladığınız diğer yapay zekâ araçlarının da paylaşabileceği uzun süreli bir hafıza verir. Ajanlar öğrendiklerini kaydeder, Honcho da bunlar üzerinde akıl yürüterek tercihlerinizin, hedeflerinizin ve çalışma biçimlerinizin bir modelini oluşturur. Ajanlar başlamadan önce ona sorular sorar. OpenBot ajanlarının kendi hafızası da vardır; Honcho sizi diğer araçlara da izleyen hafızadır. Ajanların kaydettiği mesajlar Honcho hesabınıza gider.",
+  "marketplace.plugin.honcho.app":
+    "Tek bir MCP sunucusu üzerinden Honcho çalışma alanlarınızda uzun süreli hafızayı kaydedin ve sorgulayın.",
+  "marketplace.plugin.honcho.prompt.recall":
+    "Başlamadan önce Honcho'ya nasıl çalışmayı sevdiğim hakkında ne bildiğini sor.",
+  "marketplace.plugin.honcho.prompt.save": "Bu konudaki kararları Honcho'ya kaydet.",
+  "marketplace.plugin.honcho.prompt.preferences": "Honcho yazım tarzım hakkında ne diyor? Bu taslakta bunu kullan.",
+  "marketplace.plugin.honcho.hint.apiKey": "app.honcho.dev adresinde bir anahtar oluşturun.",
+  "marketplace.plugin.hindsight.tagline": "Zamanla öğrenen hafıza",
+  "marketplace.plugin.hindsight.description":
+    "Vectorize'ın Hindsight'ı, ajanlara Hindsight Cloud'da uzun süreli bir hafıza verir. Ajanlar olguları ve olayları saklar, onları anlam, zaman ve varlığa göre hatırlar ve zihinsel modeller oluşturmak için üzerlerinde düşünür. Anılar bankalarda tutulur ve ajanlar her proje ya da kişi için bir banka oluşturabilir. OpenBot ajanlarının kendi hafızası da vardır; Hindsight, bağladığınız diğer yapay zekâ araçlarının paylaşabileceği hafızadır. Ajanların sakladıkları Hindsight Cloud hesabınıza gider.",
+  "marketplace.plugin.hindsight.app":
+    "Tek bir MCP sunucusu üzerinden Hindsight Cloud bankalarınızdaki anıları saklayın, hatırlayın ve üzerinde düşünün.",
+  "marketplace.plugin.hindsight.prompt.recall":
+    "Başlamadan önce Hindsight'tan bu proje hakkında bildiklerimizi hatırla.",
+  "marketplace.plugin.hindsight.prompt.retain": "Bu konudaki kararları ve açık soruları Hindsight'ta sakla.",
+  "marketplace.plugin.hindsight.prompt.reflect":
+    "Hindsight'taki anılarım üzerinde düşün: son bir aydaki çalışmamda hangi örüntüleri görüyorsun?",
+  "marketplace.plugin.hindsight.hint.apiKey": "Hindsight Cloud'un Connect sayfasında bir anahtar oluşturun.",
   "marketplace.plugin.figma.tagline": "Tasarımlar ve prototipler",
   "marketplace.plugin.figma.description":
     "Figma, ajanların tasarım dosyalarını okumasına, bileşenleri, stilleri ve değişkenleri incelemesine ve üretim şartnamelerini mühendislere teslim etmesine olanak tanır. Bu bilgisayardaki Figma masaüstü uygulamasındaki MCP sunucusuna bağlanır. Sunucu yalnızca tasarımları okuyabilir; yazma desteği üzerinde çalışılıyor.",
@@ -244,6 +274,15 @@ export const messages = {
   "marketplace.plugin.higgsfield.prompt.productShot":
     "Higgsfield ile ahşap masa üzerinde seramik bir kupanın ürün fotoğrafını yap.",
   "marketplace.plugin.higgsfield.prompt.clip": "Higgsfield ile gün batımında dalgaların 5 saniyelik bir videosunu yap.",
+  "marketplace.plugin.sunra.tagline": "Yapay zekâ ile görsel, video, ses ve 3D",
+  "marketplace.plugin.sunra.description":
+    "Sunra, ajanların GPT Image, Nano Banana, Seedream, FLUX, Seedance, Kling ve Veo gibi modellerle görsel, video, ses ve 3D model üretmesini, kredi bakiyesini kontrol etmesini ve sonuçları almasını sağlar. Sonuçlar kullanıcının Sunra hesabındaki bir projeye kaydedilir. Her kullanıcı tarayıcıda kendi Sunra hesabına giriş yapar. Sunra her üretimin maliyetini önce bildirir ve o hesabın kredilerini yalnızca onaydan sonra harcar.",
+  "marketplace.plugin.sunra.app":
+    "Sunra MCP sunucusu üzerinden, tarayıcıda girişle görsel, video, ses ve 3D üretimi, krediler ve sonuçlar.",
+  "marketplace.plugin.sunra.prompt.balance": "Kaç Sunra kredim var?",
+  "marketplace.plugin.sunra.prompt.poster": "Sunra ile yağmurda bir gece pazarının dikey formatta posterini yap.",
+  "marketplace.plugin.sunra.prompt.clip":
+    "Sunra ile nehirdeki kâğıt bir teknenin 5 saniyelik videosunu yap. Önce maliyetini söyle.",
   "marketplace.plugin.elevenlabs.tagline": "Konuşma, sesler ve sesli ajanlar",
   "marketplace.plugin.elevenlabs.description":
     "ElevenLabs, ajanların metni konuşmaya çevirmesini, seslerle çalışmasını ve ElevenLabs sesli ajanlarını ve konuşmalarını oluşturmasını, test etmesini ve incelemesini sağlar. Üretilen ses kısa ömürlü bir indirme bağlantısı olarak gelir. Her kullanıcı tarayıcıda kendi ElevenLabs hesabına giriş yapar ve her üretim o hesabın kredilerini kullanır.",
@@ -388,16 +427,33 @@ export const messages = {
     "Geçen haftanın kampanyaları bir önceki haftaya göre nasıl performans gösterdi?",
   "marketplace.plugin.omnisend.prompt.segment": "VIP segmentinde kaç kişi var ve bu ay nasıl değişti?",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "Yeni koleksiyon için bir kampanya taslağı hazırla ama gönderme.",
-  "marketplace.plugin.composio.tagline": "Kendi Composio bağlantınız üzerinden birçok uygulama",
+  "marketplace.plugin.postiz.tagline": "Sosyal medya planlama",
+  "marketplace.plugin.postiz.description":
+    "Postiz, ajanların sosyal medya kanallarınızı listelemesini ve X, LinkedIn, Instagram ve TikTok gibi 30'dan fazla ağda gönderi taslağı hazırlamasını, planlamasını ve yayımlamasını sağlar. Ajanlar ayrıca medya yükleyebilir ve yapay zekâ ile görsel ve video oluşturabilir. Postiz hesabınıza tarayıcıdan giriş yapın veya Postiz'deki Settings › Developers bölümünden API anahtarını yapıştırın. Tüm Postiz bulut planları API erişimi içerir. Ajanlar bir gönderiyi hemen yayımlayabilir, bu yüzden her gönderiyi onaylamadan önce inceleyin.",
+  "marketplace.plugin.postiz.app":
+    "Kanallar, taslaklar, planlanmış gönderiler ve medya; tarayıcıdan giriş veya API anahtarıyla Postiz'in MCP sunucusu üzerinden.",
+  "marketplace.plugin.postiz.prompt.channels": "Postiz'e hangi sosyal medya kanalları bağlı?",
+  "marketplace.plugin.postiz.prompt.week": "Gelecek hafta için hangi gönderiler planlandı?",
+  "marketplace.plugin.postiz.prompt.draft":
+    "Yeni sürümümüz hakkında bir LinkedIn gönderisi taslağı hazırla, ama planlama.",
+  "marketplace.plugin.trypost.tagline": "Sosyal medya planlama",
+  "marketplace.plugin.trypost.description":
+    "TryPost, ajanların bağlı kanallarınızı listelemesini ve X, LinkedIn, Instagram, Facebook, TikTok, YouTube, Threads, Bluesky, Mastodon, Pinterest ve daha fazlasında gönderi taslağı hazırlamasını, planlamasını, sıraya eklemesini ve yayınlamasını sağlar. Ajanlar ayrıca analizleri okuyabilir, fikirleri ve onayları yönetebilir ve yayın saatlerini ayarlayabilir. Tarayıcıda TryPost hesabınıza giriş yapın ve bir çalışma alanı seçin. Ajanlar bir gönderiyi hemen yayınlayabilir, bu yüzden onaylamadan önce her gönderiyi gözden geçirin.",
+  "marketplace.plugin.trypost.app":
+    "Kanallar, gönderiler, sıra, fikirler ve analizler; tarayıcıda giriş ile TryPost'un MCP sunucusu üzerinden.",
+  "marketplace.plugin.trypost.prompt.week": "Bu hafta hangi gönderiler planlandı?",
+  "marketplace.plugin.trypost.prompt.draft":
+    "Yeni sürümümüz hakkında bir LinkedIn gönderisi taslağı hazırla, ama planlama.",
+  "marketplace.plugin.trypost.prompt.analytics": "Geçen ayki gönderilerimden hangileri en çok etkileşim aldı?",
+  "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub ve 1.000'den fazla uygulama",
   "marketplace.plugin.composio.description":
-    "Composio, ajanları tek bir MCP sunucusu üzerinden Gmail, Slack, GitHub ve yüzlerce başka uygulamaya bağlar. İstediğiniz uygulamaları Composio hesabınızda bağlayın, ardından MCP URL'sini ve API anahtarını buraya yapıştırın.",
+    "Composio, ajanlarınızı tek bir MCP sunucusu üzerinden Gmail, Slack, GitHub ve 1.000'den fazla başka uygulamaya bağlar. Composio hesabınızla oturum açın. Bir ajanın bir uygulamaya ihtiyacı olduğunda, o uygulamayı bağlamanızı ister.",
   "marketplace.plugin.composio.app":
-    "Composio MCP sunucunuza eklediğiniz uygulamalar, Composio hesabınızdaki bağlantı üzerinden.",
+    "Composio hesabınızda bağladığınız uygulamalar. Bir ajan, ihtiyaç duyduğunda bir uygulamayı bağlamanızı ister.",
   "marketplace.plugin.composio.prompt.inbox":
     "Okunmamış e-postalarımı özetle ve acil olanlara yanıt taslakları hazırla.",
   "marketplace.plugin.composio.prompt.handoff": "Bu çekme isteğinin özetini ekip kanalımıza gönder.",
   "marketplace.plugin.composio.prompt.apps": "Composio üzerinden hangi uygulamaları ve eylemleri kullanabilirsin?",
-  "marketplace.plugin.composio.hint.url": "Composio hesabınızdaki bir MCP sunucusunun URL'si",
   "marketplace.plugin.composio.hint.apiKey":
     "Composio hesabınızda, Settings > Sessions & API Key altında bulabilirsiniz.",
   "marketplace.plugin.neon.tagline": "Postgres projeleri, dalları ve geçişleri",
@@ -512,7 +568,6 @@ export const messages = {
     "Hava durumu zaman serilerinden oluşan bir veri kümesi bul ve sütunlarını göster.",
   "marketplace.auth.apiKey": "API anahtarı",
   "marketplace.auth.personalApiKey": "Kişisel API anahtarı",
-  "marketplace.auth.mcpUrl": "MCP URL'si",
   "marketplace.auth.createKey": "Anahtar oluştur",
 
   // Skills. {label} is the install button text: an agent name, "All agents" or "2 agents".
@@ -549,6 +604,13 @@ export const messages = {
   "marketplace.skills.origin.local": "Bu bilgisayarda oluşturuldu",
   "marketplace.skills.origin.workspace": "Bu ajanın klasöründe",
   "marketplace.skills.origin.marketplace": "Pazaryerinden · sürüm {version}",
+  "marketplace.skills.origin.github": "GitHub'dan · {repository}",
+  "marketplace.skills.github.search": "Arayın veya bir GitHub bağlantısı yapıştırın",
+  "marketplace.skills.github.reading": "Depoda beceriler aranıyor",
+  "marketplace.skills.github.trust": "OpenBot, GitHub'daki becerileri incelemedi. Bir beceriyi eklemeden önce okuyun.",
+  "marketplace.skills.github.source": "GitHub · {repository}, {commit} işlemesi",
+  "marketplace.skills.github.open": "GitHub",
+  "marketplace.skills.github.openName": "{repository} deposunu GitHub'da aç",
   "marketplace.skills.status.notAdded": "Eklenmedi",
   "marketplace.skills.status.on": "Açık: {agents}",
   "marketplace.skills.agentCount": { one: "{count} ajan", other: "{count} ajan" },

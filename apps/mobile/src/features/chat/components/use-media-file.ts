@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Directory, File, Paths } from "expo-file-system";
 import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
+import { largeDownloadOf } from "../model/large-files";
 
 /** The extension of a file whose name has none, for the types a player cannot read without one. */
 const MIME_EXTENSIONS: Record<string, string> = {
@@ -65,6 +66,23 @@ export function messageFileCopy(serverId: string, key: string, name: string) {
   return new File(mediaFolder(), segment(serverId), folder, fileName(name));
 }
 
+/** The writes that run now, by file. */
+const mediaWrites = new Map<string, Promise<void>>();
+
+/**
+ * Writes the Base64 of a host file to its place in the folder of downloaded files. The write is not
+ * `writeSync`: that decodes and writes megabytes on the JS thread, which also places the chat rows.
+ * Two readers of one host file, such as its card and Share, get the same write: a second write to
+ * the path would cut the file while the first reader has it.
+ */
+export function writeMediaFile(file: File, base64: string): Promise<void> {
+  const running = mediaWrites.get(file.uri);
+  if (running) return running;
+  const write = file.write(base64, { encoding: "base64" }).finally(() => mediaWrites.delete(file.uri));
+  mediaWrites.set(file.uri, write);
+  return write;
+}
+
 /**
  * A host file as a local file. A file from an earlier download is used again when it is whole.
  * `enabled` is false while the card passes in a fast fling, or until the user asks for the file.
@@ -77,9 +95,9 @@ export function useMediaFile(serverId: string, attachment: AttachmentSummary, en
     queryFn: async () => {
       const file = mediaFile(serverId, attachment);
       if (file.exists && file.size === attachment.size) return file.uri;
-      const data = await downloadAttachment(serverId, attachment.id);
+      const data = await downloadAttachment(serverId, attachment.id, largeDownloadOf(attachment));
       file.parentDirectory.create({ intermediates: true, idempotent: true });
-      file.writeSync(data.base64, { encoding: "base64" });
+      await writeMediaFile(file, data.base64);
       return file.uri;
     },
     retry: false,

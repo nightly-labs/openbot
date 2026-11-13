@@ -7,7 +7,6 @@ export const messages = {
   "error.voice.removeBusy": "音声文字起こしが終わってから、モデルを削除してください。",
   "error.voice.removeFailed": "音声モデルを削除できませんでした。もう一度お試しください。",
   "error.voice.runtimeUnavailable": "このプラットフォームではローカル音声文字起こしを使用できません。",
-  "error.voice.busy": "音声文字起こしはすでに実行中です。",
   "error.voice.modelUnavailable": "音声モデルを使用できません。",
   "error.voice.transcriptionTimedOut": "音声文字起こしがタイムアウトしました。",
   "error.voice.prepareRequired":
@@ -30,6 +29,12 @@ export const messages = {
   "error.voice.live.timedOut": "Codex ライブ音声が時間内に開始しませんでした。もう一度お試しください。",
   "error.voice.live.failed": "ライブ音声が停止しました: {reason}",
   "error.voice.live.disconnected": "ライブ音声の接続が切れました。",
+  "error.voice.live.hostFailed":
+    "サーバーの Codex がライブ音声を開始できませんでした。オーナーに、そのコンピューターの Codex を更新して ChatGPT でサインインするよう依頼してから、もう一度お試しください。",
   "error.voice.live.signIn": "ライブ音声を使うには、ChatGPT アカウントで Codex にサインインしてください。",
+  "error.voice.live.unavailable":
+    "OpenAI がライブ音声を開始できませんでした。OpenAI 側の問題です。しばらくしてからもう一度お試しください。",
+  "error.voice.live.refused":
+    "OpenAI がライブ音声の開始を拒否しました。しばらくしてからもう一度お試しいただくか、設定 でライブ音声をオフにして音声で話してください。",
   "error.voice.live.off": "Codex ライブ音声はオフです。設定 → 音声 でオンにしてください。",
 } as const satisfies PartialTranslation<typeof source>;

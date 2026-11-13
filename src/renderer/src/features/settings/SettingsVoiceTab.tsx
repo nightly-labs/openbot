@@ -28,6 +28,7 @@ import {
   type WhisperLanguage,
   XAI_SPEECH_VOICES,
 } from "@openbot/contracts/ipc";
+import { shortVoiceServerModel, voiceServerHost } from "@openbot/contracts/voice-server";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Button,
@@ -59,7 +60,7 @@ import {
   VoiceKeyRow,
   VoiceModelRow,
 } from "./VoiceModelRow";
-import { shortModel, VoiceServerDialog, voiceServerHost } from "./VoiceServerDialog";
+import { VoiceServerDialog } from "./VoiceServerDialog";
 
 const MODEL_DESCRIPTION = {
   "parakeet-tdt-0.6b-v3": "settings.voice.model.parakeet.description",
@@ -77,6 +78,8 @@ const SPEECH_MODEL_DESCRIPTION = {
   "elevenlabs-flash-v2.5": "settings.voice.speech.model.flash.description",
   "elevenlabs-multilingual-v2": "settings.voice.speech.model.multilingual.description",
   "elevenlabs-v3": "settings.voice.speech.model.v3.description",
+  "elevenlabs-v4-turbo": "settings.voice.speech.model.v4Turbo.description",
+  "elevenlabs-v4": "settings.voice.speech.model.v4.description",
   "xai-tts": "settings.voice.speech.model.xai.description",
 } as const satisfies Record<SpeechModelId, AppTextKey>;
 
@@ -675,14 +678,14 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
                   <Show when={serverDictates()}>
                     <ItemDescription>
                       {t("settings.voice.server.dictationSummary", {
-                        model: shortModel(saved().routes.transcriptionModel),
+                        model: shortVoiceServerModel(saved().routes.transcriptionModel),
                       })}
                     </ItemDescription>
                   </Show>
                   <Show when={serverSpeaks()}>
                     <ItemDescription>
                       {t("settings.voice.server.speechSummary", {
-                        model: shortModel(saved().routes.speechModel),
+                        model: shortVoiceServerModel(saved().routes.speechModel),
                         voice: saved().routes.voice ?? "",
                       })}
                     </ItemDescription>

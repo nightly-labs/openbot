@@ -240,6 +240,8 @@ export interface AgentRuntimeSnapshot {
     threadId: string;
     turnId: string;
     questions: AgentRuntimePromptQuestion[];
+    /** As on the `prompt` event: no turn waits for it. Absent from a released Team API snapshot. */
+    detached?: true;
   }>;
   pendingApprovals: AgentRuntimeApproval[];
   pendingBrowserTakeovers: BrowserTakeoverRequest[];
@@ -254,6 +256,11 @@ export interface AgentRuntimeSnapshot {
    * from a released Team API snapshot, as `usageLimits` is.
    */
   usageLimitedModels?: AgentModelChoice[];
+  /**
+   * Each provider account and model that a provider error holds for a while, so that a switch to a
+   * backup model passes over it. Absent from a released Team API snapshot, as `usageLimits` is.
+   */
+  failedModels?: AgentModelChoice[];
   /**
    * The agents whose subagents still run, with the turn that started them. A background subagent
    * runs on after its turn, so its agent is still at work. Absent from a released Team API
@@ -325,6 +332,10 @@ export function isAgentRuntimeSnapshot(value: unknown): value is AgentRuntimeSna
       (Array.isArray(value.usageLimitedModels) &&
         value.usageLimitedModels.length <= INPUT_LIMITS.agents &&
         value.usageLimitedModels.every(isAgentModelChoice))) &&
+    (value.failedModels === undefined ||
+      (Array.isArray(value.failedModels) &&
+        value.failedModels.length <= INPUT_LIMITS.agents &&
+        value.failedModels.every(isAgentModelChoice))) &&
     (value.subagentTurns === undefined ||
       (Array.isArray(value.subagentTurns) &&
         value.subagentTurns.length <= INPUT_LIMITS.agents &&
@@ -343,6 +354,7 @@ function isRuntimePrompt(value: unknown): value is AgentRuntimeSnapshot["pending
     isIdentifier(value.turnId) &&
     Array.isArray(value.questions) &&
     value.questions.length <= INPUT_LIMITS.promptQuestions &&
-    value.questions.every(isRuntimePromptQuestion)
+    value.questions.every(isRuntimePromptQuestion) &&
+    (value.detached === undefined || value.detached === true)
   );
 }

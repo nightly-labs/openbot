@@ -11,17 +11,28 @@ export function useMessageArrivals(agentId: string, messages: ChatMessage[], ena
     arriving: new Set<string>(),
   }));
   if (snapshot.agentId !== agentId || snapshot.enabled !== enabled || snapshot.messages !== messages) {
-    const known = new Map(snapshot.messages.map((message) => [message.id, message]));
     const arriving = new Set<string>();
     if (enabled && snapshot.enabled && snapshot.agentId === agentId) {
-      const previousTail = snapshot.messages.at(-1)?.id;
-      const tailIndex = previousTail ? messages.findIndex((message) => message.id === previousTail) : -1;
+      const previous = snapshot.messages;
+      // A streamed chunk keeps each message at its index, so the message before is at the same
+      // index. The map of all messages is made only when a message is not there.
+      let byId: Map<string, ChatMessage> | undefined;
+      const previousTail = previous.at(-1)?.id;
+      const tailIndex = !previousTail
+        ? -1
+        : messages[previous.length - 1]?.id === previousTail
+          ? previous.length - 1
+          : messages.findIndex((message) => message.id === previousTail);
       for (const [index, message] of messages.entries()) {
-        const old = known.get(message.id);
+        let old = previous[index];
+        if (old?.id !== message.id) {
+          if (!byId) byId = new Map(previous.map((item) => [item.id, item]));
+          old = byId.get(message.id);
+        }
         if (
           snapshot.arriving.has(message.id) ||
           (old?.kind === "message" && old.streaming && message.kind === "message" && message.status === "completed") ||
-          ((snapshot.messages.length === 0 || (tailIndex >= 0 && index > tailIndex)) && !known.has(message.id))
+          ((previous.length === 0 || (tailIndex >= 0 && index > tailIndex)) && !old)
         )
           arriving.add(message.id);
       }

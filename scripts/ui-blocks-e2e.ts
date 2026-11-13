@@ -380,7 +380,7 @@ try {
 
   await step("the turn ends before an answer: the block expires", async () => {
     const { id, message } = ask(repliesSpec, "turn-7");
-    registry.clearForTurn(THREAD, "turn-7");
+    registry.clearForTurn(THREAD, "turn-7", true);
     assert.equal(client.answers.get(id)?.success, false);
     assert.equal(client.answers.get(id)?.value?.status, "expired");
     assert.equal(message.uiBlock?.state.status, "expired");

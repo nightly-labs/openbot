@@ -1,4 +1,8 @@
 import { MCP_SERVERS_CAPABILITY } from "@openbot/contracts/ipc";
+import {
+  MCP_FROZEN_SERVERS_LIST_LIMIT,
+  MCP_MANY_SERVERS_CAPABILITY,
+} from "@openbot/contracts/team-protocol/mcp-many-servers-v1";
 import { MCP_ROUTES, mcpRequest } from "@openbot/contracts/team-protocol/mcp-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -11,9 +15,28 @@ import {
 import { type McpToolRuntimePreparation, prepareToolRuntimeForTest } from "../ipc/mcp-server-handlers";
 import type { TeamApiMcpServerOwners, TeamApiMcpServers } from "./dependencies";
 import { HttpError } from "./http-error";
-import { requireMcpAccess, requireOwnMcpServer } from "./mcp-member-access";
+import {
+  requireMcpAccess,
+  requireOwnMcpServer,
+  requireVisibleMcpAddress,
+  requireVisibleMcpTest,
+  visibleMcpServers,
+} from "./mcp-member-access";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson } from "./request-helpers";
+
+/**
+ * Refuses a peer without `mcp-many-servers-v1` a list longer than its frozen codec reads. The check
+ * runs before the route changes anything, so the peer does not get a protocol error after a change
+ * that the host already made.
+ */
+export function requireMcpListFits(capabilities: ReadonlySet<string>, rows: number): void {
+  if (rows > MCP_FROZEN_SERVERS_LIST_LIMIT && !capabilities.has(MCP_MANY_SERVERS_CAPABILITY))
+    throw new HttpError(
+      409,
+      sourceText("error.team.mcpServerListNeedsUpdate", { limit: MCP_FROZEN_SERVERS_LIST_LIMIT }),
+    );
+}
 
 /**
  * The MCP servers of the machine that runs this host, managed from a joined server.
@@ -43,14 +66,22 @@ export async function routeMcpServers(
   if (!mcpServers || !capabilities.has(MCP_SERVERS_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.mcpUnsupported"));
   const access = requireMcpAccess(member, capabilities, owners);
-  if (list) return json(200, mcpServers.listMcpServers());
+  if (list) {
+    const servers = mcpServers.listMcpServers();
+    requireMcpListFits(capabilities, servers.length);
+    return json(200, visibleMcpServers(access, servers));
+  }
   // `readJson` has already run the body through the MCP wire codec, so every field below is decoded
   // and bounded before the IPC parsers see it.
   const body = mcpRequest(url.pathname, await readJson(request));
   if (save) {
     const input = parseSaveMcpServer(body);
-    const before = new Set(mcpServers.listMcpServers().map((server) => server.id));
+    const rows = mcpServers.listMcpServers();
+    const before = new Set(rows.map((server) => server.id));
     if (before.has(input.config.id)) requireOwnMcpServer(access, input.config.id);
+    // A saved row on the address would use its stored sign-in, so `none` on the address refuses it.
+    if (input.config.transport === "http") requireVisibleMcpAddress(access, rows, input.config.url);
+    requireMcpListFits(capabilities, before.size + (before.has(input.config.id) ? 0 : 1));
     // The local save starts the runtime download; the host route shares it, or a first server
     // added remotely never gets the runtime its test and its spawn need.
     toolRuntimes?.startToolRuntimes();
@@ -60,17 +91,21 @@ export async function routeMcpServers(
     const name = input.config.name.trim();
     const added = saved.find((server) => !before.has(server.id) && server.name === name);
     if (added && owners) await runCauseEffect(owners.add(added.id, member.id));
-    return json(200, saved);
+    return json(200, visibleMcpServers(access, saved));
   }
   if (remove) {
     const input = parseRemoveMcpServer(body);
     requireOwnMcpServer(access, input.mcpServerId);
+    // The reply is the list after the removal: a released client can bring a host back to 32.
+    const rows = mcpServers.listMcpServers();
+    requireMcpListFits(capabilities, rows.length - (rows.some((server) => server.id === input.mcpServerId) ? 1 : 0));
     const servers = await runCauseEffect(mcpServers.removeMcpServer(input));
     if (owners) await runCauseEffect(owners.remove(input.mcpServerId));
-    return json(200, servers);
+    return json(200, visibleMcpServers(access, servers));
   }
   if (test) {
     const parsed = parseTestMcpServer(body);
+    requireVisibleMcpTest(access, mcpServers.listMcpServers(), parsed.config);
     if (toolRuntimes) await runCauseEffect(prepareToolRuntimeForTest(parsed.config, toolRuntimes));
     // The administrator tests the host's servers, so the host's stored sign-ins are spent - but no
     // browser opens on a machine nobody is sitting at. Only the tool count and the error travel back;
@@ -82,6 +117,7 @@ export async function routeMcpServers(
   }
   const toggled = parseSetMcpServerEnabled(body);
   requireOwnMcpServer(access, toggled.mcpServerId);
+  requireMcpListFits(capabilities, mcpServers.listMcpServers().length);
   if (toggled.enabled) toolRuntimes?.startToolRuntimes();
-  return json(200, await runCauseEffect(mcpServers.setMcpServerEnabled(toggled)));
+  return json(200, visibleMcpServers(access, await runCauseEffect(mcpServers.setMcpServerEnabled(toggled))));
 }

@@ -41,6 +41,8 @@ const agent: AgentSummary = {
 function instructions(provider: "claude" | "codex"): string {
   return developerInstructions({ ...agent, provider }, "/shared", [], "/automation", DEFAULT_AGENT_DEFAULTS, {
     computerUseInOwnChat: false,
+    // A desktop, where OpenBot draws the agent cursor, so its line is counted.
+    agentCursorDrawn: true,
     sideThread: false,
     passwordVault: false,
     storedMemoryCount: 0,
@@ -80,7 +82,7 @@ function measure(): Map<string, number> {
     ["catalog.schemas", sum(BUILTIN_TOOL_CATALOG.map((entry) => entry.inputSchema))],
     ["catalog.descriptions", sum(BUILTIN_TOOL_CATALOG.map((entry) => entry.description))],
     ["guidance", sum([...guidance])],
-    ["list-models.fixture", bytes(listModelsPayload(syntheticModels(), "codex", () => undefined))],
+    ["list-models.fixture", bytes(listModelsPayload(syntheticModels(), "codex", () => undefined, []))],
   ]);
 }
 

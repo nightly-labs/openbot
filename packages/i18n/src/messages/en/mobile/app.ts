@@ -18,6 +18,7 @@ export const messages = defineMessages("mobile.app", {
   "mobile.app.route.deletedChannels": "Deleted channels",
   "mobile.app.route.cropPhoto": "Move and Scale",
   "mobile.app.route.queuedMessages": "Queued messages",
+  "mobile.app.route.pinnedMessages": "Pinned messages",
   "mobile.app.route.thinking": "Thinking",
   "mobile.app.route.messageOptions": "Message options",
   "mobile.app.route.editMessage": "Edit message",
@@ -34,6 +35,7 @@ export const messages = defineMessages("mobile.app", {
   "mobile.app.route.usage": "Usage",
   "mobile.app.route.remoteDesktop": "Control computer",
   "mobile.app.route.marketplace": "Marketplace",
+  "mobile.app.route.library": "Library",
   // The quick actions of the app icon, which the phone shows when the icon is held.
   "mobile.app.quickAction.search": "Search",
   // The update header on home. A store update names its version; a downloaded update restarts the app.

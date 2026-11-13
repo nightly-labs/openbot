@@ -1,0 +1,33 @@
+{
+  "slug": "planetscale",
+  "name": "PlanetScale",
+  "tagline": "Databases, branches and query insights",
+  "description": "PlanetScale lets agents list databases and branches, read schemas and query insights, and run queries as the organization admin allows. Each user signs in to their own PlanetScale account through the browser.",
+  "category": "coding",
+  "creatorName": "PlanetScale",
+  "iconUrl": "https://planetscale.com/apple-touch-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-databases", "text": "List my databases and their branches." },
+    { "id": "prompt-slow-queries", "text": "Which queries were the slowest on the main branch this week?" },
+    { "id": "prompt-schema", "text": "Show the schema of the users table on the main branch." }
+  ],
+  "apps": [
+    {
+      "id": "app-planetscale-mcp",
+      "name": "PlanetScale",
+      "description": "Database, branch, schema, and query insight access, over PlanetScale's MCP server with browser sign-in.",
+      "iconUrl": "https://planetscale.com/apple-touch-icon.png",
+      "server": {
+        "name": "planetscale",
+        "transport": "http",
+        "url": "https://mcp.pscale.dev/mcp/planetscale",
+        "auth": [{ "id": "planetscale-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://planetscale.com",
+  "privacyPolicyUrl": "https://planetscale.com/legal/privacy",
+  "termsUrl": "https://planetscale.com/legal/agreement",
+  "skills": []
+}

@@ -1,5 +1,6 @@
 import type { AddedAgent, McpServerConfig, ServerSummary } from "@openbot/contracts/ipc";
 import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
+import type { MarketplaceAppsBlock } from "@openbot/ui/features/marketplace/marketplace-model";
 import type { ComponentProps } from "@solidjs/web";
 import { createMemo, Loading, omit, Show } from "solid-js";
 import type { AgentTemplateInstallCalls } from "./features/agent-templates/agent-templates-port";
@@ -8,7 +9,7 @@ import { useChannels } from "./features/channels/channels-context";
 import type { ConnectorRegistry } from "./features/connectors/connector-registry";
 import { useConversationController } from "./features/conversation/conversation-controller-context";
 import type { ServerStorageOptions } from "./features/files/ServerStoragePanel";
-import { canManageStorage, serverHasStorage } from "./features/files/storage-usage";
+import { canManageStorage, serverHasBackgroundProcesses, serverHasStorage } from "./features/files/storage-usage";
 import type { ServerSettingsModalProps } from "./features/servers/ServerSettingsModal";
 import type { ServerUpdateOptions } from "./features/servers/ServerUpdatePanel";
 import {
@@ -92,6 +93,17 @@ export function MarketplaceOverlay(props: {
      `mcp-servers-v1` from an admin, or from a member with `mcp-member-access-v1`; another member
      browses the listings and installs nothing. */
   const pluginServerId = createMemo(() => (serverCanManageMcp(props.server) ? props.server.id : undefined));
+  /* Why a joined server's apps do not connect, so the app page says it rather than hide Connect. A
+     host always lists capabilities, so an empty list on a live connection is one that this app has
+     not read yet. An offline, failed or incompatible server has its own notice. */
+  const pluginsBlocked = createMemo((): MarketplaceAppsBlock | undefined => {
+    const server = props.server;
+    if (server?.kind !== "remote" || pluginServerId()) return undefined;
+    if (!server.compatibility?.capabilities.length)
+      return server.state === "connecting" || server.state === "online" ? { reason: "checking" } : undefined;
+    const member = serverSupportsCapability(server, "mcp-servers-v1") && !serverRoleCanAdminister(server);
+    return { reason: member ? "member" : "update", host: server.name };
+  });
   /** Add custom, for a user who can add a server to the host. */
   const addServer = () => {
     const serverId = pluginServerId();
@@ -130,6 +142,7 @@ export function MarketplaceOverlay(props: {
           hostServerId={remoteAdminServer(props.server, "skills-admin-v1")?.id}
           agentServerId={remoteAdminServer(props.server, "agent-install-v1")?.id}
           agentUpdateServerId={remoteAdminServer(props.server, "agent-update-v1")?.id}
+          githubSkills={manage() && serverCanAdminister(props.server, "github-skills-v1")}
           onOpenChange={(open) => {
             /* The slug is consumed by opening, so closing forgets it: reopening the marketplace by
                hand lands on the catalog rather than on the listing a link once named. */
@@ -157,6 +170,7 @@ export function MarketplaceOverlay(props: {
           initialListing={props.marketplaceListing ?? undefined}
           onInitialListingConsumed={props.onMarketplaceListingConsumed}
           pluginServerId={pluginServerId()}
+          pluginsBlocked={pluginsBlocked()}
           onAddServer={addServer()}
           pluginHostName={
             props.server?.kind === "remote" && serverCanManageMcp(props.server) ? props.server.name : undefined
@@ -165,6 +179,7 @@ export function MarketplaceOverlay(props: {
             props.server?.kind === "remote" && serverSupportsCapability(props.server, "sign-in-relay-v1")
           }
           pluginAccounts={serverSupportsCapability(props.server, "mcp-accounts-v1")}
+          pluginAccess={serverCanAdminister(props.server, "mcp-access-v1")}
           onRunPluginPrompt={
             composerFree()
               ? (agentId, prompt) =>
@@ -227,7 +242,13 @@ export function ServerSettingsOverlay(
         {...modal}
         mcpServers={serverCanManageMcp(props.server) ? props.mcpServers : undefined}
         storage={
-          serverHasStorage(props.server) ? { ...props.storage, canManage: canManageStorage(props.server) } : undefined
+          serverHasStorage(props.server)
+            ? {
+                ...props.storage,
+                canManage: canManageStorage(props.server),
+                backgroundProcesses: serverHasBackgroundProcesses(props.server),
+              }
+            : undefined
         }
         hostUpdate={
           remoteUpdateServer(props.server)

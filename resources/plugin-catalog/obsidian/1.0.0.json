@@ -5,7 +5,7 @@
   "description": "Obsidian lets agents search, read and write the notes in your vault, so the vault can be their memory. The local server connects to the Local REST API plugin in the Obsidian app on this computer. The plugin's API key is passed to the local server as one environment variable. Keep Obsidian open while agents use it.",
   "category": "productivity",
   "creatorName": "Obsidian",
-  "iconUrl": "https://obsidian.md/favicon.ico",
+  "iconUrl": "https://obsidian.md/apple-touch-icon.png",
   "version": "1.0.0",
   "prompts": [
     { "id": "prompt-recall", "text": "What do my notes say about the decisions on this project?" },
@@ -17,7 +17,7 @@
       "id": "app-obsidian-mcp",
       "name": "Obsidian",
       "description": "Note search, reading and editing, over a local MCP server with the Local REST API plugin key.",
-      "iconUrl": "https://obsidian.md/favicon.ico",
+      "iconUrl": "https://obsidian.md/apple-touch-icon.png",
       "server": {
         "name": "obsidian",
         "transport": "stdio",

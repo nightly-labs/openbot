@@ -10,6 +10,8 @@ export const Route = createFileRoute("/app")({
     "Cache-Control": "no-store",
     "X-Robots-Tag": "noindex, nofollow",
     "Referrer-Policy": "no-referrer",
+    // Codex live voice of a joined server records in this page. The site's other pages keep `microphone=()`.
+    "Permissions-Policy": "camera=(), geolocation=(), microphone=(self), payment=(), usb=()",
     // A visual reply page runs in a sandboxed `srcdoc` frame, which inherits this policy. A
     // `script-src` or `default-src` here would stop the page and its bootstrap script.
     "Content-Security-Policy": "frame-ancestors 'none'",

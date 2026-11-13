@@ -9,7 +9,12 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "Переназначить остановленную задачу {name}",
   "channel.stoppedTask.reassign": "Переназначить",
   "channel.stoppedTask.cancel": "Отменить задачу",
+  "channel.stoppedTask.assignmentLoop":
+    "{names} передавали эту задачу друг другу слишком много раз. Она остановлена, чтобы не зациклиться.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "Участники передавали эту задачу друг другу слишком много раз. Она остановлена, чтобы не зациклиться.",
   "channel.conversation.noMembers": "Добавьте агентов в настройках канала, чтобы начать работу.",
+  "channel.conversation.waitFull": "Ожидание — {name} начнёт, когда завершится одна из текущих задач",
   "channel.conversation.archivedNotice": "Канал удалён. Только просмотр.",
   "channel.composer.label": "Сообщение в канал",
   "channel.composer.placeholder": "Сообщение: {name}",
@@ -20,6 +25,9 @@ export const messages = {
   "channel.settings.isolated": "Хранить память в этом канале",
   "channel.settings.isolatedDescription":
     "Агенты сохраняют то, что узнали здесь, как память канала. Их другие чаты её не видят.",
+  "channel.settings.browser": "Браузер",
+  "channel.settings.browserEveryone": "Все участники",
+  "channel.settings.browserNone": "Никто",
   "channel.settings.memoryCount": {
     one: "Сохранено: {count}",
     few: "Сохранено: {count}",

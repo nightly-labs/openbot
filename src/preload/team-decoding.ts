@@ -276,12 +276,15 @@ function server(summary: DynamicRecord): ServerSummary {
     compatibility,
     issue,
     connectionSequence,
+    capabilitiesPending,
     hostRestart,
     hostedSleep,
     hostedIssue,
     hostedStart,
     memberLimit,
     hosted,
+    restartAvailable,
+    storageGb,
     keyChangedAt,
     thisComputer,
   } = summary;
@@ -293,6 +296,10 @@ function server(summary: DynamicRecord): ServerSummary {
     throw new Error("Invalid memberLimit.");
   }
   if (hosted !== undefined && !isBoolean(hosted)) throw new Error("Invalid hosted.");
+  if (restartAvailable !== undefined && !isBoolean(restartAvailable)) throw new Error("Invalid restartAvailable.");
+  if (storageGb !== undefined && !(isNumber(storageGb) && Number.isSafeInteger(storageGb) && storageGb >= 1)) {
+    throw new Error("Invalid storageGb.");
+  }
   if (
     keyChangedAt !== undefined &&
     !(isNumber(keyChangedAt) && Number.isSafeInteger(keyChangedAt) && keyChangedAt >= 0)
@@ -300,6 +307,9 @@ function server(summary: DynamicRecord): ServerSummary {
     throw new Error("Invalid keyChangedAt.");
   }
   if (thisComputer !== undefined && thisComputer !== true) throw new Error("Invalid thisComputer.");
+  if (capabilitiesPending !== undefined && capabilitiesPending !== true) {
+    throw new Error("Invalid capabilitiesPending.");
+  }
   return {
     notificationsMuted: requiredBoolean(summary, "notificationsMuted"),
     notificationsMutedUntil: nullableNumber(summary, "notificationsMutedUntil"),
@@ -318,6 +328,7 @@ function server(summary: DynamicRecord): ServerSummary {
       : { compatibility: compatibility === null ? null : serverCompatibility(compatibility) }),
     ...(issue === undefined ? {} : { issue: issue === null ? null : serverIssue(issue) }),
     ...(connectionSequence === undefined ? {} : { connectionSequence }),
+    ...(capabilitiesPending === undefined ? {} : { capabilitiesPending }),
     ...(hostRestart === undefined ? {} : { hostRestart: hostRestart === null ? null : serverHostRestart(hostRestart) }),
     // Only the indicator reads it, so a value from a newer main process shows no indicator.
     ...(hostedSleep === undefined
@@ -327,6 +338,8 @@ function server(summary: DynamicRecord): ServerSummary {
     ...(hostedStart === undefined ? {} : { hostedStart: decodeHostedStart(hostedStart) }),
     ...(memberLimit === undefined ? {} : { memberLimit }),
     ...(hosted === undefined ? {} : { hosted }),
+    ...(restartAvailable === undefined ? {} : { restartAvailable }),
+    ...(storageGb === undefined ? {} : { storageGb }),
     ...(keyChangedAt === undefined ? {} : { keyChangedAt }),
     ...(thisComputer === undefined ? {} : { thisComputer }),
   };

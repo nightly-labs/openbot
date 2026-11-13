@@ -4,6 +4,7 @@ import { CHANNEL_REPLY_CHARACTERS, CHANNEL_REPLY_LIMIT } from "./channel-replies
 import {
   routineInstructionZodSchema,
   routineLimitPolicyZodSchema,
+  routineMissedPolicyUpdateZodSchema,
   routineMissedPolicyZodSchema,
   routineScheduleZodSchema,
 } from "./routine-tool-schema";
@@ -39,7 +40,7 @@ export const CHANNEL_TOOL_DEFINITIONS: readonly { name: string; description: str
   {
     name: "channel_assign",
     description:
-      "Assign one specific subtask to another channel member. You stay the owner: integrate the result and report to the user. End your turn while waiting for required results. Use only inside a channel task; for direct teammate work outside a channel use openbot.send_message.",
+      "Give a subtask to another member only when the person asks for that member or for help, or a part needs their role. You stay the owner: integrate the result and report. End your turn to wait for needed results. In a channel task only; else use openbot.send_message.",
     shape: handoff,
   },
   {
@@ -69,8 +70,8 @@ export const CHANNEL_TOOL_DEFINITIONS: readonly { name: string; description: str
   },
   {
     name: "channel_remember",
-    description:
-      "Save one short, durable fact about this channel that every member should keep. Save the same text again to correct it. This writes immediately.",
+    // The advertised schema has no maxLength, so the limit is in the description.
+    description: `Save one durable fact for every channel member to keep, up to ${INPUT_LIMITS.agentMemoryText} characters. Save the same text again to correct it. This writes immediately.`,
     shape: { text: z.string().min(1).max(INPUT_LIMITS.agentMemoryText) },
   },
   {
@@ -123,7 +124,7 @@ export const CHANNEL_TOOL_DEFINITIONS: readonly { name: string; description: str
       schedule: routineScheduleZodSchema.optional(),
       active: z.boolean().optional(),
       limitPolicy: routineLimitPolicyZodSchema.optional(),
-      missedPolicy: routineMissedPolicyZodSchema.optional(),
+      missedPolicy: routineMissedPolicyUpdateZodSchema.optional(),
     },
   },
   {

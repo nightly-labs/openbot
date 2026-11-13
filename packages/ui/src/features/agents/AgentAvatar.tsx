@@ -18,6 +18,8 @@ import { documentSoftwareRendering } from "../../document-rendering";
 
 // Cap avatar animation at 30fps: uncapped bloub clocks measured 30% renderer / 24% GPU
 // for two visible avatars. The shape is 24-40px, so the eye cannot see the difference.
+// The bloub patch in `patches/` waits between capped frames instead of asking for every display
+// frame. Each of those frames also restyled every running CSS animation in the window.
 const AVATAR_FPS = 30;
 
 interface PlushMood {

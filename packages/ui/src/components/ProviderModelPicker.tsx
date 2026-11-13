@@ -34,6 +34,7 @@ import {
   Button,
   Input,
   KeyRound,
+  Layers,
   Listbox,
   Plus,
   Popover,
@@ -44,8 +45,8 @@ import {
   SelectTrigger,
   SelectValue,
   SlidersHorizontal,
-  Switch,
   Tabs,
+  Text,
   Tooltip,
   Zap,
 } from "@openbot/ui";
@@ -83,9 +84,13 @@ interface ProviderModelPickerProps {
   icon?: JSX.Element;
   reasoningEffort?: AgentReasoningEffort | undefined;
   onReasoningEffortChange?: ((effort: AgentReasoningEffort) => void) | undefined;
-  /** Fast mode. The picker shows its switch only for a model with a fast tier, and only with `onFastModeChange`. */
+  /**
+   * Fast mode. The picker shows its Speed select only for a model with a fast tier, and only with
+   * `onFastModeChange`. With `ultrafast`, the agent asks for the Ultrafast tier in place of Fast.
+   */
   fastMode?: boolean | undefined;
-  onFastModeChange?: ((fastMode: boolean) => void) | undefined;
+  ultrafast?: boolean | undefined;
+  onFastModeChange?: ((fastMode: boolean, ultrafast: boolean) => void) | undefined;
   disabled?: boolean | undefined;
   disabledReason?: string;
   runtimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>> | undefined;
@@ -208,24 +213,58 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   const visibleProviders = createMemo(() =>
     PROVIDERS.filter((provider) => provider === CUSTOM_RAIL || !providerTurnedOff(props.agentStatus, provider)),
   );
-  /** The accounts that get rail entries: only a provider's with more than one, and only on request. */
+  /**
+   * The pool of a provider's accounts, while it is on: the provider then has one rail entry, and its
+   * agents use the account that the pool picks.
+   */
+  const railPool = (rail: RailId) => {
+    if (rail === CUSTOM_RAIL) return null;
+    const status = props.agentStatus?.providers?.find((row) => row.id === rail);
+    const pool = status?.accountPool;
+    if (!pool) return null;
+    const accounts = status?.accounts ?? [];
+    const members = accounts.filter(
+      (account) => !isApiKeyAccount(account.id, rail) && !pool.leftOut.includes(account.id),
+    );
+    const accountsText = t("provider.account.count", { count: members.length });
+    const summary = t("provider.account.poolCount", { accounts: accountsText });
+    return {
+      inUse: pool.inUse,
+      summary:
+        pool.inUse && accounts.some((account) => account.id === pool.inUse)
+          ? t("provider.account.poolInUse", { pool: summary, name: providerAccountName(t, accounts, pool.inUse) })
+          : summary,
+    };
+  };
+  /**
+   * The accounts that get rail entries: only a provider's with more than one, and only on request. A
+   * pool has one entry for its accounts, and an entry for each API key, which is not in the pool.
+   */
   const railAccounts = (rail: RailId): readonly ProviderAccountStatus[] => {
     if (!props.accountChoice || rail === CUSTOM_RAIL) return [];
     const accounts = props.agentStatus?.providers?.find((status) => status.id === rail)?.accounts ?? [];
+    if (railPool(rail)) return accounts.filter((account) => isApiKeyAccount(account.id, rail));
     return accounts.length > 1 ? accounts : [];
   };
   const railKeys = createMemo<RailKey[]>(() =>
     visibleProviders().flatMap((rail): RailKey[] => {
       const accounts = railAccounts(rail);
       if (!accounts.length || rail === CUSTOM_RAIL) return [rail];
-      return accounts.map((account) =>
+      const keys = accounts.map((account) =>
         account.id === DEFAULT_PROVIDER_ACCOUNT_ID ? rail : (`${rail}:${account.id}` as const),
       );
+      return railPool(rail) ? [rail, ...keys] : keys;
     }),
   );
-  /** The account for `onChange`: only a provider with account entries sends one. */
-  const chosenAccount = (provider: AgentProviderId, accountId: string | null): string | null | undefined =>
-    railAccounts(provider).length ? accountId : undefined;
+  /**
+   * The account for `onChange`: only a provider with account entries sends one. The pool entry keeps
+   * the account that the pool picked, and sends one only to move the agent off an API key.
+   */
+  const chosenAccount = (provider: AgentProviderId, accountId: string | null): string | null | undefined => {
+    if (!railAccounts(provider).length) return undefined;
+    const keepsPoolPick = railPool(provider) && accountId === null && currentAccount() === null;
+    return keepsPoolPick ? undefined : accountId;
+  };
   /** The agent's account when the rail lists it; otherwise the provider's own sign-in. */
   const currentAccount = (): string | null => {
     const id = props.providerAccountId;
@@ -288,6 +327,16 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     const harnesses = [...new Set(customIds().values())];
     const available = harnesses.find((harness) => status(harness).state === "available");
     return status(available ?? harnesses[0] ?? DEFAULT_CUSTOM_PROVIDER_HARNESS);
+  };
+  /**
+   * True when each provider that runs a saved endpoint has read every one of them, so an endpoint
+   * without models was left out by the provider and no restart will bring them. A host that does not
+   * report it counts as still reading.
+   */
+  const endpointsRead = (): boolean => {
+    const harnesses = new Set<string>(customIds().values());
+    const rows = props.agentStatus.providers?.filter((row) => harnesses.has(row.id)) ?? [];
+    return rows.length > 0 && rows.every((row) => row.endpointsPending === false);
   };
   /**
    * One provider status per tab. The Custom tab stands for OpenCode or Pi, which serve the endpoints,
@@ -368,10 +417,16 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   );
   const modelAvailable = (model: PickerModel): boolean =>
     providerAvailability(props.agentStatus, props.modelOptions, model.provider, t).state === "available";
-  const railSummary = (rail: RailId, status: AgentProviderStatus): string =>
-    rail === CUSTOM_RAIL ? customSummary() : providerSummary(rail, status, text);
-  const railHeadingSummary = (rail: RailId, status: AgentProviderStatus): string => {
-    if (rail !== CUSTOM_RAIL) return providerHeadingSummary(rail, status, text);
+  /** The pool's line on the pool's entry, in the place of the account's email, while the provider is available. */
+  const poolSummary = (key: RailKey, status: AgentProviderStatus): string | undefined =>
+    status.state === "available" && key === railOf(key) ? railPool(railOf(key))?.summary : undefined;
+  const railSummary = (key: RailKey, status: AgentProviderStatus): string => {
+    const rail = railOf(key);
+    return rail === CUSTOM_RAIL ? customSummary() : (poolSummary(key, status) ?? providerSummary(rail, status, text));
+  };
+  const railHeadingSummary = (key: RailKey, status: AgentProviderStatus): string => {
+    const rail = railOf(key);
+    if (rail !== CUSTOM_RAIL) return poolSummary(key, status) ?? providerHeadingSummary(rail, status, text);
     // OpenCode is what serves a custom endpoint, so its trouble is this tab's trouble.
     return status.state === "available" ? customSummary() : providerStatusLabel(status.state, t);
   };
@@ -391,13 +446,15 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
       model,
       now(),
     );
-    return spent?.covers ? spent.window : undefined;
+    // An account on credits keeps working, so its model is not stopped.
+    return spent?.covers && !spent.onCredits ? spent.window : undefined;
   };
   /** The spent window of each model of a rail entry, in the order of the models. */
   const entrySpentWindows = (key: RailKey): (AccountUsageWindow | undefined)[] => {
     const rail = railOf(key);
     if (rail === CUSTOM_RAIL || !props.accountUsage) return [];
-    const accountId = key === rail ? null : key.slice(rail.length + 1);
+    // A pool is spent only when the account that it uses is: it uses another one before a limit.
+    const accountId = key === rail ? (railPool(rail)?.inUse ?? null) : key.slice(rail.length + 1);
     return entryModelOptions(key).map((model) => spentWindow(rail, accountId, model.id));
   };
   /**
@@ -565,15 +622,53 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   const triggerAccount = () => {
     if (props.foreignProvider !== undefined) return null;
     const accounts = railAccounts(props.provider);
-    return accounts.length ? providerAccountName(t, accounts, currentAccount() ?? DEFAULT_PROVIDER_ACCOUNT_ID) : null;
+    if (!accounts.length || (railPool(props.provider) && currentAccount() === null)) return null;
+    return providerAccountName(t, accounts, currentAccount() ?? DEFAULT_PROVIDER_ACCOUNT_ID);
   };
-  /** Fast mode, only while the model has a fast tier: another model runs at standard speed. */
-  const triggerFast = () =>
-    props.foreignProvider === undefined &&
-    (selectedFixed()?.fast === true ||
-      (props.fastMode === true && props.onFastModeChange !== undefined && Boolean(selectedModel()?.fastServiceTier)));
+  /** The saved speed. It can name a tier that the model does not have. */
+  const savedSpeed = (): Speed =>
+    props.fastMode !== true ? "standard" : props.ultrafast === true ? "ultrafast" : "fast";
+  /**
+   * The tier that the next turn uses. A model without a fast tier runs at the standard tier, and
+   * Ultrafast on a model without that tier runs at Fast.
+   */
+  const speed = (): Speed => {
+    const model = selectedModel();
+    const saved = savedSpeed();
+    if (saved === "standard" || !model?.fastServiceTier) return "standard";
+    return saved === "ultrafast" && model.ultrafastServiceTier ? "ultrafast" : "fast";
+  };
+  /** The speed in the trigger, only while the model has the tier: another model runs at standard speed. */
+  const triggerSpeed = (): Speed => {
+    if (props.foreignProvider !== undefined) return "standard";
+    if (selectedFixed()?.fast === true) return "fast";
+    return props.onFastModeChange ? speed() : "standard";
+  };
+  const triggerSpeedName = () => {
+    const value = triggerSpeed();
+    return value === "standard" ? null : speedName(value, t);
+  };
+  /**
+   * The model name in the trigger. Beside an account it has no provider word, because the mark
+   * shows the provider and the account needs the room. The tooltip and the label keep the full name.
+   * A form field has the room of its row and keeps the full name.
+   */
+  const triggerShownName = () => {
+    const name = triggerModelName();
+    const prefix = `${railName(activeProvider(), t)} `;
+    return !field() && triggerAccount() && name.startsWith(prefix) ? name.slice(prefix.length) || name : name;
+  };
+  /** True while the agent's provider pools its accounts and the agent is not on an API key. */
+  const triggerPool = () =>
+    props.foreignProvider === undefined && railPool(props.provider) !== null && currentAccount() === null;
   const triggerSummary = () =>
-    [triggerModelName(), triggerEffort(), triggerFast() ? t("provider.picker.fast") : null, triggerAccount()]
+    [
+      triggerModelName(),
+      triggerEffort(),
+      triggerSpeedName(),
+      triggerAccount(),
+      triggerPool() ? t("provider.account.poolChip") : null,
+    ]
       .filter(Boolean)
       .join(" · ");
 
@@ -624,7 +719,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                 );
               }}
             </For>
-            <SwapLabel class="provider-model-trigger-name" text={triggerModelName()} motion={TRIGGER_SWAP} />
+            <SwapLabel class="provider-model-trigger-name" text={triggerShownName()} motion={TRIGGER_SWAP} />
             <Show when={triggerEffort()}>
               {(effort) => (
                 <span class="provider-model-trigger-effort">
@@ -632,11 +727,13 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                 </span>
               )}
             </Show>
-            <Show when={triggerFast()}>
-              <span class="provider-model-trigger-effort provider-model-trigger-fast">
-                <Zap aria-hidden="true" />
-                <SwapLabel text={t("provider.picker.fast")} motion={TRIGGER_SWAP} />
-              </span>
+            <Show when={triggerSpeedName()}>
+              {(name) => (
+                <span class="provider-model-trigger-effort provider-model-trigger-fast">
+                  <Zap aria-hidden="true" />
+                  <SwapLabel text={name()} motion={TRIGGER_SWAP} />
+                </span>
+              )}
             </Show>
             <Show when={triggerAccount()}>
               {(account) => (
@@ -644,6 +741,12 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                   <SwapLabel text={account()} motion={TRIGGER_SWAP} />
                 </span>
               )}
+            </Show>
+            <Show when={triggerPool()}>
+              <span class="provider-model-trigger-effort provider-model-trigger-fast">
+                <Layers aria-hidden="true" />
+                {t("provider.account.poolChip")}
+              </span>
             </Show>
           </span>
           <ChevronDownIcon />
@@ -699,7 +802,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                             ]}
                             data-state={status().state}
                             aria-label={spentLabel(
-                              `${name()}: ${railSummary(provider, status())}`,
+                              `${name()}: ${railSummary(key, status())}`,
                               status().state === "available" ? entrySpentWindow(key) : undefined,
                             )}
                             onClick={(event) => {
@@ -733,12 +836,17 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                                 </span>
                               )}
                             </Show>
+                            <Show when={key === provider && railPool(provider)}>
+                              <span class="provider-model-rail-account" aria-hidden="true">
+                                <Layers />
+                              </span>
+                            </Show>
                           </Tabs.Trigger>
                         </Tooltip.Trigger>
                         <Tooltip.Portal>
                           <Tooltip.Content class="provider-model-rail-tooltip">
                             <strong>{name()}</strong>
-                            <small>{railSummary(provider, status())}</small>
+                            <small>{railSummary(key, status())}</small>
                           </Tooltip.Content>
                         </Tooltip.Portal>
                       </Tooltip.Root>
@@ -1026,8 +1134,8 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                         </Show>
                         <span>
                           {account() && status().state === "available"
-                            ? (account()?.account.email ?? railHeadingSummary(provider, status()))
-                            : railHeadingSummary(provider, status())}
+                            ? (account()?.account.email ?? railHeadingSummary(key, status()))
+                            : railHeadingSummary(key, status())}
                         </span>
                       </div>
                       <Show when={provider === CUSTOM_RAIL && !props.onManageProviders && props.onAddCustomProvider}>
@@ -1100,15 +1208,43 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                                 fallback={
                                   search().trim()
                                     ? t("provider.picker.noMatches")
-                                    : t("provider.picker.noModels", { name: railName(provider, t) })
+                                    : // Meta sends a signed-in Muse account an empty list where Muse is not offered (#5983).
+                                      provider === "muse"
+                                      ? t("provider.picker.museNoModels")
+                                      : t("provider.picker.noModels", { name: railName(provider, t) })
                                 }
                               >
                                 {/* A saved endpoint lists no model until its provider restarts and reads it. */}
-                                <span>
-                                  {props.customProviders?.length
-                                    ? t("provider.picker.customPending")
-                                    : t("provider.picker.customEmpty")}
-                                </span>
+                                <Show
+                                  when={props.customProviders?.length && endpointsRead()}
+                                  fallback={
+                                    <span>
+                                      {props.customProviders?.length
+                                        ? t("provider.picker.customPending")
+                                        : t("provider.picker.customEmpty")}
+                                    </span>
+                                  }
+                                >
+                                  <span>
+                                    {t("provider.picker.customUnlisted", { name: railName(endpointStatus().id, t) })}
+                                  </span>
+                                  <Show when={props.onManageProviders}>
+                                    {(manageProviders) => (
+                                      <Button
+                                        type="button"
+                                        size="xs"
+                                        variant="outline"
+                                        onClick={() => {
+                                          trigger?.focus({ preventScroll: true });
+                                          setOpen(false);
+                                          if (trigger) manageProviders()(trigger);
+                                        }}
+                                      >
+                                        {t("provider.picker.editEndpoints")}
+                                      </Button>
+                                    )}
+                                  </Show>
+                                </Show>
                               </Show>
                             </div>
                           </Show>
@@ -1182,13 +1318,42 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                     </Show>
                     <Show when={ownsSelection() && selectedModel()?.fastServiceTier && props.onFastModeChange}>
                       <div class="provider-model-effort">
-                        <span>{t("provider.picker.fast")}</span>
-                        <Switch
-                          aria-label={t("provider.picker.fastLabel")}
-                          checked={props.fastMode === true}
-                          disabled={props.disabled || effortLocked()}
-                          onChange={(next) => props.onFastModeChange?.(next)}
-                        />
+                        <span>{t("provider.picker.speed")}</span>
+                        <Select<SpeedOption>
+                          class="provider-model-effort-select"
+                          options={selectedModel()?.ultrafastServiceTier ? ALL_SPEEDS : FAST_SPEEDS}
+                          optionValue="id"
+                          optionTextValue={(option) => speedName(option.id, t)}
+                          value={SPEED_OPTIONS[speed()]}
+                          sameWidth={false}
+                          placement="bottom-end"
+                          onChange={(option) => {
+                            if (!option || option.id === savedSpeed() || props.disabled || effortLocked()) return;
+                            props.onFastModeChange?.(option.id !== "standard", option.id === "ultrafast");
+                          }}
+                          itemComponent={(item) => (
+                            <SelectItem item={item.item} class="provider-model-speed-item">
+                              <span class="provider-model-speed-name">{speedName(item.item.rawValue.id, t)}</span>
+                              <Text variant="caption" tone="muted">
+                                {t(SPEED_TEXT[item.item.rawValue.id])}
+                              </Text>
+                            </SelectItem>
+                          )}
+                        >
+                          <SelectTrigger
+                            size="sm"
+                            aria-label={t("provider.picker.speed")}
+                            disabled={props.disabled || effortLocked()}
+                          >
+                            <SelectValue<SpeedOption>>
+                              {(state) => {
+                                const option = state.selectedOption();
+                                return option ? speedName(option.id, t) : null;
+                              }}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent class="provider-model-effort-content provider-model-speed-content" />
+                        </Select>
                       </div>
                     </Show>
                   </Tabs.Content>
@@ -1295,6 +1460,36 @@ function fixedModelSettingsText(settings: FixedModelSettings | null, t: AppTrans
   ]
     .filter(Boolean)
     .join(" · ");
+}
+
+type Speed = "standard" | "fast" | "ultrafast";
+
+interface SpeedOption {
+  id: Speed;
+}
+
+// Constant arrays: a Select that gets a new options array on each change can loop.
+const SPEED_OPTIONS: Record<Speed, SpeedOption> = {
+  standard: { id: "standard" },
+  fast: { id: "fast" },
+  ultrafast: { id: "ultrafast" },
+};
+const FAST_SPEEDS: SpeedOption[] = [SPEED_OPTIONS.standard, SPEED_OPTIONS.fast];
+const ALL_SPEEDS: SpeedOption[] = [...FAST_SPEEDS, SPEED_OPTIONS.ultrafast];
+
+const SPEED_NAME: Record<Speed, AppTextKey> = {
+  standard: "provider.picker.standard",
+  fast: "provider.picker.fast",
+  ultrafast: "provider.picker.ultrafast",
+};
+const SPEED_TEXT: Record<Speed, AppTextKey> = {
+  standard: "provider.picker.standardText",
+  fast: "provider.picker.fastText",
+  ultrafast: "provider.picker.ultrafastText",
+};
+
+function speedName(speed: Speed, t: AppTranslate): string {
+  return t(SPEED_NAME[speed]);
 }
 
 export function reasoningLabel(effort: AgentReasoningEffort, t: AppTranslate = currentText().t): string {

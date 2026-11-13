@@ -3,6 +3,7 @@ import type { messages as source } from "../en/island";
 
 export const messages = {
   "island.surface.label": "OpenBot في نتوء MacBook",
+  "island.surface.labelIsland": "Dynamic Island من OpenBot",
   "island.surface.interactionArea": "منطقة التفاعل في Dynamic Island",
   "island.label.idle": "فتح OpenBot",
   "island.label.working": "حالة عمل OpenBot",

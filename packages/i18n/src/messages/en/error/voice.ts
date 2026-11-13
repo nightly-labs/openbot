@@ -7,7 +7,6 @@ export const messages = defineMessages("error.voice", {
   "error.voice.removeBusy": "Wait until the voice transcription ends, then remove the model.",
   "error.voice.removeFailed": "Could not remove the voice model. Try again.",
   "error.voice.runtimeUnavailable": "Local voice transcription is not available on this platform.",
-  "error.voice.busy": "A voice transcription is already in progress.",
   "error.voice.modelUnavailable": "The voice model is unavailable.",
   "error.voice.transcriptionTimedOut": "Voice transcription timed out.",
   "error.voice.prepareRequired":
@@ -33,7 +32,13 @@ export const messages = defineMessages("error.voice", {
   "error.voice.live.timedOut": "Codex live voice did not start in time. Try again.",
   "error.voice.live.failed": "Live voice stopped: {reason}",
   "error.voice.live.disconnected": "Live voice disconnected.",
+  "error.voice.live.hostFailed":
+    "Codex on the server could not start live voice. Ask its owner to update Codex on that computer and sign in with ChatGPT, then try again.",
   "error.voice.live.signIn": "Sign in to Codex with your ChatGPT account to use live voice.",
+  "error.voice.live.unavailable":
+    "OpenAI could not start live voice. The problem is on OpenAI's side. Try again later.",
+  "error.voice.live.refused":
+    "OpenAI refused to start live voice. Try again later, or turn off live voice in Settings to talk by voice.",
   "error.voice.live.off": "Codex live voice is off. Turn it on in Settings → Voice.",
   // The user's own voice server.
   "error.voice.server.routeOff": "The voice server is not set up for this. Check Settings → Voice.",

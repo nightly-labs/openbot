@@ -1,9 +1,11 @@
-import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
+import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
   INSTANCE_TRANSFER_REMOTE_BYTES,
   INSTANCE_TRANSFER_ROUTES,
 } from "@openbot/contracts/team-protocol/instance-transfer-v1";
+import { LIVE_VOICE_ROUTES } from "@openbot/contracts/team-protocol/live-voice-v1";
+import { PENDING_APPROVAL_ROUTES } from "@openbot/contracts/team-protocol/pending-approval-v1";
 import { isQueueEditRoute, QueueEditRejectedError } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
@@ -12,10 +14,12 @@ import { runTeamEffect } from "@openbot/team-client";
 import {
   createRemoteCommandMailbox,
   type RemoteFileUpload,
+  type RemoteLargeDownload,
   type RemoteTeamCommand,
   type RemoteTeamCommandResult,
   type RemoteTeamConnectionUpdate,
   type RemoteTeamDiagnostic,
+  type RemoteTeamEvent,
   type RemoteUploadProgress,
 } from "@openbot/team-client/remote-peer";
 import { remoteWorkspaceReadTimeout } from "@openbot/team-client/remote-recovery";
@@ -48,8 +52,11 @@ import { currentText } from "@/shared/lib/text";
 import RemoteTeamBridge, { type RemoteTeamBridgeHandle } from "./remote-team-bridge.dom";
 
 export interface RemoteTeamTransportRef {
-  connect(hostId: string, hostPublicKey: string): Promise<void>;
+  /** `kept`: the authenticated connection from before stays, and its event stream lost no event. */
+  connect(hostId: string, hostPublicKey: string): Promise<{ kept: boolean }>;
   disconnect(): Promise<void>;
+  /** The phone moved to another network, such as from Wi-Fi to mobile data. The peer makes a new connection. */
+  networkChanged(): void;
   request<T>(
     method: string,
     path: string,
@@ -58,6 +65,8 @@ export interface RemoteTeamTransportRef {
     upload?: RemoteFileUpload,
     /** Hears the fraction of the uploaded file sent so far, from 0 to 1. */
     onUploadProgress?: (fraction: number) => void,
+    /** Lets one file larger than the attachment limit answer this request. */
+    largeDownload?: RemoteLargeDownload,
   ): Promise<T>;
   /** Null until the peer page is ready for views. Events of a closed view are dropped. */
   openBrowserView(
@@ -98,13 +107,31 @@ interface RemoteTeamTransportProps {
   onMembershipChanged?: () => Promise<void>;
   /** The phone got a network again. */
   onNetworkRestored?: () => void;
-  onTeamEvent: (hostId: string, event: AgentEvent | TeamRealtimeEvent) => void;
+  onTeamEvent: (hostId: string, event: RemoteTeamEvent) => void;
 }
 
 type RemoteTeamCommandInput =
   | { type: "connect"; hostId: string; hostPublicKey: string }
   | { type: "disconnect" }
-  | { type: "request"; method: string; path: string; body: TeamProtocolV2Json; upload?: RemoteFileUpload };
+  | {
+      type: "request";
+      method: string;
+      path: string;
+      body: TeamProtocolV2Json;
+      upload?: RemoteFileUpload;
+      largeDownload?: RemoteLargeDownload;
+    };
+
+/**
+ * The text for a refused live voice request. A 409 has the host's sentence: no Codex sign-in with
+ * ChatGPT on the host, no event connection, or a timeout. The screen translates it and removes
+ * secrets from it. A 500 of a start is a Codex failure on the host, whose reason stays in the host log.
+ */
+function liveVoiceErrorText(path: string, status: number, body: unknown): string | null {
+  if (path === LIVE_VOICE_ROUTES.start && status >= 500) return sourceText("error.voice.live.hostFailed");
+  if (path !== LIVE_VOICE_ROUTES.start && path !== LIVE_VOICE_ROUTES.stop) return null;
+  return isDynamicRecord(body) && isString(body.error) && body.error ? body.error : null;
+}
 
 // One object, not a new one for each render.
 const BRIDGE_DOM: DOMProps = {
@@ -197,10 +224,12 @@ export const RemoteTeamTransport = memo(
                   // As on desktop and web: a read that makes the server usable fails in seconds, so a
                   // dead path does not keep the connection attempt running for the 10 min request limit.
                   timeoutMs: remoteWorkspaceReadTimeout(next.method, next.path),
-                  // The transfer file is the one answer larger than an attachment.
+                  // The transfer file, and a large file that the user asked for, can be larger than an attachment.
                   ...(next.path === INSTANCE_TRANSFER_ROUTES.export
                     ? { largeDownload: { maxBytes: INSTANCE_TRANSFER_REMOTE_BYTES, mimeType: "application/zip" } }
-                    : {}),
+                    : next.largeDownload
+                      ? { largeDownload: next.largeDownload }
+                      : {}),
                 }
               : { id, type: "disconnect" };
         if (!onUploadProgress) return mailbox.send(command);
@@ -221,6 +250,12 @@ export const RemoteTeamTransport = memo(
               result.error ?? currentText().t("mobile.workspace.error.connectFailed"),
               result.reference,
             );
+          return { kept: result.kept === true };
+        },
+        networkChanged: () => {
+          // The handle has the method only after the page has registered it.
+          const networkChanged = bridge.current?.networkChanged;
+          if (typeof networkChanged === "function") networkChanged(null);
         },
         disconnect: async () => {
           const result = await enqueue({ type: "disconnect" });
@@ -237,9 +272,10 @@ export const RemoteTeamTransport = memo(
           body: TeamProtocolV2Json = {},
           upload?: RemoteFileUpload,
           onUploadProgress?: (fraction: number) => void,
+          largeDownload?: RemoteLargeDownload,
         ): Promise<T> => {
           const started = Date.now();
-          const send = () => enqueue({ type: "request", method, path, body, upload }, onUploadProgress);
+          const send = () => enqueue({ type: "request", method, path, body, upload, largeDownload }, onUploadProgress);
           const result = await (isBackgroundRead(method, path) ? backgroundLane(send) : send());
           // Method, path, status and time only. Never the body or the upload.
           const request = `${hostIdRef.current ?? "unknown server"} ${method} ${supportLogUrl(path)}`;
@@ -261,12 +297,19 @@ export const RemoteTeamTransport = memo(
           if (result.status === 409 && isQueueEditRoute(method, path))
             throw new QueueEditRejectedError(currentText().t("mobile.workspace.error.queueEditRejected"));
           // The host answers 409 when a form or an approval no longer waits: answered elsewhere, or ended.
-          if (result.status === 409 && method === "POST" && path === TEAM_API_ROUTES.respond.approval)
+          if (
+            result.status === 409 &&
+            method === "POST" &&
+            (path === TEAM_API_ROUTES.respond.approval || path === PENDING_APPROVAL_ROUTES.read)
+          )
             throw new InactiveRequestError(currentText().t("mobile.workspace.error.approvalInactive"));
           if (result.status === 409 && method === "POST" && path === TEAM_API_ROUTES.respond.prompt)
             throw new InactiveRequestError(currentText().t("mobile.workspace.error.formUnavailable"));
           if (result.status !== undefined && result.status >= 400)
-            throw referencedError(sourceText("error.remote.serverRequestFailed"), referenceFrom("http", result.status));
+            throw referencedError(
+              liveVoiceErrorText(path, result.status, result.body) ?? sourceText("error.remote.serverRequestFailed"),
+              referenceFrom("http", result.status),
+            );
           return decode(result.body);
         },
         openBrowserView: (options, listener) => {
@@ -401,8 +444,7 @@ export const RemoteTeamTransport = memo(
           `${hostId} peer ${step}${detail ? `: ${detail}` : ""}`,
         ),
       onNetworkRestored: async () => latest.current.props.onNetworkRestored?.(),
-      onTeamEvent: async (hostId: string, event: AgentEvent | TeamRealtimeEvent) =>
-        latest.current.props.onTeamEvent(hostId, event),
+      onTeamEvent: async (hostId: string, event: RemoteTeamEvent) => latest.current.props.onTeamEvent(hostId, event),
     }));
 
     return (

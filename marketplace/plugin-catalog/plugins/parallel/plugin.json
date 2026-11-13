@@ -1,0 +1,31 @@
+{
+  "slug": "parallel",
+  "name": "Parallel",
+  "tagline": "Web search and extraction",
+  "description": "Parallel lets agents search the web, extract content from pages, and answer questions from current web evidence. Search and page extraction need no account and no key.",
+  "category": "research",
+  "creatorName": "Parallel Web Systems",
+  "iconUrl": "https://parallel.ai/apple-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-search", "text": "Find the latest release notes for PostgreSQL and summarize the new features." },
+    { "id": "prompt-extract", "text": "Extract the pricing table from this page." },
+    {
+      "id": "prompt-question",
+      "text": "Which European countries have adopted the eIDAS 2.0 digital wallet so far? Cite sources."
+    }
+  ],
+  "apps": [
+    {
+      "id": "app-parallel-mcp",
+      "name": "Parallel",
+      "description": "Web search, page extraction, and web-grounded answers, over the Parallel MCP server with no sign-in.",
+      "iconUrl": "https://parallel.ai/apple-icon.png",
+      "server": { "name": "parallel", "transport": "http", "url": "https://mcp.parallel.ai/mcp" }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://parallel.ai",
+  "privacyPolicyUrl": "https://parallel.ai/privacy-policy",
+  "termsUrl": "https://parallel.ai/terms-of-service"
+}

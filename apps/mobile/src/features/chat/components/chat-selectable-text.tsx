@@ -1,5 +1,6 @@
 import { useRef } from "react";
-import { type ColorValue, TextInput, type TextInputInstance, useWindowDimensions } from "react-native";
+import { type ColorValue, TextInput, type TextInputInstance } from "react-native";
+import { useFontScale } from "@/shared/lib/font-scale";
 import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { fieldDirectionStyle } from "@/shared/lib/text-direction";
@@ -38,7 +39,7 @@ export function ChatSelectableText({
   onSelectionChange: (selected: string) => void;
 }) {
   const { t } = useText();
-  const { fontScale } = useWindowDimensions();
+  const fontScale = useFontScale();
   const input = useRef<TextInputInstance>(null);
   // The field selects all of its text at its first layout and again when it first reports the size
   // of its text. The first time a message selects, its text is not laid out yet at the first layout.

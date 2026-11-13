@@ -4,6 +4,7 @@ import {
   Badge,
   Button,
   buttonVariants,
+  Check,
   ConfirmDialog,
   Download,
   DropdownMenu,
@@ -73,8 +74,31 @@ export interface FileListProps {
   emptyDescription?: string;
   /** The viewer can delete files. A row also needs `deletable`. Off for a member of a remote server. */
   canDelete?: boolean | undefined;
+  /** Lets the caller select rows, such as the Library for a delete of many files. */
+  selection?: FileSelection | undefined;
+  /** The folder of a file, such as "Autumn campaign › Images". It shows on the row of a file that has one. */
+  folderLabel?: ((file: StoredFileRow) => string | undefined) | undefined;
+  /** More items for the menu of a row, before Delete. */
+  rowMenu?: ((file: StoredFileRow) => JSX.Element) | undefined;
+  /** The files are on the computer of the viewer: a row offers Open and Show in folder. The default is true. */
+  opensFiles?: boolean | undefined;
   onPreview: (file: StoredFileRow) => void;
   onAction: (file: StoredFileRow, action: StoredFileAction) => void | Promise<void>;
+}
+
+/** The selected files of a list that the caller owns. */
+export interface FileSelection {
+  /** A click selects the file instead of opening it, and each row shows its mark. */
+  active: boolean;
+  isSelected: (file: StoredFileRow) => boolean;
+  canSelect: (file: StoredFileRow) => boolean;
+  /** A click on a row in selection mode, or a Command, Control or Shift click in any mode. */
+  onToggle: (file: StoredFileRow, event: MouseEvent) => void;
+}
+
+/** Command, Control or Shift starts a selection, as in Finder and Explorer. */
+export function isSelectClick(event: MouseEvent): boolean {
+  return event.metaKey || event.ctrlKey || event.shiftKey;
 }
 
 const LOADING_ROWS = [0, 1, 2, 3, 4];
@@ -188,8 +212,12 @@ export function FileList(props: FileListProps) {
                       <FileRow
                         file={file}
                         agentName={agentName(file.agentId)}
+                        folderLabel={props.folderLabel}
+                        rowMenu={props.rowMenu}
+                        opensFiles={props.opensFiles !== false}
                         showConversation={props.showConversation !== false && !props.compact}
                         canDelete={props.canDelete === true && file.deletable}
+                        selection={props.selection}
                         dateLabel={
                           group.label
                             ? format.date(new Date(file.createdAt), {
@@ -381,39 +409,78 @@ export function FileDeleteDialog(props: {
   );
 }
 
+/** The check mark of a selectable file. The control that selects the file has the state; the mark only shows it. */
+export function FileSelectionMark(props: { selected: boolean; class?: string }) {
+  return (
+    <span
+      class={props.class ? `file-select-mark ${props.class}` : "file-select-mark"}
+      data-selected={props.selected ? "true" : undefined}
+      aria-hidden="true"
+    >
+      <Check />
+    </span>
+  );
+}
+
 function FileRow(props: {
   file: StoredFileRow;
   agentName: string | null;
+  folderLabel: ((file: StoredFileRow) => string | undefined) | undefined;
+  rowMenu: ((file: StoredFileRow) => JSX.Element) | undefined;
+  opensFiles: boolean;
   showConversation: boolean;
   canDelete: boolean;
+  selection: FileSelection | undefined;
   dateLabel: string;
   onPreview: () => void;
   onAction: (action: StoredFileAction) => void;
 }) {
   const { t, format } = useText();
   const available = () => props.file.status === "available";
+  const selecting = () => props.selection?.active === true;
+  const selectable = () => props.selection?.canSelect(props.file) === true;
+  const selected = () => props.selection?.isSelected(props.file) === true;
+  function click(event: MouseEvent): void {
+    if (props.selection && selectable() && (selecting() || isSelectClick(event))) {
+      props.selection.onToggle(props.file, event);
+      return;
+    }
+    if (!selecting()) props.onPreview();
+  }
   const meta = () =>
     [
       format.fileSize(props.file.size),
       props.showConversation ? props.file.conversation?.title : null,
       props.agentName,
+      props.folderLabel?.(props.file),
       props.dateLabel,
     ].filter(Boolean);
+  const rowLabel = () => {
+    if (selecting()) return props.file.name;
+    return canPreviewAttachment(props.file)
+      ? t("attachment.preview", { name: props.file.name })
+      : t("attachment.open", { name: props.file.name });
+  };
 
   return (
-    <li class="file-row" data-status={props.file.status}>
+    <li
+      class="file-row"
+      data-status={props.file.status}
+      data-selected={selected() ? "true" : undefined}
+      data-file-id={props.file.id}
+    >
       <Button
         type="button"
         variant="ghost"
         class="file-row-main"
-        disabled={!available()}
-        aria-label={
-          canPreviewAttachment(props.file)
-            ? t("attachment.preview", { name: props.file.name })
-            : t("attachment.open", { name: props.file.name })
-        }
-        onClick={props.onPreview}
+        disabled={selecting() ? !selectable() : !available()}
+        aria-pressed={selecting() ? (selected() ? "true" : "false") : undefined}
+        aria-label={rowLabel()}
+        onClick={click}
       >
+        <Show when={selecting()}>
+          <FileSelectionMark selected={selected()} />
+        </Show>
         <FileVisual file={props.file} />
         <span class="file-row-copy">
           <span class="file-row-name" title={props.file.name}>
@@ -434,7 +501,16 @@ function FileRow(props: {
         </span>
       </Button>
       <FileStatusBadge status={props.file.status} />
-      <FileRowMenu file={props.file} canDelete={props.canDelete} onAction={props.onAction} />
+      <Show when={!selecting()}>
+        <FileRowMenu
+          file={props.file}
+          canDelete={props.canDelete}
+          opensFiles={props.opensFiles}
+          onAction={props.onAction}
+        >
+          {props.rowMenu?.(props.file)}
+        </FileRowMenu>
+      </Show>
     </li>
   );
 }
@@ -485,8 +561,12 @@ function FileStatusBadge(props: { status: StoredFileRow["status"] }) {
 export function FileRowMenu(props: {
   file: StoredFileRow;
   canDelete: boolean;
+  /** Open and Show in folder need the file on this computer. The web client only downloads it. Default true. */
+  opensFiles?: boolean | undefined;
   onAction: (action: StoredFileAction) => void;
   class?: string | undefined;
+  /** More items, such as "Move to". They come before Delete. */
+  children?: JSX.Element;
 }) {
   const { t } = useText();
   const status = () => props.file.status;
@@ -500,7 +580,7 @@ export function FileRowMenu(props: {
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content>
-          <Show when={status() === "available"}>
+          <Show when={status() === "available" && props.opensFiles !== false}>
             <DropdownMenu.Item onSelect={() => props.onAction("open")}>
               <ExternalLink aria-hidden="true" />
               {t("common.open")}
@@ -522,12 +602,14 @@ export function FileRowMenu(props: {
               {t("common.tryAgain")}
             </DropdownMenu.Item>
           </Show>
-          <Show when={props.file.conversation && props.file.messageId}>
+          {/* A chat file has its conversation and its message. A channel file has only the channel message. */}
+          <Show when={props.file.messageId}>
             <DropdownMenu.Item onSelect={() => props.onAction("show-in-chat")}>
               <MessageCircle aria-hidden="true" />
               {t("files.action.showInChat")}
             </DropdownMenu.Item>
           </Show>
+          {props.children}
           <Show when={props.canDelete}>
             <DropdownMenu.Separator />
             <DropdownMenu.Item class="ui-action-menu-danger" onSelect={() => props.onAction("delete")}>

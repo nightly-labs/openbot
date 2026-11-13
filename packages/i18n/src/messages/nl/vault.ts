@@ -5,6 +5,13 @@ export const messages = {
   "vault.items.title": "Opgeslagen items",
   "vault.items.description":
     "Elke agent op deze server kan deze items gebruiken. OpenBot typt wachtwoorden, kaartnummers en beveiligingscodes zelf in de pagina, zodat agents ze nooit zien.",
+  "vault.items.scopedDescription":
+    "Elk item is voor de agents die je kiest. OpenBot typt wachtwoorden, kaartnummers en beveiligingscodes zelf in de pagina, zodat agents ze nooit zien.",
+  "vault.agents.label": "Agents",
+  "vault.agents.all": "Alle agents",
+  "vault.agents.some": "{chosen} van {total}",
+  "vault.agents.choose": "Agents kiezen voor {name}: {agents}",
+  "vault.agents.list": "Agents die {name} kunnen gebruiken",
   "vault.newItem": "Nieuw item",
   "vault.kind.login": "Login",
   "vault.kind.card": "Kaart",
@@ -98,6 +105,33 @@ export const messages = {
   "vault.request.addLogin": "Login toevoegen",
   "vault.request.addCard": "Kaart toevoegen",
   "vault.request.addContact": "Adres toevoegen",
-  "vault.request.notNow": "Niet nu",
+  "vault.request.addApiKey": "API-sleutel toevoegen",
+  "vault.request.apiKeyPrivate": "Gaat naar je Kluis, niet naar de chat.",
   "vault.request.saved": "Opgeslagen in de Kluis",
+  "vault.twoStep.title": "Verificatiecode",
+  "vault.twoStep.on": "Aan",
+  "vault.twoStep.off": "Uit. Agents vragen jou om de code.",
+  "vault.twoStep.setUp": "Instellen",
+  "vault.twoStep.copy": "Code kopiëren",
+  "vault.twoStep.copyFor": "Verificatiecode voor {site} kopiëren: {code}",
+  "vault.twoStep.remaining": {
+    one: "{count} seconde tot de volgende code",
+    other: "{count} seconden tot de volgende code",
+  },
+  "vault.twoStep.setupTitle": "Verificatiecode instellen",
+  "vault.twoStep.setupIntro":
+    "Zet op {site} verificatie in twee stappen aan met een authenticator-app. Als de site een QR-code toont, geef OpenBot de sleutel.",
+  "vault.twoStep.keyLabel": "Instelsleutel of otpauth://-link",
+  "vault.twoStep.keyHint":
+    "De meeste sites tonen hem onder de QR-code, als “Kun je niet scannen?” of “Sleutel handmatig invoeren”.",
+  "vault.twoStep.keyInvalid": "Dit is geen sleutel voor verificatie in twee stappen.",
+  "vault.twoStep.or": "of",
+  "vault.twoStep.chooseImage": "Screenshot van de QR-code kiezen",
+  "vault.twoStep.noQrCode": "Er staat geen QR-code in deze afbeelding.",
+  "vault.twoStep.checkIntro": "Voer deze code in op {site} om af te ronden. Als de site hem accepteert, kies Klaar.",
+  "vault.twoStep.checkHint": {
+    one: "De code verandert elke {count} seconde. De site accepteert ook de vorige.",
+    other: "De code verandert elke {count} seconden. De site accepteert ook de vorige.",
+  },
+  "vault.twoStep.theSite": "de site",
 } as const satisfies PartialTranslation<typeof source>;

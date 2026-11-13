@@ -51,6 +51,10 @@ export interface StoredRemoteServer {
   memberLimit?: number;
   /** A hosted server, from the account server's host list. */
   hosted?: boolean;
+  /** False for a hosted server that the account service cannot restart, from the account server's host list. */
+  restartAvailable?: boolean;
+  /** The plan storage in GB of a hosted server, from the account server's host list. */
+  storageGb?: number;
 }
 
 // An entry this build cannot read, and where it sat in `servers`. The slot is named by the entry
@@ -269,11 +273,13 @@ function readStoredRemoteServer(value: unknown): StoredRemoteServer | null {
     role: value.role,
     ...(value.transport === undefined ? {} : { transport: value.transport }),
     // A bad limit drops only the limit: the next host list writes it again.
-    ...(isMemberLimit(value.memberLimit) ? { memberLimit: value.memberLimit } : {}),
+    ...(isPositiveInteger(value.memberLimit) ? { memberLimit: value.memberLimit } : {}),
     ...(isBoolean(value.hosted) ? { hosted: value.hosted } : {}),
+    ...(isBoolean(value.restartAvailable) ? { restartAvailable: value.restartAvailable } : {}),
+    ...(isPositiveInteger(value.storageGb) ? { storageGb: value.storageGb } : {}),
   };
 }
 
-function isMemberLimit(value: unknown): value is number {
+function isPositiveInteger(value: unknown): value is number {
   return isNumber(value) && Number.isSafeInteger(value) && value >= 1;
 }

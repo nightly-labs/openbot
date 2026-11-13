@@ -9,7 +9,12 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "Gestopte taak van {name} opnieuw toewijzen",
   "channel.stoppedTask.reassign": "Opnieuw toewijzen",
   "channel.stoppedTask.cancel": "Taak annuleren",
+  "channel.stoppedTask.assignmentLoop":
+    "{names} gaven deze taak te vaak aan elkaar door. De taak is gestopt om een lus te voorkomen.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "De leden gaven deze taak te vaak aan elkaar door. De taak is gestopt om een lus te voorkomen.",
   "channel.conversation.noMembers": "Voeg agents toe in de kanaalinstellingen om te beginnen.",
+  "channel.conversation.waitFull": "Wachten - {name} begint als een lopende taak klaar is",
   "channel.conversation.archivedNotice": "Verwijderd kanaal. Alleen voorvertoning.",
   "channel.composer.label": "Bericht aan kanaal",
   "channel.composer.placeholder": "Bericht aan {name}",
@@ -20,6 +25,9 @@ export const messages = {
   "channel.settings.isolated": "Herinneringen in dit kanaal houden",
   "channel.settings.isolatedDescription":
     "Agenten bewaren wat ze hier leren als kanaalherinneringen. Hun andere chats zien ze niet.",
+  "channel.settings.browser": "Browser",
+  "channel.settings.browserEveryone": "Alle leden",
+  "channel.settings.browserNone": "Niemand",
   "channel.settings.memoryCount": { one: "{count} opgeslagen", other: "{count} opgeslagen" },
   "channel.settings.newConversation.title": "Nieuw gesprek",
   "channel.settings.newConversation.description":

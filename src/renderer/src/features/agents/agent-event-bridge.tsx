@@ -1,6 +1,7 @@
 import { providerDisplayName } from "@openbot/contracts/agent-providers";
 import type { AgentEvent, AgentRuntimeSnapshot } from "@openbot/contracts/ipc";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
+import { agentNotificationLevel } from "@openbot/team-client/agent-notifications";
 import { reconcileQueuesWithRuntimeWork } from "@openbot/team-client/dynamic-island-coordinator";
 import { classifyFailure } from "@openbot/telemetry";
 import { toast } from "@openbot/ui";
@@ -29,7 +30,7 @@ import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 import { useSidebar } from "../sidebar/sidebar-context";
 import { readDictatedReplies } from "../speech/speech-replies";
-import { claimErrorToast, providerErrorTitle, readableAgentError } from "./agent-error-text";
+import { agentErrorDetails, claimErrorToast, providerErrorTitle, readableAgentError } from "./agent-error-text";
 import { createAgentEventSounds } from "./agent-event-sounds";
 import {
   attentionAgentId,
@@ -61,10 +62,17 @@ export function AgentEventBridge() {
   const platform = usePlatform();
   const { activeServer, activeServerId } = useServers();
   const { openServerSettings } = useServerSettings();
-  const { applyAccountUsage } = useAuth();
+  const { applyAccountUsage, accountUsageTargetKey, refreshAccountUsage } = useAuth();
   const { applyAgentStatus, refreshAgentProviders } = useProviders();
-  const { agentList, setModelOptions, explicitlyOpenedAgentChatId, applyStoredAgents, applyUserHiddenAgents } =
-    useAgents();
+  const {
+    agentList,
+    setModelOptions,
+    explicitlyOpenedAgentChatId,
+    applyStoredAgents,
+    applyUserHiddenAgents,
+    ownAgentLevels,
+    applyOwnAgentLevels,
+  } = useAgents();
   const { setConversationErrors, setConversationErrorRuns } = useConversationController();
   const { setUiErrors } = useUiErrors();
   const agentTasks = useAgentTasks();
@@ -91,6 +99,7 @@ export function AgentEventBridge() {
     setUsageLimits,
     setSubagentTurns,
     setUsageLimitedModels,
+    setFailedModels,
     setWaitedUsageLimits,
     setContextStates,
     setThreadContextStates,
@@ -109,15 +118,19 @@ export function AgentEventBridge() {
   } = useTurns();
   const { setBrowserControlState, applyBrowserChange } = useBrowserTabs();
   const { setSidebarLayout, receiveServerPins } = useSidebar();
-  // As on web, mute and the notification level of the server decide the sounds too. Before the
-  // server list arrives, the sounds play as they did.
-  const soundLevel = () => {
+  // As on web, mute and the notification level of the server decide the sounds too, and the user's
+  // own level of the agent replaces the server level, as for the notifications. Before the server
+  // list arrives, the sounds play as they did.
+  const soundLevel = (agentId: string | null) => {
     const server = activeServer();
     if (!server) return "all";
-    return server.notificationsMuted ? "nothing" : server.notificationLevel;
+    if (server.notificationsMuted) return "nothing";
+    if (agentId === null) return server.notificationLevel;
+    return agentNotificationLevel(server.notificationLevel, ownAgentLevels(), agentId);
   };
   const playAgentEventSound = createAgentEventSounds(
-    (agentId) => soundLevel() !== "nothing" && agentList().some((agent) => agent.id === agentId && agent.notifications),
+    (agentId) =>
+      soundLevel(agentId) !== "nothing" && agentList().some((agent) => agent.id === agentId && agent.notifications),
   );
   let readRefresh = 0;
   let modelRefresh = 0;
@@ -148,6 +161,12 @@ export function AgentEventBridge() {
       case "usage-changed":
         applyAccountUsage(event.usage);
         return;
+      case "usage-credits-changed": {
+        // A joined server's usage event does not say whether an account works on credits: read it again.
+        const target = accountUsageTargetKey();
+        if (target) void refreshAccountUsage(target).catch(() => undefined);
+        return;
+      }
       case "agents-changed":
         applyStoredAgents(event.agents);
         return;
@@ -159,6 +178,9 @@ export function AgentEventBridge() {
         return;
       case "hidden-agents-changed":
         applyUserHiddenAgents(event.agents);
+        return;
+      case "agent-notification-levels-changed":
+        applyOwnAgentLevels(event);
         return;
       case "conversation":
         scheduleConversation(event.snapshot);
@@ -247,7 +269,7 @@ export function AgentEventBridge() {
           ...current,
           [event.agentId]: event.turnId,
         }));
-        if (soundLevel() === "all" && !platform.chatWindow) prepareCompletionSound();
+        if (soundLevel(event.agentId) === "all" && !platform.chatWindow) prepareCompletionSound();
         return;
       case "turn-completed":
         completedTurnByAgent.set(event.agentId, event.turnId);
@@ -275,13 +297,14 @@ export function AgentEventBridge() {
           return next === snapshot ? current : { ...current, [event.agentId]: next };
         });
         // Only the wait of this turn's thread: another thread of the agent can still wait for the user.
+        // A detached question outlives its turn: the host keeps it until the user answers.
         setPendingPrompts((current) => {
           const key = attentionKey(event.agentId, event.threadId);
           const pending = current[key];
           const submittedRequestKey = submittedPromptRequests()[event.agentId];
           if (
             pending?.type === "prompt" &&
-            promptRequestKey(pending.turnId, pending.requestId) === submittedRequestKey
+            (pending.detached || promptRequestKey(pending.turnId, pending.requestId) === submittedRequestKey)
           ) {
             return current;
           }
@@ -293,14 +316,17 @@ export function AgentEventBridge() {
         );
         if (event.status === "completed") {
           markReplyCompleted(event.agentId);
-          if (soundLevel() === "all" && !platform.chatWindow) playCompletionSoundForAgentEvent(event, agentList());
+          if (soundLevel(event.agentId) === "all" && !platform.chatWindow)
+            playCompletionSoundForAgentEvent(event, agentList());
           // A finished reply is a good moment to ask for a post. A chat window has no toasts.
           if (!platform.chatWindow && !event.quiet && !event.continues) noteSocialFollowReplyCompleted();
         }
         return;
-      case "routine-thread-turn-completed":
-        // The chat's turn state stays: the run's own `turn-completed` did not leave its thread.
-        if (soundLevel() === "all" && !platform.chatWindow) playCompletionSoundForAgentEvent(event.turn, agentList());
+      case "thread-turn-completed":
+        // The chat's turn state stays: the run's own `turn-completed` did not leave its thread. Only a
+        // routine thread plays the sound, as before: a routine run played it in the agent's chat.
+        if (event.routine && soundLevel(event.turn.agentId) === "all" && !platform.chatWindow)
+          playCompletionSoundForAgentEvent(event.turn, agentList());
         return;
       case "prompt":
         setPendingPrompts((current) => ({ ...current, [attentionEventKey(event)]: event }));
@@ -346,7 +372,7 @@ export function AgentEventBridge() {
         // another chat; the desktop notification tells the user who is not in the app. A failure does
         // not need the user, so it shows only at the "all" level, as the completion sound does.
         const agent = agentList().find((candidate) => candidate.id === event.agentId);
-        if (!agent?.notifications || soundLevel() !== "all" || platform.chatWindow) return;
+        if (!agent?.notifications || soundLevel(event.agentId) !== "all" || platform.chatWindow) return;
         if (!platform.appFocused() || isAgentChatOpen(event.agentId)) return;
         const { t } = currentText();
         toast.error(agent.name, {
@@ -357,7 +383,7 @@ export function AgentEventBridge() {
         return;
       }
       case "runtime-snapshot":
-        void channels.refresh();
+        void channels.resync();
         applyAgentRuntimeSnapshot(event.snapshot);
         return;
       case "browser-takeover-requested":
@@ -401,8 +427,14 @@ export function AgentEventBridge() {
             provider && event.model ? currentText().t("agent.error.run", { provider, model: event.model }) : provider;
           // Google asks the user to verify the account in a browser before Gemini answers (#2419).
           const link = event.link;
+          // The general sentence hides the cause, so the user can copy it into a report (#6410).
+          const details = agentErrorDetails(event.message, message);
           setConversationErrorRuns((current) => {
-            if (run || link) return { ...current, [key]: { message, run, ...(link ? { link } : {}) } };
+            if (run || link || details)
+              return {
+                ...current,
+                [key]: { message, run, ...(link ? { link } : {}), ...(details ? { details } : {}) },
+              };
             if (!(key in current)) return current;
             const { [key]: _replaced, ...next } = current;
             return next;
@@ -458,6 +490,7 @@ export function AgentEventBridge() {
       Object.fromEntries(Object.entries(current).filter(([agentId]) => agentId in usageLimits)),
     );
     setUsageLimitedModels(snapshot.usageLimitedModels ?? []);
+    setFailedModels(snapshot.failedModels ?? []);
     setSubagentTurns(Object.fromEntries((snapshot.subagentTurns ?? []).map((turn) => [turn.agentId, turn.turnId])));
     setQueues((current) => reconcileQueuesWithRuntimeWork(current, snapshot.work, runtimeTurns));
     setPendingPrompts((current) => reconcileAttentionPrompts(current, snapshot, submittedPromptRequests()));
@@ -466,10 +499,10 @@ export function AgentEventBridge() {
   }
 
   onSettled(() => {
-    if (soundLevel() === "all" && !platform.chatWindow) prepareCompletionSound();
+    if (soundLevel(null) === "all" && !platform.chatWindow) prepareCompletionSound();
     const unsubscribe = agentsPort().agent.onEvent((event) => {
       if (event.type === "channels-changed") {
-        void channels.refresh();
+        void channels.changed(event.channelId);
         return;
       }
       flush(() => handleAgentEvent(event));

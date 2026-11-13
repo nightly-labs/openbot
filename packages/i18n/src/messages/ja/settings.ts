@@ -16,6 +16,12 @@ export const messages = {
     "ウインドウの後ろにぼかしたデスクトップを表示します。Webサイトとメニューもアプリのテーマになります。",
   "settings.interfaceSize.title": "インターフェイスのサイズ",
   "settings.interfaceSize.description": "OpenBot のテキストとコントロールのサイズです。",
+  "settings.interfaceFont.title": "インターフェイスのフォント",
+  "settings.interfaceFont.description": "メニュー、チャット、設定のフォントです。",
+  "settings.interfaceFont.default": "デフォルト (Inter)",
+  "settings.codeFont.title": "コードのフォント",
+  "settings.codeFont.description": "コード、ターミナル、ファイルパスのフォントです。",
+  "settings.codeFont.default": "デフォルト",
   "settings.logoColor.title": "ロゴの色",
   "settings.logoColor.description": "Dock、タスクバー、Dynamic Island に表示されます。",
   "settings.logoColor.buildNote": "このビルドは独自のロゴの色を使います。選択はリリース版のアプリに適用されます。",
@@ -89,6 +95,8 @@ export const messages = {
   "settings.externalLinks.fallback.description": "リンクは既定のブラウザーで開きました。",
   "settings.sendShortcut.title": "送信キー",
   "settings.sendShortcut.description": "このデバイスとこのブラウザーでメッセージを送信するキーを選びます。",
+  "settings.chatOrder.description":
+    "このデバイスのサイドバーで未読チャットを表示する場所を選びます。手動にすると未読グループはオフになります。",
   "settings.sendShortcut.enter": "Enter で送信",
   "settings.sendShortcut.modEnterMac": "⌘Enter で送信",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter で送信",
@@ -118,6 +126,10 @@ export const messages = {
   "settings.agentDefaults.setAllLabel": "すべてのエージェントの {setting} を設定",
   "settings.agentDefaults.agentLabel": "{agent} の {setting}",
   "settings.agentDefaults.loadFailed": "エージェントを読み込めませんでした。",
+  "settings.commitCoAuthor.sectionTitle": "Git コミット",
+  "settings.commitCoAuthor.title": "コミットに OpenBot を記載",
+  "settings.commitCoAuthor.description":
+    "エージェントが作成するコミットに OpenBot を共同作成者として追加します。作成者はあなたのままです。",
   "settings.planStart.title": "作業の開始",
   "settings.planStart.wait": "開始を押したとき",
   "settings.planStart.after": "{time}後",
@@ -135,6 +147,7 @@ export const messages = {
   "settings.planStart.set": "設定",
   "settings.automationLimit.sectionTitle": "上限",
   "settings.automationLimit.sectionDescription": "このコンピューターのすべてのエージェントに適用されます。",
+  "settings.automationLimit.sectionDescriptionServer": "このサーバーのすべてのエージェントに適用されます。",
   "settings.automationLimit.title": "1時間あたりのリクエスト",
   "settings.automationLimit.option": "1時間あたり{limit}件",
   "settings.automationLimit.note":
@@ -196,7 +209,14 @@ export const messages = {
   "settings.soundTheme.play": "{name}を再生",
   "settings.notch.title": "動作",
   "settings.notch.show.title": "MacBook のノッチに状況を表示する",
+  "settings.notch.show.titleTopOfScreen": "画面上部に状況を表示する",
   "settings.notch.show.description": "エージェントの動作と対応が必要な項目を各ディスプレイの上部に表示します。",
+  "settings.notch.xwayland.title": "再起動が必要です",
+  "settings.notch.xwayland.description":
+    "Wayland では、ほかのアプリの上に Dynamic Island を表示するために OpenBot が XWayland を使う必要があります。それまでは、アイランドは表示されません。",
+  "settings.notch.xwayland.unsupported":
+    "XWayland のない Wayland では、Dynamic Island をほかのアプリの上に表示できません。",
+  "settings.notch.xwayland.restart": "再起動",
   "settings.notch.idle.title": "待機中のアイランドを表示する",
   "settings.notch.idle.description": "表示する状況がないときに OpenBot のロゴとあいさつを表示します。",
   "settings.notch.displays.title": "追加のディスプレイにも表示する",
@@ -221,6 +241,12 @@ export const messages = {
     "「他のアプリの上」にすると、OpenBot がバックグラウンドのときもドックが表示されます。",
   "settings.agentDock.placement.screen": "他のアプリの上",
   "settings.agentDock.placement.window": "OpenBot のウィンドウ内",
+  "settings.agentDock.xwayland.title": "再起動が必要です",
+  "settings.agentDock.xwayland.description":
+    "Wayland では、ほかのアプリの上にドックを表示するために OpenBot が XWayland を使う必要があります。それまでは、ドックは OpenBot のウィンドウ内に表示されます。",
+  "settings.agentDock.xwayland.unsupported":
+    "XWayland のない Wayland では、ドックをほかのアプリの上に表示できません。OpenBot のウィンドウ内に表示されます。",
+  "settings.agentDock.xwayland.restart": "再起動",
   "settings.agentDock.display.title": "ディスプレイ",
   "settings.agentDock.display.description":
     "そのディスプレイが接続されていない場合、ドックは OpenBot ウィンドウのディスプレイに表示されます。",
@@ -233,10 +259,19 @@ export const messages = {
   "settings.agentDock.edge.description": "ドックを上下にドラッグすると、端に沿って移動できます。",
   "settings.agentDock.edge.right": "右",
   "settings.agentDock.edge.left": "左",
+  "settings.agentDock.size.title": "ドックのサイズ",
+  "settings.agentDock.size.description":
+    "ドラッグして、他のアプリの上に表示するドックのサイズを変更します。メインウィンドウでは、ドックはインターフェイスのサイズに従います。",
   "settings.agentDock.autoHide.title": "使用していないときは隠す",
   "settings.agentDock.autoHide.description": "ドックが端に隠れます。ポインタを端に移動すると表示されます。",
+  "settings.agentDock.edgeStrip.title": "端に細い帯を表示",
+  "settings.agentDock.edgeStrip.description":
+    "ドックが隠れた場所に細い帯が残ります。ポインタを近づけるとドックが表示されます。エージェントから質問があると、帯に色の波が流れます。",
   "settings.agentDock.results.title": "完了した作業を表示",
   "settings.agentDock.results.description": "エージェントの結果がドックの横に短い時間表示されます。",
+  "settings.agentDock.activeSeats.title": "新着のあるエージェントを表示",
+  "settings.agentDock.activeSeats.description":
+    "ドックにないエージェントやチャンネルも、新しいメッセージがある間や返答を待っている間はドックに表示されます。",
   "settings.agentDock.agents.title": "ドックのエージェント",
   "settings.agentDock.agents.description": "{server} のエージェントです。サーバーごとに専用のドックがあります。",
   "settings.agentDock.agents.empty": "このサーバーにはまだエージェントがいません。",
@@ -485,6 +520,8 @@ export const messages = {
   "settings.updates.status.ready": "{target} の準備ができました。再起動して適用してください。",
   "settings.updates.status.installing": "{target} を適用するため再起動しています…",
   "settings.updates.status.upToDate": "OpenBot は Stable チャンネルで最新です。",
+  "settings.updates.status.staged":
+    "{target} は一部のコンピューターから順に配信中です。アップデートを確認すると今すぐ入手できます。",
   "settings.updates.status.checkFailed": "OpenBot はアップデートを確認できませんでした。もう一度お試しください。",
   "settings.updates.status.unsupported": "このビルドではアップデートを利用できません。",
   "settings.updates.actionFailed": "OpenBot をアップデートできませんでした。",
@@ -633,6 +670,8 @@ export const messages = {
   "settings.voice.speech.codexLive.title": "Codex ライブ音声",
   "settings.voice.speech.codexLive.description":
     "どのエージェントとの音声会話も、Codex のサインインで OpenAI のライブ音声を使います。音声、依頼、エージェントの返信は OpenAI に送られます。",
+  "settings.voice.speech.codexLive.serverDescription":
+    "どのエージェントとの音声会話も、サーバーの Codex のサインインで OpenAI のライブ音声を使います。音声、依頼、エージェントの返信は OpenAI に送られます。",
   "settings.voice.speech.speed.title": "速度",
   "settings.voice.speech.voice.title": "声",
   "settings.voice.speech.voice.female": "女性の声 {number}",
@@ -653,8 +692,6 @@ export const messages = {
   "settings.transfer.old.text": "エージェントとサーバー設定をファイルに保存します。",
   "settings.transfer.new.title": "このサーバーにインポート",
   "settings.transfer.new.text": "ファイルからエージェントとサーバー設定を追加します。",
-  "settings.transfer.notMoved":
-    "API キー、サインイン、コネクター、アプリの環境設定、チャット履歴は移動されません。新しいサーバーで設定し直してください。",
   "settings.transfer.back": "戻る",
   "settings.transfer.loading": "エージェントを読み込んでいます…",
   "settings.transfer.summary.label": "ファイルの内容",
@@ -664,12 +701,26 @@ export const messages = {
   "settings.transfer.count.noSettings": "サーバー設定なし",
   "settings.transfer.includeAgent": "{name} を含める",
   "settings.transfer.export.title": "このサーバーをエクスポート",
-  "settings.transfer.export.files": "ワークスペースのファイルを含める",
-  "settings.transfer.export.filesDescription":
-    "エージェントが作成したファイルと共有フォルダーです。ファイルを小さくするにはオフにします。",
-  "settings.transfer.export.settings": "サーバー設定を含める",
+  "settings.transfer.preset.label": "ファイルに含める内容",
+  "settings.transfer.preset.templates": "テンプレート",
+  "settings.transfer.preset.everything": "すべて",
+  "settings.transfer.meter.files": "/ {total}（ワークスペースのファイル）",
+  "settings.transfer.part.agents": "エージェントとその設定",
+  "settings.transfer.part.agentsDescription": "{contents}。常にファイルに含まれます。",
+  "settings.transfer.part.settings": "サーバー設定",
+  "settings.transfer.part.chats": "チャット履歴",
+  "settings.transfer.part.chatsDescription":
+    "チャットとサイドスレッド、そのファイル、およびルーティンの実行履歴です。エージェントはコンテキストを保ったままこれらのチャットを続けます。",
+  "settings.transfer.part.channels": "チャンネルのメッセージ",
+  "settings.transfer.part.channelsDescription":
+    "エクスポートするエージェントが参加しているチャンネルのメッセージと、そのファイル、チャンネルのルーティンの実行履歴です。",
+  "settings.transfer.part.files": "ワークスペースのファイル",
+  "settings.transfer.part.filesDescription": "エージェントが作成したファイルと共有フォルダーです。",
+  "settings.transfer.part.preferences": "サーバーの環境設定",
+  "settings.transfer.part.preferencesDescription":
+    "名前、ロゴ、タイムゾーン、パーソナリティ、エージェントのデフォルト、モデルの選択、メモリーとスキルの設定、各メンバーの通知レベルとピン留めです。",
   "settings.transfer.export.settingsDescription":
-    "MCP サーバー、カスタムプロバイダー、サイドバーのセクション、ルーティンフローです。",
+    "MCP サーバー、カスタムプロバイダー、サイドバーのセクション、ルーティンフロー、共有スキルです。",
   "settings.transfer.export.chooseAgents": "エージェントを選択 ({selected} / {total})",
   "settings.transfer.export.hideAgents": "エージェントを非表示",
   "settings.transfer.export.agentsLabel": "エクスポートするエージェント",
@@ -697,8 +748,11 @@ export const messages = {
   "settings.transfer.import.agentsLabel": "ファイル内のエージェント",
   "settings.transfer.import.nameExists": "名前が重複",
   "settings.transfer.import.settings": "サーバー設定をインポート",
-  "settings.transfer.import.settingsDescription":
-    "このサーバーにない MCP サーバー、カスタムプロバイダー、サイドバーのセクションを追加します。",
+  "settings.transfer.import.settingsAndPreferences":
+    "このサーバーにない MCP サーバー、カスタムプロバイダー、サイドバーのセクション、共有スキルを追加します。",
+  "settings.transfer.import.preferences": "サーバーの環境設定をインポート",
+  "settings.transfer.import.preferencesDescription":
+    "このサーバーの名前、ロゴ、環境設定と、各メンバーの通知レベルとピン留めを、ファイル内のものに置き換えます。",
   "settings.transfer.import.submit": { other: "エージェント {count} 件をインポート" },
   "settings.transfer.import.submitSettings": "サーバー設定をインポート",
   "settings.transfer.import.importing": "インポート中…",
@@ -711,4 +765,23 @@ export const messages = {
   "settings.transfer.result.signInButton": "{provider} にサインイン",
   "settings.transfer.result.notImported": "インポートされなかった項目",
   "settings.transfer.result.warnings": "確認事項",
+  "settings.transfer.copy.tileTitle": "別のサーバーにコピー",
+  "settings.transfer.copy.tileText": "エージェントを自分の別のサーバーに送ります。",
+  "settings.transfer.copy.title": "エージェントを別のサーバーにコピー",
+  "settings.transfer.copy.from": "コピー元",
+  "settings.transfer.copy.to": "コピー先",
+  "settings.transfer.copy.chooseServer": "サーバーを選択",
+  "settings.transfer.copy.search": "エージェントを検索",
+  "settings.transfer.copy.agentsOn": "{server} のエージェント",
+  "settings.transfer.copy.all": { other: "すべてのエージェント（{count} 件）" },
+  "settings.transfer.copy.noAgents": "このサーバーにはエージェントがありません。",
+  "settings.transfer.copy.new": "新規",
+  "settings.transfer.copy.notCopied":
+    "エージェントのチャンネルと共有フォルダーもコピーされます。API キー、サインイン、コネクタ、チャット履歴はコピーされません。別のサーバーで設定し直してください。",
+  "settings.transfer.copy.submit": { other: "エージェント {count} 件をコピー" },
+  "settings.transfer.copy.copying": "コピー中…",
+  "settings.transfer.copy.done": { other: "エージェント {count} 件を {server} にコピーしました。" },
+  "settings.transfer.copy.open": "{server} を開く",
+  "settings.transfer.copy.loadFailed": "エージェントを読み込めませんでした",
+  "settings.transfer.copy.failed": "コピーが完了しませんでした",
 } as const satisfies PartialTranslation<typeof source>;

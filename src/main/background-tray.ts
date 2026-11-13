@@ -14,6 +14,11 @@ export interface BackgroundTray {
    * them and can stop all remote control.
    */
   setRemoteControl: (memberNames: readonly string[]) => void;
+  /**
+   * The main window is hidden because the user kept OpenBot running at a close while agents worked.
+   * The icon then shows also when OpenBot does not run in the background, as the way back.
+   */
+  setHiddenWhileWorking: (hidden: boolean) => void;
   destroy: () => void;
 }
 
@@ -40,6 +45,7 @@ export function createBackgroundTray(options: {
   let icon = options.icon;
   let keepRunningInBackground = false;
   let remoteControl: readonly string[] = [];
+  let hiddenWhileWorking = false;
 
   function relabel(): void {
     if (!tray) return;
@@ -72,9 +78,12 @@ export function createBackgroundTray(options: {
     tray = null;
   }
 
-  /** The icon shows while OpenBot runs in the background or a member controls this computer. */
+  /**
+   * The icon shows while OpenBot runs in the background, while its window is hidden for agents that
+   * work, or while a member controls this computer.
+   */
   function update(): void {
-    if (!keepRunningInBackground && remoteControl.length === 0) {
+    if (!keepRunningInBackground && !hiddenWhileWorking && remoteControl.length === 0) {
       destroy();
       return;
     }
@@ -97,6 +106,11 @@ export function createBackgroundTray(options: {
     },
     setRemoteControl: (memberNames) => {
       remoteControl = [...memberNames];
+      update();
+    },
+    setHiddenWhileWorking: (hidden) => {
+      if (hidden === hiddenWhileWorking) return;
+      hiddenWhileWorking = hidden;
       update();
     },
     destroy,

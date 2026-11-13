@@ -5,6 +5,7 @@ export const messages = {
   "error.billing.lifecycleFailed": "서버 요금제를 변경할 수 없어요. 결제를 새로고침한 후 다시 시도해 주세요.",
   "error.billing.confirmMismatch": "삭제하려면 서버 이름을 입력해 주세요.",
   "error.billing.restartBusy": "지금은 서버를 다시 시작할 수 없어요. 잠시 후 다시 시도해 주세요.",
+  "error.billing.restartUnavailable": "이 서버는 여기에서 다시 시작할 수 없어요. 지원팀에 문의해 주세요.",
   "error.billing.planRequired": "이 서버의 요금제가 종료되었어요. 서버를 시작하려면 요금제를 갱신해 주세요.",
   "error.billing.planSoldOut": "이 요금제는 품절되었어요. 다른 요금제를 선택해 주세요.",
   "error.billing.licenseExists": "이 계정에는 이미 라이선스가 있어요. 대신 사용자 수를 변경해 주세요.",

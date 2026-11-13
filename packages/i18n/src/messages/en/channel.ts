@@ -8,7 +8,12 @@ export const messages = defineMessages("channel", {
   "channel.stoppedTask.reassignLabel": "Reassign the stopped task of {name}",
   "channel.stoppedTask.reassign": "Reassign",
   "channel.stoppedTask.cancel": "Cancel task",
+  "channel.stoppedTask.assignmentLoop":
+    "{names} passed this task between them too many times. It stopped to prevent a loop.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "The members passed this task between them too many times. It stopped to prevent a loop.",
   "channel.conversation.noMembers": "Add agents in channel settings to start work.",
+  "channel.conversation.waitFull": "Waiting - {name} starts when a running task ends",
   "channel.conversation.archivedNotice": "Deleted channel. Preview only.",
   "channel.composer.label": "Message to channel",
   "channel.composer.placeholder": "Message {name}",
@@ -19,6 +24,9 @@ export const messages = defineMessages("channel", {
   "channel.settings.isolated": "Keep memories in this channel",
   "channel.settings.isolatedDescription":
     "Agents save what they learn here as channel memories. Their other chats do not see them.",
+  "channel.settings.browser": "Browser",
+  "channel.settings.browserEveryone": "Every member",
+  "channel.settings.browserNone": "No one",
   "channel.settings.memoryCount": { one: "{count} saved", other: "{count} saved" },
   "channel.settings.newConversation.title": "New conversation",
   "channel.settings.newConversation.description": "The members forget the earlier messages. The channel setup stays.",

@@ -9,6 +9,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { CustomProviderHeader, CustomProviderInputKind, DetectedModel } from "@openbot/contracts/ipc";
 import {
   CUSTOM_PROVIDER_INPUT_KINDS,
+  CUSTOM_PROVIDER_REASONING_EFFORTS,
   isCustomProviderContextWindow,
   isCustomProviderMaxOutput,
   PROVIDER_DETECTION_LIMITS,
@@ -171,8 +172,9 @@ const LISTED_INPUT_KINDS: ReadonlyMap<string, CustomProviderInputKind> = new Map
 /**
  * What a list entry says about the model, in the shapes that servers publish: models.dev
  * (`modalities.input`, `limit.context`, `limit.output`), OpenRouter (`architecture.input_modalities`,
- * `context_length`, `top_provider.max_completion_tokens`) and vLLM (`max_model_len`). A missing or
- * out-of-range value is left out.
+ * `context_length`, `top_provider.max_completion_tokens`, `reasoning.supported_efforts`), RefuseLess
+ * (`reasoning_efforts`) and vLLM (`max_model_len`). A missing or out-of-range value is left out, and
+ * so is an effort that a custom model cannot declare, such as RefuseLess's `off` (#5784).
  */
 function modelDetails(entry: DynamicRecord): Omit<DetectedModel, "id"> {
   const limit = isDynamicRecord(entry.limit) ? entry.limit : {};
@@ -188,8 +190,14 @@ function modelDetails(entry: DynamicRecord): Omit<DetectedModel, "id"> {
         listed.some((name) => isString(name) && LISTED_INPUT_KINDS.get(name) === kind),
       )
     : undefined;
+  const reasoning = isDynamicRecord(entry.reasoning) ? entry.reasoning : {};
+  const listedEfforts = [reasoning.supported_efforts, entry.reasoning_efforts].find(Array.isArray);
+  const reasoningEfforts = Array.isArray(listedEfforts)
+    ? CUSTOM_PROVIDER_REASONING_EFFORTS.filter((effort) => listedEfforts.includes(effort))
+    : [];
   return {
     ...(inputs ? { inputs } : {}),
+    ...(reasoningEfforts.length > 0 ? { reasoningEfforts } : {}),
     ...(contextWindow !== undefined ? { contextWindow } : {}),
     // The form takes a max output only with a context window. A cap as large as the window leaves no
     // room for the prompt (OpenRouter often lists both as the same number), so the default stays.

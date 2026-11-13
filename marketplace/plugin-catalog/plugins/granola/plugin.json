@@ -1,0 +1,33 @@
+{
+  "slug": "granola",
+  "name": "Granola",
+  "tagline": "Meeting notes search",
+  "description": "Granola lets agents search and read meeting notes and transcripts in the signed-in Granola account. Each user signs in to their own Granola account through the browser.",
+  "category": "productivity",
+  "creatorName": "Granola",
+  "iconUrl": "https://www.granola.ai/favicon/apple-touch-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-week-recap", "text": "Recap my meetings this week and the decisions we made." },
+    { "id": "prompt-find-note", "text": "Find my notes from the call where we discussed the hiring plan." },
+    { "id": "prompt-follow-up", "text": "Draft a follow-up email from my last meeting notes." }
+  ],
+  "apps": [
+    {
+      "id": "app-granola-mcp",
+      "name": "Granola",
+      "description": "Meeting note and transcript search, over Granola's MCP server with browser sign-in.",
+      "iconUrl": "https://www.granola.ai/favicon/apple-touch-icon.png",
+      "server": {
+        "name": "granola",
+        "transport": "http",
+        "url": "https://mcp.granola.ai/mcp",
+        "auth": [{ "id": "granola-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.granola.ai",
+  "privacyPolicyUrl": "https://docs.granola.ai/help-center/policies/privacy-policy",
+  "termsUrl": "https://docs.granola.ai/help-center/policies/terms-of-service/application-terms-of-service"
+}

@@ -6,6 +6,7 @@ import { useText } from "@openbot/ui/text";
 import { actionToast } from "../../action-toast";
 import { usePlatform } from "../../platform";
 import { useSettings } from "../settings/settings-context";
+import { serverSupportsCapability } from "./server-capabilities";
 import { useServerSelection } from "./server-selection";
 import { useServerSettings } from "./server-settings";
 import { useServers } from "./servers-context";
@@ -23,6 +24,7 @@ export function useServerActions() {
     setJoinServerOpen,
     setAddServerOpen,
     setCreateLocalServerOpen,
+    setInstallServerOpen,
     hostedServersAvailable,
     hostedServerIds,
     hostedServersLoaded,
@@ -90,6 +92,14 @@ export function useServerActions() {
     return hostedServersAvailable() ? undefined : createLocal;
   }
 
+  /** Opens the dialog with the command that installs a server on another computer and adds it to this account. */
+  const installServer = platform.landingPreview ? undefined : () => setInstallServerOpen(true);
+
+  /** As `addMenuCreateLocal`: the hosted server plans show the item in their "Other options" menu. */
+  function addMenuInstallServer(): (() => void) | undefined {
+    return hostedServersAvailable() ? undefined : installServer;
+  }
+
   /**
    * Hides the server on this computer. When it is open, another server opens in its place: the first
    * online one, so that the hide does not wait for or fail on an offline server.
@@ -132,7 +142,13 @@ export function useServerActions() {
       onThisComputer(serverId) ? requestLeaveServer(serverId, trigger) : openHostedServerDelete(serverId, trigger),
     canDelete: (serverId) => hostedServerIds().has(serverId) || onThisComputer(serverId),
     onRestart: requestRestartServer,
-    canRestart: (serverId) => hostedServerIds().has(serverId) || onThisComputer(serverId),
+    // A self-hosted server restarts itself when its host has `host-restart-v1`; an older host does not.
+    // It must be online: an offline server keeps its last capabilities, but cannot get the request.
+    canRestart: (serverId) => {
+      if (hostedServerIds().has(serverId) || onThisComputer(serverId)) return true;
+      const server = servers().find((candidate) => candidate.id === serverId);
+      return server?.state === "online" && serverSupportsCapability(server, "host-restart-v1");
+    },
     onHide: (serverId) => void hideLocal(serverId),
     // Only beside another server: the list is never empty.
     canHide: () => remoteServers().length > 0,
@@ -144,6 +160,8 @@ export function useServerActions() {
     add,
     createLocal,
     addMenuCreateLocal,
+    installServer,
+    addMenuInstallServer,
     addCreatesServer: hostedServersAvailable,
     hiddenLocal,
     callbacks,

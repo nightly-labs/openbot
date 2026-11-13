@@ -34,18 +34,28 @@ export const messages = {
   "error.import.fileRenamed": "{name} : {file} existe déjà, cette copie est donc enregistrée sous {saved}.",
   "error.import.fileSkipped": "{name} : le fichier {file} est ignoré. {reason}",
   "error.import.chooseZip": "Choisissez un fichier .zip.",
-  "error.import.zipTooLarge": "L’exportation doit être un fichier .zip de moins de 2 Go.",
   "error.import.unsafeFile": "L’exportation contient un fichier non sûr : {name}",
-  "error.import.expandedTooLarge": "L’exportation décompressée doit faire moins de 2 Go et {limit} fichiers.",
+  "error.import.tooManyFiles": "L’exportation doit contenir au maximum {limit} fichiers.",
+  "error.import.diskSpace":
+    "{name} : ses fichiers nécessitent {size} Go d’espace disque libre, et {free} Go sont libres. Libérez de l’espace, puis importez de nouveau l’agent.",
   "error.import.remoteExpandedTooLarge": "L’exportation décompressée doit faire moins de 500 Mo et {limit} fichiers.",
   "error.import.zipInvalid":
     "Le fichier choisi n’est pas un .zip valide. Si Grok Bot l’enregistre encore, attendez, puis choisissez-le de nouveau.",
+  "error.import.entryDamaged": "Le fichier est endommagé dans l’exportation.",
+  "error.import.foldersSkipped":
+    "{number} fichiers des dossiers .git et node_modules sont omis. Un outil peut les recréer.",
   "error.import.empty": "L’exportation est vide.",
   "error.import.remoteZipTooLarge":
     "Pour importer dans un serveur rejoint, l’exportation doit être un fichier .zip de moins de 100 Mo.",
   "error.import.hostBusy": "Le serveur lit d’autres exportations. Réessayez dans quelques minutes.",
+  "error.import.uploadDiskSpace":
+    "L’export nécessite {size} Go d’espace disque libre sur le serveur, et {free} Go sont libres. Libérez de l’espace sur le serveur, puis choisissez à nouveau l’export.",
+  "error.import.remoteZipTooLargeOldHost":
+    "Ce serveur accepte un export de 100 Mo au maximum. Mettez à jour OpenBot sur le serveur pour importer un export plus grand.",
   "error.import.skillKept":
     "{name} : le serveur a déjà la compétence « {skill} », l’agent utilise donc celle-ci. Demandez à un administrateur de la mettre à jour.",
+  "error.import.skillRenamed":
+    "{name} : le nom de la compétence « {skill} » est trop proche de celui d’une autre compétence, elle est donc enregistrée sous « {renamed} ».",
   "error.import.transferRemoteTooLarge":
     "Un fichier de transfert pour un serveur rejoint doit faire moins de 100 Mo. Désactivez les fichiers des espaces de travail ou exportez moins d’agents.",
   "error.import.transferNotFile": "Ce fichier n’est pas un fichier de transfert OpenBot.",
@@ -60,6 +70,22 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name} : le modèle « {model} » n’est pas encore disponible ici, donc l’agent utilise le modèle par défaut. Choisissez de nouveau le modèle quand son fournisseur est prêt.",
   "error.import.transferSettingSkipped": "{name} n’est pas importé. {reason}",
+  "error.import.transferRunsSkipped":
+    "{name} : l’historique des exécutions de la routine « {routine} » n’est pas importé.",
+  "error.import.transferSharedSkillsSkipped":
+    "Impossible de lire les compétences partagées, elles ne sont donc pas dans le fichier.",
+  "error.import.transferSharedSkillsNotAdded":
+    "Les compétences partagées du fichier n’ont pas pu être ajoutées à ce serveur.",
+  "error.import.transferMemberPreferencesSkipped": {
+    one: "Les choix de {count} membre n’ont pas pu être enregistrés.",
+    other: "Les choix de {count} membres n’ont pas pu être enregistrés.",
+  },
+  "error.import.transferSharedSkillExists":
+    "Une compétence partagée avec ce nom et d’autres fichiers existe déjà sur ce serveur.",
+  "error.import.transferServerPreferencesSkipped": {
+    one: "{count} préférence du serveur dans le fichier n’est pas valide ici, elle n’est donc pas importée.",
+    other: "{count} préférences du serveur dans le fichier ne sont pas valides ici, elles ne sont donc pas importées.",
+  },
   "error.import.transferRoutineFlowSkipped": "L’import a laissé de côté un flux de routine. {reason}",
   "error.import.transferCustomAgentCommand":
     "{name} : les agents personnalisés ne sont pas importés, car ils exécutent une commande. Vérifiez la commande « {command} » et ajoutez de nouveau l’agent dans les réglages.",

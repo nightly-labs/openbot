@@ -21,6 +21,7 @@ export const messages = {
   "queue.item.steerFallback.providerUnsupported":
     "이 제공자는 실행 중인 턴에 방향 지시를 할 수 없어서 메시지가 대기열에서 기다려요.",
   "queue.item.steerFallback.steerFailed": "방향 지시에 실패해서 메시지가 대기열에서 기다려요.",
+  "queue.item.steerFallback.routineRun": "지금 루틴이 실행 중이라서 메시지가 대기열에서 기다려요.",
   "queue.item.runAsTask": "새 스레드에서 실행",
   "queue.item.runAsTaskLabel": "대기 중인 메시지 {position}을(를) 새 스레드에서 실행",
   "queue.item.deleteLabel": "대기 중인 메시지 {position} 삭제",

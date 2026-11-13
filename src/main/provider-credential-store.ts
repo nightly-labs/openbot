@@ -15,6 +15,10 @@ export class CredentialStoreFailure extends Schema.TaggedError<CredentialStoreFa
 
 const { io: credentialIO, sync: credentialSync } = causeHelpers(CredentialStoreFailure);
 
+function accountKeyName(provider: AgentProviderId, accountId: string): string {
+  return `${provider}:${accountId}`;
+}
+
 /**
  * One envelope holding every provider's key, each encrypted on its own.
  *
@@ -89,6 +93,33 @@ export class ProviderCredentialStore {
   status(provider: AgentProviderId): ProviderApiKeyStatus {
     if (this.get(provider) !== null) return "saved";
     return this.#loadError ? "unreadable" : "missing";
+  }
+
+  /**
+   * The key of a provider account that is a key, or `null`. It is in the envelope under the provider
+   * and the account, so a build that does not know it keeps it and never reads it as a provider's key.
+   */
+  accountKey(provider: AgentProviderId, accountId: string): string | null {
+    if (!this.#loaded) throw new Error("The provider credential store is not loaded.");
+    return this.#keys.get(accountKeyName(provider, accountId)) ?? null;
+  }
+
+  /** Saves the key of a provider account, or removes it when `key` is null. */
+  setAccountKey(
+    provider: AgentProviderId,
+    accountId: string,
+    key: string | null,
+  ): Effect.Effect<void, CredentialStoreFailure> {
+    const name = accountKeyName(provider, accountId);
+    return this.#edit((keys) => {
+      if (key === null) return keys.delete(name);
+      // A save into a file that could not be read replaces every provider key in it. The key dialog of
+      // a provider warns before that; an account key has no such warning, so it does not replace the file.
+      if (this.#loadError) throw new Error(sourceText("error.provider.credentialFileUnreadable"));
+      registerSecretValue(key);
+      keys.set(name, key);
+      return true;
+    });
   }
 
   set(provider: AgentProviderId, key: string): Effect.Effect<void, CredentialStoreFailure> {

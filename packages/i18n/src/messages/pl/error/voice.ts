@@ -7,7 +7,6 @@ export const messages = {
   "error.voice.removeBusy": "Poczekaj na koniec transkrypcji głosu, a potem usuń model.",
   "error.voice.removeFailed": "Nie udało się usunąć modelu głosowego. Spróbuj ponownie.",
   "error.voice.runtimeUnavailable": "Lokalna transkrypcja głosu nie jest dostępna na tej platformie.",
-  "error.voice.busy": "Transkrypcja głosu już trwa.",
   "error.voice.modelUnavailable": "Model głosowy jest niedostępny.",
   "error.voice.transcriptionTimedOut": "Przekroczono limit czasu transkrypcji głosu.",
   "error.voice.prepareRequired":
@@ -29,6 +28,12 @@ export const messages = {
   "error.voice.live.timedOut": "Głos na żywo Codex nie uruchomił się na czas. Spróbuj ponownie.",
   "error.voice.live.failed": "Głos na żywo zatrzymał się: {reason}",
   "error.voice.live.disconnected": "Głos na żywo został rozłączony.",
+  "error.voice.live.hostFailed":
+    "Codex na serwerze nie mógł uruchomić głosu na żywo. Poproś właściciela, aby zaktualizował Codex na tym komputerze i zalogował się przez ChatGPT, a potem spróbuj ponownie.",
   "error.voice.live.signIn": "Zaloguj się do Codex kontem ChatGPT, aby używać głosu na żywo.",
+  "error.voice.live.unavailable":
+    "OpenAI nie mogło uruchomić głosu na żywo. Problem leży po stronie OpenAI. Spróbuj ponownie później.",
+  "error.voice.live.refused":
+    "OpenAI odmówiło uruchomienia głosu na żywo. Spróbuj ponownie później albo wyłącz głos na żywo w Ustawieniach, aby rozmawiać głosem.",
   "error.voice.live.off": "Głos na żywo Codex jest wyłączony. Włącz go w Ustawienia → Głos.",
 } as const satisfies PartialTranslation<typeof source>;

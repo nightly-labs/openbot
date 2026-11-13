@@ -9,7 +9,12 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "{name}의 중단된 작업 다시 배정",
   "channel.stoppedTask.reassign": "다시 배정",
   "channel.stoppedTask.cancel": "작업 취소",
+  "channel.stoppedTask.assignmentLoop":
+    "{names} 사이에서 이 작업이 너무 많이 넘겨졌습니다. 반복을 막기 위해 중단했습니다.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "멤버들이 이 작업을 서로 너무 많이 넘겼습니다. 반복을 막기 위해 중단했습니다.",
   "channel.conversation.noMembers": "채널 설정에서 에이전트를 추가하면 작업을 시작할 수 있어요.",
+  "channel.conversation.waitFull": "대기 중 - 실행 중인 작업이 끝나면 {name}이(가) 시작해요",
   "channel.conversation.archivedNotice": "삭제된 채널이에요. 미리보기만 가능해요.",
   "channel.composer.label": "채널에 메시지 보내기",
   "channel.composer.placeholder": "{name}에 메시지 보내기",
@@ -20,6 +25,9 @@ export const messages = {
   "channel.settings.isolated": "메모리를 이 채널에 유지",
   "channel.settings.isolatedDescription":
     "에이전트가 여기서 배운 내용은 채널 메모리로 저장되며, 다른 채팅에서는 보이지 않습니다.",
+  "channel.settings.browser": "브라우저",
+  "channel.settings.browserEveryone": "모든 멤버",
+  "channel.settings.browserNone": "없음",
   "channel.settings.memoryCount": { other: "{count}개 저장됨" },
   "channel.settings.newConversation.title": "새 대화",
   "channel.settings.newConversation.description": "멤버가 이전 메시지를 잊습니다. 채널 설정은 그대로입니다.",

@@ -5,7 +5,12 @@
  */
 
 import { leadingAddress } from "@openbot/contracts/chat-tag-references";
-import type { AgentApproval, AgentEvent, BrowserTakeoverRequest } from "@openbot/contracts/ipc";
+import {
+  type AgentApproval,
+  type AgentEvent,
+  type BrowserTakeoverRequest,
+  channelBrowserAgent,
+} from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import { unloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
 import { useText } from "@openbot/ui/text";
@@ -51,14 +56,16 @@ export interface ChannelConversationEnvironment {
   approvals: () => readonly AgentApproval[];
   /** Every browser takeover that waits on the host. */
   takeovers: () => readonly BrowserTakeoverRequest[];
-  /** The agents that a user hid on the host. */
-  hiddenAgentIds: () => ReadonlySet<string>;
+  /** Every question that waits on the host. A saved card with no answer is open only while its question is here. */
+  prompts: () => readonly Extract<AgentEvent, { type: "prompt" }>[];
+  /** The hidden agents that the host stops. A host with `agent-hidden-work` stops none. */
+  pausedAgentIds: () => ReadonlySet<string>;
 }
 
 /** Must run inside the view that shows the channel: it reads the channel store and the interface text. */
 export function createChannelConversation(env: ChannelConversationEnvironment) {
   const channels = useChannels();
-  const { t, errorMessage } = useText();
+  const { t, errorDetails } = useText();
   const channelId = env.channelId;
   const page = () => {
     const current = channels.state.page;
@@ -67,6 +74,20 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
   const summary = () => channels.state.channels.find((channel) => channel.id === channelId);
   const threads = () => summary()?.threads;
   const readOnly = () => page()?.channel.archived === true;
+  const memberThreadIds = createMemo(() => new Set(threads()?.map((thread) => thread.threadId)));
+  /** An agent that the host stops gets no tab here, as it gets no work. A member with no thread here cannot use a tab yet. */
+  const browserOwner = createMemo(() => {
+    const channel = page()?.channel;
+    const allowed = channel ? channelBrowserAgent(channel) : false;
+    if (!channel || allowed === false) return null;
+    const paused = env.pausedAgentIds();
+    const owners = channel.members.flatMap((member) => {
+      const threadId = threads()?.find((thread) => thread.agentId === member.agentId)?.threadId;
+      return threadId && !paused.has(member.agentId) ? [{ agentId: member.agentId, threadId }] : [];
+    });
+    if (typeof allowed === "string") return owners.find((owner) => owner.agentId === allowed) ?? null;
+    return owners.find((owner) => owner.agentId === channel.leadAgentId) ?? owners[0] ?? null;
+  });
   const agentName = (agentId: string | null | undefined) => {
     const agent = channels.agents().find((candidate) => candidate.id === agentId);
     const authored = page()?.messages.find((entry) => entry.author.id === agentId);
@@ -78,19 +99,32 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
   /*
    * A row keeps its object while it does not change, so a streamed chunk draws one row again and not
    * the whole transcript.
+   *
+   * A row that comes after the rows this view already drew arrives live, so it enters as a new bubble
+   * of an agent chat does. Before, a channel message showed in one frame. The rows of the first page
+   * and of an older page do not enter. The reader's own message does not enter again: the row that
+   * the send drew at once entered already.
    */
   let rowsById = new Map<string, AgentMessage>();
+  let drawn = false;
+  const ownRow = (row: AgentMessage) =>
+    row.author === "you" && row.senderMember !== undefined && env.isOwnSender(row.senderMember.id);
   const messages = createMemo((): AgentMessage[] => {
     const current = page();
     if (!current) return [];
     const next = new Map<string, AgentMessage>();
-    const rows = channelConversationRows(entries()).map((mapped) => {
+    const mappedRows = channelConversationRows(entries());
+    const lastKnown = mappedRows.findLastIndex((mapped) => rowsById.has(mapped.id));
+    const rows = mappedRows.map((mapped, index) => {
       const known = rowsById.get(mapped.id);
-      const row = known && agentMessagesEqual(known, mapped) ? known : mapped;
+      const live = known ? known.animate === true : drawn && index > lastKnown && !ownRow(mapped);
+      const fresh = live ? { ...mapped, animate: true } : mapped;
+      const row = known && agentMessagesEqual(known, fresh) ? known : fresh;
       next.set(row.id, row);
       return row;
     });
     rowsById = next;
+    drawn = true;
     return rows;
   });
   const unreadCount = () => summary()?.unreadCount ?? 0;
@@ -102,7 +136,7 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
 
   const waiting = createMemo(() => {
     const current = page();
-    return current ? waitingChannelPrompt(current) : null;
+    return current ? waitingChannelPrompt(current, threads(), env.prompts()) : null;
   });
   const prompt = createMemo((): Extract<AgentEvent, { type: "prompt" }> | undefined => {
     const found = waiting();
@@ -177,7 +211,9 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
       const messageId = sentChannelMessageId(after, sequenceBefore, body, env.isOwnSender);
       return messageId ? { messageId } : { error: t("channel.error.action") };
     } catch (error) {
-      return { error: errorMessage(error, t("channel.error.action")) };
+      // The reason alone can be the generic text, so the reference says which failure it was.
+      const details = errorDetails(error, t("channel.error.action"));
+      return { error: details.message, reference: details.reference };
     }
   }
 
@@ -220,6 +256,7 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     id: channelId,
     name: () => page()?.channel.name ?? summary()?.name ?? "",
     readOnly,
+    ownMessage: ownRow,
     author: (message) => {
       const id = message.senderAgentId ?? "";
       return {
@@ -232,9 +269,11 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     workers: () => {
       const current = page();
       return current
-        ? channelWorkers(current, channels.agents(), t("chat.activity.agentFallback"), env.hiddenAgentIds())
+        ? channelWorkers(current, channels.agents(), t("chat.activity.agentFallback"), env.pausedAgentIds())
         : [];
     },
+    memberThreadIds,
+    browserOwner,
     workingTurns,
     interactionAgentName: () => {
       const agentId = approval()?.agentId ?? browserTakeover()?.agentId ?? prompt()?.agentId;

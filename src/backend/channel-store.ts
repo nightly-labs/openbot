@@ -14,7 +14,9 @@ import {
   decodeChannel,
   isChannelMessage,
   isChannelTask,
+  MCP_SIGN_IN_ITEM_TYPE_PREFIX,
   SIGNED_OUT_CHANNEL_MEMBER_ID,
+  withBrowserMember,
 } from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
@@ -194,6 +196,7 @@ export class ChannelStore {
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'channel-change'
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'context-reset'
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'commentary'
+                AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?) AS unread,
             (SELECT COUNT(*) FROM projection_channel_tasks AS t
               WHERE t.channel_id = c.channel_id
@@ -203,7 +206,13 @@ export class ChannelStore {
                 AND json_extract(t.task_json, '$.state') IN ('queued', 'waiting', 'running')) AS open
             FROM projection_channels AS c ORDER BY c.rowid`,
         )
-        .all(memberId, memberId, excludedId, `${CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX}%`),
+        .all(
+          memberId,
+          memberId,
+          excludedId,
+          `${CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX}%`,
+          `${MCP_SIGN_IN_ITEM_TYPE_PREFIX}%`,
+        ),
     );
     const threads = new Map<string, ChannelThread[]>();
     for (const row of databaseRows(
@@ -423,6 +432,34 @@ export class ChannelStore {
   }
 
   /**
+   * `tasks` with the dependencies that each waiting task already read: the `awaitedTaskIds` of its
+   * turns, whose results the turn had when it started. A lead that assigns work in rounds keeps every
+   * sub-task in `dependencies`, so the page shows only the round it waits for (#7505). Only the views
+   * of a person read it; the agent's channel history does not.
+   */
+  withSeenDependencies(channelId: string, tasks: ChannelTask[]): ChannelTask[] {
+    if (!tasks.some((task) => task.state === "waiting")) return tasks;
+    // The rows are in the order the assignments started, because an update keeps its row.
+    const started = new Map<string, number>();
+    const readAt = new Map<string, Map<string, number>>();
+    this.assignments(channelId).forEach((assignment, order) => {
+      started.set(assignment.taskId, order);
+      const read = readAt.get(assignment.taskId) ?? new Map<string, number>();
+      for (const id of assignment.awaitedTaskIds) read.set(id, order);
+      readAt.set(assignment.taskId, read);
+    });
+    return tasks.map((task) => {
+      if (task.state !== "waiting") return task;
+      // A dependency that ran again after the turn that read it, as after Reassign, has a new result.
+      const seenDependencies = task.dependencies.filter((id) => {
+        const at = readAt.get(task.id)?.get(id);
+        return at !== undefined && (started.get(id) ?? -1) < at;
+      });
+      return seenDependencies.length ? { ...task, seenDependencies } : task;
+    });
+  }
+
+  /**
    * How many messages are older than a page, and when the first one was written: the day rail draws
    * the unloaded part from it. The time is only in the message JSON, so only the oldest row is read.
    */
@@ -446,7 +483,9 @@ export class ChannelStore {
     const previous = this.database.commandResult(commandId);
     if (previous !== undefined) return decodeChannel(previous);
     if (!change.tasks.every(isChannelTask)) throw new Error("Invalid channel task.");
-    const channel = { ...change.channel, revision: change.channel.revision + 1 };
+    // A browser member that leaves the channel takes the browser with it: no member gets it in its
+    // place, as the setting limits access.
+    const channel = { ...withBrowserMember(change.channel), revision: change.channel.revision + 1 };
     // A late write of a deleted message must not keep its text in the event history either.
     const deleted = this.database.connection.prepare(
       "SELECT 1 FROM projection_channel_messages WHERE channel_id = ? AND message_id = ? AND json_extract(message_json, '$.deleted') = 1",
@@ -728,10 +767,14 @@ export class ChannelStore {
     );
   }
 
-  executionThreads(): Array<{ id: string; threadId: string }> {
+  executionThreads(): Array<{ id: string; threadId: string; channelId: string }> {
     return databaseRows(
-      this.database.connection.prepare("SELECT agent_id, thread_id FROM projection_channel_contexts").all(),
-    ).map((row) => ({ id: requiredStringColumn(row, "agent_id"), threadId: requiredStringColumn(row, "thread_id") }));
+      this.database.connection.prepare("SELECT channel_id, agent_id, thread_id FROM projection_channel_contexts").all(),
+    ).map((row) => ({
+      id: requiredStringColumn(row, "agent_id"),
+      threadId: requiredStringColumn(row, "thread_id"),
+      channelId: requiredStringColumn(row, "channel_id"),
+    }));
   }
 
   contextThreads(channelId: string): string[] {

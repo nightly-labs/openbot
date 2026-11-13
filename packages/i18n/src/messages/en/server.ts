@@ -131,6 +131,33 @@ export const messages = defineMessages("server", {
     "OpenBot stops the server and moves its agents, chats and files to the trash.",
   "server.local.deleting": "Deleting server…",
   "server.local.deletedTitle": "Deleted {name}",
+  // A server that the user installs on a Linux computer or VPS of their own with one command.
+  "server.install.title": "New server on another computer",
+  "server.install.description":
+    "Run this command on a Linux computer or VPS that you own. It installs OpenBot and adds the server to this account.",
+  "server.install.making": "Making a command for this account…",
+  "server.install.failed": "OpenBot could not make a command. Check the internet connection.",
+  // Copies the command with the instructions that an AI agent needs.
+  "server.install.copyForAgent": "Copy for an AI agent",
+  // {time} is minutes and seconds, such as 14:52.
+  "server.install.expiresIn": "Works once. Expires in {time}.",
+  "server.install.newCommand": "New command",
+  "server.install.waiting": "Waiting for the command to run on your server…",
+  // {name} is the new server.
+  "server.install.starting": "{name} signed in. Starting the server…",
+  "server.install.connected": "{name} is connected.",
+  // {name} is a server that signed in earlier with the command. The app is not connected to it now.
+  "server.install.offline": "{name} is offline.",
+  "server.install.expired": "This command expired. Make a new one.",
+  // The text that "Copy for an AI agent" copies. The last line of the command output stays in English.
+  "server.install.agentPrompt":
+    'Install OpenBot on this Linux server and sign it in to my OpenBot account.\nRun this command as root. It asks no questions and takes a few minutes:\n\n{command}\n\nIt ends with the line "OpenBot is connected to your account." and exit code 0.\nThe command works once, for 15 minutes. Do not save it anywhere.',
+  // Puts an SSH task into the composer of the open chat.
+  "server.install.setUpWithAgent": "Set up with an agent",
+  // The task that "Set up with an agent" puts into the composer. The user adds the SSH address at the end.
+  // The agent gets the command from OpenBot, after the user approves it.
+  "server.install.sshAgentPrompt":
+    "Connect over SSH to my Linux server and install OpenBot on it as a server.\n\nSSH address (user@host):",
   // Shown over the plans when the account has the maximum number of hosted servers. The plans are disabled.
   "server.add.limit.title": "This account has the maximum number of servers",
   "server.add.limit.description": {
@@ -277,8 +304,7 @@ export const messages = defineMessages("server", {
   "server.settings.generalTitle": "General",
   "server.settings.generalDescription": "Manage this server’s name, logo, and preferences.",
   "server.settings.vaultTitle": "Vault",
-  "server.settings.vaultDescription":
-    "Save logins, cards and contact info that every agent on this server can fill in.",
+  "server.settings.vaultDescription": "Save logins, cards, contact info and API keys for the agents on this server.",
   "server.settings.membersTitle": "Members",
   "server.settings.membersDescription": "Publish this server, invite people, and manage access.",
   "server.settings.desktopTitle": "Remote desktop",
@@ -391,11 +417,24 @@ export const messages = defineMessages("server", {
   "server.settings.later": "Later",
   "server.settings.setUp": "Set up",
   "server.settings.agents": "Agents",
+  "server.settings.agentsDescription":
+    "Choose what the agents on this server can do when you do not set it for an agent.",
   "server.settings.timezone": "Timezone",
   "server.settings.timezoneDescription":
     "New routines use this timezone when the message does not give the sender's timezone.",
   "server.settings.timezoneAutomatic": "Automatic ({zone})",
   "server.settings.timezoneLoadFailed": "Could not load the server timezone.",
+  "server.settings.turnLimit": "Threads at the same time",
+  "server.settings.turnLimitDescription":
+    "How many agent threads can run at the same time on this server. More threads use more memory.",
+  "server.settings.turnLimitAutomatic": "Automatic ({count})",
+  "server.settings.turnLimitAutomaticUnlimited": "Automatic (no limit)",
+  "server.settings.turnLimitUnlimited": "Unlimited",
+  "server.settings.turnLimitsLoadFailed": "Could not load the thread limits of this server.",
+  "server.settings.agentTaskLimit": "Parallel threads per agent",
+  "server.settings.agentTaskLimitDescription":
+    "How many threads each agent can run at the same time when the agent has no limit of its own.",
+  "server.settings.agentTaskLimitDefault": "Default ({count})",
   "server.settings.memoryLimit": "Memories per agent",
   "server.settings.memoryLimitDescription": "How many memories each agent on this server can keep.",
   "server.settings.memoryLimitLoadFailed": "Could not load the memory limit of this server.",
@@ -405,7 +444,17 @@ export const messages = defineMessages("server", {
   "server.settings.memoryReviewOff": "Off",
   "server.settings.memoryReviewTurns": { one: "Every {count} turn", other: "Every {count} turns" },
   "server.settings.memoryReviewLoadFailed": "Could not load the memory review setting.",
-  "server.settings.rolesTitle": "Roles",
+  "server.settings.skillLearning": "Skill learning",
+  "server.settings.skillLearningDescription": "Whether agents on this server save what they learn as skills.",
+  "server.settings.skillLearningAutomatic": "Automatic",
+  "server.settings.skillLearningAsk": "Ask first",
+  "server.settings.skillLearningOff": "Off",
+  "server.settings.skillLearningLoadFailed": "Could not load the skill learning setting.",
+  "server.settings.browsingMemory": "Learn from my browsing",
+  "server.settings.browsingMemoryDescription":
+    "When you control an agent's browser, the agent learns how sites work from the pages and buttons you use. Typed text is not kept.",
+  "server.settings.browsingMemoryLoadFailed": "Could not load the browsing setting.",
+  "server.settings.rolesTitle": "Permissions",
   "server.settings.rolesDescription":
     "Choose the agents that members can use. A member gets the highest access of Everyone and of their roles. Owners and admins can use all agents.",
   "server.settings.auditTitle": "Audit log",
@@ -430,7 +479,7 @@ export const messages = defineMessages("server", {
   "server.settings.hostKeyChanged": "Last change",
   // {date} is the date and time of the change.
   "server.settings.hostKeyChangedDescription": "{date}. The previous key and the new key both signed this change.",
-  "server.settings.hostKeyLocalOnly": "Only the server on this computer can change its key here.",
+  "server.settings.hostKeyOwnerOnly": "Only the owner can change the server key.",
   "server.settings.removeTitle": "Remove server",
   "server.settings.removeDescription":
     "Remove this server from the account service for all members. Use this when its computer is no longer available.",
@@ -500,6 +549,7 @@ export const messages = defineMessages("server", {
   "server.roles.memberCount": { one: "{count} member", other: "{count} members" },
   "server.roles.agentList": "Agents: {names}",
   "server.roles.agentLevel": "Access of {role} to {agent}",
+  "server.roles.changeInEveryone": "Change in Everyone",
   "server.roles.setAll": "Set all",
   "server.roles.setAllLabel": "Set all: access of {role} to all agents",
   "server.roles.loadFailed": "Could not load the roles of this server.",

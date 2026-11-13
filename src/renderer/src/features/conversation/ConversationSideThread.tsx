@@ -44,6 +44,7 @@ export function ConversationSideThread(props: { threadId: string }) {
     copyMessage,
     copiedMessageId,
     branchThread,
+    messagePins,
   } = useConversationViewScope();
   const { t, errorMessage } = useText();
   const failureToast = (fallback: AppTextKey) => ({
@@ -119,6 +120,14 @@ export function ConversationSideThread(props: { threadId: string }) {
     if (!view.threads?.onBranch) return undefined;
     return (messageId: string) => void branchThread(props.threadId, messageId);
   };
+  /** Pin and Unpin on the messages of this thread. A host without `message-pins-v1` has no such item. */
+  const threadPins = (taskId: string) => {
+    if (!messagePins.available()) return undefined;
+    return {
+      isPinned: (messageId: string) => messagePins.isPinned(taskId, messageId),
+      onToggle: (messageId: string, pinned: boolean) => messagePins.set(taskId, messageId, pinned),
+    };
+  };
   /** Deletes a message of this thread. A host without `message-delete-v1` has no Delete item. */
   const deleteMessage = () => {
     const remove = view.threads?.onDeleteMessage;
@@ -191,6 +200,7 @@ export function ConversationSideThread(props: { threadId: string }) {
             onSend={(text) => sendSide(current().thread, text)}
             onStop={() => current().thread.onStop()}
             onOpenLink={(url) => void openExternalMessageUrl(url)}
+            onSelectAgent={view.onSelectAgent}
             onPreview={(attachment) => void previewAttachment(attachment)}
             onAttachmentAction={attachmentAction}
             approval={current().thread.approval}
@@ -203,6 +213,8 @@ export function ConversationSideThread(props: { threadId: string }) {
             attention={answerCard()}
             messageCard={mcpSignInCard}
             olderMessages={current().thread.olderMessages}
+            newerMessages={current().thread.newerMessages}
+            focusMessage={current().thread.focusMessage}
             stepsAbove={turnSteps.stepsAbove}
             factsAbove={turnSteps.factsAbove}
             activeSteps={turnSteps.activeSteps()}
@@ -212,6 +224,7 @@ export function ConversationSideThread(props: { threadId: string }) {
             compactMessageActions={compactMessageActions()}
             onBranch={branch()}
             onDeleteMessage={deleteMessage()}
+            messagePins={threadPins(current().thread.task.id)}
             canDeleteMessage={view.canDeleteMessage}
             branchSource={branchSource(current().thread, current().agent.name)}
             onReply={reply()}

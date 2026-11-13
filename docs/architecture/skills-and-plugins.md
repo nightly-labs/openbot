@@ -101,7 +101,10 @@ the worker claims after it loaded, so the origin stays tainted in that session. 
 page is open, no page of its origin in the same session fills. When it ends, a same-origin page of a
 connected popup or opener keeps that mark, each other open page of the origin must navigate before
 its own fill, and OpenBot clears the origin's Cache Storage and service workers. A fill waits for that purge, and runs it again when no other page of
-the origin is open. A page whose navigation a service worker handled must reload once. Cookies, localStorage and
+the origin is open. A page whose navigation a service worker handled must reload once with `navigate direction=reload`.
+That reload uses `reloadIgnoringCache`, which skips the service worker, also when the page registered it
+again after the purge (#8017). A normal reload, a reload from `evaluate`, or opening the address again
+can go through the worker and refuse the fill again. Cookies, localStorage and
 IndexedDB stay, because clearing them signs the user out and deletes offline data. So a site whose
 own code runs a stored value as code is not protected, as from any other script that the site
 loads. The same rules apply to `fill_card`. A login matches by 1Password's autofill rule, on the registrable domain
@@ -149,7 +152,11 @@ register a value of 8 or more characters for log redaction when the call arrives
 the Vault registers a shorter value when it saves it. Both work only when a
 person's message in this computer's OpenBot chat started the turn, as for workflow changes: an
 external chat, a team member, a routine, another agent, or a web page cannot replace a key or a
-password. They return no secret. `save_api_key` replaces a Vault key with the same name and deletes
+password. In a channel task, `save_api_key` saves only a value that the request of the root task holds
+as a whole token of 8 or more characters, when this computer's user wrote that request
+(`ChannelService.localRequestHolds`, #6369), and only under a name that the agent has no key for
+yet: the agent also reads the lead's and the other members' words there. Otherwise, it tells the
+agent to call `request_api_key`, whose form works in a channel and can replace a key. They return no secret. `save_api_key` replaces a Vault key with the same name and deletes
 the calling agent's own key with that name, because the agent's own key wins in `list_api_keys`.
 Another agent's own key with that name stays and still wins for that agent. The value is in the provider's
 transcript because the agent sent it; OpenBot keeps no tool arguments in its trace. An agent cannot
@@ -216,6 +223,8 @@ person.
 ## Local skill library
 
 `src/main/local-skill-library.ts` owns immutable revisions under the application's user-data directory, in `local-skills/<local-skill-uuid>/<revision>/bundle.zip`. A staging directory is renamed only after the bundle is written; reads ignore unpublished staging directories. Revisions are serialized and checked against the caller's expected revision. No SQLite migration is required.
+
+`create_skill` and `revise_skill` publish a folder of the agent's workspace. An agent often writes a plain frontmatter value with a colon, such as `description: Use when: ...`, which YAML refuses. When the frontmatter does not parse, the library quotes each top-level plain value that has a colon and tries again. When that parses, the bundle gets the quoted `SKILL.md`; the folder in the workspace does not change. Otherwise the publish fails as before.
 
 The shared package validator handles local and marketplace bundles. The existing installer owns per-agent files, hashes, disabled storage, and both provider directories. Local installations skip marketplace downloads and receipt requests. Installation operations are serialized per agent; a library revision does not update installed copies.
 

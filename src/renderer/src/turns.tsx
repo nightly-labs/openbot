@@ -7,6 +7,7 @@ import type {
   QueueSnapshot,
   RoutineFields,
 } from "@openbot/contracts/ipc";
+import { approvalIsCut, withWholeApproval } from "@openbot/team-client/runtime-attention";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, untrack } from "solid-js";
 import { desktopAnalytics } from "./analytics";
@@ -97,6 +98,8 @@ const Turns = createSimpleContext({
     const [subagentTurns, setSubagentTurns] = createSignal<Record<string, string>>({});
     // Each provider account and model that a usage limit holds, also with no agent on it.
     const [usageLimitedModels, setUsageLimitedModels] = createSignal<AgentModelChoice[]>([]);
+    // Each provider account and model that a provider error holds, so that a switch passes over it.
+    const [failedModels, setFailedModels] = createSignal<AgentModelChoice[]>([]);
     // The holds whose ask card the user closed with "Wait", by agent, with the reset of that hold.
     const [waitedUsageLimits, setWaitedUsageLimits] = createSignal<Record<string, number | null>>({});
     const [queues, setQueues] = createSignal<Record<string, QueueSnapshot>>(seed?.queues ?? {});
@@ -138,6 +141,36 @@ const Turns = createSimpleContext({
           : current,
       );
     }
+    // A runtime snapshot cuts the long texts of an approval. Main reads the whole copy once for each cut
+    // request. Until it comes, and when the server cannot send it, the card offers only Deny.
+    const wholeApprovalReads = new Set<string>();
+    createEffect(
+      () => approvals().filter(approvalIsCut),
+      (cut) => {
+        for (const approval of cut) {
+          const key = JSON.stringify([scopeServerId, approval.agentId, approval.turnId, approval.requestId]);
+          if (wholeApprovalReads.has(key)) continue;
+          wholeApprovalReads.add(key);
+          void turnsPort()
+            .agent.readPendingApproval({ agentId: approval.agentId, requestId: approval.requestId })
+            .then((whole) => {
+              // Before a joined server connects, main does not know its capabilities and returns null. The
+              // next change of the approvals tries again.
+              if (!whole) {
+                wholeApprovalReads.delete(key);
+                return;
+              }
+              if (!scopeIsCurrent()) return;
+              setApprovals((current) => {
+                const next = withWholeApproval(current, whole);
+                return next === current ? current : [...next];
+              });
+            })
+            // The next change of the approvals tries again.
+            .catch(() => wholeApprovalReads.delete(key));
+        }
+      },
+    );
     const completedTurnByAgent = new Map<string, string>();
     const queueSnapshotRequests = new Map<string, number>();
     const waitSnapshotRequests = new Map<string, number>();
@@ -404,6 +437,8 @@ const Turns = createSimpleContext({
       const serverId = activeServerId();
       void turnsPort()
         .agent.cancelWait({ agentId: agent.id, waitId })
+        // A joined server sends no event when a wait closes, so the list is read again.
+        .then(() => loadWaits(agent.id, serverId))
         .catch((error) => appendUiError(agent.id, error, currentText().t("app.errorStatus.waitCancel"), serverId));
     }
 
@@ -579,6 +614,8 @@ const Turns = createSimpleContext({
       setSubagentTurns,
       usageLimitedModels,
       setUsageLimitedModels,
+      failedModels,
+      setFailedModels,
       waitedUsageLimits,
       setWaitedUsageLimits,
       queues,

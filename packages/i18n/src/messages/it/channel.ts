@@ -9,7 +9,12 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "Riassegna l'attività interrotta di {name}",
   "channel.stoppedTask.reassign": "Riassegna",
   "channel.stoppedTask.cancel": "Annulla attività",
+  "channel.stoppedTask.assignmentLoop":
+    "{names} si sono passati questa attività troppe volte. È stata interrotta per evitare un ciclo.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "I membri si sono passati questa attività troppe volte. È stata interrotta per evitare un ciclo.",
   "channel.conversation.noMembers": "Aggiungi agenti nelle impostazioni del canale per iniziare a lavorare.",
+  "channel.conversation.waitFull": "In attesa - {name} inizia quando termina un'attività in corso",
   "channel.conversation.archivedNotice": "Canale eliminato. Solo anteprima.",
   "channel.composer.label": "Messaggio al canale",
   "channel.composer.placeholder": "Scrivi a {name}",
@@ -20,6 +25,9 @@ export const messages = {
   "channel.settings.isolated": "Tieni le memorie in questo canale",
   "channel.settings.isolatedDescription":
     "Gli agenti salvano ciò che imparano qui come memorie del canale. Le loro altre chat non le vedono.",
+  "channel.settings.browser": "Browser",
+  "channel.settings.browserEveryone": "Tutti i membri",
+  "channel.settings.browserNone": "Nessuno",
   "channel.settings.memoryCount": { one: "{count} salvata", other: "{count} salvate" },
   "channel.settings.newConversation.title": "Nuova conversazione",
   "channel.settings.newConversation.description":

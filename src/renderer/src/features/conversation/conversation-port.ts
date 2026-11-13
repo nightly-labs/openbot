@@ -10,12 +10,14 @@ export interface ConversationPort {
     | "readAgentSessionSettings"
     | "listAgentNotificationLevels"
     | "askSideQuestion"
+    | "saveSkillSuggestion"
     | "setAgentSessionSetting"
     | "resetAgentSessionSetting"
     | "onScopedEvent"
     | "deleteConversationMessage"
     | "deleteTable"
     | "listMemories"
+    | "listPinnedMessages"
     | "listRoutines"
     | "listTables"
     | "markConversationRead"
@@ -24,6 +26,7 @@ export interface ConversationPort {
     | "releaseFilePreview"
     | "searchConversationMessages"
     | "sendMessage"
+    | "setMessagePinned"
   >;
   browser: Pick<
     OpenBotDesktopApi["browser"],

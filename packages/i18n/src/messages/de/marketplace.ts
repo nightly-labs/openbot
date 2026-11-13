@@ -123,6 +123,11 @@ export const messages = {
   "marketplace.app.remove.confirmTitle": "{name} entfernen?",
   "marketplace.app.remove.keep": "Behalten",
   "marketplace.app.connection": "Verbindung",
+  "marketplace.app.access.use": "Kann nutzen",
+  "marketplace.app.access.noAgents": "Keine Agenten",
+  "marketplace.app.access.agentsOf": "Agenten, die {name} nutzen können",
+  "marketplace.app.access.chooseAgents": "{name}: {summary}. Agenten wählen",
+  "marketplace.app.access.level": "Zugriff von {role} auf {name}",
   "marketplace.app.setup.account": "Melde dich im Browser mit deinem {name}-Konto an.",
   "marketplace.app.setup.key": "Benötigt einen API-Schlüssel aus deinem {name}-Konto.",
   "marketplace.app.setup.keySaved": "{field} auf {host} gespeichert.",
@@ -130,6 +135,10 @@ export const messages = {
   "marketplace.app.setup.desktop": "Läuft in der Desktop-App von {name} unter {address}.",
   "marketplace.app.setup.desktopConnected": "Verbunden mit {address}.",
   "marketplace.app.setup.open": "Keine Anmeldung und kein Schlüssel nötig.",
+  "marketplace.app.blocked.update":
+    "Auf {host} läuft eine ältere OpenBot-Version, die keine Apps verbinden kann. Aktualisiere OpenBot auf {host} oder bitte den Inhaber darum.",
+  "marketplace.app.blocked.member":
+    "Nur ein Inhaber oder Admin von {host} kann dort Apps verbinden. Bitte eine dieser Personen, {name} zu verbinden oder OpenBot auf {host} zu aktualisieren, damit Mitglieder Apps verbinden können.",
   "marketplace.app.connectAgain": "Erneut verbinden",
   "marketplace.app.automation.askOnInstall": "Bei Installation macOS um Zugriff bitten",
   "marketplace.app.automation.title": "Zugriff auf Apple-Apps",
@@ -201,6 +210,29 @@ export const messages = {
     "Durchsuche meine Cobrain-Notizen danach, was wir zu den Preisen entschieden haben.",
   "marketplace.plugin.cobrain.prompt.saveNote":
     "Speichere in Cobrain eine Notiz mit dem, was wir heute erledigt haben und was noch offen ist.",
+  "marketplace.plugin.honcho.tagline": "Dein Gedächtnis in allen KI-Tools",
+  "marketplace.plugin.honcho.description":
+    "Honcho von Plastic Labs gibt Agenten ein Langzeitgedächtnis über dich, das andere verbundene KI-Tools teilen können. Agenten speichern, was sie lernen, und Honcho zieht daraus Schlüsse und baut ein Modell deiner Vorlieben, Ziele und Arbeitsweisen. Agenten stellen ihm Fragen, bevor sie anfangen. OpenBot-Agenten haben auch ihr eigenes Gedächtnis; Honcho ist das Gedächtnis, das dir in andere Tools folgt. Nachrichten, die Agenten speichern, gehen an dein Honcho-Konto.",
+  "marketplace.plugin.honcho.app":
+    "Langzeitgedächtnis in deinen Honcho-Workspaces über einen MCP-Server speichern und abfragen.",
+  "marketplace.plugin.honcho.prompt.recall":
+    "Frag Honcho, bevor wir anfangen, was es darüber weiß, wie ich gern arbeite.",
+  "marketplace.plugin.honcho.prompt.save": "Speichere die Entscheidungen aus diesem Thread in Honcho.",
+  "marketplace.plugin.honcho.prompt.preferences":
+    "Was sagt Honcho über meinen Schreibstil? Nutze es für diesen Entwurf.",
+  "marketplace.plugin.honcho.hint.apiKey": "Erstelle einen Schlüssel auf app.honcho.dev.",
+  "marketplace.plugin.hindsight.tagline": "Ein Gedächtnis, das mit der Zeit lernt",
+  "marketplace.plugin.hindsight.description":
+    "Hindsight von Vectorize gibt Agenten ein Langzeitgedächtnis in Hindsight Cloud. Agenten behalten Fakten und Ereignisse, rufen sie nach Bedeutung, Zeit und Entität ab und reflektieren darüber, um mentale Modelle zu bilden. Erinnerungen liegen in Banks, und Agenten können für jedes Projekt oder jede Person eine Bank anlegen. OpenBot-Agenten haben auch ihr eigenes Gedächtnis; Hindsight ist das Gedächtnis, das andere verbundene KI-Tools teilen können. Was Agenten behalten, geht an dein Hindsight-Cloud-Konto.",
+  "marketplace.plugin.hindsight.app":
+    "Erinnerungen in deinen Hindsight-Cloud-Banks über einen MCP-Server behalten, abrufen und reflektieren.",
+  "marketplace.plugin.hindsight.prompt.recall":
+    "Ruf aus Hindsight ab, was wir über dieses Projekt wissen, bevor wir anfangen.",
+  "marketplace.plugin.hindsight.prompt.retain":
+    "Behalte die Entscheidungen und offenen Fragen aus diesem Thread in Hindsight.",
+  "marketplace.plugin.hindsight.prompt.reflect":
+    "Reflektiere über meine Hindsight-Erinnerungen: Welche Muster siehst du in meiner Arbeit im letzten Monat?",
+  "marketplace.plugin.hindsight.hint.apiKey": "Erstelle einen Schlüssel auf der Seite Connect in Hindsight Cloud.",
   "marketplace.plugin.figma.tagline": "Designs und Prototypen",
   "marketplace.plugin.figma.description":
     "Mit Figma lesen Agenten Designdateien, prüfen Komponenten, Stile und Variablen und übergeben Produktionsspezifikationen an Entwickler. Es verbindet sich mit dem MCP-Server in der Figma-Desktop-App auf diesem Computer. Der Server kann Designs nur lesen; Schreibunterstützung ist in Arbeit.",
@@ -230,6 +262,16 @@ export const messages = {
     "Erstelle mit Higgsfield ein Produktfoto einer Keramiktasse auf einem Holztisch.",
   "marketplace.plugin.higgsfield.prompt.clip":
     "Erstelle mit Higgsfield ein 5-Sekunden-Video von Wellen bei Sonnenuntergang.",
+  "marketplace.plugin.sunra.tagline": "KI-Bilder, -Videos, -Audio und 3D",
+  "marketplace.plugin.sunra.description":
+    "Sunra lässt Agenten Bilder, Videos, Audio und 3D-Modelle mit Modellen wie GPT Image, Nano Banana, Seedream, FLUX, Seedance, Kling und Veo erzeugen, das Guthaben an Credits prüfen und die Ergebnisse abrufen. Ergebnisse landen in einem Projekt im Sunra-Konto des Nutzers. Jeder Nutzer meldet sich im Browser bei seinem eigenen Sunra-Konto an. Sunra nennt zuerst die Kosten jeder Generierung und verbraucht Credits dieses Kontos erst nach der Bestätigung.",
+  "marketplace.plugin.sunra.app":
+    "Bild-, Video-, Audio- und 3D-Generierung, Credits und Ergebnisse über den MCP-Server von Sunra mit Anmeldung im Browser.",
+  "marketplace.plugin.sunra.prompt.balance": "Wie viele Sunra-Credits habe ich?",
+  "marketplace.plugin.sunra.prompt.poster":
+    "Erstelle mit Sunra ein Poster von einem Nachtmarkt im Regen, im Hochformat.",
+  "marketplace.plugin.sunra.prompt.clip":
+    "Erstelle mit Sunra ein 5-Sekunden-Video von einem Papierboot auf einem Fluss. Nenne mir zuerst die Kosten.",
   "marketplace.plugin.elevenlabs.tagline": "Sprache, Stimmen und Sprachagenten",
   "marketplace.plugin.elevenlabs.description":
     "Mit ElevenLabs wandeln Agenten Text in Sprache um, arbeiten mit Stimmen und erstellen, testen und prüfen ElevenLabs-Sprachagenten und ihre Gespräche. Erzeugtes Audio kommt als kurzlebiger Download-Link zurück. Jeder Benutzer meldet sich im Browser bei seinem eigenen ElevenLabs-Konto an, und jede Erzeugung verbraucht Credits dieses Kontos.",
@@ -388,16 +430,34 @@ export const messages = {
     "Wie viele Kontakte sind im VIP-Segment, und wie hat es sich diesen Monat verändert?",
   "marketplace.plugin.omnisend.prompt.draftCampaign":
     "Entwirf eine Kampagne für die neue Kollektion, aber sende sie nicht.",
-  "marketplace.plugin.composio.tagline": "Viele Apps über deinen eigenen Composio-Link",
+  "marketplace.plugin.postiz.tagline": "Social-Media-Planung",
+  "marketplace.plugin.postiz.description":
+    "Mit Postiz können Agenten deine Social-Media-Kanäle auflisten und Beiträge auf über 30 Netzwerken wie X, LinkedIn, Instagram und TikTok entwerfen, planen und veröffentlichen. Agenten können auch Medien hochladen und KI-Bilder und -Videos erstellen. Melde dich im Browser bei deinem Postiz-Konto an oder füge den API-Schlüssel aus Settings › Developers in Postiz ein. Alle Postiz-Cloud-Tarife enthalten API-Zugriff. Agenten können einen Beitrag sofort veröffentlichen, also prüfe jeden Beitrag, bevor du ihn genehmigst.",
+  "marketplace.plugin.postiz.app":
+    "Kanäle, Entwürfe, geplante Beiträge und Medien über den MCP-Server von Postiz mit Anmeldung im Browser oder einem API-Schlüssel.",
+  "marketplace.plugin.postiz.prompt.channels": "Welche Social-Media-Kanäle sind mit Postiz verbunden?",
+  "marketplace.plugin.postiz.prompt.week": "Welche Beiträge sind für nächste Woche geplant?",
+  "marketplace.plugin.postiz.prompt.draft":
+    "Entwirf einen LinkedIn-Beitrag zu unserem neuen Release, aber plane ihn nicht ein.",
+  "marketplace.plugin.trypost.tagline": "Social-Media-Planung",
+  "marketplace.plugin.trypost.description":
+    "Mit TryPost können Agenten deine verbundenen Kanäle auflisten und Beiträge auf X, LinkedIn, Instagram, Facebook, TikTok, YouTube, Threads, Bluesky, Mastodon, Pinterest und weiteren Netzwerken entwerfen, planen, in die Warteschlange stellen und veröffentlichen. Agenten können auch Statistiken lesen, Ideen und Freigaben verwalten und Veröffentlichungszeiten festlegen. Melde dich im Browser bei deinem TryPost-Konto an und wähle einen Workspace. Agenten können einen Beitrag sofort veröffentlichen, prüfe also jeden Beitrag, bevor du ihn genehmigst.",
+  "marketplace.plugin.trypost.app":
+    "Kanäle, Beiträge, Warteschlange, Ideen und Statistiken über den MCP-Server von TryPost mit Anmeldung im Browser.",
+  "marketplace.plugin.trypost.prompt.week": "Welche Beiträge sind für diese Woche geplant?",
+  "marketplace.plugin.trypost.prompt.draft":
+    "Entwirf einen LinkedIn-Beitrag zu unserem neuen Release, aber plane ihn nicht ein.",
+  "marketplace.plugin.trypost.prompt.analytics":
+    "Welche meiner Beiträge vom letzten Monat hatten das meiste Engagement?",
+  "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub und über 1.000 weitere Apps",
   "marketplace.plugin.composio.description":
-    "Composio verbindet Agenten über einen MCP-Server mit Gmail, Slack, GitHub und Hunderten weiterer Apps. Verbinde die gewünschten Apps in deinem Composio-Konto und füge dann hier seine MCP-URL und seinen API-Schlüssel ein.",
+    "Composio verbindet deine Agenten über einen MCP-Server mit Gmail, Slack, GitHub und über 1.000 weiteren Apps. Melde dich mit deinem Composio-Konto an. Wenn ein Agent eine App braucht, bittet er dich, diese App zu verbinden.",
   "marketplace.plugin.composio.app":
-    "Die Apps, die du deinem Composio-MCP-Server hinzufügst, über den Link aus deinem Composio-Konto.",
+    "Die Apps, die du in deinem Composio-Konto verbindest. Ein Agent bittet dich, eine App zu verbinden, wenn er sie braucht.",
   "marketplace.plugin.composio.prompt.inbox":
     "Fasse meine ungelesenen E-Mails zusammen und entwirf Antworten auf die dringenden.",
   "marketplace.plugin.composio.prompt.handoff": "Poste eine Zusammenfassung dieses Pull Requests in unseren Teamkanal.",
   "marketplace.plugin.composio.prompt.apps": "Welche Apps und Aktionen kannst du über Composio nutzen?",
-  "marketplace.plugin.composio.hint.url": "Die URL eines MCP-Servers in deinem Composio-Konto",
   "marketplace.plugin.composio.hint.apiKey":
     "Du findest ihn in deinem Composio-Konto unter Settings > Sessions & API Key.",
   "marketplace.plugin.neon.tagline": "Postgres-Projekte, Branches und Migrationen",
@@ -519,7 +579,6 @@ export const messages = {
     "Finde einen Datensatz mit Wetter-Zeitreihen und zeig seine Spalten.",
   "marketplace.auth.apiKey": "API-Schlüssel",
   "marketplace.auth.personalApiKey": "Persönlicher API-Schlüssel",
-  "marketplace.auth.mcpUrl": "MCP-URL",
   "marketplace.auth.createKey": "Schlüssel erstellen",
   "marketplace.skill.doc": "SKILL.md",
   "marketplace.try.in": "In {name} ausprobieren",
@@ -554,6 +613,14 @@ export const messages = {
   "marketplace.skills.origin.local": "Auf diesem Computer erstellt",
   "marketplace.skills.origin.workspace": "Im Ordner dieses Agenten",
   "marketplace.skills.origin.marketplace": "Aus dem Marketplace · Version {version}",
+  "marketplace.skills.origin.github": "Von GitHub · {repository}",
+  "marketplace.skills.github.search": "Suchen oder GitHub-Link einfügen",
+  "marketplace.skills.github.reading": "Fähigkeiten im Repository werden gesucht",
+  "marketplace.skills.github.trust":
+    "OpenBot hat Fähigkeiten von GitHub nicht geprüft. Lies eine Fähigkeit, bevor du sie hinzufügst.",
+  "marketplace.skills.github.source": "GitHub · {repository} bei {commit}",
+  "marketplace.skills.github.open": "GitHub",
+  "marketplace.skills.github.openName": "{repository} auf GitHub öffnen",
   "marketplace.skills.status.notAdded": "Nicht hinzugefügt",
   "marketplace.skills.status.on": "Aktiv bei {agents}",
   "marketplace.skills.agentCount": { one: "{count} Agent", other: "{count} Agenten" },

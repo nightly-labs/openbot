@@ -1,4 +1,4 @@
-import { Button, ChevronRight } from "@openbot/ui";
+import { PageHeader, type PageHeaderParent } from "@openbot/ui/features/window/PageHeader";
 import { cx, prefersReducedMotion } from "@openbot/ui/utils";
 import { type JSX, Portal } from "@solidjs/web";
 import { createEffect, createSignal, createUniqueId, onCleanup, Show, untrack } from "solid-js";
@@ -56,7 +56,7 @@ interface SettingsDialogShellProps {
   floatingContent?: JSX.Element;
   onContentElement?: (element: HTMLElement) => void;
   restoreFocusTarget?: HTMLElement | null | undefined;
-  /** Where the settings show, or nothing while their page is not on screen. The page has no close button. */
+  /** Where the settings show, or nothing while their page is not on screen. The frame of the page owns its Close button. */
   page: SettingsPagePlacement | undefined;
 }
 
@@ -142,6 +142,12 @@ export function SaveBarDock<T>(props: SaveBarDockProps<T>) {
 export function SettingsDialogShell(props: SettingsDialogShellProps) {
   const titleId = createUniqueId();
   const descriptionId = createUniqueId();
+  /** The heading names only the open page. On a detail page, the section before it goes back to its list. */
+  const pathTitle = () => props.crumb?.title ?? props.title;
+  const pathParents = (): PageHeaderParent[] => {
+    const crumb = props.crumb;
+    return crumb ? [{ title: props.title, onSelect: crumb.back }] : [];
+  };
   const [canScrollUp, setCanScrollUp] = createSignal(false);
   const [canScrollDown, setCanScrollDown] = createSignal(false);
   let shown = untrack(() => props.open);
@@ -236,27 +242,7 @@ export function SettingsDialogShell(props: SettingsDialogShellProps) {
               <div class="settings-modal-main">
                 {/* The heading names only the open page, as a Marketplace title does; the parent before it goes back. */}
                 <Portal mount={page().path}>
-                  <div class="settings-page-path">
-                    <Show when={props.crumb}>
-                      {(crumb) => (
-                        <>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="xs"
-                            class="settings-page-path-parent"
-                            onClick={() => crumb().back()}
-                          >
-                            {props.title}
-                          </Button>
-                          <ChevronRight class="settings-page-path-separator" aria-hidden="true" />
-                        </>
-                      )}
-                    </Show>
-                    <h2 id={titleId} class="settings-page-path-current">
-                      {props.crumb?.title ?? props.title}
-                    </h2>
-                  </div>
+                  <PageHeader class="settings-page-path" title={pathTitle()} headingId={titleId} path={pathParents()} />
                 </Portal>
                 <p id={descriptionId} class="settings-page-description">
                   {props.description}

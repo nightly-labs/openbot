@@ -4,8 +4,16 @@ import type { messages as source } from "../../en/error/agent";
 export const messages = {
   "error.agent.historyUnavailable":
     "История недоступна для этого запроса. Прочитайте недавнюю историю ещё раз или используйте channel_history для работы с каналом.",
+  "error.agent.historyArgumentsInvalid":
+    "Неверные аргументы истории: {detail} Исправь аргументы и повтори попытку. openbot.tool_describe возвращает схему.",
   "error.agent.toolRequestInvalid":
     "Некорректные аргументы поиска инструментов. Используйте объявленную схему и исходное полное имя инструмента.",
+  "error.agent.toolCallArgumentsNotObject":
+    "Инструмент не запущен. В tool_call параметр arguments должен быть объектом JSON, а не текстом. Отправьте вызов снова, передав arguments как объект.",
+  "error.agent.toolCallDiscoveryTool":
+    "Инструмент не запущен. tool_call не может запускать openbot.tool_search и openbot.tool_describe. Вызовите их напрямую с теми же аргументами.",
+  "error.agent.routineScheduleArgumentsInvalid":
+    "Расписание регулярной задачи некорректно: {detail} Исправьте расписание и повторите попытку. openbot.tool_describe возвращает схему.",
   "error.agent.approvalWhileDeleting": "Нельзя дать подтверждение, пока агент удаляется.",
   "error.agent.accessLocalOnly": "Доступ агента можно изменить только на компьютере, где он работает.",
   "error.agent.duplicateCleanupFailed": "Не удалось дублировать агента, а неполную копию удалить не получилось.",
@@ -46,6 +54,8 @@ export const messages = {
     "Сейчас нет доступных моделей {provider}. Вызовите list_models, чтобы увидеть доступные модели.",
   "error.agent.reasoningEffortUnsupported":
     "Модель «{model}» не поддерживает уровень усилий «{effort}». Поддерживаются: {efforts}.",
+  "error.agent.reasoningEffortNotConfigurable":
+    "У модели «{model}» нет настройки уровня усилий, поэтому его нельзя изменить.",
   "error.agent.noStartingModelInSettings":
     "У {provider} нет доступных моделей, и у других подключённых провайдеров их тоже нет. Войдите в аккаунт провайдера или измените провайдера по умолчанию в разделе Настройки сервера → Провайдеры.",
   "error.agent.noStartingModel":
@@ -77,6 +87,10 @@ export const messages = {
   "error.agent.endpointRemoved": "Эндпоинт, который использовал этот агент, удалён. Выберите для него другую модель.",
   "error.agent.turnStalled":
     "{provider} перестал отвечать, поэтому OpenBot завершил этот ход. Отправьте сообщение ещё раз или выберите другую модель.",
+  "error.agent.toolLoopStopped":
+    "{provider} много раз повторил неудачный шаг, поэтому OpenBot остановил этот ход. Отправьте сообщение ещё раз или выберите другую модель.",
+  "error.agent.compactionConnectionLost":
+    "Соединение прервалось, пока агент сжимал контекст, поэтому задача остановилась. Проверьте подключение к интернету, затем отправьте сообщение, чтобы продолжить.",
   "error.agent.selectedGone": "Выбранного агента больше нет.",
   "error.agent.profileEndpointsChanged": "Пользовательские эндпоинты изменились во время создания. Повторите попытку.",
   "error.agent.profileInvalid": "Провайдер вернул некорректный профиль. Попробуйте изменить запрос.",

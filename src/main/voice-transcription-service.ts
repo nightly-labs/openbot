@@ -29,7 +29,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
-import { Effect, Exit, Fiber, Scope } from "effect";
+import { Effect, Exit, Fiber, Scope, Semaphore } from "effect";
 import { savedKeyError, type VoiceApiKeyStore } from "./voice-api-key-store";
 import {
   type OpenVoiceStreamSocket,
@@ -163,6 +163,8 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
   #nextRequestId = 1;
   #idleTimer: NodeJS.Timeout | null = null;
   #busy = false;
+  /** Transcriptions run one at a time: dictation and the parts of a video wait in one queue. */
+  readonly #queue = Semaphore.makeUnsafe(1);
 
   constructor(options: VoiceTranscriptionServiceOptions) {
     super();
@@ -256,50 +258,52 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
   readonly transcribe = Effect.fn("VoiceTranscription.transcribe")(
     (audio: Uint8Array): Effect.Effect<VoiceTranscriptionResult, VoiceOperationError> =>
       Effect.gen({ self: this }, function* () {
-        if (this.#busy) return yield* new VoiceOperationError({ cause: new Error(sourceText("error.voice.busy")) });
-        return yield* Effect.acquireUseRelease(
-          Effect.sync(() => {
-            this.#busy = true;
-          }),
-          () =>
-            Effect.gen({ self: this }, function* () {
-              const settings = this.#preferences.get();
-              const { modelId } = settings;
-              if (isGroqVoiceModelId(modelId)) return yield* this.#transcribeAtGroq(audio, modelId, settings.language);
-              // ElevenLabs takes a stream, not a recording.
-              if (!isLocalVoiceModelId(modelId))
-                return yield* new VoiceOperationError({
-                  cause: new Error(sourceText("error.voice.transcriptionFailed")),
-                });
-              // After the first full check in this process, this is a `stat` of each model file.
-              const modelStatus = yield* this.downloadModel(modelId);
-              if (modelStatus.phase !== "ready")
-                return yield* new VoiceOperationError({
-                  cause: new Error(modelStatus.message ?? sourceText("error.voice.modelUnavailable")),
-                });
-              const startedAt = Date.now();
-              const pcm = audio.slice(WAV_HEADER_BYTES);
-              const audioSeconds = (pcm.byteLength / BYTES_PER_SECOND).toFixed(1);
-              return yield* Effect.gen({ self: this }, function* () {
-                const text = yield* this.#request(pcm, modelId, settings.language);
-                if (text.length > INPUT_LIMITS.messageText)
-                  return yield* new VoiceOperationError({ cause: new Error("The voice transcript is too long.") });
-                logger.info(`Voice transcription of ${audioSeconds}s completed in ${Date.now() - startedAt}ms.`);
-                return { text };
-              }).pipe(
-                Effect.mapError((error) => {
-                  logger.error(
-                    `Voice transcription of ${audioSeconds}s failed after ${Date.now() - startedAt}ms.`,
-                    errorCategory(error.cause),
-                  );
-                  return new VoiceOperationError({ cause: userFacingError(error.cause) });
-                }),
-              );
-            }),
-          () =>
+        return yield* this.#queue.withPermit(
+          Effect.acquireUseRelease(
             Effect.sync(() => {
-              this.#busy = false;
+              this.#busy = true;
             }),
+            () =>
+              Effect.gen({ self: this }, function* () {
+                const settings = this.#preferences.get();
+                const { modelId } = settings;
+                if (isGroqVoiceModelId(modelId))
+                  return yield* this.#transcribeAtGroq(audio, modelId, settings.language);
+                // ElevenLabs takes a stream, not a recording.
+                if (!isLocalVoiceModelId(modelId))
+                  return yield* new VoiceOperationError({
+                    cause: new Error(sourceText("error.voice.transcriptionFailed")),
+                  });
+                // After the first full check in this process, this is a `stat` of each model file.
+                const modelStatus = yield* this.downloadModel(modelId);
+                if (modelStatus.phase !== "ready")
+                  return yield* new VoiceOperationError({
+                    cause: new Error(modelStatus.message ?? sourceText("error.voice.modelUnavailable")),
+                  });
+                const startedAt = Date.now();
+                const pcm = audio.slice(WAV_HEADER_BYTES);
+                const audioSeconds = (pcm.byteLength / BYTES_PER_SECOND).toFixed(1);
+                return yield* Effect.gen({ self: this }, function* () {
+                  const text = yield* this.#request(pcm, modelId, settings.language);
+                  if (text.length > INPUT_LIMITS.messageText)
+                    return yield* new VoiceOperationError({ cause: new Error("The voice transcript is too long.") });
+                  logger.info(`Voice transcription of ${audioSeconds}s completed in ${Date.now() - startedAt}ms.`);
+                  return { text };
+                }).pipe(
+                  Effect.mapError((error) => {
+                    logger.error(
+                      `Voice transcription of ${audioSeconds}s failed after ${Date.now() - startedAt}ms.`,
+                      errorCategory(error.cause),
+                    );
+                    return new VoiceOperationError({ cause: userFacingError(error.cause) });
+                  }),
+                );
+              }),
+            () =>
+              Effect.sync(() => {
+                this.#busy = false;
+              }),
+          ),
         );
       }).pipe(Effect.forkIn(this.#scope, { startImmediately: true }), Effect.flatMap(Fiber.join)),
   );

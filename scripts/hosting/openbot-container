@@ -54,8 +54,9 @@ rm -f /tmp/.X0-lock /tmp/.X11-unix/X0 /tmp/.X1-lock /tmp/.X11-unix/X1
 # The subshells exit at once, so tini adopts Xvfb. As a child of OpenBot, Xvfb would get the high OOM
 # value of the agent processes, and OpenBot stops when the kernel kills its display. :1 has a white
 # root (`-wr`): remote desktop shows it, and the default black root looks like no video (#3554).
+# `-noreset` keeps the arrow pointer that is set below when its last client disconnects.
 (Xvfb :0 -screen 0 1280x800x24 -nolisten tcp >/dev/null 2>&1 &)
-(Xvfb :1 -screen 0 "$(display_size "${OPENBOT_DISPLAY_SIZE:-}")x24" -nolisten tcp -wr >/dev/null 2>&1 &)
+(Xvfb :1 -screen 0 "$(display_size "${OPENBOT_DISPLAY_SIZE:-}")x24" -nolisten tcp -wr -noreset >/dev/null 2>&1 &)
 export DISPLAY=:0 OPENBOT_AGENT_DISPLAY=:1
 for display in :0 :1; do
   for _ in $(seq 1 100); do
@@ -64,6 +65,9 @@ for display in :0 :1; do
   done
   xdpyinfo -display "$display" >/dev/null 2>&1 || fail "The virtual display $display did not start."
 done
+# An empty :1 shows the default pointer of the X server, an "×", and remote desktop then looks
+# broken (#6091). An arrow is the pointer that users know.
+xsetroot -display :1 -cursor_name left_ptr || true
 
 # Each data volume makes its own keyring password on its first start. The password only lets the
 # daemon open the keyring without a person; the file is 0600. A keyring with no password file is not

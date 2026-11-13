@@ -123,10 +123,14 @@ export const messages = {
   "provider.picker.olderModels": "以前のモデル",
   "provider.picker.olderModelsList": "{name} の以前のモデル",
   "provider.picker.noModels": "{name} で利用できるモデルはありません。",
+  "provider.picker.museNoModels":
+    "Muse はこのアカウントにモデルを返しませんでした。このエージェントが動作している国では Muse を利用できない可能性があります。別のプロバイダーのモデルを選択してください。",
   "provider.picker.customEmpty":
     "OpenAI 互換のエンドポイントを追加してください。このコンピューター上のモデルサーバーでも、ベース URL とキーがあるサービスでも使えます。",
   "provider.picker.customPending":
     "エンドポイントのモデルはまだ読み込まれていません。プロバイダーは現在のタスクが止まったあとで読み込みます。",
+  "provider.picker.customUnlisted": "{name} はエンドポイントのモデルを表示していません。",
+  "provider.picker.editEndpoints": "エンドポイントを編集",
   "provider.picker.defaultModelLabel": "{name}、デフォルト",
   "provider.picker.usageLimit": "使用量の上限に達しました",
   "provider.picker.usageLimitWindow": "{window}の上限",
@@ -137,7 +141,12 @@ export const messages = {
   "provider.picker.effortLabel": "エージェントの推論の強さ",
   "provider.picker.effortFixed": "{effort}（{provider} が固定）",
   "provider.picker.fast": "高速",
-  "provider.picker.fastLabel": "高速モード",
+  "provider.picker.fastText": "応答が速く、使用量が増えます",
+  "provider.picker.speed": "速度",
+  "provider.picker.standard": "標準",
+  "provider.picker.standardText": "既定の速度",
+  "provider.picker.ultrafast": "超高速",
+  "provider.picker.ultrafastText": "最速の応答、使用量が大幅に増えます",
   "provider.picker.selectEffort": "推論の強さを選択",
   "provider.picker.custom": "カスタム",
   "provider.picker.cliReady": "{cli} 準備完了",
@@ -159,25 +168,41 @@ export const messages = {
   "provider.geminiKey.title": "Gemini API キー",
   "provider.geminiKey.description":
     "このコンピューターに Gemini API キーを保存します。保存したキーは Google アカウントの代わりに使われます。Google でサインインするには、キーを削除してから Gemini の行で「接続」を選択してください。",
+  "provider.geminiKey.descriptionHost":
+    "ホストに Gemini API キーを保存します。保存したキーは Google アカウントの代わりに使われます。Google でサインインするには、キーを削除してから Gemini の行で「接続」を選択してください。",
   "provider.geminiKey.label": "Gemini API キー",
   "provider.claudeKey.title": "Anthropic API キー",
   "provider.claudeKey.description":
     "ホストに Anthropic API キーを保存します。Anthropic は各リクエストをキーの API クレジットに請求し、Claude のプランには請求しません。エージェントで使うには、エージェントのモデルメニューで「APIキー」アカウントを選択します。Claude にサインインしていない場合、すべてのエージェントがキーを使います。",
   "provider.claudeKey.label": "Anthropic API キー",
+  "provider.cursorKey.title": "Cursor API キー",
+  "provider.cursorKey.description":
+    "2 つ目以降の Cursor アカウントは API キーを使います。Cursor ダッシュボードの Integrations でキーを作成し、ここに貼り付けてください。キーはこのコンピューターに保存されます。",
+  "provider.cursorKey.descriptionHost":
+    "2 つ目以降の Cursor アカウントは API キーを使います。Cursor ダッシュボードの Integrations でキーを作成し、ここに貼り付けてください。キーはホストに保存されます。",
+  "provider.cursorKey.label": "Cursor API キー",
   "provider.inceptionKey.title": "Inception API キー",
   "provider.inceptionKey.description":
     "Mercury モデルを使うには、このコンピューターに Inception API キーを保存します。OpenBot はダウンロードした Pi CLI でモデルを実行します。",
+  "provider.inceptionKey.descriptionHost":
+    "Mercury モデルを使うには、ホストに Inception API キーを保存します。OpenBot はダウンロードした Pi CLI でモデルを実行します。",
   "provider.inceptionKey.label": "Inception API キー",
   "provider.deepseekKey.title": "DeepSeek API キー",
   "provider.deepseekKey.description":
     "DeepSeek モデルを使うには、このコンピューターに DeepSeek API キーを保存します。OpenBot はダウンロードした Pi CLI でモデルを実行します。",
+  "provider.deepseekKey.descriptionHost":
+    "DeepSeek モデルを使うには、ホストに DeepSeek API キーを保存します。OpenBot はダウンロードした Pi CLI でモデルを実行します。",
   "provider.deepseekKey.label": "DeepSeek API キー",
   "provider.openrouterKey.title": "OpenRouter API キー",
   "provider.trustedrouterKey.title": "TrustedRouter API キー",
   "provider.openrouterKey.description":
     "OpenRouter のモデルを使うには、このコンピューターに OpenRouter API キーを保存します。OpenBot はダウンロードした Pi CLI でモデルを実行します。",
+  "provider.openrouterKey.descriptionHost":
+    "OpenRouter のモデルを使うには、ホストに OpenRouter API キーを保存します。OpenBot はダウンロードした Pi CLI でモデルを実行します。",
   "provider.trustedrouterKey.description":
     "TrustedRouter のモデルを使うには、このコンピューターに TrustedRouter API キーを保存します。OpenBot はダウンロードした Pi CLI でモデルを実行します。",
+  "provider.trustedrouterKey.descriptionHost":
+    "TrustedRouter のモデルを使うには、ホストに TrustedRouter API キーを保存します。OpenBot はダウンロードした Pi CLI でモデルを実行します。",
   "provider.openrouterKey.label": "OpenRouter API キー",
   "provider.trustedrouterKey.label": "TrustedRouter API キー",
 
@@ -221,13 +246,31 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} には使用量リセットのクレジットが残っていません。",
   "provider.account.resetUsageAlreadyRedeemed": "{name} のこのリセットのクレジットはすでに使われています。",
   "provider.account.resetUsageFailed": "{name} の使用量をリセットできませんでした。",
+  "provider.account.pool": "アカウントをプール",
+  "provider.account.poolDescription":
+    "エージェントは使用量の上限に近づくまで 1 つのアカウントを使い、その後は上限が最初にリセットされるアカウントを使います。",
+  "provider.account.inUse": "使用中",
+  "provider.account.notInPool": "プール外",
+  "provider.account.leaveOutOfPool": "プールから外す",
+  "provider.account.putBackInPool": "プールに戻す",
+  "provider.account.poolChip": "プール",
+  "provider.account.poolCount": "{accounts}のプール",
+  "provider.account.poolInUse": "{pool} · {name} を使用中",
+  "provider.settings.accountsPooledDescription":
+    "{max} 件中 {count} 件。エージェントはこれらのアカウントを共有します。",
   "provider.settings.disconnectTitle": "{name} を切断しますか？",
   "provider.settings.disconnectOthers": "{provider} を再接続するまで、ほかの {provider} アカウントは待機します。",
   "provider.settings.disconnectLocal":
     "OpenBot はこのコンピュータで {provider} からサインアウトします。ターミナルの {provider} CLI もサインアウトします。",
   "provider.settings.disconnectHost": "OpenBot はサーバーで {provider} からサインアウトします。",
+  "provider.settings.geminiKeyReplacesAccount":
+    "保存された Gemini API キーが Google のサインインの代わりに使われます。Google のプランとそのモデルを使うには、キーを削除してください。",
   "provider.settings.versionInstalledByUser": "{version} · 自分でインストール",
   "provider.settings.versionDownloaded": "{version} · OpenBot がダウンロード",
+  "provider.settings.otherVersionInstalledByUser": "未使用：{version} · 自分でインストール",
+  "provider.settings.otherVersionDownloaded": "未使用：{version} · OpenBot がダウンロード",
+  "provider.settings.useInstalledVersion": "インストール版を使う",
+  "provider.settings.useDownloadedVersion": "OpenBot 版を使う",
   "provider.settings.cache": "キャッシュ",
   "provider.settings.promptCache": "プロンプトキャッシュ",
   "provider.settings.promptCacheDescription":
@@ -239,7 +282,16 @@ export const messages = {
   "provider.settings.claudeUserSetup": "自分の Claude Code 設定を使う",
   "provider.settings.claudeUserSetupDescription":
     "エージェントは ~/.claude から CLAUDE.md、スキル、エージェント、フック、プラグインを読み込みます。オフにすると、各ターンで送るプロンプトが短くなります。ワークスペースのファイルは引き続き読み込まれます。",
+  "provider.settings.claudeUserSetupServerDescription":
+    "エージェントはサーバー上の ~/.claude から CLAUDE.md、スキル、エージェント、フック、プラグインを読み込みます。オフにすると、各ターンで送るプロンプトが短くなります。ワークスペースのファイルは引き続き読み込まれます。",
   "provider.settings.claudeUserSetupLoadFailed": "Claude Code の設定を読み込めませんでした。",
+  "provider.settings.context": "コンテキスト",
+  "provider.settings.compactWindow": "チャットを圧縮するサイズ",
+  "provider.settings.compactWindowDescription":
+    "チャットがこのサイズに達すると、Claude Code は古いターンを要約します。小さくするとターンが速く安くなります。大きくすると詳細が多く残ります。ウィンドウが小さいモデルは、その上限で圧縮します。",
+  "provider.settings.compactWindowDefault": "Claude Code の既定",
+  "provider.settings.compactWindowTokens": "{size} トークン",
+  "provider.settings.compactWindowLoadFailed": "このサーバーの圧縮サイズを読み込めませんでした。",
   "provider.settings.models": "モデル",
   "provider.settings.modelsDescription": { other: "{count} 件中 {shown} 件のモデルがモデル選択に表示されます。" },
   "provider.settings.modelsSearch": "モデルを検索",
@@ -255,4 +307,6 @@ export const messages = {
   "provider.settings.deleteOff":
     "OpenBot が {name} 用にダウンロードした CLI（{size}）を削除します。アカウント、サインイン、エージェントは残ります。",
   "provider.settings.removeDownloadFailed": "ダウンロードを削除できませんでした。",
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot はこのコンピュータで {provider} からサインアウトします。ターミナルの {provider} CLI はサインインしたままです。",
 } as const satisfies PartialTranslation<typeof source>;

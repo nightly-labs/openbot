@@ -44,11 +44,24 @@ function changePlist(file, change) {
   fs.writeFileSync(file, plist.build(value));
 }
 
-/** @param {string} output */
+/** The page that this prebuild built. Each target that needs the page gets a copy of it. */
+let builtPage = "";
+
+/**
+ * Writes the page to `output`. The share extension and the shortcuts of the app (`with-shortcuts.js`)
+ * use the same page, so one prebuild builds it once.
+ *
+ * @param {string} output
+ */
 function buildPage(output) {
+  if (builtPage && fs.existsSync(builtPage)) {
+    if (builtPage !== output) fs.copyFileSync(builtPage, output);
+    return;
+  }
   const result = spawnSync("bun", [PAGE_BUILD, output], { stdio: "inherit" });
   if (result.error) throw new Error(`The share extension page needs Bun: ${result.error.message}`);
   if (result.status !== 0) throw new Error("The share extension page did not build.");
+  builtPage = output;
 }
 
 /** @type {import('expo/config-plugins').ConfigPlugin<string>} */
@@ -146,6 +159,14 @@ const withExtensionProject = (config) =>
       group.children.push({ value: fileRef, comment: file });
       into.phase.files.push({ value: buildFile, comment: `${file} in ${into.name}` });
     }
+    // Expo sets the team of `ios.appleTeamId` on the targets that exist when its own mod runs.
+    // expo-sharing adds this target after that, so in a new project the target would have no team,
+    // and `expo run:ios` would then select a team for all targets by itself.
+    if (mod.ios?.appleTeamId) {
+      const sections = project.pbxXCBuildConfigurationSection();
+      const configurations = objects.XCConfigurationList[target.buildConfigurationList].buildConfigurations;
+      for (const { value } of configurations) sections[value].buildSettings.DEVELOPMENT_TEAM = mod.ios.appleTeamId;
+    }
     return mod;
   });
 
@@ -187,3 +208,4 @@ const withShareTarget = (config, props) => {
 };
 
 module.exports = withShareTarget;
+module.exports.buildPage = buildPage;

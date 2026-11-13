@@ -1,4 +1,5 @@
 import { feedbackSentIssue } from "@openbot/contracts/feedback";
+import { serverInstallEvent } from "@openbot/contracts/hosted-servers";
 import type { ClientAgentSummary, ConversationMessage, QueueDeliveryStatus } from "@openbot/contracts/ipc";
 import {
   AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE,
@@ -18,6 +19,7 @@ import {
   routineConversationEvent,
   routineRunConversationEvent,
   skillConversationEvent,
+  skillSuggestionEvent,
 } from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import { sourceText as englishSourceText } from "@openbot/i18n/source";
@@ -57,6 +59,7 @@ export function toAgentProfile(stored: ClientAgentSummary): AgentProfile {
     ...(stored.allowNewChat === undefined ? {} : { allowNewChat: stored.allowNewChat }),
     ...(stored.quickAcknowledgement === undefined ? {} : { quickAcknowledgement: stored.quickAcknowledgement }),
     ...(stored.fastMode === undefined ? {} : { fastMode: stored.fastMode }),
+    ...(stored.ultrafast === undefined ? {} : { ultrafast: stored.ultrafast }),
     ...(stored.ownBrowserSession === undefined ? {} : { ownBrowserSession: stored.ownBrowserSession }),
     ...(stored.browserProfileId === undefined ? {} : { browserProfileId: stored.browserProfileId }),
     ...(stored.busyMessageMode === undefined ? {} : { busyMessageMode: stored.busyMessageMode }),
@@ -128,6 +131,7 @@ export function toAgentMessage(message: ConversationMessage, ownerAgentId?: stri
     ...(message.attachments === undefined ? {} : { attachments: message.attachments }),
     ...(message.voiceRecording === undefined ? {} : { voiceRecording: message.voiceRecording }),
     ...(message.imageGeneration === undefined ? {} : { imageGeneration: message.imageGeneration }),
+    ...(message.videoGeneration === undefined ? {} : { videoGeneration: message.videoGeneration }),
     ...(message.questionPrompt === undefined ? {} : { questionPrompt: message.questionPrompt }),
     ...(message.uiBlock ? { uiBlock: message.uiBlock } : {}),
     ...(message.exchange === undefined ? {} : { exchange: message.exchange }),
@@ -258,6 +262,7 @@ export function agentProfilesEqual(left: AgentProfile, right: AgentProfile): boo
     left.allowNewChat === right.allowNewChat &&
     left.quickAcknowledgement === right.quickAcknowledgement &&
     left.fastMode === right.fastMode &&
+    left.ultrafast === right.ultrafast &&
     left.ownBrowserSession === right.ownBrowserSession &&
     left.browserProfileId === right.browserProfileId &&
     left.busyMessageMode === right.busyMessageMode &&
@@ -374,8 +379,12 @@ function chatActionMarker(
   if (skillEvent) return { ...skillEvent, kind: "skill-lifecycle", timestamp: message.createdAt };
   const suggestion = marketplaceSuggestionEvent(message);
   if (suggestion) return { kind: "marketplace-suggestion", appId: suggestion.appId, timestamp: message.createdAt };
+  const skillSuggestion = skillSuggestionEvent(message);
+  if (skillSuggestion) return { ...skillSuggestion, kind: "skill-suggestion", timestamp: message.createdAt };
   const signIn = mcpSignInEvent(message);
   if (signIn) return { kind: "mcp-sign-in", mcpServerId: signIn.mcpServerId, timestamp: message.createdAt };
+  const install = serverInstallEvent(message);
+  if (install) return { kind: "server-install", ...install, timestamp: message.createdAt };
   const issue = feedbackSentIssue(message);
   if (issue)
     return { kind: "feedback-sent", ...issue, title: feedbackSentTitle(message.text), timestamp: message.createdAt };

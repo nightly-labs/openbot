@@ -135,3 +135,18 @@ open the inventory for the file-by-file detail.
   changes: `openbot-central-auth-v1.bin` and the remote-desktop secret files are encrypted against
   the keychain entry those identify. Diff `electron-builder.yml` for `appId`, `ElectronTeamID`, and
   the `publish` block — this overlaps gate F on purpose, because one field breaks two things.
+
+## Mobile over-the-air updates
+
+A mobile over-the-air update (`bun run mobile:ota:publish`, `apps/mobile/README.md`) puts new
+JavaScript on a binary that keeps its own, older bundle. Two events run the older bundle again with
+the data that the update wrote: a rollback (`mobile:ota:rollback`), and the start after an update
+that stopped at launch. So for an update, this gate applies in both directions:
+
+- A key or file format that the update writes must be one that the bundle in the store binary reads.
+  A bumped version suffix, such as `openbot.mobile.session.v2`, is safe only when the old bundle
+  ignores it and still finds its own `v1` value.
+- Find the store bundle with the build tag: `git ls-remote --tags origin 'refs/tags/mobile-build/*'`
+  names the commit of each store build. Run the queries of this gate over `<that commit>..HEAD` for
+  `apps/mobile/src` and `packages/team-client/src`.
+- A change that fails this check goes out with a store version, not over the air.

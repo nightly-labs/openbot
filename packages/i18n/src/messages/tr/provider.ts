@@ -120,10 +120,14 @@ export const messages = {
   "provider.picker.olderModels": "Eski modeller",
   "provider.picker.olderModelsList": "Eski {name} modelleri",
   "provider.picker.noModels": "{name} sağlayıcısından kullanılabilir model yok.",
+  "provider.picker.museNoModels":
+    "Muse bu hesap için model göndermedi. Muse, bu ajanın çalıştığı ülkede kullanılamıyor olabilir. Başka bir sağlayıcıdan model seçin.",
   "provider.picker.customEmpty":
     "OpenAI uyumlu bir uç nokta ekleyin — bu bilgisayardaki bir model sunucusu veya bir temel URL ve anahtara sahip herhangi bir hizmet.",
   "provider.picker.customPending":
     "Uç noktalarınızın modelleri henüz yüklenmedi. Sağlayıcı bunları geçerli görevi durduktan sonra okur.",
+  "provider.picker.customUnlisted": "{name}, uç noktalarınızın modellerini listelemiyor.",
+  "provider.picker.editEndpoints": "Uç noktaları düzenle",
   "provider.picker.defaultModelLabel": "{name}, varsayılan",
   "provider.picker.usageLimit": "Kullanım sınırına ulaşıldı",
   "provider.picker.usageLimitWindow": "{window} sınırı",
@@ -134,7 +138,12 @@ export const messages = {
   "provider.picker.effortLabel": "Ajan akıl yürütme eforu",
   "provider.picker.effortFixed": "{effort}, {provider} tarafından sabit",
   "provider.picker.fast": "Hızlı",
-  "provider.picker.fastLabel": "Hızlı mod",
+  "provider.picker.fastText": "Daha hızlı yanıtlar, daha fazla kullanım",
+  "provider.picker.speed": "Hız",
+  "provider.picker.standard": "Standart",
+  "provider.picker.standardText": "Varsayılan hız",
+  "provider.picker.ultrafast": "Ultra hızlı",
+  "provider.picker.ultrafastText": "En hızlı yanıtlar, çok daha fazla kullanım",
   "provider.picker.selectEffort": "Efor seçin",
   "provider.picker.custom": "Özel",
   "provider.picker.cliReady": "{cli} hazır",
@@ -158,25 +167,41 @@ export const messages = {
   "provider.geminiKey.title": "Gemini API anahtarı",
   "provider.geminiKey.description":
     "Bu bilgisayara bir Gemini API anahtarı kaydedin. Kayıtlı anahtar, Google hesabınızın yerine kullanılır. Google ile oturum açmak için anahtarı kaldırın ve Gemini satırında Bağlan'ı seçin.",
+  "provider.geminiKey.descriptionHost":
+    "Ana makineye bir Gemini API anahtarı kaydedin. Kayıtlı anahtar, Google hesabınızın yerine kullanılır. Google ile oturum açmak için anahtarı kaldırın ve Gemini satırında Bağlan'ı seçin.",
   "provider.geminiKey.label": "Gemini API anahtarı",
   "provider.claudeKey.title": "Anthropic API anahtarı",
   "provider.claudeKey.description":
     'Ana bilgisayara bir Anthropic API anahtarı kaydedin. Anthropic her isteği Claude planınıza değil, anahtarın API kredisine faturalar. Bir ajan için kullanmak üzere ajanın model menüsünde "API anahtarı" hesabını seçin. Claude\'da oturum açık değilse tüm ajanlar anahtarı kullanır.',
   "provider.claudeKey.label": "Anthropic API anahtarı",
+  "provider.cursorKey.title": "Cursor API anahtarı",
+  "provider.cursorKey.description":
+    "İlkinden sonraki her Cursor hesabı bir API anahtarı kullanır. Cursor panelinde, Integrations bölümünde bir anahtar oluşturun ve buraya yapıştırın. Anahtar bu bilgisayara kaydedilir.",
+  "provider.cursorKey.descriptionHost":
+    "İlkinden sonraki her Cursor hesabı bir API anahtarı kullanır. Cursor panelinde, Integrations bölümünde bir anahtar oluşturun ve buraya yapıştırın. Anahtar ana makineye kaydedilir.",
+  "provider.cursorKey.label": "Cursor API anahtarı",
   "provider.inceptionKey.title": "Inception API anahtarı",
   "provider.inceptionKey.description":
     "Mercury modellerini kullanmak için bu bilgisayara bir Inception API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
+  "provider.inceptionKey.descriptionHost":
+    "Mercury modellerini kullanmak için ana makineye bir Inception API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
   "provider.inceptionKey.label": "Inception API anahtarı",
   "provider.deepseekKey.title": "DeepSeek API anahtarı",
   "provider.deepseekKey.description":
     "DeepSeek modellerini kullanmak için bu bilgisayara bir DeepSeek API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
+  "provider.deepseekKey.descriptionHost":
+    "DeepSeek modellerini kullanmak için ana makineye bir DeepSeek API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
   "provider.deepseekKey.label": "DeepSeek API anahtarı",
   "provider.openrouterKey.title": "OpenRouter API anahtarı",
   "provider.trustedrouterKey.title": "TrustedRouter API anahtarı",
   "provider.openrouterKey.description":
     "OpenRouter modellerini kullanmak için bu bilgisayara bir OpenRouter API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
+  "provider.openrouterKey.descriptionHost":
+    "OpenRouter modellerini kullanmak için ana makineye bir OpenRouter API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
   "provider.trustedrouterKey.description":
     "TrustedRouter modellerini kullanmak için bu bilgisayara bir TrustedRouter API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
+  "provider.trustedrouterKey.descriptionHost":
+    "TrustedRouter modellerini kullanmak için ana makineye bir TrustedRouter API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
   "provider.openrouterKey.label": "OpenRouter API anahtarı",
   "provider.trustedrouterKey.label": "TrustedRouter API anahtarı",
   "provider.openCodeKey.title": "OpenCode Go'da oturum açın",
@@ -221,13 +246,30 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} hesabında kullanım sıfırlama kredisi kalmadı.",
   "provider.account.resetUsageAlreadyRedeemed": "{name} hesabının bu sıfırlama kredisi zaten kullanıldı.",
   "provider.account.resetUsageFailed": "{name} kullanımı sıfırlanamadı.",
+  "provider.account.pool": "Hesapları havuzla",
+  "provider.account.poolDescription":
+    "Ajanlar bir hesabı kullanım sınırına yaklaşana kadar kullanır, sonra sınırı ilk sıfırlanan hesaba geçer.",
+  "provider.account.inUse": "Kullanımda",
+  "provider.account.notInPool": "Havuz dışı",
+  "provider.account.leaveOutOfPool": "Havuzdan çıkar",
+  "provider.account.putBackInPool": "Havuza geri koy",
+  "provider.account.poolChip": "Havuz",
+  "provider.account.poolCount": "{accounts} havuzu",
+  "provider.account.poolInUse": "{pool} · {name} kullanımda",
+  "provider.settings.accountsPooledDescription": "{count}/{max}. Ajanlar bu hesapları paylaşır.",
   "provider.settings.disconnectTitle": "{name} bağlantısı kesilsin mi?",
   "provider.settings.disconnectOthers": "Diğer {provider} hesapları, {provider} yeniden bağlanana kadar bekler.",
   "provider.settings.disconnectLocal":
     "OpenBot bu bilgisayarda {provider} oturumunu kapatır. Terminalinizdeki {provider} CLI oturumu da kapanır.",
   "provider.settings.disconnectHost": "OpenBot sunucuda {provider} oturumunu kapatır.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "Google oturumu yerine kayıtlı bir Gemini API anahtarı kullanılıyor. Bir Google planını ve modellerini kullanmak için anahtarı kaldır.",
   "provider.settings.versionInstalledByUser": "{version} · senin yüklediğin",
   "provider.settings.versionDownloaded": "{version} · OpenBot tarafından indirildi",
+  "provider.settings.otherVersionInstalledByUser": "Kullanılmıyor: {version} · senin yüklediğin",
+  "provider.settings.otherVersionDownloaded": "Kullanılmıyor: {version} · OpenBot tarafından indirildi",
+  "provider.settings.useInstalledVersion": "Yüklü sürümü kullan",
+  "provider.settings.useDownloadedVersion": "OpenBot sürümünü kullan",
   "provider.settings.cache": "Önbellek",
   "provider.settings.promptCache": "İstem önbelleği",
   "provider.settings.promptCacheDescription":
@@ -239,7 +281,16 @@ export const messages = {
   "provider.settings.claudeUserSetup": "Kendi Claude Code kurulumumu kullan",
   "provider.settings.claudeUserSetupDescription":
     "Ajanlar CLAUDE.md dosyanızı, becerilerinizi, ajanlarınızı, kancalarınızı ve eklentilerinizi ~/.claude klasöründen yükler. Kapalıyken her tur daha kısa bir istem gönderir. Çalışma alanı dosyaları yine yüklenir.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "Ajanlar sunucudaki ~/.claude konumundan CLAUDE.md, beceriler, ajanlar, hook’lar ve eklentileri yükler. Kapalıyken her tur daha kısa bir istem gönderir. Çalışma alanı dosyaları yine yüklenir.",
   "provider.settings.claudeUserSetupLoadFailed": "Claude Code ayarı yüklenemedi.",
+  "provider.settings.context": "Bağlam",
+  "provider.settings.compactWindow": "Sohbetleri sıkıştırma boyutu",
+  "provider.settings.compactWindowDescription":
+    "Sohbet bu boyuta ulaştığında Claude Code eski turları özetler. Düşük değer turları hızlı ve ucuz tutar. Yüksek değer daha fazla ayrıntı tutar. Daha küçük pencereli bir model kendi sınırında sıkıştırır.",
+  "provider.settings.compactWindowDefault": "Claude Code varsayılanı",
+  "provider.settings.compactWindowTokens": "{size} token",
+  "provider.settings.compactWindowLoadFailed": "Bu sunucunun sıkıştırma boyutu yüklenemedi.",
   "provider.settings.models": "Modeller",
   "provider.settings.modelsDescription": {
     one: "{count} modelden {shown} tanesi model seçicide görünür.",
@@ -258,4 +309,6 @@ export const messages = {
   "provider.settings.deleteOff":
     "OpenBot'un {name} için indirdiği CLI silinir ({size}). Hesaplar, oturumlar ve ajanlar kalır.",
   "provider.settings.removeDownloadFailed": "İndirme kaldırılamadı.",
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot bu bilgisayarda {provider} oturumunu kapatır. Terminalindeki {provider} CLI kendi oturumunu korur.",
 } as const satisfies PartialTranslation<typeof source>;

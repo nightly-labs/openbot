@@ -13,6 +13,14 @@ import {
   WORKFLOWS_GITHUB_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-github-v1";
 import {
+  WORKFLOWS_MEDIA_CAPABILITY,
+  WORKFLOWS_MEDIA_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-v1";
+import {
+  WORKFLOWS_SUNRA_CAPABILITY,
+  WORKFLOWS_SUNRA_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-sunra-v1";
+import {
   WORKFLOW_RUN_STEP_LIMIT,
   WORKFLOW_STEP_TEXT_LIMIT,
   WORKFLOWS_CAPABILITY,
@@ -46,6 +54,8 @@ import { runEventsEffect } from "./route-events";
 
 const WORKFLOW_PATHS = new Set<string>(Object.values(WORKFLOWS_ROUTES));
 const WORKFLOW_GITHUB_PATHS = new Set<string>(Object.values(WORKFLOWS_GITHUB_ROUTES));
+const WORKFLOW_MEDIA_PATHS = new Set<string>(Object.values(WORKFLOWS_MEDIA_ROUTES));
+const WORKFLOW_SUNRA_PATHS = new Set<string>(Object.values(WORKFLOWS_SUNRA_ROUTES));
 
 function workflowMissing(): never {
   throw new HttpError(404, sourceText("error.workflow.missing"));
@@ -88,7 +98,7 @@ function placeOutputs(graph: WorkflowGraph): Map<string, string> {
  * The settings of each GitHub, Discord, Telegram or Slack trigger and output, and of each output into an
  * OpenBot channel, by node. Their changes act as the host's GitHub App bot, speak in the host's Discord
  * servers, Telegram chats or Slack workspaces, or post in the host's channels, so only an owner or admin
- * can add or change one (`workflows-github-v1`).
+ * can add or change one (`workflows-github-v1`, `workflows-chats-v1`, `workflows-channels-v1`).
  */
 function adminNodes(graph: WorkflowGraph): Map<string, string> {
   const nodes = new Map<string, string>();
@@ -155,11 +165,17 @@ export async function routeWorkflows(
   const { method, url, capabilities, member, request, json, protocol } = context;
   const path = url.pathname;
   const githubPath = WORKFLOW_GITHUB_PATHS.has(path);
-  if (method !== "POST" || !(githubPath || WORKFLOW_PATHS.has(path))) return "unmatched";
+  const mediaPath = WORKFLOW_MEDIA_PATHS.has(path);
+  const sunraPath = WORKFLOW_SUNRA_PATHS.has(path);
+  if (method !== "POST" || !(githubPath || mediaPath || sunraPath || WORKFLOW_PATHS.has(path))) return "unmatched";
   if (!workflows || !capabilities.has(WORKFLOWS_CAPABILITY))
     throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
   const github = workflows.github;
   if (githubPath && (!github || !capabilities.has(WORKFLOWS_GITHUB_CAPABILITY)))
+    throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
+  if (mediaPath && !capabilities.has(WORKFLOWS_MEDIA_CAPABILITY))
+    throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
+  if (sunraPath && !capabilities.has(WORKFLOWS_SUNRA_CAPABILITY))
     throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
   // `readJson` has already run the body through the workflows wire codec.
   const body = await readJson(request);
@@ -358,6 +374,15 @@ export async function routeWorkflows(
       return json(200, await runEventsEffect(workflows.rotateWorkflowSecret(input)));
     }
   }
+  // Each member can keep a picture, as each member can send a draft. The draft id is known only to
+  // its sender.
+  if (path === WORKFLOWS_MEDIA_ROUTES.keepPicture) {
+    return json(200, { fileId: await run(workflows.keepPicture(stringField(body, "draftId"))) });
+  }
+  // Each member who can use workflows can read it: it says only whether the host has a Sunra sign-in.
+  if (path === WORKFLOWS_SUNRA_ROUTES.providers) return json(200, workflows.mediaProviders());
+  // The same members can read the credits: they spend them when they run a Sunra step.
+  if (path === WORKFLOWS_SUNRA_ROUTES.credits) return json(200, await run(workflows.mediaCredits()));
   if (!github) return "unmatched";
   switch (path) {
     case WORKFLOWS_GITHUB_ROUTES.catalog:

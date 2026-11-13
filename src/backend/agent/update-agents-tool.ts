@@ -1,9 +1,15 @@
-import { type AgentSummary, agentComputerUseEnabled, workspaceAccessEnforced } from "@openbot/contracts/ipc";
+import {
+  AGENT_PROVIDERS,
+  type AgentModelOption,
+  type AgentSummary,
+  agentComputerUseEnabled,
+  workspaceAccessEnforced,
+} from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
 import type { DynamicToolCallParams } from "../protocol";
-import { requestedRuntime, requestedToolModel } from "./model-tools";
+import { agentReasoningEffort, requestedRuntime, requestedToolModel, requireRunnableChange } from "./model-tools";
 import type { OpenBotToolRouterHooks } from "./openbot-tool-router";
 import {
   profileToolErrorMessage,
@@ -17,12 +23,12 @@ import { ToolOperationFailed, toolStep } from "./tool-operation";
 const logger = createOpenBotLogger("update-agents-tool");
 
 /** The settings of one changed agent. Instructions are left out, so a result for many agents stays small. */
-function agentSettings(agent: AgentSummary) {
+function agentSettings(agent: AgentSummary, models: AgentModelOption[]) {
   return {
     name: agent.name,
     provider: agent.provider,
     model: agent.model,
-    reasoningEffort: agent.reasoningEffort,
+    ...agentReasoningEffort(agent, models),
     // A runtime change during work applies before the next turn.
     ...(agent.pendingRuntime ? { pendingRuntime: agent.pendingRuntime } : {}),
     access: workspaceAccessEnforced(agent) ? "workspace" : "full",
@@ -44,7 +50,16 @@ export const handleUpdateAgentsTool = Effect.fn("UpdateAgentsTool.handle")(
   function* (
     params: DynamicToolCallParams,
     senderAgentId: string,
-    hooks: Pick<OpenBotToolRouterHooks, "listAgents" | "listModels" | "updateAgent" | "redactMcp">,
+    hooks: Pick<
+      OpenBotToolRouterHooks,
+      | "listAgents"
+      | "listModels"
+      | "agentModels"
+      | "providerAccounts"
+      | "providerStatuses"
+      | "updateAgent"
+      | "redactMcp"
+    >,
   ): Effect.fn.Return<OpenBotToolResponse, ToolOperationFailed> {
     const { agentIds, provider, model, reasoningEffort, access, computerUse, notifications } =
       updateAgentsToolSchema.parse(params.arguments, { reportInput: true });
@@ -55,10 +70,14 @@ export const handleUpdateAgentsTool = Effect.fn("UpdateAgentsTool.handle")(
     if (!hooks.listAgents().some((agent) => agent.id === senderAgentId)) {
       throw new Error("The calling agent no longer exists.");
     }
-    const models = hooks.listModels();
-    // A provider or model that is not listed is wrong for every agent, so the whole call fails once.
-    // An effort alone depends on each agent's model and is checked per agent.
-    if (provider !== undefined || model !== undefined) requestedToolModel(runtimeRequest, models);
+    // A provider or model that no account lists is wrong for every agent, so the whole call fails once.
+    // A model that only some accounts serve, and an effort alone, are checked per agent (#6109).
+    if (provider !== undefined || model !== undefined) {
+      const accountOnly = AGENT_PROVIDERS.flatMap((id) =>
+        (hooks.providerAccounts(id) ?? []).flatMap((account) => account.models ?? []),
+      );
+      requestedToolModel(runtimeRequest, [...hooks.listModels(), ...accountOnly]);
+    }
     const failed = (agentId: string, message: string): AgentResult => ({ agentId, ok: false, error: message });
     const failure = (agentId: string, cause: unknown) =>
       Effect.sync(() => {
@@ -74,7 +93,14 @@ export const handleUpdateAgentsTool = Effect.fn("UpdateAgentsTool.handle")(
         if (widensAgentSettings(target, access, computerUse)) {
           return failed(agentId, sourceText("error.agent.onlyUserWidensSettings"));
         }
+        // A provider change moves the agent to the new provider's own sign-in.
+        const ownProvider = provider ?? target.provider;
+        const models = hooks.agentModels({
+          provider: ownProvider,
+          providerAccountId: ownProvider === target.provider ? target.providerAccountId : undefined,
+        });
         const runtime = yield* toolStep(() => requestedRuntime(target, runtimeRequest, models));
+        yield* toolStep(() => requireRunnableChange(target, runtime, hooks.providerStatuses()));
         const updated = yield* hooks.updateAgent(
           {
             agentId,
@@ -84,7 +110,11 @@ export const handleUpdateAgentsTool = Effect.fn("UpdateAgentsTool.handle")(
           },
           senderAgentId,
         );
-        return { agentId, ok: true, ...agentSettings(updated) } satisfies AgentResult;
+        const updatedModels = hooks.agentModels({
+          provider: updated.provider,
+          providerAccountId: updated.providerAccountId,
+        });
+        return { agentId, ok: true, ...agentSettings(updated, updatedModels) } satisfies AgentResult;
       }).pipe(
         Effect.catch((error) => failure(agentId, error.cause)),
         Effect.catchDefect((defect) => failure(agentId, defect)),

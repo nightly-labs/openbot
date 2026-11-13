@@ -9,7 +9,12 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "Reatribuir a tarefa interrompida de {name}",
   "channel.stoppedTask.reassign": "Reatribuir",
   "channel.stoppedTask.cancel": "Cancelar tarefa",
+  "channel.stoppedTask.assignmentLoop":
+    "{names} passaram esta tarefa entre si vezes demais. Ela parou para evitar um loop.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "Os membros passaram esta tarefa entre si vezes demais. Ela parou para evitar um loop.",
   "channel.conversation.noMembers": "Adicione agentes nas configurações do canal para começar o trabalho.",
+  "channel.conversation.waitFull": "Aguardando - {name} começa quando uma tarefa em andamento terminar",
   "channel.conversation.archivedNotice": "Canal excluído. Somente visualização.",
   "channel.composer.label": "Mensagem para o canal",
   "channel.composer.placeholder": "Mensagem para {name}",
@@ -20,6 +25,9 @@ export const messages = {
   "channel.settings.isolated": "Manter as memórias neste canal",
   "channel.settings.isolatedDescription":
     "Os agentes guardam o que aprendem aqui como memórias do canal. As outras conversas deles não as veem.",
+  "channel.settings.browser": "Navegador",
+  "channel.settings.browserEveryone": "Todos os membros",
+  "channel.settings.browserNone": "Ninguém",
   "channel.settings.memoryCount": { one: "{count} salva", other: "{count} salvas" },
   "channel.settings.newConversation.title": "Nova conversa",
   "channel.settings.newConversation.description":

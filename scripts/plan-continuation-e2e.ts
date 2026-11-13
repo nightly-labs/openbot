@@ -15,6 +15,8 @@
 //       approval question ("Proceed?"), a real question before it, or a wait does not continue.
 //   4b. A turn with no plan continues when its answer ends on a next step or asks whether to
 //       continue, at most 2 times for one request. A long report that ends on a next step does not.
+//       A Portuguese next step ("Vou consultar o conector agora.") or a status ("I'm checking …")
+//       continues too; one that waits for the user, a later time or a send does not.
 //   5. A turn that opens a wait does not continue.
 //   6. Stop during a continuation ends the chain. The next message works.
 //   7. A message that waits in the queue stops the continuation and runs next.
@@ -501,6 +503,32 @@ try {
     return { answers: answers.length };
   });
 
+  await check("Portuguese offers, later times, sends and reported problems do not continue", async () => {
+    // A new agent, so that the long chat of the check above does not start a memory turn here.
+    const agent = await createAgent("Cuidadoso");
+    const answers = [
+      "Vou consultar o conector se você quiser.",
+      "Vou verificar depois da sua confirmação.",
+      "Vou rodar os testes amanhã.",
+      "Vou enviar o e-mail agora.",
+      "I'm running late.",
+      "Vou consultar o conector se quiser.",
+      "Vou rodar os testes depois.",
+      "Vou verificar com o time e te retorno.",
+      "I'm running into a permission error.",
+      "I'm checking with the team.",
+      "Estou vendo um erro de permissão no log.",
+    ];
+    for (const answer of answers) {
+      const mark = loggedTurns().length;
+      const id = await send(agent.id, `Check it again. ${plan({ steps: [], answer })}`);
+      assert.equal(await settled(id), "completed");
+      assert.equal(turnsSince(mark).length, 1, `No next-step turn runs after: ${answer}`);
+    }
+    assert.equal(continuationLines(agent.id).length, 0);
+    return { answers: answers.length };
+  });
+
   await check("an answer that only asks whether to continue keeps the plan going", async () => {
     const agent = await createAgent("Permission");
     const mark = loggedTurns().length;
@@ -566,6 +594,32 @@ try {
       "The last answer shows.",
     );
     return { turns: turns.length };
+  });
+
+  await check("a Portuguese next step or a status of running work continues", async () => {
+    const agent = await createAgent("Consultor");
+    const answers = [
+      "Vou consultar o conector agora.",
+      "Estou consultando o conector do Drive.",
+      "Consultando o conector…",
+      "I'm checking the connector now.",
+      "Let me query the connector.",
+      "Deixa eu dar uma olhada no conector.",
+    ];
+    for (const answer of answers) {
+      const mark = loggedTurns().length;
+      const id = await send(
+        agent.id,
+        `Read the sheet. ${plan({ steps: [], answer }, { steps: [], answer: "A planilha tem 3 linhas." })}`,
+      );
+      assert.equal(await settled(id), "completed");
+      assert.deepEqual(
+        turnsSince(mark).map((turn) => turn.note),
+        [false, true],
+        `One next-step continuation turn runs after: ${answer}`,
+      );
+    }
+    return { answers: answers.length };
   });
 
   await check("a request with no plan continues at most 2 times for a next step", async () => {

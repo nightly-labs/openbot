@@ -1,4 +1,10 @@
-import type { AgentDefaultKey, AgentDefaults, ClientAgentSummary } from "@openbot/contracts/ipc";
+import type {
+  AgentDefaultChoice,
+  AgentDefaultKey,
+  AgentDefaultSetting,
+  AgentDefaults,
+  ClientAgentSummary,
+} from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Alert,
@@ -31,12 +37,6 @@ import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { AutomationLimitRow } from "./AutomationLimitRow";
 import { PlanStartRow } from "./PlanStartRow";
-
-/** A setting of the Agents tab: the three account defaults, and "Steer agents while they work". */
-export type AgentDefaultSetting = AgentDefaultKey | "busyMessageMode";
-
-/** What one agent does for a setting: follow the default, or its own value. */
-export type AgentDefaultChoice = "default" | "on" | "off";
 
 const CHOICES: AgentDefaultChoice[] = ["default", "on", "off"];
 
@@ -129,6 +129,8 @@ export interface SettingsAgentsTabProps {
   steer: boolean;
   /** The open setting, or null for the list of settings. */
   setting: AgentDefaultSetting | null;
+  /** Where the agents run, for the text of the local script limit. Missing: this computer. */
+  scope?: "computer" | "server";
   /** The dialog element that the menus portal into. */
   menuMount: HTMLElement | undefined;
   onOpen: (setting: AgentDefaultSetting) => void;
@@ -137,12 +139,14 @@ export interface SettingsAgentsTabProps {
   onPlanStartChange: (value: number | null) => void;
   /** Sets how many messages and routine runs local scripts can send each agent in one hour. */
   onAutomationLimitChange: (value: number) => void;
+  /** Turns the OpenBot co-author line of the agents' git commits on or off, for all agents. */
+  onCommitCoAuthorChange: (on: boolean) => void;
   /** Gives `choice` to each agent of `agentIds`. */
   onChoiceChange: (agentIds: readonly string[], setting: AgentDefaultSetting, choice: AgentDefaultChoice) => void;
 }
 
 /**
- * Settings › Agents, in the design of Server settings › Roles. The list has one row for each
+ * Server Settings › Agents, in the design of Server settings › Roles. The list has one row for each
  * setting, with the agents that have it on. A setting page has its default, and each agent with a
  * menu and Set all. An agent with no value of its own follows the default.
  */
@@ -213,6 +217,19 @@ export function SettingsAgentsTab(props: SettingsAgentsTabProps) {
             );
           }}
         </For>
+      </ItemGroup>
+    </SettingsSection>
+  );
+
+  const commitSection = () => (
+    <SettingsSection title={t("settings.commitCoAuthor.sectionTitle")}>
+      <ItemGroup class="settings-modal-card">
+        <SwitchField
+          checked={props.defaults.commitCoAuthor}
+          onChange={props.onCommitCoAuthorChange}
+          label={t("settings.commitCoAuthor.title")}
+          description={t("settings.commitCoAuthor.description")}
+        />
       </ItemGroup>
     </SettingsSection>
   );
@@ -338,7 +355,11 @@ export function SettingsAgentsTab(props: SettingsAgentsTabProps) {
         <Show when={setting === "allowAutomation"}>
           <SettingsSection
             title={t("settings.automationLimit.sectionTitle")}
-            description={t("settings.automationLimit.sectionDescription")}
+            description={t(
+              props.scope === "server"
+                ? "settings.automationLimit.sectionDescriptionServer"
+                : "settings.automationLimit.sectionDescription",
+            )}
           >
             <ItemGroup class="settings-modal-card">
               <AutomationLimitRow
@@ -356,7 +377,16 @@ export function SettingsAgentsTab(props: SettingsAgentsTabProps) {
   return (
     <>
       {loadError()}
-      <Show when={props.setting} fallback={list()} keyed>
+      <Show
+        when={props.setting}
+        fallback={
+          <>
+            {list()}
+            {commitSection()}
+          </>
+        }
+        keyed
+      >
         {(setting) => settingPage(setting)}
       </Show>
     </>

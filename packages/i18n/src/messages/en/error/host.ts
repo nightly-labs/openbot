@@ -22,6 +22,7 @@ export const messages = defineMessages("error.host", {
   "error.host.noServer": "This computer has no server to change.",
   "error.host.identityLocalOnly": "The server name and logo can only be changed on the computer that runs it.",
   "error.host.timezoneInvalid": "This timezone is not known.",
+  "error.host.turnLimitInvalid": "This thread limit is not valid.",
   "error.host.maintenanceInterrupted":
     "Interrupted host maintenance. Verify the application and reset host state before retrying.",
   "error.host.updateFailed":

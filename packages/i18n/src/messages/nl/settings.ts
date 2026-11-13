@@ -16,6 +16,12 @@ export const messages = {
     "Toon het vervaagde bureaublad achter het venster. Websites en menu’s gebruiken dan het thema van de app.",
   "settings.interfaceSize.title": "Interfacegrootte",
   "settings.interfaceSize.description": "De grootte van tekst en bedieningselementen in OpenBot.",
+  "settings.interfaceFont.title": "Lettertype van de interface",
+  "settings.interfaceFont.description": "Het lettertype van menu's, chats en instellingen.",
+  "settings.interfaceFont.default": "Standaard (Inter)",
+  "settings.codeFont.title": "Lettertype voor code",
+  "settings.codeFont.description": "Het lettertype van code, terminals en bestandspaden.",
+  "settings.codeFont.default": "Standaard",
   "settings.logoColor.title": "Logokleur",
   "settings.logoColor.description": "Te zien in het Dock, de taakbalk en het Dynamic Island.",
   "settings.logoColor.buildNote": "Deze build houdt een eigen logokleur. De keuze geldt voor de release-app.",
@@ -90,6 +96,8 @@ export const messages = {
   "settings.externalLinks.fallback.description": "De link is in de standaardbrowser geopend.",
   "settings.sendShortcut.title": "Sneltoets voor verzenden",
   "settings.sendShortcut.description": "Kies de toetsen die een bericht verzenden op dit apparaat en in deze browser.",
+  "settings.chatOrder.description":
+    "Kies waar de zijbalk ongelezen chats op dit apparaat toont. Handmatig zet de groep Ongelezen uit.",
   "settings.sendShortcut.enter": "Enter verstuurt",
   "settings.sendShortcut.modEnterMac": "⌘Enter verstuurt",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter verstuurt",
@@ -118,6 +126,10 @@ export const messages = {
   "settings.agentDefaults.setAllLabel": "Stel {setting} in voor alle agents",
   "settings.agentDefaults.agentLabel": "{setting} voor {agent}",
   "settings.agentDefaults.loadFailed": "De agents konden niet worden gelezen.",
+  "settings.commitCoAuthor.sectionTitle": "Git-commits",
+  "settings.commitCoAuthor.title": "OpenBot vermelden in commits",
+  "settings.commitCoAuthor.description":
+    "Agents voegen OpenBot toe als co-auteur van hun commits. Jij blijft de auteur.",
   "settings.planStart.title": "Het werk starten",
   "settings.planStart.wait": "Als ik op Starten druk",
   "settings.planStart.after": "Na {time}",
@@ -135,6 +147,7 @@ export const messages = {
   "settings.planStart.set": "Instellen",
   "settings.automationLimit.sectionTitle": "Limiet",
   "settings.automationLimit.sectionDescription": "Dit geldt voor alle agents op deze computer.",
+  "settings.automationLimit.sectionDescriptionServer": "Dit geldt voor alle agents op deze server.",
   "settings.automationLimit.title": "Verzoeken per uur",
   "settings.automationLimit.option": "{limit} per uur",
   "settings.automationLimit.note":
@@ -197,8 +210,15 @@ export const messages = {
   "settings.soundTheme.play": "{name} afspelen",
   "settings.notch.title": "Gedrag",
   "settings.notch.show.title": "Toon status in de notch van de MacBook",
+  "settings.notch.show.titleTopOfScreen": "Toon status bovenaan het scherm",
   "settings.notch.show.description":
     "Toon activiteit van agents en items die aandacht nodig hebben bovenaan elk scherm.",
+  "settings.notch.xwayland.title": "Herstart nodig",
+  "settings.notch.xwayland.description":
+    "Onder Wayland moet OpenBot XWayland gebruiken om het Dynamic Island boven andere apps te tonen. Tot dan is het eiland niet te zien.",
+  "settings.notch.xwayland.unsupported":
+    "Onder Wayland zonder XWayland kan het Dynamic Island niet boven andere apps staan.",
+  "settings.notch.xwayland.restart": "Herstarten",
   "settings.notch.idle.title": "Toon inactief eiland",
   "settings.notch.idle.description": "Toon het OpenBot-logo en een begroeting wanneer er geen status actief is.",
   "settings.notch.displays.title": "Toon op extra schermen",
@@ -224,6 +244,12 @@ export const messages = {
     "‘Boven andere apps’ houdt het dock in beeld als OpenBot op de achtergrond is.",
   "settings.agentDock.placement.screen": "Boven andere apps",
   "settings.agentDock.placement.window": "In het OpenBot-venster",
+  "settings.agentDock.xwayland.title": "Herstart nodig",
+  "settings.agentDock.xwayland.description":
+    "Onder Wayland moet OpenBot XWayland gebruiken om het dock boven andere apps te tonen. Tot dan staat het dock in het OpenBot-venster.",
+  "settings.agentDock.xwayland.unsupported":
+    "Onder Wayland zonder XWayland kan het dock niet boven andere apps staan. Het staat in het OpenBot-venster.",
+  "settings.agentDock.xwayland.restart": "Herstarten",
   "settings.agentDock.display.title": "Scherm",
   "settings.agentDock.display.description":
     "Als dat scherm niet is aangesloten, gaat het dock naar het scherm van het OpenBot-venster.",
@@ -236,11 +262,20 @@ export const messages = {
   "settings.agentDock.edge.description": "Sleep het dock omhoog of omlaag om het langs de rand te verplaatsen.",
   "settings.agentDock.edge.right": "Rechts",
   "settings.agentDock.edge.left": "Links",
+  "settings.agentDock.size.title": "Dockgrootte",
+  "settings.agentDock.size.description":
+    "Sleep om de grootte van de dock boven andere apps te wijzigen. In het hoofdvenster volgt de dock de interfacegrootte.",
   "settings.agentDock.autoHide.title": "Verbergen als het niet wordt gebruikt",
   "settings.agentDock.autoHide.description":
     "Het dock schuift in de rand. Beweeg de aanwijzer naar de rand om het te tonen.",
+  "settings.agentDock.edgeStrip.title": "Een strook aan de rand tonen",
+  "settings.agentDock.edgeStrip.description":
+    "Een smalle strook blijft waar het dock verdwijnt. Beweeg de aanwijzer ernaartoe om het dock te tonen. Een kleurgolf gaat door de strook als een agent je iets vraagt.",
   "settings.agentDock.results.title": "Klaar werk tonen",
   "settings.agentDock.results.description": "Resultaten van agents verschijnen kort naast het dock.",
+  "settings.agentDock.activeSeats.title": "Agents met nieuws tonen",
+  "settings.agentDock.activeSeats.description":
+    "Een agent of kanaal dat niet in het dock staat, verschijnt erin zolang het een nieuw bericht heeft of op je wacht.",
   "settings.agentDock.agents.title": "Agents in het dock",
   "settings.agentDock.agents.description": "De agents van {server}. Elke server heeft een eigen dock.",
   "settings.agentDock.agents.empty": "Deze server heeft nog geen agents.",
@@ -488,6 +523,7 @@ export const messages = {
   "settings.updates.status.ready": "{target} is klaar. Start opnieuw om toe te passen.",
   "settings.updates.status.installing": "Opnieuw starten om {target} toe te passen…",
   "settings.updates.status.upToDate": "OpenBot is up-to-date op het kanaal Stabiel.",
+  "settings.updates.status.staged": "{target} wordt gefaseerd uitgerold. Zoek naar updates om het nu te krijgen.",
   "settings.updates.status.checkFailed": "OpenBot kan niet controleren op updates. Probeer het opnieuw.",
   "settings.updates.status.unsupported": "Updates zijn niet beschikbaar in deze build.",
   "settings.updates.actionFailed": "Kan OpenBot niet bijwerken.",
@@ -634,6 +670,8 @@ export const messages = {
   "settings.voice.speech.codexLive.title": "Codex live spraak",
   "settings.voice.speech.codexLive.description":
     "Spraakgesprekken met elke agent gebruiken live spraak van OpenAI met je Codex-aanmelding. Je stem, je verzoeken en de antwoorden van de agent gaan naar OpenAI.",
+  "settings.voice.speech.codexLive.serverDescription":
+    "Spraakgesprekken met elke agent gebruiken live spraak van OpenAI met de Codex-aanmelding van de server. Je stem, je verzoeken en de antwoorden van de agent gaan naar OpenAI.",
   "settings.voice.speech.speed.title": "Snelheid",
   "settings.voice.speech.voice.title": "Stem",
   "settings.voice.speech.voice.female": "Vrouwenstem {number}",
@@ -654,8 +692,6 @@ export const messages = {
   "settings.transfer.old.text": "Bewaar de agents en serverinstellingen ervan in een bestand.",
   "settings.transfer.new.title": "Importeer in deze server",
   "settings.transfer.new.text": "Voeg de agents en serverinstellingen uit een bestand toe.",
-  "settings.transfer.notMoved":
-    "API-sleutels, aanmeldingen, connectors, app-voorkeuren en chatgeschiedenis worden niet verplaatst. Stel ze opnieuw in op de nieuwe server.",
   "settings.transfer.back": "Terug",
   "settings.transfer.loading": "Je agents lezen…",
   "settings.transfer.summary.label": "Wat het bestand bevat",
@@ -665,12 +701,26 @@ export const messages = {
   "settings.transfer.count.noSettings": "Geen serverinstellingen",
   "settings.transfer.includeAgent": "{name} meenemen",
   "settings.transfer.export.title": "Exporteer deze server",
-  "settings.transfer.export.files": "Neem werkruimtebestanden mee",
-  "settings.transfer.export.filesDescription":
-    "Bestanden die je agents hebben gemaakt, en de map Shared. Zet uit voor een klein bestand.",
-  "settings.transfer.export.settings": "Neem serverinstellingen mee",
+  "settings.transfer.preset.label": "Wat er in het bestand komt",
+  "settings.transfer.preset.templates": "Sjablonen",
+  "settings.transfer.preset.everything": "Alles",
+  "settings.transfer.meter.files": "van {total} aan werkruimtebestanden",
+  "settings.transfer.part.agents": "Agents en hun inrichting",
+  "settings.transfer.part.agentsDescription": "{contents}. Altijd in het bestand.",
+  "settings.transfer.part.settings": "Serverinstellingen",
+  "settings.transfer.part.chats": "Chatgeschiedenis",
+  "settings.transfer.part.chatsDescription":
+    "De chats en zijthreads met hun bestanden, en de rungeschiedenis van de routines. De agents zetten deze chats voort met hun context.",
+  "settings.transfer.part.channels": "Kanaalberichten",
+  "settings.transfer.part.channelsDescription":
+    "De berichten van de kanalen waarin de geëxporteerde agents zitten, met hun bestanden en de rungeschiedenis van de kanaalroutines.",
+  "settings.transfer.part.files": "Werkruimtebestanden",
+  "settings.transfer.part.filesDescription": "Bestanden die je agents hebben gemaakt, en de map Shared.",
+  "settings.transfer.part.preferences": "Servervoorkeuren",
+  "settings.transfer.part.preferencesDescription":
+    "Naam, logo, tijdzone, persoonlijkheid, standaarden voor agents, modelkeuzes, instellingen voor herinneringen en vaardigheden, en de meldingsniveaus en vastgezette items van elke persoon.",
   "settings.transfer.export.settingsDescription":
-    "MCP-servers, aangepaste modelaanbieders, zijbalkonderdelen en routineflows.",
+    "MCP-servers, aangepaste modelaanbieders, zijbalkonderdelen, routineflows en gedeelde vaardigheden.",
   "settings.transfer.export.chooseAgents": "Kies agents ({selected} van {total})",
   "settings.transfer.export.hideAgents": "Verberg agents",
   "settings.transfer.export.agentsLabel": "Agents om te exporteren",
@@ -698,8 +748,11 @@ export const messages = {
   "settings.transfer.import.agentsLabel": "Agents in het bestand",
   "settings.transfer.import.nameExists": "Naam al in gebruik",
   "settings.transfer.import.settings": "Importeer serverinstellingen",
-  "settings.transfer.import.settingsDescription":
-    "Voegt de MCP-servers, aangepaste modelaanbieders en zijbalkonderdelen toe die deze server nog niet heeft.",
+  "settings.transfer.import.settingsAndPreferences":
+    "Voegt de MCP-servers, aangepaste modelaanbieders, zijbalkonderdelen en gedeelde vaardigheden toe die deze server nog niet heeft.",
+  "settings.transfer.import.preferences": "Servervoorkeuren importeren",
+  "settings.transfer.import.preferencesDescription":
+    "Vervangt de naam, het logo en de voorkeuren van deze server, en de meldingsniveaus en vastgezette items van elke persoon, door die uit het bestand.",
   "settings.transfer.import.submit": { one: "Importeer {count} agent", other: "Importeer {count} agents" },
   "settings.transfer.import.submitSettings": "Importeer serverinstellingen",
   "settings.transfer.import.importing": "Importeren…",
@@ -712,4 +765,26 @@ export const messages = {
   "settings.transfer.result.signInButton": "Log in bij {provider}",
   "settings.transfer.result.notImported": "Niet geïmporteerd",
   "settings.transfer.result.warnings": "Controleer deze",
+  "settings.transfer.copy.tileTitle": "Kopiëren naar een andere server",
+  "settings.transfer.copy.tileText": "Stuur agents naar een andere server van je.",
+  "settings.transfer.copy.title": "Agents naar een andere server kopiëren",
+  "settings.transfer.copy.from": "Van",
+  "settings.transfer.copy.to": "Naar",
+  "settings.transfer.copy.chooseServer": "Kies een server",
+  "settings.transfer.copy.search": "Agents zoeken",
+  "settings.transfer.copy.agentsOn": "Agents op {server}",
+  "settings.transfer.copy.all": { one: "Alle {count} agent", other: "Alle {count} agents" },
+  "settings.transfer.copy.noAgents": "Deze server heeft geen agents.",
+  "settings.transfer.copy.new": "Nieuw",
+  "settings.transfer.copy.notCopied":
+    "Hun kanalen en de map Shared worden ook gekopieerd. API-sleutels, aanmeldingen, connectors en chatgeschiedenis worden niet gekopieerd. Stel ze opnieuw in op de andere server.",
+  "settings.transfer.copy.submit": { one: "Kopieer {count} agent", other: "Kopieer {count} agents" },
+  "settings.transfer.copy.copying": "Kopiëren…",
+  "settings.transfer.copy.done": {
+    one: "{count} agent gekopieerd naar {server}.",
+    other: "{count} agents gekopieerd naar {server}.",
+  },
+  "settings.transfer.copy.open": "Open {server}",
+  "settings.transfer.copy.loadFailed": "De agents konden niet worden gelezen",
+  "settings.transfer.copy.failed": "Het kopiëren is niet voltooid",
 } as const satisfies PartialTranslation<typeof source>;

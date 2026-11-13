@@ -9,7 +9,12 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "Réattribuer la tâche arrêtée de {name}",
   "channel.stoppedTask.reassign": "Réattribuer",
   "channel.stoppedTask.cancel": "Annuler la tâche",
+  "channel.stoppedTask.assignmentLoop":
+    "{names} se sont passé cette tâche trop de fois. Elle a été arrêtée pour éviter une boucle.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "Les membres se sont passé cette tâche trop de fois. Elle a été arrêtée pour éviter une boucle.",
   "channel.conversation.noMembers": "Ajoutez des agents dans les réglages du canal pour commencer le travail.",
+  "channel.conversation.waitFull": "En attente – {name} commence quand une tâche en cours se termine",
   "channel.conversation.archivedNotice": "Canal supprimé. Aperçu uniquement.",
   "channel.composer.label": "Message au canal",
   "channel.composer.placeholder": "Message à {name}",
@@ -20,6 +25,9 @@ export const messages = {
   "channel.settings.isolated": "Garder les souvenirs dans ce canal",
   "channel.settings.isolatedDescription":
     "Les agents enregistrent ce qu’ils apprennent ici comme souvenirs du canal. Leurs autres discussions ne les voient pas.",
+  "channel.settings.browser": "Navigateur",
+  "channel.settings.browserEveryone": "Tous les membres",
+  "channel.settings.browserNone": "Personne",
   "channel.settings.memoryCount": { one: "{count} enregistré", other: "{count} enregistrés" },
   "channel.settings.newConversation.title": "Nouvelle conversation",
   "channel.settings.newConversation.description":

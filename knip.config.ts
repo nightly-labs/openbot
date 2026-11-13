@@ -23,6 +23,11 @@ const config: KnipConfig = {
   ignoreBinaries: [
     // Opens the interactive provider sign-in CLI on Linux.
     "xterm",
+    // Read and forget the SSH host keys of a reinstalled pool machine, and read the operator keys of the
+    // SSH agent, in `leaseweb-pool.ts`.
+    "ssh-keygen",
+    "ssh-keyscan",
+    "ssh-add",
     // Builds the remote desktop runtime.
     "cmake",
     // Rewrite and inspect macOS dylib load paths.
@@ -38,6 +43,8 @@ const config: KnipConfig = {
     "cloudflared",
     // Copies a profile database read-only for the agent threads upgrade E2E script.
     "sqlite3",
+    // Extracts the signed `.app` from a release ZIP, with its links and signature, in the release upgrade E2E script.
+    "ditto",
     // Speaks the English samples of the macOS dictation smoke test.
     "say",
     // Finds the child processes of the dev app in the channel E2E scripts.
@@ -54,6 +61,20 @@ const config: KnipConfig = {
     "vm_stat",
     // Starts a D-Bus session with a test keyring in the Linux secret storage E2E script.
     "dbus-run-session",
+    // Find Icon Composer, and make the macOS `.icns` and Dock image in `compile-macos-icon.ts`.
+    "xcode-select",
+    "sips",
+    "iconutil",
+    // Run the X11 desktop, the window manager, the compositor, the screen recording and the screenshots
+    // of the Linux agent dock and Dynamic Island E2E scripts in Docker.
+    "Xvfb",
+    "xdpyinfo",
+    "openbox",
+    "wmctrl",
+    "picom",
+    "ffmpeg",
+    "gdbus",
+    "import",
   ],
   workspaces: {
     ".": {
@@ -110,12 +131,17 @@ const config: KnipConfig = {
     "apps/site-router": {
       project: ["src/**/*.ts"],
     },
+    "apps/mobile-updates": {
+      entry: ["scripts/*.ts"],
+      project: ["src/**/*.ts", "scripts/**/*.ts"],
+    },
     "apps/mobile": {
       entry: [
         "src/app/**/*.{ts,tsx}",
         "plugins/**/*.{js,ts}",
-        // metro.config.js maps `solid-js` and `@solidjs/web` to these files by path.
-        "src/shims/*.ts",
+        // metro.config.js maps `solid-js` and `@solidjs/web` to these files by path, and gives the
+        // Uniwind component wrappers `uniwind-react-native.js` as `react-native`.
+        "src/shims/*.{ts,js}",
         // metro.config.js loads this stylesheet by path (`cssEntryFile`).
         "global.css",
         // scripts/mobile-share-sender.ts builds the share extension page from this file by path.
@@ -123,6 +149,8 @@ const config: KnipConfig = {
       ],
       project: ["src/**/*.{ts,tsx}", "plugins/**/*.{js,ts}"],
       ignoreDependencies: [
+        // Not a package: metro.config.js resolves this name to the real `react-native` for the shims.
+        "openbot-original-react-native",
         // `expo` installs it; Expo config plugins import it by this name.
         "@expo/config-plugins",
         // Expo CLI loads it as a dev tools plugin (the simulators in a browser tab); no code imports it.

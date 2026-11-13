@@ -20,6 +20,10 @@ export const messages = {
   "composer.update.manual": "Atualize {provider} no computador em que ele é executado para continuar.",
   "composer.update.pending": "Atualizando…",
   "composer.update.action": "Atualizar",
+  "composer.usageLimit.credits": "Você usou todo o limite do plano {provider}. Seus agentes agora usam seus créditos.",
+  "composer.usageLimit.creditsResets":
+    "Você usou todo o limite do plano {provider}. Seus agentes usam seus créditos até a renovação em {reset}.",
+  "composer.usageLimit.creditsTitle": "Usando créditos",
   "composer.usageLimit.resets": "Você usou todo o seu limite de {provider}. Ele será renovado em {reset}.",
   "composer.usageLimit.selectModel":
     "Você usou todo o seu limite de {provider}. Selecione outro modelo para continuar.",
@@ -78,6 +82,7 @@ export const messages = {
   "composer.placeholder.answer": "Digite sua resposta",
   "composer.add.label": "Adicionar à instrução",
   "composer.add.files": "Anexar arquivos",
+  "composer.add.teach": "Ensinar uma tarefa",
   "composer.add.skill": "Usar uma habilidade",
   "composer.upload.cancel": "Cancelar envio",
   "composer.upload.uploading": "Enviando {name}",
@@ -117,6 +122,10 @@ export const messages = {
   "composer.error.changeModel": "Não foi possível mudar de modelo. Tente novamente.",
   "composer.error.changeEffort": "Não foi possível alterar o esforço. Tente novamente.",
   "composer.error.changeFastMode": "Não foi possível alterar o modo rápido. Tente novamente.",
+  "composer.fastMode.confirmTitle": "Ativar o modo rápido?",
+  "composer.fastMode.confirmDescription":
+    "O Claude responde mais rápido, mas cada token custa mais. Com uma assinatura do Claude, o modo rápido sempre usa créditos de uso, mesmo quando o seu plano ainda tem uso disponível.",
+  "composer.fastMode.confirm": "Ativar",
   "composer.context.label": "Contexto: {percent} usado",
   "composer.context.labelEstimated": "Contexto: cerca de {percent} usado",
   "composer.context.labelCompacting": "Compactando o contexto",

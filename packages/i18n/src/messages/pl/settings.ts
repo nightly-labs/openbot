@@ -16,6 +16,12 @@ export const messages = {
     "Pokazuj rozmyty pulpit za oknem. Strony i menu używają wtedy motywu aplikacji.",
   "settings.interfaceSize.title": "Rozmiar interfejsu",
   "settings.interfaceSize.description": "Rozmiar tekstu i elementów sterujących w OpenBot.",
+  "settings.interfaceFont.title": "Czcionka interfejsu",
+  "settings.interfaceFont.description": "Czcionka menu, czatów i ustawień.",
+  "settings.interfaceFont.default": "Domyślna (Inter)",
+  "settings.codeFont.title": "Czcionka kodu",
+  "settings.codeFont.description": "Czcionka kodu, terminali i ścieżek plików.",
+  "settings.codeFont.default": "Domyślna",
   "settings.logoColor.title": "Kolor logo",
   "settings.logoColor.description": "Widoczny w Docku, na pasku zadań i w Dynamic Island.",
   "settings.logoColor.buildNote": "Ta kompilacja ma własny kolor logo. Wybór dotyczy wersji wydanej.",
@@ -90,6 +96,8 @@ export const messages = {
   "settings.sendShortcut.title": "Skrót wysyłania",
   "settings.sendShortcut.description":
     "Wybierz klawisze, które wysyłają wiadomość na tym urządzeniu i w tej przeglądarce.",
+  "settings.chatOrder.description":
+    "Wybierz, gdzie pasek boczny pokazuje nieprzeczytane czaty na tym urządzeniu. Ręcznie wyłącza grupę Nieprzeczytane.",
   "settings.sendShortcut.enter": "Enter wysyła",
   "settings.sendShortcut.modEnterMac": "⌘Enter wysyła",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter wysyła",
@@ -118,6 +126,10 @@ export const messages = {
   "settings.agentDefaults.setAllLabel": "{setting}: ustaw dla wszystkich agentów",
   "settings.agentDefaults.agentLabel": "{setting}: {agent}",
   "settings.agentDefaults.loadFailed": "Nie udało się odczytać agentów.",
+  "settings.commitCoAuthor.sectionTitle": "Commity Git",
+  "settings.commitCoAuthor.title": "Wymieniaj OpenBot w commitach",
+  "settings.commitCoAuthor.description":
+    "Agenci dodają OpenBot jako współautora swoich commitów. Ty pozostajesz autorem.",
   "settings.planStart.title": "Rozpoczęcie pracy",
   "settings.planStart.wait": "Gdy nacisnę Start",
   "settings.planStart.after": "Po {time}",
@@ -135,6 +147,7 @@ export const messages = {
   "settings.planStart.set": "Ustaw",
   "settings.automationLimit.sectionTitle": "Limit",
   "settings.automationLimit.sectionDescription": "Dotyczy wszystkich agentów na tym komputerze.",
+  "settings.automationLimit.sectionDescriptionServer": "Dotyczy wszystkich agentów na tym serwerze.",
   "settings.automationLimit.title": "Żądania na godzinę",
   "settings.automationLimit.option": "{limit} na godzinę",
   "settings.automationLimit.note":
@@ -202,7 +215,13 @@ export const messages = {
   "settings.soundTheme.play": "Odtwórz {name}",
   "settings.notch.title": "Działanie",
   "settings.notch.show.title": "Pokazuj status w wycięciu MacBooka",
+  "settings.notch.show.titleTopOfScreen": "Pokazuj status u góry ekranu",
   "settings.notch.show.description": "Pokazuj aktywność agentów i elementy wymagające uwagi u góry każdego ekranu.",
+  "settings.notch.xwayland.title": "Wymagane ponowne uruchomienie",
+  "settings.notch.xwayland.description":
+    "W Wayland OpenBot musi używać XWayland, aby pokazać Dynamic Island nad innymi aplikacjami. Do tego czasu wyspa się nie pokazuje.",
+  "settings.notch.xwayland.unsupported": "W Wayland bez XWayland Dynamic Island nie może być nad innymi aplikacjami.",
+  "settings.notch.xwayland.restart": "Uruchom ponownie",
   "settings.notch.idle.title": "Pokazuj bezczynną wyspę",
   "settings.notch.idle.description": "Pokazuj logo OpenBot i powitanie, gdy żaden status nie jest aktywny.",
   "settings.notch.displays.title": "Pokazuj na dodatkowych ekranach",
@@ -227,6 +246,12 @@ export const messages = {
     "„Nad innymi aplikacjami” zostawia dok na ekranie, gdy OpenBot działa w tle.",
   "settings.agentDock.placement.screen": "Nad innymi aplikacjami",
   "settings.agentDock.placement.window": "W oknie OpenBot",
+  "settings.agentDock.xwayland.title": "Wymagane ponowne uruchomienie",
+  "settings.agentDock.xwayland.description":
+    "W Wayland OpenBot musi używać XWayland, aby pokazać dok nad innymi aplikacjami. Do tego czasu dok jest w oknie OpenBot.",
+  "settings.agentDock.xwayland.unsupported":
+    "W Wayland bez XWayland dok nie może być nad innymi aplikacjami. Jest w oknie OpenBot.",
+  "settings.agentDock.xwayland.restart": "Uruchom ponownie",
   "settings.agentDock.display.title": "Ekran",
   "settings.agentDock.display.description":
     "Jeśli ten ekran nie jest podłączony, dok przechodzi na ekran okna OpenBot.",
@@ -239,10 +264,19 @@ export const messages = {
   "settings.agentDock.edge.description": "Przeciągnij dok w górę lub w dół, aby przesunąć go wzdłuż krawędzi.",
   "settings.agentDock.edge.right": "Prawa",
   "settings.agentDock.edge.left": "Lewa",
+  "settings.agentDock.size.title": "Rozmiar doku",
+  "settings.agentDock.size.description":
+    "Przeciągnij, aby zmienić rozmiar doku nad innymi aplikacjami. W oknie głównym dok ma rozmiar interfejsu.",
   "settings.agentDock.autoHide.title": "Ukrywaj, gdy nieużywany",
   "settings.agentDock.autoHide.description": "Dok chowa się w krawędzi. Przesuń wskaźnik do krawędzi, aby go pokazać.",
+  "settings.agentDock.edgeStrip.title": "Pokazuj pasek przy krawędzi",
+  "settings.agentDock.edgeStrip.description":
+    "Cienki pasek zostaje tam, gdzie chowa się dok. Zbliż do niego wskaźnik, aby pokazać dok. Gdy agent o coś pyta, przez pasek przechodzi fala kolorów.",
   "settings.agentDock.results.title": "Pokazuj ukończoną pracę",
   "settings.agentDock.results.description": "Wyniki agentów pojawiają się na chwilę obok doku.",
+  "settings.agentDock.activeSeats.title": "Pokazuj agentów z nowościami",
+  "settings.agentDock.activeSeats.description":
+    "Agent lub kanał spoza doku pojawia się w nim, dopóki ma nową wiadomość lub czeka na ciebie.",
   "settings.agentDock.agents.title": "Agenci w doku",
   "settings.agentDock.agents.description": "Agenci serwera {server}. Każdy serwer ma własny dok.",
   "settings.agentDock.agents.empty": "Ten serwer nie ma jeszcze agentów.",
@@ -504,6 +538,8 @@ export const messages = {
   "settings.updates.status.ready": "Gotowe: {target}. Uruchom ponownie, aby zastosować.",
   "settings.updates.status.installing": "Ponowne uruchamianie, aby zastosować: {target}…",
   "settings.updates.status.upToDate": "OpenBot jest aktualny w kanale Stabilny.",
+  "settings.updates.status.staged":
+    "{target} trafia najpierw do części komputerów. Sprawdź aktualizacje, aby pobrać tę wersję teraz.",
   "settings.updates.status.checkFailed": "OpenBot nie mógł sprawdzić aktualizacji. Spróbuj ponownie.",
   "settings.updates.status.unsupported": "Aktualizacje są niedostępne w tej kompilacji.",
   "settings.updates.actionFailed": "Nie udało się zaktualizować OpenBot.",
@@ -668,6 +704,8 @@ export const messages = {
   "settings.voice.speech.codexLive.title": "Głos na żywo Codex",
   "settings.voice.speech.codexLive.description":
     "Rozmowy głosowe z każdym agentem używają głosu na żywo OpenAI z Twoim logowaniem Codex. Twój głos, Twoje prośby i odpowiedzi agenta trafiają do OpenAI.",
+  "settings.voice.speech.codexLive.serverDescription":
+    "Rozmowy głosowe z każdym agentem używają głosu na żywo OpenAI z logowaniem Codex serwera. Twój głos, Twoje prośby i odpowiedzi agenta trafiają do OpenAI.",
   "settings.voice.speech.speed.title": "Szybkość",
   "settings.voice.speech.voice.title": "Głos",
   "settings.voice.speech.voice.female": "Głos żeński {number}",
@@ -688,8 +726,6 @@ export const messages = {
   "settings.transfer.old.text": "Zapisz agentów i ustawienia serwera w pliku.",
   "settings.transfer.new.title": "Importuj na ten serwer",
   "settings.transfer.new.text": "Dodaj agentów i ustawienia serwera z pliku.",
-  "settings.transfer.notMoved":
-    "Klucze API, logowania, konektory, preferencje aplikacji i historia czatów nie są przenoszone. Skonfiguruj je ponownie na nowym serwerze.",
   "settings.transfer.back": "Wstecz",
   "settings.transfer.loading": "Wczytywanie twoich agentów…",
   "settings.transfer.summary.label": "Zawartość pliku",
@@ -699,12 +735,26 @@ export const messages = {
   "settings.transfer.count.noSettings": "Brak ustawień serwera",
   "settings.transfer.includeAgent": "Uwzględnij agenta {name}",
   "settings.transfer.export.title": "Eksportuj ten serwer",
-  "settings.transfer.export.files": "Uwzględnij pliki obszaru roboczego",
-  "settings.transfer.export.filesDescription":
-    "Pliki utworzone przez twoich agentów i folder współdzielony. Wyłącz, aby plik był mały.",
-  "settings.transfer.export.settings": "Uwzględnij ustawienia serwera",
+  "settings.transfer.preset.label": "Co trafia do pliku",
+  "settings.transfer.preset.templates": "Szablony",
+  "settings.transfer.preset.everything": "Wszystko",
+  "settings.transfer.meter.files": "z {total} w plikach obszaru roboczego",
+  "settings.transfer.part.agents": "Agenci i ich konfiguracja",
+  "settings.transfer.part.agentsDescription": "{contents}. Zawsze w pliku.",
+  "settings.transfer.part.settings": "Ustawienia serwera",
+  "settings.transfer.part.chats": "Historia czatów",
+  "settings.transfer.part.chatsDescription":
+    "Czaty i wątki boczne wraz z ich plikami oraz historia uruchomień rutyn. Agenci kontynuują te czaty z ich kontekstem.",
+  "settings.transfer.part.channels": "Wiadomości kanałów",
+  "settings.transfer.part.channelsDescription":
+    "Wiadomości z kanałów, w których są eksportowani agenci, wraz z ich plikami i historią uruchomień rutyn kanałów.",
+  "settings.transfer.part.files": "Pliki obszaru roboczego",
+  "settings.transfer.part.filesDescription": "Pliki utworzone przez twoich agentów i folder współdzielony.",
+  "settings.transfer.part.preferences": "Preferencje serwera",
+  "settings.transfer.part.preferencesDescription":
+    "Nazwa, logo, strefa czasowa, osobowość, domyślne ustawienia agentów, wybór modeli, ustawienia wspomnień i umiejętności oraz poziomy powiadomień i przypięte elementy każdej osoby.",
   "settings.transfer.export.settingsDescription":
-    "Serwery MCP, własni dostawcy modeli, sekcje paska bocznego i przepływy rutyn.",
+    "Serwery MCP, własni dostawcy modeli, sekcje paska bocznego, przepływy rutyn i wspólne umiejętności.",
   "settings.transfer.export.chooseAgents": "Wybierz agentów ({selected} z {total})",
   "settings.transfer.export.hideAgents": "Ukryj agentów",
   "settings.transfer.export.agentsLabel": "Agenci do eksportu",
@@ -731,8 +781,11 @@ export const messages = {
   "settings.transfer.import.agentsLabel": "Agenci w pliku",
   "settings.transfer.import.nameExists": "Nazwa zajęta",
   "settings.transfer.import.settings": "Importuj ustawienia serwera",
-  "settings.transfer.import.settingsDescription":
-    "Dodaje serwery MCP, własnych dostawców modeli i sekcje paska bocznego, których ten serwer nie ma.",
+  "settings.transfer.import.settingsAndPreferences":
+    "Dodaje serwery MCP, własnych dostawców modeli, sekcje paska bocznego i wspólne umiejętności, których ten serwer nie ma.",
+  "settings.transfer.import.preferences": "Importuj preferencje serwera",
+  "settings.transfer.import.preferencesDescription":
+    "Zastępuje nazwę, logo i preferencje tego serwera oraz poziomy powiadomień i przypięte elementy każdej osoby tymi z pliku.",
   "settings.transfer.import.submit": {
     one: "Importuj {count} agenta",
     few: "Importuj {count} agentów",
@@ -754,4 +807,38 @@ export const messages = {
   "settings.transfer.result.signInButton": "Zaloguj się do {provider}",
   "settings.transfer.result.notImported": "Nie zaimportowano",
   "settings.transfer.result.warnings": "Sprawdź te elementy",
+  "settings.transfer.copy.tileTitle": "Kopiuj na inny serwer",
+  "settings.transfer.copy.tileText": "Wyślij agentów na inny ze swoich serwerów.",
+  "settings.transfer.copy.title": "Kopiuj agentów na inny serwer",
+  "settings.transfer.copy.from": "Z",
+  "settings.transfer.copy.to": "Do",
+  "settings.transfer.copy.chooseServer": "Wybierz serwer",
+  "settings.transfer.copy.search": "Szukaj agentów",
+  "settings.transfer.copy.agentsOn": "Agenci na {server}",
+  "settings.transfer.copy.all": {
+    one: "Wszyscy agenci ({count})",
+    few: "Wszyscy agenci ({count})",
+    many: "Wszyscy agenci ({count})",
+    other: "Wszyscy agenci ({count})",
+  },
+  "settings.transfer.copy.noAgents": "Ten serwer nie ma agentów.",
+  "settings.transfer.copy.new": "Nowy",
+  "settings.transfer.copy.notCopied":
+    "Ich kanały i folder współdzielony też są kopiowane. Klucze API, logowania, konektory i historia czatów nie są kopiowane. Skonfiguruj je ponownie na drugim serwerze.",
+  "settings.transfer.copy.submit": {
+    one: "Kopiuj {count} agenta",
+    few: "Kopiuj {count} agentów",
+    many: "Kopiuj {count} agentów",
+    other: "Kopiuj {count} agenta",
+  },
+  "settings.transfer.copy.copying": "Kopiowanie…",
+  "settings.transfer.copy.done": {
+    one: "Skopiowano {count} agenta na {server}.",
+    few: "Skopiowano {count} agentów na {server}.",
+    many: "Skopiowano {count} agentów na {server}.",
+    other: "Skopiowano {count} agenta na {server}.",
+  },
+  "settings.transfer.copy.open": "Otwórz {server}",
+  "settings.transfer.copy.loadFailed": "Nie udało się odczytać agentów",
+  "settings.transfer.copy.failed": "Kopiowanie nie zostało ukończone",
 } as const satisfies PartialTranslation<typeof source>;

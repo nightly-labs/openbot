@@ -17,6 +17,7 @@ export const messages = {
   "error.auth.serviceTimeout": "账号服务未及时响应，请重试。",
   "error.auth.serviceStatus": "账号服务返回了错误（{status}），请稍后重试。",
   "error.auth.invalidHostedServer": "账号服务返回了无效的托管服务器。",
+  "error.auth.invalidServerClaim": "账号服务返回了无效的服务器代码。",
   "error.auth.codeNotSent": "OpenBot 无法发送登录验证码。",
   "error.auth.deliveryTimeout": "OpenBot 未能及时确认送达。验证码可能仍会到达，重发前请先检查送达情况。",
   "error.auth.deliveryInterrupted": "连接在 OpenBot 确认送达之前就结束了。为避免重复发送，请先检查送达情况。",

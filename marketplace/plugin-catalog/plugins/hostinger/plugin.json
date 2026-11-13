@@ -1,0 +1,33 @@
+{
+  "slug": "hostinger",
+  "name": "Hostinger",
+  "tagline": "Hosting, domains and DNS",
+  "description": "Hostinger lets agents read and manage websites, domains, DNS records, and VPS instances in the signed-in Hostinger account. Each user signs in to their own Hostinger account through the browser.",
+  "category": "coding",
+  "creatorName": "Hostinger",
+  "iconUrl": "https://avatars.githubusercontent.com/u/2630767?s=256&v=4",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-domains", "text": "List my domains and show which ones expire in the next 60 days." },
+    { "id": "prompt-dns", "text": "Show the DNS records for my main domain." },
+    { "id": "prompt-vps", "text": "What is the status and plan of each of my VPS instances?" }
+  ],
+  "apps": [
+    {
+      "id": "app-hostinger-mcp",
+      "name": "Hostinger",
+      "description": "Hosting, domains, DNS, and VPS management, over Hostinger's MCP server with browser sign-in.",
+      "iconUrl": "https://avatars.githubusercontent.com/u/2630767?s=256&v=4",
+      "server": {
+        "name": "hostinger",
+        "transport": "http",
+        "url": "https://mcp.hostinger.com",
+        "auth": [{ "id": "hostinger-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.hostinger.com",
+  "privacyPolicyUrl": "https://www.hostinger.com/legal/privacy-policy",
+  "termsUrl": "https://www.hostinger.com/legal/universal-terms-of-service-agreement"
+}

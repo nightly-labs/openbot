@@ -21,6 +21,15 @@ const AGENT = {
   avatarUrl: null,
 };
 
+const CHANNEL = {
+  id: "channel-1",
+  name: "Launch",
+  title: "Release work",
+  members: ["agent-1"],
+  icon: { name: "megaphone", hue: 210 },
+  imageUrl: null,
+};
+
 const RESULT = { id: "message-1", agentId: "agent-1", kind: "message", label: "Done.", at: 1_762_500_000_000 } as const;
 
 const PRESENTATION: AgentDockPresentation = {
@@ -28,15 +37,56 @@ const PRESENTATION: AgentDockPresentation = {
   display: { kind: "display", id: 69733382 },
   edge: "left",
   autoHide: true,
+  edgeStrip: false,
+  sizePercent: 85,
   offsets: [{ displayId: 69733382, offset: 0 }],
-  seats: [{ agent: AGENT, mood: "working", state: { kind: "unread", count: 2 } }],
+  seats: [
+    { kind: "agent", agent: AGENT, mood: "working", state: { kind: "unread", count: 2 }, temporary: false },
+    { kind: "channel", channel: CHANNEL, state: null, temporary: false },
+  ],
   available: [],
+  availableChannels: [CHANNEL],
   agents: [AGENT],
   chats: [
     {
-      agentId: "agent-1",
-      messages: [{ id: "message-1", author: "agent", kind: "text", body: "Done.", attachments: [] }],
+      seat: { kind: "agent", id: "agent-1" },
+      messages: [
+        {
+          id: "message-1",
+          author: "agent",
+          senderAgentId: null,
+          senderMember: null,
+          kind: "text",
+          body: "Done.",
+          attachments: [],
+        },
+      ],
       working: false,
+      wait: null,
+    },
+    {
+      seat: { kind: "channel", id: "channel-1" },
+      messages: [
+        {
+          id: "message-2",
+          author: "agent",
+          senderAgentId: "agent-1",
+          senderMember: null,
+          kind: "text",
+          body: "Shipped.",
+          attachments: [],
+        },
+        {
+          id: "message-3",
+          author: "you",
+          senderAgentId: null,
+          senderMember: { id: "member-1", name: "Grace" },
+          kind: "text",
+          body: "Thanks.",
+          attachments: [],
+        },
+      ],
+      working: true,
       wait: null,
     },
   ],
@@ -54,15 +104,49 @@ describe("agent dock decoding", () => {
     );
   });
 
+  it("accepts a temporary seat and rejects a seat that does not say whether it is temporary", () => {
+    const temporary: AgentDockPresentation = {
+      ...PRESENTATION,
+      seats: [{ kind: "agent", agent: AGENT, mood: "idle", state: { kind: "unread", count: 1 }, temporary: true }],
+    };
+    expect(decodeAgentDockPresentation(temporary)).toEqual(temporary);
+    const unmarked = [{ kind: "agent", agent: AGENT, mood: "idle", state: null }];
+    expect(() => decodeAgentDockPresentation({ ...PRESENTATION, seats: unmarked })).toThrow(
+      "Invalid agent dock presentation.",
+    );
+  });
+
   it("rejects a presentation over its limits", () => {
     const seats = Array.from({ length: AGENT_DOCK_LIMITS.seats + 1 }, () => PRESENTATION.seats[0]);
     expect(() => decodeAgentDockPresentation({ ...PRESENTATION, seats })).toThrow("Invalid agent dock presentation.");
-    const badCount = [{ agent: AGENT, mood: "idle", state: { kind: "unread", count: AGENT_DOCK_LIMITS.count + 1 } }];
+    const badCount = [
+      {
+        kind: "agent",
+        agent: AGENT,
+        mood: "idle",
+        state: { kind: "unread", count: AGENT_DOCK_LIMITS.count + 1 },
+        temporary: false,
+      },
+    ];
     expect(() => decodeAgentDockPresentation({ ...PRESENTATION, seats: badCount })).toThrow(
       "Invalid agent dock presentation.",
     );
     const longName = { ...AGENT, name: "a".repeat(INPUT_LIMITS.agentName + 1) };
     expect(() => decodeAgentDockPresentation({ ...PRESENTATION, agents: [longName] })).toThrow(
+      "Invalid agent dock presentation.",
+    );
+    for (const channel of [
+      { ...CHANNEL, name: "a".repeat(INPUT_LIMITS.agentName + 1) },
+      { ...CHANNEL, members: [""] },
+      { ...CHANNEL, icon: { name: "megaphone", hue: 360 } },
+      { ...CHANNEL, imageUrl: "a".repeat(AGENT_DOCK_LIMITS.channelImageUrl + 1) },
+    ]) {
+      expect(() => decodeAgentDockPresentation({ ...PRESENTATION, availableChannels: [channel] })).toThrow(
+        "Invalid agent dock presentation.",
+      );
+    }
+    const channels = Array.from({ length: AGENT_DOCK_LIMITS.channels + 1 }, () => CHANNEL);
+    expect(() => decodeAgentDockPresentation({ ...PRESENTATION, availableChannels: channels })).toThrow(
       "Invalid agent dock presentation.",
     );
   });
@@ -113,13 +197,38 @@ describe("agent dock decoding", () => {
   });
 
   it("accepts the actions that main forwards and rejects others", () => {
-    const action = { type: "open-chat", serverId: "local", agentId: null };
+    const action = { type: "open-chat", serverId: "local", seat: null };
     expect(decodeAgentDockAction(action)).toEqual(action);
+    const channelChat = { type: "open-chat", serverId: "local", seat: { kind: "channel", id: "channel-1" } };
+    expect(decodeAgentDockAction(channelChat)).toEqual(channelChat);
+    const openChannel = { type: "open-channel", serverId: "local", channelId: "channel-1" };
+    expect(decodeAgentDockAction(openChannel)).toEqual(openChannel);
     expect(decodeAgentDockAction({ type: "open-link", url: "https://example.com" })).toEqual({
       type: "open-link",
       url: "https://example.com",
     });
     expect(decodeAgentDockAction({ type: "open-settings" })).toEqual({ type: "open-settings" });
+    expect(decodeAgentDockAction({ type: "hide" })).toEqual({ type: "hide" });
+    const move = {
+      type: "move",
+      serverId: "local",
+      seat: { kind: "agent", id: "agent-1" },
+      before: { kind: "channel", id: "channel-1" },
+    };
+    expect(decodeAgentDockAction(move)).toEqual(move);
+    const moveToEnd = { type: "move", serverId: "local", seat: { kind: "agent", id: "agent-1" }, before: null };
+    expect(decodeAgentDockAction(moveToEnd)).toEqual(moveToEnd);
+    expect(() =>
+      decodeAgentDockAction({ type: "move", serverId: "local", seat: { kind: "agent", id: "agent-1" } }),
+    ).toThrow("Invalid agent dock action.");
+    expect(() =>
+      decodeAgentDockAction({
+        type: "move",
+        serverId: "local",
+        seat: { kind: "agent", id: "agent-1" },
+        before: { kind: "group", id: "group-1" },
+      }),
+    ).toThrow("Invalid agent dock action.");
     expect(decodeAgentDockAction({ type: "open-window", serverId: "local", agentId: "agent-1" })).toEqual({
       type: "open-window",
       serverId: "local",
@@ -129,7 +238,16 @@ describe("agent dock decoding", () => {
       "Invalid agent dock action.",
     );
     expect(() => decodeAgentDockAction({ type: "open-link", url: "" })).toThrow("Invalid agent dock action.");
-    expect(() => decodeAgentDockAction({ type: "add", serverId: "", agentId: "agent-1" })).toThrow(
+    expect(() => decodeAgentDockAction({ type: "add", serverId: "", seat: { kind: "agent", id: "agent-1" } })).toThrow(
+      "Invalid agent dock action.",
+    );
+    expect(() => decodeAgentDockAction({ type: "add", serverId: "local", agentId: "agent-1" })).toThrow(
+      "Invalid agent dock action.",
+    );
+    expect(() =>
+      decodeAgentDockAction({ type: "remove", serverId: "local", seat: { kind: "group", id: "group-1" } }),
+    ).toThrow("Invalid agent dock action.");
+    expect(() => decodeAgentDockAction({ type: "open-channel", serverId: "local", channelId: "" })).toThrow(
       "Invalid agent dock action.",
     );
     expect(() => decodeAgentDockAction({ type: "run", serverId: "local" })).toThrow("Invalid agent dock action.");

@@ -21,6 +21,7 @@ export const messages = {
   "queue.item.steerFallback.providerUnsupported":
     "Этот провайдер не умеет направлять выполняемый ход, поэтому сообщение ждёт в очереди.",
   "queue.item.steerFallback.steerFailed": "Направить не удалось, поэтому сообщение ждёт в очереди.",
+  "queue.item.steerFallback.routineRun": "Сейчас выполняется регулярная задача, поэтому сообщение ждёт в очереди.",
   "queue.item.runAsTask": "Запустить в новой ветке",
   "queue.item.runAsTaskLabel": "Запустить сообщение в очереди {position} в новой ветке",
   "queue.item.deleteLabel": "Удалить сообщение в очереди {position}",

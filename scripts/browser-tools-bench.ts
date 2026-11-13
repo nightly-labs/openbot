@@ -725,6 +725,14 @@ function ambiguousRefusals(entries: DynamicRecord[]): number {
     .length;
 }
 
+/** Tool results that report a failure: each one costs the agent at least one more call. */
+function failedToolResults(entries: DynamicRecord[]): number {
+  return entries
+    .filter((entry) => entry.type === "user")
+    .flatMap((entry) => contentItems(entry, "tool_result"))
+    .filter((item) => item.is_error === true).length;
+}
+
 function violations(variant: Variant, uses: ToolUse[]): string[] {
   const found = new Set<string>();
   for (const use of uses) {
@@ -846,7 +854,9 @@ async function readUsage(page: Page, agentId: string): Promise<Usage> {
 async function agentIdle(page: Page, agentId: string): Promise<boolean> {
   return page.evaluate<boolean>(`(async (agentId) => {
     const queue = await window.openbot.agent.listQueue(agentId);
-    if (queue.deliveries.length === 0) return false;
+    // A new agent's first message is its hidden welcome setup message: no delivery shows it, and
+    // queue.welcome is set until its turn ends.
+    if (queue.welcome) return false;
     if (queue.deliveries.some((one) => ["queued", "starting", "running"].includes(one.status))) return false;
     const page = await window.openbot.agent.readConversationPage({ agentId, limit: 1 });
     const last = page.messages[page.messages.length - 1];
@@ -943,6 +953,8 @@ interface RunRow {
   toolNamesKnown: boolean;
   /** Tool results that refused an ambiguous target. */
   ambiguousRefusals: number;
+  /** Tool results that report a failure. */
+  failedCalls: number;
   /** The lessons that the calendar server recorded in the run. */
   registrations?: string[];
   uncachedInput: number;
@@ -978,6 +990,7 @@ async function runOnce(
     toolNames: {},
     toolNamesKnown: false,
     ambiguousRefusals: 0,
+    failedCalls: 0,
     uncachedInput: 0,
     cachedInput: 0,
     cacheCreation: 0,
@@ -1064,6 +1077,7 @@ async function runOnce(
     const entries = await readSessionEntries(marker, started - MINUTE);
     const uses = entries === null ? null : toolUses(entries);
     row.ambiguousRefusals = entries === null ? 0 : ambiguousRefusals(entries);
+    row.failedCalls = entries === null ? 0 : failedToolResults(entries);
     if (task.calendar) row.registrations = [...lessonCalendar.registrations];
     if (task.consent) logger.info(`consent ${task.id}: ${json(consentChoices.splice(0))}`);
     row.toolNamesKnown = uses !== null;
@@ -1116,6 +1130,7 @@ function summarize(rows: RunRow[]) {
       medianOutput: median(own.map((row) => row.output)),
       medianToolCalls: median(own.map((row) => row.toolCalls)),
       ambiguousRefusals: sum((row) => row.ambiguousRefusals),
+      failedCalls: sum((row) => row.failedCalls),
       medianDurationMs: median(own.map((row) => row.durationMs)),
       medianCostUsd: median(own.map((row) => row.costUsd)),
       totalInput: sum((row) => row.inputTotal),
@@ -1126,12 +1141,12 @@ function summarize(rows: RunRow[]) {
 
 function markdown(summary: ReturnType<typeof summarize>): string {
   const lines = [
-    "| Variant | Runs | Success | Correct | Compliant | Median input | Median uncached | Median output | Median tool calls | Median time (s) | Median cost ($) |",
-    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    "| Variant | Runs | Success | Correct | Compliant | Median input | Median uncached | Median output | Median tool calls | Failed calls | Median time (s) | Median cost ($) |",
+    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
   ];
   for (const row of summary) {
     lines.push(
-      `| ${row.variant} ${row.description} | ${row.runs} | ${row.success} | ${row.correct} | ${row.compliant} | ${row.medianInputTotal} | ${row.medianUncachedInput} | ${row.medianOutput} | ${row.medianToolCalls} | ${(row.medianDurationMs / SECOND).toFixed(1)} | ${row.medianCostUsd.toFixed(4)} |`,
+      `| ${row.variant} ${row.description} | ${row.runs} | ${row.success} | ${row.correct} | ${row.compliant} | ${row.medianInputTotal} | ${row.medianUncachedInput} | ${row.medianOutput} | ${row.medianToolCalls} | ${row.failedCalls} | ${(row.medianDurationMs / SECOND).toFixed(1)} | ${row.medianCostUsd.toFixed(4)} |`,
     );
   }
   return lines.join("\n");
@@ -1267,7 +1282,7 @@ async function main(): Promise<void> {
           const row = await runOnce(page, variant, task, repeat, truths.get(task.id) ?? "", cdpUrl);
           rows.push(row);
           logger.info(
-            `  ${row.correct ? "correct" : "wrong"}${row.compliant ? "" : " (not compliant)"} input ${row.inputTotal} output ${row.output} tools ${row.toolCalls} ${(row.durationMs / SECOND).toFixed(0)} s${row.error ? ` error: ${row.error}` : ""}${row.violations.length > 0 ? ` used: ${row.violations.join(", ")}` : ""}`,
+            `  ${row.correct ? "correct" : "wrong"}${row.compliant ? "" : " (not compliant)"} input ${row.inputTotal} output ${row.output} tools ${row.toolCalls} failed ${row.failedCalls} ${(row.durationMs / SECOND).toFixed(0)} s${row.error ? ` error: ${row.error}` : ""}${row.violations.length > 0 ? ` used: ${row.violations.join(", ")}` : ""}`,
           );
           await write();
         }

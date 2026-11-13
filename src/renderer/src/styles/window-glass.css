@@ -59,7 +59,8 @@
   --surface: var(--openbot-bg-surface);
 }
 
-/* A popper, a menu, a tooltip or a drag preview covers the chat, so it stays solid in the window. */
+/* A popper, a menu, a tooltip, a drag preview or a control that hangs over other content covers that
+ * content, so it stays solid in the window. */
 :root[data-openbot-window-glass]
   .app-window
   :is(
@@ -70,6 +71,26 @@
     [role="listbox"],
     [role="tooltip"],
     .ui-popover-menu-surface,
+    .mention-picker,
+    .chat-search,
+    .subagents-dock-bar,
+    .scroll-to-latest,
+    .side-panel-drop,
+    .attachment-drop-overlay,
+    .agent-folders-chat-drop,
+    .browser-preview-open-label,
+    .browser-takeover-preview-open-label,
+    .chat-visual-box:popover-open,
+    .file-preview-truncated,
+    .library-pill,
+    .skills-marketplace-error,
+    .media-generation-chip,
+    .agent-settings-avatar-badge,
+    .profile-edit-photo-badge,
+    .server-install-card-badge,
+    .server-rail-muted,
+    .app-loading,
+    .server-onboarding-screen,
     .sidebar-agent-drag-preview,
     .sidebar-person-drag-preview,
     .sidebar-section-drag-preview
@@ -90,6 +111,12 @@
   --openbot-queue-surface: var(--openbot-bg-surface);
   --background: var(--openbot-bg-canvas);
   --surface: var(--openbot-bg-surface);
+}
+
+/* A badge on the corner of an avatar or a bubble covers that corner, so its disc is solid. Its ring
+ * stays clear, as the surface around it is. */
+:root[data-openbot-window-glass] .app-window :is(.agent-row-agent-status, .ui-bubble-reactions) {
+  --openbot-bg-surface: var(--window-solid-surface);
 }
 
 :root[data-openbot-window-glass] body {
@@ -206,15 +233,33 @@
     .sidebar-folder > header,
     .marketplace-skill-group-bar,
     .agent-instructions-bar,
+    .tasks-page-composer.composer-wrap,
     .trace-row[data-parent],
     .trace-axis-row
   ) {
   backdrop-filter: blur(var(--openbot-space-4));
 }
 
+/* The panels over the composer go under its top edge. The composer is clear here, so the part under
+ * it is cut off and its text does not show through the composer. */
+:root[data-openbot-window-glass] .app-window .composer-stack {
+  clip-path: inset(0 0 var(--composer-stack-overlap) 0);
+}
+
+/* A diagram node covers the grid and the connections under it, so the nodes stay solid on the clear
+ * board. */
+:root[data-openbot-window-glass] .app-window .diagram-board-viewport {
+  --openbot-bg-surface: var(--window-solid-surface);
+  --openbot-bg-surface-raised: var(--window-solid-surface-raised);
+  --openbot-bg-control: var(--window-solid-control);
+  --openbot-bg-control-hover: var(--window-solid-control-hover);
+  --openbot-bg-control-active: var(--window-solid-control-active);
+}
+
 /* A workflow node covers the connections and the nodes under it, so the node cards stay solid on the
- * clear canvas. */
+ * clear canvas. The bars that float over the nodes keep the tint that they have in a solid window. */
 :root[data-openbot-window-glass] .app-window .wfn-stage {
+  --wfn-glass: color-mix(in srgb, var(--window-solid-surface-raised) 75%, transparent);
   --wfn-card: var(--window-solid-canvas);
   --wfn-field: var(--window-solid-surface-raised);
   --wfn-port: color-mix(in srgb, var(--openbot-text-primary) 10%, var(--window-solid-canvas));

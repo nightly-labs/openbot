@@ -4,7 +4,7 @@
 //
 //   bun scripts/mobile-release-announcement-e2e.ts
 
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -93,9 +93,13 @@ const site = `http://127.0.0.1:${server.port}`;
 const work = mkdtempSync(join(tmpdir(), "openbot-mobile-release-e2e-"));
 mkdirSync(join(work, "apps/mobile"), { recursive: true });
 mkdirSync(join(work, "apps/auth-api/src/server"), { recursive: true });
-cpSync(
-  join(root, "apps/auth-api/src/server/mobile-features-config.ts"),
+// The real file, with each version before the ones that the publish steps below set.
+writeFileSync(
   join(work, "apps/auth-api/src/server/mobile-features-config.ts"),
+  readFileSync(join(root, "apps/auth-api/src/server/mobile-features-config.ts"), "utf8").replace(
+    /"\d+\.\d+\.\d+"/g,
+    '"1.4.6"',
+  ),
 );
 
 const SECTION = "\n\n### Added\n\n- A change.\n";
@@ -349,6 +353,74 @@ try {
     "check prints both posts",
     result.status === 0 && (result.output.match(/is out on/g) ?? []).length === 2,
     result.output,
+  );
+
+  // An OTA section is not a store version: the newest store version gets the post, and the OTA
+  // section gets no post, no tag and no highlights.
+  state.tags.clear();
+  state.live = { ios: ["1.4.7.1", "1.4.7"], android: ["1.4.7.1", "1.4.7"] };
+  state.latest = { ios: "1.4.7", android: "1.4.7" };
+  writeChangelog({ "1.4.7": "2026-11-06" });
+  const beforeOta = readFileSync(join(work, "apps/mobile/CHANGELOG.md"), "utf8");
+  writeFileSync(join(work, "CHANGELOG.before.md"), beforeOta);
+  writeChangelog({ "1.4.7.1": "2026-11-08", "1.4.7": "2026-11-06" });
+  const postsBeforeOta = state.posts.length;
+  result = await announce();
+  check(
+    "an OTA section gets no post and no tag",
+    result.status === 0 &&
+      state.posts.length === postsBeforeOta + 1 &&
+      lastPost().includes("**OpenBot v1.4.7 is out on iOS and Android**") &&
+      !result.output.includes("1.4.7.1") &&
+      [...state.tags].sort().join() === "mobile-announced/v1.4.7/android,mobile-announced/v1.4.7/ios",
+    { output: result.output, post: lastPost(), tags: [...state.tags] },
+  );
+  // The Changelog workflow asks for highlights only for the version that `available` prints.
+  result = await cli("discord-mobile-release-announcement.ts", ["available", "CHANGELOG.before.md"]);
+  check("an OTA section asks for no highlights", result.status === 0 && result.output.trim() === "", result.output);
+  result = await cli("discord-mobile-release-announcement.ts", [
+    "announce",
+    "--version",
+    "1.4.7.1",
+    "--stores",
+    "ios",
+    "--site",
+    site,
+    "--github-api",
+    site,
+  ]);
+  check(
+    "--version does not post an OTA section",
+    result.status !== 0 &&
+      state.posts.length === postsBeforeOta + 1 &&
+      ![...state.tags].some((tag) => tag.includes("1.4.7.1")),
+    { output: result.output, tags: [...state.tags] },
+  );
+
+  // The publish step does not make an OTA section the newest store version.
+  writeChangelog({ "1.4.7.1": "2026-11-08 (Android)", "1.4.7": "2026-11-06 (Android)" });
+  writeFileSync(configPath, originalConfig);
+  const otaChangelog = readFileSync(join(work, "apps/mobile/CHANGELOG.md"), "utf8");
+  result = await cli("publish-mobile-release.ts", ["ios", "--version", "1.4.7.1"]);
+  check(
+    "publish refuses an OTA section",
+    result.status !== 0 &&
+      result.output.includes("1.4.7.1 is an OTA update") &&
+      readFileSync(configPath, "utf8") === originalConfig &&
+      readFileSync(join(work, "apps/mobile/CHANGELOG.md"), "utf8") === otaChangelog,
+    result.output,
+  );
+  // iOS gets 1.4.7. The OTA section of 1.4.6 names only Android, and no store reviews it.
+  writeChangelog({ "1.4.7": "2026-11-06 (Android)", "1.4.6.1": "2026-11-05 (Android)", "1.4.6": "2026-11-04" });
+  result = await cli("publish-mobile-release.ts", ["ios", "--skip-older"]);
+  const afterOta = readFileSync(join(work, "apps/mobile/CHANGELOG.md"), "utf8");
+  check(
+    "publish leaves an OTA section as it is",
+    result.status === 0 &&
+      afterOta.includes("## [1.4.6.1] - 2026-11-05 (Android)\n") &&
+      /## \[1\.4\.7\] - 2026-11-06 \(Android\), \d{4}-\d{2}-\d{2} \(iOS\)\n/.test(afterOta) &&
+      /\n\s+ios: "1\.4\.7"/.test(readFileSync(configPath, "utf8")),
+    { output: result.output, headings: afterOta.split("\n").filter((line) => line.startsWith("## [")) },
   );
 } finally {
   server.stop(true);

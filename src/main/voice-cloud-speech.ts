@@ -25,6 +25,8 @@ const ELEVENLABS_MODELS: Partial<Record<CloudSpeechModelId, { modelId: string; l
   // ElevenLabs does not accept `language_code` for Multilingual v2: it finds the language itself.
   "elevenlabs-multilingual-v2": { modelId: "eleven_multilingual_v2", languageCode: false },
   "elevenlabs-v3": { modelId: "eleven_v3", languageCode: true },
+  "elevenlabs-v4-turbo": { modelId: "eleven_v4_turbo", languageCode: true },
+  "elevenlabs-v4": { modelId: "eleven_v4", languageCode: true },
 };
 
 /**

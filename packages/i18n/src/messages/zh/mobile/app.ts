@@ -19,6 +19,7 @@ export const messages = {
   "mobile.app.route.deletedChannels": "已删除的频道",
   "mobile.app.route.cropPhoto": "移动与缩放",
   "mobile.app.route.queuedMessages": "排队的消息",
+  "mobile.app.route.pinnedMessages": "置顶消息",
   "mobile.app.route.thinking": "思考过程",
   "mobile.app.route.messageOptions": "消息选项",
   "mobile.app.route.editMessage": "编辑消息",
@@ -34,6 +35,7 @@ export const messages = {
   "mobile.app.route.threads": "话题",
   "mobile.app.route.usage": "用量",
   "mobile.app.route.marketplace": "市场",
+  "mobile.app.route.library": "资料库",
   // The quick actions of the app icon, which the phone shows when the icon is held.
   "mobile.app.quickAction.search": "搜索",
   "mobile.app.update.title": "OpenBot {version} 来了",

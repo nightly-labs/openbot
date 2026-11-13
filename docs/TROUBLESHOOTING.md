@@ -76,17 +76,26 @@ voice prompts show an error. Use a newer distribution. The arm64 AppImage needs 
 
 On Linux, OpenBot uses the GPU until the GPU fails on your computer. If the GPU process crashes, or a
 start stops in its first 30 seconds, OpenBot writes `gpu-crash.json` or `gpu-start.json` in
-`~/.config/OpenBot`. While one of these files is there, OpenBot renders on the CPU. An update with a
-new Chromium version tries the GPU again. A GPU process restart after a lost GPU context, for example
+`~/.config/OpenBot`. While one of these files is there, OpenBot renders on the CPU. A start that
+stops with no crash, for example a kill or a power loss, gets one more try with the GPU; a second
+stop in a row turns it off. An update with a new Chromium version tries the GPU again. A GPU process restart after a lost GPU context, for example
 after suspend, does not count. A server (`OPENBOT_SERVER=1` or a hosted server) always renders on the
-CPU. Chromium also renders on the CPU when it blocks the GPU driver, for example in a remote desktop.
+CPU, and its browser runs WebGL on the CPU (SwiftShader) for sites such as the Figma editor. A GPU
+process crash on a server writes `gpu-crash.json` and turns off WebGL at the next start. Chromium
+also renders on the CPU when it blocks the GPU driver, for example in a remote desktop.
 
 When OpenBot renders on the CPU, dialogs and panels do not blur what is behind them, and agent
 avatars do not move. These two effects used the most CPU time.
 
+On a Wayland session, a start that renders on the CPU opens OpenBot again on XWayland: on Wayland,
+Chromium can leave the window empty, and KDE then shows only a 1x1 taskbar entry. The log then shows
+"Software rendering is on, so OpenBot uses XWayland". Without XWayland (no `DISPLAY`), OpenBot stays
+on Wayland. To stay on Wayland, start OpenBot with `--ozone-platform=wayland`.
+
 - To try the GPU again, for example after a driver update, remove the file. The log names it.
-- To always use the GPU, start OpenBot with `OPENBOT_DISABLE_GPU=0`.
+- To always use the GPU, start OpenBot with `OPENBOT_DISABLE_GPU=0`. A server ignores this value.
 - If OpenBot stops at each start, start it with `OPENBOT_DISABLE_GPU=1` to always render on the CPU.
+  On a server, this value also turns off WebGL.
 
 ## OpenBot does not start on Linux when the monitor is off
 
@@ -300,10 +309,17 @@ are independent and are not removed with OpenBot.
 
 Use the [bug report form](https://github.com/nightly-labs/openbot/issues/new?template=bug_report.yml)
 for reproducible bugs. It asks for the platform, the OpenBot version (Settings → Updates on the
-desktop, Settings → About on the phone), the operating system and hardware, the provider and its CLI
-version, the steps, and the expected and actual results. When a provider row shows an error, select
-**Copy diagnostics** in its menu and paste the result into the form. On the phone, Settings →
-Support → **Save log file** makes a log that you can attach. Never publish tokens, `~/.codex`,
+desktop), the operating system and hardware, the provider and its CLI version, the steps, and the
+expected and actual results. When a provider row shows an error, select **Copy diagnostics** in its
+menu and paste the result into the form.
+
+For a problem in the iPhone or Android app, use the
+[mobile app bug report form](https://github.com/nightly-labs/openbot/issues/new?template=mobile_bug_report.yml).
+It asks for the full app version line from Settings → About. Settings → Support → **Save log file**
+makes a log that you can attach. Attach it for a connection or network problem: we will most
+probably close such a report without it.
+
+Never publish tokens, `~/.codex`,
 `~/.claude`, conversations, private files, Electron user data, or full unreviewed diagnostics.
 
 When the desktop app closes by itself, look in the `logs` folder of its user data
@@ -313,6 +329,11 @@ When the desktop app closes by itself, look in the `logs` folder of its user dat
 - `main/main.log` has a `Quitting: <reason>.` line when OpenBot quit by itself or was closed.
 - `trace.ndjson` has an `exit` line with the same reason, and a `crash` line for each renderer or
   helper process that stopped.
+
+When OpenBot or a server freezes again and again, `stall-profiles.ndjson` in the same folder has a line
+for a minute in which the main process stopped for 2 seconds or more, twice in a row. The line names
+the OpenBot functions that used the time (`top`) and their callers (`stack`). It holds no paths and
+none of your data, so you can attach it to a report.
 
 A dump in the `Crashpad` folder next to `logs` means a process crashed. Tell us that a dump exists,
 but do not attach it publicly: it can hold secrets. When neither file has a reason and there is no

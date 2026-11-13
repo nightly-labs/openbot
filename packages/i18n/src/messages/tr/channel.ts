@@ -9,7 +9,12 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "{name} ajanının durdurulan görevini yeniden ata",
   "channel.stoppedTask.reassign": "Yeniden ata",
   "channel.stoppedTask.cancel": "Görevi iptal et",
+  "channel.stoppedTask.assignmentLoop":
+    "{names} bu görevi birbirine çok fazla kez aktardı. Döngüyü önlemek için durduruldu.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "Üyeler bu görevi birbirine çok fazla kez aktardı. Döngüyü önlemek için durduruldu.",
   "channel.conversation.noMembers": "Çalışmayı başlatmak için kanal ayarlarından ajan ekleyin.",
+  "channel.conversation.waitFull": "Bekliyor - {name}, devam eden bir görev bitince başlayacak",
   "channel.conversation.archivedNotice": "Silinmiş kanal. Yalnızca önizleme.",
   "channel.composer.label": "Kanala mesaj",
   "channel.composer.placeholder": "{name} kanalına mesaj gönder",
@@ -20,6 +25,9 @@ export const messages = {
   "channel.settings.isolated": "Bellekleri bu kanalda tut",
   "channel.settings.isolatedDescription":
     "Ajanlar burada öğrendiklerini kanal belleği olarak kaydeder. Diğer sohbetleri bunları görmez.",
+  "channel.settings.browser": "Tarayıcı",
+  "channel.settings.browserEveryone": "Tüm üyeler",
+  "channel.settings.browserNone": "Hiç kimse",
   "channel.settings.memoryCount": { one: "{count} kayıtlı", other: "{count} kayıtlı" },
   "channel.settings.newConversation.title": "Yeni konuşma",
   "channel.settings.newConversation.description": "Üyeler önceki mesajları unutur. Kanal ayarları kalır.",

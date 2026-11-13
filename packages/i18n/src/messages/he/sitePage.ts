@@ -84,6 +84,9 @@ export const messages = {
   "sitePage.pricing.enterprise.body":
     "שרתים גדולים יותר, יותר מ-{count} חברים, או כל דבר אחר שאתם צריכים. עם תמיכת Enterprise.",
   "sitePage.pricing.enterprise.contact": "יצירת קשר עם המכירות",
+  "sitePage.pricing.consent.statement": "אני מצהיר/ה שאני מקבל/ת את {policy}, {terms}.",
+  "sitePage.pricing.consent.policy": "מדיניות הפרטיות",
+  "sitePage.pricing.consent.terms": "התנאים וזכות הביטול",
   "sitePage.teams.title": "OpenBot לצוותים",
   "sitePage.teams.description":
     "אפשר להריץ את OpenBot על תשתית מנוהלת, או לתת לנו לתכנן פריסה מותאמת סביב הצוות, תהליכי העבודה והמערכות הקיימות שלכם.",
@@ -370,6 +373,7 @@ export const messages = {
   "sitePage.landing.download.appStore": "הורדה מ-App Store",
   "sitePage.landing.download.googlePlay": "זמין ב-Google Play",
   "sitePage.landing.download.pages": "דרישות מערכת ושלבי התקנה:",
+  "sitePage.landing.download.apk": "הורדת APK",
   "sitePage.site.download": "הורדה",
   "sitePage.site.app": "אפליקציה",
   "sitePage.site.primaryNavigation": "ניווט ראשי",

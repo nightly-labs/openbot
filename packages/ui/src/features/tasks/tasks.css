@@ -24,33 +24,7 @@
 }
 
 .tasks-page-header {
-  display: flex;
-  align-items: center;
-  gap: var(--openbot-space-2);
   padding: var(--openbot-space-6) var(--openbot-space-2) var(--openbot-space-3);
-}
-
-/* The arrow lines up with the content edge, not its hit area. */
-.tasks-page-header .ui-icon-button {
-  margin-inline-start: calc(-1 * var(--openbot-space-2));
-}
-
-/* Back and the agents panel toggle follow the reading direction. */
-.tasks-page-header svg:is([class~="lucide-arrow-left"], [class~="lucide-panel-left"]):dir(rtl) {
-  transform: scaleX(-1);
-}
-
-.tasks-page-header h2 {
-  min-width: 0;
-  flex: 1;
-  margin: 0;
-  font-size: var(--openbot-text-xl);
-  font-weight: var(--openbot-weight-semibold);
-}
-
-.tasks-page-header h2 span {
-  color: var(--openbot-text-muted);
-  font-weight: var(--openbot-weight-regular);
 }
 
 .tasks-page-avatar.agent-avatar {
@@ -71,14 +45,23 @@
   padding: var(--openbot-space-1) 0 0;
 }
 
-.tasks-page-composer .composer-notice {
-  margin-bottom: var(--openbot-space-2);
-}
-
 .tasks-page-composer-agent {
   display: flex;
   min-width: 0;
   align-items: center;
+}
+
+/* One row: the agent, the text of the task, then the microphone and Start. */
+.tasks-page-composer .composer[data-compact] {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  /* The agent button is 32px, so 7px keeps the 48px of the chat input. */
+  padding-block: 7px;
+  padding-inline-start: var(--openbot-space-3);
+}
+
+.tasks-page-composer .composer[data-compact] .tasks-page-composer-agent {
+  grid-column: 1;
+  grid-row: 1;
 }
 
 .tasks-page-agent.ui-button {
@@ -464,12 +447,6 @@ html.panel-resizing .tasks-page-side {
 
 .tasks-panel .file-preview-header {
   --task-list-glyph: 16px;
-}
-
-/* A question or a browser takeover waits: the chat answers it. */
-.tasks-panel-answer-footer {
-  display: flex;
-  justify-content: flex-end;
 }
 
 /* A change to a different task: the new task fades in at its place. */

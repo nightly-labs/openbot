@@ -55,7 +55,7 @@ import {
   Switch,
   untrack,
 } from "solid-js";
-import { AmbientMotion } from "../../ambient-motion";
+import { AmbientMotion, useAmbientMotion } from "../../ambient-motion";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { StopIcon } from "../conversation/ConversationIcons";
 import { playIdleGreetingMotion } from "./idle-greeting-motion";
@@ -771,12 +771,19 @@ function CompactLeading(props: {
 }): JSX.Element {
   const statusAgent = () => compactStatusAgent(props.presentation);
   const working = () => (props.presentation.mode === "working" ? props.presentation.working : []);
+  // The logo blinks only while the pointer is on the island: each blink draws frames all day.
+  const ambientMotion = useAmbientMotion();
+  const logoAnimation = () => (ambientMotion() ? "blink" : "none");
   return (
     <span class="dynamic-island-surface-content-swap dynamic-island-surface-compact-swap">
       <Switch
         fallback={
           <span class="dynamic-island-surface-leading-anchor" data-island-spatial-anchor="center">
-            <AppLogo variant={props.variant ?? "production"} animation="blink" class="dynamic-island-surface-logo" />
+            <AppLogo
+              variant={props.variant ?? "production"}
+              animation={logoAnimation()}
+              class="dynamic-island-surface-logo"
+            />
           </span>
         }
       >
@@ -906,9 +913,10 @@ function IdleGreetingCard(props: { emoji: IdleGreetingEmoji }): JSX.Element {
 }
 
 /**
- * The greetings change every few seconds, and each one moves only while a pointer is on the island. A
- * motion makes the island window draw a frame on every display refresh, and the island is on screen
- * all day: moving at rest cost about a fifth of a core, in the renderers and the GPU process.
+ * While a pointer is on the island, the greetings change every few seconds and each one moves. Away from
+ * it, the greeting stays as it is. A motion or a crossfade makes the island window draw a frame on every
+ * display refresh, and the island is on screen all day: moving at rest cost about a fifth of a core, in
+ * the renderers and the GPU process, and the crossfades alone cost about 1% of a core on Linux.
  */
 function IdleGreetingEmoji(props: { moving: boolean }): JSX.Element {
   const [index, setIndex] = createSignal(0);
@@ -941,22 +949,29 @@ function IdleGreetingEmoji(props: { moving: boolean }): JSX.Element {
     },
   );
 
+  createEffect(
+    () => props.moving,
+    (moving) => {
+      if (!moving) return;
+      const timer = setInterval(() => {
+        const nextIndex = (index() + 1) % IDLE_GREETING_EMOJIS.length;
+        const nextEmoji = IDLE_GREETING_EMOJIS[nextIndex] ?? IDLE_GREETING_EMOJIS[0];
+        const nextSlot = activeSlot() === 0 ? 1 : 0;
+        if (nextSlot === 0) setFirstEmoji(nextEmoji);
+        else setSecondEmoji(nextEmoji);
+        animationFrame = requestAnimationFrame(() => {
+          animationFrame = undefined;
+          setIndex(nextIndex);
+          setActiveSlot(nextSlot);
+          playMotion(nextSlot, nextEmoji, props.moving);
+        });
+      }, IDLE_GREETING_INTERVAL);
+      return () => clearInterval(timer);
+    },
+  );
+
   onSettled(() => {
-    const timer = setInterval(() => {
-      const nextIndex = (index() + 1) % IDLE_GREETING_EMOJIS.length;
-      const nextEmoji = IDLE_GREETING_EMOJIS[nextIndex] ?? IDLE_GREETING_EMOJIS[0];
-      const nextSlot = activeSlot() === 0 ? 1 : 0;
-      if (nextSlot === 0) setFirstEmoji(nextEmoji);
-      else setSecondEmoji(nextEmoji);
-      animationFrame = requestAnimationFrame(() => {
-        animationFrame = undefined;
-        setIndex(nextIndex);
-        setActiveSlot(nextSlot);
-        playMotion(nextSlot, nextEmoji, props.moving);
-      });
-    }, IDLE_GREETING_INTERVAL);
     return () => {
-      clearInterval(timer);
       if (animationFrame !== undefined) cancelAnimationFrame(animationFrame);
       for (const motion of [...motions[0], ...motions[1]]) motion.cancel();
     };

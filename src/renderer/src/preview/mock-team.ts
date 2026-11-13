@@ -199,6 +199,9 @@ export function createMockTeam(
     retryConnection: async (serverId) => {
       const server = servers.find((candidate) => candidate.id === serverId);
       if (!server) throw new Error("Server not found");
+      // As in main, the check keeps an online server and its connection.
+      if (server.state === "online" && !server.issue && !server.hostedSleep && !server.hostedIssue)
+        return clone(server);
       const connected = {
         ...server,
         state: "online" as const,

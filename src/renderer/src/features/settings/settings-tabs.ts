@@ -2,7 +2,6 @@ import type { AppInfo } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Bell,
-  Bot,
   CircleArrowDown,
   CreditCard,
   Mic,
@@ -17,7 +16,6 @@ import {
 
 export type SettingsTab =
   | "general"
-  | "agents"
   | "notifications"
   | "voice"
   | "dynamic-island"
@@ -67,10 +65,13 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
     rows: [
       { titleKey: "settings.language.title", descriptionKey: "settings.language.description" },
       { titleKey: "settings.interfaceSize.title", descriptionKey: "settings.interfaceSize.description" },
+      { titleKey: "settings.interfaceFont.title", descriptionKey: "settings.interfaceFont.description" },
+      { titleKey: "settings.codeFont.title", descriptionKey: "settings.codeFont.description" },
       { titleKey: "settings.logoColor.title", descriptionKey: "settings.logoColor.description" },
       { titleKey: "settings.chatColor.title", descriptionKey: "settings.chatColor.description" },
       { titleKey: "settings.chatBackground.title", descriptionKey: "settings.chatBackground.description" },
       { titleKey: "settings.sendShortcut.title", descriptionKey: "settings.sendShortcut.description" },
+      { titleKey: "sidebar.order.title", descriptionKey: "settings.chatOrder.description" },
       { titleKey: "settings.showAgentSteps.title", descriptionKey: "settings.showAgentSteps.description" },
       {
         titleKey: "settings.compactMessageActions.title",
@@ -86,19 +87,6 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
       { titleKey: "settings.restoreWorkspace.title", descriptionKey: "settings.restoreWorkspace.description" },
       { titleKey: "settings.quitGuard.title", descriptionKey: "settings.quitGuard.description", macOS: true },
       { titleKey: "settings.analytics.title", descriptionKey: "settings.analytics.description" },
-    ],
-  },
-  {
-    value: "agents",
-    titleKey: "settings.tab.agents.title",
-    descriptionKey: "settings.tab.agents.description",
-    icon: Bot,
-    rows: [
-      { titleKey: "agentSettings.automation.title" },
-      { titleKey: "agentSettings.agentNewChat.title" },
-      { titleKey: "agentSettings.quickAcknowledgement.title" },
-      { titleKey: "settings.busyMessage.title", descriptionKey: "settings.busyMessage.description" },
-      { titleKey: "settings.backgroundProcesses.title", descriptionKey: "settings.backgroundProcesses.description" },
     ],
   },
   {
@@ -151,10 +139,15 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
     descriptionKey: "settings.tab.dynamicIsland.description",
     icon: PanelTop,
     rows: [
-      { titleKey: "settings.notch.show.title", descriptionKey: "settings.notch.show.description" },
+      { titleKey: "settings.notch.show.title", descriptionKey: "settings.notch.show.description", macOS: true },
+      {
+        titleKey: "settings.notch.show.titleTopOfScreen",
+        descriptionKey: "settings.notch.show.description",
+        macOS: false,
+      },
       { titleKey: "settings.notch.idle.title", descriptionKey: "settings.notch.idle.description" },
       { titleKey: "settings.notch.displays.title", descriptionKey: "settings.notch.displays.description" },
-      { titleKey: "settings.notch.haptics.title", descriptionKey: "settings.notch.haptics.description" },
+      { titleKey: "settings.notch.haptics.title", descriptionKey: "settings.notch.haptics.description", macOS: true },
       { titleKey: "settings.notch.servers.title", descriptionKey: "settings.notch.servers.description" },
       { titleKey: "settings.notch.size.title", descriptionKey: "settings.notch.size.description" },
     ],
@@ -168,6 +161,7 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
       { titleKey: "settings.agentDock.show.title", descriptionKey: "settings.agentDock.show.description" },
       { titleKey: "settings.agentDock.placement.title", descriptionKey: "settings.agentDock.placement.description" },
       { titleKey: "settings.agentDock.display.title", descriptionKey: "settings.agentDock.display.description" },
+      { titleKey: "settings.agentDock.size.title", descriptionKey: "settings.agentDock.size.description" },
       { titleKey: "settings.agentDock.agents.title" },
     ],
   },
@@ -234,7 +228,7 @@ export function navItem(tab: SettingsTab): SettingsNavItem {
 
 /**
  * Whether the settings panel and its search show the tab. Hosted servers opens from its own entry, not
- * from this panel. The Dynamic Island and the agent dock are macOS features of the main window.
+ * from this panel. The Dynamic Island and the agent dock are macOS, Windows and Linux features of the main window.
  */
 export function settingsTabShown(
   tab: SettingsTab,
@@ -242,14 +236,14 @@ export function settingsTabShown(
 ): boolean {
   if (tab === "hosted-servers") return false;
   if (tab === "dynamic-island") return dynamicIslandSettingsShown(window.platform, window.chatWindow);
-  if (tab === "agent-dock") return window.platform === "darwin" && !window.chatWindow;
+  if (tab === "agent-dock") return window.platform !== undefined && !window.chatWindow;
   return true;
 }
 
 /**
- * The Dynamic Island exists only on macOS, and only the main window owns it: main rejects its calls
- * from a chat window.
+ * The Dynamic Island exists on macOS, Windows and Linux, and only the main window owns it: main rejects
+ * its calls from a chat window.
  */
 export function dynamicIslandSettingsShown(platform: AppInfo["platform"] | undefined, chatWindow: boolean): boolean {
-  return platform === "darwin" && !chatWindow;
+  return platform !== undefined && !chatWindow;
 }

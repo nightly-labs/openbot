@@ -5,6 +5,7 @@ import {
   parseHostedServerCheckout,
   parseHostedServerList,
   parseHostedServerSummary,
+  parseServerClaim,
 } from "@openbot/contracts/hosted-servers";
 import type { HostedServersDesktopApi } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
@@ -12,6 +13,7 @@ import { currentText } from "@openbot/ui/text";
 import type { AddServerResume } from "../servers/AddServerOverlay";
 
 const REQUEST_TIMEOUT_MS = 15_000;
+const SERVER_CLAIMS_PATH = "v2/server-claims";
 
 /**
  * The hosted server calls for a signed-in browser: the add server dialog and the server list in
@@ -27,7 +29,9 @@ export function createWebHostedServerCalls(
     init: { method?: "POST" | "DELETE"; body?: string; headers?: Record<string, string> } = {},
   ): Promise<Response> {
     const post = init.body !== undefined;
-    const response = await accountFetch(`/api/browser/v2/hosting/${path}`, {
+    // A server claim is an account operation, not a hosted server one.
+    const url = path === SERVER_CLAIMS_PATH ? `/api/browser/${path}` : `/api/browser/v2/hosting/${path}`;
+    const response = await accountFetch(url, {
       method: init.method ?? (post ? "POST" : "GET"),
       credentials: "same-origin",
       cache: "no-store",
@@ -66,6 +70,7 @@ export function createWebHostedServerCalls(
     },
     list: () => request("servers", parseHostedServerList),
     plans: () => request("plans", parseHostedServerCatalog),
+    createServerClaim: () => request(SERVER_CLAIMS_PATH, parseServerClaim, { body: "{}" }),
     async create({ requestId, ...input }) {
       const body = JSON.stringify(input);
       return open(

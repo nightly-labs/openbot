@@ -148,6 +148,11 @@ export const messages = {
   "marketplace.app.remove.confirmTitle": "إزالة {name}؟",
   "marketplace.app.remove.keep": "إبقاء",
   "marketplace.app.connection": "الاتصال",
+  "marketplace.app.access.use": "يمكنه الاستخدام",
+  "marketplace.app.access.noAgents": "لا يوجد وكلاء",
+  "marketplace.app.access.agentsOf": "الوكلاء الذين يمكنهم استخدام {name}",
+  "marketplace.app.access.chooseAgents": "{name}: {summary}. اختر الوكلاء",
+  "marketplace.app.access.level": "وصول {role} إلى {name}",
   "marketplace.app.setup.account": "سجّل الدخول بحساب {name} في المتصفح.",
   "marketplace.app.setup.key": "يحتاج إلى مفتاح API من حساب {name}.",
   "marketplace.app.setup.keySaved": "حُفظ {field} على {host}.",
@@ -155,6 +160,10 @@ export const messages = {
   "marketplace.app.setup.desktop": "يعمل في تطبيق {name} المكتبي على {address}.",
   "marketplace.app.setup.desktopConnected": "متصل بـ {address}.",
   "marketplace.app.setup.open": "لا يلزم تسجيل دخول أو مفتاح.",
+  "marketplace.app.blocked.update":
+    "يشغّل {host} إصدارًا أقدم من OpenBot لا يمكنه ربط التطبيقات. حدّث OpenBot على {host}، أو اطلب من مالكه تحديثه.",
+  "marketplace.app.blocked.member":
+    "يمكن لمالك {host} أو لمشرف فيه فقط ربط التطبيقات هناك. اطلب من أحدهم ربط {name}، أو تحديث OpenBot على {host} ليتمكن الأعضاء من ربط التطبيقات.",
   "marketplace.app.connectAgain": "الربط مرة أخرى",
   "marketplace.app.automation.askOnInstall": "طلب الوصول من macOS عند التثبيت",
   "marketplace.app.automation.title": "الوصول إلى تطبيقات Apple",
@@ -215,6 +224,23 @@ export const messages = {
   "marketplace.plugin.cobrain.prompt.startSession": "حمّل سياق Cobrain لهذا المشروع قبل أن نبدأ.",
   "marketplace.plugin.cobrain.prompt.searchDecision": "ابحث في ملاحظات Cobrain عمّا قررناه بشأن التسعير.",
   "marketplace.plugin.cobrain.prompt.saveNote": "احفظ ملاحظة في Cobrain بما أنجزناه اليوم وما تبقّى.",
+  "marketplace.plugin.honcho.tagline": "ذاكرتك عبر كل أدوات الذكاء الاصطناعي",
+  "marketplace.plugin.honcho.description":
+    "يمنح Honcho من Plastic Labs الوكلاء ذاكرة طويلة المدى عنك يمكن لأدوات الذكاء الاصطناعي الأخرى التي تربطها أن تشاركها. يحفظ الوكلاء ما يتعلمونه، ويستنتج Honcho منه نموذجًا لتفضيلاتك وأهدافك وطرق عملك. يطرح الوكلاء عليه الأسئلة قبل أن يبدؤوا. لوكلاء OpenBot ذاكرتهم الخاصة أيضًا؛ وHoncho هو الذاكرة التي تتبعك إلى الأدوات الأخرى. تذهب الرسائل التي يحفظها الوكلاء إلى حسابك في Honcho.",
+  "marketplace.plugin.honcho.app": "احفظ الذاكرة طويلة المدى واستعلم عنها في مساحات عمل Honcho عبر خادم MCP واحد.",
+  "marketplace.plugin.honcho.prompt.recall": "قبل أن نبدأ، اسأل Honcho عمّا يعرفه عن طريقتي المفضلة في العمل.",
+  "marketplace.plugin.honcho.prompt.save": "احفظ قرارات هذه المحادثة في Honcho.",
+  "marketplace.plugin.honcho.prompt.preferences": "ماذا يقول Honcho عن أسلوبي في الكتابة؟ استخدمه في هذه المسودة.",
+  "marketplace.plugin.honcho.hint.apiKey": "أنشئ مفتاحًا في app.honcho.dev.",
+  "marketplace.plugin.hindsight.tagline": "ذاكرة تتعلم مع الوقت",
+  "marketplace.plugin.hindsight.description":
+    "يمنح Hindsight من Vectorize الوكلاء ذاكرة طويلة المدى في Hindsight Cloud. يحتفظ الوكلاء بالحقائق والأحداث، ويستدعونها حسب المعنى والوقت والكيان، ويتأملون فيها لتكوين نماذج ذهنية. تُحفظ الذكريات في بنوك، ويمكن للوكلاء إنشاء بنك لكل مشروع أو شخص. لوكلاء OpenBot ذاكرتهم الخاصة أيضًا؛ وHindsight هو الذاكرة التي يمكن لأدوات الذكاء الاصطناعي الأخرى التي تربطها أن تشاركها. ما يحتفظ به الوكلاء يذهب إلى حسابك في Hindsight Cloud.",
+  "marketplace.plugin.hindsight.app": "احتفظ بالذكريات واستدعها وتأمل فيها في بنوك Hindsight Cloud عبر خادم MCP واحد.",
+  "marketplace.plugin.hindsight.prompt.recall": "قبل أن نبدأ، استدعِ من Hindsight ما نعرفه عن هذا المشروع.",
+  "marketplace.plugin.hindsight.prompt.retain": "احتفظ في Hindsight بالقرارات والأسئلة المفتوحة من هذه المحادثة.",
+  "marketplace.plugin.hindsight.prompt.reflect":
+    "تأمل في ذكرياتي في Hindsight: ما الأنماط التي تراها في عملي خلال الشهر الماضي؟",
+  "marketplace.plugin.hindsight.hint.apiKey": "أنشئ مفتاحًا في صفحة Connect في Hindsight Cloud.",
   "marketplace.plugin.figma.tagline": "التصاميم والنماذج الأولية",
   "marketplace.plugin.figma.description":
     "يتيح Figma للوكلاء قراءة ملفات التصميم، وفحص المكونات والأنماط والمتغيرات، وتسليم مواصفات الإنتاج للمهندسين. يتصل بخادم MCP في تطبيق Figma المكتبي على هذا الحاسوب. يستطيع الخادم قراءة التصاميم فقط؛ ودعم الكتابة قيد التطوير.",
@@ -239,6 +265,14 @@ export const messages = {
   "marketplace.plugin.higgsfield.prompt.credits": "كم لديّ من أرصدة Higgsfield؟",
   "marketplace.plugin.higgsfield.prompt.productShot": "أنشئ في Higgsfield صورة منتج لكوب خزفي على طاولة خشبية.",
   "marketplace.plugin.higgsfield.prompt.clip": "أنشئ في Higgsfield فيديو مدته 5 ثوانٍ لأمواج عند الغروب.",
+  "marketplace.plugin.sunra.tagline": "صور وفيديو وصوت ونماذج ثلاثية الأبعاد بالذكاء الاصطناعي",
+  "marketplace.plugin.sunra.description":
+    "يتيح Sunra للوكلاء إنشاء الصور والفيديو والصوت والنماذج ثلاثية الأبعاد بنماذج مثل GPT Image وNano Banana وSeedream وFLUX وSeedance وKling وVeo، والتحقق من رصيد الأرصدة، وقراءة النتائج. تُحفظ النتائج في مشروع داخل حساب المستخدم في Sunra. يسجّل كل مستخدم الدخول إلى حسابه في Sunra عبر المتصفح. يعرض Sunra تكلفة كل عملية إنشاء أولًا، ولا يستهلك أرصدة ذلك الحساب إلا بعد تأكيدها.",
+  "marketplace.plugin.sunra.app":
+    "إنشاء الصور والفيديو والصوت والنماذج ثلاثية الأبعاد، والأرصدة والنتائج، عبر خادم MCP الخاص بـ Sunra مع تسجيل الدخول في المتصفح.",
+  "marketplace.plugin.sunra.prompt.balance": "كم لديّ من أرصدة Sunra؟",
+  "marketplace.plugin.sunra.prompt.poster": "أنشئ في Sunra ملصقًا لسوق ليلي تحت المطر، بتنسيق عمودي.",
+  "marketplace.plugin.sunra.prompt.clip": "أنشئ في Sunra فيديو مدته 5 ثوانٍ لقارب ورقي على نهر. أخبرني بالتكلفة أولًا.",
   "marketplace.plugin.elevenlabs.tagline": "الكلام والأصوات ووكلاء الصوت",
   "marketplace.plugin.elevenlabs.description":
     "يتيح ElevenLabs للوكلاء تحويل النص إلى كلام، والعمل مع الأصوات، وإنشاء وكلاء صوت ElevenLabs واختبارهم ومراجعتهم ومراجعة محادثاتهم. يعود الصوت المُنشأ كرابط تنزيل صالح لمدة قصيرة. يسجّل كل مستخدم الدخول إلى حساب ElevenLabs الخاص به عبر المتصفح، وكل عملية إنشاء تستهلك أرصدة ذلك الحساب.",
@@ -376,15 +410,30 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.lastCampaign": "كيف كان أداء حملات الأسبوع الماضي مقارنة بالأسبوع الذي قبله؟",
   "marketplace.plugin.omnisend.prompt.segment": "كم عدد جهات الاتصال في شريحة VIP، وكيف تغيّرت هذا الشهر؟",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "اكتب مسودة حملة للمجموعة الجديدة، لكن لا ترسلها.",
-  "marketplace.plugin.composio.tagline": "تطبيقات كثيرة عبر رابط Composio الخاص بك",
+  "marketplace.plugin.postiz.tagline": "جدولة منشورات التواصل الاجتماعي",
+  "marketplace.plugin.postiz.description":
+    "يتيح Postiz للوكلاء عرض قنواتك على وسائل التواصل الاجتماعي، وكتابة المسودات وجدولة المنشورات ونشرها على أكثر من 30 شبكة، مثل X وLinkedIn وInstagram وTikTok. ويمكن للوكلاء أيضًا رفع الوسائط وإنشاء صور ومقاطع فيديو بالذكاء الاصطناعي. سجّل الدخول إلى حسابك في Postiz عبر المتصفح، أو الصق مفتاح API من Settings › Developers في Postiz. كل خطط Postiz السحابية تتضمن الوصول إلى API. يمكن للوكلاء نشر منشور فورًا، لذا راجع كل منشور قبل الموافقة عليه.",
+  "marketplace.plugin.postiz.app":
+    "القنوات والمسودات والمنشورات المجدولة والوسائط، عبر خادم MCP من Postiz بتسجيل الدخول في المتصفح أو بمفتاح API.",
+  "marketplace.plugin.postiz.prompt.channels": "ما قنوات التواصل الاجتماعي المتصلة بـ Postiz؟",
+  "marketplace.plugin.postiz.prompt.week": "ما المنشورات المجدولة للأسبوع القادم؟",
+  "marketplace.plugin.postiz.prompt.draft": "اكتب مسودة منشور على LinkedIn عن إصدارنا الجديد، لكن لا تجدوله.",
+  "marketplace.plugin.trypost.tagline": "جدولة وسائل التواصل الاجتماعي",
+  "marketplace.plugin.trypost.description":
+    "يتيح TryPost للوكلاء عرض قنواتك المتصلة، وكتابة المنشورات وجدولتها وإضافتها إلى قائمة الانتظار ونشرها على X وLinkedIn وInstagram وFacebook وTikTok وYouTube وThreads وBluesky وMastodon وPinterest وغيرها. ويمكن للوكلاء أيضًا قراءة التحليلات وإدارة الأفكار والموافقات وتحديد أوقات النشر. سجّل الدخول إلى حسابك في TryPost عبر المتصفح واختر مساحة عمل. يمكن للوكلاء نشر منشور فورًا، لذا راجع كل منشور قبل الموافقة عليه.",
+  "marketplace.plugin.trypost.app":
+    "القنوات والمنشورات وقائمة الانتظار والأفكار والتحليلات، عبر خادم MCP الخاص بـ TryPost مع تسجيل الدخول من المتصفح.",
+  "marketplace.plugin.trypost.prompt.week": "ما المنشورات المجدولة لهذا الأسبوع؟",
+  "marketplace.plugin.trypost.prompt.draft": "اكتب مسودة منشور على LinkedIn عن إصدارنا الجديد، لكن لا تجدوله.",
+  "marketplace.plugin.trypost.prompt.analytics": "أي من منشوراتي في الشهر الماضي حصل على أكبر تفاعل؟",
+  "marketplace.plugin.composio.tagline": "Gmail وSlack وGitHub وأكثر من 1000 تطبيق آخر",
   "marketplace.plugin.composio.description":
-    "يربط Composio الوكلاء بـ Gmail وSlack وGitHub ومئات التطبيقات الأخرى عبر خادم MCP واحد. اربط التطبيقات التي تريدها في حساب Composio، ثم الصق عنوان MCP URL ومفتاح API هنا.",
+    "يربط Composio وكلاءك بـ Gmail وSlack وGitHub وأكثر من 1000 تطبيق آخر عبر خادم MCP واحد. سجّل الدخول بحساب Composio. عندما يحتاج وكيل إلى تطبيق، يطلب منك ربط ذلك التطبيق.",
   "marketplace.plugin.composio.app":
-    "التطبيقات التي تضيفها إلى خادم Composio MCP، عبر الرابط من حساب Composio الخاص بك.",
+    "التطبيقات التي تربطها في حساب Composio. يطلب منك الوكيل ربط تطبيق عندما يحتاج إليه.",
   "marketplace.plugin.composio.prompt.inbox": "لخّص بريدي غير المقروء وصُغ ردودًا على الرسائل العاجلة.",
   "marketplace.plugin.composio.prompt.handoff": "انشر ملخص طلب السحب هذا في قناة فريقنا.",
   "marketplace.plugin.composio.prompt.apps": "ما التطبيقات والإجراءات التي يمكنك استخدامها عبر Composio؟",
-  "marketplace.plugin.composio.hint.url": "عنوان URL لخادم MCP في حساب Composio الخاص بك",
   "marketplace.plugin.composio.hint.apiKey": "تجده في حساب Composio، ضمن Settings > Sessions & API Key.",
   "marketplace.plugin.neon.tagline": "مشاريع Postgres والفروع وعمليات الترحيل",
   "marketplace.plugin.neon.description":
@@ -493,7 +542,6 @@ export const messages = {
   "marketplace.plugin.huggingface.prompt.dataset": "ابحث عن مجموعة بيانات لسلاسل زمنية للطقس واعرض أعمدتها.",
   "marketplace.auth.apiKey": "مفتاح API",
   "marketplace.auth.personalApiKey": "مفتاح API شخصي",
-  "marketplace.auth.mcpUrl": "MCP URL",
   "marketplace.auth.createKey": "إنشاء مفتاح",
 
   "marketplace.skill.doc": "SKILL.md",
@@ -536,6 +584,13 @@ export const messages = {
   "marketplace.skills.origin.local": "أُنشئت على هذا الحاسوب",
   "marketplace.skills.origin.workspace": "في مجلد هذا الوكيل",
   "marketplace.skills.origin.marketplace": "من المتجر · الإصدار {version}",
+  "marketplace.skills.origin.github": "من GitHub · {repository}",
+  "marketplace.skills.github.search": "ابحث أو الصق رابط GitHub",
+  "marketplace.skills.github.reading": "جارٍ البحث عن مهارات في المستودع",
+  "marketplace.skills.github.trust": "لم يراجع OpenBot المهارات من GitHub. اقرأ المهارة قبل إضافتها.",
+  "marketplace.skills.github.source": "GitHub · {repository} عند {commit}",
+  "marketplace.skills.github.open": "GitHub",
+  "marketplace.skills.github.openName": "فتح {repository} على GitHub",
   "marketplace.skills.status.notAdded": "غير مضافة",
   "marketplace.skills.status.on": "على {agents}",
   "marketplace.skills.agentCount": {

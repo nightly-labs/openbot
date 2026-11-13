@@ -38,7 +38,12 @@ function channelConversationMessage(entry: ChannelMessage): AgentMessage {
       ...row,
       id: entry.id,
       kind: "action-marker",
-      actionMarker: { ...routing, kind: "channel-routing", timestamp: entry.message.createdAt },
+      actionMarker: {
+        kind: "channel-routing",
+        action: routing.action,
+        agentIds: [routing.agentId],
+        timestamp: entry.message.createdAt,
+      },
     };
   if (member)
     return { ...row, id: entry.id, author: "you", senderMember: { id: entry.author.id, name: entry.author.name } };
@@ -53,7 +58,8 @@ function foldedEntry(entry: ChannelMessage): boolean {
 /**
  * The rows of a channel page. The thinking and narration of a member's turn fold into one thinking
  * row, as in an agent chat, and show as the steps above the member's answer. With the Natural style
- * the narration also shows as the member's progress updates (`narrationRows`). Before, each part showed
+ * the narration also shows as the member's progress updates (`narrationRows`) until the answer
+ * comes (`scroll-store`). Before, each part showed
  * as a message, and a model that streams its whole reasoning (DeepSeek through OpenCode) showed a
  * very long one.
  */
@@ -71,10 +77,33 @@ export function channelConversationRows(entries: readonly ChannelMessage[]): Age
   for (const entry of entries)
     if (entry.message.turnId && foldedEntry(entry) && entry.author.kind !== "member")
       turnAuthors.set(entry.message.turnId, entry.author.id);
-  return rows.map((row) => {
-    const author = row.kind === "thinking" && row.turnId ? turnAuthors.get(row.turnId) : undefined;
-    return author ? { ...row, senderAgentId: author } : row;
-  });
+  return joinRoutingRows(
+    rows.map((row) => {
+      const author = row.kind === "thinking" && row.turnId ? turnAuthors.get(row.turnId) : undefined;
+      return author ? { ...row, senderAgentId: author } : row;
+    }),
+  );
+}
+
+/**
+ * Consecutive routing receipts of one action as one row. The lead often gives the parts of one request
+ * to several members at once, and a row for each read as a list of separate events. The row keeps the
+ * id of its first receipt, so a member that joins later adds a name to the row the reader sees.
+ */
+function joinRoutingRows(rows: AgentMessage[]): AgentMessage[] {
+  const joined: AgentMessage[] = [];
+  for (const row of rows) {
+    const marker = row.actionMarker?.kind === "channel-routing" ? row.actionMarker : undefined;
+    const previous = joined.at(-1);
+    const open = previous?.actionMarker?.kind === "channel-routing" ? previous.actionMarker : undefined;
+    if (!marker || !previous || !open || open.action !== marker.action) {
+      joined.push(row);
+      continue;
+    }
+    const agentIds = [...open.agentIds, ...marker.agentIds.filter((id) => !open.agentIds.includes(id))];
+    joined[joined.length - 1] = { ...previous, actionMarker: { ...open, agentIds, timestamp: marker.timestamp } };
+  }
+  return joined;
 }
 
 /**
@@ -136,14 +165,15 @@ export function firstUnreadChannelMessageId(
  * The lead's routing turn moves no task out of `queued` and writes no message of its own. Without
  * it the transcript stands still while the coordinator thinks, which reads as a dropped request.
  * Only `queued` and `waiting`: routing that ends without an owner leaves the task `paused` with the
- * coordinator's reason above the composer, and that notice is the indicator from then on. A lead that
- * the user hid routes nothing until the restore, so it is not shown as working.
+ * coordinator's reason above the composer, and that notice is the indicator from then on. A hidden
+ * lead on a host without `agent-hidden-work` routes nothing until the restore, so it is not shown as
+ * working.
  */
 export function channelWorkers(
   page: ChannelPage,
   agents: readonly AgentProfile[],
   fallbackName: string,
-  hiddenAgentIds: ReadonlySet<string>,
+  pausedAgentIds: ReadonlySet<string>,
 ): ChannelWorker[] {
   const ids = new Set<string>();
   const active = new Set<string>();
@@ -164,7 +194,7 @@ export function channelWorkers(
   const lead = page.channel.leadAgentId;
   if (
     lead &&
-    !hiddenAgentIds.has(lead) &&
+    !pausedAgentIds.has(lead) &&
     page.tasks.some((task) => !task.ownerAgentId && (task.state === "queued" || task.state === "waiting"))
   )
     ids.add(lead);
@@ -181,9 +211,10 @@ export function channelWorkers(
  * A task the service stopped carries the reason, and an archived channel stops every task without
  * one, so the reason tells the two apart. A failed task belongs here too: its parent waits for it,
  * and only the reader starts it again. The assignment limit stops a whole tree at once, and `resume`
- * starts a task with everything under it, so the entry is the root.
+ * starts a task with everything under it, so the entry is the root. `runAgentIds` are the owners of
+ * the tasks of the run, so the assignment limit can name the members that passed the work around.
  */
-export function stoppedChannelTasks(page: ChannelPage): ChannelTask[] {
+export function stoppedChannelTasks(page: ChannelPage): (ChannelTask & { runAgentIds: string[] })[] {
   if (page.channel.archived) return [];
   const roots = new Map<string, ChannelTask>();
   for (const task of page.tasks) {
@@ -191,7 +222,16 @@ export function stoppedChannelTasks(page: ChannelPage): ChannelTask[] {
     const known = roots.get(task.rootTaskId);
     if (!known || task.id === task.rootTaskId) roots.set(task.rootTaskId, task);
   }
-  return [...roots.values()];
+  return [...roots.values()].map((root) => ({
+    ...root,
+    runAgentIds: [
+      ...new Set(
+        page.tasks.flatMap((task) =>
+          task.rootTaskId === root.rootTaskId && task.ownerAgentId ? [task.ownerAgentId] : [],
+        ),
+      ),
+    ],
+  }));
 }
 
 /**
@@ -219,15 +259,34 @@ export function activeChannelRuns(page: ChannelPage): string[] {
   return [...runs];
 }
 
-/** The newest question of an agent that nobody answered yet. An archived channel takes no answer. */
+/**
+ * The newest question of an agent that the host still waits on. An archived channel takes no answer.
+ * The saved row can miss the end of its question, so only a question in the host's list is open, as
+ * an approval is. Before, a stale row stayed open and its answer failed (#8142). The request must
+ * also come from the channel's thread: a custom agent counts its request ids again after a restart.
+ */
 export function waitingChannelPrompt(
   page: ChannelPage,
+  threads: readonly ChannelThread[] | undefined,
+  waiting: readonly { agentId: string; threadId: string; requestId: string | number }[],
 ): { entry: ChannelMessage; prompt: ConversationQuestionPrompt } | null {
   if (page.channel.archived) return null;
   for (let index = page.messages.length - 1; index >= 0; index -= 1) {
     const entry = page.messages[index];
     const prompt = entry?.message.questionPrompt;
-    if (entry && prompt && entry.author.kind !== "member" && !prompt.resolution) return { entry, prompt };
+    if (
+      entry &&
+      prompt &&
+      entry.author.kind !== "member" &&
+      !prompt.resolution &&
+      waiting.some(
+        (request) =>
+          request.agentId === entry.author.id &&
+          String(request.requestId) === String(prompt.requestId) &&
+          channelOwnsRequest(page, threads, request),
+      )
+    )
+      return { entry, prompt };
   }
   return null;
 }

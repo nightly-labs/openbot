@@ -1,12 +1,25 @@
-import type { ChannelSummary } from "@openbot/contracts/ipc";
+import { avatarHueSwatch } from "@openbot/brand/bloub-avatar";
+import type { AvatarHue, ChannelIconName, ChannelSummary } from "@openbot/contracts/ipc";
+import { useQuery } from "@tanstack/react-query";
+import { Image } from "expo-image";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Folder from "lucide-react-native/icons/folder";
-import { memo } from "react";
+import { memo, type ReactNode, useState } from "react";
 import { View } from "react-native";
 import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
+import { useQueryScope } from "@/features/auth/context/mobile-session-context";
+import { DISCONNECTED_APPEARANCE } from "@/features/workspace/components/use-connection-appearance";
+import {
+  useMobileWorkspaceActions,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
+import { savedChannelImage } from "@/features/workspace/model/agent-avatar-cache";
+import { queryKeys } from "@/features/workspace/model/query-keys";
+import { showsOnline } from "@/features/workspace/model/server-status";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { useText } from "@/shared/lib/text";
+import { CHANNEL_ICONS, knownChannelIcon } from "../model/channel-icons";
 
 /*
  * The members in the square one agent avatar occupies, as the desktop sidebar draws them, so a
@@ -47,16 +60,150 @@ const LAYOUTS: Readonly<Record<number, readonly Cell[]>> = {
   ],
 };
 
+/** A channel picture is a rounded square, as on the desktop, so a channel does not look like an agent. */
+const PICTURE_RADIUS = 0.3;
+
+type ChannelPictureSource = Pick<ChannelSummary, "members"> & Partial<Pick<ChannelSummary, "id" | "icon" | "imageUrl">>;
+
+/**
+ * The picture of a channel: its uploaded image, else its icon on a colour, else the member faces.
+ * The image loads only with `serverId`; without it the channel shows its icon or its faces.
+ */
 export const ChannelAvatar = memo(function ChannelAvatar({
   channel,
   agents,
   size,
+  serverId,
   disconnected = false,
+}: {
+  channel: ChannelPictureSource;
+  agents: ReadonlyMap<string, MobileAgent>;
+  size: number;
+  serverId?: string;
+  disconnected?: boolean;
+}) {
+  const icon = knownChannelIcon(channel.icon);
+  const fallback = icon ? (
+    <ChannelIconTile name={icon.name} hue={icon.hue} size={size} disconnected={disconnected} />
+  ) : (
+    <MemberFaces channel={channel} agents={agents} size={size} disconnected={disconnected} />
+  );
+  if (!channel.imageUrl || !channel.id || !serverId) return fallback;
+  return (
+    <ChannelImage
+      serverId={serverId}
+      channelId={channel.id}
+      imageUrl={channel.imageUrl}
+      size={size}
+      disconnected={disconnected}
+    >
+      {fallback}
+    </ChannelImage>
+  );
+});
+
+/** An icon on the channel colour. The picture editor draws its choices with it too. */
+export function ChannelIconTile({
+  name,
+  hue,
+  size,
+  disconnected = false,
+}: {
+  name: ChannelIconName;
+  hue: AvatarHue;
+  size: number;
+  disconnected?: boolean;
+}) {
+  const swatch = avatarHueSwatch(hue);
+  const Glyph = CHANNEL_ICONS[name].glyph;
+  return (
+    <View
+      accessible={false}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size * PICTURE_RADIUS,
+        borderCurve: "continuous",
+        alignItems: "center",
+        justifyContent: "center",
+        // The hue at about a quarter over the surface, as the desktop mixes it.
+        backgroundColor: `${swatch}42`,
+        opacity: disconnected ? DISCONNECTED_APPEARANCE.opacity : 1,
+      }}
+    >
+      <Glyph color={swatch} size={size * 0.55} strokeWidth={2} />
+    </View>
+  );
+}
+
+function ChannelImage({
+  serverId,
+  channelId,
+  imageUrl,
+  size,
+  disconnected,
+  children,
+}: {
+  serverId: string;
+  channelId: string;
+  imageUrl: string;
+  size: number;
+  disconnected: boolean;
+  children: ReactNode;
+}) {
+  const { channelStore } = useMobileWorkspaceActions();
+  const queryScope = useQueryScope();
+  const online = useMobileWorkspaceSelector((current) =>
+    current.servers.some((server) => server.id === serverId && showsOnline(server)),
+  );
+  const image = useQuery({
+    queryKey: queryKeys.channelImage(queryScope, serverId, channelId, imageUrl),
+    enabled: online,
+    queryFn: () => channelStore.image(serverId, channelId, imageUrl),
+    // A saved image shows at once, also before the server connects.
+    initialData: () => savedChannelImage(serverId, channelId, imageUrl) ?? undefined,
+    staleTime: Infinity,
+  });
+  const [failed, setFailed] = useState<string | null>(null);
+  const uri = image.data;
+  // An image that does not load shows the icon or the faces, as on the desktop.
+  if (!uri || uri === failed) return children;
+  return (
+    <View
+      accessible={false}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size * PICTURE_RADIUS,
+        borderCurve: "continuous",
+        overflow: "hidden",
+      }}
+    >
+      <Image
+        source={{ uri }}
+        contentFit="cover"
+        recyclingKey={uri}
+        style={{ width: size, height: size, opacity: disconnected ? DISCONNECTED_APPEARANCE.opacity : 1 }}
+        onError={() => setFailed(uri)}
+      />
+    </View>
+  );
+}
+
+const MemberFaces = memo(function MemberFaces({
+  channel,
+  agents,
+  size,
+  disconnected,
 }: {
   channel: Pick<ChannelSummary, "members">;
   agents: ReadonlyMap<string, MobileAgent>;
   size: number;
-  disconnected?: boolean;
+  disconnected: boolean;
 }) {
   const muted = useThemeColor("muted");
   const total = channel.members.length;

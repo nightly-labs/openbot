@@ -5,8 +5,15 @@ import { type SharedValue, useSharedValue, withTiming } from "react-native-reani
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { AUTOMATIC_DICTATION_LANGUAGE, useDictationLanguage } from "@/features/settings/model/dictation-language";
-import { parakeetSupported, useParakeetModel } from "@/features/voice/model/parakeet-model";
+import {
+  isLocalRecognition,
+  localRecognitionSupported,
+  useParakeetModel,
+  useParakeetUnifiedModel,
+  useQwenModel,
+} from "@/features/voice/model/recognition-models";
 import { speechNative } from "@/features/voice/model/speech-native";
+import { useVoiceServer } from "@/features/voice/model/voice-server";
 import { useVoiceSettings } from "@/features/voice/model/voice-settings";
 import { haptics } from "@/shared/lib/haptics";
 import { phoneLanguages } from "@/shared/lib/phone-languages";
@@ -412,17 +419,23 @@ function useSystemDictation({
 }
 
 /**
- * The recognizer that Settings > Voice chose, when it can run now. Parakeet needs its model and
- * enough memory, ElevenLabs needs a key, and both need a speech module with a microphone. Otherwise
- * the phone's recognizer listens, so the microphone always works.
+ * The recognizer that Settings > Voice chose, when it can run now. A model on the phone needs its
+ * download and enough memory, ElevenLabs needs a key, and both need a speech module with a
+ * microphone. Otherwise the phone's recognizer listens, so the microphone always works.
  */
 function useActiveRecognition(): "system" | ModelRecognition {
   const recognition = useVoiceSettings((state) => state.recognition);
   const hasKey = useVoiceSettings((state) => state.hasElevenLabsKey);
   const parakeetReady = useParakeetModel((state) => state.phase === "ready");
+  const unifiedReady = useParakeetUnifiedModel((state) => state.phase === "ready");
+  const qwenReady = useQwenModel((state) => state.phase === "ready");
+  const serverDictates = useVoiceServer((state) => state.server?.routes.dictation === true);
   if (!modelCaptureAvailable()) return "system";
-  if (recognition === "parakeet" && parakeetReady && parakeetSupported()) return "parakeet";
+  const ready = { parakeet: parakeetReady, "parakeet-unified": unifiedReady, "qwen3-asr": qwenReady };
+  if (isLocalRecognition(recognition) && ready[recognition] && localRecognitionSupported(recognition))
+    return recognition;
   if (recognition === "elevenlabs" && hasKey) return "elevenlabs";
+  if (recognition === "voice-server" && serverDictates) return "voice-server";
   return "system";
 }
 
@@ -433,10 +446,16 @@ function useActiveRecognition(): "system" | ModelRecognition {
 export function useVoiceDictation({
   enabled,
   onDraft,
+  endsOnPause = false,
 }: {
   /** False stops listening and keeps the text, for example when the chat goes offline. */
   enabled: boolean;
   onDraft: (text: string) => void;
+  /**
+   * A voice conversation: a recognizer that gives its text only at the end, the voice server, ends
+   * the session after the pause of Settings > Voice, so the turn can go.
+   */
+  endsOnPause?: boolean;
 }): VoiceDictation {
   const engine = useActiveRecognition();
   const system = useSystemDictation({ enabled: enabled && engine === "system", onDraft });
@@ -444,6 +463,7 @@ export function useVoiceDictation({
     engine: engine === "system" ? null : engine,
     enabled: enabled && engine !== "system",
     onDraft,
+    endsOnPause,
   });
   return engine === "system" ? system : model;
 }

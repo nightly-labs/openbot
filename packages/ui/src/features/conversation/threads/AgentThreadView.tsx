@@ -25,9 +25,14 @@ import {
   AgentStepsDisclosure,
   type AgentStepsFacts,
 } from "@openbot/ui/features/conversation/AgentSteps";
-import type { AttachmentDownloads, AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
+import {
+  AttachmentCards,
+  type AttachmentDownloads,
+  type AttachmentMediaSource,
+} from "@openbot/ui/features/conversation/AttachmentCards";
 import { agentActivityExitDuration } from "@openbot/ui/features/conversation/activity-timing";
 import { branchPointIds } from "@openbot/ui/features/conversation/branch-points";
+import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
 import { type ChatMessageAuthor, ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { ComposerAddMenu } from "@openbot/ui/features/conversation/ComposerAddMenu";
 import {
@@ -43,8 +48,13 @@ import {
 import { ComposerNotice } from "@openbot/ui/features/conversation/ComposerNotice";
 import { ComposerReplyPreview } from "@openbot/ui/features/conversation/ComposerReplyPreview";
 import { ComposerSendControl } from "@openbot/ui/features/conversation/ComposerSendControl";
+import { ComposerStackCard } from "@openbot/ui/features/conversation/ComposerStackCard";
 import { ContextUsageMeter, type ContextUsageView } from "@openbot/ui/features/conversation/ContextUsage";
 import { ApprovalCard } from "@openbot/ui/features/conversation/ConversationPrompts";
+import {
+  preferredMessageScrollBehavior,
+  ScrollToLatestButton,
+} from "@openbot/ui/features/conversation/MessageNavigation";
 import {
   DeleteMessageDialog,
   MessageActions,
@@ -62,7 +72,9 @@ import { ComposerVoiceControls, type VoicePhase } from "@openbot/ui/features/con
 import { type TextValue, useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { children, createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show, untrack } from "solid-js";
+import { createComposerRowsResize } from "../createComposerRowsResize";
 import { type AgentThreadBranchSource, BranchDivider } from "./BranchDivider";
+import { MAIN_THREAD_ID } from "./thread-types";
 
 const HOLD_TEXT = {
   "agent-restarting": "conversation.threads.hold.agentRestarting",
@@ -74,6 +86,8 @@ const HOLD_TEXT = {
 
 /** The list stays at its end while new text comes in, when the user has not scrolled up. */
 const STICK_DISTANCE = 48;
+/** A message this many view heights from the middle of the view or nearer slides into place. */
+const NEAR_SCROLL_VIEWS = 2;
 
 /**
  * Whether the thread shows this message as a row. A stopped turn can leave an agent message with no
@@ -87,6 +101,7 @@ function shownInThread(message: AgentMessage): boolean {
     message.body.trim().length > 0 ||
     (message.attachments?.length ?? 0) > 0 ||
     message.imageGeneration !== undefined ||
+    message.videoGeneration !== undefined ||
     message.questionPrompt !== undefined ||
     message.plan !== undefined ||
     message.actionMarker !== undefined
@@ -199,6 +214,11 @@ export interface AgentThreadViewProps {
   onSend: (text: string) => Promise<boolean>;
   onStop: () => void;
   onOpenLink: (url: string) => void;
+  /**
+   * Opens an agent's chat, or one of its threads by tab id. With it, a message to or from another agent
+   * shows as a marker, as in the agent's own chat. Without it, the message shows as a row.
+   */
+  onSelectAgent?: ((agentId: string, tabId?: string) => void) | undefined;
   onPreview: (attachment: AttachmentSummary) => void;
   onAttachmentAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
   /** The window draws the macOS window controls over the top start corner. The image viewer leaves room. */
@@ -219,6 +239,11 @@ export interface AgentThreadViewProps {
    * or when the server cannot read them.
    */
   olderMessages?: AgentThreadOlderMessages | undefined;
+  /**
+   * The thread shows a part around an old message, and its latest messages are not loaded: a way back
+   * to the latest message shows. `onLoad` reads them in the place of the part.
+   */
+  newerMessages?: AgentThreadOlderMessages | undefined;
   /** The card that the app draws in the place of a message row, such as an MCP sign-in. Undefined keeps the row. */
   messageCard?: ((message: AgentMessage) => JSX.Element | undefined) | undefined;
   /**
@@ -269,6 +294,10 @@ export interface AgentThreadViewProps {
   onCancelReply?: (() => void) | undefined;
   /** A message to scroll to and mark once, when it shows. Each new request has a new nonce. */
   focusMessage?: { messageId: string; nonce: number } | undefined;
+  /** Pins a message to this thread, or unpins it. Without it, the message menu has no such item. */
+  messagePins?:
+    | { isPinned: (messageId: string) => boolean; onToggle: (messageId: string, pinned: boolean) => void }
+    | undefined;
   /**
    * The queue of the thread, as the agent's own chat shows its queue. Without it the thread lists the
    * start of each queued message: a joined server sends no more on `agent-tasks-v1`.
@@ -326,6 +355,17 @@ export function AgentThreadView(props: AgentThreadViewProps) {
         olderAnchor = undefined;
     },
   );
+  // A read of the latest messages takes the place of the part, and the view follows its end again.
+  createEffect(
+    () => props.newerMessages?.loading === true,
+    (loading) => {
+      if (loading) atEnd = true;
+    },
+  );
+  function loadLatest(newer: AgentThreadOlderMessages): void {
+    atEnd = true;
+    newer.onLoad();
+  }
   let shownTaskId = untrack(() => props.task?.id);
   const activityLabel = nextAgentActivityLabel();
   const fades = createScrollFades();
@@ -365,7 +405,8 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       if (atEnd) element.scrollTop = element.scrollHeight;
     });
     follow.observe(list);
-    element.scrollTop = element.scrollHeight;
+    // A thread that opens at a message, such as a pin, stays at it.
+    if (atEnd) element.scrollTop = element.scrollHeight;
     element.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       follow.disconnect();
@@ -377,9 +418,15 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   function showMessage(messageId: string): boolean {
     const message = scroller?.querySelector<HTMLElement>(`[data-chat-search-message="${CSS.escape(messageId)}"]`);
     const row = message?.closest<HTMLElement>(".virtual-chat-row");
-    if (!row) return false;
+    if (!row || !scroller) return false;
     atEnd = false;
-    row.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
+    // A row near the view slides into place. A far row, or a part that took the place of the
+    // messages, shows at once: a long slide over messages that the reader did not ask for helps nobody.
+    const view = scroller.getBoundingClientRect();
+    const bounds = row.getBoundingClientRect();
+    const distance = Math.abs(bounds.top + bounds.height / 2 - (view.top + view.height / 2));
+    const behavior = distance <= view.height * NEAR_SCROLL_VIEWS ? preferredMessageScrollBehavior() : "auto";
+    row.scrollIntoView({ behavior, block: "center", inline: "nearest" });
     // The row lights up, then fades.
     delete row.dataset.replyFlash;
     void row.offsetWidth;
@@ -395,7 +442,14 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   let focusedNonce: number | undefined;
   // The thread scrolls to a message once, when its row shows, for example its source after "Branched from".
   createEffect(
-    () => ({ focus: props.focusMessage, count: props.messages.length, taskId: props.task?.id }),
+    // A part that takes the place of the messages can have as many messages, so the ends are in the key too.
+    () => ({
+      focus: props.focusMessage,
+      count: props.messages.length,
+      first: props.messages[0]?.id,
+      last: props.messages.at(-1)?.id,
+      taskId: props.task?.id,
+    }),
     ({ focus }) => {
       if (!focus || focus.nonce === focusedNonce) return;
       if (showMessage(focus.messageId)) focusedNonce = focus.nonce;
@@ -473,7 +527,64 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       avatarSeed: senderId,
     };
   };
-  /** The items of a message's menu: Reply, Copy, Branch on the last answer of a finished turn, and Delete. */
+  /* The exchange ids of the agent messages whose text shows under their marker. */
+  const [openAgentMessages, setOpenAgentMessages] = createSignal<ReadonlySet<string>>(new Set());
+  const toggleAgentMessage = (messageId: string) =>
+    setOpenAgentMessages((open) => {
+      const next = new Set(open);
+      if (!next.delete(messageId)) next.add(messageId);
+      return next;
+    });
+  /** The marker of a message to or from another agent. A message with no text gets no toggle. */
+  const agentMessageMarker = (message: AgentMessage) => {
+    const marker = message.actionMarker;
+    if (marker?.kind !== "agent-message" || !props.onSelectAgent) return undefined;
+    if (message.body.trim() === "") return marker;
+    return { ...marker, expanded: openAgentMessages().has(marker.messageId) };
+  };
+  /** The text of an open agent message, under its marker, as the sender's message. Its attachments stay under the marker. */
+  const agentMessageText = (messageId: string) => {
+    const message = () => props.messages.find((candidate) => candidate.exchange?.messageId === messageId);
+    return (
+      <Show when={message()}>
+        {(current) => (
+          <ChatMessageRow
+            message={{
+              id: current().id,
+              author: "agent",
+              body: current().body,
+              time: current().time,
+              ...(current().createdAt === undefined ? {} : { createdAt: current().createdAt }),
+              kind: "text",
+            }}
+            author={author(current())}
+            showAuthor
+            showTime
+            agents={props.agents}
+            skills={props.skills}
+            // The sender's name opens the thread that sent the message, or else the sender's own chat, as in the chat.
+            onSelectAgent={(agentId) =>
+              agentId === current().exchange?.senderAgentId
+                ? props.onSelectAgent?.(agentId, current().exchange?.senderTaskId ?? MAIN_THREAD_ID)
+                : props.onSelectAgent?.(agentId)
+            }
+            onOpenTag={props.onOpenTag}
+            onOpenLink={props.onOpenLink}
+            onPreview={props.onPreview}
+            onAttachmentAction={props.onAttachmentAction}
+            macWindowControls={props.macWindowControls}
+          />
+        )}
+      </Show>
+    );
+  };
+  function pinAction(message: AgentMessage) {
+    const pins = props.messagePins;
+    if (!pins || message.streaming) return undefined;
+    const pinned = pins.isPinned(message.id);
+    return { pinned, onToggle: () => pins.onToggle(message.id, !pinned) };
+  }
+  /** The items of a message's menu: Reply, Copy, Pin, Branch on the last answer of a finished turn, and Delete. */
   function menuItems(message: AgentMessage, onCopy: (message: AgentMessage) => void): MessageMenuItemsProps {
     return {
       message,
@@ -483,6 +594,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       onCopy: () => onCopy(message),
       onBranch: branchAction(message),
       branchDisabled: branchBusy(),
+      pin: pinAction(message),
       onDelete: deleteAction(message),
     };
   }
@@ -605,6 +717,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   });
   const queuePanelOwner = () => (queueRows().deliveries.length > 0 ? queueRows().taskId : undefined);
   const queueOpen = () => (props.queue?.deliveries.length ?? 0) > 0 && queueRows().taskId === props.task?.id;
+  const draftRows = createComposerRowsResize(() => props.task?.id ?? "");
   const hasRow = () =>
     Boolean(props.onRemoveAttachment) &&
     ((props.rowAttachments?.length ?? 0) > 0 || (props.pendingImages?.length ?? 0) > 0);
@@ -646,6 +759,9 @@ export function AgentThreadView(props: AgentThreadViewProps) {
         aria-label={t("conversation.threads.view.label", { title: title() })}
         onScroll={fades.measure}
       >
+        <Show when={props.newerMessages}>
+          {(newer) => <ScrollToLatestButton onClick={() => loadLatest(newer())} />}
+        </Show>
         <div class="virtual-chat-list virtual-chat-list-static" ref={fades.watch}>
           <Show when={props.olderMessages}>
             {(older) => (
@@ -682,7 +798,31 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                       />
                     )}
                   </Show>
-                  <Show when={message().kind !== "thinking"}>
+                  <Show when={message().kind !== "thinking" && agentMessageMarker(message())}>
+                    {(marker) => (
+                      <article data-chat-search-message={message().id}>
+                        <ChatActionMarker
+                          marker={marker()}
+                          agents={props.agents}
+                          onSelectAgent={(agentId, tabId) => props.onSelectAgent?.(agentId, tabId)}
+                          onToggleAgentMessage={toggleAgentMessage}
+                          agentMessageText={agentMessageText}
+                        />
+                        <Show when={marker().direction === "incoming" && (message().attachments?.length ?? 0) > 0}>
+                          <div class="chat-action-attachments">
+                            <AttachmentCards
+                              attachments={message().attachments ?? []}
+                              mediaSource={props.mediaSource}
+                              downloads={props.downloads}
+                              onPreview={(attachment) => props.onPreview(attachment)}
+                              onAction={props.onAttachmentAction}
+                            />
+                          </div>
+                        </Show>
+                      </article>
+                    )}
+                  </Show>
+                  <Show when={message().kind !== "thinking" && !agentMessageMarker(message())}>
                     <Show
                       when={card()}
                       fallback={
@@ -769,74 +909,80 @@ export function AgentThreadView(props: AgentThreadViewProps) {
         </div>
       </section>
       <div class="composer-wrap">
-        <Show when={failed()}>
-          {(task) => (
-            <ComposerNotice
-              tone="danger"
-              title={t("conversation.threads.view.failed")}
-              body={task().error || t("conversation.threads.view.failedBody")}
-            />
-          )}
-        </Show>
-        <Show when={props.replyTo}>
-          {(message) => (
-            <ComposerReplyPreview
-              message={message()}
-              agents={props.agents}
-              skills={props.skills}
-              disabled={sending() || voicePhase() === "transcribing"}
-              onCancel={() => props.onCancelReply?.()}
-            />
-          )}
-        </Show>
-        <Show when={props.queue}>
-          {(queue) => (
-            <div class="composer-stack">
-              <div
-                class="agent-queue-slot"
-                data-open={queueOpen() ? "true" : "false"}
-                aria-hidden={queueOpen() ? undefined : "true"}
-                inert={queueOpen() ? undefined : true}
-              >
-                <div class="agent-queue-slot-inner">
-                  {/* Each thread gets its own panel, so its rows do not animate in from the thread before. */}
-                  <Show when={queuePanelOwner()} keyed>
-                    {(_taskId) => (
-                      <QueuePanel
-                        deliveries={queueRows().deliveries}
-                        agents={props.agents}
-                        skills={props.skills}
-                        editingDeliveryId={queue().editingDeliveryId}
-                        canSteer={Boolean(props.task?.activeTurnId)}
-                        onSteer={queue().onSteer}
-                        onCancel={(deliveryId) => queue().onCancel(deliveryId)}
-                        onEdit={(delivery) => queue().onEdit(delivery)}
-                        onReorder={(deliveryIds) => queue().onReorder(deliveryIds)}
-                      />
-                    )}
-                  </Show>
+        {/* One card for everything above the input: see composer-stack.css. */}
+        <div class="composer-stack">
+          <ComposerStackCard when={failed()}>
+            {(task) => (
+              <ComposerNotice
+                tone="danger"
+                title={t("conversation.threads.view.failed")}
+                body={task().error || t("conversation.threads.view.failedBody")}
+              />
+            )}
+          </ComposerStackCard>
+          <Show when={props.queue}>
+            {(queue) => (
+              <>
+                <div
+                  class="agent-queue-slot"
+                  data-open={queueOpen() ? "true" : "false"}
+                  aria-hidden={queueOpen() ? undefined : "true"}
+                  inert={queueOpen() ? undefined : true}
+                >
+                  <div class="agent-queue-slot-inner">
+                    {/* Each thread gets its own panel, so its rows do not animate in from the thread before. */}
+                    <Show when={queuePanelOwner()} keyed>
+                      {(_taskId) => (
+                        <QueuePanel
+                          deliveries={queueRows().deliveries}
+                          agents={props.agents}
+                          skills={props.skills}
+                          editingDeliveryId={queue().editingDeliveryId}
+                          canSteer={Boolean(props.task?.activeTurnId)}
+                          onSteer={queue().onSteer}
+                          onCancel={(deliveryId) => queue().onCancel(deliveryId)}
+                          onEdit={(delivery) => queue().onEdit(delivery)}
+                          onReorder={(deliveryIds) => queue().onReorder(deliveryIds)}
+                        />
+                      )}
+                    </Show>
+                  </div>
                 </div>
-              </div>
-              <Show when={queue().editingDeliveryId}>
-                <ComposerNotice
-                  body={t("composer.queueEdit.body")}
-                  action={
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      type="button"
-                      disabled={queue().editBusy}
-                      onClick={() => queue().onCancelEdit()}
-                    >
-                      {t("composer.queueEdit.cancel")}
-                    </Button>
-                  }
-                />
-              </Show>
-            </div>
-          )}
-        </Show>
+                <ComposerStackCard when={queue().editingDeliveryId}>
+                  {() => (
+                    <ComposerNotice
+                      body={t("composer.queueEdit.body")}
+                      action={
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          type="button"
+                          disabled={queue().editBusy}
+                          onClick={() => queue().onCancelEdit()}
+                        >
+                          {t("composer.queueEdit.cancel")}
+                        </Button>
+                      }
+                    />
+                  )}
+                </ComposerStackCard>
+              </>
+            )}
+          </Show>
+          <ComposerStackCard when={props.replyTo}>
+            {(message) => (
+              <ComposerReplyPreview
+                message={message()}
+                agents={props.agents}
+                skills={props.skills}
+                disabled={sending() || voicePhase() === "transcribing"}
+                onCancel={() => props.onCancelReply?.()}
+              />
+            )}
+          </ComposerStackCard>
+        </div>
         <form
+          ref={draftRows.form}
           class="composer agent-thread-composer"
           data-compact={hasRow() ? undefined : "true"}
           data-has-attachments={hasRow() ? "" : undefined}
@@ -852,10 +998,11 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                 pending={props.pendingImages}
                 removeDisabled={sending() || voicePhase() === "transcribing"}
                 onRemove={(attachment) => remove()(attachment)}
+                macWindowControls={props.macWindowControls}
               />
             )}
           </Show>
-          <div class="composer-input-label">
+          <div class="composer-input-label" ref={draftRows.label}>
             <ComposerEditor
               agentId={props.agent.id}
               agents={props.agents}

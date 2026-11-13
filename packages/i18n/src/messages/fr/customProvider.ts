@@ -75,23 +75,24 @@ export const messages = {
   "customProvider.field.apiKeyKeptHint": "Une clé est enregistrée. Laissez ce champ vide pour la conserver.",
   "customProvider.models": "Modèles",
   "customProvider.model.id": "ID du modèle {number}",
+  "customProvider.model.idColumn": "ID du modèle",
   "customProvider.model.name": "Nom d’affichage du modèle {number}",
   "customProvider.model.namePlaceholder": "Nom d’affichage",
   "customProvider.model.contextWindow": "Fenêtre de contexte du modèle {number}",
   "customProvider.model.contextWindowPlaceholder": "Jetons",
+  "customProvider.model.contextWindowColumn": "Fenêtre de contexte",
   "customProvider.model.maxOutput": "Sortie maximale du modèle {number}",
   "customProvider.model.maxOutputPlaceholder": "Jetons",
+  "customProvider.model.maxOutputColumn": "Sortie max.",
   "customProvider.model.efforts": "Effort du modèle {number}",
   "customProvider.model.effortsLabel": "Effort",
-  "customProvider.model.effortsHintOpenCode":
-    "Sélectionnez les niveaux d’effort que chaque modèle accepte. Sans sélection, OpenCode propose Faible, Moyen et Élevé.",
-  "customProvider.model.effortsHintPi":
-    "Sélectionnez les niveaux d’effort que chaque modèle accepte. Sans sélection, le modèle ne raisonne pas.",
+  "customProvider.model.effortsDefault": "Par défaut",
+  "customProvider.model.effortsNone": "Sans raisonnement",
   "customProvider.model.inputs": "Entrées du modèle {number}",
   "customProvider.model.inputsLabel": "Accepte",
   "customProvider.model.inputImage": "Images",
   "customProvider.model.inputPdf": "PDF",
-  "customProvider.model.inputsHint": "Sélectionnez ce que chaque modèle peut lire en plus du texte.",
+  "customProvider.model.inputsNone": "Texte seul",
   "customProvider.model.foundValuesHint":
     "Certaines valeurs viennent du point de terminaison. Vous pouvez les modifier.",
   "customProvider.model.remove": "Supprimer le modèle {number}",
@@ -113,7 +114,11 @@ export const messages = {
   },
   "customProvider.discovery.empty":
     "Le point de terminaison ne liste aucun modèle. Ajoutez vous-même les ID de modèle.",
-  "customProvider.discovery.label": "Modèles listés par le point de terminaison",
+  "customProvider.discovery.choose": "Choisir des modèles",
+  "customProvider.discovery.search": "Rechercher des modèles",
+  "customProvider.discovery.selectAll": "Tout sélectionner",
+  "customProvider.discovery.deselectAll": "Tout désélectionner",
+  "customProvider.discovery.noMatch": "Aucun modèle ne correspond à votre recherche.",
 
   "customProvider.preset.title": "Ajouter un fournisseur ou un agent",
   "customProvider.preset.description":
@@ -134,6 +139,7 @@ export const messages = {
   "customProvider.probe.running": { one: "Actif · {count} modèle", other: "Actif · {count} modèles" },
 
   "customProvider.detected.title": "Trouvé sur cet ordinateur",
+  "customProvider.detected.titleServer": "Trouvé sur le serveur",
   "customProvider.detected.scanning": "Recherche de modèles et d’agents locaux.",
   "customProvider.detected.scanAgain": "Rechercher à nouveau",
   "customProvider.detected.empty": "OpenBot n’a trouvé aucun serveur de modèles local ni agent ACP.",
@@ -157,6 +163,8 @@ export const messages = {
   "customProvider.detection.enabled": "Rechercher les modèles et les agents locaux",
   "customProvider.detection.enabledDescription":
     "OpenBot vérifie les adresses par défaut d’Ollama et de LM Studio, et cherche les agents ACP connus dans votre PATH.",
+  "customProvider.detection.enabledDescriptionServer":
+    "Le serveur vérifie les adresses par défaut d’Ollama et de LM Studio, et cherche les agents ACP connus dans son PATH.",
   "customProvider.detection.addresses": "Autres adresses de serveurs de modèles",
   "customProvider.detection.address.label": "Adresse {number}",
   "customProvider.detection.address.remove": "Supprimer l’adresse {number}",
@@ -177,6 +185,7 @@ export const messages = {
   "customProvider.acp.agentIdHint": "Lettres minuscules, chiffres ou tirets. Vous ne pourrez pas le modifier ensuite.",
   "customProvider.acp.command": "Commande",
   "customProvider.acp.commandHint": "Le programme à démarrer. OpenBot le cherche dans votre PATH.",
+  "customProvider.acp.commandHintServer": "Le programme à démarrer. Le serveur le cherche dans son PATH.",
   "customProvider.acp.args": "Arguments",
   "customProvider.acp.argsHint":
     "Séparez les arguments par des espaces. Mettez entre guillemets un argument qui contient des espaces.",
@@ -203,6 +212,9 @@ export const messages = {
   "customProvider.acp.trustTitle": "Cette commande s’exécute sur votre ordinateur",
   "customProvider.acp.trustDescription":
     "OpenBot la démarre avec votre compte utilisateur. L’agent peut lire et modifier des fichiers, et exécuter des commandes. N’ajoutez qu’un agent de confiance.",
+  "customProvider.acp.hostTrustTitle": "Cette commande s’exécute sur le serveur",
+  "customProvider.acp.hostTrustDescription":
+    "OpenBot la démarre avec le compte utilisateur du serveur. L’agent peut lire et modifier des fichiers sur le serveur, et y exécuter des commandes. N’ajoutez qu’un agent de confiance.",
   "customProvider.acp.submit": "Ajouter l’agent",
   "customProvider.acp.editTitle": "Modifier un agent ACP personnalisé",
   "customProvider.acp.submitEdit": "Enregistrer l’agent",
@@ -221,6 +233,7 @@ export const messages = {
 
   "customProvider.agents.title": "Agents personnalisés",
   "customProvider.agents.description": "Les agents ACP qu’OpenBot démarre sur cet ordinateur.",
+  "customProvider.agents.hostDescription": "Les agents ACP qu’OpenBot démarre sur l’ordinateur du serveur.",
   "customProvider.agents.empty": "Aucun agent personnalisé pour l’instant.",
   "customProvider.agents.add": "Ajouter un agent",
   "customProvider.agents.restart": "Redémarrer les agents",

@@ -1,13 +1,14 @@
-// Changes each default in Settings › Agents of a running dev app, as a person does, and checks that
-// the window stays responsive (#5708). For each setting page it turns the Default switch off and on,
-// and waits until main saved each value. On Local scripts it chooses another "Requests an hour"; on
-// Quick acknowledgement it chooses another "Start the work". A Select reports its value again when
+// Changes each default in Server Settings › Agents of this computer in a running dev app, as a person
+// does, and checks that the window stays responsive (#5708). For each setting page it turns the
+// Default switch off and on, and waits until main saved each value. On Local scripts it chooses another "Requests an hour"; on
+// Quick acknowledgement it chooses another "Start the work". On the list it turns "Credit OpenBot in
+// commits" off and on. A Select reports its value again when
 // its options change. When the page saved that value as a new settings object, the settings and the
 // Select updated each other with no end, and the window froze in a release build. The dev build
 // stops such a loop with "Potential Infinite Loop Detected", so the check fails on that error, on
 // any page error, and when the renderer does not answer in time after a change.
-// Run it on the host app and on the test client of `bun run dev:test-client`, which is the
-// computer that uses a remote server. Restores the saved defaults at the end. Writes
+// Run it on a dev app while this computer is the selected server: the row below the nav of the user
+// settings opens the settings of the selected server. Restores the saved defaults at the end. Writes
 // .openbot-build/settings-agent-defaults/report-<port>.json. Needs `--port=<debugging port>` and
 // `--allow-mutations`, because it changes saved settings.
 import assert from "node:assert/strict";
@@ -83,8 +84,14 @@ function settingsTitle() {
   return page.getByRole("heading", { level: 1, name: t("app.settingsPage.title"), exact: true });
 }
 
+function agentsTab() {
+  return page
+    .getByRole("tablist", { name: t("server.settings.sections"), exact: true })
+    .getByRole("tab", { name: t("server.settings.agents"), exact: true });
+}
+
 function agentsPanel() {
-  return page.getByRole("tabpanel", { name: t("settings.tab.agents.title"), exact: true });
+  return page.getByRole("tabpanel", { name: t("server.settings.agents"), exact: true });
 }
 
 async function closeWhatsNew(): Promise<void> {
@@ -102,7 +109,9 @@ async function openAgentsTab(): Promise<void> {
       .getByRole("button", { name: t("app.rail.settings"), exact: true })
       .click();
   await settingsTitle().waitFor();
-  await page.getByRole("tab", { name: t("settings.tab.agents.title"), exact: true }).click();
+  // The row below the nav of the user settings opens the settings of the selected server.
+  await page.locator(".settings-page-switch").click();
+  await agentsTab().click();
   await agentsPanel().waitFor();
   // The tab keeps the setting page that was open last.
   if (await backToList().isVisible()) await backToList().click();
@@ -110,7 +119,7 @@ async function openAgentsTab(): Promise<void> {
 
 /** The "Agents" part of the `Agents › <setting>` path in the page header. */
 function backToList() {
-  return page.locator(".settings-page-path").getByRole("button", { name: t("settings.tab.agents.title"), exact: true });
+  return page.locator(".settings-page-path").getByRole("button", { name: t("server.settings.agents"), exact: true });
 }
 
 function savedDefaults(): Promise<AgentDefaults> {
@@ -145,6 +154,9 @@ async function chooseOtherOption(trigger: ReturnType<Page["getByRole"]>): Promis
 }
 
 mkdirSync(OUT, { recursive: true });
+// The script reads and restores the defaults of this computer, so the settings it opens must be this computer's.
+const activeServer = (await page.evaluate(() => window.openbot.servers.list())).find((server) => server.active);
+assert.equal(activeServer?.kind, "local", "Select this computer in the server list, then run the script again.");
 const originalDefaults = await savedDefaults();
 const originalSteer = await savedOn("busyMessageMode");
 const steps: Array<{ setting: string; action: string; responseMs: number }> = [];
@@ -200,12 +212,30 @@ try {
     await backToList().click();
     await open.waitFor();
   }
+  const commitSwitch = agentsPanel().getByRole("switch", { name: t("settings.commitCoAuthor.title"), exact: true });
+  const commitStart = (await savedDefaults()).commitCoAuthor;
+  for (const next of [!commitStart, commitStart]) {
+    await commitSwitch.click({ force: true });
+    await page.waitForFunction(
+      async (value) => (await window.openbot.getAgentDefaults()).commitCoAuthor === value,
+      next,
+    );
+    assert.equal(await commitSwitch.isChecked(), next, "The commit co-author switch does not show the saved value.");
+    steps.push({
+      setting: "commitCoAuthor",
+      action: `switch ${next ? "on" : "off"}`,
+      responseMs: await rendererAnswers(),
+    });
+  }
   assert.deepEqual(pageErrors, [], "The renderer reported an error while the defaults changed.");
 } finally {
-  await page.evaluate((defaults) => window.openbot.setAgentDefaults(defaults), originalDefaults);
   await page.evaluate(
-    (steer) => window.openbot.setBusyMessageModePreference({ mode: steer ? "steer" : "queue" }),
-    originalSteer,
+    ([defaults, steer]) =>
+      window.openbot.agent.updateAgentDefaultsOverview(
+        { ...defaults, busyMessageMode: steer ? "steer" : "queue" },
+        "local",
+      ),
+    [originalDefaults, originalSteer] as const,
   );
   // The settings of the window still hold the values that the test chose, and the next change in
   // Settings would save them again. A reload reads the restored values from main.

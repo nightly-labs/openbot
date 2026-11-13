@@ -9,7 +9,12 @@ export const messages = {
   "channel.stoppedTask.reassignLabel": "Przydziel ponownie zatrzymane zadanie: {name}",
   "channel.stoppedTask.reassign": "Przekaż",
   "channel.stoppedTask.cancel": "Anuluj zadanie",
+  "channel.stoppedTask.assignmentLoop":
+    "{names} przekazywali sobie to zadanie zbyt wiele razy. Zatrzymano je, aby uniknąć pętli.",
+  "channel.stoppedTask.assignmentLoopMembers":
+    "Członkowie przekazywali sobie to zadanie zbyt wiele razy. Zatrzymano je, aby uniknąć pętli.",
   "channel.conversation.noMembers": "Dodaj agentów w ustawieniach kanału, aby rozpocząć pracę.",
+  "channel.conversation.waitFull": "Oczekiwanie – {name} zacznie, gdy skończy się trwające zadanie",
   "channel.conversation.archivedNotice": "Usunięty kanał. Tylko podgląd.",
   "channel.composer.label": "Wiadomość do kanału",
   "channel.composer.placeholder": "Wiadomość do: {name}",
@@ -20,6 +25,9 @@ export const messages = {
   "channel.settings.isolated": "Zachowaj wspomnienia w tym kanale",
   "channel.settings.isolatedDescription":
     "Agenci zapisują to, czego się tu nauczą, jako wspomnienia kanału. Ich inne czaty ich nie widzą.",
+  "channel.settings.browser": "Przeglądarka",
+  "channel.settings.browserEveryone": "Każdy członek",
+  "channel.settings.browserNone": "Nikt",
   "channel.settings.memoryCount": {
     one: "{count} zapisane",
     few: "{count} zapisane",

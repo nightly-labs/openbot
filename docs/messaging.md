@@ -41,6 +41,8 @@ browser. A joined server shows no Slack page.
 
 - A mention in a channel starts, or continues, a conversation in that thread. A reply in that thread
   reaches the same agent without a mention.
+- When a message in a thread needs no answer, such as thanks, the agent can stay quiet. OpenBot then
+  removes its "Working on it…" post, and the ✅ reaction shows that it read the message.
 - A direct message always reaches OpenBot. OpenBot answers in a thread under it, so each direct
   message is its own conversation.
 - A new conversation goes to the Slack Orchestrator. It answers short requests itself, and gives other
@@ -273,9 +275,14 @@ whole list, with the ID of each fact. The prompt marks the facts as data, not in
 - OpenBot has no screen for these facts yet. Ask the agent in the workspace to forget a fact.
 
 `openbot.messaging_history` reads the newest messages of the conversation's own channel or thread:
-30 by default, 100 at most. It reads no other place. Slack can limit it to one read a minute; it
+30 by default, 100 at most. With `connection` and `place` from `openbot.messaging_list_places`, it
+reads that place in the user's own chat or in a routine, for example a routine that summarizes a
+chat each morning. It reads only a place that the list shows. A turn that answers an external chat,
+or a teammate's turn on a request from it, cannot read a different place: a person there is not the
+OpenBot user. Slack can limit it to one read a minute; it
 then fails at once, and the agent can try again. Discord gives the text only of messages that
-mention OpenBot, and of bot posts. Discord messages name their files. Telegram gives what this computer saw since it started.
+mention OpenBot, and of bot posts. Discord messages name their files. Telegram and WhatsApp give
+what this computer saw since it started; WhatsApp keeps the newest 200 messages of all its chats.
 
 ## Posts that an agent sends
 
@@ -295,7 +302,11 @@ routine prompt, for example "post the summary to #bot-inflow on Discord".
 - A long text goes in more than one post. When a later part fails, the earlier parts stay posted.
 - A routine posts only when its run calls the tool. The scheduler does not post the run's answer.
 - A reply to the post reaches an agent only as usual: it must mention OpenBot, and it goes to the
-  Orchestrator.
+  Orchestrator. One exception, on Slack: when the post pings a person with `<@user ID>`, that
+  person's reply in the post's thread reaches the Slack Orchestrator without a mention. The
+  Orchestrator gets the post and the name of the agent that sent it. A person that a later answer in
+  that thread pings can reply without a mention too. The replies of other people always need a
+  mention.
 - There is no list of allowed channels and no approval. Anyone who can give the agents work can ask
   them to post in any place that OpenBot can see. A Slack private channel needs an `/invite`.
 - Discord listing needs a Signal that knows the `listChannels` call. An older Signal refuses it

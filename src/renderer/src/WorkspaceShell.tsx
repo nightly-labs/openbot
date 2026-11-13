@@ -35,7 +35,7 @@ import { WorkspaceServerRail } from "./features/servers/WorkspaceServerRail";
 import { useSettings } from "./features/settings/settings-context";
 import { WorkspaceSidebar } from "./features/sidebar/WorkspaceSidebar";
 import { TasksPanel } from "./features/tasks/TasksPanel";
-import { createHostRestartToasts, type HostRestartView } from "./features/updates/host-restart-toast";
+import { createHostRestartToasts, type HostRestartView, noteServerAgents } from "./features/updates/host-restart-toast";
 import { useUsage } from "./features/usage/usage-context";
 import { WindowPageView } from "./features/window/WindowPageView";
 import { WorkspacePageRail } from "./features/window/WorkspacePageRail";
@@ -158,14 +158,6 @@ export function WorkspaceShell(props: {
       if (unsupported) usage.closeUsage();
     },
   );
-  /** The list stays while a connection screen covers the page: the screen does not span the sidebar. */
-  const tasksAgentsHidden = () =>
-    middlePane() === "tasks" &&
-    !windowPage.tasksAgentsOpen() &&
-    scope.loaded() &&
-    !scope.connection.panelsFailed &&
-    !blockedRemoteServer();
-
   const blockedRemoteServer = createMemo(() => {
     const server = activeServer();
     // A hosted server that sleeps or wakes keeps the workspace on screen. The next input wakes it.
@@ -198,6 +190,16 @@ export function WorkspaceShell(props: {
     if (issue) return { message: sourceText(issue.message), reference: issue.reference ?? null };
     return scope.connection.failed ? scope.connection.failure : null;
   };
+  // A remote connection can read online while the host does not answer it. Each read then failed after
+  // the same wait (#5912). The check replaces the connection only when the host does not answer.
+  const checkRemoteConnection = () => {
+    const server = activeServer();
+    if (server?.kind === "remote" && server.state === "online") void retryServerConnection(server.id);
+  };
+  const retryConversationLoad = () => {
+    checkRemoteConnection();
+    retryConversation();
+  };
   const retry = () => {
     const server = activeServer();
     if (!serversLoaded()) {
@@ -205,8 +207,10 @@ export function WorkspaceShell(props: {
       return;
     }
     if (!server) return;
-    if (server.state === "online") scope.retry();
-    else void retryServerConnection(server.id);
+    if (server.state === "online") {
+      checkRemoteConnection();
+      scope.retry();
+    } else void retryServerConnection(server.id);
   };
   // The main window shows the toasts and prompts of the servers once.
   if (!chatWindow)
@@ -296,6 +300,19 @@ export function WorkspaceShell(props: {
     />
   );
 
+  // A server that this window saw with no agents stays in its first run after the owner leaves it.
+  createEffect(
+    () => {
+      const server = activeServer();
+      return server?.kind === "remote" && agentListSettled()
+        ? { id: server.id, empty: agentList().length === 0 }
+        : null;
+    },
+    (seen) => {
+      if (seen) noteServerAgents(seen.id, seen.empty);
+    },
+  );
+
   const remoteHosts = (): HostRestartView[] =>
     servers().flatMap((server) =>
       server.kind === "remote"
@@ -306,6 +323,10 @@ export function WorkspaceShell(props: {
               online: server.id === activeServer()?.id ? scope.loaded() : server.state === "online",
               restart: server.hostRestart?.state ?? null,
               version: server.hostRestart?.version ?? null,
+              // Until the agents load, the open server could be new; a notice that waits shows after them.
+              ...(server.id === activeServer()?.id
+                ? { firstRun: !agentListSettled() || agentList().length === 0 }
+                : {}),
             },
           ]
         : [],
@@ -334,11 +355,17 @@ export function WorkspaceShell(props: {
                   name={activeAgent()?.name ?? ""}
                   loading={!activeConversation()?.loaded && activeConversation()?.loading === true}
                   error={activeConversation()?.loadError ?? null}
-                  onRetry={retryConversation}
+                  onRetry={retryConversationLoad}
                 />
               </Show>
               <Show when={scope.loaded() && scope.connection.panelsFailed}>
-                <ServerPanelLoadNotice busy={scope.connection.panelsLoading} onRetry={() => void scope.retryPanels()} />
+                <ServerPanelLoadNotice
+                  busy={scope.connection.panelsLoading}
+                  onRetry={() => {
+                    checkRemoteConnection();
+                    void scope.retryPanels();
+                  }}
+                />
               </Show>
             </>
           }
@@ -346,7 +373,6 @@ export function WorkspaceShell(props: {
           blockedServer={blockedRemoteServer()}
           onRetryServer={retryServerConnection}
           windowPage={windowPage.page()}
-          sidebarHidden={tasksAgentsHidden()}
           left={
             <Show when={!chatWindow}>
               <WorkspaceServerRail />
@@ -370,8 +396,6 @@ export function WorkspaceShell(props: {
                 serverId={serverId()}
                 hostName={servers().find((server) => server.id === serverId())?.name ?? t("app.page.serverFallback")}
                 onBack={usage.closeUsage}
-                agentsOpen={!tasksAgentsHidden()}
-                onToggleAgents={() => windowPage.setTasksAgentsOpen(tasksAgentsHidden())}
               />
             )}
           </Show>

@@ -192,6 +192,7 @@ interface LiveActivityInput {
   post: Post;
   loadAgentAvatar: () => Promise<string>;
   supportsPush: () => boolean;
+  sideThreadOfTurn: () => string | null;
 }
 interface ServerNotificationSetting {
   level: "all" | "needs-me" | "nothing";
@@ -299,6 +300,7 @@ async function startSession(serverIds: readonly string[], settings: Record<strin
       post,
       loadAgentAvatar: async () => "",
       supportsPush: () => true,
+      sideThreadOfTurn: () => null,
     });
     return null;
   }

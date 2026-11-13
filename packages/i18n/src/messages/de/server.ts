@@ -123,6 +123,24 @@ export const messages = {
     "OpenBot stoppt den Server und verschiebt seine Agenten, Chats und Dateien in den Papierkorb.",
   "server.local.deleting": "Server wird gelöscht…",
   "server.local.deletedTitle": "{name} gelöscht",
+  "server.install.title": "Neuer Server auf einem anderen Computer",
+  "server.install.description":
+    "Führe diesen Befehl auf einem Linux-Computer oder VPS aus, der dir gehört. Er installiert OpenBot und fügt den Server zu diesem Konto hinzu.",
+  "server.install.making": "Befehl für dieses Konto wird erstellt…",
+  "server.install.failed": "OpenBot konnte keinen Befehl erstellen. Prüfe die Internetverbindung.",
+  "server.install.copyForAgent": "Für einen KI-Agenten kopieren",
+  "server.install.expiresIn": "Funktioniert einmal. Läuft in {time} ab.",
+  "server.install.newCommand": "Neuer Befehl",
+  "server.install.waiting": "Warte, bis der Befehl auf deinem Server läuft…",
+  "server.install.starting": "{name} ist angemeldet. Server wird gestartet…",
+  "server.install.connected": "{name} ist verbunden.",
+  "server.install.offline": "{name} ist offline.",
+  "server.install.expired": "Dieser Befehl ist abgelaufen. Erstelle einen neuen.",
+  "server.install.agentPrompt":
+    'Installiere OpenBot auf diesem Linux-Server und melde ihn bei meinem OpenBot-Konto an.\nFühre diesen Befehl als root aus. Er stellt keine Fragen und dauert einige Minuten:\n\n{command}\n\nEr endet mit der Zeile "OpenBot is connected to your account." und dem Exit-Code 0.\nDer Befehl funktioniert einmal, 15 Minuten lang. Speichere ihn nirgends.',
+  "server.install.setUpWithAgent": "Mit einem Agenten einrichten",
+  "server.install.sshAgentPrompt":
+    "Verbinde dich per SSH mit meinem Linux-Server und installiere dort OpenBot als Server.\n\nSSH-Adresse (user@host):",
   "server.add.limit.title": "Dieses Konto hat die maximale Anzahl von Servern",
   "server.add.limit.description": {
     one: "Ein Konto kann {count} kostenpflichtigen Server haben. Lösche zuerst einen Server, um einen weiteren hinzuzufügen.",
@@ -316,11 +334,24 @@ export const messages = {
   "server.settings.later": "Später",
   "server.settings.setUp": "Einrichten",
   "server.settings.agents": "Agenten",
+  "server.settings.agentsDescription":
+    "Legen Sie fest, was die Agenten auf diesem Server tun können, wenn Sie es nicht für einen Agenten festlegen.",
   "server.settings.timezone": "Zeitzone",
   "server.settings.timezoneDescription":
     "Neue Routinen verwenden diese Zeitzone, wenn die Nachricht die Zeitzone des Absenders nicht angibt.",
   "server.settings.timezoneAutomatic": "Automatisch ({zone})",
   "server.settings.timezoneLoadFailed": "Die Zeitzone des Servers konnte nicht geladen werden.",
+  "server.settings.turnLimit": "Threads gleichzeitig",
+  "server.settings.turnLimitDescription":
+    "Wie viele Agent-Threads auf diesem Server gleichzeitig laufen können. Mehr Threads brauchen mehr Arbeitsspeicher.",
+  "server.settings.turnLimitAutomatic": "Automatisch ({count})",
+  "server.settings.turnLimitAutomaticUnlimited": "Automatisch (kein Limit)",
+  "server.settings.turnLimitUnlimited": "Kein Limit",
+  "server.settings.turnLimitsLoadFailed": "Die Thread-Limits dieses Servers konnten nicht geladen werden.",
+  "server.settings.agentTaskLimit": "Parallele Threads pro Agent",
+  "server.settings.agentTaskLimitDescription":
+    "Wie viele Threads jeder Agent gleichzeitig ausführen kann, wenn er kein eigenes Limit hat.",
+  "server.settings.agentTaskLimitDefault": "Standard ({count})",
   "server.settings.memoryLimit": "Erinnerungen pro Agent",
   "server.settings.memoryLimitDescription": "Wie viele Erinnerungen jeder Agent auf diesem Server behalten kann.",
   "server.settings.memoryLimitLoadFailed": "Das Erinnerungslimit dieses Servers konnte nicht geladen werden.",
@@ -330,6 +361,16 @@ export const messages = {
   "server.settings.memoryReviewOff": "Aus",
   "server.settings.memoryReviewTurns": { one: "Alle {count} Runde", other: "Alle {count} Runden" },
   "server.settings.memoryReviewLoadFailed": "Die Einstellung für die Erinnerungsprüfung konnte nicht geladen werden.",
+  "server.settings.skillLearning": "Fähigkeiten lernen",
+  "server.settings.skillLearningDescription": "Ob Agenten auf diesem Server das Gelernte als Fähigkeiten speichern.",
+  "server.settings.skillLearningAutomatic": "Automatisch",
+  "server.settings.skillLearningAsk": "Zuerst fragen",
+  "server.settings.skillLearningOff": "Aus",
+  "server.settings.skillLearningLoadFailed": "Die Einstellung „Fähigkeiten lernen“ konnte nicht geladen werden.",
+  "server.settings.browsingMemory": "Aus meinem Browsen lernen",
+  "server.settings.browsingMemoryDescription":
+    "Wenn du den Browser eines Agenten steuerst, lernt der Agent aus den Seiten und Schaltflächen, die du nutzt, wie Websites funktionieren. Eingegebener Text wird nicht gespeichert.",
+  "server.settings.browsingMemoryLoadFailed": "Die Browsing-Einstellung konnte nicht geladen werden.",
   "server.settings.remoteOnline": "Der Host ist online. Sein Eigentümer steuert die Veröffentlichung.",
   "server.settings.remoteOffline": "Der Host ist offline. Sein Eigentümer steuert die Veröffentlichung.",
   "server.settings.reachable": "Online erreichbar. Nur eingeladene Personen können sich anmelden.",
@@ -348,7 +389,7 @@ export const messages = {
   "server.settings.hostKeyChanged": "Letzte Änderung",
   "server.settings.hostKeyChangedDescription":
     "{date}. Der vorherige und der neue Schlüssel haben diese Änderung signiert.",
-  "server.settings.hostKeyLocalOnly": "Hier kann nur der Server auf diesem Computer seinen Schlüssel ändern.",
+  "server.settings.hostKeyOwnerOnly": "Nur der Eigentümer kann den Serverschlüssel ändern.",
   "server.settings.removeTitle": "Server entfernen",
   "server.settings.removeDescription":
     "Entferne diesen Server für alle Mitglieder aus dem Kontodienst. Nutze dies, wenn sein Computer nicht mehr verfügbar ist.",

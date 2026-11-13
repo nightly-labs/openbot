@@ -1,6 +1,8 @@
 import {
   BROWSER_DOCK_LIMITS,
+  BROWSER_DOCK_OVERLAY_WIDTH,
   type BrowserDockAction,
+  type BrowserDockFrame,
   type BrowserDockGlass,
   type BrowserDockPresentation,
   LOCAL_SERVER_ID,
@@ -65,7 +67,7 @@ export function BrowserDockSurface() {
     );
   }
 
-  function measure(): { height: number; glass: BrowserDockGlass[] } {
+  function measure(): Omit<BrowserDockFrame, "seq"> {
     const dock = surface?.firstElementChild;
     if (!(dock instanceof HTMLElement)) return { height: 0, glass: [] };
     const viewport = window.innerHeight;
@@ -78,9 +80,24 @@ export function BrowserDockSurface() {
         if (shape) glass.push(shape);
       }
     }
-    // A menu needs room above the dock, so the overlay takes the whole page while one is open.
-    const needed = open.length > 0 ? BROWSER_DOCK_LIMITS.frameSize : viewport - dock.getBoundingClientRect().top;
-    return { height: clamp(Math.ceil(needed + SHADOW_ROOM), 0, BROWSER_DOCK_LIMITS.frameSize), glass };
+    // The dock is at the bottom centre, so the page at its sides gets the clicks. A menu needs the whole page.
+    // The box takes its width from the overlay, so the overlay of the box has a fixed width: a width measured
+    // from the box would keep a narrow overlay narrow. The overlay of the tab, when the user hid the box, is
+    // only as wide as the tab. An even width keeps the centre on a whole pixel.
+    const tab = dock.hasAttribute("data-tucked") ? dock.querySelector(".browser-dock-tab") : null;
+    const box = (tab ?? dock).getBoundingClientRect();
+    const limit = BROWSER_DOCK_LIMITS.frameSize;
+    const needed = open.length > 0 ? limit : viewport - box.top;
+    const height = clamp(Math.ceil(needed + SHADOW_ROOM), 0, limit);
+    const centre = window.innerWidth / 2;
+    const reach = Math.max(centre - box.left, box.right - centre);
+    const width =
+      open.length > 0 ? limit : tab ? clamp(2 * Math.ceil(reach + SHADOW_ROOM), 0, limit) : BROWSER_DOCK_OVERLAY_WIDTH;
+    // Main places the glass in an overlay of the new width before this view has that width. The dock stays
+    // at the centre, so a glass shape keeps its distance from the centre.
+    const shift = (width - window.innerWidth) / 2;
+    for (const shape of glass) shape.left = clamp(shape.left + shift, -limit, limit);
+    return { height, glass, anchor: { width } };
   }
 
   function report() {

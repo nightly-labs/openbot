@@ -143,6 +143,7 @@ try {
       setEnabled: () => {},
       setAccountActive: () => {},
       refresh: () => {},
+      ensureHost: () => Effect.void,
       registerRoute: (routeId) => Effect.succeed(`${RELAY_ORIGIN}/v1/webhooks/${routeId}`),
       revokeRoute: (routeId) => Effect.sync(() => void revoked.push(routeId)),
     },
