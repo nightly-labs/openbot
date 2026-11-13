@@ -910,9 +910,17 @@ export class MessagingThreads {
       case "turn-completed": {
         const link = this.store.linkForThread(event.threadId);
         if (!link) return false;
-        const started = this.#turnOrigins.get(event.turnId) ?? { origin: null, followUp: false };
+        const started = this.#turnOrigins.get(event.turnId) ?? { deliveryIds: [], origin: null, followUp: false };
         this.#turnOrigins.delete(event.turnId);
         this.#progress.delete(event.turnId);
+        // A turn whose messages went back to the queue runs again, such as an empty answer to a
+        // teammate's result (#8573). The conversation keeps its status post until that run ends.
+        if (
+          event.status === "interrupted" &&
+          started.deliveryIds.length > 0 &&
+          started.deliveryIds.every((id) => this.#mailbox.getDelivery(id)?.delivery.status === "queued")
+        )
+          return !this.#hooks.ownChat(event.threadId);
         // A turn with no known requester tells no conversation, so `deliverySettled` still must.
         if (started.origin) {
           this.#finishedTurns.add(event.turnId);
