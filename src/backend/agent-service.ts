@@ -4528,8 +4528,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   /**
    * The local user can open files outside a workspace when access is unrestricted, and in the agent's
-   * added folders in Workspace only. `exactPath` does not
-   * use a file with the same name from the thread's tool history, so an inline image shows no older file.
+   * added folders in Workspace only. `exactPath` does not use a file with the same name from the thread's
+   * tool history or an added folder, so an inline image shows no older file.
    */
   readonly resolveLocalWorkspaceFile = Effect.fn("AgentService.resolveLocalWorkspaceFile")(function* (
     this: AgentService,
@@ -4540,7 +4540,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const agent = yield* lifecycleStep("find workspace agent", () => this.#agentForFile(agentId));
     return yield* resolveWorkspaceFile(agent, inputPath, {
       ...localWorkspaceAccess(agent),
-      ...(options.exactPath ? {} : { fileHistory: this.#turn.fileHistory.paths(agent.id, agent.threadId) }),
+      ...(options.exactPath
+        ? { exactPath: true }
+        : { fileHistory: this.#turn.fileHistory.paths(agent.id, agent.threadId) }),
     }).pipe(
       Effect.mapError(
         (failure) => new AgentLifecycleFailed({ operation: "resolve local workspace file", cause: failure.cause }),
