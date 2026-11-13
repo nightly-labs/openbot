@@ -429,6 +429,19 @@ export class BrowserCdpEngine {
             node.backendNodeId,
             `function(origin, input) { if (this.isConnected && this.ownerDocument !== document) return 'frame'; return this.isConnected && location.origin === origin && (!input || (this.localName === 'input' && !this.disabled && !this.readOnly && ['password','text','tel','number'].includes(this.type))); }`,
             [origin, input],
+          ).pipe(
+            // The top frame's world cannot reach a node in a frame of another origin in the page's
+            // process, so the check fails before it can name the frame. Only a child frame that holds
+            // the node changes the reason.
+            Effect.catch((failure) =>
+              Effect.gen({ self: this }, function* () {
+                const holder = yield* Effect.gen({ self: this }, function* () {
+                  const childFrames = frameIds(yield* send("Page.getFrameTree", {})).slice(1);
+                  return yield* this.#nodeFrameWorld(send, node.backendNodeId, undefined, childFrames);
+                }).pipe(Effect.catch(() => Effect.succeed(undefined)));
+                return holder === undefined ? yield* Effect.fail(failure) : "frame";
+              }),
+            ),
           );
           if (valid === "frame") return yield* inFrame(index);
           if (valid !== true)
