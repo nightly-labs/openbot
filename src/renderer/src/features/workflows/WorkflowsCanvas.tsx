@@ -182,9 +182,9 @@ function WorkflowCanvasLoading(props: { error?: boolean }) {
   return (
     <main
       class="window-page workflow-page-loading"
-      role="status"
-      aria-busy="true"
-      aria-label={currentText().t("common.loading")}
+      role={props.error ? "alert" : "status"}
+      aria-busy={props.error ? undefined : "true"}
+      aria-label={currentText().t(props.error ? "workflow.page.failed" : "common.loading")}
     >
       <Show when={props.error} fallback={
         <div class="workflow-page-loading-content" aria-hidden="true">
@@ -193,7 +193,7 @@ function WorkflowCanvasLoading(props: { error?: boolean }) {
           <Skeleton class="workflow-page-loading-line workflow-page-loading-line-short" />
         </div>
       }>
-        <p role="alert">{currentText().t("workflow.page.failed")}</p>
+        <p>{currentText().t("workflow.page.failed")}</p>
       </Show>
     </main>
   );
