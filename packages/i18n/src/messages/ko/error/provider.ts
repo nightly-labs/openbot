@@ -251,6 +251,8 @@ export const messages = {
   "error.provider.antigravityNotStarted": "Gemini 서버를 찾았지만 버전을 읽을 수 없어요.",
   "error.provider.antigravityOverrideInvalid":
     "OPENBOT_ANTIGRAVITY_PATH의 Gemini 서버가 없거나 실행할 수 없어요. 경로를 고치거나 변수를 삭제한 다음 OpenBot을 다시 시작하세요.",
+  "error.provider.antigravityOverrideUnreadable":
+    "OPENBOT_ANTIGRAVITY_PATH의 Gemini 서버가 시작됐지만 OpenBot이 버전을 읽을 수 없어요. 변수를 Antigravity CLI 1.5.3 이상으로 설정하거나 삭제한 다음 OpenBot을 다시 시작하세요.",
   "error.provider.antigravityVersionUnreadable": "Gemini 서버 버전을 읽을 수 없어요.",
   "error.provider.antigravitySignIn": "Gemini를 사용하려면 Google로 로그인하세요.",
   "error.provider.antigravityRateLimited":

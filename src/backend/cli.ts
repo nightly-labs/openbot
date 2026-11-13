@@ -349,6 +349,7 @@ export const resolveAntigravityCli: (input?: {
           ? [{ executable: input.bundledExecutable, source: "managed" as const }]
           : [];
     let found = false;
+    let timedOut = false;
     for (const candidate of candidates) {
       if (!(yield* isExecutable(candidate.executable))) continue;
       found = true;
@@ -364,6 +365,7 @@ export const resolveAntigravityCli: (input?: {
         }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
       );
       if (Result.isSuccess(attempt)) return attempt.success;
+      if (isCliTimeout(attempt.failure.cause)) timedOut = true;
 
       /* Try the remaining candidates. */
     }
@@ -371,6 +373,10 @@ export const resolveAntigravityCli: (input?: {
     // "not downloaded": Download is refused while the override is set (#4978).
     if (!found && override.length > 0)
       throw new CodexCliError(sourceText("error.provider.antigravityOverrideInvalid"), "invalid");
+    // A path the user set that runs but prints no version that OpenBot can read, such as an old
+    // CLI, must also name the variable: Download and update are refused while it is set (#8161).
+    if (override.length > 0 && !timedOut)
+      throw new CodexCliError(sourceText("error.provider.antigravityOverrideUnreadable"), "invalid");
     throw new CodexCliError(
       found ? sourceText("error.provider.antigravityNotStarted") : sourceText("error.provider.antigravityMissing"),
       found ? "invalid" : "missing",

@@ -235,6 +235,8 @@ export const messages = {
   "error.provider.antigravityNotStarted": "שרת Gemini נמצא, אך לא ניתן לקרוא את הגרסה שלו.",
   "error.provider.antigravityOverrideInvalid":
     "שרת Gemini ב-OPENBOT_ANTIGRAVITY_PATH חסר או שאינו ניתן להרצה. יש לתקן את הנתיב או להסיר את המשתנה, ואז להפעיל מחדש את OpenBot.",
+  "error.provider.antigravityOverrideUnreadable":
+    "שרת Gemini ב-OPENBOT_ANTIGRAVITY_PATH הופעל, אבל OpenBot לא יכול לקרוא את הגרסה שלו. יש להגדיר את המשתנה ל-Antigravity CLI 1.5.3 ומעלה, או להסיר אותו, ואז להפעיל מחדש את OpenBot.",
   "error.provider.antigravityVersionUnreadable": "לא ניתן לקרוא את הגרסה של שרת Gemini.",
   "error.provider.antigravitySignIn": "יש להתחבר עם Google כדי להשתמש ב-Gemini.",
   "error.provider.antigravityRateLimited":
