@@ -17,6 +17,14 @@ export interface AcpCustomEndpoint {
   readonly stallMs?: number;
 }
 
+/** An MCP server that the agent could not start for one session, as `AcpFlavor.mcpServerFailure` reads it. */
+export interface AcpMcpServerFailure {
+  readonly sessionId: string;
+  /** The name that the server travels under to the agent. */
+  readonly name: string;
+  readonly reason: string;
+}
+
 /**
  * What one ACP agent does differently from the protocol. `AcpAgentClient` reads each hook at the
  * place that the agent's behavior changes; an absent hook is the protocol's own behavior. Add a hook
@@ -214,6 +222,11 @@ export interface AcpFlavor {
    */
   relayStdioMcpServers?: true;
   /**
+   * The MCP server that an extension notification reports as not started, or `null`. The agent
+   * leaves the server out of the session with no error, so OpenBot reports it as a dropped server.
+   */
+  mcpServerFailure?(method: string, params: DynamicRecord): AcpMcpServerFailure | null;
+  /**
    * The MCP server names in the agent's own files for `cwd`. The agent starts its own entry in place
    * of a session server with the same name, so that server travels as `openbot_<name>`. `argv` is
    * the command line of the agent's process, which can name the folder of those files.
@@ -301,6 +314,22 @@ function noAnswerUnlessPlanOrCompaction(
 }
 
 /**
+ * Grok CLI 1.0.77 sends `x.ai/mcp/server_status` for each MCP server of a session. A server whose
+ * first start fails, by a crash or by no answer in its start time, is `unavailable` with the reason
+ * `handshake_failed`, and its detail names the cause. Grok then answers `search_tool` as complete
+ * without the server, so the agent and the user did not learn why its tools were missing (#8083).
+ * Only the first start counts: the `restart_failed` statuses after it, and those of a session that
+ * closes, repeat a failure or come from the close.
+ */
+function grokMcpServerFailure(method: string, params: DynamicRecord): AcpMcpServerFailure | null {
+  if (method !== "x.ai/mcp/server_status" || params.status !== "unavailable" || params.reason !== "handshake_failed")
+    return null;
+  if (typeof params.sessionId !== "string" || typeof params.name !== "string") return null;
+  const reason = typeof params.detail === "string" && params.detail.trim() ? params.detail.trim() : params.reason;
+  return { sessionId: params.sessionId, name: params.name, reason };
+}
+
+/**
  * Grok CLI 1.0.22 and 1.0.70 send no `usage` in the `session/prompt` result and no `usage_update`.
  * The result's `_meta.usage` holds the tokens and the cost of this prompt's model calls (#4827).
  */
@@ -314,6 +343,7 @@ export const GROK_ACP_FLAVOR: AcpFlavor = {
   // Grok CLI 1.0.77 accepts an answer of only spaces and line breaks, and ends the prompt as done.
   // The chat then showed no answer and no error (#6529).
   emptyAnswerFailure: noAnswerUnlessPlanOrCompaction,
+  mcpServerFailure: grokMcpServerFailure,
   // Grok CLI 1.0.77 reads the reply of `ask_user_question` as an enum with the tag `outcome`, and
   // fails the tool on a reply without it. `accepted` has the answers by question text, each a text
   // or a list of texts, and `annotations`. `cancelled` tells the model that the user did not answer.
