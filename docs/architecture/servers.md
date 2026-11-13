@@ -433,6 +433,14 @@ that account, the step fails with "account not found"; the host never makes the 
 account. A Sunra model ignores the field. The capability adds no route. A client shows the accounts
 in the model picker only on a host that advertises it, because an older host ignores the field.
 
+`workflows-media-transparent-v1` lets an image step of GPT Image or Grok Imagine have a transparent
+background. The node reads one more field, `background`; with `transparent` the host makes a picture
+with clear pixels around the subject. Codex's image tool makes the clear pixels itself. Grok's tool
+cannot, so the host asks Grok for one flat colour and removes it before it keeps the file. A video,
+another model and any other value keep the model's own background. The capability adds no route. A
+client shows the Background chip only on a host that advertises it, because an older host ignores
+the field.
+
 The optional event `workflows-changed { workflowId }` names the workflow that changed, so the
 client reads it again. A client without the capability shows `serverTooOld` on the Workflows page.
 

@@ -110,6 +110,8 @@ export interface WorkflowImageModel {
   durations?: readonly number[];
   /** The resolutions that it makes, the default first. */
   resolutions?: readonly string[];
+  /** Whether an image can have a transparent background. */
+  transparent?: boolean;
   /**
    * The accounts of the provider, when it has more than one and the host makes a file on the account
    * of the step (`workflows-media-account-v1`). The picker then has one entry for each account.

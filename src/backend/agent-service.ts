@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { AGENT_PROVIDERS, agentProviderDescriptor, customAgentIdOfModel } from "@openbot/contracts/agent-providers";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
@@ -378,6 +379,12 @@ export interface AgentServiceOptions {
   hostedSites?: AgentHostedSites | null;
   /** Draws pages for `html_preview`. Without it the tool tells the agent to show the page unchecked. */
   visualPreview?: ChatVisualPreviewHost | null;
+  /**
+   * Decodes a picture, makes its flat background clear (`clearFlatBackground`) and gives it back as a
+   * PNG; null when the picture has no flat background. Without it a transparent Grok image keeps the
+   * flat colour that the step asks for.
+   */
+  clearPictureBackground?: ((bytes: Uint8Array) => Uint8Array | null) | undefined;
   /** Captures the desktop for `capture_screen`; null where this process has no desktop. */
   screenCapture?: ScreenCaptureHost | null;
   /** Downloads and reads online videos for `read_video`; null where this process cannot decode them. */
@@ -602,6 +609,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly routineRecords: RoutineRecords;
   readonly #mcp: McpGateway;
   readonly #mcpAgentAccess: AgentServiceOptions["mcpAgentAccess"];
+  readonly #clearPictureBackground: AgentServiceOptions["clearPictureBackground"];
   readonly #providers: ProviderRuntime;
   readonly #providerUseChanges = Semaphore.makeUnsafe(1);
   readonly #endpoints: CustomEndpoints;
@@ -653,6 +661,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   constructor(options: AgentServiceOptions) {
     super();
     this.#mcpAgentAccess = options.mcpAgentAccess;
+    this.#clearPictureBackground = options.clearPictureBackground;
     const {
       store,
       mailbox,
@@ -2995,6 +3004,29 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         return yield* failed(failure ?? sourceText("error.workflow.mediaFailed"));
       const savedPath = getString(item, "saved_path");
       const result = input.kind === "image" ? getString(item, "result") : null;
+      // Grok makes the flat colour that the step asks for; the host makes it clear.
+      const clear = this.#clearPictureBackground;
+      if (input.specs.transparent && provider === "grok" && clear && (savedPath || result)) {
+        const source = savedPath
+          ? yield* Effect.tryPromise({ try: () => readFile(savedPath), catch: () => null }).pipe(
+              Effect.orElseSucceed(() => null),
+            )
+          : yield* Effect.try({ try: () => decodeGeneratedImage(result ?? ""), catch: () => null }).pipe(
+              Effect.orElseSucceed(() => null),
+            );
+        const bytes = source
+          ? yield* Effect.try({ try: () => clear(source), catch: () => null }).pipe(Effect.orElseSucceed(() => null))
+          : null;
+        // When the background stays or the clear copy cannot be saved, the step keeps the picture that
+        // the model made, as a step with a solid background does.
+        const attachment = bytes
+          ? yield* Effect.result(
+              this.#mailbox.storeGeneratedAttachment({ bytes, name: "generated-image.png", mimeType: "image/png" }),
+            )
+          : null;
+        if (attachment && Result.isSuccess(attachment)) return attachment.success.id;
+        logger.warn("Could not make the background of a Grok image clear.");
+      }
       const stored = savedPath
         ? yield* Effect.result(
             this.#mailbox.storeGeneratedAttachment({

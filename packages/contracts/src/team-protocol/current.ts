@@ -181,6 +181,7 @@ import { WORKFLOWS_CHANNELS_CAPABILITY } from "./workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "./workflows-chats-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "./workflows-github-v1";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "./workflows-media-account-v1";
+import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "./workflows-media-transparent-v1";
 import { WORKFLOWS_MEDIA_CAPABILITY } from "./workflows-media-v1";
 import { WORKFLOWS_SUNRA_CAPABILITY } from "./workflows-sunra-v1";
 import { WORKFLOWS_CAPABILITY } from "./workflows-v1";
@@ -413,6 +414,7 @@ export {
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY,
   WORKFLOWS_MEDIA_CAPABILITY,
+  WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
   WORKFLOWS_SUNRA_CAPABILITY,
   WORKSPACE_DIRECTORY_CAPABILITY,
 };
@@ -624,6 +626,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   TEAM_USAGE_TERTIARY_CAPABILITY,
   HOST_TURN_LIMITS_CAPABILITY,
   STORAGE_USER_FILES_CAPABILITY,
+  WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -848,7 +851,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY &&
     capability !== TEAM_USAGE_TERTIARY_CAPABILITY &&
     capability !== HOST_TURN_LIMITS_CAPABILITY &&
-    capability !== STORAGE_USER_FILES_CAPABILITY,
+    capability !== STORAGE_USER_FILES_CAPABILITY &&
+    capability !== WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -949,6 +953,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   TEAM_USAGE_TERTIARY_CAPABILITY,
   HOST_TURN_LIMITS_CAPABILITY,
   STORAGE_USER_FILES_CAPABILITY,
+  WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1132,6 +1137,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY &&
       capability !== TEAM_USAGE_TERTIARY_CAPABILITY &&
       capability !== HOST_TURN_LIMITS_CAPABILITY &&
-      capability !== STORAGE_USER_FILES_CAPABILITY,
+      capability !== STORAGE_USER_FILES_CAPABILITY &&
+      capability !== WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
   );
 }

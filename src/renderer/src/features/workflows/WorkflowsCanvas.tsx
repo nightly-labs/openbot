@@ -93,9 +93,12 @@ export function WorkflowsCanvas(props: {
         const accounts = props.host.mediaAccountSupported()
           ? props.status.providers?.find((row) => row.id === model.provider)?.accounts
           : undefined;
+        // An older host ignores the background of a step, so its models make no transparent image.
+        const { transparent, ...rest } = model;
         return [
           {
-            ...model,
+            ...rest,
+            ...(transparent && props.host.mediaTransparentSupported() ? { transparent } : {}),
             ...(status.apiKeyInUse ? { apiKey: true } : {}),
             ...(accounts && accounts.length > 1 ? { accounts } : {}),
           },

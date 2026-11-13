@@ -19,6 +19,7 @@ import { RoutineFlowStore } from "../backend/routine-flows/routine-flow-store";
 import { createRoutineFlows, type RoutineFlowsHandle } from "../backend/routine-flows/routine-flows";
 import { RoutineResultStore } from "../backend/routine-results/routine-result-store";
 import { createRoutineResults, type RoutineResultsHandle } from "../backend/routine-results/routine-results";
+import { clearFlatBackground } from "../backend/workflows/flat-background";
 import { WorkflowGitHubStore } from "../backend/workflows/workflow-github-store";
 import { WorkflowRunStore } from "../backend/workflows/workflow-run-store";
 import { WorkflowStore } from "../backend/workflows/workflow-store";
@@ -2143,6 +2144,15 @@ export async function createApplicationServices({
     mailbox,
     browser,
     visualPreview: new ChatVisualPreviewer(),
+    clearPictureBackground: (bytes) => {
+      // Skia decodes the PNG or JPEG; its bitmap is premultiplied, as `clearFlatBackground` writes it.
+      const picture = nativeImage.createFromBuffer(Buffer.from(bytes));
+      if (picture.isEmpty()) return null;
+      const size = picture.getSize();
+      const pixels = picture.toBitmap();
+      if (!clearFlatBackground(pixels, size.width, size.height)) return null;
+      return nativeImage.createFromBitmap(pixels, size).toPNG();
+    },
     videoReader: new VideoReader({
       runtimeDirectory: join(app.getPath("userData"), "runtimes", "yt-dlp"),
       target: runtimeTarget(process.platform, process.arch),
