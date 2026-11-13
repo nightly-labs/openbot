@@ -35,10 +35,21 @@ const setSkillEnabledSchema = z
   .strict();
 const uninstallSkillSchema = z.object({ agentId: targetAgentId, skillId: installedSkillId }).strict();
 
+/** A saved skill whose latest revision does not read, for example because its frontmatter is not valid YAML. */
+export interface UnreadableLocalSkill {
+  skillId: string;
+  error: string;
+}
+
+export interface LocalSkillListing {
+  skills: MarketplaceSkillDetail[];
+  unreadable: UnreadableLocalSkill[];
+}
+
 export interface LocalSkillTools {
   create(input: CreateLocalSkillInput): Effect.Effect<MarketplaceSkillDetail, ToolOperationFailed>;
   revise(input: ReviseLocalSkillInput): Effect.Effect<MarketplaceSkillDetail, ToolOperationFailed>;
-  list(): Effect.Effect<MarketplaceSkillDetail[], ToolOperationFailed>;
+  list(): Effect.Effect<LocalSkillListing, ToolOperationFailed>;
   get(
     input: LocalSkillRevisionInput,
   ): Effect.Effect<MarketplaceSkillDetail & { archivePath: string }, ToolOperationFailed>;
@@ -158,8 +169,12 @@ export const runLocalSkillTool = Effect.fn("SkillTools.run")(function* (
       });
       return skill;
     }
-    case "list_local_skills":
-      return (yield* api.list()).map(skillToolSummary);
+    case "list_local_skills": {
+      const { skills, unreadable } = yield* api.list();
+      const listed = skills.map(skillToolSummary);
+      // The agent names each skill that does not read, so the user can fix it or ask for help.
+      return unreadable.length ? { skills: listed, unreadable } : listed;
+    }
     case "set_skill_enabled": {
       const input = yield* toolStep(() => setSkillEnabledSchema.parse(args));
       const target = yield* toolStep(() => targetAgent(input.agentId));
