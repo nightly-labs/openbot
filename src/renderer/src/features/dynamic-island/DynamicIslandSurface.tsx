@@ -305,6 +305,7 @@ export function DynamicIslandSurface() {
             widthPercent={preference().widthPercent}
             heightPercent={preference().heightPercent}
             extendedHoverArea
+            idleInsideNotch
             inlineReply
             onStateChange={changeViewState}
             onAction={perform}
