@@ -527,13 +527,16 @@ export function MessageBody(props: {
      while the file arrives, so the chat does not grow when the image shows. An image that does not
      load shows as a card. */
   const [unloadedImages, setUnloadedImages] = createSignal<ReadonlySet<string>>(new Set());
+  /* A generated image is what the user asked to see, so it loads up to the media limit, as a generated video does. */
+  const loadLimit = (attachment: AttachmentSummary) =>
+    props.message.imageGeneration && props.message.attachments?.[0]?.id === attachment.id ? "media" : "thumbnail";
   const arrivingImage = (attachment: AttachmentSummary) => {
     const source = props.mediaSource;
     return (
       source !== undefined &&
       attachment.previewKind === "image" &&
       !attachment.previewUrl &&
-      attachment.size <= source.thumbnailLimit &&
+      attachment.size <= (loadLimit(attachment) === "media" ? source.mediaLimit : source.thumbnailLimit) &&
       !unloadedImages().has(attachment.id)
     );
   };
@@ -555,7 +558,7 @@ export function MessageBody(props: {
       const unloaded = (attachment: AttachmentSummary) =>
         setUnloadedImages((current) => new Set(current).add(attachment.id));
       for (const attachment of arriving) {
-        void source?.load(attachment).then(
+        void source?.load(attachment, loadLimit(attachment)).then(
           (shown) => {
             if (!shown) unloaded(attachment);
           },
