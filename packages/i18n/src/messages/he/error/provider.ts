@@ -336,6 +336,8 @@ export const messages = {
     "{provider} דחה את מפתח ה-API השמור. יש להחליף או להסיר את המפתח בהגדרות, ואז לנסות שוב.",
   "error.provider.keyProviderNoBalance":
     "בחשבון {provider} של מפתח ה-API השמור אין יתרה. יש להוסיף קרדיט לחשבון ואז לנסות שוב.",
+  "error.provider.keyProviderLowCredit":
+    "בחשבון {provider} של מפתח ה-API השמור אין מספיק קרדיט לתשובה מהמודל הזה. יש להוסיף קרדיט לחשבון או לבחור מודל אחר, ואז לנסות שוב.",
   "error.provider.modelServiceRefused":
     "שירות המודל דחה את הבקשה. יש לבחור מודל אחר, או לבדוק את הגישה שלך למודל הזה בשירות.",
   "error.provider.modelServiceRefusedReason":

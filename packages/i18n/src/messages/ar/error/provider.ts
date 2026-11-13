@@ -336,6 +336,8 @@ export const messages = {
     "رفض {provider} مفتاح API المحفوظ. استبدل المفتاح أو أزله في الإعدادات، ثم أعد المحاولة.",
   "error.provider.keyProviderNoBalance":
     "لا يوجد رصيد في حساب {provider} الخاص بمفتاح API المحفوظ. أضف رصيدًا إلى الحساب، ثم أعد المحاولة.",
+  "error.provider.keyProviderLowCredit":
+    "لا يكفي رصيد حساب {provider} الخاص بمفتاح API المحفوظ لردّ من هذا النموذج. أضف رصيدًا إلى الحساب، أو اختر نموذجًا آخر، ثم أعد المحاولة.",
   "error.provider.modelServiceRefused":
     "رفضت خدمة النموذج الطلب. اختر نموذجًا آخر، أو تحقق من صلاحية وصولك إلى هذا النموذج لدى الخدمة.",
   "error.provider.modelServiceRefusedReason":

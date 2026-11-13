@@ -365,6 +365,8 @@ export const messages = {
     "{provider} rechazó la clave de API guardada. Reemplaza o elimina la clave en Ajustes y vuelve a intentarlo.",
   "error.provider.keyProviderNoBalance":
     "La cuenta de {provider} de la clave de API guardada no tiene saldo. Añade saldo a la cuenta y vuelve a intentarlo.",
+  "error.provider.keyProviderLowCredit":
+    "La cuenta de {provider} de la clave de API guardada no tiene saldo suficiente para una respuesta de este modelo. Añade saldo a la cuenta o elige otro modelo, y vuelve a intentarlo.",
   "error.provider.modelServiceRefused":
     "El servicio del modelo rechazó la solicitud. Elige otro modelo o comprueba tu acceso a este modelo en el servicio.",
   "error.provider.modelServiceRefusedReason":

@@ -358,6 +358,8 @@ export const messages = {
     "{provider} heeft de opgeslagen API-sleutel geweigerd. Vervang of verwijder de sleutel in Instellingen en probeer het opnieuw.",
   "error.provider.keyProviderNoBalance":
     "Het {provider}-account van de opgeslagen API-sleutel heeft geen saldo. Voeg tegoed toe aan het account en probeer het opnieuw.",
+  "error.provider.keyProviderLowCredit":
+    "Het {provider}-account van de opgeslagen API-sleutel heeft niet genoeg tegoed voor een antwoord van dit model. Voeg tegoed toe aan het account of kies een ander model en probeer het opnieuw.",
   "error.provider.modelServiceRefused":
     "De modeldienst heeft het verzoek geweigerd. Kies een ander model of controleer je toegang tot dit model bij de dienst.",
   "error.provider.modelServiceRefusedReason":
