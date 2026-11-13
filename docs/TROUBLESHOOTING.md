@@ -162,8 +162,10 @@ list, because the tree in the text already names each element by its index.
 
 ## A chat is missing after an update
 
-Do not follow the reset steps below. Your messages are stored in one SQLite file, nothing copies it
-before an upgrade, and moving that folder puts the only copy out of reach.
+Do not follow the reset steps below. Your messages are stored in one SQLite file, and moving that
+folder puts it out of reach. OpenBot copies the file before an update changes its format (see
+[Go back to the version before an update](#go-back-to-the-version-before-an-update)), but releases
+before that made no copy, and a copy does not hold the messages that came after it.
 
 Quit OpenBot and start it again first. On launch OpenBot gives a chat back to the agent it belongs to
 when an agent and its chat lose track of each other, so a restart recovers most cases on its own.
@@ -218,6 +220,33 @@ Then remove the older copy. On Windows, look for a second OpenBot in Settings â†
 new OpenBot again if a taskbar or desktop shortcut opens the old one. Older versions show the
 message `OpenBot database version <n> is newer than this application supports (<m>).` The same
 steps apply.
+
+## Go back to the version before an update
+
+Before an update changes the format of your data, OpenBot copies the database into the
+`openbot-db-copies` folder next to it, and keeps the newest two copies:
+
+```text
+~/Library/Application Support/OpenBot/openbot-db-copies
+```
+
+On Windows, the folder is `%APPDATA%\OpenBot\openbot-db-copies`. A copy is named
+`<time>-schema-<n>-before-<version>.db`: OpenBot made it before version `<version>` updated the data.
+Releases before this one made no copy, and OpenBot makes no copy when the disk has too little free
+space.
+
+Use a copy only when the new version does not work with your data. The copy does not have the
+messages, agents and settings that came after it. To go back:
+
+1. Quit OpenBot.
+2. Install the version that you used before `<version>`. In Settings â†’ Updates, turn off
+   **Automatically download updates**.
+3. In the OpenBot folder, move `openbot.db`, `openbot.db-wal` and `openbot.db-shm` to a safe place.
+   Do not delete them.
+4. Copy the copy into the OpenBot folder, and rename it to `openbot.db`.
+5. Start OpenBot.
+
+Report the problem with the details below, so that the next version can read your data.
 
 ## Routines do not run while the computer sleeps
 

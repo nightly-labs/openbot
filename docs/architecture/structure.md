@@ -68,6 +68,11 @@ SolidJS, provider, Cloudflare, and application code; and the account server to d
 
 - `openbot.db` is the source of truth for OpenBot agents, conversations, queues, reactions,
   attachments, and provider-session bindings.
+- `openbot-db-copies/` next to `openbot.db` holds the newest two copies that `DatabaseCore` makes with
+  `VACUUM INTO` before the first pending migration (`src/backend/database/pre-migration-copy.ts`). A
+  copy is for a manual return to the release before an update. No code reads a copy, and no code may
+  assume that one exists: releases before this one made none, and a copy is skipped when the disk is
+  low or the copy fails.
 - `RoutineStore` saves a routine and its webhook trigger in one transaction. `WebhookRouteStore`
   owns route IDs, encrypted secrets, receipts, and route revocations. `RoutineRecords` gives main one
   owner-neutral view of these. Webhook runs use the existing agent and channel queues. Main owns
