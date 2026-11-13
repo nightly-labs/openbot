@@ -20,6 +20,8 @@ export const messages = {
   "island.badge.takeover": "직접 진행",
   "island.badge.failed": "실패",
   "island.status.replied": "답장함",
+  "island.status.repliedIn": "{channel}에서 답장함",
+  "island.channel.agentIn": "{channel}의 {name}",
   "island.status.failed": "실패",
   "island.status.needsYou": "도움 필요",
   "island.status.needsApproval": "승인 필요",

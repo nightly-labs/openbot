@@ -1,6 +1,7 @@
 import { INPUT_LIMITS } from "./input-limits";
 import { type AvatarHue, isAvatarHue } from "./ipc-agent-identity";
 import type { AgentApprovalKind, AgentApprovalPermissions } from "./ipc-approvals";
+import { type ChannelIcon, isChannelIcon } from "./ipc-chat-channels";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
 
 export interface DynamicIslandPreference {
@@ -80,8 +81,18 @@ export interface DynamicIslandAgentIdentity {
   avatarUrl: string | null;
 }
 
+/** The channel that an item happens in. A direct chat with the agent has none. */
+export interface DynamicIslandChannelIdentity {
+  id: string;
+  name: string;
+  icon: ChannelIcon | null;
+  imageUrl: string | null;
+}
+
 export interface DynamicIslandWorkingItem {
   agent: DynamicIslandAgentIdentity;
+  /** The agent works in this channel. Absent or null: in its direct chat. */
+  channel?: DynamicIslandChannelIdentity | null;
   task: string;
   /** The turn that Stop interrupts. It is null while a queued delivery runs before its turn starts. */
   turnId: string | null;
@@ -89,6 +100,8 @@ export interface DynamicIslandWorkingItem {
 
 export interface DynamicIslandMessageItem {
   agent: DynamicIslandAgentIdentity;
+  /** The reply is in this channel. Absent or null: in the agent's direct chat. */
+  channel?: DynamicIslandChannelIdentity | null;
   messageId: string;
   text: string;
   createdAt: string;
@@ -164,6 +177,8 @@ export type DynamicIslandPresentation =
 export type DynamicIslandAction =
   | { type: "open-app" }
   | { type: "open-agent"; serverId: string; agentId: string }
+  /** Shows a channel in the main window: a working item or a reply in a channel. */
+  | { type: "open-channel"; serverId: string; channelId: string }
   | { type: "open-message"; serverId: string; agentId: string; messageId: string }
   /**
    * A short reply typed on the island. The main window stays where it is. A retry of the same draft
@@ -271,6 +286,7 @@ export function isDynamicIslandPresentation(value: unknown): value is DynamicIsl
 export function isDynamicIslandAction(value: unknown): value is DynamicIslandAction {
   if (!isDynamicRecord(value) || !isString(value.type)) return false;
   if (value.type === "open-app") return true;
+  if (value.type === "open-channel") return isShortString(value.serverId, 160) && isShortString(value.channelId, 160);
   if (!isShortString(value.serverId, 160) || !isShortString(value.agentId, 160)) return false;
   if (value.type === "open-agent") return true;
   if (value.type === "open-message") return isShortString(value.messageId, 160);
@@ -327,7 +343,8 @@ function isWorkingItem(value: unknown): value is DynamicIslandWorkingItem {
     isDynamicRecord(value) &&
     isAgentIdentity(value.agent) &&
     isShortString(value.task, 240) &&
-    isNullableShortString(value.turnId, 160)
+    isNullableShortString(value.turnId, 160) &&
+    isOptionalChannel(value.channel)
   );
 }
 
@@ -337,7 +354,19 @@ function isMessageItem(value: unknown): value is DynamicIslandMessageItem {
     isAgentIdentity(value.agent) &&
     isShortString(value.messageId, 160) &&
     isShortString(value.text, 600) &&
-    isShortString(value.createdAt, 80)
+    isShortString(value.createdAt, 80) &&
+    isOptionalChannel(value.channel)
+  );
+}
+
+function isOptionalChannel(value: unknown): value is DynamicIslandChannelIdentity | null | undefined {
+  if (value === undefined || value === null) return true;
+  return (
+    isDynamicRecord(value) &&
+    isShortString(value.id, 160) &&
+    isShortString(value.name, 120) &&
+    (value.icon === null || isChannelIcon(value.icon)) &&
+    (value.imageUrl === null || isShortString(value.imageUrl, 2_048))
   );
 }
 

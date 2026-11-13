@@ -20,6 +20,9 @@ export const messages = defineMessages("island", {
   "island.badge.takeover": "Take over",
   "island.badge.failed": "Failed",
   "island.status.replied": "replied",
+  "island.status.repliedIn": "replied in {channel}",
+  // An agent at work, or a reply, in a channel: "Nyx in Design".
+  "island.channel.agentIn": "{name} in {channel}",
   "island.status.failed": "failed",
   "island.status.needsYou": "needs you",
   "island.status.needsApproval": "needs approval",
