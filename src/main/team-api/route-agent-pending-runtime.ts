@@ -20,8 +20,9 @@ import { readJson, requireAdmin, requireAgentLevel, requireListedAgent, stringFi
 /**
  * A change of the provider, model, effort or account of one agent from a joined server. While the agent
  * works, the host keeps it for the next turn, as the chat on the host's computer does; the released agent
- * route refuses it. It needs the `manage` level of the agent, as a model change does. A named provider
- * account that is not the agent's account needs an owner or admin, as `provider-accounts-v1` does.
+ * route refuses it. It needs the `manage` level of the agent, as a model change does. A provider
+ * account change needs an owner or admin, as `provider-accounts-v1` does, except the move to the new
+ * provider's own sign-in that a provider change gives.
  * Frozen by `agent-pending-runtime-v1`.
  */
 export async function routeAgentPendingRuntime(
@@ -55,10 +56,15 @@ export async function routeAgentPendingRuntime(
     input.reasoningEffort = reasoningEffort;
   }
   if (typeof providerAccountId === "string") {
-    const current = agents.listAgents().find((agent) => agent.id === agentId)?.providerAccountId;
-    // The provider's own sign-in is the account that a model change gives. Another named account is an
-    // admin choice.
-    if (providerAccountId !== DEFAULT_PROVIDER_ACCOUNT_ID && providerAccountId !== current) requireAdmin(member);
+    const agent = agents.listAgents().find((item) => item.id === agentId);
+    // A provider change goes to the new provider's own sign-in, as on the released agent route. Any other
+    // account change is an admin choice, as on `provider-accounts-v1`.
+    const ownSignInOfNewProvider =
+      providerAccountId === DEFAULT_PROVIDER_ACCOUNT_ID &&
+      input.provider !== undefined &&
+      input.provider !== agent?.provider;
+    if (providerAccountId !== (agent?.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID) && !ownSignInOfNewProvider)
+      requireAdmin(member);
     input.providerAccountId = providerAccountId === DEFAULT_PROVIDER_ACCOUNT_ID ? null : providerAccountId;
   }
   if (Object.keys(input).length === 1) throw new HttpError(400, "update is empty.");

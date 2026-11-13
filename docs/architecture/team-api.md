@@ -532,8 +532,8 @@ The optional `agent-pending-runtime-v1` capability (protocol 9 only) adds
 `reasoningEffort` and `providerAccountId`, where `default` is the provider's own sign-in). It changes the
 runtime as the pickers on the host's computer do: while the agent works, the host keeps the change as
 `pendingRuntime` and applies it before the next turn, where the released `PATCH /v1/agents/:agentId`
-refuses a provider change. It needs a visible agent (else 404) and `manage` on it (else 403); a named
-account that is not the agent's account needs an owner or admin (else 403). For a peer with the
+refuses a provider change. It needs a visible agent (else 404) and `manage` on it (else 403); another
+account needs an owner or admin (else 403), except the new provider's own sign-in on a provider change. For a peer with the
 capability, the host also adds `pendingRuntime` to each agent of `GET /v1/agents` and of the
 `bots-changed` event, so the "After this turn" badge shows on the client.
 `src/main/team-api/route-agent-pending-runtime.ts` owns the route. The desktop with a joined server and

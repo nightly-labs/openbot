@@ -11405,15 +11405,32 @@ try {
       ...v9,
       json: { ...change, providerAccountId: "a0123456789abcdef" },
     });
+    // The move of an agent on a named account to its provider's own sign-in, with no provider change.
+    const named = agents.find((item) => item.id === "agent-ada");
+    if (named) named.providerAccountId = "a0123456789abcdef";
+    const ownSignInOnly = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", providerAccountId: "default" },
+    });
+    if (named) delete named.providerAccountId;
     check(
-      "the runtime change route without the capability, with no change, of a hidden agent, for a member with only chat, or to a named account by a member is refused",
+      "the runtime change route without the capability, with no change, of a hidden agent, for a member with only chat, or to another account by a member is refused",
       errorIs(unsupported, 400, sourceText("error.team.providersUnsupported")) &&
         empty.status === 400 &&
         errorIs(hiddenAgent, 404, sourceText("error.team.agentNotFound")) &&
         errorIs(chatOnly, 403, sourceText("error.team.agentManageDenied")) &&
         errorIs(namedAccount, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(ownSignInOnly, 403, sourceText("error.team.adminRequired")) &&
         callsOf("updateAgentRuntime").length === changesBefore,
-      [summary(unsupported), summary(empty), summary(hiddenAgent), summary(chatOnly), summary(namedAccount)],
+      [
+        summary(unsupported),
+        summary(empty),
+        summary(hiddenAgent),
+        summary(chatOnly),
+        summary(namedAccount),
+        summary(ownSignInOnly),
+      ],
     );
     const effortOnly = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, {
       token: bobToken,
