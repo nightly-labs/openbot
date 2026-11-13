@@ -95,7 +95,7 @@ import { recordRestartActivity } from "../restart-activity";
 import { shortenDiagnostic } from "./../stderr-diagnostics";
 import { stopProcessTree } from "../windows-process-tree";
 import { normalizeAccountUsage, usageWindowHasReset, usageWindowResetSince } from "./account-usage";
-import { captureBrowser } from "./browser-capture";
+import { captureBrowser, signInPageByOpenBot } from "./browser-capture";
 import { startCliCodeLogin } from "./cli-code-login";
 import { CliLoginFailed, CliLoginFlow, toCliLoginFailed } from "./cli-login-flow";
 import { CodexLoginFlow, toCodexLoginFailed } from "./codex-login";
@@ -1824,7 +1824,7 @@ export class ProviderRuntime implements ProviderPort {
         yield* this.#cliLogin
           .start(provider, (cli) =>
             Effect.gen(function* () {
-              const browser = onHost ? yield* captureBrowser(openExternal) : {};
+              const browser = signInPageByOpenBot(onHost, signIn.command) ? yield* captureBrowser(openExternal) : {};
               const { argv } = signIn.command;
               const target = cliSpawnTarget(
                 cli.executable,
