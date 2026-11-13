@@ -28,13 +28,16 @@
 //       (docs/hosted-servers.md#a-new-server-on-a-pool-machine). A free machine that has the data of a
 //       server (a first start that failed, or a move that went back) is not changed; with
 //       `--reinstall`, the script erases its disk first.
-//   bun scripts/hosting/leaseweb-pool.ts move <server ID> <VPS ID | auto> [--keys=<file>] [--units=<unit>,...] [--apply]
+//   bun scripts/hosting/leaseweb-pool.ts move <server ID> <VPS ID | auto> [--keys=<file>] [--units=<unit>,...] [--docker] [--apply]
 //       Moves one server from its boat sandbox to a free machine of the pool, as
 //       docs/hosted-servers.md#move-a-server-from-boat says. The machine takes no new server from then
 //       on. `auto` selects the machine when the move starts: a free machine of the plan, in the order of the
 //       account service for a new server. When a new customer gets that machine first, it takes the next one. It prepares the machine when it is not prepared (then `--keys` is necessary). It needs `BOAT_API_KEY`. The move does not copy the
 //       systemd units of the customer, so it stops when the sandbox has one. `--units` names the units
-//       that an operator moves by hand, and the move then continues.
+//       that an operator moves by hand, and the move then continues. It refuses a sandbox whose stop at
+//       boat is failing, and stops before the downtime when the sandbox has Docker containers. `--docker`
+//       says that an operator moves the containers by hand (stopped before the move, so the boat stop can
+//       save the sandbox), and the move then continues.
 //   bun scripts/hosting/leaseweb-pool.ts custom <VPS ID> --owner=<email> --customer=<word> \
 //       --name=<server name> --keys=<file> [--apply]
 //       Sets up a VPS with no reference as the server of one customer, not in the pool
@@ -205,10 +208,16 @@ interface Release {
   sha256: string;
 }
 // boat answers with the sandbox, or with `{ sandbox }` (apps/auth-api/src/server/boat-client.ts).
+// `stop` is the last stop request. A stop that boat cannot save is `failing`, and the state stays `idle`.
+const sandboxValueSchema = z.object({
+  state: z.string(),
+  stop: z.object({ status: z.string() }).nullish(),
+});
 const sandboxSchema = z.union([
-  z.object({ sandbox: z.object({ state: z.string() }) }).transform((value) => value.sandbox),
-  z.object({ state: z.string() }),
+  z.object({ sandbox: sandboxValueSchema }).transform((value) => value.sandbox),
+  sandboxValueSchema,
 ]);
+type Sandbox = z.infer<typeof sandboxValueSchema>;
 const commandSchema = z.object({
   // null when the command did not end in its time.
   exitCode: z.number().nullable(),
@@ -1351,16 +1360,16 @@ bash ${MACHINE_HOSTING}/leaseweb-bootstrap.sh '${keys}'
     return text ? JSON.parse(text) : null;
   }
 
-  async #sandboxState(sandbox: string) {
-    return sandboxSchema.parse(await this.#boat("GET", `/sandboxes/${sandbox}`)).state;
+  async #sandbox(sandbox: string): Promise<Sandbox> {
+    return sandboxSchema.parse(await this.#boat("GET", `/sandboxes/${sandbox}`));
   }
 
-  /** Waits until `done` accepts the state of the sandbox. */
-  async #waitForSandbox(sandbox: string, done: (state: string) => boolean, what: string) {
+  /** Waits until `done` accepts the sandbox. */
+  async #waitForSandbox(sandbox: string, done: (value: Sandbox) => boolean, what: string) {
     const deadline = Date.now() + 10 * 60_000;
     while (Date.now() < deadline) {
-      const state = await this.#sandboxState(sandbox);
-      if (done(state)) return state;
+      const value = await this.#sandbox(sandbox);
+      if (done(value)) return value.state;
       await delay(3_000);
     }
     throw new Error(`Sandbox ${sandbox} did not ${what} in 10 minutes.`);
@@ -1426,7 +1435,7 @@ exit "$status"`;
     throw new Error(`The pool has no free ${product} for this server. Add a machine first.`);
   }
 
-  async move(serverId: string, vpsArg: string, unitsMovedByHand: readonly string[] = []) {
+  async move(serverId: string, vpsArg: string, unitsMovedByHand: readonly string[] = [], dockerMovedByHand = false) {
     if (!SERVER_ID_PATTERN.test(serverId)) throw new Error(`Not a server ID: ${serverId}`);
     if (vpsArg !== "auto" && !VPS_ID_PATTERN.test(vpsArg)) throw new Error(`Not a VPS ID: ${vpsArg}`);
     const started = Date.now();
@@ -1457,8 +1466,18 @@ exit "$status"`;
     let vpsId = machine.id;
     const release = await this.#release();
     let state = this.#machineState(machine);
+    const before = await this.#sandbox(sandbox);
+    // boat tries a failing stop again every few minutes. Each try stops OpenBot in the sandbox, and a try
+    // during the downtime looks like a stop that ended. On 2026-11-13 a move then started OpenBot on the
+    // machine while boat cancelled the stop, and the sandbox started OpenBot again.
+    if (before.stop?.status === "failing") {
+      throw new Error(
+        `boat cannot stop sandbox ${sandbox}: its stop is failing. Read stop.error of GET /sandboxes/${sandbox}, ` +
+          "and repair the sandbox first. Nothing changed.",
+      );
+    }
     logger.info(
-      `Move server ${serverId} (${row.plan}, ${row.desired_state}, sandbox ${await this.#sandboxState(sandbox)}) to VPS ${vpsId} ` +
+      `Move server ${serverId} (${row.plan}, ${row.desired_state}, sandbox ${before.state}) to VPS ${vpsId} ` +
         `(${machine.location} ${machine.product}, ${state?.user ? `OpenBot ${state.version}` : "not prepared"}).`,
     );
     if (!this.#apply) {
@@ -1520,11 +1539,11 @@ exit "$status"`;
     // 3. Before the downtime: the sandbox runs, the move files are in it, and the machine has its packages.
     let packages: string[];
     try {
-      const sandboxState = await this.#sandboxState(sandbox);
+      const sandboxState = (await this.#sandbox(sandbox)).state;
       if (!SANDBOX_USABLE.has(sandboxState)) {
         logger.info(`Sandbox ${sandbox} is ${sandboxState}. Start it.`);
         await this.#boat("POST", `/sandboxes/${sandbox}/resume`, { ttlSeconds: 7200 }, 120_000);
-        await this.#waitForSandbox(sandbox, (value) => SANDBOX_USABLE.has(value), "start");
+        await this.#waitForSandbox(sandbox, (value) => SANDBOX_USABLE.has(value.state), "start");
       } else {
         // The Worker does not extend the lease any more. boat would stop the sandbox at its end.
         await this.#boat("PATCH", `/sandboxes/${sandbox}`, { ttlSeconds: 7200 });
@@ -1566,6 +1585,13 @@ ssh-keygen -q -t ed25519 -N '' -C openbot-move -f "$d/key" </dev/null
 echo "key=$(cat "$d/key.pub")"
 echo "ids=$(id -u user):$(id -g user)"
 echo "version=$(sed -n 's/^X-AppImage-Version=//p' /opt/OpenBot/app/*.desktop | head -n 1)"
+echo "containers=$(find /var/lib/docker/containers -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)"
+if ids=$(docker ps -aq 2>/dev/null); then
+  echo "docker_running=$(docker ps -q | wc -l)"
+  restart=0
+  [ -n "$ids" ] && restart=$(docker inspect -f '{{.HostConfig.RestartPolicy.Name}}' $ids | awk '$0 != "no" { n++ } END { print n + 0 }')
+  echo "docker_restart=$restart"
+fi
 bash "$d/move-from-boat.sh" packages`,
       );
       const values = keyValues(output);
@@ -1580,6 +1606,32 @@ bash "$d/move-from-boat.sh" packages`,
         throw new Error(
           `The sandbox has systemd units of the customer that the move does not copy: ${units.join(", ")}.`,
         );
+      }
+      // The VPS has no Docker, and the move does not copy containers or images. A container that restarts
+      // also makes the stop at boat fail. So a server with a container stays on boat.
+      const containers = Number(values.get("containers") ?? "");
+      if (!Number.isInteger(containers)) throw new Error("The sandbox did not count its Docker containers.");
+      if (containers > 0 && !dockerMovedByHand) {
+        throw new Error(
+          `The sandbox has ${containers} Docker containers. The VPS has no Docker, and the move does not copy them.`,
+        );
+      }
+      if (containers > 0) {
+        // The operator stops each container and sets its restart policy to `no` first. A container that runs
+        // or restarts makes the boat stop fail during the downtime. When the Docker daemon does not answer,
+        // no container runs or restarts.
+        const running = Number(values.get("docker_running") ?? "0");
+        const restarting = Number(values.get("docker_restart") ?? "0");
+        if (!Number.isInteger(running) || !Number.isInteger(restarting)) {
+          throw new Error("The sandbox did not give the state of its Docker containers.");
+        }
+        if (running > 0 || restarting > 0) {
+          throw new Error(
+            `The sandbox has ${running} running Docker containers and ${restarting} with a restart policy other ` +
+              "than no. Stop each container and set its restart policy to no before the move.",
+          );
+        }
+        logger.warn(`The sandbox has ${containers} stopped Docker containers. An operator moves them by hand.`);
       }
       const sandboxVersion = values.get("version") ?? "";
       if (values.get("ids") !== machineState.ids) {
@@ -1666,14 +1718,19 @@ systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/ru
       await this.#sandboxRun(sandbox, `rm -rf ${SANDBOX_MOVE}`);
       lap("Export and copy");
 
-      // 5. The sandbox stops while the machine imports. The export stopped OpenBot in the sandbox, and
-      // `archiving` is a machine that boat saves and that runs nothing, so OpenBot can then start here.
+      // 5. The sandbox stops while the machine imports. OpenBot starts here only when boat saved and stopped
+      // the sandbox. `archiving` is not enough: boat can cancel the stop after it, and the sandbox then runs
+      // and starts OpenBot again.
       await this.#boat("POST", `/sandboxes/${sandbox}/stop`, {});
       this.#remote(machine, `bash ${MACHINE_HOSTING}/move-from-boat.sh import ${MACHINE_ARCHIVE}`);
       lap("Import");
       const stopped = await this.#waitForSandbox(
         sandbox,
-        (value) => value === "archiving" || value === "archived",
+        (value) => {
+          if (value.stop?.status === "failing")
+            throw new Error(`boat cannot stop sandbox ${sandbox}: its stop is failing.`);
+          return value.state === "archived";
+        },
         "stop",
       );
       lap(`Sandbox ${stopped}`);
@@ -1737,7 +1794,7 @@ systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/ru
 }
 
 const USAGE =
-  "Usage: leaseweb-pool.ts status | free | add <VPS ID>... | remove <VPS ID>... | sync | prepare <VPS ID>... --keys=<file> [--reinstall] | move <server ID> <VPS ID | auto> [--keys=<file>] [--units=<unit>,...] | custom <VPS ID> --owner=<email> --customer=<word> --name=<server name> --keys=<file> [--apply] [--env=test]";
+  "Usage: leaseweb-pool.ts status | free | add <VPS ID>... | remove <VPS ID>... | sync | prepare <VPS ID>... --keys=<file> [--reinstall] | move <server ID> <VPS ID | auto> [--keys=<file>] [--units=<unit>,...] [--docker] | custom <VPS ID> --owner=<email> --customer=<word> --name=<server name> --keys=<file> [--apply] [--env=test]";
 
 async function main(args: string[]) {
   const [command, ...operands] = args.filter((arg) => !arg.startsWith("--"));
@@ -1751,7 +1808,7 @@ async function main(args: string[]) {
   else if (command === "sync") await pool.sync();
   else if (command === "prepare" && operands.length > 0) await pool.prepare(operands, args.includes("--reinstall"));
   else if (command === "move" && operands.length === 2 && operands[0] && operands[1])
-    await pool.move(operands[0], operands[1], option("units")?.split(",").filter(Boolean));
+    await pool.move(operands[0], operands[1], option("units")?.split(",").filter(Boolean), args.includes("--docker"));
   else if (command === "custom" && operands.length === 1 && operands[0])
     await pool.custom(operands[0], {
       owner: option("owner") ?? "",
