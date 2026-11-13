@@ -492,4 +492,28 @@ export const messages = {
   "chat.feedbackSent.badge": "Gönderildi",
   "chat.feedbackSent.body": "OpenBot ekibi okuyup ilgilenecek 💜",
   "chat.feedbackSent.openNamed": "GitHub'da #{number} numaralı issue'yu aç",
+  "chat.feedbackSent.remove": "Kaldır",
+  "chat.feedbackSent.removeConfirm":
+    "Bu rapor GitHub'dan kaldırılsın mı? Herkes için kaldırılır ve bu işlem geri alınamaz.",
+  "chat.feedbackSent.fixOrRemove": "Düzelt veya kaldır",
+  "chat.feedbackSent.fixChoice": "Düzeltilmiş rapor gönder",
+  "chat.feedbackSent.fixChoiceHint": "Ajan bu raporu kaldırır ve seçtiğiniz kısımlar olmadan yeniden gönderir.",
+  "chat.feedbackSent.removeChoice": "Kaldır",
+  "chat.feedbackSent.removeChoiceHint": "GitHub'dan kaldırın. Bu işlem geri alınamaz.",
+  "chat.feedbackSent.fixPrompt": "#{number} numaralı raporumu GitHub'dan kaldır ve şu kısım olmadan yeniden gönder:",
+  "chat.feedbackSent.removePrompt": "#{number} numaralı raporumu GitHub'dan kaldır.",
+  "chat.feedbackSent.composerFilled": "İstek mesaj kutunuzda. Tamamlayıp gönderin.",
+  "chat.feedbackSent.keep": "Kalsın",
+  "chat.feedbackSent.removing": "Kaldırılıyor…",
+  "chat.feedbackSent.removeFailed": "OpenBot raporu kaldıramadı. Bağlantınızı kontrol edip tekrar deneyin.",
+  "chat.feedbackSent.removeSignedOut": "Kaldırmak için OpenBot'a giriş yapın.",
+  "chat.feedbackSent.removeNotYours":
+    "OpenBot bu raporu kaldıramıyor. Rapor, kaldırma özelliğinden önce veya başka bir hesapla gönderildi.",
+  "chat.feedbackSent.removeUnavailable": "OpenBot şu anda rapor kaldıramıyor. Daha sonra tekrar deneyin.",
+  "chat.feedbackSent.removeLimited": "Çok fazla deneme. Bir dakika bekleyip tekrar deneyin.",
+  "chat.feedbackSent.removeNotFound": "OpenBot bu raporu sohbette bulamıyor.",
+  "chat.feedbackWithdrawn.title": "Rapor kaldırıldı",
+  "chat.feedbackWithdrawn.badge": "Kaldırıldı",
+  "chat.feedbackWithdrawn.body":
+    "Raporunuz artık GitHub'da değil. Düzeltilmiş bir rapor göndermek için ajandan isteyin.",
 } as const satisfies PartialTranslation<typeof source>;

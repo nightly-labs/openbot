@@ -368,6 +368,7 @@ export const messages = {
   "error.backend.branchSourceBusy": "请先停止当前回合，再为此聊天创建分支。",
   "error.backend.branchMessageNotFound": "只能从助手已完成的回答创建分支。",
   "error.backend.branchRemoteUnsupported": "分支仅适用于本电脑上的助手。",
+  "error.backend.feedbackWithdrawRemoteUnsupported": "要删除此报告，请让助手删除它。",
   "error.backend.threadMoveRefused": "只有你单独发给该助手的消息才能在新话题中运行。",
   "error.backend.taskTitleRequired": "请给任务起一个简短的标题。",
   "error.backend.taskToolInvalid": "标题不超过 120 个字符，并写明要做什么。",

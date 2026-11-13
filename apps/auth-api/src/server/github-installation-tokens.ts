@@ -122,6 +122,20 @@ const searchSchema = Schema.Struct({
   ),
 });
 const commentSchema = Schema.Struct({ id: Schema.Number });
+const authorSchema = Schema.NullOr(Schema.Struct({ login: Schema.String }));
+const feedbackIssueSchema = Schema.Struct({
+  node_id: Schema.String,
+  body: Schema.optional(Schema.NullOr(Schema.String)),
+  pull_request: Schema.optional(Schema.Unknown),
+  user: authorSchema,
+});
+const feedbackCommentsSchema = Schema.Array(
+  Schema.Struct({ id: Schema.Number, body: Schema.optional(Schema.NullOr(Schema.String)), user: authorSchema }),
+);
+const repositoryNodeSchema = Schema.Struct({ node_id: Schema.String });
+const graphqlSchema = Schema.Struct({ errors: Schema.optional(Schema.Array(Schema.Unknown)) });
+/** The comments of one issue that a withdrawal reads: a Worker request has a limited count of subrequests. */
+const MAX_COMMENT_PAGES = 10;
 
 const SIMILAR_ISSUES = 5;
 /** Enough of an issue for the agent to see what a new report adds to it. */
@@ -133,6 +147,20 @@ const FEEDBACK_APP = "openbotgit";
 export interface GitHubIssue {
   number: number;
   url: string;
+}
+
+/**
+ * What a withdrawal removed from the public repository: the whole issue, the account's comments on
+ * it, or nothing because the issue is not there anymore.
+ */
+export type WithdrawnFeedback = "issue" | "comment" | "gone";
+
+/** True when the account of the request sent this text. */
+export type FeedbackSender = (body: string) => Effect.Effect<boolean, GitHubInstallationTokensError>;
+
+/** The answer for an issue with no report of the account, also when the issue is not a report. */
+function notSentBy(): GitHubInstallationTokensError {
+  return new GitHubInstallationTokensError(404, "feedback_not_yours", "This account sent no report on this issue.");
 }
 
 /** An open issue that a search found. */
@@ -289,6 +317,78 @@ export class GitHubInstallationTokens {
     return { number: target.number, url: target.html_url };
   }).bind(this);
 
+  /**
+   * Takes a report of one account off the public repository. GitHub shows each earlier version of an
+   * edited text to everyone, so an edit cannot remove words: an issue that the account opened moves to
+   * `privateRepository`, with its history, and a comment of the account is deleted. `sentBy` decides
+   * which texts the account sent. An issue that moved or was deleted is `gone`.
+   */
+  readonly withdrawFeedback = Effect.fn("GitHubInstallationTokens.withdrawFeedback")(function* (
+    this: GitHubInstallationTokens,
+    repository: string,
+    number: number,
+    sentBy: FeedbackSender,
+    privateRepository: string | null,
+  ): Effect.fn.Return<WithdrawnFeedback, GitHubInstallationTokensError> {
+    const token = yield* this.#repositoryToken(repository, WRITE_ISSUES);
+    // A moved issue answers with a redirect to its new place, which must not be read as this issue.
+    const issue = yield* this.#send(
+      `/repos/${repository}/issues/${number}`,
+      token,
+      { method: "GET", redirect: "manual" },
+      feedbackIssueSchema,
+      [301, 404, 410],
+    );
+    if (!issue) return "gone";
+    if (issue.pull_request !== undefined) return yield* notSentBy();
+    if (issue.user?.login === `${FEEDBACK_APP}[bot]` && (yield* sentBy(issue.body ?? ""))) {
+      if (!privateRepository)
+        return yield* new GitHubInstallationTokensError(
+          503,
+          "feedback_withdraw_unavailable",
+          "A sent issue cannot be removed now.",
+        );
+      // GitHub moves an issue only with a token for both repositories.
+      const both = yield* this.#repositoryToken(repository, WRITE_ISSUES, [privateRepository]);
+      const target = yield* this.#get(`/repos/${privateRepository}`, both, repositoryNodeSchema);
+      const moved = yield* this.#post(
+        "/graphql",
+        both,
+        {
+          query:
+            "mutation($issue: ID!, $repository: ID!) { transferIssue(input: { issueId: $issue, repositoryId: $repository }) { issue { number } } }",
+          variables: { issue: issue.node_id, repository: target.node_id },
+        },
+        graphqlSchema,
+      );
+      if (moved.errors?.length)
+        return yield* new GitHubInstallationTokensError(502, "github_failed", "GitHub did not move the issue.");
+      return "issue";
+    }
+    const own: number[] = [];
+    for (let page = 1; page <= MAX_COMMENT_PAGES; page += 1) {
+      const comments = yield* this.#get(
+        `/repos/${repository}/issues/${number}/comments?per_page=${PAGE_SIZE}&page=${page}`,
+        token,
+        feedbackCommentsSchema,
+      );
+      for (const comment of comments)
+        if (comment.user?.login === `${FEEDBACK_APP}[bot]` && (yield* sentBy(comment.body ?? ""))) own.push(comment.id);
+      if (comments.length < PAGE_SIZE) break;
+    }
+    if (own.length === 0) return yield* notSentBy();
+    // 204 is the answer of a deleted comment, and 404 of a comment that is gone already.
+    for (const id of own)
+      yield* this.#send(
+        `/repos/${repository}/issues/comments/${id}`,
+        token,
+        { method: "DELETE" },
+        Schema.Unknown,
+        [204, 404],
+      );
+    return "comment";
+  }).bind(this);
+
   /** The open issues that the app opened whose titles have one of `terms`, best match first. */
   readonly searchIssues = Effect.fn("GitHubInstallationTokens.searchIssues")(function* (
     this: GitHubInstallationTokens,
@@ -312,13 +412,17 @@ export class GitHubInstallationTokens {
       }));
   }).bind(this);
 
-  /** A token for one repository of the app's own installation, with only `permissions`. */
+  /**
+   * A token for one repository of the app's own installation, with only `permissions`. `others` are
+   * more repositories of the same owner and installation.
+   */
   readonly #repositoryToken = Effect.fn("GitHubInstallationTokens.repositoryToken")(function* (
     this: GitHubInstallationTokens,
     repository: string,
     permissions: Readonly<Record<string, string>>,
+    others: readonly string[] = [],
   ): Effect.fn.Return<Credential, GitHubInstallationTokensError> {
-    const [, name] = repository.split("/");
+    const names = [repository, ...others].map((fullName) => fullName.split("/")[1]);
     let installationId = this.#repositoryInstallations.get(repository);
     if (installationId === undefined) {
       installationId = (yield* this.#get(`/repos/${repository}/installation`, APP, repositoryInstallationSchema)).id;
@@ -328,7 +432,7 @@ export class GitHubInstallationTokens {
     const minted = yield* this.#post(
       `/app/installations/${installationId}/access_tokens`,
       APP,
-      { repositories: [name], permissions },
+      { repositories: names, permissions },
       accessTokenSchema,
     ).pipe(Effect.tapError(() => Effect.sync(() => this.#repositoryInstallations.delete(repository))));
     return { kind: "installation", token: minted.token };

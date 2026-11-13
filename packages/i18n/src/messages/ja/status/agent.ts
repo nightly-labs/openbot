@@ -35,6 +35,11 @@ export const messages = {
   "status.agent.feedbackRecentErrors": "チャットの最近のエラー:",
   "status.agent.feedbackSameAs": "issue #{issue} に追加します",
   "status.agent.feedbackSent": "OpenBot チームに送信しました: {title}",
+  "status.agent.feedbackWithdrawn": "GitHub から削除しました: {title}",
+  "status.agent.feedbackWithdrawCommand": "レポート #{issue} を GitHub から削除",
+  "status.agent.feedbackWithdrawReason":
+    "このレポートは GitHub で誰も見られなくなります。元に戻せません。修正するには、エージェントが修正したレポートを送信できます。",
+  "status.agent.feedbackWithdrawing": "レポートを GitHub から削除しています…",
   "status.agent.serverInstallCommand":
     "別のコンピューターに OpenBot をサーバー {name} としてインストールし、あなたのアカウントにサインインさせる 1 回限りのコマンドを作成します。エージェントがそこで実行します。",
   "status.agent.serverInstallCard": "サーバー {name} のインストールコマンド",

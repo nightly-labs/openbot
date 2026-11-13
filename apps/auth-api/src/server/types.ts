@@ -124,6 +124,11 @@ export interface WorkerBindings {
   GITHUB_APP_CLIENT_ID?: string;
   /** The private key of the OpenBot GitHub App as a PKCS #8 PEM. Without it, no installation token is issued. */
   GITHUB_APP_PRIVATE_KEY?: string;
+  /**
+   * The private repository, as `owner/name`, where a withdrawn feedback issue moves. The OpenBot
+   * GitHub App needs issue write access to it. Empty, an issue cannot be withdrawn; a comment can.
+   */
+  FEEDBACK_WITHDRAWN_REPOSITORY?: string;
   /** The Apple Push Notification service key (`.p8`, PEM text). The Live Activity relay is off without it. */
   APNS_PRIVATE_KEY?: string;
   APNS_KEY_ID?: string;

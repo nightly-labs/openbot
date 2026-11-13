@@ -2546,6 +2546,11 @@ export function authApiRateLimit(error: unknown): { code: string; retryAfterSeco
   return { code: error.code, retryAfterSeconds: error.retryAfterSeconds ?? null };
 }
 
+/** The error code that the account service sent, such as `feedback_not_yours`, or null for another failure. */
+export function authApiErrorCode(error: unknown): string | null {
+  return error instanceof AuthApiError ? error.code : null;
+}
+
 /**
  * A client error that the same request cannot change, such as a machine token that the account service
  * no longer accepts (401). A timeout and a rate limit can pass later.

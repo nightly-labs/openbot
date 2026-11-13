@@ -81,6 +81,9 @@
     // The public Client ID of the OpenBotGit GitHub App. Its private key is the optional secret
     // GITHUB_APP_PRIVATE_KEY (PKCS #8). Without the key, agents act on GitHub as the signed-in user.
     "GITHUB_APP_CLIENT_ID": "Iv23lik5pzHz70cb0RUL",
+    // The private repository where a withdrawn feedback issue moves, as `owner/name`. The GitHub App
+    // needs Issues write access to it. Empty, the app can withdraw a comment, but not an issue.
+    "FEEDBACK_WITHDRAWN_REPOSITORY": "",
     "APNS_TEAM_ID": "8A47NKRZSJ",
     "APNS_TOPIC": "run.openbot.mobile"
   },

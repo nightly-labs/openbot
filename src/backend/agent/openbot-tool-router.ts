@@ -120,6 +120,7 @@ import type { ConversationRuntime } from "./conversation-runtime";
 import { handleDataTool } from "./data-tools";
 import { responseAttachmentMessageId, visualReplyFileName, visualReplyMessageId } from "./delivery-content";
 import type { DrainScheduler } from "./drain-scheduler";
+import type { FeedbackWithdrawal } from "./feedback-withdrawal";
 import { HistoryTools, historyCursorThread, isHistoryBrowse, MAIN_CHAT_TASK_ID } from "./history-tools";
 import type { HostedSiteCoordinator } from "./hosted-site-coordinator";
 import { isHostedSiteMutationTool } from "./hosted-site-events";
@@ -246,6 +247,17 @@ export type FeedbackSendResult =
   | { readonly status: "limited"; readonly daily: boolean; readonly retryAfterSeconds: number | null };
 
 /**
+ * What became of a withdrawal: the report is off GitHub, or the account did not send it, or the
+ * account service cannot move an issue now.
+ */
+export type FeedbackWithdrawResult =
+  | { readonly status: "withdrawn" }
+  | { readonly status: "signedOut" }
+  | { readonly status: "notYours" }
+  | { readonly status: "unavailable" }
+  | { readonly status: "limited"; readonly retryAfterSeconds: number | null };
+
+/**
  * What became of a message from another agent while its recipient's chat turn runs: `steered` into
  * that turn, or the reason it waits for the next one. Null when no running chat turn could take it,
  * so the message starts when the recipient is free.
@@ -266,6 +278,8 @@ export interface AgentFeedback {
   /** The open issues with a similar title; empty when the search fails. */
   similar(title: string): Effect.Effect<SimilarFeedbackIssue[]>;
   send(feedback: Feedback): Effect.Effect<FeedbackSendResult, ToolOperationFailed>;
+  /** Takes a report that this account sent off GitHub, by its issue number. */
+  withdraw(number: number): Effect.Effect<FeedbackWithdrawResult, ToolOperationFailed>;
 }
 
 /** The errors of a chat that a report takes: the last few, from the last hour. */
@@ -427,6 +441,8 @@ export interface OpenBotToolRouterOptions {
   feedbackFacts?: FeedbackFacts | null | undefined;
   /** Sends approved `send_feedback` text; null where this process has no account service. */
   feedback?: AgentFeedback | null | undefined;
+  /** Takes sent reports off GitHub for `withdraw_feedback`; absent where this process has no account service. */
+  feedbackWithdrawal?: FeedbackWithdrawal | undefined;
   /** Makes claims for `create_server_install_command`; null where this process has no account service. */
   serverClaims?: AgentServerClaims | null | undefined;
   /** The API keys that users saved for agents; null where nothing can save them. */
@@ -477,6 +493,7 @@ export class OpenBotToolRouter {
   readonly #githubConnected: () => boolean;
   readonly #feedbackFacts: FeedbackFacts | null;
   readonly #feedback: AgentFeedback | null;
+  readonly #feedbackWithdrawal: FeedbackWithdrawal | null;
   /** The last OpenBot tool failures of each provider thread, for the errors of a report. */
   readonly #toolFailures = new Map<string, { at: number; text: string }[]>();
   /** The turns whose report already got the similar issues, so the next call sends it. */
@@ -537,6 +554,7 @@ export class OpenBotToolRouter {
     this.#githubConnected = options.githubConnected ?? (() => false);
     this.#feedbackFacts = options.feedbackFacts ?? null;
     this.#feedback = options.feedback ?? null;
+    this.#feedbackWithdrawal = options.feedbackWithdrawal ?? null;
     this.#serverClaims = options.serverClaims ?? null;
     this.#apiKeys = options.apiKeys ?? null;
     this.#vaultItems = options.vaultItems ?? null;
@@ -1352,6 +1370,83 @@ export class OpenBotToolRouter {
     });
   });
 
+  /**
+   * `withdraw_feedback`: takes a report that this account sent off GitHub after the owner approves, and
+   * marks its card in this chat as removed. The account service checks that this account sent it.
+   */
+  readonly #withdrawFeedback = Effect.fn("OpenBotToolRouter.withdrawFeedback")(function* (
+    this: OpenBotToolRouter,
+    client: AgentClient,
+    request: AppServerRequest,
+    params: DynamicToolCallParams,
+    senderAgentId: string,
+  ): Effect.fn.Return<OpenBotToolResponse, ToolOperationFailed> {
+    const issue = isRecord(params.arguments) ? params.arguments.issue : undefined;
+    if (!isIssueNumber(issue)) return openBotToolFailure("issue must be the number of a sent report.");
+    const withdrawal = this.#feedbackWithdrawal;
+    if (!withdrawal || !this.#feedback?.signedIn())
+      return openBotToolFailure(
+        "OpenBot cannot remove the report, because the user is not signed in to OpenBot. Ask them to sign in and try again.",
+      );
+    if (!this.#requestedByPerson(senderAgentId, params.turnId, params.threadId))
+      return openBotToolFailure(
+        "Only a person's message, in your OpenBot chat or a thread they opened, can remove a report.",
+      );
+    const threadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
+    const decision = yield* this.#attention.awaitToolApproval(
+      client,
+      request,
+      {
+        requestId: request.id,
+        agentId: senderAgentId,
+        threadId,
+        turnId: params.turnId,
+        kind: "permissions",
+        command: sourceText("status.agent.feedbackWithdrawCommand", { issue: String(issue) }),
+        cwd: null,
+        reason: sourceText("status.agent.feedbackWithdrawReason"),
+        grantRoot: null,
+        permissions: null,
+      },
+      // The report went out with the owner's account, so only the owner takes it back.
+      { ownerOnly: true },
+    );
+    if (decision === "cancel")
+      return openBotToolResult({
+        status: "cancelled",
+        next: "Nobody answered the card, so the report is still on GitHub.",
+      });
+    if (decision !== "accept")
+      return openBotToolResult({
+        status: "declined",
+        next: "The user selected Not now. The report is still on GitHub. Do not remove it another way.",
+      });
+    const result = yield* withdrawal
+      .withdraw(senderAgentId, threadId, issue)
+      .pipe(Effect.catchTag("StoredStateFailure", ({ cause }) => Effect.fail(new ToolOperationFailed({ cause }))));
+    switch (result.status) {
+      case "withdrawn":
+        return openBotToolResult({
+          status: "withdrawn",
+          next: "The report is not on GitHub anymore. Tell the user in one short sentence. If they wanted to correct it, call send_feedback with the corrected text: it becomes a new report.",
+        });
+      case "signedOut":
+        return openBotToolFailure(
+          "The user is not signed in to OpenBot, so OpenBot cannot remove the report. Ask them to sign in and try again.",
+        );
+      case "notYours":
+        return openBotToolFailure(
+          "This account did not send a report on that issue, or the report was sent before OpenBot could remove reports. Tell the user that only the OpenBot team can remove it now, at https://github.com/nightly-labs/openbot/discussions.",
+        );
+      case "unavailable":
+        return openBotToolFailure(
+          "OpenBot cannot remove a whole issue now. Tell the user to try again later, or to ask the OpenBot team at https://github.com/nightly-labs/openbot/discussions.",
+        );
+      case "limited":
+        return openBotToolFailure("Too many tries. Wait one minute, then try again once.");
+    }
+  });
+
   /** Keeps a failed OpenBot tool call of a thread, so that a report can show what failed. */
   #rememberToolFailure(
     threadId: string,
@@ -2101,6 +2196,8 @@ export class OpenBotToolRouter {
     }
 
     if (params.tool === "send_feedback") return yield* this.#sendFeedback(client, request, params, senderAgentId);
+    if (params.tool === "withdraw_feedback")
+      return yield* this.#withdrawFeedback(client, request, params, senderAgentId);
 
     if (params.tool === "create_server_install_command")
       return yield* this.#serverInstallCommand(client, request, params, senderAgentId);

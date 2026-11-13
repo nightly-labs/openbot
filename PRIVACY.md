@@ -1232,7 +1232,12 @@ Network traffic can also occur when:
   errors. OpenBot removes known secrets from the text and the errors before it shows them. The service opens it as a public
   issue, or a comment on the issue that the agent chose, in the
   `nightly-labs/openbot` repository on GitHub, as the OpenBot GitHub App, so the issue does not show
-  the account. The service does not store or log the text. For the limit of a few issues each minute and
+  the account. The service does not store or log the text. It adds a hidden owner mark to the end of
+  the text: a random value and a keyed hash of that value and the account ID. The mark does not name
+  the account, and the service stores nothing for it. When the user removes the report (Fix or remove on the
+  thank-you card, or the agent's `withdraw_feedback` after the user approves), OpenBot sends the issue
+  number with the account session. The service checks the mark, then deletes a comment, or moves an
+  issue with its edit history to a private repository that only the OpenBot team can read. For the limit of a few issues each minute and
   10 each day, it counts the issues of each account; D1 keeps the account ID, the UTC day and the
   count, and deletes the earlier days of an account when the account sends again, or when the account
   is deleted. When the user is not signed in or the send fails, OpenBot gives a link to the GitHub

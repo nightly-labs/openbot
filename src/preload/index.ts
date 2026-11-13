@@ -275,6 +275,7 @@ import {
   decodeTaskPage,
   decodeTaskWindow,
   decodeWaits,
+  decodeWithdrawFeedbackResult,
 } from "./conversation-decoding";
 import {
   decodeDynamicIslandAction,
@@ -660,6 +661,7 @@ const agentGroup = bridgeGroup(IPC_ENDPOINTS.agent, {
   sendMessage: decodeReceipt,
   setMessageReaction: decodeVoid,
   deleteConversationMessage: decodeVoid,
+  withdrawFeedback: decodeWithdrawFeedbackResult,
   listQueue: decodeQueue,
   listWaits: decodeWaits,
   listPinnedMessages: decodePinnedMessages,

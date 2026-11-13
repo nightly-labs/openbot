@@ -392,6 +392,7 @@ export const messages = {
   "error.backend.branchSourceBusy": "أوقف الدور الحالي قبل تفريع هذه الدردشة.",
   "error.backend.branchMessageNotFound": "يمكنك التفريع فقط من إجابة مكتملة للوكيل.",
   "error.backend.branchRemoteUnsupported": "التفريعات متاحة فقط للوكلاء على هذا الحاسوب.",
+  "error.backend.feedbackWithdrawRemoteUnsupported": "لإزالة هذا البلاغ، اطلب من الوكيل إزالته.",
   "error.backend.threadMoveRefused": "يمكن تشغيل الرسالة التي أرسلتها إلى هذا الوكيل وحده فقط في سلسلة جديدة.",
   "error.backend.taskTitleRequired": "امنح المهمة عنوانًا قصيرًا.",
   "error.backend.taskToolInvalid": "امنح المهمة عنوانًا من 120 حرفًا كحد أقصى ووصفًا موجزًا يوضح ما يجب فعله.",

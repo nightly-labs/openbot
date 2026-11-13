@@ -123,6 +123,8 @@ import type {
   VoiceLiveEvent,
   VoiceLiveSession,
   VoiceLiveStart,
+  WithdrawFeedbackInput,
+  WithdrawFeedbackResult,
 } from "@openbot/contracts/ipc";
 import {
   AGENT_TASK_LIMIT_DEFAULT,
@@ -189,6 +191,7 @@ import type { SectionTeammates } from "./agent/developer-instructions";
 import { DrainScheduler } from "./agent/drain-scheduler";
 import { DuplicationGate, toAgentDuplicationFailed } from "./agent/duplication-gate";
 import type { FailureContext, FailureSignal } from "./agent/failure-signal";
+import { FeedbackWithdrawal } from "./agent/feedback-withdrawal";
 import { type AgentHostedSites, HostedSiteCoordinator } from "./agent/hosted-site-coordinator";
 import { ImageGenRuntime } from "./agent/image-gen-runtime";
 import {
@@ -603,6 +606,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #tasks: AgentTasks;
   readonly #history: AgentHistoryTransfer;
   readonly #messageDeletion: MessageDeletion;
+  readonly #feedbackWithdrawal: FeedbackWithdrawal;
   readonly #messagePins: MessagePins;
   readonly #tables: AgentTables | null;
   readonly #routines: RoutineScheduler;
@@ -788,6 +792,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       mailbox,
       conversation: this.#conversation,
       tasks: this.#tasks,
+    });
+    this.#feedbackWithdrawal = new FeedbackWithdrawal({
+      store,
+      conversation: this.#conversation,
+      tasks: this.#tasks,
+      feedback: options.feedback ?? null,
     });
     this.#messagePins = new MessagePins({
       store,
@@ -1951,6 +1961,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       githubConnected: () => Boolean(githubConnector?.mcpServer()),
       feedbackFacts: options.feedbackFacts ?? null,
       feedback: options.feedback ?? null,
+      feedbackWithdrawal: this.#feedbackWithdrawal,
       serverClaims: options.serverClaims ?? null,
       apiKeys: options.agentApiKeys ?? null,
       vaultItems: options.vaultItems ?? null,
@@ -6069,6 +6080,22 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       Effect.catchTag("StoredStateFailure", ({ cause }) =>
         Effect.fail(new AgentLifecycleFailed({ operation: "deleteConversationMessage", cause })),
       ),
+    );
+  }
+
+  /**
+   * The Remove action of a thank-you card: takes the report off GitHub with the account of this
+   * computer, and marks the card as removed.
+   */
+  withdrawFeedback(input: WithdrawFeedbackInput): Effect.Effect<WithdrawFeedbackResult, AgentLifecycleFailed> {
+    return this.#feedbackWithdrawal.withdrawCard(input).pipe(
+      Effect.map(({ status }) => ({ status })),
+      Effect.catchTags({
+        StoredStateFailure: ({ cause }) =>
+          Effect.fail(new AgentLifecycleFailed({ operation: "withdrawFeedback", cause })),
+        ToolOperationFailed: ({ cause }) =>
+          Effect.fail(new AgentLifecycleFailed({ operation: "withdrawFeedback", cause })),
+      }),
     );
   }
 

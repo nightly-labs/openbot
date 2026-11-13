@@ -237,6 +237,7 @@ import {
   parseSteerQueuedMessage,
   parseUpdateAgent,
   parseUpdateQueuedMessage,
+  parseWithdrawFeedback,
 } from "./agent-inputs";
 import type { IpcGroupHandlers } from "./define-ipc-group";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
@@ -1108,6 +1109,13 @@ export function agentIpcHandlers({
                 taskId: input.taskId,
                 messageId: input.messageId,
               }),
+      }),
+      // The account of this computer sent the report. A joined server's agent removes it with `withdraw_feedback`.
+      withdrawFeedback: scopedHandler(parseWithdrawFeedback, {
+        local: (input) => runCauseEffect(service.withdrawFeedback(input)),
+        remote: () => {
+          throw new Error(sourceText("error.backend.feedbackWithdrawRemoteUnsupported"));
+        },
       }),
       sendMessage: scopedHandler(parseSendMessage, {
         local: (input) => runCauseEffect(service.sendMessage(input, host.conversationSender())),

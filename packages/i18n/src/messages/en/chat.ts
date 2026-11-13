@@ -482,4 +482,28 @@ export const messages = defineMessages("chat", {
   "chat.feedbackSent.badge": "Sent",
   "chat.feedbackSent.body": "The OpenBot team will read it and take care of it 💜",
   "chat.feedbackSent.openNamed": "Open issue #{number} on GitHub",
+  "chat.feedbackSent.remove": "Remove",
+  "chat.feedbackSent.removeConfirm":
+    "Remove this report from GitHub? It is removed for everyone, and you cannot undo this.",
+  "chat.feedbackSent.fixOrRemove": "Fix or remove",
+  "chat.feedbackSent.fixChoice": "Send a corrected report",
+  "chat.feedbackSent.fixChoiceHint":
+    "The agent removes this report and sends it again without the parts that you choose.",
+  "chat.feedbackSent.removeChoice": "Remove it",
+  "chat.feedbackSent.removeChoiceHint": "Take it off GitHub. You cannot undo this.",
+  "chat.feedbackSent.fixPrompt": "Remove my report #{number} from GitHub, and send it again without this:",
+  "chat.feedbackSent.removePrompt": "Remove my report #{number} from GitHub.",
+  "chat.feedbackSent.composerFilled": "The request is in your message box. Complete it, then send it.",
+  "chat.feedbackSent.keep": "Keep it",
+  "chat.feedbackSent.removing": "Removing…",
+  "chat.feedbackSent.removeFailed": "OpenBot could not remove it. Check your connection, then try again.",
+  "chat.feedbackSent.removeSignedOut": "Sign in to OpenBot to remove it.",
+  "chat.feedbackSent.removeNotYours":
+    "OpenBot cannot remove this report. It was sent before reports could be removed, or with another account.",
+  "chat.feedbackSent.removeUnavailable": "OpenBot cannot remove reports now. Try again later.",
+  "chat.feedbackSent.removeLimited": "Too many tries. Wait one minute, then try again.",
+  "chat.feedbackSent.removeNotFound": "OpenBot cannot find this report in the chat.",
+  "chat.feedbackWithdrawn.title": "Report removed",
+  "chat.feedbackWithdrawn.badge": "Removed",
+  "chat.feedbackWithdrawn.body": "Your report is not on GitHub anymore. To send a corrected report, ask the agent.",
 });

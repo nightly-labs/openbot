@@ -307,6 +307,8 @@ import type {
   SearchConversationMessagesInput,
   SendMessageInput,
   SetMessageReactionInput,
+  WithdrawFeedbackInput,
+  WithdrawFeedbackResult,
 } from "./ipc-conversations";
 import type {
   CheckCustomAgentInput,
@@ -1806,6 +1808,8 @@ export const IPC_ENDPOINTS = {
     deleteConversationMessage: scopedRequest<DeleteConversationMessageInput, void>()(
       "agent:delete-conversation-message",
     ),
+    // Local only: the account of this computer sent the report, and a joined server has no route for it.
+    withdrawFeedback: scopedRequest<WithdrawFeedbackInput, WithdrawFeedbackResult>()("agent:withdraw-feedback"),
     listQueue: scopedRequest<string, QueueSnapshot>()("agent:list-queue"),
     listWaits: scopedRequest<string, AgentWaitsSnapshot>()("agent:list-waits"),
     cancelWait: scopedRequest<CancelAgentWaitInput, void>()("agent:cancel-wait"),

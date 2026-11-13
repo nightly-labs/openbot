@@ -1,3 +1,4 @@
+import type { WithdrawFeedbackStatus } from "@openbot/contracts/ipc";
 import { Heading, Text } from "@openbot/ui";
 import type { AgentProfile, ChatActionMarkerModel } from "@openbot/ui/data";
 import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
@@ -185,26 +186,54 @@ export const ReducedMotion: Story = {
   parameters: { chromatic: { prefersReducedMotion: "reduce" } },
 };
 
-/** After `openbot.send_feedback` opens the issue: the thank-you card with the issue link. */
-export const FeedbackSent: Story = {
-  render: () => (
+function FeedbackSentStory(props: { withdrawn: boolean; result?: WithdrawFeedbackStatus; remote?: boolean }) {
+  return (
     <main class="foundation-story">
       <section class="chat-primitives-stage chat-primitives-stage-narrow" aria-label="Feedback sent card">
         <ChatActionMarker
           marker={{
             kind: "feedback-sent",
+            messageId: "feedback-card",
             title: "The chat stops scrolling after a long reply",
             number: 5712,
             url: "https://github.com/nightly-labs/openbot/issues/5712",
+            withdrawn: props.withdrawn,
             timestamp: "2026-11-08T10:02:00.000Z",
           }}
           agents={agents}
           onSelectAgent={onSelectAgent}
+          onWithdrawFeedback={
+            props.remote
+              ? undefined
+              : () =>
+                  new Promise<WithdrawFeedbackStatus>((resolve) =>
+                    setTimeout(() => resolve(props.result ?? "withdrawn"), 1200),
+                  )
+          }
+          onRequestFeedbackChange={() => {}}
         />
       </section>
     </main>
-  ),
+  );
+}
+
+/**
+ * After `openbot.send_feedback` opens the issue: the thank-you card with the issue link. Fix or remove
+ * offers a corrected report, which the composer asks the agent for, or Remove, which asks in the card,
+ * then takes the report off GitHub.
+ */
+export const FeedbackSent: Story = { render: () => <FeedbackSentStory withdrawn={false} /> };
+
+/** Remove fails: the card keeps the question open and says what to do. */
+export const FeedbackSentRemoveFails: Story = {
+  render: () => <FeedbackSentStory withdrawn={false} result="unavailable" />,
 };
+
+/** A joined server's report: both choices put a request for the agent in the composer. */
+export const FeedbackSentJoinedServer: Story = { render: () => <FeedbackSentStory withdrawn={false} remote /> };
+
+/** After Remove, or after the agent's `withdraw_feedback`: the report is not on GitHub anymore. */
+export const FeedbackWithdrawn: Story = { render: () => <FeedbackSentStory withdrawn /> };
 
 export const RoutineRunSummary: Story = {
   render: () => (

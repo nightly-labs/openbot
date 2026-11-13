@@ -33,6 +33,11 @@ export const messages = {
   "status.agent.feedbackRecentErrors": "Erros recentes no chat:",
   "status.agent.feedbackSameAs": "Adiciona à issue #{issue}",
   "status.agent.feedbackSent": "Enviado para a equipe do OpenBot: {title}",
+  "status.agent.feedbackWithdrawn": "Removido do GitHub: {title}",
+  "status.agent.feedbackWithdrawCommand": "Remover o relato #{issue} do GitHub",
+  "status.agent.feedbackWithdrawReason":
+    "Ninguém mais poderá ver este relato no GitHub. Não é possível desfazer. Para corrigi-lo, o agente pode enviar um relato corrigido.",
+  "status.agent.feedbackWithdrawing": "Removendo seu relato do GitHub…",
   "status.agent.serverInstallCommand":
     "Criar um comando de uso único que instala o OpenBot em outro computador como o servidor {name} e o conecta à sua conta. O agente o executa lá.",
   "status.agent.serverInstallCard": "Comando de instalação para o servidor {name}",

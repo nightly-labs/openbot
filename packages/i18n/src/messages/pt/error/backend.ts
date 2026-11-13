@@ -428,6 +428,7 @@ export const messages = {
   "error.backend.branchMessageNotFound":
     "Só é possível criar uma ramificação a partir de uma resposta concluída do agente.",
   "error.backend.branchRemoteUnsupported": "As ramificações só estão disponíveis para agentes neste computador.",
+  "error.backend.feedbackWithdrawRemoteUnsupported": "Para remover este relato, peça ao agente para removê-lo.",
   "error.backend.threadMoveRefused":
     "Só uma mensagem que você enviou apenas para este agente pode ser executada em um novo tópico.",
   "error.backend.taskTitleRequired": "Dê um título curto à tarefa.",

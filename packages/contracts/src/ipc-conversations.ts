@@ -197,6 +197,33 @@ export interface DeleteConversationMessageInput {
   taskId?: string;
 }
 
+/** Takes the report of a thank-you card off GitHub. The card is in the agent's chat or in one of its side threads. */
+export interface WithdrawFeedbackInput {
+  agentId: string;
+  /** The thank-you card. */
+  messageId: string;
+  /** The task of this agent whose chat holds the card. Without it, the agent's own chat. */
+  taskId?: string;
+}
+
+/**
+ * What became of a withdrawal: the report is off GitHub; nobody is signed in; another account sent it;
+ * the account service cannot remove an issue now; too many tries; or the card is not a sent report.
+ */
+export const WITHDRAW_FEEDBACK_STATUSES = [
+  "withdrawn",
+  "signedOut",
+  "notYours",
+  "unavailable",
+  "limited",
+  "notFound",
+] as const;
+export type WithdrawFeedbackStatus = (typeof WITHDRAW_FEEDBACK_STATUSES)[number];
+
+export interface WithdrawFeedbackResult {
+  status: WithdrawFeedbackStatus;
+}
+
 export interface SetMessageReactionInput {
   agentId: string;
   messageId: string;

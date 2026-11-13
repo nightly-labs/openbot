@@ -1,4 +1,5 @@
 import { AGENT_MEMORY_CONTEXT_BUDGET_BYTES, essentialMemoryBytes } from "@openbot/contracts/agent-memory-context";
+import { feedbackSentIssue, feedbackWithdrawnItemType } from "@openbot/contracts/feedback";
 import type {
   AcpRegistryEntry,
   AgentProviderRef,
@@ -3095,6 +3096,20 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           snapshot.messages = snapshot.messages.filter((message) => message.id !== input.messageId);
         });
         emitAgentEvent({ type: "message-pins-changed", agentId: input.agentId });
+      },
+      // The preview has no account service: the card changes to a removed card at once.
+      withdrawFeedback: async (input) => {
+        const card = getSnapshot(input.agentId).messages.find((message) => message.id === input.messageId);
+        const issue = card ? feedbackSentIssue(card) : null;
+        if (!issue) return { status: "notFound" };
+        updateSnapshot(input.agentId, (snapshot) => {
+          snapshot.messages = snapshot.messages.map((message) =>
+            message.id === input.messageId
+              ? { ...message, itemType: feedbackWithdrawnItemType(issue.number) }
+              : message,
+          );
+        });
+        return { status: "withdrawn" };
       },
       chooseAttachments: async (_input) => [],
       importAttachmentData: async (data) =>

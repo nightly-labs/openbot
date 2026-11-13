@@ -33,6 +33,11 @@ export const messages = {
   "status.agent.feedbackRecentErrors": "채팅의 최근 오류:",
   "status.agent.feedbackSameAs": "이슈 #{issue}에 추가됩니다",
   "status.agent.feedbackSent": "OpenBot 팀에 보냄: {title}",
+  "status.agent.feedbackWithdrawn": "GitHub에서 삭제함: {title}",
+  "status.agent.feedbackWithdrawCommand": "GitHub에서 보고서 #{issue} 삭제",
+  "status.agent.feedbackWithdrawReason":
+    "이제 GitHub에서 누구도 이 보고서를 볼 수 없어요. 되돌릴 수 없어요. 고치려면 에이전트가 수정한 보고서를 보낼 수 있어요.",
+  "status.agent.feedbackWithdrawing": "GitHub에서 보고서를 삭제하는 중…",
   "status.agent.serverInstallCommand":
     "다른 컴퓨터에 OpenBot을 서버 {name}(으)로 설치하고 계정에 로그인하는 일회용 명령을 만듭니다. 에이전트가 그곳에서 실행합니다.",
   "status.agent.serverInstallCard": "서버 {name}의 설치 명령",

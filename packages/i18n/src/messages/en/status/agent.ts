@@ -34,6 +34,11 @@ export const messages = defineMessages("status.agent", {
   "status.agent.feedbackRecentErrors": "Recent errors in the chat:",
   "status.agent.feedbackSameAs": "Adds to issue #{issue}",
   "status.agent.feedbackSent": "Sent to the OpenBot team: {title}",
+  "status.agent.feedbackWithdrawn": "Removed from GitHub: {title}",
+  "status.agent.feedbackWithdrawCommand": "Remove report #{issue} from GitHub",
+  "status.agent.feedbackWithdrawReason":
+    "Everyone loses access to this report on GitHub. You cannot undo this. To fix it, the agent can send a corrected report.",
+  "status.agent.feedbackWithdrawing": "Removing your report from GitHub…",
   "status.agent.serverInstallCommand":
     "Make a one-time command that installs OpenBot on another computer as the server {name} and signs it in to your account. The agent runs it there.",
   "status.agent.serverInstallCard": "Install command for the server {name}",

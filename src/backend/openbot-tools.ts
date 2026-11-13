@@ -757,6 +757,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     },
   },
   {
+    name: "withdraw_feedback",
+    description:
+      "Remove a report that the user sent from GitHub, when they ask. The user approves first. To correct one, remove it, then send it again.",
+    shape: { issue: z.number().int().min(1).describe("Its issue number.") },
+  },
+  {
     name: "react_to_user_message",
     description:
       "Add one emoji reaction to the current user message for a clear emotional moment, such as a win, affection, gratitude, humor, sadness, disappointment or frustration. An emoji in the written answer is not a reaction.",

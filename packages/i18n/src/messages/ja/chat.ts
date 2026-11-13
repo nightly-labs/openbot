@@ -469,4 +469,28 @@ export const messages = {
   "chat.feedbackSent.badge": "送信済み",
   "chat.feedbackSent.body": "OpenBot チームが確認して対応します 💜",
   "chat.feedbackSent.openNamed": "GitHub で issue #{number} を開く",
+  "chat.feedbackSent.remove": "削除",
+  "chat.feedbackSent.removeConfirm":
+    "このレポートを GitHub から削除しますか？すべての人から見えなくなり、元に戻せません。",
+  "chat.feedbackSent.fixOrRemove": "修正または削除",
+  "chat.feedbackSent.fixChoice": "修正したレポートを送信",
+  "chat.feedbackSent.fixChoiceHint": "エージェントがこのレポートを削除し、選んだ部分を除いて再送信します。",
+  "chat.feedbackSent.removeChoice": "削除する",
+  "chat.feedbackSent.removeChoiceHint": "GitHub から削除します。元に戻せません。",
+  "chat.feedbackSent.fixPrompt": "レポート #{number} を GitHub から削除し、次の部分を除いて再送信してください:",
+  "chat.feedbackSent.removePrompt": "レポート #{number} を GitHub から削除してください。",
+  "chat.feedbackSent.composerFilled": "依頼をメッセージ欄に入れました。内容を仕上げてから送信してください。",
+  "chat.feedbackSent.keep": "残す",
+  "chat.feedbackSent.removing": "削除しています…",
+  "chat.feedbackSent.removeFailed": "OpenBot は削除できませんでした。接続を確認して、もう一度お試しください。",
+  "chat.feedbackSent.removeSignedOut": "削除するには OpenBot にサインインしてください。",
+  "chat.feedbackSent.removeNotYours":
+    "OpenBot はこのレポートを削除できません。削除機能より前に、または別のアカウントで送信されました。",
+  "chat.feedbackSent.removeUnavailable": "OpenBot は現在レポートを削除できません。後でもう一度お試しください。",
+  "chat.feedbackSent.removeLimited": "試行回数が多すぎます。1 分待ってから、もう一度お試しください。",
+  "chat.feedbackSent.removeNotFound": "OpenBot はチャット内にこのレポートを見つけられません。",
+  "chat.feedbackWithdrawn.title": "レポートを削除しました",
+  "chat.feedbackWithdrawn.badge": "削除済み",
+  "chat.feedbackWithdrawn.body":
+    "レポートはもう GitHub にありません。修正したレポートを送信するには、エージェントに依頼してください。",
 } as const satisfies PartialTranslation<typeof source>;
