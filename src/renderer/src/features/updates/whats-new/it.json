@@ -1,5 +1,134 @@
 [
   {
+    "version": "0.69.0",
+    "date": "2026-11-12",
+    "notices": [
+      "Gli agenti nascosti ora continuano a lavorare. OpenBot ha disattivato le routine degli agenti che avevi nascosto prima di questa versione, quindi riattiva le routine che vuoi."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Fissa un messaggio nella chat di un agente: fai clic destro su di esso e seleziona Fissa. Il pulsante dei messaggi fissati nell’intestazione della chat mostra i messaggi fissati di tutte le chat dell’agente.",
+          "La Libreria ha cartelle e tre viste. Un agente può anche salvare i file che allega in una cartella che indichi.",
+          "Insegna un’attività: seleziona Insegna un’attività nel menu +, poi svolgi l’attività nel browser dell’agente. L’agente salva i passaggi come skill.",
+          "Raggruppa gli account di un provider nelle Impostazioni. Gli agenti usano un account finché non si avvicina a un limite di utilizzo, poi quello successivo.",
+          "Aggiungi skill da GitHub: incolla il link di un repository pubblico nel campo di ricerca delle skill del Marketplace.",
+          "Impostazioni server → Trasferimento può esportare una copia completa di un server e copiare gli agenti su un altro server in un solo passaggio.",
+          "Silenzia un agente dal suo menu nella barra laterale. Un agente silenziato non invia notifiche e non riproduce suoni."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Un messaggio che invii a un agente mentre lavora ora indirizza il turno in corso. Per accodarlo come prima, disattiva Indirizza gli agenti mentre lavorano in Impostazioni → Agenti.",
+          "Un agente nascosto continua a lavorare. Esegue le sue routine e compare in Ha bisogno di te quando attende la tua risposta.",
+          "Il server aperto appare come logo in fondo alla barra delle pagine. Il pulsante Nuovo è alla fine del campo di ricerca della barra laterale.",
+          "OpenBot usa Electron 45.3.0 con Chromium 156, e più siti con una verifica anti-bot si caricano nel browser dell’agente."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot si avvia più in fretta, soprattutto su Windows, e un computer lento resta utilizzabile dopo l’avvio.",
+          "OpenBot resta reattivo dopo un riavvio quando hai molte attività o thread.",
+          "Su Linux e Windows, OpenBot completa la chiusura quando chiudi la finestra principale.",
+          "Le routine vengono eseguite in orario dopo che l’orologio del computer è stato corretto.",
+          "Il testo che copi da una chat non ha più righe vuote all’inizio o alla fine."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.68.0",
+    "date": "2026-11-11",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Le impostazioni del canale hanno un'impostazione Browser. Scegli se ogni membro, un solo membro o nessun membro può usare il browser nel canale.",
+          "Il pannello laterale del canale ha un pannello Browser e un pannello File. Mostrano le schede dei membri del canale e i file inviati nel canale.",
+          "Fai clic destro sulla Dynamic Island o sul dock degli agenti per nasconderli. Puoi anche trascinare un agente in un nuovo punto del dock e cambiare la dimensione del dock nelle Impostazioni.",
+          "Puoi disattivare il gruppo Non lette nella barra laterale. Fai clic destro sul titolo Non lette oppure imposta Ordina chat su Manuale.",
+          "Quando una nuova versione non riesce ad avviarsi 3 volte di seguito, si apre una finestra di ripristino. Puoi riprovare, scaricare la versione precedente o esportare la diagnostica."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Una nuova versione ora arriva prima a circa 1 computer su 10 e, circa un giorno dopo, a tutti i computer. Per riceverla subito, seleziona Cerca aggiornamenti.",
+          "Gli agenti fanno domande con opzioni nella finestra delle domande. Le schede con i pulsanti servono solo per le approvazioni."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Una chat che hai letto non resta più nel gruppo Non lette. I thread secondari non letti, come quello di una routine, non tengono più lì un agente.",
+          "Su Windows, il dock degli agenti e la Dynamic Island non rallentano più il puntatore in tutte le app mentre molti agenti lavorano.",
+          "Un team non si ferma più quando il responsabile del team termina il turno senza risposta, dopo che i membri del team hanno riportato i risultati.",
+          "Una chat di Claude diventata troppo lunga ora avvia una nuova sessione con la cronologia della chat. Prima, ogni messaggio falliva con \"Prompt is too long\".",
+          "Quando un account Claude raggiunge il limite di 5 ore, l'agente passa al modello di backup o attende il ripristino.",
+          "Un agente può salvare uno screenshot del browser come file e allegarlo alla sua risposta."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.67.1",
+    "date": "2026-11-10",
+    "notices": [],
+    "groups": [
+      {
+        "type": "fixed",
+        "items": [
+          "Gemini si installa e si aggiorna di nuovo su Windows. Nella 0.67.0 si fermava con un errore su un collegamento o un file speciale.",
+          "Un agente che invia un messaggio a un collega di team occupato ora sa se il messaggio è finito nell'attività in corso del collega. Quando il messaggio attende, l'agente può dirti il motivo.",
+          "Durante il Controllo del computer, gli agenti non dicono più che il loro cursore non è disponibile. OpenBot disegna il cursore dove l'agente fa clic, scorre o si sposta."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.67.0",
+    "date": "2026-11-10",
+    "notices": [
+      "Dopo questo aggiornamento la Modalità veloce è disattivata per ogni agente Claude. Se la usavi, riattivala nel selettore dei modelli."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Aggiungi un server sul tuo computer Linux o VPS con un solo comando, oppure chiedi a un agente di installarlo lì tramite SSH.",
+          "Impostazioni server → Trasferimento ora può spostare sul nuovo server la cronologia delle chat, i canali e i flussi di lavoro.",
+          "Su Linux, la Dynamic Island e il dock degli agenti restano sopra le altre finestre, come su Mac.",
+          "Attiva la Modalità veloce per un agente Claude, o scegli Ultraveloce per un agente Codex, nel selettore dei modelli.",
+          "Gli agenti conservano ciò che imparano su un sito come memoria di quel sito, e non ripetono i passaggi che non hanno funzionato.",
+          "Il catalogo App ha 207 nuove app, come monday.com, Miro, Dropbox e Zapier. Le colleghi accedendo nel browser."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Le chat con risposte non lette appaiono per prime, nel gruppo Non lette. Per cambiare l'ordine, seleziona Ordina chat nel menu dell'elenco delle chat.",
+          "Su un server a cui ti sei unito, come un VPS, l'app desktop e l'app nel browser ora hanno la maggior parte delle funzioni di questo computer.",
+          "Gli agenti aggiungono OpenBot come coautore dei loro commit git. L'autore resti tu. Disattivalo in Le tue impostazioni → Agenti.",
+          "Gli agenti completano le attività nel browser in meno passaggi e con circa il 18% di token in meno.",
+          "Gemini ora funziona con Antigravity CLI. Il tuo accesso Google resta."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Un agente Claude che fermi ora si ferma in circa 10 secondi, e i suoi messaggi in coda partono.",
+          "Su Windows, gli agenti possono usare il browser mentre la finestra di OpenBot è ridotta a icona o nell'area di notifica.",
+          "Su macOS, «Riavvia per aggiornare» non chiude più OpenBot quando viene eseguito dalla sua immagine disco. Ti dice di spostare OpenBot nella cartella Applicazioni.",
+          "In una conversazione vocale, un colpo di tosse o la pressione di un tasto non interrompe più la risposta dell'agente."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.66.0",
     "date": "2026-11-09",
     "notices": [],

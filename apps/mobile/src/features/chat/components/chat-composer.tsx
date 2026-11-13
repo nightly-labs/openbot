@@ -902,6 +902,12 @@ export const ChatComposer = memo(function ChatComposer({
     else if (action === "send") onSend(latestTextRef.current);
   }
 
+  // Return on a hardware keyboard. The field still has focus, so it sends the native text, as a submit does.
+  function submitKey(text: string): void {
+    if (control.mode !== "send" || !controlReady || voiceOpen) return;
+    if (sendGate.submit()) onSend(editMentionDraft(latestTextRef.current, text));
+  }
+
   function pressControl(): void {
     switch (control.mode) {
       case "stop":
@@ -1281,7 +1287,7 @@ export const ChatComposer = memo(function ChatComposer({
                 <Animated.View
                   style={[{ position: "absolute", left: FIELD_INSET, right: FIELD_INSET, bottom: 0 }, fieldSlideStyle]}
                 >
-                  <ComposerPasteTarget onPasteFiles={pasteFiles}>
+                  <ComposerPasteTarget onPasteFiles={pasteFiles} onSubmitKey={submitKey}>
                     <TextInput
                       ref={inputRef}
                       nativeID="chat-composer-input"

@@ -81,11 +81,19 @@ export const routineLimitPolicyZodSchema = z
     "What a run does while the agent's provider account is at its usage limit: wait runs it after the reset, skip drops it. New routines use wait. A one-time schedule always uses wait.",
   );
 
+const ROUTINE_MISSED_POLICY_MEANING =
+  "What the routine does with occurrences that came due while OpenBot or its server was off: skip records and drops them, run-once runs the newest one when OpenBot starts and records the others.";
+
 export const routineMissedPolicyZodSchema = z
   .enum(ROUTINE_MISSED_POLICIES)
   .describe(
-    "What the routine does with occurrences that came due while OpenBot or its server was off: skip records and drops them, run-once runs the newest one when OpenBot starts and records the others. When a routine is created with no value, a one-time schedule uses run-once and other schedules use skip. An update with no value keeps the saved policy.",
+    `${ROUTINE_MISSED_POLICY_MEANING} With no value, a one-time schedule uses run-once and other schedules use skip.`,
   );
+
+/** The update tools already say that a field left out keeps its saved value. */
+export const routineMissedPolicyUpdateZodSchema = z
+  .enum(ROUTINE_MISSED_POLICIES)
+  .describe(ROUTINE_MISSED_POLICY_MEANING);
 
 export const routineRunPlaceZodSchema = z
   .enum(ROUTINE_RUN_PLACES)

@@ -334,11 +334,24 @@ export const messages = {
   "server.settings.later": "Später",
   "server.settings.setUp": "Einrichten",
   "server.settings.agents": "Agenten",
+  "server.settings.agentsDescription":
+    "Legen Sie fest, was die Agenten auf diesem Server tun können, wenn Sie es nicht für einen Agenten festlegen.",
   "server.settings.timezone": "Zeitzone",
   "server.settings.timezoneDescription":
     "Neue Routinen verwenden diese Zeitzone, wenn die Nachricht die Zeitzone des Absenders nicht angibt.",
   "server.settings.timezoneAutomatic": "Automatisch ({zone})",
   "server.settings.timezoneLoadFailed": "Die Zeitzone des Servers konnte nicht geladen werden.",
+  "server.settings.turnLimit": "Threads gleichzeitig",
+  "server.settings.turnLimitDescription":
+    "Wie viele Agent-Threads auf diesem Server gleichzeitig laufen können. Mehr Threads brauchen mehr Arbeitsspeicher.",
+  "server.settings.turnLimitAutomatic": "Automatisch ({count})",
+  "server.settings.turnLimitAutomaticUnlimited": "Automatisch (kein Limit)",
+  "server.settings.turnLimitUnlimited": "Kein Limit",
+  "server.settings.turnLimitsLoadFailed": "Die Thread-Limits dieses Servers konnten nicht geladen werden.",
+  "server.settings.agentTaskLimit": "Parallele Threads pro Agent",
+  "server.settings.agentTaskLimitDescription":
+    "Wie viele Threads jeder Agent gleichzeitig ausführen kann, wenn er kein eigenes Limit hat.",
+  "server.settings.agentTaskLimitDefault": "Standard ({count})",
   "server.settings.memoryLimit": "Erinnerungen pro Agent",
   "server.settings.memoryLimitDescription": "Wie viele Erinnerungen jeder Agent auf diesem Server behalten kann.",
   "server.settings.memoryLimitLoadFailed": "Das Erinnerungslimit dieses Servers konnte nicht geladen werden.",
@@ -354,6 +367,10 @@ export const messages = {
   "server.settings.skillLearningAsk": "Zuerst fragen",
   "server.settings.skillLearningOff": "Aus",
   "server.settings.skillLearningLoadFailed": "Die Einstellung „Fähigkeiten lernen“ konnte nicht geladen werden.",
+  "server.settings.browsingMemory": "Aus meinem Browsen lernen",
+  "server.settings.browsingMemoryDescription":
+    "Wenn du den Browser eines Agenten steuerst, lernt der Agent aus den Seiten und Schaltflächen, die du nutzt, wie Websites funktionieren. Eingegebener Text wird nicht gespeichert.",
+  "server.settings.browsingMemoryLoadFailed": "Die Browsing-Einstellung konnte nicht geladen werden.",
   "server.settings.remoteOnline": "Der Host ist online. Sein Eigentümer steuert die Veröffentlichung.",
   "server.settings.remoteOffline": "Der Host ist offline. Sein Eigentümer steuert die Veröffentlichung.",
   "server.settings.reachable": "Online erreichbar. Nur eingeladene Personen können sich anmelden.",
@@ -372,7 +389,7 @@ export const messages = {
   "server.settings.hostKeyChanged": "Letzte Änderung",
   "server.settings.hostKeyChangedDescription":
     "{date}. Der vorherige und der neue Schlüssel haben diese Änderung signiert.",
-  "server.settings.hostKeyLocalOnly": "Hier kann nur der Server auf diesem Computer seinen Schlüssel ändern.",
+  "server.settings.hostKeyOwnerOnly": "Nur der Eigentümer kann den Serverschlüssel ändern.",
   "server.settings.removeTitle": "Server entfernen",
   "server.settings.removeDescription":
     "Entferne diesen Server für alle Mitglieder aus dem Kontodienst. Nutze dies, wenn sein Computer nicht mehr verfügbar ist.",

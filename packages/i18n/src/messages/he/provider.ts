@@ -125,6 +125,8 @@ export const messages = {
     "אפשר להוסיף נקודת קצה תואמת OpenAI — שרת מודלים במחשב הזה, או כל שירות עם כתובת בסיס ומפתח.",
   "provider.picker.customPending":
     "המודלים של נקודות הקצה שלך עדיין לא נטענו. הספק קורא אותם אחרי שהמשימה הנוכחית שלו נעצרת.",
+  "provider.picker.customUnlisted": "{name} לא מציג את המודלים של נקודות הקצה שלך.",
+  "provider.picker.editEndpoints": "עריכת נקודות קצה",
   "provider.picker.defaultModelLabel": "{name}, ברירת מחדל",
   "provider.picker.usageLimit": "הגעת למגבלת השימוש",
   "provider.picker.usageLimitWindow": "מגבלת {window}",
@@ -135,7 +137,12 @@ export const messages = {
   "provider.picker.effortLabel": "מאמץ החשיבה של הסוכן",
   "provider.picker.effortFixed": "{effort}, נקבע על ידי {provider}",
   "provider.picker.fast": "מהיר",
-  "provider.picker.fastLabel": "מצב מהיר",
+  "provider.picker.fastText": "תשובות מהירות יותר, שימוש מוגבר",
+  "provider.picker.speed": "מהירות",
+  "provider.picker.standard": "רגיל",
+  "provider.picker.standardText": "מהירות ברירת מחדל",
+  "provider.picker.ultrafast": "מהיר במיוחד",
+  "provider.picker.ultrafastText": "התשובות המהירות ביותר, שימוש גבוה בהרבה",
   "provider.picker.selectEffort": "בחירת מאמץ",
   "provider.picker.custom": "מותאם אישית",
   "provider.picker.cliReady": "{cli} מוכן",
@@ -157,6 +164,8 @@ export const messages = {
   "provider.geminiKey.title": "מפתח Gemini API",
   "provider.geminiKey.description":
     "אפשר לשמור מפתח Gemini API במחשב הזה. מפתח שמור בא במקום חשבון Google שלך. כדי להתחבר עם Google, יש להסיר את המפתח ולבחור חיבור בשורה של Gemini.",
+  "provider.geminiKey.descriptionHost":
+    "אפשר לשמור מפתח Gemini API במארח. מפתח שמור בא במקום חשבון Google שלך. כדי להתחבר עם Google, יש להסיר את המפתח ולבחור חיבור בשורה של Gemini.",
   "provider.geminiKey.label": "מפתח Gemini API",
   "provider.claudeKey.title": "מפתח Anthropic API",
   "provider.claudeKey.description":
@@ -171,14 +180,20 @@ export const messages = {
   "provider.inceptionKey.title": "מפתח Inception API",
   "provider.inceptionKey.description":
     "אפשר לשמור מפתח Inception API במחשב הזה כדי להשתמש במודלים של Mercury. OpenBot מריץ אותם ב-Pi CLI שהוא מוריד.",
+  "provider.inceptionKey.descriptionHost":
+    "אפשר לשמור מפתח Inception API במארח כדי להשתמש במודלים של Mercury. OpenBot מריץ אותם ב-Pi CLI שהוא מוריד.",
   "provider.inceptionKey.label": "מפתח Inception API",
   "provider.deepseekKey.title": "מפתח DeepSeek API",
   "provider.deepseekKey.description":
     "אפשר לשמור מפתח DeepSeek API במחשב הזה כדי להשתמש במודלים של DeepSeek. OpenBot מריץ אותם ב-Pi CLI שהוא מוריד.",
+  "provider.deepseekKey.descriptionHost":
+    "אפשר לשמור מפתח DeepSeek API במארח כדי להשתמש במודלים של DeepSeek. OpenBot מריץ אותם ב-Pi CLI שהוא מוריד.",
   "provider.deepseekKey.label": "מפתח DeepSeek API",
   "provider.openrouterKey.title": "מפתח OpenRouter API",
   "provider.openrouterKey.description":
     "אפשר לשמור מפתח OpenRouter API במחשב הזה כדי להשתמש במודלים ש-OpenRouter מספקת. OpenBot מריץ אותם ב-Pi CLI שהוא מוריד.",
+  "provider.openrouterKey.descriptionHost":
+    "אפשר לשמור מפתח OpenRouter API במארח כדי להשתמש במודלים ש-OpenRouter מספקת. OpenBot מריץ אותם ב-Pi CLI שהוא מוריד.",
   "provider.openrouterKey.label": "מפתח OpenRouter API",
   "provider.openCodeKey.title": "התחברות ל-OpenCode Go",
   "provider.openCodeKey.description": "מודלים חינמיים לא דורשים חשבון. מפתח פותח את מודלי Go בתשלום.",
@@ -222,6 +237,16 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "ל-{name} לא נותרו זיכויי איפוס שימוש.",
   "provider.account.resetUsageAlreadyRedeemed": "זיכוי האיפוס הזה של {name} כבר נוצל.",
   "provider.account.resetUsageFailed": "לא ניתן לאפס את השימוש של {name}.",
+  "provider.account.pool": "איגום חשבונות",
+  "provider.account.poolDescription":
+    "הסוכנים משתמשים בחשבון אחד עד שהוא מתקרב למגבלת שימוש, ואז בחשבון שהמגבלה שלו מתאפסת ראשונה.",
+  "provider.account.inUse": "בשימוש",
+  "provider.account.notInPool": "מחוץ למאגר",
+  "provider.account.leaveOutOfPool": "הוצאה מהמאגר",
+  "provider.account.putBackInPool": "החזרה למאגר",
+  "provider.account.poolChip": "מאגר",
+  "provider.account.poolCount": "מאגר של {accounts}",
+  "provider.account.poolInUse": "{pool} · {name} בשימוש",
   "provider.settings.connected": "מחובר",
   "provider.settings.other": "ספקים אחרים",
   "provider.settings.search": "חיפוש ספקים",
@@ -248,6 +273,7 @@ export const messages = {
   "provider.settings.defaultSubtitle": "ברירת מחדל לסוכנים חדשים · {use}",
   "provider.settings.accounts": "חשבונות",
   "provider.settings.accountsDescription": "{count} מתוך {max}. כל סוכן משתמש בחשבון אחד.",
+  "provider.settings.accountsPooledDescription": "{count} מתוך {max}. הסוכנים חולקים את החשבונות האלה.",
   "provider.settings.accountBlocked": "{agents} לא יכולים לפעול עד שתתחבר שוב.",
   "provider.settings.removeTitle": "להסיר את {name}?",
   "provider.settings.removeMoves": "{agents} ישתמשו ב-{name}.",
@@ -267,6 +293,8 @@ export const messages = {
   "provider.settings.keyOptional": "אופציונלי. מפתח מוסיף מודלים בתשלום.",
   "provider.settings.keyAlternative": "או להדביק מפתח API של {name}.",
   "provider.settings.geminiKeyInUse": "Gemini משתמש במפתח הזה, ולא בתוכנית Google AI שלך. השימוש בתוכנית לא מוצג.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "מפתח Gemini API שמור משמש במקום התחברות עם Google. כדי להשתמש בתוכנית Google ובמודלים שלה, הסר את המפתח.",
   "provider.settings.claudeKeyInUse":
     "Anthropic מחייבת את קרדיט ה-API של המפתח, ולא את מינוי Claude. יש לבחור את חשבון מפתח ה-API בתפריט המודל של סוכן. כש-Claude לא מחובר, כל הסוכנים משתמשים במפתח.",
   "provider.settings.codexKeyInUse":
@@ -279,6 +307,10 @@ export const messages = {
   "provider.settings.versionAvailable": "{installed} · {available} זמינה",
   "provider.settings.versionInstalledByUser": "{version} · הותקנה על ידיך",
   "provider.settings.versionDownloaded": "{version} · הורדה על ידי OpenBot",
+  "provider.settings.otherVersionInstalledByUser": "לא בשימוש: {version} · הותקנה על ידיך",
+  "provider.settings.otherVersionDownloaded": "לא בשימוש: {version} · הורדה על ידי OpenBot",
+  "provider.settings.useInstalledVersion": "השתמש בגרסה המותקנת",
+  "provider.settings.useDownloadedVersion": "השתמש בגרסה של OpenBot",
   "provider.settings.update": "עדכון",
   "provider.settings.downloadLabel": "הורדת {name}",
   "provider.settings.diagnostics": "אבחון",
@@ -292,7 +324,16 @@ export const messages = {
   "provider.settings.claudeUserSetup": "שימוש בהגדרות Claude Code שלי",
   "provider.settings.claudeUserSetupDescription":
     "הסוכנים טוענים את CLAUDE.md, הכישורים, הסוכנים, ה-hooks והתוספים שלך מ-~/.claude. כשהאפשרות כבויה, כל תור שולח הנחיה קצרה יותר. קבצי סביבת העבודה עדיין נטענים.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "הסוכנים טוענים את CLAUDE.md, המיומנויות, הסוכנים, ה-hooks והתוספים מ-~/.claude בשרת. כשהמתג כבוי, כל תור שולח הנחיה קצרה יותר. קובצי סביבת העבודה עדיין נטענים.",
   "provider.settings.claudeUserSetupLoadFailed": "לא ניתן לטעון את ההגדרה של Claude Code.",
+  "provider.settings.context": "הקשר",
+  "provider.settings.compactWindow": "כיווץ צ׳אטים ב־",
+  "provider.settings.compactWindowDescription":
+    "Claude Code מסכם את התורות הישנים של צ׳אט כשהצ׳אט מגיע לגודל הזה. נמוך יותר שומר על תורות מהירים וזולים. גבוה יותר שומר יותר פרטים. מודל עם חלון קטן יותר מכווץ במגבלה שלו.",
+  "provider.settings.compactWindowDefault": "ברירת המחדל של Claude Code",
+  "provider.settings.compactWindowTokens": "{size} טוקנים",
+  "provider.settings.compactWindowLoadFailed": "לא ניתן לטעון את גודל הכיווץ של השרת הזה.",
   "provider.settings.models": "מודלים",
   "provider.settings.modelsDescription": {
     one: "{shown} מתוך מודל אחד מוצג בבורר המודלים.",
@@ -325,4 +366,6 @@ export const messages = {
     two: "{url} · שני מודלים",
     other: "{url} · {count} מודלים",
   },
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot מנתק את {provider} במחשב הזה. ה-CLI של {provider} במסוף שלך נשאר מחובר.",
 } as const satisfies PartialTranslation<typeof source>;

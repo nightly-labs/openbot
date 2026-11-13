@@ -1,0 +1,33 @@
+{
+  "slug": "runway",
+  "name": "Runway",
+  "tagline": "AI image and video generation",
+  "description": "Runway lets agents generate images and videos with Runway models in the account of the signed-in user. Each generation uses account credits.",
+  "category": "design",
+  "creatorName": "Runway",
+  "iconUrl": "https://runway.com/icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-product-image", "text": "Generate a square product image of a ceramic mug on a wooden table." },
+    { "id": "prompt-short-video", "text": "Make a 5-second video of a paper boat in the rain." },
+    { "id": "prompt-image-to-video", "text": "Turn this image into a short video with a slow camera pan." }
+  ],
+  "apps": [
+    {
+      "id": "app-runway-mcp",
+      "name": "Runway",
+      "description": "Image and video generation, over Runway's MCP server with browser sign-in.",
+      "iconUrl": "https://runway.com/icon.png",
+      "server": {
+        "name": "runway",
+        "transport": "http",
+        "url": "https://mcp.runwayml.com/mcp",
+        "auth": [{ "id": "runway-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://runway.com",
+  "privacyPolicyUrl": "https://runway.com/privacy-policy",
+  "termsUrl": "https://runway.com/terms-of-use",
+  "skills": []
+}

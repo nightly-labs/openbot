@@ -71,6 +71,8 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
       let initiationPending = false;
       let committed = false;
       let successorStarted = false;
+      let documentPending = false;
+      let previousDocumentAborted = false;
       let timer: NodeJS.Timeout | undefined;
       const cleanup = () => {
         clearTimeout(timer);
@@ -102,11 +104,13 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
       const didStartNavigation = (_event: unknown, _url: string, isInPlace: boolean, isMainFrame: boolean) => {
         if (!isMainFrame) return;
         if (committed && !isInPlace) successorStarted = true;
+        if (!isInPlace) documentPending = true;
         // A page that calls `pushState` while it loads must not end the wait for that load.
         inPlace = started ? inPlace && isInPlace : isInPlace;
         started = true;
       };
       const didNavigate = () => {
+        documentPending = false;
         if (started) committed = true;
       };
       const didStopLoading = () => {
@@ -116,7 +120,16 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
         if (started && inPlace && isMainFrame) complete();
       };
       const didFailLoad = (_event: unknown, code: number, description: string, _url: string, isMainFrame: boolean) => {
-        if (!started || !isMainFrame || supersededBy(code)) return;
+        if (!started || !isMainFrame) return;
+        // Electron reports no `did-fail-load` for a navigation that is cancelled before it commits. An
+        // `ERR_ABORTED` while the next document is pending is the load of the document that it replaces,
+        // such as a streaming page that still loads. Wait for the next document.
+        if (documentPending && code === ERR_ABORTED) {
+          previousDocumentAborted = true;
+          supersededBy(code);
+          return;
+        }
+        if (supersededBy(code)) return;
         finish(new Error(timedOut ? NAVIGATION_TIMED_OUT : `Navigation failed (${code}): ${description}`));
       };
       const destroyed = () => {
@@ -163,8 +176,14 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
             (error) =>
               setImmediate(() => {
                 initiationPending = false;
-                if (settled || supersededBy(error instanceof Error && "errno" in error ? error.errno : undefined))
+                const errno = error instanceof Error && "errno" in error ? error.errno : undefined;
+                if (settled || supersededBy(errno)) return;
+                // `loadURL` rejects with the abort of the replaced document, also when the next document
+                // commits. That document's load ends the wait.
+                if (errno === ERR_ABORTED && previousDocumentAborted && committed) {
+                  if (!contents.isLoading()) complete();
                   return;
+                }
                 finish(timedOut ? new Error(NAVIGATION_TIMED_OUT) : error);
               }),
           );
@@ -183,16 +202,18 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
   },
 );
 
+const nthText = (nth: number | undefined) => (nth === undefined ? "" : ` nth=${nth}`);
+
 export function describeBrowserTarget(target: BrowserTarget): string {
   switch (target.kind) {
     case "ref":
       return `ref ${target.ref}@${target.revision}`;
     case "role":
-      return `role ${target.role}${target.name ? ` “${target.name}”` : ""}`;
+      return `role ${target.role}${target.name ? ` “${target.name}”` : ""}${nthText(target.nth)}`;
     case "text":
-      return `text “${target.text}”`;
+      return `text “${target.text}”${nthText(target.nth)}`;
     case "css":
-      return `css ${target.selector}`;
+      return `css ${target.selector}${nthText(target.nth)}`;
     case "point":
       return `point ${target.x},${target.y}`;
   }

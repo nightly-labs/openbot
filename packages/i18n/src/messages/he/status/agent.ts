@@ -8,6 +8,8 @@ export const messages = {
   "status.agent.modelSwitchedForLimit": "הגעת למכסת השימוש. עבר אל {model}.",
   "status.agent.modelReturnedAfterLimit": "מכסת השימוש התאפסה. חזר אל {model}.",
   "status.agent.modelSwitchedForError": "שגיאת ספק. עבר אל {model}.",
+  "status.agent.modelSwitchedForSpentBalance":
+    "ל-{previous} לא נשארו קרדיטים. עבר ל-{model}. כדי להשתמש בו שוב, הוסף קרדיטים ואז בחר בו.",
   "status.agent.modelReturnedAfterError": "חזר אל {model} אחרי שגיאת הספק.",
   "status.agent.marketplaceSuggested": "הציע אפליקציה מהחנות: {app}.",
   "status.agent.channelMemberAdded": "{agent} הוסיף את {member} לערוץ. {person} ביקש זאת.",
@@ -27,6 +29,8 @@ export const messages = {
     "מילוי הכרטיס השמור {card} ב-{site}. אחרי האישור שלך, סוכנים יוכלו למלא את הכרטיס הזה באתר הזה בלי אישור. אפשר להסיר את האתר בהגדרות שרת > כספת.",
   "status.agent.reportProblem": "זה יהפוך לבעיה ציבורית ב-GitHub, עם גרסת האפליקציה והמערכת שלך. השם שלך לא מוצג.",
   "status.agent.sendIdea": "זה יהפוך ל-issue ציבורי ב-GitHub. השם שלך לא מוצג.",
+  "status.agent.feedbackRecentErrors": "שגיאות אחרונות בצ'אט:",
+  "status.agent.feedbackSameAs": "מתווסף ל-issue #{issue}",
   "status.agent.feedbackSent": "נשלח לצוות OpenBot: {title}",
   "status.agent.serverInstallCommand":
     "ליצור פקודה חד־פעמית שמתקינה את OpenBot במחשב אחר כשרת {name} ומחברת אותו לחשבון שלך. הסוכן מריץ אותה שם.",

@@ -21,6 +21,18 @@ import { chatContentIsVisible } from "../model/chat-layout";
 export const CHAT_ROW_GAP = 10;
 /** A message from search opens this far under the header. */
 const FOCUS_GAP = 12;
+/**
+ * The most scrolls that place the row of a message. The list places a far row from estimated sizes;
+ * the rows around it then get their sizes and move it, so the chat scrolls again until it stays.
+ */
+const FOCUS_PLACE_ATTEMPTS = 6;
+/** A row that moved this far or less since the last scroll is in place. */
+const FOCUS_PLACE_TOLERANCE = 1;
+
+/** Resolves after the next two frames, when the rows that the last scroll showed have their sizes. */
+function afterLayout(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+}
 /** On Android the chat takes the latest message this many frames after the last row has its size. */
 const ANDROID_PLACE_FRAMES = 2;
 /** The longest wait on Android before the chat takes the latest message, also without a measured row. */
@@ -364,21 +376,63 @@ export function useChatMotion(
     followLatest.current = false;
     setKeyboardLiftBehavior("never");
   }, []);
+  /** The chat follows the latest message when its end is in view at scroll position `scrollY`. */
+  const followFrom = useCallback(
+    (scrollY: number) => {
+      const m = measurements.current;
+      followLatest.current = chatContentIsVisible(
+        m.content,
+        m.viewport,
+        scrollY,
+        m.composer + Math.max(0, keyboardHeight.get() - keyboardOffset),
+      );
+      setKeyboardLiftBehavior(followLatest.current ? "whenAtEnd" : "never");
+    },
+    [keyboardHeight, keyboardOffset],
+  );
+  /** Counts the reader's drags, so that a placement of a row stops when the reader scrolls. */
+  const drags = useRef(0);
   const onScrollBeginDrag = useCallback(() => {
     // A drag is the reader's choice. A move of the list while rows get their sizes is not.
+    drags.current += 1;
     setOpeningFollow(false);
     leaveLatest();
     reveal();
     cancelSend();
   }, [leaveLatest, reveal, cancelSend]);
-  /** Opens the chat with row `index` under the header, instead of at the latest message. */
+  /**
+   * Opens the chat with row `index` under the header, instead of at the latest message. A message
+   * from search is the reader's choice of place. The NEW line (`unread`) is not: as on desktop, the
+   * opening is not a scroll of the reader, and the chat follows the latest message when its end is in view.
+   */
   const openAt = useCallback(
-    (index: number): Promise<void> => {
-      leaveLatest();
-      const scrolled = listRef.current?.scrollToIndex({ index, viewOffset: header + FOCUS_GAP, animated: false });
-      return (scrolled ?? Promise.resolve()).then(reveal, reveal);
+    async (index: number, unread = false): Promise<void> => {
+      if (unread) followLatest.current = false;
+      else leaveLatest();
+      const startDrags = drags.current;
+      let shown: number | null = null;
+      try {
+        for (let attempt = 0; attempt < FOCUS_PLACE_ATTEMPTS; attempt += 1) {
+          // The reader scrolled, or the list closed: the reader's position wins.
+          const list = listRef.current;
+          if (!list || drags.current !== startDrags) break;
+          await list.scrollToIndex({ index, viewOffset: header + FOCUS_GAP, animated: false });
+          await afterLayout();
+          const state = listRef.current?.getState();
+          if (!state) break;
+          // Where the row is in the view. When it no longer moves, the rows around it have their sizes.
+          const next = state.positionAtIndex(index) - state.scroll;
+          if (shown !== null && Math.abs(next - shown) <= FOCUS_PLACE_TOLERANCE) break;
+          shown = next;
+        }
+      } catch {
+        // A failed scroll keeps the position that the list has. The chat still shows.
+      }
+      reveal();
+      const state = unread && drags.current === startDrags ? listRef.current?.getState() : undefined;
+      if (state) followFrom(state.scroll);
     },
-    [leaveLatest, header, reveal],
+    [leaveLatest, header, reveal, followFrom],
   );
   /** Positions the chat at the latest message again, after the latest page replaces a window around a searched message. */
   const returnToLatest = useCallback(() => {
@@ -386,20 +440,11 @@ export function useChatMotion(
     setKeyboardLiftBehavior("whenAtEnd");
     setLatestGeneration((generation) => generation + 1);
   }, []);
+  // Only a user scroll can resume following. Keyboard dismissal can make the
+  // reply visible without the user choosing to return to it.
   const onScrollEndDrag = useCallback(
-    (event: { nativeEvent: Pick<NativeScrollEvent, "contentOffset"> }) => {
-      // Only a user scroll can resume following. Keyboard dismissal can make the
-      // reply visible without the user choosing to return to it.
-      const m = measurements.current;
-      followLatest.current = chatContentIsVisible(
-        m.content,
-        m.viewport,
-        event.nativeEvent.contentOffset.y,
-        m.composer + Math.max(0, keyboardHeight.get() - keyboardOffset),
-      );
-      setKeyboardLiftBehavior(followLatest.current ? "whenAtEnd" : "never");
-    },
-    [keyboardHeight, keyboardOffset],
+    (event: { nativeEvent: Pick<NativeScrollEvent, "contentOffset"> }) => followFrom(event.nativeEvent.contentOffset.y),
+    [followFrom],
   );
   const scrollToLatest = useCallback(() => {
     followLatest.current = true;

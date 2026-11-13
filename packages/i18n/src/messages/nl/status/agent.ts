@@ -9,6 +9,8 @@ export const messages = {
   "status.agent.modelSwitchedForLimit": "Gebruikslimiet bereikt. Overgeschakeld naar {model}.",
   "status.agent.modelReturnedAfterLimit": "Gebruikslimiet voorbij. Teruggeschakeld naar {model}.",
   "status.agent.modelSwitchedForError": "Fout bij de aanbieder. Overgeschakeld naar {model}.",
+  "status.agent.modelSwitchedForSpentBalance":
+    "{previous} heeft geen tegoed meer. Overgeschakeld naar {model}. Voeg tegoed toe en selecteer het daarna om het weer te gebruiken.",
   "status.agent.modelReturnedAfterError": "Teruggeschakeld naar {model} na de fout bij de aanbieder.",
   "status.agent.marketplaceSuggested": "Een app uit de marktplaats voorgesteld: {app}.",
   "status.agent.channelMemberAdded": "{agent} heeft {member} aan het kanaal toegevoegd. {person} vroeg erom.",
@@ -33,6 +35,8 @@ export const messages = {
   "status.agent.reportProblem":
     "Dit wordt een openbare GitHub-issue, met de appversie en je systeem. Je naam is niet zichtbaar.",
   "status.agent.sendIdea": "Dit wordt een openbaar GitHub-issue. Je naam wordt niet getoond.",
+  "status.agent.feedbackRecentErrors": "Recente fouten in de chat:",
+  "status.agent.feedbackSameAs": "Wordt toegevoegd aan issue #{issue}",
   "status.agent.feedbackSent": "Naar het OpenBot-team gestuurd: {title}",
   "status.agent.serverInstallCommand":
     "Een eenmalige opdracht maken die OpenBot op een andere computer installeert als de server {name} en die aanmeldt bij je account. De agent voert hem daar uit.",

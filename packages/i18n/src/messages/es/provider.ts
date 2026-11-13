@@ -129,6 +129,8 @@ export const messages = {
     "Añade un endpoint compatible con OpenAI: un servidor de modelos en este equipo o cualquier servicio con una URL base y una clave.",
   "provider.picker.customPending":
     "Los modelos de tus endpoints aún no están cargados. El proveedor los lee cuando termina su tarea actual.",
+  "provider.picker.customUnlisted": "{name} no muestra los modelos de tus endpoints.",
+  "provider.picker.editEndpoints": "Editar endpoints",
   "provider.picker.defaultModelLabel": "{name}, predeterminado",
   "provider.picker.usageLimit": "Límite de uso alcanzado",
   "provider.picker.usageLimitWindow": "Límite ({window})",
@@ -139,7 +141,12 @@ export const messages = {
   "provider.picker.effortLabel": "Esfuerzo de razonamiento del agente",
   "provider.picker.effortFixed": "{effort}, fijado por {provider}",
   "provider.picker.fast": "Rápido",
-  "provider.picker.fastLabel": "Modo rápido",
+  "provider.picker.fastText": "Respuestas más rápidas, mayor uso",
+  "provider.picker.speed": "Velocidad",
+  "provider.picker.standard": "Estándar",
+  "provider.picker.standardText": "Velocidad predeterminada",
+  "provider.picker.ultrafast": "Ultrarrápido",
+  "provider.picker.ultrafastText": "Las respuestas más rápidas, uso mucho mayor",
   "provider.picker.selectEffort": "Seleccionar esfuerzo",
   "provider.picker.custom": "Personalizado",
   "provider.picker.cliReady": "{cli} listo",
@@ -162,6 +169,8 @@ export const messages = {
   "provider.geminiKey.title": "Clave de API de Gemini",
   "provider.geminiKey.description":
     "Guarda una clave de API de Gemini en este equipo. Una clave guardada se usa en lugar de tu cuenta de Google. Para iniciar sesión con Google, elimina la clave y selecciona Conectar en la fila de Gemini.",
+  "provider.geminiKey.descriptionHost":
+    "Guarda una clave de API de Gemini en el host. Una clave guardada se usa en lugar de tu cuenta de Google. Para iniciar sesión con Google, elimina la clave y selecciona Conectar en la fila de Gemini.",
   "provider.geminiKey.label": "Clave de API de Gemini",
   "provider.claudeKey.title": "Clave de API de Anthropic",
   "provider.claudeKey.description":
@@ -170,14 +179,20 @@ export const messages = {
   "provider.inceptionKey.title": "Clave de API de Inception",
   "provider.inceptionKey.description":
     "Guarda una clave de API de Inception en este equipo para usar los modelos Mercury. OpenBot los ejecuta en la CLI de Pi que descarga.",
+  "provider.inceptionKey.descriptionHost":
+    "Guarda una clave de API de Inception en el host para usar los modelos Mercury. OpenBot los ejecuta en la CLI de Pi que descarga.",
   "provider.inceptionKey.label": "Clave de API de Inception",
   "provider.deepseekKey.title": "Clave de API de DeepSeek",
   "provider.deepseekKey.description":
     "Guarda una clave de API de DeepSeek en este equipo para usar los modelos de DeepSeek. OpenBot los ejecuta en la CLI de Pi que descarga.",
+  "provider.deepseekKey.descriptionHost":
+    "Guarda una clave de API de DeepSeek en el host para usar los modelos de DeepSeek. OpenBot los ejecuta en la CLI de Pi que descarga.",
   "provider.deepseekKey.label": "Clave de API de DeepSeek",
   "provider.openrouterKey.title": "Clave de API de OpenRouter",
   "provider.openrouterKey.description":
     "Guarda una clave de API de OpenRouter en este equipo para usar los modelos que ofrece OpenRouter. OpenBot los ejecuta en la CLI de Pi que descarga.",
+  "provider.openrouterKey.descriptionHost":
+    "Guarda una clave de API de OpenRouter en el host para usar los modelos que ofrece OpenRouter. OpenBot los ejecuta en la CLI de Pi que descarga.",
   "provider.openrouterKey.label": "Clave de API de OpenRouter",
   "provider.openCodeKey.title": "Iniciar sesión en OpenCode Go",
   "provider.openCodeKey.description":
@@ -221,14 +236,31 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} no tiene más créditos de restablecimiento de uso.",
   "provider.account.resetUsageAlreadyRedeemed": "Este crédito de restablecimiento de {name} ya se usó.",
   "provider.account.resetUsageFailed": "No se pudo restablecer el uso de {name}.",
+  "provider.account.pool": "Agrupar cuentas",
+  "provider.account.poolDescription":
+    "Los agentes usan una cuenta hasta que se acerca a un límite de uso y luego la cuenta cuyo límite se restablece antes.",
+  "provider.account.inUse": "En uso",
+  "provider.account.notInPool": "Fuera del grupo",
+  "provider.account.leaveOutOfPool": "Sacar del grupo",
+  "provider.account.putBackInPool": "Volver al grupo",
+  "provider.account.poolChip": "Grupo",
+  "provider.account.poolCount": "Grupo de {accounts}",
+  "provider.account.poolInUse": "{pool} · {name} en uso",
+  "provider.settings.accountsPooledDescription": "{count} de {max}. Los agentes comparten estas cuentas.",
   "provider.settings.disconnectTitle": "¿Desconectar {name}?",
   "provider.settings.disconnectOthers":
     "Las otras cuentas de {provider} esperan hasta que vuelvas a conectar {provider}.",
   "provider.settings.disconnectLocal":
     "OpenBot cierra la sesión de {provider} en este ordenador. La CLI de {provider} de tu terminal también cierra la sesión.",
   "provider.settings.disconnectHost": "OpenBot cierra la sesión de {provider} en el servidor.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "Se usa una clave de API de Gemini guardada en lugar de un inicio de sesión de Google. Para usar un plan de Google y sus modelos, elimina la clave.",
   "provider.settings.versionInstalledByUser": "{version} · instalada por ti",
   "provider.settings.versionDownloaded": "{version} · descargada por OpenBot",
+  "provider.settings.otherVersionInstalledByUser": "Sin usar: {version} · instalada por ti",
+  "provider.settings.otherVersionDownloaded": "Sin usar: {version} · descargada por OpenBot",
+  "provider.settings.useInstalledVersion": "Usar la instalada",
+  "provider.settings.useDownloadedVersion": "Usar la de OpenBot",
   "provider.settings.cache": "Caché",
   "provider.settings.promptCache": "Caché de prompts",
   "provider.settings.promptCacheDescription":
@@ -240,7 +272,16 @@ export const messages = {
   "provider.settings.claudeUserSetup": "Usar mi configuración de Claude Code",
   "provider.settings.claudeUserSetupDescription":
     "Los agentes cargan tu CLAUDE.md, skills, agentes, hooks y plugins de ~/.claude. Desactivado, cada turno envía un prompt más corto. Los archivos del espacio de trabajo se siguen cargando.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "Los agentes cargan CLAUDE.md, skills, agentes, hooks y plugins desde ~/.claude en el servidor. Desactivado, cada turno envía un prompt más corto. Los archivos del espacio de trabajo se siguen cargando.",
   "provider.settings.claudeUserSetupLoadFailed": "No se pudo cargar el ajuste de Claude Code.",
+  "provider.settings.context": "Contexto",
+  "provider.settings.compactWindow": "Compactar chats en",
+  "provider.settings.compactWindowDescription":
+    "Claude Code resume los turnos antiguos de un chat cuando el chat alcanza este tamaño. Menos mantiene los turnos rápidos y baratos. Más conserva más detalle. Un modelo con una ventana más pequeña compacta en su propio límite.",
+  "provider.settings.compactWindowDefault": "Predeterminado de Claude Code",
+  "provider.settings.compactWindowTokens": "{size} tokens",
+  "provider.settings.compactWindowLoadFailed": "No se pudo cargar el tamaño de compactación de este servidor.",
   "provider.settings.models": "Modelos",
   "provider.settings.modelsDescription": {
     one: "{shown} de {count} modelo aparece en el selector de modelos.",
@@ -259,4 +300,6 @@ export const messages = {
   "provider.settings.deleteOff":
     "Elimina la CLI que OpenBot descargó para {name} ({size}). Las cuentas, los inicios de sesión y los agentes se mantienen.",
   "provider.settings.removeDownloadFailed": "No se pudo quitar la descarga.",
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot cierra la sesión de {provider} en este ordenador. La CLI de {provider} en tu terminal mantiene su propia sesión.",
 } as const satisfies PartialTranslation<typeof source>;

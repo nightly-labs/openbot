@@ -12,15 +12,19 @@ import { createScopeGuard } from "../../scope-lifetime";
 // A joined server gives the accounts of its providers on `provider-accounts-v1` routes. The released
 // status, agent and usage routes never carry an account, so the client adds them from these.
 
-/** The status with the accounts of each provider that can hold more than one. */
+/** The status with the accounts of each provider that can hold more than one, and the pools that are on. */
 export function withHostAccounts(status: AgentStatus, host: HostProviderAccounts | null): AgentStatus {
   if (!host || !status.providers) return status;
   const accounts = new Map(host.providers.map((row) => [row.provider, row.accounts]));
+  const pools = new Map(host.pools?.map((row) => [row.provider, row.pool]));
   return {
     ...status,
     providers: status.providers.map((row) => {
       const rows = accounts.get(row.id);
-      return rows ? { ...row, accounts: rows } : row;
+      if (!rows) return row;
+      const { accountPool: _released, ...rest } = row;
+      const pool = pools.get(row.id);
+      return pool ? { ...rest, accounts: rows, accountPool: pool } : { ...rest, accounts: rows };
     }),
   };
 }

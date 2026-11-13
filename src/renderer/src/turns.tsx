@@ -406,6 +406,8 @@ const Turns = createSimpleContext({
       const serverId = activeServerId();
       void turnsPort()
         .agent.cancelWait({ agentId: agent.id, waitId })
+        // A joined server sends no event when a wait closes, so the list is read again.
+        .then(() => loadWaits(agent.id, serverId))
         .catch((error) => appendUiError(agent.id, error, currentText().t("app.errorStatus.waitCancel"), serverId));
     }
 

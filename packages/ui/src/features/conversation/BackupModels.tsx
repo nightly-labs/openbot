@@ -297,10 +297,16 @@ export function BackupModelsPage(props: BackupModelsPageProps) {
 export interface UsageLimitAskCardProps {
   /** The provider whose usage limit holds the message. */
   provider: AgentProviderId;
+  /** The name of the model that the limit holds, when it is known. A limit can cover one model only. */
+  model?: string | undefined;
+  /** The agent whose work waits, in a channel, where the work is not the reader's own message. */
+  agentName?: string | undefined;
   /** Epoch seconds, or null when the provider has not said. */
   resetsAt: number | null;
   /** The models that can take the message now, the first one preselected. */
   options: readonly BackupModelOption[];
+  /** Whether the reader can save the choice in the backup models. Absent means yes. */
+  rememberable?: boolean;
   /** Moves the agent. `remember` saves the choice first in the order and switches without asking next time. */
   onSend: (option: BackupModelOption, remember: boolean) => Promise<void>;
   onWait: () => void;
@@ -321,13 +327,18 @@ export function UsageLimitAskCard(props: UsageLimitAskCardProps) {
   const [failure, setFailure] = createSignal<{ message: string; reference: string | null } | null>(null);
   const body = () => {
     const reset = formatUsageReset(props.resetsAt, format);
+    const name = props.agentName;
+    if (name)
+      return reset
+        ? t("chat.usageLimit.channelBodyReset", { name, reset })
+        : t("chat.usageLimit.channelBody", { name });
     return reset ? t("chat.usageLimit.bodyReset", { reset }) : t("chat.usageLimit.body");
   };
   async function send(option: BackupModelOption): Promise<void> {
     setFailure(null);
     setSending(true);
     try {
-      await props.onSend(option, remember());
+      await props.onSend(option, props.rememberable !== false && remember());
     } catch (error) {
       setFailure({ message: errorMessage(error, t("chat.usageLimit.failed")), reference: errorReference(error) });
     } finally {
@@ -338,7 +349,11 @@ export function UsageLimitAskCard(props: UsageLimitAskCardProps) {
     <UiBlockCard
       class="usage-limit-ask-card"
       status="pending"
-      title={t("chat.usageLimit.title", { provider: agentProviderName(props.provider) })}
+      title={
+        props.model
+          ? t("chat.usageLimit.modelTitle", { model: props.model })
+          : t("chat.usageLimit.title", { provider: agentProviderName(props.provider) })
+      }
       subtitle={body()}
       busy={sending()}
       waiting
@@ -388,15 +403,17 @@ export function UsageLimitAskCard(props: UsageLimitAskCardProps) {
         </>
       }
     >
-      <label class="usage-limit-ask-remember" for={rememberId}>
-        <Checkbox
-          id={rememberId}
-          checked={remember()}
-          disabled={sending()}
-          onChange={(event) => setRemember(event.currentTarget.checked)}
-        />
-        {t("chat.usageLimit.remember")}
-      </label>
+      <Show when={props.rememberable !== false}>
+        <label class="usage-limit-ask-remember" for={rememberId}>
+          <Checkbox
+            id={rememberId}
+            checked={remember()}
+            disabled={sending()}
+            onChange={(event) => setRemember(event.currentTarget.checked)}
+          />
+          {t("chat.usageLimit.remember")}
+        </label>
+      </Show>
       <Show when={failure()}>
         {(details) => (
           <p class="usage-limit-ask-error" role="alert">

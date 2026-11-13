@@ -91,7 +91,15 @@ export function ServerConnectionNotice(props: ServerConnectionNoticeProps) {
   const [round, setRound] = createSignal(0);
   const [waitedLong, setWaitedLong] = createSignal(false);
   const [toastClosed, setToastClosed] = createSignal(false);
-  const urgent = () => Boolean(props.issue) || (props.phase !== "loading" && props.phase !== "connecting");
+  /**
+   * A hosted server that starts and has no issue does what it must: it is not a failure, so it has no
+   * error code, and its toast waits as a long load does. When the start fails, the issue makes the
+   * toast urgent again, with its code, Details and Retry.
+   */
+  const starting = () => props.phase === "waking" && !props.issue;
+  const urgent = () =>
+    Boolean(props.issue) || (props.phase !== "loading" && props.phase !== "connecting" && !starting());
+  const reference = () => (starting() ? null : props.reference);
   createEffect(round, () => {
     const timer = setTimeout(() => setWaitedLong(true), FIRST_LOAD_TOAST_DELAY_MS);
     return () => clearTimeout(timer);
@@ -237,15 +245,18 @@ export function ServerConnectionNotice(props: ServerConnectionNoticeProps) {
       </Show>
       <strong class="server-connection-toast-title">{title()}</strong>
       <Show when={detail()}>{(text) => <p class="server-connection-toast-body">{text()}</p>}</Show>
-      <ErrorReference reference={props.reference} />
+      <ErrorReference reference={reference()} />
       {upsell()}
-      <div class="server-connection-toast-actions ui-toast-card-actions">
-        {detailsButton("sm")}
-        {manageButton("sm")}
-        <Button variant="default" size="sm" onClick={retry}>
-          {t("server.connection.retry")}
-        </Button>
-      </div>
+      {/* A server that starts shows its progress only: the user has nothing to retry or read yet. */}
+      <Show when={!starting()}>
+        <div class="server-connection-toast-actions ui-toast-card-actions">
+          {detailsButton("sm")}
+          {manageButton("sm")}
+          <Button variant="default" size="sm" onClick={retry}>
+            {t("server.connection.retry")}
+          </Button>
+        </div>
+      </Show>
     </section>
   );
   let toastShown = false;
@@ -293,7 +304,7 @@ export function ServerConnectionNotice(props: ServerConnectionNoticeProps) {
             <div>
               <p>{title()}</p>
               <p class="server-connection-detail">{detail()}</p>
-              <ErrorReference reference={props.reference} />
+              <ErrorReference reference={reference()} />
               {upsell()}
             </div>
             <div class="server-connection-actions">{actions()}</div>
@@ -328,6 +339,11 @@ export interface ConversationLoadNoticeProps {
   loading: boolean;
   /** Why the history did not load. The notice then shows Retry. */
   error: string | null;
+  /**
+   * The wait is sure to be long, such as the first load of a saved frame: the screen shows at once,
+   * so the chat under it does not show for a moment first.
+   */
+  immediate?: boolean;
   onRetry: () => void;
 }
 
@@ -345,15 +361,28 @@ export function ConversationLoadNotice(props: ConversationLoadNoticeProps) {
   // The screen that started its exit. It stays ready, so a new wait does not stop its exit.
   const [exiting, setExiting] = createSignal<number | null>(null);
   let screens = 0;
+  // Whether the screen that shows now came at once.
+  let immediate = false;
   createEffect(waiting, (current) => {
     if (!current) {
-      setExiting(untrack(screen));
-      return;
+      // The chat under the screen measures its rows and moves to its latest message in the next two
+      // frames. The screen starts its exit after them, so the reader does not see the rows move.
+      const shown = untrack(screen);
+      let frame = requestAnimationFrame(() => {
+        frame = requestAnimationFrame(() => setExiting(shown));
+      });
+      return () => cancelAnimationFrame(frame);
     }
-    const timer = setTimeout(() => {
+    const show = () => {
       screens += 1;
       setScreen(screens);
-    }, CONVERSATION_LOADING_DELAY_MS);
+    };
+    immediate = untrack(() => props.immediate === true);
+    if (immediate) {
+      show();
+      return;
+    }
+    const timer = setTimeout(show, CONVERSATION_LOADING_DELAY_MS);
     return () => clearTimeout(timer);
   });
   return (
@@ -362,7 +391,8 @@ export function ConversationLoadNotice(props: ConversationLoadNoticeProps) {
         {(key) => (
           <AppLoadingScreen
             scene="thinking"
-            ready={key === exiting() || !waiting()}
+            immediate={immediate}
+            ready={key === exiting()}
             label={t("server.connection.loading", { name: props.name })}
             title={t("server.connection.loading", { name: props.name })}
             onExited={() => setScreen((current) => (current === key ? null : current))}

@@ -1,4 +1,4 @@
-import { type BugReport, type FeatureRequest, feedbackPreview } from "@openbot/contracts/feedback";
+import { type BugReport, type FeatureRequest, type Feedback, feedbackPreview } from "@openbot/contracts/feedback";
 import type { AgentApproval } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { ApprovalCard } from "@openbot/ui/features/conversation/ConversationPrompts";
@@ -101,6 +101,13 @@ const sentFacts = {
   os: "macOS 26.1 (arm64)",
   provider: "Claude (Claude Code)",
   providerVersion: "2.3.1",
+  model: "claude-opus-5-5",
+  effort: "high",
+  host: "Desktop app",
+  surface: null,
+  foundBy: "user",
+  recentErrors: "",
+  sameAs: null,
 } as const;
 const bugReport: BugReport = {
   kind: "bug",
@@ -129,18 +136,37 @@ const feedbackApproval = (text: string, reason = sourceText("status.agent.report
   cwd: null,
   reason,
 });
+/** The card text, with the host's notes in English as the host writes them. */
+const preview = (feedback: Feedback) =>
+  feedbackPreview(feedback, {
+    recentErrors: sourceText("status.agent.feedbackRecentErrors"),
+    sameAs: (issue) => sourceText("status.agent.feedbackSameAs", { issue: String(issue) }),
+  });
 /** `openbot.send_feedback` with a bug: the agent offers to send it to the OpenBot team. */
 export const ReportProblem: Story = {
-  args: { agentName: "Chief", approval: feedbackApproval(feedbackPreview(bugReport)) },
+  args: { agentName: "Chief", approval: feedbackApproval(preview(bugReport)) },
 };
 /** `openbot.send_feedback` with a feature idea: the same card, with what the user wants and why. */
 export const SendIdea: Story = {
   args: {
     agentName: "Chief",
-    approval: feedbackApproval(feedbackPreview(featureRequest), sourceText("status.agent.sendIdea")),
+    approval: feedbackApproval(preview(featureRequest), sourceText("status.agent.sendIdea")),
+  },
+};
+/** A bug with the chat's recent errors, added to an open issue that has the same problem. */
+export const ReportProblemWithErrors: Story = {
+  args: {
+    agentName: "Chief",
+    approval: feedbackApproval(
+      preview({
+        ...bugReport,
+        recentErrors: "openbot.history_search: The query is too long.\nThe provider stopped: 529 Overloaded",
+        sameAs: 6812,
+      }),
+    ),
   },
 };
 /** After Send: the card keeps its loader until GitHub opens the issue. */
 export const SendingFeedback: Story = {
-  args: { agentName: "Chief", approval: feedbackApproval(feedbackPreview(bugReport)), sending: true },
+  args: { agentName: "Chief", approval: feedbackApproval(preview(bugReport)), sending: true },
 };

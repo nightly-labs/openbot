@@ -79,14 +79,22 @@ start stops in its first 30 seconds, OpenBot writes `gpu-crash.json` or `gpu-sta
 `~/.config/OpenBot`. While one of these files is there, OpenBot renders on the CPU. An update with a
 new Chromium version tries the GPU again. A GPU process restart after a lost GPU context, for example
 after suspend, does not count. A server (`OPENBOT_SERVER=1` or a hosted server) always renders on the
-CPU. Chromium also renders on the CPU when it blocks the GPU driver, for example in a remote desktop.
+CPU, and its browser runs WebGL on the CPU (SwiftShader) for sites such as the Figma editor. A GPU
+process crash on a server writes `gpu-crash.json` and turns off WebGL at the next start. Chromium
+also renders on the CPU when it blocks the GPU driver, for example in a remote desktop.
 
 When OpenBot renders on the CPU, dialogs and panels do not blur what is behind them, and agent
 avatars do not move. These two effects used the most CPU time.
 
+On a Wayland session, a start that renders on the CPU opens OpenBot again on XWayland: on Wayland,
+Chromium can leave the window empty, and KDE then shows only a 1x1 taskbar entry. The log then shows
+"Software rendering is on, so OpenBot uses XWayland". Without XWayland (no `DISPLAY`), OpenBot stays
+on Wayland. To stay on Wayland, start OpenBot with `--ozone-platform=wayland`.
+
 - To try the GPU again, for example after a driver update, remove the file. The log names it.
-- To always use the GPU, start OpenBot with `OPENBOT_DISABLE_GPU=0`.
+- To always use the GPU, start OpenBot with `OPENBOT_DISABLE_GPU=0`. A server ignores this value.
 - If OpenBot stops at each start, start it with `OPENBOT_DISABLE_GPU=1` to always render on the CPU.
+  On a server, this value also turns off WebGL.
 
 ## OpenBot does not start on Linux when the monitor is off
 
@@ -300,10 +308,17 @@ are independent and are not removed with OpenBot.
 
 Use the [bug report form](https://github.com/nightly-labs/openbot/issues/new?template=bug_report.yml)
 for reproducible bugs. It asks for the platform, the OpenBot version (Settings → Updates on the
-desktop, Settings → About on the phone), the operating system and hardware, the provider and its CLI
-version, the steps, and the expected and actual results. When a provider row shows an error, select
-**Copy diagnostics** in its menu and paste the result into the form. On the phone, Settings →
-Support → **Save log file** makes a log that you can attach. Never publish tokens, `~/.codex`,
+desktop), the operating system and hardware, the provider and its CLI version, the steps, and the
+expected and actual results. When a provider row shows an error, select **Copy diagnostics** in its
+menu and paste the result into the form.
+
+For a problem in the iPhone or Android app, use the
+[mobile app bug report form](https://github.com/nightly-labs/openbot/issues/new?template=mobile_bug_report.yml).
+It asks for the full app version line from Settings → About. Settings → Support → **Save log file**
+makes a log that you can attach. Attach it for a connection or network problem: we will most
+probably close such a report without it.
+
+Never publish tokens, `~/.codex`,
 `~/.claude`, conversations, private files, Electron user data, or full unreviewed diagnostics.
 
 When the desktop app closes by itself, look in the `logs` folder of its user data

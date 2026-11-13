@@ -9,6 +9,8 @@ export const messages = {
   "status.agent.modelSwitchedForLimit": "Kullanım sınırına ulaşıldı. {model} modeline geçildi.",
   "status.agent.modelReturnedAfterLimit": "Kullanım sınırı bitti. {model} modeline geri dönüldü.",
   "status.agent.modelSwitchedForError": "Sağlayıcı hatası. {model} modeline geçildi.",
+  "status.agent.modelSwitchedForSpentBalance":
+    "{previous} için kredi kalmadı. {model} modeline geçildi. Yeniden kullanmak için kredi ekleyin ve sonra seçin.",
   "status.agent.modelReturnedAfterError": "Sağlayıcı hatasından sonra {model} modeline geri dönüldü.",
   "status.agent.marketplaceSuggested": "Bir Pazaryeri uygulaması önerildi: {app}.",
   "status.agent.channelMemberAdded": "{agent}, {member} ajanını kanala ekledi. İsteyen: {person}.",
@@ -28,6 +30,8 @@ export const messages = {
   "status.agent.reportProblem":
     "Bu, uygulama sürümü ve sisteminizle birlikte herkese açık bir GitHub issue'su olur. Adınız görünmez.",
   "status.agent.sendIdea": "Bu, herkese açık bir GitHub issue'su olur. Adın gösterilmez.",
+  "status.agent.feedbackRecentErrors": "Sohbetteki son hatalar:",
+  "status.agent.feedbackSameAs": "#{issue} numaralı issue'ya eklenir",
   "status.agent.feedbackSent": "OpenBot ekibine gönderildi: {title}",
   "status.agent.serverInstallCommand":
     "OpenBot'u başka bir bilgisayara {name} sunucusu olarak kuran ve hesabınızda oturum açan tek kullanımlık bir komut oluştur. Ajan onu orada çalıştırır.",

@@ -25,14 +25,18 @@ import { installNotificationHandler } from "@/features/push-notifications/use-no
 import { installQuickActions, resetQuickActions } from "@/features/quick-actions/quick-actions-native";
 import { loadAppLanguage } from "@/features/settings/model/app-language";
 import { loadAppearance, useAppearance } from "@/features/settings/model/appearance";
+import { loadChatOrderPreference } from "@/features/settings/model/chat-order";
 import { loadDictationLanguage } from "@/features/settings/model/dictation-language";
 import { loadHapticsPreference } from "@/features/settings/model/haptics";
+import { loadLargeFilePreference } from "@/features/settings/model/large-files";
 import { offerLayoutRestart } from "@/features/settings/model/layout-direction";
 import { loadLiveActivitiesPreference } from "@/features/settings/model/live-activities";
 import { loadMessageColor } from "@/features/settings/model/message-color";
 import { useMotionPreferences } from "@/features/settings/model/motion";
 import { loadMotionPreferences } from "@/features/settings/model/motion-storage";
+import { loadPhotoQualityPreference } from "@/features/settings/model/photo-quality";
 import { loadPushNotificationPreference } from "@/features/settings/model/push-notifications";
+import { loadRoutineCollapsePreference } from "@/features/settings/model/routine-collapse";
 import { loadTextSize } from "@/features/settings/model/text-size";
 import { resetShareExtension } from "@/features/share/model/share-extension";
 import { installSupportLog } from "@/features/support/model/support-log-capture";
@@ -214,7 +218,11 @@ export default function RootLayout() {
     void untilForeground().then(() => {
       void loadAppearance().catch(() => undefined);
       void loadHapticsPreference().catch(() => undefined);
+      void loadLargeFilePreference().catch(() => undefined);
+      void loadPhotoQualityPreference().catch(() => undefined);
       void loadMessageColor().catch(() => undefined);
+      void loadRoutineCollapsePreference().catch(() => undefined);
+      void loadChatOrderPreference().catch(() => undefined);
       void loadTextSize().catch(() => undefined);
       void loadLiveActivitiesPreference().catch(() => undefined);
       void loadPushNotificationPreference().catch(() => undefined);

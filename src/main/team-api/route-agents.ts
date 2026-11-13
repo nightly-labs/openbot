@@ -40,7 +40,7 @@ import { ForbiddenAttentionAnswer, InactiveAttentionRequest } from "../../backen
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { parseSidebarLayoutAction } from "../ipc/agent-inputs";
 import type { ModelVisibility } from "../model-visibility";
-import type { TeamApiAgents, TeamApiOptions, TeamApiSidebarLayout } from "./dependencies";
+import type { TeamApiAgents, TeamApiLibraryFolders, TeamApiOptions, TeamApiSidebarLayout } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import {
@@ -50,7 +50,6 @@ import {
   browserTakeoverDecision,
   markerExclusionsForCapabilities,
   memberSender,
-  messageTextCut,
   pageLimit,
   pathIdentifier,
   promptAnswers,
@@ -60,12 +59,12 @@ import {
   requireAdmin,
   requireAgentLevel,
   stringField,
-  WEBRTC_FRAME_BODY_BUDGET,
 } from "./request-helpers";
 import { routeAgentConversation } from "./route-agent-conversation";
 import { routeAgentMemories } from "./route-agent-memories";
 import { routeAgentQueue } from "./route-agent-queue";
 import { routeAgentRoutines } from "./route-agent-routines";
+import { searchPageWithinFrame } from "./route-thread-message-search";
 
 export interface AgentRouteDependencies {
   // The whole service, unlike every other module here, because this one forwards it to four
@@ -73,6 +72,8 @@ export interface AgentRouteDependencies {
   agents: TeamApiAgents;
   skills?: TeamApiOptions["skills"];
   sidebarLayout: Pick<TeamApiSidebarLayout, "getSnapshot" | "mutate" | "removeAgent" | "withProfileAssignment">;
+  /** The Library folders of this host: a deleted agent takes its folders with it. */
+  libraryFolders?: Pick<TeamApiLibraryFolders, "removeAgent"> | undefined;
   duplicateAgent: (agentId: string, operationId: string) => Effect.Effect<DuplicateAgentResult, AgentDuplicationFailed>;
   /** `model-visibility-v1`: the models that the model picker of this server shows. */
   visibleModels?: Pick<ModelVisibility, "picker">;
@@ -80,7 +81,7 @@ export interface AgentRouteDependencies {
 
 export async function routeAgents(
   context: TeamApiRequestContext,
-  { agents, skills, sidebarLayout, duplicateAgent, visibleModels }: AgentRouteDependencies,
+  { agents, skills, sidebarLayout, libraryFolders, duplicateAgent, visibleModels }: AgentRouteDependencies,
 ): Promise<RouteOutcome> {
   const { method, url, request, response, member, capabilities, json, empty } = context;
   const hidden = hiddenProviderAgentIds(agents.listAgents(), context.protocol);
@@ -173,29 +174,13 @@ export async function routeAgents(
     // bodies only. `botId` is what every shipped client sends and what every shipped host reads.
     const agentId = url.searchParams.get("botId") ?? undefined;
     const cursor = url.searchParams.get("cursor") ?? undefined;
-    // Each result holds its whole message, so a page can be larger than one WebRTC frame. Then the
-    // page keeps the results that fit, and one result alone that is too large is cut. The text filter
-    // reads every stored message, so the search runs at most twice: the second time at the kept
-    // count, which gives the cursor of the next page.
-    let page = agents.searchConversationMessages(query, agentId, cursor, pageLimit(url));
-    let bytes = Buffer.byteLength(JSON.stringify(page));
-    if (bytes > WEBRTC_FRAME_BODY_BUDGET) {
-      let kept = 0;
-      let size = Buffer.byteLength(JSON.stringify({ ...page, results: [] }));
-      for (const result of page.results) {
-        size += Buffer.byteLength(JSON.stringify(result)) + 1;
-        if (size > WEBRTC_FRAME_BODY_BUDGET) break;
-        kept += 1;
-      }
-      page = agents.searchConversationMessages(query, agentId, cursor, Math.max(1, kept));
-      bytes = Buffer.byteLength(JSON.stringify(page));
-    }
-    if (bytes <= WEBRTC_FRAME_BODY_BUDGET) return json(200, page);
-    const cut = messageTextCut(
-      page.results.map((result) => result.message),
-      bytes - WEBRTC_FRAME_BODY_BUDGET,
+    return json(
+      200,
+      searchPageWithinFrame(
+        (limit) => agents.searchConversationMessages(query, agentId, cursor, limit),
+        pageLimit(url),
+      ),
     );
-    return json(200, { ...page, results: page.results.map((result) => ({ ...result, message: cut(result.message) })) });
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.status) {
     return json(200, agents.getStatus());
@@ -288,6 +273,7 @@ export async function routeAgents(
         throw new HttpError(403, sourceText("error.team.membersCannotDeleteAgents"));
       await runCauseEffect(agents.deleteAgent(agentId));
       await runCauseEffect(sidebarLayout.removeAgent(agentId));
+      if (libraryFolders) await runCauseEffect(libraryFolders.removeAgent(agentId));
       return empty(204);
     }
     if (action === "avatar") {

@@ -96,6 +96,8 @@ export interface ProviderAccountsHost {
   resetCredits(client: AgentClient): number | null | undefined;
   consumeUsageReset(client: AgentClient): Effect.Effect<ProviderUsageResetOutcome, ProviderAccountFailed>;
   changed(): void;
+  /** Runs after an account check listed the account's models. */
+  modelsListed?(provider: AgentProviderId, accountId: string): Effect.Effect<void>;
   /** Sends the reading of an account check: after a sign-in, and when the provider's own sign-in connects. */
   usageChanged(limit: AccountUsageLimit): void;
   redact(text: string): string;
@@ -197,8 +199,15 @@ export class ProviderAccounts {
 
   /** The models of an account after the first, from its last check; empty before one listed them. */
   models(provider: AgentProviderId, accountId: string | undefined): AgentModelOption[] {
+    return this.listedModels(provider, accountId) ?? [];
+  }
+
+  /** As `models`, but null while an account after the first has not listed its models yet. */
+  listedModels(provider: AgentProviderId, accountId: string | undefined): AgentModelOption[] | null {
     const account = this.account(provider, accountId);
-    return account ? structuredClone(this.#models.get(account.id) ?? []) : [];
+    if (!account) return [];
+    const models = this.#models.get(account.id);
+    return models ? structuredClone(models) : null;
   }
 
   /**
@@ -367,6 +376,42 @@ export class ProviderAccounts {
     this.#host.changed();
   }).bind(this);
 
+  /** The accounts that the provider's pool leaves out, or null while its pool is off. */
+  pool(provider: AgentProviderId): { leftOut: readonly string[] } | null {
+    return this.#support(provider) ? this.#store.pool(provider) : null;
+  }
+
+  /** Turns the provider's pool on with the accounts it leaves out, or off. Unknown accounts are dropped. */
+  readonly setPool = Effect.fn("ProviderAccounts.setPool")(function* (
+    this: ProviderAccounts,
+    provider: AgentProviderId,
+    enabled: boolean,
+    leftOut: readonly string[],
+  ) {
+    const name = providerLabel(provider);
+    if (provider === "acp" || !this.#support(provider))
+      return yield* accountFailure(sourceText("error.provider.accountsUnsupported", { provider: name }));
+    const known = new Set([DEFAULT_PROVIDER_ACCOUNT_ID, ...this.#store.list(provider).map((account) => account.id)]);
+    yield* this.#store
+      .setPool(provider, enabled ? { leftOut: leftOut.filter((accountId) => known.has(accountId)) } : null)
+      .pipe(Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })));
+    this.#host.changed();
+  }).bind(this);
+
+  /** The connected accounts after the first that have a plan. A key account has no plan to pool. */
+  planAccounts(provider: AgentProviderId): string[] {
+    if (!this.#support(provider)) return [];
+    return this.#store
+      .list(provider)
+      .filter((account) => !isKeyAccount(account) && this.#states.get(account.id)?.state === "connected")
+      .map((account) => account.id);
+  }
+
+  /** The last usage reading of an account after the first, or null before one. */
+  keptUsage(accountId: string): AccountUsageLimit | null {
+    return this.#usage.get(accountId)?.limit ?? null;
+  }
+
   /**
    * Stops the account's processes, signs it out, and removes its folder with the credentials in it.
    * The caller moves its agents to the provider's own sign-in first.
@@ -516,7 +561,10 @@ export class ProviderAccounts {
     return limits;
   }).bind(this);
 
-  /** The reading of one account for the usage limit check: its agent's process, or the kept one. */
+  /**
+   * The reading of one account for the usage limit check: its agent's process, or the kept one. While
+   * the account's gate waits after a failed read, the process is not asked, and there is no reading.
+   */
   readonly usageFor = Effect.fn("ProviderAccounts.usageFor")(function* (
     this: ProviderAccounts,
     provider: AgentProviderId,
@@ -524,7 +572,11 @@ export class ProviderAccounts {
     model: string,
   ) {
     const client = this.#host.agentClient(provider, accountId);
-    if (client) return yield* this.#host.readUsage(client, model);
+    if (client)
+      return yield* this.#usageGate(accountId).unlessWaiting({
+        read: this.#host.readUsage(client, model),
+        waiting: (): AccountUsage => ({ limits: [] }),
+      });
     // The kept reading has no model: take the windows of the model's quota group from it.
     const kept = this.#usage.get(accountId)?.limit;
     const quota = kept && usageQuotaForModel(kept, model);
@@ -639,6 +691,7 @@ export class ProviderAccounts {
           if (models && this.#states.has(account.id)) {
             this.#models.set(account.id, models);
             this.#host.changed();
+            if (this.#host.modelsListed) yield* this.#host.modelsListed(provider, account.id);
           }
         }),
       ({ client }) => this.#host.stopClient(client),
@@ -696,7 +749,7 @@ export class ProviderAccounts {
       return yield* accountFailure(
         sourceText("error.provider.signOutUnsupported", { provider: providerLabel(provider) }),
       );
-    yield* this.#runSignOut(cli, command, {}).pipe(
+    yield* this.#runSignOut(provider, cli, command, {}).pipe(
       Effect.mapError((error) => accountFailure(this.#message(provider, error))),
     );
   });
@@ -710,7 +763,7 @@ export class ProviderAccounts {
     const cli = this.#host.cli(account.provider);
     // A key account never signed in; the key goes with the stored credential.
     if (!command || !cli || isKeyAccount(account)) return;
-    yield* this.#runSignOut(cli, command, this.environment(account)).pipe(
+    yield* this.#runSignOut(account.provider, cli, command, this.environment(account)).pipe(
       // The folder goes in any case; a credential the CLI kept elsewhere is the CLI's to clear.
       Effect.catch((error) =>
         Effect.sync(() =>
@@ -724,10 +777,12 @@ export class ProviderAccounts {
   });
 
   #runSignOut(
+    provider: AgentProviderId,
     cli: AgentCliInfo,
     command: NonNullable<ProviderAccountSupport["signOut"]>,
     environment: Readonly<Record<string, string>>,
   ): Effect.Effect<void, ProviderProcessFailed | ProviderSignInError> {
+    const privateTemp = this.#host.signInTemp(provider);
     return Effect.scoped(
       Effect.gen(function* () {
         const env = { ...cliPathEnvironment(cli), ...command.env(cli), ...environment };
@@ -740,6 +795,8 @@ export class ProviderAccounts {
             timeoutMs: command.timeoutMs,
             logoutOnly: true,
             signOutMethod: command.acpLogout === true ? undefined : command.acpLogout,
+            // The Windows Gemini server unpacks into the temporary folder at each start (`antigravityTemp`).
+            privateTemp,
           });
           // A refused ACP sign-out has a safe message, which the account flow shows as the reason.
           return yield* logout.done.pipe(

@@ -362,6 +362,24 @@ export class ConversationQueries {
     return row ? this.#conversationRowsBefore(threadId, conversationRowCursor(row), options).count : 0;
   }
 
+  /** Whether the reader can see a message after a message of the thread. False when the thread does not hold it. */
+  conversationHasAfter(threadId: string, messageId: string, options: ConversationMarkerExclusions = {}): boolean {
+    const row = this.#messageOrderRow(threadId, messageId);
+    if (!row) return false;
+    const next = databaseRow(
+      this.#core.connection
+        .prepare(
+          `${ORDERED_THREAD_MESSAGES}
+           SELECT 1 AS found FROM ordered
+           WHERE (${ORDER_KEY_COLUMNS}) > (?, ?, ?, ?, ?, ?, ?)
+           ${conversationMarkerSqlFilter(options)}
+           LIMIT 1`,
+        )
+        .get(threadId, ...pageKeyValues(conversationRowCursor(row))),
+    );
+    return next !== null;
+  }
+
   #messageOrderRow(threadId: string, messageId: string): DynamicRecord | null {
     return databaseRow(
       this.#core.connection

@@ -8,6 +8,8 @@ export const messages = {
   "status.agent.modelSwitchedForLimit": "تم بلوغ حد الاستخدام. تم التبديل إلى {model}.",
   "status.agent.modelReturnedAfterLimit": "انتهى حد الاستخدام. تمت العودة إلى {model}.",
   "status.agent.modelSwitchedForError": "خطأ في المزوّد. تم التبديل إلى {model}.",
+  "status.agent.modelSwitchedForSpentBalance":
+    "لم يتبق رصيد في {previous}. تم التبديل إلى {model}. لاستخدامه مرة أخرى، أضف رصيدًا ثم اختره.",
   "status.agent.modelReturnedAfterError": "تمت العودة إلى {model} بعد خطأ المزوّد.",
   "status.agent.marketplaceSuggested": "اقترح تطبيقًا من المتجر: {app}.",
   "status.agent.channelMemberAdded": "أضاف {agent} العضو {member} إلى القناة. بطلب من {person}.",
@@ -28,6 +30,8 @@ export const messages = {
     "تعبئة البطاقة المحفوظة {card} في {site}. بعد موافقتك، يمكن للوكلاء تعبئة هذه البطاقة في هذا الموقع دون موافقة. أزل الموقع من إعدادات الخادم > الخزنة.",
   "status.agent.reportProblem": "سيصبح هذا مشكلة عامة على GitHub، مع إصدار التطبيق ونظامك. لا يظهر اسمك.",
   "status.agent.sendIdea": "يصبح هذا مشكلة عامة على GitHub. لا يظهر اسمك.",
+  "status.agent.feedbackRecentErrors": "الأخطاء الأخيرة في المحادثة:",
+  "status.agent.feedbackSameAs": "يُضاف إلى المشكلة #{issue}",
   "status.agent.feedbackSent": "أُرسل إلى فريق OpenBot: {title}",
   "status.agent.serverInstallCommand":
     "إنشاء أمر لمرة واحدة يثبّت OpenBot على كمبيوتر آخر كالخادم {name} ويسجّل دخوله إلى حسابك. يشغّله الوكيل هناك.",

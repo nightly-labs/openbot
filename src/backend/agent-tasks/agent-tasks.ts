@@ -58,6 +58,8 @@ export interface AgentTasksHooks {
   emit(event: AgentEvent): void;
   /** The agent, for its provider and its task limit. */
   agent(agentId: string): AgentSummary | undefined;
+  /** The task limit of an agent that has no limit of its own on this host. */
+  defaultTaskLimit(): number;
   /** Why the drain holds the next message of this task, as the drain names it, or null. Read late. */
   hold(agentId: string, taskId: string): string | null;
   /** A message is queued in a task: the queue and the drain take it. */
@@ -135,7 +137,7 @@ export class AgentTasks implements TaskLanes {
 
   limit(agentId: string): number {
     const agent = this.#hooks.agent(agentId);
-    return agent ? agentTaskLimit(agent) : 1;
+    return agent ? agentTaskLimit(agent, this.#hooks.defaultTaskLimit()) : 1;
   }
 
   /** Whether the agent's provider runs one turn at a time, across its own chat and its tasks. */
@@ -647,10 +649,16 @@ export class AgentTasks implements TaskLanes {
         const waiters = this.#turnEndWaiters.get(task.taskId);
         this.#turnEndWaiters.delete(task.taskId);
         for (const ended of waiters ?? []) Deferred.doneUnsafe(ended, Effect.void);
-        // A routine run in the agent's chat notified. In its own thread it notifies the same way, but
-        // through its own event, so the agent's chat keeps its turn state.
-        if (task.routineId !== null && !event.quiet && !event.continues)
-          this.#hooks.emit({ type: "routine-thread-turn-completed", taskId: task.taskId, turn: event });
+        // A turn in the agent's chat notifies. In a side thread it notifies through its own event, so
+        // the agent's chat keeps its turn state. A routine run in its own thread notifies as it did in
+        // the agent's chat; the listeners read `routine` to keep that apart from the other threads.
+        if (!event.quiet && !event.continues)
+          this.#hooks.emit({
+            type: "thread-turn-completed",
+            taskId: task.taskId,
+            routine: task.routineId !== null,
+            turn: event,
+          });
         return true;
       }
       case "queue-changed":

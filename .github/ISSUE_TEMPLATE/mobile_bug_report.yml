@@ -1,0 +1,176 @@
+name: Mobile app bug report
+description: Report a problem in the OpenBot app for iPhone or Android.
+title: "[Mobile]: "
+labels: [bug, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug in the mobile app. Complete all required fields. We close reports that do not have the app version.
+
+        **For a connection or network problem, attach the support log from Settings → Support → "Save log file". We will most probably close a connection or network report that does not have this log.**
+
+        Do not include credentials, private files, conversation contents, or unreviewed logs. Report vulnerabilities through the private security process.
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - iOS
+        - Android
+    validations:
+      required: true
+
+  - type: input
+    id: app-version
+    attributes:
+      label: Mobile app version
+      description: "Open Settings → About and copy the full line below the OpenBot name: the version, the build number in parentheses, and the update ID when it shows."
+      placeholder: 1.4.0 (212) · a1b2c3d4
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install-source
+    attributes:
+      label: Installation source
+      options:
+        - App Store
+        - TestFlight
+        - Google Play
+        - APK from openbot.run
+        - Built from source
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Device and system version
+      placeholder: iPhone 16 Plus, iOS 27.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Connection or network (cannot connect, disconnects, pairing)
+        - Sign-in and account
+        - Conversations and messages
+        - Agents and providers
+        - Channels
+        - Routines and schedules
+        - Notifications
+        - Voice
+        - Files and attachments
+        - Settings
+        - App updates and installation
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: server-version
+    attributes:
+      label: Server version
+      description: The OpenBot version of the computer or server that the phone connects to. On the desktop, see Settings → Updates. Write "unknown" when you cannot find it.
+      placeholder: 0.42.0
+
+  - type: dropdown
+    id: server-kind
+    attributes:
+      label: Server type
+      options:
+        - Desktop app on my computer
+        - Self-hosted server
+        - Hosted server
+        - Another member's computer
+        - Not related to a server
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - Crash or the app does not start
+        - Data loss
+        - Blocked, with no workaround
+        - Works, but incorrectly or slowly
+        - Visual or text problem
+    validations:
+      required: true
+
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: Frequency
+      options:
+        - Every time
+        - Sometimes
+        - One time only
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A short summary of the problem.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Give each action and its exact values.
+      placeholder: |
+        1. Open ...
+        2. Tap ...
+        3. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+      description: Include the exact error text that the app shows.
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Support log
+      description: Open Settings → Support → "Save log file", and attach the file or paste the relevant lines. Remove tokens, email addresses, and private paths. For a connection or network problem, this log is necessary. We will most probably close a connection or network report that does not have it.
+      render: shell
+
+  - type: textarea
+    id: media
+    attributes:
+      label: Screenshots or recording
+      description: Drag files here. Hide private data first.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched the existing issues, and this is not a duplicate.
+          required: true
+        - label: I removed secrets, tokens, private paths, and personal data.
+          required: true
+        - label: This is not a vulnerability report.
+          required: true

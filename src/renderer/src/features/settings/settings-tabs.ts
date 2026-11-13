@@ -2,7 +2,6 @@ import type { AppInfo } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Bell,
-  Bot,
   CircleArrowDown,
   CreditCard,
   Mic,
@@ -17,7 +16,6 @@ import {
 
 export type SettingsTab =
   | "general"
-  | "agents"
   | "notifications"
   | "voice"
   | "dynamic-island"
@@ -67,10 +65,13 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
     rows: [
       { titleKey: "settings.language.title", descriptionKey: "settings.language.description" },
       { titleKey: "settings.interfaceSize.title", descriptionKey: "settings.interfaceSize.description" },
+      { titleKey: "settings.interfaceFont.title", descriptionKey: "settings.interfaceFont.description" },
+      { titleKey: "settings.codeFont.title", descriptionKey: "settings.codeFont.description" },
       { titleKey: "settings.logoColor.title", descriptionKey: "settings.logoColor.description" },
       { titleKey: "settings.chatColor.title", descriptionKey: "settings.chatColor.description" },
       { titleKey: "settings.chatBackground.title", descriptionKey: "settings.chatBackground.description" },
       { titleKey: "settings.sendShortcut.title", descriptionKey: "settings.sendShortcut.description" },
+      { titleKey: "sidebar.order.title", descriptionKey: "settings.chatOrder.description" },
       { titleKey: "settings.showAgentSteps.title", descriptionKey: "settings.showAgentSteps.description" },
       {
         titleKey: "settings.compactMessageActions.title",
@@ -86,19 +87,6 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
       { titleKey: "settings.restoreWorkspace.title", descriptionKey: "settings.restoreWorkspace.description" },
       { titleKey: "settings.quitGuard.title", descriptionKey: "settings.quitGuard.description", macOS: true },
       { titleKey: "settings.analytics.title", descriptionKey: "settings.analytics.description" },
-    ],
-  },
-  {
-    value: "agents",
-    titleKey: "settings.tab.agents.title",
-    descriptionKey: "settings.tab.agents.description",
-    icon: Bot,
-    rows: [
-      { titleKey: "agentSettings.automation.title" },
-      { titleKey: "agentSettings.agentNewChat.title" },
-      { titleKey: "agentSettings.quickAcknowledgement.title" },
-      { titleKey: "settings.busyMessage.title", descriptionKey: "settings.busyMessage.description" },
-      { titleKey: "settings.backgroundProcesses.title", descriptionKey: "settings.backgroundProcesses.description" },
     ],
   },
   {
@@ -173,6 +161,7 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
       { titleKey: "settings.agentDock.show.title", descriptionKey: "settings.agentDock.show.description" },
       { titleKey: "settings.agentDock.placement.title", descriptionKey: "settings.agentDock.placement.description" },
       { titleKey: "settings.agentDock.display.title", descriptionKey: "settings.agentDock.display.description" },
+      { titleKey: "settings.agentDock.size.title", descriptionKey: "settings.agentDock.size.description" },
       { titleKey: "settings.agentDock.agents.title" },
     ],
   },

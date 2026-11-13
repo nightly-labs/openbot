@@ -150,8 +150,6 @@ export const messages = {
   "agentSettings.runtime.accessLabel": "Accesso dell'agente",
   "agentSettings.runtime.busyMessage": "Durante il lavoro",
   "agentSettings.runtime.busyMessageLabel": "Messaggi mentre l'agente lavora",
-  "agentSettings.runtime.taskLimit": "Thread in parallelo",
-  "agentSettings.runtime.taskLimitLabel": "Thread eseguiti contemporaneamente",
   "agentSettings.runtime.workingDirectory": "Cartella di lavoro",
   "agentSettings.runtime.notAvailable": "Non ancora disponibile",
   "agentSettings.runtime.fullAccessNote":
@@ -171,9 +169,6 @@ export const messages = {
   "agentSettings.busyMessage.steer": "Indirizza",
   "agentSettings.busyMessage.steerUnsupported":
     "{provider} non può indirizzare un turno in corso. I messaggi inviati mentre lavora restano in coda.",
-  "agentSettings.taskLimit.default": "Predefinito ({count})",
-  "agentSettings.taskLimit.oneTurn":
-    "{provider} esegue un turno alla volta. I thread di questo agente si aspettano a vicenda.",
 
   "agentSettings.notificationLevel.title": "Avvisami",
   "agentSettings.notificationLevel.server": "Predefinita del server ({level})",

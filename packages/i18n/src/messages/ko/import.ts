@@ -34,8 +34,13 @@ export const messages = {
   "import.guide.hermesTitle": "Hermes Agent에서 에이전트 가져오기",
   "import.guide.hermesLede":
     "Hermes 프로필마다 에이전트가 하나씩 만들어져요. 이 컴퓨터의 프로필을 읽거나, Hermes의 내보내기 스킬로 .zip 파일 하나에 묶을 수 있어요.",
+  "import.guide.hermesLedeServer":
+    "Hermes 프로필마다 에이전트가 하나씩 만들어져요. 서버의 프로필을 읽거나, Hermes의 내보내기 스킬로 .zip 파일 하나에 묶을 수 있어요.",
+  "import.guide.hermesLedeExport":
+    "Hermes 프로필마다 에이전트가 하나씩 만들어져요. Hermes의 내보내기 스킬이 프로필을 .zip 파일 하나로 묶어요.",
   "import.guide.hermesSetupLabel": "프로필 가져오는 방법",
   "import.guide.setupFolder": "이 컴퓨터에서 읽기",
+  "import.guide.setupServer": "서버에서 읽기",
   "import.guide.setupCommand": "명령으로 설치",
   "import.guide.hermesStepFolder": "Hermes 폴더 읽기",
   "import.guide.hermesStep1": "Hermes에 내보내기 스킬 추가",
@@ -87,7 +92,10 @@ export const messages = {
   "import.result.warnings": "일부 항목은 옮겨지지 않았어요",
   "import.source.title": "에이전트가 지금 어디에 있나요?",
   "import.source.lede": "OpenBot이 이 컴퓨터로 복사해요. 변경하기 전에 모든 항목을 확인할 수 있어요.",
+  "import.source.ledeServer": "OpenBot이 서버로 복사해요. 변경하기 전에 모든 항목을 확인할 수 있어요.",
   "import.source.hermesNote": "이 컴퓨터의 Hermes 폴더를 읽거나 Hermes에서 .zip 파일을 내보내세요.",
+  "import.source.hermesNoteServer": "서버의 Hermes 폴더를 읽거나 Hermes에서 .zip 파일을 내보내세요.",
+  "import.source.hermesNoteExport": "Hermes에서 .zip 파일을 내보내세요.",
   "import.source.grokNote": "클라우드에 있어요. 그곳의 내보내기 에이전트가 .zip 파일을 만들어요.",
   "import.source.transfer": "다른 OpenBot 컴퓨터",
   "import.source.transferNote": "에이전트와 설정을 함께 옮기려면 전송을 사용하세요.",
@@ -96,6 +104,9 @@ export const messages = {
   "import.hermes.notFound": "이 컴퓨터에 Hermes 프로필이 없어요",
   "import.hermes.notFoundNote":
     "Hermes가 다른 폴더(예: HERMES_HOME으로 지정한 폴더)를 사용한다면 그 폴더를 선택하세요.",
+  "import.hermes.notFoundServer": "이 서버에 Hermes 프로필이 없어요",
+  "import.hermes.notFoundServerNote":
+    "OpenBot은 서버의 Hermes 폴더를 읽어요. 이 컴퓨터의 Hermes를 가져오려면 Hermes에서 .zip 파일을 내보내세요.",
   "import.hermes.chooseFolder": "Hermes 폴더 선택",
   "import.hermes.chooseAnother": "다른 폴더 선택",
   "import.hermes.title": "Hermes Agent의 에이전트",

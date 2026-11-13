@@ -51,7 +51,7 @@ const CREDENTIAL_ASSIGNMENT = new RegExp(
 // value must be one long alphanumeric run, as the vendors issue them. `ASIA` is a word, so only the
 // exact shape of an AWS key ID counts.
 const KNOWN_SECRET_PREFIXES =
-  /(?<![A-Za-z0-9_-])(?:(?:sk-ant|sk-|sk_|xai-|ghp_|gho_|ghu_|ghr_|ghs_|github_pat_|AKIA|xox[abeoprs]-|xapp-|glpat-|rk_live_|whsec_)[A-Za-z0-9._-]{8,}|AIza[A-Za-z0-9_-]{30,}|(?:npm|hf|gsk)_[A-Za-z0-9]{30,}|ASIA[A-Z0-9]{16}(?![A-Za-z0-9]))/g;
+  /(?<![A-Za-z0-9_-])(?:(?:sk-ant|sk-|sk_|xai-|ghp_|gho_|ghu_|ghr_|ghs_|github_pat_|AKIA|xox[abeoprs]-|xapp-|glpat-|rk_live_)[A-Za-z0-9._-]{8,}|whsec_[A-Za-z0-9+/=._-]{8,}|AIza[A-Za-z0-9_-]{30,}|(?:npm|hf|gsk)_[A-Za-z0-9]{30,}|ASIA[A-Z0-9]{16}(?![A-Za-z0-9]))/g;
 // A JSON Web Token: a header and a payload that both start as a JSON object, then the signature.
 const JSON_WEB_TOKEN = /(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]*/g;
 // A PEM private key, with its body. A key that the text cuts off before its END line is removed to
@@ -248,8 +248,8 @@ const UNSCANNED = "[redacted-unscanned]";
  *
  * A provider writes `ERROR request failed: {"headers":{"X-Tenant":"…"}}` on one stderr line, so the
  * text does not parse as JSON and the key rules above never see the header. Every balanced `{…}` or
- * `[…]` run that does parse is replaced by its redacted form, which gives an embedded payload the
- * same treatment as a structured param: `headers` values go, secret-named keys go, prose stays.
+ * `[…]` run that does parse gets the same treatment as a structured param: `headers` values go,
+ * secret-named keys go, prose stays. A run that no rule changes stays as it was written.
  */
 function redactEmbeddedJson(value: string, emails: boolean): string {
   let result = "";
@@ -282,8 +282,12 @@ function redactEmbeddedJson(value: string, emails: boolean): string {
         index = end;
         continue;
       }
-      result += value.slice(index, start + 1);
-      index = start + 1;
+      // No quote follows the opening brackets, so none of them opens a record. They are passed at once,
+      // so `{{name}}` costs one scan against the bound and not two.
+      let next = start + 1;
+      while (value[next] === "{" || value[next] === "[") next += 1;
+      result += value.slice(index, next);
+      index = next;
       continue;
     }
     result += value.slice(index, start) + parsed;
@@ -292,12 +296,58 @@ function redactEmbeddedJson(value: string, emails: boolean): string {
   return result + value.slice(index);
 }
 
+/**
+ * The redacted form of a JSON payload, or the payload as written when no rule changed it.
+ *
+ * Writing an unchanged payload again is not neutral: `JSON.parse` rounds an integer past 2^53, so a
+ * 19-digit ID in a skill example reached the agent with other digits, and the spacing went too
+ * (#7760). The original is kept only when the parse lost no key: with a key written twice, the parse
+ * keeps the last value, and the first could hold a secret that no rule then read.
+ */
 function parseRedacted(candidate: string, emails: boolean): string | null {
   try {
-    return JSON.stringify(convertValue(JSON.parse(candidate), new Set<object>(), emails)) ?? null;
+    const parsed = JSON.parse(candidate);
+    const converted = convertValue(parsed, new Set<object>(), emails);
+    if (unchangedKeyCount(parsed, converted) === writtenKeyCount(candidate)) return candidate;
+    return JSON.stringify(converted) ?? null;
   } catch {
     return null;
   }
+}
+
+/**
+ * The keys of a parsed payload when its redacted form is the same value, or -1 when a rule changed it.
+ * The redacted form ends in "[too deep]" at the conversion depth bound, so the walk stops there too.
+ */
+function unchangedKeyCount(parsed: unknown, converted: unknown): number {
+  if (parsed === null || typeof parsed !== "object") return parsed === converted ? 0 : -1;
+  if (converted === null || typeof converted !== "object" || Array.isArray(parsed) !== Array.isArray(converted))
+    return -1;
+  const entries = Object.entries(parsed);
+  const convertedEntries = Object.entries(converted);
+  if (entries.length !== convertedEntries.length) return -1;
+  let count = Array.isArray(parsed) ? 0 : entries.length;
+  for (const [index, [key, value]] of entries.entries()) {
+    const [convertedKey, convertedValue] = convertedEntries[index] ?? [];
+    const inner = key === convertedKey ? unchangedKeyCount(value, convertedValue) : -1;
+    if (inner < 0) return -1;
+    count += inner;
+  }
+  return count;
+}
+
+/** The keys a JSON text writes: each string that a `:` follows. */
+function writtenKeyCount(text: string) {
+  let count = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    if (text[index] !== '"') continue;
+    index += 1;
+    while (index < text.length && text[index] !== '"') index += text[index] === "\\" ? 2 : 1;
+    let next = index + 1;
+    while (text[next] === " " || text[next] === "\t" || text[next] === "\n" || text[next] === "\r") next += 1;
+    if (text[next] === ":") count += 1;
+  }
+  return count;
 }
 
 /**
@@ -306,12 +356,16 @@ function parseRedacted(candidate: string, emails: boolean): string | null {
  * `{ and the run never closes` is a sentence; `{"headers":…` is a record. Only the second is worth
  * dropping when it does not close, because prose loses nothing by staying and a record can hold a
  * credential under a header name no rule can predict.
+ *
+ * Only an object key names what is under it, and a serializer opens an object with a quoted key, so
+ * the first character after the opening brackets must be a quote. A template placeholder such as
+ * `{{name}}` or a link such as `[[Page]]` has none, and an agent's text keeps it as written (#6437).
  */
 function startsLikeJson(value: string, start: number): boolean {
   for (let index = start + 1; index < value.length; index += 1) {
     const char = value[index];
-    if (char === " " || char === "\t" || char === "\n" || char === "\r") continue;
-    return char === '"' || char === "{" || char === "[";
+    if (char === " " || char === "\t" || char === "\n" || char === "\r" || char === "{" || char === "[") continue;
+    return char === '"';
   }
   return false;
 }
@@ -364,14 +418,10 @@ function redactSerializedJson(value: string, emails: boolean): string | null {
   // truncation that follows keeps only the first characters - which would be
   // the unredacted ones.
   if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return null;
-  try {
-    return JSON.stringify(convertValue(JSON.parse(trimmed), new Set<object>(), emails)) ?? null;
-  } catch {
-    // Neither a parse failure nor a conversion failure may become the failure
-    // the caller was trying to report: fall back to the regex rules, which
-    // scan the text without recursing.
-    return null;
-  }
+  // Neither a parse failure nor a conversion failure may become the failure
+  // the caller was trying to report: `null` falls back to the regex rules,
+  // which scan the text without recursing.
+  return parseRedacted(trimmed, emails);
 }
 
 // The `typeof` checks below narrow caller-provided unions rather than

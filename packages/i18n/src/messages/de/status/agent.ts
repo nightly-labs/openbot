@@ -9,6 +9,8 @@ export const messages = {
   "status.agent.modelSwitchedForLimit": "Nutzungslimit erreicht. Zu {model} gewechselt.",
   "status.agent.modelReturnedAfterLimit": "Nutzungslimit beendet. Zurück zu {model} gewechselt.",
   "status.agent.modelSwitchedForError": "Anbieterfehler. Zu {model} gewechselt.",
+  "status.agent.modelSwitchedForSpentBalance":
+    "{previous} hat kein Guthaben mehr. Zu {model} gewechselt. Um es wieder zu nutzen, lade Guthaben auf und wähle es dann aus.",
   "status.agent.modelReturnedAfterError": "Nach dem Anbieterfehler zurück zu {model} gewechselt.",
   "status.agent.marketplaceSuggested": "Eine Marketplace-App wurde vorgeschlagen: {app}.",
   "status.agent.channelMemberAdded": "{agent} hat {member} zum Kanal hinzugefügt. {person} hat darum gebeten.",
@@ -30,6 +32,8 @@ export const messages = {
   "status.agent.reportProblem":
     "Daraus wird ein öffentliches GitHub-Issue mit der App-Version und deinem System. Dein Name wird nicht angezeigt.",
   "status.agent.sendIdea": "Daraus wird ein öffentliches GitHub-Issue. Dein Name wird nicht angezeigt.",
+  "status.agent.feedbackRecentErrors": "Letzte Fehler im Chat:",
+  "status.agent.feedbackSameAs": "Wird zu Issue #{issue} hinzugefügt",
   "status.agent.feedbackSent": "An das OpenBot-Team gesendet: {title}",
   "status.agent.serverInstallCommand":
     "Einen einmaligen Befehl erstellen, der OpenBot auf einem anderen Computer als Server {name} installiert und bei deinem Konto anmeldet. Der Agent führt ihn dort aus.",

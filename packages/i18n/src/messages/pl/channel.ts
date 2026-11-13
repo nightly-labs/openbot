@@ -24,6 +24,9 @@ export const messages = {
   "channel.settings.isolated": "Zachowaj wspomnienia w tym kanale",
   "channel.settings.isolatedDescription":
     "Agenci zapisują to, czego się tu nauczą, jako wspomnienia kanału. Ich inne czaty ich nie widzą.",
+  "channel.settings.browser": "Przeglądarka",
+  "channel.settings.browserEveryone": "Każdy członek",
+  "channel.settings.browserNone": "Nikt",
   "channel.settings.memoryCount": {
     one: "{count} zapisane",
     few: "{count} zapisane",

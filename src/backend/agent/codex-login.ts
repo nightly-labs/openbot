@@ -8,9 +8,10 @@ import { causeHelpers } from "../effect-boundary";
 import {
   type AccountLoginCompletedResult,
   type AccountReadResult,
+  CODEX_MODEL_PROVIDER_ACCOUNT_TYPE,
   decodeAccountDeviceCodeLoginStartResult,
   decodeAccountLoginStartResult,
-  decodeAccountReadResult,
+  decodeCodexAccountReadResult,
   decodeRecordResponse,
   isCodexLoginType,
 } from "./../protocol";
@@ -33,6 +34,8 @@ interface PendingCodexLogin {
 /** What the ChatGPT sign-in needs from the provider runtime that owns the Codex status and client. */
 export interface CodexLoginHost {
   bundledExecutable(): string | null | undefined;
+  /** True when the user chose their own Codex CLI, also over a newer copy (`chooseInstalledCli`). */
+  installedChosen(): boolean;
   /** A new Codex client, bound to the runtime's events but not started. */
   createClient(cli: CodexCliInfo): AgentClient;
   /** True when this client, or any client when none is given, is the active Codex client. */
@@ -141,7 +144,12 @@ export class CodexLoginFlow {
    */
   readonly saveApiKey = Effect.fn("CodexLogin.saveApiKey")(function* (this: CodexLoginFlow, apiKey: string) {
     const bundledExecutable = this.#host.bundledExecutable();
-    const cli = yield* resolveInstalledFirst(resolveCodexCli, bundledExecutable, true).pipe(toCodexLoginFailed);
+    const cli = yield* resolveInstalledFirst(
+      resolveCodexCli,
+      bundledExecutable,
+      true,
+      this.#host.installedChosen(),
+    ).pipe(toCodexLoginFailed);
     yield* Effect.acquireUseRelease(
       loginStep(() => this.#host.createClient(cli)),
       (client) =>
@@ -151,11 +159,15 @@ export class CodexLoginFlow {
             .request("account/login/start", { type: "apiKey", apiKey }, decodeRecordResponse)
             .pipe(toCodexLoginFailed);
           const { account } = yield* client
-            .request("account/read", { refreshToken: false }, decodeAccountReadResult)
+            .request("account/read", { refreshToken: false }, decodeCodexAccountReadResult)
             .pipe(toCodexLoginFailed);
           if (account?.type !== "apiKey") {
             return yield* new CodexLoginFailed({
-              cause: new Error(sourceText("error.provider.noAuthenticatedAccount", { provider: "ChatGPT" })),
+              cause: new Error(
+                account?.type === CODEX_MODEL_PROVIDER_ACCOUNT_TYPE
+                  ? sourceText("error.provider.codexModelProvider")
+                  : sourceText("error.provider.noAuthenticatedAccount", { provider: "ChatGPT" }),
+              ),
             });
           }
         }),
@@ -188,8 +200,15 @@ export class CodexLoginFlow {
 
     yield* Effect.gen({ self: this }, function* () {
       const account = yield* pending.client
-        .request("account/read", { refreshToken: true }, decodeAccountReadResult)
+        .request("account/read", { refreshToken: true }, decodeCodexAccountReadResult)
         .pipe(toCodexLoginFailed);
+      // Codex kept the login, but its model provider does not use it.
+      if (account.account?.type === CODEX_MODEL_PROVIDER_ACCOUNT_TYPE) {
+        return yield* this.#fail(
+          pending,
+          new ProviderSignInError({ message: sourceText("error.provider.codexModelProvider") }),
+        );
+      }
       if (account.account?.type !== "chatgpt") {
         return yield* new CodexLoginFailed({
           cause: new Error(sourceText("error.provider.noAuthenticatedAccount", { provider: "ChatGPT" })),
@@ -255,7 +274,7 @@ export class CodexLoginFlow {
     const activated = yield* Effect.result(
       Effect.gen({ self: this }, function* () {
         const result = yield* pending.client
-          .request("account/read", { refreshToken: true }, decodeAccountReadResult)
+          .request("account/read", { refreshToken: true }, decodeCodexAccountReadResult)
           .pipe(toCodexLoginFailed);
         const account = result.account;
         if (account?.type !== "chatgpt") return false;
@@ -289,8 +308,13 @@ export class CodexLoginFlow {
     this.#host.setConnecting();
     return yield* Effect.gen({ self: this }, function* () {
       const bundledExecutable = this.#host.bundledExecutable();
-      // The CLI that the provider runs: the user's when it is as new as OpenBot's copy.
-      const resolved = yield* resolveInstalledFirst(resolveCodexCli, bundledExecutable, true).pipe(toCodexLoginFailed);
+      // The CLI that the provider runs: the user's when it is as new as OpenBot's copy, or chosen.
+      const resolved = yield* resolveInstalledFirst(
+        resolveCodexCli,
+        bundledExecutable,
+        true,
+        this.#host.installedChosen(),
+      ).pipe(toCodexLoginFailed);
       cli = resolved;
       return yield* Effect.acquireUseRelease(
         loginStep(() => this.#host.createClient(resolved)),
@@ -299,7 +323,7 @@ export class CodexLoginFlow {
             yield* initializeLoginClient(client);
             if (!this.#host.hasActiveClient()) {
               const existing = yield* client
-                .request("account/read", { refreshToken: false }, decodeAccountReadResult)
+                .request("account/read", { refreshToken: false }, decodeCodexAccountReadResult)
                 .pipe(
                   toCodexLoginFailed,
                   // An expired sign-in fails this check too, such as "workspace routing discovery

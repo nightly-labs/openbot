@@ -62,6 +62,8 @@ export interface GitHubMcpProxyOptions {
   botToken: (owner: string, name: string) => string | null;
   /** Whether the user token can read `owner/name`, or null when that is not known. */
   canRead: (owner: string, name: string, signal: AbortSignal) => Effect.Effect<boolean | null>;
+  /** GitHub refused `token` with HTTP 401. */
+  refused: (token: string) => Effect.Effect<void>;
 }
 
 interface Upstream {
@@ -300,6 +302,7 @@ export class GitHubMcpProxy {
       Effect.catch((failure) =>
         Effect.gen({ self: this }, function* () {
           const error = failure.cause;
+          if (isRefused(error)) yield* this.#options.refused(token);
           if (!(error instanceof StreamableHTTPError && error.code === 404)) return yield* failure;
           yield* this.#drop(token, client);
           const replacement = yield* this.#upstream(token);
@@ -323,7 +326,14 @@ export class GitHubMcpProxy {
       this.#upstreams.set(token, upstream);
     }
     const current = upstream;
-    yield* current.ready.pipe(Effect.tapError(() => this.#drop(token, current.client)));
+    yield* current.ready.pipe(
+      Effect.tapError((failure) =>
+        Effect.andThen(
+          this.#drop(token, current.client),
+          isRefused(failure.cause) ? this.#options.refused(token) : Effect.void,
+        ),
+      ),
+    );
     return current.client;
   });
 
@@ -342,6 +352,11 @@ export class GitHubMcpProxy {
     const secret = Buffer.from(this.#options.secret());
     return candidate.length === secret.length && timingSafeEqual(candidate, secret);
   }
+}
+
+/** GitHub's answer to a token that is not valid, for example after the user revoked the app on GitHub. */
+function isRefused(error: unknown): boolean {
+  return error instanceof StreamableHTTPError && error.code === 401;
 }
 
 /** Explains a refusal that the app's permissions cause, because GitHub's own text does not say what to do. */

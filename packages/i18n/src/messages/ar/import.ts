@@ -75,8 +75,13 @@ export const messages = {
   "import.guide.hermesTitle": "انقل وكلاءك من Hermes Agent",
   "import.guide.hermesLede":
     "يصبح كل ملف تعريف في Hermes وكيلًا. اقرأ ملفات التعريف على هذا الحاسوب، أو دع مهارة التصدير في Hermes تجمعها في ملف .zip واحد.",
+  "import.guide.hermesLedeServer":
+    "يصبح كل ملف تعريف في Hermes وكيلًا. اقرأ ملفات التعريف على الخادم، أو دع مهارة التصدير في Hermes تجمعها في ملف .zip واحد.",
+  "import.guide.hermesLedeExport":
+    "يصبح كل ملف تعريف في Hermes وكيلًا. تحزمها مهارة التصدير في Hermes في ملف .zip واحد.",
   "import.guide.hermesSetupLabel": "كيفية جلب ملفات التعريف",
   "import.guide.setupFolder": "قراءة هذا الحاسوب",
+  "import.guide.setupServer": "قراءة الخادم",
   "import.guide.setupCommand": "التثبيت بأمر",
   "import.guide.hermesStepFolder": "اقرأ مجلد Hermes",
   "import.guide.hermesStep1": "أضف مهارة التصدير إلى Hermes",
@@ -134,7 +139,10 @@ export const messages = {
   "import.result.warnings": "لم تُنقل بعض العناصر",
   "import.source.title": "أين وكلاؤك الآن؟",
   "import.source.lede": "ينسخها OpenBot إلى هذا الحاسوب. ترى كل عنصر قبل أن يتغيّر أي شيء.",
+  "import.source.ledeServer": "ينسخها OpenBot إلى الخادم. ترى كل عنصر قبل أن يتغيّر أي شيء.",
   "import.source.hermesNote": "اقرأ مجلد Hermes على هذا الحاسوب، أو صدّر ملف .zip من Hermes.",
+  "import.source.hermesNoteServer": "اقرأ مجلد Hermes على الخادم، أو صدّر ملف .zip من Hermes.",
+  "import.source.hermesNoteExport": "صدّر ملف .zip من Hermes.",
   "import.source.grokNote": "في السحابة. يُنشئ وكيل تصدير هناك ملف .zip.",
   "import.source.transfer": "حاسوب OpenBot آخر",
   "import.source.transferNote": "استخدم «النقل» لنقل الوكلاء والإعدادات معًا.",
@@ -142,6 +150,9 @@ export const messages = {
   "import.hermes.readFailed": "تعذّرت قراءة مجلد Hermes",
   "import.hermes.notFound": "لا ملفات تعريف Hermes على هذا الحاسوب",
   "import.hermes.notFoundNote": "إذا كان Hermes يستخدم مجلدًا آخر، مثل مجلد يحدده HERMES_HOME، فاختر ذلك المجلد.",
+  "import.hermes.notFoundServer": "لا ملفات تعريف Hermes على هذا الخادم",
+  "import.hermes.notFoundServerNote":
+    "يقرأ OpenBot مجلد Hermes على الخادم. لاستيراد Hermes من هذا الحاسوب، صدّر ملف .zip من Hermes.",
   "import.hermes.chooseFolder": "اختيار مجلد Hermes",
   "import.hermes.chooseAnother": "اختيار مجلد آخر",
   "import.hermes.title": "وكلاء من Hermes Agent",

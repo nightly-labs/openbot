@@ -36,9 +36,19 @@ export function customProvidersOn(source: CustomProviderSource, harness: CustomP
   return () => source().filter((provider) => (provider.harness ?? "opencode") === harness);
 }
 
+/**
+ * How long a custom endpoint may send nothing before its turn fails. A local model can read a long
+ * prompt for more than OpenCode's 5 minutes before its first token, and more so while the computer
+ * does other work (#3823, #7330). Two limits get this value: OpenCode's wait for the response
+ * headers (`headerTimeout`, 300,000 ms by default in OpenCode 2.2.7) and OpenBot's own stall limit.
+ */
+export const CUSTOM_ENDPOINT_SILENCE_MS = 30 * 60_000;
+
 /** The options block OpenCode hands to its bundled OpenAI-compatible, OpenAI or Anthropic adapter. */
 interface OpenCodeProviderOptions {
   readonly baseURL: string;
+  readonly headerTimeout: number;
+  readonly chunkTimeout: number;
   readonly apiKey?: string;
   readonly headers?: Readonly<Record<string, string>>;
 }
@@ -76,7 +86,7 @@ interface OpenCodeProviderEntry {
 }
 
 /**
- * The stored OpenCode Go key, under a built-in provider that `OPENCODE_API_KEY` also reaches.
+ * The stored OpenCode Go key, under the built-in `opencode-go` provider.
  *
  * OpenCode applies the key from its own `auth.json` (`opencode auth login`) after the environment
  * key, so an old key saved there replaced the key pasted into OpenBot, and a new key could not fix
@@ -134,8 +144,14 @@ export const OPENCODE_AGENT_CONFIG: OpenCodeConfigBase = {
 
 const OPENCODE_CONFIG_ENV = "OPENCODE_CONFIG_CONTENT";
 
-/** The built-in providers that read `OPENCODE_API_KEY`: OpenCode Go and the free tier. */
-const OPENCODE_KEY_PROVIDERS = ["opencode-go", "opencode"] as const;
+/**
+ * The built-in provider that gets the stored key: OpenCode Go. The free tier, `opencode`, gets no
+ * key. OpenCode gives that provider its anonymous free-tier key only while it has no key of its own,
+ * so a stored key there failed each free model with "provider authentication required" when OpenCode
+ * Zen refused it (#7550). Checked in OpenCode 2.2.5: with the key only here, a free model answered
+ * although the key was refused, and the Go models stayed in the catalog.
+ */
+const OPENCODE_GO_PROVIDER = "opencode-go";
 
 /** What a plain OpenCode user needs, now that the free models run without an account at all. */
 const OPENCODE_GO_ADVICE = "OpenCode listed no model. Add an OpenCode Go key to continue.";
@@ -188,6 +204,8 @@ function providerEntry(provider: CustomProviderConfig): OpenCodeProviderEntry {
     name: provider.name,
     options: {
       baseURL: anthropic ?? provider.baseUrl,
+      headerTimeout: CUSTOM_ENDPOINT_SILENCE_MS,
+      chunkTimeout: CUSTOM_ENDPOINT_SILENCE_MS,
       // An absent key and an empty key are different things to an HTTP client: an empty `apiKey`
       // would be sent as a blank Authorization header, which a keyless local endpoint may reject
       // outright. The spread keeps the key out of the object rather than setting it to undefined.
@@ -254,7 +272,7 @@ function mergeOpenCodeConfig(
   apiKey: string | null,
 ): OpenCodeConfig {
   const entries = {
-    ...(apiKey ? Object.fromEntries(OPENCODE_KEY_PROVIDERS.map((id) => [id, { options: { apiKey } }])) : {}),
+    ...(apiKey ? { [OPENCODE_GO_PROVIDER]: { options: { apiKey } } } : {}),
     ...customProviderEntries(providers),
   };
   return { ...base, agent: OPENCODE_TITLE_OFF, ...(Object.keys(entries).length > 0 ? { provider: entries } : {}) };

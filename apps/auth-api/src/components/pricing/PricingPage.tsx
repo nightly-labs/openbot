@@ -1,9 +1,11 @@
 import type { BillingPlanId } from "@openbot/contracts/billing";
 import { type LicenseTier, pricingOrderSearch } from "@openbot/contracts/license";
 import type { TranslatedLocale } from "@openbot/i18n";
+import { Checkbox } from "@openbot/ui/checkbox";
 import { OrderForm, type OrderFormOrder } from "@openbot/ui/features/billing/OrderForm";
 import { TextProvider, useText } from "@openbot/ui/text";
-import { type Accessor, createSignal, onSettled, Show } from "solid-js";
+import { Link } from "@tanstack/solid-router";
+import { type Accessor, createSignal, createUniqueId, onSettled, Show } from "solid-js";
 import { landingAnalytics } from "../../lib/analytics";
 import { PRICING_ROUTE, type PricingOffer } from "../../lib/pricing-page";
 import { LandingFooter } from "../landing/LandingFooter";
@@ -11,7 +13,7 @@ import { LandingGlow } from "../landing/LandingGlow";
 import { SiteHeader } from "../landing/SiteHeader";
 import { useSitePath } from "../landing/SiteText";
 import { ButtonLink } from "../ui/button";
-import type { PricingPageText } from "./pricing-page-text";
+import { CONSENT_POLICY_MARKER, CONSENT_TERMS_MARKER, type PricingPageText } from "./pricing-page-text";
 import "./PricingPage.css";
 
 /**
@@ -34,16 +36,71 @@ const LICENSE_RARITY_STEPS: Record<LicenseTier | "none", number> = { none: 0, st
 const FIRST_SERVER: BillingPlanId = "standard";
 const FIRST_LICENSE: LicenseTier = "team";
 
+/** Splits the consent sentence at the markers and keeps them, so each marker becomes its link. */
+const CONSENT_MARKERS = new RegExp(`(${CONSENT_POLICY_MARKER}|${CONSENT_TERMS_MARKER})`);
+
+/**
+ * The consent sentence with its two links. The markers in the sentence of each language show where the links go.
+ * The links open in a new tab, so the order stays as the buyer set it.
+ */
+function Consent(props: {
+  id: string;
+  text: PricingPageText["consent"];
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  const path = useSitePath();
+  const part = (piece: string) => {
+    if (piece === CONSENT_POLICY_MARKER) {
+      return (
+        <Link to={path("/privacy")} target="_blank" rel="noopener">
+          {props.text.policy}
+        </Link>
+      );
+    }
+    if (piece === CONSENT_TERMS_MARKER) {
+      return (
+        <Link to={path("/terms")} target="_blank" rel="noopener">
+          {props.text.terms}
+        </Link>
+      );
+    }
+    return piece;
+  };
+  const pieces = () => props.text.statement.split(CONSENT_MARKERS).filter((piece) => piece !== "");
+  return (
+    <div class="pricing-consent">
+      <Checkbox
+        id={props.id}
+        class="pricing-consent-box"
+        checked={props.checked}
+        onChange={(event) => props.onChange(event.currentTarget.checked)}
+      />
+      <label id={`${props.id}-label`} for={props.id} class="pricing-consent-label">
+        {pieces().map(part)}
+      </label>
+    </div>
+  );
+}
+
 /**
  * A full page load, as the header's App link. The web app reads `start` and the order after sign-in: an order with
  * a server opens the add server dialog, which sells the server and its license together, and a license alone opens
- * Billing. Each one fills in the order and goes on to Checkout, so the buyer does not choose again.
+ * Billing. Each one fills in the order and goes on to Checkout, so the buyer does not choose again. The buyer must
+ * accept the privacy policy, the terms and the right of withdrawal first: the button stays off until the box is ticked.
  */
-function OrderAction(props: { order: Accessor<OrderFormOrder> }) {
+function OrderAction(props: {
+  order: Accessor<OrderFormOrder>;
+  consent: PricingPageText["consent"];
+  accepted: Accessor<boolean>;
+  onAccept: (accepted: boolean) => void;
+}) {
   const { t } = useText();
+  const id = `pricing-consent-${createUniqueId()}`;
   const buying = () => props.order().server !== null || props.order().license !== null;
   const start = () => (props.order().server === null ? "license" : "server");
   const label = () => (props.order().server === null ? t("billing.order.cta.license") : t("billing.order.cta.server"));
+  const blocked = () => !props.accepted();
   const download = () => (
     <ButtonLink to="/download" variant="secondary" size="md" icon="download" class="pricing-cta">
       {t("billing.order.cta.download")}
@@ -51,17 +108,22 @@ function OrderAction(props: { order: Accessor<OrderFormOrder> }) {
   );
   return (
     <Show when={buying()} fallback={download()}>
-      <ButtonLink
-        to="/app"
-        search={{ start: start(), ...pricingOrderSearch(props.order()) }}
-        reloadDocument
-        variant="primary"
-        size="md"
-        icon="arrow-right"
-        class="pricing-cta"
-      >
-        {label()}
-      </ButtonLink>
+      <div class="pricing-consent-action">
+        <Consent id={id} text={props.consent} checked={props.accepted()} onChange={props.onAccept} />
+        <ButtonLink
+          to="/app"
+          search={{ start: start(), ...pricingOrderSearch(props.order()) }}
+          reloadDocument
+          variant="primary"
+          size="md"
+          icon="arrow-right"
+          class="pricing-cta"
+          disabled={blocked()}
+          aria-describedby={`${id}-label`}
+        >
+          {label()}
+        </ButtonLink>
+      </div>
     </Show>
   );
 }
@@ -87,6 +149,8 @@ export function PricingPage(props: {
     server: FIRST_SERVER,
     license: FIRST_LICENSE,
   });
+  // The tick stays when the buyer changes the order.
+  const [accepted, setAccepted] = createSignal(false);
 
   const path = useSitePath();
 
@@ -103,7 +167,9 @@ export function PricingPage(props: {
       <h1 id="pricing-title">{props.text.heading}</h1>
     </div>
   );
-  const action = (current: Accessor<OrderFormOrder>) => <OrderAction order={current} />;
+  const action = (current: Accessor<OrderFormOrder>) => (
+    <OrderAction order={current} consent={props.text.consent} accepted={accepted} onAccept={setAccepted} />
+  );
   const contact = () => <ContactAction />;
   const remember = (next: OrderFormOrder) => setOrder({ server: next.server, license: next.license?.tier ?? null });
 

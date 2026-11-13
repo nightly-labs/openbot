@@ -1,0 +1,33 @@
+{
+  "slug": "truthifi",
+  "name": "Truthifi",
+  "tagline": "Investment account insights",
+  "description": "Truthifi lets agents read the user's linked investment accounts, holdings, fees, and performance. Access is read-only, and each user signs in to their own Truthifi account through the browser.",
+  "category": "data-analytics",
+  "creatorName": "Truthifi",
+  "iconUrl": "https://framerusercontent.com/images/u37AxMviOa9x9r67PQkR35LJQ.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-allocation", "text": "What is my current asset allocation across all accounts?" },
+    { "id": "prompt-fees", "text": "Which of my funds have the highest fees?" },
+    { "id": "prompt-performance", "text": "How did my portfolio perform this year compared with last year?" }
+  ],
+  "apps": [
+    {
+      "id": "app-truthifi-mcp",
+      "name": "Truthifi",
+      "description": "Read-only investment account data, over Truthifi's MCP server with browser sign-in.",
+      "iconUrl": "https://framerusercontent.com/images/u37AxMviOa9x9r67PQkR35LJQ.png",
+      "server": {
+        "name": "truthifi",
+        "transport": "http",
+        "url": "https://api.truthifi.com/mcp",
+        "auth": [{ "id": "truthifi-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://truthifi.com",
+  "privacyPolicyUrl": "https://truthifi.com/privacy",
+  "termsUrl": "https://truthifi.com/terms"
+}

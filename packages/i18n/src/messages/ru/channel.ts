@@ -24,6 +24,9 @@ export const messages = {
   "channel.settings.isolated": "Хранить память в этом канале",
   "channel.settings.isolatedDescription":
     "Агенты сохраняют то, что узнали здесь, как память канала. Их другие чаты её не видят.",
+  "channel.settings.browser": "Браузер",
+  "channel.settings.browserEveryone": "Все участники",
+  "channel.settings.browserNone": "Никто",
   "channel.settings.memoryCount": {
     one: "Сохранено: {count}",
     few: "Сохранено: {count}",

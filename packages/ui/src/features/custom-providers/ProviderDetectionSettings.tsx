@@ -20,6 +20,8 @@ interface ProviderDetectionSettingsProps {
   busy?: boolean | undefined;
   /** The last save failed. The host keeps the rows, so the user can correct them. */
   error?: string | null | undefined;
+  /** The settings are of a joined server, which looks on its own network and PATH. */
+  onServer?: boolean | undefined;
 }
 
 // The examples are the same in each language.
@@ -94,7 +96,11 @@ export function ProviderDetectionSettings(props: ProviderDetectionSettingsProps)
           disabled={props.busy === true}
           onChange={(enabled) => props.onChange({ ...props.value, enabled })}
           label={t("customProvider.detection.enabled")}
-          description={t("customProvider.detection.enabledDescription")}
+          description={t(
+            props.onServer
+              ? "customProvider.detection.enabledDescriptionServer"
+              : "customProvider.detection.enabledDescription",
+          )}
         />
       </ItemGroup>
       <Show when={props.error}>

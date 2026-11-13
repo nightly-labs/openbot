@@ -126,6 +126,8 @@ export const messages = {
     "Aggiungi un endpoint compatibile con OpenAI: un server di modelli su questo computer, o qualsiasi servizio con un URL di base e una chiave.",
   "provider.picker.customPending":
     "I modelli dei tuoi endpoint non sono ancora caricati. Il provider li legge dopo la fine della sua attività in corso.",
+  "provider.picker.customUnlisted": "{name} non elenca i modelli dei tuoi endpoint.",
+  "provider.picker.editEndpoints": "Modifica endpoint",
   "provider.picker.defaultModelLabel": "{name}, predefinito",
   "provider.picker.usageLimit": "Limite di utilizzo raggiunto",
   "provider.picker.usageLimitWindow": "Limite ({window})",
@@ -136,7 +138,12 @@ export const messages = {
   "provider.picker.effortLabel": "Impegno di ragionamento dell'agente",
   "provider.picker.effortFixed": "{effort}, fissato da {provider}",
   "provider.picker.fast": "Veloce",
-  "provider.picker.fastLabel": "Modalità veloce",
+  "provider.picker.fastText": "Risposte più rapide, utilizzo maggiore",
+  "provider.picker.speed": "Velocità",
+  "provider.picker.standard": "Standard",
+  "provider.picker.standardText": "Velocità predefinita",
+  "provider.picker.ultrafast": "Ultraveloce",
+  "provider.picker.ultrafastText": "Le risposte più rapide, utilizzo molto maggiore",
   "provider.picker.selectEffort": "Seleziona l'impegno",
   "provider.picker.custom": "Personalizzato",
   "provider.picker.cliReady": "{cli} pronto",
@@ -159,6 +166,8 @@ export const messages = {
   "provider.geminiKey.title": "Chiave API di Gemini",
   "provider.geminiKey.description":
     "Salva una chiave API di Gemini su questo computer. Una chiave salvata viene usata al posto del tuo account Google. Per accedere con Google, rimuovi la chiave e seleziona «Connetti» nella riga di Gemini.",
+  "provider.geminiKey.descriptionHost":
+    "Salva una chiave API di Gemini sull'host. Una chiave salvata viene usata al posto del tuo account Google. Per accedere con Google, rimuovi la chiave e seleziona «Connetti» nella riga di Gemini.",
   "provider.geminiKey.label": "Chiave API di Gemini",
   "provider.claudeKey.title": "Chiave API di Anthropic",
   "provider.claudeKey.description":
@@ -167,14 +176,20 @@ export const messages = {
   "provider.inceptionKey.title": "Chiave API di Inception",
   "provider.inceptionKey.description":
     "Salva una chiave API di Inception su questo computer per usare i modelli Mercury. OpenBot li esegue nella CLI di Pi che scarica.",
+  "provider.inceptionKey.descriptionHost":
+    "Salva una chiave API di Inception sull'host per usare i modelli Mercury. OpenBot li esegue nella CLI di Pi che scarica.",
   "provider.inceptionKey.label": "Chiave API di Inception",
   "provider.deepseekKey.title": "Chiave API di DeepSeek",
   "provider.deepseekKey.description":
     "Salva una chiave API di DeepSeek su questo computer per usare i modelli DeepSeek. OpenBot li esegue nella CLI di Pi che scarica.",
+  "provider.deepseekKey.descriptionHost":
+    "Salva una chiave API di DeepSeek sull'host per usare i modelli DeepSeek. OpenBot li esegue nella CLI di Pi che scarica.",
   "provider.deepseekKey.label": "Chiave API di DeepSeek",
   "provider.openrouterKey.title": "Chiave API di OpenRouter",
   "provider.openrouterKey.description":
     "Salva una chiave API di OpenRouter su questo computer per usare i modelli di OpenRouter. OpenBot li esegue nella CLI di Pi che scarica.",
+  "provider.openrouterKey.descriptionHost":
+    "Salva una chiave API di OpenRouter sull'host per usare i modelli di OpenRouter. OpenBot li esegue nella CLI di Pi che scarica.",
   "provider.openrouterKey.label": "Chiave API di OpenRouter",
 
   "provider.openCodeKey.title": "Accedi a OpenCode Go",
@@ -219,13 +234,30 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} non ha più crediti di azzeramento dell'utilizzo.",
   "provider.account.resetUsageAlreadyRedeemed": "Questo credito di azzeramento di {name} è già stato usato.",
   "provider.account.resetUsageFailed": "Impossibile azzerare l'utilizzo di {name}.",
+  "provider.account.pool": "Raggruppa account",
+  "provider.account.poolDescription":
+    "Gli agenti usano un account finché non si avvicina a un limite di utilizzo, poi l'account il cui limite si azzera per primo.",
+  "provider.account.inUse": "In uso",
+  "provider.account.notInPool": "Fuori dal pool",
+  "provider.account.leaveOutOfPool": "Escludi dal pool",
+  "provider.account.putBackInPool": "Rimetti nel pool",
+  "provider.account.poolChip": "Pool",
+  "provider.account.poolCount": "Pool di {accounts}",
+  "provider.account.poolInUse": "{pool} · {name} in uso",
+  "provider.settings.accountsPooledDescription": "{count} di {max}. Gli agenti condividono questi account.",
   "provider.settings.disconnectTitle": "Disconnettere {name}?",
   "provider.settings.disconnectOthers": "Gli altri account {provider} attendono finché non ricolleghi {provider}.",
   "provider.settings.disconnectLocal":
     "OpenBot disconnette {provider} su questo computer. Anche la CLI {provider} nel terminale viene disconnessa.",
   "provider.settings.disconnectHost": "OpenBot disconnette {provider} sul server.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "Una chiave API Gemini salvata viene usata al posto di un accesso con Google. Per usare un piano Google e i suoi modelli, rimuovi la chiave.",
   "provider.settings.versionInstalledByUser": "{version} · installata da te",
   "provider.settings.versionDownloaded": "{version} · scaricata da OpenBot",
+  "provider.settings.otherVersionInstalledByUser": "Non in uso: {version} · installata da te",
+  "provider.settings.otherVersionDownloaded": "Non in uso: {version} · scaricata da OpenBot",
+  "provider.settings.useInstalledVersion": "Usa quella installata",
+  "provider.settings.useDownloadedVersion": "Usa quella di OpenBot",
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Cache dei prompt",
   "provider.settings.promptCacheDescription":
@@ -237,7 +269,16 @@ export const messages = {
   "provider.settings.claudeUserSetup": "Usa la mia configurazione di Claude Code",
   "provider.settings.claudeUserSetupDescription":
     "Gli agenti caricano CLAUDE.md, skill, agenti, hook e plugin da ~/.claude. Disattivato, ogni turno invia un prompt più breve. I file dello spazio di lavoro vengono comunque caricati.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "Gli agenti caricano CLAUDE.md, skill, agenti, hook e plugin da ~/.claude sul server. Se disattivato, ogni turno invia un prompt più breve. I file dello spazio di lavoro vengono comunque caricati.",
   "provider.settings.claudeUserSetupLoadFailed": "Impossibile caricare l’impostazione di Claude Code.",
+  "provider.settings.context": "Contesto",
+  "provider.settings.compactWindow": "Compatta le chat a",
+  "provider.settings.compactWindowDescription":
+    "Claude Code riassume i turni più vecchi di una chat quando la chat raggiunge questa dimensione. Più basso mantiene i turni rapidi ed economici. Più alto conserva più dettagli. Un modello con una finestra più piccola compatta al proprio limite.",
+  "provider.settings.compactWindowDefault": "Predefinito di Claude Code",
+  "provider.settings.compactWindowTokens": "{size} token",
+  "provider.settings.compactWindowLoadFailed": "Impossibile caricare la dimensione di compattazione di questo server.",
   "provider.settings.models": "Modelli",
   "provider.settings.modelsDescription": {
     one: "{shown} di {count} modello appare nel selettore dei modelli.",
@@ -256,4 +297,6 @@ export const messages = {
   "provider.settings.deleteOff":
     "Elimina la CLI che OpenBot ha scaricato per {name} ({size}). Account, accessi e agenti restano.",
   "provider.settings.removeDownloadFailed": "Impossibile rimuovere il download.",
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot disconnette {provider} su questo computer. La CLI di {provider} nel tuo terminale mantiene il proprio accesso.",
 } as const satisfies PartialTranslation<typeof source>;

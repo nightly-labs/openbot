@@ -14,6 +14,8 @@ export const messages = {
     "{provider} indique que votre forfait est épuisé. Choisissez un autre modèle ou passez à un forfait {provider} supérieur.",
   "error.provider.acpMcpNotLoaded":
     "{provider} n’a pas chargé les outils d’OpenBot : cet agent ne peut donc ni les utiliser ni joindre ses coéquipiers. Une règle d’équipe {provider} peut bloquer les serveurs MCP locaux. Demandez à l’administrateur de votre équipe de les autoriser, puis réessayez.",
+  "error.provider.acpOwnMcpServerFailed":
+    "{provider} n’a pas pu démarrer le serveur MCP {name}, la réponse s’est donc arrêtée. Ce serveur est dans vos propres réglages de {provider}, pas dans OpenBot. Supprimez-le ou réparez-le à cet endroit, puis démarrez une nouvelle conversation.",
   "error.provider.endpointsReadOnly":
     "Les points de terminaison enregistrés ont été écrits par une version plus récente d’OpenBot, ou le fichier est illisible. Mettez à jour OpenBot pour les modifier.",
   "error.provider.endpointNoSecureStorage":
@@ -198,6 +200,8 @@ export const messages = {
   "error.provider.cliBusyUpdate": "La CLI {provider} traite un tour. Attendez la fin, puis mettez à jour.",
   "error.provider.cliSelectFailed": "OpenBot n’a pas pu sélectionner la CLI gérée installée.",
   "error.provider.noAuthenticatedAccount": "{provider} n’a renvoyé aucun compte authentifié.",
+  "error.provider.codexModelProvider":
+    "Sur cet ordinateur, Codex utilise un autre fournisseur de modèles, et ce fournisseur n’utilise ni connexion ChatGPT ni clé d’API OpenAI. Les agents ChatGPT peuvent utiliser ce fournisseur dès maintenant. Pour utiliser votre compte ChatGPT, remettez OpenAI comme fournisseur de modèles de Codex.",
   "error.provider.signInExpired": "Votre connexion à {provider} a expiré. Reconnectez-vous pour continuer.",
   "error.provider.cliActivateFailed": "OpenBot n’a pas pu activer la CLI gérée.",
   "error.provider.noMainlandChinaSignIn": "{provider} n’a pas de connexion pour la Chine continentale.",
@@ -210,6 +214,8 @@ export const messages = {
     "OpenCode n’a pas de connexion pour le fournisseur de modèle « {provider} ». Choisissez un modèle avec l’étiquette Gratuit, ou connectez le fournisseur : collez une clé OpenCode Go dans les réglages d’OpenCode, ou exécutez `opencode auth login` dans un terminal. Réessayez ensuite.",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode n’a pas de connexion pour le fournisseur de ce modèle. Choisissez un modèle avec l’étiquette Gratuit, ou connectez le fournisseur : collez une clé OpenCode Go dans les réglages d’OpenCode, ou exécutez `opencode auth login` dans un terminal. Réessayez ensuite.",
+  "error.provider.opencodeFreeModelRefused":
+    "OpenCode a refusé ce modèle gratuit. Certains modèles gratuits ne sont pas disponibles dans tous les pays. Choisissez un autre modèle avec l’étiquette Gratuit, ou collez une clé OpenCode Go dans les réglages d’OpenCode et choisissez un modèle OpenCode Go.",
   "error.provider.customEndpointKeyRefused":
     "Le point de terminaison « {provider} » a refusé sa clé d’API ou ses en-têtes. Saisissez-les de nouveau dans Réglages du serveur → Fournisseurs, puis réessayez.",
   "error.provider.customEndpointKeyMissing":
@@ -230,12 +236,18 @@ export const messages = {
     "Les modèles gratuits d’OpenCode ont atteint leur limite d’utilisation. Tous les modèles gratuits partagent cette limite. Pour continuer, collez une clé OpenCode Go dans les réglages d’OpenCode, ou choisissez un modèle d’un autre fournisseur.",
   "error.provider.opencodeProviderFailed":
     "Le fournisseur du modèle a échoué de son côté. Votre connexion n’en est pas la cause. Réessayez plus tard ou choisissez un autre modèle.\n{detail}",
+  "error.provider.opencodeIncompleteReply":
+    "La réponse du modèle a été coupée ou n’était pas valide. Renvoyez votre message ou choisissez un autre modèle.\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode n’a pas pu se connecter au fournisseur du modèle. Vérifiez la connexion réseau de l’ordinateur qui exécute OpenBot, puis réessayez.\n{detail}",
   "error.provider.codexStateBusy":
     "ChatGPT prépare encore son historique local après un démarrage précédent. Attendez quelques minutes, puis réessayez.",
+  "error.provider.codexThreadInUse":
+    "Une autre application Codex a ouvert cette conversation, par exemple l'application de bureau Codex, Codex CLI ou une extension d'IDE. Une seule application à la fois peut écrire dans une conversation Codex. Fermez la conversation dans cette application, puis renvoyez votre message.",
   "error.provider.realtimeLimitZero":
     "Linux a arrêté le fournisseur, car OpenBot a une limite de CPU en temps réel de 0. Cette limite vient de votre système. Installez et démarrez rtkit (`rtkit-daemon`), exécutez `systemctl --user restart xdg-desktop-portal`, puis redémarrez OpenBot. Redémarrer seulement xdg-desktop-portal ne suffit pas tant que rtkit est absent.",
+  "error.provider.cpuUnsupported":
+    "Le processeur de cet ordinateur ne peut pas exécuter ce fournisseur. Utilisez un autre fournisseur.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode n’a pas pu ouvrir sa base de données, car une version plus récente d’OpenCode l’a modifiée. Mettez OpenCode à jour vers la version 2 ou ultérieure, puis réessayez.",
   "error.provider.opencodeNoAnswer":
@@ -255,9 +267,6 @@ export const messages = {
   "error.provider.stoppedBeforeAgentProcess": "{provider} s’est arrêté avant le démarrage du processus de l’agent.",
   "error.provider.archiveUnreadable":
     "L’archive de l’environnement d’exécution est illisible ou utilise un format non pris en charge.",
-  "error.provider.antigravityArchivePath": "L’archive Gemini contient un fichier inattendu.",
-  "error.provider.antigravityChecksum": "La somme de contrôle de l’environnement d’exécution Gemini ne correspond pas.",
-  "error.provider.antigravityReleaseShape": "La version Gemini a une forme inattendue.",
   "error.provider.antigravityMissing": "Gemini n’est pas téléchargé. Téléchargez-le dans OpenBot pour continuer.",
   "error.provider.antigravityNotStarted": "Le serveur Gemini a été trouvé, mais sa version est illisible.",
   "error.provider.antigravityOverrideInvalid":
@@ -272,6 +281,12 @@ export const messages = {
     "Gemini ne peut pas utiliser ce modèle pour le moment. Choisissez un autre modèle, puis réessayez.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Le service Gemini de Google n’a pas terminé la requête. Réessayez dans quelques minutes.\n{detail}",
+  "error.provider.antigravityRequestRejected":
+    "Gemini a refusé cette requête. Choisissez un autre modèle, puis renvoyez votre message. Si l’erreur revient, commencez une nouvelle discussion.\n{detail}",
+  "error.provider.antigravityConnectionLost":
+    "Gemini a perdu la connexion avec son agent et s’est arrêté. Envoyez un message pour continuer.",
+  "error.provider.antigravityRemoteWindowsSignIn":
+    "Sur un hôte Windows, Gemini ouvre la page Google sur l’hôte lui-même. Connectez Gemini sur l’ordinateur hôte.",
   "error.provider.cursorArchivePath": "L’archive Cursor contient un fichier inattendu.",
   "error.provider.cursorChecksum": "La somme de contrôle de l’environnement d’exécution Cursor ne correspond pas.",
   "error.provider.cursorReleaseShape": "La version Cursor a une forme inattendue.",
@@ -308,13 +323,21 @@ export const messages = {
   "error.provider.hermesVersionUnreadable": "Impossible de lire la version de Hermes Agent.",
   "error.provider.hermesSignIn":
     "Connectez-vous avec Nous Portal ou exécutez `hermes setup` dans un terminal pour utiliser Hermes.",
+  "error.provider.hermesTurnFailed":
+    "Hermes n’a pas pu terminer ce tour. Si sa réponse donne une raison, suivez-la. Sinon, un serveur MCP de cet agent est peut-être indisponible : vérifiez-le dans Réglages du serveur › MCP, puis renvoyez votre message.",
   "error.provider.usageLimitReached": "Le compte a atteint sa limite d’utilisation.",
+  "error.provider.claudeContextFull":
+    "Cette conversation est devenue trop longue pour Claude. OpenBot a ouvert une nouvelle session Claude Code avec l’historique de la conversation. Réessayez.",
   "error.provider.claudeApiKeyNoCredit":
     "La clé API Anthropic n'a pas de crédit API. Un forfait Claude ne paie pas les requêtes faites avec une clé API. Ajoutez du crédit dans l'Anthropic Console, ou connectez-vous à Claude dans les réglages et sélectionnez le compte Claude dans le menu des modèles de l'agent.",
   "error.provider.foreignReasoning":
     "{provider} n’a pas accepté le raisonnement précédent de cette conversation, car un autre compte ou une autre clé API l’a reçu. OpenBot a ouvert une nouvelle session {provider} avec l’historique de la conversation. Réessayez.",
   "error.provider.imageTooSmall":
     "Le modèle n'a pas accepté une image de ce chat, car l'image est trop petite. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez.",
+  "error.provider.imageTooLarge":
+    "Le modèle n'a pas accepté une image de ce chat, car l'image est trop grande. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez.",
+  "error.provider.imageCountLimit":
+    "Le modèle n'a pas accepté ce chat, car il contient trop d'images. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez.",
   "error.provider.opencodeSessionRejected":
     "OpenCode a refusé la requête sans en donner la cause. Cela peut arriver dans une longue conversation ou après un changement de modèle. OpenBot a démarré une nouvelle session OpenCode avec l’historique de la conversation. Réessayez. Si l’erreur continue, choisissez un autre modèle ou un effort plus faible.",
   "error.provider.museMcpStartupFault":
@@ -343,6 +366,10 @@ export const messages = {
     "{provider} a refusé la clé d’API enregistrée. Remplacez ou supprimez la clé dans les Réglages, puis réessayez.",
   "error.provider.keyProviderNoBalance":
     "Le compte {provider} de la clé d’API enregistrée n’a pas de solde. Ajoutez du crédit au compte, puis réessayez.",
+  "error.provider.modelServiceRefused":
+    "Le service du modèle a refusé la requête. Choisissez un autre modèle ou vérifiez votre accès à ce modèle auprès du service.",
+  "error.provider.modelServiceRefusedReason":
+    "Le service du modèle a refusé la requête : {reason}. Choisissez un autre modèle ou vérifiez votre accès à ce modèle auprès du service.",
   "error.provider.messageTooLarge": "OpenBot a arrêté {provider}, car il a envoyé un message de plus de {limit} Mo.",
   "error.provider.customAgentIdInvalid":
     "Un ID d’agent ne peut contenir que des lettres minuscules, des chiffres ou `-`, et ne peut pas être l’ID d’un fournisseur intégré.",

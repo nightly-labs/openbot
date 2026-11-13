@@ -19,6 +19,11 @@ export const messages = {
   "error.workflow.conditionUnclear": "모델이 ‘예’ 또는 ‘아니요’로 답하지 않았어요.",
   "error.workflow.modelFailed": "모델이 답할 수 없었어요. 단계를 다시 실행해 주세요.",
   "error.workflow.modelBusy": "다른 모델 요청이 실행 중이에요. 잠시 후 단계를 다시 실행해 주세요.",
+  "error.workflow.mediaFailed": "모델이 이미지나 동영상을 만들 수 없었어요. 단계를 다시 실행해 주세요.",
+  "error.workflow.pictureMissing": "이미지가 서버에 더 이상 없어요. 다시 보내 주세요.",
+  "error.workflow.pictureType": "PNG, JPEG 또는 WebP 이미지를 사용해 주세요.",
+  "error.workflow.mediaInputMissing": "이전 단계의 이미지를 사용할 수 없어요. 그 단계를 다시 실행해 주세요.",
+  "error.workflow.mediaInputNotImage": "이 단계는 동영상이 아닌 이미지만 받아요. 동영상에서 오는 연결을 지워 주세요.",
   "error.workflow.stepMissing": "이 단계는 더 이상 존재하지 않아요.",
   "error.workflow.nodeMissing": "이 단계는 워크플로에 없어요.",
   "error.workflow.runMissing": "이 실행은 더 이상 존재하지 않아요.",
@@ -64,4 +69,14 @@ export const messages = {
   "error.workflow.githubUncertain":
     "변경이 도중에 멈췄어요. GitHub에 이미 반영됐을 수 있어요. 단계를 다시 실행하기 전에 GitHub를 확인하세요.",
   "error.workflow.githubNoEvent": "이 트리거가 시작할 이슈나 풀 리퀘스트가 GitHub에 없어요.",
+  "error.workflow.sunraSignIn": "Sunra 모델을 사용하려면 앱에서 Sunra에 로그인하세요.",
+  "error.workflow.sunraNoCredits":
+    "Sunra 계정의 크레딧이 부족합니다. sunra.ai/pricing에서 크레딧을 추가한 다음 단계를 다시 실행하세요.",
+  "error.workflow.sunraNeedsPlan":
+    "이 Sunra 모델에는 Sunra 플랜이 필요합니다. sunra.ai/pricing에서 플랜을 선택하거나 다른 모델을 선택하세요.",
+  "error.workflow.sunraTeamInputs":
+    "Sunra는 개인 계정에서만 입력 이미지를 사용합니다. Sunra에서 개인 계정을 선택하거나 이미지 연결을 제거하세요.",
+  "error.workflow.sunraFailed": "Sunra가 파일을 만들지 못했습니다: {reason}",
+  "error.workflow.sunraTimeout":
+    "Sunra가 제시간에 파일을 완성하지 못했습니다. 단계를 다시 실행하기 전에 sunra.ai의 OpenBot 프로젝트를 확인하세요.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -2,7 +2,10 @@ import { expoGoOnAndroid } from "@/shared/lib/expo-go";
 
 import type { NotificationTarget } from "./push-notifications-native.types";
 
-type UseNotificationTaps = (open: (target: NotificationTarget) => void, openChat: () => string | null) => void;
+type UseNotificationTaps = (
+  open: (target: NotificationTarget) => void,
+  onScreen: (target: NotificationTarget) => boolean,
+) => void;
 
 /**
  * `expo-notifications` throws when it loads in Expo Go on Android, which has no push notifications.

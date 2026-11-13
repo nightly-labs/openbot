@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/prompt";
 
 export const messages = {
-  "prompt.inputRequired": "입력 필요",
   "prompt.question.label": "에이전트 질문",
   "prompt.question.cancelled": "질문이 취소되었어요",
   "prompt.question.expired": "질문이 만료되었어요",
@@ -12,15 +11,12 @@ export const messages = {
   "prompt.question.next": "다음",
   "prompt.question.cancel": "질문 취소",
   "prompt.question.privatePlaceholder": "비공개 답변을 입력하세요",
-  "prompt.customPlaceholder": "직접 답변을 입력하세요",
   "prompt.question.customAnswerFor": "직접 입력한 답변: {question}",
   "prompt.question.skip": "건너뛰기",
   "prompt.question.chooseAll": "해당하는 항목을 모두 선택하세요.",
   "prompt.question.somethingElse": "기타",
   "prompt.question.emptyTitle": "대기 중인 질문이 없어요.",
   "prompt.question.emptyBody": "에이전트가 다른 결정이 필요하면 이어서 진행해요.",
-  "prompt.choice.hint": "맞는 항목을 고르거나 직접 입력하세요.",
-  "prompt.choice.customLabel": "직접 입력한 답변",
   "prompt.approval.answerFailed": "이 승인에 응답할 수 없어요. 다시 시도해 주세요.",
   "prompt.approval.grantFailed": "상시 승인을 저장할 수 없어요. 다시 시도해 주세요.",
   "prompt.approval.label": "에이전트 승인",

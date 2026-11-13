@@ -9,6 +9,8 @@ export const messages = {
   "status.agent.modelSwitchedForLimit": "使用量の上限に達しました。{model} に切り替えました。",
   "status.agent.modelReturnedAfterLimit": "使用量の上限が解除されました。{model} に戻しました。",
   "status.agent.modelSwitchedForError": "プロバイダーのエラーが発生しました。{model} に切り替えました。",
+  "status.agent.modelSwitchedForSpentBalance":
+    "{previous} のクレジットがなくなりました。{model} に切り替えました。再び使うには、クレジットを追加してから選択してください。",
   "status.agent.modelReturnedAfterError": "プロバイダーのエラーの後、{model} に戻しました。",
   "status.agent.marketplaceSuggested": "マーケットプレイスのアプリを提案しました: {app}。",
   "status.agent.channelMemberAdded": "{agent} が {member} をチャンネルに追加しました。{person} の依頼です。",
@@ -30,6 +32,8 @@ export const messages = {
   "status.agent.reportProblem":
     "アプリのバージョンとシステム情報付きで、公開の GitHub issue になります。あなたの名前は表示されません。",
   "status.agent.sendIdea": "公開の GitHub issue になります。あなたの名前は表示されません。",
+  "status.agent.feedbackRecentErrors": "チャットの最近のエラー:",
+  "status.agent.feedbackSameAs": "issue #{issue} に追加します",
   "status.agent.feedbackSent": "OpenBot チームに送信しました: {title}",
   "status.agent.serverInstallCommand":
     "別のコンピューターに OpenBot をサーバー {name} としてインストールし、あなたのアカウントにサインインさせる 1 回限りのコマンドを作成します。エージェントがそこで実行します。",

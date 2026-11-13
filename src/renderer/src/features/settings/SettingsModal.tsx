@@ -49,7 +49,6 @@ import { createNotificationLevelsStore } from "./notification-levels-store";
 import { createProfileActivityStore } from "./profile-activity-store";
 import { renderProfileShareImage } from "./profile-share-image";
 import { type AgentDockSettingsModel, SettingsAgentDockTab } from "./SettingsAgentDockTab";
-import { createSettingsAgentsSection } from "./SettingsAgentsSection";
 import { SettingsDynamicIslandTab } from "./SettingsDynamicIslandTab";
 import { SettingsGeneralTab } from "./SettingsGeneralTab";
 import { SettingsNotificationsTab } from "./SettingsNotificationsTab";
@@ -166,11 +165,6 @@ export function SettingsModal(props: SettingsModalProps) {
     visible: () => props.open && activeTab() === "notifications",
     servers: () => props.servers ?? [],
   });
-  const agents = createSettingsAgentsSection({
-    visible: () => props.open && activeTab() === "agents",
-    value: () => props.value,
-    onValueChange: (value) => props.onValueChange(value),
-  });
   let handledHostedServerDeleteNonce = 0;
   createEffect(
     () => (props.open ? props.hostedServerDeleteRequest : null),
@@ -190,7 +184,6 @@ export function SettingsModal(props: SettingsModalProps) {
     (tab) => {
       if (!tab) return;
       setActiveTab(tab);
-      agents.showList();
     },
   );
   const agentDockShown = () =>
@@ -204,7 +197,6 @@ export function SettingsModal(props: SettingsModalProps) {
     );
 
   const title = () => i18n.t(navItem(activeTab()).titleKey);
-  const agentsCrumb = () => (activeTab() === "agents" ? agents.crumb() : null);
   const description = () => i18n.t(navItem(activeTab()).descriptionKey);
 
   const tabsProps = {
@@ -214,7 +206,6 @@ export function SettingsModal(props: SettingsModalProps) {
     onChange(value: string) {
       if (
         value === "general" ||
-        value === "agents" ||
         value === "notifications" ||
         value === "voice" ||
         (value === "dynamic-island" && dynamicIslandShown()) ||
@@ -270,9 +261,8 @@ export function SettingsModal(props: SettingsModalProps) {
         page={props.page}
         open={props.open}
         title={title()}
-        crumb={agentsCrumb()}
         description={description()}
-        contentKey={`${activeTab()}:${agents.crumb()?.title ?? ""}`}
+        contentKey={activeTab()}
         restoreFocusTarget={props.restoreFocusTarget}
         onContentElement={(element) => (modalElement = element)}
         sidebar={
@@ -305,11 +295,6 @@ export function SettingsModal(props: SettingsModalProps) {
             chatColor={props.account.chatColor ?? null}
             onSetChatColor={props.onSetChatColor}
           />
-        </Tabs.Content>
-
-        <Tabs.Content value="agents" class="settings-modal-tab-panel" data-tab="agents">
-          {preferencesLoadError()}
-          <agents.Panel menuMount={modalElement} />
         </Tabs.Content>
 
         <Tabs.Content value="notifications" class="settings-modal-tab-panel" data-tab="notifications">

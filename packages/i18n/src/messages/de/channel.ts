@@ -24,6 +24,9 @@ export const messages = {
   "channel.settings.isolated": "Erinnerungen in diesem Kanal behalten",
   "channel.settings.isolatedDescription":
     "Agenten speichern, was sie hier lernen, als Kanalerinnerungen. Ihre anderen Chats sehen sie nicht.",
+  "channel.settings.browser": "Browser",
+  "channel.settings.browserEveryone": "Alle Mitglieder",
+  "channel.settings.browserNone": "Niemand",
   "channel.settings.memoryCount": {
     one: "{count} gespeichert",
     other: "{count} gespeichert",

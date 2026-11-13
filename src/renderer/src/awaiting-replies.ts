@@ -94,7 +94,11 @@ export interface ChannelAwaitingInput {
   name: (agentId: string | null) => string;
 }
 
-/** The sub-tasks of each channel task that waits for them. */
+/**
+ * The sub-tasks of each channel task that waits for them. A finished sub-task that the waiting task
+ * already read in an earlier turn is not one it waits for, so a lead that assigns in rounds shows only
+ * the current round (#7505). A host without channel-seen-subtasks-v1 names none, and all show.
+ */
 export function channelAwaitingReplies(input: ChannelAwaitingInput): AwaitingReplyItem[] {
   const { t } = currentText();
   const waiting = new Map(input.tasks.filter((task) => task.state === "waiting").map((task) => [task.id, task]));
@@ -102,7 +106,8 @@ export function channelAwaitingReplies(input: ChannelAwaitingInput): AwaitingRep
     const parent = task.parentTaskId ? waiting.get(task.parentTaskId) : undefined;
     if (!parent) return [];
     const state = channelTaskState(task.state);
-    if (!state) return [];
+    const finished = state === "replied" || state === "failed";
+    if (!state || (finished && parent.seenDependencies?.includes(task.id))) return [];
     return [
       {
         id: task.id,

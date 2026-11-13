@@ -76,6 +76,24 @@ export interface OwnedRoutine extends RoutineFields {
 /** What starts a run: its trigger, or the source of a manual run. */
 export type RoutineRunStart = "scheduled" | RoutineRunSource;
 
+/**
+ * A finished run that a server transfer brought, with the times of the other server. It has no
+ * trigger and no handle here: both belonged to the other server.
+ */
+export interface ImportedRoutineRun {
+  kind: "scheduled" | "manual";
+  source?: RoutineRunSource;
+  scheduledFor: string;
+  routineName: string;
+  instruction: string;
+  /** A finished status: the caller maps an open run to one, so nothing starts it again. */
+  status: RoutineRunStatus;
+  error: string | null;
+  missed?: { count: number; until: string | null };
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** A run read back with its owner and the handle that names the work it started. */
 export interface OwnedRoutineRun extends RoutineRunFields {
   ownerId: string;
@@ -746,32 +764,8 @@ export class RoutineStore {
    * routines stays due as well, so it runs once now.
    */
   skipMissed(now = new Date(), held?: RoutineHoldWindow): void {
-    this.#skipMissedIn(this.#allActive(), now, held, false);
-  }
-
-  /**
-   * `skipMissed` for the routines of one owner, when the user restores a hidden agent. The hide was a
-   * pause that the user chose, so every missed occurrence is skipped, also for a routine set to run
-   * once, as a paused routine does when it is resumed.
-   */
-  skipMissedFor(ownerId: string, now = new Date()): void {
-    this.#skipMissedIn(
-      this.#allActive().filter((routine) => routine.ownerId === ownerId),
-      now,
-      undefined,
-      true,
-    );
-  }
-
-  #skipMissedIn(
-    routines: readonly OwnedRoutine[],
-    now: Date,
-    held: RoutineHoldWindow | undefined,
-    skipAll: boolean,
-  ): void {
-    for (const routine of routines) {
-      const missedPolicy = skipAll ? "skip" : routine.missedPolicy;
-      const { trigger } = routine;
+    for (const routine of this.#allActive()) {
+      const { missedPolicy, trigger } = routine;
       const due = Date.parse(trigger.nextRunAt);
       if (held && due >= held.since.getTime() && due <= held.until.getTime()) continue;
       if (trigger.schedule.kind === "once") {
@@ -937,6 +931,53 @@ export class RoutineStore {
           ).run(timestamp, sequences[1] ?? 0, routine.id);
         }
         return null;
+      },
+    );
+  }
+
+  /**
+   * Writes the finished runs of one routine that a server transfer brought, in one transaction.
+   * The run history shows them; the scheduler never reads a finished run. Returns the new run ids,
+   * in the order of `runs`.
+   */
+  protected importRunRows(routineId: string, ownerId: string, runs: readonly ImportedRoutineRun[]): string[] {
+    if (runs.length === 0) return [];
+    const { commandPrefix, eventPrefix, runAggregate, runTable, ownerColumn } = this.tables;
+    const runIds = runs.map(() => randomUUID());
+    return this.database.dispatch(
+      `${commandPrefix}-run:import:${routineId}:${randomUUID()}`,
+      runs.map((run, index) => ({
+        aggregateType: runAggregate,
+        aggregateId: routineId,
+        eventType: `${eventPrefix}.run-imported`,
+        payload: { runId: runIds[index], status: run.status, scheduledFor: run.scheduledFor },
+      })),
+      (db, sequences) => {
+        const insert = db.prepare(
+          `INSERT INTO ${runTable} (
+             run_id, routine_id, ${ownerColumn}, trigger_id, run_kind, run_source, scheduled_for, routine_name,
+             instruction, status, error, missed_count, missed_until, created_at, updated_at, last_event_sequence
+           ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        );
+        for (const [index, run] of runs.entries())
+          insert.run(
+            runIds[index] ?? randomUUID(),
+            routineId,
+            ownerId,
+            run.kind,
+            run.source ?? null,
+            run.scheduledFor,
+            run.routineName,
+            run.instruction,
+            run.status,
+            run.error,
+            run.missed?.count ?? null,
+            run.missed?.until ?? null,
+            run.createdAt,
+            run.updatedAt,
+            sequences[index] ?? 0,
+          );
+        return runIds;
       },
     );
   }

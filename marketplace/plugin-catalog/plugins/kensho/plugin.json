@@ -1,0 +1,36 @@
+{
+  "slug": "kensho",
+  "name": "Kensho",
+  "tagline": "S&P Global financial data",
+  "description": "Kensho lets agents read S&P Global company financials, earnings call transcripts, and market data through the Kensho LLM-ready API. It needs an S&P Global or Kensho subscription, and each user signs in through the browser.",
+  "category": "data-analytics",
+  "creatorName": "Kensho Technologies",
+  "iconUrl": "https://kensho.com/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    {
+      "id": "prompt-financials",
+      "text": "Show the revenue and operating margin of Microsoft for the last five years."
+    },
+    { "id": "prompt-transcript", "text": "Summarize the latest earnings call of Nvidia." },
+    { "id": "prompt-compare", "text": "Compare the net debt of the three largest US airlines." }
+  ],
+  "apps": [
+    {
+      "id": "app-kensho-mcp",
+      "name": "Kensho",
+      "description": "Company financials, transcripts, and market data, over Kensho's MCP server with browser sign-in.",
+      "iconUrl": "https://kensho.com/favicon.ico",
+      "server": {
+        "name": "kensho",
+        "transport": "http",
+        "url": "https://kfinance.kensho.com/integrations/mcp",
+        "auth": [{ "id": "kensho-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://kensho.com",
+  "privacyPolicyUrl": "https://www.spglobal.com/en/privacy/privacy-policy-english",
+  "termsUrl": "https://www.spglobal.com/en/terms-of-use"
+}

@@ -60,7 +60,11 @@ import type { TeamChatStore } from "../backend/team-chat-store";
 import type { AgentAccessStore } from "./agent-access-store";
 import { type AgentNotificationLevelStore, OWNER_NOTIFICATION_KEY } from "./agent-notification-level-store";
 import { BrowserViewGateway } from "./browser-view-gateway";
-import type { RemoteHostTicketHome, VerifiedRemoteSessionTicket } from "./central-auth-manager";
+import {
+  isFinalClientError,
+  type RemoteHostTicketHome,
+  type VerifiedRemoteSessionTicket,
+} from "./central-auth-manager";
 import { LiveActivityPushService, LiveActivitySendFailure } from "./live-activity-push";
 import type { PushNotificationStore } from "./push-notification-store";
 import {
@@ -121,6 +125,7 @@ interface HostServiceOptions {
   channels?: ChannelService;
   mcpServers?: ForwardedApiOptions["mcpServers"];
   mcpServerOwners?: ForwardedApiOptions["mcpServerOwners"];
+  mcpAccess?: ForwardedApiOptions["mcpAccess"];
   mcpSignIns?: ForwardedApiOptions["mcpSignIns"];
   signInRelay?: ForwardedApiOptions["signInRelay"];
   connectors?: ForwardedApiOptions["connectors"];
@@ -134,11 +139,14 @@ interface HostServiceOptions {
   providerSignOut?: ForwardedApiOptions["providerSignOut"];
   mcpToolRuntimePreparation?: ForwardedApiOptions["mcpToolRuntimePreparation"];
   storage?: ForwardedApiOptions["storage"];
+  libraryFolders?: ForwardedApiOptions["libraryFolders"];
   machine?: ForwardedApiOptions["machine"];
+  backgroundProcesses?: ForwardedApiOptions["backgroundProcesses"];
   liveVoice?: ForwardedApiOptions["liveVoice"];
   hostedSites?: ForwardedApiOptions["hostedSites"];
   events?: ForwardedApiOptions["events"];
   agentImport?: ForwardedApiOptions["agentImport"];
+  hermesImport?: ForwardedApiOptions["hermesImport"];
   instanceTransfer?: ForwardedApiOptions["instanceTransfer"];
   routineFlows?: ForwardedApiOptions["routineFlows"];
   workflows?: ForwardedApiOptions["workflows"];
@@ -423,6 +431,8 @@ export class HostService extends EventEmitter<HostEvents> {
             const member = options.store.getMember(memberId);
             return member !== null && !member.disabled;
           },
+          sideThreadOfTurn: (agentId, turnId) =>
+            options.agentTasks?.listTasks(agentId).tasks.find((task) => task.activeTurnId === turnId)?.threadId ?? null,
           logger,
         })
       : undefined;
@@ -479,6 +489,7 @@ export class HostService extends EventEmitter<HostEvents> {
       ...(options.channels === undefined ? {} : { channels: options.channels }),
       ...(options.mcpServers === undefined ? {} : { mcpServers: options.mcpServers }),
       ...(options.mcpServerOwners === undefined ? {} : { mcpServerOwners: options.mcpServerOwners }),
+      ...(options.mcpAccess === undefined ? {} : { mcpAccess: options.mcpAccess }),
       ...(options.mcpSignIns === undefined ? {} : { mcpSignIns: options.mcpSignIns }),
       ...(options.signInRelay === undefined ? {} : { signInRelay: options.signInRelay }),
       ...(options.connectors === undefined ? {} : { connectors: options.connectors }),
@@ -494,11 +505,14 @@ export class HostService extends EventEmitter<HostEvents> {
         ? {}
         : { mcpToolRuntimePreparation: options.mcpToolRuntimePreparation }),
       ...(options.storage === undefined ? {} : { storage: options.storage }),
+      ...(options.libraryFolders === undefined ? {} : { libraryFolders: options.libraryFolders }),
       ...(options.machine === undefined ? {} : { machine: options.machine }),
+      ...(options.backgroundProcesses === undefined ? {} : { backgroundProcesses: options.backgroundProcesses }),
       ...(options.liveVoice === undefined ? {} : { liveVoice: options.liveVoice }),
       ...(options.hostedSites === undefined ? {} : { hostedSites: options.hostedSites }),
       ...(options.events === undefined ? {} : { events: options.events }),
       ...(options.agentImport === undefined ? {} : { agentImport: options.agentImport }),
+      ...(options.hermesImport === undefined ? {} : { hermesImport: options.hermesImport }),
       ...(options.instanceTransfer === undefined ? {} : { instanceTransfer: options.instanceTransfer }),
       ...(options.routineFlows === undefined ? {} : { routineFlows: options.routineFlows }),
       ...(options.workflows === undefined ? {} : { workflows: options.workflows }),
@@ -567,6 +581,7 @@ export class HostService extends EventEmitter<HostEvents> {
                 });
               return yield* issueTicket(hostId, failedSignalUrl === undefined ? {} : { failedSignalUrl });
             }),
+          renewalRefused: isFinalClientError,
           onSignalRecoveryFailure: (error, reason) => {
             logger.warn(`Host phase ${this.#status.phase} -> error: Signal ${reason}.`);
             this.#setStatus({
@@ -2191,6 +2206,9 @@ export class HostService extends EventEmitter<HostEvents> {
    */
   channelPersonIsRemote(personId: string): boolean {
     if (personId === SIGNED_OUT_CHANNEL_MEMBER_ID || personId === this.#findCurrentMemberId()) return false;
+    // A server on this computer has no account session. Its owner is the password member that only
+    // the desktop app on this computer logs in as.
+    if (this.#options.passwordOwner === true && personId === this.#options.store.getOwnerMemberId()) return false;
     try {
       return personId !== `local-user:${this.#options.getSignedInUser().id}`;
     } catch {

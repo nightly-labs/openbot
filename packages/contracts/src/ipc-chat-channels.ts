@@ -83,10 +83,51 @@ export interface ChannelDraft {
    */
   isolated?: boolean;
   /**
-   * Absent keeps the stored icon, and null removes it. Only this computer keeps it: the Team API
-   * channel codecs do not carry it, so a joined server and a phone show the member faces.
+   * Which members can use the browser in this channel (#4135). Absent is every member. A save without
+   * it keeps the stored value. The Team API channel codecs carry it only between peers with
+   * `channel-browser-v1`.
+   */
+  browser?: ChannelBrowser;
+  /**
+   * Absent keeps the stored icon, and null removes it. The Team API channel codecs carry it only
+   * between peers with `channel-picture-v1`; other peers show the member faces.
    */
   icon?: ChannelIcon | null;
+}
+
+/**
+ * `members`: every member can use the browser. `member`: only `agentId`, which is a member of the
+ * channel; the others pass a browser step to it. `none`: no member can use it.
+ */
+export type ChannelBrowser = { kind: "members" } | { kind: "none" } | { kind: "member"; agentId: string };
+
+export const CHANNEL_BROWSER_MEMBERS: ChannelBrowser = { kind: "members" };
+
+export function isChannelBrowser(value: unknown): value is ChannelBrowser {
+  if (!isDynamicRecord(value)) return false;
+  if (value.kind === "members" || value.kind === "none") return Object.keys(value).length === 1;
+  return value.kind === "member" && isIdentifier(value.agentId) && Object.keys(value).length === 2;
+}
+
+/** The member that can use the browser of `channel`: `true` for every member, `false` for none. */
+export function channelBrowserAgent(channel: Pick<ChannelDraft, "browser">): string | boolean {
+  const browser = channel.browser ?? CHANNEL_BROWSER_MEMBERS;
+  if (browser.kind === "member") return browser.agentId;
+  return browser.kind === "members";
+}
+
+/** True when `agentId` can use the browser in `channel`. */
+export function channelAllowsBrowser(channel: Pick<ChannelDraft, "browser">, agentId: string): boolean {
+  const agent = channelBrowserAgent(channel);
+  return typeof agent === "string" ? agent === agentId : agent;
+}
+
+/** `channel`, with the browser setting `none` when its browser member is not a member any more. */
+export function withBrowserMember<T extends ChannelDraft>(channel: T): T {
+  const browser = channel.browser;
+  if (browser?.kind !== "member" || channel.members.some((member) => member.agentId === browser.agentId))
+    return channel;
+  return { ...channel, browser: { kind: "none" } };
 }
 
 export interface Channel extends ChannelDraft {
@@ -94,7 +135,11 @@ export interface Channel extends ChannelDraft {
   archived: boolean;
   revision: number;
   createdAt: string;
-  /** An `openbot-avatar://channel/` URL of the uploaded image. Only `setChannelImage` changes it. */
+  /**
+   * An `openbot-avatar://channel/` URL of the uploaded image. Only `setChannelImage` changes it. A
+   * joined server sends the host's URL with `channel-picture-v1`; the desktop changes it to an
+   * `openbot-remote-avatar://<server>/channel/` URL, and the web client to a data URL.
+   */
   imageUrl?: string | null;
 }
 
@@ -122,6 +167,11 @@ export interface ChannelTask {
   revision: number;
   assignmentCount: number;
   error: string | null;
+  /**
+   * On a page only, for a `waiting` task: the dependencies whose results one of its earlier turns
+   * already had. Never stored. Absent from a host without channel-seen-subtasks-v1.
+   */
+  seenDependencies?: string[];
 }
 
 export interface ChannelMessage {
@@ -254,10 +304,22 @@ export function normalizeChannelDraft(value: unknown): DynamicRecord | undefined
  * with such an icon is still refused.
  */
 function normalizeSavedChannel(value: unknown): DynamicRecord | undefined {
-  const channel = normalizeChannelDraft(value);
+  const channel = readableBrowser(normalizeChannelDraft(value));
   if (!channel || channel.icon === undefined || channel.icon === null || isChannelIcon(channel.icon)) return channel;
   const { icon: _unreadable, ...rest } = channel;
   return rest;
+}
+
+/**
+ * A browser setting that this version cannot read, or that names an agent that is not a member, reads
+ * as `none`. The setting limits access, so a value that cannot be read must not give every member the
+ * browser.
+ */
+function readableBrowser(channel: DynamicRecord | undefined): DynamicRecord | undefined {
+  if (!channel || channel.browser === undefined) return channel;
+  const members = Array.isArray(channel.members) ? channel.members.filter(isChannelMember) : [];
+  if (isChannelBrowser(channel.browser) && browserIsMember(channel.browser, members)) return channel;
+  return { ...channel, browser: { kind: "none" } };
 }
 
 /**
@@ -276,13 +338,24 @@ export function isChannelDraft(
     isBoundedString(value.title, INPUT_LIMITS.agentTitle) &&
     isBoundedString(value.instructions, instructionsLimit) &&
     (value.isolated === undefined || typeof value.isolated === "boolean") &&
+    (value.browser === undefined || isChannelBrowser(value.browser)) &&
     Array.isArray(value.members) &&
     value.members.length <= INPUT_LIMITS.agents &&
     value.members.every(isChannelMember) &&
     new Set(value.members.map((member) => member.agentId)).size === value.members.length &&
     (value.leadAgentId === null ||
       (isIdentifier(value.leadAgentId) && value.members.some((member) => member.agentId === value.leadAgentId))) &&
-    (value.icon === undefined || value.icon === null || isChannelIcon(value.icon))
+    (value.icon === undefined || value.icon === null || isChannelIcon(value.icon)) &&
+    browserIsMember(value.browser, value.members)
+  );
+}
+
+/** The browser member of a draft, like its lead, is one of its members. */
+function browserIsMember(browser: unknown, members: readonly ChannelMember[]): boolean {
+  return (
+    !isChannelBrowser(browser) ||
+    browser.kind !== "member" ||
+    members.some((member) => member.agentId === browser.agentId)
   );
 }
 
@@ -302,7 +375,7 @@ export function isChannelIcon(value: unknown): value is ChannelIcon {
 
 /** Only the fields of a draft, so a save cannot carry a host-owned field such as `imageUrl`. */
 function draftFields(draft: ChannelDraft): ChannelDraft {
-  const { name, title, instructions, members, leadAgentId, isolated, icon } = draft;
+  const { name, title, instructions, members, leadAgentId, isolated, browser, icon } = draft;
   return {
     name,
     title,
@@ -310,6 +383,7 @@ function draftFields(draft: ChannelDraft): ChannelDraft {
     members,
     leadAgentId,
     ...(isolated === undefined ? {} : { isolated }),
+    ...(browser === undefined ? {} : { browser }),
     ...(icon === undefined ? {} : { icon }),
   };
 }
@@ -363,7 +437,8 @@ export function isChannelTask(value: unknown): value is ChannelTask {
     isOneOf(["queued", "running", "waiting", "paused", "completed", "failed", "cancelled"] as const, value.state) &&
     sequence(value.revision) &&
     sequence(value.assignmentCount) &&
-    (value.error === null || isBoundedString(value.error, INPUT_LIMITS.messageText))
+    (value.error === null || isBoundedString(value.error, INPUT_LIMITS.messageText)) &&
+    (value.seenDependencies === undefined || identifiers(value.seenDependencies))
   );
 }
 

@@ -77,9 +77,13 @@ export type AgentDockSeatState =
   | { kind: "routine"; phase: "running" | "queued" | "failed"; count: number }
   | { kind: "limited"; resetsAt: number | null };
 
+/**
+ * `temporary`: the user did not put the seat on the dock. It shows while it has a new message or waits
+ * for the user, when the user turned that on in Settings.
+ */
 export type AgentDockSeat =
-  | { kind: "agent"; agent: AgentDockAgent; mood: AgentDockMood; state: AgentDockSeatState | null }
-  | { kind: "channel"; channel: AgentDockChannel; state: AgentDockSeatState | null };
+  | { kind: "agent"; agent: AgentDockAgent; mood: AgentDockMood; state: AgentDockSeatState | null; temporary: boolean }
+  | { kind: "channel"; channel: AgentDockChannel; state: AgentDockSeatState | null; temporary: boolean };
 
 /**
  * A text message of the chat. `error` is a message that the app wrote because an action failed.
@@ -148,6 +152,12 @@ export interface AgentDockOffset {
   offset: number;
 }
 
+/**
+ * The size of the dock above the other apps, in percent of its normal size. In the main window, the
+ * dock follows the interface size.
+ */
+export const AGENT_DOCK_SIZE_LIMITS = { min: 70, max: 140, step: 1, default: 100 } as const;
+
 /** A drag of the dock body. Main reads the pointer position and moves the window. */
 export type AgentDockDragPhase = "start" | "move" | "end";
 
@@ -157,6 +167,10 @@ export interface AgentDockPresentation {
   edge: AgentDockEdge;
   /** The dock slides into the screen edge when the pointer is not on it and no chat is open. */
   autoHide: boolean;
+  /** While hidden, a thin strip stays at the edge. It grows as the pointer comes near and shows the dock when the pointer is close. */
+  edgeStrip: boolean;
+  /** See `AGENT_DOCK_SIZE_LIMITS`. */
+  sizePercent: number;
   /** The saved positions. A display without one has the dock in the centre. */
   offsets: AgentDockOffset[];
   seats: AgentDockSeat[];
@@ -177,6 +191,8 @@ export type AgentDockAction =
   | { type: "open-chat"; serverId: string; seat: AgentDockSeatRef | null }
   | { type: "add"; serverId: string; seat: AgentDockSeatRef }
   | { type: "remove"; serverId: string; seat: AgentDockSeatRef }
+  /** Puts a seat before another seat, or at the end when `before` is null. */
+  | { type: "move"; serverId: string; seat: AgentDockSeatRef; before: AgentDockSeatRef | null }
   /** Main sends it. A retry of the same draft keeps its `clientMessageId`, so the seat gets the message once. */
   | { type: "send"; serverId: string; seat: AgentDockSeatRef; text: string; clientMessageId: string }
   /** Shows the agent in the main window. */
@@ -187,7 +203,9 @@ export type AgentDockAction =
   | { type: "open-window"; serverId: string; agentId: string }
   | { type: "open-link"; url: string }
   /** Shows the agent dock settings in the main window. */
-  | { type: "open-settings" };
+  | { type: "open-settings" }
+  /** Turns the dock off, as the switch in Settings does. */
+  | { type: "hide" };
 
 /**
  * Why the agent dock and the Dynamic Island cannot show above other apps now. "restart": OpenBot runs on Wayland, and it can start
@@ -222,6 +240,8 @@ export function isAgentDockPresentation(value: unknown): value is AgentDockPrese
     isAgentDockDisplay(value.display) &&
     (value.edge === "left" || value.edge === "right") &&
     isBoolean(value.autoHide) &&
+    isBoolean(value.edgeStrip) &&
+    integerInRange(value.sizePercent, AGENT_DOCK_SIZE_LIMITS.min, AGENT_DOCK_SIZE_LIMITS.max) &&
     isList(value.offsets, AGENT_DOCK_LIMITS.displays, isAgentDockOffset) &&
     isList(value.seats, AGENT_DOCK_LIMITS.seats, isSeat) &&
     isList(value.available, INPUT_LIMITS.agents, isAgent) &&
@@ -235,7 +255,7 @@ export function isAgentDockPresentation(value: unknown): value is AgentDockPrese
 export function isAgentDockAction(value: unknown): value is AgentDockAction {
   if (!isDynamicRecord(value) || !isString(value.type)) return false;
   if (value.type === "open-link") return isBoundedString(value.url, INPUT_LIMITS.browserUrl) && value.url.length > 0;
-  if (value.type === "open-settings") return true;
+  if (value.type === "open-settings" || value.type === "hide") return true;
   if (!isIdentifier(value.serverId)) return false;
   switch (value.type) {
     case "open-chat":
@@ -243,6 +263,8 @@ export function isAgentDockAction(value: unknown): value is AgentDockAction {
     case "add":
     case "remove":
       return isSeatRef(value.seat);
+    case "move":
+      return isSeatRef(value.seat) && (value.before === null || isSeatRef(value.before));
     case "open-agent":
     case "open-window":
       return isIdentifier(value.agentId);
@@ -357,7 +379,8 @@ function isSeatRef(value: unknown): value is AgentDockSeatRef {
 }
 
 function isSeat(value: unknown): value is AgentDockSeat {
-  if (!isDynamicRecord(value) || !(value.state === null || isSeatState(value.state))) return false;
+  if (!isDynamicRecord(value) || !(value.state === null || isSeatState(value.state)) || !isBoolean(value.temporary))
+    return false;
   if (value.kind === "agent") return isAgent(value.agent) && isOneOf(AGENT_DOCK_MOODS, value.mood);
   return value.kind === "channel" && isChannel(value.channel);
 }

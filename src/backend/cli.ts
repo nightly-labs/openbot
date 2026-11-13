@@ -1,6 +1,6 @@
 import { execFile, spawn } from "node:child_process";
 import { constants } from "node:fs";
-import { access, readFile, stat } from "node:fs/promises";
+import { access, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, delimiter, dirname, extname, isAbsolute, join, posix, resolve, win32 } from "node:path";
 import { promisify, stripVTControlCharacters } from "node:util";
@@ -324,19 +324,12 @@ export const resolveOpencodeCli: (input?: {
   Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
 );
 
-/** The file beside `bin/` that names the version of an Antigravity install. */
-export const ANTIGRAVITY_MANIFEST = "antigravity-package.json";
-
-export function antigravityHarnessName(target: string): "localharness_external" | "localharness_external.exe" {
-  return target.startsWith("win32") ? "localharness_external.exe" : "localharness_external";
-}
-
 /**
- * The Antigravity server is never looked for on `PATH`: the Antigravity IDE installs an
- * `antigravity` command that is an editor, not this server. Only the copy OpenBot downloaded, or the
- * path in `OPENBOT_ANTIGRAVITY_PATH`, is used. The server takes no `--version`, so the version comes
- * from the manifest two levels above the program, which a managed install writes. The server
- * still gets `cliLaunchPath`: the MCP servers that it starts are commands such as bare `node` (#3418).
+ * The Antigravity CLI is never looked for on `PATH`: the Antigravity IDE installs an `antigravity`
+ * command that is an editor, not this CLI. Only the copy OpenBot downloaded, or the path in
+ * `OPENBOT_ANTIGRAVITY_PATH`, is used. The CLI prints its version, such as `1.5.4`, with
+ * `--version`. It still gets `cliLaunchPath`: the MCP servers that it starts are commands such as
+ * bare `node` (#3418).
  *
  * A path the user set is the only candidate: when it cannot start, the error says so, and the
  * managed copy does not run in its place without a message.
@@ -361,14 +354,12 @@ export const resolveAntigravityCli: (input?: {
       found = true;
       const attempt = yield* Effect.result(
         Effect.gen(function* () {
-          const manifest = join(dirname(dirname(candidate.executable)), ANTIGRAVITY_MANIFEST);
-          const version = parseAntigravityVersion(yield* providerCall(() => readFile(manifest, "utf8")));
-          const launchPath = yield* cliLaunchPath(candidate.executable, candidate.source);
+          const { stdout, launch } = yield* readCliVersion(candidate, "antigravity");
           return {
             executable: candidate.executable,
-            version,
+            version: parseAntigravityVersion(stdout),
             source: candidate.source,
-            ...(launchPath ? { launchPath } : {}),
+            ...launch,
           };
         }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
       );
@@ -388,17 +379,10 @@ export const resolveAntigravityCli: (input?: {
   Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
 );
 
-export function parseAntigravityVersion(manifest: string): string {
-  let version: unknown = null;
-  try {
-    const value = JSON.parse(manifest);
-    if (isDynamicRecord(value)) version = value.version;
-  } catch {
-    /* Reported below. */
-  }
-  if (typeof version !== "string" || !/^\d+\.\d+\.\d+$/u.test(version)) {
-    throw new CodexCliError(sourceText("error.provider.antigravityVersionUnreadable"), "invalid");
-  }
+/** Antigravity CLI 1.5.4 prints `1.5.4`. */
+function parseAntigravityVersion(output: string): string {
+  const version = /^\s*(\d+\.\d+\.\d+)\s*$/u.exec(output)?.[1];
+  if (!version) throw new CodexCliError(sourceText("error.provider.antigravityVersionUnreadable"), "invalid");
   return version;
 }
 
@@ -458,17 +442,24 @@ export const resolveHermesCli: (input?: {
     for (const candidate of candidates) {
       if (!(yield* isExecutable(candidate.executable))) continue;
       found = true;
-      const attempt = yield* Effect.result(
+      const read = (args: readonly string[]) =>
         Effect.gen(function* () {
-          const { stdout, launch } = yield* readCliVersion(candidate, "hermes");
+          const { stdout, launch } = yield* readCliVersion(candidate, "hermes", args);
           return {
             executable: candidate.executable,
             version: parseHermesVersion(stdout),
             source: "system" as const,
             ...launch,
           };
-        }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
-      );
+        }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))));
+      // `hermes --version` waits for a network update check, which can take more than the limit and
+      // then never saves its result, so every check timed out (#7989). `hermes acp --version` prints
+      // only the version. A Hermes before 0.14 refuses that flag at once and gets `--version`.
+      const quick = yield* Effect.result(read(["acp", "--version"]));
+      const attempt =
+        Result.isSuccess(quick) || isCliTimeout(quick.failure.cause)
+          ? quick
+          : yield* Effect.result(read(["--version"]));
       if (Result.isSuccess(attempt)) return attempt.success;
       const error = attempt.failure.cause;
 
@@ -484,11 +475,12 @@ export const resolveHermesCli: (input?: {
 );
 
 /**
- * Hermes prints its release and its build on the first line, such as
+ * `hermes acp --version` prints only the version, such as `0.21.5+5805.g54bc5e5`. `hermes --version`
+ * prints its release and its build on the first line, such as
  * `Hermes Agent v0.21.5+5805.g54bc5e5 (2026.9.24) · upstream 54bc5e50`. A line about an update can follow.
  */
 function parseHermesVersion(output: string): string {
-  const version = output.match(/^Hermes Agent v(\d+\.\d+\.\d+)\b/mu)?.[1];
+  const version = output.match(/^(?:Hermes Agent v)?(\d+\.\d+\.\d+)\b/mu)?.[1];
   if (!version) throw new CodexCliError(sourceText("error.provider.hermesVersionUnreadable"), "invalid");
   return version;
 }
@@ -755,19 +747,12 @@ export function claudeTakesPromptSnapshotFlag(version: string): boolean {
 }
 
 /**
- * Whether this Antigravity ACP server answers `/usage` itself, with no model turn. Checked in 1.4.1;
- * 1.3.0 sends the command to the model.
+ * Whether this Antigravity CLI takes `--gemini-dir` and `--app-data-dir`, so that an account after
+ * the first can have a folder of its own, and keeps its token in a file there when it sees
+ * `WSL_DISTRO_NAME`. Checked in 1.5.3 and 1.5.4.
  */
-export function antigravityAnswersUsageCommand(version: string): boolean {
-  return isMinimumVersion(version, [1, 4, 1]);
-}
-
-/**
- * Whether this Antigravity ACP server keeps its token and settings in `GEMINI_HOME`, so that an
- * account after the first can have a folder of its own. Checked in 1.4.0, 1.4.1 and 1.4.3.
- */
-export function antigravityReadsGeminiHome(version: string): boolean {
-  return isMinimumVersion(version, [1, 4, 0]);
+export function antigravityTakesStateFolders(version: string): boolean {
+  return isMinimumVersion(version, [1, 5, 3]);
 }
 
 function isMinimumVersion(version: string, minimum: readonly number[]): boolean {
@@ -882,7 +867,7 @@ function parseMistralVersion(output: string): string {
 }
 
 /** The providers whose CLI is one native program that OpenBot can download. */
-type NativeCliProvider = "pi" | "muse" | "devin" | "copilot" | "mistral";
+type NativeCliProvider = "pi" | "muse" | "devin" | "copilot" | "mistral" | "antigravity";
 
 /** The version parser of each native provider CLI. */
 export const NATIVE_VERSION_PARSERS: Readonly<Record<NativeCliProvider, (output: string) => string>> = {
@@ -891,6 +876,7 @@ export const NATIVE_VERSION_PARSERS: Readonly<Record<NativeCliProvider, (output:
   devin: parseDevinVersion,
   copilot: parseCopilotVersion,
   mistral: parseMistralVersion,
+  antigravity: parseAntigravityVersion,
 };
 
 export function isVersion(value: string): boolean {
@@ -920,24 +906,53 @@ export function resolveInstalledFirst<Cli extends AgentCliInfo, E>(
   resolve: (input: { bundledExecutable?: string | null }) => Effect.Effect<Cli, E>,
   bundledExecutable: string | null | undefined,
   preferInstalled: boolean,
+  installedChosen = false,
 ): Effect.Effect<Cli, E> {
+  return chooseInstalledFirst(resolve, bundledExecutable, preferInstalled, installedChosen).pipe(
+    Effect.map((choice) => choice.cli),
+  );
+}
+
+/**
+ * The CLI that runs, and the one the user can switch to: the CLI the user installed while OpenBot's
+ * copy runs, or the newer copy while the user's CLI runs because they chose it.
+ */
+export interface InstalledFirstChoice<Cli> {
+  readonly cli: Cli;
+  readonly passedOver: { readonly source: "system" | "managed"; readonly version: string } | null;
+}
+
+/**
+ * `resolveInstalledFirst`, with the CLI it passed over. `installedChosen`: the user chose their own
+ * CLI, so it runs also when the copy is newer. A launcher of the user's, such as a script that picks
+ * Pi's settings folder, then still runs after an update (#6327).
+ */
+export function chooseInstalledFirst<Cli extends AgentCliInfo, E>(
+  resolve: (input: { bundledExecutable?: string | null }) => Effect.Effect<Cli, E>,
+  bundledExecutable: string | null | undefined,
+  preferInstalled: boolean,
+  installedChosen = false,
+): Effect.Effect<InstalledFirstChoice<Cli>, E> {
   const copy = resolve(bundledExecutable === undefined ? {} : { bundledExecutable });
-  if (!preferInstalled) return copy;
   const installedCli = resolve({ bundledExecutable: null }).pipe(Effect.orElseSucceed(() => null));
-  const choose = (resolved: Cli, installed: Cli | null): Cli =>
-    resolved.source === "managed" &&
-    installed?.source === "system" &&
-    (installed.version === resolved.version || olderVersion(resolved.version, installed.version))
-      ? installed
-      : resolved;
+  const choose = (resolved: Cli, installed: Cli | null): InstalledFirstChoice<Cli> => {
+    if (resolved.source !== "managed" || installed?.source !== "system") return { cli: resolved, passedOver: null };
+    const asNew = installed.version === resolved.version || olderVersion(resolved.version, installed.version);
+    if (preferInstalled && (asNew || installedChosen)) {
+      const copyNewer = olderVersion(installed.version, resolved.version);
+      return { cli: installed, passedOver: copyNewer ? { source: "managed", version: resolved.version } : null };
+    }
+    return { cli: resolved, passedOver: { source: "system", version: installed.version } };
+  };
   return Effect.gen(function* () {
     // With a copy, the two probes run at once: the user's CLI adds no wait unless it is the slower one.
+    // An update starts the copy, but still reads the user's CLI, so that it can offer it afterwards.
     if (bundledExecutable) {
       const [resolved, installed] = yield* Effect.all([copy, installedCli], { concurrency: 2 });
       return choose(resolved, installed);
     }
     const resolved = yield* copy;
-    return resolved.source === "managed" ? choose(resolved, yield* installedCli) : resolved;
+    return resolved.source === "managed" ? choose(resolved, yield* installedCli) : { cli: resolved, passedOver: null };
   });
 }
 
@@ -1328,12 +1343,14 @@ function isCliTimeout(error: unknown): error is CodexCliError {
 }
 
 /**
- * Runs `--version` with the `PATH` that the CLI's processes get, so a `#!/usr/bin/env node` CLI that
- * starts here also starts as the provider. `launch` holds that `PATH` for the resolved CLI info.
+ * Runs `--version` (or the fixed `args` that print the version) with the `PATH` that the CLI's
+ * processes get, so a `#!/usr/bin/env node` CLI that starts here also starts as the provider.
+ * `launch` holds that `PATH` for the resolved CLI info.
  */
 const readCliVersion = Effect.fn("Cli.readVersion")(function* (
   { executable: candidate, source }: { executable: string; source: "system" | "managed" },
   provider: AgentProviderId,
+  args: readonly string[] = ["--version"],
 ) {
   const launchPath = yield* cliLaunchPath(candidate, source);
   const launch = launchPath ? { launchPath } : {};
@@ -1343,7 +1360,7 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
     target
       ? execFileAsync(
           process.env.ComSpec?.trim() || "cmd.exe",
-          ["/d", "/s", "/c", `""${candidate.replaceAll("%", "%%")}" --version"`],
+          ["/d", "/s", "/c", `""${candidate.replaceAll("%", "%%")}" ${args.join(" ")}"`],
           {
             timeout,
             maxBuffer: 64 * 1024,
@@ -1351,7 +1368,7 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
             windowsVerbatimArguments: true,
           },
         )
-      : execFileAsync(candidate, ["--version"], {
+      : execFileAsync(candidate, [...args], {
           timeout,
           maxBuffer: 64 * 1024,
           windowsHide: process.platform === "win32",

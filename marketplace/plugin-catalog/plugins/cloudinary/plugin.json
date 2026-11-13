@@ -1,0 +1,33 @@
+{
+  "slug": "cloudinary",
+  "name": "Cloudinary",
+  "tagline": "Image and video assets",
+  "description": "Cloudinary lets agents search, upload, tag and organize images, videos and files, and build transformation URLs. Each user signs in to their own Cloudinary account through the browser.",
+  "category": "design",
+  "creatorName": "Cloudinary",
+  "iconUrl": "https://cloudinary.com/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-find", "text": "Find the product images tagged summer in my Cloudinary account." },
+    { "id": "prompt-upload", "text": "Upload this image to the marketing folder." },
+    { "id": "prompt-resize", "text": "Give me a URL for this image resized to 800 pixels wide." }
+  ],
+  "apps": [
+    {
+      "id": "app-cloudinary-mcp",
+      "name": "Cloudinary",
+      "description": "Asset search, upload, tagging, and folders, over Cloudinary's MCP server with browser sign-in.",
+      "iconUrl": "https://cloudinary.com/favicon.ico",
+      "server": {
+        "name": "cloudinary",
+        "transport": "http",
+        "url": "https://asset-management.mcp.cloudinary.com/mcp",
+        "auth": [{ "id": "cloudinary-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://cloudinary.com",
+  "privacyPolicyUrl": "https://cloudinary.com/privacy",
+  "termsUrl": "https://cloudinary.com/tou"
+}

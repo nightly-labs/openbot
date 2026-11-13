@@ -145,7 +145,7 @@ try {
   let sequence = (await client.read(channel.id)).throughSequence;
   await client.send(
     channel.id,
-    "Call the ask_ui tool once with a choice block titled 'Pick a color' with the options Red and Blue. When the answer comes, reply with the chosen color only.",
+    "Call the ask_ui tool once with a confirm block titled 'Pick a color' with the buttons Red and Blue. When the answer comes, reply with the chosen color only.",
     a.id,
   );
   const colorPrompt = await nextPrompt(a.id, prompts, "the ask_ui prompt arrives");

@@ -1,0 +1,28 @@
+{
+  "slug": "svelte",
+  "name": "Svelte",
+  "tagline": "Svelte and SvelteKit docs",
+  "description": "Svelte gives agents the current Svelte 5 and SvelteKit documentation, checks Svelte components for issues, and makes Playground links. It needs no account and no key.",
+  "category": "coding",
+  "creatorName": "Svelte",
+  "iconUrl": "https://svelte.dev/favicon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-runes", "text": "How do I migrate this component from stores to runes?" },
+    { "id": "prompt-autofix", "text": "Check this Svelte component for problems and suggest fixes." },
+    { "id": "prompt-load", "text": "How do I load data on the server in a SvelteKit page?" }
+  ],
+  "apps": [
+    {
+      "id": "app-svelte-mcp",
+      "name": "Svelte",
+      "description": "Svelte documentation, component checks, and Playground links, over the Svelte MCP server with no sign-in.",
+      "iconUrl": "https://svelte.dev/favicon.png",
+      "server": { "name": "svelte", "transport": "http", "url": "https://mcp.svelte.dev/mcp" }
+    }
+  ],
+  "websiteUrl": "https://svelte.dev",
+  "privacyPolicyUrl": null,
+  "termsUrl": null,
+  "skills": []
+}

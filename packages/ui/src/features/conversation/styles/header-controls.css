@@ -26,6 +26,46 @@
   letter-spacing: 0;
 }
 
+/* With a title, the name button gets narrower before any other part of the header, but not narrower
+   than the avatar and the name. */
+.conversation-title:has(> h1 > .conversation-agent-title-room),
+.conversation-heading-group:not(:has(> .agent-threads-header)):has(.conversation-agent-title-room) {
+  min-width: auto;
+  flex-shrink: 1000;
+}
+
+/* The name keeps its width. The title column takes only the room that is left, down to none. A
+   channel heading is not in this grid: its name has its own ellipsis (channels.css). */
+.conversation-agent-heading {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, max-content);
+  align-items: center;
+  white-space: nowrap;
+}
+
+/* The header hides a title that has less room than its minimum width (see ConversationHeader.tsx). */
+.conversation-agent-title-room {
+  display: flex;
+  min-width: 0;
+}
+
+.conversation-agent-title-room[data-hidden] {
+  display: none;
+}
+
+.conversation-agent-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  text-overflow: ellipsis;
+}
+
+.conversation-agent-title::before {
+  content: "·" / "";
+  margin-inline: 0.4em;
+}
+
 .conversation-access-lock {
   display: inline-flex;
   flex: none;
@@ -190,11 +230,13 @@
   stroke-width: var(--openbot-icon-stroke);
 }
 
-/* An email can be long: the account gives way before the model name does. */
+/* An email can be long: the account gives way before the model name does. Shrink is in proportion
+   to the factor, so the account takes all of it until it has no width left. The factor is large
+   because a part of a pixel off the model name is sufficient to cut it with an ellipsis. */
 .provider-model-trigger-account {
   min-width: 0;
   max-width: 160px;
-  flex-shrink: 1;
+  flex-shrink: 100000;
   overflow: hidden;
 }
 
@@ -709,6 +751,21 @@
 
 .provider-model-effort-content .ui-select-item[data-highlighted] {
   background: var(--ui-menu-item-hover);
+}
+
+/* Each speed has a name and a description, so the list is wider than the select, and wraps. */
+.provider-model-speed-content {
+  width: 300px;
+}
+
+.provider-model-speed-item .ui-select-item-label {
+  display: flex;
+  flex-direction: column;
+  white-space: normal;
+}
+
+.provider-model-speed-name {
+  color: var(--openbot-text-primary);
 }
 
 /* The check of the selected model is a filled circle on the left, as in the menus. */

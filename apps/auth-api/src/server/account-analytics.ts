@@ -19,6 +19,7 @@ import {
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import { Effect, Schema } from "effect";
+import type { HostedPoolGroup } from "./hosted-pool-snapshot";
 
 /** The same OpenPanel project as the desktop app and the website. ANALYTICS.md is the contract. */
 const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
@@ -29,9 +30,9 @@ const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
  * `billing_snapshot`. A billing event without `product` is from a server plan. No generation 10
  * property changes. Generation 12 adds `email_sent`. Generation 13 adds the `license` kind of `email_sent`.
  * Generation 14 adds `email_fallback_sent`. Generation 15 adds the `ready` hosted server action, with
- * `duration_ms` and the `create` reason.
+ * `duration_ms` and the `create` reason. Generation 16 adds `hosted_pool_snapshot`.
  */
-export const ACCOUNT_ANALYTICS_SCHEMA_VERSION = 15;
+export const ACCOUNT_ANALYTICS_SCHEMA_VERSION = 16;
 const SEND_TIMEOUT_MS = 5_000;
 const ACCOUNT_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 
@@ -152,7 +153,9 @@ export type AccountAnalyticsEvent =
       /** On `ready`: from the request to boat until boat reported the sandbox as usable. */
       durationMs?: number;
     }
-  | { name: "email_sent" | "email_fallback_sent"; kind: EmailKind; result: EmailResult };
+  | { name: "email_sent" | "email_fallback_sent"; kind: EmailKind; result: EmailResult }
+  /** Each 5 minutes: the machines of the operator in one location and product, by state. */
+  | { name: "hosted_pool_snapshot"; group: HostedPoolGroup };
 
 /** Account events that only the Worker sees: new accounts, payments, hosted servers and email sends. */
 export interface AccountAnalytics {
@@ -303,6 +306,7 @@ function accountEventProperties(event: AccountAnalyticsEvent): AnalyticsProperti
     if (!isOneOf(EMAIL_KINDS, event.kind) || !isOneOf(EMAIL_RESULTS, event.result)) return null;
     return { ...properties, kind: event.kind, result: event.result };
   }
+  if (event.name === "hosted_pool_snapshot") return hostedPoolProperties(properties, event.group);
   if (event.name !== "hosted_server_action" || !isOneOf(HOSTED_SERVER_ACTIONS, event.action)) return null;
   properties.action = event.action;
   if (isOneOf(BILLING_PLAN_IDS, event.plan)) properties.plan = event.plan;
@@ -319,6 +323,32 @@ function accountEventProperties(event: AccountAnalyticsEvent): AnalyticsProperti
   )
     properties.duration_ms = duration;
   return properties;
+}
+
+const POOL_LOCATION_PATTERN = /^(?:[A-Z]{3}-\d{2}|all|unknown)$/u;
+const POOL_PRODUCT_PATTERN = /^(?:VPS\d{2}|all|unknown)$/u;
+const POOL_COUNTS = [
+  "machines",
+  "free",
+  "to_reinstall",
+  "plan_ended",
+  "cancel_scheduled",
+  "in_use",
+  "free_in_7d",
+  "free_in_30d",
+] as const satisfies readonly (keyof HostedPoolGroup)[];
+const MAX_POOL_COUNT = 100_000;
+
+/** Drops the event when a location, a product or a count is not of the pool. */
+function hostedPoolProperties(properties: AnalyticsProperties, group: HostedPoolGroup): AnalyticsProperties | null {
+  if (!POOL_LOCATION_PATTERN.test(group.location) || !POOL_PRODUCT_PATTERN.test(group.product)) return null;
+  const result: AnalyticsProperties = { ...properties, location: group.location, product: group.product };
+  for (const key of POOL_COUNTS) {
+    const count = group[key];
+    if (!Number.isInteger(count) || count < 0 || count > MAX_POOL_COUNT) return null;
+    result[key] = count;
+  }
+  return result;
 }
 
 const FIRST_TOUCH_CAMPAIGN_PROPERTIES = {

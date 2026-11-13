@@ -102,6 +102,32 @@ const repositoriesSchema = Schema.Struct({
 const accessTokenSchema = Schema.Struct({ token: Schema.NonEmptyString, expires_at: Schema.String });
 const repositoryInstallationSchema = Schema.Struct({ id: Schema.Number });
 const issueSchema = Schema.Struct({ number: Schema.Number, html_url: Schema.String });
+const issueStateSchema = Schema.Struct({
+  number: Schema.Number,
+  html_url: Schema.String,
+  state: Schema.String,
+  locked: Schema.Boolean,
+  pull_request: Schema.optional(Schema.Unknown),
+  user: Schema.NullOr(Schema.Struct({ login: Schema.String })),
+});
+const searchSchema = Schema.Struct({
+  items: Schema.Array(
+    Schema.Struct({
+      number: Schema.Number,
+      title: Schema.String,
+      html_url: Schema.String,
+      body: Schema.optional(Schema.NullOr(Schema.String)),
+      pull_request: Schema.optional(Schema.Unknown),
+    }),
+  ),
+});
+const commentSchema = Schema.Struct({ id: Schema.Number });
+
+const SIMILAR_ISSUES = 5;
+/** Enough of an issue for the agent to see what a new report adds to it. */
+const SIMILAR_SUMMARY_LENGTH = 300;
+/** The app's slug. Its issues show `openbotgit[bot]`; reports add to those issues only. */
+const FEEDBACK_APP = "openbotgit";
 
 /** An issue that the app opened. */
 export interface GitHubIssue {
@@ -109,8 +135,27 @@ export interface GitHubIssue {
   url: string;
 }
 
+/** An open issue that a search found. */
+export interface GitHubSimilarIssue {
+  number: number;
+  title: string;
+  url: string;
+  /** The issue's "What happened?", "Problem" or "Proposed behavior" answer, cut. */
+  summary: string;
+}
+
+/** The first text answer of an issue that the app opened from a report. */
+function issueSummary(body: string | null | undefined): string {
+  const answer = /(?:^|\n)### (?:What happened\?|Problem|Proposed behavior)\n+([\s\S]*?)(?=\n### |\n---\n|$)/.exec(
+    body ?? "",
+  );
+  return (answer?.[1] ?? "").replace(/\s+/g, " ").trim().slice(0, SIMILAR_SUMMARY_LENGTH);
+}
+
 type Credential = { kind: "user"; token: string } | { kind: "app" } | { kind: "installation"; token: string };
 const APP: Credential = { kind: "app" };
+const READ_ISSUES = { issues: "read" } as const;
+const WRITE_ISSUES = { issues: "write" } as const;
 
 interface WritableRepository {
   id: number;
@@ -209,6 +254,70 @@ export class GitHubInstallationTokens {
     repository: string,
     issue: { title: string; body: string; labels: readonly string[] },
   ): Effect.fn.Return<GitHubIssue, GitHubInstallationTokensError> {
+    const token = yield* this.#repositoryToken(repository, WRITE_ISSUES);
+    const opened = yield* this.#post(`/repos/${repository}/issues`, token, issue, issueSchema);
+    return { number: opened.number, url: opened.html_url };
+  }).bind(this);
+
+  /**
+   * Adds a comment as `openbotgit[bot]` to an open issue that the app opened, not to a pull request or
+   * an issue of a person, such as a status page issue. Another, closed, locked or missing issue fails
+   * with `issue_not_open`, so the app can open a new issue instead.
+   */
+  readonly commentIssue = Effect.fn("GitHubInstallationTokens.commentIssue")(function* (
+    this: GitHubInstallationTokens,
+    repository: string,
+    number: number,
+    comment: string,
+  ): Effect.fn.Return<GitHubIssue, GitHubInstallationTokensError> {
+    const token = yield* this.#repositoryToken(repository, WRITE_ISSUES);
+    const target = yield* this.#send(
+      `/repos/${repository}/issues/${number}`,
+      token,
+      { method: "GET" },
+      issueStateSchema,
+      [404, 410],
+    );
+    if (
+      target?.state !== "open" ||
+      target.locked ||
+      target.pull_request !== undefined ||
+      target.user?.login !== `${FEEDBACK_APP}[bot]`
+    )
+      return yield* new GitHubInstallationTokensError(409, "issue_not_open", "The issue is not open.");
+    yield* this.#post(`/repos/${repository}/issues/${number}/comments`, token, { body: comment }, commentSchema);
+    return { number: target.number, url: target.html_url };
+  }).bind(this);
+
+  /** The open issues that the app opened whose titles have one of `terms`, best match first. */
+  readonly searchIssues = Effect.fn("GitHubInstallationTokens.searchIssues")(function* (
+    this: GitHubInstallationTokens,
+    repository: string,
+    terms: readonly string[],
+  ): Effect.fn.Return<GitHubSimilarIssue[], GitHubInstallationTokensError> {
+    if (terms.length === 0) return [];
+    const token = yield* this.#repositoryToken(repository, READ_ISSUES);
+    const query = new URLSearchParams({
+      q: `repo:${repository} is:issue is:open author:app/${FEEDBACK_APP} in:title ${terms.join(" OR ")}`,
+      per_page: String(SIMILAR_ISSUES),
+    });
+    const found = yield* this.#get(`/search/issues?${query.toString()}`, token, searchSchema);
+    return found.items
+      .filter((item) => item.pull_request === undefined)
+      .map((item) => ({
+        number: item.number,
+        title: item.title,
+        url: item.html_url,
+        summary: issueSummary(item.body),
+      }));
+  }).bind(this);
+
+  /** A token for one repository of the app's own installation, with only `permissions`. */
+  readonly #repositoryToken = Effect.fn("GitHubInstallationTokens.repositoryToken")(function* (
+    this: GitHubInstallationTokens,
+    repository: string,
+    permissions: Readonly<Record<string, string>>,
+  ): Effect.fn.Return<Credential, GitHubInstallationTokensError> {
     const [, name] = repository.split("/");
     let installationId = this.#repositoryInstallations.get(repository);
     if (installationId === undefined) {
@@ -219,17 +328,11 @@ export class GitHubInstallationTokens {
     const minted = yield* this.#post(
       `/app/installations/${installationId}/access_tokens`,
       APP,
-      { repositories: [name], permissions: { issues: "write" } },
+      { repositories: [name], permissions },
       accessTokenSchema,
     ).pipe(Effect.tapError(() => Effect.sync(() => this.#repositoryInstallations.delete(repository))));
-    const opened = yield* this.#post(
-      `/repos/${repository}/issues`,
-      { kind: "installation", token: minted.token },
-      issue,
-      issueSchema,
-    );
-    return { number: opened.number, url: opened.html_url };
-  }).bind(this);
+    return { kind: "installation", token: minted.token };
+  });
 
   readonly #issueForInstallation = Effect.fn("GitHubInstallationTokens.issueForInstallation")(function* (
     this: GitHubInstallationTokens,
@@ -354,14 +457,32 @@ export class GitHubInstallationTokens {
     );
   }
 
-  /** Do not retain response bodies or causes that can contain a credential. */
-  readonly #request = Effect.fn("GitHubInstallationTokens.request")(function* <T>(
+  #request<T>(
+    path: string,
+    credential: Credential,
+    init: RequestInit,
+    schema: Schema.Decoder<T>,
+  ): Effect.Effect<T, GitHubInstallationTokensError> {
+    return this.#send(path, credential, init, schema, []).pipe(
+      Effect.flatMap((value) =>
+        value === null
+          ? Effect.fail(new GitHubInstallationTokensError(502, "github_failed", "GitHub sent an unexpected answer."))
+          : Effect.succeed(value),
+      ),
+    );
+  }
+
+  /**
+   * The decoded answer, or null for a status in `nullStatuses`, such as 404 for a missing issue. Do not retain response bodies or causes that can contain a credential.
+   */
+  readonly #send = Effect.fn("GitHubInstallationTokens.send")(function* <T>(
     this: GitHubInstallationTokens,
     path: string,
     credential: Credential,
     init: RequestInit,
     schema: Schema.Decoder<T>,
-  ): Effect.fn.Return<T, GitHubInstallationTokensError> {
+    nullStatuses: readonly number[],
+  ): Effect.fn.Return<T | null, GitHubInstallationTokensError> {
     const route = path.split("?")[0];
     const authorization = credential.kind === "app" ? `Bearer ${yield* this.#appJwt()}` : `token ${credential.token}`;
     const response = yield* Effect.tryPromise({
@@ -387,6 +508,10 @@ export class GitHubInstallationTokens {
             "github_app_unavailable",
             "GitHub refused the OpenBot GitHub App key.",
           );
+    }
+    if (nullStatuses.includes(response.status)) {
+      yield* Effect.tryPromise(() => response.body?.cancel() ?? Promise.resolve()).pipe(Effect.ignore);
+      return null;
     }
     if (!response.ok)
       return yield* new GitHubInstallationTokensError(

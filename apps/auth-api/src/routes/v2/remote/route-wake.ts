@@ -1,4 +1,5 @@
 import { TELEGRAM_BOT_ID_PATTERN, TELEGRAM_CHAT_ID_PATTERN } from "@openbot/contracts/signal-protocol/telegram-route";
+import { WEBHOOK_ROUTE_ID_PATTERN } from "@openbot/contracts/signal-protocol/webhook-route";
 import { createFileRoute } from "@tanstack/solid-router";
 import { Effect } from "effect";
 import { z } from "zod";
@@ -25,13 +26,14 @@ const routeWakeSchema = z.object({
       botId: z.string().regex(TELEGRAM_BOT_ID_PATTERN),
       chatId: z.string().regex(TELEGRAM_CHAT_ID_PATTERN),
     }),
+    z.object({ platform: z.literal("webhook"), routeId: z.string().regex(WEBHOOK_ROUTE_ID_PATTERN) }),
   ]),
   wake: z.boolean(),
 });
 
-// Signal has a Slack, Discord or Telegram event for a route whose host has no socket. A hosted server
-// that sleeps starts with `wake`, and the answer tells Signal whether to keep the event until the host
-// connects.
+// Signal has a Slack, Discord, Telegram or generic webhook event for a route whose host has no socket.
+// A hosted server that sleeps starts with `wake`, and the answer tells Signal whether to keep the event
+// until the host connects. Signal never keeps a generic webhook: its sender sends it again.
 export const Route = createFileRoute("/v2/remote/route-wake")({
   server: {
     handlers: {

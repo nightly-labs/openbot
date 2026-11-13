@@ -1,7 +1,58 @@
 import { ConversationHeader } from "@openbot/ui/features/conversation/ConversationHeader";
+import type { PinnedMessageItem } from "@openbot/ui/features/conversation/PinnedMessages";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { STORY_AGENT, STORY_AGENT_STATUS, STORY_MODELS, storyRuntimeSettings } from "./fixtures";
+import { STORY_AGENT, STORY_AGENT_STATUS, STORY_AGENTS, STORY_MODELS, storyRuntimeSettings } from "./fixtures";
+
+const STORY_PINS: PinnedMessageItem[] = [
+  {
+    id: "pin-checklist",
+    author: STORY_AGENT.name,
+    time: "18 Aug, 08:36",
+    thread: null,
+    pinnedBy: STORY_AGENT.name,
+    body: "**Launch day checklist**\n\n1. 08:00: freeze `main` and tag the release candidate.\n2. 08:20: smoke test the macOS, Windows and Linux builds.\n3. 08:40: publish the blog post as a draft and check the links.\n4. 09:00: publish the release, the blog post and the X thread.\n5. 09:30: watch the crash reports and the support inbox for one hour.",
+  },
+  {
+    id: "pin-staging",
+    author: STORY_AGENT.name,
+    time: "17 Aug, 10:18",
+    thread: "Staging review",
+    pinnedBy: null,
+    body: "Staging is ready for review.\n\n- URL: `staging.openbot.run`\n- Test account: `launch-review@openbot.run`\n- Password: in the shared vault, item **Staging review**",
+  },
+  {
+    id: "pin-launch-date",
+    author: "You",
+    time: "17 Aug, 09:02",
+    thread: null,
+    pinnedBy: null,
+    body: "The launch date is fixed: **Tuesday 1 September, 09:00 CET**. Ask me before you move anything that depends on it.",
+  },
+];
+
+/** 50 pins of several chats, with short, long and unbroken messages and long thread names. */
+const MANY_STORY_PINS: PinnedMessageItem[] = Array.from({ length: 50 }, (_, index) => {
+  const base = STORY_PINS[index % STORY_PINS.length] ?? {
+    id: "pin",
+    author: "You",
+    time: "",
+    body: "",
+    thread: null,
+    pinnedBy: null,
+  };
+  const body =
+    index % 7 === 3
+      ? "ok"
+      : index % 7 === 5
+        ? `https://staging.openbot.run/review/${"launch-checklist-".repeat(12)}${index}`
+        : `${base.body}\n\n${"The reviewers read each step again before the release and report every difference. ".repeat(index % 4)}`;
+  const thread =
+    index % 6 === 4 ? `Release notes for the macOS, Windows and Linux builds of version 0.${index}` : base.thread;
+  return { ...base, id: `pin-${index}`, body, thread };
+});
+
+const pinnedMessages = (pins: PinnedMessageItem[]) => ({ pins, agents: STORY_AGENTS, onJump: fn(), onUnpin: fn() });
 
 const meta = {
   title: "Conversation/Header",
@@ -71,3 +122,9 @@ export const ProviderAfterThisTurn: Story = {
     },
   },
 };
+/** The pin button with three pins. Open the list: each pin is a quote, and Unpin shows on hover. */
+export const PinnedMessages: Story = { args: { pinnedMessages: pinnedMessages(STORY_PINS) } };
+/** A chat at its limit of 50 pins. The list scrolls under its title, and each quote stays at four lines. */
+export const ManyPinnedMessages: Story = { args: { pinnedMessages: pinnedMessages(MANY_STORY_PINS) } };
+/** A chat with no pin. The list says how to pin a message. */
+export const NoPinnedMessages: Story = { args: { pinnedMessages: pinnedMessages([]) } };

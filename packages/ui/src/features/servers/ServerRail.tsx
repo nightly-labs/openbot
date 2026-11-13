@@ -8,7 +8,7 @@ import {
   Eye,
   Plus,
   Server,
-  ServerGradientLogo,
+  ServerPlushLogo,
   Tooltip,
 } from "@openbot/ui";
 import { createEffect, createSignal, createStore, For, onCleanup, Show } from "solid-js";
@@ -625,7 +625,7 @@ export function ServerMark(props: { server: Pick<ServerSummary, "id" | "logoUrl"
     },
   );
   return (
-    <Show when={!failed() ? props.server.logoUrl : null} fallback={<ServerGradientLogo seed={props.server.id} />}>
+    <Show when={!failed() ? props.server.logoUrl : null} fallback={<ServerPlushLogo seed={props.server.id} />}>
       {(url) => <img class="server-rail-logo" src={url()} alt="" draggable={false} onError={() => setFailed(true)} />}
     </Show>
   );

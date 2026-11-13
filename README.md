@@ -210,14 +210,13 @@ keeps that install and offers no download. Set `OPENBOT_OPENCODE_PATH` to select
 outside your shell's search path. Remote OpenCode agents require Team API v4; older clients do not
 show these agents.
 
-Gemini uses a Google AI Pro or Ultra plan. OpenBot downloads Google's Antigravity ACP server on
-this computer when you select Download on the Gemini row, because Google's license does not let
-OpenBot include it. Sign in opens Google's sign-in page in your browser. OpenBot never uses an
+Gemini uses a Google AI Pro or Ultra plan. OpenBot downloads Google's Antigravity CLI on this
+computer when you select Download on the Gemini row, because Google's license does not let OpenBot
+include it. Sign in opens Google's sign-in page in your browser. OpenBot never uses an
 `antigravity` command on your search path, because the Antigravity editor installs a command with
-that name. Set `OPENBOT_ANTIGRAVITY_PATH` to select a server executable yourself. Put it in a
-`bin/` folder, and put an `antigravity-package.json` file with its `version` in the folder above
-`bin/`. Keep `localharness_external` beside the server. When that path is set, OpenBot uses
-only it. Connect remains available in the host's local Server settings > Providers screen. Remote
+that name. Set `OPENBOT_ANTIGRAVITY_PATH` to select an Antigravity CLI 1.5.3 or later executable
+yourself. OpenBot reads its version with `--version`. When that path is set, OpenBot uses only
+it. Connect remains available in the host's local Server settings > Providers screen. Remote
 settings cannot perform Google sign-in; use a browser on the host. See
 [Gemini setup and download recovery](docs/architecture/providers.md#gemini) for the required
 layout, the reported IPv6 download failure, and checks that do not change host networking.
@@ -391,7 +390,7 @@ Optional scripts, references, and assets follow the Codex skill folder structure
 
 Open **Server settings → Import** on this computer, or on a joined server in the desktop app or the browser client. Every member of a server can import, not only an owner or admin. Add the [OpenBot export agent](https://x.ai/bot/pOUBH2kQK8CKvM7nW8stG) to Grok Bot and say "Export my agents for OpenBot". It saves one `.zip` file to Downloads. Choose that file in OpenBot, select the agents, and import them.
 
-The import adds each agent's name, instructions, avatar, skills, routines, and memories. Workspace files are copied to `imported/` in the agent's workspace if you included them. Chat history is not copied: the export agent keeps the important facts as memories. For this computer, the file is read here and is not uploaded, and it has no size limit: OpenBot reads it from disk one file at a time and skips an agent whose files do not fit in the free disk space. For a joined server, the file (at most 100 MB) goes to the computer that runs that server through the encrypted host connection. A member's import uses a skill that the server already has instead of changing it. The export skill and its format are in [`resources/agent-import/grok-bot/SKILL.md`](resources/agent-import/grok-bot/SKILL.md).
+The import adds each agent's name, instructions, avatar, skills, routines, and memories. Workspace files are copied to `imported/` in the agent's workspace if you included them. Chat history is not copied: the export agent keeps the important facts as memories. For this computer, the file is read here and is not uploaded, and it has no size limit: OpenBot reads it from disk one file at a time and skips an agent whose files do not fit in the free disk space. For a joined server, the file goes to the computer that runs that server through the encrypted host connection, in parts, so it has no size limit either; the server must have free disk space for it. A server on an older version of OpenBot takes a file of at most 100 MB. A member's import uses a skill that the server already has instead of changing it. The export skill and its format are in [`resources/agent-import/grok-bot/SKILL.md`](resources/agent-import/grok-bot/SKILL.md).
 
 ## Commands
 
@@ -481,6 +480,10 @@ See [web client delivery](docs/web-client.md) for the release gate and focused c
 | `bun run release:patch` | Create the next patch version commit and tag. |
 | `bun run mobile:release` | Open the mobile release menu: prepare a version, build it, mark it available or skipped on a store (with its flags), write the Discord highlights, and see the live state. Each step that changes files opens its pull request. |
 | `bun run mobile:release:patch` | Move the iPhone app notes from `apps/mobile/changelog.d` into `apps/mobile/CHANGELOG.md` and set the next patch version in `app.json`. Also `mobile:release:minor` and `mobile:release:major`. |
+| `bun run mobile:ota:check` | Show the native runtime version of this checkout and the mobile store builds that can get it as an over-the-air update. Read-only. See [over-the-air updates](apps/mobile/README.md#over-the-air-updates). |
+| `bun run mobile:ota:publish -- --platform <ios\|android\|all> --message <text>` | Start the `Mobile OTA update` workflow for the current branch (`main` or `mobile-hotfix/*`): it sends the JavaScript bundle to the phones of the store builds with the same runtime version, with no store review. `--rollout <1-100>` limits the phones, `--dry-run` publishes nothing. `mobile:ota:rollout` changes the percentage, `mobile:ota:rollback` takes the update back, and `mobile:ota:status` shows what the update server gives each store build. |
+| `bun run mobile:release:ota -- --base <store build tag> --platform <ios\|android\|all>` | Move the note files that are new since the store build into an over-the-air section of `apps/mobile/CHANGELOG.md`, such as `1.5.0.1`. The store version does not change. |
+| `bun run test:mobile-ota` | Run the mobile update server (`apps/mobile-updates`) on a local R2 bucket with the real publish commands, and ask for updates as a phone does: signatures, file hashes, rollout, rollback and the publish guard. Offline; writes `.openbot-build/mobile-ota-e2e/report.json`. |
 | `bun run mobile:release:published <ios\|android\|both>` | Write today's date for a store that made the mobile build available. `/changelog` shows each store, and a store that still reviews the build as "In review". Also raises that store's flags in `mobile-features-config.ts`. Add `--version x.y.z` for a version that is not in `app.json`, and `--skip-older` to mark the older versions that the store still reviews as skipped. |
 | `bun run test:acp-directories` | Run three fake ACP agents through the `acp` provider driver: new, load and resume requests carry the workspace roots as `additionalDirectories` only when the agent advertises them. Offline; writes `.openbot-build/acp-additional-directories-e2e/report.json`. |
 | `bun run test:custom-agents` | Run two fake ACP agents through the agent store, Check agent (with its model list) and the `acp` provider router: equal session ids, restart and resume, switch, and delete. Offline; writes `.openbot-build/custom-acp-agent-e2e/report.json`. |
@@ -651,7 +654,7 @@ list of documents, text, data, and source files.
 - `~/.claude` — login and session history managed exclusively by Claude CLI.
 - `~/.grok` — login and session history managed exclusively by Grok CLI.
 - `~/.gemini` (or `$GEMINI_HOME`) — login and session history managed exclusively by the
-  Antigravity ACP server that Gemini uses.
+  Antigravity CLI that Gemini uses.
 - `~/.cursor` — login and session history managed exclusively by the Cursor CLI. A confined Cursor
   process keeps its settings in `~/.cursor/openbot-confined`, so it never changes yours.
 - `~/.cline` (or `$CLINE_DIR`) — login and session history managed exclusively by the Cline CLI.

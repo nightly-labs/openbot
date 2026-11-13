@@ -10,6 +10,7 @@ import { useAgents } from "../agents/agents-context";
 import { useBrowserTabs } from "../browser/browser-context";
 import { useConnectors } from "../connectors/connectors-context";
 import { Conversation } from "../conversation/Conversation";
+import { trackUsageLimitShown, useUsageLimitAsk } from "../conversation/usage-limit-ask";
 import { useRemoteDesktop } from "../remote-desktop/remote-desktop-context";
 import {
   remoteMcpSignIn,
@@ -17,6 +18,7 @@ import {
   serverCanAdminister,
   serverSendsWebhookTests,
   serverSetsWebhookSenderSecret,
+  serverSupportsCapability,
 } from "../servers/server-capabilities";
 import { createServerResponseStyle } from "../servers/server-personality";
 import { useServerScope } from "../servers/server-scope";
@@ -45,6 +47,7 @@ export function WorkspaceChannelConversation(props: { account: () => CentralAuth
 }
 
 function DesktopChannelConversation(props: { channelId: string; account: () => CentralAuthUser }) {
+  const channels = useChannels();
   const platform = usePlatform();
   const scope = useServerScope();
   const connectors = useConnectors();
@@ -54,8 +57,8 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
   const { activeServer, activeServerSupportsCapability, joinServerOpen } = useServers();
   const { serverSettingsOpen, openMcpSignIn, serverSettingsTargetId, serverSettingsMcpSignIns } = useServerSettings();
   const { appSettingsOpen, skillsMarketplaceOpen, generalSettings } = useSettings();
-  const { agentStatus, agentList, updateAgent, setAgentAvatar, userHiddenAgentIds } = useAgents();
-  const { approvals, pendingPrompts } = useTurns();
+  const { agentStatus, agentList, updateAgent, setAgentAvatar, userPausedAgentIds } = useAgents();
+  const { approvals, pendingPrompts, usageLimits } = useTurns();
   const {
     browserTabs,
     activeBrowserTabId,
@@ -80,12 +83,16 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
       if (event?.type === "browser-takeover-requested") requests.push(event.request);
     return requests;
   });
+  const prompts = createMemo(() =>
+    Object.values(pendingPrompts()).flatMap((event) => (event?.type === "prompt" ? [event] : [])),
+  );
   const view = createChannelConversation({
     channelId: props.channelId,
     isOwnSender,
     connectionReady: () => scope.loaded(),
     routines: {
       localHost: () => activeServer()?.kind === "local",
+      onceSchedule: () => serverSupportsCapability(activeServer(), "routines-once-v1"),
       eventsServerId: () => (serverCanAdminister(activeServer(), "events-v1") ? activeServer()?.id : undefined),
       routineRecovery: () => remoteRoutineRecovery(activeServer()),
       webhookTests: () => serverSendsWebhookTests(activeServer()),
@@ -93,8 +100,30 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
     },
     approvals,
     takeovers,
-    hiddenAgentIds: userHiddenAgentIds,
+    prompts,
+    pausedAgentIds: userPausedAgentIds,
   });
+  // A usage limit that holds the member whose turn a queued request waits for, the lead while no member
+  // owns it, asks where that member's work goes, as the agent's own chat does. Before, the channel only
+  // went quiet.
+  const usageLimitAskFor = useUsageLimitAsk();
+  // The first held agent that asks: one that the user chose to wait for asks no more.
+  const usageLimitAsk = createMemo(() => {
+    const page = channels.state.page;
+    if (page?.channel.id !== props.channelId || page.channel.archived) return undefined;
+    const limits = usageLimits();
+    for (const task of page.tasks) {
+      const agentId = task.ownerAgentId ?? page.channel.leadAgentId;
+      if (task.state !== "queued" || !agentId || !(agentId in limits)) continue;
+      const ask = usageLimitAskFor(
+        agentList().find((agent) => agent.id === agentId),
+        true,
+      );
+      if (ask) return { agentId, ask };
+    }
+    return undefined;
+  });
+  trackUsageLimitShown(usageLimitAsk);
   // A named function, not a ternary in the prop: the compiler makes a memo for a ternary, and the
   // composer reads this prop in an effect, where Solid cannot make a memo.
   const shownAgentStatus = (): AgentStatus =>
@@ -136,6 +165,7 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
       prompt={view.prompt()}
       promptUiBlock={view.promptUiBlock()}
       approval={view.approval()}
+      usageLimitAsk={usageLimitAsk()?.ask}
       browserTakeover={view.browserTakeover()}
       activeTurnId={view.activeTurnId()}
       skillsMarketplaceOpen={skillsMarketplaceOpen()}

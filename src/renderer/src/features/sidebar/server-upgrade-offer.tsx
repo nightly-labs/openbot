@@ -154,6 +154,7 @@ export function ServerUpgradeOffer(props: {
           freeBytes={disk(offer()).freeBytes}
           totalBytes={disk(offer()).totalBytes}
           plan={offer().plan.plan}
+          storageGb={offer().plan.storageGb}
           nextPlan={offer().nextPlan}
           interval={offer().plan.interval}
           currency={offer().plan.currency}

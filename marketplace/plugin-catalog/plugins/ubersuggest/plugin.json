@@ -1,0 +1,33 @@
+{
+  "slug": "ubersuggest",
+  "name": "Ubersuggest",
+  "tagline": "SEO keyword research",
+  "description": "Ubersuggest lets agents read keyword ideas, search volume, domain traffic, backlinks, and site audit data. Access is read-only, and each user signs in to their own Ubersuggest account through the browser.",
+  "category": "data-analytics",
+  "creatorName": "NP Digital",
+  "iconUrl": "https://ubersuggest.com/apple-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-keywords", "text": "Find keyword ideas for project management software with their search volume." },
+    { "id": "prompt-competitor", "text": "What are the top pages of a competitor's domain by estimated traffic?" },
+    { "id": "prompt-backlinks", "text": "Summarize the backlinks of my site and the strongest referring domains." }
+  ],
+  "apps": [
+    {
+      "id": "app-ubersuggest-mcp",
+      "name": "Ubersuggest",
+      "description": "Keyword, traffic, backlink, and site audit data, over NP Digital's MCP server with browser sign-in.",
+      "iconUrl": "https://ubersuggest.com/apple-icon.png",
+      "server": {
+        "name": "ubersuggest",
+        "transport": "http",
+        "url": "https://ubersuggest-mcp.neilpatelapi.com/mcp",
+        "auth": [{ "id": "ubersuggest-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://ubersuggest.com",
+  "privacyPolicyUrl": "https://npdigital.com/privacy-notice/",
+  "termsUrl": "https://neilpatel.com/terms/"
+}

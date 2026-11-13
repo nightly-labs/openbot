@@ -161,6 +161,25 @@ const server = createServer((request, response) => {
     </script>`);
     return;
   }
+  if (url.pathname === "/hints-away") {
+    // A redirect to a different origin, which has not asked for hints.
+    const host = request.headers.host ?? "127.0.0.1";
+    response.writeHead(302, { location: `http://${host.replace("127.0.0.1", "localhost")}/hints` });
+    response.end();
+    return;
+  }
+  if (url.pathname === "/hints") {
+    // The site asks for the hints that Chrome sends only on request.
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.setHeader("accept-ch", REQUESTED_HINTS.map(([header]) => header).join(", "));
+    const requestHeaders = JSON.stringify(request.headers).replaceAll("<", "\\u003c");
+    response.end(`<main></main><script>
+      navigator.userAgentData.getHighEntropyValues(${JSON.stringify(REQUESTED_HINTS.map(([, key]) => key))}).then((values) => {
+        document.querySelector("main").textContent = JSON.stringify({ requestHeaders: ${requestHeaders}, values });
+      });
+    </script>`);
+    return;
+  }
   if (url.pathname === "/abort") {
     response.destroy();
     return;
@@ -441,7 +460,7 @@ const server = createServer((request, response) => {
       <span class="pseudo-option"><input type="radio" name="pay" aria-label="Pay by transfer" /></span>
       <span hidden data-hidden-wait>hidden wait sentinel</span>
       <button aria-label="SPA" onclick="setTimeout(() => { history.pushState({}, '', '/v2#done'); document.querySelector('output').textContent='SPA done'; }, 20)">SPA</button>
-      <button draggable="true" aria-label="Drag source">Drag source</button><button aria-label="Drop target" ondragover="event.preventDefault()" ondrop="event.preventDefault();document.querySelector('output').textContent='drag:' + event.isTrusted">Drop target</button>
+      <button draggable="true" aria-label="Drag source">Drag source</button><button aria-label="Drop target" ondragover="event.preventDefault();requestAnimationFrame(() => { this.dataset.dropFrame = 'yes'; })" ondrop="event.preventDefault();document.querySelector('output').textContent=this.dataset.dropFrame === 'yes' ? 'drag:' + event.isTrusted : 'drag:no-frame';delete this.dataset.dropFrame">Drop target</button>
       <input type="file" aria-label="Files" onchange="document.querySelector('output').textContent=this.files[0]?.name || ''" />
       <button aria-label="Attach files" onclick="const input = document.createElement('input'); input.type = 'file'; input.onchange = () => { document.querySelector('output').textContent = 'chooser:' + (input.files[0]?.name || ''); }; input.click()">Attach files</button>
       <button aria-label="No chooser">No chooser</button>
@@ -1037,8 +1056,8 @@ async function main(): Promise<void> {
       tabId: v2Tab.id,
       target: { kind: "ref", ref: String(staleFrameTarget.ref), revision: staleFrameRevision },
     });
-    if (staleFrameClick.success || !toolError(staleFrameClick).includes("Stale browser reference")) {
-      throw new Error("V2 iframe navigation did not invalidate revision-bound references.");
+    if (staleFrameClick.success || !toolError(staleFrameClick).includes("Element reference is no longer available")) {
+      throw new Error("V2 iframe navigation did not invalidate the references of that frame.");
     }
     const semanticChangeSnapshot = await runCauseEffect(browser.snapshot(v2Tab.id));
     const semanticChangeTarget = semanticChangeSnapshot.elements.find((element) => element.name === "SPA");
@@ -3261,6 +3280,8 @@ async function runDragAction(browser: BrowserHost, tabId: string, v2Contents: We
     tabId: tabId,
     source: { kind: "role", role: "button", name: "Drag source", exact: true },
     target: { kind: "role", role: "button", name: "Drop target", exact: true },
+    // The smoke tab draws about one frame each second, and each pointer move waits for a frame.
+    timeoutMs: 30_000,
   });
   if (!dragged.success) throw new Error(`V2 drag failed: ${toolError(dragged)}`);
   const dragValue = await v2Contents.executeJavaScript("document.querySelector('output').textContent", true);
@@ -3275,6 +3296,7 @@ async function runDragAction(browser: BrowserHost, tabId: string, v2Contents: We
       }))()`,
       true,
     );
+    // "drag:no-frame" means that the drop came before the frame that the page's dragover asked for.
     throw new Error(`V2 drag did not produce a trusted drop event: ${JSON.stringify(dragDiagnostics)}`);
   }
 }
@@ -4246,12 +4268,79 @@ async function runIdentityScenario(browser: BrowserHost, origin: string): Promis
   const secondTab = await runCauseEffect(browser.open(`${origin}/headers?source=second-tab`, "smoke-thread"));
   const second = await checkBrowserIdentity(browser, secondTab.id);
   await runIdentityFrameProbe(browser, origin);
+  const requestedHints = await runRequestedHintsProbe(browser, origin);
   await mkdir(".openbot-build", { recursive: true });
   await writeFile(
     ".openbot-build/browser-identity.json",
-    JSON.stringify({ initial, reloaded, navigated, second, requests: recordedIdentityAgents }, null, 2),
+    JSON.stringify({ initial, reloaded, navigated, second, requestedHints, requests: recordedIdentityAgents }, null, 2),
   );
   process.stdout.write("BrowserHost: matching page, reload, navigation, and second-tab identity passed.\n");
+}
+
+/** Each requested hint header and the `getHighEntropyValues` key that the page reads for it. */
+const REQUESTED_HINTS = [
+  ["sec-ch-ua-full-version-list", "fullVersionList"],
+  ["sec-ch-ua-full-version", "uaFullVersion"],
+  ["sec-ch-ua-platform-version", "platformVersion"],
+  ["sec-ch-ua-arch", "architecture"],
+  ["sec-ch-ua-bitness", "bitness"],
+  ["sec-ch-ua-model", "model"],
+  ["sec-ch-ua-wow64", "wow64"],
+  ["sec-ch-ua-form-factors", "formFactors"],
+] as const;
+
+/** The header value that Chrome sends for a value that the page reads. */
+function hintHeaderValue(value: unknown): string {
+  if (typeof value === "boolean") return value ? "?1" : "?0";
+  if (Array.isArray(value))
+    return value
+      .map((item) =>
+        isDynamicRecord(item) ? `"${getString(item, "brand")}";v="${getString(item, "version")}"` : `"${String(item)}"`,
+      )
+      .join(", ");
+  return `"${String(value)}"`;
+}
+
+/** A site gets the hints that it asked for, from its next request, with the values that its page reads. */
+async function runRequestedHintsProbe(browser: BrowserHost, origin: string) {
+  const tab = await runCauseEffect(browser.open(`${origin}/hints`, "smoke-thread"));
+  const read = async () => {
+    const deadline = Date.now() + 10_000;
+    while (Date.now() < deadline) {
+      const text = (await runCauseEffect(browser.snapshot(tab.id))).text;
+      if (text.trim()) {
+        const payload = JSON.parse(text);
+        if (isDynamicRecord(payload) && isDynamicRecord(payload.requestHeaders) && isDynamicRecord(payload.values))
+          return { requestHeaders: payload.requestHeaders, values: payload.values };
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    throw new Error("The requested-hints page did not report.");
+  };
+  const first = await read();
+  const early = REQUESTED_HINTS.filter(([header]) => first.requestHeaders[header] !== undefined);
+  if (early.length > 0) throw new Error(`Hints were sent before the site asked: ${JSON.stringify(early)}`);
+  await runCauseEffect(browser.reload(tab.id));
+  const second = await read();
+  // Windows gives no platform version: the host cannot compute the value that the page reads.
+  const hints = REQUESTED_HINTS.filter(
+    ([header]) => process.platform !== "win32" || header !== "sec-ch-ua-platform-version",
+  );
+  const expected = Object.fromEntries(hints.map(([header, key]) => [header, hintHeaderValue(second.values[key])]));
+  const sent = Object.fromEntries(hints.map(([header]) => [header, second.requestHeaders[header]]));
+  if (JSON.stringify(sent) !== JSON.stringify(expected))
+    throw new Error(
+      `Requested hints differ from the page: sent ${JSON.stringify(sent)}, page ${JSON.stringify(expected)}`,
+    );
+  // A redirect to a different origin must not carry the hints that the first origin asked for.
+  await runCauseEffect(browser.loadUrl(tab.id, `${origin}/hints-away`));
+  const away = await read();
+  const carried = REQUESTED_HINTS.filter(([header]) => away.requestHeaders[header] !== undefined);
+  if (!String(away.requestHeaders.host).startsWith("localhost") || carried.length > 0)
+    throw new Error(`A redirect carried hints to a different origin: ${JSON.stringify(carried)}`);
+  await runCauseEffect(browser.close(tab.id));
+  process.stdout.write("BrowserHost: requested client hints match the page.\n");
+  return sent;
 }
 
 async function checkBrowserIdentity(browser: BrowserHost, tabId: string): Promise<DynamicRecord> {

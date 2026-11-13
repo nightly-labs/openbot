@@ -86,7 +86,7 @@ function vaultFormValues(input: VaultSaveInput): Record<string, string> {
         securityCode: input.securityCode ?? "",
       };
     case "contact": {
-      const { kind: _kind, id: _id, ...fields } = input;
+      const { kind: _kind, id: _id, agents: _agents, ...fields } = input;
       return fields;
     }
     case "apiKey":

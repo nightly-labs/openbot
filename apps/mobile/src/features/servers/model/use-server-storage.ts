@@ -27,6 +27,23 @@ export function useServerStorage(serverId: string) {
     /** The host caches a scan. A retry, a deletion or a clear measures again, as on desktop. */
     async rescan(): Promise<void> {
       await queryClient.fetchQuery({ queryKey, staleTime: 0, queryFn: () => loadServerStorage(serverId, true) });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.serverDisk(queryScope, serverId) });
     },
   };
+}
+
+/**
+ * The disk of a hosted server, read when the Storage page opens and after each measurement, as on
+ * desktop. The page shows what the plan has left, not the free space of the whole disk.
+ */
+export function useServerDisk(serverId: string, enabled: boolean) {
+  const { loadServerDisk } = useMobileWorkspaceActions();
+  const queryScope = useQueryScope();
+  return useQuery({
+    queryKey: queryKeys.serverDisk(queryScope, serverId),
+    enabled,
+    retry: false,
+    staleTime: 0,
+    queryFn: () => loadServerDisk(serverId),
+  });
 }

@@ -5,11 +5,13 @@
 import { COMPARISONS } from "../content/compare";
 import { OPENBOT_PLANS } from "../content/compare/comparison";
 import { PROVIDER_PAGES } from "../content/providers";
+import { ANDROID_APK_AVAILABLE } from "../lib/android-apk";
 import { CHANGELOG_DESCRIPTION, changelogUrl } from "../lib/changelog";
 import { CONTENT_COLLECTIONS } from "../lib/content";
 import { articleUrl, type CollectionId, collectionIndexUrl } from "../lib/content-collection";
 import {
   OPENBOT_ALTERNATE_DOWNLOAD_LINKS,
+  OPENBOT_ANDROID_APK_LINK,
   OPENBOT_DOWNLOAD_LINKS,
   OPENBOT_DOWNLOAD_PAGE_LINKS,
   OPENBOT_LINKS,
@@ -54,6 +56,11 @@ function llmsTxt(): string {
     `- [Windows](${absolute(OPENBOT_DOWNLOAD_LINKS.windows)}): Windows 10 or later, x64`,
     `- [Linux](${absolute(OPENBOT_DOWNLOAD_LINKS.linux)}): x64 AppImage`,
     `- [Linux for arm64](${absolute(OPENBOT_ALTERNATE_DOWNLOAD_LINKS.linux)}): arm64 AppImage`,
+    ...(ANDROID_APK_AVAILABLE
+      ? [
+          `- [Android APK](${absolute(OPENBOT_ANDROID_APK_LINK)}): Android 7.0 or later, for a phone with no Google Play`,
+        ]
+      : []),
     `- [Source code](${OPENBOT_LINKS.repository}): PolyForm Noncommercial 1.0.0`,
     "",
   ];
