@@ -33,6 +33,7 @@ import { useText } from "../../text";
 import { ImageLightbox, type ImageLightboxOpening } from "../conversation/ImageLightbox";
 import { MediaGenerationCanvas } from "../conversation/media-generation-frame";
 import { VideoPlayer } from "../conversation/VideoPlayer";
+import { usePictureShape } from "./picture-shape";
 import { MediaModelPicker } from "./WorkflowMediaModelPicker";
 import { type PickerGroup, PickerMenu } from "./WorkflowPicker";
 import { resultValue, useBoard } from "./workflow-board";
@@ -68,6 +69,15 @@ const ASPECT_SHAPE = {
   "16:9": "workflow.image.aspect.wide",
   "9:16": "workflow.image.aspect.portrait",
 } as const satisfies Record<Aspect, AppTextKey>;
+
+/** The background of an image: the model's own, or clear pixels around the subject. */
+const BACKGROUNDS = ["solid", "transparent"] as const;
+type Background = (typeof BACKGROUNDS)[number];
+
+const BACKGROUND_TEXT = {
+  solid: "workflow.image.background.solid",
+  transparent: "workflow.image.background.transparent",
+} as const satisfies Record<Background, AppTextKey>;
 
 /** The text of each media kind. */
 const KIND_TEXT = {
@@ -228,6 +238,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
   );
   const [duration, setDuration] = useField<number>(() => props.id, "duration", WORKFLOW_VIDEO_DURATIONS[0], asSeconds);
   const [resolution, setResolution] = useField<string>(() => props.id, "resolution", "720p", asText);
+  const [background, setBackground] = useField<Background>(() => props.id, "background", "solid", oneOf(BACKGROUNDS));
   const models = () => board.catalogs().imageModels.filter((choice) => choice.kinds.includes(kind()));
   const [modelId] = useField(
     () => props.id,
@@ -240,7 +251,11 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
   const [account] = useField(() => props.id, "account", "", asString);
   /** What the model gets: a choice that it does not make shows as the one it makes in its place. */
   const specs = () =>
-    workflowMediaSpecs({ aspect: aspect(), duration: duration(), resolution: resolution() }, kind(), model());
+    workflowMediaSpecs(
+      { aspect: aspect(), duration: duration(), resolution: resolution(), background: background() },
+      kind(),
+      model(),
+    );
   const resolutions = () => workflowMediaResolutions(model(), kind());
   const [firstFrame] = useField(() => props.id, "firstFrame", "", asString);
   const [lastFrame] = useField(() => props.id, "lastFrame", "", asString);
@@ -286,6 +301,10 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
     return shown ? resultValue(shown) : props.image;
   };
   const shownUrl = () => urlOf(shownValue());
+  /** An image with clear pixels shows on the canvas with no card behind it. */
+  const shape = usePictureShape(() => (kind() === "image" ? shownUrl() : undefined));
+  const clear = () => kind() === "image" && !run.running() && shape()?.clear === true;
+  const backgroundText = () => t(BACKGROUND_TEXT[specs().transparent ? "transparent" : "solid"]);
   /** The name that a download of the media takes. */
   const fileName = () => (kind() === "video" ? "video.mp4" : "image.png");
   const [viewer, setViewer] = createSignal<ImageLightboxOpening>();
@@ -322,6 +341,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
         label={text("title")}
         kind="image"
         media
+        clear={clear()}
         thumb={(result) => (kind() === "image" ? urlOf(result.value) : undefined)}
         inputs={["text", "image"]}
         inputPorts={kind() === "video" ? videoPorts(t) : undefined}
@@ -458,6 +478,17 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                     onSelect={setResolution}
                   />
                 )}
+              </Show>
+              <Show when={kind() === "image" && model()?.transparent}>
+                <ChipMenu
+                  label={t("workflow.image.backgroundLabel", { value: backgroundText() })}
+                  title={t("workflow.image.background")}
+                  text={backgroundText()}
+                  value={specs().transparent ? "transparent" : "solid"}
+                  groups={[{ options: BACKGROUNDS.map((value) => ({ value, label: t(BACKGROUND_TEXT[value]) })) }]}
+                  disabled={specsDisabled()}
+                  onSelect={setBackground}
+                />
               </Show>
               <Show when={kind() === "video"}>
                 <Show when={model()?.voices}>

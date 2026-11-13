@@ -749,6 +749,23 @@
   box-shadow: 0 0 0 1px var(--openbot-text-muted);
 }
 
+/*
+ * A picture with clear pixels: no fill and no ring, so the canvas and its lines show through it. The
+ * whole picture shows, never cropped. The ring comes back on hover, so the edge of the node shows.
+ */
+.wfn-stage .wfn-card[data-clear],
+.wfn-stage .wfn-card[data-clear] .wfn-asset-trigger:not([data-dropping]) {
+  background: transparent;
+}
+
+.wfn-stage .wfn-card[data-clear] {
+  box-shadow: none;
+}
+
+.wfn-node .wfn-card[data-media][data-clear] .wfn-asset-trigger > .wfn-media {
+  object-fit: contain;
+}
+
 /* A file from the computer over the card: the card takes the hover fill. */
 .wfn-stage .wfn-asset-trigger[data-dropping] {
   background: var(--wfn-hover);

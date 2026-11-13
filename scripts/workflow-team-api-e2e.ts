@@ -17,6 +17,9 @@
 // The host advertises `workflows-media-account-v1` to a protocol 9 peer. An image step whose account
 // the host does not have fails with "account not found" in the real agent service, and never makes the
 // file on another account; a step with no account reaches the media maker with the own sign-in.
+// The host advertises `workflows-media-transparent-v1` to a protocol 9 peer. An image step of GPT Image
+// or Grok Imagine with `background` "transparent" reaches the media maker as a transparent request
+// with the ask of its provider; a video and a step without the field do not.
 // Agent steps answer through stand-ins, so no model turn is sent. The account check reads the provider
 // status, which can start a provider CLI to list its models; it never starts a turn or makes a file.
 // Run: `bun scripts/workflow-team-api-e2e.ts`.
@@ -42,6 +45,7 @@ import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-account-v1";
+import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
 import {
   WORKFLOWS_MEDIA_CAPABILITY,
   WORKFLOWS_MEDIA_CODECS,
@@ -87,6 +91,8 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/workflow-team-api-e2
 let sunraSignedIn = false;
 /** The account of each media request, in order. Null is the provider's own sign-in. */
 const mediaAccounts: (string | null)[] = [];
+/** Whether each media request asks for a transparent image, and its prompt, in order. */
+const mediaRequests: { transparent: boolean; prompt: string }[] = [];
 const HOST_VERSION = "0.0.0-e2e";
 const OWNER = { username: "owner-user", password: "owner-password-123" };
 const MEMBER = { username: "member-user", password: "member-password-123" };
@@ -307,6 +313,7 @@ async function startHost(): Promise<Host> {
       // no file is paid for.
       generateMedia: (request) => {
         mediaAccounts.push(request.account);
+        mediaRequests.push({ transparent: request.specs.transparent, prompt: request.prompt });
         if (request.account === null) return Effect.succeed("e2e-media-file");
         return agents.generateWorkflowMedia(request).pipe(
           Effect.mapError((failure) => ({
@@ -1378,6 +1385,49 @@ try {
       assert.equal(fallback.status, "done", JSON.stringify(fallback.error));
       assert.deepEqual(mediaAccounts, ["acct-not-on-this-host", null, null]);
       return { missing: missing.error, own: own.status, default: fallback.status, accounts: mediaAccounts };
+    },
+  );
+
+  await step(
+    "transparent image: the host advertises workflows-media-transparent-v1; GPT Image and Grok Imagine get a transparent request",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        list(
+          record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+          "capabilities",
+        );
+      assert.ok((await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V7)).includes(WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY));
+      const run = async (fields: WorkflowNode["fields"]) => {
+        const before = mediaRequests.length;
+        const workflow = await hostWorkflow(`Transparent ${String(fields.model)}`, {
+          nodes: [promptNode, { id: "image", kind: "image", at: at(300), fields }],
+          edges: [{ id: "edge", from: "prompt", to: "image", type: "text" }],
+          strokes: [],
+        });
+        const started = await ok(WORKFLOWS_ROUTES.startRun, ownerToken, {
+          workflowId: workflow.id,
+          requestId: requestId(),
+        });
+        const done = await settled(text(record(started.run, "run").id, "run id"), "image");
+        assert.equal(done.status, "done", JSON.stringify(done.error));
+        const request = mediaRequests[before];
+        assert.ok(request, "the step reached the media maker");
+        return request;
+      };
+      const gpt = await run({ model: "gpt-image", background: "transparent" });
+      assert.equal(gpt.transparent, true);
+      assert.match(gpt.prompt, /transparent background/);
+      const grok = await run({ model: "grok-imagine", background: "transparent" });
+      assert.equal(grok.transparent, true);
+      assert.match(grok.prompt, /#00FF00/);
+      const video = await run({ model: "grok-imagine", media: "video", background: "transparent" });
+      assert.equal(video.transparent, false);
+      assert.doesNotMatch(video.prompt, /#00FF00/);
+      const solid = await run({ model: "gpt-image" });
+      assert.equal(solid.transparent, false);
+      assert.doesNotMatch(solid.prompt, /transparent background/);
+      return { gpt: gpt.transparent, grok: grok.transparent, video: video.transparent, solid: solid.transparent };
     },
   );
 

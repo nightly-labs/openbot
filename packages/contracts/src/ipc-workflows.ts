@@ -107,7 +107,9 @@ export type WorkflowFieldValue = string | number | boolean;
  *   model's resolutions, such as "720p" or "2K"), and for a video `duration` (seconds), `firstFrame`
  *   and `lastFrame` (the id of an image node that an
  *   `image` edge connects, whose picture is the first or the last frame) and `voice` (an id of
- *   `WORKFLOW_VIDEO_VOICES`). The pictures of the other image nodes with an `image` edge into it are
+ *   `WORKFLOW_VIDEO_VOICES`), and for an image `background` ("transparent" for a picture with clear
+ *   pixels around its subject, from a model with `transparent`; absent is the model's own background).
+ *   The pictures of the other image nodes with an `image` edge into it are
  *   references. The output of its step is the id of the generated attachment.
  * Every other field is view state, such as a colour or a font, and the host keeps it as it is.
  */
@@ -149,6 +151,8 @@ export interface WorkflowMediaModel {
    * absent; an image without them has no resolution choice.
    */
   resolutions?: readonly string[];
+  /** Whether an image can have a transparent background (`background` "transparent"). */
+  transparent?: boolean;
 }
 
 /** The Sunra image models, from Sunra's `list_models` (2026-11-12). */
@@ -185,6 +189,7 @@ export const WORKFLOW_MEDIA_MODELS: readonly WorkflowMediaModel[] = [
     subscription: "ChatGPT",
     kinds: ["image"],
     voices: false,
+    transparent: true,
   },
   {
     id: "grok-imagine",
@@ -194,6 +199,7 @@ export const WORKFLOW_MEDIA_MODELS: readonly WorkflowMediaModel[] = [
     subscription: "Grok",
     kinds: ["image", "video"],
     voices: true,
+    transparent: true,
   },
   sunraModel("nano-banana-pro", "Nano Banana Pro", "Google", "image", { resolutions: SUNRA_IMAGE_RESOLUTIONS }),
   sunraModel("gpt-image-2", "GPT Image 2", "OpenAI", "image", { resolutions: SUNRA_IMAGE_RESOLUTIONS }),
@@ -236,7 +242,7 @@ export function workflowMediaKind(fields: WorkflowFields): WorkflowMediaKind {
 }
 
 /** The choices of a model, or of every model when it is not known. */
-type WorkflowMediaRange = Pick<WorkflowMediaModel, "aspects" | "durations" | "resolutions">;
+type WorkflowMediaRange = Pick<WorkflowMediaModel, "aspects" | "durations" | "resolutions" | "transparent">;
 
 export function workflowMediaAspects(model: WorkflowMediaRange | null | undefined): readonly WorkflowMediaAspect[] {
   return model?.aspects ?? WORKFLOW_MEDIA_ASPECTS;
@@ -260,6 +266,8 @@ export interface WorkflowMediaSpecs {
   /** Seconds. Only a video uses it. */
   duration: number;
   resolution: string | null;
+  /** An image with a transparent background. Only an image of a model with `transparent` has one. */
+  transparent: boolean;
 }
 
 /**
@@ -283,7 +291,8 @@ export function workflowMediaSpecs(
   const resolutions = workflowMediaResolutions(model, kind);
   const preferred = typeof fields.resolution === "string" ? fields.resolution : "720p";
   const resolution = resolutions.includes(preferred) ? preferred : (resolutions[0] ?? null);
-  return { aspect, duration, resolution };
+  const transparent = kind === "image" && model?.transparent === true && fields.background === "transparent";
+  return { aspect, duration, resolution, transparent };
 }
 
 /** The model of an `image` node, or null when the node names a model the host does not know. */
