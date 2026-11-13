@@ -1691,7 +1691,8 @@ textarea {
 }
 
 /* The chat count of a closed section follows its name, as in the Hidden group, and pushes the end
-   of the header to the far side. A long name shortens before the count does. */
+   of the header to the far side. A long name shortens before the count does. The start margin takes
+   the 8px gap of .sidebar-section-toggle back to the space-1 of the Hidden group count. */
 .sidebar-section-count {
   flex: 0 0 auto;
   margin-inline: calc(var(--openbot-space-1) - 8px) auto;

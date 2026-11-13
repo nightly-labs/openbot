@@ -4,9 +4,9 @@
  * caller - both regions that show a section header reach it through here.
  *
  * A folder in a folder names its parent before its own name, in muted text, because folders do not
- * indent. A folder header ends with a folder icon, and a section header with a chevron. While a
- * section is closed, its header shows how many chats it holds and how many messages in them are
- * unread, so a chat that arrives in it does not go unseen.
+ * indent. A folder header ends with a folder icon, and the unassigned section with a chevron. While
+ * a folder or the unassigned section is closed, its header shows how many chats it hides and how
+ * many messages in them are unread, so a chat that arrives in it does not go unseen (#7982).
  */
 
 import { SIDEBAR_FOLDER_LEVELS } from "@openbot/contracts/ipc";
@@ -26,7 +26,7 @@ import {
   Pencil,
   Trash2,
 } from "@openbot/ui";
-import { For, Show } from "solid-js";
+import { createMemo, For, Show } from "solid-js";
 import { useText } from "../../text";
 import { SidebarSectionEditor } from "./SidebarSectionEditor";
 import { useSidebarScope } from "./sidebar-scope";
@@ -70,7 +70,7 @@ export function SidebarSectionHeader(headerProps: { sectionId: string; name: str
   const parentId = () => sectionParent(headerProps.sectionId);
   const parentName = () => customSectionById().get(parentId() ?? "")?.name;
   const unread = () => (collapsed() ? sectionUnreadCount(headerProps.sectionId) : 0);
-  const hidden = () => (collapsed() ? sectionChatCount(headerProps.sectionId) : 0);
+  const hidden = createMemo(() => (collapsed() ? sectionChatCount(headerProps.sectionId) : 0));
   /** An open folder that holds nothing shows a closed folder icon. */
   const empty = () =>
     (filteredChatsBySection().get(headerProps.sectionId)?.length ?? 0) === 0 &&
@@ -125,7 +125,7 @@ export function SidebarSectionHeader(headerProps: { sectionId: string; name: str
             </span>
             <Show when={hidden() > 0}>
               <span class="sidebar-section-count" aria-hidden="true">
-                {t("sidebar.hidden.count", { count: hidden() })}
+                {t("sidebar.section.count", { count: hidden() })}
               </span>
               <span class="sr-only">{t("sidebar.section.chatCount", { count: hidden() })}</span>
             </Show>

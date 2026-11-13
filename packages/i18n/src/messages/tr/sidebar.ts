@@ -50,6 +50,7 @@ export const messages = {
   "sidebar.section.saveFailed": "Bu klasör kaydedilemedi. Tekrar deneyin.",
   "sidebar.section.unassigned": "Atanmamış",
   "sidebar.section.chatCount": { one: "{count} sohbet", other: "{count} sohbet" },
+  "sidebar.section.count": { one: "({count})", other: "({count})" },
   "sidebar.section.people": "Kişiler",
   "sidebar.section.fallback": "Klasör",
   "sidebar.folder.newInside": "Yeni alt klasör",

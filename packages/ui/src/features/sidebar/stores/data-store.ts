@@ -384,8 +384,9 @@ export function createSidebarDataStore(deps: {
   }
 
   /**
-   * The chats that a closed section hides, for the count on its header. Without it, a chat that an
-   * agent adds to a closed section, such as an agent it creates, shows nowhere (#7982).
+   * The chats that a closed section hides, for the count on its header: its own and those of the
+   * folders in it. Pinned chats and the chats in "Needs you" or "Unread" show elsewhere, so they do
+   * not count. Without it, an agent that another agent creates in a closed section shows nowhere (#7982).
    */
   function sectionChatCount(sectionId: string): number {
     return sectionChatIdsDeep(sectionId).length;

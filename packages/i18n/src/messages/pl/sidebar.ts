@@ -55,6 +55,7 @@ export const messages = {
     many: "{count} czatów",
     other: "{count} czatu",
   },
+  "sidebar.section.count": { one: "({count})", few: "({count})", many: "({count})", other: "({count})" },
   "sidebar.section.people": "Osoby",
   "sidebar.section.fallback": "Folder",
   "sidebar.folder.newInside": "Nowy podfolder",

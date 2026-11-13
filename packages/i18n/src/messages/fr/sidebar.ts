@@ -50,6 +50,7 @@ export const messages = {
   "sidebar.section.saveFailed": "Impossible d’enregistrer ce dossier. Réessayez.",
   "sidebar.section.unassigned": "Non attribué",
   "sidebar.section.chatCount": { one: "{count} discussion", other: "{count} discussions" },
+  "sidebar.section.count": { one: "({count})", other: "({count})" },
   "sidebar.section.people": "Personnes",
   "sidebar.section.fallback": "Dossier",
   "sidebar.folder.newInside": "Nouveau sous-dossier",

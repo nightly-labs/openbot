@@ -50,6 +50,7 @@ export const messages = {
   "sidebar.section.saveFailed": "לא ניתן היה לשמור את התיקייה הזו. יש לנסות שוב.",
   "sidebar.section.unassigned": "ללא שיוך",
   "sidebar.section.chatCount": { one: "צ'אט אחד", two: "שני צ'אטים", other: "{count} צ'אטים" },
+  "sidebar.section.count": { one: "({count})", two: "({count})", other: "({count})" },
   "sidebar.section.people": "אנשים",
   "sidebar.section.fallback": "תיקייה",
   "sidebar.folder.newInside": "תיקייה חדשה בפנים",

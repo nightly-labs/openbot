@@ -55,6 +55,7 @@ export const messages = {
     many: "{count} чатов",
     other: "{count} чата",
   },
+  "sidebar.section.count": { one: "({count})", few: "({count})", many: "({count})", other: "({count})" },
   "sidebar.section.people": "Люди",
   "sidebar.section.fallback": "Папка",
   "sidebar.folder.newInside": "Новая вложенная папка",
