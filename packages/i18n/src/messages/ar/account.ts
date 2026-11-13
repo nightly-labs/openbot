@@ -63,6 +63,7 @@ export const messages = {
   "account.update.downloadLabel": "تنزيل التحديث. يتوفر تحديث جديد.",
   "account.update.available": "يتوفر تحديث جديد",
   "account.update.ready": "التحديث جاهز",
+  "account.update.notInstalled": "لم يُثبَّت التحديث",
   "account.update.progress": "تقدّم تنزيل التحديث",
   "account.login.connectingTitle": "جارٍ الاتصال بـ OpenBot",
   "account.login.unavailableTitle": "الخدمة غير متاحة",

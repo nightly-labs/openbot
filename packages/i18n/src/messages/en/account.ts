@@ -55,6 +55,7 @@ export const messages = defineMessages("account", {
   "account.update.downloadLabel": "Download update. New update available.",
   "account.update.available": "New update available",
   "account.update.ready": "Update ready",
+  "account.update.notInstalled": "Update not installed",
   "account.update.progress": "Update download progress",
   "account.login.connectingTitle": "Connecting to OpenBot",
   "account.login.unavailableTitle": "Service unavailable",

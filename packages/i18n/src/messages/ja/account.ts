@@ -56,6 +56,7 @@ export const messages = {
   "account.update.downloadLabel": "アップデートをダウンロードします。新しいアップデートがあります。",
   "account.update.available": "新しいアップデートがあります",
   "account.update.ready": "アップデートの準備ができました",
+  "account.update.notInstalled": "アップデート未インストール",
   "account.update.progress": "アップデートのダウンロードの進行状況",
   "account.login.connectingTitle": "OpenBot に接続しています",
   "account.login.unavailableTitle": "サービスを利用できません",
