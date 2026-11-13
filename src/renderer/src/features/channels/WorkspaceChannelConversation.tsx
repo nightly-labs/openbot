@@ -82,6 +82,9 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
       if (event?.type === "browser-takeover-requested") requests.push(event.request);
     return requests;
   });
+  const prompts = createMemo(() =>
+    Object.values(pendingPrompts()).flatMap((event) => (event?.type === "prompt" ? [event] : [])),
+  );
   const view = createChannelConversation({
     channelId: props.channelId,
     isOwnSender,
@@ -96,6 +99,7 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
     },
     approvals,
     takeovers,
+    prompts,
     pausedAgentIds: userPausedAgentIds,
   });
   // A usage limit that holds the member whose turn a queued request waits for, the lead while no member

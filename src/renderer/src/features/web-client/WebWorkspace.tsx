@@ -3728,6 +3728,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       },
                       approvals: () => workspace.state.approvals,
                       takeovers: () => workspace.state.takeovers,
+                      prompts: () => workspace.state.prompts,
                       pausedAgentIds,
                     });
                     return (
