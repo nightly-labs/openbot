@@ -28,18 +28,15 @@
 
 /* With a title, the name button gets narrower before any other part of the header, but not narrower
    than the avatar and the name. */
-.conversation-title:has(> h1 > .conversation-agent-title-room) {
-  min-width: auto;
-  flex-shrink: 1000;
-}
-
+.conversation-title:has(> h1 > .conversation-agent-title-room),
 .conversation-heading-group:not(:has(> .agent-threads-header)):has(.conversation-agent-title-room) {
   min-width: auto;
   flex-shrink: 1000;
 }
 
-/* The name keeps its width. The title column takes only the room that is left, down to none. */
-.conversation-title h1 {
+/* The name keeps its width. The title column takes only the room that is left, down to none. A
+   channel heading is not in this grid: its name has its own ellipsis (channels.css). */
+.conversation-agent-heading {
   display: grid;
   min-width: 0;
   grid-template-columns: auto minmax(0, max-content);

@@ -62,12 +62,6 @@ function AgentTitle(props: { title: string }) {
   onSettled(() => {
     const header = room?.closest(".conversation-header");
     if (!room || !header) return;
-    const measure = () => {
-      if (!room) return;
-      room.removeAttribute("data-hidden");
-      const minimum = AGENT_TITLE_MIN_EM * (Number.parseFloat(getComputedStyle(room).fontSize) || 12);
-      room.toggleAttribute("data-hidden", room.getBoundingClientRect().width < minimum);
-    };
     // The next frame measures, not the observer, because hiding the title resizes observed parts.
     let frame = 0;
     const observer = new ResizeObserver(() => {
@@ -77,13 +71,24 @@ function AgentTitle(props: { title: string }) {
           measure();
         });
     });
+    const measure = () => {
+      if (!room) return;
+      // The thread row can mount after the title. Observing a part again has no effect.
+      for (const part of header.querySelectorAll(
+        ".conversation-title, .conversation-heading-group, .conversation-header-actions, .agent-threads-header",
+      )) {
+        observer.observe(part);
+      }
+      room.removeAttribute("data-hidden");
+      const style = getComputedStyle(room);
+      // When a style rule hides the title (folded thread tabs), the size is not known. The title then
+      // stays without the mark, and the observer measures it again when the rule shows it.
+      if (style.display === "none") return;
+      const minimum = AGENT_TITLE_MIN_EM * (Number.parseFloat(style.fontSize) || 12);
+      room.toggleAttribute("data-hidden", room.getBoundingClientRect().width < minimum);
+    };
     observer.observe(room);
     observer.observe(header);
-    for (const part of header.querySelectorAll(
-      ".conversation-title, .conversation-heading-group, .conversation-header-actions, .agent-threads-header",
-    )) {
-      observer.observe(part);
-    }
     measure();
     return () => {
       observer.disconnect();
@@ -121,7 +126,7 @@ export function ConversationHeader(props: ConversationHeaderProps) {
               onClick={() => (props.onOpenChat ?? props.onOpenSettings)()}
             >
               <AgentAvatar agent={agent()} />
-              <h1 dir="auto">
+              <h1 class="conversation-agent-heading" dir="auto">
                 <span class="conversation-agent-name">{agent().name}</span>
                 <Show when={agent().title.trim()}>{(title) => <AgentTitle title={title()} />}</Show>
               </h1>
