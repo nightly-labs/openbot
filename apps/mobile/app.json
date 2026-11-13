@@ -10,6 +10,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "run.openbot.mobile",
+      "appleTeamId": "8A47NKRZSJ",
       "supportsTablet": true,
       "associatedDomains": ["applinks:openbot.run"],
       "infoPlist": {
@@ -234,7 +235,8 @@
           "groupIdentifier": "group.run.openbot.mobile"
         }
       ],
-      "./plugins/with-shortcuts"
+      "./plugins/with-shortcuts",
+      "./plugins/with-xcode-warning-fixes"
     ],
     "experiments": {
       "typedRoutes": true,

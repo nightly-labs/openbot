@@ -1,11 +1,11 @@
 import ExpoModulesCore
 import UIKit
 
-final class NoFilesException: Exception {
+final class NoFilesException: Exception, @unchecked Sendable {
   override var reason: String { "No files to share" }
 }
 
-final class NoPresenterException: Exception {
+final class NoPresenterException: Exception, @unchecked Sendable {
   override var reason: String { "No screen can show the share sheet" }
 }
 
