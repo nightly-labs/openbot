@@ -161,6 +161,10 @@ export function useChatMotion(
   // While the chat opens, the list keeps the latest message in view: older rows come above the
   // first rows and get their sizes, and the latest page can add messages after the kept ones.
   const [openingFollow, setOpeningFollow] = useState(!holdOpening);
+  // The reader asked for the latest message with the button. The list then keeps the end in view
+  // while a reply grows, so the button does not come back after each new line. A drag or a sent
+  // message ends it: the reader then chooses the place again, or the sent message takes its own.
+  const [pinnedToLatest, setPinnedToLatest] = useState(false);
   const heldOpening = useRef(holdOpening);
   const current = useRef({ lastUserId });
   current.current = { lastUserId };
@@ -349,6 +353,7 @@ export function useChatMotion(
   const beginSend = useCallback(() => {
     // A sent message takes its own place in the list.
     setOpeningFollow(false);
+    setPinnedToLatest(false);
     followLatest.current = true;
     setKeyboardLiftBehavior("whenAtEnd");
     const baseline = current.current.lastUserId;
@@ -373,6 +378,7 @@ export function useChatMotion(
   /** The reader, not the chat, now chooses the position. */
   const leaveLatest = useCallback(() => {
     setUserScrolled(true);
+    setPinnedToLatest(false);
     followLatest.current = false;
     setKeyboardLiftBehavior("never");
   }, []);
@@ -448,6 +454,7 @@ export function useChatMotion(
   );
   const scrollToLatest = useCallback(() => {
     followLatest.current = true;
+    setPinnedToLatest(true);
     setKeyboardLiftBehavior("whenAtEnd");
     void listRef.current?.scrollToEnd({ animated: !reducedMotion });
   }, [reducedMotion]);
@@ -471,7 +478,10 @@ export function useChatMotion(
        * The list keeps the latest message in view. A question waits for the reader at the end of the
        * chat while it grows, and an opening chat stays at the latest message until the reader drags.
        */
-      followsEnd: (requiredInputId !== null && keyboardLiftBehavior === "whenAtEnd") || (openingFollow && !holdOpening),
+      followsEnd:
+        (requiredInputId !== null && keyboardLiftBehavior === "whenAtEnd") ||
+        (openingFollow && !holdOpening) ||
+        pinnedToLatest,
       scrollOffset,
       historyStyle,
       firstMessageStyle,
@@ -504,6 +514,7 @@ export function useChatMotion(
       keyboardLiftBehavior,
       requiredInputId,
       openingFollow,
+      pinnedToLatest,
       scrollOffset,
       historyStyle,
       firstMessageStyle,

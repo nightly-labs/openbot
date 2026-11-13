@@ -103,12 +103,17 @@ export function localAttachmentPreview(file: { mimeType: string; base64: string;
  * source text, and a large data URL ran the app out of memory. A large file is not kept as Base64
  * in the cache. A file that cannot be written leaves the data.
  */
-function keepFile(serverId: string, attachment: AttachmentSummary, data: RemoteFileUpload): string | undefined {
+async function keepFile(
+  serverId: string,
+  attachment: AttachmentSummary,
+  data: RemoteFileUpload,
+): Promise<string | undefined> {
   try {
     const file = mediaFile(serverId, attachment);
     if (!file.exists || file.size !== attachment.size) {
       file.parentDirectory.create({ intermediates: true, idempotent: true });
-      file.writeSync(data.base64, { encoding: "base64" });
+      // Not `writeSync`: it decodes and writes megabytes on the JS thread, which also places the chat rows.
+      await file.write(data.base64, { encoding: "base64" });
     }
     return file.uri;
   } catch {
@@ -138,7 +143,7 @@ function keptFile(serverId: string, attachment: AttachmentSummary): (RemoteFileU
  * not read back into memory.
  */
 async function writeFileData(file: File, data: RemoteFileUpload & { fileUri?: string }) {
-  if (data.base64 || !data.fileUri) file.writeSync(data.base64, { encoding: "base64" });
+  if (data.base64 || !data.fileUri) await file.write(data.base64, { encoding: "base64" });
   else await new File(data.fileUri).copy(file);
 }
 
@@ -264,7 +269,8 @@ function attachmentFileQuery(
       if (kept) return kept;
       const data = await downloadAttachment(serverId, attachment.id, largeDownloadOf(attachment));
       const large = attachment.size > MOBILE_ATTACHMENT_BYTES;
-      const fileUri = large || data.mimeType.startsWith("image/") ? keepFile(serverId, attachment, data) : undefined;
+      const fileUri =
+        large || data.mimeType.startsWith("image/") ? await keepFile(serverId, attachment, data) : undefined;
       // The cache does not keep the Base64 of a large file that is on disk: the file has it.
       return fileUri && large ? { ...data, base64: "", fileUri } : { ...data, fileUri };
     },
@@ -558,7 +564,7 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
       for (const attachment of attachments) {
         const data = await load(attachment);
         // The chat media folder holds the file with a safe name, and the next launch clears it.
-        const uri = data.fileUri ?? keepFile(serverId, attachment, data);
+        const uri = data.fileUri ?? (await keepFile(serverId, attachment, data));
         if (!uri)
           throw new Error(
             images ? t("mobile.chat.attachment.imageUnavailable") : t("mobile.chat.attachment.unavailable"),

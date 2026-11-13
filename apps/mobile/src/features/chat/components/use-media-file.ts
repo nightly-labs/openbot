@@ -80,7 +80,8 @@ export function useMediaFile(serverId: string, attachment: AttachmentSummary, en
       if (file.exists && file.size === attachment.size) return file.uri;
       const data = await downloadAttachment(serverId, attachment.id, largeDownloadOf(attachment));
       file.parentDirectory.create({ intermediates: true, idempotent: true });
-      file.writeSync(data.base64, { encoding: "base64" });
+      // Not `writeSync`: it decodes and writes megabytes on the JS thread, which also places the chat rows.
+      await file.write(data.base64, { encoding: "base64" });
       return file.uri;
     },
     retry: false,

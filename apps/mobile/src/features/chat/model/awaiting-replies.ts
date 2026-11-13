@@ -81,6 +81,26 @@ export function awaitingReplies(
   return [...rows.filter((row) => row.wait), ...rows.filter((row) => !row.wait)];
 }
 
+/** True when both lists have the same rows, with the same content, in the same order. */
+export function sameAwaitingReplies(before: readonly AwaitingReply[], after: readonly AwaitingReply[]): boolean {
+  return (
+    before.length === after.length &&
+    after.every((row, index) => {
+      const kept = before[index];
+      return (
+        kept !== undefined &&
+        kept.id === row.id &&
+        kept.agentId === row.agentId &&
+        kept.state === row.state &&
+        kept.preview === row.preview &&
+        kept.deliveryId === row.deliveryId &&
+        kept.wait?.reason === row.wait?.reason &&
+        kept.wait?.detail === row.wait?.detail
+      );
+    })
+  );
+}
+
 /** Null for a delivery that has landed: its answer is in the transcript, or it had none. */
 function deliveryState(status: QueueDelivery["status"]): Exclude<AwaitingReplyState, "replied"> | null {
   if (status === "queued") return "asked";
