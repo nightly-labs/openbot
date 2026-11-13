@@ -17,7 +17,11 @@ import { resolveCreationModel } from "../agents/agent-creation-model";
 import { useAgents } from "../agents/agents-context";
 import { useCustomAgents } from "../custom-agents/custom-agents-context";
 import { useSetup } from "../onboarding/onboarding-context";
-import { serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
+import {
+  serverCanAdminister,
+  serverSetsWebhookSenderSecret,
+  serverSupportsCapability,
+} from "../servers/server-capabilities";
 import { useServers } from "../servers/servers-context";
 import { RoutineFlowsCanvas } from "./RoutineFlowsCanvas";
 import { desktopRoutineFlowsHost } from "./routine-flows-port";
@@ -73,6 +77,7 @@ export function WorkspaceRoutineFlows() {
     return server?.kind === "remote" && !server.compatibility?.hostAppVersion;
   };
   const webhooks = () => serverCanAdminister(activeServer(), EVENTS_CAPABILITY);
+  const senderSecret = () => serverSetsWebhookSenderSecret(activeServer());
   /** A routine is made in the agent's settings, so the agent's chat opens with a new routine in them. */
   function createRoutine(agentId: string): void {
     layout.setSidebarView("agents");
@@ -94,7 +99,7 @@ export function WorkspaceRoutineFlows() {
     >
       {(id) => (
         <RoutineFlowsCanvas
-          host={desktopRoutineFlowsHost(id, webhooks)}
+          host={desktopRoutineFlowsHost(id, webhooks, senderSecret)}
           agent={activeAgent()}
           agents={agentList()}
           newAgentModels={newAgentModels()}

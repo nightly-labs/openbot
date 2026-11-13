@@ -24,6 +24,11 @@ export interface DiagramWebhookActions {
   onSave: (routineNodeId: string, change: { eventType: string | null; filters: EventFilter[] }) => Promise<void>;
   /** Makes a new signing secret and answers it, to be shown one time. */
   onRegenerateSecret: (routineNodeId: string) => Promise<string>;
+  /**
+   * Replaces the secret with one that the sender made, such as a Composio or Svix secret. Absent
+   * when the host cannot do this.
+   */
+  onUseSenderSecret?: ((routineNodeId: string, secret: string) => Promise<void>) | undefined;
 }
 
 export function DiagramRoutineWebhookConfig(props: {
@@ -38,6 +43,15 @@ export function DiagramRoutineWebhookConfig(props: {
   const [saving, setSaving] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
 
+  /** Uses a secret that the sender made. A secret from Regenerate that still shows no longer works. */
+  const senderSecret = () => {
+    const use = props.actions.onUseSenderSecret;
+    if (!use) return undefined;
+    return async (value: string) => {
+      await use(props.routineNodeId, value);
+      setSecret(null);
+    };
+  };
   const changed = () =>
     (eventType().trim() || null) !== props.webhook.eventType ||
     JSON.stringify(eventFiltersFromDrafts(filters())) !== JSON.stringify(props.webhook.filters);
@@ -71,6 +85,7 @@ export function DiagramRoutineWebhookConfig(props: {
         onRegenerateSecret={async () => {
           setSecret(await props.actions.onRegenerateSecret(props.routineNodeId));
         }}
+        onUseSenderSecret={senderSecret()}
       />
       <Show when={error()}>{(message) => <p role="alert">{message()}</p>}</Show>
       <Show when={changed()}>

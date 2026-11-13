@@ -421,6 +421,14 @@ export function RoutineFlowsCanvas(props: RoutineFlowsCanvasProps) {
                         const { secret } = await webhooks.rotateSecret({ id: routine.id, owner: ownerOf(routine) });
                         return secret;
                       },
+                      onUseSenderSecret: host().webhooks?.setSecret
+                        ? async (routineNodeId, secret) => {
+                            const routine = routineOfNode(routineNodeId);
+                            const set = host().webhooks?.setSecret;
+                            if (!routine || !set) throw new Error(t("routine.webhook.senderSecretFailed"));
+                            await set({ id: routine.id, owner: ownerOf(routine), secret });
+                          }
+                        : undefined,
                     }
                   : undefined
               }
