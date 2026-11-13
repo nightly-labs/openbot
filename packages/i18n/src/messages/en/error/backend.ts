@@ -108,6 +108,7 @@ export const messages = defineMessages("error.backend", {
   "error.backend.memoryOperationFailed": "The memory operation failed. Try again.",
   "error.backend.memoryGone": "This memory no longer exists.",
   "error.backend.routineGone": "This routine no longer exists.",
+  "error.backend.routineRunGone": "This routine run no longer exists.",
   "error.backend.turnNotStarted": "The provider did not start this turn.",
   "error.backend.routineResultConnectionOff": "This messaging connection is off or removed. Choose another place.",
   "error.backend.routineResultNoDelivery": "This run has no answer to send again.",

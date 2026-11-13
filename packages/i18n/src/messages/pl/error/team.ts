@@ -72,6 +72,7 @@ export const messages = {
   "error.team.agentColorsUnsupported": "To połączenie nie obsługuje kolorów agentów.",
   "error.team.chatColorsUnsupported": "To połączenie nie obsługuje kolorów czatu.",
   "error.team.routineRunPlaceUnsupported": "To połączenie nie może zmienić miejsca uruchamiania rutyny.",
+  "error.team.routineFlowStopUnsupported": "To połączenie nie może zatrzymać uruchomienia rutyny.",
   "error.team.sidebarFoldersUnsupported": "To połączenie nie obsługuje folderów w folderach.",
   "error.team.agentNotificationLevelsUnsupported":
     "Ten serwer nie może zapisać Twojego poziomu powiadomień dla każdego agenta. Zaktualizuj OpenBot na komputerze, na którym działa.",

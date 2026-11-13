@@ -71,6 +71,7 @@ export const messages = {
   "error.team.agentColorsUnsupported": "צבעי סוכנים אינם נתמכים בחיבור הזה.",
   "error.team.chatColorsUnsupported": "צבעי צ'אטים אינם נתמכים בחיבור הזה.",
   "error.team.routineRunPlaceUnsupported": "החיבור הזה אינו יכול לשנות היכן שגרה רצה.",
+  "error.team.routineFlowStopUnsupported": "החיבור הזה לא יכול לעצור הרצה של שגרה.",
   "error.team.sidebarFoldersUnsupported": "תיקיות בתוך תיקיות אינן נתמכות בחיבור הזה.",
   "error.team.agentNotificationLevelsUnsupported":
     "השרת הזה אינו יכול לשמור רמת התראות אישית לכל סוכן. יש לעדכן את OpenBot במחשב שמריץ אותו.",

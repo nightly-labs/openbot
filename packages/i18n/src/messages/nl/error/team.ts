@@ -74,6 +74,7 @@ export const messages = {
   "error.team.agentColorsUnsupported": "Deze verbinding ondersteunt geen agentkleuren.",
   "error.team.chatColorsUnsupported": "Deze verbinding ondersteunt geen chatkleuren.",
   "error.team.routineRunPlaceUnsupported": "Deze verbinding kan niet wijzigen waar een routine wordt uitgevoerd.",
+  "error.team.routineFlowStopUnsupported": "Deze verbinding kan een routine-uitvoering niet stoppen.",
   "error.team.sidebarFoldersUnsupported": "Deze verbinding ondersteunt geen mappen in mappen.",
   "error.team.agentNotificationLevelsUnsupported":
     "Deze server kan geen eigen meldingsniveau per agent bewaren. Werk OpenBot bij op de computer waarop de server draait.",

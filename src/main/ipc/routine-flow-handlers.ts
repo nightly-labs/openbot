@@ -1,6 +1,10 @@
 // Routine flows: the canvas of one agent's routines and the handoffs between its agents. This
 // computer's host answers from its own runtime; a joined server answers through `routine-flows-v1`.
 
+import {
+  ROUTINE_FLOW_STOP_CAPABILITY,
+  ROUTINE_FLOW_STOP_ROUTES,
+} from "@openbot/contracts/team-protocol/routine-flow-stop-v1";
 import { ROUTINE_FLOWS_CAPABILITY, ROUTINE_FLOWS_ROUTES } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import { sourceText } from "@openbot/i18n/source";
 import type { Effect } from "effect";
@@ -17,12 +21,16 @@ import {
   parseDisconnectRoutineFlow,
   parseRemoveRoutineFlowPosition,
   parseSaveRoutineFlowPosition,
+  parseStopRoutineFlowRun,
   parseUpdateRoutineFlowLink,
 } from "./routine-flow-inputs";
 import { scopedHandler } from "./scoped-handler";
 
 interface RoutineFlowRemoteServers {
-  supportsCapability(serverId: string, capability: typeof ROUTINE_FLOWS_CAPABILITY): boolean;
+  supportsCapability(
+    serverId: string,
+    capability: typeof ROUTINE_FLOWS_CAPABILITY | typeof ROUTINE_FLOW_STOP_CAPABILITY,
+  ): boolean;
   request<T>(
     serverId: string,
     path: string,
@@ -72,6 +80,14 @@ export function routineFlowIpcHandlers({
         local: (input) => runCauseEffect(routineFlows.updateLink(input)),
         remote: (input, serverId) =>
           remote(serverId, ROUTINE_FLOWS_ROUTES.updateLink, decodeRemoteRoutineFlowLink, input),
+      }),
+      stopRun: scopedHandler(parseStopRoutineFlowRun, {
+        local: (input) => runCauseEffect(routineFlows.stopRun(input)),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, ROUTINE_FLOW_STOP_CAPABILITY))
+            throw new Error(sourceText("error.team.routineFlowStopUnsupported"));
+          return remote(serverId, ROUTINE_FLOW_STOP_ROUTES.stopRun, acceptEmpty, input);
+        },
       }),
     },
   };

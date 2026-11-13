@@ -474,6 +474,7 @@ import type {
   RoutineFlowCanvas,
   RoutineFlowLink,
   SaveRoutineFlowPositionInput,
+  StopRoutineFlowRunInput,
   UpdateRoutineFlowLinkInput,
 } from "./ipc-routine-flows";
 import type {
@@ -1805,6 +1806,8 @@ export const IPC_ENDPOINTS = {
     connect: scopedRequest<ConnectRoutineFlowInput, RoutineFlowLink>()("routine-flows:connect"),
     disconnect: scopedRequest<DisconnectRoutineFlowInput, void>()("routine-flows:disconnect"),
     updateLink: scopedRequest<UpdateRoutineFlowLinkInput, RoutineFlowLink>()("routine-flows:update-link"),
+    /** Stops a run that has not ended. A joined server answers through `routine-flow-stop-v1`. */
+    stopRun: scopedRequest<StopRoutineFlowRunInput, void>()("routine-flows:stop-run"),
   },
   /**
    * Workflows: graphs of steps drawn on a canvas, their versions and their runs. The agent event

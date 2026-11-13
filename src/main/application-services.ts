@@ -2204,6 +2204,14 @@ export async function createApplicationServices({
       turnAnswer,
       agentName: (agentId) => store.list().find((agent) => agent.id === agentId)?.name ?? agentId,
       sendHandoff: (input) => service.enqueueRoutineHandoff(input),
+      stopRoutineRun: (input) => service.stopRoutineRun(input),
+      stopDelivery: (agentId, deliveryId) => {
+        const found = mailbox.getDelivery(deliveryId)?.delivery;
+        if (!found) return Effect.void;
+        return found.status === "running" && found.turnId
+          ? service.interrupt(agentId, found.turnId)
+          : service.cancelQueuedMessage(agentId, deliveryId);
+      },
       // An agent event, so this window, joined clients and the web app hear it the same way.
       changed: (agentIds) => {
         for (const agentId of agentIds) service.notifyRoutineFlowsChanged(agentId);

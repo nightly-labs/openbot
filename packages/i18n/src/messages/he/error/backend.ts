@@ -103,6 +103,7 @@ export const messages = {
   "error.backend.memoryOperationFailed": "פעולת הזיכרון נכשלה. יש לנסות שוב.",
   "error.backend.memoryGone": "הזיכרון הזה כבר אינו קיים.",
   "error.backend.routineGone": "השגרה הזו כבר אינה קיימת.",
+  "error.backend.routineRunGone": "הרצת השגרה הזו כבר אינה קיימת.",
   "error.backend.turnNotStarted": "הספק לא התחיל את התור הזה.",
   "error.backend.routineResultConnectionOff": "חיבור ההודעות הזה כבוי או הוסר. יש לבחור מקום אחר.",
   "error.backend.routineResultNoDelivery": "להרצה הזו אין תשובה לשלוח שוב.",

@@ -103,5 +103,20 @@ export function mockRoutineFlows(
       const [removed] = links.splice(index, 1);
       if (removed) changed([owner(removed.routineId) ?? removed.fromAgentId, removed.fromAgentId, removed.toAgentId]);
     },
+    // A stopped run ends as cancelled, its open steps with it; a run that has ended stays as it is.
+    stopRun: async (input) => {
+      const run = source.routineRuns.get(input.routineId)?.find((candidate) => candidate.id === input.runId);
+      if (!run) throw new Error("This routine run no longer exists.");
+      const now = new Date().toISOString();
+      if (run.status === "queued" || run.status === "running" || run.status === "needs-attention")
+        Object.assign(run, { status: "cancelled", updatedAt: now });
+      for (const step of steps)
+        if (step.runId === run.id && step.status === "running")
+          Object.assign(step, { status: "cancelled", updatedAt: now });
+      changed([
+        run.agentId,
+        ...links.filter((link) => link.routineId === input.routineId).map((link) => link.toAgentId),
+      ]);
+    },
   };
 }

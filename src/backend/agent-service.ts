@@ -2183,6 +2183,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       .pipe(Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "testRoutine", cause: failure.cause })));
   }
 
+  /** The user's Stop for one routine run that has not ended; see `RoutineScheduler.stopRun`. */
+  stopRoutineRun(input: {
+    agentId: string;
+    routineId: string;
+    runId: string;
+  }): Effect.Effect<void, AgentLifecycleFailed> {
+    return this.#routines
+      .stopRun(input)
+      .pipe(
+        Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "stopRoutineRun", cause: failure.cause })),
+      );
+  }
+
   /** Hands a routine run's work on to the next agent of its flow; answers the delivery id. */
   enqueueRoutineHandoff(input: {
     run: Pick<RoutineRun, "id" | "routineId" | "routineName" | "scheduledFor">;

@@ -878,6 +878,7 @@ const openbotApi: OpenBotDesktopApi = {
     connect: decodeRoutineFlowLink,
     disconnect: decodeVoid,
     updateLink: decodeRoutineFlowLink,
+    stopRun: decodeVoid,
   }),
   workflows: bridgeGroup(IPC_ENDPOINTS.workflows, {
     list: decodeWorkflowSummaries,

@@ -101,6 +101,7 @@ export const messages = {
   "error.backend.memoryOperationFailed": "记忆操作失败，请重试。",
   "error.backend.memoryGone": "该记忆已不存在。",
   "error.backend.routineGone": "该自动化任务已不存在。",
+  "error.backend.routineRunGone": "该自动化任务的此次运行已不存在。",
   "error.backend.turnNotStarted": "服务商未启动本轮对话。",
   "error.backend.routineResultConnectionOff": "该消息连接已关闭或已移除，请另选投递位置。",
   "error.backend.routineResultNoDelivery": "本次运行没有可再次发送的回答。",

@@ -110,6 +110,7 @@ export const messages = {
   "error.backend.memoryOperationFailed": "Bellek işlemi başarısız oldu. Tekrar deneyin.",
   "error.backend.memoryGone": "Bu bellek artık mevcut değil.",
   "error.backend.routineGone": "Bu rutin artık mevcut değil.",
+  "error.backend.routineRunGone": "Bu rutin çalıştırması artık mevcut değil.",
   "error.backend.turnNotStarted": "Sağlayıcı bu turu başlatmadı.",
   "error.backend.routineResultConnectionOff": "Bu mesajlaşma bağlantısı kapalı veya kaldırılmış. Başka bir yer seçin.",
   "error.backend.routineResultNoDelivery": "Bu çalıştırmanın yeniden gönderilecek bir yanıtı yok.",

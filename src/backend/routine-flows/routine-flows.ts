@@ -30,6 +30,7 @@ import type {
   RoutineFlowStep,
   RoutineRun,
   SaveRoutineFlowPositionInput,
+  StopRoutineFlowRunInput,
   UpdateRoutineFlowLinkInput,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
@@ -79,6 +80,14 @@ export interface RoutineFlowsDependencies {
     text: string;
     idempotencyKey: string;
   }): Effect.Effect<string, { readonly cause: unknown }>;
+  /** The user's Stop for a routine run that has not ended: its turn, also in a side thread, and its queue place. */
+  stopRoutineRun(input: {
+    agentId: string;
+    routineId: string;
+    runId: string;
+  }): Effect.Effect<void, { readonly cause: unknown }>;
+  /** Stops one handoff: the turn that answers it, or its place in the queue. */
+  stopDelivery(agentId: string, deliveryId: string): Effect.Effect<void, { readonly cause: unknown }>;
   /** The agents whose canvases changed. */
   changed(agentIds: string[]): void;
   now?: () => Date;
@@ -97,6 +106,12 @@ export interface RoutineFlowsShape {
    * flow only when all of them are visible to the member.
    */
   agentsOf(ref: { routineId: string } | { linkId: string }): Effect.Effect<string[] | null, RoutineFlowFailed>;
+  /**
+   * The user's Stop for one run: the routine's own turn and every handoff that works now stop, and
+   * each agent of the flow that has not started is skipped. The run and the stopped steps end as
+   * cancelled. A run that has ended stays as it is.
+   */
+  stopRun(input: StopRoutineFlowRunInput): Effect.Effect<void, RoutineFlowFailed>;
   /** Moves every flow that can move now. */
   sweep(): Effect.Effect<void>;
   /** Asks for a sweep when an agent event may have ended a step. Returns at once. */
@@ -387,6 +402,41 @@ class RoutineFlows extends Context.Service<RoutineFlows, RoutineFlowsShape>()("o
           yield* Effect.forkIn(sweep(), scope);
         });
 
+        const stopRun = Effect.fn("RoutineFlows.stopRun")(function* (input: StopRoutineFlowRunInput) {
+          const run = yield* attempt(() => {
+            const found = store.run(input.runId);
+            if (!found || found.routineId !== input.routineId)
+              throw new RoutineFlowError(sourceText("error.backend.routineRunGone"));
+            return found;
+          });
+          const failed = (failure: { readonly cause: unknown }) => new RoutineFlowFailed({ cause: failure.cause });
+          yield* dependencies
+            .stopRoutineRun({ agentId: run.agentId, routineId: run.routineId, runId: run.id })
+            .pipe(Effect.mapError(failed));
+          // Under the sweep's lock, so a sweep cannot hand the run on between these reads and writes.
+          yield* lock.withPermit(
+            Effect.gen(function* () {
+              const steps = yield* attempt(() => store.steps(run.id));
+              for (const step of steps) {
+                if (step.status !== "running") continue;
+                if (step.deliveryId)
+                  yield* dependencies.stopDelivery(step.agentId, step.deliveryId).pipe(Effect.mapError(failed));
+                yield* attempt(() => store.settleStep(step.id, "cancelled", null, null));
+              }
+              yield* attempt(() => {
+                const links = store.linksForRoutines([run.routineId]).filter((link) => link.createdAt <= run.createdAt);
+                const started = new Set(steps.map((step) => step.agentId));
+                for (const agentId of routineFlowDepths(run.agentId, links).keys())
+                  if (agentId !== run.agentId && !started.has(agentId))
+                    store.addStep({ runId: run.id, agentId, input: "", status: "skipped" });
+              });
+            }),
+          );
+          dependencies.changed(agentsOfRoutine(run.routineId));
+          // The routine's own step, which the sweep records once the run has ended.
+          yield* Effect.forkIn(sweep(), scope);
+        });
+
         return RoutineFlows.of({
           canvas,
           savePosition,
@@ -395,6 +445,7 @@ class RoutineFlows extends Context.Service<RoutineFlows, RoutineFlowsShape>()("o
           disconnect,
           updateLink,
           agentsOf,
+          stopRun,
           sweep,
           notice,
         });

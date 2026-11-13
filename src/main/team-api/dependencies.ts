@@ -365,7 +365,7 @@ export type TeamApiInstanceTransfer = Pick<
  */
 export type TeamApiRoutineFlows = Pick<
   RoutineFlowsHandle,
-  "canvas" | "savePosition" | "removePosition" | "connect" | "disconnect" | "updateLink" | "agentsOf"
+  "canvas" | "savePosition" | "removePosition" | "connect" | "disconnect" | "updateLink" | "agentsOf" | "stopRun"
 >;
 
 /**

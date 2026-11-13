@@ -117,6 +117,7 @@ import {
   PROVIDERS_V5_CAPABILITY,
   PUSH_NOTIFICATIONS_CAPABILITY,
   QUIET_TURN_CAPABILITY,
+  ROUTINE_FLOW_STOP_CAPABILITY,
   ROUTINE_FLOWS_CAPABILITY,
   ROUTINE_RECOVERY_CAPABILITY,
   ROUTINE_RESULTS_CAPABILITY,
@@ -2488,6 +2489,7 @@ export class TeamApiServer {
           if (capability === INSTANCE_TRANSFER_CAPABILITY) return this.#options.instanceTransfer !== undefined;
           if (capability === LIVE_ACTIVITY_PUSH_CAPABILITY) return this.#options.liveActivityPush !== undefined;
           if (capability === ROUTINE_FLOWS_CAPABILITY) return this.#options.routineFlows !== undefined;
+          if (capability === ROUTINE_FLOW_STOP_CAPABILITY) return this.#options.routineFlows !== undefined;
           if (capability === WORKFLOWS_CAPABILITY) return this.#options.workflows !== undefined;
           if (capability === WORKFLOWS_GITHUB_CAPABILITY) return this.#options.workflows?.github !== undefined;
           // The chats and workspaces of Telegram and Slack nodes come from the routine-results options.

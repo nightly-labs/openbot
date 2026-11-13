@@ -113,6 +113,7 @@ export const messages = {
   "error.backend.memoryOperationFailed": "Operacja na wspomnieniach nie powiodła się. Spróbuj ponownie.",
   "error.backend.memoryGone": "To wspomnienie już nie istnieje.",
   "error.backend.routineGone": "Ta rutyna już nie istnieje.",
+  "error.backend.routineRunGone": "To uruchomienie rutyny już nie istnieje.",
   "error.backend.turnNotStarted": "Dostawca nie rozpoczął tej tury.",
   "error.backend.routineResultConnectionOff":
     "To połączenie z komunikatorem jest wyłączone lub usunięte. Wybierz inne miejsce.",

@@ -78,6 +78,7 @@ export const messages = {
   "error.team.agentColorsUnsupported": "I colori degli agenti non sono supportati da questa connessione.",
   "error.team.chatColorsUnsupported": "I colori della chat non sono supportati da questa connessione.",
   "error.team.routineRunPlaceUnsupported": "Questa connessione non può cambiare dove viene eseguita una routine.",
+  "error.team.routineFlowStopUnsupported": "Questa connessione non può fermare l’esecuzione di una routine.",
   "error.team.sidebarFoldersUnsupported": "Le cartelle nelle cartelle non sono supportate da questa connessione.",
   "error.team.agentNotificationLevelsUnsupported":
     "Questo server non può salvare il tuo livello di notifiche per ogni agente. Aggiorna OpenBot sul computer che lo esegue.",
