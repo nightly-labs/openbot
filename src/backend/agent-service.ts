@@ -4581,13 +4581,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const contexts = yield* this.channels.compactTargets(channelId);
     // A provider process stops after some minutes with no turn, and only its process compacts a session.
     // It starts again as for a turn; a process that a turn would replace is not touched. A busy channel
-    // refuses first, so it starts no process.
+    // refuses first, and a provider whose last process could not compact on request does not start.
     const { agents: members, candidates: found } = yield* lifecycleStep("find channel compact members", () =>
       this.#channelCompactCandidates(contexts),
     );
     const stoppedMembers = [...new Set(found.map(({ agentId }) => members.get(agentId)))].filter(
       (agent): agent is AgentSummary =>
-        agent !== undefined && !this.#providers.agentClientRunning(agent) && this.#providers.agentClientCurrent(agent),
+        agent !== undefined &&
+        this.#mayCompactOnRequest(agent) &&
+        !this.#providers.agentClientRunning(agent) &&
+        this.#providers.agentClientCurrent(agent),
     );
     yield* Effect.forEach(
       stoppedMembers,
@@ -4637,8 +4640,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   /**
    * Why no member of a channel compacts. A member with no session has nothing to compact yet. A member
-   * whose provider compacts by itself, or not at all, cannot compact on request. A provider that did
-   * not start can, so it gets the general refusal.
+   * whose provider compacts by itself, or not at all, cannot compact on request. A provider that
+   * never started can, so it gets the general refusal.
    */
   #channelCompactRefusal(
     candidates: ReadonlyArray<{ agentId: string }>,
@@ -4647,12 +4650,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (!candidates.length) return sourceText("error.backend.channelCompactNoSession");
     const onRequest = candidates.some(({ agentId }) => {
       const agent = agents.get(agentId);
-      const client = agent ? this.#providers.clientForAgent(agent) : null;
-      return !client || compactsOnRequest(client.contextCompaction);
+      return agent !== undefined && this.#mayCompactOnRequest(agent);
     });
     return sourceText(
       onRequest ? "error.backend.channelCompactUnavailable" : "error.backend.channelCompactNotSupported",
     );
+  }
+
+  /** False when the last process of the agent's provider could not compact on request. */
+  #mayCompactOnRequest(agent: AgentSummary): boolean {
+    const mode = this.#providers.lastCompactionMode(agent);
+    return mode === undefined || compactsOnRequest(mode);
   }
 
   /**
