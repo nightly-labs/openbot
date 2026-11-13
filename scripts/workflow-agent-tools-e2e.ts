@@ -19,7 +19,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { Effect } from "effect";
 import { z } from "zod";
-import { discoverTools, resolveDeferredTool } from "../src/backend/agent/tool-catalog";
+import { deferredCallArgumentsError, discoverTools, resolveDeferredTool } from "../src/backend/agent/tool-catalog";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import type { DynamicToolCallParams } from "../src/backend/protocol";
@@ -217,6 +217,21 @@ try {
   );
   const alias = resolveDeferredTool(params("tool_call", { tool: "openbot.list_workflows", arguments: {} }), "codex");
   check("tool_call accepts the qualified name as tool", alias?.tool === "list_workflows", alias);
+  // An ACP agent sent the MCP names that it sees, and no arguments for a tool that has none. Each try
+  // got the same general refusal, and its routine failed until the run ended (#7955).
+  const mcpName = resolveDeferredTool(params("tool_call", { name: "mcp__openbot__list_workflows" }), "acp");
+  check(
+    "tool_call accepts an MCP tool name and no arguments",
+    mcpName?.tool === "list_workflows" && JSON.stringify(mcpName.arguments) === "{}",
+    mcpName,
+  );
+  const bareName = params("tool_call", { name: "list_workflows", arguments: {} });
+  const bareError = resolveDeferredTool(bareName, "acp") ? null : deferredCallArgumentsError(bareName, "acp");
+  check(
+    "tool_call names the catalog tool for a name without its namespace",
+    bareError?.includes("openbot.list_workflows") === true,
+    bareError,
+  );
 
   // 2. One call builds a workflow with refs.
   const built = await call("create", "edit_workflow", {

@@ -390,11 +390,29 @@ function decodeArgumentsText(text: string): DynamicRecord | null {
   return null;
 }
 
-/** Decodes a `tool_call` envelope. Models send `arguments` as JSON text, so the text is decoded first. */
+/**
+ * Decodes a `tool_call` envelope. Models send `arguments` as JSON text, so the text is decoded first.
+ * For a tool with no arguments, models and OpenAI-compatible gateways leave out `arguments` or send
+ * `null` or empty text, which is an empty object. The target tool still checks its own arguments (#7955).
+ */
 function parseCall(params: DynamicToolCallParams) {
   const envelope = params.arguments;
-  if (!isRecord(envelope) || typeof envelope.arguments !== "string") return callSchema.safeParse(envelope);
-  return callSchema.safeParse({ ...envelope, arguments: decodeArgumentsText(envelope.arguments) });
+  if (!isRecord(envelope)) return callSchema.safeParse(envelope);
+  const sent = envelope.arguments;
+  if (sent === undefined || sent === null || (typeof sent === "string" && sent.trim() === ""))
+    return callSchema.safeParse({ ...envelope, arguments: {} });
+  if (typeof sent !== "string") return callSchema.safeParse(envelope);
+  return callSchema.safeParse({ ...envelope, arguments: decodeArgumentsText(sent) });
+}
+
+/**
+ * The catalog tool of `name`: its qualified name, or the MCP name that an agent sees for it, such as
+ * `openbot_browser__snapshot` or `mcp__openbot_browser__snapshot`. An ACP agent sent these names
+ * through tool_call and got the same refusal for each try (#7955).
+ */
+function catalogEntry(catalog: typeof BUILTIN_TOOL_CATALOG, name: string) {
+  const mcpName = name.startsWith("mcp__") ? name.slice("mcp__".length) : name;
+  return catalog.find((tool) => tool.name === name || `${tool.namespace}__${tool.tool}` === mcpName);
 }
 
 /**
@@ -407,17 +425,36 @@ function callsDiscoveryTool(envelope: unknown): boolean {
 }
 
 /**
- * The error for a `tool_call` that `resolveDeferredTool` refused because it names a discovery tool or
- * its `arguments` is not an object, or null for another reason. A general error made the agent send
- * the same text again: an agent that loaded a schema through tool_call never got it (#6754).
+ * The error for a `tool_call` that `resolveDeferredTool` refused, or null when no specific error
+ * applies. A general error made the agent send the same call again: an agent that loaded a schema
+ * through tool_call never got it (#6754), and a routine's browser calls failed until the run ended
+ * (#7955). No supplied values are echoed: a suggested name comes from the catalog. `unknownToolNote`
+ * follows the error for a name outside the catalog, which can be a tool of the user's MCP servers.
  */
-export function deferredCallArgumentsError(params: DynamicToolCallParams): string | null {
+export function deferredCallArgumentsError(
+  params: DynamicToolCallParams,
+  provider: AgentProviderId,
+  unknownToolNote: string | null = null,
+): string | null {
   if (callsDiscoveryTool(params.arguments)) return sourceText("error.agent.toolCallDiscoveryTool");
   const parsed = parseCall(params);
-  const sent = isRecord(params.arguments) && params.arguments.arguments !== undefined;
-  return sent && !parsed.success && parsed.error.issues.some(({ path }) => path[0] === "arguments")
-    ? sourceText("error.agent.toolCallArgumentsNotObject")
-    : null;
+  if (!parsed.success) {
+    const { issues } = parsed.error;
+    if (issues.some(({ code }) => code === "unrecognized_keys")) return sourceText("error.agent.toolCallEnvelopeKeys");
+    return issues.some(({ path }) => path[0] === "arguments")
+      ? sourceText("error.agent.toolCallArgumentsNotObject")
+      : null;
+  }
+  // The envelope is valid, so the name is outside the catalog. A dotted or bare name, such as
+  // `browser.snapshot` or `snapshot`, gets the one catalog tool of the same short name.
+  const name = (parsed.data.name ?? parsed.data.tool ?? "").trim();
+  const short = name.includes("__") ? null : name.slice(name.lastIndexOf(".") + 1);
+  const [match, other] = short ? catalogFor(provider).filter((tool) => tool.tool === short) : [];
+  const error =
+    match && !other
+      ? sourceText("error.agent.toolCallUnknownToolSuggest", { name: match.name })
+      : sourceText("error.agent.toolCallUnknownTool");
+  return unknownToolNote ? `${error} ${unknownToolNote}` : error;
 }
 
 /**
@@ -430,8 +467,7 @@ export function resolveDeferredTool(
 ): DynamicToolCallParams | null {
   const parsed = parseCall(params);
   if (!parsed.success) return null;
-  const name = parsed.data.name ?? parsed.data.tool;
-  const entry = catalogFor(provider).find((tool) => tool.name === name);
+  const entry = catalogEntry(catalogFor(provider), (parsed.data.name ?? parsed.data.tool ?? "").trim());
   if (!entry) return null;
   return { ...params, namespace: entry.namespace, tool: entry.tool, arguments: parsed.data.arguments };
 }
