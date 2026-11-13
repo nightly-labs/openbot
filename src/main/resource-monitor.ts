@@ -578,7 +578,8 @@ export class ResourceMonitor implements AnalyticsResourceSource {
       }
     }
 
-    yield* this.#profileStalls(mainLoopMs, turnInLoopWindow).pipe(Effect.ignore);
+    // A profile must not cost the sample, also when its summary throws.
+    yield* this.#profileStalls(mainLoopMs, turnInLoopWindow).pipe(Effect.ignoreCause);
     const statements = this.#options.statementTimings.drain();
     for (const duration of statements) recordValue(day, METRIC.database, duration);
     if (statements.length > 0) {

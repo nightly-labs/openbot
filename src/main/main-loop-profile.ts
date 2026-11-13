@@ -6,7 +6,8 @@ import { AnalyticsOperationFailure } from "./analytics-effects";
  * A CPU profile of the main process for a minute in which the main loop stalls, and its summary: the
  * functions that used the time and who called them. The profile stays in memory. A summary holds
  * function names from the code, the file name of an application file, the name of a package and the
- * name of a Node module. A directory, a URL or a name from other code never reaches a summary.
+ * name of a Node module. A directory or a URL never reaches a summary, and code with a file outside
+ * the application has no name in it.
  */
 
 /** A minute whose longest main-loop delay is at least this long can start or keep a profile. */
@@ -24,12 +25,13 @@ const ANONYMOUS = "(anonymous)";
 const ENGINE_NAMES = new Set(["(program)", "(garbage collector)", "(idle)", "(root)"]);
 const FUNCTION_NAME = /^[A-Za-z_$][\w$.]*$/;
 const FILE_NAME = /^[\w.-]+$/;
-const NODE_MODULE = /^node:[\w./-]+$/;
-const PACKAGE_NAME = /^(?:@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*$/;
+// A Node module is one name, or a path under `internal` or `electron`. Evaluated text can name any URL.
+const NODE_MODULE = /^node:(?:[a-z_]+|(?:internal|electron)\/[a-z0-9_/]+)$/;
+const PACKAGE_NAME = /^(?:@[a-z0-9][\w.-]{0,27}\/)?[a-z0-9][\w.-]{0,27}$/;
 
 /** One frame as a summary holds it. */
 const FRAME_PATTERN =
-  /^(?:\((?:program|garbage collector|external|anonymous)\)|(?:[A-Za-z_$][\w$.]{0,59}|\(anonymous\)) (?:native|node:[\w./-]{1,60}|npm:[\w.@/-]{1,60}|app:[\w.-]{1,60}:\d{1,8}))$/;
+  /^(?:\((?:program|garbage collector|external|anonymous)\)|(?:[A-Za-z_$][\w$.]{0,59}|\(anonymous\)) (?:native|node:(?:[a-z_]{1,60}|(?:internal|electron)\/[a-z0-9_/]{1,50})|npm:(?:@[a-z0-9][\w.-]{0,27}\/)?[a-z0-9][\w.-]{0,27}|app:[\w.-]{1,60}:\d{1,8}))$/;
 const STACK_SEPARATOR = " < ";
 const MAX_STACK_LENGTH = 900;
 
@@ -83,19 +85,27 @@ function framePlace(url: string, lineNumber: number, appRoot: string): string | 
   if (url.startsWith("node:")) return NODE_MODULE.test(url) && url.length <= 65 ? url : null;
   const path = url.startsWith("file://") ? filePath(url) : url;
   if (path === null) return null;
-  const normalized = path.replaceAll("\\", "/");
-  const root = appRoot.replaceAll("\\", "/").replace(/\/+$/, "");
+  const normalized = comparablePath(path);
+  const root = comparablePath(appRoot).replace(/\/+$/, "");
+  // A path that goes up can end outside the application.
+  if (normalized.split("/").some((part) => part === ".." || part === ".")) return null;
   if (root === "" || !normalized.startsWith(`${root}/`)) return null;
   const inside = normalized.slice(root.length + 1);
   const packageAt = inside.lastIndexOf("node_modules/");
   if (packageAt >= 0) {
     const parts = inside.slice(packageAt + "node_modules/".length).split("/");
     const name = parts[0]?.startsWith("@") ? `${parts[0]}/${parts[1] ?? ""}` : (parts[0] ?? "");
-    return PACKAGE_NAME.test(name) && name.length <= 56 ? `npm:${name}` : null;
+    return PACKAGE_NAME.test(name) ? `npm:${name}` : null;
   }
   const file = inside.slice(inside.lastIndexOf("/") + 1);
   if (!FILE_NAME.test(file) || file.length > 50) return null;
   return `app:${file}:${Math.max(0, Math.min(99_999_999, Math.trunc(lineNumber) + 1))}`;
+}
+
+/** Forward slashes, and a lower-case drive letter: Windows gives `C:` and `c:` for the same disk. */
+function comparablePath(path: string): string {
+  const slashed = path.replaceAll("\\", "/");
+  return /^[A-Za-z]:\//.test(slashed) ? slashed.charAt(0).toLowerCase() + slashed.slice(1) : slashed;
 }
 
 function filePath(url: string): string | null {
@@ -116,7 +126,8 @@ function frameLabel(node: CpuProfileNode, appRoot: string): string {
   if (place === null) return EXTERNAL;
   // A name that is not a plain identifier, such as a getter or a computed key, keeps its place only.
   const name = FUNCTION_NAME.test(functionName) && functionName.length <= MAX_NAME_LENGTH ? functionName : ANONYMOUS;
-  // Code with no URL is a V8 builtin or evaluated text. A builtin always has a plain name.
+  // Code with no URL is a V8 builtin or evaluated text. A builtin always has a plain name. A named
+  // function of evaluated text keeps that name: nothing tells the two apart.
   if (place === "native" && name === ANONYMOUS) return EXTERNAL;
   const label = `${name} ${place}`;
   return FRAME_PATTERN.test(label) ? label : EXTERNAL;

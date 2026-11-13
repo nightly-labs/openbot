@@ -49,6 +49,16 @@ describe("summarizeCpuProfile", () => {
     expect(JSON.stringify(summary)).not.toContain("alice");
   });
 
+  it("matches a Windows application path with another drive letter case", () => {
+    const summary = summarizeCpuProfile(
+      profile([
+        { functionName: "kept", url: "file:///c:/Program%20Files/OpenBot/resources/app.asar/out/main/index.js" },
+      ]),
+      "C:\\Program Files\\OpenBot\\resources\\app.asar",
+    );
+    expect(summary.top.map((entry) => entry.frame)).toEqual(["kept app:index.js:1"]);
+  });
+
   it("replaces other code and unsafe names with a fixed label", () => {
     const summary = summarizeCpuProfile(
       profile([
@@ -59,6 +69,9 @@ describe("summarizeCpuProfile", () => {
         { functionName: "load", url: `file://${APP}/out/main/sk live.js` },
         { functionName: "outside", url: `file://${APP}-other/out/main/index.js` },
         { functionName: "escape", url: `file://${APP}/../../Documents/private.js` },
+        { functionName: "raw", url: `${APP}/../../Documents/private.js` },
+        { functionName: "encoded", url: `file://${APP}/..%2F..%2FDocuments/private.js` },
+        { functionName: "named", url: "node:home/alice/private" },
         { functionName: "kept", url: `file://${APP}/out/main/index.js` },
       ]),
       APP,
@@ -83,6 +96,10 @@ describe("summarizeCpuProfile", () => {
     expect(isProfileFrame("run file:///Users/alice/index.js")).toBe(false);
     expect(isProfileFrame("sk-live-abcdefgh1234")).toBe(false);
     expect(isProfileStack("kept app:index.js:1 < /Users/alice/private.txt")).toBe(false);
+    expect(isProfileFrame("run npm:Users/alice/Documents/secret")).toBe(false);
+    expect(isProfileFrame("run node:/Users/alice/x")).toBe(false);
     expect(isProfileStack("kept app:index.js:1 < all native")).toBe(true);
+    expect(isProfileFrame("listOnTimeout node:internal/timers")).toBe(true);
+    expect(isProfileFrame("parse npm:@scope/pkg")).toBe(true);
   });
 });
