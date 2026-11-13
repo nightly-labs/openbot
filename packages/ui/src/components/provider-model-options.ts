@@ -100,6 +100,14 @@ function openRouterLabNames(options: readonly ClientAgentModelOption[]): Map<str
 }
 
 /** Free tier first; id says nothing about locality. */
+/** OpenCode and custom agent models are named `<service>/<model>`. Other models have no service. */
+export function splitServiceName(provider: string, fullName: string): { service: string; name: string } {
+  const separator = provider === "opencode" || provider === "acp" ? fullName.indexOf("/") : -1;
+  return separator < 0
+    ? { service: "", name: fullName }
+    : { service: fullName.slice(0, separator), name: fullName.slice(separator + 1) };
+}
+
 function modelTier(model: PickerModel): 0 | 1 {
   return model.free ? 0 : 1;
 }
@@ -150,10 +158,8 @@ export function pickerModels(
           variants: [],
         };
       }
-      // OpenCode and custom agent models are named `<service>/<model>`; the service is the group.
-      const separator = model.provider === "opencode" || model.provider === "acp" ? model.name.indexOf("/") : -1;
-      let service = separator < 0 ? "" : model.name.slice(0, separator);
-      let name = separator < 0 ? model.name : model.name.slice(separator + 1);
+      // The service is the group.
+      let { service, name } = splitServiceName(model.provider, model.name);
       // A custom agent can serve several providers. Its id holds them as `<agent>/<provider>/<model>`
       // even when its display name does not, so the provider segment of the id is the group.
       if (model.provider === "acp") {
