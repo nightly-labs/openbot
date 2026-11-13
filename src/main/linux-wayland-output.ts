@@ -300,7 +300,7 @@ export const restartOnXWaylandForAboveApps = Effect.fn("restartOnXWaylandForAbov
 /**
  * True when this start uses software rendering on Wayland, a new OpenBot process on XWayland has
  * started, and this one must exit before Chromium connects to Wayland. Run it before the
- * single-instance lock, with the final `userData` path.
+ * single-instance lock. An explicit `--ozone-platform=wayland` stays on Wayland.
  */
 export const restartOnXWaylandForSoftwareRendering = Effect.fn("restartOnXWaylandForSoftwareRendering")(function* (
   environment: NodeJS.ProcessEnv,
