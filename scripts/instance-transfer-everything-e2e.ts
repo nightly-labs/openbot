@@ -290,9 +290,12 @@ function profile(name: string) {
     skills: { library: () => library, installLocal: () => Effect.void },
     sharedSkills: {
       list: () =>
-        library
-          .list()
-          .pipe(Effect.map((list) => list.map(({ id, slug, name, version }) => ({ id, slug, name, version })))),
+        library.listWithUnreadable().pipe(
+          Effect.map(({ skills, unreadable }) => ({
+            skills: skills.map(({ id, slug, name, version }) => ({ id, slug, name, version })),
+            unreadable: unreadable.map(({ skillId }) => skillId),
+          })),
+        ),
       // No agent of the check installs a library skill, so each one counts as shared.
       assigned: () => Effect.succeed(new Set<string>()),
       bundle: (id, version) => library.bundle(id, version),

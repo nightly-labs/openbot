@@ -293,7 +293,11 @@ export interface InstanceTransferOptions {
   serverPreferences?: TransferServerPreferencePort;
   /** The skills of the shared library. Absent where the server has no library. */
   sharedSkills?: {
-    list(): Effect.Effect<{ id: string; slug: string; name: string; version: number }[], unknown>;
+    /** The skills that read, and the ids of the skills whose latest revision does not read. */
+    list(): Effect.Effect<
+      { skills: { id: string; slug: string; name: string; version: number }[]; unreadable: string[] },
+      unknown
+    >;
     /** The ids of the skills that these agents have. They carry those skills themselves. */
     assigned(agentIds: readonly string[]): Effect.Effect<ReadonlySet<string>, unknown>;
     bundle(id: string, version: number): Effect.Effect<Uint8Array, unknown>;
@@ -827,7 +831,10 @@ export class InstanceTransferService {
     const read = yield* Effect.result(
       Effect.gen(function* () {
         const assigned = yield* port.assigned(agentIds);
-        const skills = (yield* port.list()).filter((skill) => !assigned.has(skill.id));
+        const listed = yield* port.list();
+        // A skill that does not read stays here; the others still go in the file.
+        if (listed.unreadable.length > 0) warnings.push(sourceText("error.import.transferSharedSkillsSkipped"));
+        const skills = listed.skills.filter((skill) => !assigned.has(skill.id));
         const shared: NonNullable<TransferManifestFile["sharedSkills"]> = [];
         let size = 0;
         for (const skill of skills.slice(0, TRANSFER_SHARED_SKILLS)) {
@@ -874,7 +881,7 @@ export class InstanceTransferService {
       warnings.push(sourceText("error.import.transferSharedSkillsNotAdded"));
       return;
     }
-    const existing = new Map(listed.success.map((skill) => [skill.slug, skill]));
+    const existing = new Map(listed.success.skills.map((skill) => [skill.slug, skill]));
     for (const value of values) {
       if (
         !isDynamicRecord(value) ||
