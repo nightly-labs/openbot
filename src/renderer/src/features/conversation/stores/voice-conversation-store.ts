@@ -35,6 +35,13 @@ const SPEECH_START_MS = 240;
  */
 const REPLY_SPEECH_LOUDNESS = 0.5;
 const REPLY_SPEECH_START_MS = 400;
+/**
+ * A sound that holds the reply for this long, and goes on, is transcribed once. With no words, such
+ * as running water, the reply goes on and the sound becomes the room noise.
+ */
+const HOLD_WORDS_MS = 2_000;
+/** A transcript with no letter or digit, such as ".", has no words. */
+const WORD = /[\p{L}\p{N}]/u;
 /** A recording with no speech starts again after this long, at a pause, so it does not keep the silence. */
 const SILENT_RECORDING_MS = 4_000;
 const RESTART_QUIET_MS = 600;
@@ -121,6 +128,8 @@ interface Turn extends Recording {
   timers: Array<ReturnType<typeof setInterval>>;
   /** The user spoke in this turn. */
   spoke: boolean;
+  /** The sound now has no words: the meter takes its level as the room noise. */
+  roomNoise: boolean;
 }
 
 /**
@@ -157,6 +166,8 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
    * words stop the reply. A sound with no words, such as a cough, lets it go on.
    */
   let held = false;
+  /** When the hold started, until the sound that caused it is checked for words. */
+  let heldAt: number | undefined;
   /** The reply ended while it waited, for example a turn with no answer to read. */
   let heldReplyEnded = false;
   /** The words of the turn that waits for its reply, to show again when the reply goes on. */
@@ -331,6 +342,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
    */
   function holdReply(): void {
     held = true;
+    heldAt = performance.now();
     heldReplyEnded = false;
     holdSpeech(target);
     resumeListening();
@@ -412,6 +424,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       timers: [],
       startedAt: performance.now(),
       spoke: false,
+      roomNoise: false,
       livePreview: undefined,
     };
     turn = current;
@@ -504,6 +517,11 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
         for (const sample of samples) sum += sample * sample;
         const db = 20 * Math.log10(Math.max(Math.sqrt(sum / samples.length), 1e-5));
         if (db > DIGITAL_SILENCE_DB) {
+          if (current.roomNoise) {
+            current.roomNoise = false;
+            noiseDb = db;
+            loudFor = 0;
+          }
           noiseDb = db < noiseDb ? db : Math.min(db, noiseDb + NOISE_RISE_DB);
           peakDb = Math.max(db, peakDb - PEAK_FALL_DB);
         }
@@ -540,8 +558,44 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
           quietFor += LEVEL_INTERVAL_MS;
           if (current.spoke && quietFor >= TURN_END_SILENCE_MS) endTurn(current);
         }
+        if (held && heldAt !== undefined && current.spoke && performance.now() - heldAt >= HOLD_WORDS_MS)
+          checkHeldWords(current);
       }, LEVEL_INTERVAL_MS),
     );
+  }
+
+  /**
+   * The sound that holds the reply goes on. Only words stop the reply, so the recording so far is
+   * transcribed once. With no words, the reply goes on, and the sound is the room noise from now on.
+   * A failed check keeps the hold: the end of the turn decides.
+   */
+  function checkHeldWords(current: Turn): void {
+    // The voice host takes one request at a time: the check waits for the live preview.
+    if (step !== "listening" || current.livePreview || current.chunks.length === 0) return;
+    heldAt = undefined;
+    if (WORD.test(state.heard)) return;
+    const recorder = current.recorder;
+    const check = transcribe(new Blob(current.chunks, { type: recorder.mimeType }))
+      .then((text) => {
+        if (!held || turn !== current || current.recorder !== recorder || !current.spoke || step !== "listening")
+          return;
+        if (WORD.test(text)) {
+          setState((draft) => {
+            draft.heard = text;
+          });
+          return;
+        }
+        // The recording stays: the user can start to speak while the check runs. At the next quiet
+        // moment, the meter starts a new recording, as for any turn with no speech.
+        current.spoke = false;
+        current.roomNoise = true;
+        void resumeReply();
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (current.livePreview === check) current.livePreview = undefined;
+      });
+    current.livePreview = check;
   }
 
   /** Shows the words so far. A failure says nothing that the final pass does not say better. */
@@ -593,11 +647,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       await current.livePreview;
       if (current.chunks.length === 0) throw new Error(currentText().t("composer.voice.noSpeechRecorded"));
       recording = new Blob(current.chunks, { type: mimeType });
-      text = (
-        streamed
-          ? await transcribeStreamed(recording)
-          : await deps.voice.transcribe({ audio: await recordingToWav(recording) })
-      ).text.trim();
+      text = await transcribe(recording);
     } catch (error) {
       if (own !== generation || disposed) return;
       analytics.track("voice_turn", {
@@ -615,7 +665,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     }
     if (own !== generation || disposed) return;
     const transcribedMs = elapsedMs(transcribingAt);
-    if (!text) {
+    if (!WORD.test(text)) {
       analytics.track("voice_turn", {
         ...turnProperties,
         result: "failed",
@@ -700,6 +750,14 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       void speechPort()
         .agent.discardDraftAttachment(id, LOCAL_SERVER_ID)
         .catch(() => {});
+  }
+
+  /** The words of a recording, from the dictation model that the user chose. */
+  async function transcribe(recording: Blob): Promise<string> {
+    const result = streamed
+      ? await transcribeStreamed(recording)
+      : await deps.voice.transcribe({ audio: await recordingToWav(recording) });
+    return result.text.trim();
   }
 
   /** ElevenLabs hears through a stream: the whole recording is sent, then the stream ends. */
