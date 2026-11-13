@@ -3,7 +3,6 @@ import { type AgentProviderId, type ConversationMessage, ROUTINE_QUIET_ANSWER_IT
 import { Effect } from "effect";
 import { generatedMediaKind } from "./agent/image-generation";
 import {
-  answeredRequestId,
   isNoUpdateAnswer,
   isNoUpdateToolCall,
   isTextAnswer,
@@ -76,10 +75,11 @@ export interface ProviderHistoryImportInput {
    */
   quietTeammateThread?: boolean;
   /**
-   * The routine delivery of the run in which this agent sent a message, if any. A teammate's answer
-   * to a quiet run can have ended quiet after a call to the no-update tool. Left out, it cannot.
+   * Whether this teammate's answer replies to a request that a quiet routine run of the agent sent.
+   * Its turn can have ended quiet after a call to the no-update tool. A run whose record is gone does
+   * not count: the tool refused its answer, so the answer showed. Left out, no answer counts.
    */
-  routineDeliveryOfRequest?(messageId: string): DeliveryContext | null;
+  continuesQuietRun?(delivery: DeliveryContext["delivery"]): boolean;
 }
 
 export interface ProviderHistoryImportResult {
@@ -340,9 +340,10 @@ function routineTurnAnswers(
         if (routine !== false && item.type === "userMessage" && typeof item.clientId === "string") {
           const delivery = input.findDelivery(item.clientId)?.delivery;
           // A continuation turn has its own client ID, so the check uses the delivery's ID.
-          const requestId = delivery && input.quietTeammateThread === true ? answeredRequestId(delivery) : null;
-          const answeredRun = requestId ? (input.routineDeliveryOfRequest?.(requestId) ?? null) : null;
-          const continuesQuietRun = answeredRun !== null && input.quietRoutineDelivery(answeredRun.delivery.id);
+          const continuesQuietRun =
+            delivery !== undefined &&
+            input.quietTeammateThread === true &&
+            input.continuesQuietRun?.(delivery) === true;
           if (continuesQuietRun) needsNoUpdate = true;
           routine =
             delivery !== undefined &&
