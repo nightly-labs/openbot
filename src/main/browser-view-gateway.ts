@@ -61,6 +61,12 @@ const MAX_FRAMES_IN_FLIGHT = 4;
  */
 const HELD_FRAME_DEADLINE_MS = 1_000;
 /**
+ * How long a new view waits for the page's first frame. A page that draws nothing, or a start that
+ * never finishes, would otherwise leave the member on "Connecting" with no end (#8148). The start
+ * can wait for the tab's queue and a reload, so this is well above a normal start.
+ */
+const FIRST_FRAME_DEADLINE_MS = 20_000;
+/**
  * Frames kept after the one the client has drawn. A client that asked to name frames and then
  * stops saying which one is on screen still gets a frame at each deadline, and would otherwise keep
  * one entry per frame for the whole view. Past this the view is closed. The drawn frame is not
@@ -323,6 +329,12 @@ export class BrowserViewGateway {
     session.drawnSequence = 0;
     this.#forgetHeldFrame(session);
     recordRestartActivity();
+    let drew = false;
+    const firstFrame = setTimeout(() => {
+      if (drew || session.socket !== client) return;
+      this.#dispatch(this.#closeSession(session, sourceText("error.backend.browserViewNoFrame")));
+    }, FIRST_FRAME_DEADLINE_MS);
+    client.once("close", () => clearTimeout(firstFrame));
     client.on("message", (data, binary) => {
       if (binary || session.socket !== client) return;
       this.#noteDrawnFrame(session, client, data);
@@ -349,6 +361,10 @@ export class BrowserViewGateway {
       const stopView = yield* browser.start(
         session.tabId,
         (frame) => {
+          if (!drew) {
+            drew = true;
+            clearTimeout(firstFrame);
+          }
           if (session.socket !== client) return;
           if (session.rememberFrames && framesInFlight(session) >= MAX_FRAMES_IN_FLIGHT) {
             this.#holdFrame(session, client, frame);

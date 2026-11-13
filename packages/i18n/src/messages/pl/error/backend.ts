@@ -15,6 +15,7 @@ export const messages = {
   "error.backend.browserViewLimit": "Na tym hoście jest otwartych zbyt wiele widoków przeglądarki.",
   "error.backend.browserViewEnded": "Podgląd tej strony na żywo zakończył się.",
   "error.backend.browserViewFailed": "Podgląd tej strony na żywo nie powiódł się.",
+  "error.backend.browserViewNoFrame": "Strona na serwerze się nie wyświetliła. Zamknij ten widok i otwórz go ponownie.",
   "error.backend.windowTemporarilyUnavailable": "Okno OpenBot jest chwilowo niedostępne.",
   "error.backend.windowUnavailable": "Okno OpenBot jest niedostępne.",
   "error.backend.sunshineApiHttp": "API Sunshine zwróciło błąd HTTP {status}.",

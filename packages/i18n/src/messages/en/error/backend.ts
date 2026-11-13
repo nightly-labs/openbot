@@ -18,6 +18,7 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserViewLimit": "Too many browser views are open on this host.",
   "error.backend.browserViewEnded": "The live view of this page ended.",
   "error.backend.browserViewFailed": "The live view of this page failed.",
+  "error.backend.browserViewNoFrame": "The page on the server did not show. Close this view and open it again.",
   "error.backend.windowTemporarilyUnavailable": "The OpenBot window is temporarily unavailable.",
   "error.backend.windowUnavailable": "The OpenBot window is unavailable.",
   "error.backend.sunshineApiHttp": "Sunshine API failed with HTTP {status}.",

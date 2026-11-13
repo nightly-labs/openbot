@@ -15,6 +15,7 @@ export const messages = {
   "error.backend.browserViewLimit": "На этом хосте открыто слишком много видов браузера.",
   "error.backend.browserViewEnded": "Показ этой страницы в реальном времени завершён.",
   "error.backend.browserViewFailed": "Не удалось показать эту страницу в реальном времени.",
+  "error.backend.browserViewNoFrame": "Страница на сервере не отобразилась. Закройте этот вид и откройте его снова.",
   "error.backend.windowTemporarilyUnavailable": "Окно OpenBot временно недоступно.",
   "error.backend.windowUnavailable": "Окно OpenBot недоступно.",
   "error.backend.sunshineApiHttp": "API Sunshine вернул ошибку HTTP {status}.",
