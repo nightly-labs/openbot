@@ -1563,8 +1563,9 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     // that, and a refusal signs this device out as it does at any later time.
     const storedUser = this.#sessionUser?.token === sessionToken ? this.#sessionUser.user : null;
     if (storedUser && !this.#options.confirmSessionAtStart) {
+      const state = this.#setState({ status: "signed_in", user: storedUser });
       Effect.runFork(this.#owned(this.#confirmRestoredSession(sessionToken)).pipe(Effect.ignore));
-      return this.#setState({ status: "signed_in", user: storedUser });
+      return state;
     }
     return yield* Effect.gen({ self: this }, function* () {
       const user = yield* this.#startupRequestEffect("/v1/me", { method: "GET" }, decodeCentralAuthUser, sessionToken);

@@ -449,7 +449,13 @@ const Servers = createSimpleContext({
       try {
         setServers(await serversPort().servers.reorder({ serverIds }));
       } catch (error) {
-        setServers(previous);
+        // The connection state can have changed during the call. The copy from before the call
+        // is the fallback only.
+        setServers(
+          await serversPort()
+            .servers.list()
+            .catch(() => previous),
+        );
         throw error;
       }
     }
