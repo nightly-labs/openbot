@@ -3,7 +3,6 @@
 // It writes the state to `--ready-file` when the page has loaded. A "quit" line or the end of stdin
 // quits the app, so the app also quits when the test stops. A "crash" line crashes the main process.
 import { writeFileSync } from "node:fs";
-import { join } from "node:path";
 import { app, BrowserWindow, crashReporter } from "electron";
 import { configureLinuxGpu } from "../src/main/linux-gpu-mode";
 
@@ -18,8 +17,7 @@ process.stdout.on("error", () => undefined);
 process.stderr.on("error", () => undefined);
 const userDataPath = argument("user-data");
 app.setPath("userData", userDataPath);
-// As `src/main/index.ts`: the next start reads the dumps to tell a crash from a kill.
-app.setPath("crashDumps", join(userDataPath, "Crashpad"));
+// As `src/main/index.ts`, with its default `crashDumps` path: the next start reads the dumps.
 crashReporter.start({ uploadToServer: false });
 const mode = configureLinuxGpu({
   userDataPath,
@@ -60,6 +58,7 @@ void app.whenReady().then(async () => {
       hardwareAccelerationEnabled: app.isHardwareAccelerationEnabled(),
       gpuCompositing: app.getGPUFeatureStatus().gpu_compositing,
       webglRenderer,
+      crashDumps: app.getPath("crashDumps"),
     }),
   );
   process.stdin.setEncoding("utf8");

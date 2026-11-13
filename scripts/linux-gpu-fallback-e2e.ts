@@ -21,6 +21,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
+import { countCrashDumps } from "../src/main/run-marker";
 import { withoutElectronRuntimeFlags } from "./electron-spawn-env";
 
 const ROOT = resolve(import.meta.dirname, "..");
@@ -49,6 +50,7 @@ interface ReadyLine {
   hardwareAccelerationEnabled: boolean;
   gpuCompositing: string;
   webglRenderer: string | null;
+  crashDumps: string;
 }
 
 interface Step {
@@ -144,7 +146,11 @@ try {
   launch = await start(crashed, 600_000);
   launch.child.stdin?.write("crash\n");
   await launch.exited;
-  await until(() => crashDumpCount(join(crashed, "Crashpad")) > 0, "the main process crash writes a dump");
+  const crashDumps = launch.ready.crashDumps;
+  await until(
+    () => countCrashDumps(crashDumps, 0, Number.POSITIVE_INFINITY) > 0,
+    "the main process crash writes a dump",
+  );
   launch = await start(crashed, 1_000);
   assert.deepEqual(launch.ready.mode, { hardwareAcceleration: false, reason: "unfinished-start" });
   steps.push({ step: "after a crashed start", ready: launch.ready });
@@ -266,14 +272,6 @@ async function until<T>(read: () => T | undefined | false, what: string): Promis
     if (value !== undefined && value !== false) return value;
     if (Date.now() > deadline) throw new Error(`Timed out waiting for: ${what}`);
     await sleep(100);
-  }
-}
-
-function crashDumpCount(directory: string): number {
-  try {
-    return readdirSync(directory, { recursive: true }).filter((name) => String(name).endsWith(".dmp")).length;
-  } catch {
-    return 0;
   }
 }
 

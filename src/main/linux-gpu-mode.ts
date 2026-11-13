@@ -209,7 +209,8 @@ function readUnfinishedStart(path: string): UnfinishedStart | undefined {
   } catch (error) {
     logger.warn(`Unable to read the time of ${path}:`, toLogValue(error));
   }
-  return { ...record, crashed: countCrashDumps(app.getPath("crashDumps"), writtenAt, Date.now()) > 0 };
+  // No upper limit: a clock that goes back after a reboot must not hide a dump.
+  return { ...record, crashed: countCrashDumps(app.getPath("crashDumps"), writtenAt, Number.POSITIVE_INFINITY) > 0 };
 }
 
 // Synchronous: the first write runs before the app is ready, and a crash can stop the process soon after.
