@@ -129,4 +129,6 @@ export const messages = {
   "status.agent.compactionContinues":
     "De verbinding viel weg terwijl de agent zijn context comprimeerde. De agent gaat verder.",
   "status.agent.branchTitle": "Afgetakte chat",
+  "status.agent.routineSkippedLimit": "Overgeslagen: gebruikslimiet bereikt",
+  "status.agent.routineSkippedBusy": "Overgeslagen: de vorige run was nog niet klaar",
 } as const satisfies PartialTranslation<typeof source>;

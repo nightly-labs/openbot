@@ -91,4 +91,6 @@ export const messages = {
   "status.agent.planContinues": "В плане есть незавершённые шаги. Агент продолжает ({current} из {limit}).",
   "status.agent.compactionContinues": "Соединение прервалось, пока агент сжимал контекст. Агент продолжает.",
   "status.agent.branchTitle": "Ответвлённый чат",
+  "status.agent.routineSkippedLimit": "Пропущено: достигнут лимит использования",
+  "status.agent.routineSkippedBusy": "Пропущено: предыдущий запуск не завершился",
 } as const satisfies PartialTranslation<typeof source>;

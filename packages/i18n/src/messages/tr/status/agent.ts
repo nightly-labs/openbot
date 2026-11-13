@@ -90,4 +90,6 @@ export const messages = {
   "status.agent.planContinues": "Planda açık adımlar var. Ajan devam ediyor ({current}/{limit}).",
   "status.agent.compactionContinues": "Ajan bağlamını sıkıştırırken bağlantı kesildi. Ajan devam ediyor.",
   "status.agent.branchTitle": "Dallandırılmış sohbet",
+  "status.agent.routineSkippedLimit": "Atlandı: kullanım sınırına ulaşıldı",
+  "status.agent.routineSkippedBusy": "Atlandı: önceki çalıştırma bitmemişti",
 } as const satisfies PartialTranslation<typeof source>;

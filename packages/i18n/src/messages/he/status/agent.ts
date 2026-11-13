@@ -123,4 +123,6 @@ export const messages = {
   "status.agent.planContinues": "בתוכנית יש שלבים פתוחים. הסוכן ממשיך ({current} מתוך {limit}).",
   "status.agent.compactionContinues": "החיבור נפסק בזמן שהסוכן כיווץ את ההקשר שלו. הסוכן ממשיך.",
   "status.agent.branchTitle": "צ'אט מסועף",
+  "status.agent.routineSkippedLimit": "דולגה: הגעת למגבלת השימוש",
+  "status.agent.routineSkippedBusy": "דולגה: הריצה הקודמת לא הסתיימה",
 } as const satisfies PartialTranslation<typeof source>;

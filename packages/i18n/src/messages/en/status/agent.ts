@@ -127,4 +127,6 @@ export const messages = defineMessages("status.agent", {
     "The connection stopped while the agent compacted its context. The agent continues.",
   "status.agent.branchTitle": "Branched chat",
   "status.agent.importedChatTitle": "Imported chat",
+  "status.agent.routineSkippedLimit": "Skipped: usage limit reached",
+  "status.agent.routineSkippedBusy": "Skipped: the last run had not ended",
 });

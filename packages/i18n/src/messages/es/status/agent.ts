@@ -91,4 +91,6 @@ export const messages = {
   "status.agent.compactionContinues":
     "La conexión se detuvo mientras el agente compactaba su contexto. El agente continúa.",
   "status.agent.branchTitle": "Chat ramificado",
+  "status.agent.routineSkippedLimit": "Omitida: se alcanzó el límite de uso",
+  "status.agent.routineSkippedBusy": "Omitida: la ejecución anterior no había terminado",
 } as const satisfies PartialTranslation<typeof source>;

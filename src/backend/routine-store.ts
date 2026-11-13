@@ -852,14 +852,24 @@ export class RoutineStore {
   }
 
   /**
+   * Records one occurrence that the scheduler did not start, with the reason that the history shows,
+   * and moves the trigger to `nextRunAt` (#8028).
+   */
+  protected recordSkippedRow(routine: OwnedRoutine, at: Date, nextRunAt: Date, reason: string): void {
+    this.#recordMissed(routine, { first: at, until: at, count: 1 }, nextRunAt, reason);
+  }
+
+  /**
    * Records the skipped occurrences on one cancelled run and moves the trigger in one transaction, so
    * a crash cannot record them twice. The run is never queued: it only fills the history. A null
-   * `nextRunAt` is a one-time trigger, which keeps its time and pauses the routine instead.
+   * `nextRunAt` is a one-time trigger, which keeps its time and pauses the routine instead. A null
+   * `reason` means that OpenBot was closed at that time.
    */
   #recordMissed(
     routine: OwnedRoutine,
     skipped: { first: Date; until: Date; count: number },
     nextRunAt: Date | null,
+    reason: string | null = null,
   ): void {
     const {
       commandPrefix,
@@ -877,13 +887,13 @@ export class RoutineStore {
     const until = skipped.count > 1 ? skipped.until.toISOString() : null;
     const next = nextRunAt?.toISOString() ?? null;
     this.database.dispatch(
-      `${commandPrefix}-trigger:missed:${triggerId}:${scheduledFor}`,
+      `${commandPrefix}-trigger:${reason === null ? "missed" : "skipped"}:${triggerId}:${scheduledFor}`,
       [
         {
           aggregateType: runAggregate,
           aggregateId: routine.id,
           eventType: `${eventPrefix}.run-missed`,
-          payload: { runId, triggerId, scheduledFor, until, count: skipped.count },
+          payload: { runId, triggerId, scheduledFor, until, count: skipped.count, reason },
         },
         next
           ? {
@@ -905,7 +915,7 @@ export class RoutineStore {
           `INSERT INTO ${runTable} (
              run_id, routine_id, ${ownerColumn}, trigger_id, run_kind, scheduled_for, routine_name, instruction,
              status, error, missed_count, missed_until, created_at, updated_at, last_event_sequence
-           ) VALUES (?, ?, ?, ?, 'scheduled', ?, ?, ?, 'cancelled', NULL, ?, ?, ?, ?, ?)`,
+           ) VALUES (?, ?, ?, ?, 'scheduled', ?, ?, ?, 'cancelled', ?, ?, ?, ?, ?, ?)`,
         ).run(
           runId,
           routine.id,
@@ -914,6 +924,7 @@ export class RoutineStore {
           scheduledFor,
           routine.name,
           routine.instruction,
+          reason,
           skipped.count,
           until,
           timestamp,
