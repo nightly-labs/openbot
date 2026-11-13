@@ -11,6 +11,7 @@ import type {
   DeleteRoutineInput,
   ListRoutineRunsInput,
   QueueDelivery,
+  QuietRoutineRunsInput,
   Routine,
   RoutineConversationEventAction,
   RoutineRun,
@@ -511,6 +512,12 @@ export class RoutineScheduler implements RoutineDueSource {
     if (!this.#routines.getRecord(agentId, routineId))
       throw new RoutineInputError(sourceText("error.backend.routineGone"));
     return this.#routines.importRuns(agentId, routineId, runs);
+  }
+
+  /** The ids in `input.runIds` of the agent's runs that ended with nothing to report. */
+  quietRunIds(input: QuietRoutineRunsInput): string[] {
+    this.#conversation.requireKnownAgent(input.agentId);
+    return this.#routines.quietRunIds(input.agentId, input.runIds);
   }
 
   listRuns(input: ListRoutineRunsInput, withSkipped = false): RoutineRun[] {

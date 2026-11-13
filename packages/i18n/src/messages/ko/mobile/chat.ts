@@ -31,6 +31,8 @@ export const messages = {
   "mobile.chat.routine.created": "루틴을 만듦",
   "mobile.chat.routine.updated": "루틴을 수정함",
   "mobile.chat.routine.deleted": "루틴을 삭제함",
+  "mobile.chat.routine.nothingToReport": "보고할 내용 없음",
+  "mobile.chat.routine.quietUnsupported": "이 연결에서는 보고할 내용이 없었던 루틴 실행을 표시할 수 없어요.",
   "mobile.chat.routine.group.title": "루틴 활동",
   "mobile.chat.routine.group.count": { other: "이벤트 {count}개" },
   "mobile.chat.contextReset": "새 채팅이 시작됨",

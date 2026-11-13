@@ -451,6 +451,13 @@ routes: a visible agent (else 404), and `manage` on it for a save (else 403); a 
 sees, on a host with `channel-chats-v1`. An unknown routine or a date that has passed gets 400.
 Without the capability the routes answer 400, and a client hides the `once` option for that host.
 
+The optional `routine-runs-quiet-v1` capability (protocol 9 only) adds `POST /v1/routine-runs-quiet`
+(`agentId`, `runIds`: at most 100). It answers `runIds`, the ids among them of the agent's routine runs
+that ended with nothing to report, so a client can label their chat rows. A member reads it for an agent
+that the member can see (else 404), as the released run route. An id of another agent, of a channel run,
+or that the host does not know is not in the answer. `src/main/team-api/route-routine-runs-quiet.ts`
+owns it. Without the capability the route answers 400, and a client shows the rows without the label.
+
 The optional `routine-run-command-v1` capability (protocol 9 only) adds
 `POST /v1/admin/routines/run-command` (`agentId`, `routineId`). It answers `command`, the command that
 runs that routine from a script on the host, as Routines > Copy run command gives it on this computer.

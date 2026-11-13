@@ -255,7 +255,8 @@ export interface RoutineRunFields {
   missed?: RoutineMissedRuns;
   /**
    * Set only on an agent routine run that ended with nothing to report. A channel routine run, a run from
-   * before this was stored, and a run of a remote host leave it out.
+   * before this was stored, and a run of a remote host leave it out: a joined server answers which runs
+   * were quiet through `routine-runs-quiet-v1`.
    */
   quiet?: true;
   createdAt: string;
@@ -349,6 +350,13 @@ export interface ListRoutineRunsInput {
   agentId: string;
   routineId: string;
   limit?: number;
+}
+
+/** The runs of an agent's routines that a chat shows, to learn which ended with nothing to report. */
+export interface QuietRoutineRunsInput {
+  agentId: string;
+  /** At most `INPUT_LIMITS.routineRunsPage` (100) ids. */
+  runIds: string[];
 }
 
 /** A time range of the routine calendar, as two ISO instants. The host limits its length. */

@@ -148,6 +148,7 @@ export function serverSupportsCapability(
       capability === "background-processes-v1" ||
       capability === "routines-once-v1" ||
       capability === "routine-run-command-v1" ||
+      capability === "routine-runs-quiet-v1" ||
       capability === "claude-user-setup-v1" ||
       capability === "claude-compact-window-v1" ||
       capability === "agent-usage-limit-v1" ||

@@ -26,6 +26,10 @@ import {
   ROUTINE_RUN_PLACE_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-run-place-v1";
 import {
+  decodeQuietRoutineRunIds,
+  ROUTINE_RUNS_QUIET_ROUTES,
+} from "@openbot/contracts/team-protocol/routine-runs-quiet-v1";
+import {
   decodeOnceAgentRoutines,
   decodeOnceChannelRoutines,
   ROUTINES_ONCE_CAPABILITY,
@@ -60,6 +64,7 @@ import {
   parseCreateRoutine,
   parseDeleteRoutine,
   parseListRoutineRuns,
+  parseQuietRoutineRuns,
   parseRoutineCalendar,
   parseTestRoutine,
   parseUpdateRoutine,
@@ -177,6 +182,17 @@ export function routineIpcHandlers({
               `${TEAM_API_ROUTES.agent.routineRuns(parsed.agentId, parsed.routineId)}?limit=${parsed.limit}`,
               decodeRoutineRuns,
             ),
+          ),
+      }),
+      // The renderer asks a joined server only when it has `routine-runs-quiet-v1`.
+      quietRoutineRuns: scopedHandler(parseQuietRoutineRuns, {
+        local: (parsed) => service.quietRoutineRunIds(parsed),
+        remote: (parsed, serverId) =>
+          runCauseEffect(
+            remoteServers.request(serverId, ROUTINE_RUNS_QUIET_ROUTES.list, decodeQuietRoutineRunIds, {
+              method: "POST",
+              body: parsed,
+            }),
           ),
       }),
       automationRunCommand: scopedHandler(parseTestRoutine, {

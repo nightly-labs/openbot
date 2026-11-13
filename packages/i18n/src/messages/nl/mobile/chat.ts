@@ -24,6 +24,9 @@ export const messages = {
   "mobile.chat.routine.created": "Routine gemaakt",
   "mobile.chat.routine.updated": "Routine bijgewerkt",
   "mobile.chat.routine.deleted": "Routine verwijderd",
+  "mobile.chat.routine.nothingToReport": "Niets te melden",
+  "mobile.chat.routine.quietUnsupported":
+    "Deze verbinding kan niet tonen welke routine-uitvoeringen niets te melden hadden.",
   "mobile.chat.routine.group.title": "Routine-activiteit",
   "mobile.chat.routine.group.count": { one: "{count} gebeurtenis", other: "{count} gebeurtenissen" },
   "mobile.chat.contextReset": "Nieuwe chat gestart",

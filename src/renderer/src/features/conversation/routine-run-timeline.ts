@@ -218,22 +218,19 @@ export function placeRoutineRunTurns(
 }
 
 /**
- * The completed runs whose row shows no answer, by routine id: a run with no message in the chat, or with
- * only quiet answers. Only these can have ended with nothing to report, so the chat reads their runs.
+ * The ids of the completed runs whose row shows no answer: a run with no message in the chat, or with
+ * only quiet answers. Only these can have ended with nothing to report, so the chat asks about them.
  */
 export function quietRunCandidates(
   rows: readonly AgentMessage[],
   turns: ReadonlyMap<string, readonly AgentMessage[]>,
-): Map<string, string[]> {
-  const candidates = new Map<string, string[]>();
-  for (const row of rows) {
+): string[] {
+  return rows.flatMap((row) => {
     const marker = routineRunMarker(row);
-    if (marker?.status !== "succeeded") continue;
+    if (marker?.status !== "succeeded") return [];
     const messages = turns.get(marker.runId) ?? [];
-    if (messages.some((message) => message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE)) continue;
-    candidates.set(marker.routineId, [...(candidates.get(marker.routineId) ?? []), marker.runId]);
-  }
-  return candidates;
+    return messages.some((message) => message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE) ? [] : [marker.runId];
+  });
 }
 
 /** Marks the row of each run in `quietRunIds` as a run that ended with nothing to report. */

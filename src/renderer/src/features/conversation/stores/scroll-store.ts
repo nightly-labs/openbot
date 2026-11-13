@@ -1,3 +1,4 @@
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import type { AgentMessage } from "@openbot/ui/data";
 import type { RoutineRunToggleMarkerModel } from "@openbot/ui/features/conversation/ChatActionMarker";
@@ -172,30 +173,29 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   const routineRunTurns = createMemo(() => routineRunTurnMessages(deps.props.messages, shownMessages()));
   const routineRunRows = createMemo(() => summarizeRoutineRunMessages(shownMessages()));
   /*
-   * The runs that ended with nothing to report. Only the host's run record says so, so the chat reads
-   * the runs of a routine when a completed run row shows no answer. Each run is read once; a failed read
-   * leaves its row as it is until the rows change.
+   * The runs that ended with nothing to report. Only the host's run record says so, so the chat asks
+   * the host about each completed run row that shows no answer. Each run is asked about once; a failed
+   * read leaves its row as it is until the rows change.
    */
   const [quietRunIds, setQuietRunIds] = createSignal<ReadonlySet<string>>(new Set());
   const readRunIds = new Set<string>();
   createEffect(
     () => ({
       candidates: quietRunCandidates(routineRunRows(), routineRunTurns()),
-      listRuns: deps.props.listRoutineRuns,
+      quietRuns: deps.props.quietRoutineRuns,
     }),
-    ({ candidates, listRuns }) => {
-      if (!listRuns) return;
-      for (const [routineId, runIds] of candidates) {
-        const unread = runIds.filter((runId) => !readRunIds.has(runId));
-        if (unread.length === 0) continue;
-        for (const runId of unread) readRunIds.add(runId);
-        void listRuns(routineId)
-          .then((runs) => {
-            const quiet = runs.flatMap((run) => (run.quiet ? [run.id] : []));
+    ({ candidates, quietRuns }) => {
+      if (!quietRuns) return;
+      const unread = candidates.filter((runId) => !readRunIds.has(runId));
+      for (let start = 0; start < unread.length; start += QUIET_RUNS_PER_READ) {
+        const runIds = unread.slice(start, start + QUIET_RUNS_PER_READ);
+        for (const runId of runIds) readRunIds.add(runId);
+        void quietRuns(runIds)
+          .then((quiet) => {
             if (quiet.length > 0) setQuietRunIds((current) => new Set([...current, ...quiet]));
           })
           .catch(() => {
-            for (const runId of unread) readRunIds.delete(runId);
+            for (const runId of runIds) readRunIds.delete(runId);
           });
       }
     },
@@ -503,6 +503,8 @@ function heldWhileWritten(message: AgentMessage): boolean {
 }
 
 /** The ids Claude and the ACP agents give a turn's thinking, beside its narration, as `REASONING_ID` in the backend. */
+/** The most run ids in one read: the host takes at most this many. */
+const QUIET_RUNS_PER_READ = INPUT_LIMITS.routineRunsPage;
 const THINKING_ITEM_ID = /:(?:reasoning|thought(?::\d+)?)$/u;
 
 /**

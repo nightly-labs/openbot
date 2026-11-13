@@ -310,6 +310,10 @@ import {
   ROUTINE_RUN_PLACE_CAPABILITY,
   ROUTINE_RUN_PLACE_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-run-place-v1";
+import {
+  ROUTINE_RUNS_QUIET_CAPABILITY,
+  ROUTINE_RUNS_QUIET_ROUTES,
+} from "@openbot/contracts/team-protocol/routine-runs-quiet-v1";
 import { ROUTINES_ONCE_CAPABILITY, ROUTINES_ONCE_ROUTES } from "@openbot/contracts/team-protocol/routines-once-v1";
 import { SIDE_QUESTION_CAPABILITY, SIDE_QUESTION_ROUTES } from "@openbot/contracts/team-protocol/side-question-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
@@ -1230,6 +1234,10 @@ const fakeAgents: TeamApiAgents = {
   deleteRoutine: unused("deleteRoutine"),
   testRoutine: unused("testRoutine"),
   listRoutineRuns: unused("listRoutineRuns"),
+  quietRoutineRunIds: (input) => {
+    record("quietRoutineRunIds", input);
+    return input.runIds.filter((runId) => runId === "run-quiet");
+  },
   listChannelMemories: unused("listChannelMemories"),
   createChannelMemory: unused("createChannelMemory"),
   updateChannelMemory: unused("updateChannelMemory"),
@@ -9493,6 +9501,56 @@ try {
         errorIs(hiddenAgent, 404, sourceText("error.team.agentNotFound")) &&
         saves().length === 2,
       [summary(gone), summary(badPlace), summary(missing), summary(hiddenAgent)],
+    );
+  }
+
+  // ---- Which routine runs had nothing to report (routine-runs-quiet-v1) ----
+  {
+    const capabilities = [ROUTINE_RUNS_QUIET_CAPABILITY];
+    const asked = { agentId: "agent-ada", runIds: ["run-quiet", "run-loud", "run-other"] };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises routine-runs-quiet-v1 to a protocol 9 peer and not to a protocol 8 peer",
+      list(field(compatibility.body, "capabilities")).includes(ROUTINE_RUNS_QUIET_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(ROUTINE_RUNS_QUIET_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", ROUTINE_RUNS_QUIET_ROUTES.list, { token: bobToken, json: asked });
+    check(
+      "the route without the capability gets 400 routineRunsQuietUnsupported, and reads nothing",
+      errorIs(unsupported, 400, sourceText("error.team.routineRunsQuietUnsupported")) &&
+        callsOf("quietRoutineRunIds").length === 0,
+      summary(unsupported),
+    );
+    const quiet = await call("POST", ROUTINE_RUNS_QUIET_ROUTES.list, { token: bobToken, json: asked, capabilities });
+    check(
+      "a member who sees the agent gets only the quiet runs among the ids that the client asks about",
+      quiet.status === 200 &&
+        isDeepStrictEqual(quiet.body, { runIds: ["run-quiet"] }) &&
+        isDeepStrictEqual(callsOf("quietRoutineRunIds"), [[asked]]),
+      summary(quiet),
+    );
+    const tooMany = await call("POST", ROUTINE_RUNS_QUIET_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-ada", runIds: Array.from({ length: 101 }, (_, index) => `run-${index}`) },
+      capabilities,
+    });
+    const missing = await call("POST", ROUTINE_RUNS_QUIET_ROUTES.list, {
+      token: bobToken,
+      json: { ...asked, agentId: "agent-none" },
+      capabilities,
+    });
+    accessLevels = { revision: 12, everyone: { "agent-ada": "none" }, roles: [] };
+    const blocked = await call("POST", ROUTINE_RUNS_QUIET_ROUTES.list, { token: bobToken, json: asked, capabilities });
+    accessLevels = { revision: 13, everyone: {}, roles: [] };
+    check(
+      "more than 100 ids get 400, and an unknown agent or an agent that the member cannot see gets 404; the host reads nothing",
+      tooMany.status === 400 &&
+        errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(blocked, 404, sourceText("error.team.agentNotFound")) &&
+        callsOf("quietRoutineRunIds").length === 1,
+      [summary(tooMany), summary(missing), summary(blocked)],
     );
   }
 

@@ -72,6 +72,8 @@ export const messages = {
   "error.team.agentColorsUnsupported": "To połączenie nie obsługuje kolorów agentów.",
   "error.team.chatColorsUnsupported": "To połączenie nie obsługuje kolorów czatu.",
   "error.team.routineRunPlaceUnsupported": "To połączenie nie może zmienić miejsca uruchamiania rutyny.",
+  "error.team.routineRunsQuietUnsupported":
+    "To połączenie nie może pokazać, które uruchomienia rutyn nie miały nic do zgłoszenia.",
   "error.team.routinesOnceUnsupported": "To połączenie nie może zapisać jednorazowych rutyn.",
   "error.team.routineRunCommandUnsupported": "To połączenie nie może podać polecenia uruchomienia rutyny.",
   "error.team.threadQueueUnsupported": "To połączenie nie może pokazać kolejki wątku pobocznego.",

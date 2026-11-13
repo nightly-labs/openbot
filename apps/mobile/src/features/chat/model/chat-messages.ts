@@ -69,6 +69,10 @@ export type ChatMessage =
       label: MobileTextKey;
       routineId: string;
       routineName: string;
+      /** The run of a run marker. Null for a routine change. */
+      runId: string | null;
+      /** The run ended with nothing to report (`routine-runs-quiet-v1`). */
+      quiet?: true | undefined;
     }
   | {
       id: string;
@@ -336,6 +340,7 @@ function projectRoutineMarker(message: ConversationMessage, latestRuns: Readonly
     label: marker.label,
     routineId: marker.routineId,
     routineName: marker.routineName,
+    runId: marker.runId ?? null,
   }));
 }
 const aliasedMessages = new WeakMap<ChatMessage, ChatMessage>();
@@ -650,6 +655,19 @@ function rowMarkers(row: ChatRow): readonly { id: string }[] {
   return row.kind === "exchange-group" ? row.exchanges : row.kind === "routine-run-group" ? row.runs : [row];
 }
 
+const quietRoutineRows = new WeakMap<RoutineMarker, RoutineMarker>();
+
+/** Marks the row of each run in `quietRunIds` as a run that ended with nothing to report. A row keeps its object. */
+export function withQuietRoutineRuns(rows: readonly ChatMessage[], quietRunIds: ReadonlySet<string>): ChatMessage[] {
+  if (quietRunIds.size === 0) return [...rows];
+  return rows.map((row) => {
+    if (row.kind !== "routine" || !row.runId || !quietRunIds.has(row.runId)) return row;
+    const marked = quietRoutineRows.get(row) ?? { ...row, quiet: true as const };
+    quietRoutineRows.set(row, marked);
+    return marked;
+  });
+}
+
 const routineRunGroups = new WeakMap<RoutineMarker, RoutineRunGroup>();
 /** The row ID that each routine marker last showed in, by marker ID. */
 const routineRowIds = new Map<string, string>();
@@ -863,6 +881,7 @@ function projectChannelMessage(
       label: routine.label,
       routineId: routine.routineId,
       routineName: routine.routineName,
+      runId: routine.runId ?? null,
     };
   }
   if (entry.message.questionPrompt) {

@@ -24,7 +24,6 @@ import type {
   QueueSnapshot,
   ResponseStyle,
   RoutineFields,
-  RoutineRun,
   ServerSummary,
   TeamPresenceSnapshot,
   UpdateAgentAdminSettingsInput,
@@ -223,10 +222,10 @@ export interface ConversationProps {
   /** The agent's routines, for the chat card of a routine the agent created or changed. */
   routines?: readonly RoutineFields[] | undefined;
   /**
-   * Reads the newest runs of one of the agent's routines, so a run row can say that the run had nothing
-   * to report. Absent on a joined server: its runs do not say it.
+   * The ids of the given runs of the agent's routines that ended with nothing to report, so their rows
+   * can say so. Absent on a joined server without `routine-runs-quiet-v1`.
    */
-  listRoutineRuns?: ((routineId: string) => Promise<readonly RoutineRun[]>) | undefined;
+  quietRoutineRuns?: ((runIds: readonly string[]) => Promise<readonly string[]>) | undefined;
   modelOptions: ClientAgentModelOption[];
   messages: readonly AgentMessage[];
   messageReferences?: Record<string, AgentMessage> | undefined;

@@ -504,6 +504,7 @@ import type {
   CreateRoutineInput,
   DeleteRoutineInput,
   ListRoutineRunsInput,
+  QuietRoutineRunsInput,
   Routine,
   RoutineCalendar,
   RoutineCalendarInput,
@@ -1848,6 +1849,9 @@ export const IPC_ENDPOINTS = {
     deleteRoutine: scopedRequest<DeleteRoutineInput, void>()("agent:delete-routine"),
     testRoutine: scopedRequest<TestRoutineInput, RoutineRun>()("agent:test-routine"),
     listRoutineRuns: scopedRequest<ListRoutineRunsInput, RoutineRun[]>()("agent:list-routine-runs"),
+    // The ids of the given runs that ended with nothing to report. A joined server takes it through
+    // `routine-runs-quiet-v1`.
+    quietRoutineRuns: scopedRequest<QuietRoutineRunsInput, string[]>()("agent:quiet-routine-runs"),
     /** The shell command a local script uses to run the routine. It names the token file, not the token. */
     automationRunCommand: scopedRequest<TestRoutineInput, string>()("agent:automation-run-command"),
     // Every routine of the host, of agents and channels, with its runs in a range.

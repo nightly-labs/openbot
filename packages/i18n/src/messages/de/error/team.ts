@@ -76,6 +76,8 @@ export const messages = {
   "error.team.agentColorsUnsupported": "Diese Verbindung unterstützt keine Agentenfarben.",
   "error.team.chatColorsUnsupported": "Diese Verbindung unterstützt keine Chatfarben.",
   "error.team.routineRunPlaceUnsupported": "Diese Verbindung kann nicht ändern, wo eine Routine läuft.",
+  "error.team.routineRunsQuietUnsupported":
+    "Diese Verbindung kann nicht anzeigen, welche Routineläufe nichts zu melden hatten.",
   "error.team.routinesOnceUnsupported": "Diese Verbindung kann keine Routinen speichern, die einmal laufen.",
   "error.team.routineRunCommandUnsupported": "Diese Verbindung kann den Ausführungsbefehl einer Routine nicht liefern.",
   "error.team.threadQueueUnsupported": "Diese Verbindung kann die Warteschlange eines Nebenthreads nicht anzeigen.",

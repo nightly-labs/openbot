@@ -170,6 +170,19 @@ export class AgentRoutineStore extends RoutineStore {
     return toRun(this.markRunQuietRow(runId));
   }
 
+  /** The ids in `runIds` of the agent's runs that ended with nothing to report. */
+  quietRunIds(agentId: string, runIds: readonly string[]): string[] {
+    if (runIds.length === 0) return [];
+    const { runTable, ownerColumn } = this.tables;
+    return this.database.connection
+      .prepare(
+        `SELECT run_id FROM ${runTable}
+         WHERE ${ownerColumn} = ? AND quiet = 1 AND run_id IN (${runIds.map(() => "?").join(", ")})`,
+      )
+      .all(agentId, ...runIds)
+      .map((row) => String(row.run_id));
+  }
+
   runForDelivery(deliveryId: string): RoutineRun | null {
     const run = this.runForHandleRow(deliveryId);
     return run ? toRun(run) : null;

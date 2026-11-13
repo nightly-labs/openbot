@@ -71,6 +71,7 @@ export const messages = {
   "error.team.agentColorsUnsupported": "이 연결에서는 에이전트 색상을 지원하지 않아요.",
   "error.team.chatColorsUnsupported": "이 연결에서는 채팅 색상을 지원하지 않아요.",
   "error.team.routineRunPlaceUnsupported": "이 연결에서는 루틴이 실행되는 위치를 바꿀 수 없어요.",
+  "error.team.routineRunsQuietUnsupported": "이 연결에서는 보고할 내용이 없었던 루틴 실행을 표시할 수 없어요.",
   "error.team.routinesOnceUnsupported": "이 연결에서는 한 번 실행되는 루틴을 저장할 수 없어요.",
   "error.team.routineRunCommandUnsupported": "이 연결에서는 루틴 실행 명령을 가져올 수 없어요.",
   "error.team.threadQueueUnsupported": "이 연결에서는 사이드 스레드의 대기열을 표시할 수 없어요.",

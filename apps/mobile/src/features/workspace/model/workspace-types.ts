@@ -1060,6 +1060,8 @@ export interface MobileWorkspaceContextValue {
   canAttachThreadFiles: (serverId: string) => boolean;
   /** True when the host advertises `message-pins-v1`: a member who can message an agent can pin its messages. */
   canPinMessages: (serverId: string) => boolean;
+  /** True when the host advertises `routine-runs-quiet-v1`: it says which routine runs had nothing to report. */
+  canReadQuietRoutineRuns: (serverId: string) => boolean;
   /** True when the host advertises `agent-thread-branches-v1`: a member who can message an agent can branch its chats. */
   canBranchThreads: (serverId: string) => boolean;
   /** True when the host advertises `workflows-v1`. The host shows each member the workflows of their agents. */
@@ -1134,6 +1136,8 @@ export interface MobileWorkspaceContextValue {
   markAgentThreadRead: (input: MarkAgentTaskReadInput, serverId: string) => Promise<AgentTaskReadState>;
   /** The pinned messages of all chats of the agent, the newest pin first. */
   loadMessagePins: (agentId: string, serverId: string) => Promise<PinnedMessagesSnapshot>;
+  /** The ids in `runIds` of the agent's routine runs that ended with nothing to report. */
+  loadQuietRoutineRuns: (agentId: string, runIds: readonly string[], serverId: string) => Promise<readonly string[]>;
   /** Pins or unpins one message of the agent's chat or of one of its threads. Answers the new list. */
   setMessagePinned: (input: SetMessagePinnedInput, serverId: string) => Promise<PinnedMessagesSnapshot>;
   /** Answers a question of a task turn. The host finds the question by its request, on any thread. */
@@ -1236,6 +1240,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canReadThreads"
   | "canAttachThreadFiles"
   | "canPinMessages"
+  | "canReadQuietRoutineRuns"
   | "canBranchThreads"
   | "canUseWorkflows"
   | "canUseWorkflowGitHub"

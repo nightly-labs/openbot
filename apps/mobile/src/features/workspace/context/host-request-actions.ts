@@ -156,6 +156,7 @@ import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/pro
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
+import { ROUTINE_RUNS_QUIET_CAPABILITY } from "@openbot/contracts/team-protocol/routine-runs-quiet-v1";
 import { SERVER_AUDIT_CAPABILITY } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { SHARED_TABLES_CAPABILITY } from "@openbot/contracts/team-protocol/shared-tables-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
@@ -332,6 +333,7 @@ import {
   stopLiveVoice,
   type TeamApiRequest,
   TeamRequestError,
+  teamAgentRoutinesApi,
 } from "@openbot/team-client/team-api-requests";
 import type { QueryClient } from "@tanstack/react-query";
 import { Effect } from "effect";
@@ -414,6 +416,7 @@ type HostRequestActions = Pick<
   | "markAgentThreadRead"
   | "loadMessagePins"
   | "setMessagePinned"
+  | "loadQuietRoutineRuns"
   | "respondToTaskPrompt"
   | "loadAgentSkills"
   | "installAgentSkill"
@@ -649,6 +652,7 @@ export function createHostRequestChecks(capabilities: ServerCapabilities): HostR
     canReadThreads: (serverId) => has(serverId, AGENT_THREAD_READS_CAPABILITY),
     canAttachThreadFiles: (serverId) => has(serverId, AGENT_THREAD_FILES_CAPABILITY),
     canPinMessages: (serverId) => has(serverId, MESSAGE_PINS_CAPABILITY),
+    canReadQuietRoutineRuns: (serverId) => has(serverId, ROUTINE_RUNS_QUIET_CAPABILITY),
     canBranchThreads: (serverId) => has(serverId, AGENT_THREAD_BRANCHES_CAPABILITY),
     canUseWorkflows: (serverId) => has(serverId, WORKFLOWS_CAPABILITY),
     canUseWorkflowGitHub: (serverId) =>
@@ -1258,6 +1262,10 @@ export function createHostRequestActions({
     markAgentThreadRead: async (input, serverId) =>
       runTeamRequest(markAgentThreadRead(threadReadsApi(serverId), input)),
     loadMessagePins: async (agentId, serverId) => runTeamRequest(listMessagePins(messagePinsApi(serverId), agentId)),
+    loadQuietRoutineRuns: (agentId, runIds, serverId) =>
+      teamAgentRoutinesApi(
+        capabilityApi(serverId, ROUTINE_RUNS_QUIET_CAPABILITY, "mobile.chat.routine.quietUnsupported"),
+      ).quietRoutineRuns({ agentId, runIds: [...runIds] }),
     setMessagePinned: async (input, serverId) => runTeamRequest(setMessagePinned(messagePinsApi(serverId), input)),
     respondToTaskPrompt: async (input, serverId) => {
       await request(

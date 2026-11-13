@@ -73,6 +73,8 @@ export const messages = {
   "error.team.agentColorsUnsupported": "Это подключение не поддерживает цвета агентов.",
   "error.team.chatColorsUnsupported": "Это подключение не поддерживает цвета чата.",
   "error.team.routineRunPlaceUnsupported": "Это подключение не может изменить, где выполняется регулярная задача.",
+  "error.team.routineRunsQuietUnsupported":
+    "Это подключение не может показать, какие запуски регулярных задач завершились без новостей.",
   "error.team.routinesOnceUnsupported": "Это подключение не может сохранить однократные регулярные задачи.",
   "error.team.routineRunCommandUnsupported": "Это подключение не может выдать команду запуска регулярной задачи.",
   "error.team.threadQueueUnsupported": "Это подключение не может показать очередь побочной ветки.",

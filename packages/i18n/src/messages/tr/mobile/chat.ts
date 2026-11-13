@@ -32,6 +32,9 @@ export const messages = {
   "mobile.chat.routine.created": "Oluşturulan rutin",
   "mobile.chat.routine.updated": "Güncellenen rutin",
   "mobile.chat.routine.deleted": "Silinen rutin",
+  "mobile.chat.routine.nothingToReport": "Bildirilecek bir şey yok",
+  "mobile.chat.routine.quietUnsupported":
+    "Bu bağlantı, hangi rutin çalıştırmalarının bildirecek bir şeyi olmadığını gösteremez.",
   "mobile.chat.routine.group.title": "Rutin etkinliği",
   "mobile.chat.routine.group.count": { one: "{count} olay", other: "{count} olay" },
   "mobile.chat.contextReset": "Yeni sohbet başlatıldı",

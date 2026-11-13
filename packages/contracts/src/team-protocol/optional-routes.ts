@@ -117,6 +117,7 @@ import { ROUTINE_RECOVERY_CODECS } from "./routine-recovery-v1";
 import { ROUTINE_RESULTS_CODECS } from "./routine-results-v1";
 import { ROUTINE_RUN_COMMAND_CODECS } from "./routine-run-command-v1";
 import { ROUTINE_RUN_PLACE_CODECS } from "./routine-run-place-v1";
+import { ROUTINE_RUNS_QUIET_CODECS } from "./routine-runs-quiet-v1";
 import { ROUTINES_ONCE_CODECS } from "./routines-once-v1";
 import { SERVER_AUDIT_CODECS } from "./server-audit-v1";
 import { SHARED_TABLES_CODECS } from "./shared-tables-v1";
@@ -230,6 +231,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...ROUTINE_FLOWS_CODECS,
   ...ROUTINE_RECOVERY_CODECS,
   ...ROUTINE_RUN_PLACE_CODECS,
+  ...ROUTINE_RUNS_QUIET_CODECS,
   ...ROUTINE_RESULTS_CODECS,
   ...WEBHOOK_TESTS_CODECS,
   ...WEBHOOK_SENDER_SECRET_CODECS,

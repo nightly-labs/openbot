@@ -79,6 +79,7 @@ import type {
   ProviderUsageResets,
   QueuedMessageReceipt,
   QueueSnapshot,
+  QuietRoutineRunsInput,
   ReadAgentTaskAroundInput,
   ReadAgentTaskPageInput,
   RemoveMcpServerInput,
@@ -2348,6 +2349,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /** Writes the finished runs of an imported channel routine. Returns the new run ids in order. */
   importChannelRoutineRuns(channelId: string, routineId: string, runs: readonly ImportedRoutineRun[]): string[] {
     return this.#channelRoutines.importRuns(channelId, routineId, runs);
+  }
+
+  /** The ids in `input.runIds` of the agent's runs that ended with nothing to report. */
+  quietRoutineRunIds(input: QuietRoutineRunsInput): string[] {
+    return this.#routines.quietRunIds(input);
   }
 
   /** `withSkipped` adds the skipped-run records, which only the local history shows. */

@@ -29,6 +29,8 @@ export const messages = {
   "mobile.chat.routine.created": "已创建自动化任务",
   "mobile.chat.routine.updated": "已更新自动化任务",
   "mobile.chat.routine.deleted": "已删除自动化任务",
+  "mobile.chat.routine.nothingToReport": "没有需要报告的内容",
+  "mobile.chat.routine.quietUnsupported": "当前连接无法显示哪些自动化任务运行没有需要报告的内容。",
   "mobile.chat.routine.group.title": "自动化任务动态",
   "mobile.chat.routine.group.count": { one: "{count} 个事件", other: "{count} 个事件" },
   "mobile.chat.contextReset": "已开始新对话",
