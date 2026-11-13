@@ -1,10 +1,10 @@
 {
-  "version": "0.69.0",
+  "version": "0.70.0",
   "highlights": [
-    "Hidden agents now keep working. Turn on again the routines of the agents that you hid before this version.",
-    "A message that you send to a working agent now steers its turn. You can still select Queue in Settings > Agents.",
-    "Pin messages in a chat, and sort your Library files into folders.",
-    "Teach an agent a task in its browser, and add skills from a GitHub link.",
-    "Pool the accounts of a provider, and export a full copy of a server or copy its agents to another server."
+    "Update your joined servers to this version too: you can then restart a self-hosted server from the app and set its agent defaults and thread limits.",
+    "Choose which agents can use each Vault item. An API key saved for one agent now stays in the encrypted Vault.",
+    "Make pictures and short videos in Workflows with GPT Image, Grok Imagine and Sunra models.",
+    "Connect Sunra and TryPost from the Apps marketplace.",
+    "OpenBot opens faster when chats are long, and on Windows and Linux it asks before it quits while agents work."
   ]
 }
