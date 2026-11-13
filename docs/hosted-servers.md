@@ -921,7 +921,7 @@ When it ends, the owner sees the server in the app, and can invite the other mem
 
 - With no `--apply`, it only shows what it would do. It refuses a VPS with a reference, and a VPS of
   the hosted pool.
-- A custom VPS never has the reference `pool-free`, and each pool step that changes a machine
+- A custom VPS never has the reference `pool`, and each pool step that changes a machine
   (`prepare`, `move`, and then `sync`) needs it, so the pool never uses a custom VPS. When `add` and
   `custom` take the same VPS at the same time, each one reads the reference again, and the one that
   lost stops.
@@ -994,8 +994,8 @@ Leaseweb accounts use one scheme:
 | Reference | Use | Example |
 | --- | --- | --- |
 | None (no reference, or an empty one) | Not used. **Only a VPS with no reference can be taken for a new use.** | |
-| `pool-free` | In the hosted pool, with no server. Only `leaseweb-pool.ts` and [Move a server from boat](#move-a-server-from-boat) use it. | `pool-free` |
-| `<owner email> <first 8 characters of the OpenBot server ID>` | In the hosted pool, with a hosted server. `move` sets it for a moved server, and `sync` for a server that started on the machine. | `jane@example.com 1a2b3c4d` |
+| `pool` | In the hosted pool. It does not tell whether a server has the VPS: a purchase gives a VPS to a server in D1 and does not change the reference. `leaseweb-pool.ts status` shows the free ones. Only `leaseweb-pool.ts` and [Move a server from boat](#move-a-server-from-boat) use a pool VPS. Before 2026-11-13 a free pool VPS had `pool-free`; the script reads it as `pool`. | `pool` |
+| `<owner email> <first 8 characters of the OpenBot server ID>` | In the hosted pool, with a hosted server. `move` sets it for a moved server, and `sync` for a server that started on the machine. A label for the Leaseweb panel only: `sync` sets `pool` again on a free pool VPS that still has one. | `jane@example.com 1a2b3c4d` |
 | `custom-<NN> <customer> <owner email>` | A server for one customer, not in the pool. `<NN>` is the next number after the highest on all accounts; `leaseweb-pool.ts custom` sets it. `<customer>` is one word in small letters. | `custom-01 acme jane@example.com` |
 | `openbot-signal-<home>` | A Signal machine (see `docs/remote-session-deployment.md`). | `openbot-signal-us` |
 | `pool-test-<NN>` | A test machine of the operator. | `pool-test-01` |
@@ -1006,14 +1006,15 @@ To take a VPS:
    reference in the location you need.
 2. Set its reference at once, before any other work on it. Then read the VPS again: when the
    reference is not yours, another operator took it, and you select another one.
-3. Never take a VPS that has a reference, also `pool-free`. A pool VPS leaves the pool only with
+3. Never take a VPS that has a reference, also `pool`. A pool VPS leaves the pool only with
    `leaseweb-pool.ts remove`, by a decision of the operator. `remove` keeps the reference
-   `pool-free`, so the operator then sets the new reference, or clears it with
+   `pool`, so the operator then sets the new reference, or clears it with
    `{"reference": ""}` when the VPS is not used.
 
-`leaseweb-pool.ts add` gives `pool-free` to a VPS with no reference, and refuses a VPS with another
-reference. For a pool VPS, the record of the account service, not the reference, decides which VPS
-is free. The email in the reference goes to Leaseweb, so `PRIVACY.md` must name that before a
+`leaseweb-pool.ts add` gives `pool` to a VPS with no reference, and refuses a VPS with another
+reference. For a pool VPS, only the record of the account service (`operator_host` in D1) tells
+which VPS is free; a unique index on it refuses a second server on one VPS. Do not select a pool VPS
+from the Leaseweb panel: `move <server ID> auto` selects a free one when the move starts. The email in the reference goes to Leaseweb, so `PRIVACY.md` must name that before a
 customer server gets one.
 
 A pool VPS and a custom VPS also use these names:
@@ -1168,7 +1169,7 @@ writes `observed_state`:
 | The owner renews | Sets `desired_state = 'running'` and clears the error. `plan_ended_at` stays. | Start `openbot.service`, then write `observed_state = 'running'`. |
 | 30 days after the plan ended, with no open subscription | Reads the subscription at Stripe, then deletes the server as the owner does. | As for a delete. |
 | The owner or an admin restarts the server | Refuses with `409 hosted_server_restart_unavailable`. | Restart `openbot.service` on a request to support. |
-| The owner deletes the server | Cancels the plan, deletes the sandbox in `retired_sandbox_id`, removes the Remote host, ends the session, and sets `observed_state = 'deleted'`. `operator_host` stays. | Reinstall the VPS, set its reference to `pool-free`, then set `operator_host = NULL`. |
+| The owner deletes the server | Cancels the plan, deletes the sandbox in `retired_sandbox_id`, removes the Remote host, ends the session, and sets `observed_state = 'deleted'`. `operator_host` stays. | Reinstall the VPS, set its reference to `pool`, then set `operator_host = NULL`. |
 | boat sends an event for the old sandbox | Finds no row for it. | Nothing. |
 
 The Worker sends no message to the operator, and it connects to no machine. Run
@@ -1182,10 +1183,13 @@ in, reports its use and installs updates as it did on boat. `provision.sh` insta
 start it, so the data is in place before the first start. `scripts/hosting/move-from-boat.sh` does
 the parts of a move that run on the two machines, as root.
 
-`leaseweb-pool.ts move <server ID> <VPS ID> --apply` does steps 2 to 8 for one server, and writes the
-time of each step and of the downtime. Before the row changes, it checks for a server that is
+`leaseweb-pool.ts move <server ID> <VPS ID | auto> --apply` does steps 2 to 8 for one server, and writes
+the time of each step and of the downtime. Before the row changes, it checks for a server that is
 `running` or `idle` and a free machine of the pool with the product of the plan, and it takes the
-token of the machine away, so that no new server gets it. After the
+token of the machine away, so that no new server gets it. Use `auto`: new customers get machines at
+each moment, so a VPS that you selected earlier can have a server when the move starts. `auto` selects
+a ready machine first, in the locations of the currency of the server, as the account service does
+for a new server. When a new customer gets it before the token is away, it takes the next one. After the
 row changes and before the export, it checks the same IDs of `user` on the two machines, an OpenBot
 on the machine that is not older than that of the sandbox, and an ssh from the sandbox to the machine.
 When a step before the export fails, it gives the row back to the sandbox, and the customer sees no
@@ -1194,7 +1198,7 @@ hand. It needs `BOAT_API_KEY` in the environment, from `apps/auth-api/.env.dev`:
 
 ```bash
 bunx dotenvx run -f apps/auth-api/.env.production -f apps/auth-api/.env.dev -fk <root>/.env.keys -- \
-  bun scripts/hosting/leaseweb-pool.ts move <server ID> <VPS ID> --keys=<operator keys> --apply
+  bun scripts/hosting/leaseweb-pool.ts move <server ID> auto --keys=<operator keys> --apply
 ```
 
 Tested on 2026-11-12 with the test Worker: one Standard server from a boat sandbox to a VPS 2 in
@@ -1553,7 +1557,7 @@ system and goes back to the pool for the next new server or the next move. The W
    operator decides. A renewal before the 30 days keeps the server. The 30 days are
    `OPERATOR_HOST_DATA_KEPT_MS` in `hosted-server-service.ts`.
 3. `sync` reinstalls the machine with `UBUNTU_26_04_64BIT`, which erases the disk, sets its reference
-   to `pool-free`, and sets `operator_host = NULL` on the deleted row. The machine is free.
+   to `pool`, and sets `operator_host = NULL` on the deleted row. The machine is free.
    Leaseweb shows the state `RUNNING` for the whole reinstall, so `sync` waits until SSH shows new
    host keys.
 4. `prepare` installs OpenBot on the free machine again and offers it for a new server
@@ -1592,11 +1596,11 @@ bunx dotenvx run -f apps/auth-api/.env.production -fk <root>/.env.keys -- \
 | Command | Work |
 | --- | --- |
 | `status` | Read only. Free and ready machines of each location and product, each free machine that is not ready, each new server that waits for its sign-in, and the work of `sync`. |
-| `add <VPS ID>...` | Adds bought machines. It reads the location and the product from Leaseweb, and sets the reference `pool-free` when the machine has none. It refuses a machine with another reference. |
+| `add <VPS ID>...` | Adds bought machines. It reads the location and the product from Leaseweb, and sets the reference `pool` when the machine has none. It refuses a machine with another reference. |
 | `remove <VPS ID>...` | Takes a free machine out of the pool, for example before its contract ends. It refuses a machine that a server has. |
-| `sync` | Stops OpenBot where a plan ended, starts it where the owner renewed, and reinstalls each machine of a deleted server. It reinstalls only a machine of the pool. It also sets the reference of each machine on which a new server started. |
+| `sync` | Stops OpenBot where a plan ended, starts it where the owner renewed, and reinstalls each machine of a deleted server. It reinstalls only a machine of the pool. It also sets the reference of each machine on which a new server started, and `pool` on each free machine with another reference. |
 | `prepare <VPS ID>... --keys=<file> [--reinstall]` | Installs the newest release, disabled, on free machines, runs the bootstrap with the operator keys in `<file>`, restarts each machine, and offers it for a new server. A prepared machine with no server data and an older OpenBot gets the newest release (`move-from-boat.sh upgrade`); `move` does the same. A disabled OpenBot does not update itself, so run `prepare` again after each release. A free machine that has the data of a server (a start that failed) is skipped; `--reinstall` erases it first. |
-| `move <server ID> <VPS ID> [--keys=<file>]` | Moves one server from boat to a free machine. See [Move a server from boat](#move-a-server-from-boat). It prepares the machine when necessary. The machine takes no new server from then on. |
+| `move <server ID> <VPS ID \| auto> [--keys=<file>]` | Moves one server from boat to a free machine. See [Move a server from boat](#move-a-server-from-boat). It prepares the machine when necessary. The machine takes no new server from then on. `auto` selects the machine when the move starts, and takes the next one when a new customer gets it first. |
 
 `sync` connects as root over SSH with the key of the operator. Not confirmed: SSH from a server of the
 operator. One key of the computer that runs `prepare` or `move` must be in `--keys`: the bootstrap
