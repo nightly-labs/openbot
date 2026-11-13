@@ -107,6 +107,8 @@ export type AgentEvent =
   | { type: "vault-changed" }
   /** The named browser profiles of this server, or the profile of one of its agents, changed. */
   | { type: "browser-profiles-changed" }
+  /** A Library folder of this server, or the folder of one of its files, changed. Views read the folders again. */
+  | { type: "library-folders-changed" }
   | { type: "agent-session-settings-changed"; agentId: string }
   /** A pin of a chat of the agent changed. Views read the list of pins again. */
   | { type: "message-pins-changed"; agentId: string }
@@ -295,6 +297,7 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
       return isIdentifier(value.workflowId) && (value.agentId === undefined || isIdentifier(value.agentId));
     case "vault-changed":
     case "browser-profiles-changed":
+    case "library-folders-changed":
       return true;
     case "channel-memories-changed":
     case "channel-routines-changed":

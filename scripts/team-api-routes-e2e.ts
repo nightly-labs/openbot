@@ -247,6 +247,7 @@ import {
   INSTANCE_TRANSFER_CAPABILITY,
   INSTANCE_TRANSFER_ROUTES,
 } from "@openbot/contracts/team-protocol/instance-transfer-v1";
+import { LIBRARY_FOLDERS_EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/library-folders-events-v1";
 import {
   LIBRARY_FOLDERS_CAPABILITY,
   LIBRARY_FOLDERS_ROUTES,
@@ -2134,6 +2135,10 @@ try {
   );
 
   await Effect.runPromise(libraryStore.initialize());
+  // As in application-services: each saved folder change is an agent event (library-folders-events-v1).
+  libraryStore.onChanged(() => {
+    for (const listener of agentEventListeners) listener({ type: "library-folders-changed" });
+  });
   server = new TeamApiServer({
     appVersion: APP_VERSION,
     agentImport,
@@ -10679,6 +10684,49 @@ try {
     );
   }
 
+  /**
+   * An event socket of bob. `scope` is the capabilities that its first message sends; null sends no
+   * scope. `arrived` waits for an event that matches, until the deadline.
+   */
+  const openEventSocket = async (scope: readonly string[] | null) => {
+    const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
+      TEAM_PROTOCOL_V1_WEBSOCKET,
+      `openbot-token.${bobToken}`,
+    ]);
+    const events: DynamicRecord[] = [];
+    const waiters = new Set<() => void>();
+    socket.addEventListener("message", (message) => {
+      const value = JSON.parse(String(message.data));
+      if (isDynamicRecord(value)) {
+        events.push(value);
+        for (const wake of waiters) wake();
+      }
+    });
+    await new Promise<void>((resolveOpen, reject) => {
+      socket.addEventListener("open", () => resolveOpen(), { once: true });
+      socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+    });
+    if (scope)
+      socket.send(JSON.stringify({ type: "agent-event-scope", includeConversations: false, capabilities: scope }));
+    /** Whether an event that matches arrives before the deadline. */
+    const arrived = (matches: (event: DynamicRecord) => boolean, deadlineMs: number) =>
+      new Promise<boolean>((resolveArrived) => {
+        if (events.some(matches)) return resolveArrived(true);
+        const timer = setTimeout(() => {
+          waiters.delete(wake);
+          resolveArrived(false);
+        }, deadlineMs);
+        const wake = () => {
+          if (!events.some(matches)) return;
+          clearTimeout(timer);
+          waiters.delete(wake);
+          resolveArrived(true);
+        };
+        waiters.add(wake);
+      });
+    return { socket, events, arrived };
+  };
+
   // ---- Pinned messages of a chat (message-pins-v1) ----
   {
     const capabilities = [MESSAGE_PINS_CAPABILITY];
@@ -10854,44 +10902,6 @@ try {
     );
 
     // A pin change reaches a client with the capability, and no client without it.
-    const openEventSocket = async (scope: readonly string[] | null) => {
-      const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
-        TEAM_PROTOCOL_V1_WEBSOCKET,
-        `openbot-token.${bobToken}`,
-      ]);
-      const events: DynamicRecord[] = [];
-      const waiters = new Set<() => void>();
-      socket.addEventListener("message", (message) => {
-        const value = JSON.parse(String(message.data));
-        if (isDynamicRecord(value)) {
-          events.push(value);
-          for (const wake of waiters) wake();
-        }
-      });
-      await new Promise<void>((resolveOpen, reject) => {
-        socket.addEventListener("open", () => resolveOpen(), { once: true });
-        socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
-      });
-      if (scope)
-        socket.send(JSON.stringify({ type: "agent-event-scope", includeConversations: false, capabilities: scope }));
-      /** Whether an event that matches arrives before the deadline. */
-      const arrived = (matches: (event: DynamicRecord) => boolean, deadlineMs: number) =>
-        new Promise<boolean>((resolveArrived) => {
-          if (events.some(matches)) return resolveArrived(true);
-          const timer = setTimeout(() => {
-            waiters.delete(wake);
-            resolveArrived(false);
-          }, deadlineMs);
-          const wake = () => {
-            if (!events.some(matches)) return;
-            clearTimeout(timer);
-            waiters.delete(wake);
-            resolveArrived(true);
-          };
-          waiters.add(wake);
-        });
-      return { socket, events, arrived };
-    };
     const isPinsChanged = (event: DynamicRecord) => event.type === "message-pins-changed";
     const emitPins = () => {
       for (const listener of agentEventListeners) listener({ type: "message-pins-changed", agentId: "agent-ada" });
@@ -12101,6 +12111,53 @@ try {
         isDeepStrictEqual(reopened.getSnapshot(), stored()) &&
         stored().folders.length === 4,
       { revision: stored().revision, folders: stored().folders.length },
+    );
+
+    // library-folders-events-v1: each saved change reaches a client with the capability at once, with
+    // no data, and no client without it. A phone and the web client then read the folders again.
+    const v9Compatibility = list(field(compatibility.body, "capabilities"));
+    const isFoldersChanged = (event: DynamicRecord) => event.type === "library-folders-changed";
+    const withEvents = await openEventSocket([LIBRARY_FOLDERS_EVENTS_CAPABILITY]);
+    const withoutEvents = await openEventSocket(null);
+    // The host reads the scope of a socket from its first message, and no answer says that it did.
+    let changeArrived = false;
+    let eventFolders = 0;
+    for (let attempt = 0; attempt < 20 && !changeArrived; attempt += 1) {
+      const id = `folder-event-${attempt}`;
+      await act(bobToken, { type: "create", id, agentId: "agent-ada", name: `Event ${attempt}` });
+      eventFolders += 1;
+      changeArrived = await withEvents.arrived(isFoldersChanged, 250);
+    }
+    const eventsBeforeDelete = withEvents.events.filter(isFoldersChanged).length;
+    for (let attempt = 0; attempt < eventFolders; attempt += 1)
+      await act(bobToken, { type: "delete", folderId: `folder-event-${attempt}` });
+    const deleteArrived = await withEvents.arrived(
+      () => withEvents.events.filter(isFoldersChanged).length >= eventsBeforeDelete + eventFolders,
+      5_000,
+    );
+    for (const listener of agentEventListeners)
+      listener({ type: "conversation-invalidated", agentId: "agent-ada", revision: 92_000 });
+    const foldersBarrier = await withoutEvents.arrived(
+      (event) => event.type === "conversation-invalidated" && event.revision === 92_000,
+      5_000,
+    );
+    withEvents.socket.close();
+    withoutEvents.socket.close();
+    check(
+      "a folder change reaches a client with library-folders-events-v1 with no data, and no client without it",
+      v9Compatibility.includes(LIBRARY_FOLDERS_EVENTS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(LIBRARY_FOLDERS_EVENTS_CAPABILITY) &&
+        changeArrived &&
+        deleteArrived &&
+        withEvents.events.filter(isFoldersChanged).every((event) => isDeepStrictEqual(Object.keys(event), ["type"])) &&
+        foldersBarrier &&
+        !withoutEvents.events.some(isFoldersChanged) &&
+        stored().folders.length === 4,
+      {
+        with: withEvents.events.filter(isFoldersChanged).length,
+        without: withoutEvents.events.map((event) => event.type),
+        folders: stored().folders.length,
+      },
     );
   }
 

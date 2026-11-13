@@ -20,6 +20,7 @@ import {
   decodeChannelRoutines,
   decodeChannelSummaries,
   decodeInstalledSkills,
+  decodeLibraryFoldersSnapshot,
   decodeMachineMetrics,
   decodeStorageDisk,
   decodeStorageUsage,
@@ -138,6 +139,10 @@ import { HOST_TIMEZONE_CAPABILITY } from "@openbot/contracts/team-protocol/host-
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-v1";
+import {
+  LIBRARY_FOLDERS_CAPABILITY,
+  LIBRARY_FOLDERS_ROUTES,
+} from "@openbot/contracts/team-protocol/library-folders-v1";
 import { LIVE_VOICE_CAPABILITY } from "@openbot/contracts/team-protocol/live-voice-v1";
 import {
   MACHINE_RESOURCES_CAPABILITY,
@@ -170,6 +175,7 @@ import {
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import type { TeamProtocolV1Capability } from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
+import { decodeTeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { VAULT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
@@ -427,6 +433,8 @@ type HostRequestActions = Pick<
   | "uninstallAgentSkill"
   | "loadAgentStorage"
   | "loadServerStorage"
+  | "loadLibraryFolders"
+  | "changeLibraryFolders"
   | "loadServerDisk"
   | "loadMachineMetrics"
   | "clearServerStorage"
@@ -665,6 +673,8 @@ export function createHostRequestChecks(capabilities: ServerCapabilities): HostR
       has(serverId, WORKFLOWS_CHATS_CAPABILITY) &&
       has(serverId, ROUTINE_RESULTS_CAPABILITY),
     canReadServerStorage: (serverId) => has(serverId, STORAGE_CAPABILITY),
+    // The folders lay out the files of the storage scan, so the Library needs both.
+    canOrganizeLibrary: (serverId) => has(serverId, STORAGE_CAPABILITY) && has(serverId, LIBRARY_FOLDERS_CAPABILITY),
     canControlComputer: (serverId) => has(serverId, REMOTE_DESKTOP_CAPABILITY),
     canSetAgentNotificationLevel: (serverId) => has(serverId, AGENT_NOTIFICATION_LEVELS_CAPABILITY),
     canStartNewChat: (serverId) => has(serverId, CONTEXT_RESET_CAPABILITY),
@@ -1299,6 +1309,30 @@ export function createHostRequestActions({
       return assertStorageUsageScope(
         await request("POST", STORAGE_ROUTES.usage, decodeStorageUsage, input, serverId),
         input,
+      );
+    },
+    loadLibraryFolders: async (serverId) => {
+      requireCapability(
+        capabilities,
+        serverId,
+        LIBRARY_FOLDERS_CAPABILITY,
+        "mobile.server.library.folders.unsupported",
+      );
+      return request("POST", LIBRARY_FOLDERS_ROUTES.read, decodeLibraryFoldersSnapshot, {}, serverId);
+    },
+    changeLibraryFolders: async (action, serverId) => {
+      requireCapability(
+        capabilities,
+        serverId,
+        LIBRARY_FOLDERS_CAPABILITY,
+        "mobile.server.library.folders.unsupported",
+      );
+      return request(
+        "POST",
+        LIBRARY_FOLDERS_ROUTES.actions,
+        decodeLibraryFoldersSnapshot,
+        decodeTeamProtocolV2Json(action),
+        serverId,
       );
     },
     loadServerDisk: async (serverId) => {

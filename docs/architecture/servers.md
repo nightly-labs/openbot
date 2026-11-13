@@ -77,8 +77,8 @@ access to it, and gets 403 without it; an owner or an admin changes all folders.
 has, and no file that is in one, as in `storage-v1`. An action that names an agent that they cannot see, a folder of one or a file in
 one gets 404. A refused change is 404 for
 an agent, a folder or a file that the host does not have, and 400 for each other rule. Each route
-answers the full snapshot that the member can see. There is no event: a client reads the snapshot
-again. The read is a passive route. A deleted agent loses its folders, and a file that an owner or
+answers the full snapshot that the member can see. `library-folders-v1` has no event; see
+[Library folder events](#library-folder-events). The read is a passive route. A deleted agent loses its folders, and a file that an owner or
 admin deletes leaves its folder. A host without the capability reads as null, and a change is refused
 before any request. The instance transfer does not carry the folders.
 
@@ -734,6 +734,20 @@ member leaves gives the time of the last input. A host that answers `phones: fal
 for 5 minutes, so a host without a phone of the member does not learn when the member is at the
 computer. The web client cannot read the idle time of the computer and does not send it. The owner of
 the host computer needs no report: the host reads `powerMonitor` itself (`hostComputerInUse`).
+
+### Library folder events
+
+`library-folders-events-v1` (`team-protocol/library-folders-events-v1.ts`, protocol 9 only) adds one
+optional event, `library-folders-changed`, with no data. `LibraryFoldersStore` calls its `onChanged`
+listeners after each change that it saves: a change from a member through the route or the IPC, an
+agent that saves a file into a folder path, and the start-up removal of the folders of deleted agents
+and of the entries of deleted files. `application-services.ts` emits the event through `AgentService`,
+so this computer's windows get it too. The host advertises the capability with `library-folders-v1`.
+A client reads `POST /v1/library-folders` again: the desktop Library (`library-folders.ts`), the web
+client and the phone (`apps/mobile/src/features/servers/model/use-library-folders.ts`) show a change
+made on another device or by an agent while the page is open. A client of an older host reads the
+folders again after a storage scan only. The phone also scans again when the folders name a file
+that its last scan does not have, as after an agent saved a new file into a folder.
 
 ### Admin capabilities
 

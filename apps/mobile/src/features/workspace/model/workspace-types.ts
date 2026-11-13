@@ -89,6 +89,8 @@ import type {
   InstallSkillInput,
   InstanceTransferPreview,
   InstanceTransferSummary,
+  LibraryFolderAction,
+  LibraryFoldersSnapshot,
   MachineMetrics,
   MarkAgentTaskReadInput,
   McpAccessSnapshot,
@@ -866,6 +868,11 @@ export interface MobileWorkspaceContextValue {
   loadAgentStorage: (agentId: string, serverId: string, force?: boolean) => Promise<StorageUsage | null>;
   /** True when the host advertises `storage-v1`. Every member reads the host's storage. */
   canReadServerStorage: (serverId: string) => boolean;
+  /**
+   * True when the host advertises `library-folders-v1` and `storage-v1`. Every member reads the
+   * folders; a member changes the folders of an agent that they can chat with, and the host checks it.
+   */
+  canOrganizeLibrary: (serverId: string) => boolean;
   /** An owner or admin of an online host that serves `machine-resources-v1`. The host checks the role again. */
   canReadMachineMetrics: (serverId: string) => boolean;
   /** The disk, memory and CPU use of the machine that runs the host. Owners and admins only. */
@@ -876,6 +883,10 @@ export interface MobileWorkspaceContextValue {
   remoteDesktopConnection: (serverId: string) => RemoteDesktopConnection | null;
   /** Every location on the host, its agents, its largest chats and its stored files. */
   loadServerStorage: (serverId: string, force?: boolean) => Promise<StorageUsage>;
+  /** The Library folders of the host that this member can see (`library-folders-v1`). */
+  loadLibraryFolders: (serverId: string) => Promise<LibraryFoldersSnapshot>;
+  /** Applies one folder change. The host answers with all folders that this member can see. */
+  changeLibraryFolders: (action: LibraryFolderAction, serverId: string) => Promise<LibraryFoldersSnapshot>;
   /**
    * The disk of the host data, with the bytes of the user's files from a host with
    * `storage-user-files-v1`. Null when the host has neither that nor `storage-disk-v1`.
@@ -1249,6 +1260,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canUseWorkflowGitHub"
   | "canUseWorkflowChats"
   | "canReadServerStorage"
+  | "canOrganizeLibrary"
   | "canControlComputer"
   | "canSetAgentNotificationLevel";
 
