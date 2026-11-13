@@ -194,11 +194,11 @@ export const messages = {
     "オンボーディングのドキュメントを新しいリリースチェックリストで更新してください。",
   "marketplace.plugin.cobrain.tagline": "AI エージェントの共有メモリー",
   "marketplace.plugin.cobrain.description":
-    "Cobrain は、接続したすべての AI が読み書きできる Markdown のメモリーです。エージェントは作業の前にクライアントやプロジェクトのコンテキストを読み込み、過去のメモや決定事項を検索し、学んだことを保存します。そのため、次の会話は前回の続きから始まります。各ユーザーは自分の Cobrain アカウントにサインインします。",
+    "Cobrain は、OpenBot の外にある、あなた自身の Markdown メモリーです。同じメモを Claude、ChatGPT、Codex など、接続したどの AI でも使えます。OpenBot 自身のメモリーと並べて、ひとつのアプリを超えて残すべきことに使ってください。「このクライアントを Cobrain に保存して」「昨日プロジェクト X について何を決めた？」と頼めば、翌日には Claude や ChatGPT が同じメモを読めます。各ユーザーは自分の Cobrain アカウントでサインインします。",
   "marketplace.plugin.cobrain.app": "1 つの MCP サーバーで、Cobrain のメモを読み取り、検索し、書き込みます。",
-  "marketplace.plugin.cobrain.prompt.startSession":
-    "始める前に、このプロジェクトの Cobrain コンテキストを読み込んでください。",
-  "marketplace.plugin.cobrain.prompt.searchDecision": "価格について決めたことを Cobrain のメモから探してください。",
+  "marketplace.plugin.cobrain.prompt.firstNote":
+    "このプロジェクトについて、目的・これまでの決定・次のステップを短いメモにして Cobrain に保存してください。",
+  "marketplace.plugin.cobrain.prompt.whatYouKnow": "Cobrain から私について何がわかりますか？",
   "marketplace.plugin.cobrain.prompt.saveNote":
     "今日やったことと残っていることを Cobrain にメモとして保存してください。",
   "marketplace.plugin.honcho.tagline": "AI ツールをまたぐあなたの記憶",
