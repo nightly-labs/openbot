@@ -630,12 +630,7 @@ export function agentIpcHandlers({
           runCauseEffect(remoteServers.request(serverId, CHANNEL_ROUTES.list, decodeChannelSummaries)),
       }),
       readChannel: scopedHandler(parseChannelRead, {
-        local: (input) => {
-          const page = service.channels.store.page(input.channelId, input.beforeSequence);
-          // An older page adds only messages: the view keeps the tasks of the first page.
-          if (input.beforeSequence !== undefined) return page;
-          return { ...page, tasks: service.channels.store.withSeenDependencies(input.channelId, page.tasks) };
-        },
+        local: (input) => service.channels.page(input.channelId, input.beforeSequence),
         remote: (input, serverId) =>
           runCauseEffect(
             remoteServers.request(serverId, CHANNEL_ROUTES.read, decodeChannelPage, { method: "POST", body: input }),

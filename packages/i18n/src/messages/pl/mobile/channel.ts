@@ -45,6 +45,8 @@ export const messages = {
   "mobile.channel.deleted.restoreFailedBody": "Nie udało się przywrócić tego kanału. Spróbuj ponownie.",
   "mobile.channel.chat.fallbackName": "Kanał",
   "mobile.channel.chat.deletedNotice": "Usunięty kanał. Tylko podgląd.",
+  "mobile.channel.chat.waitBusy": "Oczekiwanie – {name} pracuje w kanale {channel}",
+  "mobile.channel.chat.waitFull": "Oczekiwanie – {name} zacznie, gdy skończy się trwające zadanie",
   "mobile.channel.records.connect": "Połącz się z serwerem, aby edytować ten kanał.",
   "mobile.channel.records.loadFailed": "Nie udało się wczytać ustawień kanału.",
   "mobile.channel.records.gone": "Ten element nie jest już dostępny.",

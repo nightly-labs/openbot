@@ -17,6 +17,7 @@ import {
   withChannelPicture,
 } from "./channel-picture-v1";
 import { withChannelSeenSubtasks } from "./channel-seen-subtasks-v1";
+import { withChannelTaskWaits } from "./channel-task-waits-v1";
 import { CHANNEL_ROUTES, channelRequest, channelResponse, isChannelRoute } from "./channels-v1";
 import { isChannelHistoryExtentRoute, withChannelHistoryExtent } from "./history-extent-v1";
 import { isMcpSignInListRoute, mcpManyServersResponse, mcpManySignInsResponse } from "./mcp-many-servers-v1";
@@ -52,6 +53,8 @@ export interface TeamSideRouteOptions {
   channelBrowser?: boolean;
   /** channel-seen-subtasks-v1: a waiting task of a channel page keeps `seenDependencies`. Passed as `channelAttention` is. */
   channelSeenSubtasks?: boolean;
+  /** channel-task-waits-v1: the first page of a channel keeps `waits`. Passed as `channelAttention` is. */
+  channelTaskWaits?: boolean;
   /**
    * mcp-many-servers-v1: a list of MCP servers or of their sign-ins holds up to 100 rows. Passed as
    * `channelAttention` is.
@@ -81,9 +84,10 @@ const CHANNEL_CODEC: TeamSideRouteCodec = {
     const pictured = options?.channelPicture && status < 400 ? withChannelPicture(path, isolated, value) : isolated;
     const browser = options?.channelBrowser && status < 400 ? withChannelBrowser(path, pictured, value) : pictured;
     const seen = options?.channelSeenSubtasks && status < 400 ? withChannelSeenSubtasks(path, browser, value) : browser;
+    const waits = options?.channelTaskWaits && status < 400 ? withChannelTaskWaits(path, seen, value) : seen;
     return options?.channelAttention && status < 400 && isChannelAttentionRoute(path)
-      ? withChannelAttention(path, seen, value)
-      : seen;
+      ? withChannelAttention(path, waits, value)
+      : waits;
   },
 };
 /** The image route of channel-picture-v1. Its channel answer is the answer of a channel command. */
