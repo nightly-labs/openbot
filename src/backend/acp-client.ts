@@ -450,10 +450,11 @@ export const OPENBOT_ACP_CLIENT_INFO = { name: "openbot", title: "OpenBot", vers
 /** Each check answers that it found no refusal when it cannot tell. */
 export interface AcpSavedSignInCheck {
   /**
-   * Whether the agent's server refuses the saved sign-in, after a turn with no answer: `lasting`
-   * when the refusal holds until a new sign-in, `turn` when it is sure for this turn only, or null.
+   * Whether the agent's server refuses the saved sign-in, after a turn with no answer on `model`:
+   * `lasting` when the refusal holds until a new sign-in, `turn` when it is sure for this turn only,
+   * or null.
    */
-  refusedAfterEmptyAnswer(): Effect.Effect<"lasting" | "turn" | null>;
+  refusedAfterEmptyAnswer(model: string | null): Effect.Effect<"lasting" | "turn" | null>;
   /** Whether a `lasting` refusal holds for the saved sign-in still. */
   refusedAtStart(): Effect.Effect<boolean>;
 }
@@ -2521,7 +2522,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           ? (this.#flavor.emptyAnswerFailure?.(turn, this.#label) ?? null)
           : null;
       const savedSignInCheck = emptyAnswerFailure === null ? undefined : this.options.savedSignInCheck;
-      const refusal = savedSignInCheck ? yield* savedSignInCheck.refusedAfterEmptyAnswer() : null;
+      const refusal = savedSignInCheck ? yield* savedSignInCheck.refusedAfterEmptyAnswer(thread.currentModelId) : null;
       if (savedSignInCheck && (thread.activeTurn !== turn || turn.completing)) return;
       // A stop during the check ends the turn as interrupted, below.
       if (emptyAnswerFailure !== null && !turn.stopped) {

@@ -21,6 +21,12 @@ import { type KimiSavedSignIn, readKimiSavedSignIn } from "./kimi-usage";
 
 const KIMI_SIGN_IN_CHECK_TIMEOUT_MS = 5_000;
 
+/**
+ * The CLI names each model of the managed Kimi Code provider `kimi-code/<model>`, with `,thinking`
+ * for its thinking variant (`managed_model_key`). Only these models use the saved sign-in.
+ */
+const MANAGED_MODEL_PREFIX = "kimi-code/";
+
 class KimiSignInCheckFailed extends Schema.TaggedError<KimiSignInCheckFailed>()("KimiSignInCheckFailed", {
   cause: Schema.Defect(),
 }) {}
@@ -58,8 +64,9 @@ const modelsStatus = Effect.fn("Kimi.modelsStatus")(function* (signIn: KimiSaved
  */
 export function kimiSavedSignInCheck(env: () => NodeJS.ProcessEnv): AcpSavedSignInCheck {
   return {
-    refusedAfterEmptyAnswer: () =>
+    refusedAfterEmptyAnswer: (model) =>
       Effect.gen(function* () {
+        if (!model?.startsWith(MANAGED_MODEL_PREFIX)) return null;
         const signIn = yield* readKimiSavedSignIn(true, env());
         if (Option.isNone(signIn) || !signIn.value.managed) return null;
         if ((yield* modelsStatus(signIn.value)) !== 401) return null;
