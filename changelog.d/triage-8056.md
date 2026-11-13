@@ -1,6 +1,6 @@
 ### Fixed
 
-- The Effort menu of a Mistral model shows the thinking levels of that model, such as Off, Low, High
+- The Effort menu of a Mistral model shows the thinking levels of that model, such as None, Low, High
   and Max, and the level that you select applies to the chat. Before, the menu showed only Medium,
   which had no effect, and the levels were only in a separate Thinking row under Provider settings.
   Now the Thinking row shows only for a model with a level that the Effort menu does not have. On a

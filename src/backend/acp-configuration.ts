@@ -592,9 +592,9 @@ function isAdditionalSetting(option: SessionConfigOption, effortCategories: read
   });
 }
 
-export function sessionSettingsSnapshot(
+function sessionSettingsSnapshot(
   options: SessionConfigOption[],
-  effortCategories: readonly string[] = EFFORT_CATEGORIES,
+  effortCategories: readonly string[],
 ): AgentSessionSettingsSnapshot {
   const additional = (option: SessionConfigOption) => isAdditionalSetting(option, effortCategories);
   return {
@@ -683,7 +683,7 @@ function modelsFromConfig(options: SessionConfigOption[], effortCategories: read
 
 function reasoningFromConfig(
   options: SessionConfigOption[],
-  effortCategories: readonly string[] = EFFORT_CATEGORIES,
+  effortCategories: readonly string[],
 ): Pick<
   AcpModel,
   "defaultReasoningEffort" | "supportedReasoningEfforts" | "reasoningEffortConfigurable" | "reasoningEffortWireValues"
