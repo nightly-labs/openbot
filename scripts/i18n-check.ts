@@ -35,6 +35,8 @@ const SKIPPED_DIRECTORIES = new Set(["node_modules", "dist", "build", "out", ".e
 const RELEASED_SOURCE_KEYS = new Set([
   "error.agent.noStartingModel",
   "error.provider.cliBusyUpdate",
+  // Hosts before the timed start stop (#8071) send it for a provider that stopped starting.
+  "error.provider.startStopped",
   // Hosts before side threads send these for the agent-tasks-v1 routes.
   "error.backend.taskNotFound",
   "error.backend.taskStillRunning",
