@@ -31,11 +31,15 @@ export function bytesResponse(bytes: Uint8Array, headers: Record<string, string>
       headers: { ...rangeHeaders, "Content-Range": `bytes */${bytes.byteLength}` },
     });
   }
-  if (!requested) return new Response(Buffer.from(bytes), { headers: rangeHeaders });
-  const { start, end } = requested;
+  const { start, end } = requested ?? { start: 0, end: bytes.byteLength - 1 };
+  // Without the length, the player cannot seek: `video.seekable` stays empty.
   return new Response(Buffer.from(bytes.subarray(start, end + 1)), {
-    status: 206,
-    headers: { ...rangeHeaders, "Content-Range": `bytes ${start}-${end}/${bytes.byteLength}` },
+    status: requested ? 206 : 200,
+    headers: {
+      ...rangeHeaders,
+      "Content-Length": String(end + 1 - start),
+      ...(requested ? { "Content-Range": `bytes ${start}-${end}/${bytes.byteLength}` } : {}),
+    },
   });
 }
 
