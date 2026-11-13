@@ -27,13 +27,15 @@
 //       (docs/hosted-servers.md#a-new-server-on-a-pool-machine). A free machine that has the data of a
 //       server (a first start that failed, or a move that went back) is not changed; with
 //       `--reinstall`, the script erases its disk first.
-//   bun scripts/hosting/leaseweb-pool.ts move <server ID> <VPS ID> [--keys=<file>] [--units=<unit>,...] [--apply]
+//   bun scripts/hosting/leaseweb-pool.ts move <server ID> <VPS ID> [--keys=<file>] [--units=<unit>,...] [--docker] [--apply]
 //       Moves one server from its boat sandbox to a free machine of the pool, as
 //       docs/hosted-servers.md#move-a-server-from-boat says. The machine takes no new server from then
 //       on. It prepares the machine when it is not prepared (then `--keys` is necessary). It needs `BOAT_API_KEY`. The move does not copy the
 //       systemd units of the customer, so it stops when the sandbox has one. `--units` names the units
 //       that an operator moves by hand, and the move then continues. It refuses a sandbox whose stop at
-//       boat is failing, and stops before the downtime when the sandbox has Docker containers.
+//       boat is failing, and stops before the downtime when the sandbox has Docker containers. `--docker`
+//       says that an operator moves the containers by hand (stopped before the move, so the boat stop can
+//       save the sandbox), and the move then continues.
 //   bun scripts/hosting/leaseweb-pool.ts custom <VPS ID> --owner=<email> --customer=<word> \
 //       --name=<server name> --keys=<file> [--apply]
 //       Sets up a VPS with no reference as the server of one customer, not in the pool
@@ -1359,7 +1361,7 @@ exit "$status"`;
     return result.stdout ?? "";
   }
 
-  async move(serverId: string, vpsId: string, unitsMovedByHand: readonly string[] = []) {
+  async move(serverId: string, vpsId: string, unitsMovedByHand: readonly string[] = [], dockerMovedByHand = false) {
     if (!SERVER_ID_PATTERN.test(serverId)) throw new Error(`Not a server ID: ${serverId}`);
     const started = Date.now();
     let last = started;
@@ -1511,11 +1513,13 @@ bash "$d/move-from-boat.sh" packages`,
       // also makes the stop at boat fail. So a server with a container stays on boat.
       const containers = Number(values.get("containers") ?? "");
       if (!Number.isInteger(containers)) throw new Error("The sandbox did not count its Docker containers.");
-      if (containers > 0) {
+      if (containers > 0 && !dockerMovedByHand) {
         throw new Error(
           `The sandbox has ${containers} Docker containers. The VPS has no Docker, and the move does not copy them.`,
         );
       }
+      if (containers > 0)
+        logger.warn(`The sandbox has ${containers} Docker containers. An operator moves them by hand.`);
       const sandboxVersion = values.get("version") ?? "";
       if (values.get("ids") !== machineState.ids) {
         throw new Error(
@@ -1677,7 +1681,7 @@ systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/ru
 }
 
 const USAGE =
-  "Usage: leaseweb-pool.ts status | free | add <VPS ID>... | remove <VPS ID>... | sync | prepare <VPS ID>... --keys=<file> [--reinstall] | move <server ID> <VPS ID> [--keys=<file>] [--units=<unit>,...] | custom <VPS ID> --owner=<email> --customer=<word> --name=<server name> --keys=<file> [--apply] [--env=test]";
+  "Usage: leaseweb-pool.ts status | free | add <VPS ID>... | remove <VPS ID>... | sync | prepare <VPS ID>... --keys=<file> [--reinstall] | move <server ID> <VPS ID> [--keys=<file>] [--units=<unit>,...] [--docker] | custom <VPS ID> --owner=<email> --customer=<word> --name=<server name> --keys=<file> [--apply] [--env=test]";
 
 async function main(args: string[]) {
   const [command, ...operands] = args.filter((arg) => !arg.startsWith("--"));
@@ -1691,7 +1695,7 @@ async function main(args: string[]) {
   else if (command === "sync") await pool.sync();
   else if (command === "prepare" && operands.length > 0) await pool.prepare(operands, args.includes("--reinstall"));
   else if (command === "move" && operands.length === 2 && operands[0] && operands[1])
-    await pool.move(operands[0], operands[1], option("units")?.split(",").filter(Boolean));
+    await pool.move(operands[0], operands[1], option("units")?.split(",").filter(Boolean), args.includes("--docker"));
   else if (command === "custom" && operands.length === 1 && operands[0])
     await pool.custom(operands[0], {
       owner: option("owner") ?? "",
