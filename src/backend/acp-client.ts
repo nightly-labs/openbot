@@ -2894,8 +2894,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (turn.retryNotices && update.sessionUpdate === "agent_message_chunk" && update.content.type === "text") {
       const notices = turn.retryNotices;
       turn.retryNotices = "";
-      // No try worked: the notices are the start of the failure text, which names the cause.
-      if (this.#flavor.sdkHarness?.answerIsFailure.test(update.content.text)) {
+      // No try worked: the notices are the start of the failure text, which names the cause. The
+      // failure text counts with one line break before it or with none, as the notices do.
+      if (this.#flavor.sdkHarness?.answerIsFailure.test(`\n${update.content.text.replace(/^\n+/u, "")}`)) {
         turn.waitNotice = false;
         this.#applyTurnUpdate(
           thread,
