@@ -19,6 +19,11 @@
   pointer-events: none;
 }
 
+/* On the desktop the dock is not part of a window frame: it takes the notch colour of the Dynamic Island. */
+.agent-dock[data-surface="screen"] {
+  --agent-dock-fill: var(--openbot-bg-notch);
+}
+
 /* On the left edge the stage is mirrored. */
 .agent-dock[data-side="left"] {
   right: auto;

@@ -209,6 +209,8 @@ export interface AgentDockShapeRect {
 
 export interface AgentDockProps {
   seats: readonly AgentDockSeat[];
+  /** The dock floats on the desktop, above other apps, rather than in the main window. */
+  onScreen?: boolean | undefined;
   /** The agents that the add menu offers. */
   available: readonly ComposerAgent[];
   /** The channels that the add menu offers. */
@@ -1145,6 +1147,7 @@ export function AgentDock(props: AgentDockProps) {
     <div
       class="agent-dock"
       ref={(element) => (stage = element)}
+      data-surface={props.onScreen ? "screen" : undefined}
       data-side={props.side ?? "right"}
       data-draggable={props.onDrag ? "" : undefined}
       data-dragging={dragging() ? "" : undefined}
