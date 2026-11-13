@@ -3781,6 +3781,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         promptUiBlock={channelView.promptUiBlock()}
                         approval={channelView.approval()}
                         browserTakeover={channelView.browserTakeover()}
+                        // A member's Sign in card signs in as the agent chat's does (#6228).
+                        onOpenMcpSignIn={openMcpSignInFromChat()}
+                        mcpSignedIn={(mcpServerId) => serverSettings.state.mcpSignIns[mcpServerId]?.signedIn === true}
                         onSelectAgent={(id) => {
                           setMobilePane("conversation");
                           void select(id);

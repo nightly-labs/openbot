@@ -5,6 +5,7 @@
 // carries, so a value the renderer reads always has the shape its type says.
 
 import {
+  type AgentApproval,
   type AgentTask,
   type AgentTaskPage,
   type AgentTaskReadState,
@@ -22,6 +23,7 @@ import {
   type ConversationWithReadState,
   type DraftAttachment,
   type FilePreview,
+  isAgentApproval,
   isAgentTask,
   isAgentTaskPage,
   isAgentTaskReadState,
@@ -264,6 +266,13 @@ export function decodeTaskWindow(value: unknown): AgentTaskWindow {
 export function decodeQueue(value: unknown): QueueSnapshot {
   if (!isQueueSnapshot(value)) {
     throw new Error("Invalid queue response.");
+  }
+  return value;
+}
+
+export function decodePendingApproval(value: unknown): AgentApproval | null {
+  if (value !== null && !isAgentApproval(value)) {
+    throw new Error("Invalid pending approval response.");
   }
   return value;
 }

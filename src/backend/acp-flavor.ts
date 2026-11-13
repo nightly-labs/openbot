@@ -300,7 +300,22 @@ export const CLINE_ACP_FLAVOR: AcpFlavor = { subagentTools: ["spawn_agent"] };
  * GitHub Copilot CLI 1.0.105 advertises only http and sse MCP servers, and drops a stdio one, so its
  * agents had no Computer Use and no stdio server of the user (github/copilot-cli#3889).
  */
-export const COPILOT_ACP_FLAVOR: AcpFlavor = { relayStdioMcpServers: true };
+export const COPILOT_ACP_FLAVOR: AcpFlavor = {
+  relayStdioMcpServers: true,
+  turnFailure: copilotTurnFailure,
+};
+
+/**
+ * GitHub Copilot CLI 1.0.105 writes the model request. For some models it sends
+ * `thinking.type.enabled`, which GitHub's service refuses with a 400, and each turn on that model
+ * fails. The chat showed "Execution failed: CAPIError: 400 ..." (#8222). OpenBot sends only the model
+ * and the effort, so the user's action is another model.
+ */
+function copilotTurnFailure(_error: unknown, detail: string): string {
+  return /"thinking\.type\.enabled" is not supported for this model/u.test(detail)
+    ? sourceText("error.provider.copilotThinkingRejected")
+    : detail;
+}
 
 /**
  * A turn that ended as done with no answer text and no tool call fails, also when it sent its

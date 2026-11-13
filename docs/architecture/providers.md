@@ -980,6 +980,21 @@ hooks, rules, MCP and permission files there and in the CLI config folder, and t
 `.workspace-trusted` and `mcp-approvals.json` files in each folder in `projects`. Migration 24 adds
 `cursor` to `projection_provider_sessions`.
 
+The CLI holds one sign-in for each computer user: `auth.json` in a fixed folder, or the login
+Keychain on macOS, and `CURSOR_CONFIG_DIR` moves only its settings. So a Cursor account after the
+first is not a home folder but one Cursor API key (`ProviderKeyAccountSupport` in
+`provider-drivers.ts`, `accountSignIn: "key"` in the descriptor). `ProviderCredentialStore` keeps the
+key encrypted under `cursor:<account id>`. `ProviderAccounts.connectKey` first asks Cursor whether it
+accepts the key (`checkCursorApiKey`, the CLI's own `POST /auth/exchange_user_api_key`), because the
+CLI answers a refused key and a failed connection with the same internal error. A process of the
+account gets `CURSOR_API_KEY`, an empty `CURSOR_AUTH_TOKEN` and `AGENT_CLI_CREDENTIAL_STORE=memory`.
+With the memory store the CLI (checked on 2026.10.01) does not read the sign-in of the computer user
+and does not replace it with the tokens of the key; without it, the key's tokens overwrite that
+sign-in. The variable is not in Cursor's documentation. So a CLI before 2026.10.01 offers no account
+after the first (`supports` of the driver). A key account has no browser sign-in, no CLI
+sign-out and no usage reading, and it is not in an account pool. A joined server adds one through
+`provider-account-keys-v1`; the released sign-in routes of `provider-accounts-v1` refuse it.
+
 The CLI reports no usage over ACP. The driver's `readRateLimits` (`src/backend/cursor-usage.ts`)
 sends the request that the CLI sends itself, `aiserver.v1.DashboardService/GetCurrentPeriodUsage`
 as Connect JSON to `https://api2.cursor.sh` or `CURSOR_API_ENDPOINT`, with the CLI's access token.

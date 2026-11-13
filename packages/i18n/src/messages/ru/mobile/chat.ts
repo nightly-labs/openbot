@@ -449,7 +449,14 @@ export const messages = {
   "mobile.chat.approval.effect.permissions":
     "«Разрешить» даст {name} эти разрешения на {server}. «Отклонить» сохранит текущие разрешения.",
   "mobile.chat.approval.partial":
-    "Этот запрос слишком длинный для телефона. Чтобы разрешить его, откройте OpenBot на {server}. Отклонить его можно здесь.",
+    "{server} отправляет на телефон только начало этого запроса. Чтобы разрешить его, обновите OpenBot на {server} или откройте этот чат в приложении OpenBot для компьютера. Отклонить его можно здесь.",
+  "mobile.chat.approval.loading": "Загрузка полного запроса…",
+  "mobile.chat.approval.loadFailed": "Не удалось загрузить полный запрос. Отклонить его можно здесь.",
+  "mobile.chat.approval.retry": "Повторить",
+  "mobile.chat.approval.report.bugHeadline": "Нашли ошибку? Давайте исправим.",
+  "mobile.chat.approval.report.ideaHeadline": "Есть идея? Давайте воплотим.",
+  "mobile.chat.approval.report.dontSend": "Не сейчас",
+  "mobile.chat.approval.report.send": "Отправить команде OpenBot",
   "mobile.chat.approval.allow": "Разрешить",
   "mobile.chat.approval.deny": "Отклонить",
   "mobile.chat.approval.reconnect": "Подключитесь к {server}, чтобы ответить на этот запрос.",

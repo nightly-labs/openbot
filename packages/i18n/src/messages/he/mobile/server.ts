@@ -1376,6 +1376,13 @@ export const messages = {
   "mobile.server.providers.accountName": "שם",
   "mobile.server.providers.accountNameHint": "מוצג רק לך ולמנהלי השרת הזה. אם השדה ריק, יוצג האימייל.",
   "mobile.server.providers.accountSignInAgain": "התחברות מחדש",
+  "mobile.server.providers.accountsKeyHint":
+    "כל סוכן משתמש בחשבון אחד. את החשבון בוחרים בהגדרות הסוכן. חשבון חדש צריך מפתח API של אותו חשבון.",
+  "mobile.server.providers.accountChangeKey": "החלפת מפתח",
+  "mobile.server.providers.accountKeyHint":
+    "יש להדביק מפתח API של חשבון {provider}. המפתח נשלח לשרת. הטלפון הזה לא שומר אותו.",
+  "mobile.server.providers.accountKeyChecking": "בודק את המפתח…",
+  "mobile.server.providers.accountKeyAddFailed": "לא ניתן להוסיף את החשבון. אפשר לנסות שוב.",
   "mobile.server.providers.removeAccount": "הסרת החשבון",
   "mobile.server.providers.removeAccountTitle": "להסיר את {name}?",
   "mobile.server.providers.removeAccountBody": "השרת מסיר את החשבון הזה ואת ההתחברות שלו.",

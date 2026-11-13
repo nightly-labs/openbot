@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { readFile, stat } from "node:fs/promises";
+import { resolve } from "node:path";
 import {
   type ClientSideConnection,
   type ContentBlock,
@@ -1702,7 +1703,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           requestedThreadId ?? randomUUID(),
           dynamicTools,
           () => threadRef?.activeTurn?.id ?? null,
-          (call, signal) => this.#callDynamicTool(call, signal),
+          (call, signal, detachAfterMs) => this.#callDynamicTool(call, signal, detachAfterMs),
           this.#flavor.mcpServersPerDirectory ? cwd : undefined,
         )
         .pipe(toProviderClientOperationError),
@@ -3659,6 +3660,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (option) return { outcome: { outcome: "selected", optionId: option.optionId } };
     }
     const requestedPermissions = kind === "permissions" ? { [params.toolCall.kind ?? "file-system"]: true } : null;
+    const filePaths = kind === "file-change" ? permissionFilePaths(params.toolCall, thread?.cwd) : [];
     const result = yield* this.#waitForUser(
       turn,
       this.#serverRequests.call(
@@ -3669,6 +3671,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           command: params.toolCall.kind === "execute" ? printableInput(params.toolCall.rawInput) : null,
           reason: params.toolCall.title ?? null,
           permissions: requestedPermissions,
+          // The card names the file; without it the card says "Agent workspace" for any folder.
+          grantRoot: filePaths.length === 1 ? filePaths[0] : null,
+          // Only the agent's own confined process sends the paths that OpenBot may accept for it: a
+          // shared process has no sandbox to stop a link. A move can name only its source.
+          ...(this.options.confine && params.toolCall.kind !== "move" ? { confinedWritePaths: filePaths } : {}),
         },
         turn?.stop.signal,
       ),
@@ -3783,6 +3790,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       arguments: unknown;
     },
     signal: AbortSignal,
+    detachAfterMs: number | undefined,
   ): Effect.fn.Return<DynamicToolResult, ProviderClientOperationError> {
     if (this.#historyReplays.has(params.threadId)) {
       return { success: false, contentItems: [{ type: "inputText", text: "History replay cannot execute tools." }] };
@@ -3790,7 +3798,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const turn = this.#threads.get(params.threadId)?.activeTurn;
     if (turn) turn.answered = true;
     const result = yield* this.#serverRequests
-      .call("item/tool/call", params, signal)
+      .call("item/tool/call", params, signal, detachAfterMs)
       .pipe(toProviderClientOperationError);
     if (!isDynamicToolResult(result))
       return yield* providerFailure(new Error("OpenBot returned an invalid dynamic tool result."));
@@ -3854,6 +3862,19 @@ const promptBlocksEffect = Effect.fn("AcpAgentClient.promptBlocks")(function* (p
   }
   return blocks;
 });
+
+/**
+ * The files that an edit request changes: its locations, then the paths of its diffs. Cursor
+ * 2026.11.05-86047df names a write only in a `diff` and sends no locations, and names a delete only
+ * in the title (#6176). A relative path is read from the session folder.
+ */
+function permissionFilePaths(toolCall: RequestPermissionRequest["toolCall"], cwd: string | undefined): string[] {
+  const paths = [
+    ...(toolCall.locations ?? []).map((location) => location.path),
+    ...(toolCall.content ?? []).flatMap((item) => (item.type === "diff" ? [item.path] : [])),
+  ];
+  return [...new Set(paths.map((path) => (cwd ? resolve(cwd, path) : path)))];
+}
 
 function printableInput(value: unknown): string | null {
   if (isString(value)) return value;

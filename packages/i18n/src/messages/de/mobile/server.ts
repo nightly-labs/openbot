@@ -1109,6 +1109,13 @@ export const messages = {
   "mobile.server.providers.status.ready": "Installiert",
   "mobile.server.providers.status.notInstalled": "Nicht installiert",
   "mobile.server.providers.status.checking": "Wird geprüft",
+  "mobile.server.providers.accountsKeyHint":
+    "Jeder Agent nutzt ein Konto. Wähle es in den Einstellungen des Agenten. Ein neues Konto braucht einen API-Schlüssel dieses Kontos.",
+  "mobile.server.providers.accountChangeKey": "Schlüssel ändern",
+  "mobile.server.providers.accountKeyHint":
+    "Füge einen API-Schlüssel des {provider}-Kontos ein. Der Schlüssel geht an den Server. Dieses Telefon behält ihn nicht.",
+  "mobile.server.providers.accountKeyChecking": "Schlüssel wird geprüft…",
+  "mobile.server.providers.accountKeyAddFailed": "Das Konto konnte nicht hinzugefügt werden. Versuche es erneut.",
   "mobile.server.providers.pool": "Konten bündeln",
   "mobile.server.providers.poolHint":
     "Agenten nutzen ein Konto, bis es fast ein Nutzungslimit erreicht, dann das Konto, dessen Limit zuerst zurückgesetzt wird.",

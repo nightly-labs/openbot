@@ -11,8 +11,15 @@ its activity with the active host (`live-activity-push-v1`, `POST /v1/live-activ
 with `away: true` when it leaves the foreground. `LiveActivityPushService` in `src/main` keeps the
 registration in memory for that session. While the phone is away, each agent event (at most once a
 second) reads the runtime snapshot of the agents the member can see and the member's read state,
-builds the props, and sends a change. A change of state has priority 10; a change inside a state
-waits 5 seconds and has priority 5. An unchanged state is sent again every 10 minutes, so its stale
+builds the props, and sends a change. iOS has a budget of priority 10 updates for each
+hour and can delay or drop the updates above it, and several agents change the state often. So priority
+10 is only for an alert, a new request, failure or reply, and an agent that finishes its work. Each
+other change has priority 5, which does not use the budget: work that starts, a request that someone
+answered on another device, and a count or a text that changes. The first update after the phone
+says that it goes away also has priority 5, because it repeats the view that the phone showed a moment
+before; after a closed connection the phone can show an old view, so a request, a failure or a reply
+has priority 10 then. A priority 5 change inside a state
+waits 5 seconds. An unchanged state is sent again every 10 minutes, so its stale
 date moves on; a host that sleeps stops this, and the view then shows that it is out of date. An idle
 state ends the activity.
 

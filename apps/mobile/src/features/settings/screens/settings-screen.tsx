@@ -7,6 +7,7 @@ import CreditCard from "lucide-react-native/icons/credit-card";
 import EyeOff from "lucide-react-native/icons/eye-off";
 import Info from "lucide-react-native/icons/info";
 import Languages from "lucide-react-native/icons/languages";
+import Layers2 from "lucide-react-native/icons/layers-2";
 import Lock from "lucide-react-native/icons/lock";
 import MessageCircleQuestionMark from "lucide-react-native/icons/message-circle-question-mark";
 import Mic from "lucide-react-native/icons/mic";
@@ -26,6 +27,7 @@ import { agentDefaultsServers } from "@/features/settings/model/agent-defaults";
 import { useBillingState } from "@/features/settings/model/billing";
 import { saveLargeFilePreference, useLargeFilePreference } from "@/features/settings/model/large-files";
 import { savePhotoQualityPreference, usePhotoQualityPreference } from "@/features/settings/model/photo-quality";
+import { shortcutsSupported } from "@/features/shortcuts/shortcuts-native";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { ProfileAvatar } from "@/shared/components/profile-avatar";
 import { haptics } from "@/shared/lib/haptics";
@@ -116,6 +118,12 @@ export function SettingsScreen() {
         <SettingsRow leading={<RowIcon icon={Mic} />} onPress={() => router.push("/settings/voice")}>
           <Typography.Paragraph>{t("mobile.settings.voice.title")}</Typography.Paragraph>
         </SettingsRow>
+        {/* The shortcuts need the Shortcuts app of iOS 26. */}
+        {shortcutsSupported ? (
+          <SettingsRow leading={<RowIcon icon={Layers2} />} onPress={() => router.push("/settings/shortcuts")}>
+            <Typography.Paragraph>{t("mobile.settings.shortcuts.title")}</Typography.Paragraph>
+          </SettingsRow>
+        ) : null}
         <SettingsRow leading={<RowIcon icon={Vibrate} />} onPress={() => router.push("/settings/haptics")}>
           <Typography.Paragraph>{t("mobile.settings.feedback.haptics")}</Typography.Paragraph>
         </SettingsRow>

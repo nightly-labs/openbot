@@ -1028,6 +1028,13 @@ export const messages = {
   "mobile.server.providers.status.ready": "설치됨",
   "mobile.server.providers.status.notInstalled": "설치 안 됨",
   "mobile.server.providers.status.checking": "확인 중",
+  "mobile.server.providers.accountsKeyHint":
+    "에이전트마다 계정 하나를 사용해요. 에이전트 설정에서 선택하세요. 새 계정에는 해당 계정의 API 키가 필요해요.",
+  "mobile.server.providers.accountChangeKey": "키 변경",
+  "mobile.server.providers.accountKeyHint":
+    "{provider} 계정의 API 키를 붙여넣으세요. 키는 서버로 전송돼요. 이 휴대폰에는 저장되지 않아요.",
+  "mobile.server.providers.accountKeyChecking": "키 확인 중…",
+  "mobile.server.providers.accountKeyAddFailed": "계정을 추가하지 못했어요. 다시 시도해 주세요.",
   "mobile.server.providers.pool": "계정 풀 사용",
   "mobile.server.providers.poolHint":
     "에이전트는 사용량 한도에 가까워질 때까지 한 계정을 쓰고, 그다음 한도가 가장 먼저 초기화되는 계정을 써요.",

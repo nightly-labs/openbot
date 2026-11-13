@@ -1049,6 +1049,13 @@ export const messages = {
   "mobile.server.providers.status.ready": "Geïnstalleerd",
   "mobile.server.providers.status.notInstalled": "Niet geïnstalleerd",
   "mobile.server.providers.status.checking": "Controleren",
+  "mobile.server.providers.accountsKeyHint":
+    "Elke agent gebruikt één account. Kies het in de instellingen van de agent. Een nieuw account heeft een API-sleutel van dat account nodig.",
+  "mobile.server.providers.accountChangeKey": "Sleutel wijzigen",
+  "mobile.server.providers.accountKeyHint":
+    "Plak een API-sleutel van het {provider}-account. De sleutel gaat naar de server. Deze telefoon bewaart hem niet.",
+  "mobile.server.providers.accountKeyChecking": "Sleutel controleren…",
+  "mobile.server.providers.accountKeyAddFailed": "Kan het account niet toevoegen. Probeer het opnieuw.",
   "mobile.server.providers.pool": "Accounts bundelen",
   "mobile.server.providers.poolHint":
     "Agents gebruiken één account tot het een gebruikslimiet nadert, en dan het account waarvan de limiet het eerst reset.",
