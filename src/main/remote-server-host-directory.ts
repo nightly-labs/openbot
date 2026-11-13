@@ -52,6 +52,8 @@ export function watchRemoteHostDirectory(options: {
 
 /** How often a server list is read again while an install command can still be used. */
 const SERVER_CLAIM_REFRESH_INTERVAL_MS = 5_000;
+/** A command works for 15 minutes. A clock that is behind the account service does not make the watch longer. */
+const SERVER_CLAIM_MAX_WATCH_MS = 15 * 60_000;
 
 /**
  * A server that signs in with an install command reaches this computer's list through Signal only
@@ -64,9 +66,7 @@ export function watchServerClaims(options: {
   /** The ids of the remote servers in the list now. */
   serverIds(): readonly string[];
   refresh(): void;
-  now?: () => number;
 }): { add(expiresAt: number): void; stop(): void } {
-  const now = options.now ?? Date.now;
   let timer: ReturnType<typeof setInterval> | undefined;
   let known = new Set<string>();
   let claims = 0;
@@ -78,7 +78,7 @@ export function watchServerClaims(options: {
   };
   const tick = () => {
     const fresh = options.serverIds().filter((id) => !known.has(id)).length;
-    if (fresh >= claims || now() >= deadline) stop();
+    if (fresh >= claims || Date.now() >= deadline) stop();
     else options.refresh();
   };
   return {
@@ -89,7 +89,7 @@ export function watchServerClaims(options: {
         timer.unref();
       }
       claims += 1;
-      deadline = Math.max(deadline, expiresAt);
+      deadline = Math.max(deadline, Math.min(expiresAt, Date.now() + SERVER_CLAIM_MAX_WATCH_MS));
     },
     stop,
   };
