@@ -99,7 +99,6 @@ function openRouterLabNames(options: readonly ClientAgentModelOption[]): Map<str
   return names;
 }
 
-/** Free tier first; id says nothing about locality. */
 /** OpenCode and custom agent models are named `<service>/<model>`. Other models have no service. */
 export function splitServiceName(provider: string, fullName: string): { service: string; name: string } {
   const separator = provider === "opencode" || provider === "acp" ? fullName.indexOf("/") : -1;
@@ -108,6 +107,7 @@ export function splitServiceName(provider: string, fullName: string): { service:
     : { service: fullName.slice(0, separator), name: fullName.slice(separator + 1) };
 }
 
+/** Free tier first; id says nothing about locality. */
 function modelTier(model: PickerModel): 0 | 1 {
   return model.free ? 0 : 1;
 }
