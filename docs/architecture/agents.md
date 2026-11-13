@@ -78,6 +78,11 @@ of only quiet routine runs and teammate updates settles as above, also on the em
 path and in the history import. The desktop chat shows its quiet answers under the marker of the
 last update of the turn, which starts closed (`teammateUpdateAnswers`).
 
+A teammate's answer to a request that a quiet routine run sent continues that run, so nobody waits
+for its turn either (`answeredRequestId`, #8364). Such a turn ends quiet only after a call to
+`routine_no_update`: without the call its answer is a result and shows. The answer to a Test run's
+request always shows.
+
 `quiet` reaches remote clients too, through the optional `quiet-turn-v1` capability
 (`packages/contracts/src/team-protocol/quiet-turn-v1.ts`). The host sends a client with the
 capability a `quiet-turn-completed` event in place of `turn-completed`. The client transport changes

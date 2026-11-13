@@ -3,6 +3,7 @@ import { type AgentProviderId, type ConversationMessage, ROUTINE_QUIET_ANSWER_IT
 import { Effect } from "effect";
 import { generatedMediaKind } from "./agent/image-generation";
 import {
+  answeredRequestId,
   isNoUpdateAnswer,
   isNoUpdateToolCall,
   isTextAnswer,
@@ -74,6 +75,11 @@ export interface ProviderHistoryImportInput {
    * routine's side thread, as at the turn completion. Left out, it cannot.
    */
   quietTeammateThread?: boolean;
+  /**
+   * The routine delivery of the run in which this agent sent a message, if any. A teammate's answer
+   * to a quiet run can have ended quiet after a call to the no-update tool. Left out, it cannot.
+   */
+  routineDeliveryOfRequest?(messageId: string): DeliveryContext | null;
 }
 
 export interface ProviderHistoryImportResult {
@@ -321,6 +327,8 @@ function routineTurnAnswers(
     let noUpdateCalled = false;
     let failureReported = false;
     let imageGenerated = false;
+    // A teammate's answer to a quiet routine run is quiet only after a call to the no-update tool.
+    let needsNoUpdate = false;
     let afterIndex = -1;
     while (true) {
       const page = yield* providerSync(() =>
@@ -332,10 +340,15 @@ function routineTurnAnswers(
         if (routine !== false && item.type === "userMessage" && typeof item.clientId === "string") {
           const delivery = input.findDelivery(item.clientId)?.delivery;
           // A continuation turn has its own client ID, so the check uses the delivery's ID.
+          const requestId = delivery && input.quietTeammateThread === true ? answeredRequestId(delivery) : null;
+          const answeredRun = requestId ? (input.routineDeliveryOfRequest?.(requestId) ?? null) : null;
+          const continuesQuietRun = answeredRun !== null && input.quietRoutineDelivery(answeredRun.delivery.id);
+          if (continuesQuietRun) needsNoUpdate = true;
           routine =
             delivery !== undefined &&
             ((input.quietTeammateThread === true && quietTeammateDelivery(delivery)) ||
-              (delivery.sender.kind === "routine" && input.quietRoutineDelivery(delivery.id)));
+              (delivery.sender.kind === "routine" && input.quietRoutineDelivery(delivery.id)) ||
+              continuesQuietRun);
           // A completed delivery with an error is a run whose agent reported a failure: never quiet.
           if (delivery?.status === "completed" && delivery.error !== null) failureReported = true;
         }
@@ -351,7 +364,7 @@ function routineTurnAnswers(
       if (page.length < 50 || !last || last.itemIndex <= afterIndex) break;
       afterIndex = last.itemIndex;
     }
-    if (!routine) return "none";
+    if (!routine || (needsNoUpdate && !noUpdateCalled)) return "none";
     if (failureReported) return "answered";
     if (noUpdateCalled) return imageGenerated ? "image" : "quiet";
     return markers > 0 && !reported && !imageGenerated ? "quiet" : "answered";

@@ -69,6 +69,7 @@ import {
 } from "./provider-diagnostics";
 import type { ProviderRuntime } from "./provider-runtime";
 import {
+  answeredRequestId,
   isNoUpdateAnswer,
   quietTeammateDelivery,
   settleQuietChannelTurn,
@@ -778,7 +779,7 @@ export class TurnLifecycle {
       // A plan continuation that ends empty goes to the plan's own end (`PlanContinuation.consider`).
       deliveries.some(({ planContinuation }) => planContinuation !== undefined) ||
       deliveries.every(({ delivery }) => quietTeammateDelivery(delivery)) ||
-      this.#quietRoutineTurn(agentId, threadId, deliveries)
+      this.#quietRoutineTurn(agentId, threadId, deliveries, this.#noUpdateTurns.has(turnId))
     )
       return false;
     const messages = this.#conversation.ensureSnapshot(agentId, threadId).messages;
@@ -1214,7 +1215,12 @@ export class TurnLifecycle {
           !this.#reportedFailures.has(errorTurnId) &&
           (this.#quietChannelTurns.has(errorTurnId) ||
             (this.#noUpdateTurns.has(errorTurnId) &&
-              this.#quietRoutineTurn(agentId, threadId, this.#mailbox.findDeliveriesByTurn(agentId, errorTurnId))))
+              this.#quietRoutineTurn(
+                agentId,
+                threadId,
+                this.#mailbox.findDeliveriesByTurn(agentId, errorTurnId),
+                true,
+              )))
         ) {
           this.#quietEmptyAnswers.add(errorTurnId);
           logger.info("A quiet turn ended with no answer after its no-update call.", {
@@ -1411,8 +1417,8 @@ export class TurnLifecycle {
   /**
    * Records a call to the no-update tool. `quiet` when the turn runs only quiet routine runs and
    * teammate updates, so its completion keeps the text answers as quiet answers; `shown` when a
-   * person waits for the answer, as in a Test run; null when neither a routine run nor a teammate
-   * update started the turn. The completion decides again, because a message can join the turn after
+   * person waits for the answer, as in a Test run; null when neither a routine run, a teammate
+   * update nor a teammate's answer to a quiet routine run (`#continuesQuietRun`) started the turn. The completion decides again, because a message can join the turn after
    * the call. `channelRun` is a turn that owns a main task of a channel routine's request: the channel
    * then posts no message for the turn (#7166).
    */
@@ -1422,12 +1428,17 @@ export class TurnLifecycle {
       return this.#reportedFailures.has(turnId) ? "shown" : "quiet";
     }
     const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
-    if (!deliveries.some(({ delivery }) => delivery.sender.kind === "routine" || quietTeammateDelivery(delivery)))
+    if (
+      !deliveries.some(
+        ({ delivery }) =>
+          delivery.sender.kind === "routine" || quietTeammateDelivery(delivery) || this.#continuesQuietRun(delivery),
+      )
+    )
       return null;
     this.#noUpdateTurns.add(turnId);
     // A failed run is never quiet, so its answer must still be written.
     if (this.#reportedFailures.has(turnId)) return "shown";
-    return this.#quietRoutineTurn(agentId, threadId, deliveries) ? "quiet" : "shown";
+    return this.#quietRoutineTurn(agentId, threadId, deliveries, true) ? "quiet" : "shown";
   }
 
   /** Whether the channel shows the answers of this running channel routine turn as steps (#7166). */
@@ -1455,9 +1466,16 @@ export class TurnLifecycle {
 
   /**
    * Only a turn that runs nothing but quiet routine runs and teammate updates, in the agent's own
-   * chat or in a routine's side thread: not in a channel, a messaging thread or another task.
+   * chat or in a routine's side thread: not in a channel, a messaging thread or another task. After
+   * a call to the no-update tool (`noUpdateCalled`), a teammate's answer to a quiet routine run counts
+   * too (`#continuesQuietRun`).
    */
-  #quietRoutineTurn(agentId: string, threadId: string | null, deliveries: readonly DeliveryContext[]): boolean {
+  #quietRoutineTurn(
+    agentId: string,
+    threadId: string | null,
+    deliveries: readonly DeliveryContext[],
+    noUpdateCalled = false,
+  ): boolean {
     const publicThreadId = threadId === null ? null : this.#conversation.publicThreadId(agentId, threadId);
     return (
       deliveries.length > 0 &&
@@ -1466,9 +1484,17 @@ export class TurnLifecycle {
       deliveries.every(
         ({ delivery }) =>
           quietTeammateDelivery(delivery) ||
-          (delivery.sender.kind === "routine" && this.#hooks.quietRoutineDelivery(delivery.id)),
+          (delivery.sender.kind === "routine" && this.#hooks.quietRoutineDelivery(delivery.id)) ||
+          (noUpdateCalled && this.#continuesQuietRun(delivery)),
       )
     );
+  }
+
+  /** A teammate's answer to a request that a quiet routine run of this agent sent (#8364). */
+  #continuesQuietRun(delivery: DeliveryContext["delivery"]): boolean {
+    const requestId = answeredRequestId(delivery);
+    const run = requestId ? this.#mailbox.routineDeliveryOfRequest(delivery.recipientAgentId, requestId) : null;
+    return run !== null && this.#hooks.quietRoutineDelivery(run.delivery.id);
   }
 
   readonly #completeTurn = Effect.fn("TurnLifecycle.completeTurn")(
@@ -1767,7 +1793,7 @@ export class TurnLifecycle {
       const quiet =
         outcome === "completed" &&
         reportedFailure === undefined &&
-        (this.#quietRoutineTurn(agentId, snapshot.threadId, deliveries)
+        (this.#quietRoutineTurn(agentId, snapshot.threadId, deliveries, noUpdateCalled)
           ? settleQuietRoutineTurn(snapshot, turnId, noUpdateCalled)
           : quietChannelRun && settleQuietChannelTurn(snapshot, turnId));
       // A turn that is not quiet after all, such as one with a file, shows its answers in the channel.

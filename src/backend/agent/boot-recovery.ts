@@ -375,6 +375,7 @@ export class BootRecovery {
             quietRoutineDelivery: (deliveryId) => this.#hooks.quietRoutineDelivery(deliveryId),
             quietTeammateThread:
               !this.#conversation.isExecutionThread(publicThreadId) || this.#hooks.isRoutineThread(publicThreadId),
+            routineDeliveryOfRequest: (messageId) => this.#mailbox.routineDeliveryOfRequest(agent.id, messageId),
           }).pipe(toBootRecoveryFailed);
           yield* recoveryStep(() => this.#refreshBackfilledConversation(agent.id, publicThreadId));
         }).pipe(
