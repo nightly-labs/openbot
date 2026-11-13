@@ -149,6 +149,9 @@ export const messages = {
     "Los resultados y los mensajes de la búsqueda aparecen y desaparecen con un breve desenfoque cuando cambian. Con el movimiento reducido, solo se desvanecen. Si está desactivado, cambian al instante.",
   "mobile.settings.feedback.footer": "Respuesta táctil para las acciones en la aplicación en este dispositivo.",
   "mobile.settings.feedback.haptics": "Respuesta háptica",
+  "mobile.settings.feedback.replies": "Háptica de respuestas",
+  "mobile.settings.feedback.repliesFooter":
+    "Toques mientras aparece la respuesta de un agente en un chat. La otra háptica sigue activa.",
   "mobile.settings.feedback.retry": "Reintentar guardar el ajuste háptico",
   "mobile.settings.liveActivities.title": "Actividades en directo",
   "mobile.settings.liveActivities.footer":

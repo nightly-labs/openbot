@@ -142,6 +142,8 @@ export const messages = {
     "תוצאות חיפוש והודעות חיפוש מתעמעמות פנימה והחוצה עם טשטוש קצר כשהן משתנות. כשהתנועה מופחתת, הן רק מתעמעמות. כשהאפשרות כבויה, הן משתנות מיד.",
   "mobile.settings.feedback.footer": "משוב במגע לפעולות באפליקציה במכשיר הזה.",
   "mobile.settings.feedback.haptics": "משוב haptic",
+  "mobile.settings.feedback.replies": "משוב haptic לתשובות",
+  "mobile.settings.feedback.repliesFooter": "הקשות בזמן שתשובת סוכן מופיעה בצ'אט. שאר המשוב נשאר פעיל.",
   "mobile.settings.feedback.retry": "ניסיון חוזר לשמירת הגדרת המשוב haptic",
   "mobile.settings.liveActivities.title": "Live Activities",
   "mobile.settings.liveActivities.footer":

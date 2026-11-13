@@ -146,6 +146,9 @@ export const messages = {
     "Les résultats et les messages de la recherche apparaissent et disparaissent avec un léger flou quand ils changent. Quand les mouvements sont réduits, ils passent seulement en fondu. Si cette option est désactivée, ils changent immédiatement.",
   "mobile.settings.feedback.footer": "Retour tactile pour les actions de l’app sur cet appareil.",
   "mobile.settings.feedback.haptics": "Retour haptique",
+  "mobile.settings.feedback.replies": "Haptique des réponses",
+  "mobile.settings.feedback.repliesFooter":
+    "Vibrations pendant l'affichage de la réponse d'un agent dans un chat. Les autres vibrations restent actives.",
   "mobile.settings.feedback.retry": "Réessayer d’enregistrer le réglage haptique",
   "mobile.settings.liveActivities.title": "Activités en direct",
   "mobile.settings.liveActivities.footer":

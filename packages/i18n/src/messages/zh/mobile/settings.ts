@@ -138,6 +138,8 @@ export const messages = {
     "搜索结果和搜索消息变化时会带短促的模糊淡入淡出。开启减弱动效时只做淡入淡出。关闭该选项后立即切换。",
   "mobile.settings.feedback.footer": "这台设备上应用操作的触感反馈。",
   "mobile.settings.feedback.haptics": "触感反馈",
+  "mobile.settings.feedback.replies": "回复触感反馈",
+  "mobile.settings.feedback.repliesFooter": "聊天中智能体回复显示时的振动。其他触感反馈保持开启。",
   "mobile.settings.feedback.retry": "重试保存触感反馈设置",
   "mobile.settings.liveActivities.title": "实时活动",
   "mobile.settings.liveActivities.footer": "OpenBot 运行时，在锁屏和灵动岛上显示助手的工作、消息、提问和审批。",

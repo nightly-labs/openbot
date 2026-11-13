@@ -146,6 +146,9 @@ export const messages = {
     "Os resultados e as mensagens da busca aparecem e somem com um breve desfoque quando mudam. Com o movimento reduzido, eles só esmaecem. Quando isto está desativado, eles mudam na hora.",
   "mobile.settings.feedback.footer": "Resposta ao toque nas ações do app neste dispositivo.",
   "mobile.settings.feedback.haptics": "Resposta tátil",
+  "mobile.settings.feedback.replies": "Resposta tátil nas respostas",
+  "mobile.settings.feedback.repliesFooter":
+    "Toques enquanto a resposta de um agente aparece no chat. A outra resposta tátil continua ativa.",
   "mobile.settings.feedback.retry": "Tentar salvar a resposta tátil de novo",
   "mobile.settings.liveActivities.title": "Atividades ao Vivo",
   "mobile.settings.liveActivities.footer":

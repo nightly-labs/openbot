@@ -145,6 +145,9 @@ export const messages = {
     "Quando cambiano, i risultati e i messaggi di ricerca compaiono e scompaiono con una breve sfocatura. Con il movimento ridotto, si dissolvono soltanto. Quando l'opzione è disattivata, cambiano subito.",
   "mobile.settings.feedback.footer": "Feedback al tocco per le azioni nell'app su questo dispositivo.",
   "mobile.settings.feedback.haptics": "Feedback aptico",
+  "mobile.settings.feedback.replies": "Feedback aptico risposte",
+  "mobile.settings.feedback.repliesFooter":
+    "Vibrazioni mentre la risposta di un agente appare in chat. L'altro feedback aptico resta attivo.",
   "mobile.settings.feedback.retry": "Riprova a salvare l'impostazione del feedback aptico",
   "mobile.settings.liveActivities.title": "Live Activity",
   "mobile.settings.liveActivities.footer":

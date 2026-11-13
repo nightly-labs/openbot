@@ -145,6 +145,9 @@ export const messages = {
     "検索結果と検索メッセージは、変わるときに短いぼかしでフェードイン・フェードアウトします。動きを減らしているときはフェードのみです。オフにすると、すぐに切り替わります。",
   "mobile.settings.feedback.footer": "このデバイスでのアプリ操作の触覚フィードバックです。",
   "mobile.settings.feedback.haptics": "触覚フィードバック",
+  "mobile.settings.feedback.replies": "返信の触覚フィードバック",
+  "mobile.settings.feedback.repliesFooter":
+    "チャットにエージェントの返信が表示される間の振動です。ほかの触覚フィードバックはオンのままです。",
   "mobile.settings.feedback.retry": "触覚フィードバックの設定をもう一度保存",
   "mobile.settings.liveActivities.title": "ライブアクティビティ",
   "mobile.settings.liveActivities.footer":

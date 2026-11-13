@@ -154,6 +154,9 @@ export const messages = {
     "Wyniki i komunikaty wyszukiwania pojawiają się i znikają z krótkim rozmyciem, gdy się zmieniają. Gdy ruch jest ograniczony, tylko się przenikają. Gdy to jest wyłączone, zmieniają się od razu.",
   "mobile.settings.feedback.footer": "Wibracje przy akcjach w aplikacji na tym urządzeniu.",
   "mobile.settings.feedback.haptics": "Haptyka",
+  "mobile.settings.feedback.replies": "Haptyka odpowiedzi",
+  "mobile.settings.feedback.repliesFooter":
+    "Wibracje podczas pojawiania się odpowiedzi agenta na czacie. Pozostała haptyka zostaje włączona.",
   "mobile.settings.feedback.retry": "Ponów zapis ustawienia haptyki",
   "mobile.settings.liveActivities.title": "Aktywności na żywo",
   "mobile.settings.liveActivities.footer":

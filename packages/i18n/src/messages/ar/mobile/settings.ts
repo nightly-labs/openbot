@@ -157,6 +157,8 @@ export const messages = {
     "تظهر نتائج البحث ورسائله وتختفي تدريجيًا مع تمويه قصير عند تغيّرها. عند تقليل الحركة، تتلاشى فقط. عند إيقاف هذا، تتغير فورًا.",
   "mobile.settings.feedback.footer": "الاستجابة اللمسية للإجراءات في التطبيق على هذا الجهاز.",
   "mobile.settings.feedback.haptics": "الاهتزاز اللمسي",
+  "mobile.settings.feedback.replies": "اهتزاز الردود",
+  "mobile.settings.feedback.repliesFooter": "نقرات أثناء ظهور رد الوكيل في المحادثة. يبقى الاهتزاز الآخر مفعّلًا.",
   "mobile.settings.feedback.retry": "إعادة محاولة حفظ إعداد الاهتزاز اللمسي",
   "mobile.settings.liveActivities.title": "الأنشطة المباشرة",
   "mobile.settings.liveActivities.footer":

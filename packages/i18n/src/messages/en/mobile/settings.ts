@@ -143,6 +143,8 @@ export const messages = defineMessages("mobile.settings", {
     "Search results and search messages fade in and out with a short blur when they change. When motion is reduced, they only fade. When this is off, they change at once.",
   "mobile.settings.feedback.footer": "Touch feedback for actions in the app on this device.",
   "mobile.settings.feedback.haptics": "Haptics",
+  "mobile.settings.feedback.replies": "Reply haptics",
+  "mobile.settings.feedback.repliesFooter": "Taps while an agent's reply appears in a chat. The other haptics stay on.",
   "mobile.settings.feedback.retry": "Retry saving haptics setting",
   "mobile.settings.liveActivities.title": "Live Activities",
   "mobile.settings.liveActivities.footer":
