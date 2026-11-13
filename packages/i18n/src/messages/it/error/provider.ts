@@ -219,6 +219,8 @@ export const messages = {
     "Il provider del modello di OpenCode ha segnalato una richiesta di caricamento non valida. Scegli un altro modello e continua. Controlla le routine salvate prima di ricrearle.\n{detail}",
   "error.provider.opencodeUnreadableContent":
     "Questo modello non può leggere un file o un'immagine in questa chat. Scegli un modello che legge i file, poi invia di nuovo il messaggio.",
+  "error.provider.opencodeContextTooSmall":
+    "Questa chat non entra nella finestra di contesto del modello. In Ollama o LM Studio, carica il modello con un contesto più lungo e inserisci la stessa finestra nelle impostazioni del suo provider in OpenBot. Oppure scegli un modello più grande.",
   "error.provider.opencodeFreeLimit":
     "I modelli gratuiti di OpenCode hanno raggiunto il limite di utilizzo. Tutti i modelli gratuiti condividono questo limite. Per continuare, incolla una chiave OpenCode Go nelle impostazioni di OpenCode, oppure scegli un modello di un altro provider.",
   "error.provider.opencodeProviderFailed":
@@ -345,6 +347,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "Solo i link di accesso HTTPS possono aprirsi nel browser.",
   "error.provider.geminiKeyRefused":
     "Gemini ha rifiutato la chiave API salvata. Sostituisci o rimuovi la chiave nelle Impostazioni, poi connettiti di nuovo.",
+  "error.provider.geminiAccountSettingsUnreadable":
+    "Gemini non riesce ad aprire il file delle impostazioni di questo account, quindi non può accedere. Rimuovi questo account e aggiungilo di nuovo.",
+  "error.provider.geminiSettingsUnreadable":
+    "Gemini non riesce ad aprire il suo file delle impostazioni su questo computer, quindi non può accedere. Chiudi le altre app che usano Gemini, poi chiudi e riapri OpenBot.",
   "error.provider.geminiVerificationRequired":
     "Google deve verificare il tuo account prima che Gemini possa rispondere. Verifica il tuo account Google in un browser, poi invia di nuovo il messaggio.",
   "error.provider.keyProviderRefused":

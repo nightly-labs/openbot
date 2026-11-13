@@ -201,6 +201,8 @@ export const messages = {
     "أبلغ مزوّد نموذج OpenCode عن طلب رفع غير صالح. اختر نموذجًا آخر وتابع. تحقق من المهام الدورية المحفوظة قبل إنشائها مرة أخرى.\n{detail}",
   "error.provider.opencodeUnreadableContent":
     "لا يستطيع هذا النموذج قراءة ملف أو صورة في هذه الدردشة. اختر نموذجًا يمكنه قراءة الملفات، ثم أرسل رسالتك مرة أخرى.",
+  "error.provider.opencodeContextTooSmall":
+    "هذه المحادثة لا تتسع في نافذة سياق النموذج. في Ollama أو LM Studio، حمّل النموذج بطول سياق أكبر، وأدخل النافذة نفسها في إعدادات مزوده في OpenBot. أو اختر نموذجًا أكبر.",
   "error.provider.opencodeFreeLimit":
     "بلغت نماذج OpenCode المجانية حد الاستخدام. تشترك جميع النماذج المجانية في هذا الحد. للمتابعة، الصق مفتاح OpenCode Go في إعدادات OpenCode، أو اختر نموذجًا من مزوّد آخر.",
   "error.provider.opencodeProviderFailed":
@@ -320,6 +322,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "لا يمكن فتح سوى روابط تسجيل الدخول HTTPS في المتصفح.",
   "error.provider.geminiKeyRefused":
     "رفض Gemini مفتاح API المحفوظ. استبدل المفتاح أو أزله في الإعدادات، ثم اتصل مرة أخرى.",
+  "error.provider.geminiAccountSettingsUnreadable":
+    "لا يستطيع Gemini فتح ملف إعدادات هذا الحساب، لذا لا يمكنه تسجيل الدخول. أزل هذا الحساب ثم أضفه مرة أخرى.",
+  "error.provider.geminiSettingsUnreadable":
+    "لا يستطيع Gemini فتح ملف إعداداته على هذا الكمبيوتر، لذا لا يمكنه تسجيل الدخول. أغلق التطبيقات الأخرى التي تستخدم Gemini، ثم أغلق OpenBot وافتحه مرة أخرى.",
   "error.provider.geminiVerificationRequired":
     "يجب أن يتحقق Google من حسابك قبل أن يتمكن Gemini من الرد. تحقق من حساب Google في متصفح، ثم أرسل رسالتك مرة أخرى.",
   "error.provider.keyProviderRefused":

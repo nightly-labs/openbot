@@ -42,6 +42,7 @@ import type {
 import {
   agentComputerUseEnabled,
   agentNewChatAllowed,
+  agentPermissionLevel,
   agentQuickAcknowledgementEnabled,
   COMPUTER_USE_MCP_SERVER_ID,
   channelAllowsBrowser,
@@ -1523,6 +1524,13 @@ export class OpenBotToolRouter {
       // The rest of the setup stays readable when the skill folders cannot be read.
       skillsError = error instanceof Error ? error.message : String(error);
     }
+    const access = workspaceAccessEnforced(agent) ? "workspace" : "full";
+    // The level that applies, as the settings show it. A Workspace only agent keeps its stored grant, but
+    // the grant answers nothing there, so reporting it as on hid the reason for each card (#8308).
+    const permissions = agentPermissionLevel({
+      access,
+      autoApprove: this.#approvalAutomation.autoApproves(agent.id),
+    });
     return {
       id: agent.id,
       name: agent.name,
@@ -1535,14 +1543,15 @@ export class OpenBotToolRouter {
         this.#hooks.agentModels({ provider: agent.provider, providerAccountId: agent.providerAccountId }),
       ),
       ...agentAccountSetup(agent),
-      access: workspaceAccessEnforced(agent) ? "workspace" : "full",
+      access,
+      permissions,
       computerUse,
       // The setting can be on while the driver is not ready, and then the agent has no driver tools (#6612).
       ...(computerUse
         ? { computerUseReady: mcpServers.some((server) => server.id === COMPUTER_USE_MCP_SERVER_ID) }
         : {}),
       notifications: agent.notifications,
-      autoApprove: this.#approvalAutomation.autoApproves(agent.id),
+      autoApprove: permissions === "full",
       ...(skills ? { skills } : { skillsError }),
       routines: this.#routines.list(agent.id).map((routine) => ({
         id: routine.id,

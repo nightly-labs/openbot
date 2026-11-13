@@ -429,6 +429,19 @@ export class BrowserCdpEngine {
             node.backendNodeId,
             `function(origin, input) { if (this.isConnected && this.ownerDocument !== document) return 'frame'; return this.isConnected && location.origin === origin && (!input || (this.localName === 'input' && !this.disabled && !this.readOnly && ['password','text','tel','number'].includes(this.type))); }`,
             [origin, input],
+          ).pipe(
+            // The top frame's world cannot reach a node in a frame of another origin in the page's
+            // process, so the check fails before it can name the frame. Only a child frame that holds
+            // the node changes the reason.
+            Effect.catch((failure) =>
+              Effect.gen({ self: this }, function* () {
+                const holder = yield* Effect.gen({ self: this }, function* () {
+                  const childFrames = frameIds(yield* send("Page.getFrameTree", {})).slice(1);
+                  return yield* this.#nodeFrameWorld(send, node.backendNodeId, undefined, childFrames);
+                }).pipe(Effect.catch(() => Effect.succeed(undefined)));
+                return holder === undefined ? yield* Effect.fail(failure) : "frame";
+              }),
+            ),
           );
           if (valid === "frame") return yield* inFrame(index);
           if (valid !== true)
@@ -748,6 +761,8 @@ export class BrowserCdpEngine {
   #retainDebugger = false;
   #ownsDebugger = false;
   #idleDetach: NodeJS.Immediate | undefined;
+  /** The host turned emulated focus off for a hidden, idle tab (`setIdleFocus`). */
+  #idleFocusOff = false;
   #closing = false;
   #disposed = false;
   readonly #scope = Scope.makeUnsafe();
@@ -2201,6 +2216,21 @@ export class BrowserCdpEngine {
     return true;
   }
 
+  /**
+   * A lease emulates focus, and a page with emulated focus stays visible also when its tab is hidden
+   * and throttled. A debugger that `setEnvironment` keeps attached keeps that focus after the lease,
+   * so the host turns it off for a hidden tab and on again when the tab is shown or used. Until then,
+   * each lease that ends turns it off again (`#restoreIdleFocus`), as a preview capture of the tab.
+   */
+  readonly setIdleFocus = Effect.fn("BrowserCdp.setIdleFocus")(function* (
+    this: BrowserCdpEngine,
+    enabled: boolean,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    this.#idleFocusOff = !enabled;
+    if (!this.#mayEmulateIdleFocus()) return;
+    yield* browserCall(() => this.#contents.debugger.sendCommand("Emulation.setFocusEmulationEnabled", { enabled }));
+  });
+
   readonly setEnvironment = Effect.fn("BrowserCdp.setEnvironment")(function* (
     this: BrowserCdpEngine,
     environment: BrowserEnvironment,
@@ -3605,10 +3635,28 @@ export class BrowserCdpEngine {
         Effect.sync(() => {
           this.#activeLeases -= 1;
           this.#releaseIdleDebugger();
+          this.#restoreIdleFocus();
         }),
       ),
     );
   });
+
+  /** As `#releaseIdleDebugger`, on a later task: a lease can end inside a CDP message. */
+  #restoreIdleFocus(): void {
+    if (!this.#idleFocusOff || this.#activeLeases > 0) return;
+    setImmediate(() => {
+      if (!this.#idleFocusOff || !this.#mayEmulateIdleFocus()) return;
+      void this.#contents.debugger
+        .sendCommand("Emulation.setFocusEmulationEnabled", { enabled: false })
+        .catch(() => {});
+    });
+  }
+
+  /** Only a debugger that this engine keeps attached, between leases, holds a focus that a lease set. */
+  #mayEmulateIdleFocus(): boolean {
+    if (!this.#ownsDebugger || this.#activeLeases > 0 || this.#disposed || this.#closing) return false;
+    return !this.#contents.isDestroyed() && this.#contents.debugger.isAttached();
+  }
 
   #detachOwnedDebugger(): void {
     if (!this.#ownsDebugger) return;

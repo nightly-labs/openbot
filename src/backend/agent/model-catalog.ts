@@ -138,8 +138,8 @@ export class ModelCatalog {
   });
 
   /**
-   * Reads the catalogue of every connected CLI. Answers which providers replied with a fresh one, and
-   * which providers' 5 s `model/list` timed out.
+   * Reads the catalogue of every connected CLI. Answers which providers replied with a fresh one,
+   * which providers' 5 s `model/list` timed out, and which providers' `model/list` failed.
    *
    * A provider that has no client, or whose `model/list` failed or timed out, keeps the models it
    * already had. That is the right catalogue to keep answering with, but it is not proof of what the
@@ -157,8 +157,8 @@ export class ModelCatalog {
           // client in the map has an account: activation refreshes the catalog before it marks the
           // provider available, so the old status alone does not mean signed out.
           if (catalog.hiddenWhenSignedOut && signedOut && !client)
-            return { provider, models: [], fresh: false, timedOut: false };
-          if (!client) return { provider, models: previous, fresh: false, timedOut: false };
+            return { provider, models: [], fresh: false, timedOut: false, failed: false };
+          if (!client) return { provider, models: previous, fresh: false, timedOut: false, failed: false };
           const startedAt = performance.now();
           return yield* Effect.gen({ self: this }, function* () {
             const { models: sorted, listed } = yield* this.read(client, catalog);
@@ -172,9 +172,9 @@ export class ModelCatalog {
               durationMs: Math.round(performance.now() - startedAt),
             });
             if (catalog.fallback && listed === 0) {
-              return { provider, models: catalog.fallback(previous), fresh: false, timedOut: false };
+              return { provider, models: catalog.fallback(previous), fresh: false, timedOut: false, failed: false };
             }
-            return { provider, models: sorted, fresh: true, timedOut: false };
+            return { provider, models: sorted, fresh: true, timedOut: false, failed: false };
           }).pipe(
             Effect.catch((failure) => {
               const timeout = isProviderTimeout(failure.cause);
@@ -190,6 +190,8 @@ export class ModelCatalog {
                 fresh: false,
                 // A slow list already had the full request timeout, so a second read gains nothing.
                 timedOut: timeout && !catalog.slowList,
+                // The list that stays can be the list of a CLI that an update replaced (#8321).
+                failed: !timeout,
               });
             }),
           );
@@ -200,6 +202,7 @@ export class ModelCatalog {
     return {
       fresh: new Set(discovered.filter((entry) => entry.fresh).map((entry) => entry.provider)),
       timedOut: new Set(discovered.filter((entry) => entry.timedOut).map((entry) => entry.provider)),
+      failed: new Set(discovered.filter((entry) => entry.failed).map((entry) => entry.provider)),
     };
   });
 

@@ -350,7 +350,11 @@ export class AgentMemories {
         return openBotToolFailure("memoryId is invalid.");
       }
       const current = memoryId ? this.#memories.get(senderAgentId, memoryId) : null;
-      if (memoryId && !current) return openBotToolFailure("This memory does not belong to the current agent.");
+      // No memory of this agent has the ID: it was deleted or merged, or the ID is wrong (#8334).
+      if (memoryId && !current)
+        return openBotToolFailure(
+          `${sourceText("error.backend.memoryGone")} Call list_memories to read your current memories. To keep the fact, save it without memoryId.`,
+        );
       const planned = this.#plannedContext(senderAgentId, params.turnId, params.callId);
       const duplicateEntry = [...planned.all].find(([key, memory]) => key !== memoryId && memory.text === text);
       const duplicate = duplicateEntry?.[1];
@@ -440,7 +444,10 @@ export class AgentMemories {
         return openBotToolFailure("memoryId is required.");
       }
       const current = this.#memories.get(senderAgentId, args.memoryId);
-      if (!current) return openBotToolFailure("This memory does not belong to the current agent.");
+      if (!current)
+        return openBotToolFailure(
+          `${sourceText("error.backend.memoryGone")} There is nothing to delete. Call list_memories if you need your current memory IDs.`,
+        );
       const selection = this.#memories.getSelection(senderAgentId, current.id);
       if (selection?.userControlled)
         return openBotToolFailure(sourceText("error.backend.memorySelectionUserControlled"));

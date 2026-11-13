@@ -57,9 +57,9 @@ public class QuickActionsModule: Module {
     }
     .runOnQueue(.main)
 
-    OnStartObserving {
+    OnStartObserving { [weak self] in
       DispatchQueue.main.async {
-        QuickActionInbox.shared.listen { [weak self] id in
+        QuickActionInbox.shared.listen { id in
           self?.sendEvent(quickActionEvent, ["id": id])
         }
       }

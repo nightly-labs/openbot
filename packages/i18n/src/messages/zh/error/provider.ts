@@ -192,6 +192,8 @@ export const messages = {
     "OpenCode 的模型服务商报告上传请求无效。请改用其他模型继续；重新创建自动化任务前请先检查已保存的自动化任务。\n{detail}",
   "error.provider.opencodeUnreadableContent":
     "该模型无法读取该对话中的文件或图片。请选择能读取文件的模型，然后重新发送消息。",
+  "error.provider.opencodeContextTooSmall":
+    "此聊天超出了模型的上下文窗口。请在 Ollama 或 LM Studio 中以更大的上下文长度加载模型，并在 OpenBot 中该模型提供方的设置里填写相同的窗口。或者选择更大的模型。",
   "error.provider.opencodeFreeLimit":
     "OpenCode 免费模型已达到使用上限。所有免费模型共用这一上限。要继续，请在 OpenCode 设置中粘贴 OpenCode Go 密钥，或选择其他提供商的模型。",
   "error.provider.opencodeProviderFailed":
@@ -304,6 +306,10 @@ export const messages = {
   "error.provider.acpSignInMethodMissing": "该服务商在这台电脑上不提供该登录方式。请更新服务商后重试。",
   "error.provider.httpsSignInLinkOnly": "只有 HTTPS 登录链接才能在浏览器中打开。",
   "error.provider.geminiKeyRefused": "Gemini 拒绝了已保存的 API 密钥。请在设置中更换或移除该密钥，然后重新连接。",
+  "error.provider.geminiAccountSettingsUnreadable":
+    "Gemini 无法打开此账号的设置文件，因此无法登录。请移除此账号，然后重新添加。",
+  "error.provider.geminiSettingsUnreadable":
+    "Gemini 无法打开此电脑上的设置文件，因此无法登录。请退出其他使用 Gemini 的应用，然后退出并重新打开 OpenBot。",
   "error.provider.geminiVerificationRequired":
     "Gemini 回答前，Google 需要验证你的账号。在浏览器中验证你的 Google 账号，然后重新发送消息。",
   "error.provider.keyProviderRefused": "{provider} 拒绝了已保存的 API 密钥。请在设置中更换或移除该密钥，然后重试。",

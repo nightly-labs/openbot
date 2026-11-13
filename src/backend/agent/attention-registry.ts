@@ -88,6 +88,7 @@ import {
   browserTakeoverError,
   browserTakeoverResult,
   commandText,
+  declinedMcpElicitationText,
   detachedPromptResult,
   dynamicPromptResult,
   expiredPromptResult,
@@ -1938,11 +1939,7 @@ export class AttentionRegistry {
     const questions = mcpElicitationQuestions(request.params);
     if (!owner || !questions) {
       client.respond(request.id, { action: "decline", content: null, _meta: null });
-      this.#emitError(
-        "mcp_safety_handoff",
-        "A local plugin requested an unsupported security hand-off, so OpenBot declined it.",
-        owner?.agentId,
-      );
+      this.#emitError("mcp_safety_handoff", declinedMcpElicitationText(request.params), owner?.agentId);
       return;
     }
     const { agentId, publicThreadId, turnId, params } = owner;

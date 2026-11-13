@@ -207,6 +207,11 @@ const START_FAILURE_LIMIT = 3;
 const STABLE_RUN_MS = 2 * 60_000;
 /** How often a restart the user asked for checks whether the provider's turns have ended. */
 const PROVIDER_RESTART_POLL_MS = 1_000;
+/**
+ * The waits before a model list that failed is read again. The first read after a CLI update can
+ * fail for a short time, and a read at once failed again.
+ */
+const FAILED_MODEL_LIST_RETRY_DELAYS_MS = [2_000, 15_000];
 /** The start failure of OpenCode 1 on a database that OpenCode 2 made. */
 const OPENCODE_NEWER_DATABASE = /\bDatabase is not empty and has no session table\b/u;
 /**
@@ -273,7 +278,12 @@ function pushedUsageLimit(provider: AgentProvider, params: unknown): AccountUsag
     return null;
   }
   if ((rateLimits.limitId ?? provider) !== provider) return null;
-  const limit = normalizeAccountUsage({ rateLimits, rateLimitsByLimitId: null }).limits[0];
+  // A push with no credit state leaves the credits as they were, as Codex's own view keeps them.
+  const { credits, ...windows } = rateLimits;
+  const limit = normalizeAccountUsage({
+    rateLimits: credits ? rateLimits : windows,
+    rateLimitsByLimitId: null,
+  }).limits[0];
   return limit && (limit.primary || limit.secondary) ? limit : null;
 }
 
@@ -497,6 +507,8 @@ export class ProviderRuntime implements ProviderPort {
   #errorSerial = 0;
   /** The providers whose model list is read again after it timed out. */
   readonly #relisting = new Set<AgentProvider>();
+  /** The clients whose failed model list was read again. Each client gets these reads one time. */
+  readonly #relistedAfterFailure = new WeakSet<AgentClient>();
   /** The MCP server failures shown in this run, by provider, server and kind. */
   readonly #reportedMcpFailures = new Set<string>();
   /** The last usage each provider reported, shown for a released provider instead of starting it. */
@@ -510,6 +522,8 @@ export class ProviderRuntime implements ProviderPort {
   readonly #resetCredits = new WeakMap<AgentClient, number | null>();
   /** The same count for each provider's own sign-in, kept for a released provider as `#lastUsage` is. */
   readonly #ownResetCredits = new Map<AgentProvider, number | null>();
+  /** Whether the last reading of each client's own quota said that the account works on credits. */
+  readonly #creditsAvailable = new WeakMap<AgentClient, boolean>();
   /**
    * Providers whose last usage read returned no limit, such as custom ACP agents. The dock polls
    * every five minutes, so starting a released one to ask again would keep its process running.
@@ -3092,13 +3106,27 @@ export class ProviderRuntime implements ProviderPort {
       id: provider,
       primary: pushed.primary ?? kept?.primary ?? null,
       secondary: pushed.secondary ?? kept?.secondary ?? null,
+      ...(pushed.creditsAvailable === undefined ? {} : { creditsAvailable: pushed.creditsAvailable }),
     };
     this.#usageUnreported.delete(provider);
     this.#lastUsage.set(provider, limit);
+    this.#noteCredits(source, limit);
     const limits = [...this.#lastUsage]
       .filter(([item]) => !this.#usageUnreported.has(item) && (this.#clients.has(item) || this.#released.has(item)))
       .map(([, item]) => item);
     this.#emit({ type: "usage-changed", usage: structuredClone({ limits }) });
+  }
+
+  /**
+   * A joined server's usage event does not say whether an account works on credits, so a change of it
+   * gets its own event, and `usage-credits-v1` clients read the usage again. A model's own quota, which
+   * has a different id, says nothing about it.
+   */
+  #noteCredits(client: AgentClient, limit: AccountUsage["limits"][number] | undefined): void {
+    const available = limit?.creditsAvailable;
+    if (available === undefined || this.#creditsAvailable.get(client) === available) return;
+    this.#creditsAvailable.set(client, available);
+    this.#emit({ type: "usage-credits-changed" });
   }
 
   /** Refresh the notice once when one provider reports the same exhausted balance several ways. */
@@ -4415,11 +4443,15 @@ export class ProviderRuntime implements ProviderPort {
   }
 
   #startStoppedMessage(provider: AgentProvider, reason?: string | null): string {
-    // Each start ends in the same way until the user fixes the system, so the fix stays on the row (#4848).
-    const realtimeLimitZero = sourceText("error.provider.realtimeLimitZero");
-    if (reason === realtimeLimitZero) return realtimeLimitZero;
-    const cpuUnsupported = sourceText("error.provider.cpuUnsupported");
-    if (reason === cpuUnsupported) return cpuUnsupported;
+    // Each start ends in the same way until the user fixes the system, so the fix stays on the row (#4848,
+    // #6200). A refresh cannot repair these.
+    const kept = [
+      sourceText("error.provider.realtimeLimitZero"),
+      sourceText("error.provider.cpuUnsupported"),
+      sourceText("error.provider.geminiSettingsUnreadable"),
+      sourceText("error.provider.geminiAccountSettingsUnreadable"),
+    ];
+    if (reason && kept.includes(reason)) return reason;
     return sourceText("error.provider.startStopped", { provider: providerLabel(provider) });
   }
 
@@ -4489,7 +4521,7 @@ export class ProviderRuntime implements ProviderPort {
    */
   readonly #refreshModelCatalog = Effect.fn("ProviderRuntime.refreshModelCatalog")(function* (this: ProviderRuntime) {
     const errorSerialAtStart = this.#errorSerial;
-    const { fresh, timedOut } = yield* this.#modelCatalog.refresh();
+    const { fresh, timedOut, failed } = yield* this.#modelCatalog.refresh();
     let cleared = false;
     for (const provider of fresh) {
       const lastError = this.#lastErrors.get(provider);
@@ -4508,23 +4540,42 @@ export class ProviderRuntime implements ProviderPort {
         Effect.forkIn(this.#scope),
       );
     }
+    // A list that failed kept the list from before. After an update of the CLI, that is the list of
+    // the old version: the row showed the new version, and the new models came only after a restart
+    // (#8321). Each client gets these reads one time, so a CLI that always fails starts no loop.
+    for (const provider of failed) {
+      const client = this.#clients.get(provider);
+      // The guard is the client, not the provider: the client that replaces this one during the
+      // waits must get its own reads when its list also fails.
+      if (!client || this.#relistedAfterFailure.has(client)) continue;
+      this.#relistedAfterFailure.add(client);
+      yield* Effect.gen({ self: this }, function* () {
+        for (const delayMs of FAILED_MODEL_LIST_RETRY_DELAYS_MS) {
+          yield* Effect.sleep(delayMs);
+          // The start of a new client reads its own list.
+          if (this.#clients.get(provider) !== client) return;
+          if (yield* this.#relistModels(provider)) return;
+        }
+      }).pipe(Effect.forkIn(this.#scope));
+    }
     return fresh;
   });
 
   /**
    * Reads the model list of a provider again, once, with the full request timeout. A fresh list
    * clears the provider's last error, when the error is older than this read, and publishes the
-   * status, so the renderer reads the catalogue again.
+   * status, so the renderer reads the catalogue again. Answers whether the list is fresh.
    */
   readonly #relistModels = Effect.fn("ProviderRuntime.relistModels")(function* (
     this: ProviderRuntime,
     provider: AgentProvider,
   ) {
     const errorSerialAtStart = this.#errorSerial;
-    if (!(yield* this.#modelCatalog.relist(provider))) return;
+    if (!(yield* this.#modelCatalog.relist(provider))) return false;
     const lastError = this.#lastErrors.get(provider);
     if (lastError && lastError.serial <= errorSerialAtStart) this.#lastErrors.delete(provider);
     this.#setStatus({});
+    return true;
   });
 
   /** Shows a provider failure to the user and keeps it on the provider row. */
@@ -4629,6 +4680,10 @@ export class ProviderRuntime implements ProviderPort {
       if (this.#clients.get(client.provider) === client) this.#ownResetCredits.set(client.provider, available);
     }
     const usage = normalizeAccountUsage(rateLimits, client.provider === "codex" ? model : undefined);
+    this.#noteCredits(
+      client,
+      usage.limits.find((limit) => limit.id === client.provider),
+    );
     // The dock's reading, such as when Codex starts: the gate counts it, so the next poll does not read again.
     if (this.#clients.get(client.provider) === client && model === defaultUsageModel(client.provider)) {
       this.#keepUsage(client.provider, usage);

@@ -150,6 +150,7 @@ import { Route as V1SkillsAdminSubmissionsRouteImport } from './routes/v1/skills
 import { Route as V1SkillsSlugSlugRouteImport } from './routes/v1/skills/slug/$slug'
 import { Route as V2HostingBoatWebhookRouteImport } from './routes/v2/hosting/boat/webhook'
 import { Route as V2HostingClaimsRedeemRouteImport } from './routes/v2/hosting/claims/redeem'
+import { Route as V2HostingPoolAssignmentRouteImport } from './routes/v2/hosting/pool/assignment'
 import { Route as V2HostingServersIndexRouteImport } from './routes/v2/hosting/servers/index'
 import { Route as V2RemoteDiscordRouteReconcileRouteImport } from './routes/v2/remote/discord-route/reconcile'
 import { Route as V2RemoteDiscordRouteRemovedRouteImport } from './routes/v2/remote/discord-route/removed'
@@ -929,6 +930,11 @@ const V2HostingClaimsRedeemRoute = V2HostingClaimsRedeemRouteImport.update({
   path: '/v2/hosting/claims/redeem',
   getParentRoute: () => rootRouteImport,
 } as any)
+const V2HostingPoolAssignmentRoute = V2HostingPoolAssignmentRouteImport.update({
+  id: '/v2/hosting/pool/assignment',
+  path: '/v2/hosting/pool/assignment',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const V2HostingServersIndexRoute = V2HostingServersIndexRouteImport.update({
   id: '/v2/hosting/servers/',
   path: '/v2/hosting/servers/',
@@ -1444,6 +1450,7 @@ export interface FileRoutesByFullPath {
   '/v1/skills/slug/$slug': typeof V1SkillsSlugSlugRoute
   '/v2/hosting/boat/webhook': typeof V2HostingBoatWebhookRoute
   '/v2/hosting/claims/redeem': typeof V2HostingClaimsRedeemRoute
+  '/v2/hosting/pool/assignment': typeof V2HostingPoolAssignmentRoute
   '/v2/remote/discord-route/reconcile': typeof V2RemoteDiscordRouteReconcileRoute
   '/v2/remote/discord-route/removed': typeof V2RemoteDiscordRouteRemovedRoute
   '/v2/remote/discord-route/validate': typeof V2RemoteDiscordRouteValidateRoute
@@ -1648,6 +1655,7 @@ export interface FileRoutesByTo {
   '/v1/skills/slug/$slug': typeof V1SkillsSlugSlugRoute
   '/v2/hosting/boat/webhook': typeof V2HostingBoatWebhookRoute
   '/v2/hosting/claims/redeem': typeof V2HostingClaimsRedeemRoute
+  '/v2/hosting/pool/assignment': typeof V2HostingPoolAssignmentRoute
   '/v2/remote/discord-route/reconcile': typeof V2RemoteDiscordRouteReconcileRoute
   '/v2/remote/discord-route/removed': typeof V2RemoteDiscordRouteRemovedRoute
   '/v2/remote/discord-route/validate': typeof V2RemoteDiscordRouteValidateRoute
@@ -1857,6 +1865,7 @@ export interface FileRoutesById {
   '/v1/skills/slug/$slug': typeof V1SkillsSlugSlugRoute
   '/v2/hosting/boat/webhook': typeof V2HostingBoatWebhookRoute
   '/v2/hosting/claims/redeem': typeof V2HostingClaimsRedeemRoute
+  '/v2/hosting/pool/assignment': typeof V2HostingPoolAssignmentRoute
   '/v2/remote/discord-route/reconcile': typeof V2RemoteDiscordRouteReconcileRoute
   '/v2/remote/discord-route/removed': typeof V2RemoteDiscordRouteRemovedRoute
   '/v2/remote/discord-route/validate': typeof V2RemoteDiscordRouteValidateRoute
@@ -2063,6 +2072,7 @@ export interface FileRouteTypes {
     | '/v1/skills/slug/$slug'
     | '/v2/hosting/boat/webhook'
     | '/v2/hosting/claims/redeem'
+    | '/v2/hosting/pool/assignment'
     | '/v2/remote/discord-route/reconcile'
     | '/v2/remote/discord-route/removed'
     | '/v2/remote/discord-route/validate'
@@ -2267,6 +2277,7 @@ export interface FileRouteTypes {
     | '/v1/skills/slug/$slug'
     | '/v2/hosting/boat/webhook'
     | '/v2/hosting/claims/redeem'
+    | '/v2/hosting/pool/assignment'
     | '/v2/remote/discord-route/reconcile'
     | '/v2/remote/discord-route/removed'
     | '/v2/remote/discord-route/validate'
@@ -2475,6 +2486,7 @@ export interface FileRouteTypes {
     | '/v1/skills/slug/$slug'
     | '/v2/hosting/boat/webhook'
     | '/v2/hosting/claims/redeem'
+    | '/v2/hosting/pool/assignment'
     | '/v2/remote/discord-route/reconcile'
     | '/v2/remote/discord-route/removed'
     | '/v2/remote/discord-route/validate'
@@ -2655,6 +2667,7 @@ export interface RootRouteChildren {
   V1SkillsSlugSlugRoute: typeof V1SkillsSlugSlugRoute
   V2HostingBoatWebhookRoute: typeof V2HostingBoatWebhookRoute
   V2HostingClaimsRedeemRoute: typeof V2HostingClaimsRedeemRoute
+  V2HostingPoolAssignmentRoute: typeof V2HostingPoolAssignmentRoute
   V2RemoteDiscordRouteReconcileRoute: typeof V2RemoteDiscordRouteReconcileRoute
   V2RemoteDiscordRouteRemovedRoute: typeof V2RemoteDiscordRouteRemovedRoute
   V2RemoteDiscordRouteValidateRoute: typeof V2RemoteDiscordRouteValidateRoute
@@ -3705,6 +3718,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V2HostingClaimsRedeemRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v2/hosting/pool/assignment': {
+      id: '/v2/hosting/pool/assignment'
+      path: '/v2/hosting/pool/assignment'
+      fullPath: '/v2/hosting/pool/assignment'
+      preLoaderRoute: typeof V2HostingPoolAssignmentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v2/hosting/servers/': {
       id: '/v2/hosting/servers/'
       path: '/v2/hosting/servers'
@@ -4490,6 +4510,7 @@ const rootRouteChildren: RootRouteChildren = {
   V1SkillsSlugSlugRoute: V1SkillsSlugSlugRoute,
   V2HostingBoatWebhookRoute: V2HostingBoatWebhookRoute,
   V2HostingClaimsRedeemRoute: V2HostingClaimsRedeemRoute,
+  V2HostingPoolAssignmentRoute: V2HostingPoolAssignmentRoute,
   V2RemoteDiscordRouteReconcileRoute: V2RemoteDiscordRouteReconcileRoute,
   V2RemoteDiscordRouteRemovedRoute: V2RemoteDiscordRouteRemovedRoute,
   V2RemoteDiscordRouteValidateRoute: V2RemoteDiscordRouteValidateRoute,

@@ -7,6 +7,7 @@ import { Button } from "../../button";
 import { Brain, ChevronRight, Puzzle, Sparkles } from "../../icons";
 import { type TextValue, useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
+import { ActivityShine } from "./ActivityShine";
 import { useDuration } from "./Subagents";
 import { type TraceKeyboard, type TraceSpan, TraceWaterfallDialog } from "./TraceWaterfall";
 
@@ -127,10 +128,17 @@ function stepBody(step: AgentStep, newest: boolean, text: TextValue): JSX.Elemen
     return (
       <span class={["agent-step-text", { "agent-activity-label": newest }]} dir="auto">
         {step.text}
+        {newest && <ActivityShine text={step.text} />}
       </span>
     );
   }
-  return <span class={["agent-step-text", { "agent-activity-label": newest }]}>{text.sourceText(step.text)}</span>;
+  const label = text.sourceText(step.text);
+  return (
+    <span class={["agent-step-text", { "agent-activity-label": newest }]}>
+      {label}
+      {newest && <ActivityShine text={label} />}
+    </span>
+  );
 }
 
 /** The line of a failed tool step, with a closed toggle that shows its error. */
@@ -143,7 +151,12 @@ function FailedStep(props: { text: string; error: string | undefined; newest: bo
   const label = () => t(open() ? "chat.steps.hideError" : "chat.steps.showError");
   return (
     <div class="agent-step-failed">
-      <span class={["agent-step-text", { "agent-activity-label": props.newest }]}>{props.text}</span>
+      <span class={["agent-step-text", { "agent-activity-label": props.newest }]}>
+        {props.text}
+        <Show when={props.newest}>
+          <ActivityShine text={props.text} />
+        </Show>
+      </span>
       <Button
         type="button"
         variant="ghost"

@@ -394,9 +394,8 @@ const BROWSER_WEB_PREFERENCES = {
   allowRunningInsecureContent: false,
   // An agent works in tabs that the panel does not show. A throttled tab waits up to a few seconds
   // for each pointer move, because Chromium sends the move with the next frame, and it tells the
-  // page that it is hidden. The cost is that a hidden page keeps its full timer and frame rate
-  // until the idle sweep puts the tab to sleep (`IDLE_TAB_SLEEP_MS`, sooner past `MAX_IDLE_AWAKE_TABS`
-  // idle tabs or when memory is low).
+  // page that it is hidden. A hidden tab that nobody uses is throttled at the next idle sweep
+  // (`#throttleHiddenTabs`), so its videos and animations do not run without end.
   backgroundThrottling: false,
 };
 
@@ -837,6 +836,7 @@ export class BrowserHost {
   });
 
   readonly #sleepIdleTabs = Effect.fn("BrowserHost.sleepIdleTabs")(function* (this: BrowserHost) {
+    this.#throttleHiddenTabs();
     const now = Date.now();
     const idleMs = this.#memoryLow() ? LOW_MEMORY_TAB_SLEEP_MS : IDLE_TAB_SLEEP_MS;
     const awake: BrowserHostTab[] = [];
@@ -851,6 +851,37 @@ export class BrowserHost {
       if (now - tab.lastUsedAt >= this.#awakeTabGraceMs) yield* this.#sleep(tab);
     }
   });
+
+  /**
+   * A tab that the panel does not show and that nobody uses is throttled, as Chrome throttles a
+   * background tab: the page is told that it is hidden, so its videos pause and its timers slow
+   * down. The next use or show turns the throttling off again (`#unthrottle`). Emulated focus keeps
+   * a page visible, so it goes off too (`BrowserCdpEngine.setIdleFocus`).
+   */
+  #throttleHiddenTabs(): void {
+    for (const tab of this.#tabs.values()) {
+      if (tab.closing || tab.contents.isDestroyed() || tab.contents.getBackgroundThrottling()) continue;
+      if (this.#viewShown(tab.view)) continue;
+      if (this.#tabBusy(tab)) continue;
+      tab.contents.setBackgroundThrottling(true);
+      this.#setIdleFocus(tab, false);
+    }
+  }
+
+  /** See `BROWSER_WEB_PREFERENCES` for why a tab that is shown or used is not throttled. */
+  #unthrottle(tab: BrowserHostTab): void {
+    if (tab.contents.isDestroyed() || !tab.contents.getBackgroundThrottling()) return;
+    tab.contents.setBackgroundThrottling(false);
+    this.#setIdleFocus(tab, true);
+  }
+
+  /** Not awaited: a page that does not answer must not stop the idle sweep. */
+  #setIdleFocus(tab: BrowserHostTab, enabled: boolean): void {
+    if (tab.closing) return;
+    Effect.runFork(
+      tab.engine.setIdleFocus(enabled).pipe(Effect.ignore, Effect.forkIn(tab.scope, { startImmediately: true })),
+    );
+  }
 
   /**
    * Only an agent's own tab sleeps. A popup and its opener keep a live link between their pages, and
@@ -870,8 +901,12 @@ export class BrowserHost {
 
   /** A reload loses what the page holds, so a tab that a person or a task still has open stays loaded. */
   #tabInUse(tab: BrowserHostTab): boolean {
+    return this.#activeTabId === tab.id || this.#tabBusy(tab);
+  }
+
+  /** A task, a recording, a live view or a person uses the tab now, also when the panel does not show it. */
+  #tabBusy(tab: BrowserHostTab): boolean {
     return (
-      this.#activeTabId === tab.id ||
       // A preview capture is not a use. An unload that starts during one waits behind it on the queue.
       tab.pendingOperations > (tab.previewCapture ? 1 : 0) ||
       tab.viewInvalidations.size > 0 ||
@@ -4087,6 +4122,7 @@ export class BrowserHost {
       height: this.#bounds.height * zoomFactor,
     });
     tab.view.setBounds(bounds);
+    this.#unthrottle(tab);
     tab.view.setVisible(true);
     this.#attachedViewShown = true;
     tab.contents.invalidate();
@@ -4308,6 +4344,7 @@ export class BrowserHost {
     if (!tab) return yield* browserFailure(new Error(`Unknown browser tab: ${tabId}`));
     yield* this.#wake(tab);
     tab.lastUsedAt = Date.now();
+    this.#unthrottle(tab);
     return tab;
   });
 

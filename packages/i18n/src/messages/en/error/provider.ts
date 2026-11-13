@@ -209,6 +209,8 @@ export const messages = defineMessages("error.provider", {
     "OpenCode's model provider reported an invalid upload request. Choose another model and continue. Check saved routines before you create them again.\n{detail}",
   "error.provider.opencodeUnreadableContent":
     "This model cannot read a file or image in this chat. Choose a model that can read files, then send your message again.",
+  "error.provider.opencodeContextTooSmall":
+    "This chat does not fit in the model's context window. In Ollama or LM Studio, load the model with a larger context length, and enter the same window in its OpenBot provider settings. Or choose a larger model.",
   "error.provider.opencodeFreeLimit":
     "The free OpenCode models reached their usage limit. All free models share this limit. To continue, paste an OpenCode Go key in the OpenCode settings, or choose a model from another provider.",
   "error.provider.opencodeProviderFailed":
@@ -331,6 +333,10 @@ export const messages = defineMessages("error.provider", {
   "error.provider.httpsSignInLinkOnly": "Only HTTPS sign-in links can open in the browser.",
   "error.provider.geminiKeyRefused":
     "Gemini refused the saved API key. Replace or remove the key in Settings, then connect again.",
+  "error.provider.geminiAccountSettingsUnreadable":
+    "Gemini cannot open the settings file of this account, so it cannot sign in. Remove this account and add it again.",
+  "error.provider.geminiSettingsUnreadable":
+    "Gemini cannot open its settings file on this computer, so it cannot sign in. Quit the other apps that use Gemini, then quit and open OpenBot again.",
   "error.provider.geminiVerificationRequired":
     "Google must verify your account before Gemini can answer. Verify your Google account in a browser, then send your message again.",
   "error.provider.keyProviderRefused":

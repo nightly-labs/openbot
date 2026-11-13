@@ -7,6 +7,157 @@ the [root changelog](../../CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.4.10] - In review
+
+### Added
+
+- Connect Honcho or Hindsight from the Apps marketplace with browser sign-in or an API key, so agents can save and recall long-term memory that other AI tools you connect can share.
+- Choose when Claude compacts the chats of a server's agents. On the Claude page of a server's
+  Providers, set "Compact chats at" to a size from 100K to 1M tokens, or keep "Claude Code default".
+  The server must also be on the new version of OpenBot.
+- The Apps marketplace has 207 new apps, for example monday.com, Miro, Dropbox, Zapier, Datadog,
+  Intercom, Granola and Webflow. Connect each one with browser sign-in to your own account. Some apps,
+  such as Exa, DeepWiki and CoinGecko, need no account.
+- You can mute an agent from its menu in the chat list. Touch and hold the agent and select **Mute**;
+  **Unmute** gives it the notification level of the server again. The mute applies to you only, on
+  each of your devices.
+- You can turn off the “Working on it…” message of a WhatsApp number in Marketplace › Apps ›
+  WhatsApp. OpenBot then posts only the answer. The server must also be on the new version.
+- On a server with more than one account for a provider, you can turn on **Pool accounts** on the
+  provider page. Agents then use one account until it nears a usage limit, then the account whose
+  limit resets first. **In use** shows the account that agents use now. On an account page, **Leave
+  out of pool** and **Put back in pool** remove the account from the pool or add it again. The server
+  must also be on the new OpenBot version.
+- Disconnect a server's first Gemini account in the server's provider settings. The server must be on
+  the new OpenBot version.
+- When an agent suggests an app, such as Canva or GitHub, the chat shows a card for it. Tap Connect to connect the app, or Skip to fold the card. The card says when only the server owner or an admin can connect the app.
+- Server settings has an Agent personality page, as on desktop. An owner or admin can set the response style of the server's agents to Natural or Classic.
+- On a server with the Natural style, the short updates that an agent writes while it works show as their own messages in agent chats, threads and channels.
+- Open chat files larger than 10 MB on the phone. Tap the file to download it. A video or an audio
+  file then plays in the chat, an image opens in the image viewer, and a document opens in the
+  preview. Files up to 100 MB download; a larger file still opens on the desktop.
+- Settings has a new switch, "Download large files automatically". When it is on, images, videos
+  and audio up to 100 MB download when the chat shows them. It is off, so large files use mobile
+  data only when you tap them.
+- The chat shows a video that an agent makes. The video shows in its frame while the agent makes it,
+  and then plays in the chat player. The server must also be on the new OpenBot version; with an
+  older server, the video shows as a file.
+- An owner or admin can choose who gets each MCP server on the page of that server: the agents that get it, and the access (No access, Can use or Can manage) of Everyone and of each role. The server must also be on the new version.
+- Copy an image from a chat: the image viewer has a Copy button next to Share and Save.
+- Touch and hold a message with files to copy, share or save them. Copy puts an image on the clipboard as a picture and a text file as text. Save puts an image in Photos and another file in a folder that you pick in Files. A message with more than one file opens a menu that names each file, with Share all, Save all to Files and Save images to Photos.
+- You can pin and unpin messages in an agent's chat and in its threads. Touch and hold a message and tap Pin.
+- Pinned messages opens a sheet with the pins of all chats of the agent, with the chat of each pin and who pinned it. Tap a pin to go to its message, or swipe left to unpin it. The server must also be on the OpenBot version that adds pinned messages on desktop.
+- Server settings has a new Agents page, under Timezone. It has Personality, Memories per agent, and the new Memory review, Skill learning and Learn from my browsing settings, as on the desktop. Owners and admins see the new settings when the server runs an OpenBot version that has them.
+- The Everyone page and the page of a role have "Set all", which gives one level to all agents.
+- Chats with unread replies now show first in the chat list, as on the desktop. Choose "Sort chats" in the menu at the top right: "Unread in a group" (the default) puts them in an "Unread" group under "Needs you", "Unread first in folders" puts them first in each folder, and "Manual" keeps your saved order. Each phone keeps its own choice.
+- Restart a server that you host yourself from the phone: as an owner or admin, open Server settings and
+  select Restart. Before, only an OpenBot-hosted server had this row. The server must also be on the new
+  version of OpenBot.
+- You can change the app icon in Settings › Appearance › App icon. Swipe through the logo colors of
+  the desktop app and tap Use this icon. On Android, the icon changes when you leave the app.
+- Settings has a Billing page that shows the plan, the billing period, the next renewal or end date and the price of each cloud server. It shows only where cloud servers are available in the app.
+- Set up two-step codes for the Vault logins of a server from the mobile app. Scan the QR code of the site with the camera, choose a screenshot of it, or paste the setup key, then check the first code on the site before you save. The Vault list shows the live code of each login with a key; tap it to copy the code. The server must be on OpenBot 0.66.0 or later.
+- Settings has an Agents page for an owner or admin of a server, as the Agents tab of the desktop Settings. It shows the defaults for local scripts, new chats, the plan card and steering, which agents have each one on, and the OpenBot co-author line of git commits. You can change a default, the plan start time and the local script limit, and set each agent to follow the default or to its own value. The page also lists the background processes that agents left running on the server, such as dev servers, and you can stop one. The server must also be on the new version.
+- An owner or admin can now edit a custom provider of a server in Server Settings > Providers: its
+  name, base URL, models, API key and headers. Agents on a kept model stay on it. Leave the API key
+  or the value of a saved header empty to keep the saved value. The server must also be on OpenBot
+  0.66.0 or later; on an older server, you can still only remove the provider and add it again.
+- Agent info > Model has a Speed choice in place of the Fast mode switch: Standard, Fast and, for a model that has it, Ultrafast. Claude agents can now use fast mode too: the app asks you to confirm the higher price first. Ultrafast and Claude fast mode need a server on the next OpenBot release; an older server keeps Standard and Fast.
+- Connect Sunra from the Apps marketplace with browser sign-in, so agents can make images, videos,
+  audio and 3D models with your Sunra credits.
+- Connect TryPost from the Apps marketplace with browser sign-in, so agents can list your social media
+  channels, draft, schedule, queue and publish posts, and read analytics.
+- Server settings › Transfer has "Copy to another server" in the mobile app. Choose the server to copy to, select the agents, and copy them in one step, with no file to save and open. The agents keep their workspace files, and their channels and the Shared folder are copied too. API keys, sign-ins, connectors, and chat history are not copied. It shows when you are an owner or admin of two or more online servers. A server does not need a new version.
+- The Library has folders. The folder button at the bottom of the screen shows where you are. Tap it to choose all files, an agent, a folder, or the files of deleted agents. Make, rename and delete folders, and move a file into a folder from its menu. A change on the desktop app, on another phone or by an agent shows at once. The server must run an OpenBot version with Library folders; live changes need this version on the server.
+- Settings > Haptics has a Reply haptics switch. Turn it off to stop the taps while an agent's reply appears, and keep the other haptics.
+- On an iPad or a phone with a hardware keyboard, Return sends the message. Shift+Return adds a new
+  line. The screen keyboard does not change: its Return key still adds a new line.
+- Read and allow long approvals on the phone. The app loads the full request from the server, and a bug report or an idea for the OpenBot team shows its full text in a box that scrolls. Before, the phone showed only the start and offered only Deny. The server must run the newest OpenBot version.
+- OpenBot has two shortcuts in the iPhone Shortcuts app, for iOS 26 and later: List Agents and Send
+  Message. You can also run them from the Action button, Siri or an automation.
+  - List Agents shows your agents. A tap on an agent opens its chat.
+  - Send Message asks for the text and sends it to your agent. The app does not open, and it does
+    not need to be in the background. A card shows the result, and the reply comes as a notification.
+  - **Choose the agent for Send Message in Settings > Shortcuts.**
+  - With the app lock on, a shortcut opens OpenBot and asks for the lock.
+- An owner or admin can add more than one Cursor account to a server in Server settings › Providers ›
+  Cursor. Each account after the first uses a Cursor API key. The server must also be on the new version.
+- Connect Adobe Analytics from the Apps marketplace with browser sign-in, so agents can find report
+  suites, dimensions, metrics and segments, and run reports. Your Adobe administrator must give your
+  account MCP access first.
+- When you change the theme in Settings › Appearance, a soft wash of colors moves across the screen
+  and the new theme comes in after it, as in the desktop app. Reduce Motion and the Animations
+  setting turn it off. It needs the new app version from the store.
+
+### Changed
+
+- The marketplace shows Productivity, Documents and Design first, and Coding near the end.
+- Hidden chats of a server on the new OpenBot version keep working. The Hidden chats screen says so;
+  for an older server it says, as before, that a hidden chat does not run.
+- Main buttons are now white in dark mode and black in light mode, as on desktop. They no longer flash blue when you tap them.
+- Settings › Profile on the mobile app keeps its layout while your activity loads. The values and the
+  year of days then animate into place.
+- While a server is not connected, the drawer and Server Settings keep the rows of its last connection, such as Control computer, Library and Providers, and show them disabled. The rows no longer go away and come back.
+- The top right button of a chat is now a More menu with the browser, the actions that a channel needs, and the pinned messages. The button has an orange dot when a channel needs your action.
+- On Android, some launchers remove the OpenBot icon from the home screen once after this update.
+  Add it again from the app list.
+- If you have a cloud server, the plus button in the server list opens your cloud servers, also where the app does not show plans.
+- A Vault login shows the user name and the password in one card.
+- An agent's question now shows as a message, with its answers as buttons under it, as in the approval cards. "Reply in the chat" and "Skip" are buttons there too.
+- When an Android phone cannot open a store for the update, Update opens the OpenBot download page.
+  Before, it opened the Google Play website.
+- The app reads its feature settings from the account service at most each 10 minutes, not each minute.
+- The app now sends a smaller copy of each photo, up to 2048 pixels on the long side. A photo
+  arrives faster, also on a slow connection. To send the original photo, turn on "Send photos at
+  full quality" in Settings → Conversations.
+- An agent chat or a channel with unread messages now opens at the top of the NEW section, as on desktop. Channels now also show the NEW line.
+- When a server cannot send the full request, the card names the server and tells you to update it or open the chat in the OpenBot desktop app.
+- The button that goes to the latest message now keeps the chat at the end while a reply arrives.
+  Before, the button came back after each new line of the reply. A drag, or a message that you send,
+  stops this.
+
+### Fixed
+
+- The model picker of a second Gemini (or other provider) account now shows the models of that
+  account's plan, such as Gemini 4 Argon on an Ultra plan. Before, it showed only the models of the
+  first account. The server must also be on the new version of OpenBot.
+- Restart server no longer shows for a hosted server that the app cannot restart. Before, the action
+  showed and then failed.
+- Replies in Italian are read aloud with the Italian voice. Before, a reply with "è", "più" or
+  "città" was read with the French voice.
+- Settings rows show their full value again, such as the update status, the timezone and the member count, and the chevron is at the end of the row.
+- On Android, sharing to OpenBot from another app opens a sheet again. In it you choose the server and the agent, add an optional message, and send the shared text, links, images or files from the sheet. The chat then opens. Files that the server does not take, or that are too large, show an error before anything is sent.
+- The page of a role in Server settings › Roles now shows the access that its members really get.
+  Before, an agent showed "No access" even when Everyone gave all members "Can manage". When Everyone
+  gives more, the agent shows that level with "· Everyone", and lower levels are off. "Change in
+  Everyone" in the menu opens Everyone.
+- On a slow or unstable network, a joined server no longer shows "The remote request timed out." and
+  fails to load the open chat while the server still answers. Before, the app stopped waiting for
+  some reads after 15 seconds, also when they only waited behind earlier answers. Now a read fails
+  only when the server sends nothing for 15 seconds, or after one minute.
+- On Android, a text field with a Paste button no longer shows a dark box and a blue ring inside its frame.
+- When an agent wrote a text, such as a draft reply, and then asked you a question about it in the same turn, the chat showed only the question. Now the text shows above the question until you answer it, as on desktop.
+- Usage now shows the third usage bar of a server: the OpenCode Go and Kimi weekly or monthly limit,
+  and the Cursor plan total. Before, the app showed only two bars. The server must also be on the new
+  desktop version.
+- Server › Storage on a hosted server now shows the free space of the plan, not the free space of
+  the whole disk of the machine. The correct value on a virtual server needs the server on the new
+  version.
+- Chats on a server now show the latest messages after you come back to the app. Before, some chats
+  that were not open could keep old messages until you closed and opened the app again.
+- The chat is smoother while a reply arrives, most of all in a long chat. Before, each part of the
+  reply made the app prepare all loaded messages and the message field again.
+- A thread is smoother while its reply arrives. Before, the app drew the thread again for each part
+  of the reply, also when many parts came at one time.
+- A page or diagram card, a video and a card with a long draft keep one height when you scroll back
+  to them. Before, they changed their height and moved the messages near them.
+- A task list or a group of agent messages that you opened or closed stays that way when you scroll
+  away and back. Before, it went back to its first state and moved the messages near it.
+- A long code block shows faster when it comes into view.
+- The chat no longer stops for a moment when a large file ends its download.
+- When the ChatGPT plan limit of a server is used but its account has credits, the agent screen no
+  longer says that the usage limit stops the model. Codex keeps working on the credits.
+
 ## [1.4.9] - 2026-11-12
 
 ### Added

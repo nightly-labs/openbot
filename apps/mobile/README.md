@@ -80,6 +80,10 @@ missing, the command stops with setup instructions. The standard command does no
 look for RocketSim, even if `ROCKETSIM_APP_PATH` or the old `OPENBOT_ROCKETSIM`
 variable is set.
 
+A build for an iPhone signs all targets with the Apple team of `ios.appleTeamId` in `app.json`, so
+Expo does not ask for a team. To build with a different team, change that value on your computer and
+do not commit it: the app config is in the runtime version.
+
 The iOS commands keep the Xcode build in `ios/DerivedData`, not in
 `~/Library/Developer/Xcode/DerivedData`, so removing a worktree removes its build. Do not remove
 `ios/build`: CocoaPods writes codegen output there. When that output is missing, `bun mobile:ios`
