@@ -180,6 +180,9 @@ export function presentChatMessages(
   pending: readonly PendingChatMessage[],
   aliases: ReadonlyMap<string, string>,
 ): ChatMessage[] {
+  // A chat with no message of this phone on its way, and none that keeps a local row, shows the
+  // host rows as they are. This runs on each streamed chunk, so it makes no copy of them then.
+  if (pending.length === 0 && aliases.size === 0) return messages;
   // Events can precede the receipt. Wait for its ID rather than matching by text,
   // which could incorrectly merge another member's identical message.
   const baseline = pending.find((item) => !item.serverId && item.baseline)?.baseline;
@@ -388,27 +391,41 @@ function projectedMarker(
   return item;
 }
 
-/** The order of the last sorted transcript, and the fields that decided it. */
-let lastOrder: { key: string; ids: string[] } | null = null;
+/** The last transcript that was sorted, and the place of each of its messages in the sorted order. */
+let lastOrder: { input: readonly ConversationMessage[]; order: number[] } | null = null;
+
+/** The sort reads only these fields of a message. */
+function sameSortFields(before: ConversationMessage | undefined, after: ConversationMessage): boolean {
+  if (before === after) return true;
+  return (
+    before !== undefined &&
+    before.id === after.id &&
+    before.turnId === after.turnId &&
+    before.createdAt === after.createdAt &&
+    before.author === after.author &&
+    before.itemType === after.itemType &&
+    before.exchange?.direction === after.exchange?.direction
+  );
+}
 
 /**
- * The sort reads only these fields. A streamed chunk changes only text and status, so the order of
- * the previous frame applies and the transcript is not sorted again.
+ * A streamed chunk changes only the text and the status of a message, which the sort does not read.
+ * The order of the transcript before it then applies, and the transcript is not sorted again.
  */
 export function sortedConversationMessages(messages: readonly ConversationMessage[]) {
-  const key = messages
-    .map(
-      (message) =>
-        `${message.id}\u0000${message.turnId ?? ""}\u0000${message.createdAt}\u0000${message.author}\u0000${message.itemType ?? ""}\u0000${message.exchange?.direction ?? ""}`,
-    )
-    .join("\u0001");
-  if (lastOrder?.key === key) {
-    const byId = new Map(messages.map((message) => [message.id, message]));
-    const ordered = lastOrder.ids.flatMap((id) => byId.get(id) ?? []);
-    if (byId.size === messages.length && ordered.length === messages.length) return ordered;
+  const last = lastOrder;
+  if (last && last.input.length === messages.length) {
+    const { input } = last;
+    if (messages.every((message, index) => sameSortFields(input[index], message))) {
+      lastOrder = { input: messages, order: last.order };
+      return last.order.flatMap((index) => messages[index] ?? []);
+    }
   }
   const sorted = sortConversationMessages([...messages]);
-  lastOrder = { key, ids: sorted.map((message) => message.id) };
+  const indices = new Map(messages.map((message, index) => [message, index]));
+  const order = sorted.flatMap((message) => indices.get(message) ?? []);
+  // A message that is in the transcript two times has one index: such a transcript is sorted each time.
+  lastOrder = order.length === messages.length && indices.size === messages.length ? { input: messages, order } : null;
   return sorted;
 }
 
