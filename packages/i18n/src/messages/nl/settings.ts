@@ -221,6 +221,9 @@ export const messages = {
   "settings.notch.xwayland.restart": "Herstarten",
   "settings.notch.idle.title": "Toon inactief eiland",
   "settings.notch.idle.description": "Toon het OpenBot-logo en een begroeting wanneer er geen status actief is.",
+  "settings.notch.animate.title": "Altijd animeren",
+  "settings.notch.animate.description":
+    "Animeer het eiland en het agentdock altijd, niet alleen als de aanwijzer erop staat. Gebruikt meer stroom.",
   "settings.notch.displays.title": "Toon op extra schermen",
   "settings.notch.displays.description": "Toon het Dynamic Island op aangesloten externe schermen.",
   "settings.notch.haptics.title": "Haptische feedback",

@@ -307,6 +307,7 @@ export function AgentDockSurface() {
         <>
           <AgentDock
             seats={seats()}
+            alwaysAnimate={presentation()?.alwaysAnimate === true}
             available={presentation()?.available ?? []}
             availableChannels={availableChannels()}
             chat={chat}

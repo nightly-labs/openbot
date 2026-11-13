@@ -226,6 +226,9 @@ export const messages = {
   "settings.notch.xwayland.restart": "Перезапустить",
   "settings.notch.idle.title": "Показывать панель в режиме ожидания",
   "settings.notch.idle.description": "Показывать логотип OpenBot и приветствие, когда нет активного статуса.",
+  "settings.notch.animate.title": "Всегда анимировать",
+  "settings.notch.animate.description":
+    "Анимировать панель и док агентов всё время, а не только при наведении указателя. Расходует больше энергии.",
   "settings.notch.displays.title": "Показывать на дополнительных дисплеях",
   "settings.notch.displays.description": "Показывать Dynamic Island на подключённых внешних дисплеях.",
   "settings.notch.haptics.title": "Тактильный отклик",

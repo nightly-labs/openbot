@@ -209,6 +209,8 @@ export interface AgentDockShapeRect {
 
 export interface AgentDockProps {
   seats: readonly AgentDockSeat[];
+  /** Animate all the time, not only while the user uses the dock (the Always animate setting). */
+  alwaysAnimate?: boolean | undefined;
   /** The agents that the add menu offers. */
   available: readonly ComposerAgent[];
   /** The channels that the add menu offers. */
@@ -376,7 +378,7 @@ export function AgentDock(props: AgentDockProps) {
   /** The pointer is on a part of the dock that takes it. The stage itself lets the pointer through. */
   const [pointerOn, setPointerOn] = createSignal(false);
   // The dock stays above the other apps. A working agent moves on it only while the user uses the dock.
-  const ambientMotion = () => pointerOn() || dragging() || state.open !== null;
+  const ambientMotion = () => props.alwaysAnimate === true || pointerOn() || dragging() || state.open !== null;
   const seatMotion = new Map<string, { y: Spring; scale: Spring }>();
 
   function seatSprings(id: string, y = PANEL_HEIGHT / 2) {

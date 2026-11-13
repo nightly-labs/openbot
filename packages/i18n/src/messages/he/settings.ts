@@ -214,6 +214,8 @@ export const messages = {
   "settings.notch.xwayland.restart": "הפעלה מחדש",
   "settings.notch.idle.title": "הצגת האי במצב סרק",
   "settings.notch.idle.description": "הצגת הלוגו של OpenBot וברכה כשאין סטטוס פעיל.",
+  "settings.notch.animate.title": "הנפשה תמידית",
+  "settings.notch.animate.description": "הנפשת האי ומעגן הסוכנים כל הזמן, לא רק כשהסמן נמצא עליהם. צורך יותר חשמל.",
   "settings.notch.displays.title": "הצגה בתצוגות נוספות",
   "settings.notch.displays.description": "הצגת Dynamic Island בתצוגות חיצוניות מחוברות.",
   "settings.notch.haptics.title": "משוב haptic",

@@ -303,6 +303,7 @@ export function DynamicIslandSurface() {
             variant={variant}
             notchSize={displayMode === "notch" ? notchSize() : undefined}
             widthPercent={preference().widthPercent}
+            alwaysAnimate={preference().alwaysAnimate === true}
             heightPercent={preference().heightPercent}
             extendedHoverArea
             inlineReply

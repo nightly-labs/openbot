@@ -224,6 +224,9 @@ export const messages = defineMessages("settings", {
   "settings.notch.xwayland.restart": "Restart",
   "settings.notch.idle.title": "Show idle island",
   "settings.notch.idle.description": "Show the OpenBot logo and greeting when no status is active.",
+  "settings.notch.animate.title": "Always animate",
+  "settings.notch.animate.description":
+    "Animate the island and the agent dock all the time, not only while the pointer is on them. Uses more power.",
   "settings.notch.displays.title": "Show on additional displays",
   "settings.notch.displays.description": "Show Dynamic Island on connected external displays.",
   "settings.notch.haptics.title": "Haptic feedback",
