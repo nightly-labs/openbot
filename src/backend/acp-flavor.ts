@@ -357,6 +357,17 @@ function hermesTurnFailure(error: unknown, detail: string): string {
 }
 
 /**
+ * Hermes Agent 0.23 runs ACP through its gateway. A prompt, load or resume of a session that the
+ * process does not hold fails with an internal error and only `not_found` in `data.details`, not with
+ * ACP's `-32002`, so each message to that agent failed (#8078). A refused prompt only makes the next
+ * message load the session again, and a session that the gateway still stores keeps its history.
+ * Only a refused load replaces the session. Other codes and details keep it.
+ */
+function hermesSessionNotFound(error: RequestError): boolean | null {
+  return error.code === -32603 && isRecord(error.data) && error.data.details === "not_found" ? true : null;
+}
+
+/**
  * Hermes Agent 0.21.5 answers a `session/resume` of a missing session with a new session, and the
  * reply does not give its id: each later prompt to the saved id then ends as "refusal". Its
  * `session/load` of a missing session answers null, which the SDK gives as an empty reply. A load of
@@ -364,6 +375,7 @@ function hermesTurnFailure(error: unknown, detail: string): string {
  */
 export const HERMES_ACP_FLAVOR: AcpFlavor = {
   loadInsteadOfResume: { missing: (response) => response.modes == null },
+  sessionNotFound: hermesSessionNotFound,
   lostTurns: HERMES_LOST_TURNS,
   // Hermes Agent 0.23.0 streams the answer, and then sends all of it again when a plugin rewrote it
   // (`transform_llm_output`). The rewrite has the streamed message's ID, so the answer showed two
@@ -489,10 +501,16 @@ const CUSTOM_ACP_FLAVOR: AcpFlavor = {
 
 const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
   omp: OMP_ACP_FLAVOR,
-  // Hermes Agent added as a custom agent (`hermes acp`) keeps the custom rules. Its lost turns are
-  // discarded, its answer sent again replaces the streamed one, and its failed turn is explained, as
-  // for the Hermes provider.
-  hermes: { ...CUSTOM_ACP_FLAVOR, lostTurns: HERMES_LOST_TURNS, resendsAnswer: true, turnFailure: hermesTurnFailure },
+  // Hermes Agent added as a custom agent (`hermes acp`) keeps the custom rules. Its missing session
+  // is found, its lost turns are discarded, its answer sent again replaces the streamed one, and its
+  // failed turn is explained, as for the Hermes provider.
+  hermes: {
+    ...CUSTOM_ACP_FLAVOR,
+    sessionNotFound: (error, sessionId) => hermesSessionNotFound(error) ?? ompSessionNotFound(error, sessionId),
+    lostTurns: HERMES_LOST_TURNS,
+    resendsAnswer: true,
+    turnFailure: hermesTurnFailure,
+  },
 };
 
 /**
