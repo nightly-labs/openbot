@@ -10,6 +10,9 @@
 //   5. A teammate update that wants no answer can end empty: it completes with no error.
 //   6. In a thread, an empty lead turn of a teammate result runs once more too, and its answer ends
 //      the thread's turn (#8503). A second empty run shows the error in the thread.
+//   7. In a WhatsApp conversation, an empty orchestrator turn of a teammate result runs once more too,
+//      and the conversation gets the answer with no "Stopped." end before it (#8573). A second empty
+//      run ends the conversation's request as failed.
 // `bun run test:codex-empty-lead-turn`. Writes .openbot-build/codex-empty-lead-turn-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -121,7 +124,7 @@ const decide = (text, model) => {
   if (result) {
     const mode = result[1];
     const run = nextRun(mode);
-    const empty = mode === "empty-always" || mode === "thread-empty-always" || ((mode === "empty-once" || mode === "thread-empty-once") && run === 1) || (mode === "empty-on-primary" && model === PRIMARY);
+    const empty = mode === "empty-always" || mode === "thread-empty-always" || mode === "chat-empty-always" || ((mode === "empty-once" || mode === "thread-empty-once" || mode === "chat-empty-once") && run === 1) || (mode === "empty-on-primary" && model === PRIMARY);
     return { kind: "result", mode, calls: [], empty, reply: "Team done." };
   }
   const named = /<<CALLS([\\s\\S]*?)CALLS>>/.exec(text);
@@ -369,6 +372,56 @@ async function askTeammateInThread(leadId: string, teammateId: string, mode: str
   return { turns: turns(), outcome: ended.outcome, error: ended.error, answer, errors: errorsFor(leadId, since) };
 }
 
+/**
+ * A WhatsApp message asks the orchestrator, which asks one teammate. Returns when the conversation's
+ * request for the teammate's result ended, with each end that the conversation was told of.
+ */
+async function askTeammateFromWhatsApp(leadId: string, teammateId: string, mode: string) {
+  const since = events.length;
+  const ends: { status: string; followUp: boolean; answer: string | null }[] = [];
+  const stopListening = agents.messaging.onActivity((activity) => {
+    if (activity.type === "finished" && activity.link.platformChannelId === `${mode}@s.whatsapp.net`)
+      ends.push({ status: activity.status, followUp: activity.followUp, answer: activity.answer });
+  });
+  try {
+    const connection = agents.messaging.store.ensureConnection("whatsapp", "48100000000", "Phone");
+    agents.messaging.store.updateConnection(connection.connectionId, { enabled: true });
+    const received = await runCauseEffect(
+      agents.messaging.receive({
+        connectionId: connection.connectionId,
+        agentId: leadId,
+        platformChannelId: `${mode}@s.whatsapp.net`,
+        threadKey: mode,
+        isDirect: true,
+        title: "Client",
+        text: `Ask the team. ${calls({
+          tool: "send_message",
+          arguments: { recipientAgentIds: [teammateId], text: `TEAM-QUESTION mode:${mode}`, expectsReply: true },
+        })}`,
+        sourcePaths: [],
+        origin: { authorId: "48200000000", authorName: "Client", platformMessageId: `${mode}-message` },
+        idempotencyKey: `whatsapp:${mode}`,
+      }),
+    );
+    assert.equal(received.status, "queued");
+    const linkId = received.status === "queued" ? received.link.linkId : "";
+    await waitFor(`the conversation's ${mode} result request to end`, () =>
+      ends.some((end) => end.followUp && end.status !== "interrupted"),
+    );
+    await waitFor(
+      "the conversation's requests to settle",
+      () => mailbox.unresolvedMessagingDeliveries(linkId).length === 0,
+    );
+    return {
+      turns: fakeTurns().filter((turn) => turn.kind === "result" && turn.mode === mode),
+      ends,
+      errors: errorsFor(leadId, since),
+    };
+  } finally {
+    stopListening();
+  }
+}
+
 async function lastAnswer(agentId: string): Promise<string | undefined> {
   const snapshot = await runCauseEffect(agents.readConversation(agentId));
   return snapshot.messages.findLast((message) => message.author === "assistant" && message.itemType !== "commentary")
@@ -503,6 +556,36 @@ try {
     assert.equal(outcome.turns.length, 2, `The result runs again only once: ${JSON.stringify(outcome)}`);
     assert.equal(outcome.outcome, "failed");
     assert.equal(outcome.error, NO_ANSWER);
+    return outcome;
+  });
+
+  await check("in a WhatsApp conversation, an empty turn after a teammate result runs once more", async () => {
+    const outcome = await askTeammateFromWhatsApp(lead.id, alpha.id, "chat-empty-once");
+    assert.deepEqual(
+      outcome.turns.map((turn) => [turn.model, turn.empty]),
+      [
+        [PRIMARY, true],
+        [PRIMARY, false],
+      ],
+      JSON.stringify(outcome),
+    );
+    assert.deepEqual(
+      outcome.ends.filter((end) => end.followUp),
+      [{ status: "completed", followUp: true, answer: "Team done." }],
+      "The conversation gets the answer, and no end of the empty run.",
+    );
+    assert.deepEqual(outcome.errors, []);
+    return outcome;
+  });
+
+  await check("in a WhatsApp conversation, a second empty run of the same result fails the request", async () => {
+    const outcome = await askTeammateFromWhatsApp(lead.id, alpha.id, "chat-empty-always");
+    assert.equal(outcome.turns.length, 2, `The result runs again only once: ${JSON.stringify(outcome)}`);
+    assert.deepEqual(
+      outcome.ends.filter((end) => end.followUp),
+      [{ status: "failed", followUp: true, answer: null }],
+    );
+    assert.deepEqual(outcome.errors, [NO_ANSWER]);
     return outcome;
   });
 
