@@ -313,6 +313,8 @@ export const messages = defineMessages("error.provider", {
     "The model did not accept this chat because the chat has too many images. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.opencodeSessionRejected":
     "OpenCode refused the request and did not give the cause. This can occur in a long chat or after a model change. OpenBot started a new OpenCode session with the chat history. Try again. If the error continues, select a different model or a lower effort.",
+  "error.provider.opencodeCompactionFailed":
+    "The model could not summarize this long chat to make room in its context window. OpenBot started a new OpenCode session with the chat history. Try again. If the error continues, select a stronger model.",
   "error.provider.museMcpStartupFault":
     "Muse could not start an MCP server and blocked MCP in this session. OpenBot started a new Muse session with the chat history. Try again. If the error continues, turn off Computer Use or the failed MCP server for this agent.",
   "error.provider.claudeSessionMissing":

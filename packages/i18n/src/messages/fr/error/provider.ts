@@ -344,6 +344,8 @@ export const messages = {
     "Le modèle n'a pas accepté ce chat, car il contient trop d'images. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez.",
   "error.provider.opencodeSessionRejected":
     "OpenCode a refusé la requête sans en donner la cause. Cela peut arriver dans une longue conversation ou après un changement de modèle. OpenBot a démarré une nouvelle session OpenCode avec l’historique de la conversation. Réessayez. Si l’erreur continue, choisissez un autre modèle ou un effort plus faible.",
+  "error.provider.opencodeCompactionFailed":
+    "Le modèle n’a pas pu résumer cette longue conversation pour libérer de la place dans sa fenêtre de contexte. OpenBot a démarré une nouvelle session OpenCode avec l’historique. Réessayez. Si l’erreur continue, choisissez un modèle plus puissant.",
   "error.provider.museMcpStartupFault":
     "Muse n’a pas pu démarrer un serveur MCP et a bloqué MCP dans cette session. OpenBot a démarré une nouvelle session Muse avec l’historique de la conversation. Réessayez. Si l’erreur persiste, désactivez Computer Use ou le serveur MCP en échec pour cet agent.",
   "error.provider.claudeSessionMissing":
