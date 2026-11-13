@@ -329,6 +329,11 @@ When the desktop app closes by itself, look in the `logs` folder of its user dat
 - `trace.ndjson` has an `exit` line with the same reason, and a `crash` line for each renderer or
   helper process that stopped.
 
+When OpenBot or a server freezes again and again, `stall-profiles.ndjson` in the same folder has a line
+for a minute in which the main process stopped for 2 seconds or more, twice in a row. The line names
+the OpenBot functions that used the time (`top`) and their callers (`stack`). It holds no paths and
+none of your data, so you can attach it to a report.
+
 A dump in the `Crashpad` folder next to `logs` means a process crashed. Tell us that a dump exists,
 but do not attach it publicly: it can hold secrets. When neither file has a reason and there is no
 dump, something outside OpenBot stopped it.

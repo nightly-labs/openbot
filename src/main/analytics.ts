@@ -37,7 +37,9 @@ import type { WorkflowRunEnd } from "../backend/workflows/workflows";
 import { type AnalyticsOperationFailure, analyticsIO, analyticsSync } from "./analytics-effects";
 import { PROVIDER_AUTH_KINDS, type ProviderAuthKind } from "./analytics-provider-auth";
 import type { WebhookDeliveryReport } from "./host-events-service";
+import { isProfileFrame, isProfileStack } from "./main-loop-profile";
 import { REMOTE_CONNECT_PHASES, type RemoteConnectPhase, type RemoteConnectSummary } from "./remote-connect-trace";
+import type { MainLoopStallProfile } from "./resource-monitor";
 import { localDay, RESOURCE_ENUMS, RESOURCE_PROPERTY_NAMES, type ResourceProperties } from "./resource-summary";
 import { UNCLEAN_EXIT_ENUMS, type UncleanExitProperties } from "./run-marker";
 import { SERVICE_STEP_PROPERTY_NAMES, SERVICE_STEPS, START_KINDS, type StartupProperties } from "./startup-timing";
@@ -217,6 +219,7 @@ type HostEventName =
   | "system_resources"
   | "system_startup"
   | "system_unclean_exit"
+  | "system_main_loop_profile"
   | "system_remote_connect"
   | "hosted_site_action";
 /**
@@ -313,6 +316,24 @@ export interface AnalyticsInventoryDayStore {
 }
 
 const AGENT_PROPERTY_NAMES = ["provider", "model", "reasoning_effort", "agent_source", "agent_listing"] as const;
+
+type ProfileTopIndex = 1 | 2 | 3 | 4 | 5;
+type ProfileTopPropertyName = `top_${ProfileTopIndex}_${"frame" | "self_pct" | "stack"}`;
+const PROFILE_TOP_INDEXES = [1, 2, 3, 4, 5] as const satisfies readonly ProfileTopIndex[];
+const MAIN_LOOP_PROFILE_PROPERTY_NAMES = [
+  "stall_ms",
+  "phase",
+  "turn_active",
+  "host_kind",
+  "profiled_ms",
+  "busy_pct",
+  ...PROFILE_TOP_INDEXES.flatMap((index): ProfileTopPropertyName[] => [
+    `top_${index}_frame`,
+    `top_${index}_self_pct`,
+    `top_${index}_stack`,
+  ]),
+] as const;
+const MAX_PROFILE_MS = 60 * 60_000;
 
 const HOST_ALLOWLIST = {
   system_turn_started: [...AGENT_PROPERTY_NAMES, "origin"],
@@ -413,6 +434,7 @@ const HOST_ALLOWLIST = {
     "os_restarted",
     "host_kind",
   ],
+  system_main_loop_profile: MAIN_LOOP_PROFILE_PROPERTY_NAMES,
   system_remote_connect: [
     "outcome",
     "connection",
@@ -681,6 +703,30 @@ export class HostAnalytics {
   handleStartup(properties: StartupProperties): void {
     if (this.#closed) return;
     this.#track("system_startup", properties);
+  }
+
+  /**
+   * One profiled minute in which the main loop stalled: the functions that used the time. The monitor
+   * limits how often it makes one. The sanitizer checks each frame's shape again.
+   */
+  handleMainLoopProfile(profile: MainLoopStallProfile): void {
+    if (this.#closed) return;
+    const properties: HostProperties = {
+      stall_ms: Math.min(profile.stallMs, MAX_PROFILE_MS),
+      phase: profile.phase,
+      turn_active: profile.turnActive,
+      host_kind: profile.hostKind,
+      profiled_ms: Math.min(profile.profiledMs, MAX_PROFILE_MS),
+      busy_pct: profile.busyPct,
+    };
+    for (const index of PROFILE_TOP_INDEXES) {
+      const entry = profile.top[index - 1];
+      if (!entry) break;
+      properties[`top_${index}_frame`] = entry.frame;
+      properties[`top_${index}_self_pct`] = entry.selfPct;
+      properties[`top_${index}_stack`] = entry.stack;
+    }
+    this.#track("system_main_loop_profile", properties);
   }
 
   /** One connection to a remote host: phase times and counts, never the host. */
@@ -1365,6 +1411,15 @@ function sanitizeHostProperty(name: HostEventName, key: string, value: unknown):
       return isBoolean(value) ? value : undefined;
     }
     return boundedCount(value, 10_000_000);
+  }
+  if (name === "system_main_loop_profile") {
+    if (key === "phase") return isOneOf(RESOURCE_ENUMS.main_loop_delay_max_phase, value) ? value : undefined;
+    if (key === "host_kind") return isOneOf(RESOURCE_ENUMS.host_kind, value) ? value : undefined;
+    if (key === "turn_active") return isBoolean(value) ? value : undefined;
+    if (key === "stall_ms" || key === "profiled_ms") return boundedCount(value, MAX_PROFILE_MS);
+    if (key.endsWith("_frame")) return isProfileFrame(value) ? value : undefined;
+    if (key.endsWith("_stack")) return isProfileStack(value) ? value : undefined;
+    return isNumber(value) && value >= 0 && value <= 100 ? value : undefined;
   }
   if (name === "system_unclean_exit") {
     if (key === "phase" || key === "uptime_class" || key === "host_kind") {
