@@ -1083,6 +1083,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               }),
             );
           }),
+        onAccountModelsListed: (provider, accountId) =>
+          this.#endpoints.moveAccountAgentsOffUnlistedModels(provider, accountId),
         onProviderResumed: (provider) => {
           for (const agent of this.#store.list()) {
             if (providerForAgent(agent) === provider) this.#drain.scheduleDrain(agent.id);

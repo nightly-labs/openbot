@@ -351,6 +351,8 @@ export interface ProviderHooks {
    * they were at `configRevision`, which is what `captureConfigRevision` answered when it spawned.
    */
   onProviderActivated(provider: AgentProvider, configRevision: number): Effect.Effect<void, ProviderOperationFailed>;
+  /** Runs after an account after the first listed its models, which `accountModels` now answers. */
+  onAccountModelsListed?(provider: AgentProvider, accountId: string): Effect.Effect<void>;
   /**
    * The configuration a process spawning now reads. A CLI reads the endpoint files once, at spawn,
    * so a change made while it starts is not in the process that arrives.
@@ -716,6 +718,12 @@ export class ProviderRuntime implements ProviderPort {
               Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })),
             ),
           changed: () => this.#setStatus({}),
+          // Forked: the hook can move agents, and the check that listed the models must not wait for that.
+          modelsListed: (provider, accountId) =>
+            (this.#hooks.onAccountModelsListed?.(provider, accountId) ?? Effect.void).pipe(
+              Effect.forkIn(this.#scope),
+              Effect.asVoid,
+            ),
           usageChanged: (limit) => this.#emit({ type: "usage-changed", usage: { limits: [structuredClone(limit)] } }),
           redact: (text) => this.#redactMcp(redactText(text)),
         })
@@ -2086,6 +2094,12 @@ export class ProviderRuntime implements ProviderPort {
     // A turned-off provider offers no model, as `listModels` does.
     if (this.#off.has(provider)) return [];
     return this.#providerAccounts?.models(provider, accountId) ?? [];
+  }
+
+  /** As `accountModels`, but null while an account after the first has not listed its models yet. */
+  listedAccountModels(provider: AgentProvider, accountId: string | undefined): AgentModelOption[] | null {
+    if (this.#off.has(provider)) return [];
+    return this.#providerAccounts?.listedModels(provider, accountId) ?? [];
   }
 
   /** True when `accountId` names an account after the first that this computer holds. */
