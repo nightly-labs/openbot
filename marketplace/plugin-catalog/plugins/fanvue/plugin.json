@@ -1,0 +1,33 @@
+{
+  "slug": "fanvue",
+  "name": "Fanvue",
+  "tagline": "Creator account insights",
+  "description": "Fanvue lets agents read earnings, subscribers, messages, and posts in the signed-in Fanvue creator account. Each user signs in to their own Fanvue account through the browser.",
+  "category": "other",
+  "creatorName": "Fanvue",
+  "iconUrl": "https://www.fanvue.com/media/home/apple-touch-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-earnings", "text": "How did my earnings this month compare with last month?" },
+    { "id": "prompt-unread", "text": "Which subscriber messages are still waiting for a reply?" },
+    { "id": "prompt-draft-post", "text": "Draft a caption for a post that announces my new weekly schedule." }
+  ],
+  "apps": [
+    {
+      "id": "app-fanvue-mcp",
+      "name": "Fanvue",
+      "description": "Earnings, subscriber, message, and post access, over Fanvue's MCP server with browser sign-in.",
+      "iconUrl": "https://www.fanvue.com/media/home/apple-touch-icon.png",
+      "server": {
+        "name": "fanvue",
+        "transport": "http",
+        "url": "https://mcp.fanvue.com/mcp",
+        "auth": [{ "id": "fanvue-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.fanvue.com",
+  "privacyPolicyUrl": "https://legal.fanvue.com/privacy-policy",
+  "termsUrl": "https://legal.fanvue.com/terms-conditions"
+}

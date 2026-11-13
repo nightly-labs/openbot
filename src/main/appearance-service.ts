@@ -4,6 +4,7 @@ import {
   DEFAULT_APP_APPEARANCE,
   DEFAULT_TRANSPARENT_WINDOW,
   isAppAppearance,
+  isAppFontFamily,
   isAppThemePaletteId,
   isChatBackgroundColor,
   type SetAppAppearancePreferenceInput,
@@ -18,7 +19,13 @@ import { readThemePalettes, watchThemePalettes } from "./theme-palette-files";
 /** What the file holds. The palettes are not saved: they are read from their own files. */
 type StoredAppearancePreference = Pick<
   AppAppearancePreference,
-  "appearance" | "transparentWindow" | "palette" | "chatBackgroundLight" | "chatBackgroundDark"
+  | "appearance"
+  | "transparentWindow"
+  | "palette"
+  | "chatBackgroundLight"
+  | "chatBackgroundDark"
+  | "interfaceFont"
+  | "codeFont"
 > & {
   /**
    * False until the user picks a theme in Settings: a light, dark or system choice, or a palette.
@@ -36,6 +43,8 @@ const DEFAULT_PREFERENCE: StoredAppearancePreference = {
   palette: null,
   chatBackgroundLight: null,
   chatBackgroundDark: null,
+  interfaceFont: null,
+  codeFont: null,
   themeChosen: false,
 };
 
@@ -45,7 +54,9 @@ const DEFAULT_PREFERENCE: StoredAppearancePreference = {
  * from starting, and must not let a palette replace it. A file with no `transparentWindow` reads as
  * an opaque window. A file with no `palette`, which every file before palettes is, reads as no
  * palette, and one with no `themeChosen` as a chosen theme: the user saved it. A file with no chat
- * background, or with a value that is not a color, reads as the color of the theme.
+ * background, or with a value that is not a color, reads as the color of the theme. A file with no
+ * font, which every file before the font choice is, or with a name that cannot go into a CSS font
+ * list, reads as the default font.
  */
 const readAppearancePreference = Effect.fn("AppearancePreference.read")(function* (path: string) {
   const read = yield* Effect.result(
@@ -58,6 +69,8 @@ const readAppearancePreference = Effect.fn("AppearancePreference.read")(function
         palette: isAppThemePaletteId(parsed.palette) ? parsed.palette : null,
         chatBackgroundLight: isChatBackgroundColor(parsed.chatBackgroundLight) ? parsed.chatBackgroundLight : null,
         chatBackgroundDark: isChatBackgroundColor(parsed.chatBackgroundDark) ? parsed.chatBackgroundDark : null,
+        interfaceFont: isAppFontFamily(parsed.interfaceFont) ? parsed.interfaceFont : null,
+        codeFont: isAppFontFamily(parsed.codeFont) ? parsed.codeFont : null,
         themeChosen: parsed.themeChosen !== false,
       };
     }),
@@ -120,6 +133,8 @@ export class AppearanceService {
       palettes: this.#palettes.map((item) => ({ ...item, colors: { ...item.colors } })),
       chatBackgroundLight: this.#preference.chatBackgroundLight,
       chatBackgroundDark: this.#preference.chatBackgroundDark,
+      interfaceFont: this.#preference.interfaceFont,
+      codeFont: this.#preference.codeFont,
     };
   }
 

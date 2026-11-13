@@ -4,8 +4,16 @@ import type { messages as source } from "../../en/error/agent";
 export const messages = {
   "error.agent.historyUnavailable":
     "De geschiedenis is niet beschikbaar voor dit verzoek. Lees de recente geschiedenis opnieuw, of gebruik channel_history voor werk in een kanaal.",
+  "error.agent.historyArgumentsInvalid":
+    "Onjuiste geschiedenisargumenten: {detail} Corrigeer de argumenten en probeer het opnieuw. openbot.tool_describe geeft het schema.",
   "error.agent.toolRequestInvalid":
     "Ongeldige argumenten voor het zoeken naar tools. Gebruik het opgegeven schema en een oorspronkelijke, volledige toolnaam.",
+  "error.agent.toolCallArgumentsNotObject":
+    "De tool is niet uitgevoerd. In tool_call moet arguments een JSON-object zijn, geen tekst. Stuur de aanroep opnieuw met arguments als object.",
+  "error.agent.toolCallDiscoveryTool":
+    "De tool is niet uitgevoerd. tool_call kan openbot.tool_search en openbot.tool_describe niet uitvoeren. Roep ze direct aan met dezelfde argumenten.",
+  "error.agent.routineScheduleArgumentsInvalid":
+    "De planning van de routine is ongeldig: {detail} Corrigeer de planning en probeer het opnieuw. openbot.tool_describe geeft het schema.",
   "error.agent.approvalWhileDeleting": "Je kunt geen toestemming geven terwijl de agent wordt verwijderd.",
   "error.agent.accessLocalOnly": "Toegang van de agent kun je alleen wijzigen op de computer waarop de agent draait.",
   "error.agent.duplicateCleanupFailed":
@@ -51,6 +59,8 @@ export const messages = {
     "Er is nu geen model van {provider} beschikbaar. Roep list_models aan om de beschikbare modellen te zien.",
   "error.agent.reasoningEffortUnsupported":
     "Model “{model}” ondersteunt redeneerniveau “{effort}” niet. Ondersteunde niveaus: {efforts}.",
+  "error.agent.reasoningEffortNotConfigurable":
+    "Model “{model}” heeft geen instelling voor het redeneerniveau, dus je kunt het niveau niet wijzigen.",
   "error.agent.noStartingModelInSettings":
     "{provider} heeft geen model beschikbaar, en geen andere aanbieder waarbij je bent ingelogd heeft er een. Log in bij een aanbieder, of wijzig de standaardaanbieder in Serverinstellingen → Aanbieders.",
   "error.agent.noStartingModel":
@@ -153,6 +163,8 @@ export const messages = {
   "error.agent.mcpServerNotSaved": "De MCP-server reageerde niet, dus is hij niet opgeslagen. {error}",
   "error.agent.mcpServerKeysMove":
     "De MCP-server {name} bewaart sleutels voor de huidige server. Vraag de gebruiker om het adres, de opdracht, de argumenten of het transport te wijzigen in Serverinstellingen, MCP.",
+  "error.agent.mcpServerBuiltIn":
+    "{name} is een onderdeel van OpenBot, dus de MCP-tools kunnen deze niet testen, aan- of uitzetten of verwijderen. De gebruiker beheert deze op de computer waarop OpenBot draait: de GitHub-koppeling in Marktplaats, Apps, GitHub, en PC-besturing in Instellingen, PC-besturing.",
   "error.agent.mcpServerUnknown": "Er is geen MCP-server met de naam {name}. Roep list_mcp_servers aan voor de namen.",
   "error.agent.screenCaptureWindowMissing":
     "Dat venster is nu niet open. Roep list_capture_sources aan voor de huidige venster-id’s.",

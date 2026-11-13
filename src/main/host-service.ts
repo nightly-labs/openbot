@@ -60,7 +60,11 @@ import type { TeamChatStore } from "../backend/team-chat-store";
 import type { AgentAccessStore } from "./agent-access-store";
 import { type AgentNotificationLevelStore, OWNER_NOTIFICATION_KEY } from "./agent-notification-level-store";
 import { BrowserViewGateway } from "./browser-view-gateway";
-import type { RemoteHostTicketHome, VerifiedRemoteSessionTicket } from "./central-auth-manager";
+import {
+  isFinalClientError,
+  type RemoteHostTicketHome,
+  type VerifiedRemoteSessionTicket,
+} from "./central-auth-manager";
 import { LiveActivityPushService, LiveActivitySendFailure } from "./live-activity-push";
 import type { PushNotificationStore } from "./push-notification-store";
 import {
@@ -121,6 +125,7 @@ interface HostServiceOptions {
   channels?: ChannelService;
   mcpServers?: ForwardedApiOptions["mcpServers"];
   mcpServerOwners?: ForwardedApiOptions["mcpServerOwners"];
+  mcpAccess?: ForwardedApiOptions["mcpAccess"];
   mcpSignIns?: ForwardedApiOptions["mcpSignIns"];
   signInRelay?: ForwardedApiOptions["signInRelay"];
   connectors?: ForwardedApiOptions["connectors"];
@@ -134,11 +139,14 @@ interface HostServiceOptions {
   providerSignOut?: ForwardedApiOptions["providerSignOut"];
   mcpToolRuntimePreparation?: ForwardedApiOptions["mcpToolRuntimePreparation"];
   storage?: ForwardedApiOptions["storage"];
+  libraryFolders?: ForwardedApiOptions["libraryFolders"];
   machine?: ForwardedApiOptions["machine"];
+  backgroundProcesses?: ForwardedApiOptions["backgroundProcesses"];
   liveVoice?: ForwardedApiOptions["liveVoice"];
   hostedSites?: ForwardedApiOptions["hostedSites"];
   events?: ForwardedApiOptions["events"];
   agentImport?: ForwardedApiOptions["agentImport"];
+  hermesImport?: ForwardedApiOptions["hermesImport"];
   instanceTransfer?: ForwardedApiOptions["instanceTransfer"];
   routineFlows?: ForwardedApiOptions["routineFlows"];
   workflows?: ForwardedApiOptions["workflows"];
@@ -423,6 +431,8 @@ export class HostService extends EventEmitter<HostEvents> {
             const member = options.store.getMember(memberId);
             return member !== null && !member.disabled;
           },
+          sideThreadOfTurn: (agentId, turnId) =>
+            options.agentTasks?.listTasks(agentId).tasks.find((task) => task.activeTurnId === turnId)?.threadId ?? null,
           logger,
         })
       : undefined;
@@ -479,6 +489,7 @@ export class HostService extends EventEmitter<HostEvents> {
       ...(options.channels === undefined ? {} : { channels: options.channels }),
       ...(options.mcpServers === undefined ? {} : { mcpServers: options.mcpServers }),
       ...(options.mcpServerOwners === undefined ? {} : { mcpServerOwners: options.mcpServerOwners }),
+      ...(options.mcpAccess === undefined ? {} : { mcpAccess: options.mcpAccess }),
       ...(options.mcpSignIns === undefined ? {} : { mcpSignIns: options.mcpSignIns }),
       ...(options.signInRelay === undefined ? {} : { signInRelay: options.signInRelay }),
       ...(options.connectors === undefined ? {} : { connectors: options.connectors }),
@@ -494,11 +505,14 @@ export class HostService extends EventEmitter<HostEvents> {
         ? {}
         : { mcpToolRuntimePreparation: options.mcpToolRuntimePreparation }),
       ...(options.storage === undefined ? {} : { storage: options.storage }),
+      ...(options.libraryFolders === undefined ? {} : { libraryFolders: options.libraryFolders }),
       ...(options.machine === undefined ? {} : { machine: options.machine }),
+      ...(options.backgroundProcesses === undefined ? {} : { backgroundProcesses: options.backgroundProcesses }),
       ...(options.liveVoice === undefined ? {} : { liveVoice: options.liveVoice }),
       ...(options.hostedSites === undefined ? {} : { hostedSites: options.hostedSites }),
       ...(options.events === undefined ? {} : { events: options.events }),
       ...(options.agentImport === undefined ? {} : { agentImport: options.agentImport }),
+      ...(options.hermesImport === undefined ? {} : { hermesImport: options.hermesImport }),
       ...(options.instanceTransfer === undefined ? {} : { instanceTransfer: options.instanceTransfer }),
       ...(options.routineFlows === undefined ? {} : { routineFlows: options.routineFlows }),
       ...(options.workflows === undefined ? {} : { workflows: options.workflows }),
@@ -567,6 +581,7 @@ export class HostService extends EventEmitter<HostEvents> {
                 });
               return yield* issueTicket(hostId, failedSignalUrl === undefined ? {} : { failedSignalUrl });
             }),
+          renewalRefused: isFinalClientError,
           onSignalRecoveryFailure: (error, reason) => {
             logger.warn(`Host phase ${this.#status.phase} -> error: Signal ${reason}.`);
             this.#setStatus({
@@ -877,8 +892,16 @@ export class HostService extends EventEmitter<HostEvents> {
     return identity ? { hostId: identity.serverId, fingerprint: identity.fingerprint } : null;
   }
 
+  /**
+   * `background` is a configuration with no user action (`register`): a failed registration then
+   * fails the call and leaves the status as it is, so the user sees no error for it.
+   */
   readonly configure = Effect.fn("HostService.configure")(
-    function* (this: HostService, input: ConfigureHostInput): Effect.fn.Return<HostStatus, RemoteWorkflowError> {
+    function* (
+      this: HostService,
+      input: ConfigureHostInput,
+      background = false,
+    ): Effect.fn.Return<HostStatus, RemoteWorkflowError> {
       const optionalRegisterRemoteHost = this.#options.registerRemoteHost;
       const optionalUpdateRemoteHostLogo = this.#options.updateRemoteHostLogo;
       const account = yield* remoteDecode(() => this.#options.getSignedInUser());
@@ -914,7 +937,8 @@ export class HostService extends EventEmitter<HostEvents> {
       const ownerMembershipId = yield* remoteDecode(() => this.#requiredOwnerMemberId());
       const attempt0 = yield* Effect.gen({ self: this }, function* () {
         if (!this.#isActiveHost(identity.serverId)) return this.getStatus();
-        if (optionalRegisterRemoteHost) yield* this.#registerRemoteHost(optionalRegisterRemoteHost, ownerMembershipId);
+        if (optionalRegisterRemoteHost)
+          yield* this.#registerRemoteHost(optionalRegisterRemoteHost, ownerMembershipId, background);
         if (input.logo !== undefined && this.#isActiveHost(identity.serverId)) {
           yield* optionalUpdateRemoteHostLogo?.(identity.serverId, input.logo ?? null, identity.logoVersion) ??
             Effect.succeed(undefined);
@@ -925,6 +949,7 @@ export class HostService extends EventEmitter<HostEvents> {
           message: sourceText("status.host.registered"),
         });
       }).pipe(Effect.result);
+      if (Result.isFailure(attempt0) && background) return yield* attempt0.failure;
       if (Result.isFailure(attempt0)) {
         const error = attempt0.failure.cause;
         // A failure that arrives after another account signed in belongs to the host that is
@@ -1055,6 +1080,26 @@ export class HostService extends EventEmitter<HostEvents> {
     },
     (operation) => this.#hostKeyLock.withPermit(operation),
   );
+
+  /**
+   * Registers this host for the signed-in account without publishing it, as `configure` does. A
+   * host with no name gets the name that a phone connection gives it. A webhook route needs the
+   * machine token that the registration gives (#6029).
+   */
+  readonly register = Effect.fn("HostService.register")(function* (this: HostService) {
+    // After a sign-in, `applySignedInAccount` binds the account's host a moment later. Its status
+    // change starts the next route sync, so the host is not made a second time here.
+    if (this.#boundAccountId !== this.#signedInAccountId()) return;
+    if (!this.#options.store.configured) {
+      yield* this.configure({ serverName: "OpenBot" }, true);
+      return;
+    }
+    const register = this.#options.registerRemoteHost;
+    if (!register) return;
+    yield* remoteDecode(() => this.#options.store.assertOwnerAccount(this.#options.getSignedInUser()));
+    // `automatic`: the account service refuses a host that its owner removed (#5273).
+    yield* this.#registerRemoteHost(register, yield* remoteDecode(() => this.#requiredOwnerMemberId()), true);
+  }).bind(this);
 
   /**
    * Every remote step runs under the signed-in account's authentication, so one that started
@@ -2161,6 +2206,9 @@ export class HostService extends EventEmitter<HostEvents> {
    */
   channelPersonIsRemote(personId: string): boolean {
     if (personId === SIGNED_OUT_CHANNEL_MEMBER_ID || personId === this.#findCurrentMemberId()) return false;
+    // A server on this computer has no account session. Its owner is the password member that only
+    // the desktop app on this computer logs in as.
+    if (this.#options.passwordOwner === true && personId === this.#options.store.getOwnerMemberId()) return false;
     try {
       return personId !== `local-user:${this.#options.getSignedInUser().id}`;
     } catch {

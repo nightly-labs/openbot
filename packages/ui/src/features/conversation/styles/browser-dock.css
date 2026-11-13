@@ -20,7 +20,8 @@
 /*
  * The dock over a browser page: the island for what the agent does, the queue, and the composer of the
  * tab's agent. Each part is glass. The layers are local to the dock: the copies of a motion go under the
- * composer, the sent text goes over it, and the island is on top.
+ * composer, the sent text goes over it, and the island is on top. The dock is at the bottom centre of the
+ * page. The user can hide the box to reach the page under it.
  */
 .browser-dock {
   position: absolute;
@@ -48,6 +49,7 @@
 }
 
 .browser-dock-composer svg,
+.browser-dock-tab svg,
 .browser-dock-island-activity svg {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
@@ -250,6 +252,127 @@
   flex: none;
 }
 
+/*
+ * The user hid the box: a tab with the agent stays at the bottom edge, in the middle of the box. It has the
+ * height, the bottom line and the avatar inset of the field, so the glass of the field shrinks into it and
+ * grows out of it.
+ */
+/* While the copy of its glass moves, the field draws no glass of its own. */
+.browser-dock[data-glassless] .browser-dock-composer {
+  border-color: transparent;
+  background: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+.browser-dock-hide {
+  border-radius: var(--openbot-radius-pill);
+}
+
+.browser-dock .browser-dock-tab {
+  position: absolute;
+  bottom: 0;
+  overflow: hidden;
+  width: fit-content;
+  max-width: min(360px, 100%);
+  height: auto;
+  box-sizing: border-box;
+  justify-content: flex-start;
+  padding-block: var(--openbot-space-1);
+  padding-inline: var(--openbot-space-2) var(--openbot-space-3);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  font-weight: inherit;
+  gap: var(--openbot-space-2);
+  inset-inline: 0;
+  line-height: 1;
+  margin-inline: auto;
+  white-space: nowrap;
+}
+
+/* Only the box, or only the tab, shows. */
+.browser-dock:is([data-tucked], [data-phase="showing"]) > :not(.browser-dock-tab, .browser-dock-tuck-glass) {
+  visibility: hidden;
+}
+
+.browser-dock:not([data-tucked]) > .browser-dock-tab {
+  visibility: hidden;
+}
+
+/* The ghost button would draw its solid hover colour over the glass, and the tab would not match the box. */
+.browser-dock .browser-dock-glass.browser-dock-tab:hover {
+  background: var(--openbot-bg-glass);
+}
+
+/* As high as the send button, so the tab is as high as the field. */
+.browser-dock-tab-avatar {
+  position: relative;
+  display: flex;
+  height: 28px;
+  flex: none;
+  align-items: center;
+}
+
+/* A ring turns around the avatar while the agent works on the page. */
+.browser-dock-tab-avatar[data-working]::after {
+  position: absolute;
+  border: 1.5px solid transparent;
+  border-radius: var(--openbot-radius-pill);
+  border-top-color: var(--openbot-accent);
+  border-right-color: var(--openbot-accent);
+  animation: ui-spin 900ms linear infinite;
+  content: "";
+  inset: 3px -1px;
+}
+
+/* A dot marks a reply or a question that the user did not see. */
+.browser-dock-tab-avatar[data-unread]::after {
+  position: absolute;
+  top: 3px;
+  right: -2px;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-accent);
+  content: "";
+}
+
+.browser-dock-tab-label {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+
+.browser-dock .browser-dock-tab .browser-dock-tab-chevron {
+  flex: none;
+  color: var(--openbot-text-secondary);
+  transition: translate var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.browser-dock-tab:hover .browser-dock-tab-chevron {
+  translate: 0 -2px;
+}
+
+/* The copy of the glass of the field, on its way between the field and the tab, under the field. */
+.browser-dock-tuck-glass {
+  z-index: 0;
+  border-radius: var(--openbot-radius-pill);
+}
+
+/*
+ * A hidden box keeps the width that it had open. The overlay over a page is only as wide as the tab, and
+ * without this the box would get narrow too, so the field would grow into the wrong place.
+ */
+.browser-dock:is([data-tucked], [data-phase="showing"]) {
+  width: var(--browser-dock-open-width, min(640px, calc(100% - 2 * var(--openbot-space-6))));
+  /* The page under the hidden box gets the clicks where no overlay shrinks, as over a remote live view. */
+  pointer-events: none;
+}
+
+.browser-dock[data-tucked] > .browser-dock-tab {
+  pointer-events: auto;
+}
+
 .browser-dock-editor {
   min-width: 0;
   flex: 1;
@@ -374,5 +497,9 @@
 @media (prefers-reduced-motion: reduce) {
   .browser-dock-stack > .agent-queue-slot {
     transition: none;
+  }
+
+  .browser-dock-tab-avatar[data-working]::after {
+    animation: none;
   }
 }

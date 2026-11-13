@@ -9,7 +9,11 @@ import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { useChatRowBackground } from "@/features/agents/components/chat-list-pane-context";
 import { ChannelAvatar } from "@/features/channels/components/channel-avatar";
-import { useAgentListUnreadCount, useAgentListWaitReason } from "@/features/workspace/components/use-agent-activity";
+import {
+  useAgentListUnreadCount,
+  useAgentListUnreadThreads,
+  useAgentListWaitReason,
+} from "@/features/workspace/components/use-agent-activity";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileSidebarItem } from "@/features/workspace/model/sidebar-layout";
 import { useBarTop } from "@/shared/lib/native-bar";
@@ -58,6 +62,7 @@ const RailAgent = memo(function RailAgent({ agent }: { agent: MobileAgent }) {
   const { t } = useText();
   const background = useChatRowBackground(agent.id);
   const unreadCount = useAgentListUnreadCount(agent.id);
+  const unreadThreads = useAgentListUnreadThreads(agent.id);
   const openLabel = t("mobile.agent.list.open", { name: agent.name });
   const waitReason = useAgentListWaitReason(agent.id);
   return (
@@ -66,10 +71,13 @@ const RailAgent = memo(function RailAgent({ agent }: { agent: MobileAgent }) {
         chatId={agent.id}
         accessibilityRole="button"
         accessibilityLabel={
-          unreadCount > 0
+          unreadCount > 0 || unreadThreads
             ? t("mobile.agent.list.withState", {
                 label: openLabel,
-                state: t("mobile.agent.list.unread", { count: unreadCount }),
+                state:
+                  unreadCount > 0
+                    ? t("mobile.agent.list.unread", { count: unreadCount })
+                    : t("mobile.agent.list.unreadThreads"),
               })
             : openLabel
         }
@@ -90,7 +98,7 @@ const RailAgent = memo(function RailAgent({ agent }: { agent: MobileAgent }) {
           />
           {waitReason ? (
             <AgentWaitBadge reason={waitReason} size={16} />
-          ) : unreadCount > 0 ? (
+          ) : unreadCount > 0 || unreadThreads ? (
             <AgentUnreadBadge count={unreadCount} avatarSize={AVATAR_SIZE} ringColor={background} />
           ) : null}
         </View>
@@ -123,7 +131,7 @@ const RailChannel = memo(function RailChannel({
         className="size-14 items-center justify-center rounded-2xl"
         style={{ backgroundColor: background, borderCurve: "continuous" }}
       >
-        <ChannelAvatar channel={channel} agents={agents} size={AVATAR_SIZE} />
+        <ChannelAvatar channel={channel} agents={agents} size={AVATAR_SIZE} serverId={serverId} />
         {unread ? <RailUnreadDot /> : null}
       </ChatLinkPressable>
     </Link>

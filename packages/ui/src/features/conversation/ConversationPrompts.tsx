@@ -1,4 +1,3 @@
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentApproval,
   BrowserPreview,
@@ -6,113 +5,16 @@ import type {
   BrowserTakeoverRequest,
   LocalBrowserSecretResponse,
 } from "@openbot/contracts/ipc";
+import { type FeedbackApproval, feedbackApproval } from "@openbot/team-client/feedback-approval";
+import { approvalIsCut } from "@openbot/team-client/runtime-attention";
 import { classifyFailure } from "@openbot/telemetry";
-import { Badge, Button, Input, LoaderCircle, LogIn, Maximize2, Monitor, RadioGroup, toast } from "@openbot/ui";
+import { Button, LogIn, Maximize2, Monitor, toast } from "@openbot/ui";
 import { StandingApprovalConfirmation } from "@openbot/ui/components/StandingApprovalConfirmation";
 import { BrowserSecretCard, type BrowserSecretVault } from "@openbot/ui/features/conversation/BrowserSecretCard";
 import { BrowserTakeoverPreview } from "@openbot/ui/features/conversation/BrowserTakeoverPreview";
 import { type TextValue, useText } from "@openbot/ui/text";
 import { createMemo, createSignal, For, Show } from "solid-js";
-import { type FeedbackApproval, feedbackApproval } from "./feedback-approval";
-import { isSendShortcutKey, type SendShortcut, sendShortcutAriaKey } from "./send-shortcut";
 import { UiBlockCard } from "./ui-blocks/UiBlockCard";
-
-export function ChoiceCard(props: {
-  title: string;
-  hint?: string;
-  choices: string[];
-  customChoice?: string;
-  pending?: boolean;
-  /**
-   * Which chord submits a custom answer. Enter keeps the current behavior; in the modifier mode
-   * plain Enter does not submit and the single-line field adds no line.
-   */
-  sendShortcut?: SendShortcut;
-  onSubmit: (answer: string) => Promise<boolean>;
-}) {
-  const { t } = useText();
-  const [answer, setAnswer] = createSignal("");
-  const [customSelected, setCustomSelected] = createSignal(false);
-  let customInput: HTMLInputElement | undefined;
-  const selectedChoice = () => (customSelected() ? (props.customChoice ?? "") : answer());
-  const submit = async () => {
-    const value = answer().trim();
-    if (value && !props.pending) await props.onSubmit(value);
-  };
-  return (
-    <div class="choice-card conversation-interaction-card" aria-busy={props.pending ? "true" : undefined}>
-      <header class="conversation-interaction-header">
-        <strong>{props.title}</strong>
-        <Badge variant="warning-light" class="conversation-interaction-status" role="status">
-          <LoaderCircle class="conversation-interaction-spinner" data-icon="inline-start" aria-hidden="true" />
-          {props.pending ? t("common.sending") : t("prompt.inputRequired")}
-        </Badge>
-      </header>
-      <p class="choice-card-hint">{props.hint ?? t("prompt.choice.hint")}</p>
-      <RadioGroup.Root
-        class="choice-options"
-        aria-label={props.title}
-        value={selectedChoice()}
-        disabled={props.pending ?? false}
-        onChange={(choice) => {
-          if (choice === props.customChoice) {
-            setAnswer("");
-            setCustomSelected(true);
-            queueMicrotask(() => customInput?.focus());
-            return;
-          }
-          setCustomSelected(false);
-          setAnswer(choice);
-          void props.onSubmit(choice);
-        }}
-      >
-        <For each={props.choices}>
-          {(choice, index) => (
-            <RadioGroup.Item class="choice-option-item" value={choice} disabled={props.pending ?? false}>
-              <RadioGroup.ItemInput aria-label={choice} />
-              <RadioGroup.ItemControl
-                class={[
-                  "choice-option",
-                  {
-                    "choice-option-selected": choice === props.customChoice ? customSelected() : answer() === choice,
-                  },
-                ]}
-              >
-                <span class="choice-key">{String.fromCharCode(65 + index())}</span>
-                <span>{choice}</span>
-              </RadioGroup.ItemControl>
-            </RadioGroup.Item>
-          )}
-        </For>
-      </RadioGroup.Root>
-      <Input
-        ref={(element) => (customInput = element)}
-        class="choice-input"
-        value={answer()}
-        placeholder={t("prompt.customPlaceholder")}
-        aria-label={t("prompt.choice.customLabel")}
-        aria-keyshortcuts={sendShortcutAriaKey(props.sendShortcut ?? "enter")}
-        maxlength={INPUT_LIMITS.promptAnswerText}
-        disabled={props.pending}
-        onValueChange={(value) => {
-          setCustomSelected(true);
-          setAnswer(value);
-        }}
-        onKeyDown={(event) => {
-          // The browser owns the key that commits an IME composition. Safari sends it
-          // after `compositionend` without `isComposing`; keyCode 229 marks it.
-          if (event.isComposing || event.keyCode === 229) return;
-          const sendShortcut = props.sendShortcut ?? "enter";
-          // Enter to send keeps the previous chord: every Enter sends.
-          if (sendShortcut === "enter") {
-            if (event.key !== "Enter") return;
-          } else if (!isSendShortcutKey(event, sendShortcut)) return;
-          void submit();
-        }}
-      />
-    </div>
-  );
-}
 
 export function ApprovalCard(props: {
   approval: AgentApproval;
@@ -138,6 +40,9 @@ export function ApprovalCard(props: {
   const [confirmingAlways, setConfirmingAlways] = createSignal(false);
   let alwaysAllowButton: HTMLButtonElement | undefined;
   const report = createMemo(() => feedbackApproval(props.approval));
+  // A runtime snapshot cut the request. Allow must not cover text that the user cannot see, so the card
+  // offers only Deny until the whole copy comes.
+  const cut = () => approvalIsCut(props.approval);
   const submit = async (decision: "accept" | "decline") => {
     if (submitting()) return;
     setSubmitting(true);
@@ -193,7 +98,7 @@ export function ApprovalCard(props: {
                 >
                   {t("prompt.approval.deny")}
                 </Button>
-                <Show when={props.onAlwaysAllow}>
+                <Show when={props.onAlwaysAllow && !cut()}>
                   <Button
                     ref={alwaysAllowButton}
                     variant="secondary"
@@ -205,15 +110,17 @@ export function ApprovalCard(props: {
                     {t("prompt.approval.alwaysAllow")}
                   </Button>
                 </Show>
-                <Button
-                  variant="default"
-                  size="sm"
-                  type="button"
-                  disabled={submitting()}
-                  onClick={() => void submit("accept")}
-                >
-                  {t("prompt.approval.allow")}
-                </Button>
+                <Show when={!cut()}>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    type="button"
+                    disabled={submitting()}
+                    onClick={() => void submit("accept")}
+                  >
+                    {t("prompt.approval.allow")}
+                  </Button>
+                </Show>
               </>
             }
           >
@@ -236,6 +143,9 @@ export function ApprovalCard(props: {
             <Show when={props.approval.kind === "permissions"}>
               <PermissionDetails permissions={props.approval.permissions} />
             </Show>
+            <Show when={cut()}>
+              <p class="approval-cut-note">{t("prompt.approval.cut")}</p>
+            </Show>
           </UiBlockCard>
           <StandingApprovalConfirmation
             open={confirmingAlways()}
@@ -250,6 +160,7 @@ export function ApprovalCard(props: {
       {(offer) => (
         <FeedbackOffer
           report={offer()}
+          cut={cut()}
           submitting={submitting()}
           sending={(submitting() && accepting()) || props.sending === true}
           onSend={() => void submit("accept")}
@@ -266,13 +177,21 @@ export function ApprovalCard(props: {
  */
 function FeedbackOffer(props: {
   report: FeedbackApproval;
+  /** The report is only its start, so Send waits for the whole copy. */
+  cut: boolean;
   submitting: boolean;
   sending: boolean;
   onSend: () => void;
   onDismiss: () => void;
 }) {
-  const { t } = useText();
+  const { t, sourceText } = useText();
   const idea = () => props.report.kind === "idea";
+  // The host writes its notes, such as the recent errors, as source text paragraphs.
+  const text = () =>
+    props.report.text
+      .split("\n\n")
+      .map((part) => sourceText(part))
+      .join("\n\n");
   return (
     <section
       class="approval-card conversation-interaction-card feedback-offer"
@@ -287,8 +206,11 @@ function FeedbackOffer(props: {
       </strong>
       <blockquote class="feedback-offer-quote">
         <strong>{props.report.title}</strong>
-        <Show when={props.report.text}>{(text) => <p>{text()}</p>}</Show>
+        <Show when={text()}>{(body) => <p>{body()}</p>}</Show>
       </blockquote>
+      <Show when={props.cut}>
+        <p class="approval-cut-note">{t("prompt.approval.cut")}</p>
+      </Show>
       <div class="feedback-offer-actions">
         <Button
           variant="secondary"
@@ -301,17 +223,19 @@ function FeedbackOffer(props: {
         >
           {t("prompt.approval.report.dontSend")}
         </Button>
-        <Button
-          variant="default"
-          type="button"
-          class="approval-button"
-          disabled={props.submitting && !props.sending}
-          loading={props.sending}
-          loadingLabel={t("common.sending")}
-          onClick={() => props.onSend()}
-        >
-          {t("prompt.approval.report.send")}
-        </Button>
+        <Show when={!props.cut}>
+          <Button
+            variant="default"
+            type="button"
+            class="approval-button"
+            disabled={props.submitting && !props.sending}
+            loading={props.sending}
+            loadingLabel={t("common.sending")}
+            onClick={() => props.onSend()}
+          >
+            {t("prompt.approval.report.send")}
+          </Button>
+        </Show>
       </div>
     </section>
   );

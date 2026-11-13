@@ -12,6 +12,7 @@
 
 import { randomUUID } from "node:crypto";
 import { lstat, mkdir, open, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import type { AgentProviderId } from "@openbot/contracts/agent-providers";
 import { AVATAR_IMAGE_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -26,8 +27,15 @@ import {
   type ApplyInstanceTransferInput,
   AVATAR_SEED_PATTERN,
   type AvatarImageInput,
+  type Channel,
+  type ChannelBrowser,
+  type ChannelCommand,
+  type ChannelMemory,
+  type ChannelRoutine,
   type ConnectRoutineFlowInput,
   type CreateAgentInput,
+  type CreateChannelMemoryInput,
+  type CreateChannelRoutineInput,
   type CreateRoutineInput,
   type CustomAgentSummary,
   type CustomProviderSummary,
@@ -41,26 +49,51 @@ import {
   type InstanceTransferSummary,
   isAgentImportKey,
   isAvatarColor,
+  isChannelBrowser,
+  isChannelDraft,
+  isChannelIcon,
   isCustomProviderContextWindow,
   isCustomProviderHarness,
   isCustomProviderInputs,
   isCustomProviderMaxOutput,
   isCustomProviderReasoningEfforts,
+  isServerNotificationLevel,
+  type ListChannelRoutineRunsInput,
+  type ListRoutineRunsInput,
   type McpServerConfig,
+  ROUTINE_LIMIT_POLICIES,
+  ROUTINE_MISSED_POLICIES,
+  ROUTINE_RUN_PLACES,
   type Routine,
   type RoutineFlowLink,
+  type RoutineFlowPosition,
+  type RoutineRunFields,
   type SaveCustomProviderInput,
+  type SaveRoutineFlowPositionInput,
+  type ServerNotificationLevel,
   type SetAgentMemoryInclusionInput,
+  SIDEBAR_PIN_KINDS,
+  SIDEBAR_PIN_LIMIT,
   type SidebarLayoutAction,
   type SidebarLayoutSnapshot,
+  type SidebarPinKind,
   type UpdateAgentInput,
+  type UpdateHostIdentityInput,
 } from "@openbot/contracts/ipc";
+import {
+  type EventRoutine,
+  type EventRoutineOwner,
+  isEventRoutineTriggerInput,
+  type SaveEventRoutineInput,
+} from "@openbot/contracts/ipc-events";
+import { isDynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
 import { INSTANCE_TRANSFER_REMOTE_BYTES } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Exit, Result } from "effect";
-import { Zip, ZipPassThrough } from "fflate";
+import { Zip, ZipPassThrough, zipSync } from "fflate";
 import { isMissingFileError } from "../backend/file-errors";
 import { isPathInside } from "../backend/path-containment";
+import type { ImportedRoutineRun } from "../backend/routine-store";
 import {
   type ArchiveFile,
   type ArchiveLimits,
@@ -75,24 +108,57 @@ import {
   writeImportedFilesEffect,
   writeTreeEffect,
 } from "./agent-archive";
-import type { AgentImportSkills } from "./agent-import-service";
+import type { AgentImportSkills, ChannelActor } from "./agent-import-service";
 import { validTimezone } from "./agent-marketplace-service";
 import { type ArchiveOperationError, archiveCall, archiveFailure, archiveSync } from "./archive-effects";
+import { InstanceTransferChunks } from "./instance-transfer-chunks";
+import {
+  decodeChannelFiles,
+  exportChannelMessages,
+  exportHistory,
+  importChannelMessages,
+  importHistory,
+  type TransferChannelHistory,
+  type TransferHistoryAgents,
+} from "./instance-transfer-history";
 import {
   agentPrefix,
+  channelPrefix,
   decodeTransferManifest,
   INSTANCE_TRANSFER_FORMAT,
   INSTANCE_TRANSFER_MANIFEST,
   INSTANCE_TRANSFER_VERSION,
+  LIBRARY_FOLDER,
+  SERVER_FOLDER,
   SHARED_FOLDER,
+  SHARED_SKILL_BYTES,
+  TRANSFER_CHANNELS,
+  TRANSFER_SHARED_SKILLS,
   type TransferAgent,
+  type TransferChannel,
   type TransferManifest,
   type TransferManifestFile,
   type TransferSettings,
 } from "./instance-transfer-manifest";
+import {
+  applyPreferences,
+  hiddenAgentWasStopped,
+  readPreferences,
+  type TransferPreferenceAgents,
+  type TransferPreferencePort,
+} from "./instance-transfer-preferences";
+import { decodeRuns, type TransferRun, transferRuns } from "./instance-transfer-runs";
+import {
+  applyServerPreferences,
+  readServerPreferences,
+  type TransferServerPreferencePort,
+} from "./instance-transfer-server-preferences";
+import { exportWorkflows, importWorkflows, type TransferWorkflowPort } from "./instance-transfer-workflows";
+import { parseAvatarImage } from "./ipc/avatar-inputs";
+import { parseHostIdentity } from "./ipc/server-inputs";
 import { MANAGED_SKILL_FOLDERS, OWNERSHIP_MARKER } from "./managed-skill-service";
 import { readPackFolders } from "./skill-marketplace-service";
-import { isUnsafeArchivePath } from "./skill-package";
+import { isUnsafeArchivePath, normalizedFiles } from "./skill-package";
 
 const ARCHIVE: ArchiveLimits = {
   files: INSTANCE_TRANSFER_LIMITS.files,
@@ -105,6 +171,11 @@ const ARCHIVE: ArchiveLimits = {
  * its owner records name agent ids of this computer, so a transfer never copies it.
  */
 const SHARED_DATA = "data";
+/**
+ * `Transfers/` in `~/OpenBot/Shared` holds the files of chat messages. Only a message names such a
+ * file, so the files travel with the chat history, not with the Shared folder.
+ */
+const SHARED_TRANSFERS = "transfers";
 /** A file sent to or from a member of a joined client: one WebRTC file transfer. */
 const REMOTE_ARCHIVE: ArchiveLimits = {
   files: INSTANCE_TRANSFER_LIMITS.files,
@@ -114,6 +185,14 @@ const REMOTE_ARCHIVE: ArchiveLimits = {
 };
 /** The owner of the files the local user reads. A member's owner is the member id. */
 const LOCAL_OWNER = "local";
+
+/** One member's choices, with the agents and channels named by `Id`: an id here, or a key in the file. */
+export interface MemberPreferences<Id> {
+  accountId: string;
+  server: ServerNotificationLevel | null;
+  agents: { agentId: Id; level: ServerNotificationLevel }[];
+  pins: { kind: SidebarPinKind; id: Id }[];
+}
 /** A file that a member sent and nobody applied is removed after this. */
 const UPLOAD_TTL_MS = 30 * 60_000;
 /** Skill folders are copied here, published to the local library, and removed again. */
@@ -127,7 +206,7 @@ const AVATAR_EXTENSIONS: Record<AvatarImageInput["mimeType"], string> = {
 };
 
 /** The agent operations a transfer uses, as `AgentService` offers them. */
-interface InstanceTransferAgents {
+interface InstanceTransferAgents extends TransferPreferenceAgents, TransferHistoryAgents {
   listAgents(): AgentSummary[];
   listRoutines(agentId: string): Routine[];
   listMemories(agentId: string): AgentMemory[];
@@ -140,11 +219,29 @@ interface InstanceTransferAgents {
   ): Effect.Effect<AgentSummary, unknown>;
   updateAgent(input: UpdateAgentInput): Effect.Effect<AgentSummary, unknown>;
   createRoutine(input: CreateRoutineInput, options?: { recordConversationEvent?: boolean }): Pick<Routine, "id">;
+  listRoutineRuns(input: ListRoutineRunsInput, withSkipped?: boolean): RoutineRunFields[];
+  importRoutineRuns(agentId: string, routineId: string, runs: readonly ImportedRoutineRun[]): string[];
   createMemory(input: { agentId: string; text: string }): Pick<AgentMemory, "id">;
   memoryLimit(): number;
   initializeMemorySelection(agentId: string): void;
   setAvatar(agentId: string, image: AvatarImageInput | null): Effect.Effect<AgentSummary, unknown>;
   deleteAgent(agentId: string): Effect.Effect<void, unknown>;
+  channels: TransferChannelHistory & {
+    store: {
+      ids(): string[];
+      get(channelId: string): Channel;
+    };
+    images: { resolve(channel: Channel): { path: string; mimeType: AvatarImageInput["mimeType"] } | null };
+    command(command: ChannelCommand, actor: ChannelActor): Effect.Effect<Channel, unknown>;
+    setImage(channelId: string, image: AvatarImageInput | null): Effect.Effect<unknown, unknown>;
+  };
+  listChannelMemories(channelId: string): ChannelMemory[];
+  listChannelRoutines(channelId: string): ChannelRoutine[];
+  createChannelMemory(input: CreateChannelMemoryInput): unknown;
+  createChannelRoutine(input: CreateChannelRoutineInput): Pick<ChannelRoutine, "id">;
+  listChannelRoutineRuns(input: ListChannelRoutineRunsInput, withSkipped?: boolean): RoutineRunFields[];
+  importChannelRoutineRuns(channelId: string, routineId: string, runs: readonly ImportedRoutineRun[]): string[];
+  deleteChannel(channelId: string): Effect.Effect<void, unknown>;
 }
 
 /** The server settings an export reads and an import writes. Main wires each to its owner. */
@@ -162,6 +259,24 @@ interface InstanceTransferSettings {
   connectRoutineFlow(input: ConnectRoutineFlowInput): Effect.Effect<unknown, unknown>;
   /** Providers that are signed in and ready on this computer. */
   signedInProviders(): AgentProviderId[];
+  /** Absent where the server runs no workflows. */
+  workflows?: TransferWorkflowPort;
+  routineFlowPositions?(agentId: string): Effect.Effect<RoutineFlowPosition[], unknown>;
+  saveRoutineFlowPosition?(input: SaveRoutineFlowPositionInput): Effect.Effect<unknown, unknown>;
+}
+
+/** A routine that a webhook starts, as the file keeps it. Its address and secret stay behind. */
+interface TransferWebhookRoutine {
+  key: string;
+  name: string;
+  instruction: string;
+  active: boolean;
+  timezone: string;
+  eventType: string | null;
+  filters: unknown[];
+  limitPolicy?: string;
+  missedPolicy?: string;
+  runIn?: string;
 }
 
 export interface InstanceTransferOptions {
@@ -170,6 +285,46 @@ export interface InstanceTransferOptions {
   settings: InstanceTransferSettings;
   /** `~/OpenBot/Shared`. */
   sharedRoot: string;
+  /** Who creates an imported channel when the local user imports. */
+  channelActor: () => ChannelActor;
+  /** The local owner's choices for agents. A member's import does not change them. */
+  preferences?: TransferPreferencePort;
+  /** The host-wide preferences of Server settings. Absent where the server keeps none. */
+  serverPreferences?: TransferServerPreferencePort;
+  /** The skills of the shared library. Absent where the server has no library. */
+  sharedSkills?: {
+    list(): Effect.Effect<{ id: string; slug: string; name: string; version: number }[], unknown>;
+    /** The ids of the skills that these agents have. They carry those skills themselves. */
+    assigned(agentIds: readonly string[]): Effect.Effect<ReadonlySet<string>, unknown>;
+    bundle(id: string, version: number): Effect.Effect<Uint8Array, unknown>;
+    /** Adds a skill to the library without giving it to an agent. */
+    add(bytes: Uint8Array): Effect.Effect<unknown, unknown>;
+  };
+  /**
+   * The notification levels and pins of the members other than the owner, by account: a member id
+   * belongs to one server. `apply` gives them to the member with that account here, and returns false
+   * when there is none.
+   */
+  memberPreferences?: {
+    read(): MemberPreferences<string>[];
+    /** `owner`: the owner imports. Otherwise an entry of the owner's account changes nothing. */
+    apply(preferences: MemberPreferences<string>, owner: boolean): Effect.Effect<boolean, unknown>;
+  };
+  /** The server's name and logo, as Server settings > General saves them. Absent where there is no team. */
+  serverIdentity?: {
+    read(): { name: string; logo: { path: string; mimeType: AvatarImageInput["mimeType"] } | null } | null;
+    save(input: UpdateHostIdentityInput): Effect.Effect<unknown, unknown>;
+  };
+  /**
+   * The member id of the server's owner, read when each request runs: it can change after a sync.
+   * The owner who exports or imports from another computer counts as the owner here.
+   */
+  ownerMemberId?: () => string | null;
+  /** Routines that a webhook starts. Absent where the server has no events service. */
+  webhookRoutines?: {
+    list(owner: EventRoutineOwner): Effect.Effect<EventRoutine[], unknown>;
+    save(input: SaveEventRoutineInput): Effect.Effect<{ routine: Pick<EventRoutine, "id"> }, unknown>;
+  };
   appVersion: string;
   /** Where a file sent by a member of a joined client, or made for one, waits. */
   uploadDirectory?: string;
@@ -200,13 +355,27 @@ interface StagedTransfer {
 
 export class InstanceTransferService {
   readonly #staged = new Map<string, StagedTransfer>();
+  /** The local user, or the owner's member id on a joined client. */
+  readonly #isOwner = (person: string | undefined) =>
+    person === undefined || person === LOCAL_OWNER || (person !== "" && person === this.options.ownerMemberId?.());
   readonly #timezone: () => string;
   readonly #now: () => Date;
   #uploadDirectoryReady: Deferred.Deferred<void, ArchiveOperationError> | null = null;
+  /** `instance-transfer-chunks-v1`: a file for a member of a joined client, in parts, up to the local limits. */
+  readonly chunks: InstanceTransferChunks;
 
   constructor(private readonly options: InstanceTransferOptions) {
     this.#timezone = options.timezone ?? (() => Intl.DateTimeFormat().resolvedOptions().timeZone);
     this.#now = options.now ?? (() => new Date());
+    this.chunks = new InstanceTransferChunks({
+      directory: () => {
+        const directory = options.uploadDirectory;
+        if (!directory) return Effect.fail(archiveFailure(new Error("Instance transfer uploads are not available.")));
+        return this.#prepareUploadDirectory(directory).pipe(Effect.as(directory));
+      },
+      stage: (path, owner) => this.#stageFile(path, owner, true, ARCHIVE),
+      exportTo: (path, input, exporter) => this.exportTo(path, input, ARCHIVE, exporter),
+    });
   }
 
   /** What each agent would carry: the export screen shows it before anything is written. */
@@ -242,7 +411,22 @@ export class InstanceTransferService {
     path: string,
     input: ExportInstanceInput,
     limits: ArchiveLimits = ARCHIVE,
+    /** The person whose channel messages the import gives to the person who imports. */
+    exporter?: string,
   ): Effect.fn.Return<InstanceExportResult, ArchiveOperationError> {
+    return yield* (yield* this.prepareExport(input, limits, exporter)).write(path);
+  }).bind(this);
+
+  /**
+   * Reads what the export carries and checks the file limits, before the user chooses where to save
+   * it. `write` writes that export.
+   */
+  readonly prepareExport = Effect.fn("InstanceTransfer.prepareExport")(function* (
+    this: InstanceTransferService,
+    input: ExportInstanceInput,
+    limits: ArchiveLimits = ARCHIVE,
+    exporter?: string,
+  ): Effect.fn.Return<PreparedExport, ArchiveOperationError> {
     const all = this.options.agents.listAgents();
     const selected = input.agentIds.map((id) => all.find((agent) => agent.id === id));
     if (selected.some((agent) => !agent))
@@ -254,9 +438,11 @@ export class InstanceTransferService {
     const keys = new Map<string, string>();
     const manifestAgents: TransferAgent[] = [];
     let bytes = 0;
-    for (const [index, agent] of agents.entries()) {
-      const key = isAgentImportKey(agent.id) ? agent.id : `agent-${index + 1}`;
-      keys.set(agent.id, key);
+    // Every key first: a message of one agent can name another agent of the file.
+    for (const [index, agent] of agents.entries())
+      keys.set(agent.id, isAgentImportKey(agent.id) ? agent.id : `agent-${index + 1}`);
+    for (const agent of agents) {
+      const key = keys.get(agent.id) ?? agent.id;
       const prefix = agentPrefix(key);
 
       let avatar: string | null = null;
@@ -303,19 +489,18 @@ export class InstanceTransferService {
         }
       }
 
-      const routines: TransferAgent["routines"][number][] = this.options.agents
-        .listRoutines(agent.id)
-        .map((routine) => ({
-          key: routine.id,
-          name: routine.name,
-          instruction: routine.instruction,
-          active: routine.active,
-          timezone: routine.timezone,
-          schedule: routine.trigger.schedule,
-          ...(routine.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
-          ...(routine.missedPolicy ? { missedPolicy: routine.missedPolicy } : {}),
-          ...(routine.runIn ? { runIn: routine.runIn } : {}),
-        }));
+      // With the chat history: the runs' results are messages of the chats.
+      const routines = this.options.agents.listRoutines(agent.id).map((routine) => ({
+        ...transferRoutine(routine),
+        ...(input.includeHistory
+          ? runsOf(() =>
+              this.options.agents.listRoutineRuns(
+                { agentId: agent.id, routineId: routine.id, limit: INPUT_LIMITS.routineRunsPage },
+                true,
+              ),
+            )
+          : {}),
+      }));
       const oneTimeRoutines = routines.filter((routine) => routine.schedule.kind === "once");
 
       const selections = new Map(
@@ -324,6 +509,16 @@ export class InstanceTransferService {
           .selections.filter((selection) => selection.userControlled)
           .map((selection) => [selection.memoryId, selection.inclusion] as const),
       );
+      const preferences = this.options.preferences
+        ? yield* readPreferences(agent, this.options.preferences)
+        : undefined;
+      const webhookRoutines = yield* this.#readWebhookRoutines({ kind: "agent", id: agent.id });
+      let history: string | null = null;
+      if (input.includeHistory) {
+        const exported = yield* exportHistory(this.options.agents, agent.id, prefix, keys, entries);
+        history = exported.index;
+        bytes += exported.bytes;
+      }
       manifestAgents.push({
         key,
         name: agent.name,
@@ -348,6 +543,83 @@ export class InstanceTransferService {
           const inclusion = selections.get(memory.id);
           return { text: memory.text, ...(inclusion ? { inclusion } : {}) };
         }),
+        ...(preferences ? { preferences } : {}),
+        ...(history ? { history } : {}),
+        ...(webhookRoutines.length > 0 ? { webhookRoutines } : {}),
+      });
+    }
+
+    const channels: TransferChannel[] = [];
+    const channelKeys = new Map<string, string>();
+    const channelPort = this.options.agents.channels;
+    const resolveFile = (attachmentId: string) => this.options.agents.resolveTransferFile(attachmentId);
+    const channelMessages = Effect.fn("InstanceTransfer.channelMessages")(function* (
+      port: TransferChannelHistory,
+      channelId: string,
+      prefix: string,
+    ) {
+      const exported = yield* exportChannelMessages(port, resolveFile, channelId, prefix, keys, entries);
+      bytes += exported.bytes;
+      return {
+        ...(exported.parts.length > 0 ? { messages: exported.parts } : {}),
+        ...(exported.files.length > 0 ? { files: exported.files } : {}),
+      };
+    });
+    for (const channelId of channelPort.store.ids()) {
+      const channel = channelPort.store.get(channelId);
+      const members = channel.members.flatMap((member) => keys.get(member.agentId) ?? []);
+      if (members.length === 0) continue;
+      if (channels.length === TRANSFER_CHANNELS) {
+        warnings.push(sourceText("error.import.transferChannelLimit", { limit: TRANSFER_CHANNELS }));
+        break;
+      }
+      if (channel.instructions.length > INPUT_LIMITS.agentDescription)
+        warnings.push(
+          sourceText("error.import.transferChannelInstructionsCut", {
+            name: channel.name,
+            limit: INPUT_LIMITS.agentDescription,
+          }),
+        );
+      const key = isAgentImportKey(channel.id) ? channel.id : `channel-${channels.length + 1}`;
+      channelKeys.set(channel.id, key);
+      let image: string | null = null;
+      const resolved = channelPort.images.resolve(channel);
+      if (resolved) {
+        image = `${channelPrefix(key)}image.${AVATAR_EXTENSIONS[resolved.mimeType]}`;
+        const imagePath = resolved.path;
+        entries.push({ name: image, read: () => readFile(imagePath) });
+      }
+      channels.push({
+        key,
+        name: channel.name,
+        title: channel.title,
+        // A channel can keep longer instructions from before the limit, but a new channel cannot.
+        instructions: channel.instructions.slice(0, INPUT_LIMITS.agentDescription),
+        members,
+        lead: channel.leadAgentId ? (keys.get(channel.leadAgentId) ?? null) : null,
+        ...(channel.isolated === undefined ? {} : { isolated: channel.isolated }),
+        ...(channel.browser ? { browser: transferBrowser(channel.browser, (agentId) => keys.get(agentId)) } : {}),
+        ...(channel.icon ? { icon: channel.icon } : {}),
+        image,
+        archived: channel.archived,
+        memories: this.options.agents.listChannelMemories(channel.id).map((memory) => memory.text),
+        routines: this.options.agents.listChannelRoutines(channel.id).map((routine) => ({
+          ...transferRoutine(routine),
+          ...((input.includeChannelMessages ?? input.includeHistory)
+            ? runsOf(() =>
+                this.options.agents.listChannelRoutineRuns(
+                  { channelId: channel.id, routineId: routine.id, limit: INPUT_LIMITS.routineRunsPage },
+                  true,
+                ),
+              )
+            : {}),
+        })),
+        ...(yield* this.#readWebhookRoutines({ kind: "channel", id: channel.id }).pipe(
+          Effect.map((webhookRoutines) => (webhookRoutines.length > 0 ? { webhookRoutines } : {})),
+        )),
+        ...((input.includeChannelMessages ?? input.includeHistory)
+          ? yield* channelMessages(channelPort, channel.id, channelPrefix(key))
+          : {}),
       });
     }
 
@@ -364,6 +636,17 @@ export class InstanceTransferService {
         });
       }
     }
+    const sharedSkills = input.includeSettings
+      ? yield* this.#exportSharedSkills(
+          agents.map((agent) => agent.id),
+          entries,
+          warnings,
+        )
+      : { skills: [], bytes: 0 };
+    bytes += sharedSkills.bytes;
+    // Before the limits, so the logo counts.
+    const serverIdentity = input.includeServerPreferences ? yield* this.#exportServerIdentity(entries) : {};
+    bytes += serverIdentity.bytes ?? 0;
     // A transfer file has the same text for both limits.
     if (entries.length + 1 > limits.files || bytes > (limits.bytes?.limit ?? Number.POSITIVE_INFINITY))
       return yield* archiveFailure(new Error(limits.expandedTooLarge));
@@ -373,17 +656,30 @@ export class InstanceTransferService {
       version: INSTANCE_TRANSFER_VERSION,
       source: { appVersion: this.options.appVersion, exportedAt: this.#now().toISOString() },
       agents: manifestAgents,
-      settings: input.includeSettings ? yield* this.#readSettings(keys, manifestAgents) : null,
+      settings: input.includeSettings ? yield* this.#readSettings(keys, channelKeys, manifestAgents) : null,
+      ...(sharedSkills.skills.length > 0 ? { sharedSkills: sharedSkills.skills } : {}),
       shared,
       signedIn: this.options.settings.signedInProviders(),
+      ...(channels.length > 0 ? { channels, exporter: exporter ?? this.options.channelActor().id } : {}),
+      ...(serverIdentity.serverIdentity ? { serverIdentity: serverIdentity.serverIdentity } : {}),
+      ...(input.includeServerPreferences ? this.#exportMemberPreferences(keys, channelKeys) : {}),
+      // The owner's own notification level only when the owner exports.
+      ...(input.includeServerPreferences && this.options.serverPreferences
+        ? { serverPreferences: readServerPreferences(this.options.serverPreferences, this.#isOwner(exporter)) }
+        : {}),
     };
     const manifestBytes = new TextEncoder().encode(JSON.stringify(manifest, null, 2));
     entries.unshift({ name: INSTANCE_TRANSFER_MANIFEST, read: () => Promise.resolve(manifestBytes) });
-    const gone = yield* writeZipEffect(path, entries);
     return {
-      saved: true,
-      fileName: basename(path),
-      warnings: gone > 0 ? [...warnings, sourceText("error.import.transferFilesGone", { number: gone })] : warnings,
+      write: (path: string) =>
+        writeZipEffect(path, entries).pipe(
+          Effect.map((gone) => ({
+            saved: true,
+            fileName: basename(path),
+            warnings:
+              gone > 0 ? [...warnings, sourceText("error.import.transferFilesGone", { number: gone })] : warnings,
+          })),
+        ),
     };
   }).bind(this);
 
@@ -394,12 +690,13 @@ export class InstanceTransferService {
   readonly exportForMember = Effect.fn("InstanceTransfer.exportForMember")(function* (
     this: InstanceTransferService,
     input: ExportInstanceInput,
+    memberId: string,
   ): Effect.fn.Return<string, ArchiveOperationError> {
     const directory = this.options.uploadDirectory;
     if (!directory) return yield* archiveFailure(new Error("Instance transfer uploads are not available."));
     yield* this.#prepareUploadDirectory(directory);
     const path = join(directory, `${randomUUID()}.zip`);
-    yield* this.exportTo(path, input, REMOTE_ARCHIVE).pipe(
+    yield* this.exportTo(path, input, REMOTE_ARCHIVE, memberId).pipe(
       Effect.tapError(() => archiveCall(() => rm(path, { force: true })).pipe(Effect.ignore)),
     );
     return path;
@@ -408,16 +705,36 @@ export class InstanceTransferService {
   readonly #readSettings = Effect.fn("InstanceTransfer.readSettings")(function* (
     this: InstanceTransferService,
     keys: ReadonlyMap<string, string>,
+    channelKeys: ReadonlyMap<string, string>,
     agents: readonly TransferAgent[],
   ): Effect.fn.Return<TransferSettings, ArchiveOperationError> {
     const settings = this.options.settings;
     const layout = settings.sidebar();
-    const routineKeys = new Set(agents.flatMap((agent) => transferRoutines(agent).map((routine) => routine.key)));
+    const routineKeys = new Set(
+      agents.flatMap((agent) => [
+        ...transferRoutines(agent).map((routine) => routine.key),
+        ...(agent.webhookRoutines ?? []).flatMap((routine) =>
+          isDynamicRecord(routine) && typeof routine.key === "string" ? [routine.key] : [],
+        ),
+      ]),
+    );
     const links = new Map<string, RoutineFlowLink>();
     for (const agentId of keys.keys())
       for (const link of yield* settings.routineFlowLinks(agentId).pipe(Effect.mapError(failure)))
         links.set(link.id, link);
     const redact = createRedaction();
+    const positions: NonNullable<TransferSettings["routineFlowPositions"]>[number][] = [];
+    if (settings.routineFlowPositions)
+      for (const [agentId, agentKey] of keys)
+        for (const position of yield* settings
+          .routineFlowPositions(agentId)
+          .pipe(Effect.orElseSucceed((): RoutineFlowPosition[] => []))) {
+          const nodeKey = filePositionKey(position.nodeKey, keys, routineKeys);
+          if (nodeKey) positions.push({ agentKey, nodeKey, x: position.x, y: position.y });
+        }
+    const workflows = settings.workflows
+      ? exportWorkflows(yield* settings.workflows.workflows().pipe(Effect.mapError(failure)), keys, channelKeys)
+      : [];
     const order = [
       ...layout.agentOrder,
       ...Object.keys(layout.agentAssignments).filter((id) => !layout.agentOrder.includes(id)),
@@ -463,6 +780,8 @@ export class InstanceTransferService {
           : [];
       }),
       cleared: redact.cleared(),
+      ...(workflows.length > 0 ? { workflows } : {}),
+      ...(positions.length > 0 ? { routineFlowPositions: positions } : {}),
     };
   });
 
@@ -491,6 +810,245 @@ export class InstanceTransferService {
       Effect.tapError(() => archiveCall(() => rm(path, { force: true })).pipe(Effect.ignore)),
     );
   }).bind(this);
+
+  /**
+   * The skills of the shared library that no exported agent has: those agents carry their own. A skill
+   * of an agent that stays here goes in too, so the new library has it. The files of each go into
+   * `library/<slug>/`.
+   */
+  readonly #exportSharedSkills = Effect.fn("InstanceTransfer.exportSharedSkills")(function* (
+    this: InstanceTransferService,
+    agentIds: readonly string[],
+    entries: ZipEntry[],
+    warnings: string[],
+  ): Effect.fn.Return<{ skills: NonNullable<TransferManifestFile["sharedSkills"]>; bytes: number }> {
+    const port = this.options.sharedSkills;
+    if (!port) return { skills: [], bytes: 0 };
+    const read = yield* Effect.result(
+      Effect.gen(function* () {
+        const assigned = yield* port.assigned(agentIds);
+        const skills = (yield* port.list()).filter((skill) => !assigned.has(skill.id));
+        const shared: NonNullable<TransferManifestFile["sharedSkills"]> = [];
+        let size = 0;
+        for (const skill of skills.slice(0, TRANSFER_SHARED_SKILLS)) {
+          const files = normalizedFiles(yield* port.bundle(skill.id, skill.version));
+          const names = Object.keys(files).sort();
+          const path = `${LIBRARY_FOLDER}/${skill.slug}`;
+          // The archive refuses some names, such as a zip in a zip; such a skill stays here.
+          if (names.some((name) => isUnsafeArchivePath(`${path}/${name}`))) {
+            warnings.push(sourceText("error.import.transferSharedSkillsSkipped"));
+            continue;
+          }
+          shared.push({ slug: skill.slug, name: skill.name, path, files: names });
+          for (const name of names) {
+            const bytes = files[name] ?? new Uint8Array();
+            size += bytes.byteLength;
+            entries.push({ name: `${path}/${name}`, read: () => Promise.resolve(bytes) });
+          }
+        }
+        return { skills: shared, bytes: size };
+      }),
+    );
+    if (Result.isFailure(read)) {
+      warnings.push(sourceText("error.import.transferSharedSkillsSkipped"));
+      return { skills: [], bytes: 0 };
+    }
+    return read.success;
+  });
+
+  /**
+   * Adds the file's shared skills that this library does not have. A skill with a name that the
+   * library already has is never replaced: the same files are left as they are, and other files are
+   * a warning (#7513).
+   */
+  readonly #importSharedSkills = Effect.fn("InstanceTransfer.importSharedSkills")(function* (
+    this: InstanceTransferService,
+    archive: ArchiveFile,
+    values: readonly unknown[],
+    warnings: string[],
+  ) {
+    const port = this.options.sharedSkills;
+    if (!port) return;
+    const listed = yield* Effect.result(port.list());
+    if (Result.isFailure(listed)) {
+      warnings.push(sourceText("error.import.transferSharedSkillsNotAdded"));
+      return;
+    }
+    const existing = new Map(listed.success.map((skill) => [skill.slug, skill]));
+    for (const value of values) {
+      if (
+        !isDynamicRecord(value) ||
+        typeof value.slug !== "string" ||
+        typeof value.name !== "string" ||
+        typeof value.path !== "string" ||
+        !value.path.startsWith(`${LIBRARY_FOLDER}/`) ||
+        isUnsafeArchivePath(value.path) ||
+        !Array.isArray(value.files) ||
+        !value.files.every((file) => typeof file === "string" && !isUnsafeArchivePath(`${value.path}/${file}`))
+      )
+        continue;
+      const name = value.name.slice(0, 80);
+      const folder = value.path;
+      const names: string[] = value.files;
+      const result = yield* Effect.result(
+        Effect.gen(function* () {
+          const read = yield* readEntriesEffect(
+            archive,
+            names.map((file) => `${folder}/${file}`),
+            SHARED_SKILL_BYTES,
+          );
+          const packed: Record<string, Uint8Array> = {};
+          for (const file of names) {
+            const bytes = read[`${folder}/${file}`];
+            if (!bytes) return yield* archiveFailure(new Error(sourceText("error.skill.zipInvalid")));
+            packed[file] = bytes;
+          }
+          // The library takes a skill package; its check is the one a new local skill gets.
+          const bytes = yield* archiveSync(() => zipSync(packed));
+          const files = yield* archiveSync(() => normalizedFiles(bytes));
+          const same = existing.get(String(value.slug));
+          if (same) {
+            const currentBytes = yield* port.bundle(same.id, same.version).pipe(Effect.mapError(archiveFailure));
+            const currentFiles = yield* archiveSync(() => normalizedFiles(currentBytes));
+            if (!sameFiles(files, currentFiles))
+              warnings.push(
+                sourceText("error.import.transferSettingSkipped", {
+                  name,
+                  reason: sourceText("error.import.transferSharedSkillExists"),
+                }),
+              );
+            return;
+          }
+          yield* port.add(bytes).pipe(Effect.mapError(archiveFailure));
+        }),
+      );
+      if (Result.isFailure(result))
+        warnings.push(sourceText("error.import.transferSettingSkipped", { name, reason: message(result.failure) }));
+    }
+  });
+
+  /** The members' choices for the manifest, for the agents and channels in the file only. */
+  #exportMemberPreferences(
+    agentKeys: ReadonlyMap<string, string>,
+    channelKeys: ReadonlyMap<string, string>,
+  ): { memberPreferences?: MemberPreferences<string>[] } {
+    const members = this.options.memberPreferences?.read() ?? [];
+    const keyOf = (kind: SidebarPinKind, id: string) => (kind === "agent" ? agentKeys : channelKeys).get(id);
+    const exported = members.map((member) => ({
+      accountId: member.accountId,
+      server: member.server,
+      agents: member.agents.flatMap(({ agentId, level }) => {
+        const key = agentKeys.get(agentId);
+        return key ? [{ agentId: key, level }] : [];
+      }),
+      pins: member.pins.flatMap(({ kind, id }) => {
+        const key = keyOf(kind, id);
+        return key ? [{ kind, id: key }] : [];
+      }),
+    }));
+    return exported.length > 0 ? { memberPreferences: exported } : {};
+  }
+
+  /** Gives each member of the file that has an account here the choices of the file. */
+  readonly #importMemberPreferences = Effect.fn("InstanceTransfer.importMemberPreferences")(function* (
+    this: InstanceTransferService,
+    values: readonly unknown[],
+    agentIds: ReadonlyMap<string, string>,
+    channelIds: ReadonlyMap<string, string>,
+    /** The owner imports: only then can an entry of the owner's account change the owner's choices. */
+    owner: boolean,
+    warnings: string[],
+  ) {
+    const port = this.options.memberPreferences;
+    if (!port) return;
+    let failed = 0;
+    for (const value of values) {
+      const member = decodeMemberPreferences(value);
+      if (!member) continue;
+      const idOf = (kind: SidebarPinKind, key: string) => (kind === "agent" ? agentIds : channelIds).get(key);
+      const result = yield* Effect.result(
+        port.apply(
+          {
+            accountId: member.accountId,
+            server: member.server,
+            agents: member.agents.flatMap(({ agentId, level }) => {
+              const id = agentIds.get(agentId);
+              return id ? [{ agentId: id, level }] : [];
+            }),
+            pins: member.pins.flatMap(({ kind, id }) => {
+              const mapped = idOf(kind, id);
+              return mapped ? [{ kind, id: mapped }] : [];
+            }),
+          },
+          owner,
+        ),
+      );
+      if (Result.isFailure(result)) failed += 1;
+    }
+    if (failed > 0) warnings.push(sourceText("error.import.transferMemberPreferencesSkipped", { count: failed }));
+  });
+
+  /**
+   * The server's name and logo for the manifest, with the logo's size; the logo goes into `server/`.
+   * A logo file that is gone leaves the logo out, and the name still goes.
+   */
+  readonly #exportServerIdentity = Effect.fn("InstanceTransfer.exportServerIdentity")(function* (
+    this: InstanceTransferService,
+    entries: ZipEntry[],
+  ): Effect.fn.Return<{ serverIdentity?: TransferManifestFile["serverIdentity"]; bytes?: number }> {
+    const identity = this.options.serverIdentity?.read();
+    if (!identity) return {};
+    const source = identity.logo;
+    const size = source
+      ? yield* archiveCall(() => stat(source.path)).pipe(
+          Effect.map((info) => (info.isFile() ? info.size : null)),
+          Effect.orElseSucceed(() => null),
+        )
+      : null;
+    if (!source || size === null) return { serverIdentity: { name: identity.name, logo: null }, bytes: 0 };
+    const logo = { path: `${SERVER_FOLDER}/logo.${AVATAR_EXTENSIONS[source.mimeType]}`, mimeType: source.mimeType };
+    entries.push({ name: logo.path, read: () => readFile(source.path) });
+    return { serverIdentity: { name: identity.name, logo }, bytes: size };
+  });
+
+  /**
+   * Gives this server the name and logo of the file, through the same save as Server settings >
+   * General. A name or logo that this server does not accept is a warning.
+   */
+  readonly #importServerIdentity = Effect.fn("InstanceTransfer.importServerIdentity")(function* (
+    this: InstanceTransferService,
+    archive: ArchiveFile,
+    value: unknown,
+    warnings: string[],
+  ) {
+    const port = this.options.serverIdentity;
+    if (!port || !isDynamicRecord(value) || typeof value.name !== "string") return;
+    const name = value.name;
+    const result = yield* Effect.result(
+      Effect.gen(function* () {
+        // The logo changes only when the file has one that reads: a logo that is not in the file, or
+        // that cannot be read, leaves this server's logo as it is.
+        let logo: AvatarImageInput | null = null;
+        const source = isDynamicRecord(value.logo) ? value.logo : null;
+        if (
+          source &&
+          typeof source.path === "string" &&
+          typeof source.mimeType === "string" &&
+          source.path.startsWith(`${SERVER_FOLDER}/`) &&
+          !isUnsafeArchivePath(source.path)
+        ) {
+          const bytes = (yield* readEntriesEffect(archive, [source.path], AVATAR_IMAGE_LIMITS.storedBytes))[
+            source.path
+          ];
+          if (bytes) logo = parseAvatarImage({ mimeType: source.mimeType, bytes });
+        }
+        const input = parseHostIdentity({ serverName: name, ...(logo ? { logo } : {}) });
+        yield* port.save(input);
+      }),
+    );
+    if (Result.isFailure(result))
+      warnings.push(sourceText("error.import.transferSettingSkipped", { name, reason: message(result.failure) }));
+  });
 
   /** Clear files from the previous process before either writer creates a file. */
   readonly #prepareUploadDirectory = Effect.fn("InstanceTransfer.prepareUploadDirectory")(function* (
@@ -584,6 +1142,10 @@ export class InstanceTransferService {
         };
       }),
       hasSettings: manifest.settings !== null,
+      hasServerPreferences:
+        manifest.serverPreferences !== null ||
+        manifest.serverIdentity !== null ||
+        manifest.memberPreferences.length > 0,
       warnings: bounded(warnings),
     };
   });
@@ -615,6 +1177,8 @@ export class InstanceTransferService {
     owner = LOCAL_OWNER,
     /** The caller's zone, for routines with no valid zone. A zone that is not valid reads as the host's. */
     timezone?: string,
+    /** Who creates the channels: the member who imports, or the local user. */
+    actor?: ChannelActor,
   ): Effect.fn.Return<InstanceTransferResult, ArchiveOperationError> {
     const staged = this.#staged.get(input.token);
     // Another member's token reads as a closed file, so the answer does not show that it exists.
@@ -622,7 +1186,9 @@ export class InstanceTransferService {
       return yield* archiveFailure(new Error(sourceText("error.import.exportClosed")));
     this.#staged.delete(staged.token);
     const fallbackTimezone = timezone !== undefined && validTimezone(timezone) ? timezone : this.#timezone();
-    return yield* this.#applyStaged(staged, input, fallbackTimezone).pipe(Effect.ensuring(this.#drop(staged)));
+    return yield* this.#applyStaged(staged, input, fallbackTimezone, actor ?? this.options.channelActor()).pipe(
+      Effect.ensuring(this.#drop(staged)),
+    );
   }).bind(this);
 
   readonly #applyStaged = Effect.fn("InstanceTransfer.applyStaged")(function* (
@@ -630,6 +1196,7 @@ export class InstanceTransferService {
     staged: StagedTransfer,
     input: ApplyInstanceTransferInput,
     fallbackTimezone: string,
+    actor: ChannelActor,
   ): Effect.fn.Return<InstanceTransferResult, ArchiveOperationError> {
     const selected = staged.manifest.agents.filter((agent) => input.keys.includes(agent.key));
     if (selected.length !== input.keys.length)
@@ -655,9 +1222,11 @@ export class InstanceTransferService {
     const skipped: AgentImportSkipped[] = [];
     const agentIds = new Map<string, string>();
     const routineIds = new Map<string, string>();
+    /** The new id of each imported run, by its id in the file, so a chat names the copy. */
+    const runIds = new Map<string, string>();
     for (const agent of selected) {
       const result = yield* Effect.result(
-        this.#importAgent(archive, staged, agent, routineIds, warnings, fallbackTimezone),
+        this.#importAgent(archive, staged, agent, routineIds, runIds, warnings, fallbackTimezone),
       );
       if (Result.isFailure(result)) {
         skipped.push({ key: agent.key, name: agent.name, reason: message(result.failure.cause) });
@@ -666,7 +1235,87 @@ export class InstanceTransferService {
         agentIds.set(agent.key, result.success.id);
       }
     }
+    // Chats after every agent and routine exists, so each link in a message finds its copy. Their
+    // files go to the upload folder, which a restart clears, in a folder with a random name.
+    const uploads = this.options.uploadDirectory;
+    const scratch = uploads ? yield* this.#prepareUploadDirectory(uploads).pipe(Effect.as(uploads)) : tmpdir();
+    for (const agent of selected) {
+      const agentId = agentIds.get(agent.key);
+      if (!agentId || !agent.history) continue;
+      yield* importHistory(
+        archive,
+        this.options.agents,
+        {
+          index: agent.history,
+          agentId,
+          agentName: agent.name,
+          prefix: agentPrefix(agent.key),
+          agentIds,
+          routineIds,
+          runIds,
+          scratch,
+          readerId: actor.id,
+        },
+        warnings,
+      ).pipe(
+        Effect.catch(() =>
+          Effect.sync(() => warnings.push(sourceText("error.import.transferHistorySkipped", { name: agent.name }))),
+        ),
+      );
+    }
+    const channelIds = new Map<string, string>();
+    for (const channel of staged.manifest.channels) {
+      const result = yield* Effect.result(
+        this.#importChannel(
+          archive,
+          channel,
+          agentIds,
+          routineIds,
+          runIds,
+          actor,
+          staged.manifest.exporter,
+          warnings,
+          fallbackTimezone,
+          scratch,
+        ),
+      );
+      if (Result.isFailure(result))
+        warnings.push(
+          sourceText("error.import.transferSettingSkipped", {
+            name: channel.name,
+            reason: message(result.failure.cause),
+          }),
+        );
+      else if (result.success) channelIds.set(channel.key, result.success);
+    }
+    if (settings?.workflows && this.options.settings.workflows)
+      yield* importWorkflows(settings.workflows, this.options.settings.workflows, agentIds, channelIds, warnings);
     if (settings) yield* this.#applyLayout(settings, agentIds, routineIds, warnings);
+    // A member who is not on this server yet gets nothing: their member id here is new.
+    if (input.includeServerPreferences && staged.manifest.memberPreferences.length > 0)
+      yield* this.#importMemberPreferences(
+        staged.manifest.memberPreferences,
+        agentIds,
+        channelIds,
+        this.#isOwner(staged.owner),
+        warnings,
+      );
+    // After the agents, so a skill that an agent brought is already in the library.
+    if (input.includeSettings && staged.manifest.sharedSkills.length > 0)
+      yield* this.#importSharedSkills(archive, staged.manifest.sharedSkills, warnings);
+    // With the settings, and only by the owner: the name is the one every member and the account see.
+    if (input.includeServerPreferences && staged.manifest.serverIdentity && this.#isOwner(staged.owner))
+      yield* this.#importServerIdentity(archive, staged.manifest.serverIdentity, warnings);
+    // With the settings: the import into a new server sets it up as the old one was.
+    // Only on request: "Import server settings" of a released client adds what is missing, and
+    // replaces nothing (`instance-transfer-full-copy-v1`).
+    if (input.includeServerPreferences && staged.manifest.serverPreferences && this.options.serverPreferences)
+      yield* applyServerPreferences(
+        this.options.serverPreferences,
+        staged.manifest.serverPreferences,
+        this.#isOwner(staged.owner),
+        warnings,
+      );
     if (staged.manifest.shared) yield* this.#importShared(archive, staged.manifest.shared, warnings);
 
     const signedIn = new Set(this.options.settings.signedInProviders());
@@ -793,6 +1442,18 @@ export class InstanceTransferService {
           sourceText("error.import.transferRoutineFlowSkipped", { reason: message(causeOf(connected.failure)) }),
         );
     }
+
+    // A place on a canvas only helps the user find a node again, so one that fails is left out.
+    for (const position of settings.routineFlowPositions ?? []) {
+      const agentId = agentIds.get(position.agentKey);
+      const [kind, key] = position.nodeKey.split(":", 2);
+      const id =
+        kind === "agent" ? agentIds.get(key ?? "") : kind === "routine" ? routineIds.get(key ?? "") : undefined;
+      if (!agentId || !id || !port.saveRoutineFlowPosition) continue;
+      yield* port
+        .saveRoutineFlowPosition({ agentId, nodeKey: `${kind}:${id}`, x: position.x, y: position.y })
+        .pipe(Effect.ignore);
+    }
   });
 
   /** Copies `~/OpenBot/Shared` files. A file that is already here is kept as it is. */
@@ -825,12 +1486,224 @@ export class InstanceTransferService {
     if (kept > 0) warnings.push(sourceText("error.import.transferSharedKept", { number: kept }));
   });
 
+  /** The routines of an agent or a channel that a webhook starts. */
+  readonly #readWebhookRoutines = Effect.fn("InstanceTransfer.readWebhookRoutines")(function* (
+    this: InstanceTransferService,
+    owner: EventRoutineOwner,
+  ) {
+    const port = this.options.webhookRoutines;
+    if (!port) return [];
+    const routines = yield* port.list(owner).pipe(Effect.orElseSucceed((): EventRoutine[] => []));
+    return routines.flatMap((routine): TransferWebhookRoutine[] =>
+      routine.trigger.kind === "webhook"
+        ? [
+            {
+              key: routine.id,
+              name: routine.name,
+              instruction: routine.instruction,
+              active: routine.active,
+              timezone: routine.timezone,
+              eventType: routine.trigger.eventType,
+              filters: routine.trigger.filters,
+              ...(routine.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
+              ...(routine.missedPolicy ? { missedPolicy: routine.missedPolicy } : {}),
+              ...(routine.runIn ? { runIn: routine.runIn } : {}),
+            },
+          ]
+        : [],
+    );
+  });
+
+  /**
+   * Adds the routines that a webhook starts. Each one gets a new address and secret here, which the
+   * user gives to the sender, so each one is a warning that says so.
+   */
+  readonly #importWebhookRoutines = Effect.fn("InstanceTransfer.importWebhookRoutines")(function* (
+    this: InstanceTransferService,
+    owner: EventRoutineOwner,
+    values: readonly unknown[],
+    ownerName: string,
+    routineIds: Map<string, string>,
+    warnings: string[],
+    fallbackTimezone: string,
+    /** The owner is an agent that its source app had stopped, so each routine is added turned off. */
+    routinesOff = false,
+  ) {
+    const port = this.options.webhookRoutines;
+    if (!port) return;
+    for (const value of values) {
+      const routine = decodeWebhookRoutine(value);
+      if (!routine) continue;
+      const saved = yield* Effect.result(
+        port.save({
+          owner,
+          name: routine.name,
+          instruction: routine.instruction,
+          active: routine.active && !routinesOff,
+          timezone: validTimezone(routine.timezone) ? routine.timezone : fallbackTimezone,
+          trigger: routine.trigger,
+          ...(routine.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
+          ...(routine.missedPolicy ? { missedPolicy: routine.missedPolicy } : {}),
+          ...(owner.kind === "agent" && routine.runIn ? { runIn: routine.runIn } : {}),
+        }),
+      );
+      if (Result.isFailure(saved)) {
+        warnings.push(
+          sourceText("error.import.routineSkipped", {
+            name: ownerName,
+            routine: routine.name,
+            reason: message(causeOf(saved.failure)),
+          }),
+        );
+        continue;
+      }
+      routineIds.set(routine.key, saved.success.routine.id);
+      warnings.push(sourceText("error.import.transferRoutineWebhook", { name: ownerName, routine: routine.name }));
+    }
+  });
+
+  /** Creates a channel of the imported members. A step that fails deletes it, and the others go on. */
+  readonly #importChannel = Effect.fn("InstanceTransfer.importChannel")(function* (
+    this: InstanceTransferService,
+    archive: ArchiveFile,
+    source: TransferChannel,
+    agentIds: ReadonlyMap<string, string>,
+    routineIds: Map<string, string>,
+    runIds: Map<string, string>,
+    actor: ChannelActor,
+    exporter: string | null,
+    warnings: string[],
+    fallbackTimezone: string,
+    /** Where the files of the messages wait while they are copied. */
+    scratch: string,
+  ): Effect.fn.Return<string | null, ArchiveOperationError> {
+    const members = source.members.flatMap((key) => {
+      const agentId = agentIds.get(key);
+      return agentId ? [{ agentId }] : [];
+    });
+    // The user did not import any member: the channel is not offered.
+    if (members.length === 0) return null;
+    const leadAgentId = source.lead ? (agentIds.get(source.lead) ?? null) : null;
+    const draft = {
+      name: source.name,
+      title: source.title,
+      instructions: source.instructions,
+      members,
+      leadAgentId,
+      ...(source.isolated === undefined ? {} : { isolated: source.isolated }),
+      // A value this version cannot read, such as a kind from a later version, gives the browser to no member.
+      ...(source.browser === undefined
+        ? {}
+        : {
+            browser: isChannelBrowser(source.browser)
+              ? transferBrowser(source.browser, (key) => agentIds.get(key))
+              : { kind: "none" as const },
+          }),
+      ...(isChannelIcon(source.icon) ? { icon: source.icon } : {}),
+    };
+    if (!isChannelDraft(draft)) return yield* archiveFailure(new Error(sourceText("error.import.transferNotFile")));
+    const image = source.image
+      ? avatarImage((yield* readEntriesEffect(archive, [source.image], AVATAR_IMAGE_LIMITS.sourceBytes))[source.image])
+      : null;
+    if (source.image && !image) warnings.push(sourceText("error.import.avatarSkipped", { name: source.name }));
+
+    const port = this.options.agents;
+    let completed = false;
+    return yield* Effect.acquireUseRelease(
+      port.channels
+        .command({ type: "save", operationId: randomUUID(), channelId: randomUUID(), draft }, actor)
+        .pipe(Effect.mapError(failure)),
+      (channel) =>
+        Effect.gen({ self: this }, function* () {
+          if (image) yield* port.channels.setImage(channel.id, image).pipe(Effect.mapError(failure));
+          // A memory that this computer refuses, such as a repeated text, is left out.
+          for (const text of source.memories)
+            yield* archiveSync(() => port.createChannelMemory({ channelId: channel.id, text })).pipe(Effect.ignore);
+          for (const routine of source.routines) {
+            const created = yield* archiveSync(() =>
+              port.createChannelRoutine({
+                channelId: channel.id,
+                name: routine.name,
+                instruction: routine.instruction,
+                active: routine.active,
+                timezone: validTimezone(routine.timezone) ? routine.timezone : fallbackTimezone,
+                schedule: routine.schedule,
+                ...(routine.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
+                ...(routine.missedPolicy ? { missedPolicy: routine.missedPolicy } : {}),
+              }),
+            ).pipe(Effect.result);
+            if (Result.isSuccess(created)) {
+              routineIds.set(routine.key, created.success.id);
+              const routineId = created.success.id;
+              const runs = decodeRuns(routine.runs, true);
+              importRuns(
+                () => port.importChannelRoutineRuns(channel.id, routineId, runs),
+                runs,
+                runIds,
+                () => sourceText("error.import.transferRunsSkipped", { name: source.name, routine: routine.name }),
+                warnings,
+              );
+            } else
+              warnings.push(
+                sourceText("error.import.routineSkipped", {
+                  name: source.name,
+                  routine: routine.name,
+                  reason: message(created.failure.cause),
+                }),
+              );
+          }
+          yield* this.#importWebhookRoutines(
+            { kind: "channel", id: channel.id },
+            source.webhookRoutines ?? [],
+            source.name,
+            routineIds,
+            warnings,
+            fallbackTimezone,
+          );
+          if (source.messages?.length) {
+            const lead = source.lead ? agentIds.get(source.lead) : undefined;
+            yield* importChannelMessages(archive, port.channels, {
+              channelId: channel.id,
+              parts: source.messages,
+              files: decodeChannelFiles(source.files, channelPrefix(source.key)),
+              prefix: channelPrefix(source.key),
+              agentIds,
+              routineIds,
+              runIds,
+              exporter,
+              actor,
+              fileOwner: lead ?? members[0]?.agentId ?? null,
+              scratch,
+            });
+            // The history was read on the other computer, so it does not arrive unread. The command
+            // also tells the open views about the messages.
+            const last = port.channels.store.messages(channel.id, undefined, 1).at(-1);
+            if (last)
+              yield* port.channels
+                .command(
+                  { type: "read", operationId: randomUUID(), channelId: channel.id, throughSequence: last.sequence },
+                  actor,
+                )
+                .pipe(Effect.mapError(failure));
+          }
+          if (source.archived)
+            yield* port.channels
+              .command({ type: "archive", operationId: randomUUID(), channelId: channel.id }, actor)
+              .pipe(Effect.mapError(failure));
+          completed = true;
+          return channel.id;
+        }),
+      (channel) => (completed ? Effect.void : port.deleteChannel(channel.id).pipe(Effect.ignore)),
+    );
+  });
+
   readonly #importAgent = Effect.fn("InstanceTransfer.importAgent")(function* (
     this: InstanceTransferService,
     archive: ArchiveFile,
     staged: StagedTransfer,
     source: TransferAgent,
     routineIds: Map<string, string>,
+    runIds: Map<string, string>,
     warnings: string[],
     fallbackTimezone: string,
   ): Effect.fn.Return<AgentSummary, ArchiveOperationError> {
@@ -907,6 +1780,7 @@ export class InstanceTransferService {
             );
           }
 
+          const routinesOff = hiddenAgentWasStopped(source.preferences);
           for (const routine of transferRoutines(source)) {
             const created = yield* archiveSync(() =>
               this.options.agents.createRoutine(
@@ -914,7 +1788,7 @@ export class InstanceTransferService {
                   agentId: agent.id,
                   name: routine.name,
                   instruction: routine.instruction,
-                  active: routine.active,
+                  active: routine.active && !routinesOff,
                   timezone: validTimezone(routine.timezone) ? routine.timezone : fallbackTimezone,
                   schedule: routine.schedule,
                   ...(routine.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
@@ -924,8 +1798,18 @@ export class InstanceTransferService {
                 { recordConversationEvent: false },
               ),
             ).pipe(Effect.result);
-            if (Result.isSuccess(created)) routineIds.set(routine.key, created.success.id);
-            else
+            if (Result.isSuccess(created)) {
+              routineIds.set(routine.key, created.success.id);
+              const routineId = created.success.id;
+              const runs = decodeRuns(routine.runs, false);
+              importRuns(
+                () => this.options.agents.importRoutineRuns(agent.id, routineId, runs),
+                runs,
+                runIds,
+                () => sourceText("error.import.transferRunsSkipped", { name: source.name, routine: routine.name }),
+                warnings,
+              );
+            } else
               warnings.push(
                 sourceText("error.import.routineSkipped", {
                   name: source.name,
@@ -934,6 +1818,16 @@ export class InstanceTransferService {
                 }),
               );
           }
+
+          yield* this.#importWebhookRoutines(
+            { kind: "agent", id: agent.id },
+            source.webhookRoutines ?? [],
+            source.name,
+            routineIds,
+            warnings,
+            fallbackTimezone,
+            routinesOff,
+          );
 
           // The limit can be lower here than on the computer that made the file.
           const memoryLimit = this.options.agents.memoryLimit();
@@ -971,6 +1865,15 @@ export class InstanceTransferService {
               ...(isAvatarColor(source.chatColor) ? { chatColor: source.chatColor } : {}),
             })
             .pipe(Effect.mapError(failure));
+          // Every step here is a warning when it fails, so the agent stays.
+          yield* applyPreferences(
+            agent,
+            source.preferences,
+            this.options.agents,
+            this.options.preferences ?? null,
+            this.#isOwner(staged.owner),
+            warnings,
+          );
           completed = true;
           return agent;
         }),
@@ -1147,14 +2050,110 @@ function named(name: string): (reason: string) => string {
   return (reason) => sourceText("error.import.transferSettingSkipped", { name, reason });
 }
 
+/** A routine that a webhook starts, checked as a save checks it. */
+function decodeWebhookRoutine(value: unknown) {
+  if (!isDynamicRecord(value)) return null;
+  const { key, name, instruction, active, timezone, eventType, filters, limitPolicy, missedPolicy, runIn } = value;
+  const trigger = { kind: "webhook" as const, eventType, filters };
+  if (
+    typeof key !== "string" ||
+    typeof name !== "string" ||
+    typeof instruction !== "string" ||
+    typeof active !== "boolean" ||
+    typeof timezone !== "string" ||
+    !isEventRoutineTriggerInput(trigger) ||
+    trigger.kind !== "webhook"
+  )
+    return null;
+  return {
+    key,
+    name,
+    instruction,
+    active,
+    timezone,
+    trigger,
+    limitPolicy: ROUTINE_LIMIT_POLICIES.find((known) => known === limitPolicy),
+    missedPolicy: ROUTINE_MISSED_POLICIES.find((known) => known === missedPolicy),
+    runIn: ROUTINE_RUN_PLACES.find((known) => known === runIn),
+  };
+}
+
+/** A canvas node key in the file: an agent by its key, a routine by its key. Others are left out. */
+function filePositionKey(
+  nodeKey: string,
+  agentKeys: ReadonlyMap<string, string>,
+  routineKeys: ReadonlySet<string>,
+): string | null {
+  const [kind, id] = nodeKey.split(":", 2);
+  if (kind === "agent" && id) {
+    const key = agentKeys.get(id);
+    return key ? `agent:${key}` : null;
+  }
+  return kind === "routine" && id && routineKeys.has(id) ? nodeKey : null;
+}
+
+/** A routine of an agent or a channel, as the file keeps it. */
+function transferRoutine(routine: Routine | ChannelRoutine): TransferAgent["routines"][number] {
+  return {
+    key: routine.id,
+    name: routine.name,
+    instruction: routine.instruction,
+    active: routine.active,
+    timezone: routine.timezone,
+    schedule: routine.trigger.schedule,
+    ...(routine.limitPolicy ? { limitPolicy: routine.limitPolicy } : {}),
+    ...(routine.missedPolicy ? { missedPolicy: routine.missedPolicy } : {}),
+    ...("runIn" in routine && routine.runIn ? { runIn: routine.runIn } : {}),
+  };
+}
+
+/** The runs of one routine for the file. A history that cannot be read leaves the routine without runs. */
+function runsOf(read: () => RoutineRunFields[]): { runs?: TransferRun[] } {
+  try {
+    const runs = transferRuns(read());
+    return runs.length > 0 ? { runs } : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Writes the runs of one imported routine and records each new run id by the id in the file, so the
+ * chats can name the copies. A history that fails is a warning: the routine stays.
+ */
+function importRuns(
+  write: () => string[],
+  runs: readonly TransferRun[],
+  runIds: Map<string, string>,
+  warning: () => string,
+  warnings: string[],
+): void {
+  if (runs.length === 0) return;
+  try {
+    const ids = write();
+    for (const [index, run] of runs.entries()) {
+      const id = ids[index];
+      if (id) runIds.set(run.id, id);
+    }
+  } catch {
+    warnings.push(warning());
+  }
+}
+
 /** The routines of an agent in a file, with the one-time routines that older apps skip. */
 function transferRoutines(agent: TransferAgent): TransferAgent["routines"] {
   return [...agent.routines, ...(agent.oneTimeRoutines ?? [])];
 }
 
+/** The Shared folders that a transfer never copies as files. */
 function isSharedData(name: string): boolean {
   const lower = name.toLowerCase();
-  return lower === SHARED_DATA || lower.startsWith(`${SHARED_DATA}/`);
+  return [SHARED_DATA, SHARED_TRANSFERS].some((folder) => lower === folder || lower.startsWith(`${folder}/`));
+}
+
+/** An export that is read and checked, and not written yet. */
+export interface PreparedExport {
+  write(path: string): Effect.Effect<InstanceExportResult, ArchiveOperationError>;
 }
 
 interface ZipEntry {
@@ -1229,4 +2228,47 @@ function bounded(warnings: string[]): string[] {
 function message(error: unknown): string {
   const text = error instanceof Error ? error.message : "The import failed.";
   return text.slice(0, AGENT_IMPORT_LIMITS.message);
+}
+
+/**
+ * The browser rule with its member mapped between agent ids and archive keys. A named member that is not
+ * in the file, or that the user did not import, gives the browser to no member: the rule never opens up.
+ */
+function transferBrowser(browser: ChannelBrowser, map: (id: string) => string | undefined): ChannelBrowser {
+  if (browser.kind !== "member") return browser;
+  const agentId = map(browser.agentId);
+  return agentId ? { kind: "member", agentId } : { kind: "none" };
+}
+
+/** Two skill packages with the same files and the same bytes in each. */
+function sameFiles(a: Record<string, Uint8Array>, b: Record<string, Uint8Array>): boolean {
+  const names = Object.keys(a);
+  if (names.length !== Object.keys(b).length) return false;
+  return names.every((name) => {
+    const other = b[name];
+    return other !== undefined && Buffer.from(a[name] ?? []).equals(Buffer.from(other));
+  });
+}
+
+/** One member's choices from the file, or null when the entry is invalid. */
+function decodeMemberPreferences(value: unknown): MemberPreferences<string> | null {
+  if (!isDynamicRecord(value) || typeof value.accountId !== "string" || value.accountId.length > 128) return null;
+  const server = value.server === null || isServerNotificationLevel(value.server) ? value.server : null;
+  const agents = Array.isArray(value.agents)
+    ? value.agents.flatMap((entry): MemberPreferences<string>["agents"] =>
+        isDynamicRecord(entry) && isAgentImportKey(entry.agentId) && isServerNotificationLevel(entry.level)
+          ? [{ agentId: entry.agentId, level: entry.level }]
+          : [],
+      )
+    : [];
+  const pins = Array.isArray(value.pins)
+    ? value.pins
+        .slice(0, SIDEBAR_PIN_LIMIT)
+        .flatMap((entry): MemberPreferences<string>["pins"] =>
+          isDynamicRecord(entry) && isOneOf(SIDEBAR_PIN_KINDS, entry.kind) && isAgentImportKey(entry.id)
+            ? [{ kind: entry.kind, id: entry.id }]
+            : [],
+        )
+    : [];
+  return { accountId: value.accountId, server, agents, pins };
 }

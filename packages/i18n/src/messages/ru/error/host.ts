@@ -23,6 +23,7 @@ export const messages = {
   "error.host.noServer": "На этом компьютере нет сервера, который можно изменить.",
   "error.host.identityLocalOnly": "Название и логотип сервера можно изменить только на компьютере, где он работает.",
   "error.host.timezoneInvalid": "Этот часовой пояс неизвестен.",
+  "error.host.turnLimitInvalid": "Это ограничение потоков недопустимо.",
   "error.host.maintenanceInterrupted":
     "Обслуживание хоста прервано. Проверьте приложение и сбросьте состояние хоста, прежде чем повторять.",
   "error.host.updateFailed":

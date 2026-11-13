@@ -19,6 +19,7 @@ export const messages = {
   "mobile.app.route.deletedChannels": "已删除的频道",
   "mobile.app.route.cropPhoto": "移动与缩放",
   "mobile.app.route.queuedMessages": "排队的消息",
+  "mobile.app.route.pinnedMessages": "置顶消息",
   "mobile.app.route.thinking": "思考过程",
   "mobile.app.route.messageOptions": "消息选项",
   "mobile.app.route.editMessage": "编辑消息",

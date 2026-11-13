@@ -1,4 +1,9 @@
-import { CHAT_VISUAL_FRAME_SANDBOX, CHAT_VISUAL_PAGE_LIMIT, chatVisualDocument } from "@openbot/contracts/chat-visual";
+import {
+  CHAT_VISUAL_FRAME_SANDBOX,
+  CHAT_VISUAL_PAGE_LIMIT,
+  type ChatVisualDocumentOptions,
+  chatVisualDocument,
+} from "@openbot/contracts/chat-visual";
 import { isTrustedRendererUrl } from "./trusted-renderer";
 
 /**
@@ -16,9 +21,9 @@ function baseMimeType(mimeType: string): string {
   return (mimeType.split(";", 1)[0] ?? "").trim().toLowerCase();
 }
 
-export function chatVisualResponse(bytes: Uint8Array): Response {
+export function chatVisualResponse(bytes: Uint8Array, options: ChatVisualDocumentOptions = {}): Response {
   if (bytes.byteLength > CHAT_VISUAL_PAGE_LIMIT) return new Response("Not found", { status: 404 });
-  return new Response(chatVisualDocument(new TextDecoder().decode(bytes)), {
+  return new Response(chatVisualDocument(new TextDecoder().decode(bytes), options), {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       "Content-Security-Policy": `sandbox ${CHAT_VISUAL_FRAME_SANDBOX}`,

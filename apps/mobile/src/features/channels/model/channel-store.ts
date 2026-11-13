@@ -1,7 +1,9 @@
+import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import {
   CHANNEL_CHATS_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
+  type Channel,
   type ChannelCommand,
   type ChannelPage,
   type ChannelSummary,
@@ -15,13 +17,19 @@ import {
   type RespondToPromptInput,
   type UpdateChannelRoutineInput,
 } from "@openbot/contracts/ipc";
+import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import {
+  CHANNEL_PICTURE_CAPABILITY,
+  CHANNEL_PICTURE_ROUTES,
+} from "@openbot/contracts/team-protocol/channel-picture-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import { replaceEqualDeep } from "@tanstack/react-query";
 import { answeredPromptResolution } from "../../chat/model/question-prompt";
+import { saveChannelImage, savedChannelImage } from "../../workspace/model/agent-avatar-cache";
 
 export type ChannelRequest = <T>(
   method: string,
@@ -39,6 +47,8 @@ export interface ChannelState {
   canDelete: boolean;
   /** The host takes `cancel` for a stopped task (`channel-task-cancel-v1`). */
   canCancelTasks: boolean;
+  /** The host takes a channel icon and image (`channel-picture-v1`). */
+  canSetPicture: boolean;
   loading: boolean;
   /** The host list has loaded at least once, or the host has no channels to list. */
   listed: boolean;
@@ -51,6 +61,7 @@ const EMPTY: ChannelState = {
   supported: false,
   canDelete: false,
   canCancelTasks: false,
+  canSetPicture: false,
   loading: false,
   listed: false,
   error: null,
@@ -145,6 +156,7 @@ export class MobileChannelStore {
       next.supported === entry.state.supported &&
       next.canDelete === entry.state.canDelete &&
       next.canCancelTasks === entry.state.canCancelTasks &&
+      next.canSetPicture === entry.state.canSetPicture &&
       next.loading === entry.state.loading &&
       next.listed === entry.state.listed &&
       next.error === entry.state.error
@@ -160,6 +172,7 @@ export class MobileChannelStore {
       supported,
       canDelete: capabilities.includes(CHANNEL_DELETE_CAPABILITY),
       canCancelTasks: capabilities.includes(CHANNEL_TASK_CANCEL_CAPABILITY),
+      canSetPicture: capabilities.includes(CHANNEL_PICTURE_CAPABILITY),
       // A host without channels has its whole list already: none. A kept copy goes.
       ...(supported ? {} : { listed: true, channels: [], pages: new Map() }),
     });
@@ -176,6 +189,7 @@ export class MobileChannelStore {
       supported: true,
       canDelete: capabilities.includes(CHANNEL_DELETE_CAPABILITY),
       canCancelTasks: capabilities.includes(CHANNEL_TASK_CANCEL_CAPABILITY),
+      canSetPicture: capabilities.includes(CHANNEL_PICTURE_CAPABILITY),
       channels,
       pages: new Map(pages.filter((page) => ids.has(page.channel.id)).map((page) => [page.channel.id, page])),
     });
@@ -461,16 +475,7 @@ export class MobileChannelStore {
       return result;
     }
     if (entry.valid) {
-      entry.writes += 1;
-      const previous = entry.state.channels.find((channel) => channel.id === result.id);
-      if (!previous || result.revision >= previous.revision) {
-        const summary: ChannelSummary = { unreadCount: 0, activeTasks: 0, lastMessage: null, ...previous, ...result };
-        this.publish(entry, {
-          channels: previous
-            ? entry.state.channels.map((channel) => (channel.id === result.id ? summary : channel))
-            : [...entry.state.channels, summary],
-        });
-      }
+      this.applyChannel(entry, result);
       // A send waits for the history of an open channel, so its row replaces the phone's own. A channel
       // that no screen shows reads its history when it opens.
       if (options?.waitForRefresh && command.type === "send" && entry.observed.has(result.id))
@@ -486,6 +491,67 @@ export class MobileChannelStore {
       }
     }
     return result;
+  }
+  /** Shows a channel that the host answered, unless the phone already has a later revision. */
+  private applyChannel(entry: Entry, result: Channel) {
+    entry.writes += 1;
+    const previous = entry.state.channels.find((channel) => channel.id === result.id);
+    if (previous && result.revision < previous.revision) return;
+    const summary: ChannelSummary = { unreadCount: 0, activeTasks: 0, lastMessage: null, ...previous, ...result };
+    this.publish(entry, {
+      channels: previous
+        ? entry.state.channels.map((channel) => (channel.id === result.id ? summary : channel))
+        : [...entry.state.channels, summary],
+    });
+  }
+  /**
+   * Sets or removes the uploaded image of a channel (`channel-picture-v1`). The host gives the image a
+   * new version, so the phone reads the new file.
+   */
+  async setImage(serverId: string, channelId: string, image: RemoteFileUpload | null) {
+    const entry = this.entry(serverId);
+    if (!entry.state.canSetPicture) throw new Error(sourceText("error.remote.channelsUnsupported"));
+    const result = await this.request(
+      image ? "PUT" : "DELETE",
+      `${CHANNEL_PICTURE_ROUTES.image}?${new URLSearchParams({ channelId })}`,
+      decodeChannel,
+      undefined,
+      serverId,
+      image ?? undefined,
+    );
+    // The phone keeps the image it sent, so the new version shows without a download.
+    if (image && result.imageUrl)
+      saveChannelImage(serverId, channelId, result.imageUrl, `data:${image.mimeType};base64,${image.base64}`);
+    // The answer is the whole channel, so no list read follows. The host event refreshes the rest.
+    if (entry.valid) this.applyChannel(entry, result);
+    return result;
+  }
+  /**
+   * The image of a channel as a `file://` URI, or as a data URL when the phone cannot save it. A
+   * version that this phone has saved needs no request.
+   */
+  async image(serverId: string, channelId: string, imageUrl: string): Promise<string> {
+    const saved = savedChannelImage(serverId, channelId, imageUrl);
+    if (saved) return saved;
+    const version = new URL(imageUrl).searchParams.get("v");
+    if (!version) throw new Error("The channel image has no version.");
+    const dataUrl = await this.request(
+      "GET",
+      `${CHANNEL_PICTURE_ROUTES.image}?${new URLSearchParams({ channelId, v: version })}`,
+      (value) => {
+        if (
+          !isDynamicRecord(value) ||
+          !isString(value.mimeType) ||
+          !isAvatarMimeType(value.mimeType) ||
+          !isString(value.base64)
+        )
+          throw new Error("The host returned an invalid channel image.");
+        return `data:${value.mimeType};base64,${value.base64}`;
+      },
+      undefined,
+      serverId,
+    );
+    return saveChannelImage(serverId, channelId, imageUrl, dataUrl);
   }
   /** Reads each unread channel's latest page for its boundary, since a summary has no sequence. */
   async markAllRead(serverId: string, operationId: () => string) {

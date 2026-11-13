@@ -1,7 +1,7 @@
 import { licensePeriodAmount, licensePlanFromPrice } from "@openbot/contracts/license";
 import { Effect, Schema } from "effect";
 import { readBillingCohortCounts } from "./billing-cohorts";
-import { BillingUsd } from "./billing-usd";
+import { BillingUsd, type BillingUsdCurrency } from "./billing-usd";
 import { SalesAnalyticsDelivery, SalesAnalyticsDeliveryError } from "./sales-analytics-delivery";
 import { isLicensePrice, STRIPE_API_VERSION } from "./stripe-client";
 
@@ -122,7 +122,7 @@ interface SubscriptionSample {
   quantity: number;
   status: "active" | "past_due";
   amountMinor: number;
-  currency: "eur" | "usd" | "pln";
+  currency: BillingUsdCurrency;
   interval: "month" | "year";
   cancelAtPeriodEnd: boolean;
 }
@@ -475,7 +475,7 @@ function inferInterval(
 
 function subscriptionAmountAfterDiscount(
   subscription: StripeSubscriptionSample,
-  currency: "eur" | "usd" | "pln",
+  currency: BillingUsdCurrency,
   product: StoredSubscription["product"],
   timestamp: number,
 ): Effect.Effect<{ amountMinor: number }, BillingSnapshotError> {
@@ -525,7 +525,7 @@ function productItems(
  * cannot expand the tiers of another currency. The license service uses the same list price of the plan.
  * The amount is for the period of the Price; the caller divides a year.
  */
-function licensePriceAmount(price: StripePrice, quantity: number, currency: "eur" | "usd" | "pln"): number {
+function licensePriceAmount(price: StripePrice, quantity: number, currency: BillingUsdCurrency): number {
   if (!Number.isSafeInteger(quantity) || quantity < 0) throw new BillingSnapshotError({ code: "invalid_subscription" });
   return licensePeriodAmount(
     licensePlanFromPrice({ lookup_key: price.lookup_key ?? null, metadata: price.metadata ?? {} }),
@@ -587,8 +587,8 @@ function applyDiscounts(
   return result;
 }
 
-function isBillingUsdCurrency(value: string): value is "eur" | "usd" | "pln" {
-  return value === "eur" || value === "usd" || value === "pln";
+function isBillingUsdCurrency(value: string): value is BillingUsdCurrency {
+  return value === "eur" || value === "usd" || value === "pln" || value === "brl";
 }
 
 function addSafe(left: number, right: number): number {

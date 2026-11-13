@@ -1,0 +1,33 @@
+{
+  "slug": "aleph",
+  "name": "Aleph",
+  "tagline": "Financial data for FP&A",
+  "description": "Aleph lets agents query the financial data, reports, and models of the signed-in user's Aleph workspace. Each user signs in to their own Aleph account through the browser.",
+  "category": "data-analytics",
+  "creatorName": "Aleph",
+  "iconUrl": "https://cdn.prod.website-files.com/6778d1207e03199a243dafef/6ababa65cb4c65e204c52e53_aleph-icon-512.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-variance", "text": "Explain the variance between budget and actuals for last quarter." },
+    { "id": "prompt-burn", "text": "What is our monthly burn rate for the last six months?" },
+    { "id": "prompt-board-summary", "text": "Draft a summary of revenue and margin trends for the board pack." }
+  ],
+  "apps": [
+    {
+      "id": "app-aleph-mcp",
+      "name": "Aleph",
+      "description": "Financial data and report queries, over Aleph's MCP server with browser sign-in.",
+      "iconUrl": "https://cdn.prod.website-files.com/6778d1207e03199a243dafef/6ababa65cb4c65e204c52e53_aleph-icon-512.png",
+      "server": {
+        "name": "aleph",
+        "transport": "http",
+        "url": "https://mcp.getaleph.com/mcp",
+        "auth": [{ "id": "aleph-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.getaleph.com",
+  "privacyPolicyUrl": "https://www.getaleph.com/privacy-policy",
+  "termsUrl": "https://www.getaleph.com/terms-of-service"
+}

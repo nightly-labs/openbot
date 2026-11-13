@@ -3,7 +3,6 @@ import type { messages as source } from "../../en/error/mcp";
 
 export const messages = {
   "error.mcp.redirectByName": "Diese Adresse ist nicht über ihren Namen erreichbar.",
-  "error.mcp.redirectGetOnly": "Diese Adresse beantwortet nur GET.",
   "error.mcp.redirectNotSignIn": "Diese Adresse gehört nicht zu einer Anmeldung.",
   "error.mcp.redirectRefused": "Die Anmeldung wurde abgelehnt. Kehre zu OpenBot zurück und versuche es erneut.",
   "error.mcp.redirectNoSignIn": "Keine Anmeldung wartet darauf. Sie wurde möglicherweise bereits beendet.",

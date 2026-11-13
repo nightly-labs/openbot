@@ -1,4 +1,10 @@
-import type { GetStorageUsageInput, StorageDesktopApi, StorageUsage } from "@openbot/contracts/ipc";
+import {
+  applyLibraryFolderAction,
+  EMPTY_LIBRARY_FOLDERS,
+  type GetStorageUsageInput,
+  type StorageDesktopApi,
+  type StorageUsage,
+} from "@openbot/contracts/ipc";
 import {
   FILES_AGENT_USAGE,
   FILES_BREAKDOWN,
@@ -11,22 +17,29 @@ import {
 const GB = 1024 ** 3;
 const FREE_BYTES = 182 * GB;
 
-/** The Files fixtures as one server's storage, so a delete or clear in the preview shows at once. */
-export function createMockStorage(): StorageDesktopApi {
+/**
+ * The Files fixtures as one server's storage, so a delete or clear in the preview shows at once.
+ * `onFoldersChanged` sends `library-folders-changed`, as a host does after each folder change.
+ */
+export function createMockStorage(onFoldersChanged: () => void = () => undefined): StorageDesktopApi {
   let files = structuredClone(FILES_ROWS);
   let breakdown = structuredClone(FILES_BREAKDOWN);
   let removableRuntimes = structuredClone(FILES_REMOVABLE_RUNTIMES);
+  let libraryFolders = structuredClone(EMPTY_LIBRARY_FOLDERS);
 
   const usage = (input: GetStorageUsageInput): StorageUsage => {
+    // The fixtures hold no channel messages, so a channel has no files here.
     const inScope = (agentId: string | null, conversationId: string | null) =>
       input.scope === "host" ||
-      (input.scope === "agent" ? agentId === input.agentId : conversationId === input.conversationId);
+      (input.scope === "agent" && agentId === input.agentId) ||
+      (input.scope === "conversation" && conversationId === input.conversationId);
     const scopedFiles = files.filter((file) => inScope(file.agentId, file.conversation?.id ?? null));
     const agentBreakdown = input.scope === "agent" && input.agentId === "chief" ? FILES_CHIEF_BREAKDOWN : [];
     return structuredClone({
       scope: input.scope,
       agentId: input.agentId ?? null,
       conversationId: input.conversationId ?? null,
+      ...(input.channelId === undefined ? {} : { channelId: input.channelId }),
       scannedAt: new Date().toISOString(),
       freeBytes: FREE_BYTES,
       breakdown: input.scope === "host" ? breakdown : agentBreakdown,
@@ -54,12 +67,24 @@ export function createMockStorage(): StorageDesktopApi {
     deleteFile: async ({ fileId }) => {
       if (!files.some((file) => file.id === fileId)) throw new Error("The file does not exist or is already deleted.");
       files = files.filter((file) => file.id !== fileId);
+      const { [fileId]: _folder, ...placement } = libraryFolders.placement;
+      libraryFolders = { ...libraryFolders, placement };
     },
     clear: async ({ category }) => {
       breakdown = breakdown.map((row) => (row.category === category ? { ...row, bytes: 0 } : row));
     },
     openFile: async () => undefined,
     openLocation: async () => undefined,
+    getLibraryFolders: async () => structuredClone(libraryFolders),
+    changeLibraryFolders: async (action) => {
+      libraryFolders = applyLibraryFolderAction(libraryFolders, action, {
+        // The preview has no fixed list of agents: each agent can have folders.
+        agentIds: { has: () => true },
+        fileAgent: (fileId) => files.find((file) => file.id === fileId)?.agentId,
+      });
+      onFoldersChanged();
+      return structuredClone(libraryFolders);
+    },
     getRemovableRuntimes: async () => structuredClone(removableRuntimes),
     removeRemovableRuntimes: async () => {
       const { bytes } = removableRuntimes;

@@ -1,0 +1,33 @@
+{
+  "slug": "deepledger",
+  "name": "DeepLedger",
+  "tagline": "Bookkeeping for QuickBooks and Xero",
+  "description": "DeepLedger lets agents read and record transactions, reports, receivables and payables in QuickBooks Online, Xero and Bill.com, and help with reconciliation and month-end close. Each user signs in to their own DeepLedger account through the browser.",
+  "category": "other",
+  "creatorName": "DeepLedger",
+  "iconUrl": "https://deepledger.ai/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-pnl", "text": "Show the profit and loss report for last month." },
+    { "id": "prompt-uncategorized", "text": "Which bank transactions are still uncategorized?" },
+    { "id": "prompt-receivables", "text": "Which invoices are more than 30 days overdue?" }
+  ],
+  "apps": [
+    {
+      "id": "app-deepledger-mcp",
+      "name": "DeepLedger",
+      "description": "Bookkeeping, reports, and month-end close, over DeepLedger's MCP server with browser sign-in.",
+      "iconUrl": "https://deepledger.ai/favicon.ico",
+      "server": {
+        "name": "deepledger",
+        "transport": "http",
+        "url": "https://mcp.deepledger.ai/mcp",
+        "auth": [{ "id": "deepledger-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://deepledger.ai",
+  "privacyPolicyUrl": "https://deepledger.ai/privacy",
+  "termsUrl": "https://deepledger.ai/terms"
+}

@@ -1,5 +1,5 @@
 // Updates a managed provider CLI end to end on the real driver and `ProviderRuntime` while a turn
-// runs on the provider (#2473), with a fake Gemini ACP server for the installed and the new version.
+// runs on the provider (#2473), with a fake Antigravity CLI for the installed and the new version.
 // Checks that the update waits for the turn instead of failing, holds new turns meanwhile, keeps an
 // idle restart of the app away while it waits, installs when the turn ends without a restart of the
 // app, never runs two installs at once when it is asked for again while it waits, and that a cancel
@@ -13,7 +13,6 @@ import { Effect, Result } from "effect";
 import { ConversationRuntime } from "../src/backend/agent/conversation-runtime";
 import { ProviderRuntime } from "../src/backend/agent/provider-runtime";
 import { AgentStore } from "../src/backend/agent-store";
-import { ANTIGRAVITY_MANIFEST } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { BUILT_IN_PROVIDER_DRIVERS, NO_PROVIDER_CREDENTIALS } from "../src/backend/provider-drivers";
@@ -21,13 +20,18 @@ import { checkProviderAccountReload } from "./provider-account-reload-e2e";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/provider-update-busy-e2e");
 const WAIT_MS = 15_000;
-const INSTALLED = "1.2.1";
-const NEWER = "1.2.2";
+const INSTALLED = "1.5.3";
+const NEWER = "1.5.4";
 
-// An ACP server with one model. It writes its pid to `FAKE_AGY_LOG` when it starts.
-const FAKE_AGY = `#!/usr/bin/env node
+// An ACP server with one model. It prints its version for `--version`, as the Antigravity CLI does,
+// and writes its pid to `FAKE_AGY_LOG` when it starts.
+const fakeAgy = (version: string) => `#!/usr/bin/env node
 const fs = require("node:fs");
 const NL = String.fromCharCode(10);
+if (process.argv[2] === "--version") {
+  process.stdout.write("${version}" + NL);
+  process.exit(0);
+}
 fs.appendFileSync(process.env.FAKE_AGY_LOG, process.pid + NL);
 const write = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + NL);
 function handle(message) {
@@ -73,6 +77,8 @@ const root = await mkdtemp(join(tmpdir(), "openbot-provider-update-busy-e2e-"));
 const log = join(root, "agy.log");
 const report: Report = { passed: false };
 process.env.FAKE_AGY_LOG = log;
+// The driver reads and writes the sign-in in the Gemini home. Keep it off the user's `~/.gemini`.
+process.env.GEMINI_HOME = join(root, "gemini");
 
 /** Waits for a condition that another fiber or process changes, and fails after `WAIT_MS`. */
 async function waitFor(label: string, check: () => boolean): Promise<void> {
@@ -84,10 +90,9 @@ async function waitFor(label: string, check: () => boolean): Promise<void> {
 }
 
 async function installVersion(version: string): Promise<string> {
-  const executable = join(root, "agy", version, "bin", "agy_acp_server");
+  const executable = join(root, "agy", version, "bin", "antigravity");
   await mkdir(join(root, "agy", version, "bin"), { recursive: true });
-  await writeFile(join(root, "agy", version, ANTIGRAVITY_MANIFEST), JSON.stringify({ version }));
-  await writeFile(executable, FAKE_AGY);
+  await writeFile(executable, fakeAgy(version));
   await chmod(executable, 0o755);
   return executable;
 }

@@ -1009,11 +1009,31 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     return true;
   }
 
-  /** A message that a card in the chat sends for the user, such as Continue after a sign-in. */
-  function sendCardMessage(body: string): boolean {
-    const target = deps.currentTarget();
+  /**
+   * A message that a card in the chat sends for the user, such as Continue after a sign-in. A card
+   * that waits before it sends gives the chat of the click as `target`.
+   */
+  function sendCardMessage(body: string, target = deps.currentTarget()): boolean {
     if (!target || deps.submitting() || !deps.agentReady()) return false;
     queueSend(target, { text: body, attachments: [], replyToMessageId: null }, body);
+    return true;
+  }
+
+  /**
+   * A card message with a file that the app made, such as the steps of a shown task. The chat shows
+   * the short body and the file. False when the chat cannot send now or the host refuses the file.
+   */
+  async function sendCardFile(body: string, file: File): Promise<boolean> {
+    const target = deps.currentTarget();
+    if (!target || deps.submitting() || !deps.agentReady()) return false;
+    const runtime = conversationRuntime(deps.props);
+    const attachments = await importPastedFiles(
+      [file],
+      () => 0,
+      (data) => runtime.agent.importAttachmentData(data, target.serverId),
+    ).catch(() => []);
+    if (attachments.length === 0) return false;
+    queueSend(target, { text: body, attachments, replyToMessageId: null }, body);
     return true;
   }
 
@@ -1034,6 +1054,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     composerAnswersPrompt,
     sendSelectionInstruction,
     sendCardMessage,
+    sendCardFile,
     retryPendingSend,
     editPendingSend,
     dismissPendingSend,

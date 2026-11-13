@@ -5,6 +5,7 @@ import { Image } from "expo-image";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Check from "lucide-react-native/icons/check";
+import Copy from "lucide-react-native/icons/copy";
 import Download from "lucide-react-native/icons/download";
 import Share from "lucide-react-native/icons/share";
 import X from "lucide-react-native/icons/x";
@@ -162,6 +163,7 @@ export function ImageViewer({
   hiddenSource,
   busy,
   onShare,
+  onCopy,
   onSave,
   onIndexChange,
   onDismissed,
@@ -178,6 +180,8 @@ export function ImageViewer({
   /** The actions of the page on screen. */
   busy: boolean;
   onShare: () => void;
+  /** Puts the picture on the clipboard. Absent for a picture that the clipboard does not take, such as an SVG. */
+  onCopy?: (() => Promise<boolean>) | undefined;
   /** Absent for a picture that the photo library does not take, such as an SVG. */
   onSave?: (() => Promise<boolean>) | undefined;
   onIndexChange?: (index: number) => void;
@@ -245,10 +249,13 @@ export function ImageViewer({
   // React hears which page is on screen only to mount its neighbours and label the controls.
   const [shown, setShown] = useState(initialIndex);
   const [savedKeys, setSavedKeys] = useState<ReadonlySet<string>>(() => new Set());
+  // The clipboard holds one picture: the one copied last.
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const backdrop = useDerivedValue(() => clamp(t.get(), 0, 1) * fade.get());
   const motion: ViewerMotion = { t, origin, index, pageOffset, scale, shrink, tx, ty, dragX, dragY };
   const current = pages[shown] ?? pages[0];
   const saved = current ? savedKeys.has(current.key) : false;
+  const copied = current !== undefined && copiedKey === current.key;
   const name = current?.attachment.name ?? "";
   const position = text.t("mobile.chat.imageViewer.position", { current: shown + 1, total: count });
 
@@ -751,6 +758,32 @@ export function ImageViewer({
               >
                 <Share size={20} color={String(foreground)} />
               </ChatGlassIconButton>
+              {onCopy ? (
+                <ChatGlassIconButton
+                  accessibilityLabel={
+                    copied ? text.t("mobile.chat.imageViewer.copied") : text.t("mobile.chat.imageViewer.copy", { name })
+                  }
+                  hidden={!chromeVisible}
+                  disabled={busy}
+                  fallbackBackground={fallbackBackground}
+                  liquidGlassAvailable={liquidGlassAvailable}
+                  onPress={() => {
+                    const key = current?.key;
+                    void haptics.impact("soft");
+                    void onCopy().then((done) => {
+                      if (!done || key === undefined) return;
+                      void haptics.notification("success");
+                      setCopiedKey(key);
+                    });
+                  }}
+                >
+                  {copied ? (
+                    <Check size={21} color={String(foreground)} />
+                  ) : (
+                    <Copy size={20} color={String(foreground)} />
+                  )}
+                </ChatGlassIconButton>
+              ) : null}
               {onSave ? (
                 <ChatGlassIconButton
                   accessibilityLabel={

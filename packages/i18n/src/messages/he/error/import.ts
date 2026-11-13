@@ -40,7 +40,13 @@ export const messages = {
   "error.import.empty": "הייצוא ריק.",
   "error.import.remoteZipTooLarge": "כדי לייבא לשרת שהצטרפת אליו, הייצוא חייב להיות קובץ .zip קטן מ-100 MB.",
   "error.import.hostBusy": "השרת קורא ייצואים אחרים. יש לנסות שוב בעוד כמה דקות.",
+  "error.import.uploadDiskSpace":
+    "הייצוא צריך {size} GB של מקום פנוי בדיסק של השרת, ויש {free} GB פנויים. יש לפנות מקום בשרת, ואז לבחור שוב את הייצוא.",
+  "error.import.remoteZipTooLargeOldHost":
+    "השרת הזה מקבל ייצוא של עד 100 MB. יש לעדכן את OpenBot בשרת כדי לייבא ייצוא גדול יותר.",
   "error.import.skillKept": '{name}: בשרת כבר יש את המיומנות "{skill}", ולכן הסוכן משתמש בה. יש לבקש ממנהל לעדכן אותה.',
+  "error.import.skillRenamed":
+    '{name}: השם של המיומנות "{skill}" דומה מדי לשם של מיומנות אחרת, ולכן היא נשמרת בשם "{renamed}".',
   "error.import.hermesNoProfiles":
     "בתיקייה הזו אין פרופילי Hermes. יש לבחור את תיקיית Hermes, שמכילה את config.yaml או את SOUL.md.",
   "error.import.hermesClosed": "פרופילי Hermes אינם פתוחים עוד. יש לקרוא אותם שוב.",
@@ -63,6 +69,20 @@ export const messages = {
   "error.import.transferModelMissing":
     '{name}: המודל "{model}" עדיין אינו זמין כאן, ולכן הסוכן משתמש במודל ברירת המחדל. יש לבחור את המודל שוב כשהספק שלו יהיה מוכן.',
   "error.import.transferSettingSkipped": "{name} לא מיובא. {reason}",
+  "error.import.transferRunsSkipped": '{name}: היסטוריית הריצות של השגרה "{routine}" לא מיובאת.',
+  "error.import.transferSharedSkillsSkipped": "לא ניתן לקרוא את המיומנויות המשותפות, ולכן הן לא בקובץ.",
+  "error.import.transferSharedSkillsNotAdded": "לא ניתן להוסיף לשרת הזה את המיומנויות המשותפות שבקובץ.",
+  "error.import.transferMemberPreferencesSkipped": {
+    one: "לא ניתן לשמור את הבחירות של חבר אחד.",
+    two: "לא ניתן לשמור את הבחירות של שני חברים.",
+    other: "לא ניתן לשמור את הבחירות של {count} חברים.",
+  },
+  "error.import.transferSharedSkillExists": "מיומנות משותפת בשם הזה ועם קבצים אחרים כבר קיימת בשרת הזה.",
+  "error.import.transferServerPreferencesSkipped": {
+    one: "העדפת שרת אחת בקובץ אינה תקפה כאן, ולכן היא לא מיובאת.",
+    two: "שתי העדפות שרת בקובץ אינן תקפות כאן, ולכן הן לא מיובאות.",
+    other: "{count} העדפות שרת בקובץ אינן תקפות כאן, ולכן הן לא מיובאות.",
+  },
   "error.import.transferRoutineFlowSkipped": "הייבוא השמיט זרימת שגרה. {reason}",
   "error.import.transferCustomAgentCommand":
     '{name}: סוכנים מותאמים אישית אינם מיובאים, כי הם מריצים פקודה. יש לבדוק את הפקודה "{command}" ולהוסיף את הסוכן שוב בהגדרות.',

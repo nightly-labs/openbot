@@ -1,10 +1,10 @@
 {
-  "version": "1.4.7",
+  "version": "1.4.9",
   "highlights": [
-    "Delete a message, mark it as unread, or send its text to a channel: touch and hold the message.",
-    "Link WhatsApp numbers and change Telegram and Slack triggers and outputs from your phone. The server needs the latest OpenBot.",
-    "Use the app in Arabic, with a right-to-left layout. Each chat paragraph shows in the direction of its text.",
-    "Connect Coinbase, Robinhood, RevenueCat, TickTick, Proton Pass and Higgsfield from the Apps marketplace.",
-    "The app reconnects faster when you come back to it, uses less memory while a reply streams, and closes less often."
+    "Get fixes without a store update: when a fix is ready, the home screen shows A new OpenBot is ready. Tap Update and the app restarts with the fix.",
+    "Attach MOV or MP4 videos from Photos, and search the model list in agent settings and Create agent.",
+    "New provider pages: add an API key for ChatGPT and Claude, choose a default provider for new agents, and sign in through the browser.",
+    "Give a channel its own picture, and get a notification when an agent finishes or stops with an error in a thread. The server needs the new OpenBot version.",
+    "Connect Postiz from the Apps marketplace so agents can draft, schedule and publish social media posts."
   ]
 }

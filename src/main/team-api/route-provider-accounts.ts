@@ -1,9 +1,22 @@
 import { isString } from "@openbot/contracts/runtime-values";
 import {
+  PROVIDER_ACCOUNT_KEYS_CAPABILITY,
+  PROVIDER_ACCOUNT_KEYS_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-keys-v1";
+import {
+  PROVIDER_ACCOUNT_MODELS_CAPABILITY,
+  PROVIDER_ACCOUNT_MODELS_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-models-v1";
+import {
+  PROVIDER_ACCOUNT_POOL_CAPABILITY,
+  PROVIDER_ACCOUNT_POOL_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-pool-v1";
+import {
   PROVIDER_ACCOUNTS_CAPABILITY,
   PROVIDER_ACCOUNTS_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { redactText, registerSecretValue } from "@openbot/logging";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { parseProviderId } from "../ipc/app-inputs";
 import type { TeamApiProviderAccounts } from "./dependencies";
@@ -62,6 +75,76 @@ export async function routeProviderAccounts(
       await runCauseEffect(accounts.setAgentAccount(body.agentId, accountId));
       return json(200, {});
   }
+}
+
+/**
+ * The models that each account after the first serves and the provider's own sign-in does not.
+ * Frozen by `provider-account-models-v1`. `requireAdmin` runs on the route.
+ */
+export async function routeProviderAccountModels(
+  context: TeamApiRequestContext,
+  accounts: TeamApiProviderAccounts | undefined,
+): Promise<RouteOutcome> {
+  const { method, url, capabilities, member, json } = context;
+  if (method !== "POST" || url.pathname !== PROVIDER_ACCOUNT_MODELS_ROUTES.list) return "unmatched";
+  if (!accounts || !capabilities.has(PROVIDER_ACCOUNT_MODELS_CAPABILITY))
+    throw new HttpError(400, sourceText("error.team.providersUnsupported"));
+  requireAdmin(member);
+  return json(200, accounts.models());
+}
+
+const POOL_ROUTES: ReadonlySet<string> = new Set(Object.values(PROVIDER_ACCOUNT_POOL_ROUTES));
+
+/**
+ * The account pool of each of this host's providers. Frozen by `provider-account-pool-v1`.
+ * `requireAdmin` runs on every route.
+ */
+export async function routeProviderAccountPool(
+  context: TeamApiRequestContext,
+  accounts: TeamApiProviderAccounts | undefined,
+): Promise<RouteOutcome> {
+  const { method, url, capabilities, member, request, json } = context;
+  if (method !== "POST" || !POOL_ROUTES.has(url.pathname)) return "unmatched";
+  if (!accounts || !capabilities.has(PROVIDER_ACCOUNT_POOL_CAPABILITY))
+    throw new HttpError(400, sourceText("error.team.providersUnsupported"));
+  requireAdmin(member);
+  if (url.pathname === PROVIDER_ACCOUNT_POOL_ROUTES.list) return json(200, accounts.pools());
+  // `readJson` has already run the body through the `provider-account-pool-v1` codec.
+  const body = await readJson(request);
+  const leftOut = Array.isArray(body.leftOut) ? body.leftOut.filter(isString) : [];
+  await runCauseEffect(accounts.setPool(parseProviderId(body.provider), body.enabled === true, leftOut));
+  return json(200, {});
+}
+
+/**
+ * Gives an account of one of this host's providers its API key. Frozen by `provider-account-keys-v1`.
+ * `requireAdmin` runs on the route. The key is in the request only; no answer or log holds it.
+ */
+export async function routeProviderAccountKeys(
+  context: TeamApiRequestContext,
+  accounts: TeamApiProviderAccounts | undefined,
+): Promise<RouteOutcome> {
+  const { method, url, capabilities, member, request, json } = context;
+  if (method !== "POST" || url.pathname !== PROVIDER_ACCOUNT_KEYS_ROUTES.connect) return "unmatched";
+  if (!accounts || !capabilities.has(PROVIDER_ACCOUNT_KEYS_CAPABILITY))
+    throw new HttpError(400, sourceText("error.team.providersUnsupported"));
+  requireAdmin(member);
+  // `readJson` has already run the body through the `provider-account-keys-v1` codec.
+  const body = await readJson(request);
+  const key = isString(body.key) ? body.key.trim() : "";
+  if (!key) throw new HttpError(400, "key is invalid.");
+  registerSecretValue(key);
+  try {
+    await runCauseEffect(
+      accounts.connectKey(parseProviderId(body.provider), isString(body.accountId) ? body.accountId : null, key),
+    );
+  } catch (error) {
+    // The admin must see why the provider refused the key, as on the provider routes. A CLI can quote
+    // its key, so the message leaves this computer redacted.
+    if (error instanceof Error) throw new HttpError(409, redactText(error.message));
+    throw error;
+  }
+  return json(200, {});
 }
 
 function requiredAccount(accountId: string | null): string {

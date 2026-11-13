@@ -200,7 +200,9 @@ export function MessageSelectionActions(props: {
     };
     const onKeyUp = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        dismiss();
+        // Escape in a text field closes its own list. The caret there is the document selection.
+        if (event.target instanceof HTMLElement && event.target.isContentEditable) clearSelection();
+        else dismiss();
         return;
       }
       if (event.target instanceof Element && event.target.closest(".selection-actions-layer")) return;

@@ -127,6 +127,8 @@ export const messages = {
     "OpenAI 호환 엔드포인트를 추가하세요. 이 컴퓨터의 모델 서버나 기본 URL과 키가 있는 서비스면 돼요.",
   "provider.picker.customPending":
     "엔드포인트의 모델을 아직 불러오지 않았어요. 제공자는 현재 작업이 끝난 후 모델을 읽어요.",
+  "provider.picker.customUnlisted": "{name}에 엔드포인트의 모델이 표시되지 않아요.",
+  "provider.picker.editEndpoints": "엔드포인트 편집",
   "provider.picker.defaultModelLabel": "{name}, 기본",
   "provider.picker.usageLimit": "사용 한도에 도달했어요",
   "provider.picker.usageLimitWindow": "{window} 한도",
@@ -137,7 +139,12 @@ export const messages = {
   "provider.picker.effortLabel": "에이전트 추론 강도",
   "provider.picker.effortFixed": "{effort} ({provider}에서 고정)",
   "provider.picker.fast": "빠르게",
-  "provider.picker.fastLabel": "빠른 모드",
+  "provider.picker.fastText": "더 빠른 응답, 사용량 증가",
+  "provider.picker.speed": "속도",
+  "provider.picker.standard": "표준",
+  "provider.picker.standardText": "기본 속도",
+  "provider.picker.ultrafast": "초고속",
+  "provider.picker.ultrafastText": "가장 빠른 응답, 사용량 크게 증가",
   "provider.picker.selectEffort": "강도 선택",
   "provider.picker.custom": "사용자 지정",
   "provider.picker.cliReady": "{cli} 준비됨",
@@ -160,22 +167,36 @@ export const messages = {
   "provider.geminiKey.title": "Gemini API 키",
   "provider.geminiKey.description":
     "이 컴퓨터에 Gemini API 키를 저장하세요. 저장된 키가 Google 계정보다 우선 사용돼요. Google로 로그인하려면 키를 제거하고 Gemini 행에서 연결을 선택하세요.",
+  "provider.geminiKey.descriptionHost":
+    "호스트에 Gemini API 키를 저장하세요. 저장된 키가 Google 계정보다 우선 사용돼요. Google로 로그인하려면 키를 제거하고 Gemini 행에서 연결을 선택하세요.",
   "provider.geminiKey.label": "Gemini API 키",
   "provider.claudeKey.title": "Anthropic API 키",
   "provider.claudeKey.description":
     "호스트에 Anthropic API 키를 저장하세요. Anthropic이 각 요청을 Claude 플랜이 아닌 키의 API 크레딧으로 청구해요. 에이전트에서 사용하려면 에이전트의 모델 메뉴에서 'API 키' 계정을 선택하세요. Claude에 로그인하지 않은 경우 모든 에이전트가 키를 사용해요.",
   "provider.claudeKey.label": "Anthropic API 키",
+  "provider.cursorKey.title": "Cursor API 키",
+  "provider.cursorKey.description":
+    "두 번째부터의 Cursor 계정은 API 키를 사용해요. Cursor 대시보드의 Integrations에서 키를 만들어 여기에 붙여넣으세요. 키는 이 컴퓨터에 저장돼요.",
+  "provider.cursorKey.descriptionHost":
+    "두 번째부터의 Cursor 계정은 API 키를 사용해요. Cursor 대시보드의 Integrations에서 키를 만들어 여기에 붙여넣으세요. 키는 호스트에 저장돼요.",
+  "provider.cursorKey.label": "Cursor API 키",
   "provider.inceptionKey.title": "Inception API 키",
   "provider.inceptionKey.description":
     "Mercury 모델을 사용하려면 이 컴퓨터에 Inception API 키를 저장하세요. OpenBot은 다운로드한 Pi CLI에서 모델을 실행해요.",
+  "provider.inceptionKey.descriptionHost":
+    "Mercury 모델을 사용하려면 호스트에 Inception API 키를 저장하세요. OpenBot은 다운로드한 Pi CLI에서 모델을 실행해요.",
   "provider.inceptionKey.label": "Inception API 키",
   "provider.deepseekKey.title": "DeepSeek API 키",
   "provider.deepseekKey.description":
     "DeepSeek 모델을 사용하려면 이 컴퓨터에 DeepSeek API 키를 저장하세요. OpenBot은 다운로드한 Pi CLI에서 모델을 실행해요.",
+  "provider.deepseekKey.descriptionHost":
+    "DeepSeek 모델을 사용하려면 호스트에 DeepSeek API 키를 저장하세요. OpenBot은 다운로드한 Pi CLI에서 모델을 실행해요.",
   "provider.deepseekKey.label": "DeepSeek API 키",
   "provider.openrouterKey.title": "OpenRouter API 키",
   "provider.openrouterKey.description":
     "OpenRouter 모델을 사용하려면 이 컴퓨터에 OpenRouter API 키를 저장하세요. OpenBot은 다운로드한 Pi CLI에서 모델을 실행해요.",
+  "provider.openrouterKey.descriptionHost":
+    "OpenRouter 모델을 사용하려면 호스트에 OpenRouter API 키를 저장하세요. OpenBot은 다운로드한 Pi CLI에서 모델을 실행해요.",
   "provider.openrouterKey.label": "OpenRouter API 키",
 
   "provider.openCodeKey.title": "OpenCode Go에 로그인",
@@ -218,6 +239,16 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name}에 남은 사용량 초기화 크레딧이 없어요.",
   "provider.account.resetUsageAlreadyRedeemed": "{name}의 이 초기화 크레딧은 이미 사용되었어요.",
   "provider.account.resetUsageFailed": "{name}의 사용량을 초기화할 수 없어요.",
+  "provider.account.pool": "계정 풀 사용",
+  "provider.account.poolDescription":
+    "에이전트는 사용량 한도에 가까워질 때까지 한 계정을 쓰고, 그다음 한도가 가장 먼저 초기화되는 계정을 써요.",
+  "provider.account.inUse": "사용 중",
+  "provider.account.notInPool": "풀 제외",
+  "provider.account.leaveOutOfPool": "풀에서 제외",
+  "provider.account.putBackInPool": "풀에 다시 추가",
+  "provider.account.poolChip": "풀",
+  "provider.account.poolCount": "{accounts} 풀",
+  "provider.account.poolInUse": "{pool} · {name} 사용 중",
 
   "provider.settings.connected": "연결됨",
   "provider.settings.other": "다른 제공자",
@@ -239,6 +270,7 @@ export const messages = {
   "provider.settings.defaultSubtitle": "새 에이전트 기본값 · {use}",
   "provider.settings.accounts": "계정",
   "provider.settings.accountsDescription": "{max}개 중 {count}개. 에이전트마다 계정 하나를 사용해요.",
+  "provider.settings.accountsPooledDescription": "{max}개 중 {count}개. 에이전트가 이 계정을 함께 사용해요.",
   "provider.settings.accountBlocked": "다시 로그인할 때까지 {agents}을(를) 실행할 수 없어요.",
   "provider.settings.removeTitle": "{name}을(를) 제거할까요?",
   "provider.settings.removeMoves": "{agents}이(가) {name}을(를) 사용하게 돼요.",
@@ -259,6 +291,8 @@ export const messages = {
   "provider.settings.keyAlternative": "또는 {name} API 키를 붙여넣으세요.",
   "provider.settings.geminiKeyInUse":
     "Gemini가 Google AI 요금제가 아닌 이 키를 사용해요. 요금제의 사용량은 표시되지 않아요.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "저장된 Gemini API 키가 Google 로그인 대신 사용돼요. Google 요금제와 그 모델을 사용하려면 키를 삭제하세요.",
   "provider.settings.claudeKeyInUse":
     "Anthropic은 Claude 플랜이 아닌 키의 API 크레딧으로 청구해요. 에이전트의 모델 메뉴에서 'API 키' 계정을 선택하세요. Claude에 로그인하지 않은 경우 모든 에이전트가 키를 사용해요.",
   "provider.settings.addKey": "키 추가",
@@ -268,6 +302,10 @@ export const messages = {
   "provider.settings.versionAvailable": "{installed} · {available} 사용 가능",
   "provider.settings.versionInstalledByUser": "{version} · 직접 설치함",
   "provider.settings.versionDownloaded": "{version} · OpenBot이 다운로드함",
+  "provider.settings.otherVersionInstalledByUser": "사용 안 함: {version} · 직접 설치함",
+  "provider.settings.otherVersionDownloaded": "사용 안 함: {version} · OpenBot이 다운로드함",
+  "provider.settings.useInstalledVersion": "설치한 버전 사용",
+  "provider.settings.useDownloadedVersion": "OpenBot 버전 사용",
   "provider.settings.update": "업데이트",
   "provider.settings.downloadLabel": "{name} 다운로드",
   "provider.settings.diagnostics": "진단",
@@ -275,7 +313,16 @@ export const messages = {
   "provider.settings.claudeUserSetup": "내 Claude Code 설정 사용",
   "provider.settings.claudeUserSetupDescription":
     "에이전트가 ~/.claude에서 CLAUDE.md, 스킬, 에이전트, 훅, 플러그인을 불러옵니다. 끄면 각 턴에서 더 짧은 프롬프트를 보냅니다. 작업 공간 파일은 계속 불러옵니다.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "에이전트가 서버의 ~/.claude에서 CLAUDE.md, 스킬, 에이전트, 훅, 플러그인을 불러와요. 끄면 각 턴에서 더 짧은 프롬프트를 보내요. 워크스페이스 파일은 계속 불러와요.",
   "provider.settings.claudeUserSetupLoadFailed": "Claude Code 설정을 불러오지 못했습니다.",
+  "provider.settings.context": "컨텍스트",
+  "provider.settings.compactWindow": "채팅 압축 크기",
+  "provider.settings.compactWindowDescription":
+    "채팅이 이 크기에 도달하면 Claude Code가 이전 턴을 요약해요. 낮으면 턴이 빠르고 저렴해요. 높으면 더 많은 세부 정보가 남아요. 창이 더 작은 모델은 자체 한도에서 압축해요.",
+  "provider.settings.compactWindowDefault": "Claude Code 기본값",
+  "provider.settings.compactWindowTokens": "토큰 {size}",
+  "provider.settings.compactWindowLoadFailed": "이 서버의 압축 크기를 불러올 수 없었어요.",
   "provider.settings.models": "모델",
   "provider.settings.modelsDescription": { other: "모델 {count}개 중 {shown}개가 모델 선택에 보여요." },
   "provider.settings.modelsSearch": "모델 검색",
@@ -300,4 +347,6 @@ export const messages = {
   "provider.settings.endpoints": "엔드포인트",
   "provider.settings.noEndpoints": "엔드포인트가 없어요.",
   "provider.settings.endpointModels": { other: "{url} · 모델 {count}개" },
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot이 이 컴퓨터에서 {provider} 로그아웃을 해요. 터미널의 {provider} CLI는 로그인 상태를 유지해요.",
 } as const satisfies PartialTranslation<typeof source>;

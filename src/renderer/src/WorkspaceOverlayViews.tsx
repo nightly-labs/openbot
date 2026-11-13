@@ -9,7 +9,7 @@ import { useChannels } from "./features/channels/channels-context";
 import type { ConnectorRegistry } from "./features/connectors/connector-registry";
 import { useConversationController } from "./features/conversation/conversation-controller-context";
 import type { ServerStorageOptions } from "./features/files/ServerStoragePanel";
-import { canManageStorage, serverHasStorage } from "./features/files/storage-usage";
+import { canManageStorage, serverHasBackgroundProcesses, serverHasStorage } from "./features/files/storage-usage";
 import type { ServerSettingsModalProps } from "./features/servers/ServerSettingsModal";
 import type { ServerUpdateOptions } from "./features/servers/ServerUpdatePanel";
 import {
@@ -142,6 +142,7 @@ export function MarketplaceOverlay(props: {
           hostServerId={remoteAdminServer(props.server, "skills-admin-v1")?.id}
           agentServerId={remoteAdminServer(props.server, "agent-install-v1")?.id}
           agentUpdateServerId={remoteAdminServer(props.server, "agent-update-v1")?.id}
+          githubSkills={manage() && serverCanAdminister(props.server, "github-skills-v1")}
           onOpenChange={(open) => {
             /* The slug is consumed by opening, so closing forgets it: reopening the marketplace by
                hand lands on the catalog rather than on the listing a link once named. */
@@ -178,6 +179,7 @@ export function MarketplaceOverlay(props: {
             props.server?.kind === "remote" && serverSupportsCapability(props.server, "sign-in-relay-v1")
           }
           pluginAccounts={serverSupportsCapability(props.server, "mcp-accounts-v1")}
+          pluginAccess={serverCanAdminister(props.server, "mcp-access-v1")}
           onRunPluginPrompt={
             composerFree()
               ? (agentId, prompt) =>
@@ -240,7 +242,13 @@ export function ServerSettingsOverlay(
         {...modal}
         mcpServers={serverCanManageMcp(props.server) ? props.mcpServers : undefined}
         storage={
-          serverHasStorage(props.server) ? { ...props.storage, canManage: canManageStorage(props.server) } : undefined
+          serverHasStorage(props.server)
+            ? {
+                ...props.storage,
+                canManage: canManageStorage(props.server),
+                backgroundProcesses: serverHasBackgroundProcesses(props.server),
+              }
+            : undefined
         }
         hostUpdate={
           remoteUpdateServer(props.server)

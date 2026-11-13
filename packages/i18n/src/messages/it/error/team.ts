@@ -78,8 +78,20 @@ export const messages = {
   "error.team.agentColorsUnsupported": "I colori degli agenti non sono supportati da questa connessione.",
   "error.team.chatColorsUnsupported": "I colori della chat non sono supportati da questa connessione.",
   "error.team.routineRunPlaceUnsupported": "Questa connessione non può cambiare dove viene eseguita una routine.",
+  "error.team.routinesOnceUnsupported": "Questa connessione non può salvare routine che vengono eseguite una volta.",
+  "error.team.routineRunCommandUnsupported":
+    "Questa connessione non può fornire il comando di esecuzione di una routine.",
+  "error.team.threadQueueUnsupported": "Questa connessione non può mostrare la coda di un thread secondario.",
+  "error.team.hostTurnLimitsUnsupported":
+    "Questa connessione non può mostrare né modificare i limiti dei thread del server.",
+  "error.team.usageLimitUnsupported":
+    "Questa connessione non può mostrare né modificare i limiti di utilizzo degli agenti.",
+  "error.team.hermesImportUnsupported": "Questa connessione non può importare profili Hermes dal server.",
+  "error.team.providerDetectionUnsupported":
+    "Questa connessione non può trovare i server di modelli e gli agenti del server.",
   "error.team.routineFlowStopUnsupported": "Questa connessione non può fermare l’esecuzione di una routine.",
   "error.team.sidebarFoldersUnsupported": "Le cartelle nelle cartelle non sono supportate da questa connessione.",
+  "error.team.libraryFoldersUnsupported": "Le cartelle della Libreria non sono supportate da questa connessione.",
   "error.team.agentNotificationLevelsUnsupported":
     "Questo server non può salvare il tuo livello di notifiche per ogni agente. Aggiorna OpenBot sul computer che lo esegue.",
   "error.team.sidebarPinsUnsupported":
@@ -94,6 +106,7 @@ export const messages = {
   "error.team.workspaceDirectoryUnsupported":
     "La visualizzazione delle cartelle non è supportata da questa connessione.",
   "error.team.conversationFileSearchUnsupported": "Questa connessione non supporta la ricerca nei file.",
+  "error.team.threadMessageSearchUnsupported": "Questa connessione non supporta la ricerca nei thread secondari.",
   "error.team.sideQuestionUnsupported": "Questa connessione non supporta le domande a parte.",
   "error.team.liveVoiceUnsupported":
     "Questo server non supporta la voce dal vivo di Codex. Aggiorna OpenBot sul computer che lo esegue.",
@@ -113,6 +126,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "La modifica dell'identità del server non è supportata da questa connessione.",
   "error.team.hostUpdateUnsupported": "Gli aggiornamenti dell'host non sono supportati da questa connessione.",
   "error.team.hostTimezoneUnsupported": "Questa connessione non supporta il fuso orario del server.",
+  "error.team.hostRestartUnsupported": "Questa connessione non supporta il riavvio del server.",
   "error.team.hostKeyRotationUnsupported": "Questa connessione non supporta il cambio della chiave del server.",
   "error.team.localServersUnsupported": "Questa connessione non supporta i server su questo computer.",
   "error.team.routineResultsUnsupported": "Questa connessione non supporta le destinazioni delle routine.",
@@ -121,7 +135,12 @@ export const messages = {
   "error.team.folderUnavailable": "Questa cartella non è disponibile sul computer host.",
   "error.team.memoryReviewUnsupported": "Questa connessione non supporta la revisione delle memorie.",
   "error.team.skillLearningUnsupported": "Questa connessione non supporta l’apprendimento delle skill.",
+  "error.team.browsingMemoryUnsupported": "Questa connessione non supporta l'apprendimento dalla navigazione.",
   "error.team.promptCacheTtlUnsupported": "Questa connessione non supporta la durata della cache dei prompt.",
+  "error.team.claudeUserSetupUnsupported":
+    "Questa connessione non supporta l’interruttore della configurazione di Claude Code.",
+  "error.team.claudeCompactWindowUnsupported":
+    "Questa connessione non supporta la dimensione di compattazione di Claude.",
   "error.team.modelVisibilityUnsupported": "Questa connessione non supporta l'elenco dei modelli.",
   "error.team.providerDefaultUnsupported": "Questa connessione non supporta il provider predefinito.",
   "error.team.attachmentNameRequired": "Serve un nome di allegato sicuro.",
@@ -158,6 +177,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "L'autenticazione sicura non è supportata da questo client.",
   "error.team.agentSettingsUnsupported": "Le impostazioni dell'agente non sono supportate da questa connessione.",
   "error.team.adminRequired": "Serve l'accesso come amministratore.",
+  "error.team.mcpAccessStale": "Qualcuno ha modificato l’accesso a questo server MCP. Ripeti la modifica.",
   "error.team.mcpServerNotYours":
     "Solo la persona che ha aggiunto questo server MCP, o un amministratore, può modificarlo.",
   "error.team.ownerRequired": "Solo il proprietario di questo server può farlo.",
@@ -173,4 +193,13 @@ export const messages = {
   "error.team.signInRelayMismatch": "Questo indirizzo non appartiene a questo accesso.",
   "error.team.signInRelayLinkUnknown": "Nessun agente su questo server ha mostrato questo link di accesso.",
   "error.team.hostPersonalityUnsupported": "Questa connessione non supporta la personalità del server.",
+  "error.team.agentWaitsUnsupported": "Questa connessione non supporta le attese aperte.",
+  "error.team.pendingApprovalUnsupported": "Questa connessione non permette di leggere un'approvazione completa.",
+  "error.team.messagePinsUnsupported": "Questa connessione non supporta i messaggi fissati.",
+  "error.team.queuedMessageThreadUnsupported":
+    "Questa connessione non supporta l’esecuzione di un messaggio in coda come nuovo thread.",
+  "error.team.backgroundProcessesUnsupported": "Questa connessione non supporta i processi in background.",
+  "error.team.providerUseUnsupported":
+    "Questa connessione non supporta l’attivazione e la disattivazione dei provider.",
+  "error.team.providerUseInvalid": "Questo provider non ha un interruttore di attivazione.",
 } as const satisfies PartialTranslation<typeof source>;

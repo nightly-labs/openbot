@@ -2,7 +2,8 @@
 // Signal homes configured. A host that asks for a home gets one by the rendezvous hash, keeps it,
 // moves only when that home failed for it, and its members follow it. Other host tickets, and a
 // Worker with no homes, name the entry Signal and no `signal` claim. Two requests that race store
-// one home.
+// one home. With home locations, a host gets one of the homes near the place of its request and
+// moves to it from a far home, but only when that home answers `/health/ready`.
 //
 // Run: bun apps/auth-api/scripts/remote-signal-homes-e2e.ts
 // It writes .openbot-build/remote-signal-homes-e2e/report.json and exits non-zero on a failure.
@@ -13,7 +14,7 @@ import { DatabaseSync } from "node:sqlite";
 import { REMOTE_TICKET_AUDIENCE } from "@openbot/contracts/signal-protocol/ticket";
 import { Effect } from "effect";
 import { jwtVerify } from "jose";
-import { RemoteControlPlane } from "../src/server/remote-control-plane";
+import { RemoteControlPlane, type SignalLocation } from "../src/server/remote-control-plane";
 import { sqliteD1 } from "./sqlite-d1";
 
 const ROOT = resolve(import.meta.dirname, "../../..");
@@ -22,6 +23,22 @@ const MIGRATIONS = join(ROOT, "apps", "auth-api", "migrations");
 const ENTRY_URL = "wss://signal.test/v1/signal";
 const HOME_URLS = { a: "wss://signal-a.test/v1/signal", b: "wss://signal-b.test/v1/signal" } as const;
 const HOMES = `a=${HOME_URLS.a}, b=${HOME_URLS.b}`;
+const REGION_URLS = {
+  ...HOME_URLS,
+  us: "wss://signal-us.test/v1/signal",
+  au: "wss://signal-au.test/v1/signal",
+} as const;
+const REGION_HOMES = Object.entries(REGION_URLS)
+  .map(([id, url]) => `${id}=${url}`)
+  .join(",");
+// a and b in Helsinki, us in San Jose, au in Sydney.
+const REGION_LOCATIONS = "a=60.17:24.94, b=60.17:24.94, us=37.34:-121.89, au=-33.87:151.21";
+const PLACES = {
+  berlin: { latitude: 52.52, longitude: 13.4 },
+  newYork: { latitude: 40.71, longitude: -74.01 },
+  sydney: { latitude: -33.87, longitude: 151.21 },
+  tokyo: { latitude: 35.68, longitude: 139.69 },
+};
 const WAIT_LIMIT_MS = 10_000;
 
 const checks: { name: string; passed: boolean; detail?: unknown }[] = [];
@@ -51,10 +68,14 @@ async function signalClaim(ticket: string): Promise<string> {
   return typeof payload.signal === "string" ? payload.signal : "none";
 }
 
-/** The rendezvous choice of the design, computed apart from the Worker code. */
-function rendezvous(hostId: string): keyof typeof HOME_URLS {
+/** The rendezvous choice of the design over `ids`, computed apart from the Worker code. */
+function rendezvousOf<Id extends string>(hostId: string, ids: readonly Id[]): Id {
   const score = (id: string) => createHash("sha256").update(`${id}\n${hostId}`).digest().readBigUInt64BE(0);
-  return score("a") > score("b") ? "a" : "b";
+  return ids.reduce((best, id) => (score(id) > score(best) ? id : best));
+}
+
+function rendezvous(hostId: string): keyof typeof HOME_URLS {
+  return rendezvousOf(hostId, ["a", "b"] as const);
 }
 
 function machineToken(hostId: string): string {
@@ -97,19 +118,34 @@ function storedHome(database: DatabaseSync, hostId: string): string {
   return row?.signal_home === null || row?.signal_home === undefined ? "none" : String(row.signal_home);
 }
 
-function plane(database: D1Database | DatabaseSync, homes: string, entryUrl = ENTRY_URL) {
-  return new RemoteControlPlane({
-    DB: database instanceof DatabaseSync ? sqliteD1(database) : database,
-    ...ticketKeys,
-    REMOTE_SIGNAL_URL: entryUrl,
-    REMOTE_SIGNAL_HOMES: homes,
-  });
+/** The Signal machines (host names) whose `/health/ready` fails, and each health URL that was asked. */
+const downMachines = new Set<string>();
+const healthRequests: string[] = [];
+async function healthFetch(input: string | URL | Request): Promise<Response> {
+  const url = new URL(input instanceof Request ? input.url : input);
+  if (url.pathname !== "/health/ready") throw new Error(`Unexpected request: ${url.pathname}`);
+  healthRequests.push(url.href);
+  if (downMachines.has(url.hostname)) throw new TypeError("fetch failed");
+  return new Response("{}", { status: 200 });
+}
+
+function plane(database: D1Database | DatabaseSync, homes: string, entryUrl = ENTRY_URL, locations = "") {
+  return new RemoteControlPlane(
+    {
+      DB: database instanceof DatabaseSync ? sqliteD1(database) : database,
+      ...ticketKeys,
+      REMOTE_SIGNAL_URL: entryUrl,
+      REMOTE_SIGNAL_HOMES: homes,
+      REMOTE_SIGNAL_HOME_LOCATIONS: locations,
+    },
+    { fetch: healthFetch },
+  );
 }
 
 async function hostTicket(
   remote: RemoteControlPlane,
   hostId: string,
-  placement?: { signalHome: boolean | null; failedSignalUrl: string | null },
+  placement?: { signalHome: boolean | null; failedSignalUrl: string | null; location?: SignalLocation | null },
 ) {
   const answer = await Effect.runPromise(remote.issueHostTicket(hostId, machineToken(hostId), placement));
   return { signalUrl: answer.signalUrl, signal: await signalClaim(answer.ticket) };
@@ -134,6 +170,11 @@ async function outcome<A, E>(operation: Effect.Effect<A, E>): Promise<string> {
 }
 
 const asks = (failedSignalUrl: string | null = null) => ({ signalHome: true, failedSignalUrl });
+const asksFrom = (location: SignalLocation | null, failedSignalUrl: string | null = null) => ({
+  signalHome: true,
+  failedSignalUrl,
+  location,
+});
 
 async function aHostGetsKeepsAndMovesItsHome() {
   const database = await hostsWithSessions(["host-1"]);
@@ -327,12 +368,142 @@ async function hostsSpreadOverTheHomes() {
   check("40 hosts use both homes", counts.a > 0 && counts.b > 0, counts);
 }
 
+async function hostsGetANearHome() {
+  const hostIds = ["near-1", "near-2", "near-3", "near-4", "near-5", "near-6", "near-7"];
+  const database = await hostsWithSessions(hostIds);
+  const remote = plane(database, REGION_HOMES, ENTRY_URL, REGION_LOCATIONS);
+  const newYork = await hostTicket(remote, "near-1", asksFrom(PLACES.newYork));
+  check(
+    "a host in New York gets the San Jose home",
+    newYork.signal === "us" && newYork.signalUrl === REGION_URLS.us && storedHome(database, "near-1") === "us",
+    { newYork },
+  );
+  const sydney = await hostTicket(remote, "near-2", asksFrom(PLACES.sydney));
+  check("a host in Sydney gets the Sydney home", sydney.signal === "au" && sydney.signalUrl === REGION_URLS.au, {
+    sydney,
+  });
+  const berlin = await hostTicket(remote, "near-3", asksFrom(PLACES.berlin));
+  check(
+    "a host in Berlin gets the rendezvous choice of the two Helsinki homes",
+    berlin.signal === rendezvousOf("near-3", ["a", "b"] as const),
+    { berlin, expected: rendezvousOf("near-3", ["a", "b"] as const) },
+  );
+  const unknown = await hostTicket(remote, "near-4", asksFrom(null));
+  const allIds: string[] = Object.keys(REGION_URLS);
+  check(
+    "a host request with no place gets the rendezvous choice of each home",
+    unknown.signal === rendezvousOf("near-4", allIds),
+    { unknown, expected: rendezvousOf("near-4", allIds) },
+  );
+
+  database.prepare("UPDATE remote_hosts SET signal_home = 'a' WHERE host_id = 'near-5'").run();
+  const before = await sessionTicket(remote, "near-5");
+  const moved = await hostTicket(remote, "near-5", asksFrom(PLACES.sydney));
+  const followed = await sessionTicket(remote, "near-5");
+  check(
+    "a host in Sydney with a stored Helsinki home moves to the Sydney home, and its members follow",
+    before.signal === "a" &&
+      moved.signal === "au" &&
+      storedHome(database, "near-5") === "au" &&
+      followed.signal === "au" &&
+      followed.signalUrl === REGION_URLS.au,
+    { before, moved, followed },
+  );
+  const other = rendezvousOf("near-3", ["a", "b"] as const) === "a" ? "b" : "a";
+  database.prepare("UPDATE remote_hosts SET signal_home = ? WHERE host_id = 'near-3'").run(other);
+  const kept = await hostTicket(remote, "near-3", asksFrom(PLACES.berlin));
+  check(
+    "a host in Berlin keeps a stored Helsinki home that the hash would not choose",
+    kept.signal === other && storedHome(database, "near-3") === other,
+    { kept, other },
+  );
+  database.prepare("UPDATE remote_hosts SET signal_home = 'us' WHERE host_id = 'near-6'").run();
+  const unplaced = await hostTicket(remote, "near-6", asksFrom(null));
+  check("a host request with no place keeps any stored home", unplaced.signal === "us", { unplaced });
+
+  const failed = await hostTicket(remote, "near-2", asksFrom(PLACES.sydney, REGION_URLS.au));
+  check(
+    "a host in Sydney whose home failed gets the next nearest home, San Jose",
+    failed.signal === "us" && storedHome(database, "near-2") === "us",
+    { failed },
+  );
+  downMachines.add("signal-au.test");
+  healthRequests.length = 0;
+  const stillDown = await hostTicket(remote, "near-2", asksFrom(PLACES.sydney));
+  check(
+    "while its Sydney home does not answer, the host keeps the San Jose home and its members stay",
+    stillDown.signal === "us" &&
+      storedHome(database, "near-2") === "us" &&
+      (await sessionTicket(remote, "near-2")).signal === "us" &&
+      healthRequests.includes("https://signal-au.test/health/ready"),
+    { stillDown, healthRequests: [...healthRequests] },
+  );
+  downMachines.delete("signal-au.test");
+  const back = await hostTicket(remote, "near-2", asksFrom(PLACES.sydney));
+  check(
+    "when its Sydney home answers again, the host goes back to it",
+    back.signal === "au" && storedHome(database, "near-2") === "au",
+    { back },
+  );
+  downMachines.add("signal-us.test");
+  healthRequests.length = 0;
+  const firstHome = await hostTicket(remote, "near-7", asksFrom(PLACES.newYork));
+  const failedAway = await hostTicket(remote, "near-1", asksFrom(PLACES.newYork, REGION_URLS.us));
+  downMachines.delete("signal-us.test");
+  check(
+    "a host with no stored home, or whose home failed, gets its home with no health request",
+    firstHome.signal === "us" && failedAway.signal !== "us" && healthRequests.length === 0,
+    { firstHome, failedAway, healthRequests: [...healthRequests] },
+  );
+  database.prepare("UPDATE remote_hosts SET signal_home = 'us' WHERE host_id = 'near-1'").run();
+  const tokyo = await hostTicket(remote, "near-1", asksFrom(PLACES.tokyo));
+  check(
+    "a host whose stored home is within the margin of the nearest home keeps it (Tokyo: Sydney 7,800 km, San Jose 8,200 km)",
+    tokyo.signal === "us",
+    { tokyo },
+  );
+}
+
+async function invalidLocationsFailClosed() {
+  const database = await hostsWithSessions(["host-1"]);
+  const invalid = {
+    "a location list that misses a home": "a=60.17:24.94, b=60.17:24.94",
+    "a location of an ID that is not a home": `${REGION_LOCATIONS}, eu=50:10`,
+    "a latitude out of range": "a=91:24.94, b=60.17:24.94, us=37.34:-121.89, au=-33.87:151.21",
+    "a location with no longitude": "a=60.17, b=60.17:24.94, us=37.34:-121.89, au=-33.87:151.21",
+    "a location that is not a number": "a=north:east, b=60.17:24.94, us=37.34:-121.89, au=-33.87:151.21",
+    "a duplicate location": `${REGION_LOCATIONS}, a=60.17:24.94`,
+  };
+  for (const [name, locations] of Object.entries(invalid)) {
+    const remote = plane(database, REGION_HOMES, ENTRY_URL, locations);
+    const host = await outcome(remote.issueHostTicket("host-1", machineToken("host-1"), asksFrom(PLACES.berlin)));
+    const member = await outcome(remote.issueSessionTicket("owner", "session-host-1", "client-public-key"));
+    check(
+      `${name} fails each ticket with remote_not_configured`,
+      host === "remote_not_configured" && member === "remote_not_configured",
+      { host, member },
+    );
+  }
+  const rolledBack = await hostTicket(
+    plane(database, "", ENTRY_URL, REGION_LOCATIONS),
+    "host-1",
+    asksFrom(PLACES.berlin),
+  );
+  check(
+    "an empty home list with locations still set rolls back to the entry Signal",
+    rolledBack.signal === "none" && rolledBack.signalUrl === ENTRY_URL,
+    { rolledBack },
+  );
+}
+
 const scenarios = [
   aHostGetsKeepsAndMovesItsHome,
   noHomesKeepsTheEntrySignal,
   anInvalidHomeListFailsClosed,
   racingRequestsStoreOneHome,
   hostsSpreadOverTheHomes,
+  hostsGetANearHome,
+  invalidLocationsFailClosed,
 ];
 for (const scenario of scenarios) {
   try {

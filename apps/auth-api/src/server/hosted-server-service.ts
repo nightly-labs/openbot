@@ -1,12 +1,14 @@
 import {
   BILLING_CURRENCIES,
   BILLING_INTERVALS,
+  BILLING_OPTIONAL_CURRENCIES,
   BILLING_PLAN_IDS,
   type BillingCurrency,
   type BillingInterval,
   type BillingPlanId,
   isOpenBillingStatus,
   memberLimitForPlan,
+  planStorageGb,
 } from "@openbot/contracts/billing";
 import {
   HOSTED_PLAN_SIZE,
@@ -50,6 +52,7 @@ import {
 import { constantTimeEqual, deriveSecret, hmacSha256, randomToken, sha256 } from "./crypto";
 import type { RemoteFailure } from "./remote-control-plane";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
+import { priceHasCurrency } from "./stripe-client";
 import type { AuthUser, WorkerBindings } from "./types";
 
 const CLAIM_TTL_MS = 60 * 60_000;
@@ -85,6 +88,29 @@ const SETUP_RETRY_AFTER_MS = 10 * 60_000;
  * the cron marks the setup failed and sets it up again.
  */
 const CREATE_LOST_AFTER_MS = 10 * 60_000;
+/**
+ * The Leaseweb package of each plan in the pool of the operator (docs/hosted-servers.md). A new paid
+ * server starts on a free prepared machine of that package, and in a boat sandbox when the pool has none.
+ */
+const POOL_PRODUCT_OF_PLAN: Record<BillingPlanId, string> = { starter: "VPS01", standard: "VPS02", pro: "VPS03" };
+const POOL_HOST_PATTERN = /^leaseweb:\d{1,20}$/u;
+/** A free machine asks each 10 seconds. One that did not ask in this time gets no server. */
+export const POOL_SEEN_WITHIN_MS = 150_000;
+/** The time of the last ask is written at most this often, so most asks only read. */
+const POOL_SEEN_WRITE_AFTER_MS = 60_000;
+/**
+ * OpenBot on a pool machine signs in less than a minute after the assignment. When it did not in this
+ * time, the cron takes the server off the machine and makes a boat sandbox for it.
+ */
+const POOL_START_LOST_AFTER_MS = 4 * 60_000;
+/** A machine that another purchase took in the same moment is skipped. After this many, boat is used. */
+const POOL_CANDIDATES = 3;
+/**
+ * A first start on a pool machine that waits for the sign-in of OpenBot. A server that an operator moved
+ * from boat has a template and its old sandbox, so it never matches.
+ */
+const POOL_FIRST_START_SQL = `(operator_host IS NOT NULL AND observed_state = 'starting' AND last_wake_reason = 'create'
+  AND provider_template IS NULL AND retired_sandbox_id IS NULL AND claim_redeemed_at IS NULL)`;
 /** boat allows 120 characters in a sandbox name. */
 const SANDBOX_NAME_MAX_LENGTH = 120;
 /** A server that reports no activity this long stops. The next use starts it again. */
@@ -134,6 +160,12 @@ const RETENTION_DISK_KEPT_MS = 14 * 24 * 60 * 60_000;
  * cron each 5 minutes or each minute) leaves them to clients.
  */
 const RETENTION_WAKE_EVERY_MINUTES = 10;
+/**
+ * The Terms and the DPA keep the data of an ended plan for 30 days. After that the cron deletes a server
+ * that runs on a machine of the operator, and the operator reinstalls the machine for the next customer
+ * (docs/hosted-servers.md#reuse-a-pool-machine).
+ */
+export const OPERATOR_HOST_DATA_KEPT_MS = 30 * 24 * 60 * 60_000;
 /** A server can report a routine run at most this far ahead. A later run is reported when it comes nearer. */
 const NEXT_RUN_MAX_AHEAD_MS = 400 * 24 * 60 * 60_000;
 /**
@@ -202,6 +234,14 @@ interface HostedServerRow {
   name: string;
   provider_sandbox_id: string | null;
   provider_template: string | null;
+  /**
+   * The machine of a server that an operator moved out of boat, such as `leaseweb:12728110`. NULL when
+   * boat runs the server. Such a row has no sandbox: the Worker sends no boat call for it and writes
+   * only `desired_state`, and the operator writes `observed_state` (docs/hosted-servers.md).
+   */
+  operator_host: string | null;
+  /** The boat sandbox from before the move. A delete of the server deletes it. */
+  retired_sandbox_id: string | null;
   size: HostedServerSize;
   pending_size: HostedServerSize | null;
   plan: BillingPlanId;
@@ -226,7 +266,7 @@ interface HostedServerRow {
   deletion_subscription_id: string | null;
 }
 
-const ROW_COLUMNS = `server_id, owner_user_id, name, provider_sandbox_id, provider_template, size, pending_size, plan, billing_interval, currency,
+const ROW_COLUMNS = `server_id, owner_user_id, name, provider_sandbox_id, provider_template, operator_host, retired_sandbox_id, size, pending_size, plan, billing_interval, currency,
   checkout_session_id, idempotency_key, desired_state, observed_state, observed_error, provider_event_at, auth_session_id,
   last_active_at, lease_until, next_run_at, last_wake_reason, start_requested_at, created_at, updated_at, deletion_scheduled_at,
   deletion_subscription_id`;
@@ -235,6 +275,7 @@ const ROW_COLUMNS = `server_id, owner_user_id, name, provider_sandbox_id, provid
 export type HostedServerBilling = Pick<
   BillingService,
   | "catalog"
+  | "license"
   | "createCheckout"
   | "closeCheckout"
   | "cancelServerPlans"
@@ -265,6 +306,9 @@ export interface CheckoutReturn {
   /** Where the journey started in the app. Only analytics reads it. */
   entryPoint?: HostedServerEntryPoint;
 }
+
+/** The answer to a free pool machine that asks for a server. The claim signs OpenBot on that machine in. */
+export type HostedPoolAssignment = { state: "waiting" } | { state: "assigned"; serverId: string; claim: string };
 
 export interface HostedServerTickResult {
   restarted: number;
@@ -438,6 +482,20 @@ export class HostedServerService {
           ((input.plan === "starter" && license.tier !== "starter") || license.users > memberLimitForPlan(input.plan)))
       )
         return yield* invalid("license");
+      // An optional currency, such as BRL, sells only when the Stripe Prices of the plan and of the license
+      // have it. The check comes before the server row, so a refused order leaves no unpaid server.
+      if (isOneOf(BILLING_OPTIONAL_CURRENCIES, input.currency)) {
+        const catalog = yield* billing.catalog().pipe(Effect.mapError(hostedFailure));
+        const currency = input.currency;
+        if (!catalog.plans.some((plan) => plan.id === input.plan && plan.prices[currency] !== undefined))
+          return yield* invalid("currency");
+        if (license) {
+          const licensePrice = yield* billing.license
+            .price({ tier: license.tier, interval: input.interval, bundle: true })
+            .pipe(Effect.mapError(hostedFailure));
+          if (!licensePrice || !priceHasCurrency(licensePrice, currency)) return yield* invalid("currency");
+        }
+      }
       const size = HOSTED_PLAN_SIZE[input.plan];
       const previous = yield* hostedCall(() =>
         dependencies.database
@@ -737,6 +795,57 @@ export class HostedServerService {
     }).pipe(Effect.ensuring(this.#releaseLifecycle(row.server_id, token).pipe(Effect.orDie)));
   });
 
+  /**
+   * Deletes a server on a machine of the operator when its plan ended `OPERATOR_HOST_DATA_KEPT_MS` ago and
+   * Stripe confirms that its newest subscription is cancelled. An open subscription, such as an `unpaid`
+   * one that Stripe still retries, keeps the server. The operator then reinstalls the machine.
+   */
+  readonly #deleteExpired = Effect.fn("HostedServerService.deleteExpired")(function* (
+    this: HostedServerService,
+    row: HostedServerRow & { plan_ended_at: number },
+  ) {
+    const dependencies = yield* HostedServerDependencies;
+    const billing = dependencies.billing;
+    if (!billing) return;
+    const newest = yield* hostedCall(() =>
+      dependencies.database
+        .prepare(
+          `SELECT stripe_subscription_id,
+           EXISTS(SELECT 1 FROM billing_subscriptions o WHERE o.server_id = ? AND o.status IN ${OPEN_STATUSES_SQL}) AS open
+         FROM billing_subscriptions WHERE server_id = ?
+         ORDER BY COALESCE(current_period_end, 0) DESC, updated_at DESC LIMIT 1`,
+        )
+        .bind(row.server_id, row.server_id)
+        .first<{ stripe_subscription_id: string; open: number }>(),
+    );
+    if (!newest || newest.open) return;
+    const token = crypto.randomUUID();
+    if (!(yield* this.#claimLifecycle(row.server_id, token))) return;
+    yield* Effect.gen({ self: this }, function* () {
+      if (!(yield* billing.subscriptionEnded(newest.stripe_subscription_id).pipe(Effect.mapError(hostedFailure))))
+        return;
+      // A renewal that the owner paid just now keeps the server, and its webhook starts it. When the close
+      // fails, the page stays open and the owner can still pay, so the next tick tries again.
+      const checkout = (yield* this.#requireRow(row.server_id)).checkout_session_id;
+      if (checkout && (yield* this.#closeCheckout(checkout)) !== "closed") return;
+      const claimed = yield* hostedCall(() =>
+        dependencies.database
+          .prepare(
+            `UPDATE hosted_servers SET desired_state = 'deleted', updated_at = ?
+         WHERE server_id = ? AND desired_state = 'stopped' AND operator_host IS NOT NULL AND plan_ended_at = ?
+         AND lifecycle_token = ? AND lifecycle_lease_until > ?
+         AND NOT EXISTS(SELECT 1 FROM billing_subscriptions s WHERE s.server_id = hosted_servers.server_id
+           AND s.status IN ${OPEN_STATUSES_SQL})`,
+          )
+          .bind(dependencies.now(), row.server_id, row.plan_ended_at, token, dependencies.now())
+          .run(),
+      );
+      if (claimed.meta.changes !== 1) return;
+      this.#track(row, { name: "hosted_server_action", action: "deleted", plan: row.plan, size: row.size });
+      yield* this.#finishDelete(yield* this.#requireRow(row.server_id));
+    }).pipe(Effect.ensuring(this.#releaseLifecycle(row.server_id, token).pipe(Effect.orDie)));
+  });
+
   readonly delete = Effect.fn("HostedServerService.delete")(
     function* (
       this: HostedServerService,
@@ -875,6 +984,14 @@ export class HostedServerService {
       const row = yield* this.#requireUsableRow(user, serverId, "admins");
       if (row.desired_state === "stopped") {
         return yield* new HostedServerServiceError(402, "plan_required", sourceText("error.billing.planRequired"));
+      }
+      // Only the operator can restart a machine outside boat. A silent success would hide that.
+      if (row.operator_host) {
+        return yield* new HostedServerServiceError(
+          409,
+          "hosted_server_restart_unavailable",
+          sourceText("error.billing.restartUnavailable"),
+        );
       }
       const sandboxId = row.provider_sandbox_id;
       const boat = dependencies.boat;
@@ -1038,22 +1155,39 @@ export class HostedServerService {
       const row = yield* hostedCall(() =>
         dependencies.database
           .prepare(
-            `SELECT server_id, name, owner_user_id, auth_session_id FROM hosted_servers
+            `SELECT server_id, name, owner_user_id, auth_session_id, operator_host FROM hosted_servers
          WHERE claim_token_hash = ? AND claim_expires_at > ? AND desired_state != 'deleted'`,
           )
           .bind(claimHash, now)
-          .first<{ server_id: string; name: string; owner_user_id: string; auth_session_id: string | null }>(),
+          .first<{
+            server_id: string;
+            name: string;
+            owner_user_id: string;
+            auth_session_id: string | null;
+            operator_host: string | null;
+          }>(),
       );
       if (!row) return yield* invalidClaim();
       const sessionId = crypto.randomUUID();
       const sessionToken = randomToken();
       const sessionTokenHash = yield* sha256(sessionToken).pipe(Effect.mapError(hostedFailure));
+      // Before the redeem changes the row: the sign-in of OpenBot is the end of a first start on a pool machine.
+      const poolStart = row.operator_host
+        ? yield* hostedCall(() =>
+            dependencies.database
+              .prepare(`SELECT ${ROW_COLUMNS} FROM hosted_servers WHERE server_id = ? AND ${POOL_FIRST_START_SQL}`)
+              .bind(row.server_id)
+              .first<HostedServerRow>(),
+          )
+        : null;
       const [redeemed] = yield* hostedCall(() =>
         dependencies.database.batch([
           // The first redeem shortens the claim lifetime to the retry window. A later one does not extend it.
+          // No provider reports a pool machine as usable, so this sign-in sets its first start to `running`.
           dependencies.database
             .prepare(
-              `UPDATE hosted_servers SET claim_redeemed_at = COALESCE(claim_redeemed_at, ?),
+              `UPDATE hosted_servers SET observed_state = CASE WHEN ${POOL_FIRST_START_SQL} THEN 'running' ELSE observed_state END,
+             claim_redeemed_at = COALESCE(claim_redeemed_at, ?),
              claim_expires_at = MIN(claim_expires_at, ?), auth_session_id = ?, updated_at = ?
            WHERE server_id = ? AND claim_token_hash = ? AND claim_expires_at > ? AND auth_session_id IS ?`,
             )
@@ -1072,9 +1206,21 @@ export class HostedServerService {
              AND EXISTS(SELECT 1 FROM hosted_servers WHERE server_id = ? AND auth_session_id = ?)`,
             )
             .bind(now, row.auth_session_id, row.server_id, sessionId),
+          // The machine has its server, so its token gets no other one. A boat server changes no row here.
+          ...(row.operator_host
+            ? [
+                dependencies.database
+                  .prepare(
+                    `UPDATE operator_hosts SET assign_token_hash = NULL WHERE host_id = ? AND assign_token_hash IS NOT NULL
+                   AND EXISTS(SELECT 1 FROM hosted_servers WHERE server_id = ? AND auth_session_id = ? AND operator_host = ?)`,
+                  )
+                  .bind(row.operator_host, row.server_id, sessionId, row.operator_host),
+              ]
+            : []),
         ]),
       );
       if (redeemed?.meta.changes !== 1) return yield* invalidClaim();
+      if (poolStart) yield* this.#recordReady(poolStart, now);
       const user = yield* hostedCall(() =>
         dependencies.database
           .prepare("SELECT id, email, name, avatar_url FROM users WHERE id = ?")
@@ -1088,6 +1234,61 @@ export class HostedServerService {
         sessionToken,
         user: { id: user.id, email: user.email, name: user.name, avatarUrl: user.avatar_url },
       };
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  /**
+   * A free prepared machine of the pool asks for its server, each 10 seconds, with the token that the
+   * operator gave it. The answer has the claim only while the first start on that machine waits. A wrong
+   * token gets 401, and the machine then stops asking.
+   */
+  readonly poolAssignment = Effect.fn("HostedServerService.poolAssignment")(
+    function* (
+      this: HostedServerService,
+      hostId: unknown,
+      token: unknown,
+    ): Effect.fn.Return<HostedPoolAssignment, HostedFailure, HostedServerDependencies> {
+      const dependencies = yield* HostedServerDependencies;
+      if (!isString(hostId) || !POOL_HOST_PATTERN.test(hostId)) return yield* invalidPoolToken();
+      if (!isString(token) || token.length < 32 || token.length > 128) return yield* invalidPoolToken();
+      const tokenHash = yield* sha256(token).pipe(Effect.mapError(hostedFailure));
+      const now = dependencies.now();
+      const machine = yield* hostedCall(() =>
+        dependencies.database
+          .prepare("SELECT assign_token_hash, seen_at FROM operator_hosts WHERE host_id = ? AND removed_at IS NULL")
+          .bind(hostId)
+          .first<{ assign_token_hash: string | null; seen_at: number | null }>(),
+      );
+      const encoder = new TextEncoder();
+      if (
+        !machine?.assign_token_hash ||
+        !constantTimeEqual(encoder.encode(machine.assign_token_hash), encoder.encode(tokenHash))
+      )
+        return yield* invalidPoolToken();
+      if (machine.seen_at === null || machine.seen_at <= now - POOL_SEEN_WRITE_AFTER_MS) {
+        yield* hostedCall(() =>
+          dependencies.database
+            .prepare("UPDATE operator_hosts SET seen_at = ? WHERE host_id = ? AND assign_token_hash = ?")
+            .bind(now, hostId, tokenHash)
+            .run(),
+        );
+      }
+      const row = yield* hostedCall(() =>
+        dependencies.database
+          .prepare(
+            `SELECT server_id, claim_token_hash FROM hosted_servers
+         WHERE operator_host = ? AND desired_state = 'running' AND claim_expires_at > ? AND ${POOL_FIRST_START_SQL}`,
+          )
+          .bind(hostId, now)
+          .first<{ server_id: string; claim_token_hash: string | null }>(),
+      );
+      const secret = yield* this.#claimKey();
+      if (!row?.claim_token_hash || !secret) return { state: "waiting" };
+      const claim = yield* hostedPoolClaim(secret, row.server_id, hostId).pipe(Effect.mapError(hostedFailure));
+      const claimHash = yield* sha256(claim).pipe(Effect.mapError(hostedFailure));
+      if (claimHash !== row.claim_token_hash) return { state: "waiting" };
+      return { state: "assigned", serverId: row.server_id, claim };
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
@@ -1179,9 +1380,9 @@ export class HostedServerService {
       );
       const boat = dependencies.boat;
       if (!boat) return result;
-      const run = (
-        rows: HostedServerRow[],
-        action: (row: HostedServerRow) => Effect.Effect<unknown, HostedFailure, HostedServerDependencies>,
+      const run = <Row extends HostedServerRow>(
+        rows: Row[],
+        action: (row: Row) => Effect.Effect<unknown, HostedFailure, HostedServerDependencies>,
       ) =>
         Effect.gen({ self: this }, function* () {
           let done = 0;
@@ -1252,7 +1453,7 @@ export class HostedServerService {
             .prepare(
               `SELECT ${ROW_COLUMNS} FROM hosted_servers
            WHERE desired_state = 'running' AND observed_state = 'error' AND provider_sandbox_id IS NULL
-             AND updated_at <= ? LIMIT ?`,
+             AND operator_host IS NULL AND updated_at <= ? LIMIT ?`,
             )
             .bind(now - SETUP_RETRY_AFTER_MS, TICK_BATCH_SIZE)
             .all<HostedServerRow>(),
@@ -1272,6 +1473,20 @@ export class HostedServerService {
           )
           .bind(now, now - CREATE_LOST_AFTER_MS)
           .run(),
+      );
+      const lostPoolStarts = yield* hostedCall(() =>
+        dependencies.database
+          .prepare(
+            `SELECT ${ROW_COLUMNS} FROM hosted_servers
+         WHERE desired_state != 'deleted' AND start_requested_at <= ? AND ${POOL_FIRST_START_SQL} LIMIT ?`,
+          )
+          .bind(now - POOL_START_LOST_AFTER_MS, TICK_BATCH_SIZE)
+          .all<HostedServerRow>(),
+      );
+      yield* run(lostPoolStarts.results, (row) =>
+        Effect.gen({ self: this }, function* () {
+          if (yield* this.#leavePoolMachine(row)) result.provisioned += 1;
+        }),
       );
       // A running server with no use for 15 minutes stops. A state change also counts as use, so a new or
       // resized server has time for its first client.
@@ -1330,12 +1545,14 @@ export class HostedServerService {
           .all<HostedServerRow>(),
       );
       result.stopped += yield* run(unstopped.results, (row) => this.#stop(row));
-      // The webhook starts a stopped server at once. This catches a start that did not happen.
+      // The webhook starts a stopped server at once. This catches a start that did not happen. Only the
+      // operator starts a machine outside boat.
       const stopped = yield* hostedCall(() =>
         dependencies.database
           .prepare(
             `SELECT ${ROW_COLUMNS} FROM hosted_servers
-         WHERE desired_state = 'running' AND observed_state = 'stopped' AND updated_at <= ? LIMIT ?`,
+         WHERE desired_state = 'running' AND observed_state = 'stopped' AND operator_host IS NULL
+           AND updated_at <= ? LIMIT ?`,
           )
           .bind(now - STUCK_AFTER_MS, TICK_BATCH_SIZE)
           .all<HostedServerRow>(),
@@ -1389,6 +1606,29 @@ export class HostedServerService {
           .all<HostedServerRow>(),
       );
       yield* run(scheduledDeletes.results, (row) => this.#deleteScheduled(row));
+      // A plan that ended under the Worker from before migration 0053 gets the date of this check.
+      yield* hostedCall(() =>
+        dependencies.database
+          .prepare(
+            "UPDATE hosted_servers SET plan_ended_at = ? WHERE desired_state = 'stopped' AND plan_ended_at IS NULL",
+          )
+          .bind(now)
+          .run(),
+      );
+      const expired = yield* hostedCall(() =>
+        dependencies.database
+          .prepare(
+            `SELECT ${ROW_COLUMNS}, plan_ended_at FROM hosted_servers
+         WHERE operator_host IS NOT NULL AND desired_state = 'stopped' AND plan_ended_at <= ?
+           AND EXISTS(SELECT 1 FROM billing_subscriptions s WHERE s.server_id = hosted_servers.server_id)
+           AND NOT EXISTS(SELECT 1 FROM billing_subscriptions s WHERE s.server_id = hosted_servers.server_id
+             AND s.status IN ${OPEN_STATUSES_SQL})
+         ORDER BY plan_ended_at LIMIT ?`,
+          )
+          .bind(now - OPERATOR_HOST_DATA_KEPT_MS, TICK_BATCH_SIZE)
+          .all<HostedServerRow & { plan_ended_at: number }>(),
+      );
+      yield* run(expired.results, (row) => this.#deleteExpired(row));
       const deleting = yield* hostedCall(() =>
         dependencies.database
           .prepare(
@@ -1533,6 +1773,7 @@ export class HostedServerService {
   /**
    * Stores a plan change from the Customer Portal, so the list and a renewal use the plan that the
    * owner pays for. A server with a sandbox gets the new machine at its next resume (`pending_size`).
+   * A machine outside boat has no resume, so its row takes the size at once.
    */
   readonly #followPlan = Effect.fn("HostedServerService.followPlan")(function* (
     this: HostedServerService,
@@ -1546,8 +1787,9 @@ export class HostedServerService {
       dependencies.database
         .prepare(
           `UPDATE hosted_servers SET plan = ?, billing_interval = ?, currency = ?,
-           size = CASE WHEN provider_template IS NULL THEN ? ELSE size END,
-           pending_size = CASE WHEN provider_template IS NULL OR size = ? THEN NULL ELSE ? END, updated_at = ?
+           size = CASE WHEN provider_template IS NULL OR operator_host IS NOT NULL THEN ? ELSE size END,
+           pending_size = CASE WHEN provider_template IS NULL OR operator_host IS NOT NULL OR size = ? THEN NULL
+             ELSE ? END, updated_at = ?
          WHERE server_id = ? AND desired_state != 'deleted'`,
         )
         .bind(sync.plan, sync.interval, sync.currency, size, size, size, dependencies.now(), row.server_id)
@@ -1578,7 +1820,7 @@ export class HostedServerService {
         .prepare(
           `UPDATE hosted_servers SET observed_state = 'stopping', updated_at = ?
          WHERE server_id = ? AND desired_state = 'running' AND observed_state = 'running'
-           AND pending_size IS NOT NULL AND COALESCE(last_active_at, 0) <= ?`,
+           AND pending_size IS NOT NULL AND COALESCE(last_active_at, 0) <= ? AND operator_host IS NULL`,
         )
         .bind(now, row.server_id, now - RESIZE_AFTER_NO_USE_MS)
         .run(),
@@ -1637,15 +1879,37 @@ export class HostedServerService {
     return null;
   });
 
-  /** Makes the sandbox of a paid server. Only one caller wins the change from `awaiting_payment`. */
+  /**
+   * Starts a paid server: on a free prepared machine of the pool, or else in a new boat sandbox. Only one
+   * caller wins the change from `awaiting_payment`. Without `pool`, only boat is used.
+   */
   readonly #provision = Effect.fn("HostedServerService.provision")(function* (
     this: HostedServerService,
     row: HostedServerRow,
+    pool = true,
   ): Effect.fn.Return<void, HostedFailure, HostedServerDependencies> {
     const dependencies = yield* HostedServerDependencies;
+    // A server on a machine outside boat never gets a sandbox: a new one would be empty.
+    if (row.operator_host) return;
+    const secret = yield* this.#claimKey();
+    // A pool problem never stops a purchase: the server then starts on boat. When the pool change was
+    // stored but its answer was lost, the boat change below finds a row with a machine and does nothing.
+    if (pool && secret) {
+      const assigned = yield* this.#assignPoolMachine(row, secret).pipe(
+        Effect.catch((error) =>
+          Effect.sync(() => {
+            console.warn("Hosted server pool assignment failed.", {
+              serverId: row.server_id,
+              error: safeErrorCode(error),
+            });
+            return false;
+          }),
+        ),
+      );
+      if (assigned) return;
+    }
     const boat = dependencies.boat;
     const template = this.#template;
-    const secret = yield* this.#claimKey();
     // Thrown before the row changes, so the webhook retry or the cron provisions it later.
     if (!boat || !template || !secret) {
       return yield* new HostedServerServiceError(503, "hosting_not_configured", "Hosted servers are not configured.");
@@ -1666,7 +1930,8 @@ export class HostedServerService {
            claim_redeemed_at = CASE WHEN ${CLAIM_OPEN_SQL} THEN NULL ELSE claim_redeemed_at END,
            provider_template = COALESCE(provider_template, ?), checkout_session_id = NULL, provider_event_at = ?,
            last_active_at = ?, lease_until = ?, updated_at = ?
-         WHERE server_id = ? AND observed_state = 'awaiting_payment' AND desired_state = 'running'`,
+         WHERE server_id = ? AND observed_state = 'awaiting_payment' AND desired_state = 'running'
+           AND operator_host IS NULL`,
         )
         .bind(now, claimHash, now + CLAIM_TTL_MS, from, now, now, now + LEASE_TTL_SECONDS * 1000, now, row.server_id)
         .run(),
@@ -1705,7 +1970,13 @@ export class HostedServerService {
         );
         return;
       }
-      this.#track(row, { name: "hosted_server_action", action: "provisioned", plan: row.plan, size: row.size });
+      this.#track(row, {
+        name: "hosted_server_action",
+        action: "provisioned",
+        plan: row.plan,
+        size: row.size,
+        machine: "boat",
+      });
       if (stored.meta.changes === 1 && isUsable(sandbox.state))
         yield* this.#recordReady({ ...row, last_wake_reason: "create", start_requested_at: now }, dependencies.now());
       yield* this.#rename(row, sandbox.id);
@@ -1724,10 +1995,126 @@ export class HostedServerService {
               .bind(failed, dependencies.now(), row.server_id)
               .run(),
           );
-          this.#track(row, { name: "hosted_server_action", action: "setup_failed", plan: row.plan, error: failed });
+          this.#track(row, {
+            name: "hosted_server_action",
+            action: "setup_failed",
+            plan: row.plan,
+            error: failed,
+            machine: "boat",
+          });
         }),
       ),
     );
+  });
+
+  /**
+   * Gives a new paid server a free prepared machine of the pool. The machine asks for its server
+   * (`poolAssignment`), starts OpenBot with the claim, and the sign-in of OpenBot sets the row to `running`
+   * (`redeemClaim`). One statement takes the machine, so two purchases never get the same one. Returns
+   * false when the pool has no such machine: the caller then uses boat.
+   */
+  readonly #assignPoolMachine = Effect.fn("HostedServerService.assignPoolMachine")(function* (
+    this: HostedServerService,
+    row: HostedServerRow,
+    secret: string,
+  ): Effect.fn.Return<boolean, HostedFailure, HostedServerDependencies> {
+    const dependencies = yield* HostedServerDependencies;
+    // After a boat attempt, boat can still make the sandbox of that attempt. Such a server stays on boat.
+    if (row.provider_template || row.provider_sandbox_id) return false;
+    const now = dependencies.now();
+    const seenAfter = now - POOL_SEEN_WITHIN_MS;
+    const locations = poolLocations(row.currency);
+    const candidates = yield* hostedCall(() =>
+      dependencies.database
+        .prepare(
+          `SELECT o.host_id FROM operator_hosts o
+         WHERE o.removed_at IS NULL AND o.product = ? AND o.assign_token_hash IS NOT NULL AND o.seen_at > ?
+           AND o.location IN (${locations.map(() => "?").join(", ")})
+           AND NOT EXISTS(SELECT 1 FROM hosted_servers h WHERE h.operator_host = o.host_id)
+         ORDER BY (o.location = ?) DESC, o.added_at, o.host_id LIMIT ?`,
+        )
+        .bind(POOL_PRODUCT_OF_PLAN[row.plan], seenAfter, ...locations, locations[0], POOL_CANDIDATES)
+        .all<{ host_id: string }>(),
+    );
+    for (const { host_id: hostId } of candidates.results) {
+      // The claim names the machine, so another machine or a boat sandbox of this server cannot use it.
+      const claim = yield* hostedPoolClaim(secret, row.server_id, hostId).pipe(Effect.mapError(hostedFailure));
+      const claimHash = yield* sha256(claim).pipe(Effect.mapError(hostedFailure));
+      const assigned = yield* hostedCall(() =>
+        dependencies.database
+          .prepare(
+            `UPDATE hosted_servers SET operator_host = ?, observed_state = 'starting', last_wake_reason = 'create',
+             start_requested_at = ?, claim_token_hash = ?, claim_expires_at = ?, claim_redeemed_at = NULL,
+             checkout_session_id = NULL, provider_event_at = ?, last_active_at = ?, updated_at = ?
+           WHERE server_id = ? AND observed_state = 'awaiting_payment' AND desired_state = 'running'
+             AND operator_host IS NULL AND provider_sandbox_id IS NULL AND provider_template IS NULL
+             AND retired_sandbox_id IS NULL AND ${CLAIM_OPEN_SQL}
+             AND EXISTS(SELECT 1 FROM operator_hosts o WHERE o.host_id = ? AND o.removed_at IS NULL
+               AND o.assign_token_hash IS NOT NULL AND o.seen_at > ?)
+             AND NOT EXISTS(SELECT 1 FROM hosted_servers h WHERE h.operator_host = ?)`,
+          )
+          .bind(hostId, now, claimHash, now + CLAIM_TTL_MS, now, now, now, row.server_id, hostId, seenAfter, hostId)
+          .run(),
+      );
+      if (assigned.meta.changes !== 1) continue;
+      this.#track(row, {
+        name: "hosted_server_action",
+        action: "provisioned",
+        plan: row.plan,
+        size: row.size,
+        machine: "pool",
+      });
+      return true;
+    }
+    return false;
+  });
+
+  /**
+   * OpenBot on a pool machine did not sign in: the machine is off, or OpenBot did not start there. The
+   * server leaves the machine and starts in a boat sandbox. The machine can have the start of a server on
+   * its disk, so it loses its token and gets no other server until the operator prepares it again.
+   */
+  readonly #leavePoolMachine = Effect.fn("HostedServerService.leavePoolMachine")(function* (
+    this: HostedServerService,
+    row: HostedServerRow,
+  ): Effect.fn.Return<boolean, HostedFailure, HostedServerDependencies> {
+    const dependencies = yield* HostedServerDependencies;
+    const hostId = row.operator_host;
+    if (!hostId) return false;
+    const now = dependencies.now();
+    const [left] = yield* hostedCall(() =>
+      dependencies.database.batch([
+        // A sign-in in this moment changed `observed_state`, so the server then keeps its machine. A server
+        // whose plan ended in this time gets `error`: with no machine and no sandbox, a renewal sets it up again.
+        dependencies.database
+          .prepare(
+            `UPDATE hosted_servers SET operator_host = NULL,
+             observed_state = CASE WHEN desired_state = 'running' THEN 'awaiting_payment' ELSE 'error' END,
+             claim_token_hash = NULL, start_requested_at = NULL, updated_at = ?
+           WHERE server_id = ? AND operator_host = ? AND desired_state != 'deleted' AND ${POOL_FIRST_START_SQL}`,
+          )
+          .bind(now, row.server_id, hostId),
+        dependencies.database
+          .prepare(
+            `UPDATE operator_hosts SET assign_token_hash = NULL WHERE host_id = ?
+             AND NOT EXISTS(SELECT 1 FROM hosted_servers h WHERE h.operator_host = ?)`,
+          )
+          .bind(hostId, hostId),
+      ]),
+    );
+    if (left?.meta.changes !== 1) return false;
+    console.warn("Hosted server left its pool machine.", { serverId: row.server_id });
+    this.#track(row, {
+      name: "hosted_server_action",
+      action: "setup_failed",
+      plan: row.plan,
+      error: "start_failed",
+      machine: "pool",
+    });
+    const current = yield* this.#requireRow(row.server_id);
+    if (current.observed_state !== "awaiting_payment") return false;
+    yield* this.#provision(current, false);
+    return true;
   });
 
   /**
@@ -1860,6 +2247,8 @@ export class HostedServerService {
   ): Effect.fn.Return<boolean, HostedFailure, HostedServerDependencies> {
     const dependencies = yield* HostedServerDependencies;
     if (row.desired_state !== "running" || row.observed_state !== "error" || row.provider_sandbox_id) return false;
+    // A machine outside boat has the data of the server. A new sandbox would be an empty second server.
+    if (row.operator_host) return false;
     if (
       !(yield* getServerEntitlement(dependencies.database, row.server_id, dependencies.now()).pipe(
         Effect.mapError(hostedFailure),
@@ -1870,7 +2259,8 @@ export class HostedServerService {
       dependencies.database
         .prepare(
           `UPDATE hosted_servers SET observed_state = 'awaiting_payment', observed_error = NULL, updated_at = ?
-         WHERE server_id = ? AND desired_state = 'running' AND observed_state = 'error' AND provider_sandbox_id IS NULL`,
+         WHERE server_id = ? AND desired_state = 'running' AND observed_state = 'error' AND provider_sandbox_id IS NULL
+           AND operator_host IS NULL`,
         )
         .bind(dependencies.now(), row.server_id)
         .run(),
@@ -1889,13 +2279,15 @@ export class HostedServerService {
     row: HostedServerRow,
   ): Effect.fn.Return<void, HostedFailure, HostedServerDependencies> {
     const dependencies = yield* HostedServerDependencies;
-    if (!row.provider_sandbox_id) {
+    // A machine outside boat keeps the data, so its row only takes the new plan: the operator starts it.
+    if (!row.provider_sandbox_id && !row.operator_host) {
       const reset = yield* hostedCall(() =>
         dependencies.database
           .prepare(
             `UPDATE hosted_servers SET desired_state = 'running', observed_state = 'awaiting_payment',
              observed_error = NULL, updated_at = ?
-           WHERE server_id = ? AND desired_state = 'stopped' AND provider_sandbox_id IS NULL`,
+           WHERE server_id = ? AND desired_state = 'stopped' AND provider_sandbox_id IS NULL
+             AND operator_host IS NULL`,
           )
           .bind(dependencies.now(), row.server_id)
           .run(),
@@ -1921,7 +2313,10 @@ export class HostedServerService {
     yield* this.#wake(yield* this.#requireRow(row.server_id), "restart");
   });
 
-  /** The plan ended: the server stops and keeps its data. It is never deleted for this. */
+  /**
+   * The plan ended: the server stops and keeps its data. boat runs a server until the owner deletes it.
+   * A server on a machine of the operator is deleted `OPERATOR_HOST_DATA_KEPT_MS` later (`#deleteExpired`).
+   */
   readonly #endPlan = Effect.fn("HostedServerService.endPlan")(function* (
     this: HostedServerService,
     row: HostedServerRow,
@@ -1931,10 +2326,10 @@ export class HostedServerService {
       dependencies.database
         .prepare(
           `UPDATE hosted_servers SET desired_state = 'stopped', observed_error = 'plan_ended', claim_token_hash = NULL,
-           updated_at = ?
+           plan_ended_at = ?, updated_at = ?
          WHERE server_id = ? AND desired_state IN ('running', 'idle')`,
         )
-        .bind(dependencies.now(), row.server_id)
+        .bind(dependencies.now(), dependencies.now(), row.server_id)
         .run(),
     );
     if (ended.meta.changes !== 1) return;
@@ -1997,7 +2392,7 @@ export class HostedServerService {
         .prepare(
           `UPDATE hosted_servers SET desired_state = 'idle', updated_at = ?
          WHERE server_id = ? AND desired_state = 'running' AND observed_state = 'running'
-           AND COALESCE(last_active_at, 0) <= ?`,
+           AND COALESCE(last_active_at, 0) <= ? AND operator_host IS NULL`,
         )
         .bind(dependencies.now(), row.server_id, now - IDLE_STOP_AFTER_MS)
         .run(),
@@ -2234,6 +2629,8 @@ export class HostedServerService {
     reason: WakeReason,
   ): Effect.fn.Return<void, HostedFailure, HostedServerDependencies> {
     const dependencies = yield* HostedServerDependencies;
+    // Only the operator starts a machine outside boat. `waking` would wait for a boat event that never comes.
+    if (row.operator_host) return;
     const now = dependencies.now();
     const rateLimited = isRateLimitedStart(row);
     if (rateLimited && now < rateLimitRetryAt(row)) return;
@@ -2417,7 +2814,8 @@ export class HostedServerService {
       dependencies.database
         .prepare(
           `UPDATE hosted_servers SET observed_state = ?, observed_error = ?, provider_event_at = ?, updated_at = ?
-         WHERE server_id = ? AND desired_state != 'deleted' AND (provider_event_at IS NULL OR provider_event_at <= ?)`,
+         WHERE server_id = ? AND desired_state != 'deleted' AND (provider_event_at IS NULL OR provider_event_at <= ?)
+           AND operator_host IS NULL`,
         )
         .bind(observed, error, eventAt, dependencies.now(), row.server_id, eventAt)
         .run(),
@@ -2444,7 +2842,10 @@ export class HostedServerService {
     const dependencies = yield* HostedServerDependencies;
     // A create call runs and can still return a sandbox. The cron deletes it after the call ends.
     if (row.observed_state === "creating" && !row.provider_sandbox_id) return;
-    const sandboxId = row.provider_sandbox_id ?? (yield* this.#findLostSandbox(row));
+    // The sandbox from before a move still has the data of the server, so it goes too. The operator
+    // erases the machine outside boat (docs/hosted-servers.md).
+    const sandboxId =
+      row.provider_sandbox_id ?? (row.operator_host ? row.retired_sandbox_id : yield* this.#findLostSandbox(row));
     if (sandboxId) {
       const boat = dependencies.boat;
       if (!boat)
@@ -2570,6 +2971,7 @@ export class HostedServerService {
       size: row.size,
       ...(row.last_wake_reason ? { reason: row.last_wake_reason } : {}),
       durationMs,
+      machine: row.operator_host ? "pool" : "boat",
     });
   });
 
@@ -2645,6 +3047,7 @@ function summary(row: HostedServerRow): HostedServerSummary {
     error: row.observed_error,
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
+    storageGb: planStorageGb(row.plan, row.operator_host !== null),
   };
 }
 
@@ -2684,6 +3087,20 @@ function isDeveloperKey(expected: string | undefined, provided: string | null | 
 
 function hostedClaim(secret: string, serverId: string) {
   return hmacSha256(secret, `openbot-hosted-claim:v1:${serverId}`);
+}
+
+/** The claim of a first start on a pool machine. It is not the boat claim of the server, and names the machine. */
+function hostedPoolClaim(secret: string, serverId: string, hostId: string) {
+  return hmacSha256(secret, `openbot-hosted-pool-claim:v1:${serverId}:${hostId}`);
+}
+
+/**
+ * The pool locations for a purchase, the best one first. PRIVACY.md names them. A purchase in euros or
+ * zlotys gets only a machine in the EU: when the EU has none, the server starts on boat, which is in the
+ * EU too. A machine in each other location gets no new server.
+ */
+function poolLocations(currency: BillingCurrency): readonly [string, ...string[]] {
+  return currency === "usd" || currency === "brl" ? ["WDC-02", "AMS-01"] : ["AMS-01"];
 }
 
 function sandboxName(plan: BillingPlanId, email: string, serverId: string): string {
@@ -2805,6 +3222,10 @@ function notFound(): HostedServerServiceError {
 
 function invalidClaim(): HostedServerServiceError {
   return new HostedServerServiceError(401, "hosted_claim_invalid", "The server claim is invalid or used.");
+}
+
+function invalidPoolToken(): HostedServerServiceError {
+  return new HostedServerServiceError(401, "hosted_pool_token_invalid", "The pool machine token is invalid.");
 }
 
 function planSoldOut(): HostedServerServiceError {

@@ -8,8 +8,16 @@
 // below does not change which codec a route gets.
 import { withAgentTaskUiBlocks } from "./agent-task-ui-blocks-v1";
 import { isChannelAttentionRoute, withChannelAttention } from "./channel-attention-v1";
+import { withChannelBrowser, withChannelDraftBrowser } from "./channel-browser-v1";
 import { withChannelDraftIsolation, withChannelIsolation } from "./channel-isolation-v1";
-import { channelRequest, channelResponse, isChannelRoute } from "./channels-v1";
+import {
+  channelPictureRoute,
+  isChannelPictureRoute,
+  withChannelDraftPicture,
+  withChannelPicture,
+} from "./channel-picture-v1";
+import { withChannelSeenSubtasks } from "./channel-seen-subtasks-v1";
+import { CHANNEL_ROUTES, channelRequest, channelResponse, isChannelRoute } from "./channels-v1";
 import { isChannelHistoryExtentRoute, withChannelHistoryExtent } from "./history-extent-v1";
 import { isMcpSignInListRoute, mcpManyServersResponse, mcpManySignInsResponse } from "./mcp-many-servers-v1";
 import { isMcpRoute, mcpRequest, mcpResponse } from "./mcp-v1";
@@ -36,6 +44,15 @@ export interface TeamSideRouteOptions {
    */
   channelIsolation?: boolean;
   /**
+   * channel-picture-v1: a channel keeps `icon` and `imageUrl`, and the draft of a save keeps `icon`.
+   * Passed as `channelIsolation` is.
+   */
+  channelPicture?: boolean;
+  /** channel-browser-v1: a channel keeps `browser`, as `channelIsolation` keeps `isolated`. */
+  channelBrowser?: boolean;
+  /** channel-seen-subtasks-v1: a waiting task of a channel page keeps `seenDependencies`. Passed as `channelAttention` is. */
+  channelSeenSubtasks?: boolean;
+  /**
    * mcp-many-servers-v1: a list of MCP servers or of their sign-ins holds up to 100 rows. Passed as
    * `channelAttention` is.
    */
@@ -50,7 +67,9 @@ export interface TeamSideRouteCodec {
 const CHANNEL_CODEC: TeamSideRouteCodec = {
   request: (path, value, options) => {
     const projected = channelRequest(path, value);
-    return options?.channelIsolation ? withChannelDraftIsolation(path, projected, value) : projected;
+    const isolated = options?.channelIsolation ? withChannelDraftIsolation(path, projected, value) : projected;
+    const pictured = options?.channelPicture ? withChannelDraftPicture(path, isolated, value) : isolated;
+    return options?.channelBrowser ? withChannelDraftBrowser(path, pictured, value) : pictured;
   },
   response: (path, status, value, options) => {
     const projected = channelResponse(path, status, value);
@@ -59,9 +78,25 @@ const CHANNEL_CODEC: TeamSideRouteCodec = {
         ? withChannelHistoryExtent(projected, value)
         : projected;
     const isolated = options?.channelIsolation && status < 400 ? withChannelIsolation(path, extended, value) : extended;
+    const pictured = options?.channelPicture && status < 400 ? withChannelPicture(path, isolated, value) : isolated;
+    const browser = options?.channelBrowser && status < 400 ? withChannelBrowser(path, pictured, value) : pictured;
+    const seen = options?.channelSeenSubtasks && status < 400 ? withChannelSeenSubtasks(path, browser, value) : browser;
     return options?.channelAttention && status < 400 && isChannelAttentionRoute(path)
-      ? withChannelAttention(path, isolated, value)
-      : isolated;
+      ? withChannelAttention(path, seen, value)
+      : seen;
+  },
+};
+/** The image route of channel-picture-v1. Its channel answer is the answer of a channel command. */
+const CHANNEL_PICTURE_CODEC: TeamSideRouteCodec = {
+  request: channelPictureRoute.request,
+  response: (path, status, value, options) => {
+    const projected = channelPictureRoute.response(status, value);
+    if (status >= 400) return projected;
+    const isolated = options?.channelIsolation
+      ? withChannelIsolation(CHANNEL_ROUTES.command, projected, value)
+      : projected;
+    const pictured = options?.channelPicture ? withChannelPicture(path, isolated, value) : isolated;
+    return options?.channelBrowser ? withChannelBrowser(CHANNEL_ROUTES.command, pictured, value) : pictured;
   },
 };
 const MCP_CODEC: TeamSideRouteCodec = {
@@ -74,6 +109,7 @@ const STORAGE_CODEC: TeamSideRouteCodec = { request: storageRequest, response: s
 /** The side-protocol codec that owns `path`, or `null` when the negotiated protocol's adapter does. */
 export function teamSideRouteCodec(path: string): TeamSideRouteCodec | null {
   if (isChannelRoute(path)) return CHANNEL_CODEC;
+  if (isChannelPictureRoute(path)) return CHANNEL_PICTURE_CODEC;
   if (isMcpRoute(path)) return MCP_CODEC;
   if (isStorageRoute(path)) return STORAGE_CODEC;
   const admin = optionalRouteCodec(path);

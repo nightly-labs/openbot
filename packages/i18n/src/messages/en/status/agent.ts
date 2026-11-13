@@ -8,6 +8,8 @@ export const messages = defineMessages("status.agent", {
   "status.agent.modelSwitchedForLimit": "Usage limit reached. Switched to {model}.",
   "status.agent.modelReturnedAfterLimit": "Usage limit ended. Switched back to {model}.",
   "status.agent.modelSwitchedForError": "Provider error. Switched to {model}.",
+  "status.agent.modelSwitchedForSpentBalance":
+    "{previous} has no credits left. Switched to {model}. To use it again, add credits and then select it.",
   "status.agent.modelReturnedAfterError": "Switched back to {model} after the provider error.",
   "status.agent.marketplaceSuggested": "Suggested a Marketplace app: {app}.",
   "status.agent.channelMemberAdded": "{agent} added {member} to the channel. {person} asked for it.",
@@ -29,6 +31,8 @@ export const messages = defineMessages("status.agent", {
   "status.agent.reportProblem":
     "This becomes a public GitHub issue, with the app version and your system. Your name is not shown.",
   "status.agent.sendIdea": "This becomes a public GitHub issue. Your name is not shown.",
+  "status.agent.feedbackRecentErrors": "Recent errors in the chat:",
+  "status.agent.feedbackSameAs": "Adds to issue #{issue}",
   "status.agent.feedbackSent": "Sent to the OpenBot team: {title}",
   "status.agent.serverInstallCommand":
     "Make a one-time command that installs OpenBot on another computer as the server {name} and signs it in to your account. The agent runs it there.",
@@ -122,4 +126,5 @@ export const messages = defineMessages("status.agent", {
   "status.agent.compactionContinues":
     "The connection stopped while the agent compacted its context. The agent continues.",
   "status.agent.branchTitle": "Branched chat",
+  "status.agent.importedChatTitle": "Imported chat",
 });

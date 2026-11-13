@@ -9,7 +9,7 @@ import { providerSync } from "../provider-client-effects";
 import { importProviderHistory } from "../provider-history-import";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { conversationContentSignature } from "./delivery-content";
-import { markIncompleteImageGeneration } from "./image-generation";
+import { markIncompleteMediaGeneration } from "./image-generation";
 import type { MailboxSync } from "./mailbox-sync";
 import type { ProviderRuntime } from "./provider-runtime";
 import { stopRunningSubagents } from "./subagent-updates";
@@ -31,6 +31,8 @@ export interface BootRecoveryHooks {
    * routine, whose record is gone. A Test, script or webhook run cannot.
    */
   quietRoutineDelivery(deliveryId: string): boolean;
+  /** Whether this thread is a routine's side thread, where a turn can end quiet. */
+  isRoutineThread(threadId: string): boolean;
   emitError(code: string, error: unknown, agentId?: string): void;
 }
 
@@ -257,7 +259,7 @@ export class BootRecovery {
           .map((message) => {
             const changed = structuredClone(message);
             changed.status = terminal;
-            markIncompleteImageGeneration(changed, terminal);
+            markIncompleteMediaGeneration(changed, terminal);
             return changed;
           });
         const revision = this.#store.database.persistConversationChanges({
@@ -302,7 +304,7 @@ export class BootRecovery {
           }
           if (turnId && changed.turnId === turnId && changed.status === "streaming") {
             changed.status = "interrupted";
-            markIncompleteImageGeneration(changed, "interrupted");
+            markIncompleteMediaGeneration(changed, "interrupted");
           }
           // A background subagent ran in the provider process, which ended with the previous run.
           const stopped = stopRunningSubagents(changed.subagents, new Date().toISOString(), { background: true });
@@ -371,6 +373,8 @@ export class BootRecovery {
             findDelivery: (deliveryId) => this.#mailbox.deliveryForProviderMessage(agent.id, deliveryId),
             findMessageDelivery: (messageId) => this.#mailbox.deliveryForMessage(messageId, agent.id),
             quietRoutineDelivery: (deliveryId) => this.#hooks.quietRoutineDelivery(deliveryId),
+            quietTeammateThread:
+              !this.#conversation.isExecutionThread(publicThreadId) || this.#hooks.isRoutineThread(publicThreadId),
           }).pipe(toBootRecoveryFailed);
           yield* recoveryStep(() => this.#refreshBackfilledConversation(agent.id, publicThreadId));
         }).pipe(

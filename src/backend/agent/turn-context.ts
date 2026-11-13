@@ -1,5 +1,8 @@
+import { AGENT_INSTRUCTION_FILE_NAMES } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import {
+  type InstructionsFileText,
+  instructionsFileUpdate,
   type MemoryContext,
   memoryContextUpdate,
   NATURAL_TURN_REMINDER,
@@ -9,7 +12,8 @@ import {
 } from "./developer-instructions";
 
 /**
- * The essential memories, the section-mates, the saved-logins rule and the style reminder of each
+ * The essential memories, the section-mates, the instruction file text (Claude only), the
+ * saved-logins rule and the style reminder of each
  * thread, for a client that sends them with the user turns (`AgentClient.turnContext`). In the
  * system prompt, each memory change would change the prefix, and the provider would write the full
  * conversation to its cache again. With the turns, a change is one small block.
@@ -24,6 +28,11 @@ export class TurnContext {
   readonly #teammates = new Map<
     string,
     { current: SectionTeammates | null; delivered: SectionTeammates | null | undefined }
+  >();
+  /** The same for the instruction file text. `undefined` as `delivered`: the context can hold any earlier text. */
+  readonly #instructionsFiles = new Map<
+    string,
+    { current: InstructionsFileText | null; delivered: InstructionsFileText | null | undefined }
   >();
   /** The same for the saved-logins rule. `undefined` as `delivered`: the context can hold any earlier block. */
   readonly #savedLogins = new Map<string, { current: boolean; delivered: boolean | undefined }>();
@@ -46,6 +55,13 @@ export class TurnContext {
       // A new conversation holds no block, as if logins were not shared.
       else this.#savedLogins.set(threadId, { current: params.savedLogins, delivered: resume ? undefined : false });
     }
+    if (isDynamicRecord(params) && "instructionsFile" in params) {
+      const file = readInstructionsFile(params.instructionsFile);
+      const known = this.#instructionsFiles.get(threadId);
+      if (known) known.current = file;
+      // A new conversation holds no text, so no file needs no block.
+      else this.#instructionsFiles.set(threadId, { current: file, delivered: resume ? undefined : null });
+    }
     if (!isDynamicRecord(params) || !("sectionTeammates" in params)) return;
     const section = readSectionTeammates(params.sectionTeammates);
     const teammates = this.#teammates.get(threadId);
@@ -62,17 +78,20 @@ export class TurnContext {
   take(threadId: string, command = false): string[] {
     const memory = this.#memories.get(threadId);
     const teammates = this.#teammates.get(threadId);
+    const file = this.#instructionsFiles.get(threadId);
     const logins = this.#savedLogins.get(threadId);
     const blocks = command
       ? []
       : [
           memory ? memoryContextUpdate(memory.delivered, memory.current) : null,
           teammates ? sectionTeammatesUpdate(teammates.delivered, teammates.current) : null,
+          file ? instructionsFileUpdate(file.delivered, file.current) : null,
           logins ? savedLoginsUpdate(logins.delivered, logins.current) : null,
           this.#styleReminders.has(threadId) ? NATURAL_TURN_REMINDER : null,
         ].filter((block): block is string => block !== null);
     if (memory) memory.delivered = command ? null : memory.current;
     if (teammates) teammates.delivered = command ? undefined : teammates.current;
+    if (file) file.delivered = command ? undefined : file.current;
     if (logins) logins.delivered = command ? undefined : logins.current;
     return blocks;
   }
@@ -86,6 +105,8 @@ export class TurnContext {
     if (memory) memory.delivered = null;
     const teammates = this.#teammates.get(threadId);
     if (teammates) teammates.delivered = undefined;
+    const file = this.#instructionsFiles.get(threadId);
+    if (file) file.delivered = undefined;
     const logins = this.#savedLogins.get(threadId);
     if (logins) logins.delivered = undefined;
   }
@@ -93,6 +114,7 @@ export class TurnContext {
   forget(threadId: string): void {
     this.#memories.delete(threadId);
     this.#teammates.delete(threadId);
+    this.#instructionsFiles.delete(threadId);
     this.#savedLogins.delete(threadId);
     this.#styleReminders.delete(threadId);
   }
@@ -119,4 +141,11 @@ function readSectionTeammates(value: unknown): SectionTeammates | null {
       isDynamicRecord(member) && isString(member.id) && isString(member.name) && isString(member.title),
   );
   return members.length > 0 ? { name: value.name, members } : null;
+}
+
+/** An empty file gives no text, as in the system prompt. */
+function readInstructionsFile(value: unknown): InstructionsFileText | null {
+  if (!isDynamicRecord(value) || !isOneOf(AGENT_INSTRUCTION_FILE_NAMES, value.fileName)) return null;
+  if (!isString(value.text) || value.text.length === 0 || typeof value.truncated !== "boolean") return null;
+  return { fileName: value.fileName, text: value.text, truncated: value.truncated };
 }

@@ -1,7 +1,7 @@
 // The tokens of the messaging connections (a Slack bot token and app-level token per agent, or the
 // credentials of a managed Slack app), and the manager token of each connected Slack workspace,
-// encrypted at rest by the operating system. Every value is registered for redaction, including the
-// few that are not secret, such as a workspace name: none of them belongs in a log.
+// encrypted at rest by the operating system. Every value is registered for redaction, except the
+// names that people read in the chat; see `DISPLAY_NAMES`.
 
 import { readFile, rm } from "node:fs/promises";
 import type { MessagingCredentialState } from "@openbot/contracts/ipc";
@@ -28,6 +28,18 @@ const envelopeSchema = z.object({
 const valuesSchema = z.record(z.string(), z.string());
 
 const MAX_ENVELOPE_BYTES = 256 * 1024;
+
+/**
+ * The names of a chat, a bot and a server. Text that an agent posts to a chat is redacted, so a
+ * registered name became `[redacted]` each time the agent wrote it, such as a sector that has the
+ * name of its Telegram group. A key that is not in this list stays registered, so a new token is
+ * redacted by default.
+ */
+const DISPLAY_NAMES = new Set(["chatTitle", "botUsername", "guildName"]);
+
+function registerSecrets(values: Record<string, string>): void {
+  for (const [key, value] of Object.entries(values)) if (!DISPLAY_NAMES.has(key)) registerSecretValue(value);
+}
 
 /**
  * Reads and writes the connection tokens, holding the decrypted values only in memory. `electron`
@@ -82,7 +94,7 @@ export class MessagingCredentialStore implements MessagingCredentials {
 
   set(connectionId: string, values: Record<string, string>): Effect.Effect<void, MessagingOperationFailed> {
     return this.#edit((next) => {
-      for (const value of Object.values(values)) registerSecretValue(value);
+      registerSecrets(values);
       next.set(connectionId, { ...values });
       return true;
     });
@@ -134,7 +146,7 @@ export class MessagingCredentialStore implements MessagingCredentials {
       const values = new Map<string, Record<string, string>>();
       for (const [connectionId, encrypted] of Object.entries(envelope.connections)) {
         const decoded = valuesSchema.parse(JSON.parse(this.#cipher.decrypt(Buffer.from(encrypted, "base64"))));
-        for (const value of Object.values(decoded)) registerSecretValue(value);
+        registerSecrets(decoded);
         values.set(connectionId, decoded);
       }
       return values;

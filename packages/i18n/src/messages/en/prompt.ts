@@ -1,7 +1,6 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("prompt", {
-  "prompt.inputRequired": "Input required",
   "prompt.question.label": "Agent questions",
   "prompt.question.cancelled": "Questions cancelled",
   "prompt.question.expired": "Questions expired",
@@ -11,15 +10,12 @@ export const messages = defineMessages("prompt", {
   "prompt.question.next": "Next",
   "prompt.question.cancel": "Cancel questions",
   "prompt.question.privatePlaceholder": "Enter a private answer",
-  "prompt.customPlaceholder": "Type your own answer",
   "prompt.question.customAnswerFor": "Custom answer for: {question}",
   "prompt.question.skip": "Skip",
   "prompt.question.chooseAll": "Choose all that apply.",
   "prompt.question.somethingElse": "Something else",
   "prompt.question.emptyTitle": "No questions are waiting.",
   "prompt.question.emptyBody": "The agent will continue when it needs another decision.",
-  "prompt.choice.hint": "Pick whatever fits, or type your own.",
-  "prompt.choice.customLabel": "Custom answer",
   "prompt.approval.answerFailed": "Could not answer this approval. Try again.",
   "prompt.approval.grantFailed": "Could not save the standing approval. Try again.",
   "prompt.approval.label": "Agent approval",
@@ -28,6 +24,8 @@ export const messages = defineMessages("prompt", {
   "prompt.approval.allow": "Allow",
   "prompt.approval.alwaysAllow": "Always allow",
   "prompt.approval.deny": "Deny",
+  "prompt.approval.cut":
+    "This card shows only the start of the request, so it offers only Deny. If Allow does not show soon, update OpenBot on the server.",
   "prompt.approval.report.bugHeadline": "Found a bug? Let's get it fixed.",
   "prompt.approval.report.ideaHeadline": "Have an idea? Let's make it real.",
   "prompt.approval.report.dontSend": "Not now",

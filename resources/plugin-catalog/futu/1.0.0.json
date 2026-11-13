@@ -1,0 +1,33 @@
+{
+  "slug": "futu",
+  "name": "Futu",
+  "tagline": "Market data and portfolio",
+  "description": "Futu lets agents read stock quotes, market data, and portfolio positions in the signed-in Futu account. Each user signs in to their own Futu account through the browser.",
+  "category": "data-analytics",
+  "creatorName": "Futu",
+  "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/67/1c/d9/671cd94a-e08f-5702-e614-1013e8bdd98b/AppIcon-NiuNiu-Universal-0-0-1x_U007epad-0-1-sRGB-85-220.png/512x512bb.jpg",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-quote", "text": "What is the latest quote and day range for Tencent (00700)?" },
+    { "id": "prompt-positions", "text": "Summarize my current positions and their profit and loss." },
+    { "id": "prompt-watchlist", "text": "Compare the 30-day performance of the stocks in my watchlist." }
+  ],
+  "apps": [
+    {
+      "id": "app-futu-mcp",
+      "name": "Futu",
+      "description": "Quotes, market data, and portfolio access, over Futu's MCP server with browser sign-in.",
+      "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/67/1c/d9/671cd94a-e08f-5702-e614-1013e8bdd98b/AppIcon-NiuNiu-Universal-0-0-1x_U007epad-0-1-sRGB-85-220.png/512x512bb.jpg",
+      "server": {
+        "name": "futu",
+        "transport": "http",
+        "url": "https://mcp.futunn.com/mcp",
+        "auth": [{ "id": "futu-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.futunn.com",
+  "privacyPolicyUrl": "https://www.futunn.com/about/disclaimer?lang=en-us",
+  "termsUrl": "https://www.futunn.com/about/services?lang=en-us",
+  "skills": []
+}

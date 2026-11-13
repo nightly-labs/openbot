@@ -48,8 +48,14 @@ export const messages = {
   "error.import.remoteZipTooLarge":
     "Für den Import auf einen Server, dem du beigetreten bist, muss der Export eine .zip-Datei unter 100 MB sein.",
   "error.import.hostBusy": "Der Server liest andere Exporte. Versuche es in einigen Minuten erneut.",
+  "error.import.uploadDiskSpace":
+    "Der Export braucht {size} GB freien Speicher auf dem Server, und {free} GB sind frei. Gib auf dem Server Speicher frei und wähle den Export dann erneut.",
+  "error.import.remoteZipTooLargeOldHost":
+    "Dieser Server nimmt Exporte bis 100 MB an. Aktualisiere OpenBot auf dem Server, um einen größeren Export zu importieren.",
   "error.import.skillKept":
     "{name}: Der Server hat die Fähigkeit „{skill}“ bereits. Der Agent verwendet daher diese Fähigkeit. Bitte einen Administrator, sie zu aktualisieren.",
+  "error.import.skillRenamed":
+    "{name}: Der Name der Fähigkeit „{skill}“ ist dem Namen einer anderen Fähigkeit zu ähnlich. Daher wird sie als „{renamed}“ gespeichert.",
   "error.import.transferRemoteTooLarge":
     "Eine Übertragungsdatei für einen beigetretenen Server muss kleiner als 100 MB sein. Deaktiviere die Dateien der Arbeitsbereiche oder exportiere weniger Agenten.",
   "error.import.transferNotFile": "Diese Datei ist keine OpenBot-Übertragungsdatei.",
@@ -64,6 +70,21 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name}: Das Modell „{model}“ ist hier noch nicht verfügbar, daher verwendet der Agent das Standardmodell. Wähle das Modell erneut, sobald sein Anbieter bereit ist.",
   "error.import.transferSettingSkipped": "{name} wird nicht importiert. {reason}",
+  "error.import.transferRunsSkipped": "{name}: Der Ausführungsverlauf der Routine „{routine}“ wird nicht importiert.",
+  "error.import.transferSharedSkillsSkipped":
+    "Die gemeinsamen Fähigkeiten konnten nicht gelesen werden und sind daher nicht in der Datei.",
+  "error.import.transferSharedSkillsNotAdded":
+    "Die geteilten Skills in der Datei konnten nicht zu diesem Server hinzugefügt werden.",
+  "error.import.transferMemberPreferencesSkipped": {
+    one: "Die Auswahl von {count} Mitglied konnte nicht gespeichert werden.",
+    other: "Die Auswahl von {count} Mitgliedern konnte nicht gespeichert werden.",
+  },
+  "error.import.transferSharedSkillExists":
+    "Auf diesem Server gibt es bereits eine gemeinsame Fähigkeit mit diesem Namen und anderen Dateien.",
+  "error.import.transferServerPreferencesSkipped": {
+    one: "{count} Serverpräferenz in der Datei ist hier nicht gültig und wird daher nicht importiert.",
+    other: "{count} Serverpräferenzen in der Datei sind hier nicht gültig und werden daher nicht importiert.",
+  },
   "error.import.transferRoutineFlowSkipped": "Der Import hat einen Routinenablauf ausgelassen. {reason}",
   "error.import.transferCustomAgentCommand":
     "{name}: Eigene Agenten werden nicht importiert, da sie einen Befehl ausführen. Prüfe den Befehl „{command}“ und füge den Agenten in den Einstellungen erneut hinzu.",

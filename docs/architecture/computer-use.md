@@ -69,13 +69,24 @@ OpenBot draws the agent cursor in its own per-display overlays for every display
 runtime starts `serve` with `--no-overlay`. The driver's overlay covers only the main display and
 cannot follow a display connected after startup. Keeping cursor ownership in OpenBot lets the
 highlight controller add, resize, and remove display overlays without restarting the daemon or
-changing provider sessions.
+changing provider sessions. The tap removes the driver's own cursor tools (`set_agent_cursor_*`
+and `get_agent_cursor_state`) from the tool list: with `--no-overlay` they change nothing on the
+screen, and on macOS they refuse. `move_cursor` stays, because OpenBot draws its cursor at the
+point of that call. A `click` or a `scroll` aimed at a window names a pixel of that window's last
+`get_window_state` screenshot, not a desktop point. The tap keeps the `screenshot_width` of each
+window from that answer and saves it with the point when the click passes. The cursor goes to the
+window's top-left corner plus the point times the window width divided by that screenshot width,
+as the driver computes it. A click that OpenBot cannot place (no `window_id`, a point in a `zoom`
+image, or no screenshot width yet) removes the cursor. A window that is not in `list_windows` gets
+no cursor.
 
 ### Agent display on a server
 
 A self-hosted server and the container start two Xvfb displays, and name the agent display in
 `OPENBOT_AGENT_DISPLAY`. The agent display has a white root (Xvfb `-wr`), because remote desktop
-shows a black root as if no video came. A boat hosted server names its desktop `:0`, and OpenBot
+shows a black root as if no video came. `xsetroot` gives it an arrow pointer, because the default
+"×" of an empty display looks like an error, and `-noreset` keeps the arrow. A boat hosted server
+names its desktop `:0`, and OpenBot
 runs on an Xvfb display. Electron keeps its own `DISPLAY`: the built-in browser draws its tabs in
 the OpenBot window, and under Xvfb a hidden view gives no capture and no clicks, so OpenBot cannot
 only hide its window. On Linux, `agent-display.ts` sets `DISPLAY` to the agent display for the

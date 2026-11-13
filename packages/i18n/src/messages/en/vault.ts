@@ -5,6 +5,13 @@ export const messages = defineMessages("vault", {
   "vault.items.title": "Saved items",
   "vault.items.description":
     "Every agent on this server can use these items. OpenBot types passwords, card numbers and security codes into the page, so agents never see them. Agents read API keys from a private file, not from the chat.",
+  "vault.items.scopedDescription":
+    "Each item is for the agents that you choose. OpenBot types passwords, card numbers and security codes into the page, so agents never see them. Agents read API keys from a file, not from the chat.",
+  "vault.agents.label": "Agents",
+  "vault.agents.all": "All agents",
+  "vault.agents.some": "{chosen} of {total}",
+  "vault.agents.choose": "Choose agents for {name}: {agents}",
+  "vault.agents.list": "Agents that can use {name}",
   "vault.newItem": "New item",
   "vault.kind.login": "Login",
   "vault.kind.card": "Card",
@@ -123,6 +130,8 @@ export const messages = defineMessages("vault", {
   "vault.request.addLogin": "Add login",
   "vault.request.addCard": "Add card",
   "vault.request.addContact": "Add address",
+  "vault.request.addApiKey": "Add API key",
+  "vault.request.apiKeyPrivate": "Goes to your Vault, not into the chat.",
   "vault.request.saved": "Saved to Vault",
   // Two-step (TOTP) code of a login: the live code, and the setup of its key in the login dialog.
   "vault.twoStep.title": "Two-step code",

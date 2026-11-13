@@ -30,7 +30,7 @@ import {
   type WAMessage,
 } from "@openbot/whatsapp/baileys";
 import { gc } from "bun";
-import { Effect } from "effect";
+import { Effect, Scope } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 import { AgentService } from "../src/backend/agent-service";
 import { AgentStore } from "../src/backend/agent-store";
@@ -67,6 +67,9 @@ const OWNER_LID = "777001";
 const FRIEND = "48600100300";
 const STRANGER = "48600100400";
 const LID_FRIEND = "48600100500";
+/** A Brazilian mobile number as people type it, and the older form that its WhatsApp account keeps. */
+const BRAZIL_TYPED = "5531988887777";
+const BRAZIL_ACCOUNT = "553188887777";
 const GROUP = "120363000000000001@g.us";
 const OTHER_GROUP = "120363000000000002@g.us";
 const PAIRING_CODE: string = "ABCD1234";
@@ -239,6 +242,14 @@ class FakeSocket implements WhatsAppSocket {
     return group(jid, jid === GROUP ? "Team" : "Family");
   }
 
+  /** Each number has an account, in the form it was asked for, except the Brazilian one, which keeps its older form. */
+  async onWhatsApp(...phoneNumbers: string[]) {
+    return phoneNumbers.map((number) => ({
+      jid: `${number === BRAZIL_TYPED ? BRAZIL_ACCOUNT : number}@s.whatsapp.net`,
+      exists: true,
+    }));
+  }
+
   async updateMediaMessage(message: WAMessage): Promise<WAMessage> {
     return message;
   }
@@ -383,6 +394,7 @@ interface Booted {
   agents: AgentService;
   messaging: MessagingService;
   runtime: WhatsAppRuntime;
+  mailbox: MailboxStore;
 }
 
 async function boot<T>(use: (services: Booted) => Promise<T>): Promise<T> {
@@ -423,7 +435,7 @@ async function boot<T>(use: (services: Booted) => Promise<T>): Promise<T> {
   });
   await runCauseEffect(messaging.start());
   try {
-    return await use({ agents, messaging, runtime });
+    return await use({ agents, messaging, runtime, mailbox });
   } finally {
     await runCauseEffect(messaging.stop());
     await runCauseEffect(agents.stop());
@@ -536,7 +548,7 @@ try {
     return { sealed: true };
   });
 
-  await boot(async ({ agents, messaging, runtime }) => {
+  await boot(async ({ agents, messaging, runtime, mailbox }) => {
     await step("link without network: the link fails as unavailable, not as an expired code", async () => {
       phone.offline = true;
       await runCauseEffect(messaging.startWhatsAppLink(parseStartWhatsAppLinkInput({ method: "qr", ownNumber: true })));
@@ -618,6 +630,41 @@ try {
       await until(() => received(agents, OWNER_JID, later.key.id ?? ""), "the later message");
       assert.equal(received(agents, OWNER_JID, own.id), false, "An own post was read as a request.");
       return { echoId: own.id };
+    });
+
+    await step("status post: a number with the setting off gets no “Working on it…” post", async () => {
+      const link = agents.messaging.store.linkByKey(connectionId(agents), OWNER_JID, "dm");
+      assert.ok(link, "No conversation for the owner's chat.");
+      // No provider runs here, so the check starts the request itself: a start names its request.
+      const request = mailbox.unresolvedMessagingDeliveries(link.linkId)[0];
+      assert.ok(request, "No request waits in the owner's chat.");
+      await runCauseEffect(mailbox.markStarting(request.delivery.id));
+      const scope = Effect.runSync(Scope.make());
+      const start = (turnId: string) =>
+        agents.messaging.event({ type: "turn-started", agentId: link.agentId, threadId: link.threadId, turnId }, scope);
+      // Posts and edits: a second start edits the post of the first one.
+      const working = () =>
+        phone.sent.filter(
+          (sent) =>
+            sent.jid === OWNER_JID &&
+            "text" in sent.content &&
+            typeof sent.content.text === "string" &&
+            sent.content.text.includes("Working on it"),
+        ).length;
+      const before = working();
+      assert.equal(messaging.whatsappOverview().accounts[0]?.workingMessage, true, "The post is not on by default.");
+      await runCauseEffect(messaging.setWhatsAppWorkingMessage(OWNER, false));
+      assert.equal(messaging.whatsappOverview().accounts[0]?.workingMessage, false);
+      start("turn-without-status-post");
+      await runCauseEffect(messaging.setWhatsAppWorkingMessage(OWNER, true));
+      assert.equal(messaging.whatsappOverview().accounts[0]?.workingMessage, true);
+      // The host handles the starts in order, so the post of this one shows that the first is done.
+      start("turn-with-status-post");
+      await until(() => working() > before, "the “Working on it…” post");
+      assert.equal(working(), before + 1, "A number with the setting off got a “Working on it…” post.");
+      // The request waits again, as the steps below expect.
+      await runCauseEffect(mailbox.restoreQueued(request.delivery.id));
+      return { posts: working() - before };
     });
 
     await step(
@@ -770,6 +817,53 @@ try {
       await until(() => received(agents, `${LID_FRIEND}@s.whatsapp.net`, lidOnly.key.id ?? ""), "the LID-only message");
       return { chat: `${LID_FRIEND}@s.whatsapp.net` };
     });
+
+    await step(
+      "Brazilian numbers: a contact typed with the 9 gets work through the form that WhatsApp sends",
+      async () => {
+        const accountJid = `${BRAZIL_ACCOUNT}@s.whatsapp.net`;
+        // A contact saved before WhatsApp named the form: the typed number is in the settings.
+        agents.messaging.store.addAllowedSender(connectionId(agents), {
+          id: BRAZIL_TYPED,
+          kind: "contact",
+          name: "Bia",
+        });
+        const saved = message({ chat: accountJid, text: "oi, tudo bem?" });
+        phone.current().receive([saved]);
+        await until(() => received(agents, accountJid, saved.key.id ?? ""), "the message of the saved contact");
+        const values = credentials.get(connectionId(agents));
+        assert.ok(values);
+        const adapter = whatsAppDriver({ runtime }).createAdapter(values, { rateLimited: () => {} });
+        await runCauseEffect(adapter.identify());
+        await runCauseEffect(
+          adapter.postAnswer({ platformChannelId: accountJid, replyThreadId: null }, "Resposta", null),
+        );
+        await until(() => phone.textsTo(accountJid).includes("Resposta"), "the answer to the saved contact");
+        // A contact added while the number is connected gets the form that WhatsApp has.
+        agents.messaging.store.removeAllowedSender(connectionId(agents), BRAZIL_TYPED);
+        const input = parseWhatsAppSenderInput({
+          workspaceId: OWNER,
+          sender: { id: "+55 31 9 8888-7777", kind: "contact", name: "Bia" },
+        });
+        await runCauseEffect(messaging.addWhatsAppSender(input.workspaceId, input.sender));
+        const ids = messaging.whatsappOverview().accounts[0]?.allowedSenders.map((sender) => sender.id) ?? [];
+        assert.ok(ids.includes(BRAZIL_ACCOUNT), "The contact was not saved in the form that WhatsApp has.");
+        assert.ok(!ids.includes(BRAZIL_TYPED), "The contact was saved as typed.");
+        // An agent writes the number as the person typed it: the post goes to the form that WhatsApp has.
+        const posted = await runCauseEffect(
+          agents.messaging.outboundTool(
+            "agent-whatsapp-e2e",
+            { threadId: "thread-whatsapp-e2e", turnId: "turn-whatsapp-e2e" },
+            "messaging_post",
+            { connection: connectionId(agents), place: "+55 31 9 8888-7777", text: "Lembrete" },
+            () => Effect.succeed([]),
+          ),
+        );
+        assert.ok(posted.success, posted.contentItems[0]?.text);
+        await until(() => phone.textsTo(accountJid).includes("Lembrete"), "the post to the typed number");
+        return { saved: BRAZIL_ACCOUNT, postedTo: accountJid };
+      },
+    );
 
     await step("burst: short messages of one person within 1.5 s become one request", async () => {
       const strangerJid = `${STRANGER}@s.whatsapp.net`;
@@ -1084,6 +1178,7 @@ try {
         [OWNER_JID]: OWNER,
         [`${STRANGER}@s.whatsapp.net`]: STRANGER,
         [`${LID_FRIEND}@s.whatsapp.net`]: LID_FRIEND,
+        [`${BRAZIL_ACCOUNT}@s.whatsapp.net`]: BRAZIL_ACCOUNT,
         [GROUP]: FRIEND,
       };
       for (const link of agents.messaging.store.links(orchestrator ?? ""))

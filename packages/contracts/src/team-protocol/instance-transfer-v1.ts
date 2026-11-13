@@ -57,7 +57,8 @@ const summary = fields({
   ),
 });
 
-const preview = fields({
+/** The stage preview. `instance-transfer-chunks-v1` finish answers the same shape. */
+export const INSTANCE_TRANSFER_PREVIEW = fields({
   token: identifier,
   appVersion: string(64),
   exportedAt: nullable(string(64)),
@@ -80,7 +81,7 @@ const preview = fields({
   warnings: messages,
 });
 
-const result = fields({
+export const INSTANCE_TRANSFER_RESULT = fields({
   agents: list(fields({ agentId: identifier, name }), 100),
   skipped: list(fields({ key, name, reason: string(500) }), 100),
   signIn: list(string(32), 32),
@@ -95,12 +96,12 @@ export const INSTANCE_TRANSFER_CODECS: ReadonlyMap<string, OptionalRouteCodec> =
     adminRoute(fields({ agentIds: list(identifier, 100), includeFiles: boolean, includeSettings: boolean }), empty),
   ],
   // The request body is the raw `.zip`, so its decoder never reads it.
-  [INSTANCE_TRANSFER_ROUTES.stage, adminRoute(empty, preview)],
+  [INSTANCE_TRANSFER_ROUTES.stage, adminRoute(empty, INSTANCE_TRANSFER_PREVIEW)],
   [
     INSTANCE_TRANSFER_ROUTES.apply,
     adminRoute(
       fields({ token: identifier, keys: list(key, 100), includeSettings: boolean, timezone: string(255) }),
-      result,
+      INSTANCE_TRANSFER_RESULT,
     ),
   ],
   [INSTANCE_TRANSFER_ROUTES.discard, adminRoute(fields({ token: identifier }), empty)],

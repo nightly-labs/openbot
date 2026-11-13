@@ -1,0 +1,33 @@
+{
+  "slug": "fathom",
+  "name": "Fathom",
+  "tagline": "Meeting notes and transcripts",
+  "description": "Fathom lets agents search recorded meetings and read their summaries, transcripts, and action items in the signed-in Fathom account. Each user signs in to their own Fathom account through the browser.",
+  "category": "productivity",
+  "creatorName": "Fathom",
+  "iconUrl": "https://cdn.prod.website-files.com/6899da9beccbdbe92be49b5d/6a4282cf5eaacfd4a9c45526_fathom_favicon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-last-call", "text": "Summarize my last customer call and list the action items." },
+    { "id": "prompt-search-meetings", "text": "Find the meetings this month where pricing came up." },
+    { "id": "prompt-follow-up", "text": "Draft a follow-up email from yesterday's meeting with the design team." }
+  ],
+  "apps": [
+    {
+      "id": "app-fathom-mcp",
+      "name": "Fathom",
+      "description": "Meeting search, summaries, transcripts, and action items, over Fathom's MCP server with browser sign-in.",
+      "iconUrl": "https://cdn.prod.website-files.com/6899da9beccbdbe92be49b5d/6a4282cf5eaacfd4a9c45526_fathom_favicon.png",
+      "server": {
+        "name": "fathom",
+        "transport": "http",
+        "url": "https://api.fathom.ai/mcp",
+        "auth": [{ "id": "fathom-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.fathom.ai",
+  "privacyPolicyUrl": "https://www.fathom.ai/privacy",
+  "termsUrl": "https://www.fathom.ai/terms",
+  "skills": []
+}

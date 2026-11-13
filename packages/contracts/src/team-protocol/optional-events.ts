@@ -13,13 +13,16 @@ import { type BrowserUserControlEvent, browserUserControlEvent } from "./browser
 import { type ChannelEvent, channelEvent } from "./channels-v1";
 import { type ChatColorsEvent, chatColorsEvent } from "./chat-colors-v1";
 import { type HostRestartEvent, hostRestartEvent } from "./host-update-v1";
+import { type LibraryFoldersEvent, libraryFoldersEvent } from "./library-folders-events-v1";
 import { type LiveVoiceEvent, liveVoiceEvent } from "./live-voice-v1";
 import { type MachineAlertEvent, machineAlertEvent } from "./machine-resources-v1";
+import { type MessagePinsEvent, messagePinsEvent } from "./message-pins-v1";
 import { type QuietTurnCompletedEvent, quietTurnEvent } from "./quiet-turn-v1";
 import { type RoutineFlowsEvent, routineFlowsEvent } from "./routine-flows-v1";
 import { type SidebarFoldersEvent, sidebarFoldersEvent } from "./sidebar-folders-v1";
 import { type SidebarPinsEvent, sidebarPinsEvent } from "./sidebar-pins-v1";
 import { type SkillsEvent, skillsEvent } from "./skills-events-v1";
+import { type UsageCreditsEvent, usageCreditsEvent } from "./usage-credits-v1";
 import { type VaultEvent, vaultEvent } from "./vault-v1";
 import { type WorkflowsEvent, workflowsEvent } from "./workflows-v1";
 
@@ -36,13 +39,16 @@ export type OptionalTeamEvent =
   | AgentTasksEvent
   | ChannelEvent
   | HostRestartEvent
+  | LibraryFoldersEvent
   | LiveVoiceEvent
   | MachineAlertEvent
+  | MessagePinsEvent
   | SidebarPinsEvent
   | SidebarFoldersEvent
   | SkillsEvent
   | QuietTurnCompletedEvent
   | RoutineFlowsEvent
+  | UsageCreditsEvent
   | VaultEvent
   | WorkflowsEvent;
 
@@ -69,13 +75,16 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
     agentTasksEvent(value) ??
     channelEvent(value) ??
     hostRestartEvent(value) ??
+    libraryFoldersEvent(value) ??
     liveVoiceEvent(value) ??
     machineAlertEvent(value) ??
+    messagePinsEvent(value) ??
     sidebarPinsEvent(value) ??
     sidebarFoldersEvent(value) ??
     skillsEvent(value) ??
     quietTurnEvent(value) ??
     routineFlowsEvent(value) ??
+    usageCreditsEvent(value) ??
     vaultEvent(value) ??
     workflowsEvent(value);
   return event && options?.agentTaskUiBlocks ? withAgentTaskEventUiBlocks(event, value) : event;

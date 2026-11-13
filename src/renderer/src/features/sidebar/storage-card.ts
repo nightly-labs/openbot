@@ -1,11 +1,12 @@
+import { hostedPlanDisk } from "@openbot/contracts/hosted-servers";
 import type { ServerSummary, StorageDisk } from "@openbot/contracts/ipc";
 import { STORAGE_DISK_CAPABILITY } from "@openbot/contracts/team-protocol/storage-disk-v1";
 import type { SidebarStorageLevel } from "@openbot/ui/features/sidebar/SidebarStorageCard";
 import { createMemo, createSignal, untrack } from "solid-js";
 import { createUsageRefreshPoll } from "../account/usage-refresh-poll";
-import { canManageStorage, hostedPlanStorageGb, planDisk } from "../files/storage-usage";
+import { canManageStorage, hostedPlanStorageGb } from "../files/storage-usage";
 import { serverSupportsCapability } from "../servers/server-capabilities";
-import { sidebarPort } from "./sidebar-port";
+import { type SidebarCardsPort, sidebarPort } from "./sidebar-port";
 
 const GB = 1024 ** 3;
 
@@ -21,7 +22,7 @@ const DISMISSED_KEY_PREFIX = "openbot:storage-card-dismissed:";
  * plan). For example, a 50 GB plan is "low" at 40 GB used.
  */
 function storageLevel(disk: StorageDisk, storageGb: number | null): SidebarStorageLevel | null {
-  const { freeBytes, totalBytes } = storageGb === null ? disk : planDisk(disk, storageGb);
+  const { freeBytes, totalBytes } = storageGb === null ? disk : hostedPlanDisk(disk, storageGb);
   if (freeBytes === null || totalBytes === null || totalBytes <= 0) return null;
   if (freeBytes < Math.min(totalBytes * 0.02, GB)) return "full";
   if (freeBytes < (storageGb === null ? Math.min(totalBytes * 0.1, 5 * GB) : Math.min(totalBytes * 0.2, 10 * GB)))
@@ -85,7 +86,7 @@ function clearUpgradeOffered(serverId: string): void {
  * because only they can free up space. A remote host without `storage-disk-v1` shows no card.
  * A hosted server shows its plan storage, not its disk.
  */
-export function createStorageCard(server: () => ServerSummary | undefined) {
+export function createStorageCard(server: () => ServerSummary | undefined, port: () => SidebarCardsPort = sidebarPort) {
   const [disk, setDisk] = createSignal<{ serverId: string; disk: StorageDisk } | null>(null);
   const storageGb = createMemo(() => hostedPlanStorageGb(server()));
   /** Changes on each close, so the card reads the saved choice again. */
@@ -98,7 +99,7 @@ export function createStorageCard(server: () => ServerSummary | undefined) {
   });
 
   function refresh(serverId: string): void {
-    sidebarPort()
+    port()
       .storage.getDisk(serverId)
       .then(
         (answer) => {
@@ -126,7 +127,7 @@ export function createStorageCard(server: () => ServerSummary | undefined) {
       if (!current || current.serverId !== target()) return null;
       const plan = storageGb();
       const level = storageLevel(current.disk, plan);
-      const { freeBytes, totalBytes } = plan === null ? current.disk : planDisk(current.disk, plan);
+      const { freeBytes, totalBytes } = plan === null ? current.disk : hostedPlanDisk(current.disk, plan);
       if (!level || freeBytes === null || totalBytes === null) return null;
       dismissals();
       if (level === "low" && readDismissed(current.serverId)) return null;

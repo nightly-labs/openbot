@@ -14,6 +14,8 @@ export const messages = {
     "{provider} сообщает, что лимит вашего тарифа исчерпан. Выберите другую модель или перейдите на более высокий тариф {provider}.",
   "error.provider.acpMcpNotLoaded":
     "{provider} не загрузил инструменты OpenBot, поэтому этот агент не может ими пользоваться и связываться с коллегами. Политика команды {provider} может блокировать локальные MCP-серверы. Попросите администратора команды разрешить их и повторите попытку.",
+  "error.provider.acpOwnMcpServerFailed":
+    "{provider} не удалось запустить MCP-сервер {name}, поэтому ответ остановлен. Этот сервер находится в ваших собственных настройках {provider}, а не в OpenBot. Удалите или исправьте его там, затем начните новый чат.",
   "error.provider.endpointsReadOnly":
     "Сохранённые эндпоинты записаны более новой версией OpenBot, либо файл не читается. Чтобы изменить их, обновите OpenBot.",
   "error.provider.endpointNoSecureStorage":
@@ -176,6 +178,8 @@ export const messages = {
   "error.provider.cliBusyUpdate": "{provider} CLI обрабатывает ход. Дождитесь его завершения, затем обновите.",
   "error.provider.cliSelectFailed": "OpenBot не смог выбрать установленный управляемый CLI.",
   "error.provider.noAuthenticatedAccount": "{provider} не вернул аккаунт с выполненным входом.",
+  "error.provider.codexModelProvider":
+    "Codex на этом компьютере использует другого поставщика моделей, и этот поставщик не использует вход в ChatGPT или ключ API OpenAI. Агенты ChatGPT уже могут использовать этого поставщика. Чтобы использовать аккаунт ChatGPT, снова выберите OpenAI как поставщика моделей Codex.",
   "error.provider.signInExpired": "Срок входа в {provider} истёк. Войдите снова, чтобы продолжить.",
   "error.provider.cliActivateFailed": "OpenBot не смог активировать управляемый CLI.",
   "error.provider.noMainlandChinaSignIn": "У {provider} нет входа для материкового Китая.",
@@ -189,6 +193,8 @@ export const messages = {
     "OpenCode не выполнил вход у провайдера модели «{provider}». Выберите модель с меткой «Бесплатно» или подключите провайдера: вставьте ключ OpenCode Go в настройках OpenCode или выполните `opencode auth login` в терминале. Затем повторите попытку.",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode не выполнил вход у провайдера этой модели. Выберите модель с меткой «Бесплатно» или подключите провайдера: вставьте ключ OpenCode Go в настройках OpenCode или выполните `opencode auth login` в терминале. Затем повторите попытку.",
+  "error.provider.opencodeFreeModelRefused":
+    "OpenCode отклонил эту бесплатную модель. Некоторые бесплатные модели доступны не во всех странах. Выберите другую модель с меткой «Бесплатно» или вставьте ключ OpenCode Go в настройках OpenCode и выберите модель OpenCode Go.",
   "error.provider.customEndpointKeyRefused":
     "Эндпоинт «{provider}» отклонил свой API-ключ или заголовки. Введите их снова в разделе «Настройки сервера → Провайдеры», затем повторите попытку.",
   "error.provider.customEndpointKeyMissing":
@@ -205,16 +211,24 @@ export const messages = {
     "Провайдер моделей OpenCode сообщил о некорректном запросе на загрузку. Выберите другую модель и продолжайте. Проверьте сохранённые регулярные задачи, прежде чем создавать их заново.\n{detail}",
   "error.provider.opencodeUnreadableContent":
     "Эта модель не может прочитать файл или изображение в этом чате. Выберите модель, которая читает файлы, затем отправьте сообщение ещё раз.",
+  "error.provider.opencodeContextTooSmall":
+    "Этот чат не помещается в контекстное окно модели. В Ollama или LM Studio загрузите модель с большей длиной контекста и укажите такое же окно в настройках её провайдера в OpenBot. Или выберите модель побольше.",
   "error.provider.opencodeFreeLimit":
     "Бесплатные модели OpenCode исчерпали лимит использования. Этот лимит общий для всех бесплатных моделей. Чтобы продолжить, вставьте ключ OpenCode Go в настройках OpenCode или выберите модель другого провайдера.",
   "error.provider.opencodeProviderFailed":
     "У провайдера моделей произошёл сбой на его стороне. Дело не в вашем соединении. Повторите попытку позже или выберите другую модель.\n{detail}",
+  "error.provider.opencodeIncompleteReply":
+    "Ответ модели оборвался или был некорректным. Отправьте сообщение ещё раз или выберите другую модель.\n{detail}",
   "error.provider.opencodeNetwork":
     "OpenCode не смог подключиться к провайдеру моделей. Проверьте сетевое подключение компьютера, где работает OpenBot, и повторите попытку.\n{detail}",
   "error.provider.codexStateBusy":
     "ChatGPT ещё готовит локальную историю после предыдущего запуска. Подождите несколько минут и повторите попытку.",
+  "error.provider.codexThreadInUse":
+    "Этот чат открыт в другом приложении Codex, например в приложении Codex для компьютера, Codex CLI или расширении IDE. Писать в чат Codex может только одно приложение одновременно. Закройте чат в том приложении, затем отправьте сообщение ещё раз.",
   "error.provider.realtimeLimitZero":
     "Linux остановил провайдера, потому что у OpenBot ограничение процессорного времени реального времени равно 0. Это ограничение задаёт ваша система. Установите и запустите rtkit (`rtkit-daemon`), выполните `systemctl --user restart xdg-desktop-portal`, затем перезапустите OpenBot. Один перезапуск xdg-desktop-portal не поможет, пока rtkit не установлен.",
+  "error.provider.cpuUnsupported":
+    "Процессор этого компьютера не может запустить этого провайдера. Используйте другого провайдера.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode не смог открыть свою базу данных, потому что её изменила более новая версия OpenCode. Обновите OpenCode до версии 2 или новее и повторите попытку.",
   "error.provider.opencodeNoAnswer":
@@ -232,9 +246,6 @@ export const messages = {
   "error.provider.noAgentProcess": "У {provider} нет запущенного процесса для этого агента.",
   "error.provider.stoppedBeforeAgentProcess": "{provider} остановился до запуска процесса агента.",
   "error.provider.archiveUnreadable": "Архив среды выполнения не читается или имеет неподдерживаемый формат.",
-  "error.provider.antigravityArchivePath": "В архиве Gemini неожиданный файл.",
-  "error.provider.antigravityChecksum": "Контрольная сумма среды выполнения Gemini не совпадает.",
-  "error.provider.antigravityReleaseShape": "У релиза Gemini неожиданная структура.",
   "error.provider.antigravityMissing": "Gemini не загружен. Загрузите его в OpenBot, чтобы продолжить.",
   "error.provider.antigravityNotStarted": "Сервер Gemini найден, но его версию прочитать не удаётся.",
   "error.provider.antigravityOverrideInvalid":
@@ -249,6 +260,12 @@ export const messages = {
     "Gemini сейчас не может использовать эту модель. Выберите другую модель и повторите попытку.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Сервис Gemini от Google не выполнил запрос. Повторите попытку через несколько минут.\n{detail}",
+  "error.provider.antigravityRequestRejected":
+    "Gemini отклонил этот запрос. Выберите другую модель и отправьте сообщение снова. Если ошибка повторится, начните новый чат.\n{detail}",
+  "error.provider.antigravityConnectionLost":
+    "Gemini потерял соединение со своим агентом и остановился. Отправьте сообщение, чтобы продолжить.",
+  "error.provider.antigravityRemoteWindowsSignIn":
+    "На хосте с Windows Gemini открывает страницу Google на самом хосте. Подключите Gemini на компьютере-хосте.",
   "error.provider.cursorArchivePath": "В архиве Cursor неожиданный файл.",
   "error.provider.cursorChecksum": "Контрольная сумма среды выполнения Cursor не совпадает.",
   "error.provider.cursorReleaseShape": "У релиза Cursor неожиданная структура.",
@@ -282,11 +299,23 @@ export const messages = {
   "error.provider.hermesVersionUnreadable": "Не удаётся прочитать версию Hermes Agent.",
   "error.provider.hermesSignIn":
     "Войдите через Nous Portal или выполните `hermes setup` в терминале, чтобы использовать Hermes.",
+  "error.provider.hermesTurnFailed":
+    "Hermes не смог завершить этот ход. Если в его ответе указана причина, следуйте ему. Если нет, возможно, MCP-сервер этого агента недоступен: проверьте его в разделе Настройки сервера › MCP и отправьте сообщение ещё раз.",
+  "error.provider.copilotThinkingRejected":
+    "GitHub Copilot не смог использовать эту модель: модель не приняла его настройку размышлений. Выберите другую модель для этого агента и отправьте сообщение ещё раз.",
   "error.provider.usageLimitReached": "Аккаунт достиг лимита использования.",
+  "error.provider.claudeContextFull":
+    "Этот чат стал слишком длинным для Claude. OpenBot начал новую сессию Claude Code с историей чата. Повторите попытку.",
   "error.provider.claudeApiKeyNoCredit":
     "На API-ключе Anthropic нет кредитов API. Тариф Claude не оплачивает запросы с API-ключом. Пополните кредиты в Anthropic Console или войдите в Claude в настройках и выберите аккаунт Claude в меню моделей агента.",
   "error.provider.foreignReasoning":
     "{provider} не принял предыдущие рассуждения в этом чате, потому что их получил другой аккаунт или API-ключ. OpenBot начал новую сессию {provider} с историей чата. Повторите попытку.",
+  "error.provider.imageTooSmall":
+    "Модель не приняла изображение в этом чате, потому что изображение слишком маленькое. OpenBot начал новый сеанс {provider} с историей чата. Попробуйте снова.",
+  "error.provider.imageTooLarge":
+    "Модель не приняла изображение в этом чате, потому что изображение слишком большое. OpenBot начал новый сеанс {provider} с историей чата. Попробуйте снова.",
+  "error.provider.imageCountLimit":
+    "Модель не приняла этот чат, потому что в нем слишком много изображений. OpenBot начал новый сеанс {provider} с историей чата. Попробуйте снова.",
   "error.provider.opencodeSessionRejected":
     "OpenCode отклонил запрос и не указал причину. Это может произойти в длинном чате или после смены модели. OpenBot начал новый сеанс OpenCode с историей чата. Повторите попытку. Если ошибка не исчезнет, выберите другую модель или меньший уровень усилий.",
   "error.provider.museMcpStartupFault":
@@ -309,12 +338,20 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "В браузере можно открыть только ссылки для входа по HTTPS.",
   "error.provider.geminiKeyRefused":
     "Gemini отклонил сохранённый ключ API. Замените или удалите ключ в настройках, затем подключитесь снова.",
+  "error.provider.geminiAccountSettingsUnreadable":
+    "Gemini не может открыть файл настроек этого аккаунта, поэтому не может войти. Удалите этот аккаунт и добавьте его снова.",
+  "error.provider.geminiSettingsUnreadable":
+    "Gemini не может открыть свой файл настроек на этом компьютере, поэтому не может войти. Закройте другие приложения, которые используют Gemini, затем закройте и снова откройте OpenBot.",
   "error.provider.geminiVerificationRequired":
     "Google нужно подтвердить ваш аккаунт, прежде чем Gemini сможет ответить. Подтвердите аккаунт Google в браузере, затем отправьте сообщение снова.",
   "error.provider.keyProviderRefused":
     "{provider} отклонил сохранённый ключ API. Замените или удалите ключ в настройках, затем повторите попытку.",
   "error.provider.keyProviderNoBalance":
     "На аккаунте {provider} для сохранённого ключа API нет средств. Пополните баланс аккаунта, затем повторите попытку.",
+  "error.provider.modelServiceRefused":
+    "Сервис модели отклонил запрос. Выберите другую модель или проверьте свой доступ к этой модели в сервисе.",
+  "error.provider.modelServiceRefusedReason":
+    "Сервис модели отклонил запрос: {reason}. Выберите другую модель или проверьте свой доступ к этой модели в сервисе.",
   "error.provider.messageTooLarge": "OpenBot остановил {provider}, потому что он отправил сообщение больше {limit} МБ.",
   "error.provider.customAgentIdInvalid":
     "ID агента должен состоять из строчных букв, цифр или `-` и не может совпадать с ID встроенного провайдера.",
@@ -366,6 +403,13 @@ export const messages = {
   "error.provider.accountDefault": "Первый аккаунт {provider} нельзя удалить.",
   "error.provider.accountUsesKey":
     "Этот аккаунт {provider} использует сохранённый API-ключ и не имеет входа. Измените ключ в Настройки сервера → Провайдеры.",
+  "error.provider.accountNeedsKey":
+    "Новому аккаунту {provider} нужен API-ключ. Обновите OpenBot на этом устройстве, затем добавьте аккаунт ещё раз.",
+  "error.provider.accountKeyRefused": "{provider} не принял этот API-ключ. Проверьте ключ и попробуйте ещё раз.",
+  "error.provider.accountKeyUnreachable":
+    "OpenBot не смог связаться с {provider}, чтобы проверить API-ключ. Проверьте подключение к интернету и попробуйте ещё раз.",
+  "error.provider.accountKeySignedOut":
+    "{provider} больше не принимает API-ключ этого аккаунта. Укажите для аккаунта новый ключ.",
   "error.provider.accountInUse": "Агент с этим аккаунтом сейчас работает. Попробуйте ещё раз, когда агент остановится.",
   "error.provider.accountsReadOnly":
     "Не удаётся прочитать сохранённые аккаунты провайдеров. Обновите OpenBot, прежде чем их менять.",

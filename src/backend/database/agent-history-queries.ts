@@ -1,4 +1,9 @@
-import { CONTEXT_RESET_ITEM_TYPE } from "@openbot/contracts/ipc";
+import {
+  AGENT_WELCOME_ITEM_TYPE,
+  CONTEXT_RESET_ITEM_TYPE,
+  type ConversationTurnTrace,
+  isConversationTurnTrace,
+} from "@openbot/contracts/ipc";
 import { ORDER_KEY_COLUMNS, ORDER_KEY_DESC, ORDERED_THREAD_MESSAGES } from "./conversation-queries";
 import type { DatabaseCore } from "./database-core";
 import {
@@ -57,7 +62,7 @@ export class AgentHistoryQueries {
       SELECT message_json,
         (SELECT provider_session_id FROM projection_turns WHERE thread_id = ? AND turn_id = json_extract(allowed.message_json, '$.turnId')) AS provider_session_id
       FROM allowed WHERE author IN ('user', 'assistant', 'agent')
-        AND COALESCE(item_type, '') != 'commentary'
+        AND COALESCE(item_type, '') NOT IN ('commentary', '${AGENT_WELCOME_ITEM_TYPE}')
         AND COALESCE(json_extract(message_json, '$.delivery.status'), 'completed') IN ('completed', 'failed', 'interrupted')
         AND (? IS NULL OR author = ?)
         AND (? IS NULL OR message_id = ?)
@@ -82,5 +87,24 @@ export class AgentHistoryQueries {
         providerSessionId: optionalStringColumn(row, "provider_session_id"),
       })),
     };
+  }
+
+  /**
+   * The trace of a turn. Only one message of the turn holds it, and that message can be a thinking
+   * message that `read` leaves out, or on another page.
+   */
+  turnTrace(threadId: string, turnId: string): ConversationTurnTrace | null {
+    const row = databaseRow(
+      this.#core.connection
+        .prepare(
+          `SELECT json_extract(message_json, '$.trace') AS trace FROM projection_thread_messages
+          WHERE thread_id = ? AND turn_id = ? AND json_type(message_json, '$.trace') = 'object' LIMIT 1`,
+        )
+        .get(threadId, turnId),
+    );
+    const text = row ? optionalStringColumn(row, "trace") : null;
+    if (!text) return null;
+    const trace = JSON.parse(text);
+    return isConversationTurnTrace(trace) ? trace : null;
   }
 }

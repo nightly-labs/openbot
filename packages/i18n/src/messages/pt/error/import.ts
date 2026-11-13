@@ -48,8 +48,14 @@ export const messages = {
   "error.import.remoteZipTooLarge":
     "Para importar em um servidor ao qual você se conectou, a exportação deve ser um .zip com menos de 100 MB.",
   "error.import.hostBusy": "O servidor está lendo outras exportações. Tente novamente em alguns minutos.",
+  "error.import.uploadDiskSpace":
+    "A exportação precisa de {size} GB de espaço livre no servidor, e há {free} GB livres. Libere espaço no servidor e escolha a exportação novamente.",
+  "error.import.remoteZipTooLargeOldHost":
+    "Este servidor aceita uma exportação de até 100 MB. Atualize o OpenBot no servidor para importar uma exportação maior.",
   "error.import.skillKept":
     '{name}: o servidor já tem a habilidade "{skill}", por isso o agente usa essa habilidade. Peça a um administrador para atualizá-la.',
+  "error.import.skillRenamed":
+    '{name}: o nome da habilidade "{skill}" é parecido demais com o de outra habilidade, por isso ela é salva como "{renamed}".',
   "error.import.transferRemoteTooLarge":
     "Um arquivo de transferência para um servidor ao qual você se conectou deve ter menos de 100 MB. Desative os arquivos do espaço de trabalho ou exporte menos agentes.",
   "error.import.transferNotFile": "Este arquivo não é um arquivo de transferência do OpenBot.",
@@ -64,6 +70,21 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name}: o modelo “{model}” ainda não está disponível aqui, então o agente usa o modelo padrão. Escolha o modelo de novo quando o provedor dele estiver pronto.",
   "error.import.transferSettingSkipped": "{name} não foi importado. {reason}",
+  "error.import.transferRunsSkipped": '{name}: o histórico de execuções da rotina "{routine}" não é importado.',
+  "error.import.transferSharedSkillsSkipped":
+    "Não foi possível ler as habilidades compartilhadas, então elas não estão no arquivo.",
+  "error.import.transferSharedSkillsNotAdded":
+    "Não foi possível adicionar a este servidor as habilidades compartilhadas do arquivo.",
+  "error.import.transferMemberPreferencesSkipped": {
+    one: "Não foi possível salvar as escolhas de {count} membro.",
+    other: "Não foi possível salvar as escolhas de {count} membros.",
+  },
+  "error.import.transferSharedSkillExists":
+    "Já existe neste servidor uma habilidade compartilhada com este nome e outros arquivos.",
+  "error.import.transferServerPreferencesSkipped": {
+    one: "{count} preferência do servidor no arquivo não é válida aqui, então não é importada.",
+    other: "{count} preferências do servidor no arquivo não são válidas aqui, então não são importadas.",
+  },
   "error.import.transferRoutineFlowSkipped": "A importação deixou de fora um fluxo de rotina. {reason}",
   "error.import.transferCustomAgentCommand":
     "{name}: agentes personalizados não são importados, porque executam um comando. Verifique o comando “{command}” e adicione o agente de novo em Configurações.",

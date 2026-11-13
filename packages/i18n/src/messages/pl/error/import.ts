@@ -47,8 +47,14 @@ export const messages = {
   "error.import.remoteZipTooLarge":
     "Aby zaimportować na dołączony serwer, eksport musi być plikiem .zip poniżej 100 MB.",
   "error.import.hostBusy": "Serwer odczytuje inne eksporty. Spróbuj ponownie za kilka minut.",
+  "error.import.uploadDiskSpace":
+    "Eksport potrzebuje {size} GB wolnego miejsca na serwerze, a wolne jest {free} GB. Zwolnij miejsce na serwerze, a potem wybierz eksport ponownie.",
+  "error.import.remoteZipTooLargeOldHost":
+    "Ten serwer przyjmuje eksport do 100 MB. Zaktualizuj OpenBot na serwerze, aby zaimportować większy eksport.",
   "error.import.skillKept":
     "{name}: serwer ma już umiejętność „{skill}”, więc agent używa tej umiejętności. Poproś administratora o jej aktualizację.",
+  "error.import.skillRenamed":
+    "{name}: nazwa umiejętności „{skill}” jest zbyt podobna do nazwy innej umiejętności, więc jest zapisana jako „{renamed}”.",
   "error.import.transferRemoteTooLarge":
     "Plik przeniesienia dla dołączonego serwera musi mieć mniej niż 100 MB. Wyłącz pliki obszaru roboczego albo wyeksportuj mniej agentów.",
   "error.import.transferNotFile": "To nie jest plik przeniesienia OpenBot.",
@@ -62,6 +68,23 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name}: model „{model}” nie jest tu jeszcze dostępny, więc agent używa modelu domyślnego. Wybierz model ponownie, gdy jego dostawca będzie gotowy.",
   "error.import.transferSettingSkipped": "Nie zaimportowano: {name}. {reason}",
+  "error.import.transferRunsSkipped": "{name}: nie zaimportowano historii uruchomień rutyny „{routine}”.",
+  "error.import.transferSharedSkillsSkipped": "Nie udało się odczytać wspólnych umiejętności, więc nie ma ich w pliku.",
+  "error.import.transferSharedSkillsNotAdded": "Nie udało się dodać do tego serwera wspólnych umiejętności z pliku.",
+  "error.import.transferMemberPreferencesSkipped": {
+    one: "Nie udało się zapisać wyborów {count} członka.",
+    few: "Nie udało się zapisać wyborów {count} członków.",
+    many: "Nie udało się zapisać wyborów {count} członków.",
+    other: "Nie udało się zapisać wyborów {count} członków.",
+  },
+  "error.import.transferSharedSkillExists":
+    "Na tym serwerze jest już wspólna umiejętność o tej nazwie i innych plikach.",
+  "error.import.transferServerPreferencesSkipped": {
+    one: "{count} preferencja serwera z pliku jest tu nieprawidłowa, więc nie zostanie zaimportowana.",
+    few: "{count} preferencje serwera z pliku są tu nieprawidłowe, więc nie zostaną zaimportowane.",
+    many: "{count} preferencji serwera z pliku jest tu nieprawidłowych, więc nie zostaną zaimportowane.",
+    other: "{count} preferencji serwera z pliku jest tu nieprawidłowych, więc nie zostaną zaimportowane.",
+  },
   "error.import.transferRoutineFlowSkipped": "Import pominął przepływ rutyny. {reason}",
   "error.import.transferCustomAgentCommand":
     "{name}: własni agenci nie są importowani, ponieważ uruchamiają polecenie. Sprawdź polecenie „{command}” i dodaj agenta ponownie w Ustawieniach.",

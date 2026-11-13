@@ -1,0 +1,33 @@
+{
+  "slug": "incidentio",
+  "name": "incident.io",
+  "tagline": "Incidents and on-call",
+  "description": "incident.io lets agents read incidents, alerts, on-call schedules, and catalog entries, and update incidents in the signed-in organization. An admin must turn on the MCP server in Settings, and each user signs in through the browser.",
+  "category": "coding",
+  "creatorName": "incident.io",
+  "iconUrl": "https://incident.io/apple-touch-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-open-incidents", "text": "List the open incidents and their severity." },
+    { "id": "prompt-on-call", "text": "Who is on call for the platform team right now?" },
+    { "id": "prompt-incident-summary", "text": "Draft a summary of yesterday's database incident for the postmortem." }
+  ],
+  "apps": [
+    {
+      "id": "app-incidentio-mcp",
+      "name": "incident.io",
+      "description": "Incidents, alerts, on-call schedules, and catalog, over incident.io's MCP server with browser sign-in.",
+      "iconUrl": "https://incident.io/apple-touch-icon.png",
+      "server": {
+        "name": "incidentio",
+        "transport": "http",
+        "url": "https://mcp.incident.io/mcp",
+        "auth": [{ "id": "incidentio-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://incident.io",
+  "privacyPolicyUrl": "https://incident.io/legal/privacy",
+  "termsUrl": "https://incident.io/legal/terms"
+}

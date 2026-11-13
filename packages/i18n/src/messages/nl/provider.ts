@@ -120,6 +120,8 @@ export const messages = {
     "Voeg een OpenAI-compatibel endpoint toe: een modelserver op deze computer, of een dienst met een basis-URL en een sleutel.",
   "provider.picker.customPending":
     "De modellen van je endpoints zijn nog niet geladen. De aanbieder leest ze nadat zijn huidige taak stopt.",
+  "provider.picker.customUnlisted": "{name} toont de modellen van je endpoints niet.",
+  "provider.picker.editEndpoints": "Endpoints bewerken",
   "provider.picker.defaultModelLabel": "{name}, standaard",
   "provider.picker.usageLimit": "Gebruikslimiet bereikt",
   "provider.picker.usageLimitWindow": "Limiet ({window})",
@@ -130,7 +132,12 @@ export const messages = {
   "provider.picker.effortLabel": "Redeneerniveau van de agent",
   "provider.picker.effortFixed": "{effort}, vastgezet door {provider}",
   "provider.picker.fast": "Snel",
-  "provider.picker.fastLabel": "Snelle modus",
+  "provider.picker.fastText": "Snellere antwoorden, meer verbruik",
+  "provider.picker.speed": "Snelheid",
+  "provider.picker.standard": "Standaard",
+  "provider.picker.standardText": "Standaardsnelheid",
+  "provider.picker.ultrafast": "Ultrasnel",
+  "provider.picker.ultrafastText": "De snelste antwoorden, veel meer verbruik",
   "provider.picker.selectEffort": "Kies niveau",
   "provider.picker.custom": "Eigen",
   "provider.picker.cliReady": "{cli} gereed",
@@ -152,22 +159,36 @@ export const messages = {
   "provider.geminiKey.title": "Gemini-API-sleutel",
   "provider.geminiKey.description":
     "Sla een Gemini-API-sleutel op deze computer op. Een opgeslagen sleutel wordt gebruikt in plaats van je Google-account. Om met Google in te loggen, verwijder je de sleutel en kies je Verbinden in de rij van Gemini.",
+  "provider.geminiKey.descriptionHost":
+    "Sla een Gemini-API-sleutel op de host op. Een opgeslagen sleutel wordt gebruikt in plaats van je Google-account. Om met Google in te loggen, verwijder je de sleutel en kies je Verbinden in de rij van Gemini.",
   "provider.geminiKey.label": "Gemini-API-sleutel",
   "provider.claudeKey.title": "Anthropic-API-sleutel",
   "provider.claudeKey.description":
     "Sla een Anthropic-API-sleutel op de host op. Anthropic brengt elk verzoek in rekening op het API-tegoed van de sleutel, niet op je Claude-abonnement. Om hem voor een agent te gebruiken, kies je het API-sleutelaccount in het modelmenu van de agent. Als Claude niet is ingelogd, gebruiken alle agents de sleutel.",
   "provider.claudeKey.label": "Anthropic-API-sleutel",
+  "provider.cursorKey.title": "Cursor-API-sleutel",
+  "provider.cursorKey.description":
+    "Elk Cursor-account na het eerste gebruikt een API-sleutel. Maak een sleutel in het Cursor-dashboard, onder Integrations, en plak die hier. De sleutel wordt op deze computer opgeslagen.",
+  "provider.cursorKey.descriptionHost":
+    "Elk Cursor-account na het eerste gebruikt een API-sleutel. Maak een sleutel in het Cursor-dashboard, onder Integrations, en plak die hier. De sleutel wordt op de host opgeslagen.",
+  "provider.cursorKey.label": "Cursor-API-sleutel",
   "provider.inceptionKey.title": "Inception-API-sleutel",
   "provider.inceptionKey.description":
     "Sla een Inception-API-sleutel op deze computer op om de Mercury-modellen te gebruiken. OpenBot draait ze in de Pi CLI die het downloadt.",
+  "provider.inceptionKey.descriptionHost":
+    "Sla een Inception-API-sleutel op de host op om de Mercury-modellen te gebruiken. OpenBot draait ze in de Pi CLI die het downloadt.",
   "provider.inceptionKey.label": "Inception-API-sleutel",
   "provider.deepseekKey.title": "DeepSeek-API-sleutel",
   "provider.deepseekKey.description":
     "Sla een DeepSeek-API-sleutel op deze computer op om de DeepSeek-modellen te gebruiken. OpenBot draait ze in de Pi CLI die het downloadt.",
+  "provider.deepseekKey.descriptionHost":
+    "Sla een DeepSeek-API-sleutel op de host op om de DeepSeek-modellen te gebruiken. OpenBot draait ze in de Pi CLI die het downloadt.",
   "provider.deepseekKey.label": "DeepSeek-API-sleutel",
   "provider.openrouterKey.title": "OpenRouter-API-sleutel",
   "provider.openrouterKey.description":
     "Sla een OpenRouter-API-sleutel op deze computer op om de modellen van OpenRouter te gebruiken. OpenBot draait ze in de Pi CLI die het downloadt.",
+  "provider.openrouterKey.descriptionHost":
+    "Sla een OpenRouter-API-sleutel op de host op om de modellen van OpenRouter te gebruiken. OpenBot draait ze in de Pi CLI die het downloadt.",
   "provider.openrouterKey.label": "OpenRouter-API-sleutel",
   "provider.openCodeKey.title": "Inloggen bij OpenCode Go",
   "provider.openCodeKey.description":
@@ -211,6 +232,16 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} heeft geen resettegoed meer.",
   "provider.account.resetUsageAlreadyRedeemed": "Dit resettegoed van {name} is al gebruikt.",
   "provider.account.resetUsageFailed": "Kan het gebruik van {name} niet resetten.",
+  "provider.account.pool": "Accounts bundelen",
+  "provider.account.poolDescription":
+    "Agents gebruiken één account tot het een gebruikslimiet nadert, en dan het account waarvan de limiet het eerst reset.",
+  "provider.account.inUse": "In gebruik",
+  "provider.account.notInPool": "Niet in pool",
+  "provider.account.leaveOutOfPool": "Uit pool halen",
+  "provider.account.putBackInPool": "Terug in pool",
+  "provider.account.poolChip": "Pool",
+  "provider.account.poolCount": "Pool van {accounts}",
+  "provider.account.poolInUse": "{pool} · {name} in gebruik",
   "provider.settings.connected": "Verbonden",
   "provider.settings.other": "Andere aanbieders",
   "provider.settings.search": "Aanbieders zoeken",
@@ -232,6 +263,7 @@ export const messages = {
   "provider.settings.defaultSubtitle": "Standaard voor nieuwe agents · {use}",
   "provider.settings.accounts": "Accounts",
   "provider.settings.accountsDescription": "{count} van {max}. Elke agent gebruikt één account.",
+  "provider.settings.accountsPooledDescription": "{count} van {max}. Agents delen deze accounts.",
   "provider.settings.accountBlocked": "{agents} kan niet draaien tot je opnieuw inlogt.",
   "provider.settings.removeTitle": "{name} verwijderen?",
   "provider.settings.removeMoves": "{agents} gaat {name} gebruiken.",
@@ -252,6 +284,8 @@ export const messages = {
   "provider.settings.keyAlternative": "Of plak een {name}-API-sleutel.",
   "provider.settings.geminiKeyInUse":
     "Gemini gebruikt deze sleutel, niet je Google AI-abonnement. Het gebruik van het abonnement wordt niet getoond.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "Een opgeslagen Gemini API-sleutel wordt gebruikt in plaats van een Google-aanmelding. Verwijder de sleutel om een Google-abonnement en de modellen ervan te gebruiken.",
   "provider.settings.claudeKeyInUse":
     "Anthropic brengt het API-tegoed van de sleutel in rekening, niet je Claude-abonnement. Kies het API-sleutelaccount in het modelmenu van een agent. Als Claude niet is ingelogd, gebruiken alle agents de sleutel.",
   "provider.settings.addKey": "Sleutel toevoegen",
@@ -261,6 +295,10 @@ export const messages = {
   "provider.settings.versionAvailable": "{installed} · {available} is beschikbaar",
   "provider.settings.versionInstalledByUser": "{version} · door jou geïnstalleerd",
   "provider.settings.versionDownloaded": "{version} · gedownload door OpenBot",
+  "provider.settings.otherVersionInstalledByUser": "Niet in gebruik: {version} · door jou geïnstalleerd",
+  "provider.settings.otherVersionDownloaded": "Niet in gebruik: {version} · gedownload door OpenBot",
+  "provider.settings.useInstalledVersion": "Geïnstalleerde gebruiken",
+  "provider.settings.useDownloadedVersion": "Versie van OpenBot gebruiken",
   "provider.settings.update": "Updaten",
   "provider.settings.downloadLabel": "Download van {name}",
   "provider.settings.diagnostics": "Diagnose",
@@ -275,7 +313,16 @@ export const messages = {
   "provider.settings.claudeUserSetup": "Mijn Claude Code-configuratie gebruiken",
   "provider.settings.claudeUserSetupDescription":
     "Agents laden je CLAUDE.md, skills, agents, hooks en plug-ins uit ~/.claude. Uit: elke beurt stuurt een kortere prompt. Bestanden van de werkruimte worden nog steeds geladen.",
+  "provider.settings.claudeUserSetupServerDescription":
+    "Agents laden CLAUDE.md, skills, agents, hooks en plug-ins uit ~/.claude op de server. Uit: elke beurt stuurt een kortere prompt. Bestanden van de werkruimte worden nog steeds geladen.",
   "provider.settings.claudeUserSetupLoadFailed": "Kan de Claude Code-instelling niet laden.",
+  "provider.settings.context": "Context",
+  "provider.settings.compactWindow": "Chats comprimeren bij",
+  "provider.settings.compactWindowDescription":
+    "Claude Code vat de oudere beurten van een chat samen wanneer de chat deze grootte bereikt. Lager houdt beurten snel en goedkoop. Hoger bewaart meer details. Een model met een kleiner venster comprimeert bij zijn eigen limiet.",
+  "provider.settings.compactWindowDefault": "Standaard van Claude Code",
+  "provider.settings.compactWindowTokens": "{size} tokens",
+  "provider.settings.compactWindowLoadFailed": "Kan de compressiegrootte van deze server niet laden.",
   "provider.settings.models": "Modellen",
   "provider.settings.modelsDescription": {
     one: "{shown} van {count} model staat in de modelkiezer.",
@@ -303,4 +350,6 @@ export const messages = {
   "provider.settings.endpoints": "Endpoints",
   "provider.settings.noEndpoints": "Geen endpoints.",
   "provider.settings.endpointModels": { one: "{url} · 1 model", other: "{url} · {count} modellen" },
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot meldt {provider} af op deze computer. De {provider}-CLI in je terminal blijft aangemeld.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -27,11 +27,15 @@ export function useOwnerHostedServerIds(server: MobileServer | undefined): Reado
   return list.data ?? null;
 }
 
-/** The same rule as the Restart item of the desktop server menu. */
+/**
+ * The hosted part of the rule of the Restart item of the desktop server menu. A self-hosted server with
+ * `host-restart-v1` uses `canRestartServerItself` of the workspace.
+ */
 export function canRestartServer(server: MobileServer, hostedServerIds: ReadonlySet<string> | null): boolean {
   return (
     server.kind === "remote" &&
     (server.role === "owner" || server.role === "admin") &&
+    server.restartAvailable !== false &&
     (server.hosted === true || Boolean(hostedServerIds?.has(server.id)))
   );
 }

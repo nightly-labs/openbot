@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/prompt";
 
 export const messages = {
-  "prompt.inputRequired": "Input vereist",
   "prompt.question.label": "Vragen van agent",
   "prompt.question.cancelled": "Vragen geannuleerd",
   "prompt.question.expired": "Vragen verlopen",
@@ -12,15 +11,12 @@ export const messages = {
   "prompt.question.next": "Volgende",
   "prompt.question.cancel": "Vragen annuleren",
   "prompt.question.privatePlaceholder": "Vul een privéantwoord in",
-  "prompt.customPlaceholder": "Typ je eigen antwoord",
   "prompt.question.customAnswerFor": "Eigen antwoord op: {question}",
   "prompt.question.skip": "Overslaan",
   "prompt.question.chooseAll": "Kies alles wat van toepassing is.",
   "prompt.question.somethingElse": "Iets anders",
   "prompt.question.emptyTitle": "Er wachten geen vragen.",
   "prompt.question.emptyBody": "De agent gaat verder wanneer hij een nieuwe beslissing nodig heeft.",
-  "prompt.choice.hint": "Kies wat past, of typ je eigen antwoord.",
-  "prompt.choice.customLabel": "Eigen antwoord",
   "prompt.approval.answerFailed": "Kan deze goedkeuring niet beantwoorden. Probeer het opnieuw.",
   "prompt.approval.grantFailed": "Kan de blijvende goedkeuring niet opslaan. Probeer het opnieuw.",
   "prompt.approval.label": "Goedkeuring voor agent",
@@ -29,6 +25,8 @@ export const messages = {
   "prompt.approval.allow": "Toestaan",
   "prompt.approval.alwaysAllow": "Altijd toestaan",
   "prompt.approval.deny": "Weigeren",
+  "prompt.approval.cut":
+    "Deze kaart toont alleen het begin van het verzoek en biedt daarom alleen Weigeren. Verschijnt Toestaan niet snel, werk OpenBot dan bij op de server.",
   "prompt.approval.report.bugHeadline": "Een bug gevonden? Laten we hem oplossen.",
   "prompt.approval.report.ideaHeadline": "Een idee? Laten we het waarmaken.",
   "prompt.approval.report.dontSend": "Niet nu",

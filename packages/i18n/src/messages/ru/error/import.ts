@@ -47,8 +47,14 @@ export const messages = {
   "error.import.remoteZipTooLarge":
     "Чтобы импортировать на подключённый сервер, экспорт должен быть файлом .zip размером до 100 МБ.",
   "error.import.hostBusy": "Сервер читает другие экспорты. Повторите попытку через несколько минут.",
+  "error.import.uploadDiskSpace":
+    "Для экспорта нужно {size} ГБ свободного места на сервере, а свободно {free} ГБ. Освободите место на сервере и выберите экспорт снова.",
+  "error.import.remoteZipTooLargeOldHost":
+    "Этот сервер принимает экспорт размером до 100 МБ. Обновите OpenBot на сервере, чтобы импортировать экспорт большего размера.",
   "error.import.skillKept":
     "{name}: на сервере уже есть навык «{skill}», поэтому агент использует его. Попросите администратора обновить его.",
+  "error.import.skillRenamed":
+    "{name}: имя навыка «{skill}» слишком похоже на имя другого навыка, поэтому он сохранён как «{renamed}».",
   "error.import.transferRemoteTooLarge":
     "Файл переноса для присоединённого сервера должен быть меньше 100 МБ. Выключите файлы рабочих пространств или экспортируйте меньше агентов.",
   "error.import.transferNotFile": "Это не файл переноса OpenBot.",
@@ -61,6 +67,22 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name}: модель «{model}» здесь пока недоступна, поэтому агент использует модель по умолчанию. Выберите модель снова, когда её провайдер будет готов.",
   "error.import.transferSettingSkipped": "{name}: не импортировано. {reason}",
+  "error.import.transferRunsSkipped": "{name}: история запусков регулярной задачи «{routine}» не импортирована.",
+  "error.import.transferSharedSkillsSkipped": "Не удалось прочитать общие навыки, поэтому их нет в файле.",
+  "error.import.transferSharedSkillsNotAdded": "Не удалось добавить на этот сервер общие навыки из файла.",
+  "error.import.transferMemberPreferencesSkipped": {
+    one: "Не удалось сохранить выбор {count} участника.",
+    few: "Не удалось сохранить выбор {count} участников.",
+    many: "Не удалось сохранить выбор {count} участников.",
+    other: "Не удалось сохранить выбор {count} участника.",
+  },
+  "error.import.transferSharedSkillExists": "На этом сервере уже есть общий навык с таким названием и другими файлами.",
+  "error.import.transferServerPreferencesSkipped": {
+    one: "{count} параметр сервера в файле здесь недопустим, поэтому он не импортируется.",
+    few: "{count} параметра сервера в файле здесь недопустимы, поэтому они не импортируются.",
+    many: "{count} параметров сервера в файле здесь недопустимы, поэтому они не импортируются.",
+    other: "{count} параметра сервера в файле здесь недопустимы, поэтому они не импортируются.",
+  },
   "error.import.transferRoutineFlowSkipped": "Схема регулярной задачи не импортирована. {reason}",
   "error.import.transferCustomAgentCommand":
     "{name}: собственные агенты не импортируются, потому что они запускают команду. Проверьте команду «{command}» и снова добавьте агента в настройках.",

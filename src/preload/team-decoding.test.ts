@@ -251,6 +251,7 @@ describe("team decoders", () => {
     ["server with no hosted start", decodeServer, { ...remoteServer, hostedStart: null }],
     ["server on this computer", decodeServer, { ...remoteServer, thisComputer: true }],
     ["hosted server with plan storage", decodeServer, { ...remoteServer, hosted: true, storageGb: 50 }],
+    ["hosted server with no restart", decodeServer, { ...remoteServer, hosted: true, restartAvailable: false }],
     ["server with a key change time", decodeServer, { ...remoteServer, keyChangedAt: 1_700_000_000_000 }],
     ["invite preview", decodeInvitePreview, invitePreview],
     ["invite link", decodeInviteUrl, "openbot://join/invite-1"],
@@ -327,7 +328,9 @@ describe("team decoders", () => {
       { ...remoteServer, compatibility: { ...remoteServer.compatibility, localProtocol: { minimum: 1 } } },
     ],
     ["server with a text connection sequence", decodeServer, { ...remoteServer, connectionSequence: "2" }],
+    ["server with a false capability wait", decodeServer, { ...remoteServer, capabilitiesPending: false }],
     ["server with an invalid hosted issue", decodeServer, { ...remoteServer, hostedIssue: "<script>" }],
+    ["server with an invalid restart flag", decodeServer, { ...remoteServer, restartAvailable: "false" }],
     [
       "server with an invalid hosted start step",
       decodeServer,

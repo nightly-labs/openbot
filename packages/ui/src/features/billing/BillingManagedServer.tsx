@@ -1,4 +1,4 @@
-import { BILLING_PLANS, type BillingServerPlan } from "@openbot/contracts/billing";
+import { type BillingServerPlan, serverStorageGb } from "@openbot/contracts/billing";
 import type { HostedServerSummary } from "@openbot/contracts/hosted-servers";
 import { createEffect, createStore } from "solid-js";
 import { useText } from "../../text";
@@ -104,7 +104,7 @@ export function BillingManagedServer(props: {
       name={props.server.name}
       planDescription={t("billing.server.summary", {
         plan: t(planNames[props.plan.plan]),
-        size: format.number(BILLING_PLANS.find((plan) => plan.id === props.plan.plan)?.storageGb ?? 0),
+        size: format.number(serverStorageGb(props.plan)),
       })}
       price={price()}
       paidThrough={props.server.deletionScheduledAt ?? props.paidThrough}

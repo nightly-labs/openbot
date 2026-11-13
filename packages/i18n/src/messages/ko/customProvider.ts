@@ -77,23 +77,24 @@ export const messages = {
   "customProvider.field.apiKeyKeptHint": "키가 저장되어 있어요. 유지하려면 비워 두세요.",
   "customProvider.models": "모델",
   "customProvider.model.id": "모델 {number} ID",
+  "customProvider.model.idColumn": "모델 ID",
   "customProvider.model.name": "모델 {number} 표시 이름",
   "customProvider.model.namePlaceholder": "표시 이름",
   "customProvider.model.contextWindow": "모델 {number} 컨텍스트 창",
   "customProvider.model.contextWindowPlaceholder": "토큰",
+  "customProvider.model.contextWindowColumn": "컨텍스트 창",
   "customProvider.model.maxOutput": "모델 {number} 최대 출력",
   "customProvider.model.maxOutputPlaceholder": "토큰",
+  "customProvider.model.maxOutputColumn": "최대 출력",
   "customProvider.model.efforts": "모델 {number} 추론 강도",
   "customProvider.model.effortsLabel": "추론 강도",
-  "customProvider.model.effortsHintOpenCode":
-    "각 모델이 받는 추론 강도를 선택하세요. 선택하지 않으면 OpenCode가 낮음, 보통, 높음을 제공합니다.",
-  "customProvider.model.effortsHintPi":
-    "각 모델이 받는 추론 강도를 선택하세요. 선택하지 않으면 모델이 추론하지 않습니다.",
+  "customProvider.model.effortsDefault": "기본값",
+  "customProvider.model.effortsNone": "추론 안 함",
   "customProvider.model.inputs": "모델 {number} 입력",
   "customProvider.model.inputsLabel": "입력",
   "customProvider.model.inputImage": "이미지",
   "customProvider.model.inputPdf": "PDF",
-  "customProvider.model.inputsHint": "각 모델이 텍스트 외에 읽을 수 있는 것을 선택하세요.",
+  "customProvider.model.inputsNone": "텍스트만",
   "customProvider.model.foundValuesHint": "일부 값은 엔드포인트에서 가져왔어요. 변경할 수 있어요.",
   "customProvider.model.remove": "모델 {number} 제거",
   "customProvider.model.add": "모델 추가",
@@ -114,7 +115,11 @@ export const messages = {
     other: "엔드포인트에 모델이 {count}개 있어요. 추가할 모델을 선택하세요.",
   },
   "customProvider.discovery.empty": "엔드포인트에 모델이 없어요. 모델 ID를 직접 추가해 주세요.",
-  "customProvider.discovery.label": "엔드포인트에 있는 모델",
+  "customProvider.discovery.choose": "모델 선택",
+  "customProvider.discovery.search": "모델 검색",
+  "customProvider.discovery.selectAll": "모두 선택",
+  "customProvider.discovery.deselectAll": "선택 해제",
+  "customProvider.discovery.noMatch": "검색과 일치하는 모델이 없어요.",
 
   // The first step of the add flow: a preset fills the form that comes next.
   "customProvider.preset.title": "제공자 또는 에이전트 추가",
@@ -137,6 +142,7 @@ export const messages = {
   // Automatic detection on the provider step and in Settings. OpenBot looks for local model servers
   // at their default addresses and for known ACP agent commands on the PATH.
   "customProvider.detected.title": "이 컴퓨터에서 찾았어요",
+  "customProvider.detected.titleServer": "서버에서 찾았어요",
   "customProvider.detected.scanning": "로컬 모델과 에이전트를 찾는 중이에요.",
   "customProvider.detected.scanAgain": "다시 검색",
   "customProvider.detected.empty": "OpenBot이 로컬 모델 서버나 ACP 에이전트를 찾지 못했어요.",
@@ -160,6 +166,8 @@ export const messages = {
   "customProvider.detection.enabled": "로컬 모델과 에이전트 찾기",
   "customProvider.detection.enabledDescription":
     "OpenBot이 Ollama와 LM Studio의 기본 주소를 확인하고, PATH에서 알려진 ACP 에이전트를 찾아요.",
+  "customProvider.detection.enabledDescriptionServer":
+    "서버가 Ollama와 LM Studio의 기본 주소를 확인하고, 서버의 PATH에서 알려진 ACP 에이전트를 찾아요.",
   "customProvider.detection.addresses": "기타 모델 서버 주소",
   "customProvider.detection.address.label": "주소 {number}",
   "customProvider.detection.address.remove": "주소 {number} 제거",
@@ -181,6 +189,7 @@ export const messages = {
   "customProvider.acp.agentIdHint": "영문 소문자, 숫자, 하이픈. 나중에 변경할 수 없어요.",
   "customProvider.acp.command": "명령",
   "customProvider.acp.commandHint": "시작할 프로그램이에요. OpenBot이 PATH에서 찾아요.",
+  "customProvider.acp.commandHintServer": "시작할 프로그램이에요. 서버가 자체 PATH에서 찾아요.",
   "customProvider.acp.args": "인수",
   "customProvider.acp.argsHint": "인수는 공백으로 구분하세요. 공백이 있는 인수는 따옴표로 묶으세요.",
   "customProvider.acp.env": "환경 변수",
@@ -202,6 +211,9 @@ export const messages = {
   "customProvider.acp.trustTitle": "이 명령은 내 컴퓨터에서 실행돼요",
   "customProvider.acp.trustDescription":
     "OpenBot이 내 사용자 계정으로 이 명령을 시작해요. 에이전트는 파일을 읽고 변경하며 명령을 실행할 수 있어요. 신뢰하는 에이전트만 추가하세요.",
+  "customProvider.acp.hostTrustTitle": "이 명령은 서버에서 실행돼요",
+  "customProvider.acp.hostTrustDescription":
+    "OpenBot이 서버의 사용자 계정으로 이 명령을 시작해요. 에이전트는 서버의 파일을 읽고 변경하며 그곳에서 명령을 실행할 수 있어요. 신뢰하는 에이전트만 추가하세요.",
   "customProvider.acp.submit": "에이전트 추가",
   "customProvider.acp.editTitle": "사용자 지정 ACP 에이전트 편집",
   "customProvider.acp.submitEdit": "에이전트 저장",
@@ -219,6 +231,7 @@ export const messages = {
   // The user's own ACP agents in Settings. Each is a command that OpenBot starts on this computer.
   "customProvider.agents.title": "사용자 지정 에이전트",
   "customProvider.agents.description": "OpenBot이 이 컴퓨터에서 시작하는 ACP 에이전트예요.",
+  "customProvider.agents.hostDescription": "OpenBot이 서버 컴퓨터에서 시작하는 ACP 에이전트예요.",
   "customProvider.agents.empty": "아직 사용자 지정 에이전트가 없어요.",
   "customProvider.agents.add": "에이전트 추가",
   "customProvider.agents.restart": "에이전트 다시 시작",

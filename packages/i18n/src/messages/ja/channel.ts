@@ -23,6 +23,9 @@ export const messages = {
   "channel.settings.isolated": "メモリーをこのチャンネルに保持",
   "channel.settings.isolatedDescription":
     "エージェントがここで学んだことはチャンネルのメモリーとして保存され、ほかのチャットには表示されません。",
+  "channel.settings.browser": "ブラウザー",
+  "channel.settings.browserEveryone": "すべてのメンバー",
+  "channel.settings.browserNone": "なし",
   "channel.settings.memoryCount": { other: "{count} 件保存済み" },
   "channel.settings.newConversation.title": "新しい会話",
   "channel.settings.newConversation.description": "メンバーは以前のメッセージを忘れます。チャンネルの設定は残ります。",

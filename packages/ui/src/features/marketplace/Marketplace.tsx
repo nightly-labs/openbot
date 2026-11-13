@@ -1,12 +1,13 @@
-import { Button, ChevronRight, ErrorReference, IconButton, X } from "@openbot/ui";
+import { ErrorReference, IconButton, X } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
+import { PageHeader, type PageHeaderParent } from "@openbot/ui/features/window/PageHeader";
 import { useText } from "@openbot/ui/text";
 import { holdFlag } from "@openbot/ui/utils";
-import { createEffect, For, Match, onCleanup, onSettled, Show, Switch } from "solid-js";
+import { createEffect, Match, onCleanup, onSettled, Show, Switch } from "solid-js";
 import { MarketplaceAgentPage } from "./MarketplaceAgentPage";
 import { AgentGroupPage } from "./MarketplaceAgents";
 import { MarketplaceAppPage } from "./MarketplaceAppPage";
-import { createBrowseLists, MarketplaceBrowse } from "./MarketplaceBrowse";
+import { AppGroupPage, createBrowseLists, MarketplaceBrowse } from "./MarketplaceBrowse";
 import { MarketplaceNav } from "./MarketplaceNav";
 import { MarketplaceLocalSkillPage, MarketplaceSkillPage } from "./MarketplaceSkillPage";
 import { SkillGroupPage } from "./MarketplaceSkills";
@@ -39,6 +40,7 @@ function viewTitle(scope: MarketplaceScope, view: MarketplaceView, fallback: str
     case "skill":
       return view.listing.name;
     case "agentGroup":
+    case "appGroup":
       return t(CATEGORY_LABELS[view.category]);
     case "app":
       return scope.model.apps().find((app) => app.id === view.id)?.name ?? fallback;
@@ -62,31 +64,20 @@ function MarketplaceHeader(props: { scope: MarketplaceScope }) {
   const stack = () => props.scope.nav.state.stack;
   const title = (view: MarketplaceView) =>
     viewTitle(props.scope, view, t(MARKETPLACE_TAB_LABEL[props.scope.nav.state.tab]), t);
+  const parents = (): PageHeaderParent[] =>
+    stack()
+      .slice(0, -1)
+      .map((view, index) => ({ title: title(view), onSelect: () => props.scope.nav.backTo(index) }));
+  const current = () => title(stack().at(-1) ?? { kind: "browse" });
   return (
-    <nav class="marketplace-heading" aria-label={t("marketplace.crumbs.label")} hidden={stack().length < 2}>
-      <For each={stack().slice(0, -1)}>
-        {(view, index) => (
-          <>
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              class="marketplace-crumb-parent"
-              data-cuelume-tap="navigate"
-              onClick={() => props.scope.nav.backTo(index())}
-            >
-              {title(view)}
-            </Button>
-            <ChevronRight class="marketplace-crumb-separator" aria-hidden="true" />
-          </>
-        )}
-      </For>
-      <Show when={stack().length > 1}>
-        <h2 class="marketplace-title" tabindex={-1}>
-          {title(stack().at(-1) ?? { kind: "browse" })}
-        </h2>
-      </Show>
-    </nav>
+    <Show when={stack().length > 1}>
+      <PageHeader
+        class="marketplace-heading"
+        title={current()}
+        path={parents()}
+        pathLabel={t("marketplace.crumbs.label")}
+      />
+    </Show>
   );
 }
 
@@ -171,9 +162,9 @@ function MarketplaceWindow(props: MarketplaceProps) {
   return (
     <>
       {/* The page rail is the way back from the page, so the top bar has no close button. */}
-      <header class="skills-marketplace-topbar">
+      <div class="skills-marketplace-topbar">
         <MarketplaceHeader scope={scope} />
-      </header>
+      </div>
       <MarketplaceNav scope={scope} lists={lists} />
       <div
         class={["skills-marketplace-body", fades.classes()]}
@@ -209,6 +200,9 @@ function MarketplaceWindow(props: MarketplaceProps) {
                 </Match>
                 <Match when={view.kind === "skill" && view.listing} keyed>
                   {(listing) => <MarketplaceSkillPage scope={scope} listing={listing} />}
+                </Match>
+                <Match when={view.kind === "appGroup" && view.category} keyed>
+                  {(category) => <AppGroupPage scope={scope} category={category} />}
                 </Match>
                 <Match when={view.kind === "app" && view.id} keyed>
                   {(id) => <MarketplaceAppPage scope={scope} id={id} />}

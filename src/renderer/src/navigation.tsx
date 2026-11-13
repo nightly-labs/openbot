@@ -70,6 +70,18 @@ const Navigation = createSimpleContext({
      */
     function selectAgent(agentId: string, tabId?: string): boolean {
       if (agentSetupOpen() && creatingAgent()) return false;
+      return openAgent(agentId, tabId);
+    }
+
+    /**
+     * Opens the agent that the setup form just made. The form is still open and creating until the
+     * update ends, so the guard of `selectAgent` would stop this open.
+     */
+    function openCreatedAgent(agentId: string): boolean {
+      return openAgent(agentId);
+    }
+
+    function openAgent(agentId: string, tabId?: string): boolean {
       // The tab is written first, so a chat window that opens for the agent reads it.
       if (tabId !== undefined) agentThreads.open(agentId, tabId);
       // A chat window shows its one chat, and main marks that chat in the sidebar. Another agent
@@ -183,24 +195,25 @@ const Navigation = createSimpleContext({
       void openAgentMessage(agentId, messageId);
     }
 
-    async function openAgentMessage(agentId: string, messageId: string): Promise<void> {
+    /** Opens the agent's own chat at a message. Resolves false when the chat does not have the message. */
+    async function openAgentMessage(agentId: string, messageId: string): Promise<boolean> {
       const serverId = activeServerId();
       await Promise.resolve();
-      if (!scopeIsCurrent()) return;
+      if (!scopeIsCurrent()) return false;
       try {
         const page = await loadAgentMessagePage(agentId, messageId);
-        if (!page) return;
+        if (!page) return false;
         setMessageFocusRequest({ agentId, messageId, nonce: Date.now() });
         try {
           let readBoundary = page.messages.at(-1)?.id ?? messageId;
           try {
-            if (!scopeIsCurrent()) return;
+            if (!scopeIsCurrent()) return true;
             const latestPage = await appPort().agent.readConversationPage({
               agentId,
               anchor: { type: "latest" },
               limit: 1,
             });
-            if (!scopeIsCurrent()) return;
+            if (!scopeIsCurrent()) return true;
             readBoundary = latestPage.messages.at(-1)?.id ?? readBoundary;
           } catch {
             // The focused page still gives us a safe read boundary when the latest-page refresh fails.
@@ -209,8 +222,10 @@ const Navigation = createSimpleContext({
         } catch (error) {
           appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId);
         }
+        return true;
       } catch (error) {
         appendUiError(agentId, error, currentText().t("app.errorStatus.messageLoad"), serverId);
+        return false;
       }
     }
 
@@ -299,6 +314,7 @@ const Navigation = createSimpleContext({
 
     return {
       selectAgent,
+      openCreatedAgent,
       selectDirectMember,
       openAgentMessage,
       messageFocusRequest,

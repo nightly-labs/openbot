@@ -85,6 +85,21 @@ export interface BrowserHostTab {
   /** How long reads of one document waited for its bot check. All reads of a document share one wait. */
   challengeWait?: { document: number; waitedMs: number };
   /**
+   * The document whose bot check offered its checkbox for one click. The next read waits once for
+   * the check to pass; later reads of that document offer no click.
+   */
+  challengeClick?: { document: number; waited: boolean };
+  /** The origin of the page whose last read found a bot check. */
+  checkOrigin?: string;
+  /**
+   * The origin of a bot check that was on the page when a person took over the tab and selected Done.
+   * While a read of that origin still finds a check, the check refuses this browser: another takeover
+   * does not pass it.
+   */
+  checkAfterTakeover?: string;
+  /** The page host whose memories a snapshot gave the agent, and the turn. The next turn shows them again. */
+  siteRecall?: { turnId: string; host: string };
+  /**
    * The last preview frame, with the page, document and capture generation it shows. A preview waits
    * behind the agent's actions, so the preview card shows this frame instead while the tab is busy.
    */
