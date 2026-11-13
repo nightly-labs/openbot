@@ -88,7 +88,8 @@ export const messages = {
   "error.remote.pinnedKeyMissing": "リモートホストに固定されたデバイスキーがありません。",
   "error.remote.hostDidNotConnect": "WebRTC ホストが接続しませんでした。",
   "error.remote.connectionCancelled": "リモート接続がキャンセルされました。",
-  "error.remote.hostDisconnected": "WebRTC ホストの接続が切れました。",
+  "error.remote.hostDisconnected":
+    "サーバーとの接続が切れました。操作が完了したか確認してから、もう一度お試しください。",
   "error.remote.eventGap": "ホストのイベントのシーケンスに欠落があります。",
   "error.remote.malformedKnownEvent": "ホストが不正な形式の既知のイベントを返しました。",
   "error.remote.fileTransportIsStopped": "WebRTC ファイル転送は停止しています。",

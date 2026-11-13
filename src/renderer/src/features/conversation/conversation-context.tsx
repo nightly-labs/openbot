@@ -28,7 +28,7 @@ import { usePlatform } from "../../platform";
 import { createScopeGuard } from "../../scope-lifetime";
 import { createSimpleContext } from "../../simple-context";
 import { useTurns } from "../../turns";
-import { useUiErrors } from "../../ui-errors";
+import { isConnectionDrop, useUiErrors } from "../../ui-errors";
 import { useAuth } from "../account/account-context";
 import { useAgentTasks } from "../agent-tasks/agent-tasks-context";
 import { useAgentReadTracking } from "../agents/agent-read-tracking";
@@ -312,7 +312,7 @@ const Conversation = createSimpleContext({
             const markReadOnOpen = agentChatsToMarkRead.delete(trackingKey);
             if (markReadOnOpen && (page.readState?.unreadCount ?? 0) > 0) {
               void markAgentMessagesRead(agentId, page.messages.at(-1)?.id ?? null, serverId).catch((error) =>
-                appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId),
+                reportAutomaticReadFailure(agentId, error, serverId),
               );
             } else if (agentChatsToRetryRead.has(trackingKey) && (page.readState?.unreadCount ?? 0) > 0) {
               const latestIncomingMessage = latestIncomingConversationMessage(page.messages);
@@ -487,8 +487,21 @@ const Conversation = createSimpleContext({
       if (!latestMessageId) return;
       if (autoReadAgentMessages.get(agentConversationKey(serverId, agentId))?.messageId === latestMessageId) return;
       void markAgentMessagesRead(agentId, latestMessageId, serverId).catch((error) =>
-        appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId),
+        reportAutomaticReadFailure(agentId, error, serverId),
       );
+    }
+
+    /**
+     * A read that the app sent by itself and that failed. When the connection to a joined server
+     * dropped, the chat reads its latest page again after the reconnect, and that page sends the
+     * read again. Only another failure shows in the chat.
+     */
+    function reportAutomaticReadFailure(agentId: string, error: unknown, serverId: string): void {
+      if (isConnectionDrop(error)) {
+        agentChatsToRetryRead.add(agentConversationKey(serverId, agentId));
+        return;
+      }
+      appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId);
     }
 
     function refreshAgentReadStateAfterFailure(
@@ -566,7 +579,7 @@ const Conversation = createSimpleContext({
           conversations[agentId]?.revision ?? -1,
           decision.rollbackState,
         );
-        appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId);
+        reportAutomaticReadFailure(agentId, error, serverId);
       });
     }
 
@@ -1107,7 +1120,7 @@ const Conversation = createSimpleContext({
         const messageId = receipt.deliveries[0]?.id ?? receipt.messageId;
         // The pending message does not wait for read state: it is the user's own message.
         markAgentMessagesRead(agentId, messageId, serverId).catch((error: unknown) => {
-          appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId);
+          reportAutomaticReadFailure(agentId, error, serverId);
         });
         return { messageId };
       } catch (error) {
@@ -1191,7 +1204,7 @@ const Conversation = createSimpleContext({
                 latestVisibleMessageId !== visibleMessageIdAtStart
               ) {
                 void markAgentMessagesRead(agentId, latestVisibleMessageId, serverId).catch((error) =>
-                  appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId),
+                  reportAutomaticReadFailure(agentId, error, serverId),
                 );
               }
             });
