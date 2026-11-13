@@ -1652,9 +1652,9 @@ export class TurnLifecycle {
         ((mayRunAgain && this.#hooks.mayFailOver(agentId)) ||
           (mayContinue && this.#hooks.mayContinueOnBackup(agentId)));
       // Teammate results start a lead's turn, and nothing else wakes the team when that turn gives no
-      // answer (#7225). With no backup to take it, the turn runs once more on the same model, in the
-      // agent's chat and in a thread (#8503). It did no step, so it repeats nothing. A second empty run
-      // shows the error.
+      // answer (#7225). With no backup to take it, the turn runs once more on the same model. A thread
+      // turn never moves to a backup, so it always runs once more here (#8503). It did no step, so it
+      // repeats nothing. A second empty run shows the error.
       const runsAgainHere =
         !failedOver &&
         mayRunAgain &&

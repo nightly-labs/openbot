@@ -60,8 +60,8 @@ const calls = (...items: FakeCall[]) => `<<CALLS${JSON.stringify(items)}CALLS>>`
 /**
  * A Codex app-server with the methods that the service calls. Each turn input decides the turn:
  * - `TEAM-RESULT mode:<mode>`: a lead turn with teammate results. It answers "Team done.", or ends
- *   with only its reasoning: always for `empty-always`, on the first run for `empty-once`, and on
- *   the primary model for `empty-on-primary`.
+ *   with only its reasoning: always for `empty-always` and `thread-empty-always`, on the first run
+ *   for `empty-once` and `thread-empty-once`, and on the primary model for `empty-on-primary`.
  * - `<<CALLS[...]CALLS>>`: calls the named OpenBot tools one at a time, then answers "Asked.".
  * - `TEAM-QUESTION mode:<mode>`: a teammate answers `TEAM-RESULT mode:<mode>`.
  * - `EMPTY-TURN`: ends with only its reasoning.
@@ -121,7 +121,7 @@ const decide = (text, model) => {
   if (result) {
     const mode = result[1];
     const run = nextRun(mode);
-    const empty = mode.endsWith("empty-always") || (mode.endsWith("empty-once") && run === 1) || (mode === "empty-on-primary" && model === PRIMARY);
+    const empty = mode === "empty-always" || mode === "thread-empty-always" || ((mode === "empty-once" || mode === "thread-empty-once") && run === 1) || (mode === "empty-on-primary" && model === PRIMARY);
     return { kind: "result", mode, calls: [], empty, reply: "Team done." };
   }
   const named = /<<CALLS([\\s\\S]*?)CALLS>>/.exec(text);
