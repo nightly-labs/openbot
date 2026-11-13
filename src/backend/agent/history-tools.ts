@@ -1,3 +1,4 @@
+import { chatVisualReply } from "@openbot/contracts/chat-visual";
 import { CONVERSATION_TRACE_STEP_LIMIT, type ConversationTurnTrace } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { redactSecrets } from "@openbot/logging";
@@ -193,7 +194,7 @@ export const HISTORY_TOOL_DEFINITIONS = [
   {
     name: "history_read",
     description:
-      "Read this chat, or one by taskId, after its latest reset. Read a messageId with offset for large text; for older messages, before is nextCursor or a messageId. Optional captured work steps contain no raw reasoning; continue them with workStepsOffset from nextWorkStepsOffset. Channels use channel_history.",
+      "Read this chat, or one by taskId, after its latest reset. Read a messageId with offset for large text or for the page text of a visual reply; for older messages, before is nextCursor or a messageId. Optional captured work steps contain no raw reasoning; continue them with workStepsOffset from nextWorkStepsOffset. Channels use channel_history.",
     shape: readShape,
   },
 ];
@@ -202,6 +203,8 @@ interface HistoryToolOptions {
   store: AgentStore;
   redact(text: string): string;
   capturedSteps(session: ProviderSession): Effect.Effect<Map<string, string> | null, ToolOperationFailed>;
+  /** The text of a visual reply page, or null when its file is deleted or not readable. */
+  pageText(attachmentId: string): Effect.Effect<string | null>;
   /** The agent's side threads, open and archived, with activity at or after `after`. The latest first. */
   recentThreads(agentId: string, after: string | null, limit: number): readonly AgentThreadRecord[];
 }
@@ -251,6 +254,8 @@ interface HistoryEntry {
   workStepsOffset?: number;
   nextWorkStepsOffset?: number | null;
   attachmentsOmitted?: number;
+  /** Set for a visual reply in a list: its text is only the page title. */
+  page?: string;
 }
 
 /** Owns bounded model-facing history output. Scope is supplied by the authenticated router. */
@@ -499,7 +504,11 @@ export class HistoryTools {
         more = false;
         break;
       }
-      const text = redact(message.text);
+      // The text of a visual reply is its title; the page is its file. A read of that one message
+      // gives the page text too, so that the agent can read what it showed before (#8346).
+      const visual = chatVisualReply(message);
+      const pageText = visual && read?.messageId ? yield* this.#options.pageText(visual.attachment.id) : null;
+      const text = redact(pageText ? `${message.text}\n\n${pageText}` : message.text);
       const match = searchMatch(text, terms);
       if (match < 0) {
         result.nextCursor = nextCursor(message.id);
@@ -525,6 +534,7 @@ export class HistoryTools {
               mimeType: redact(file.mimeType),
               size: file.size,
             })),
+        ...(visual && !read?.messageId ? { page: "history_read with this messageId gives the page text." } : {}),
       };
       if (read?.includeWorkSteps) {
         const session = sessions.find((candidate) => candidate.id === row.providerSessionId);

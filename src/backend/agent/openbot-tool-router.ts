@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import { chatVisualItemType } from "@openbot/contracts/chat-visual";
@@ -188,6 +189,7 @@ import type { AgentBrowserHost } from "./turn-lifecycle";
 import { unknownAgentMessage } from "./unknown-agent";
 import { handleUpdateAgentsTool } from "./update-agents-tool";
 import { READ_VIDEO_DEFAULT_FRAMES, readVideoToolSchema, type VideoReaderHost } from "./video-reader";
+import { visualPageText } from "./visual-page-text";
 
 const logger = createOpenBotLogger("openbot-tool-router");
 
@@ -492,6 +494,15 @@ export class OpenBotToolRouter {
       store: options.store,
       redact: options.hooks.redactMcpForAgent,
       capturedSteps: options.capturedSteps ?? (() => Effect.succeed(null)),
+      // A deleted or unreadable page file leaves the history answer with the title only.
+      pageText: (attachmentId) =>
+        options.mailbox.resolveAttachment(attachmentId).pipe(
+          Effect.flatMap((file) =>
+            file ? Effect.tryPromise(() => readFile(file.path, "utf8")) : Effect.succeed(null),
+          ),
+          Effect.map((html) => (html === null ? null : visualPageText(html))),
+          Effect.catch(() => Effect.succeed(null)),
+        ),
       recentThreads: (agentId, after, limit) => options.tasks.recent(agentId, after, limit),
     });
     this.#store = options.store;
