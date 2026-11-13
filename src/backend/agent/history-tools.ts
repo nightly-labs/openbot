@@ -187,7 +187,7 @@ export const HISTORY_TOOL_DEFINITIONS = [
   {
     name: "history_search",
     description:
-      'Without query: list your chats, newest first (main chat is taskId "main"). With query: search all chats or one by taskId; a message matches when it holds every word, "quotes" keep a phrase. after: 24h, 7d or a date. history_read gives more.',
+      'Without query: list your chats, newest first (main chat is taskId "main"). With query: search all chats or one by taskId. after: 24h, 7d or a date. history_read gives more.',
     shape: searchShape,
   },
   {
@@ -404,9 +404,8 @@ export class HistoryTools {
         break;
       }
     }
-    // With a cursor, older messages of this chat are not scanned yet and can still match.
-    if (result.messages.length === 0 && result.nextCursor === undefined)
-      result.next = `${NO_MATCH_HINT} ${result.next}`;
+    // With `more`, a chat is not scanned to its end, and its older messages can still match.
+    if (result.messages.length === 0 && !result.more) result.next = `${NO_MATCH_HINT} ${result.next}`;
     return openBotToolResult(result);
   }).bind(this);
 
