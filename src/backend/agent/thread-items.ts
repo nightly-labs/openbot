@@ -157,7 +157,7 @@ function isRejectedOpenCodeRequest(provider: AgentProvider, message: string): bo
 function isFailedOpenCodeCompaction(provider: AgentProvider, message: string): boolean {
   return (
     provider === "opencode" &&
-    /\bCompaction summary did not match the required template\b|\bCompaction produced no summary\b|\bCompaction summary reached the output token limit\b/.test(
+    /\bCompaction summary did not match the required template\b|\bCompaction produced no summary\b|\bCompaction summary reached the output token limit\b/i.test(
       message,
     )
   );
