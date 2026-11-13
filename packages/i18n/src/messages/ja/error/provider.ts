@@ -221,7 +221,7 @@ export const messages = {
   "error.provider.opencodeInvalidUpload":
     "OpenCode のモデルプロバイダーが無効なアップロードリクエストを報告しました。別のモデルを選択して続行してください。ルーティンをもう一度作成する前に、保存済みのルーティンを確認してください。\n{detail}",
   "error.provider.opencodeUnreadableContent":
-    "このモデルは、このチャット内のファイルまたは画像を読み取れません。ファイルを読み取れるモデルを選択してから、メッセージをもう一度送信してください。",
+    "このモデルは、このチャット内のファイルまたは画像を読み取れません。OpenBot はチャット履歴を引き継いだ新しい OpenCode セッションを開始しました。ファイルを外してメッセージをもう一度送信するか、ファイルを読み取れるモデルを選択してください。このモデルをカスタムプロバイダーに追加した場合は、その設定の「入力」で「画像」をオフにしてください。",
   "error.provider.opencodeContextTooSmall":
     "このチャットはモデルのコンテキストウィンドウに収まりません。Ollama または LM Studio で、より大きいコンテキスト長でモデルを読み込み、OpenBot のプロバイダー設定に同じウィンドウを入力してください。または、より大きいモデルを選んでください。",
   "error.provider.opencodeFreeLimit":
@@ -335,6 +335,8 @@ export const messages = {
     "画像が多すぎるため、モデルはこのチャットを受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.opencodeSessionRejected":
     "OpenCode がリクエストを拒否しましたが、原因は示されていません。長いチャットやモデルの変更後に起こることがあります。OpenBot はチャット履歴を引き継いだ新しい OpenCode セッションを開始しました。もう一度お試しください。エラーが続く場合は、別のモデルを選ぶか推論レベルを下げてください。",
+  "error.provider.opencodeCompactionFailed":
+    "モデルがこの長いチャットを要約できず、コンテキストウィンドウに空きを作れませんでした。OpenBot はチャット履歴を引き継いだ新しい OpenCode セッションを開始しました。もう一度お試しください。エラーが続く場合は、より高性能なモデルを選んでください。",
   "error.provider.museMcpStartupFault":
     "Muse が MCP サーバーを起動できず、このセッションで MCP をブロックしました。OpenBot はチャット履歴を引き継いだ新しい Muse セッションを開始しました。もう一度お試しください。エラーが続く場合は、このエージェントの Computer Use または失敗した MCP サーバーをオフにしてください。",
   "error.provider.claudeSessionMissing":

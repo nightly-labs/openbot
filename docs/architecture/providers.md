@@ -137,6 +137,9 @@ Two deferred tools recover omitted text without model calls for search or summar
   Each excerpt is at most 400 characters. Its serialized tool result is at most 8,000 characters.
 - `history_read` returns recent messages, a named message, or a page before a returned cursor or
   a returned `messageId` of the same conversation.
+  A read of one visual reply by its `messageId` gives the page title and then the text of the page
+  (`visual-page-text.ts`); a page with no text outside its scripts gives its source. In a list, a
+  visual reply has only its title and a `page` hint.
   It returns ten messages by default and twenty maximum, within a 16,000-character serialized result.
   `nextOffset` continues a large message. With `includeWorkSteps`, `nextWorkStepsOffset` can be passed
   as `workStepsOffset` to continue a large or heavily escaped capture. Captures contain selected work

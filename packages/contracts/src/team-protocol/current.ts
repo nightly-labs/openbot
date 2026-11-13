@@ -65,6 +65,7 @@ import { CHANNEL_BROWSER_CAPABILITY } from "./channel-browser-v1";
 import { CHANNEL_ISOLATION_CAPABILITY } from "./channel-isolation-v1";
 import { CHANNEL_PICTURE_CAPABILITY } from "./channel-picture-v1";
 import { CHANNEL_SEEN_SUBTASKS_CAPABILITY } from "./channel-seen-subtasks-v1";
+import { CHANNEL_TASK_WAITS_CAPABILITY } from "./channel-task-waits-v1";
 import { CHAT_COLORS_CAPABILITY } from "./chat-colors-v1";
 import { CHAT_HISTORY_CAPABILITY } from "./chat-history-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "./claude-api-key-v1";
@@ -307,6 +308,7 @@ export {
   CHANNEL_PICTURE_CAPABILITY,
   CHANNEL_SEEN_SUBTASKS_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
+  CHANNEL_TASK_WAITS_CAPABILITY,
   CHAT_COLORS_CAPABILITY,
   CHAT_HISTORY_CAPABILITY,
   COMPUTER_ACTIVITY_CAPABILITY,
@@ -640,6 +642,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   PENDING_APPROVAL_CAPABILITY,
   PROVIDER_ACCOUNT_KEYS_CAPABILITY,
   USAGE_CREDITS_CAPABILITY,
+  CHANNEL_TASK_WAITS_CAPABILITY,
   ROUTINE_FLOW_STOP_CAPABILITY,
 ] as const;
 
@@ -871,6 +874,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== PENDING_APPROVAL_CAPABILITY &&
     capability !== PROVIDER_ACCOUNT_KEYS_CAPABILITY &&
     capability !== USAGE_CREDITS_CAPABILITY &&
+    capability !== CHANNEL_TASK_WAITS_CAPABILITY &&
     capability !== ROUTINE_FLOW_STOP_CAPABILITY,
 );
 /**
@@ -977,6 +981,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   PENDING_APPROVAL_CAPABILITY,
   PROVIDER_ACCOUNT_KEYS_CAPABILITY,
   USAGE_CREDITS_CAPABILITY,
+  CHANNEL_TASK_WAITS_CAPABILITY,
   ROUTINE_FLOW_STOP_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
@@ -1167,6 +1172,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== PENDING_APPROVAL_CAPABILITY &&
       capability !== PROVIDER_ACCOUNT_KEYS_CAPABILITY &&
       capability !== USAGE_CREDITS_CAPABILITY &&
+      capability !== CHANNEL_TASK_WAITS_CAPABILITY &&
       capability !== ROUTINE_FLOW_STOP_CAPABILITY,
   );
 }

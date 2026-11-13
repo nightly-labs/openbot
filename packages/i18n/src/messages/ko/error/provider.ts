@@ -214,7 +214,7 @@ export const messages = {
   "error.provider.opencodeInvalidUpload":
     "OpenCode의 모델 제공자가 올바르지 않은 업로드 요청이라고 알렸어요. 다른 모델을 선택해 계속하세요. 저장된 루틴을 다시 만들기 전에 확인하세요.\n{detail}",
   "error.provider.opencodeUnreadableContent":
-    "이 모델은 이 채팅의 파일이나 이미지를 읽을 수 없어요. 파일을 읽을 수 있는 모델을 선택한 후 메시지를 다시 보내세요.",
+    "이 모델은 이 채팅의 파일이나 이미지를 읽을 수 없어요. OpenBot이 채팅 기록으로 새 OpenCode 세션을 시작했어요. 파일 없이 메시지를 다시 보내거나, 파일을 읽을 수 있는 모델을 선택하세요. 이 모델을 사용자 지정 제공자에 추가했다면 설정의 '입력'에서 '이미지'를 해제하세요.",
   "error.provider.opencodeContextTooSmall":
     "이 채팅이 모델의 컨텍스트 창에 맞지 않습니다. Ollama 또는 LM Studio에서 더 큰 컨텍스트 길이로 모델을 불러오고, OpenBot의 제공자 설정에 같은 창을 입력하세요. 또는 더 큰 모델을 선택하세요.",
   "error.provider.opencodeFreeLimit":
@@ -321,6 +321,8 @@ export const messages = {
     "이미지가 너무 많아서 모델이 이 채팅을 받지 않았습니다. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했습니다. 다시 시도하세요.",
   "error.provider.opencodeSessionRejected":
     "OpenCode가 원인을 알리지 않고 요청을 거부했어요. 긴 채팅이나 모델 변경 후에 발생할 수 있어요. OpenBot이 채팅 기록으로 새 OpenCode 세션을 시작했어요. 다시 시도해 주세요. 오류가 계속되면 다른 모델이나 낮은 강도를 선택하세요.",
+  "error.provider.opencodeCompactionFailed":
+    "모델이 이 긴 채팅을 요약하지 못해 컨텍스트 창에 공간을 만들지 못했어요. OpenBot이 채팅 기록으로 새 OpenCode 세션을 시작했어요. 다시 시도해 주세요. 오류가 계속되면 더 강력한 모델을 선택하세요.",
   "error.provider.museMcpStartupFault":
     "Muse가 MCP 서버를 시작하지 못해서 이 세션에서 MCP를 차단했어요. OpenBot이 채팅 기록으로 새 Muse 세션을 시작했어요. 다시 시도해 주세요. 오류가 계속되면 이 에이전트의 컴퓨터 제어 또는 실패한 MCP 서버를 끄세요.",
   "error.provider.claudeSessionMissing":

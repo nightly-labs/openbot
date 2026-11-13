@@ -211,7 +211,7 @@ export const messages = {
   "error.provider.opencodeInvalidUpload":
     "Dostawca modelu OpenCode zgłosił nieprawidłowe żądanie przesłania. Wybierz inny model i kontynuuj. Sprawdź zapisane rutyny, zanim utworzysz je ponownie.\n{detail}",
   "error.provider.opencodeUnreadableContent":
-    "Ten model nie może odczytać pliku lub obrazu w tym czacie. Wybierz model, który odczytuje pliki, a potem wyślij wiadomość ponownie.",
+    "Ten model nie może odczytać pliku lub obrazu w tym czacie. OpenBot rozpoczął nową sesję OpenCode z historią czatu. Wyślij wiadomość ponownie bez pliku albo wybierz model, który odczytuje pliki. Jeśli ten model dodano do własnego dostawcy, odznacz „Obrazy” przy „Przyjmuje” w jego ustawieniach.",
   "error.provider.opencodeContextTooSmall":
     "Ten czat nie mieści się w oknie kontekstu modelu. W Ollama lub LM Studio wczytaj model z większą długością kontekstu i wpisz to samo okno w ustawieniach jego dostawcy w OpenBot. Możesz też wybrać większy model.",
   "error.provider.opencodeFreeLimit":
@@ -318,6 +318,8 @@ export const messages = {
     "Model nie przyjął tego czatu, ponieważ czat zawiera za dużo obrazów. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie.",
   "error.provider.opencodeSessionRejected":
     "OpenCode odrzucił żądanie i nie podał przyczyny. Może się to zdarzyć w długim czacie lub po zmianie modelu. OpenBot rozpoczął nową sesję OpenCode z historią czatu. Spróbuj ponownie. Jeśli błąd się powtarza, wybierz inny model lub niższy wysiłek.",
+  "error.provider.opencodeCompactionFailed":
+    "Model nie zdołał streścić tego długiego czatu, aby zwolnić miejsce w oknie kontekstu. OpenBot rozpoczął nową sesję OpenCode z historią czatu. Spróbuj ponownie. Jeśli błąd się powtarza, wybierz mocniejszy model.",
   "error.provider.museMcpStartupFault":
     "Muse nie mógł uruchomić serwera MCP i zablokował MCP w tej sesji. OpenBot rozpoczął nową sesję Muse z historią czatu. Spróbuj ponownie. Jeśli błąd się powtarza, wyłącz Sterowanie komputerem lub serwer MCP, który zawiódł, dla tego agenta.",
   "error.provider.claudeSessionMissing":

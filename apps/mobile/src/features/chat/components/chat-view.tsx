@@ -112,6 +112,8 @@ export interface ChatViewProps {
   canSend: boolean;
   /** A note in place of the composer that says why the person cannot write here. */
   notice?: string | null;
+  /** Lines above the composer that say why a request does not start, such as a busy channel member. */
+  statusNotes?: readonly string[];
   /** The chat only shows its history, such as a deleted channel: no replies, answers or browser steps. */
   readOnly?: boolean;
   activity?: MobileAgentActivity;
@@ -258,6 +260,7 @@ export function ChatView({
   historyLoadFailed,
   canSend,
   notice = null,
+  statusNotes,
   readOnly = false,
   activity,
   activities,
@@ -1360,6 +1363,20 @@ export function ChatView({
                   {t("mobile.chat.outbox.saveFailed")}
                 </Typography.Paragraph>
               ) : null}
+              {notice
+                ? null
+                : statusNotes?.map((note) => (
+                    <Typography.Paragraph
+                      key={note}
+                      type="body-xs"
+                      numberOfLines={2}
+                      accessibilityLiveRegion="polite"
+                      className="bg-background py-1.5 text-text-secondary"
+                      style={{ paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }}
+                    >
+                      {note}
+                    </Typography.Paragraph>
+                  ))}
               {queue && !notice ? (
                 <ChatQueueButton
                   queue={queue}

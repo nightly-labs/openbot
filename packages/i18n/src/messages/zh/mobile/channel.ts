@@ -40,6 +40,8 @@ export const messages = {
   "mobile.channel.deleted.restoreFailedBody": "无法恢复该频道，请重试。",
   "mobile.channel.chat.fallbackName": "频道",
   "mobile.channel.chat.deletedNotice": "已删除的频道。仅供预览。",
+  "mobile.channel.chat.waitBusy": "等待中 - {name} 正在 {channel} 中工作",
+  "mobile.channel.chat.waitFull": "等待中 - 正在运行的任务结束后 {name} 将开始",
   "mobile.channel.records.connect": "连接到服务器后才能编辑该频道。",
   "mobile.channel.records.loadFailed": "无法加载频道设置。",
   "mobile.channel.records.gone": "该项目已不可用。",

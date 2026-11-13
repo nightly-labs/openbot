@@ -207,6 +207,11 @@ const START_FAILURE_LIMIT = 3;
 const STABLE_RUN_MS = 2 * 60_000;
 /** How often a restart the user asked for checks whether the provider's turns have ended. */
 const PROVIDER_RESTART_POLL_MS = 1_000;
+/**
+ * The waits before a model list that failed is read again. The first read after a CLI update can
+ * fail for a short time, and a read at once failed again.
+ */
+const FAILED_MODEL_LIST_RETRY_DELAYS_MS = [2_000, 15_000];
 /** The start failure of OpenCode 1 on a database that OpenCode 2 made. */
 const OPENCODE_NEWER_DATABASE = /\bDatabase is not empty and has no session table\b/u;
 /**
@@ -502,6 +507,8 @@ export class ProviderRuntime implements ProviderPort {
   #errorSerial = 0;
   /** The providers whose model list is read again after it timed out. */
   readonly #relisting = new Set<AgentProvider>();
+  /** The clients whose failed model list was read again. Each client gets these reads one time. */
+  readonly #relistedAfterFailure = new WeakSet<AgentClient>();
   /** The MCP server failures shown in this run, by provider, server and kind. */
   readonly #reportedMcpFailures = new Set<string>();
   /** The last usage each provider reported, shown for a released provider instead of starting it. */
@@ -4514,7 +4521,7 @@ export class ProviderRuntime implements ProviderPort {
    */
   readonly #refreshModelCatalog = Effect.fn("ProviderRuntime.refreshModelCatalog")(function* (this: ProviderRuntime) {
     const errorSerialAtStart = this.#errorSerial;
-    const { fresh, timedOut } = yield* this.#modelCatalog.refresh();
+    const { fresh, timedOut, failed } = yield* this.#modelCatalog.refresh();
     let cleared = false;
     for (const provider of fresh) {
       const lastError = this.#lastErrors.get(provider);
@@ -4533,23 +4540,42 @@ export class ProviderRuntime implements ProviderPort {
         Effect.forkIn(this.#scope),
       );
     }
+    // A list that failed kept the list from before. After an update of the CLI, that is the list of
+    // the old version: the row showed the new version, and the new models came only after a restart
+    // (#8321). Each client gets these reads one time, so a CLI that always fails starts no loop.
+    for (const provider of failed) {
+      const client = this.#clients.get(provider);
+      // The guard is the client, not the provider: the client that replaces this one during the
+      // waits must get its own reads when its list also fails.
+      if (!client || this.#relistedAfterFailure.has(client)) continue;
+      this.#relistedAfterFailure.add(client);
+      yield* Effect.gen({ self: this }, function* () {
+        for (const delayMs of FAILED_MODEL_LIST_RETRY_DELAYS_MS) {
+          yield* Effect.sleep(delayMs);
+          // The start of a new client reads its own list.
+          if (this.#clients.get(provider) !== client) return;
+          if (yield* this.#relistModels(provider)) return;
+        }
+      }).pipe(Effect.forkIn(this.#scope));
+    }
     return fresh;
   });
 
   /**
    * Reads the model list of a provider again, once, with the full request timeout. A fresh list
    * clears the provider's last error, when the error is older than this read, and publishes the
-   * status, so the renderer reads the catalogue again.
+   * status, so the renderer reads the catalogue again. Answers whether the list is fresh.
    */
   readonly #relistModels = Effect.fn("ProviderRuntime.relistModels")(function* (
     this: ProviderRuntime,
     provider: AgentProvider,
   ) {
     const errorSerialAtStart = this.#errorSerial;
-    if (!(yield* this.#modelCatalog.relist(provider))) return;
+    if (!(yield* this.#modelCatalog.relist(provider))) return false;
     const lastError = this.#lastErrors.get(provider);
     if (lastError && lastError.serial <= errorSerialAtStart) this.#lastErrors.delete(provider);
     this.#setStatus({});
+    return true;
   });
 
   /** Shows a provider failure to the user and keeps it on the provider row. */

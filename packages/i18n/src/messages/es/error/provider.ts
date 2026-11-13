@@ -223,7 +223,7 @@ export const messages = {
   "error.provider.opencodeInvalidUpload":
     "El proveedor del modelo de OpenCode informó de una solicitud de carga no válida. Elige otro modelo y continúa. Comprueba las rutinas guardadas antes de crearlas de nuevo.\n{detail}",
   "error.provider.opencodeUnreadableContent":
-    "Este modelo no puede leer un archivo o una imagen de este chat. Elige un modelo que pueda leer archivos y vuelve a enviar tu mensaje.",
+    "Este modelo no puede leer un archivo o una imagen de este chat. OpenBot inició una nueva sesión de OpenCode con el historial del chat. Vuelve a enviar tu mensaje sin el archivo o elige un modelo que pueda leer archivos. Si añadiste este modelo a un proveedor personalizado, desmarca «Imágenes» en «Acepta» en su configuración.",
   "error.provider.opencodeContextTooSmall":
     "Este chat no cabe en la ventana de contexto del modelo. En Ollama o LM Studio, carga el modelo con una longitud de contexto mayor e introduce la misma ventana en la configuración de su proveedor en OpenBot. O elige un modelo más grande.",
   "error.provider.opencodeFreeLimit":
@@ -331,6 +331,8 @@ export const messages = {
     "El modelo no aceptó este chat porque tiene demasiadas imágenes. OpenBot inició una nueva sesión de {provider} con el historial del chat. Inténtalo de nuevo.",
   "error.provider.opencodeSessionRejected":
     "OpenCode rechazó la solicitud y no indicó la causa. Esto puede ocurrir en un chat largo o después de cambiar de modelo. OpenBot inició una nueva sesión de OpenCode con el historial del chat. Inténtalo de nuevo. Si el error continúa, elige otro modelo o un esfuerzo menor.",
+  "error.provider.opencodeCompactionFailed":
+    "El modelo no pudo resumir este chat largo para liberar espacio en su ventana de contexto. OpenBot inició una nueva sesión de OpenCode con el historial del chat. Inténtalo de nuevo. Si el error continúa, elige un modelo más potente.",
   "error.provider.museMcpStartupFault":
     "Muse no pudo iniciar un servidor MCP y bloqueó MCP en esta sesión. OpenBot inició una nueva sesión de Muse con el historial del chat. Inténtalo de nuevo. Si el error continúa, desactiva Uso del equipo o el servidor MCP que falló para este agente.",
   "error.provider.claudeSessionMissing":

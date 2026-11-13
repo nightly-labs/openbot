@@ -191,7 +191,7 @@ export const messages = {
   "error.provider.opencodeInvalidUpload":
     "OpenCode 的模型服务商报告上传请求无效。请改用其他模型继续；重新创建自动化任务前请先检查已保存的自动化任务。\n{detail}",
   "error.provider.opencodeUnreadableContent":
-    "该模型无法读取该对话中的文件或图片。请选择能读取文件的模型，然后重新发送消息。",
+    "该模型无法读取该对话中的文件或图片。OpenBot 已使用聊天记录开始新的 OpenCode 会话。请去掉文件后重新发送消息，或选择能读取文件的模型。如果你将此模型添加到了自定义服务商，请在其设置的“接受”中取消勾选“图片”。",
   "error.provider.opencodeContextTooSmall":
     "此聊天超出了模型的上下文窗口。请在 Ollama 或 LM Studio 中以更大的上下文长度加载模型，并在 OpenBot 中该模型提供方的设置里填写相同的窗口。或者选择更大的模型。",
   "error.provider.opencodeFreeLimit":
@@ -289,6 +289,8 @@ export const messages = {
     "此聊天中的图片太多，模型未接受此聊天。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
   "error.provider.opencodeSessionRejected":
     "OpenCode 拒绝了这次请求，但没有给出原因。长对话或更换模型之后可能出现这种情况。OpenBot 已带着聊天记录开启新的 OpenCode 会话，请重试。如果仍然报错，请换一个模型或调低推理强度。",
+  "error.provider.opencodeCompactionFailed":
+    "模型无法总结这段长对话，因此无法在上下文窗口中腾出空间。OpenBot 已带着聊天记录开启新的 OpenCode 会话，请重试。如果仍然报错，请选择更强的模型。",
   "error.provider.museMcpStartupFault":
     "Muse 无法启动某个 MCP 服务器，并在本次会话中停用了 MCP。OpenBot 已带着聊天记录开启新的 Muse 会话，请重试。如果仍然报错，请关闭 Computer Use，或对该助手关闭启动失败的 MCP 服务器。",
   "error.provider.claudeSessionMissing":

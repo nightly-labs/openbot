@@ -225,7 +225,7 @@ export const messages = {
   "error.provider.opencodeInvalidUpload":
     "Der Modellanbieter von OpenCode hat eine ungültige Upload-Anfrage gemeldet. Wähle ein anderes Modell und fahre fort. Prüfe gespeicherte Routinen, bevor du sie erneut erstellst.\n{detail}",
   "error.provider.opencodeUnreadableContent":
-    "Dieses Modell kann eine Datei oder ein Bild in diesem Chat nicht lesen. Wähle ein Modell, das Dateien lesen kann, und sende deine Nachricht dann erneut.",
+    "Dieses Modell kann eine Datei oder ein Bild in diesem Chat nicht lesen. OpenBot hat eine neue OpenCode-Sitzung mit dem Chatverlauf gestartet. Sende deine Nachricht ohne die Datei erneut oder wähle ein Modell, das Dateien lesen kann. Wenn du dieses Modell zu einem eigenen Anbieter hinzugefügt hast, entferne in seinen Einstellungen bei „Akzeptiert“ die Auswahl „Bilder“.",
   "error.provider.opencodeContextTooSmall":
     "Dieser Chat passt nicht in das Kontextfenster des Modells. Lade das Modell in Ollama oder LM Studio mit einer größeren Kontextlänge und trage dasselbe Fenster in OpenBot in den Einstellungen seines Anbieters ein. Oder wähle ein größeres Modell.",
   "error.provider.opencodeFreeLimit":
@@ -339,6 +339,8 @@ export const messages = {
     "Das Modell hat diesen Chat nicht akzeptiert, weil er zu viele Bilder enthält. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.opencodeSessionRejected":
     "OpenCode hat die Anfrage abgelehnt und keinen Grund genannt. Das kann in einem langen Chat oder nach einem Modellwechsel passieren. OpenBot hat eine neue OpenCode-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut. Wenn der Fehler bleibt, wähle ein anderes Modell oder einen niedrigeren Aufwand.",
+  "error.provider.opencodeCompactionFailed":
+    "Das Modell konnte diesen langen Chat nicht zusammenfassen, um Platz im Kontextfenster zu schaffen. OpenBot hat eine neue OpenCode-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut. Wenn der Fehler bleibt, wähle ein stärkeres Modell.",
   "error.provider.museMcpStartupFault":
     "Muse konnte einen MCP-Server nicht starten und hat MCP in dieser Sitzung gesperrt. OpenBot hat eine neue Muse-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut. Wenn der Fehler bleibt, schalte Computersteuerung oder den fehlerhaften MCP-Server für diesen Agenten aus.",
   "error.provider.claudeSessionMissing":
