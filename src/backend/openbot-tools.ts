@@ -432,7 +432,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "read_agent",
     description:
-      "Read the setup of one local OpenBot agent, or your own when you omit agentId: profile, provider, model, reasoning effort, account, backup models, the model it returns to after a usage limit or a provider error, access, Computer Use, notifications, auto-approve, installed skills, routines, and the MCP servers it gets. Read-only. Call it before you change another agent.",
+      "Read the setup of one local OpenBot agent, or your own when you omit agentId: profile, provider, model, reasoning effort, account, backup models, the model it returns to after a usage limit or a provider error, access, permissions, Computer Use, notifications, auto-approve, installed skills, routines, and the MCP servers it gets. permissions is the level that applies: workspace (works in its workspace and asks the user before it goes outside it), ask (asks before it acts), or full (does not ask). autoApprove is true only at full. Read-only. Call it before you change another agent.",
     shape: readAgentToolSchema.shape,
   },
   {
