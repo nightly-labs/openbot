@@ -23,6 +23,7 @@ import { attachmentCorsHeaders, attachmentDocumentHeaders, chatVisualResponse } 
 import { buildContentSecurityPolicy, readSelfHostedSignalOrigin } from "./content-security-policy";
 import { filePreviewPages } from "./file-preview-pages";
 import { bytesResponse, fileResponse } from "./file-response";
+import { canAnswerRemoteRanges } from "./remote-attachment-cache";
 import type { RemoteServerManager } from "./remote-server-manager";
 import { parseRemoteAvatarUrl } from "./remote-server-urls";
 import { canCheckRendererPermission, canRequestRendererPermission } from "./renderer-permissions";
@@ -117,7 +118,7 @@ export function configureAttachmentProtocol({ mailbox, agents, remoteServers }: 
           "X-Content-Type-Options": "nosniff",
           "Content-Disposition": "inline",
         },
-        request.headers.get("Range"),
+        canAnswerRemoteRanges(attachment) ? request.headers.get("Range") : undefined,
       );
     } catch (error) {
       // The image shows only a download icon, so the log is the only record of why it failed.

@@ -14,6 +14,18 @@ const REMOTE_ATTACHMENT_CACHE_ENTRY_BYTES = 16 * 1024 * 1024;
 // A video or audio file that plays in the chat can use the whole budget. Its player asks for the file
 // again from each byte offset, and each miss downloads the whole file from the host again (#8521).
 const REMOTE_ATTACHMENT_CACHE_MEDIA_BYTES = REMOTE_ATTACHMENT_CACHE_BYTES;
+
+/**
+ * True for a video or audio preview that the cache keeps, so that each byte range request of its player
+ * reads the cache. A larger file, or a file of another type, gets the whole file for each request as before:
+ * a range answer would make the player ask again many times, and each request would download the file again.
+ */
+export function canAnswerRemoteRanges(attachment: RemoteAttachment): boolean {
+  return (
+    playableMediaKind(attachment.mimeType) !== null &&
+    attachment.bytes.byteLength <= REMOTE_ATTACHMENT_CACHE_MEDIA_BYTES
+  );
+}
 const REMOTE_ATTACHMENT_CACHE_TTL_MS = 10 * 60_000;
 // Previews that download at the same time from one server. The host answers a download only after its
 // last byte, and all transfers share one ordered data channel. Eight gallery images that started
@@ -146,11 +158,7 @@ export class RemoteAttachmentCache {
 
   #store(key: string, serverId: string, attachment: RemoteAttachment, preview = false): void {
     const size = attachment.bytes.byteLength;
-    const limit =
-      preview && playableMediaKind(attachment.mimeType)
-        ? REMOTE_ATTACHMENT_CACHE_MEDIA_BYTES
-        : REMOTE_ATTACHMENT_CACHE_ENTRY_BYTES;
-    if (size > limit) return;
+    if (size > REMOTE_ATTACHMENT_CACHE_ENTRY_BYTES && !(preview && canAnswerRemoteRanges(attachment))) return;
     this.#removeExpired();
     const previous = this.#entries.get(key);
     if (previous) this.#delete(key, previous);

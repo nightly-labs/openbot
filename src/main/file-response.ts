@@ -20,9 +20,11 @@ function byteRange(header: string | null, size: number): { start: number; end: n
 
 /**
  * Answers a request from bytes in memory, with the same range rules as `fileResponse`. A file from a joined server
- * arrives whole, and its `stream` scheme needs the same 206 answers as a file on this computer (#8521).
+ * arrives whole, and its `stream` scheme needs the same 206 answers as a file on this computer (#8521). Without
+ * `range`, the answer is the whole file with no length and no range support, as before.
  */
-export function bytesResponse(bytes: Uint8Array, headers: Record<string, string>, range: string | null): Response {
+export function bytesResponse(bytes: Uint8Array, headers: Record<string, string>, range?: string | null): Response {
+  if (range === undefined) return new Response(Buffer.from(bytes), { headers });
   const requested = byteRange(range, bytes.byteLength);
   const rangeHeaders = { ...headers, "Accept-Ranges": "bytes" };
   if (requested === "unsatisfiable") {
