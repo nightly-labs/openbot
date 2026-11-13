@@ -156,6 +156,7 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
       responseStyle={responseStyle()}
       presence={teamPresence()}
       currentUserEmail={props.account().email}
+      currentUserChatColor={props.account().chatColor}
       isOwnSender={isOwnSender}
       browserEnabled={!platform.landingPreview && activeServerSupportsCapability("browser-control")}
       openLinksInBrowser={generalSettings().externalLinkTarget.kind === "openbot"}

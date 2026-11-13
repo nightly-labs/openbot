@@ -605,6 +605,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         responseStyle={responseStyle()}
         presence={teamPresence()}
         currentUserEmail={props.account().email}
+        currentUserChatColor={props.account().chatColor}
         isOwnSender={isOwnSender}
         // The browser and the remote desktop show in the main window only.
         browserEnabled={
