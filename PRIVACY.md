@@ -488,7 +488,9 @@ the avatar without an account session.
 ## Hosted servers
 
 Each account can buy hosted servers. A hosted server is a Linux
-OpenBot computer that runs in a [boat](https://boat.dev) sandbox in the EU (Germany, Finland or
+OpenBot computer. It runs on a virtual server that OpenBot rents from
+[Leaseweb](https://www.leaseweb.com) when one is free at the purchase (see below), and otherwise in a
+[boat](https://boat.dev) sandbox in the EU (Germany, Finland or
 France). The sandbox holds the server's workspaces, conversations, attachments, browser data and
 team data, the same as your own computer would. The server stops 15 to 30 minutes after its last use and
 starts again when you press a key or click in an app that shows it, when a Slack, Discord or
@@ -521,16 +523,23 @@ boat dashboard: `openbot-`, the plan, your account email with each other charact
 first 8 characters of the server ID, such as `openbot-starter-ada-example-com-1a2b3c4d`. boat keeps
 the name with the sandbox.
 
-An operator can move a Standard or Pro server from boat to a virtual server that OpenBot rents from
-[Leaseweb](https://www.leaseweb.com) in Amsterdam, the Netherlands. The operator copies the server's
-disk over SSH, and deletes the copy after the move. The virtual server then holds the server's
-workspaces, conversations, attachments, browser data and team data, as the sandbox did, and runs
-all the time, with no stop after the last use. boat keeps the old sandbox until the server is
-deleted. The account service stores the Leaseweb server ID with the server. So that an operator can
+A new hosted server of each plan starts on a virtual server that OpenBot rents from
+[Leaseweb](https://www.leaseweb.com) when one is free at the purchase. For a purchase in euros or
+złotys, it is in Amsterdam, the Netherlands. For a purchase in US dollars or Brazilian reais, it is
+near Washington, D.C., in the United States, or in Amsterdam when none is free there. When no
+virtual server is free, the server starts in a boat sandbox. An operator can also move a
+server from boat to such a virtual server: the operator copies the server's disk over SSH, and
+deletes the copy after the move. The virtual server holds the server's
+workspaces, conversations, attachments, browser data and team data, as a sandbox does, and runs
+all the time, with no stop after the last use. A server that started on the virtual server has no
+boat sandbox. For a moved server, boat keeps the old sandbox until the server is
+deleted. A free virtual server asks the account service each 10 seconds whether it has a server; the
+account service stores a hash of the token of that request and the time of the last request, and
+no customer data. The account service stores the Leaseweb server ID with the server. So that an operator can
 find the server in the Leaseweb portal, the operator gives it a reference in Leaseweb: your account
 email and the first 8 characters of the server ID, such as `ada@example.com 1a2b3c4d`. When you
 delete the server, or 30 days after its plan ends with no renewal, the account service deletes the old
-sandbox, and within a day an operator reinstalls the virtual server, which erases its disk, and sets
+sandbox when the server has one, and within a day an operator reinstalls the virtual server, which erases its disk, and sets
 its reference to `pool-free`.
 
 ## Central data retention

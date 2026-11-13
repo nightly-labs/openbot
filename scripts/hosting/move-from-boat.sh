@@ -12,6 +12,16 @@
 #       On a prepared VPS that has no data of a server. A disabled OpenBot does not update, so this
 #       installs a newer release with provision.sh, and OpenBot stays disabled.
 #
+#   move-from-boat.sh offer <machine ID>
+#       On a prepared VPS that has no data of a server, after the account service has the hash of the
+#       token. Reads the token of the machine from standard input, and installs and starts
+#       openbot-pool-wait.service: the machine then asks the account service for the server of a new
+#       customer, and starts OpenBot for it (docs/hosted-servers.md#a-new-server-on-a-pool-machine).
+#
+#   move-from-boat.sh withdraw
+#       On the VPS. Stops openbot-pool-wait.service and removes the token, so that the machine takes
+#       no new server. `prepare`, `upgrade` and `import` do this first.
+#
 #   move-from-boat.sh packages
 #       On the sandbox, while the customer still uses it. Prints the apt packages that the customer
 #       installed, for `install-packages`. It does not stop OpenBot.
@@ -58,6 +68,9 @@ MANIFEST=$KEYRING_HOME/move-manifest
 # On the VPS, from the start of an import until `start`: `importing`, or `imported` and the checksum
 # of the restored database. While it is there, OpenBot did not run on the restored data.
 IMPORT_STATE=/var/lib/openbot-move-import
+# The machine ID and the token of openbot-pool-wait, of root.
+OFFER=/etc/openbot-pool
+OFFER_INSTALL=/usr/local/lib/openbot-pool
 DATABASE=$USER_HOME/.config/OpenBot/openbot.db
 # The files that must be the same on the two machines. The agent database is there only after an
 # agent made a table.
@@ -461,6 +474,51 @@ database_is_unchanged() {
   [ -n "$sum" ] && [ -f "$DATABASE" ] && [ "$(sha256sum "$DATABASE" | cut -d' ' -f1)" = "$sum" ]
 }
 
+# The machine must take no new server while an operator changes it. Without the token, the unit does
+# not start at the next boot.
+stop_offer() {
+  rm -f "$OFFER/token"
+  if [ -e /etc/systemd/system/openbot-pool-wait.service ]; then
+    systemctl disable --quiet --now openbot-pool-wait.service
+  fi
+}
+
+withdraw() {
+  [ "$#" -eq 0 ] || fail "usage: $0 withdraw"
+  stop_offer
+  echo "This machine takes no new server."
+}
+
+offer() {
+  [ "$#" -eq 1 ] || fail "usage: $0 offer <machine ID> (the token on standard input)"
+  local host=$1 source token
+  [[ $host =~ ^leaseweb:[0-9]{1,20}$ ]] || fail "The machine ID is not valid."
+  source=$(cd "$(dirname "$0")" && pwd)
+  [ -f "$source/openbot-pool-wait" ] && [ -f "$source/openbot-pool-wait.service" ] ||
+    fail "Run this file from a copy of scripts/hosting."
+  IFS= read -r token || true
+  [[ $token =~ ^[A-Za-z0-9_-]{32,128}$ ]] || fail "Standard input has no token."
+  stop_offer
+  is_hosted_install || fail "This machine is not prepared. Run \"$0 prepare\" first."
+  openbot_is_off || fail "OpenBot is enabled or runs on this machine. It is not a prepared pool server."
+  [ ! -e "$USER_HOME/.config/OpenBot" ] && [ ! -e "$USER_HOME/.config/openbot-hosted" ] &&
+    [ ! -e "$KEYRING_HOME/keyrings" ] && [ ! -e "$IMPORT_STATE" ] ||
+    fail "This machine has the data of a server. It cannot take a new one."
+  grep -q '^OPENBOT_AUTH_API_URL=https://' /opt/OpenBot/hosted/openbot.env ||
+    fail "This machine names no account service."
+  install -d -m 0755 "$OFFER_INSTALL"
+  install -m 0755 "$source/openbot-pool-wait" "$OFFER_INSTALL/openbot-pool-wait"
+  install -m 0644 "$source/openbot-pool-wait.service" /etc/systemd/system/openbot-pool-wait.service
+  install -d -m 0700 "$OFFER"
+  printf '%s\n' "$host" >"$OFFER/host"
+  # umask 077: only root reads the token.
+  printf '%s\n' "$token" >"$OFFER/token"
+  systemctl daemon-reload
+  systemctl enable --quiet openbot-pool-wait.service
+  systemctl restart openbot-pool-wait.service
+  echo "Machine $host waits for the server of a new customer."
+}
+
 prepare() {
   [ "$#" -eq 6 ] ||
     fail "usage: $0 prepare <hostname> <uid> <gid> <appimage-url> <appimage-sha256> <auth-api-url>"
@@ -474,6 +532,7 @@ prepare() {
   [ ! -e "$USER_HOME" ] && [ ! -e "$KEYRING_HOME" ] ||
     fail "This machine has data in $USER_HOME or $KEYRING_HOME."
   ! id "$SERVICE_USER" >/dev/null 2>&1 || fail "This machine has a user $SERVICE_USER."
+  stop_offer
   owner=$(getent passwd "$uid" | cut -d: -f1 || true)
   [ -z "$owner" ] || fail "The user $owner has the ID $uid on this machine. Remove that user, then run this again."
   owner=$(getent group "$gid" | cut -d: -f1 || true)
@@ -506,6 +565,7 @@ upgrade() {
   local source copy
   source=$(cd "$(dirname "$0")" && pwd)
   [ -f "$source/provision.sh" ] || fail "Run this file from a copy of scripts/hosting."
+  stop_offer
   is_hosted_install || fail "This machine is not prepared. Run \"$0 prepare\" first."
   [ ! -e "$USER_HOME/.config/OpenBot" ] && [ ! -e "$KEYRING_HOME/keyrings" ] && [ ! -e "$IMPORT_STATE" ] ||
     fail "This machine has the data of a server. Do not upgrade it here."
@@ -872,6 +932,8 @@ report_commands() {
 import_data() {
   [ "$#" -eq 1 ] && [ -f "$1" ] || fail "usage: $0 import <archive>"
   local archive=$1 manifest version installed sums clis groups missing line trees present members group
+  # First: a machine that gets the data of a moved server must not also take a new one.
+  stop_offer
   is_hosted_install || fail "This machine is not prepared. Run \"$0 prepare\" first."
   openbot_is_off || fail "OpenBot is enabled or runs on this machine. It is not a prepared pool server."
   [ ! -e "$IMPORT_STATE" ] ||
@@ -1026,11 +1088,13 @@ shift || true
 case $command in
   prepare) prepare "$@" ;;
   upgrade) upgrade "$@" ;;
+  offer) offer "$@" ;;
+  withdraw) withdraw "$@" ;;
   packages) packages "$@" ;;
   install-packages) install_packages "$@" ;;
   export) export_data "$@" ;;
   import) import_data "$@" ;;
   start) start "$@" ;;
   discard) discard "$@" ;;
-  *) fail "usage: $0 prepare|upgrade|packages|install-packages|export|import|start|discard (the top of this file has the arguments)" ;;
+  *) fail "usage: $0 prepare|upgrade|offer|withdraw|packages|install-packages|export|import|start|discard (the top of this file has the arguments)" ;;
 esac
