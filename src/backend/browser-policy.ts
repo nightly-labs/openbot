@@ -92,13 +92,13 @@ export function isAllowedMainUrl(value: string): boolean {
 }
 
 /**
- * The embedded browser grants exactly one page permission: writing plain, sanitized content to the
- * clipboard. Chromium only asks for it behind a user gesture, which is what a page's own "copy
- * link" button is, and refusing it left such a button silently doing nothing. Reading the clipboard
- * stays refused -- a page must never see what the user copied elsewhere -- and so does everything
- * else, so camera, microphone, location and notifications are unchanged.
+ * The embedded browser grants two page permissions. The first is writing plain, sanitized content
+ * to the clipboard. Chromium only asks for it behind a user gesture, which is what a page's own
+ * "copy link" button is, and refusing it left such a button silently doing nothing. Reading the
+ * clipboard stays refused -- a page must never see what the user copied elsewhere -- and so does
+ * everything other than the two, so camera, microphone, location and notifications are unchanged.
  *
- * `storage-access` is not a new right: the session already sends a frame of another site its
+ * The second is `storage-access`. It is not a new right: the session already sends a frame of another site its
  * cookies. Chrome grants the Storage Access API in that state, and a refusal made
  * `requestStorageAccess()` fail in a frame such as a Google picker (#8298).
  * `top-level-storage-access` stays refused: Chrome grants it only in a Related Website Set.
