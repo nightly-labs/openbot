@@ -1,6 +1,7 @@
 import * as SecureStore from "expo-secure-store";
 import { Uniwind } from "uniwind";
 import { create } from "zustand";
+import { sweepTheme } from "@/features/settings/model/theme-sweep";
 
 export type Appearance = "system" | "light" | "dark";
 const key = "openbot.mobile.appearance.v1";
@@ -26,8 +27,10 @@ export async function saveAppearance(value: Appearance): Promise<void> {
   useAppearance.setState({ saving: true });
   try {
     await SecureStore.setItemAsync(key, value);
-    Uniwind.setTheme(value);
-    useAppearance.setState({ value });
+    await sweepTheme(() => {
+      Uniwind.setTheme(value);
+      useAppearance.setState({ value });
+    });
   } finally {
     useAppearance.setState({ saving: false });
   }
