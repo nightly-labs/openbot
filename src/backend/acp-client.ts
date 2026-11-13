@@ -1292,6 +1292,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         const byPrompt = this.#steersByPrompt;
         if (!steer && !byPrompt) return yield* providerFailure(new Error(sourceText("error.backend.steerUnsupported")));
         const threadId = yield* providerSync(() => requiredString(params, "threadId"));
+        // Read the attachments before the check: the turn can end or ask for approval during the read.
+        const blocks = yield* promptBlocksEffect(params, this.#acceptsAudio);
         const thread = this.#threads.get(threadId);
         const turn = thread?.activeTurn;
         // A stopped turn drops the message, and an agent that has ended its turn starts the message
@@ -1308,7 +1310,6 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           (!steer && (turn.unprompted || turn.waitingOnUser > 0 || !turn.answered))
         )
           return yield* providerFailure(new Error(sourceText("error.backend.steerTurnChanged")));
-        const blocks = yield* promptBlocksEffect(params, this.#acceptsAudio);
         if (steer)
           yield* steer(this.#sessionConnection(thread), {
             sessionId: threadId,
