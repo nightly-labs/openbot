@@ -16,8 +16,8 @@ All notable changes to OpenBot will be documented here. The project follows
   client while the server is online. A server that does not answer still needs `sudo openbot restart`. The
   server must also be on the new version. In Docker, the container needs a restart policy, such as
   `--restart unless-stopped`.
-- In Settings > Vault, you can choose which agents can use each login, card, contact and API key. A new
-  item is for all agents. An agent sees, fills and reads only the items that it can use. On a joined
+- In Server Settings > Vault, you can choose which agents can use each login, card, contact and API key. A
+  new item is for all agents. An agent sees, fills and reads only the items that it can use. On a joined
   server this works in the desktop app and the web client when the server is also on this version.
 - Workflows have Image and Video steps. An Image step makes a picture with GPT Image (ChatGPT
   subscription) or Grok Imagine. A Video step makes a short clip with Grok Imagine. The card shows the
