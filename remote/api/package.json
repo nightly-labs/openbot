@@ -13,9 +13,9 @@
     "@discordjs/rest": "2.6.3",
     "@discordjs/ws": "2.0.4",
     "@openbot/contracts": "workspace:*",
-    "discord-api-types": "0.38.57",
+    "discord-api-types": "0.38.58",
     "effect": "catalog:",
-    "elysia": "1.4.30",
+    "elysia": "1.4.31",
     "jose": "catalog:",
     "zod": "catalog:"
   },
