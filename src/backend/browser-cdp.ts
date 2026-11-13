@@ -911,8 +911,14 @@ export class BrowserCdpEngine {
         this.#targets = new Map([...parsed.targets].filter(([ref]) => retainedRefs.has(ref)));
         this.#lastSnapshot = snapshot;
         // An empty snapshot of a web page also needs the image: the page draws nothing that the snapshot can read.
+        // A document with no root element, such as a load stopped before the first tag, draws no frame,
+        // and a capture of it waits until its deadline.
         const emptyPage =
-          parsed.elements.length === 0 && !parsed.text && !snapshot.loading && /^https?:/u.test(snapshot.url);
+          parsed.elements.length === 0 &&
+          !parsed.text &&
+          parsed.hasRoot &&
+          !snapshot.loading &&
+          /^https?:/u.test(snapshot.url);
         const lowCoverage = (parsed.elements.length < 3 && parsed.text.length > 200) || emptyPage;
         const recommendImage = parsed.hasVisualSurface || parsed.hasFrame || lowCoverage;
         const imageReason = parsed.hasVisualSurface

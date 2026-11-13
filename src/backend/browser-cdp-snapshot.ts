@@ -142,6 +142,7 @@ const collectSnapshotPass = Effect.fn("Browser.collectSnapshotPass")(function* (
   let textLength = 0;
   let hasVisualSurface = false;
   let hasFrame = captures.length > 1;
+  let hasRoot = true;
   let truncated = false;
   for (const capture of captures) {
     yield* browserSync(() => assertBeforeDeadline(deadline));
@@ -158,6 +159,7 @@ const collectSnapshotPass = Effect.fn("Browser.collectSnapshotPass")(function* (
         truncated ||= summary.truncated;
         hasVisualSurface ||= summary.hasVisualSurface;
         hasFrame ||= summary.hasFrame;
+        if (!capture.sessionId) hasRoot = summary.hasRoot;
       }
     }
     const remainingElements = MAX_SNAPSHOT_ELEMENTS - elements.length;
@@ -210,6 +212,7 @@ const collectSnapshotPass = Effect.fn("Browser.collectSnapshotPass")(function* (
     truncated: truncated || text.length > MAX_SNAPSHOT_TEXT || elements.length >= MAX_SNAPSHOT_ELEMENTS,
     hasVisualSurface,
     hasFrame,
+    hasRoot,
   };
 });
 
@@ -288,7 +291,7 @@ const collectPageSummaryEffect = Effect.fn("Browser.collectPageSummary")(functio
         if (scanned >= maxNodes) truncated = true;
         const text = [...inView.parts, ...outside.parts].join(' ');
         if (text.length > maxText) truncated = true;
-        return { text: text.slice(0, maxText), truncated, hasVisualSurface, hasFrame };
+        return { text: text.slice(0, maxText), truncated, hasVisualSurface, hasFrame, hasRoot: document.documentElement !== null };
       })()`,
       contextId,
       returnByValue: true,
@@ -301,6 +304,7 @@ const collectPageSummaryEffect = Effect.fn("Browser.collectPageSummary")(functio
     truncated: value?.truncated === true,
     hasVisualSurface: value?.hasVisualSurface === true,
     hasFrame: value?.hasFrame === true,
+    hasRoot: value?.hasRoot !== false,
   };
 });
 
