@@ -801,8 +801,8 @@ error. With no backup, a turn that only teammate results started runs once more 
 A thread turn never moves to a backup, so it always runs once more on the same model (#8503). So
 does the turn of an external chat conversation, such as WhatsApp (#8573); a channel task does not.
 `MessagingThreads` keeps the conversation's status post while the turn's messages wait in the queue,
-so the conversation gets no "Stopped." before the answer. The turn did no step, so it repeats nothing. A second empty run, or an empty turn from the person,
-shows the error. `scripts/codex-empty-lead-turn-e2e.ts` checks these paths.
+so the conversation gets no "Stopped." before the answer. The turn did no step, so it repeats
+nothing. A second empty run, or an empty turn from the person, shows the error. `scripts/codex-empty-lead-turn-e2e.ts` checks these paths.
 
 A message to an agent that runs a turn follows the busy-message mode: "steer" takes it into the
 running turn, "queue" starts it after the turn. The default is "steer" (`DEFAULT_BUSY_MESSAGE_MODE`).

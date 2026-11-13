@@ -919,8 +919,10 @@ export class MessagingThreads {
           event.status === "interrupted" &&
           started.deliveryIds.length > 0 &&
           started.deliveryIds.every((id) => this.#mailbox.getDelivery(id)?.delivery.status === "queued")
-        )
+        ) {
+          this.store.touch(link.linkId);
           return !this.#hooks.ownChat(event.threadId);
+        }
         // A turn with no known requester tells no conversation, so `deliverySettled` still must.
         if (started.origin) {
           this.#finishedTurns.add(event.turnId);

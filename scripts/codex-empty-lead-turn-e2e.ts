@@ -404,10 +404,14 @@ async function askTeammateFromWhatsApp(leadId: string, teammateId: string, mode:
       }),
     );
     assert.equal(received.status, "queued");
+    const linkId = received.status === "queued" ? received.link.linkId : "";
     await waitFor(`the conversation's ${mode} result request to end`, () =>
       ends.some((end) => end.followUp && end.status !== "interrupted"),
     );
-    await waitFor("the orchestrator to be idle", () => !mailbox.nextQueued(leadId));
+    await waitFor(
+      "the conversation's requests to settle",
+      () => mailbox.unresolvedMessagingDeliveries(linkId).length === 0,
+    );
     return {
       turns: fakeTurns().filter((turn) => turn.kind === "result" && turn.mode === mode),
       ends,
