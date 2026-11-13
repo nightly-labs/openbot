@@ -50,6 +50,51 @@ export function watchRemoteHostDirectory(options: {
   return () => clearInterval(timer);
 }
 
+/** How often a server list is read again while an install command can still be used. */
+const SERVER_CLAIM_REFRESH_INTERVAL_MS = 5_000;
+
+/**
+ * A server that signs in with an install command reaches this computer's list through Signal only
+ * when this computer holds a Signal socket. Otherwise it waits for the next account check, and the
+ * install card and dialog stay at waiting (#8545). While a command can still be used, this reads
+ * the list again at short intervals, until a new server for each command shows or the last command
+ * expires.
+ */
+export function watchServerClaims(options: {
+  /** The ids of the remote servers in the list now. */
+  serverIds(): readonly string[];
+  refresh(): void;
+  now?: () => number;
+}): { add(expiresAt: number): void; stop(): void } {
+  const now = options.now ?? Date.now;
+  let timer: ReturnType<typeof setInterval> | undefined;
+  let known = new Set<string>();
+  let claims = 0;
+  let deadline = 0;
+  const stop = () => {
+    clearInterval(timer);
+    timer = undefined;
+    claims = 0;
+  };
+  const tick = () => {
+    const fresh = options.serverIds().filter((id) => !known.has(id)).length;
+    if (fresh >= claims || now() >= deadline) stop();
+    else options.refresh();
+  };
+  return {
+    add(expiresAt) {
+      if (!timer) {
+        known = new Set(options.serverIds());
+        timer = setInterval(tick, SERVER_CLAIM_REFRESH_INTERVAL_MS);
+        timer.unref();
+      }
+      claims += 1;
+      deadline = Math.max(deadline, expiresAt);
+    },
+    stop,
+  };
+}
+
 interface HostKeyPin {
   readonly hostId: string;
   readonly publicKey: string;
