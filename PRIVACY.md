@@ -987,6 +987,12 @@ no review reads are deleted after 30 days. Turning the setting off deletes all r
   command lines or paths. It is kept to two files of 1 MB each and is never sent.
   `~/Library/Application Support/OpenBot/openbot-resource-summary-v1.json` holds the totals of
   today and of the previous day for the daily analytics summary and the diagnostics export.
+- `~/Library/Application Support/OpenBot/logs/stall-profiles.ndjson` holds one line for a minute in
+  which the main process froze for 2 seconds or more, twice in a row: the functions of OpenBot's code
+  that used the time, and their callers. A line holds function names, the file name of an OpenBot
+  file, package names and Node module names. It holds no directories, arguments, values, queries or
+  text of the user. It is kept to two files of 256 KB each. The five heaviest functions of a line
+  also go out as one product analytics event, at most once in 6 hours.
 - `~/Library/Application Support/OpenBot/openbot-push-notifications-v1.json` holds, for each member
   phone that gets notifications from this host, the session ID, the member ID, the Apple or Firebase
   push token, the secret that seals the notifications, the interface language, and the notification

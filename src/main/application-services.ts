@@ -3707,6 +3707,7 @@ export async function createApplicationServices({
     tabProcessIds: () => browser.tabProcessIds(),
     appWindowContents: () => BrowserWindow.getAllWindows().map((window) => window.webContents),
     turnRunning: () => service.earliestRunningTurnStartedAt() !== null,
+    appPath: app.getAppPath(),
   });
   teardown.push(TEARDOWN_ORDER.resourceMonitor, "the resource monitor", () =>
     Effect.runPromise(resourceMonitor.close()),
@@ -3795,7 +3796,10 @@ export async function createApplicationServices({
   analytics.flushPending();
   service.on("failure", (failure) => analytics.handleFailure(failure));
   reportWebhookDelivery = (report) => analytics.handleWebhookDelivery(report);
-  resourceMonitor.start(() => analytics.checkResources());
+  resourceMonitor.start(
+    () => analytics.checkResources(),
+    (profile) => analytics.handleMainLoopProfile(profile),
+  );
   const startup = localServerChild
     ? null
     : new StartupTiming({
