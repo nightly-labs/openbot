@@ -8,7 +8,7 @@ import { PinnedMessages, type PinnedMessagesProps } from "@openbot/ui/features/c
 import { SidePanelToggle, type SidePanelToggleProps } from "@openbot/ui/features/conversation/SidePanel";
 import { useText } from "@openbot/ui/text";
 import type { ComponentProps, JSX } from "@solidjs/web";
-import { Show } from "solid-js";
+import { onSettled, Show } from "solid-js";
 
 export interface ConversationHeaderProps {
   agent: AgentProfile | null | undefined;
@@ -49,6 +49,56 @@ export interface ConversationHeaderRemoteControl {
   onOpen: (trigger: HTMLButtonElement) => void;
 }
 
+/** The narrowest title, in em: less than this would show little more than the ellipsis. */
+const AGENT_TITLE_MIN_EM = 4;
+
+/**
+ * The agent's title after its name. It gives way before every other part of the header: it gets
+ * shorter, and with less room than its minimum it hides, so no empty space stays after the name.
+ * The room is always measured with the title shown, so hiding it cannot change the measurement.
+ */
+function AgentTitle(props: { title: string }) {
+  let room: HTMLSpanElement | undefined;
+  onSettled(() => {
+    const header = room?.closest(".conversation-header");
+    if (!room || !header) return;
+    const measure = () => {
+      if (!room) return;
+      room.removeAttribute("data-hidden");
+      const minimum = AGENT_TITLE_MIN_EM * (Number.parseFloat(getComputedStyle(room).fontSize) || 12);
+      room.toggleAttribute("data-hidden", room.getBoundingClientRect().width < minimum);
+    };
+    // The next frame measures, not the observer, because hiding the title resizes observed parts.
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      if (frame === 0)
+        frame = requestAnimationFrame(() => {
+          frame = 0;
+          measure();
+        });
+    });
+    observer.observe(room);
+    observer.observe(header);
+    for (const part of header.querySelectorAll(
+      ".conversation-title, .conversation-heading-group, .conversation-header-actions, .agent-threads-header",
+    )) {
+      observer.observe(part);
+    }
+    measure();
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+    };
+  });
+  return (
+    <span ref={room} class="conversation-agent-title-room">
+      <span class="conversation-agent-title" dir="auto">
+        {props.title}
+      </span>
+    </span>
+  );
+}
+
 export function ConversationHeader(props: ConversationHeaderProps) {
   const { t } = useText();
   const titleTab = () => (props.titleSelected === undefined ? undefined : "");
@@ -71,7 +121,10 @@ export function ConversationHeader(props: ConversationHeaderProps) {
               onClick={() => (props.onOpenChat ?? props.onOpenSettings)()}
             >
               <AgentAvatar agent={agent()} />
-              <h1 dir="auto">{agent().name}</h1>
+              <h1 dir="auto">
+                <span class="conversation-agent-name">{agent().name}</span>
+                <Show when={agent().title.trim()}>{(title) => <AgentTitle title={title()} />}</Show>
+              </h1>
             </Button>
           )}
         </Show>
