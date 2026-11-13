@@ -1708,10 +1708,11 @@ export class ChannelService {
             this.#wakeAgain.add(channelId);
             continue;
           }
-          // Idle stays silent: the lead judged that nothing needs doing, so there is no dispatch. A
-          // message that names a member is never idle: "Thanks @Ana" or "hi @Ana" gets Ana's answer, as
-          // a person who is named in a group chat answers. An agent writes a name as text, not as a tag,
-          // so a typed "@Name" anywhere counts too; idle completed such a request with no answer (#5964).
+          // Idle is silent for the request of a routine or an agent: the lead judged that nothing needs
+          // doing, so there is no dispatch. A message that names a member is never idle: "Thanks @Ana"
+          // or "hi @Ana" gets Ana's answer, as a person who is named in a group chat answers. An agent
+          // writes a name as text, not as a tag, so a typed "@Name" anywhere counts too; idle completed
+          // such a request with no answer (#5964).
           // An "@" in a link or in a tag, such as a quote, names no one.
           const eligible = this.eligibleMembers(channel);
           const tags = chatTagReferences(task.instruction);
@@ -1726,7 +1727,14 @@ export class ChannelService {
                 .flatMap((match) => this.#typedAddress(eligible, task.instruction.slice(match.index))),
             ]),
           ];
-          if ("idle" in decision && !named.length) {
+          // A person's request is never idle: the lead takes it, as an unclear request, and can ask
+          // what they mean. Idle completed it with no owner and no reply, so the person saw only
+          // silence (#7908).
+          const unnamedIdle = "idle" in decision && !named.length;
+          if (
+            unnamedIdle &&
+            channelResult(yield* Effect.result(channelSync(() => this.#requester(channelId, task, [task])))) === null
+          ) {
             channelResult(
               yield* Effect.result(
                 channelSync(() => this.store.update(channel, { tasks: [{ ...task, state: "completed" }] })),
@@ -1737,13 +1745,15 @@ export class ChannelService {
           }
           const picked = [
             ...new Set(
-              "idle" in decision
-                ? named
-                : "question" in decision
-                  ? [lead.id]
-                  : "agentId" in decision
-                    ? [decision.agentId]
-                    : decision.agentIds,
+              unnamedIdle
+                ? [lead.id]
+                : "idle" in decision
+                  ? named
+                  : "question" in decision
+                    ? [lead.id]
+                    : "agentId" in decision
+                      ? [decision.agentId]
+                      : decision.agentIds,
             ),
           ];
           // A member the model named that cannot take work is left out; with none left, the first
