@@ -1285,6 +1285,18 @@ still uses the sandbox. The downtime is the export, the copy, the import and the
    With `--docker`, an operator moves them by hand and the move continues. Stop each container first
    and set its restart policy to `no`, or boat cannot pause a container that restarts and the stop
    fails. Save the volumes in the home, so that the archive has them.
+
+   After the move, give the VPS rootless Docker for `user` (done on 2026-11-13 for one server, Ubuntu
+   26.04). As root: install `docker-ce`, `docker-ce-cli`, `containerd.io`, `docker-compose-plugin`,
+   `docker-ce-rootless-extras`, `uidmap`, `dbus-user-session` and `slirp4netns` from the Docker
+   repository, then `systemctl disable --now docker.service docker.socket containerd.service`. Do not
+   add `user` to the `docker` group: the rootful daemon gives root. Run `loginctl enable-linger user`.
+   As `user`, run `dockerd-rootless-setuptool.sh install` and `docker context use rootless`. Ubuntu
+   has an AppArmor profile for `/usr/bin/rootlesskit`, and `user` has a `/etc/subuid` range. Pull each
+   image by the digest of the sandbox and tag it again. Make each volume and extract its archive with
+   `tar --numeric-owner -xpf` in a container. Then start the projects of the customer, for example
+   with `docker compose up -d`. The containers connect through a process of `user`, so the egress rules
+   also apply to them: they cannot connect to the router or to the metadata address.
    It refuses, before it changes anything, a sandbox whose stop at boat is failing
    (`stop.status: "failing"`): each new try of boat stops OpenBot, and a try during the downtime looks
    like a stop that ended. On 2026-11-13 a move of a sandbox with a Docker container that restarted
