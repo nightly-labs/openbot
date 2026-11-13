@@ -146,6 +146,9 @@ export const messages = {
     "Os resultados e as mensagens da busca aparecem e somem com um breve desfoque quando mudam. Com o movimento reduzido, eles só esmaecem. Quando isto está desativado, eles mudam na hora.",
   "mobile.settings.feedback.footer": "Resposta ao toque nas ações do app neste dispositivo.",
   "mobile.settings.feedback.haptics": "Resposta tátil",
+  "mobile.settings.feedback.replies": "Resposta tátil nas respostas",
+  "mobile.settings.feedback.repliesFooter":
+    "Toques enquanto a resposta de um agente aparece no chat. A outra resposta tátil continua ativa.",
   "mobile.settings.feedback.retry": "Tentar salvar a resposta tátil de novo",
   "mobile.settings.liveActivities.title": "Atividades ao Vivo",
   "mobile.settings.liveActivities.footer":
@@ -229,6 +232,9 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Baixar arquivos grandes automaticamente",
   "mobile.settings.conversations.largeFilesFooter":
     "Imagens, vídeos e áudios com mais de {small} só são baixados quando você toca neles. Ative para baixá-los na hora, até {large}. Isso pode usar muitos dados móveis.",
+  "mobile.settings.conversations.fullQualityPhotos": "Enviar fotos em qualidade máxima",
+  "mobile.settings.conversations.fullQualityPhotosFooter":
+    "Quando desativado, o app envia uma cópia menor de cada foto, com até 2048 pixels no lado maior. Ela chega mais rápido em uma conexão lenta. Ative para enviar a foto original.",
   "mobile.settings.profile.nameUnsafe": "Remova quebras de linha e caracteres de controle do seu nome.",
   "mobile.settings.profile.nameLength": "Use de 3 a 20 caracteres no nome de exibição.",
   "mobile.settings.profile.saveFailed": "Não foi possível salvar as alterações. Tente novamente.",
@@ -490,4 +496,23 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "Não foi possível parar o processo.",
   "mobile.settings.agents.processes.stopTitle": "Parar este programa?",
   "mobile.settings.agents.processes.stopLabel": "Parar o processo {pid}",
+  "mobile.settings.shortcuts.title": "Atalhos",
+  "mobile.settings.shortcuts.agent": "Agente",
+  "mobile.settings.shortcuts.none": "Nenhum",
+  "mobile.settings.shortcuts.unsupported": "Os atalhos precisam do iOS 26 ou posterior.",
+  "mobile.settings.shortcuts.card.agents": "Agentes",
+  "mobile.settings.shortcuts.card.noAgents": "Ainda não há agentes",
+  "mobile.settings.shortcuts.card.setUp.title": "Abra o OpenBot para configurar os atalhos",
+  "mobile.settings.shortcuts.card.setUp.action": "Abrir OpenBot",
+  "mobile.settings.shortcuts.card.noAgent.title": "Escolha um agente para os atalhos",
+  "mobile.settings.shortcuts.card.noAgent.detail": "Os atalhos enviam para um agente.",
+  "mobile.settings.shortcuts.card.noAgent.action": "Escolher agente",
+  "mobile.settings.shortcuts.card.locked.title": "O OpenBot está bloqueado",
+  "mobile.settings.shortcuts.card.locked.action": "Abrir OpenBot",
+  "mobile.settings.shortcuts.footer": "Send Message no app Atalhos envia para este agente. O app não abre.",
+  "mobile.settings.shortcuts.send.sent": "Enviado",
+  "mobile.settings.shortcuts.send.failed": "O OpenBot não conseguiu enviar isto.",
+  "mobile.settings.shortcuts.send.unconfirmed": "Sem resposta do servidor. A mensagem pode estar no chat.",
+  "mobile.settings.shortcuts.send.inApp": "Enviar no OpenBot",
+  "mobile.settings.shortcuts.send.openChat": "Abrir chat",
 } as const satisfies PartialTranslation<typeof source>;

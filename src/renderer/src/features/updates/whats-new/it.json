@@ -1,5 +1,45 @@
 [
   {
+    "version": "0.70.0",
+    "date": "2026-11-13",
+    "notices": [
+      "Aggiorna a questa versione anche ogni server a cui sei unito. Riavvia il server, i valori predefiniti degli agenti, i limiti dei thread e i nuovi passaggi dei Flussi di lavoro funzionano su un server solo se ha questa versione."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Riavvia dall’app un server che ospiti tu: come proprietario o amministratore, seleziona Riavvia il server nel menu del server.",
+          "Scegli quali agenti possono usare ogni accesso, carta, contatto e chiave API in Impostazioni server > Vault. Un agente vede e compila solo gli elementi che può usare.",
+          "I Flussi di lavoro hanno passaggi Immagine e Video. Crea immagini e brevi video con i modelli GPT Image, Grok Imagine o Sunra, e collega le immagini come riferimenti.",
+          "Collega Sunra e TryPost dal Marketplace, in App. Gli agenti possono quindi creare contenuti multimediali con i tuoi crediti Sunra, e redigere e pubblicare post sui social.",
+          "Proprietari e amministratori possono impostare quanti thread girano contemporaneamente, sul server e per ogni agente, in Impostazioni server > Generali.",
+          "Mostra gli agenti con nuovi messaggi nel dock: attivalo in Impostazioni > Dock degli agenti. Fai clic destro su un agente del genere e seleziona Aggiungi al dock per tenerlo lì.",
+          "Aggiungi più di un account Cursor. Ogni agente può usare un account diverso."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Una chiave API che salvi per un solo agente ora viene conservata nel Vault cifrato. Le chiavi che gli agenti leggono hanno un nuovo percorso, quindi uno script con il vecchio percorso deve usare quello nuovo.",
+          "Le impostazioni degli agenti, come Indirizza gli agenti mentre lavorano, si trovano ora in Impostazioni server > Agenti, per ogni server, anche per questo computer.",
+          "Nella vista completa del browser, la casella del messaggio è di nuovo al centro in basso della pagina.",
+          "L’intestazione della chat mostra il titolo dell’agente dopo il suo nome, per esempio «Brock · Responsabile del negozio»."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot si apre più in fretta quando le tue chat sono lunghe.",
+          "Su Windows e Linux, OpenBot chiede conferma prima di chiudersi mentre gli agenti lavorano. Seleziona Continua per nascondere la finestra e lasciare che gli agenti finiscano.",
+          "I dispositivi si ricollegano a un server quando la connessione di un dispositivo si interrompe durante la configurazione. Anche la vista in diretta del browser di un agente su un server unito resta aperta con una connessione lenta.",
+          "Quando chiedi a un agente uno screenshot di una pagina web, ora allega l’immagine alla sua risposta.",
+          "I modelli gratuiti di OpenCode tornano a rispondere quando viene salvata una chiave OpenCode Go."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.69.0",
     "date": "2026-11-12",
     "notices": [

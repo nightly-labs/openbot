@@ -269,6 +269,9 @@ export const messages = {
     "Yuvanın gizlendiği yerde ince bir şerit kalır. Yuvayı göstermek için işaretçiyi yaklaştırın. Bir ajan size bir şey sorduğunda şeritten bir renk dalgası geçer.",
   "settings.agentDock.results.title": "Biten işleri göster",
   "settings.agentDock.results.description": "Ajanların bitirdiği sonuçlar kısa bir süre yuvanın yanında görünür.",
+  "settings.agentDock.activeSeats.title": "Yenilikleri olan ajanları göster",
+  "settings.agentDock.activeSeats.description":
+    "Yuvada olmayan bir ajan veya kanal, yeni bir mesajı olduğu ya da seni beklediği sürece yuvada görünür.",
   "settings.agentDock.agents.title": "Yuvadaki ajanlar",
   "settings.agentDock.agents.description": "{server} sunucusunun ajanları. Her sunucunun kendi yuvası vardır.",
   "settings.agentDock.agents.empty": "Bu sunucuda henüz ajan yok.",

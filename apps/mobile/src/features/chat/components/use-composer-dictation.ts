@@ -1,5 +1,5 @@
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { BackHandler } from "react-native";
 import { Easing, ReduceMotion, type SharedValue, useSharedValue, withTiming } from "react-native-reanimated";
 import type { DictationPhase } from "../model/voice-dictation";
@@ -105,14 +105,10 @@ export function useComposerDictation({
     return () => subscription.remove();
   }, [active, focused, finish]);
 
-  return {
-    available: dictation.available,
-    active,
-    busy: active || phase === "stopping",
-    phase,
-    level: dictation.level,
-    presence,
-    start,
-    finish,
-  };
+  const { available, level } = dictation;
+  // One object while its values stay, so the composer does not render again with each render of the chat.
+  return useMemo(
+    () => ({ available, active, busy: active || phase === "stopping", phase, level, presence, start, finish }),
+    [available, active, phase, level, presence, start, finish],
+  );
 }

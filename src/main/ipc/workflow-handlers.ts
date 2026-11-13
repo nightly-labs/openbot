@@ -1,7 +1,8 @@
 // Workflows: graphs of steps drawn on a canvas. This computer's host answers from its own runtime,
 // and its events service owns webhook secrets. A joined server answers through `workflows-v1`, and
 // its GitHub catalog, options, event history and last-event runs through `workflows-github-v1`, and
-// keeps an uploaded picture through `workflows-media-v1`.
+// keeps an uploaded picture through `workflows-media-v1`. It says whether it can use Sunra through
+// `workflows-sunra-v1`.
 
 import {
   WORKFLOWS_GITHUB_CAPABILITY,
@@ -11,6 +12,10 @@ import {
   WORKFLOWS_MEDIA_CAPABILITY,
   WORKFLOWS_MEDIA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-v1";
+import {
+  WORKFLOWS_SUNRA_CAPABILITY,
+  WORKFLOWS_SUNRA_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-sunra-v1";
 import { WORKFLOWS_CAPABILITY, WORKFLOWS_ROUTES } from "@openbot/contracts/team-protocol/workflows-v1";
 import { sourceText } from "@openbot/i18n/source";
 import {
@@ -19,6 +24,8 @@ import {
   decodeRemoteWorkflowGitHubHistory,
   decodeRemoteWorkflowGitHubOptions,
   decodeRemoteWorkflowList,
+  decodeRemoteWorkflowMediaCredits,
+  decodeRemoteWorkflowMediaProviders,
   decodeRemoteWorkflowPicture,
   decodeRemoteWorkflowRunDetail,
   decodeRemoteWorkflowRunPage,
@@ -61,7 +68,11 @@ import {
 interface WorkflowRemoteServers {
   supportsCapability(
     serverId: string,
-    capability: typeof WORKFLOWS_CAPABILITY | typeof WORKFLOWS_GITHUB_CAPABILITY | typeof WORKFLOWS_MEDIA_CAPABILITY,
+    capability:
+      | typeof WORKFLOWS_CAPABILITY
+      | typeof WORKFLOWS_GITHUB_CAPABILITY
+      | typeof WORKFLOWS_MEDIA_CAPABILITY
+      | typeof WORKFLOWS_SUNRA_CAPABILITY,
   ): boolean;
   request<T>(
     serverId: string,
@@ -203,6 +214,22 @@ export function workflowIpcHandlers({
             throw new Error(sourceText("error.workflow.serverTooOld"));
           return remote(serverId, WORKFLOWS_MEDIA_ROUTES.keepPicture, decodeRemoteWorkflowPicture, { draftId });
         },
+      }),
+      mediaProviders: scopedQueryHandler({
+        local: () => workflows.mediaProviders(),
+        // A host without `workflows-sunra-v1` does not run the Sunra models, so it has no Sunra.
+        remote: async (serverId) =>
+          remoteServers.supportsCapability(serverId, WORKFLOWS_SUNRA_CAPABILITY)
+            ? remote(serverId, WORKFLOWS_SUNRA_ROUTES.providers, decodeRemoteWorkflowMediaProviders, {})
+            : { sunra: false },
+      }),
+      mediaCredits: scopedQueryHandler({
+        local: () => runCauseEffect(workflows.mediaCredits()),
+        // A host without `workflows-sunra-v1` has no Sunra, so it has no credits to show.
+        remote: async (serverId) =>
+          remoteServers.supportsCapability(serverId, WORKFLOWS_SUNRA_CAPABILITY)
+            ? remote(serverId, WORKFLOWS_SUNRA_ROUTES.credits, decodeRemoteWorkflowMediaCredits, {})
+            : { sunra: null },
       }),
     },
   };

@@ -275,6 +275,9 @@ export const messages = {
     "Там, где прячется док, остаётся тонкая полоска. Подведите к ней указатель, чтобы показать док. Когда агент о чём-то спрашивает, по полоске проходит цветная волна.",
   "settings.agentDock.results.title": "Показывать готовую работу",
   "settings.agentDock.results.description": "Результаты агентов ненадолго появляются рядом с доком.",
+  "settings.agentDock.activeSeats.title": "Показывать агентов с новостями",
+  "settings.agentDock.activeSeats.description":
+    "Агент или канал, которого нет в доке, появляется в нём, пока у него есть новое сообщение или он ждёт вас.",
   "settings.agentDock.agents.title": "Агенты в доке",
   "settings.agentDock.agents.description": "Агенты сервера {server}. У каждого сервера свой док.",
   "settings.agentDock.agents.empty": "На этом сервере пока нет агентов.",

@@ -17,6 +17,7 @@
   --wfn-glass-blur: blur(40px) saturate(1.4);
   --wfn-radius-card: calc(var(--openbot-radius-lg) + var(--openbot-space-1));
   --wfn-small: calc(var(--openbot-text-sm) - 1px);
+  --wfn-tiny: calc(var(--openbot-text-sm) - 2px);
   /* Ten pixels: one step over the control radius, so a row sits concentric in its menu. */
   --wfn-radius-row: calc(var(--openbot-radius-sm) + var(--openbot-space-1));
   --wfn-radius-run: calc(var(--openbot-radius-md) + 2px);
@@ -732,6 +733,11 @@
   height: var(--wfn-height);
 }
 
+/* A picture with clear pixels shows whole, never cropped. */
+.wfn-node .wfn-card[data-media][data-clear] .wfn-media {
+  object-fit: contain;
+}
+
 .wfn-node[data-height] .wfn-card[data-media] .wfn-asset-trigger > .wfn-media {
   position: absolute;
   inset: 0;
@@ -746,6 +752,19 @@
 .wfn-asset-trigger:focus-visible {
   outline: 0;
   box-shadow: 0 0 0 1px var(--openbot-text-muted);
+}
+
+/*
+ * A picture with clear pixels: no fill and no ring, so the canvas and its lines show through it.
+ * The ring comes back on hover, so the edge of the node shows.
+ */
+.wfn-stage .wfn-card[data-clear],
+.wfn-stage .wfn-card[data-clear] .wfn-asset-trigger:not([data-dropping]) {
+  background: transparent;
+}
+
+.wfn-stage .wfn-card[data-clear] {
+  box-shadow: none;
 }
 
 /* A file from the computer over the card: the card takes the hover fill. */
@@ -1276,6 +1295,79 @@ fieldset.wfn-picker-group {
 .wfn-model-list {
   margin: 0;
   list-style: none;
+}
+
+/*
+ * The model picker of an image or video step. It keeps one size for every tab and every search, so
+ * the panel does not move. The rail scrolls when the host has many accounts.
+ */
+.wfn-media-picker.wfn-picker.ui-action-menu {
+  height: min(400px, var(--kb-popper-content-available-height, 400px));
+}
+
+.wfn-media-picker .wfn-model-layout {
+  height: 100%;
+}
+
+.wfn-media-rail {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.wfn-media-list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* The tab of all models has a line icon, not a filled logo. */
+.wfn-model-tab > svg.wfn-media-all-mark {
+  fill: none;
+}
+
+/* The number of an account, at the corner of its logo, as on the rail of the agent model picker. */
+.wfn-media-rail .wfn-model-tab {
+  position: relative;
+  flex: none;
+}
+
+.wfn-media-account-badge {
+  position: absolute;
+  inset-inline-end: 2px;
+  bottom: 2px;
+  display: grid;
+  place-items: center;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  box-sizing: border-box;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-control);
+  box-shadow: 0 0 0 1px var(--wfn-ring-strong);
+  color: var(--openbot-text-primary);
+  font-size: var(--wfn-tiny);
+  font-weight: var(--openbot-weight-medium);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* The pill of a media step names the account that pays, muted, as the first text to shorten. */
+.wfn-field-foot > .wfn-media-pill {
+  min-width: 0;
+}
+
+.wfn-media-pill-name {
+  flex: none;
+}
+
+.wfn-media-pill-account {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--openbot-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .wfn-model-list .wfn-picker-row[role="option"] {

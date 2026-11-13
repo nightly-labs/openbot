@@ -340,6 +340,17 @@ export const messages = {
     "Les nouvelles routines utilisent ce fuseau horaire quand le message n’indique pas celui de l’expéditeur.",
   "server.settings.timezoneAutomatic": "Automatique ({zone})",
   "server.settings.timezoneLoadFailed": "Impossible de charger le fuseau horaire du serveur.",
+  "server.settings.turnLimit": "Fils en même temps",
+  "server.settings.turnLimitDescription":
+    "Le nombre de fils d’agents qui peuvent s’exécuter en même temps sur ce serveur. Plus de fils utilisent plus de mémoire.",
+  "server.settings.turnLimitAutomatic": "Automatique ({count})",
+  "server.settings.turnLimitAutomaticUnlimited": "Automatique (sans limite)",
+  "server.settings.turnLimitUnlimited": "Sans limite",
+  "server.settings.turnLimitsLoadFailed": "Impossible de charger les limites de fils de ce serveur.",
+  "server.settings.agentTaskLimit": "Fils en parallèle par agent",
+  "server.settings.agentTaskLimitDescription":
+    "Le nombre de fils que chaque agent sans limite propre peut exécuter en même temps.",
+  "server.settings.agentTaskLimitDefault": "Par défaut ({count})",
   "server.settings.memoryLimit": "Souvenirs par agent",
   "server.settings.memoryLimitDescription": "Nombre de souvenirs que chaque agent de ce serveur peut conserver.",
   "server.settings.memoryLimitLoadFailed": "Impossible de charger la limite de souvenirs de ce serveur.",

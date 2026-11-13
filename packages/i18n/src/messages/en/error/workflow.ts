@@ -69,4 +69,14 @@ export const messages = defineMessages("error.workflow", {
   "error.workflow.githubUncertain":
     "The change stopped on its way. It can be on GitHub. Look there before you run the step again.",
   "error.workflow.githubNoEvent": "GitHub has no issue or pull request that this trigger starts on.",
+  "error.workflow.sunraSignIn": "Sign in to Sunra in Apps to use Sunra models.",
+  "error.workflow.sunraNoCredits":
+    "Your Sunra account does not have sufficient credits. Add credits at sunra.ai/pricing, then run the step again.",
+  "error.workflow.sunraNeedsPlan":
+    "This Sunra model needs a Sunra plan. Get a plan at sunra.ai/pricing, or select a different model.",
+  "error.workflow.sunraTeamInputs":
+    "Sunra uses input pictures only with a Personal account. Select your Personal account in Sunra, or remove the picture connections.",
+  "error.workflow.sunraFailed": "Sunra could not make the file: {reason}",
+  "error.workflow.sunraTimeout":
+    "Sunra did not finish the file in time. Look in the OpenBot project on sunra.ai before you run the step again.",
 });

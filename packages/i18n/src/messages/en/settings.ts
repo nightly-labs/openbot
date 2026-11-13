@@ -274,6 +274,9 @@ export const messages = defineMessages("settings", {
     "A thin strip stays where the dock hides. Move the pointer near it to show the dock. A color wash goes up the strip when an agent asks you something.",
   "settings.agentDock.results.title": "Show finished work",
   "settings.agentDock.results.description": "Results that agents finish show beside the dock for a short time.",
+  "settings.agentDock.activeSeats.title": "Show agents with new messages",
+  "settings.agentDock.activeSeats.description":
+    "An agent or channel that is not on the dock shows on it while it has a new message or waits for you.",
   "settings.agentDock.agents.title": "Agents on the dock",
   "settings.agentDock.agents.description": "The agents of {server}. Each server has its own dock.",
   "settings.agentDock.agents.empty": "This server has no agents yet.",

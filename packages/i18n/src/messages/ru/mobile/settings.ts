@@ -154,6 +154,9 @@ export const messages = {
     "Результаты и сообщения поиска плавно появляются и исчезают с лёгким размытием, когда меняются. Когда движение уменьшено, они только плавно появляются и исчезают. Если выключено, они меняются сразу.",
   "mobile.settings.feedback.footer": "Тактильный отклик на действия в приложении на этом устройстве.",
   "mobile.settings.feedback.haptics": "Вибрация",
+  "mobile.settings.feedback.replies": "Вибрация ответов",
+  "mobile.settings.feedback.repliesFooter":
+    "Вибрация, пока в чате появляется ответ агента. Остальная вибрация остаётся включённой.",
   "mobile.settings.feedback.retry": "Повторить сохранение настройки вибрации",
   "mobile.settings.liveActivities.title": "Live Activities",
   "mobile.settings.liveActivities.footer":
@@ -236,6 +239,9 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Скачивать большие файлы автоматически",
   "mobile.settings.conversations.largeFilesFooter":
     "Изображения, видео и аудио больше {small} скачиваются только по нажатию. Включите, чтобы скачивать их сразу, до {large}. Это может расходовать много мобильного трафика.",
+  "mobile.settings.conversations.fullQualityPhotos": "Отправлять фото в полном качестве",
+  "mobile.settings.conversations.fullQualityPhotosFooter":
+    "Когда это выключено, приложение отправляет уменьшенную копию каждого фото, до 2048 пикселей по длинной стороне. Она быстрее доходит при медленном соединении. Включите, чтобы отправлять исходное фото.",
   "mobile.settings.profile.nameUnsafe": "Уберите из имени переносы строк и управляющие символы.",
   "mobile.settings.profile.nameLength": "Имя должно содержать от 3 до 20 символов.",
   "mobile.settings.profile.saveFailed": "Не удалось сохранить изменения. Повторите попытку.",
@@ -511,4 +517,24 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "Не удалось остановить процесс.",
   "mobile.settings.agents.processes.stopTitle": "Остановить эту программу?",
   "mobile.settings.agents.processes.stopLabel": "Остановить процесс {pid}",
+  "mobile.settings.shortcuts.title": "Быстрые команды",
+  "mobile.settings.shortcuts.agent": "Агент",
+  "mobile.settings.shortcuts.none": "Нет",
+  "mobile.settings.shortcuts.unsupported": "Для быстрых команд нужна iOS 26 или новее.",
+  "mobile.settings.shortcuts.card.agents": "Агенты",
+  "mobile.settings.shortcuts.card.noAgents": "Агентов пока нет",
+  "mobile.settings.shortcuts.card.setUp.title": "Откройте OpenBot, чтобы настроить команды",
+  "mobile.settings.shortcuts.card.setUp.action": "Открыть OpenBot",
+  "mobile.settings.shortcuts.card.noAgent.title": "Выберите агента для команд",
+  "mobile.settings.shortcuts.card.noAgent.detail": "Команды отправляют одному агенту.",
+  "mobile.settings.shortcuts.card.noAgent.action": "Выбрать агента",
+  "mobile.settings.shortcuts.card.locked.title": "OpenBot заблокирован",
+  "mobile.settings.shortcuts.card.locked.action": "Открыть OpenBot",
+  "mobile.settings.shortcuts.footer":
+    "Send Message в приложении «Команды» отправляет этому агенту. Приложение не открывается.",
+  "mobile.settings.shortcuts.send.sent": "Отправлено",
+  "mobile.settings.shortcuts.send.failed": "OpenBot не смог это отправить.",
+  "mobile.settings.shortcuts.send.unconfirmed": "Сервер не ответил. Сообщение может быть в чате.",
+  "mobile.settings.shortcuts.send.inApp": "Отправить в OpenBot",
+  "mobile.settings.shortcuts.send.openChat": "Открыть чат",
 } as const satisfies PartialTranslation<typeof source>;

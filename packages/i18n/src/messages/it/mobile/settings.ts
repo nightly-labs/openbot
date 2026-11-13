@@ -145,6 +145,9 @@ export const messages = {
     "Quando cambiano, i risultati e i messaggi di ricerca compaiono e scompaiono con una breve sfocatura. Con il movimento ridotto, si dissolvono soltanto. Quando l'opzione è disattivata, cambiano subito.",
   "mobile.settings.feedback.footer": "Feedback al tocco per le azioni nell'app su questo dispositivo.",
   "mobile.settings.feedback.haptics": "Feedback aptico",
+  "mobile.settings.feedback.replies": "Feedback aptico risposte",
+  "mobile.settings.feedback.repliesFooter":
+    "Vibrazioni mentre la risposta di un agente appare in chat. L'altro feedback aptico resta attivo.",
   "mobile.settings.feedback.retry": "Riprova a salvare l'impostazione del feedback aptico",
   "mobile.settings.liveActivities.title": "Live Activity",
   "mobile.settings.liveActivities.footer":
@@ -228,6 +231,9 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Scarica automaticamente i file grandi",
   "mobile.settings.conversations.largeFilesFooter":
     "Immagini, video e audio oltre {small} si scaricano solo quando li tocchi. Attiva questa opzione per scaricarli subito, fino a {large}. Può usare molti dati mobili.",
+  "mobile.settings.conversations.fullQualityPhotos": "Invia le foto alla massima qualità",
+  "mobile.settings.conversations.fullQualityPhotosFooter":
+    "Se è disattivato, l’app invia una copia più piccola di ogni foto, fino a 2048 pixel sul lato lungo. Arriva prima con una connessione lenta. Attivalo per inviare la foto originale.",
   "mobile.settings.profile.nameUnsafe": "Rimuovi dal nome gli a capo e i caratteri di controllo.",
   "mobile.settings.profile.nameLength": "Usa da 3 a 20 caratteri per il nome visualizzato.",
   "mobile.settings.profile.saveFailed": "Impossibile salvare le modifiche. Riprova.",
@@ -493,4 +499,23 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "Impossibile arrestare il processo.",
   "mobile.settings.agents.processes.stopTitle": "Arrestare questo programma?",
   "mobile.settings.agents.processes.stopLabel": "Arresta il processo {pid}",
+  "mobile.settings.shortcuts.title": "Comandi rapidi",
+  "mobile.settings.shortcuts.agent": "Agente",
+  "mobile.settings.shortcuts.none": "Nessuno",
+  "mobile.settings.shortcuts.unsupported": "I comandi rapidi richiedono iOS 26 o successivo.",
+  "mobile.settings.shortcuts.card.agents": "Agenti",
+  "mobile.settings.shortcuts.card.noAgents": "Ancora nessun agente",
+  "mobile.settings.shortcuts.card.setUp.title": "Apri OpenBot per configurare i comandi rapidi",
+  "mobile.settings.shortcuts.card.setUp.action": "Apri OpenBot",
+  "mobile.settings.shortcuts.card.noAgent.title": "Scegli un agente per i comandi rapidi",
+  "mobile.settings.shortcuts.card.noAgent.detail": "I comandi rapidi inviano a un solo agente.",
+  "mobile.settings.shortcuts.card.noAgent.action": "Scegli agente",
+  "mobile.settings.shortcuts.card.locked.title": "OpenBot è bloccato",
+  "mobile.settings.shortcuts.card.locked.action": "Apri OpenBot",
+  "mobile.settings.shortcuts.footer": "Send Message nell’app Comandi rapidi invia a questo agente. L’app non si apre.",
+  "mobile.settings.shortcuts.send.sent": "Inviato",
+  "mobile.settings.shortcuts.send.failed": "OpenBot non è riuscito a inviarlo.",
+  "mobile.settings.shortcuts.send.unconfirmed": "Nessuna risposta dal server. Il messaggio potrebbe essere nella chat.",
+  "mobile.settings.shortcuts.send.inApp": "Invia in OpenBot",
+  "mobile.settings.shortcuts.send.openChat": "Apri chat",
 } as const satisfies PartialTranslation<typeof source>;

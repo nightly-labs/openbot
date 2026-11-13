@@ -14,6 +14,7 @@
 
 import {
   isWorkflowStepKind,
+  WORKFLOW_PICTURE_TYPES,
   type WorkflowDetail,
   type WorkflowGraph,
   type WorkflowNodeKind,
@@ -2602,11 +2603,43 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       pastedAt = undefined;
       if (event.type === "cut") canvas.deleteNodes(ids);
     };
+    /**
+     * Pictures on the clipboard, such as a screenshot or an image copied in a browser, go into the
+     * files of the board, and each becomes an asset node at the pointer. The canvas takes the paste
+     * when it has the focus, or when the pointer is on it and no field has the focus: a click on the
+     * empty canvas does not move the focus from the button that opened it. A field with focus keeps
+     * a paste that also has text.
+     */
+    const pastePictures = (event: ClipboardEvent) => {
+      const data = event.clipboardData;
+      const active = document.activeElement;
+      const pictures = [...(data?.files ?? [])].filter((file) => WORKFLOW_PICTURE_TYPES.has(file.type));
+      if (pictures.length === 0 || !allows("asset") || !props.features.uploads) return;
+      if (!inCanvas(root, active) && (!pointer || isEditable(active))) return;
+      if (isEditable(active) && data?.types.includes("text/plain")) return;
+      event.preventDefault();
+      const start = pointer ? toWorld(pointer) : undefined;
+      pictures.forEach((picture, index) => {
+        const point = start && { x: start.x + index * (NEW_NODE.width + GRID * 2), y: start.y };
+        // The host shows a failed upload, so the canvas adds no node for it.
+        board.upload(picture).then(
+          (file) => {
+            if (!deleted() && !frozen() && allows("asset"))
+              addNode("asset", point, { file: file.name, fileId: file.id });
+          },
+          () => undefined,
+        );
+      });
+    };
     /** ⌘V pastes copied nodes at the pointer, also into a field, because the clipboard has no text then. */
     const onPaste = (event: ClipboardEvent) => {
       const key = event.clipboardData?.getData(CLIP_TYPE);
-      if (deleted() || frozen() || !inCanvas(root, document.activeElement)) return;
-      if (!key || copied()?.key !== key) return;
+      if (deleted() || frozen()) return;
+      if (!key || copied()?.key !== key) {
+        pastePictures(event);
+        return;
+      }
+      if (!inCanvas(root, document.activeElement)) return;
       event.preventDefault();
       pasteNodes(pointer && toWorld(pointer));
     };

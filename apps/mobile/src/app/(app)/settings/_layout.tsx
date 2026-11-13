@@ -39,6 +39,7 @@ export default function SettingsLayout() {
       <Stack.Screen name="voice-choice" options={{ title: t("mobile.settings.voice.voice") }} />
       <Stack.Screen name="elevenlabs-key" options={{ title: t("mobile.settings.voice.elevenLabs.key") }} />
       <Stack.Screen name="voice-server" options={{ title: t("mobile.settings.voice.server.title") }} />
+      <Stack.Screen name="shortcuts" options={{ title: t("mobile.settings.shortcuts.title") }} />
       <Stack.Screen name="haptics" options={{ title: t("mobile.settings.feedback.haptics") }} />
       <Stack.Screen name="agents" options={{ title: t("mobile.settings.agents.title") }} />
       {/* The setting page sets its own title. */}

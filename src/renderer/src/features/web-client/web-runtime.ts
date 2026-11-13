@@ -6,6 +6,7 @@ import {
 import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import type {
   AccountUsage,
+  AgentApproval,
   AgentColors,
   AgentEvent,
   AgentNotificationLevelsSnapshot,
@@ -37,6 +38,7 @@ import type {
   LocalBrowserSecretResponse,
   PinnedMessagesSnapshot,
   QueueSnapshot,
+  ReadPendingApprovalInput,
   ReorderQueueInput,
   RespondToApprovalInput,
   RespondToBrowserTakeoverInput,
@@ -68,6 +70,7 @@ import {
   DEFAULT_PROVIDER_ACCOUNT_ID,
   decodeAgentFastModels,
   decodeAgentModelListings,
+  decodeUsageCredits,
   decodeWorkspaceDirectory,
   isAccountUsage,
   isAgentStatus,
@@ -83,6 +86,7 @@ import {
   isTeamPresenceSnapshot,
   withFastServiceTiers,
   withModelListings,
+  withUsageCredits,
 } from "@openbot/contracts/ipc";
 import { guardedListDecoder, optionalHistoryExtent, requiredString } from "@openbot/contracts/ipc-decoding";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
@@ -155,6 +159,11 @@ import {
   MODEL_VISIBILITY_CAPABILITY,
   MODEL_VISIBILITY_ROUTES,
 } from "@openbot/contracts/team-protocol/model-visibility-v1";
+import {
+  decodePendingApprovalResponse,
+  PENDING_APPROVAL_CAPABILITY,
+  PENDING_APPROVAL_ROUTES,
+} from "@openbot/contracts/team-protocol/pending-approval-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
@@ -168,6 +177,7 @@ import {
   THREAD_MESSAGE_SEARCH_PAGE_LIMIT,
   THREAD_MESSAGE_SEARCH_ROUTES,
 } from "@openbot/contracts/team-protocol/thread-message-search-v1";
+import { USAGE_CREDITS_CAPABILITY, USAGE_CREDITS_ROUTES } from "@openbot/contracts/team-protocol/usage-credits-v1";
 import { type TeamProtocolSupportV1, teamProtocolUpdateDirection } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V2_MAX_FILE_BYTES, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
@@ -374,6 +384,11 @@ export interface WebWorkspaceRuntime {
   setMessagePinned?: (input: SetMessagePinnedInput) => Promise<PinnedMessagesSnapshot>;
   /** Cancel on one open wait of an agent, with `agent-waits-v1`. */
   cancelWait?: (agentId: string, waitId: string) => Promise<void>;
+  /**
+   * The whole copy of an approval that a runtime snapshot cut, with `pending-approval-v1`. Null from a
+   * host without it: the card then keeps the cut copy and offers only Deny.
+   */
+  readPendingApproval?: (input: ReadPendingApprovalInput) => Promise<AgentApproval | null>;
   /** Tells a hosted server that this tab has focus. Send it only to a host with `focus-use-v1`. */
   focusUse(): Promise<void>;
   /** Resolves to the conversation message the host stored: the delivery id of the receipt. */
@@ -1465,6 +1480,10 @@ export function createWebWorkspaceRuntime(
         }),
       );
     },
+    async readPendingApproval(input) {
+      if (!capabilities.includes(PENDING_APPROVAL_CAPABILITY)) return null;
+      return decodePendingApprovalResponse(await request("POST", PENDING_APPROVAL_ROUTES.read, { ...input }));
+    },
     async cancelWait(agentId, waitId) {
       if (!capabilities.includes(AGENT_WAITS_CAPABILITY))
         throw new Error(currentText().t("error.team.agentWaitsUnsupported"));
@@ -1702,9 +1721,17 @@ export function createWebWorkspaceRuntime(
       return value;
     },
     async accountUsage() {
-      const value = await request("GET", TEAM_API_ROUTES.agents.usage);
+      // Whether an account works on credits is optional: when its read fails, the reading shows as before.
+      const [value, credits] = await Promise.all([
+        request("GET", TEAM_API_ROUTES.agents.usage),
+        capabilities.includes(USAGE_CREDITS_CAPABILITY)
+          ? request("POST", USAGE_CREDITS_ROUTES.list, {})
+              .then((rows) => decodeUsageCredits(isDynamicRecord(rows) ? rows.accounts : null))
+              .catch(() => [])
+          : [],
+      ]);
       if (!isAccountUsage(value)) throw new Error(currentText().t("error.remote.invalidData"));
-      return value;
+      return withUsageCredits(value, credits);
     },
     async createAgent(input) {
       // The released route keeps the nearest hue. The exact colour goes on `agent-colors-v1` after it.

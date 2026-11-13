@@ -341,6 +341,17 @@ export const messages = {
     "Новые регулярные задачи используют этот часовой пояс, если в сообщении нет часового пояса отправителя.",
   "server.settings.timezoneAutomatic": "Автоматически ({zone})",
   "server.settings.timezoneLoadFailed": "Не удалось загрузить часовой пояс сервера.",
+  "server.settings.turnLimit": "Ветки одновременно",
+  "server.settings.turnLimitDescription":
+    "Сколько веток агентов может выполняться одновременно на этом сервере. Больше веток — больше памяти.",
+  "server.settings.turnLimitAutomatic": "Автоматически ({count})",
+  "server.settings.turnLimitAutomaticUnlimited": "Автоматически (без ограничения)",
+  "server.settings.turnLimitUnlimited": "Без ограничения",
+  "server.settings.turnLimitsLoadFailed": "Не удалось загрузить ограничения веток этого сервера.",
+  "server.settings.agentTaskLimit": "Параллельные ветки на агента",
+  "server.settings.agentTaskLimitDescription":
+    "Сколько веток одновременно может выполнять каждый агент без собственного ограничения.",
+  "server.settings.agentTaskLimitDefault": "По умолчанию ({count})",
   "server.settings.memoryLimit": "Записей памяти на агента",
   "server.settings.memoryLimitDescription": "Сколько записей памяти может хранить каждый агент на этом сервере.",
   "server.settings.memoryLimitLoadFailed": "Не удалось загрузить лимит памяти этого сервера.",

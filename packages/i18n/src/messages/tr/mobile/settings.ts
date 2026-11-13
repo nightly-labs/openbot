@@ -144,6 +144,9 @@ export const messages = {
     "Arama sonuçları ve arama mesajları değiştiğinde kısa bir bulanıklıkla belirip kaybolur. Hareket azaltıldığında yalnızca solarak değişir. Bu kapalıyken hemen değişir.",
   "mobile.settings.feedback.footer": "Bu cihazda, uygulamadaki eylemler için dokunma geri bildirimi.",
   "mobile.settings.feedback.haptics": "Dokunsal",
+  "mobile.settings.feedback.replies": "Yanıt titreşimi",
+  "mobile.settings.feedback.repliesFooter":
+    "Sohbette bir ajanın yanıtı görünürken titreşim. Diğer titreşimler açık kalır.",
   "mobile.settings.feedback.retry": "Dokunsal ayarını kaydetmeyi tekrar dene",
   "mobile.settings.liveActivities.title": "Canlı Etkinlikler",
   "mobile.settings.liveActivities.footer":
@@ -226,6 +229,9 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Büyük dosyaları otomatik indir",
   "mobile.settings.conversations.largeFilesFooter":
     "{small} üzerindeki görseller, videolar ve sesler yalnızca dokunduğunuzda iner. {large} boyutuna kadar hemen indirmek için bunu açın. Bu çok mobil veri kullanabilir.",
+  "mobile.settings.conversations.fullQualityPhotos": "Fotoğrafları tam kalitede gönder",
+  "mobile.settings.conversations.fullQualityPhotosFooter":
+    "Bu kapalıyken uygulama her fotoğrafın daha küçük bir kopyasını gönderir, uzun kenarda en fazla 2048 piksel. Yavaş bağlantıda daha hızlı ulaşır. Orijinal fotoğrafı göndermek için açın.",
   "mobile.settings.profile.nameUnsafe": "Adınızdaki satır sonlarını ve kontrol karakterlerini kaldırın.",
   "mobile.settings.profile.nameLength": "Görünen adınız için 3–20 karakter kullanın.",
   "mobile.settings.profile.saveFailed": "Değişiklikler kaydedilemedi. Tekrar deneyin.",
@@ -483,4 +489,23 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "İşlem durdurulamadı.",
   "mobile.settings.agents.processes.stopTitle": "Bu program durdurulsun mu?",
   "mobile.settings.agents.processes.stopLabel": "{pid} işlemini durdur",
+  "mobile.settings.shortcuts.title": "Kestirmeler",
+  "mobile.settings.shortcuts.agent": "Ajan",
+  "mobile.settings.shortcuts.none": "Yok",
+  "mobile.settings.shortcuts.unsupported": "Kestirmeler için iOS 26 veya sonrası gerekir.",
+  "mobile.settings.shortcuts.card.agents": "Ajanlar",
+  "mobile.settings.shortcuts.card.noAgents": "Henüz ajan yok",
+  "mobile.settings.shortcuts.card.setUp.title": "Kestirmeleri ayarlamak için OpenBot’u aç",
+  "mobile.settings.shortcuts.card.setUp.action": "OpenBot’u aç",
+  "mobile.settings.shortcuts.card.noAgent.title": "Kestirmeler için bir ajan seç",
+  "mobile.settings.shortcuts.card.noAgent.detail": "Kestirmeler tek bir ajana gönderir.",
+  "mobile.settings.shortcuts.card.noAgent.action": "Ajan seç",
+  "mobile.settings.shortcuts.card.locked.title": "OpenBot kilitli",
+  "mobile.settings.shortcuts.card.locked.action": "OpenBot’u aç",
+  "mobile.settings.shortcuts.footer": "Kestirmeler uygulamasındaki Send Message bu ajana gönderir. Uygulama açılmaz.",
+  "mobile.settings.shortcuts.send.sent": "Gönderildi",
+  "mobile.settings.shortcuts.send.failed": "OpenBot bunu gönderemedi.",
+  "mobile.settings.shortcuts.send.unconfirmed": "Sunucudan yanıt yok. Mesaj sohbette olabilir.",
+  "mobile.settings.shortcuts.send.inApp": "OpenBot’ta gönder",
+  "mobile.settings.shortcuts.send.openChat": "Sohbeti aç",
 } as const satisfies PartialTranslation<typeof source>;

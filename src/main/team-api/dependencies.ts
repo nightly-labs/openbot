@@ -22,6 +22,7 @@ import type { HostEventsApi } from "../host-events-api";
 import type { HostEventsService } from "../host-events-service";
 import type { HostReleaseService } from "../host-release-service";
 import type { HostService } from "../host-service";
+import type { HostTurnLimitsPreferenceStore } from "../host-turn-limits-preference-store";
 import type { MachineAlertMonitor } from "../machine-alerts";
 import type { MemoryReviewPreferenceStore } from "../memory-review-preference-store";
 import type { ModelVisibility } from "../model-visibility";
@@ -189,6 +190,7 @@ type TeamApiAgentMethods = Pick<
   | "compactAgentContext"
   | "compactTaskContext"
   | "agentIdForRequest"
+  | "pendingApproval"
   | "respondToPrompt"
   | "respondToApproval"
   | "respondToBrowserSecret"
@@ -301,6 +303,7 @@ export type TeamApiProviderAccounts = Pick<
   | "startSignIn"
   | "signInStatus"
   | "cancelSignIn"
+  | "connectKey"
   | "rename"
   | "remove"
   | "setAgentAccount"
@@ -312,8 +315,8 @@ export type TeamApiProviderUsageResets = Pick<AgentService, "providerUsageResets
 /** Its presence is what `#protocolSupport` advertises `provider-sign-out-v1` on. The route is admin-only. */
 export type TeamApiProviderSignOut = Pick<AgentService, "signOutProvider">;
 
-/** Its presence is what `#protocolSupport` advertises `storage-v1` and `storage-disk-v1` on. */
-export type TeamApiStorage = Pick<StorageUsageService, "usage" | "deleteFile" | "clear" | "disk">;
+/** Its presence is what `#protocolSupport` advertises `storage-v1`, `storage-disk-v1` and `storage-user-files-v1` on. */
+export type TeamApiStorage = Pick<StorageUsageService, "usage" | "deleteFile" | "clear" | "disk" | "diskUse">;
 /** Its presence is what `#protocolSupport` advertises `library-folders-v1` on. Each member reads and changes the folders. */
 export type TeamApiLibraryFolders = Pick<LibraryFoldersService, "snapshot" | "change" | "removeAgent" | "removeFiles">;
 /** `machine-resources-v1`: the machine use and its alerts. The routes are admin-only. */
@@ -323,7 +326,7 @@ export type TeamApiMachine = Pick<
 >;
 /**
  * `background-processes-v1`: the programs that the host's agents left running. The routes are
- * admin-only. The list redacts each command line, as Settings > Agents on this computer does.
+ * admin-only. The list redacts each command line, as Server Settings > Storage on this computer does.
  */
 export interface TeamApiBackgroundProcesses {
   list(): ReturnType<typeof listBackgroundProcesses>;
@@ -462,6 +465,8 @@ export type TeamApiWorkflows = Pick<
   | "githubHistory"
   | "githubLastEvent"
   | "keepPicture"
+  | "mediaProviders"
+  | "mediaCredits"
 > &
   Pick<HostEventsService, "rotateWorkflowSecret"> & {
     /**
@@ -556,6 +561,8 @@ export interface TeamApiAdmin {
   restart?: { request(memberId: string): void };
   /** `host-timezone-v1`: the server timezone. */
   timezone?: Pick<ServerTimezonePreferenceStore, "get" | "set">;
+  /** `host-turn-limits-v1`: the total turn limit and the default task limit of each agent. */
+  turnLimits?: Pick<HostTurnLimitsPreferenceStore, "get" | "set">;
   /** `host-personality-v1`: how the server's agents talk while they work. Any member reads it. */
   personality?: Pick<ServerPersonalityPreferenceStore, "get" | "set">;
   /** `host-key-rotation-v1`: the owner changes this host's key. Resolves with the new public key. */

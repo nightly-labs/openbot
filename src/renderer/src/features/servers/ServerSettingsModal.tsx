@@ -91,6 +91,7 @@ import { type ServerRoutineFeedOptions, ServerRoutineFeedPanel } from "./ServerR
 import type { ServerSkillLearningOptions } from "./ServerSkillLearningSetting";
 import type { ServerTimezoneOptions } from "./ServerTimezoneSetting";
 import { type ServerTransferOptions, ServerTransferPanel } from "./ServerTransferPanel";
+import type { ServerTurnLimitsOptions } from "./ServerTurnLimitsSetting";
 import { type ServerUpdateOptions, ServerUpdatePanel } from "./ServerUpdatePanel";
 import { serverCanAdminister, serverCanManageMcp, serverRoleCanAdminister } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
@@ -219,6 +220,11 @@ export interface ServerSettingsModalProps {
    */
   hostTimezone?: ServerTimezoneOptions | undefined;
   /**
+   * General shows the thread limits only when a caller supplies this, and only for the local server
+   * or a remote host with `host-turn-limits-v1` that this member administers.
+   */
+  hostTurnLimits?: ServerTurnLimitsOptions | undefined;
+  /**
    * The Personality section shows only when a caller supplies this, and only for the local server or
    * a remote host with `host-personality-v1` that this member administers.
    */
@@ -285,8 +291,8 @@ export interface ServerSettingsModalProps {
    */
   serverAudit?: ServerAuditOptions | undefined;
   /**
-   * The Agents section appears only when a caller supplies this, and only for a remote host with
-   * `agent-defaults-v1` that this member administers. This computer uses Settings > Agents.
+   * The Agents section appears only when a caller supplies this: for this computer, and for an online
+   * remote host with `agent-defaults-v1` that this member administers.
    */
   agentDefaults?: ServerAgentDefaultsOptions | undefined;
   /**

@@ -233,7 +233,8 @@
           "bundleIdentifier": "run.openbot.mobile.NotificationService",
           "groupIdentifier": "group.run.openbot.mobile"
         }
-      ]
+      ],
+      "./plugins/with-shortcuts"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -133,6 +133,7 @@ import {
   type ClearBrowserDataInput,
   type ClearStorageInput,
   type ConnectProviderAccountInput,
+  type ConnectProviderAccountKeyInput,
   type CustomAgentResult,
   type CustomAgentSummary,
   type CustomProviderResult,
@@ -336,6 +337,7 @@ import { MCP_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
 import { ONEPASSWORD_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PASSWORD_MANAGERS_ROUTES } from "@openbot/contracts/team-protocol/password-managers-v1";
+import { PROVIDER_ACCOUNT_KEYS_ROUTES } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_ROUTES } from "@openbot/contracts/team-protocol/provider-account-models-v1";
 import { PROVIDER_ACCOUNT_POOL_ROUTES } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import type {
@@ -1434,6 +1436,17 @@ export function listProviderAccountsWithModels(
       return pools ? { ...withAccountModels, pools } : withAccountModels;
     }),
   );
+}
+
+/**
+ * `provider-account-keys-v1`: gives an account of a host's provider its API key, a new account when
+ * `accountId` is null. It fails with the host's reason when the provider refuses the key.
+ */
+export function connectProviderAccountKey(
+  request: TeamApiRequest,
+  input: ConnectProviderAccountKeyInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", PROVIDER_ACCOUNT_KEYS_ROUTES.connect, ignoreResponse, { ...input }));
 }
 
 /** `provider-account-pool-v1`: turns the pool of a provider's accounts on the host on or off. */

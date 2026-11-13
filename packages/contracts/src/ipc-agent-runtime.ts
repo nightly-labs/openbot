@@ -240,6 +240,8 @@ export interface AgentRuntimeSnapshot {
     threadId: string;
     turnId: string;
     questions: AgentRuntimePromptQuestion[];
+    /** As on the `prompt` event: no turn waits for it. Absent from a released Team API snapshot. */
+    detached?: true;
   }>;
   pendingApprovals: AgentRuntimeApproval[];
   pendingBrowserTakeovers: BrowserTakeoverRequest[];
@@ -352,6 +354,7 @@ function isRuntimePrompt(value: unknown): value is AgentRuntimeSnapshot["pending
     isIdentifier(value.turnId) &&
     Array.isArray(value.questions) &&
     value.questions.length <= INPUT_LIMITS.promptQuestions &&
-    value.questions.every(isRuntimePromptQuestion)
+    value.questions.every(isRuntimePromptQuestion) &&
+    (value.detached === undefined || value.detached === true)
   );
 }

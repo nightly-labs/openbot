@@ -11,8 +11,8 @@ commands. The listener runs only while at least one agent has `allowAutomation`,
 `Origin` header or a foreign `Host` before it checks the token, so a web page cannot reach it. Each
 agent accepts at most `automationRunsPerHour` messages and routine runs from scripts in one hour, so
 a script that loops cannot spend the user's quota. The value is an account default
-(`AGENT_DEFAULTS_PREFERENCE_FILE`, 30 when it is missing or invalid), set in Settings › Agents ›
-Local scripts.
+(`AGENT_DEFAULTS_PREFERENCE_FILE`, 30 when it is missing or invalid), set in Server Settings ›
+Agents › Local scripts.
 
 A run is a manual routine run with the payload after the instruction, so no Team API protocol, run
 kind or sender changes. The payload is in the run row, and `resumePendingRuns` sends it again after a
@@ -136,7 +136,7 @@ the run marker's "Open thread" link, a test run and the routine's reply digest d
 archived). A later run uses the same thread, and a run reopens an archived one. A run also gives the
 thread the routine's current name, unless a person renamed the thread. `RoutineScheduler`
 enqueues the run with the thread's task id, so the run is a task lane in `DrainScheduler`: it counts
-against the agent's task limit (default 4, `AGENT_TASK_LIMIT_DEFAULT`) and does not wait for the
+against the agent's task limit (the host default, 4 unless an admin changes it) and does not wait for the
 agent's own chat or for other routines. When the agent has `INPUT_LIMITS.agentTasks` open threads, a
 new routine gets no thread and its run goes to the agent's own chat, as before. Routine threads do not
 count against the limits of tasks that the agent starts, and that cleanup does not archive them.
@@ -508,12 +508,20 @@ of a side thread is `legacy_task_id ?? thread_id`, so a stored mailbox message a
 that name the task still find it. A mailbox message with a `taskId` belongs to that side thread, and `DrainScheduler` drains each task as its own lane. The main chat
 lane does not count toward the task limit. At most `limit` task turns of one agent run at the same
 time. `agentTaskLimit` gives the limit: the agent's local `taskLimit` setting (1 to
-`AGENT_TASK_LIMIT_MAX`, in `agent_json`), else `AGENT_TASK_LIMIT_DEFAULT` (4). An owner or admin of
-a joined server reads and sets it on `agent-task-limit-v1`. A provider whose
+`AGENT_TASK_LIMIT_MAX`, 4, in `agent_json`), else the host default. The host default is the
+`agentTaskLimit` of `HostTurnLimitsPreferenceStore` (`openbot-host-turn-limits-v1.json`, 1 to
+`HOST_AGENT_TASK_LIMIT_MAX`, 64), else `AGENT_TASK_LIMIT_DEFAULT` (4). Desktop and web agent settings do
+not show the agent's own limit; Server Settings > General sets the host default. Mobile and older
+desktop apps still read and set the agent's own limit on `agent-task-limit-v1`, and the host keeps it.
+The frozen `agent-tasks-v1` wire carries 1 to 4, so the host sends a higher limit there as 4. A provider whose
 descriptor has `concurrentTurns: false` (custom ACP agents) gets 1, and its chat and tasks run one
 turn at a time. Other task messages wait with a `hold` reason: `task-limit`, `agent-restarting`,
-`usage-limit`, `server-busy`, `agent-busy` or `one-turn`. The server-wide `TurnSlots` limit of a
-hosted server is separate.
+`usage-limit`, `server-busy`, `agent-busy` or `one-turn`. The server-wide `TurnSlots` limit is
+separate: `MemoryHold.turnLimit` gives the `turnLimit` that an owner or admin chose (1 to
+`HOST_TURN_LIMIT_MAX`, 128, also above the automatic value, or `"unlimited"` for no limit), else the
+memory value of a server (2, 8 or 16), else no limit on a desktop computer. Low memory still holds a new turn. Server Settings > General
+reads and sets both host values on `host-turn-limits-v1` (owner or admin), and a save drains the
+queues again, so a higher limit starts waiting turns at once.
 
 The chat header shows a tab for the main thread and one for each open side thread, a "+" button and a
 menu of all threads with an "Archived" group (`packages/ui/src/features/conversation/threads/`). The
@@ -681,7 +689,8 @@ still wait for idle work (`error.agent.waitForTasksBeforeProviderChange` /
 `error.agent.waitBeforeProviderChange`). A Team API model or effort change keeps the queued
 change, because the remote client cannot see it. The channel threads of the agent
 (`ChannelStore.contextThreadsForAgent`) are retired too, and their work steps are saved. A channel
-turn also carries its own self-contained context packet. The instance transfer file keeps `taskLimit`.
+turn also carries its own self-contained context packet. The instance transfer file keeps `taskLimit`, and its server
+preferences keep the host turn limits.
 
 ## Deleted chat messages
 
@@ -787,7 +796,7 @@ shows the error. `scripts/codex-empty-lead-turn-e2e.ts` checks these paths.
 
 A message to an agent that runs a turn follows the busy-message mode: "steer" takes it into the
 running turn, "queue" starts it after the turn. The default is "steer" (`DEFAULT_BUSY_MESSAGE_MODE`).
-Settings > Agents changes the app default, and each agent can set its own mode. The preference file
+Server Settings > Agents changes the app default, and each agent can set its own mode. The preference file
 exists only after the user changes the setting, so a stored "queue" stays "queue". A remote client
 reads the host's default from `agent-host-settings-v1`, so a host on an older version keeps its
 "queue" default. A provider that cannot steer natively (the ACP agents) queues the message in both

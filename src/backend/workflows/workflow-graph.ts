@@ -51,7 +51,18 @@ const RUNTIME_FIELDS: Record<WorkflowNodeKind, readonly string[]> = {
   note: ["text"],
   shape: ["text"],
   asset: ["fileId"],
-  image: ["media", "model", "prompt", "aspect", "duration", "resolution", "firstFrame", "lastFrame", "voice"],
+  image: [
+    "media",
+    "model",
+    "account",
+    "prompt",
+    "aspect",
+    "duration",
+    "resolution",
+    "firstFrame",
+    "lastFrame",
+    "voice",
+  ],
 };
 
 /** The fields of a node that a run reads, without empty ones. */

@@ -18,6 +18,7 @@ export interface TurnsPort {
     | "listRoutines"
     | "listWaits"
     | "quietRoutineRuns"
+    | "readPendingApproval"
     | "reorderQueue"
     | "respondToApproval"
     | "respondToBrowserTakeover"

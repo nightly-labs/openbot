@@ -166,22 +166,36 @@ export const messages = {
   "provider.geminiKey.title": "Chiave API di Gemini",
   "provider.geminiKey.description":
     "Salva una chiave API di Gemini su questo computer. Una chiave salvata viene usata al posto del tuo account Google. Per accedere con Google, rimuovi la chiave e seleziona «Connetti» nella riga di Gemini.",
+  "provider.geminiKey.descriptionHost":
+    "Salva una chiave API di Gemini sull'host. Una chiave salvata viene usata al posto del tuo account Google. Per accedere con Google, rimuovi la chiave e seleziona «Connetti» nella riga di Gemini.",
   "provider.geminiKey.label": "Chiave API di Gemini",
   "provider.claudeKey.title": "Chiave API di Anthropic",
   "provider.claudeKey.description":
     "Salva una chiave API di Anthropic sull'host. Anthropic addebita ogni richiesta al credito API della chiave, non al tuo piano Claude. Per usarla per un agente, seleziona l'account «Chiave API» nel menu dei modelli dell'agente. Se Claude non ha un accesso, tutti gli agenti usano la chiave.",
   "provider.claudeKey.label": "Chiave API di Anthropic",
+  "provider.cursorKey.title": "Chiave API di Cursor",
+  "provider.cursorKey.description":
+    "Ogni account Cursor dopo il primo usa una chiave API. Crea una chiave nella dashboard di Cursor, in Integrations, e incollala qui. La chiave viene salvata su questo computer.",
+  "provider.cursorKey.descriptionHost":
+    "Ogni account Cursor dopo il primo usa una chiave API. Crea una chiave nella dashboard di Cursor, in Integrations, e incollala qui. La chiave viene salvata sull'host.",
+  "provider.cursorKey.label": "Chiave API di Cursor",
   "provider.inceptionKey.title": "Chiave API di Inception",
   "provider.inceptionKey.description":
     "Salva una chiave API di Inception su questo computer per usare i modelli Mercury. OpenBot li esegue nella CLI di Pi che scarica.",
+  "provider.inceptionKey.descriptionHost":
+    "Salva una chiave API di Inception sull'host per usare i modelli Mercury. OpenBot li esegue nella CLI di Pi che scarica.",
   "provider.inceptionKey.label": "Chiave API di Inception",
   "provider.deepseekKey.title": "Chiave API di DeepSeek",
   "provider.deepseekKey.description":
     "Salva una chiave API di DeepSeek su questo computer per usare i modelli DeepSeek. OpenBot li esegue nella CLI di Pi che scarica.",
+  "provider.deepseekKey.descriptionHost":
+    "Salva una chiave API di DeepSeek sull'host per usare i modelli DeepSeek. OpenBot li esegue nella CLI di Pi che scarica.",
   "provider.deepseekKey.label": "Chiave API di DeepSeek",
   "provider.openrouterKey.title": "Chiave API di OpenRouter",
   "provider.openrouterKey.description":
     "Salva una chiave API di OpenRouter su questo computer per usare i modelli di OpenRouter. OpenBot li esegue nella CLI di Pi che scarica.",
+  "provider.openrouterKey.descriptionHost":
+    "Salva una chiave API di OpenRouter sull'host per usare i modelli di OpenRouter. OpenBot li esegue nella CLI di Pi che scarica.",
   "provider.openrouterKey.label": "Chiave API di OpenRouter",
 
   "provider.openCodeKey.title": "Accedi a OpenCode Go",
@@ -246,6 +260,10 @@ export const messages = {
     "Una chiave API Gemini salvata viene usata al posto di un accesso con Google. Per usare un piano Google e i suoi modelli, rimuovi la chiave.",
   "provider.settings.versionInstalledByUser": "{version} · installata da te",
   "provider.settings.versionDownloaded": "{version} · scaricata da OpenBot",
+  "provider.settings.otherVersionInstalledByUser": "Non in uso: {version} · installata da te",
+  "provider.settings.otherVersionDownloaded": "Non in uso: {version} · scaricata da OpenBot",
+  "provider.settings.useInstalledVersion": "Usa quella installata",
+  "provider.settings.useDownloadedVersion": "Usa quella di OpenBot",
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Cache dei prompt",
   "provider.settings.promptCacheDescription":

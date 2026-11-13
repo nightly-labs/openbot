@@ -11,6 +11,7 @@ import { AcpAgentClient, type AcpHistoryPersistence } from "./acp-client";
 import { GROK_ACP_FLAVOR } from "./acp-flavor";
 import type { GrokCliInfo } from "./cli";
 import { isMissingFileError } from "./file-errors";
+import { MCP_STDIO_PROBE_TIMEOUT_MS } from "./mcp-probe";
 import type { McpDropReporter, McpEndpointSource, McpServerSource, McpToolRuntimeSource } from "./mcp-provider-shapes";
 import { confineSpawnTarget, grokHomeDirectory, grokStatePaths, type ProcessConfinement } from "./process-confinement";
 import { type AccountRateLimitsReadResult, getRecord, getString, isRecord } from "./protocol";
@@ -66,7 +67,8 @@ export class GrokAgentClient extends AcpAgentClient {
       // Read at each spawn, so a change to the user's `config.toml` applies to the next process.
       extraEnv: () => {
         const environment = { ...agentEnvironment?.() };
-        return { ...grokFeatureEnvironment({ ...process.env, ...environment }), ...environment };
+        const merged = { ...process.env, ...environment };
+        return { ...grokFeatureEnvironment(merged), ...grokMcpStartupEnvironment(merged), ...environment };
       },
       history,
       signInMessage: sourceText("error.provider.grokSignIn"),
@@ -146,6 +148,18 @@ function grokFeatureEnvironment(env: NodeJS.ProcessEnv, home = homedir()): Recor
       (feature) => !env[feature.env]?.trim() && !layers.some((layer) => hasConfigKey(layer, feature.key)),
     ).map((feature) => [feature.env, "0"]),
   );
+}
+
+/**
+ * Grok CLI 1.0.77 gives each MCP server 30 s to start, and OpenBot's connection test gives a stdio
+ * server 60 s. A server that started in between passed the test as ready, and Grok left it out of
+ * each session with no error (#8083). These variables set Grok's default for all servers; a server's
+ * own `startup_timeout_sec` in the user's Grok settings still wins. OpenBot sets one only when the
+ * user's environment sets neither. Grok starts the servers in the background, so a turn does not wait.
+ */
+function grokMcpStartupEnvironment(env: NodeJS.ProcessEnv): Record<string, string> {
+  if (env.MCP_TIMEOUT?.trim() || env.GROK_MCP_STARTUP_TIMEOUT_SECS?.trim()) return {};
+  return { GROK_MCP_STARTUP_TIMEOUT_SECS: String(MCP_STDIO_PROBE_TIMEOUT_MS / 1_000) };
 }
 
 /**

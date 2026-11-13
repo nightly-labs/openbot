@@ -1,5 +1,45 @@
 [
   {
+    "version": "0.70.0",
+    "date": "2026-11-13",
+    "notices": [
+      "Katıldığınız her sunucuyu da bu sürüme güncelleyin. Sunucuyu yeniden başlat, ajan varsayılanları, mesaj dizisi sınırları ve yeni İş akışları adımları ancak sunucu bu sürüme sahipse çalışır."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Kendi barındırdığınız bir sunucuyu uygulamadan yeniden başlatın: sahip veya yönetici olarak sunucu menüsünde Sunucuyu yeniden başlat'ı seçin.",
+          "Her giriş, kart, kişi ve API anahtarını hangi ajanların kullanabileceğini Sunucu ayarları → Vault bölümünden seçin. Bir ajan yalnızca kullanabildiği öğeleri görür ve doldurur.",
+          "İş akışlarında Görsel ve Video adımları var. GPT Image, Grok Imagine veya Sunra modelleriyle resim ve kısa videolar oluşturun, resimleri referans olarak bağlayın.",
+          "Sunra ve TryPost'u Pazaryeri'ndeki Uygulamalar bölümünden bağlayın. Ajanlar böylece Sunra kredilerinizle medya oluşturabilir, sosyal medya gönderilerinin taslağını hazırlayıp yayımlayabilir.",
+          "Sahipler ve yöneticiler, sunucu için ve her ajan için aynı anda kaç mesaj dizisinin aynı anda çalışacağını Sunucu ayarları → Genel bölümünden belirleyebilir.",
+          "Yeni mesajı olan ajanları yuvada gösterin: Ayarlar → Ajan yuvası bölümünden açın. Böyle bir ajana sağ tıklayıp Yuvaya ekle'yi seçin; ajan yuvada kalır.",
+          "Birden fazla Cursor hesabı ekleyin. Her ajan farklı bir hesap kullanabilir."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Yalnızca bir ajan için kaydettiğiniz bir API anahtarı artık şifreli Vault'ta tutulur. Ajanların okuduğu anahtarların yeni bir yolu var; bu nedenle eski yolu kullanan bir betik yeni yolu kullanmalıdır.",
+          "Ajan ayarları, örneğin Ajanları çalışırken yönlendir, artık her sunucu için ve bu bilgisayar için Sunucu ayarları → Ajanlar bölümündedir.",
+          "Tam tarayıcı görünümünde mesaj kutusu yeniden sayfanın alt ortasında yer alır.",
+          "Sohbet üst bilgisi, ajanın adından sonra unvanını gösterir; örneğin “Brock · Mağaza müdürü”."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Sohbetleriniz uzun olduğunda OpenBot daha hızlı açılır.",
+          "Windows ve Linux'ta, ajanlar çalışırken OpenBot çıkmadan önce sorar. Pencereyi gizleyip ajanların işini bitirmesine izin vermek için Çalışsın'ı seçin.",
+          "Kurulum sırasında bir cihazın bağlantısı kesildiğinde cihazlar tekrar sunucuya bağlanır. Katılınan bir sunucudaki bir ajanın tarayıcısının canlı görünümü de yavaş bağlantıda açık kalır.",
+          "Bir ajandan web sayfasının ekran görüntüsünü istediğinizde, artık görüntüyü yanıtına ekler.",
+          "Bir OpenCode Go anahtarı kaydedildiğinde OpenCode ücretsiz modelleri yeniden yanıt verir."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.69.0",
     "date": "2026-11-12",
     "notices": [

@@ -122,12 +122,14 @@ import { voiceIpcHandlers } from "./ipc/voice-handlers";
 import { workflowIpcHandlers } from "./ipc/workflow-handlers";
 import { KeepAwake } from "./keep-awake";
 import { stopAppImageCrashpadHandlerAtExit } from "./linux-appimage-crashpad";
+import { relaunchApp } from "./linux-appimage-relaunch";
 import { installLinuxDesktopEntry } from "./linux-desktop-entry";
-import { configureLinuxGpu } from "./linux-gpu-mode";
+import { configureLinuxGpu, readLinuxGpuMode } from "./linux-gpu-mode";
 import { configureLinuxPasswordStore } from "./linux-password-store";
 import {
   keepAboveAppsXWayland,
   restartOnXWaylandForAboveApps,
+  restartOnXWaylandForSoftwareRendering,
   restartOnXWaylandWithoutMonitor,
   setAboveAppsXWayland,
   takeXWaylandRestartMarker,
@@ -316,11 +318,18 @@ if (process.platform === "win32") app.setAppUserModelId("app.openbot.desktop");
 // XWayland. Before the single-instance lock, so that the new process can take it. A parent process or
 // systemd watches the process, the output and the input of a headless server, so it does not restart.
 // The agent dock and the Dynamic Island above other apps also start again on XWayland, when the user chose it.
+// Software rendering starts again on XWayland too: on Wayland the window can get no frame and never show (#8110).
 const startedOnXWayland = takeXWaylandRestartMarker(process.env, process.argv);
 if (
   app.isPackaged &&
   !(serverMode || hostedServer || localServerChildEnvironment) &&
   ((await Effect.runPromise(restartOnXWaylandForAboveApps(process.env, app.getPath("userData")))) ||
+    (await Effect.runPromise(
+      restartOnXWaylandForSoftwareRendering(
+        process.env,
+        !readLinuxGpuMode(app.getPath("userData"), false).hardwareAcceleration,
+      ),
+    )) ||
     (await Effect.runPromise(restartOnXWaylandWithoutMonitor(process.env))))
 )
   app.exit(0);
@@ -375,6 +384,8 @@ if (hasSingleInstanceLock) {
     logger.warn("The Wayland session had no monitor, so OpenBot uses XWayland until the next start.");
   if (startedOnXWayland === "above-apps")
     logger.info("The agent dock or the Dynamic Island shows above other apps, so OpenBot uses XWayland.");
+  if (startedOnXWayland === "software-rendering")
+    logger.info("Software rendering is on, so OpenBot uses XWayland: on Wayland its window can stay empty.");
 }
 // Linux: the GPU stays on until it fails on this computer (#992). `userData` has its final path here.
 configureLinuxGpu({
@@ -782,6 +793,7 @@ function registerIpcHandlers({
   serverAudit,
   teamStore,
   serverTimezone,
+  hostTurnLimits,
   serverPersonality,
   promptCacheTtl,
   claudeUserSetup,
@@ -1024,6 +1036,7 @@ function registerIpcHandlers({
       host,
       remoteServers,
       serverTimezone,
+      hostTurnLimits,
       serverPersonality,
       agentMemoryLimit,
       memoryReview,
@@ -1447,7 +1460,7 @@ if (!hasSingleInstanceLock) {
       const isLink = (value: string) => parseDeepLink(value, inviteLinkOptions) !== null;
       const link = argv.find(isLink);
       const args = process.argv.slice(1).filter((value) => !isLink(value));
-      app.relaunch({ args: link ? [...args, link] : args });
+      relaunchApp(app, link ? [...args, link] : args);
     }
   });
 

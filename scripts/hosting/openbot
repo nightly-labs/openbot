@@ -144,7 +144,8 @@ show_status() {
   limit=$(value memory_limit)
   if [ -n "$limit" ]; then
     echo "Memory: $(($(value memory_available) / 1048576)) MiB free of $((limit / 1048576)) MiB ($(value memory_level))"
-    echo "Turns at the same time: at most $(value turn_limit)"
+    turns=$(value turn_limit)
+    if [ "$turns" = unlimited ]; then echo "Turns at the same time: no limit"; else echo "Turns at the same time: at most $turns"; fi
   fi
   staged=$(staged_version)
   if [ -n "$staged" ]; then echo "OpenBot $staged is ready to install. Run: sudo openbot update"; fi

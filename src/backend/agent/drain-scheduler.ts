@@ -1321,8 +1321,10 @@ export class DrainScheduler {
    * provider's own sign-in text when the start failed with it, such as a request for an API key, and an
    * expired sign-in otherwise, also when the provider refused the account before its check marked it.
    * Only catalog text goes to the channel: every reader of it sees it, in the reader's language.
+   * Another Codex app that holds the thread is the same: Resume fails until the reader closes it there.
    */
   #channelStartReason(recipient: AgentSummary | undefined, error: unknown): string {
+    if (isCodexThreadInUse(error)) return sourceText("error.provider.codexThreadInUse");
     if (!recipient || !(error instanceof Error)) return CHANNEL_START_FAILED;
     const provider = providerForAgent(recipient);
     const signInText =

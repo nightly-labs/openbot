@@ -262,6 +262,9 @@ export const messages = {
     "פס דק נשאר במקום שבו המעגן נעלם. קירוב המצביע אליו מציג את המעגן. גל צבע עולה בפס כשסוכן שואל אותך משהו.",
   "settings.agentDock.results.title": "הצגת עבודה שהסתיימה",
   "settings.agentDock.results.description": "תוצאות שסוכנים מסיימים מוצגות לצד המעגן לזמן קצר.",
+  "settings.agentDock.activeSeats.title": "הצגת סוכנים עם חדשות",
+  "settings.agentDock.activeSeats.description":
+    "סוכן או ערוץ שאינם במעגן מוצגים בו כל עוד יש להם הודעה חדשה או שהם מחכים לך.",
   "settings.agentDock.agents.title": "סוכנים במעגן",
   "settings.agentDock.agents.description": "הסוכנים של {server}. לכל שרת יש מעגן משלו.",
   "settings.agentDock.agents.empty": "עדיין אין סוכנים בשרת הזה.",

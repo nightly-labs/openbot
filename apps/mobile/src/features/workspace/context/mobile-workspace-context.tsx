@@ -57,6 +57,7 @@ import { MCP_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-acce
 import { MEMORY_REVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "@openbot/contracts/team-protocol/password-managers-v1";
+import { PENDING_APPROVAL_CAPABILITY } from "@openbot/contracts/team-protocol/pending-approval-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v1";
 import { PUSH_NOTIFICATION_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/push-notification-threads-v1";
@@ -101,6 +102,7 @@ import { verifyEd25519Base64Url } from "@openbot/team-client/ed25519";
 import { createFocusUsePing } from "@openbot/team-client/focus-use";
 import { createHostedServerWake, WAKE_RECONNECT_DELAY_MS } from "@openbot/team-client/hosted-server-wake";
 import type { RemoteFileUpload, RemoteLargeDownload, RemoteTeamEvent } from "@openbot/team-client/remote-peer";
+import { withWholeApproval } from "@openbot/team-client/runtime-attention";
 import {
   createHostLocalServer,
   deleteHostLocalServer,
@@ -116,6 +118,7 @@ import {
   deleteAgent,
   discardAttachmentDraft,
   interruptAgentTurn,
+  readPendingApproval,
   respondToApproval,
   respondToBrowserSecret,
   respondToBrowserTakeover,
@@ -142,6 +145,7 @@ import { useSyncedNotificationLevelsLoader } from "@/features/push-notifications
 import { QuickActionsSync } from "@/features/quick-actions/quick-actions-sync";
 import { setSyncedNotificationLevels } from "@/features/settings/model/notification-levels";
 import { ShareExtensionSync } from "@/features/share/share-extension-sync";
+import { ShortcutsSync } from "@/features/shortcuts/shortcuts-sync";
 import { fetch } from "@/features/support/model/logged-fetch";
 import { supportLog } from "@/features/support/model/support-log";
 import type { RemoteTeamTransportRef } from "@/features/workspace/components/remote-team-transport";
@@ -1891,6 +1895,25 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           throw new Error(currentText().t("mobile.workspace.error.approvalOffline"));
         await sendApproval(serverId, input);
       },
+      readsWholeApprovals: (serverId) =>
+        hasCapability(serverCapabilities.current, serverId, PENDING_APPROVAL_CAPABILITY),
+      readWholeApproval: async (serverId, approval) => {
+        if (!hasCapability(serverCapabilities.current, serverId, PENDING_APPROVAL_CAPABILITY)) return;
+        const whole = await runTeamRequest(
+          readPendingApproval(teamApi(serverId), { agentId: approval.agentId, requestId: approval.requestId }),
+        ).catch((error: unknown) => {
+          // Another device answered it, or its turn ended. The request is gone on the host too.
+          if (error instanceof InactiveRequestError)
+            liveState.update("approvalRequests", (current) => dropApproval(current, serverId, approval.requestId));
+          throw error;
+        });
+        liveState.update("approvalRequests", (current) => {
+          const previous = current[serverId];
+          if (!previous) return current;
+          const next = withWholeApproval(previous, whole);
+          return next === previous ? current : { ...current, [serverId]: next };
+        });
+      },
       respondToBrowserTakeover: (serverId, input) => runTeamRequest(respondToBrowserTakeover(teamApi(serverId), input)),
       respondToBrowserSecret: (serverId, input) => runTeamRequest(respondToBrowserSecret(teamApi(serverId), input)),
       selectServer: (id) => {
@@ -2618,6 +2641,14 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             servers={orderedServers}
             serversReady={serverDirectoryState === "ready"}
             agents={agents}
+          />
+          <ShortcutsSync
+            apiUrl={session.apiUrl}
+            userId={session.user.id}
+            servers={orderedServers}
+            serversReady={serverDirectoryState === "ready"}
+            agents={agents}
+            preferences={visiblePreferences}
           />
           <NotificationAvatarSync servers={servers} serversReady={serverDirectoryState === "ready"} agents={agents} />
           {servers.map((server) => (

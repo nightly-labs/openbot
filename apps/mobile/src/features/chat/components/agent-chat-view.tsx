@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { ChatChannelWorkRow } from "@/features/channels/components/chat-channel-work-row";
-import { useChannels } from "@/features/channels/components/use-channels";
+import { useChannelList } from "@/features/channels/components/use-channels";
 import { useAgentViewOnly } from "@/features/servers/model/use-server-roles";
 import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
 import { useAgentFirstUnreadMessageId, useApprovalRequests } from "@/features/workspace/components/use-live-workspace";
@@ -37,6 +37,14 @@ import { useMessageDelete } from "./use-message-delete";
 import { useMessagePins } from "./use-message-pins";
 import { useOpenAgentTasks } from "./use-open-agent-tasks";
 import { useQuestionPrompt } from "./use-question-prompt";
+
+const NO_MESSAGE_IDS: ReadonlySet<string> = new Set();
+
+/** `previous` when it holds exactly `ids`, else a new set of them. */
+function keptIdSet(previous: ReadonlySet<string> | null, ids: readonly string[]): ReadonlySet<string> {
+  if (previous && previous.size === ids.length && ids.every((id) => previous.has(id))) return previous;
+  return new Set(ids);
+}
 
 /** `focusMessageId` opens the chat at a message from search instead of at the latest message. */
 export function MobileChatView({
@@ -117,7 +125,7 @@ export function MobileChatView({
   // A turn on another thread, such as channel work, is not this chat's work, as on desktop. A host
   // with channel-attention-v1 names the channel of the thread, and a row below opens it.
   const otherThread = Boolean(liveActivity?.threadId && threadId && liveActivity.threadId !== threadId);
-  const channels = useChannels(agent.serverId).channels;
+  const channels = useChannelList(agent.serverId);
   const workChannel = otherThread
     ? channels.find(
         (channel) => !channel.archived && channel.threads?.some((thread) => thread.threadId === liveActivity?.threadId),
@@ -150,28 +158,32 @@ export function MobileChatView({
   const [historyLoadFailed, setHistoryLoadFailed] = useState(false);
   const [catchingUp, setCatchingUp] = useState(false);
   // The message from search, until the chat shows it. `loaded` is set when its page is in the store.
-  const [focus, setFocus] = useState(focusMessageId ? { messageId: focusMessageId, loaded: false } : null);
+  // Without one, a chat with unread messages opens at its NEW line (`unread`), as on desktop.
+  const [focus, setFocus] = useState<{ messageId: string; loaded: boolean; unread: boolean } | null>(() =>
+    focusMessageId
+      ? { messageId: focusMessageId, loaded: false, unread: false }
+      : firstUnreadMessageId
+        ? { messageId: firstUnreadMessageId, loaded: false, unread: true }
+        : null,
+  );
   const focusRef = useRef(focus);
   focusRef.current = focus;
-  const clearFocus = useCallback(() => setFocus(null), []);
+  // True after the chat showed its opening place. A later unread state does not move the chat.
+  const focusEnded = useRef(false);
+  const clearFocus = useCallback(() => {
+    focusEnded.current = true;
+    setFocus(null);
+  }, []);
   const request = useRef(0);
   const fetchHistory = useCallback(() => {
     if (!online) return;
     const id = ++request.current;
     setHistoryLoadFailed(false);
-    const messageId = focusRef.current?.loaded === false ? focusRef.current.messageId : null;
-    const load = async () => {
-      if (messageId && !conversationStore.get(agent.id)?.messages.some((message) => message.id === messageId)) {
-        if (!(await loadConversationAround(agent.id, messageId, agent.serverId))) {
-          // The host no longer has the message. The chat opens at the latest message.
-          if (request.current === id) setFocus(null);
-          await loadLatestMessages(agent.id, agent.serverId);
-          return;
-        }
-      }
-      // The list can show the message, and clear the focus, before the request ends.
-      if (messageId && request.current === id)
-        setFocus((current) => (current?.messageId === messageId ? { messageId, loaded: true } : current));
+    const pending = focusRef.current?.loaded === false ? focusRef.current : null;
+    const messageId = pending?.messageId ?? null;
+    const stored = () =>
+      Boolean(messageId && conversationStore.get(agent.id)?.messages.some((message) => message.id === messageId));
+    const readLatest = async () => {
       // Events keep a loaded chat up to date while the connection stays, so it opens without a read.
       if (conversationStore.isUpToDate(agent.id)) return;
       // The chat shows the messages that the phone kept while the latest page loads.
@@ -183,6 +195,33 @@ export function MobileChatView({
       } finally {
         if (kept && request.current === id) setCatchingUp(false);
       }
+    };
+    const load = async () => {
+      if (pending?.unread) {
+        // The latest page first: it usually holds the first unread message, and a window around a
+        // message adds only older messages to the messages that the phone kept.
+        await readLatest();
+        if (!stored() && !(await loadConversationAround(agent.id, pending.messageId, agent.serverId))) {
+          // The host no longer has the message. The chat opens at the latest message.
+          if (request.current === id) setFocus(null);
+          return;
+        }
+        if (request.current === id)
+          setFocus((current) => (current?.messageId === pending.messageId ? { ...current, loaded: true } : current));
+        return;
+      }
+      if (messageId && !stored()) {
+        if (!(await loadConversationAround(agent.id, messageId, agent.serverId))) {
+          // The host no longer has the message. The chat opens at the latest message.
+          if (request.current === id) setFocus(null);
+          await loadLatestMessages(agent.id, agent.serverId);
+          return;
+        }
+      }
+      // The list can show the message, and clear the focus, before the request ends.
+      if (messageId && request.current === id)
+        setFocus((current) => (current?.messageId === messageId ? { ...current, loaded: true } : current));
+      await readLatest();
     };
     void load().catch(() => {
       if (request.current !== id) return;
@@ -207,9 +246,19 @@ export function MobileChatView({
       setCatchingUp(false);
     };
   }, [fetchHistory]);
+  // The unread state can come after the chat opened, such as on a cold start. Until the chat has
+  // messages to show, it still opens at the NEW line.
+  useEffect(() => {
+    if (!firstUnreadMessageId || focusRef.current || focusEnded.current || conversation) return;
+    const next = { messageId: firstUnreadMessageId, loaded: false, unread: true };
+    focusRef.current = next;
+    setFocus(next);
+    fetchHistory();
+  }, [firstUnreadMessageId, conversation, fetchHistory]);
   const detached = conversation?.detached ?? false;
-  // A message in the store that the chat shows no row for, such as a thinking step.
-  const focusRowMissing = focus?.loaded === true && chatRowIndex(messages, focus.messageId) < 0;
+  // A message in the store that the chat shows no row for, such as a thinking step. The NEW line
+  // moves to the next row that has one, and the list opens at the latest message when none has.
+  const focusRowMissing = focus?.loaded === true && !focus.unread && chatRowIndex(messages, focus.messageId) < 0;
   useEffect(() => {
     if (!focusRowMissing) return;
     setFocus(null);
@@ -283,22 +332,30 @@ export function MobileChatView({
     [agent.id, agent.serverId, markAgentUnreadFrom],
   );
   // As on desktop, Mark unread is on the messages that the host counts as unread.
-  const markUnreadMessageIds = useMemo(
-    () =>
-      new Set(
-        (conversation?.messages ?? [])
-          .filter((message) => message.author !== "user" && itemTypeCountsAsUnread(message.itemType))
-          .map((message) => message.id),
-      ),
-    [conversation?.messages],
-  );
+  // The conversation is a new array on each streamed chunk, with the same messages. Each set stays
+  // the same object while its ids stay, as the list asks.
+  const lastMarkUnreadIds = useRef<ReadonlySet<string>>(NO_MESSAGE_IDS);
+  const markUnreadMessageIds = useMemo(() => {
+    const ids = (conversation?.messages ?? [])
+      .filter((message) => message.author !== "user" && itemTypeCountsAsUnread(message.itemType))
+      .map((message) => message.id);
+    lastMarkUnreadIds.current = keptIdSet(lastMarkUnreadIds.current, ids);
+    return lastMarkUnreadIds.current;
+  }, [conversation?.messages]);
   const unreadLineMessageId = unreadLine?.agentId === agent.id ? unreadLine.messageId : null;
   // The line shows above the first of these messages that has a row.
+  const lastUnreadLineIds = useRef<ReadonlySet<string> | null>(null);
   const unreadLineMessageIds = useMemo(() => {
-    if (!unreadLineMessageId) return null;
     const all = conversation?.messages ?? [];
-    const start = all.findIndex((message) => message.id === unreadLineMessageId);
-    return start < 0 ? null : new Set(all.slice(start).map((message) => message.id));
+    const start = unreadLineMessageId ? all.findIndex((message) => message.id === unreadLineMessageId) : -1;
+    lastUnreadLineIds.current =
+      start < 0
+        ? null
+        : keptIdSet(
+            lastUnreadLineIds.current,
+            all.slice(start).map((message) => message.id),
+          );
+    return lastUnreadLineIds.current;
   }, [unreadLineMessageId, conversation?.messages]);
   const activePrompt = messages.findLast(
     (message) =>
@@ -311,8 +368,12 @@ export function MobileChatView({
   const messageDelete = useMessageDelete(agent.serverId, { kind: "agent", agentId: agent.id });
   // As on desktop, the text of a message can start work in an open channel. The channel opens with
   // the text in its composer. The list changes on each channel event, so it is kept by its contents.
-  const channelKey = JSON.stringify(
-    channels.filter((channel) => !channel.archived).map((channel) => ({ id: channel.id, name: channel.name })),
+  const channelKey = useMemo(
+    () =>
+      JSON.stringify(
+        channels.filter((channel) => !channel.archived).map((channel) => ({ id: channel.id, name: channel.name })),
+      ),
+    [channels],
   );
   const sendToChannel = useMemo(() => {
     const open: { id: string; name: string }[] = JSON.parse(channelKey);
@@ -393,7 +454,9 @@ export function MobileChatView({
       olderLoading={conversation?.olderLoading ?? false}
       olderError={conversation?.olderError ?? false}
       loadOlder={loadOlder}
-      focusMessageId={focus?.messageId ?? null}
+      // The NEW line waits for its page: the messages that the phone kept can end before it.
+      focusMessageId={focus && (!focus.unread || focus.loaded) ? focus.messageId : null}
+      focusUnread={focus?.unread ?? false}
       // Offline, the chat shows what the phone has and moves to the message when its page loads.
       holdOpening={focus !== null && online}
       catchingUp={catchingUp}

@@ -13,9 +13,11 @@ export interface ProvidersPort {
   setProviderOn: OpenBotDesktopApi["setProviderOn"];
   restartProvider: OpenBotDesktopApi["restartProvider"];
   cancelProviderRestart: OpenBotDesktopApi["cancelProviderRestart"];
+  chooseInstalledCli: OpenBotDesktopApi["chooseInstalledCli"];
   startProviderCodeLogin: OpenBotDesktopApi["startProviderCodeLogin"];
   providerRuntimes: OpenBotDesktopApi["providerRuntimes"];
   connectProviderAccount: OpenBotDesktopApi["connectProviderAccount"];
+  connectProviderAccountKey: OpenBotDesktopApi["connectProviderAccountKey"];
   cancelProviderAccountSignIn: OpenBotDesktopApi["cancelProviderAccountSignIn"];
   renameProviderAccount: OpenBotDesktopApi["renameProviderAccount"];
   removeProviderAccount: OpenBotDesktopApi["removeProviderAccount"];

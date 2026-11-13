@@ -143,6 +143,9 @@ export const messages = {
     "검색 결과와 검색 메시지가 바뀔 때 짧은 흐림 효과와 함께 나타나고 사라져요. 동작이 줄어든 경우에는 페이드만 적용돼요. 끄면 바로 바뀌어요.",
   "mobile.settings.feedback.footer": "이 기기에서 앱의 동작에 대한 터치 피드백이에요.",
   "mobile.settings.feedback.haptics": "햅틱",
+  "mobile.settings.feedback.replies": "답장 햅틱",
+  "mobile.settings.feedback.repliesFooter":
+    "채팅에 에이전트 답장이 표시되는 동안의 진동입니다. 다른 햅틱은 그대로 켜져 있습니다.",
   "mobile.settings.feedback.retry": "햅틱 설정 다시 저장",
   "mobile.settings.liveActivities.title": "실시간 현황",
   "mobile.settings.liveActivities.footer":
@@ -225,6 +228,9 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "큰 파일 자동 다운로드",
   "mobile.settings.conversations.largeFilesFooter":
     "{small}보다 큰 이미지, 동영상, 오디오는 탭할 때만 다운로드돼요. 켜면 {large}까지 바로 다운로드해요. 모바일 데이터를 많이 쓸 수 있어요.",
+  "mobile.settings.conversations.fullQualityPhotos": "사진을 원본 화질로 보내기",
+  "mobile.settings.conversations.fullQualityPhotosFooter":
+    "끄면 앱이 각 사진의 작은 사본(긴 쪽 최대 2048픽셀)을 보냅니다. 느린 연결에서도 더 빨리 도착합니다. 원본 사진을 보내려면 켜세요.",
   "mobile.settings.profile.nameUnsafe": "이름에서 줄바꿈과 제어 문자를 제거해 주세요.",
   "mobile.settings.profile.nameLength": "표시 이름은 3~20자로 입력해 주세요.",
   "mobile.settings.profile.saveFailed": "변경 사항을 저장할 수 없었어요. 다시 시도해 주세요.",
@@ -474,4 +480,23 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "프로세스를 중지할 수 없어요.",
   "mobile.settings.agents.processes.stopTitle": "이 프로그램을 중지할까요?",
   "mobile.settings.agents.processes.stopLabel": "프로세스 {pid} 중지",
+  "mobile.settings.shortcuts.title": "단축어",
+  "mobile.settings.shortcuts.agent": "에이전트",
+  "mobile.settings.shortcuts.none": "없음",
+  "mobile.settings.shortcuts.unsupported": "단축어는 iOS 26 이상이 필요합니다.",
+  "mobile.settings.shortcuts.card.agents": "에이전트",
+  "mobile.settings.shortcuts.card.noAgents": "아직 에이전트가 없습니다",
+  "mobile.settings.shortcuts.card.setUp.title": "단축어를 설정하려면 OpenBot을 여세요",
+  "mobile.settings.shortcuts.card.setUp.action": "OpenBot 열기",
+  "mobile.settings.shortcuts.card.noAgent.title": "단축어에 사용할 에이전트를 선택하세요",
+  "mobile.settings.shortcuts.card.noAgent.detail": "단축어는 에이전트 하나에게 보냅니다.",
+  "mobile.settings.shortcuts.card.noAgent.action": "에이전트 선택",
+  "mobile.settings.shortcuts.card.locked.title": "OpenBot이 잠겨 있습니다",
+  "mobile.settings.shortcuts.card.locked.action": "OpenBot 열기",
+  "mobile.settings.shortcuts.footer": "단축어 앱의 Send Message는 이 에이전트에게 보냅니다. 앱은 열리지 않습니다.",
+  "mobile.settings.shortcuts.send.sent": "보냄",
+  "mobile.settings.shortcuts.send.failed": "OpenBot이 이 메시지를 보내지 못했습니다.",
+  "mobile.settings.shortcuts.send.unconfirmed": "서버에서 응답이 없습니다. 메시지가 채팅에 있을 수 있습니다.",
+  "mobile.settings.shortcuts.send.inApp": "OpenBot에서 보내기",
+  "mobile.settings.shortcuts.send.openChat": "채팅 열기",
 } as const satisfies PartialTranslation<typeof source>;

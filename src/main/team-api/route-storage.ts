@@ -12,6 +12,10 @@ import {
   STORAGE_CHANNEL_ROUTES,
 } from "@openbot/contracts/team-protocol/storage-channel-v1";
 import { STORAGE_DISK_CAPABILITY, STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-disk-v1";
+import {
+  STORAGE_USER_FILES_CAPABILITY,
+  STORAGE_USER_FILES_ROUTES,
+} from "@openbot/contracts/team-protocol/storage-user-files-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import { sourceText } from "@openbot/i18n/source";
 import type { ChannelService } from "../../backend/channel-service";
@@ -82,6 +86,13 @@ export async function routeStorage(
     // `readJson` checks that the body is empty. Every member can read it, as `storage-disk-v1` says.
     await readJson(request);
     return json(200, await runCauseEffect(storage.disk()));
+  }
+  if (method === "POST" && url.pathname === STORAGE_USER_FILES_ROUTES.disk) {
+    if (!storage || !capabilities.has(STORAGE_USER_FILES_CAPABILITY))
+      throw new HttpError(400, sourceText("error.team.storageUnsupported"));
+    // `readJson` checks that the body is empty. Every member can read it, as `storage-user-files-v1` says.
+    await readJson(request);
+    return json(200, await runCauseEffect(storage.diskUse()));
   }
   const usage = method === "POST" && url.pathname === STORAGE_ROUTES.usage;
   const deleteFile = method === "POST" && url.pathname === STORAGE_ROUTES.deleteFile;

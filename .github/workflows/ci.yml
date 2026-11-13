@@ -673,6 +673,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:cursor-usage
 
+      - name: Run the Cursor key accounts E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:cursor-key-accounts
+
       - name: Run the OpenCode Go usage E2E test
         if: ${{ !cancelled() }}
         run: bun run test:opencode-go-usage
@@ -787,6 +791,7 @@ jobs:
             .openbot-build/claude-api-key-e2e/
             .openbot-build/claude-stored-sign-in-e2e/
             .openbot-build/cursor-usage-e2e/
+            .openbot-build/cursor-key-accounts-e2e/
             .openbot-build/opencode-go-usage-e2e/
             .openbot-build/pi-sign-in-watch-e2e/
             .openbot-build/provider-launch-order-e2e/
@@ -854,6 +859,10 @@ jobs:
       - name: Run the ACP MCP server names E2E test
         if: ${{ !cancelled() }}
         run: bun run test:acp-mcp-names
+
+      - name: Run the Copilot MCP relay E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:copilot-mcp-relay
 
       - name: Run the ACP turn stall E2E test
         if: ${{ !cancelled() }}
@@ -951,6 +960,7 @@ jobs:
             .openbot-build/acp-additional-directories-e2e/
             .openbot-build/acp-flavor-e2e/
             .openbot-build/acp-mcp-server-names-e2e/
+            .openbot-build/copilot-mcp-relay-e2e/
             .openbot-build/acp-turn-stall-e2e/
             .openbot-build/agent-database-host-start-e2e/
             .openbot-build/acp-instructions-once-e2e/

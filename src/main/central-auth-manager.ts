@@ -103,6 +103,11 @@ interface CentralAuthManagerOptions {
   emailCodeRequestTimeoutMs?: number;
   /** Opens the company provider page. Without it, a company email cannot sign in. */
   companySignInBrowser?: CompanySignInBrowser | null;
+  /**
+   * True: the start waits for the account service before it reports a stored session as signed in.
+   * A hosted server sets it: its claim signs it in only when the stored session has ended.
+   */
+  confirmSessionAtStart?: boolean;
 }
 
 /** The persistent Mobile Connect link of this desktop. The account service keeps only its hash. */
@@ -192,6 +197,13 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
   #sessionToken: string | null = null;
   /** The session token in the stored file, or null when the file holds none that this start could read. */
   #storedSessionToken: string | null = null;
+  /**
+   * The profile of the signed-in account and the session token that it belongs to. The stored file
+   * holds a copy, so the next start shows the account before the account service answers.
+   */
+  #sessionUser: { token: string; user: CentralAuthUser } | null = null;
+  /** The profile in the stored file, as JSON, or null when the file holds none. */
+  #storedUserJson: string | null = null;
   readonly #teamHostTokens = new Map<string, string>();
   /** Belongs to the session that made it: the account service rejects it when that session ends. */
   #mobileConnectLink: StoredMobileConnectLink | null = null;
@@ -229,6 +241,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       startupRetryDelaysMs: options.startupRetryDelaysMs ?? STARTUP_RETRY_DELAYS_MS,
       emailCodeRequestTimeoutMs: options.emailCodeRequestTimeoutMs ?? EMAIL_CODE_REQUEST_TIMEOUT_MS,
       companySignInBrowser: options.companySignInBrowser ?? null,
+      confirmSessionAtStart: options.confirmSessionAtStart ?? false,
     };
   }
 
@@ -1546,6 +1559,14 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       );
     }
     const sessionToken = this.#sessionToken;
+    // The stored profile shows the account at once. The account service confirms the session after
+    // that, and a refusal signs this device out as it does at any later time.
+    const storedUser = this.#sessionUser?.token === sessionToken ? this.#sessionUser.user : null;
+    if (storedUser && !this.#options.confirmSessionAtStart) {
+      const state = this.#setState({ status: "signed_in", user: storedUser });
+      Effect.runFork(this.#owned(this.#confirmRestoredSession(sessionToken)).pipe(Effect.ignore));
+      return state;
+    }
     return yield* Effect.gen({ self: this }, function* () {
       const user = yield* this.#startupRequestEffect("/v1/me", { method: "GET" }, decodeCentralAuthUser, sessionToken);
       return this.#setState({ status: "signed_in", user: this.#resolveUserAvatar(user) });
@@ -1560,6 +1581,35 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         }),
       ),
     );
+  });
+
+  /**
+   * Asks the account service about a session that the start took from the stored file. A 401 ends
+   * the session. With no answer the account stays signed in: the next authorized request asks again.
+   */
+  readonly #confirmRestoredSession = Effect.fn("CentralAuth.confirmRestoredSession")(function* (
+    this: CentralAuthManager,
+    sessionToken: string,
+  ): Effect.fn.Return<void, never, CentralAuthTransport> {
+    const answer = yield* this.#startupRequestEffect(
+      "/v1/me",
+      { method: "GET" },
+      decodeCentralAuthUser,
+      sessionToken,
+    ).pipe(Effect.result);
+    if (this.#disposed || this.#sessionToken !== sessionToken) return;
+    if (Result.isFailure(answer)) {
+      const error = answer.failure.cause;
+      if (error instanceof AuthApiError && error.status === 401) {
+        yield* this.#endRevokedSession(sessionToken, true);
+        return;
+      }
+      logger.warn("The account service did not confirm the stored session.", toLogValue(error));
+      return;
+    }
+    if (this.#state.status !== "signed_in") return;
+    const user = this.#resolveUserAvatar(answer.success);
+    if (JSON.stringify(user) !== JSON.stringify(this.#state.user)) this.#setState({ status: "signed_in", user });
   });
 
   readonly requestEmailCode = Effect.fn("CentralAuth.requestEmailCode")(
@@ -2323,11 +2373,14 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     const temporaryPath = `${this.#options.storagePath}.${randomUUID()}.tmp`;
     let stage: StoredSessionStage = "encrypt";
     yield* Effect.gen({ self: this }, function* () {
+      // An older version reads only the fields that it knows, so the file stays version 2.
+      const user = this.#sessionUser?.token === sessionToken ? this.#sessionUser.user : null;
       const value = JSON.stringify({
         version: 2,
         sessionToken,
         teamHostTokens: Object.fromEntries(this.#teamHostTokens),
         ...(this.#mobileConnectLink ? { mobileConnectLink: this.#mobileConnectLink } : {}),
+        ...(user ? { user } : {}),
       });
       const encrypted = yield* authDecode(() => this.#options.encrypt(value).toString("base64"));
       stage = "write";
@@ -2336,6 +2389,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       yield* authCall(() => chmod(temporaryPath, 0o600));
       yield* authCall(() => rename(temporaryPath, this.#options.storagePath));
       this.#storedSessionToken = sessionToken;
+      this.#storedUserJson = user ? JSON.stringify(user) : null;
     }).pipe(
       // A required write fails, and its caller puts back the session that the file still holds.
       Effect.catch((failure) => {
@@ -2356,6 +2410,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       .withPermit(authCall(() => rm(this.#options.storagePath, { force: true })))
       .pipe(Effect.uninterruptible);
     this.#storedSessionToken = null;
+    this.#storedUserJson = null;
   });
 
   /**
@@ -2373,12 +2428,15 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
 
   #forgetSession(): void {
     this.#sessionToken = null;
+    this.#sessionUser = null;
     this.#sessionAccountId = null;
     this.#teamHostTokens.clear();
     this.#mobileConnectLink = null;
   }
 
   #restoreStoredSession(value: string): void {
+    this.#sessionUser = null;
+    this.#storedUserJson = null;
     if (!value.trimStart().startsWith("{")) {
       this.#sessionToken = value;
       this.#teamHostTokens.clear();
@@ -2399,12 +2457,30 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       }
     }
     this.#mobileConnectLink = restoreMobileConnectLink(stored.mobileConnectLink);
+    // A profile that does not decode is not an error: the start asks the account service as before.
+    try {
+      const user = decodeCentralAuthUser(stored.user);
+      this.#sessionUser = { token: stored.sessionToken, user };
+      this.#storedUserJson = JSON.stringify(user);
+    } catch {
+      this.#sessionUser = null;
+    }
   }
 
   #setState(state: CentralAuthState): CentralAuthState {
     // Held apart from the state, which passes through `code_sent` on the way to another
     // account: this is whose credentials the store is holding, until they are cleared.
-    if (state.status === "signed_in") this.#sessionAccountId = state.user.id;
+    if (state.status === "signed_in") {
+      this.#sessionAccountId = state.user.id;
+      const sessionToken = this.#sessionToken;
+      if (sessionToken) {
+        this.#sessionUser = { token: sessionToken, user: state.user };
+        // The file gets the profile, or its change, so the next start does not wait for the network.
+        if (JSON.stringify(state.user) !== this.#storedUserJson && !this.#disposed && this.#options.canPersist()) {
+          Effect.runFork(this.#owned(this.#writeStoredSession()).pipe(Effect.ignore));
+        }
+      }
+    }
     this.#state = state;
     const copy = this.getState();
     this.emit("changed", copy);
@@ -2470,8 +2546,11 @@ export function authApiRateLimit(error: unknown): { code: string; retryAfterSeco
   return { code: error.code, retryAfterSeconds: error.retryAfterSeconds ?? null };
 }
 
-/** A client error that the same request cannot change. A timeout and a rate limit can pass later. */
-function isFinalClientError(error: unknown): boolean {
+/**
+ * A client error that the same request cannot change, such as a machine token that the account service
+ * no longer accepts (401). A timeout and a rate limit can pass later.
+ */
+export function isFinalClientError(error: unknown): boolean {
   return (
     error instanceof AuthApiError &&
     error.status >= 400 &&

@@ -412,6 +412,17 @@ The host cuts each request text to 2,000 characters. A wait that is already clos
 host's sentence. The host sends no event when a wait changes, so a client reads the list again after a
 cancel and when a turn of the agent starts or ends.
 
+The optional `pending-approval-v1` capability (protocol 9 only) adds `POST /v1/agent-approvals/read`
+(`agentId`, `requestId`). It returns `{ approval }`, the whole copy of one approval that the agent waits
+on, as the `approval` event carries it. A runtime snapshot cuts each text of an approval to 240
+characters and sets `truncated`, so a client that did not get the event (a phone that connects
+later, a desktop after a restart) reads the whole copy here before it offers Allow. Each client keeps
+the whole copy when the next snapshot comes (`keepWholeApprovals` in
+`packages/team-client/src/runtime-attention.ts`), and shows a cut copy with Deny only.
+`src/main/team-api/route-pending-approval.ts` owns the authorization: a hidden or missing agent gets
+404, a member needs `chat` on the agent (else 403), and a request that no longer waits, or a request of
+another agent, gets 409.
+
 The optional `agent-queue-task-v1` capability (protocol 9 only) adds
 `POST /v1/agent-tasks/from-queued-message` (`agentId`, `deliveryId`, no other keys). It is "Run as a
 new thread" on a message that waits in the queue of the agent's own chat. The host advertises it only
@@ -427,7 +438,7 @@ dev server, with Stop. Only owners and admins can use them (else 403). The host 
 line before it leaves `src/main/background-processes.ts`, cuts it to 500 characters, sends at most
 200 programs and 64 ports each, and never sends the environment of a program. `processes` is null on a
 Windows host, which cannot find these programs. Stop signals only a program that is in the list at
-that time; an unknown id does nothing. This computer shows its own programs in Settings > Agents.
+that time; an unknown id does nothing. This computer shows its own programs in the same place.
 
 The optional `provider-use-v1` capability (protocol 9 only) adds `POST /v1/admin/provider-use/list`
 and `POST /v1/admin/provider-use/set` (`provider`, `on`). They are the on/off switch of the host's
