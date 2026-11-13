@@ -59,6 +59,11 @@ function createRecorder(stream: MediaStream): MediaRecorder {
     : new MediaRecorder(stream);
 }
 
+/** The recording that the turn makes now, so that it can be transcribed after a new one replaces it. */
+function currentRecording(turn: Recording): Recording {
+  return { recorder: turn.recorder, chunks: turn.chunks, startedAt: turn.startedAt, livePreview: turn.livePreview };
+}
+
 function quietLevels(): number[] {
   return new Array(SPEECH_LEVEL_COUNT).fill(0);
 }
@@ -158,8 +163,8 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   let sentHeard = "";
   /** The generation of the send whose reply the pane waits for. A hold that ends with no words keeps it. */
   let waitingSend = 0;
-  /** The words of a turn are being sent. Speech now is the next turn, and does not stop this send. */
-  let sending = false;
+  /** The sends in progress. Speech during a send is the next turn, and does not stop the send. */
+  let sending = 0;
   const startedAt = performance.now();
   /** The turns that were sent to the chat. */
   let sentTurns = 0;
@@ -449,7 +454,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     });
     recorder.addEventListener("stop", () => {
       if (turn !== current || current.recorder !== recorder) return;
-      const ended: Recording = { recorder, chunks, startedAt: current.startedAt, livePreview: current.livePreview };
+      const ended = currentRecording(current);
       releaseTurn();
       // While the agent waits, or while the turn before is transcribed, the next step opens a new turn.
       if (step === "listening") void finishTurn(ended, current.own);
@@ -525,7 +530,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
           quietFor = 0;
           if (loudFor >= (replying ? REPLY_SPEECH_START_MS : SPEECH_START_MS) && !current.spoke) {
             current.spoke = true;
-            if (step === "waiting" && !sending) holdReply();
+            if (step === "waiting" && sending === 0) holdReply();
             setState((draft) => {
               draft.error = null;
             });
@@ -559,12 +564,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
    */
   function endTurn(current: Turn): void {
     if (step !== "listening" || current.recorder.state !== "recording") return;
-    const ended: Recording = {
-      recorder: current.recorder,
-      chunks: current.chunks,
-      startedAt: current.startedAt,
-      livePreview: current.livePreview,
-    };
+    const ended = currentRecording(current);
     current.spoke = false;
     current.livePreview = undefined;
     record(current, createRecorder(current.stream));
@@ -645,7 +645,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
         draft.error = currentText().t("conversation.voice.notSent");
       });
     };
-    sending = true;
+    sending += 1;
     let recordingId: string | undefined;
     let delivered: boolean;
     try {
@@ -660,7 +660,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
         onFailed: notSent,
       });
     } finally {
-      sending = false;
+      sending -= 1;
     }
     analytics.track("voice_turn", {
       ...turnProperties,
