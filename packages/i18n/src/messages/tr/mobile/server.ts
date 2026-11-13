@@ -1499,6 +1499,7 @@ export const messages = {
   "mobile.server.route.transfer": "Aktarım",
   "mobile.server.route.transferExport": "Dışa aktar",
   "mobile.server.route.transferImport": "İçe aktar",
+  "mobile.server.route.transferCopy": "Başka bir sunucuya kopyala",
   "mobile.server.transfer.unsupported": "Aktarımı buradan yapmak için bu sunucudaki OpenBot'u güncelleyin.",
   "mobile.server.transfer.unavailable": "Aktarım yapmak için bu sunucuya sahip veya yönetici olarak bağlanın.",
   "mobile.server.transfer.title": "Bu sunucuyu başka bir bilgisayara taşıyın",
@@ -1562,4 +1563,21 @@ export const messages = {
     "Bu sağlayıcılarda diğer sunucuda oturum açılmıştı, ancak burada oturum açılmamış. Sunucu ayarları › Sağlayıcılar bölümünde bunlarda oturum açın.",
   "mobile.server.transfer.notImported": "İçe aktarılmadı",
   "mobile.server.transfer.warnings": "Bunları kontrol edin",
+  "mobile.server.transfer.copy": "Başka bir sunucuya kopyala",
+  "mobile.server.transfer.copyNote": "Ajanları sunucularınızdan birine gönderin.",
+  "mobile.server.transfer.copyTo": "Hedef",
+  "mobile.server.transfer.copyNoAgents": "Bu sunucuda ajan yok.",
+  "mobile.server.transfer.copyNotMoved":
+    "Kanalları ve paylaşılan klasör de kopyalanır. API anahtarları, oturum açma bilgileri, bağlayıcılar ve sohbet geçmişi kopyalanmaz. Bunları diğer sunucuda yeniden kurun.",
+  "mobile.server.transfer.copySubmit": { one: "{count} ajanı kopyala", other: "{count} ajanı kopyala" },
+  "mobile.server.transfer.copying": "Kopyalanıyor…",
+  "mobile.server.transfer.copyFailed": "Kopyalama tamamlanmadı.",
+  "mobile.server.transfer.copied": {
+    one: "{count} ajan {server} sunucusuna kopyalandı.",
+    other: "{count} ajan {server} sunucusuna kopyalandı.",
+  },
+  "mobile.server.transfer.copyAgents": "Kopyalanacak ajanlar",
+  "mobile.server.transfer.copyNext": "Kopyalanan ajanlar {server} sunucusunun onay kurallarını kullanır.",
+  "mobile.server.transfer.copyNoServer":
+    "Ajanları kopyalamak için başka bir sunucuya sahip veya yönetici olarak bağlanın.",
 } as const satisfies PartialTranslation<typeof source>;

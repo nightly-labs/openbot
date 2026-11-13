@@ -343,6 +343,14 @@ agents, and removes the file. Each side uses the routes above, in parts when its
 `instance-transfer-v1` takes at most 100 MB, the Shared folder included. An agent whose name is already on the destination is
 added beside it. The browser client has no copy: it connects to one host at a time.
 
+The mobile app has the same copy in Server settings > Transfer > Copy to another server. The source
+is the server of the page, and the destination is another online server that the user administers
+with `instance-transfer-v1`. The phone downloads the file from the source with the export route,
+sends it to the destination with the upload route, and applies all of its agents. The phone uses
+only `instance-transfer-v1`, so the file is at most 100 MB. The file stays in memory on the phone and
+is not written to its storage. A token that the destination keeps when the page closes before the
+apply is discarded.
+
 After a restart, the first upload or export removes old files from `instance-transfer-uploads/`,
 including unfinished `.part` files and the parts of `instance-transfer-chunks-v1`, before it writes a
 new file. Concurrent uploads and exports wait

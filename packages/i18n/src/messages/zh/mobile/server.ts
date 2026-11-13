@@ -1396,6 +1396,7 @@ export const messages = {
   "mobile.server.route.transfer": "迁移",
   "mobile.server.route.transferExport": "导出",
   "mobile.server.route.transferImport": "导入",
+  "mobile.server.route.transferCopy": "复制到其他服务器",
   "mobile.server.transfer.unsupported": "更新该服务器上的 OpenBot 后，才能在这里迁移它。",
   "mobile.server.transfer.unavailable": "以所有者或管理员身份连接到该服务器后才能迁移它。",
   "mobile.server.transfer.title": "把这台服务器迁移到另一台电脑",
@@ -1455,4 +1456,20 @@ export const messages = {
     "这些服务商原先在另一台服务器上登录，在此处尚未登录。在“服务器设置 › 服务商”中登录它们。",
   "mobile.server.transfer.notImported": "未导入",
   "mobile.server.transfer.warnings": "请检查以下内容",
+  "mobile.server.transfer.copy": "复制到其他服务器",
+  "mobile.server.transfer.copyNote": "将助手发送到你的其他服务器。",
+  "mobile.server.transfer.copyTo": "到",
+  "mobile.server.transfer.copyNoAgents": "此服务器没有助手。",
+  "mobile.server.transfer.copyNotMoved":
+    "助手所在的频道和共享文件夹也会被复制。API 密钥、登录、连接器和聊天记录不会被复制。请在另一台服务器上重新设置。",
+  "mobile.server.transfer.copySubmit": { one: "复制 {count} 个助手", other: "复制 {count} 个助手" },
+  "mobile.server.transfer.copying": "正在复制…",
+  "mobile.server.transfer.copyFailed": "复制未完成。",
+  "mobile.server.transfer.copied": {
+    one: "已将 {count} 个助手复制到 {server}。",
+    other: "已将 {count} 个助手复制到 {server}。",
+  },
+  "mobile.server.transfer.copyAgents": "要复制的助手",
+  "mobile.server.transfer.copyNext": "复制的助手使用 {server} 的批准规则。",
+  "mobile.server.transfer.copyNoServer": "以所有者或管理员身份连接到另一台服务器后才能把助手复制过去。",
 } as const satisfies PartialTranslation<typeof source>;

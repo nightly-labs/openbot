@@ -1472,6 +1472,7 @@ export const messages = {
   "mobile.server.route.transfer": "Overdracht",
   "mobile.server.route.transferExport": "Exporteren",
   "mobile.server.route.transferImport": "Importeren",
+  "mobile.server.route.transferCopy": "Kopiëren naar een andere server",
   "mobile.server.transfer.unsupported": "Werk OpenBot op deze server bij om hem hier over te dragen.",
   "mobile.server.transfer.unavailable":
     "Maak verbinding met deze server als eigenaar of beheerder om hem over te dragen.",
@@ -1537,4 +1538,21 @@ export const messages = {
     "Deze aanbieders waren op de andere server ingelogd en zijn hier niet ingelogd. Log bij ze in via Serverinstellingen › Aanbieders.",
   "mobile.server.transfer.notImported": "Niet geïmporteerd",
   "mobile.server.transfer.warnings": "Controleer deze",
+  "mobile.server.transfer.copy": "Kopiëren naar een andere server",
+  "mobile.server.transfer.copyNote": "Stuur agents naar een andere server van je.",
+  "mobile.server.transfer.copyTo": "Naar",
+  "mobile.server.transfer.copyNoAgents": "Deze server heeft geen agents.",
+  "mobile.server.transfer.copyNotMoved":
+    "Hun kanalen en de map Shared worden ook gekopieerd. API-sleutels, aanmeldingen, connectors en chatgeschiedenis worden niet gekopieerd. Stel ze opnieuw in op de andere server.",
+  "mobile.server.transfer.copySubmit": { one: "Kopieer {count} agent", other: "Kopieer {count} agents" },
+  "mobile.server.transfer.copying": "Kopiëren…",
+  "mobile.server.transfer.copyFailed": "Het kopiëren is niet voltooid.",
+  "mobile.server.transfer.copied": {
+    one: "{count} agent gekopieerd naar {server}.",
+    other: "{count} agents gekopieerd naar {server}.",
+  },
+  "mobile.server.transfer.copyAgents": "Agents om te kopiëren",
+  "mobile.server.transfer.copyNext": "Gekopieerde agents gebruiken de goedkeuringsregels van {server}.",
+  "mobile.server.transfer.copyNoServer":
+    "Maak verbinding met een andere server als eigenaar of beheerder om er agents naar te kopiëren.",
 } as const satisfies PartialTranslation<typeof source>;
