@@ -34,8 +34,8 @@ export const MOBILE_LATEST_VERSIONS: MobileLatestVersions = {
  * the APK of that version public (the `Publish the Android APK` workflow).
  *
  * `null` hides the APK download. Keep it `null` until `Stage the Android APK` has made a draft
- * release: on 2026-11-12 Google Play refused the download of the generated APK to the service
- * account ("The caller does not have permission"), and with a version here the site would link to
- * a file that is not there. Then set it to the version of the first draft.
+ * release: the first store build with that job did not save the APK (run 43258435511), and with a
+ * version here the site would link to a file that is not there. Then set it to the version of the
+ * first draft.
  */
 export const ANDROID_APK_FIRST_VERSION: string | null = null;
