@@ -537,7 +537,7 @@ export function developerInstructions(
           "When an MCP server's tools are missing or fail with an authorization, sign-in, or client registration error, describe and call openbot.test_mcp_server with the server name: OpenBot then shows a Sign in card in this chat. Do not send the user to /mcp or Server settings to sign in.",
         ]
       : []),
-    "Check a build, deploy, or other job of up to ~15 minutes in this turn at growing intervals; run your own long job detached (nohup) to outlive the call. For longer waits, open one with openbot.await_event, say what you wait for, and end your turn. For a repeated or timed request, such as every morning or remind me, create a routine with openbot.create_routine, or openbot.create_webhook_routine for events from another system; when you are not sure, or a handoff repeats, offer one in one sentence. Schedule only in OpenBot, never with provider scheduling such as Claude routines, /schedule, /loop, cron tools, or cloud agents: the user cannot see or stop that work. When an OpenBot routine tool fails, report it; do not schedule another way. Give times in the user's timezone.",
+    `Check a build, deploy, or other job of up to ~15 minutes in this turn at growing intervals; ${longJobStart()}. For longer waits, open one with openbot.await_event, say what you wait for, and end your turn. For a repeated or timed request, such as every morning or remind me, create a routine with openbot.create_routine, or openbot.create_webhook_routine for events from another system; when you are not sure, or a handoff repeats, offer one in one sentence. Schedule only in OpenBot, never with provider scheduling such as Claude routines, /schedule, /loop, cron tools, or cloud agents: the user cannot see or stop that work. When an OpenBot routine tool fails, report it; do not schedule another way. Give times in the user's timezone.`,
     "When the user tells you to stop or cancel your work, in any words, stop at once, interrupt each teammate that has part of it (describe openbot.interrupt_agent), close its waits, kill its jobs, do not resume it, and tell the user who stopped and what may still run. A request to change how you work is not a stop. After a teammate interrupts your turn, resume that work only on a new request.",
     "In a group chat with several agents, follow its rules: speak when addressed or when you add something useful, do not repeat other agents, and do your part in the chat.",
     "Attach files you created with openbot.attach_files_to_response before the final answer, except an image from your image generation tool: the chat already shows it; use absolute paths in file links and for files outside your workspace. React with openbot.react_to_user_message to clearly emotional messages, negative ones included, not neutral ones. A reaction does not replace or shorten the answer; do not mention it.",
@@ -626,6 +626,20 @@ export function developerInstructions(
   ].join("\n");
 }
 
+/**
+ * How an agent starts a job that must outlive its shell command. Codex ends the whole process group of
+ * a command when the command ends, so a plain `nohup ... &` job stops at once (#7980). A new session
+ * or process group outlives it. macOS has no `setsid` command; `set -m` gives the job its own group.
+ */
+function longJobStart(): string {
+  if (process.platform === "win32") return "run your own long job detached (nohup) to outlive the call";
+  const start =
+    process.platform === "darwin"
+      ? "(set -m; nohup <command> > <log> 2>&1 < /dev/null &)"
+      : "setsid nohup <command> > <log> 2>&1 < /dev/null &";
+  return `start your own long job in its own process group, so that it outlives the call: ${start}. A plain nohup <command> & job stops when the call ends`;
+}
+
 /** Only the file paths go into the prompt. The token stays in its file, because a provider receives this text. */
 function automationInstructions(agentId: string, root: string): string {
   const command = automationRunCommand({
@@ -636,7 +650,7 @@ function automationInstructions(agentId: string, root: string): string {
     waitId: "<waitId>",
     platform: process.platform,
   });
-  return `The user lets local scripts wake you through one of your routines. Use this instead of polling when a command must run after your turn ends, such as a long build, a download, or a worker CLI. Create a paused routine (active false) with openbot.create_routine whose instruction says what to do with the result, or reuse one that list_routines shows. Start the long command detached from your shell, so that it continues after your turn, and run this command after it in the same detached process, also when the long command fails (join them with ";", not "&&"), with a short payload such as the exit status and the log path: ${command} Before you end your turn, open a wait with openbot.await_event and put its waitId in the command, so that the run continues the user's request; leave out waitId when no request waits for the result. Then end your turn. OpenBot runs the routine and adds the payload to its task. The command reads a secret token from a file: never print, copy, or send the token, and do not use this for work that ends within your turn.`;
+  return `The user lets local scripts wake you through one of your routines. Use this instead of polling when a command must run after your turn ends, such as a long build, a download, or a worker CLI. Create a paused routine (active false) with openbot.create_routine whose instruction says what to do with the result, or reuse one that list_routines shows. Start the long command in its own process group, as for any long job, so that it continues after your turn, and run this command after it in the same detached process, also when the long command fails (join them with ";", not "&&"), with a short payload such as the exit status and the log path: ${command} Before you end your turn, open a wait with openbot.await_event and put its waitId in the command, so that the run continues the user's request; leave out waitId when no request waits for the result. Then end your turn. OpenBot runs the routine and adds the payload to its task. The command reads a secret token from a file: never print, copy, or send the token, and do not use this for work that ends within your turn.`;
 }
 
 const MAX_HOME_SKILLS_IN_INSTRUCTIONS = 100;
