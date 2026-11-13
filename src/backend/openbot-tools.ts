@@ -390,7 +390,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "list_channels",
     description:
-      "List the open channels with their id, name, lead, and members. A sidebar section (folder) is not a channel.",
+      "List the open channels with their id, name, title, instructions (first 300 characters), lead, and members. A sidebar section (folder) is not a channel.",
     shape: listChannelsToolSchema.shape,
   },
   {

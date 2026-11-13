@@ -112,6 +112,7 @@ import type { BrowserUploads } from "./browser-uploads";
 import {
   CHANNEL_AGENT_TOOL_NAMES,
   CHANNEL_AGENT_TOOL_NEEDS_LOCAL_PERSON,
+  channelAgentToolErrorMessage,
   handleChannelAgentTool,
   listChannelsToolSchema,
 } from "./channel-agent-tools";
@@ -217,7 +218,10 @@ function requestAborted(signal: AbortSignal | undefined) {
   });
 }
 
-/** The characters of an agent description that `list_agents` returns. `read_agent` returns all of it. */
+/**
+ * The characters of an agent description that `list_agents` returns, and of channel instructions that
+ * `list_channels` returns. `read_agent` returns all of a description.
+ */
 const LISTED_DESCRIPTION_LENGTH = 300;
 
 /** What `pin_message` tells the agent when the host refuses its pin. */
@@ -870,7 +874,11 @@ export class OpenBotToolRouter {
             // error with "dynamic tool request failed" (#1728, #6011, #6373).
             const correctableFailure = (error: unknown) =>
               Effect.sync(() => {
-                const message = this.#hooks.redactMcp(profileToolErrorMessage(error));
+                const message = this.#hooks.redactMcp(
+                  CHANNEL_AGENT_TOOL_NAMES.has(tool)
+                    ? channelAgentToolErrorMessage(tool, error)
+                    : profileToolErrorMessage(error),
+                );
                 if (!(error instanceof z.ZodError)) logger.warn("An OpenBot tool failed.", { tool, error: message });
                 return openBotToolFailure(message);
               });
@@ -1708,7 +1716,12 @@ export class OpenBotToolRouter {
 
     if (params.tool === "list_channels") {
       const args = listChannelsToolSchema.parse(params.arguments ?? {}, { reportInput: true });
-      return openBotToolResult({ channels: this.#channels.handoffTargets(args.archived === true) });
+      // An agent that created or changed a channel can check its instructions here (#8627).
+      return openBotToolResult({
+        channels: this.#channels
+          .handoffTargets(args.archived === true)
+          .map((channel) => ({ ...channel, instructions: listedDescription(channel.instructions) })),
+      });
     }
     if (CHANNEL_AGENT_TOOL_NAMES.has(params.tool)) {
       // In a channel task, the request that started the task must come from this computer's user.
