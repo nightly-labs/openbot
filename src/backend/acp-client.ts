@@ -180,6 +180,14 @@ const SESSION_STATE_UPDATES: ReadonlySet<SessionUpdate["sessionUpdate"]> = new S
 /** How long a stopped turn may take to end before OpenBot ends it itself. */
 const ACP_STOP_GRACE_MS = 10_000;
 
+/**
+ * How many times in a row a tool call may fail with the same arguments and the same error before
+ * OpenBot stops the turn. OpenCode 2 sends the error back to the model and has no loop guard of its
+ * own, so a model that sends `websearch {}` again after each failure spent tokens until the user
+ * stopped it (#6037). Gemini CLI, Cline and oh-my-pi also act at 5 repeats.
+ */
+const ACP_REPEATED_TOOL_FAILURES = 5;
+
 /** How often OpenBot asks `session/list` whether a session with a background task has changed. */
 const ACP_BACKGROUND_POLL_MS = 2_000;
 
@@ -258,6 +266,8 @@ interface AcpTurn {
   approvedEditRuns: Map<string, string>;
   /** Approved edits whose call under another id completed. */
   approvedEditsRan: Set<string>;
+  /** The last failed tool call (name, arguments and error), and how many times in a row it failed. */
+  repeatedFailure: { key: string; count: number } | null;
   /** The user stopped the turn. */
   stopped: boolean;
   /** Aborts when the user stops the turn: a permission request that waits gets its answer then. */
@@ -2403,6 +2413,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       approvedEdits: [],
       approvedEditRuns: new Map(),
       approvedEditsRan: new Set(),
+      repeatedFailure: null,
       stopped: false,
       stop: new AbortController(),
       completing: false,
@@ -3018,6 +3029,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         turn.messages.push(shown);
         turn.toolItems.delete(update.toolCallId);
         turn.mediaKinds.delete(update.toolCallId);
+        this.#countRepeatedFailure(thread, turn, reported === "failed" ? item : null);
       }
       if (this.#flavor.unsentBackgroundTurns && update.status === "completed" && startsBackgroundTask(update.rawOutput))
         this.#watchBackground(thread);
@@ -3098,6 +3110,38 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     turn.thought = "";
     turn.thoughtStarted = false;
     turn.thoughtItemId = `${turn.id}:thought:${turn.messages.length}`;
+  }
+
+  /**
+   * Stops a turn whose model sends the same failed tool call again and again. A call that completes,
+   * or fails in another way, starts the count again. A turn that the agent started by itself replays
+   * from history, so it is not counted.
+   */
+  #countRepeatedFailure(thread: AcpThread, turn: AcpTurn, failed: ThreadItem | null): void {
+    if (turn.unprompted) return;
+    if (!failed) {
+      turn.repeatedFailure = null;
+      return;
+    }
+    const key = JSON.stringify([failed.name, failed.arguments ?? null, failed.error ?? failed.result ?? null]);
+    const count = turn.repeatedFailure?.key === key ? turn.repeatedFailure.count + 1 : 1;
+    turn.repeatedFailure = { key, count };
+    if (count !== ACP_REPEATED_TOOL_FAILURES || turn.stopped) return;
+    Effect.runFork(
+      Effect.gen({ self: this }, function* () {
+        yield* providerCall(() => this.#sessionConnection(thread).cancel({ sessionId: thread.id })).pipe(Effect.ignore);
+        // The model chose to repeat the call; the provider did not fail. So no backup model starts.
+        turn.failureCause = "turn_limit";
+        yield* this.#abandonTurn(
+          thread,
+          turn,
+          "failed",
+          sourceText("error.agent.toolLoopStopped", {
+            provider: this.options.customEndpoint?.(thread.currentModelId)?.name ?? this.#label,
+          }),
+        );
+      }).pipe(Effect.forkIn(this.#scope)),
+    );
   }
 
   /**
