@@ -54,11 +54,12 @@ const AGENT_TITLE_MIN_EM = 4;
 
 /**
  * The agent's title after its name. It gives way before every other part of the header: it gets
- * shorter, and with less room than its minimum it hides, so no empty space stays after the name.
+ * shorter, and when it is cut to less than its minimum it hides, so no empty space stays after the name.
  * The room is always measured with the title shown, so hiding it cannot change the measurement.
  */
 function AgentTitle(props: { title: string }) {
   let room: HTMLSpanElement | undefined;
+  let title: HTMLSpanElement | undefined;
   onSettled(() => {
     const header = room?.closest(".conversation-header");
     if (!room || !header) return;
@@ -85,7 +86,9 @@ function AgentTitle(props: { title: string }) {
       // stays without the mark, and the observer measures it again when the rule shows it.
       if (style.display === "none") return;
       const minimum = AGENT_TITLE_MIN_EM * (Number.parseFloat(style.fontSize) || 12);
-      room.toggleAttribute("data-hidden", room.getBoundingClientRect().width < minimum);
+      // A short title, such as "CEO", is narrower than the minimum. It hides only when it is also cut.
+      const cut = title ? title.scrollWidth > title.clientWidth : false;
+      room.toggleAttribute("data-hidden", cut && room.getBoundingClientRect().width < minimum);
     };
     observer.observe(room);
     observer.observe(header);
@@ -97,7 +100,7 @@ function AgentTitle(props: { title: string }) {
   });
   return (
     <span ref={room} class="conversation-agent-title-room">
-      <span class="conversation-agent-title" dir="auto">
+      <span ref={title} class="conversation-agent-title" dir="auto">
         {props.title}
       </span>
     </span>
