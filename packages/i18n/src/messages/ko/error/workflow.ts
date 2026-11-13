@@ -18,6 +18,14 @@ export const messages = {
   "error.workflow.agentStepEnded": "에이전트가 답하기 전에 이 단계의 메시지가 삭제됐어요.",
   "error.workflow.conditionUnclear": "모델이 ‘예’ 또는 ‘아니요’로 답하지 않았어요.",
   "error.workflow.modelFailed": "모델이 답할 수 없었어요. 단계를 다시 실행해 주세요.",
+  "error.workflow.modelTimedOut":
+    "모델이 제때 답하지 않았어요. 이 단계의 강도를 낮추거나 더 빠른 모델을 고른 다음 다시 실행해 주세요.",
+  "error.workflow.modelToolUse":
+    "모델이 도구를 쓰려고 했지만 이 단계는 텍스트로만 답할 수 있어요. 단계를 다시 실행하거나 다른 모델을 골라 주세요.",
+  "error.workflow.modelUnavailable": "이 단계의 모델을 사용할 수 없어요. 이 단계에 다른 모델을 골라 주세요.",
+  "error.workflow.providerBusy": "제공자가 바빠요. 몇 분 기다린 다음 단계를 다시 실행해 주세요.",
+  "error.workflow.providerOffline":
+    "OpenBot이 제공자에 연결할 수 없었어요. 인터넷 연결을 확인한 다음 단계를 다시 실행해 주세요.",
   "error.workflow.modelBusy": "다른 모델 요청이 실행 중이에요. 잠시 후 단계를 다시 실행해 주세요.",
   "error.workflow.mediaFailed": "모델이 이미지나 동영상을 만들 수 없었어요. 단계를 다시 실행해 주세요.",
   "error.workflow.pictureMissing": "이미지가 서버에 더 이상 없어요. 다시 보내 주세요.",

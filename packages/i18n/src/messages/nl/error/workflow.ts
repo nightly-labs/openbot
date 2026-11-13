@@ -19,6 +19,15 @@ export const messages = {
   "error.workflow.agentStepEnded": "Het bericht van de agent voor deze stap is verwijderd voordat de agent antwoordde.",
   "error.workflow.conditionUnclear": "Het model antwoordde niet met ja of nee.",
   "error.workflow.modelFailed": "Het model kon niet antwoorden. Voer de stap opnieuw uit.",
+  "error.workflow.modelTimedOut":
+    "Het model antwoordde niet op tijd. Kies een lager denkniveau of een sneller model voor deze stap en voer hem opnieuw uit.",
+  "error.workflow.modelToolUse":
+    "Het model probeerde een tool te gebruiken, maar deze stap kan alleen met tekst antwoorden. Voer de stap opnieuw uit of kies er een ander model voor.",
+  "error.workflow.modelUnavailable":
+    "Het model van deze stap is niet beschikbaar. Kies een ander model voor deze stap.",
+  "error.workflow.providerBusy": "De provider is bezet. Wacht een paar minuten en voer de stap dan opnieuw uit.",
+  "error.workflow.providerOffline":
+    "OpenBot kon de provider niet bereiken. Controleer de internetverbinding en voer de stap dan opnieuw uit.",
   "error.workflow.modelBusy": "Er loopt een ander verzoek aan het model. Voer de stap zo opnieuw uit.",
   "error.workflow.mediaFailed": "Het model kon de afbeelding of video niet maken. Voer de stap opnieuw uit.",
   "error.workflow.pictureMissing": "De afbeelding staat niet meer op de server. Stuur hem opnieuw.",
