@@ -66,6 +66,7 @@ import type { AgentStore } from "../agent-store";
 import type { AgentTasks } from "../agent-tasks/agent-tasks";
 import type { AgentWaits } from "../agent-waits/agent-waits";
 import { attachmentCall, attachmentFailure } from "../attachment-effects";
+import { repairBrowserToolInput } from "../browser-tool-input";
 import { OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
 import type { ChannelService } from "../channel-service";
 import type { ProviderSession } from "../database/provider-sessions";
@@ -750,7 +751,9 @@ export class OpenBotToolRouter {
               threadId: this.#conversation.publicThreadId(agentId, toolRequest.params.threadId),
               ownerAgentId: agentId,
             };
-            const callTabId = isRecord(params.arguments) ? params.arguments.tabId : undefined;
+            // The browser tools read the repaired arguments, such as `tab_id`, so this check does too.
+            const callArgs = repairBrowserToolInput(params.tool, params.arguments).value;
+            const callTabId = isRecord(callArgs) && isString(callArgs.tabId) ? callArgs.tabId : undefined;
             if (this.#attention.browserTakeoverBlocks(agentId, params.threadId, callTabId)) {
               client.respond(toolRequest.id, {
                 success: false,

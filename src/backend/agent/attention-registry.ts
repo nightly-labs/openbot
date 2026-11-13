@@ -873,9 +873,9 @@ export class AttentionRegistry {
    * and a call landing mid-login would act on a page the user is in the middle of. The agent's other
    * chats keep their own tabs and the Vault, so one unanswered card does not stop them (#8012).
    */
-  browserTakeoverBlocks(agentId: string, threadId: string, tabId: unknown): boolean {
+  browserTakeoverBlocks(agentId: string, threadId: string, tabId: string | undefined): boolean {
     return [...this.#takeovers.values()].some(
-      ({ request }) => request.tabId === tabId || (request.agentId === agentId && request.threadId === threadId),
+      ({ request }) => request.agentId === agentId && (request.tabId === tabId || request.threadId === threadId),
     );
   }
 
