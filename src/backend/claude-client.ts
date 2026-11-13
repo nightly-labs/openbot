@@ -470,6 +470,10 @@ interface ActiveTurn {
   lastActivityAt: number;
   /** The CLI sent nothing past the stall limit, so the close of its query fails the turn. */
   stalled: boolean;
+  /** Requests of this turn that OpenBot answers, such as an OpenBot tool or a question to the user. The stall limit waits. */
+  hostRequests: number;
+  /** The user stopped the turn. Its stop ends it, also when the CLI does not answer (`#closeIfStopIgnored`). */
+  stopRequested: boolean;
 }
 
 interface ThreadRuntime {
@@ -506,8 +510,6 @@ interface ThreadRuntime {
   backgroundTasks: number;
   /** When the process last sent a message. With no turn, only background work sends one. */
   lastOutputAt: number;
-  /** Requests that OpenBot answers, such as an OpenBot tool or a question to the user. The stall limit waits. */
-  hostRequests: number;
   /** The uuids of the messages that this process took. The CLI does not run one of them again. */
   promptIds: Set<string>;
   /**
@@ -949,10 +951,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       if (!turn) continue;
       // A timer does not run while the computer sleeps, but the clock does.
       const asleep = Date.now() - before - CLAUDE_STALL_CHECK_MS;
-      if (asleep > CLAUDE_STALL_CHECK_MS) turn.lastActivityAt += asleep;
+      if (asleep > CLAUDE_STALL_CHECK_MS) turn.lastActivityAt = Math.min(Date.now(), turn.lastActivityAt + asleep);
       const silentFor = Date.now() - turn.lastActivityAt;
       const limit = turn.toolCalls.size > 0 || runtime.compacting ? CLAUDE_TOOL_STALL_MS : CLAUDE_TURN_STALL_MS;
-      if (runtime.hostRequests > 0 || silentFor < limit || this.#threads.get(runtime.id) !== runtime) continue;
+      if (turn.hostRequests > 0 || turn.stopRequested || silentFor < limit || this.#threads.get(runtime.id) !== runtime)
+        continue;
       queryLogger.warn("Closed a Claude query that sent nothing past the stall limit.", {
         threadId: runtime.id,
         silentForMinutes: Math.floor(silentFor / 60_000),
@@ -971,16 +974,16 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   #awaitHost<A, E, R>(threadId: string, request: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> {
     return Effect.acquireUseRelease(
       Effect.sync(() => {
-        const runtime = this.#threads.get(threadId);
-        if (runtime) runtime.hostRequests += 1;
-        return runtime;
+        const turn = this.#threads.get(threadId)?.activeTurn ?? null;
+        if (turn) turn.hostRequests += 1;
+        return turn;
       }),
       () => request,
-      (runtime) =>
+      (turn) =>
         Effect.sync(() => {
-          if (!runtime) return;
-          runtime.hostRequests -= 1;
-          if (runtime.activeTurn) runtime.activeTurn.lastActivityAt = Date.now();
+          if (!turn) return;
+          turn.hostRequests -= 1;
+          turn.lastActivityAt = Date.now();
         }),
     );
   }
@@ -1083,7 +1086,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         const runtime = yield* providerSync(() => this.#requireThread(threadId));
         const turn = runtime.activeTurn;
         const stopped = turn && turn.id === getString(params, "turnId") ? turn : null;
-        if (stopped) yield* this.#closeIfStopIgnored(runtime, stopped);
+        if (stopped) {
+          stopped.stopRequested = true;
+          yield* this.#closeIfStopIgnored(runtime, stopped);
+        }
         yield* providerCall(() => runtime.query.interrupt()).pipe(
           // The close of a CLI that did not answer the stop rejects the stop request, but the close ends the turn.
           Effect.catch((failure) =>
@@ -1635,7 +1641,6 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       subagents: newSubagentState(),
       backgroundTasks: 0,
       lastOutputAt: Date.now(),
-      hostRequests: 0,
       promptIds: new Set<string>(),
       nextTurnId: null,
       streamMessage: { id: null, thinkingBlocks: new Map<number, string>() },
@@ -1780,6 +1785,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       unprompted,
       lastActivityAt: Date.now(),
       stalled: false,
+      hostRequests: 0,
+      stopRequested: false,
     };
     runtime.activeTurn = turn;
     runtime.nextTurnId = null;
