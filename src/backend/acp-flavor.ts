@@ -476,6 +476,9 @@ export const KIMI_ACP_FLAVOR: AcpFlavor = {
     error.data.details.includes("config.toml"),
   // Its `Agent` call is titled `Agent: <description>`, and its arguments come as content text.
   subagentTools: ["Agent"],
+  // Kimi CLI 1.52.0 refuses a new session with `authRequired` when it has no token, or an expired
+  // one with no refresh token. A chat then showed "RequestError: Authentication required" (#8555).
+  authRequiredSignsOut: true,
   // Kimi CLI 1.52.0 stops reading a turn at `StepInterrupted`, so a model step that fails ends the
   // prompt as `end_turn`, and the step's error is lost. The chat then showed no answer and no error
   // (#6722). Kimi's thinking alone is not an answer.

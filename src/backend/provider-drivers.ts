@@ -62,6 +62,7 @@ import { isMissingFileError } from "./file-errors";
 import { GrokAgentClient } from "./grok-client";
 import { hermesSettingsEnvironment } from "./hermes-settings";
 import { isPythonKimiCli, kimiPythonLoginEnv, kimiPythonSavedRegionEnv, type SignInRegion } from "./kimi-region";
+import { kimiSavedSignInCheck } from "./kimi-sign-in-check";
 import { readKimiUsage } from "./kimi-usage";
 import type { McpOAuthAuthority } from "./mcp-oauth-provider";
 import type { McpOAuthProxySettingsStore } from "./mcp-oauth-proxy";
@@ -1424,6 +1425,10 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
           readKimiUsage(isPythonKimiCli(cli), { ...process.env, ...context.agentEnvironment?.() }).pipe(
             Effect.mapError((failure) => providerFailure(failure.cause)),
           ),
+        // Kimi Code 2.x answers a prompt with `authRequired` when its server refuses the sign-in.
+        ...(isPythonKimiCli(cli)
+          ? { savedSignInCheck: kimiSavedSignInCheck(() => ({ ...process.env, ...context.agentEnvironment?.() })) }
+          : {}),
       }),
     createProfileClient: (cli, timeout, context) =>
       new AcpAgentClient(cli, timeout, {
