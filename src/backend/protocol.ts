@@ -576,7 +576,19 @@ export function bridgedToolName(item: ThreadItem): string | null {
   const tool = getString(item, "tool") ?? getString(item, "name");
   if (tool !== "tool_call" && tool !== "mcp__openbot__tool_call") return null;
   const args = getRecord(item, "arguments");
-  return getString(args, "name") ?? getString(args, "tool");
+  const name = getString(args, "name") ?? getString(args, "tool");
+  return name === null ? null : qualifiedToolName(name);
+}
+
+/**
+ * The qualified name `<namespace>.<tool>` of a name that an agent sends to tool_call. An agent also sends
+ * the MCP name that it sees for the tool, `<namespace>__<tool>` or `mcp__<namespace>__<tool>`, and
+ * tool_call runs it (#7955), so the readers of its items read the same tool.
+ */
+export function qualifiedToolName(name: string): string {
+  const trimmed = name.trim();
+  const mcp = /^(?:mcp__)?([A-Za-z0-9_-]+?)__([A-Za-z0-9_-]+)$/.exec(trimmed);
+  return mcp ? `${mcp[1]}.${mcp[2]}` : trimmed;
 }
 
 export function getArray(record: unknown, key: string): unknown[] {

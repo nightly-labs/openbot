@@ -4,7 +4,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { z } from "zod";
 import { BROWSER_DYNAMIC_TOOLS, BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
 import { OPENBOT_DYNAMIC_TOOLS, OPENBOT_TOOL_DEFINITIONS } from "../openbot-tools";
-import { type DynamicToolCallParams, isRecord } from "../protocol";
+import { type DynamicToolCallParams, isRecord, qualifiedToolName } from "../protocol";
 import { advertisedJsonSchema } from "./advertised-json-schema";
 import { toolGuidance } from "./tool-guidance";
 
@@ -209,7 +209,7 @@ export function visibleDynamicTools(provider: AgentProviderId) {
 export function claudeBridgedToolName(name: string, input: unknown): string {
   if (name !== "mcp__openbot__tool_call") return name;
   const called = bridgedName(input);
-  const entry = called ? BUILTIN_TOOL_CATALOG.find((tool) => tool.name === called) : undefined;
+  const entry = called ? catalogEntry(BUILTIN_TOOL_CATALOG, called) : undefined;
   return entry ? `mcp__${entry.namespace}__${entry.tool}` : name;
 }
 
@@ -393,13 +393,13 @@ function decodeArgumentsText(text: string): DynamicRecord | null {
 /**
  * Decodes a `tool_call` envelope. Models send `arguments` as JSON text, so the text is decoded first.
  * For a tool with no arguments, models and OpenAI-compatible gateways leave out `arguments` or send
- * `null` or empty text, which is an empty object. The target tool still checks its own arguments (#7955).
+ * `null`, empty text or the text `null`, which is an empty object. The target tool still checks its own arguments (#7955).
  */
 function parseCall(params: DynamicToolCallParams) {
   const envelope = params.arguments;
   if (!isRecord(envelope)) return callSchema.safeParse(envelope);
   const sent = envelope.arguments;
-  if (sent === undefined || sent === null || (typeof sent === "string" && sent.trim() === ""))
+  if (sent === undefined || sent === null || (typeof sent === "string" && /^(?:null)?$/.test(sent.trim())))
     return callSchema.safeParse({ ...envelope, arguments: {} });
   if (typeof sent !== "string") return callSchema.safeParse(envelope);
   return callSchema.safeParse({ ...envelope, arguments: decodeArgumentsText(sent) });
@@ -411,8 +411,13 @@ function parseCall(params: DynamicToolCallParams) {
  * through tool_call and got the same refusal for each try (#7955).
  */
 function catalogEntry(catalog: typeof BUILTIN_TOOL_CATALOG, name: string) {
-  const mcpName = name.startsWith("mcp__") ? name.slice("mcp__".length) : name;
-  return catalog.find((tool) => tool.name === name || `${tool.namespace}__${tool.tool}` === mcpName);
+  const qualified = qualifiedToolName(name);
+  return catalog.find((tool) => tool.name === qualified);
+}
+
+/** The name that a decoded `tool_call` envelope calls, from `name` or its alias `tool`. */
+function calledName(call: { name?: string | undefined; tool?: string | undefined }): string {
+  return qualifiedToolName(call.name ?? call.tool ?? "");
 }
 
 /**
@@ -420,8 +425,8 @@ function catalogEntry(catalog: typeof BUILTIN_TOOL_CATALOG, name: string) {
  * name counts: a bare `tool_search` can mean the provider's own search for MCP tools.
  */
 function callsDiscoveryTool(envelope: unknown): boolean {
-  const named = bridgedName(envelope)?.trim();
-  return named !== undefined && /^(?:openbot\.|openbot__|mcp__openbot__)tool_(?:search|describe)$/.test(named);
+  const named = bridgedName(envelope);
+  return named !== null && /^openbot\.tool_(?:search|describe)$/.test(qualifiedToolName(named));
 }
 
 /**
@@ -437,6 +442,13 @@ export function deferredCallArgumentsError(
   unknownToolNote: string | null = null,
 ): string | null {
   if (callsDiscoveryTool(params.arguments)) return sourceText("error.agent.toolCallDiscoveryTool");
+  const error = refusedCallError(params, provider);
+  if (error === null || !unknownToolNote) return error;
+  const named = bridgedName(params.arguments);
+  return named !== null && catalogEntry(catalogFor(provider), named) ? error : `${error} ${unknownToolNote}`;
+}
+
+function refusedCallError(params: DynamicToolCallParams, provider: AgentProviderId): string | null {
   const parsed = parseCall(params);
   if (!parsed.success) {
     const { issues } = parsed.error;
@@ -445,16 +457,18 @@ export function deferredCallArgumentsError(
       ? sourceText("error.agent.toolCallArgumentsNotObject")
       : null;
   }
-  // The envelope is valid, so the name is outside the catalog. A dotted or bare name, such as
-  // `browser.snapshot` or `snapshot`, gets the one catalog tool of the same short name.
-  const name = (parsed.data.name ?? parsed.data.tool ?? "").trim();
-  const short = name.includes("__") ? null : name.slice(name.lastIndexOf(".") + 1);
-  const [match, other] = short ? catalogFor(provider).filter((tool) => tool.tool === short) : [];
-  const error =
-    match && !other
-      ? sourceText("error.agent.toolCallUnknownToolSuggest", { name: match.name })
-      : sourceText("error.agent.toolCallUnknownTool");
-  return unknownToolNote ? `${error} ${unknownToolNote}` : error;
+  // The envelope is valid, so the name is outside the catalog. A bare name, such as `snapshot`, or a
+  // name in a catalog namespace, such as `openbot.snapshot`, gets the one catalog tool of the same short
+  // name. A name in another namespace can be a tool of the user's MCP servers, so it gets none.
+  const catalog = catalogFor(provider);
+  const name = calledName(parsed.data);
+  const dot = name.lastIndexOf(".");
+  const namespace = dot < 0 ? null : name.slice(0, dot);
+  const short = namespace === null || catalog.some((tool) => tool.namespace === namespace) ? name.slice(dot + 1) : "";
+  const [match, other] = short ? catalog.filter((tool) => tool.tool === short) : [];
+  return match && !other
+    ? sourceText("error.agent.toolCallUnknownToolSuggest", { name: match.name })
+    : sourceText("error.agent.toolCallUnknownTool");
 }
 
 /**
@@ -467,7 +481,7 @@ export function resolveDeferredTool(
 ): DynamicToolCallParams | null {
   const parsed = parseCall(params);
   if (!parsed.success) return null;
-  const entry = catalogEntry(catalogFor(provider), (parsed.data.name ?? parsed.data.tool ?? "").trim());
+  const entry = catalogEntry(catalogFor(provider), calledName(parsed.data));
   if (!entry) return null;
   return { ...params, namespace: entry.namespace, tool: entry.tool, arguments: parsed.data.arguments };
 }
