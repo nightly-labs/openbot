@@ -98,6 +98,15 @@ export interface AcpConfigurationOptions {
   keepProbeSession?: () => boolean;
   /** `AcpFlavor.probeCloseDelayMs`. */
   probeCloseDelayMs?: number | undefined;
+  /** `AcpFlavor.effortCategories`. */
+  effortCategories?: readonly string[] | undefined;
+}
+
+/** The categories of an agent's effort option when its flavor names none. */
+const EFFORT_CATEGORIES: readonly string[] = ["thought_level"];
+
+function isEffortOption(option: SessionConfigOption, categories: readonly string[]): boolean {
+  return option.type === "select" && option.category != null && categories.includes(option.category);
 }
 
 /** Owns ACP model discovery and setting translation. The client owns sessions and their state. */
@@ -126,7 +135,13 @@ export class AcpConfiguration {
     const deadline = Date.now() + requestTimeoutMs - MODEL_DISCOVERY_RETURN_MS;
     const sweep = Effect.acquireUseRelease(
       this.#openProbe(connection),
-      (probe) => this.#modelReasoningEffortsEffect(connection, probe, modelsFromSessionSetup(probe), deadline),
+      (probe) =>
+        this.#modelReasoningEffortsEffect(
+          connection,
+          probe,
+          modelsFromSessionSetup(probe, this.options.effortCategories),
+          deadline,
+        ),
       (probe) =>
         this.options.keepProbeSession?.()
           ? Effect.sync(() => {
@@ -272,7 +287,7 @@ export class AcpConfiguration {
       // An unanswered model holds the opening model's options, which say nothing about this model.
       probed.push(
         response
-          ? { ...model, ...reasoningFromConfig(response.configOptions) }
+          ? { ...model, ...reasoningFromConfig(response.configOptions, this.options.effortCategories) }
           : { ...model, reasoningEffortConfigurable: true },
       );
     }
@@ -344,7 +359,9 @@ export class AcpConfiguration {
       }
       const options = thread.configOptions.filter(
         (candidate): candidate is Extract<SessionConfigOption, { type: "select" }> =>
-          candidate.category === category && candidate.type === "select",
+          category === "thought_level"
+            ? isEffortOption(candidate, this.options.effortCategories ?? EFFORT_CATEGORIES)
+            : candidate.category === category && candidate.type === "select",
       );
       // Cline puts a provider option of the model category before its model option. The first option
       // of the category did not list the model, and the model was never sent. A model OpenBot added
@@ -455,7 +472,9 @@ export class AcpConfiguration {
     configId: string,
     value: AgentSessionSettingValue,
   ): Effect.fn.Return<AgentSessionSettingsSnapshot, ProviderClientOperationError> {
-    const option = sessionSettingsSnapshot(thread.configOptions).options.find((entry) => entry.id === configId);
+    const option = sessionSettingsSnapshot(thread.configOptions, this.options.effortCategories).options.find(
+      (entry) => entry.id === configId,
+    );
     if (!option) return yield* providerFailure(new Error(sourceText("error.provider.sessionSettingUnavailable")));
     if (
       option.type === "boolean"
@@ -470,7 +489,7 @@ export class AcpConfiguration {
         : this.#connection(thread).setSessionConfigOption({ sessionId: thread.id, configId, value }),
     );
     thread.configOptions = response.configOptions;
-    return sessionSettingsSnapshot(thread.configOptions);
+    return sessionSettingsSnapshot(thread.configOptions, this.options.effortCategories);
   });
 
   /**
@@ -530,7 +549,8 @@ function withCurrentValue(
 }
 
 /** Permission and secret controls stay outside the generic settings path. */
-function isAdditionalSetting(option: SessionConfigOption): boolean {
+function isAdditionalSetting(option: SessionConfigOption, effortCategories: readonly string[]): boolean {
+  if (isEffortOption(option, effortCategories)) return false;
   const category = option.category?.toLowerCase();
   if (
     [category, option.id.toLowerCase()].some(
@@ -557,9 +577,13 @@ function isAdditionalSetting(option: SessionConfigOption): boolean {
   });
 }
 
-export function sessionSettingsSnapshot(options: SessionConfigOption[]): AgentSessionSettingsSnapshot {
+export function sessionSettingsSnapshot(
+  options: SessionConfigOption[],
+  effortCategories: readonly string[] = EFFORT_CATEGORIES,
+): AgentSessionSettingsSnapshot {
+  const additional = (option: SessionConfigOption) => isAdditionalSetting(option, effortCategories);
   return {
-    options: options.filter(isAdditionalSetting).map((option): AgentSessionSettingOption => {
+    options: options.filter(additional).map((option): AgentSessionSettingOption => {
       const base = {
         id: option.id,
         name: option.name,
@@ -591,11 +615,14 @@ interface SessionSetupResponse {
   models?: unknown;
 }
 
-export function modelsFromSessionSetup(response: SessionSetupResponse): AcpModel[] {
+export function modelsFromSessionSetup(
+  response: SessionSetupResponse,
+  effortCategories: readonly string[] = EFFORT_CATEGORIES,
+): AcpModel[] {
   const options = sessionConfigOptions(response);
   const discovered = availableModels(response);
-  if (discovered.length === 0 || groupedModelOption(response)) return modelsFromConfig(options);
-  const configReasoning = reasoningFromConfig(options);
+  if (discovered.length === 0 || groupedModelOption(response)) return modelsFromConfig(options, effortCategories);
+  const configReasoning = reasoningFromConfig(options, effortCategories);
   return discovered.map((model) => {
     const supportedReasoningEfforts = model.supportedReasoningEfforts ?? configReasoning.supportedReasoningEfforts;
     const reasoningEffortWireValues = model.reasoningEffortWireValues;
@@ -623,13 +650,13 @@ export function modelsFromSessionSetup(response: SessionSetupResponse): AcpModel
   });
 }
 
-function modelsFromConfig(options: SessionConfigOption[]): AcpModel[] {
+function modelsFromConfig(options: SessionConfigOption[], effortCategories: readonly string[]): AcpModel[] {
   const model = options.find(
     (option): option is Extract<SessionConfigOption, { type: "select" }> =>
       option.category === "model" && option.type === "select",
   );
   if (!model) return [];
-  const reasoning = reasoningFromConfig(options);
+  const reasoning = reasoningFromConfig(options, effortCategories);
   return selectValues(model).map((option) => ({
     id: option.value,
     name: option.name,
@@ -641,11 +668,12 @@ function modelsFromConfig(options: SessionConfigOption[]): AcpModel[] {
 
 function reasoningFromConfig(
   options: SessionConfigOption[],
+  effortCategories: readonly string[] = EFFORT_CATEGORIES,
 ): Pick<
   AcpModel,
   "defaultReasoningEffort" | "supportedReasoningEfforts" | "reasoningEffortConfigurable" | "reasoningEffortWireValues"
 > {
-  const thought = options.find((option) => option.category === "thought_level" && option.type === "select");
+  const thought = options.find((option) => isEffortOption(option, effortCategories));
   const wireValues = reasoningEffortWireValues(
     thought && thought.type === "select" ? selectValues(thought).map((option) => option.value) : ["medium"],
   );
