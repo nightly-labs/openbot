@@ -532,14 +532,17 @@ export class ChannelService {
    * "Delete history": every message of the channel leaves the view and the stored history, with its
    * files, and the members forget the channel as after "New conversation". The members,
    * instructions, memories, routines and tasks stay. Work that still runs or waits refuses it, and
-   * `members.busy` and `members.end` work as for `clearContext`.
+   * `members.busy` works as for `clearContext`. `members.forget` deletes the messages of each
+   * member's channel thread and ends its session; a failure leaves the rest for a second request.
    */
   readonly deleteHistory = Effect.fn("ChannelService.deleteHistory")(function* (
     this: ChannelService,
     channelId: string,
     members: {
       busy: (contexts: ReadonlyArray<{ agentId: string; threadId: string }>) => boolean;
-      end: (threadIds: readonly string[]) => Effect.Effect<void>;
+      forget: (
+        contexts: ReadonlyArray<{ agentId: string; threadId: string }>,
+      ) => Effect.Effect<void, ChannelOperationError>;
     },
   ) {
     yield* this.#serialize(
@@ -556,7 +559,7 @@ export class ChannelService {
         yield* channelSync(() => this.store.deleteHistory(channel));
         // A failure here leaves copies that no message shows; a second request removes them.
         yield* this.mailbox.deleteChannelMessageCopies(channelId, "all").pipe(Effect.mapError(channelFailure));
-        yield* members.end(contexts.map((context) => context.threadId));
+        yield* members.forget(contexts);
       }).pipe(Effect.uninterruptible),
     );
     this.publish(channelId);
