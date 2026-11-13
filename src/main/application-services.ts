@@ -330,6 +330,7 @@ import { McpOAuthStore } from "./mcp-oauth-store";
 import { MCP_SERVER_OWNERS_FILE, McpServerOwnersStore } from "./mcp-server-owners-store";
 import { MemoryReviewPreferenceStore } from "./memory-review-preference-store";
 import { MessagingCredentialStore } from "./messaging-credential-store";
+import { createModelReasoningSupport } from "./model-reasoning-probe";
 import { ModelReleaseCatalog, ModelVisibility } from "./model-visibility";
 import { NotificationPreferenceStore } from "./notification-preference-store";
 import { OnePasswordConnectorService } from "./onepassword-connector-service";
@@ -1718,6 +1719,7 @@ export async function createApplicationServices({
     path: join(app.getPath("userData"), CUSTOM_PROVIDERS_FILE),
     cipher: secretCipher,
   });
+  const modelReasoning = createModelReasoningSupport(() => customProviders.configs());
   // Before the service, which reads the endpoints at its first provider spawn. A file this build
   // cannot read leaves the list empty and every write refused; it does not stop the app.
   // The same reasons as the endpoints: before the service, and a file this build cannot read only
@@ -2270,7 +2272,8 @@ export async function createApplicationServices({
       claudeCompactWindow: () => claudeCompactWindow.get().tokens,
       // `configs()`, not `list()`: this is the one path the API keys travel, and it ends at the
       // spawned provider process. The IPC handlers are given `list()`.
-      customProviders: () => customProviders.configs(),
+      // With the models that an Ollama server reports as not able to reason (#8381).
+      customProviders: () => modelReasoning.configs(),
       // The same rule: `configs()`, with the environment values, goes to the agent process only.
       customAgents: () => customAgents.configs(),
       // The enabled MCP servers, read at each spawn. The service owns the store, so this reads back
@@ -3002,7 +3005,20 @@ export async function createApplicationServices({
   browserProxyStatusChanged = () => service.notifyBrowserProfilesChanged();
   // A computer that comes online or goes offline changes the proxy list.
   browserEgress.on("changed", () => service.notifyBrowserProfilesChanged());
-  const customProviderChanges = createCustomProviderChanges({ service, customProviders, providerRuntimes });
+  const customProviderChanges = createCustomProviderChanges({
+    service,
+    customProviders,
+    providerRuntimes,
+    refreshModelReasoning: () => modelReasoning.refresh(),
+  });
+  // The endpoints saved before this start. The start does not wait for their servers: an OpenCode
+  // that started before the answer restarts with it, after a turn in progress.
+  Effect.runFork(
+    modelReasoning.refresh().pipe(
+      Effect.flatMap((changed) => (changed ? service.reloadCustomProviderConfig("opencode") : Effect.void)),
+      Effect.ignore,
+    ),
+  );
   const customAgentChanges = createCustomAgentChanges({ service, customAgents });
   const acpRegistry = createAcpRegistry({
     directory: app.getPath("userData"),
