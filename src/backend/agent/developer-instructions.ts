@@ -630,14 +630,12 @@ export function developerInstructions(
  * How an agent starts a job that must outlive its shell command. Codex ends the whole process group of
  * a command when the command ends, so a plain `nohup ... &` job stops at once (#7980). A new session
  * or process group outlives it. macOS has no `setsid` command; `set -m` gives the job its own group.
+ * The text stays short: the agent context budget does not let it grow.
  */
-function longJobStart(): string {
+function longJobStart() {
   if (process.platform === "win32") return "run your own long job detached (nohup) to outlive the call";
-  const start =
-    process.platform === "darwin"
-      ? "(set -m; nohup <command> > <log> 2>&1 < /dev/null &)"
-      : "setsid nohup <command> > <log> 2>&1 < /dev/null &";
-  return `start your own long job in its own process group, so that it outlives the call: ${start}. A plain nohup <command> & job stops when the call ends`;
+  if (process.platform === "darwin") return "start your own long job with (set -m; nohup ... &) to outlive the call";
+  return "start your own long job with setsid to outlive the call";
 }
 
 /** Only the file paths go into the prompt. The token stays in its file, because a provider receives this text. */
