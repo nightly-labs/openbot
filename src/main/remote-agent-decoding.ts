@@ -7,6 +7,7 @@ import {
   decodeInstalledSkills,
   decodeProviderUsageResetOutcome,
   decodeProviderUsageResets,
+  decodeUsageCredits,
   type GithubSkillSource,
   type HostDefaultProvider,
   type HostProviderAccounts,
@@ -46,6 +47,7 @@ import type {
   QueuedMessageReceipt,
   QueueSnapshot,
   SidebarLayoutSnapshot,
+  UsageCredits,
 } from "@openbot/contracts/ipc";
 import {
   isAccountUsage,
@@ -249,6 +251,12 @@ export function decodeAccountUsageFromHost(value: unknown): AccountUsage {
     throw new Error("Invalid remote account usage.");
   }
   return value;
+}
+
+/** The `usage-credits-v1` list: an unknown provider is left out. */
+export function decodeUsageCreditsList(value: unknown): UsageCredits[] {
+  if (!isDynamicRecord(value)) throw new Error("Invalid usage credits.");
+  return decodeUsageCredits(value.accounts);
 }
 
 // Fails closed on a member, not just on the array: `packages/contracts/AGENTS.md` makes a malformed
