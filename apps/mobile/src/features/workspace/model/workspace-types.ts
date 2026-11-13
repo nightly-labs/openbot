@@ -214,6 +214,7 @@ import type { ProviderAdmin } from "@/features/servers/model/provider-admin";
 import type { RemoteDesktopConnection } from "@/features/workspace/components/remote-team-transport";
 import type { MobileConversationStore } from "./conversation-store";
 import type { LiveWorkspaceStore } from "./live-workspace-store";
+import type { PendingApproval } from "./pending-approvals";
 
 /** An export file on this phone, read when it is sent. */
 export interface AgentExportFile extends AgentExportParts {
@@ -344,6 +345,13 @@ export interface MobileWorkspaceContextValue {
    * `InactiveRequestError`, and drops the request, when it no longer waits on the host.
    */
   respondToApproval: (serverId: string, input: RespondToApprovalInput) => Promise<void>;
+  /** True when the server can send the whole copy of an approval that a runtime snapshot cut. */
+  readsWholeApprovals: (serverId: string) => boolean;
+  /**
+   * Reads the whole copy of a cut approval with `pending-approval-v1` and puts it in place of the cut
+   * one. Rejects with `InactiveRequestError`, and drops the request, when it no longer waits on the host.
+   */
+  readWholeApproval: (serverId: string, approval: PendingApproval) => Promise<void>;
   respondToBrowserTakeover: (
     serverId: string,
     input: { requestId: string | number; decision: "complete" | "cancel" },

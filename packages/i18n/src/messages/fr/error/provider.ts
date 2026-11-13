@@ -325,6 +325,8 @@ export const messages = {
     "Connectez-vous avec Nous Portal ou exécutez `hermes setup` dans un terminal pour utiliser Hermes.",
   "error.provider.hermesTurnFailed":
     "Hermes n’a pas pu terminer ce tour. Si sa réponse donne une raison, suivez-la. Sinon, un serveur MCP de cet agent est peut-être indisponible : vérifiez-le dans Réglages du serveur › MCP, puis renvoyez votre message.",
+  "error.provider.copilotThinkingRejected":
+    "GitHub Copilot n’a pas pu utiliser ce modèle : le modèle n’a pas accepté son réglage de réflexion. Sélectionnez un autre modèle pour cet agent, puis renvoyez votre message.",
   "error.provider.usageLimitReached": "Le compte a atteint sa limite d’utilisation.",
   "error.provider.claudeContextFull":
     "Cette conversation est devenue trop longue pour Claude. OpenBot a ouvert une nouvelle session Claude Code avec l’historique de la conversation. Réessayez.",
@@ -421,6 +423,13 @@ export const messages = {
   "error.provider.accountDefault": "Le premier compte {provider} ne peut pas être supprimé.",
   "error.provider.accountUsesKey":
     "Ce compte {provider} utilise la clé API enregistrée et n'a pas de connexion. Changez la clé dans Réglages du serveur → Fournisseurs.",
+  "error.provider.accountNeedsKey":
+    "Un nouveau compte {provider} a besoin d’une clé d’API. Mettez à jour OpenBot sur cet appareil, puis ajoutez le compte de nouveau.",
+  "error.provider.accountKeyRefused": "{provider} n’a pas accepté cette clé d’API. Vérifiez la clé, puis réessayez.",
+  "error.provider.accountKeyUnreachable":
+    "OpenBot n’a pas pu joindre {provider} pour vérifier la clé d’API. Vérifiez la connexion internet, puis réessayez.",
+  "error.provider.accountKeySignedOut":
+    "{provider} n’accepte plus la clé d’API de ce compte. Donnez une nouvelle clé au compte.",
   "error.provider.accountInUse": "Un agent qui utilise ce compte est au travail. Réessayez quand l’agent s’arrête.",
   "error.provider.accountsReadOnly":
     "Les comptes enregistrés du fournisseur sont illisibles. Mettez à jour OpenBot avant de les modifier.",

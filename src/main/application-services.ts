@@ -2255,6 +2255,10 @@ export async function createApplicationServices({
     developmentDefaults: appVariant === "dev",
     credentials: {
       apiKey: (provider) => providerCredentials.get(provider),
+      accountKeys: {
+        get: (provider, accountId) => providerCredentials.accountKey(provider, accountId),
+        set: (provider, accountId, key) => providerCredentials.setAccountKey(provider, accountId, key),
+      },
       // Read at each Claude spawn, so a change from Server settings applies to the next process.
       promptCacheTtl: () => promptCacheTtl.get().ttl,
       // Also read at each Claude spawn, from Settings > Providers > Claude of this computer.

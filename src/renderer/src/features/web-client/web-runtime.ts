@@ -6,6 +6,7 @@ import {
 import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import type {
   AccountUsage,
+  AgentApproval,
   AgentColors,
   AgentEvent,
   AgentNotificationLevelsSnapshot,
@@ -37,6 +38,7 @@ import type {
   LocalBrowserSecretResponse,
   PinnedMessagesSnapshot,
   QueueSnapshot,
+  ReadPendingApprovalInput,
   ReorderQueueInput,
   RespondToApprovalInput,
   RespondToBrowserTakeoverInput,
@@ -155,6 +157,11 @@ import {
   MODEL_VISIBILITY_CAPABILITY,
   MODEL_VISIBILITY_ROUTES,
 } from "@openbot/contracts/team-protocol/model-visibility-v1";
+import {
+  decodePendingApprovalResponse,
+  PENDING_APPROVAL_CAPABILITY,
+  PENDING_APPROVAL_ROUTES,
+} from "@openbot/contracts/team-protocol/pending-approval-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
@@ -374,6 +381,11 @@ export interface WebWorkspaceRuntime {
   setMessagePinned?: (input: SetMessagePinnedInput) => Promise<PinnedMessagesSnapshot>;
   /** Cancel on one open wait of an agent, with `agent-waits-v1`. */
   cancelWait?: (agentId: string, waitId: string) => Promise<void>;
+  /**
+   * The whole copy of an approval that a runtime snapshot cut, with `pending-approval-v1`. Null from a
+   * host without it: the card then keeps the cut copy and offers only Deny.
+   */
+  readPendingApproval?: (input: ReadPendingApprovalInput) => Promise<AgentApproval | null>;
   /** Tells a hosted server that this tab has focus. Send it only to a host with `focus-use-v1`. */
   focusUse(): Promise<void>;
   /** Resolves to the conversation message the host stored: the delivery id of the receipt. */
@@ -1464,6 +1476,10 @@ export function createWebWorkspaceRuntime(
           pinned: input.pinned,
         }),
       );
+    },
+    async readPendingApproval(input) {
+      if (!capabilities.includes(PENDING_APPROVAL_CAPABILITY)) return null;
+      return decodePendingApprovalResponse(await request("POST", PENDING_APPROVAL_ROUTES.read, { ...input }));
     },
     async cancelWait(agentId, waitId) {
       if (!capabilities.includes(AGENT_WAITS_CAPABILITY))

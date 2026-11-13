@@ -294,6 +294,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.hermesSignIn": "Sign in with Nous Portal, or run `hermes setup` in a terminal, to use Hermes.",
   "error.provider.hermesTurnFailed":
     "Hermes could not finish this turn. If its reply gives a reason, do what it says. If not, an MCP server of this agent can be unavailable: check it in Server settings › MCP, then send your message again.",
+  "error.provider.copilotThinkingRejected":
+    "GitHub Copilot could not use this model: the model did not accept its thinking setting. Select a different model for this agent, then send your message again.",
   "error.provider.usageLimitReached": "The account reached its usage limit.",
   "error.provider.claudeContextFull":
     "This chat became too long for Claude. OpenBot started a new Claude Code session with the chat history. Try again.",
@@ -386,6 +388,13 @@ export const messages = defineMessages("error.provider", {
   "error.provider.accountDefault": "The first {provider} account cannot be removed.",
   "error.provider.accountUsesKey":
     "This {provider} account uses the saved API key and has no sign-in. Change the key in Server settings → Providers.",
+  "error.provider.accountNeedsKey":
+    "A {provider} account after the first uses an API key. Update OpenBot on this device, then try again.",
+  "error.provider.accountKeyRefused": "{provider} did not accept this API key. Check the key, then try again.",
+  "error.provider.accountKeyUnreachable":
+    "OpenBot could not reach {provider} to check the API key. Check the internet connection, then try again.",
+  "error.provider.accountKeySignedOut":
+    "{provider} no longer accepts the API key of this account. Give the account a new key.",
   "error.provider.accountInUse": "An agent on this account is working. Try again when the agent stops.",
   "error.provider.accountsReadOnly":
     "The saved provider accounts cannot be read. Update OpenBot before you change them.",

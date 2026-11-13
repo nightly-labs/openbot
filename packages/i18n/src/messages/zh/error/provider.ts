@@ -270,6 +270,8 @@ export const messages = {
   "error.provider.hermesSignIn": "要使用 Hermes，请使用 Nous Portal 登录，或在终端中运行 `hermes setup`。",
   "error.provider.hermesTurnFailed":
     "Hermes 未能完成本轮。如果它的回复说明了原因，请按回复操作。如果没有，此智能体的某个 MCP 服务器可能不可用：请在 服务器设置 › MCP 中检查，然后重新发送消息。",
+  "error.provider.copilotThinkingRejected":
+    "GitHub Copilot 无法使用此模型：模型不接受其思考设置。请为此 Agent 选择其他模型，然后重新发送消息。",
   "error.provider.usageLimitReached": "该账号已达到用量上限。",
   "error.provider.claudeContextFull":
     "此聊天对 Claude 来说已经太长。OpenBot 已带着聊天记录开启新的 Claude Code 会话，请重试。",
@@ -349,6 +351,11 @@ export const messages = {
   "error.provider.accountDefault": "第一个 {provider} 账号无法移除。",
   "error.provider.accountUsesKey":
     "此 {provider} 账号使用已保存的 API 密钥，没有登录。请在服务器设置 → 服务商中更改密钥。",
+  "error.provider.accountNeedsKey":
+    "新的 {provider} 账号需要 API 密钥。请更新这台设备上的 OpenBot，然后重新添加该账号。",
+  "error.provider.accountKeyRefused": "{provider} 未接受该 API 密钥。请检查密钥后重试。",
+  "error.provider.accountKeyUnreachable": "OpenBot 无法连接 {provider} 来检查 API 密钥。请检查网络连接后重试。",
+  "error.provider.accountKeySignedOut": "{provider} 不再接受该账号的 API 密钥。请为该账号提供新密钥。",
   "error.provider.accountInUse": "该账号上仍有助手在工作。请等该助手停止后重试。",
   "error.provider.accountsReadOnly": "无法读取已保存的服务商账号。请先更新 OpenBot 再修改。",
   "error.provider.accountSignedOut": "该 {provider} 账号已退出登录，请重新登录。",

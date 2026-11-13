@@ -299,6 +299,8 @@ export const messages = {
     "Zaloguj się przez Nous Portal lub uruchom `hermes setup` w terminalu, aby używać Hermes.",
   "error.provider.hermesTurnFailed":
     "Hermes nie mógł dokończyć tej tury. Jeśli odpowiedź podaje powód, postępuj zgodnie z nią. Jeśli nie, serwer MCP tego agenta może być niedostępny: sprawdź go w Ustawienia serwera › MCP, a potem wyślij wiadomość ponownie.",
+  "error.provider.copilotThinkingRejected":
+    "GitHub Copilot nie mógł użyć tego modelu: model nie przyjął jego ustawienia myślenia. Wybierz inny model dla tego agenta, a potem wyślij wiadomość ponownie.",
   "error.provider.usageLimitReached": "Konto osiągnęło limit użycia.",
   "error.provider.claudeContextFull":
     "Ten czat stał się za długi dla Claude. OpenBot rozpoczął nową sesję Claude Code z historią czatu. Spróbuj ponownie.",
@@ -395,6 +397,13 @@ export const messages = {
   "error.provider.accountDefault": "Nie można usunąć pierwszego konta {provider}.",
   "error.provider.accountUsesKey":
     "To konto {provider} używa zapisanego klucza API i nie ma logowania. Zmień klucz w Ustawienia serwera → Dostawcy.",
+  "error.provider.accountNeedsKey":
+    "Nowe konto {provider} wymaga klucza API. Zaktualizuj OpenBot na tym urządzeniu, a potem dodaj konto ponownie.",
+  "error.provider.accountKeyRefused": "{provider} nie przyjął tego klucza API. Sprawdź klucz i spróbuj ponownie.",
+  "error.provider.accountKeyUnreachable":
+    "OpenBot nie mógł połączyć się z {provider}, aby sprawdzić klucz API. Sprawdź połączenie z internetem i spróbuj ponownie.",
+  "error.provider.accountKeySignedOut":
+    "{provider} nie przyjmuje już klucza API tego konta. Podaj nowy klucz dla konta.",
   "error.provider.accountInUse": "Agent korzystający z tego konta pracuje. Spróbuj ponownie, gdy agent się zatrzyma.",
   "error.provider.accountsReadOnly":
     "Nie można odczytać zapisanych kont dostawców. Zaktualizuj OpenBot, zanim je zmienisz.",

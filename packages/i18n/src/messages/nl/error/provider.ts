@@ -305,6 +305,8 @@ export const messages = {
     "Log in met Nous Portal of voer `hermes setup` uit in een terminal om Hermes te gebruiken.",
   "error.provider.hermesTurnFailed":
     "Hermes kon deze beurt niet afmaken. Als het antwoord een reden geeft, volg die dan. Zo niet, dan is een MCP-server van deze agent misschien niet beschikbaar: controleer hem in Serverinstellingen › MCP en stuur je bericht opnieuw.",
+  "error.provider.copilotThinkingRejected":
+    "GitHub Copilot kon dit model niet gebruiken: het model accepteerde de denkinstelling niet. Selecteer een ander model voor deze agent en verstuur je bericht opnieuw.",
   "error.provider.usageLimitReached": "Het account heeft de gebruikslimiet bereikt.",
   "error.provider.claudeContextFull":
     "Deze chat is te lang geworden voor Claude. OpenBot heeft een nieuwe Claude Code-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
@@ -401,6 +403,14 @@ export const messages = {
   "error.provider.accountDefault": "Het eerste {provider}-account kan niet worden verwijderd.",
   "error.provider.accountUsesKey":
     "Dit {provider}-account gebruikt de opgeslagen API-sleutel en heeft geen inlog. Wijzig de sleutel in Serverinstellingen → Aanbieders.",
+  "error.provider.accountNeedsKey":
+    "Een nieuw {provider}-account heeft een API-sleutel nodig. Werk OpenBot op dit apparaat bij en voeg het account dan opnieuw toe.",
+  "error.provider.accountKeyRefused":
+    "{provider} heeft deze API-sleutel niet geaccepteerd. Controleer de sleutel en probeer het opnieuw.",
+  "error.provider.accountKeyUnreachable":
+    "OpenBot kon {provider} niet bereiken om de API-sleutel te controleren. Controleer de internetverbinding en probeer het opnieuw.",
+  "error.provider.accountKeySignedOut":
+    "{provider} accepteert de API-sleutel van dit account niet meer. Geef het account een nieuwe sleutel.",
   "error.provider.accountInUse": "Een agent op dit account is aan het werk. Probeer het opnieuw als de agent stopt.",
   "error.provider.accountsReadOnly":
     "De opgeslagen accounts van aanbieders kunnen niet worden gelezen. Werk OpenBot bij voordat je ze wijzigt.",

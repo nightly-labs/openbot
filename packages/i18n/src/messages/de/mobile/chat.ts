@@ -422,7 +422,15 @@ export const messages = {
   "mobile.chat.approval.effect.permissions":
     "Mit „Erlauben“ erhält {name} diese Berechtigungen auf {server}. Mit „Ablehnen“ bleiben die aktuellen Berechtigungen.",
   "mobile.chat.approval.partial":
-    "Diese Anfrage ist zu lang für das Telefon. Öffne OpenBot auf {server}, um sie zu erlauben. Ablehnen kannst du sie hier.",
+    "{server} sendet nur den Anfang dieser Anfrage an das Telefon. Um sie zu erlauben, aktualisiere OpenBot auf {server} oder öffne diesen Chat in der OpenBot-Desktop-App. Ablehnen kannst du sie hier.",
+  "mobile.chat.approval.loading": "Vollständige Anfrage wird geladen …",
+  "mobile.chat.approval.loadFailed":
+    "Die vollständige Anfrage konnte nicht geladen werden. Ablehnen kannst du sie hier.",
+  "mobile.chat.approval.retry": "Erneut",
+  "mobile.chat.approval.report.bugHeadline": "Einen Fehler gefunden? Lass ihn uns beheben.",
+  "mobile.chat.approval.report.ideaHeadline": "Eine Idee? Lass sie uns umsetzen.",
+  "mobile.chat.approval.report.dontSend": "Nicht jetzt",
+  "mobile.chat.approval.report.send": "An das OpenBot-Team senden",
   "mobile.chat.approval.allow": "Erlauben",
   "mobile.chat.approval.deny": "Ablehnen",
   "mobile.chat.approval.reconnect": "Verbinde dich mit {server}, um diese Anfrage zu beantworten.",

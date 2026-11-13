@@ -1078,6 +1078,13 @@ export const messages = {
   "mobile.server.providers.status.ready": "Installato",
   "mobile.server.providers.status.notInstalled": "Non installato",
   "mobile.server.providers.status.checking": "Controllo",
+  "mobile.server.providers.accountsKeyHint":
+    "Ogni agente usa un account. Sceglilo nelle impostazioni dell'agente. Un nuovo account richiede una chiave API di quell'account.",
+  "mobile.server.providers.accountChangeKey": "Cambia chiave",
+  "mobile.server.providers.accountKeyHint":
+    "Incolla una chiave API dell'account {provider}. La chiave va al server. Questo telefono non la conserva.",
+  "mobile.server.providers.accountKeyChecking": "Verifica della chiave…",
+  "mobile.server.providers.accountKeyAddFailed": "Impossibile aggiungere l'account. Riprova.",
   "mobile.server.providers.pool": "Raggruppa account",
   "mobile.server.providers.poolHint":
     "Gli agenti usano un account finché non si avvicina a un limite di utilizzo, poi l'account il cui limite si azzera per primo.",

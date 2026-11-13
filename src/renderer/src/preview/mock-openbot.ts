@@ -1614,6 +1614,26 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       );
       return clone(changed);
     },
+    // The preview accepts each key. A key account has no email.
+    connectProviderAccountKey: async ({ provider, accountId }) => {
+      const changed = changeProviderAccounts(provider, (accounts) =>
+        accountId
+          ? accounts.map((account) =>
+              account.id === accountId ? { ...account, state: "connected", message: null } : account,
+            )
+          : [
+              ...accounts,
+              {
+                id: `a${(accounts.length + 1).toString(16).padStart(16, "0")}`,
+                label: null,
+                email: null,
+                state: "connected",
+                message: null,
+              },
+            ],
+      );
+      return clone(changed);
+    },
     // The preview signs in at once, so no sign-in runs to cancel.
     cancelProviderAccountSignIn: async () => clone(agentStatus),
     renameProviderAccount: async ({ provider, accountId, label }) =>
@@ -1932,6 +1952,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       startAccountSignIn: async () => undefined,
       accountSignInStatus: async () => ({ tabId: null, result: null }),
       cancelAccountSignIn: async () => undefined,
+      connectAccountKey: async (input) => {
+        await api.connectProviderAccountKey(input);
+      },
       renameAccount: async (input) => {
         await api.renameProviderAccount(input);
       },
@@ -3545,6 +3568,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         emit(promptResponseListeners, input);
       },
       respondToApproval: async () => undefined,
+      readPendingApproval: async () => null,
       respondToBrowserSecret: async (input) => {
         for (const listener of agentListeners)
           listener({ type: "browser-takeover-resolved", requestId: input.requestId, agentId: input.agentId });

@@ -113,6 +113,14 @@ export class AcpConfiguration {
   #probe: { connection: ClientSideConnection; sessionId: string } | null = null;
   /** One kept-probe discovery at a time: two at once would each open a probe, and one is kept. */
   readonly #probeLock = Semaphore.makeUnsafe(1);
+  /**
+   * The efforts that each model last answered with on this agent process. A sweep that does not reach
+   * a model, as on a busy process, gives the model these and not the efforts of another model (#8236).
+   */
+  #answeredEfforts: {
+    connection: ClientSideConnection;
+    models: Map<string, ReturnType<typeof reasoningFromConfig>>;
+  } | null = null;
   constructor(private readonly options: AcpConfigurationOptions) {}
   readonly discoverModels = Effect.fn("AcpConfiguration.discoverModels")(function* (
     this: AcpConfiguration,
@@ -257,6 +265,9 @@ export class AcpConfiguration {
     const probed: AcpModel[] = [];
     let answered = 0;
     let selected = opening;
+    // A new process can be a new version of the agent, so its models start with no answers.
+    if (this.#answeredEfforts?.connection !== connection) this.#answeredEfforts = { connection, models: new Map() };
+    const answeredEfforts = this.#answeredEfforts.models;
     // The sweep selects models on the process too, also while a turn sets its own.
     this.#processModel = null;
     for (const model of models) {
@@ -269,12 +280,11 @@ export class AcpConfiguration {
         selected = model.id;
         answered += 1;
       }
-      // An unanswered model holds the opening model's options, which say nothing about this model.
-      probed.push(
-        response
-          ? { ...model, ...reasoningFromConfig(response.configOptions) }
-          : { ...model, reasoningEffortConfigurable: true },
-      );
+      const efforts = response ? reasoningFromConfig(response.configOptions) : answeredEfforts.get(model.id);
+      if (response && efforts) answeredEfforts.set(model.id, efforts);
+      // An unanswered model keeps its last answer. With no answer yet, it holds the opening model's
+      // options, which say nothing about this model.
+      probed.push(efforts ? { ...model, ...efforts } : { ...model, reasoningEffortConfigurable: true });
     }
     // Back to the model the session opened on. The session is closed next, but an agent that keeps a
     // "last used model" outside the session would otherwise remember the end of this sweep, and the

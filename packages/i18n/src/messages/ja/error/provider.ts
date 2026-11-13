@@ -316,6 +316,8 @@ export const messages = {
     "Hermes を使うには、Nous Portal でサインインするか、ターミナルで `hermes setup` を実行してください。",
   "error.provider.hermesTurnFailed":
     "Hermes はこのターンを完了できませんでした。返信に理由が書かれている場合は、その指示に従ってください。書かれていない場合は、このエージェントの MCP サーバーが利用できない可能性があります。サーバーの設定 › MCP で確認してから、メッセージをもう一度送信してください。",
+  "error.provider.copilotThinkingRejected":
+    "GitHub Copilot はこのモデルを使用できませんでした。モデルが思考の設定を受け付けませんでした。このエージェントに別のモデルを選択してから、メッセージをもう一度送信してください。",
   "error.provider.usageLimitReached": "アカウントが使用量の上限に達しました。",
   "error.provider.claudeContextFull":
     "このチャットは Claude には長くなりすぎました。OpenBot はチャット履歴を引き継いだ新しい Claude Code セッションを開始しました。もう一度お試しください。",
@@ -415,6 +417,14 @@ export const messages = {
   "error.provider.accountDefault": "最初の {provider} アカウントは削除できません。",
   "error.provider.accountUsesKey":
     "この {provider} アカウントは保存された API キーを使うため、サインインはありません。キーはサーバーの設定 → プロバイダーで変更してください。",
+  "error.provider.accountNeedsKey":
+    "新しい {provider} アカウントには API キーが必要です。このデバイスの OpenBot を更新してから、もう一度アカウントを追加してください。",
+  "error.provider.accountKeyRefused":
+    "{provider} はこの API キーを受け付けませんでした。キーを確認して、もう一度お試しください。",
+  "error.provider.accountKeyUnreachable":
+    "API キーを確認するための {provider} への接続に失敗しました。インターネット接続を確認して、もう一度お試しください。",
+  "error.provider.accountKeySignedOut":
+    "{provider} はこのアカウントの API キーを受け付けなくなりました。アカウントに新しいキーを設定してください。",
   "error.provider.accountInUse":
     "このアカウントを使うエージェントが作業中です。エージェントが停止してからもう一度お試しください。",
   "error.provider.accountsReadOnly":

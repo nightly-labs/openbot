@@ -308,6 +308,8 @@ export const messages = {
   "error.provider.hermesSignIn": "Entre com o Nous Portal ou execute `hermes setup` em um terminal para usar o Hermes.",
   "error.provider.hermesTurnFailed":
     "O Hermes não conseguiu terminar este turno. Se a resposta dele der um motivo, siga o que ela diz. Se não, um servidor MCP deste agente pode estar indisponível: verifique-o em Configurações do servidor › MCP e envie sua mensagem de novo.",
+  "error.provider.copilotThinkingRejected":
+    "O GitHub Copilot não conseguiu usar este modelo: o modelo não aceitou a configuração de raciocínio. Selecione outro modelo para este agente e envie a mensagem de novo.",
   "error.provider.usageLimitReached": "A conta atingiu seu limite de uso.",
   "error.provider.claudeContextFull":
     "Este chat ficou longo demais para o Claude. O OpenBot iniciou uma nova sessão do Claude Code com o histórico do chat. Tente novamente.",
@@ -402,6 +404,13 @@ export const messages = {
   "error.provider.accountDefault": "A primeira conta de {provider} não pode ser removida.",
   "error.provider.accountUsesKey":
     "Esta conta de {provider} usa a chave de API salva e não tem login. Altere a chave em Configurações do servidor → Provedores.",
+  "error.provider.accountNeedsKey":
+    "Uma nova conta de {provider} precisa de uma chave de API. Atualize o OpenBot neste dispositivo e adicione a conta de novo.",
+  "error.provider.accountKeyRefused": "{provider} não aceitou esta chave de API. Verifique a chave e tente novamente.",
+  "error.provider.accountKeyUnreachable":
+    "O OpenBot não conseguiu acessar {provider} para verificar a chave de API. Verifique a conexão com a internet e tente novamente.",
+  "error.provider.accountKeySignedOut":
+    "{provider} não aceita mais a chave de API desta conta. Informe uma nova chave para a conta.",
   "error.provider.accountInUse":
     "Um agente que usa esta conta está trabalhando. Tente novamente quando o agente parar.",
   "error.provider.accountsReadOnly":

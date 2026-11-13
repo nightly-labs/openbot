@@ -176,6 +176,12 @@ export const messages = {
   "provider.claudeKey.description":
     "Guarda una clave de API de Anthropic en el host. Anthropic factura cada solicitud al crédito de API de la clave, no a tu plan de Claude. Para usarla en un agente, selecciona la cuenta «Clave de API» en el menú de modelos del agente. Si Claude no tiene sesión iniciada, todos los agentes usan la clave.",
   "provider.claudeKey.label": "Clave de API de Anthropic",
+  "provider.cursorKey.title": "Clave de API de Cursor",
+  "provider.cursorKey.description":
+    "Cada cuenta de Cursor después de la primera usa una clave de API. Crea una clave en el panel de Cursor, en Integrations, y pégala aquí. La clave se guarda en este equipo.",
+  "provider.cursorKey.descriptionHost":
+    "Cada cuenta de Cursor después de la primera usa una clave de API. Crea una clave en el panel de Cursor, en Integrations, y pégala aquí. La clave se guarda en el host.",
+  "provider.cursorKey.label": "Clave de API de Cursor",
   "provider.inceptionKey.title": "Clave de API de Inception",
   "provider.inceptionKey.description":
     "Guarda una clave de API de Inception en este equipo para usar los modelos Mercury. OpenBot los ejecuta en la CLI de Pi que descarga.",
