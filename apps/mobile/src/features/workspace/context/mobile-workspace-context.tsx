@@ -142,6 +142,7 @@ import { useSyncedNotificationLevelsLoader } from "@/features/push-notifications
 import { QuickActionsSync } from "@/features/quick-actions/quick-actions-sync";
 import { setSyncedNotificationLevels } from "@/features/settings/model/notification-levels";
 import { ShareExtensionSync } from "@/features/share/share-extension-sync";
+import { ShortcutsSync } from "@/features/shortcuts/shortcuts-sync";
 import { fetch } from "@/features/support/model/logged-fetch";
 import { supportLog } from "@/features/support/model/support-log";
 import type { RemoteTeamTransportRef } from "@/features/workspace/components/remote-team-transport";
@@ -2618,6 +2619,14 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             servers={orderedServers}
             serversReady={serverDirectoryState === "ready"}
             agents={agents}
+          />
+          <ShortcutsSync
+            apiUrl={session.apiUrl}
+            userId={session.user.id}
+            servers={orderedServers}
+            serversReady={serverDirectoryState === "ready"}
+            agents={agents}
+            preferences={visiblePreferences}
           />
           <NotificationAvatarSync servers={servers} serversReady={serverDirectoryState === "ready"} agents={agents} />
           {servers.map((server) => (

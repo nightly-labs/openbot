@@ -19,7 +19,8 @@
         },
         "ITSAppUsesNonExemptEncryption": false
       },
-      "icon": "./assets/icons/app-icon.icon"
+      "icon": "./assets/icons/app-icon.icon",
+      "appleTeamId": "8A47NKRZSJ"
     },
     "android": {
       "package": "run.openbot.mobile",
@@ -177,13 +178,36 @@
               {
                 "fontFamily": "Inter",
                 "fontDefinitions": [
-                  { "path": "./assets/fonts/inter/Inter-Regular.ttf", "weight": 400 },
-                  { "path": "./assets/fonts/inter/Inter-Italic.ttf", "weight": 400, "style": "italic" },
-                  { "path": "./assets/fonts/inter/Inter-Medium.ttf", "weight": 500 },
-                  { "path": "./assets/fonts/inter/Inter-SemiBold.ttf", "weight": 600 },
-                  { "path": "./assets/fonts/inter/Inter-Bold.ttf", "weight": 700 },
-                  { "path": "./assets/fonts/inter/Inter-BoldItalic.ttf", "weight": 700, "style": "italic" },
-                  { "path": "./assets/fonts/inter/Inter-ExtraBold.ttf", "weight": 800 }
+                  {
+                    "path": "./assets/fonts/inter/Inter-Regular.ttf",
+                    "weight": 400
+                  },
+                  {
+                    "path": "./assets/fonts/inter/Inter-Italic.ttf",
+                    "weight": 400,
+                    "style": "italic"
+                  },
+                  {
+                    "path": "./assets/fonts/inter/Inter-Medium.ttf",
+                    "weight": 500
+                  },
+                  {
+                    "path": "./assets/fonts/inter/Inter-SemiBold.ttf",
+                    "weight": 600
+                  },
+                  {
+                    "path": "./assets/fonts/inter/Inter-Bold.ttf",
+                    "weight": 700
+                  },
+                  {
+                    "path": "./assets/fonts/inter/Inter-BoldItalic.ttf",
+                    "weight": 700,
+                    "style": "italic"
+                  },
+                  {
+                    "path": "./assets/fonts/inter/Inter-ExtraBold.ttf",
+                    "weight": 800
+                  }
                 ]
               },
               "katex/dist/fonts/KaTeX_AMS-Regular.ttf",
@@ -233,7 +257,8 @@
           "bundleIdentifier": "run.openbot.mobile.NotificationService",
           "groupIdentifier": "group.run.openbot.mobile"
         }
-      ]
+      ],
+      "./plugins/with-shortcuts"
     ],
     "experiments": {
       "typedRoutes": true,

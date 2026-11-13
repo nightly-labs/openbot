@@ -256,6 +256,36 @@ recent apps show a blank card. The lock screen draws in `FullWindowOverlay` on i
 Android, above sheets. Notification, Live Activity, quick action and share navigation waits until
 the user unlocks. Expo Go does not have the module: it measures with the phone clock and cannot see a phone lock.
 
+## iOS shortcuts
+
+The Shortcuts app of iOS 26 and later has two OpenBot shortcuts: List Agents and Send Message. An
+older iOS has none: their cards need `SnippetIntent`.
+
+The shortcuts run in native code, with no JavaScript of the app. iOS runs a shortcut in the
+background, also when the app is not in memory. There the app has no window, React Native does not
+start, and iOS suspends the app soon after the intent returns.
+
+- The App Intents, their cards and the `AppShortcutsProvider` are Swift files in `plugins/shortcuts`.
+  `plugins/with-shortcuts.js` adds them to the app target, because Xcode reads the shortcuts of an
+  app from that target. iOS reads the names and the phrases of the shortcuts at build time, so they
+  are English and not from the `@openbot/i18n` catalog. The text of the cards is from the catalog.
+- The app writes `shortcuts.json` and the agent pictures to the App Group
+  (`src/features/shortcuts/model/shortcut-directory.ts`): the servers with their public keys, the
+  agents, the agent of Settings > Shortcuts, the app lock and the card text. Sign-out deletes it.
+- List Agents reads that file. A tap on an agent opens its chat.
+- Send Message sends to the agent of Settings > Shortcuts with the sender of the share extension
+  (`plugins/share-extension/ShareSender.swift` and the page `share-sender.html`, which the plugin
+  also adds to the app target). A hidden web view with the Team client connects to the agent's
+  server, sends the message and closes. The session token is the keychain item of the share
+  extension. The intent returns when the server has the message, or after 24 seconds: iOS stops an
+  intent after about 30. The reply comes as the notification of the server.
+- A message that did not go opens in the composer of the chat from the card. A message with no
+  answer from the server does not: it can be in the chat.
+- A button of a card opens the app through `modules/shortcuts` (`ShortcutBridge`), which gives the
+  target to `src/features/shortcuts/shortcuts-native.ts`.
+
+Check the shortcuts on an iPhone, also with the app removed from the app switcher.
+
 ## Source structure
 
 The mobile app uses a feature-first structure. Expo Router files stay deliberately thin: `src/app`
@@ -273,6 +303,7 @@ src/
     search/             search model, controls, results, and screen
     servers/            server drawer and joining a server
     settings/           account settings screen
+    shortcuts/          iOS shortcuts: the data that the native intents read, and Settings > Shortcuts
     workspace/          remote directory, WebRTC transport, live events, and workspace state
   shared/
     components/         UI used by more than one feature
