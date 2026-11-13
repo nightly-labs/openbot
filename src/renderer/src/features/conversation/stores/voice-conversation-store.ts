@@ -59,6 +59,11 @@ function createRecorder(stream: MediaStream): MediaRecorder {
     : new MediaRecorder(stream);
 }
 
+/** The recording that the turn makes now, so that it can be transcribed after a new one replaces it. */
+function currentRecording(turn: Recording): Recording {
+  return { recorder: turn.recorder, chunks: turn.chunks, startedAt: turn.startedAt, livePreview: turn.livePreview };
+}
+
 function quietLevels(): number[] {
   return new Array(SPEECH_LEVEL_COUNT).fill(0);
 }
@@ -94,24 +99,28 @@ export interface VoiceConversationDeps {
   progressUpdate: (message: ConversationMessage) => boolean;
 }
 
+/** One recording of a turn, and the live preview that reads it. */
+interface Recording {
+  recorder: MediaRecorder;
+  chunks: Blob[];
+  /** When the recording started, on the `performance.now()` clock. */
+  startedAt: number;
+  livePreview: Promise<void> | undefined;
+}
+
 /**
- * One turn of listening: the microphone, its recorder and the loudness meter. While the agent thinks
- * or speaks, the next turn already listens, so the user can interrupt it by voice.
+ * One turn of listening: the microphone, its recorder and the loudness meter. While the turn before
+ * it is transcribed and while the agent thinks or speaks, the next turn already listens, so no words
+ * are lost and the user can interrupt the agent by voice.
  */
-interface Turn {
+interface Turn extends Recording {
   /** The generation of the turn. A resumed turn gets a new one. */
   own: number;
   stream: MediaStream;
-  /** A recording with no speech is replaced by a new one, at a pause. */
-  recorder: MediaRecorder;
-  chunks: Blob[];
   context: AudioContext | undefined;
   timers: Array<ReturnType<typeof setInterval>>;
-  /** When the recording started, on the `performance.now()` clock. */
-  startedAt: number;
   /** The user spoke in this turn. */
   spoke: boolean;
-  livePreview: Promise<void> | undefined;
 }
 
 /**
@@ -154,6 +163,8 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   let sentHeard = "";
   /** The generation of the send whose reply the pane waits for. A hold that ends with no words keeps it. */
   let waitingSend = 0;
+  /** The sends in progress. Speech during a send is the next turn, and does not stop the send. */
+  let sending = 0;
   const startedAt = performance.now();
   /** The turns that were sent to the chat. */
   let sentTurns = 0;
@@ -343,7 +354,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     held = false;
     releaseSpeech(target, true);
     if (heldReplyEnded) {
-      await listen();
+      resumeListening();
       return;
     }
     setStep("waiting");
@@ -351,7 +362,16 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       draft.heard = sentHeard;
       draft.levels = quietLevels();
     });
-    await openTurn(generation);
+    await listenWhileWaiting(generation);
+  }
+
+  /**
+   * The turn that listened while the last one was transcribed and sent goes on while the agent thinks
+   * and speaks. When the user spoke in it, they speak over the agent.
+   */
+  async function listenWhileWaiting(own: number): Promise<void> {
+    if (turn?.spoke) holdReply();
+    else if (!turn) await openTurn(own);
   }
 
   /** Opens the microphone for the next turn. It listens now, or while the agent thinks and speaks. */
@@ -400,7 +420,8 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     if (livePreview)
       current.timers.push(
         setInterval(() => {
-          if (current.spoke && !current.livePreview && current.recorder.state === "recording")
+          // The voice host takes one request at a time: no preview while the turn before is transcribed.
+          if (step === "listening" && current.spoke && !current.livePreview && current.recorder.state === "recording")
             current.livePreview = refreshHeard(current).finally(() => {
               current.livePreview = undefined;
             });
@@ -417,21 +438,26 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     );
   }
 
-  /** Starts a recording of the turn. Its stop ends the turn, unless a new recording replaced it. */
+  /**
+   * Starts a recording of the turn. A stop that no new recording caused means that the microphone
+   * ended, as when a headset disconnects.
+   */
   function record(current: Turn, recorder: MediaRecorder): void {
     const chunks: Blob[] = [];
     current.recorder = recorder;
     current.chunks = chunks;
     current.startedAt = performance.now();
+    // A recording that a new one replaced, or that a mute released, still gets its last data: the end
+    // of a turn needs it. The data of a discarded recording goes with it.
     recorder.addEventListener("dataavailable", (event) => {
-      if (event.data.size > 0 && turn === current && current.recorder === recorder) chunks.push(event.data);
+      if (event.data.size > 0) chunks.push(event.data);
     });
     recorder.addEventListener("stop", () => {
       if (turn !== current || current.recorder !== recorder) return;
-      // The microphone ended while the agent waits, as when a headset disconnects. The user did not
-      // speak: the end of the reply opens a new turn.
-      if (step === "waiting") releaseTurn();
-      else void finishTurn(current, current.own);
+      const ended = currentRecording(current);
+      releaseTurn();
+      // While the agent waits, or while the turn before is transcribed, the next step opens a new turn.
+      if (step === "listening") void finishTurn(ended, current.own);
     });
     recorder.start(LIVE_TRANSCRIPT_INTERVAL_MS);
   }
@@ -504,7 +530,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
           quietFor = 0;
           if (loudFor >= (replying ? REPLY_SPEECH_START_MS : SPEECH_START_MS) && !current.spoke) {
             current.spoke = true;
-            if (step === "waiting") holdReply();
+            if (step === "waiting" && sending === 0) holdReply();
             setState((draft) => {
               draft.error = null;
             });
@@ -532,18 +558,26 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     }
   }
 
+  /**
+   * Transcribes what the user said. The microphone and its meter stay open, and a new recording
+   * starts at once: what the user says while this turn is transcribed and sent is the next turn.
+   */
   function endTurn(current: Turn): void {
-    if (current.recorder.state !== "recording") return;
-    stopCapture(current);
+    if (step !== "listening" || current.recorder.state !== "recording") return;
+    const ended = currentRecording(current);
+    current.spoke = false;
+    current.livePreview = undefined;
+    record(current, createRecorder(current.stream));
     setStep("transcribing");
     setState((draft) => {
       draft.levels = quietLevels();
     });
-    current.recorder.stop();
+    const own = current.own;
+    ended.recorder.addEventListener("stop", () => void finishTurn(ended, own), { once: true });
+    ended.recorder.stop();
   }
 
-  async function finishTurn(current: Turn, own: number): Promise<void> {
-    turn = undefined;
+  async function finishTurn(current: Recording, own: number): Promise<void> {
     const mimeType = current.recorder.mimeType;
     const analytics = desktopAnalytics.scope();
     const turnProperties = {
@@ -572,7 +606,8 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
         duration_ms: elapsedMs(transcribingAt),
         failure_code: "transcription_failed",
       });
-      await (held ? resumeReply() : listen());
+      if (held) await resumeReply();
+      else resumeListening();
       setState((draft) => {
         draft.error = voiceTranscriptionError(error);
       });
@@ -587,7 +622,8 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
         duration_ms: transcribedMs,
         failure_code: "no_speech",
       });
-      await (held ? resumeReply() : listen());
+      if (held) await resumeReply();
+      else resumeListening();
       return;
     }
     if (held) interruptByVoice();
@@ -598,27 +634,34 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       draft.heard = text;
       draft.error = null;
     });
-    const recordingId = await keepRecording(recording);
-    if (own !== generation || disposed) {
-      discardRecording(recordingId);
-      return;
-    }
-    noteDictatedMessage(target, text, { always: true, progressUpdate: deps.progressUpdate });
     // A send can fail after it is queued, so the wait for the reply ends there too.
     // A later failure, after a Retry, belongs to a turn that is over.
     const notSent = () => {
       if (disposed || own !== waitingSend || step !== "waiting") return;
       forgetDictatedMessage(target);
-      void listen();
+      resumeListening();
       setState((draft) => {
         draft.heard = text;
         draft.error = currentText().t("conversation.voice.notSent");
       });
     };
-    const delivered = await deps.submit({ ...EMPTY_DRAFT, text }, target, EMPTY_DRAFT, {
-      recordingDraftId: recordingId,
-      onFailed: notSent,
-    });
+    sending += 1;
+    let recordingId: string | undefined;
+    let delivered: boolean;
+    try {
+      recordingId = await keepRecording(recording);
+      if (own !== generation || disposed) {
+        discardRecording(recordingId);
+        return;
+      }
+      noteDictatedMessage(target, text, { always: true, progressUpdate: deps.progressUpdate });
+      delivered = await deps.submit({ ...EMPTY_DRAFT, text }, target, EMPTY_DRAFT, {
+        recordingDraftId: recordingId,
+        onFailed: notSent,
+      });
+    } finally {
+      sending -= 1;
+    }
     analytics.track("voice_turn", {
       ...turnProperties,
       result: delivered ? "succeeded" : "failed",
@@ -629,7 +672,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     if (delivered) {
       sentTurns += 1;
       // The next turn listens while the agent thinks and speaks, so the user can interrupt it.
-      if (step === "waiting") await openTurn(own);
+      if (step === "waiting") await listenWhileWaiting(own);
       return;
     }
     discardRecording(recordingId);
@@ -710,8 +753,8 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       void start();
       return;
     }
-    if (step === "waiting") {
-      // The turn that waits for the reply listens only while the microphone is on.
+    if (step === "waiting" || step === "transcribing") {
+      // The turn that waits for the transcription or the reply listens only while the microphone is on.
       if (muted) releaseTurn();
       else void openTurn(generation);
       return;
@@ -741,8 +784,8 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       result: "succeeded",
       trigger: "button",
     });
-    if (step === "waiting") resumeListening();
-    else void listen();
+    // The turn that listened while the agent thought, or while the last turn was transcribed, goes on.
+    resumeListening();
     dropReply();
   }
 
