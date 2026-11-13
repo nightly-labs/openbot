@@ -1123,7 +1123,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    *
    * A server that refuses a loopback registration with 401 or 403 gets one more with the `/callback`
    * form of the address it refused, which the listener also answers. Dropbox accepts only the paths
-   * of the MCP clients it knows (#8025). A server that refuses OpenBot itself refuses that one too.
+   * of the MCP clients it knows (#8025). A server that refuses OpenBot itself refuses that one too,
+   * and the first refusal is kept.
    */
   watchRegistration(fetch: FetchLike): FetchLike {
     return async (input, init) => {
@@ -1137,8 +1138,10 @@ class McpOAuthClientProvider implements OAuthClientProvider {
         if (!(await refusesRedirectAddress(response))) break;
         response = await fetch(input, retry);
       }
+      // Only an accepted retry replaces the refusal: its status is what the probe explains.
       const callback = response.status === 401 || response.status === 403 ? this.#withCallbackPath(request) : null;
-      if (callback) response = await fetch(input, callback);
+      const retried = callback ? await fetch(input, callback) : null;
+      if (retried?.ok) response = retried;
       this.#registrationStatus = response.status;
       return response;
     };
@@ -1712,11 +1715,15 @@ function localhostRedirectUrl(redirectUrl: string): string | null {
   return url.href;
 }
 
+/** Whether an address is on the loopback grant listener: `http` to `127.0.0.1` or `localhost`. */
+function isLoopbackHttp(url: URL | null): url is URL {
+  return url?.protocol === "http:" && (url.hostname === "127.0.0.1" || url.hostname === "localhost");
+}
+
 /** The `/callback` form of a loopback address, or `null` for any other address and for that form. */
 function callbackRedirectUrl(redirectUrl: string): string | null {
   const url = URL.parse(redirectUrl);
-  if (url?.protocol !== "http:" || (url.hostname !== "127.0.0.1" && url.hostname !== "localhost")) return null;
-  if (url.pathname === MCP_OAUTH_CALLBACK_PATH) return null;
+  if (!isLoopbackHttp(url) || url.pathname === MCP_OAUTH_CALLBACK_PATH) return null;
   url.pathname = MCP_OAUTH_CALLBACK_PATH;
   url.search = "";
   url.hash = "";
@@ -1731,8 +1738,7 @@ function callbackRedirectUrl(redirectUrl: string): string | null {
 function registersAddress(registered: readonly string[], address: string): boolean {
   if (registered.includes(address)) return true;
   const url = URL.parse(address);
-  if (url?.protocol !== "http:" || (url.hostname !== "127.0.0.1" && url.hostname !== "localhost") || !url.port)
-    return false;
+  if (!isLoopbackHttp(url) || !url.port) return false;
   url.port = "";
   return registered.includes(url.href);
 }
