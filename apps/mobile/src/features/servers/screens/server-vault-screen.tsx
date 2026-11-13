@@ -11,8 +11,10 @@ import { File } from "expo-file-system";
 import { router, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import { useState } from "react";
+import { TwoStepRowCode, useCopyTwoStepCode } from "@/features/servers/components/vault-two-step-code";
 import { useServerVault } from "@/features/servers/model/use-server-vault";
 import { vaultCardTitle, vaultContactTitle, vaultLoginTitle } from "@/features/servers/model/vault-items";
+import { useSecondClock, useServerVaultCodes } from "@/features/servers/model/vault-two-step";
 import {
   SettingsContent,
   SettingsNote,
@@ -59,6 +61,12 @@ export function ServerVaultScreen() {
   const [importResult, setImportResult] = useState<VaultHostImportResult | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const { server, canManage, canImport, canManageApiKeys, query, action, perform } = vault;
+  // The live code of each login with a two-step key (`vault-v3`). The host makes the codes.
+  const hasKeys = query.data?.items.some((item) => item.kind === "login" && item.hasTwoStep) ?? false;
+  const codes = useServerVaultCodes(serverId, hasKeys);
+  const now = useSecondClock(codes.query.data !== undefined && codes.query.data.size > 0);
+  // VoiceOver and TalkBack read a row as one element, so the row also has the Copy action of its code.
+  const { copy: copyCode } = useCopyTwoStepCode();
   if (!server || !canManage)
     return (
       <SettingsContent>
@@ -145,15 +153,27 @@ export function ServerVaultScreen() {
       <SettingsNote>{t("mobile.server.vault.description", { host })}</SettingsNote>
       <SettingsSection title={t("mobile.server.vault.logins")}>
         {logins.length === 0 ? empty : null}
-        {logins.map((login) => (
-          <SettingsRow
-            key={login.id}
-            supportingText={login.username || addedBy(login.addedBy)}
-            onPress={() => open({ itemId: login.id })}
-          >
-            <Typography.Paragraph numberOfLines={1}>{vaultLoginTitle(login)}</Typography.Paragraph>
-          </SettingsRow>
-        ))}
+        {logins.map((login) => {
+          const code = codes.code(login.id);
+          const site = vaultLoginTitle(login);
+          return (
+            <SettingsRow
+              key={login.id}
+              supportingText={login.username || addedBy(login.addedBy)}
+              onPress={() => open({ itemId: login.id })}
+              trailing={code ? <TwoStepRowCode code={code} now={now} site={site} /> : undefined}
+              disclosure={!code}
+              accessibilityActions={
+                code ? [{ name: "copyCode", label: t("mobile.server.vault.twoStep.copy") }] : undefined
+              }
+              onAccessibilityAction={(event) => {
+                if (code && event.nativeEvent.actionName === "copyCode") void copyCode(code.code);
+              }}
+            >
+              <Typography.Paragraph numberOfLines={1}>{site}</Typography.Paragraph>
+            </SettingsRow>
+          );
+        })}
         <SettingsRow disclosure={false} onPress={() => open({ kind: "login" })}>
           <Typography.Paragraph className="text-accent">{t("mobile.server.vault.addLogin")}</Typography.Paragraph>
         </SettingsRow>

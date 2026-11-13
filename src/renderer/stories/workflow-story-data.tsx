@@ -4,15 +4,16 @@
  * their runs and versions. The nodes have no data of their own.
  */
 
-import type {
-  RoutineSchedule,
-  WorkflowGitHubDelivery,
-  WorkflowGitHubHistory,
-  WorkflowGitHubItem,
-  WorkflowGraph,
-  WorkflowRunDetail,
-  WorkflowStep,
-  WorkflowVersion,
+import {
+  type RoutineSchedule,
+  WORKFLOW_MEDIA_MODELS,
+  type WorkflowGitHubDelivery,
+  type WorkflowGitHubHistory,
+  type WorkflowGitHubItem,
+  type WorkflowGraph,
+  type WorkflowRunDetail,
+  type WorkflowStep,
+  type WorkflowVersion,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { EMPTY_GITHUB_HISTORY, type WorkflowGitHubCanvas } from "@openbot/ui/features/workflows/workflow-github";
@@ -43,9 +44,40 @@ export const STORY_CATALOGS: WorkflowCatalogs = {
     { id: "story-channel-support", name: "support" },
   ],
   imageModels: [
-    { id: "gpt-image", name: "GPT Image", provider: "codex", maker: "OpenAI" },
-    { id: "nano-banana", name: "Nano Banana", provider: "antigravity", maker: "Google" },
-    { id: "grok-imagine", name: "Grok Imagine", provider: "grok", maker: "xAI" },
+    {
+      id: "gpt-image",
+      name: "GPT Image",
+      provider: "codex",
+      maker: "OpenAI",
+      subscription: "ChatGPT",
+      kinds: ["image"],
+      voices: false,
+      // Two ChatGPT plans: the picker has a tab for each one.
+      accounts: [
+        { id: "default", label: "Personal", email: "ada@example.com", state: "connected", message: null },
+        { id: "a0123456789abcdef", label: "Work", email: "ada@northwind.example", state: "connected", message: null },
+      ],
+    },
+    {
+      id: "nano-banana",
+      name: "Nano Banana",
+      provider: "antigravity",
+      maker: "Google",
+      subscription: "Google AI",
+      kinds: ["image"],
+      voices: false,
+    },
+    {
+      id: "grok-imagine",
+      name: "Grok Imagine",
+      provider: "grok",
+      maker: "xAI",
+      subscription: "Grok",
+      kinds: ["image", "video"],
+      voices: true,
+    },
+    // The host is signed in to Sunra in Apps.
+    ...WORKFLOW_MEDIA_MODELS.filter((model) => model.provider === "sunra"),
   ],
   files: FILES_ROWS,
   self: STORY_TEAM_MEMBERS.find((member) => member.id === "member-self")?.name ?? undefined,

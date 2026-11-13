@@ -37,10 +37,12 @@ const PRESENTATION: AgentDockPresentation = {
   display: { kind: "display", id: 69733382 },
   edge: "left",
   autoHide: true,
+  edgeStrip: false,
+  sizePercent: 85,
   offsets: [{ displayId: 69733382, offset: 0 }],
   seats: [
-    { kind: "agent", agent: AGENT, mood: "working", state: { kind: "unread", count: 2 } },
-    { kind: "channel", channel: CHANNEL, state: null },
+    { kind: "agent", agent: AGENT, mood: "working", state: { kind: "unread", count: 2 }, temporary: false },
+    { kind: "channel", channel: CHANNEL, state: null, temporary: false },
   ],
   available: [],
   availableChannels: [CHANNEL],
@@ -102,11 +104,29 @@ describe("agent dock decoding", () => {
     );
   });
 
+  it("accepts a temporary seat and rejects a seat that does not say whether it is temporary", () => {
+    const temporary: AgentDockPresentation = {
+      ...PRESENTATION,
+      seats: [{ kind: "agent", agent: AGENT, mood: "idle", state: { kind: "unread", count: 1 }, temporary: true }],
+    };
+    expect(decodeAgentDockPresentation(temporary)).toEqual(temporary);
+    const unmarked = [{ kind: "agent", agent: AGENT, mood: "idle", state: null }];
+    expect(() => decodeAgentDockPresentation({ ...PRESENTATION, seats: unmarked })).toThrow(
+      "Invalid agent dock presentation.",
+    );
+  });
+
   it("rejects a presentation over its limits", () => {
     const seats = Array.from({ length: AGENT_DOCK_LIMITS.seats + 1 }, () => PRESENTATION.seats[0]);
     expect(() => decodeAgentDockPresentation({ ...PRESENTATION, seats })).toThrow("Invalid agent dock presentation.");
     const badCount = [
-      { kind: "agent", agent: AGENT, mood: "idle", state: { kind: "unread", count: AGENT_DOCK_LIMITS.count + 1 } },
+      {
+        kind: "agent",
+        agent: AGENT,
+        mood: "idle",
+        state: { kind: "unread", count: AGENT_DOCK_LIMITS.count + 1 },
+        temporary: false,
+      },
     ];
     expect(() => decodeAgentDockPresentation({ ...PRESENTATION, seats: badCount })).toThrow(
       "Invalid agent dock presentation.",
@@ -188,6 +208,27 @@ describe("agent dock decoding", () => {
       url: "https://example.com",
     });
     expect(decodeAgentDockAction({ type: "open-settings" })).toEqual({ type: "open-settings" });
+    expect(decodeAgentDockAction({ type: "hide" })).toEqual({ type: "hide" });
+    const move = {
+      type: "move",
+      serverId: "local",
+      seat: { kind: "agent", id: "agent-1" },
+      before: { kind: "channel", id: "channel-1" },
+    };
+    expect(decodeAgentDockAction(move)).toEqual(move);
+    const moveToEnd = { type: "move", serverId: "local", seat: { kind: "agent", id: "agent-1" }, before: null };
+    expect(decodeAgentDockAction(moveToEnd)).toEqual(moveToEnd);
+    expect(() =>
+      decodeAgentDockAction({ type: "move", serverId: "local", seat: { kind: "agent", id: "agent-1" } }),
+    ).toThrow("Invalid agent dock action.");
+    expect(() =>
+      decodeAgentDockAction({
+        type: "move",
+        serverId: "local",
+        seat: { kind: "agent", id: "agent-1" },
+        before: { kind: "group", id: "group-1" },
+      }),
+    ).toThrow("Invalid agent dock action.");
     expect(decodeAgentDockAction({ type: "open-window", serverId: "local", agentId: "agent-1" })).toEqual({
       type: "open-window",
       serverId: "local",

@@ -1,0 +1,33 @@
+{
+  "slug": "typefully",
+  "name": "Typefully",
+  "tagline": "Social post drafts",
+  "description": "Typefully lets agents write and edit drafts, manage the posting queue, and schedule posts for the signed-in user's social accounts. Each user signs in to their own Typefully account through the browser.",
+  "category": "productivity",
+  "creatorName": "Typefully",
+  "iconUrl": "https://typefully.com/icon/apple-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-thread-draft", "text": "Draft a thread about what we shipped this week from these release notes." },
+    { "id": "prompt-queue", "text": "What posts are in my queue for the next seven days?" },
+    { "id": "prompt-rewrite", "text": "Rewrite my latest draft to be shorter and clearer." }
+  ],
+  "apps": [
+    {
+      "id": "app-typefully-mcp",
+      "name": "Typefully",
+      "description": "Draft writing, queue management, and scheduling, over Typefully's MCP server with browser sign-in.",
+      "iconUrl": "https://typefully.com/icon/apple-icon.png",
+      "server": {
+        "name": "typefully",
+        "transport": "http",
+        "url": "https://mcp.typefully.com/mcp",
+        "auth": [{ "id": "typefully-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://typefully.com",
+  "privacyPolicyUrl": "https://typefully.com/privacy",
+  "termsUrl": "https://typefully.com/terms"
+}

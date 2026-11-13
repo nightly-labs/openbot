@@ -96,6 +96,7 @@ export function silentAgentAnswer(message: AgentMessage): boolean {
     !message.actionMarker &&
     !message.questionPrompt &&
     !message.imageGeneration &&
+    !message.videoGeneration &&
     !message.attachments?.length &&
     !message.reactions?.length &&
     !message.body.trim()

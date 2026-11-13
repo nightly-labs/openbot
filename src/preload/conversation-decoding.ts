@@ -5,10 +5,12 @@
 // carries, so a value the renderer reads always has the shape its type says.
 
 import {
+  type AgentApproval,
   type AgentTask,
   type AgentTaskPage,
   type AgentTaskReadState,
   type AgentTasksSnapshot,
+  type AgentTaskWindow,
   type AgentWaitsSnapshot,
   type AttachmentDownloadProgress,
   type AttachmentImportProgress,
@@ -21,10 +23,12 @@ import {
   type ConversationWithReadState,
   type DraftAttachment,
   type FilePreview,
+  isAgentApproval,
   isAgentTask,
   isAgentTaskPage,
   isAgentTaskReadState,
   isAgentTasksSnapshot,
+  isAgentTaskWindow,
   isAgentWaitsSnapshot,
   isAttachmentSummary,
   isConversationMessage,
@@ -33,8 +37,10 @@ import {
   isConversationWithReadState,
   isFilePreviewKind,
   isFilePreviewPageUrl,
+  isPinnedMessagesSnapshot,
   isQueuedMessageReceipt,
   isQueueSnapshot,
+  type PinnedMessagesSnapshot,
   type QueuedMessageReceipt,
   type QueueSnapshot,
 } from "@openbot/contracts/ipc";
@@ -201,6 +207,13 @@ export function decodeWaits(value: unknown): AgentWaitsSnapshot {
   return value;
 }
 
+export function decodePinnedMessages(value: unknown): PinnedMessagesSnapshot {
+  if (!isPinnedMessagesSnapshot(value)) {
+    throw new Error("Invalid pinned messages response.");
+  }
+  return value;
+}
+
 export function decodeAgentTaskReadState(value: unknown): AgentTaskReadState {
   if (!isAgentTaskReadState(value)) {
     throw new Error("Invalid thread read state.");
@@ -243,9 +256,23 @@ export function decodeTaskPage(value: unknown): AgentTaskPage {
   return value;
 }
 
+export function decodeTaskWindow(value: unknown): AgentTaskWindow {
+  if (!isAgentTaskWindow(value)) {
+    throw new Error("Invalid task part response.");
+  }
+  return value;
+}
+
 export function decodeQueue(value: unknown): QueueSnapshot {
   if (!isQueueSnapshot(value)) {
     throw new Error("Invalid queue response.");
+  }
+  return value;
+}
+
+export function decodePendingApproval(value: unknown): AgentApproval | null {
+  if (value !== null && !isAgentApproval(value)) {
+    throw new Error("Invalid pending approval response.");
   }
   return value;
 }

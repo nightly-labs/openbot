@@ -1,92 +1,152 @@
-// Reads the Gemini plan usage end to end on the real Antigravity driver and ACP client, with a fake
-// server that answers `/usage` the way Antigravity 1.4.1 does: one Markdown answer in its own
-// session, and no model turn. Checks that a Google sign-in gives the Gemini weekly window and not
-// the Claude and GPT one, that a model with a quota group of its own gets that group's window
-// (#3055), that the reading names every group for the usage popover and the composer notice, that an
-// API key sign-in and a 1.3.0 server give no reading, that 1.3.0 is never sent
-// `/usage`, that the answer reaches no thread, and that later reads reuse the first session: each
-// new Antigravity session leaves a conversation database on disk.
+// Reads the Gemini plan usage end to end on the real Antigravity driver and ACP client. A fake
+// Antigravity CLI 1.5.4 serves ACP, and a local `node:http` fake of Google's Code Assist service,
+// set through `OPENBOT_DEV_ANTIGRAVITY_CODE_ASSIST_URL`, answers `loadCodeAssist` and
+// `retrieveUserQuotaSummary` with the CLI's token in a temporary `GEMINI_HOME`. Checks that a Google
+// sign-in gives the Gemini weekly window and not the Claude and GPT one, that a model with a quota
+// group of its own gets that group's window (#3055), that on a plan with no Gemini group the dock shows
+// the group with the least room left and a Gemini model still has no reading, that the reading names every group for the usage
+// popover and the composer notice, that the fake gets the Antigravity desktop app's User-Agent, the bearer token and
+// the account's project, that an API key sign-in, an access token that expires within a minute, a 403
+// and a missing project give no reading and no error, and that a usage read sends nothing to the ACP
+// server and starts no process. The `/usage` checks are gone: 1.5 has no `/usage`, so no prompt can
+// reach the model or a thread, and no session is made that a later read could reuse.
 // `bun scripts/antigravity-usage-e2e.ts`. Writes .openbot-build/antigravity-usage-e2e/report.json.
 import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { createServer, type IncomingMessage } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { type AccountUsage, isAccountUsage, usageGroupForModel, usageQuotaForModel } from "@openbot/contracts/ipc";
 import { normalizeAccountUsage } from "../src/backend/agent/account-usage";
 import type { AgentClient } from "../src/backend/agent-client";
-import type { AgentCliInfo } from "../src/backend/cli";
+import { type AgentCliInfo, resolveAntigravityCli } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { type AccountRateLimitsReadResult, decodeAccountRateLimitsReadResult } from "../src/backend/protocol";
-import { NO_PROVIDER_CREDENTIALS, requireProviderDriver } from "../src/backend/provider-drivers";
+import {
+  NO_PROVIDER_CREDENTIALS,
+  type ProviderClientContext,
+  requireProviderDriver,
+} from "../src/backend/provider-drivers";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/antigravity-usage-e2e");
+const VERSION = "1.5.4";
+const ACCESS_TOKEN = "fake-access-token";
+const PROJECT = "fake-companion-project-123";
 
-/** The answer of Antigravity 1.4.1's `format_usage_message` for a Google sign-in. */
-const GOOGLE_ANSWER = [
-  "### Session Usage",
-  "- No token usage recorded yet.",
-  "### Quota Limits",
-  "- **Gemini Models**",
-  "  *(Models within this group: Gemini Flash, Gemini Pro)*",
-  "  - **Weekly Limit Remaining:** 96% remaining (resets Oct 29, 2026, 10:12 UTC)",
-  "- **Claude and GPT models**",
-  "  *(Models within this group: Claude Opus, Claude Sonnet, GPT-OSS)*",
-  "  - **Weekly Limit Remaining:** 12% remaining (resets Oct 30, 2026, 08:00 UTC)",
-].join("\n");
+/** The `retrieveUserQuotaSummary` answer for a Google sign-in. */
+const GOOGLE_QUOTA = {
+  groups: [
+    {
+      displayName: "Gemini Models",
+      description: "Models within this group: Gemini Flash, Gemini Pro",
+      buckets: [
+        {
+          bucketId: "gemini-weekly",
+          displayName: "Weekly Limit Remaining",
+          window: "weekly",
+          resetTime: "2026-11-17T11:59:31Z",
+          remainingFraction: 0.96,
+        },
+      ],
+    },
+    {
+      displayName: "Claude and GPT models",
+      description: "Models within this group: Claude Opus, Claude Sonnet, GPT-OSS",
+      buckets: [
+        {
+          bucketId: "third-party-weekly",
+          displayName: "Weekly Limit Remaining",
+          window: "weekly",
+          resetTime: "2026-11-18T08:00:00Z",
+          remainingFraction: 0.12,
+        },
+      ],
+    },
+  ],
+};
 /** The same answer for a plan that gives Gemini 4 Argon a group of its own, here spent (#3055). */
-const ARGON_ANSWER = [
-  "### Session Usage",
-  "- No token usage recorded yet.",
-  "### Quota Limits",
-  "- **Gemini Models**",
-  "  *(Models within this group: Gemini Flash, Gemini Pro)*",
-  "  - **Weekly Limit Remaining:** 100% remaining (resets Oct 31, 2026, 08:19 UTC)",
-  "- **Gemini 4 Argon**",
-  "  *(Models within this group: Gemini 4 Argon)*",
-  "  - **Weekly Limit Remaining:** 0% remaining (resets Oct 30, 2026, 10:00 UTC)",
-  "- **Claude and GPT models**",
-  "  *(Models within this group: Claude Opus, Claude Sonnet, GPT-OSS)*",
-  "  - **Weekly Limit Remaining:** 100% remaining (resets Nov 01, 2026, 11:15 UTC)",
-].join("\n");
-const API_KEY_ANSWER = [
-  "### Session Usage",
-  "- No token usage recorded yet.",
-  "### Quota Limits",
-  "- Not applicable for current authentication method.",
-].join("\n");
+const ARGON_QUOTA = {
+  groups: [
+    {
+      displayName: "Gemini Models",
+      description: "Models within this group: Gemini Flash, Gemini Pro",
+      buckets: [
+        {
+          displayName: "Weekly Limit Remaining",
+          window: "weekly",
+          resetTime: "2026-11-19T08:19:00Z",
+          remainingFraction: 1,
+        },
+      ],
+    },
+    {
+      displayName: "Gemini 4 Argon",
+      description: "Models within this group: Gemini 4 Argon",
+      buckets: [
+        {
+          displayName: "Weekly Limit Remaining",
+          window: "weekly",
+          resetTime: "2026-11-18T10:00:00Z",
+          remainingFraction: 0,
+        },
+      ],
+    },
+    {
+      displayName: "Claude and GPT models",
+      description: "Models within this group: Claude Opus, Claude Sonnet, GPT-OSS",
+      buckets: [
+        {
+          displayName: "Weekly Limit Remaining",
+          window: "weekly",
+          resetTime: "2026-11-20T11:15:00Z",
+          remainingFraction: 1,
+        },
+      ],
+    },
+  ],
+};
 
-// Logs every request method, and answers a prompt that starts with `/usage` with `FAKE_AGY_ANSWER`
-// in one `agent_message_chunk` before the prompt returns. Any other prompt is a model turn.
-const FAKE_AGY = `#!/usr/bin/env node
+/** A plan whose answer has no Gemini group, only the Claude and GPT one, as Google sent in November 2026. */
+const NO_GEMINI_QUOTA = {
+  groups: [
+    {
+      displayName: "Claude and GPT models",
+      description: "Models within this group: Claude Opus, Claude Sonnet, GPT-OSS",
+      buckets: [
+        {
+          displayName: "Weekly Limit Remaining",
+          window: "weekly",
+          resetTime: "2026-11-17T11:59:31Z",
+          remainingFraction: 0.96,
+        },
+      ],
+    },
+  ],
+};
+
+// An Antigravity CLI that prints its version, and otherwise logs its start and every ACP method.
+// Its models come from `session/new`; a prompt ends with no answer.
+const FAKE_ANTIGRAVITY = `#!/usr/bin/env node
+if (process.argv[2] === "--version") {
+  process.stdout.write("${VERSION}\\n");
+  process.exit(0);
+}
 const fs = require("node:fs");
 const NL = String.fromCharCode(10);
+const log = (entry) => fs.appendFileSync(process.env.FAKE_AGY_LOG, JSON.stringify({ pid: process.pid, ...entry }) + NL);
+log({ method: "start", argv: process.argv.slice(2) });
 const write = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + NL);
 function handle(message) {
-  if (message.method) fs.appendFileSync(process.env.FAKE_AGY_LOG, JSON.stringify({
-    method: message.method, sessionId: message.params && message.params.sessionId,
-    text: message.params && message.params.prompt && message.params.prompt.map((block) => block.text).join(""),
-  }) + NL);
+  if (message.method) log({ method: message.method, sessionId: message.params && message.params.sessionId });
   if (message.id === undefined) return;
-  if (message.method === "initialize") {
-    write({ id: message.id, result: { protocolVersion: 1, agentCapabilities: {}, authMethods: [] } });
-    return;
-  }
-  if (message.method === "session/new") {
-    write({ id: message.id, result: {
+  if (message.method === "initialize")
+    return write({ id: message.id, result: { protocolVersion: 1, agentCapabilities: {}, authMethods: [] } });
+  if (message.method === "session/new")
+    return write({ id: message.id, result: {
       sessionId: "s-" + message.id,
       models: { availableModels: [{ modelId: "gemini-fake", name: "Gemini Fake" }], currentModelId: "gemini-fake" },
     } });
-    return;
-  }
-  if (message.method === "session/prompt") {
-    const text = message.params.prompt.map((block) => block.text).join("");
-    if (text.startsWith("/usage")) write({ method: "session/update", params: {
-      sessionId: message.params.sessionId,
-      update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: process.env.FAKE_AGY_ANSWER } },
-    } });
-    write({ id: message.id, result: { stopReason: "end_turn" } });
-    return;
-  }
+  if (message.method === "session/prompt") return write({ id: message.id, result: { stopReason: "end_turn" } });
   write({ id: message.id, result: {} });
 }
 let buffer = "";
@@ -104,34 +164,96 @@ setInterval(() => {}, 1000);
 `;
 
 interface LogEntry {
+  pid: number;
   method: string;
-  sessionId?: string;
-  text?: string;
+  argv?: string[];
+}
+
+interface QuotaRequest {
+  method: string | undefined;
+  path: string | undefined;
+  authorization: string | undefined;
+  userAgent: string | undefined;
+  body: string;
+}
+
+/** How the Code Assist fake answers. */
+interface QuotaService {
+  status: number;
+  project: string | null;
+  quota: unknown;
 }
 
 interface UsageCase {
-  version: string;
+  name: string;
   model: string | undefined;
   readings: AccountRateLimitsReadResult[];
-  prompts: string[];
-  usageSessions: string[];
-  notifications: string[];
+  quotaRequests: QuotaRequest[];
+  acpMethods: string[];
 }
 
 interface Report {
   passed: boolean;
-  googleSignIn?: UsageCase;
+  cli?: AgentCliInfo;
+  userAgent?: string;
+  googleSignIn?: UsageCase & { acpMethodsDuringLaterReads: string[] };
   perModel?: UsageCase[];
+  noGeminiGroup?: UsageCase[];
   groups?: AccountUsage;
   apiKeySignIn?: UsageCase;
-  olderRuntime?: UsageCase;
+  expiringToken?: UsageCase;
+  importedToken?: UsageCase;
+  forbidden?: UsageCase;
+  missingProject?: UsageCase;
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-antigravity-usage-e2e-"));
 const log = join(root, "agy.jsonl");
+const geminiHome = join(root, "gemini");
+const tokenFile = join(geminiHome, "antigravity-acp", "antigravity-oauth-token");
 const report: Report = { passed: false };
 const clients: AgentClient[] = [];
+/** The client of the last case. */
+let current: AgentClient | undefined;
+const service: QuotaService = { status: 200, project: PROJECT, quota: GOOGLE_QUOTA };
+const quotaRequests: QuotaRequest[] = [];
+// Every folder the driver reads or writes is in the temporary folder: never the user's `~/.gemini`.
 process.env.FAKE_AGY_LOG = log;
+process.env.GEMINI_HOME = geminiHome;
+delete process.env.OPENBOT_ANTIGRAVITY_PATH;
+
+async function body(request: IncomingMessage): Promise<string> {
+  let text = "";
+  for await (const chunk of request) text += String(chunk);
+  return text;
+}
+
+const server = createServer((request, response) => {
+  void body(request).then((parsed) => {
+    quotaRequests.push({
+      method: request.method,
+      path: request.url,
+      authorization: request.headers.authorization,
+      userAgent: request.headers["user-agent"],
+      body: parsed,
+    });
+    response.setHeader("Content-Type", "application/json");
+    if (service.status !== 200) {
+      response.statusCode = service.status;
+      response.end(JSON.stringify({ error: { code: service.status, message: "The caller does not have permission" } }));
+      return;
+    }
+    if (request.url === "/v1internal:loadCodeAssist")
+      return response.end(JSON.stringify(service.project ? { cloudaicompanionProject: service.project } : {}));
+    if (request.url === "/v1internal:retrieveUserQuotaSummary") return response.end(JSON.stringify(service.quota));
+    response.statusCode = 404;
+    response.end("{}");
+  });
+});
+await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+const quotaAddress = server.address();
+assert.ok(quotaAddress !== null && typeof quotaAddress === "object");
+process.env.OPENBOT_DEV_ANTIGRAVITY_CODE_ASSIST_URL = `http://127.0.0.1:${quotaAddress.port}/v1internal`;
 
 async function readLog(): Promise<LogEntry[]> {
   const text = await readFile(log, "utf8").catch(() => "");
@@ -141,69 +263,144 @@ async function readLog(): Promise<LogEntry[]> {
     .map((line) => JSON.parse(line));
 }
 
-async function install(version: string): Promise<AgentCliInfo> {
-  const executable = join(root, "agy", version, "bin", "agy_acp_server");
-  await mkdir(join(root, "agy", version, "bin"), { recursive: true });
-  await writeFile(executable, FAKE_AGY);
+/** Writes the CLI's token file, as the CLI does after a sign-in. */
+async function writeToken(accessToken: string, expiry: string): Promise<void> {
+  await mkdir(join(geminiHome, "antigravity-acp"), { recursive: true });
+  await writeFile(
+    tokenFile,
+    JSON.stringify({
+      token: { access_token: accessToken, token_type: "Bearer", refresh_token: "fake-refresh", expiry },
+      auth_method: "consumer",
+      id_token_email: "",
+    }),
+    { mode: 0o600 },
+  );
+}
+
+const inOneHour = () => new Date(Date.now() + 3_600_000).toISOString();
+
+async function install(): Promise<AgentCliInfo> {
+  const executable = join(root, "antigravity", VERSION, "bin", "antigravity");
+  await mkdir(join(root, "antigravity", VERSION, "bin"), { recursive: true });
+  await writeFile(executable, FAKE_ANTIGRAVITY);
   await chmod(executable, 0o755);
-  return { executable, version, source: "managed" };
+  return await runCauseEffect(resolveAntigravityCli({ systemCandidates: [], bundledExecutable: executable }));
 }
 
 /** `reads` usage reads at once on one process, as a dock poll and a refresh after a limit can. */
-async function readUsage(version: string, answer: string, reads: number, model?: string): Promise<UsageCase> {
+async function readUsage(
+  cli: AgentCliInfo,
+  name: string,
+  reads: number,
+  model?: string,
+  context: ProviderClientContext = NO_PROVIDER_CREDENTIALS,
+): Promise<UsageCase> {
   await rm(log, { force: true });
-  process.env.FAKE_AGY_ANSWER = answer;
-  const client = requireProviderDriver("antigravity").createClient(
-    await install(version),
-    10_000,
-    NO_PROVIDER_CREDENTIALS,
-  );
+  quotaRequests.length = 0;
+  const client = requireProviderDriver("antigravity").createClient(cli, 10_000, context);
   clients.push(client);
-  const notifications: string[] = [];
-  client.on("notification", (notification) => notifications.push(notification.method));
+  current = client;
   client.start();
   const readings = await Promise.all(
     Array.from({ length: reads }, () =>
       runCauseEffect(client.request("account/rateLimits/read", { model }, decodeAccountRateLimitsReadResult)),
     ),
   );
-  const prompts = (await readLog()).filter((entry) => entry.method === "session/prompt");
   return {
-    version,
+    name,
     model,
     readings,
-    prompts: prompts.map((entry) => entry.text ?? ""),
-    usageSessions: [...new Set(prompts.flatMap((entry) => (entry.sessionId ? [entry.sessionId] : [])))],
-    notifications,
+    quotaRequests: [...quotaRequests],
+    acpMethods: (await readLog()).map((entry) => entry.method),
   };
 }
 
-try {
-  // 1. A Google sign-in on 1.4.1: the Gemini group's weekly window, both reads in one session.
-  const google = await readUsage("1.4.1", GOOGLE_ANSWER, 2, "gemini-3.8-flash-high");
-  report.googleSignIn = google;
-  assert.deepEqual(google.prompts, ["/usage", "/usage"], "1.4.1 is sent `/usage` for each read");
-  assert.equal(google.usageSessions.length, 1, "the second read reuses the first read's session");
-  for (const reading of google.readings)
-    assert.deepEqual(reading.rateLimits, {
-      limitId: "antigravity",
-      primary: null,
-      secondary: { usedPercent: 4, windowDurationMins: 10_080, resetsAt: Date.UTC(2026, 9, 29, 10, 12) / 1_000 },
-    });
-  assert.ok(
-    !google.notifications.some((method) => method.startsWith("item/") || method.startsWith("turn/")),
-    `the answer reaches no thread: ${google.notifications.join(", ")}`,
+const weekly = (usedPercent: number, resetTime: string) => ({
+  limitId: "antigravity",
+  primary: null,
+  secondary: { usedPercent, windowDurationMins: 10_080, resetsAt: Date.parse(resetTime) / 1_000 },
+});
+
+/** A reading that gave no usage, with no quota call. */
+function assertNoUsage(reading: UsageCase, calls: string[]): void {
+  for (const value of reading.readings) assert.equal(value.rateLimits, null, `${reading.name}: no reading`);
+  assert.deepEqual(
+    reading.quotaRequests.map((request) => request.path),
+    calls,
+    `${reading.name}: the Code Assist calls`,
   );
+  assert.ok(!reading.acpMethods.includes("session/prompt"), `${reading.name}: no prompt reaches the ACP server`);
+}
+
+try {
+  // The managed install `<root>/<version>/bin/antigravity` gives its version with `--version`.
+  const cli = await install();
+  report.cli = cli;
+  assert.equal(cli.version, VERSION);
+  assert.equal(cli.source, "managed");
+  const os = process.platform === "win32" ? "windows" : process.platform;
+  const arch = process.arch === "x64" ? "amd64" : process.arch;
+  // The desktop app's version, not the CLI's: Google sends the Gemini group only to it (#7215).
+  report.userAgent = `antigravity/2.31.0 ${os}/${arch}`;
+
+  // 1. A Google sign-in: the Gemini group's weekly window, from the account's project.
+  await writeToken(ACCESS_TOKEN, inOneHour());
+  const google = await readUsage(cli, "Google sign-in", 1, "gemini-3.8-flash-high");
+  const expectedGoogle = weekly(4, "2026-11-17T11:59:31Z");
+  assert.deepEqual(google.readings[0]?.rateLimits, expectedGoogle);
+  assert.deepEqual(
+    google.quotaRequests,
+    [
+      {
+        method: "POST",
+        path: "/v1internal:loadCodeAssist",
+        authorization: `Bearer ${ACCESS_TOKEN}`,
+        userAgent: report.userAgent,
+        body: "{}",
+      },
+      {
+        method: "POST",
+        path: "/v1internal:retrieveUserQuotaSummary",
+        authorization: `Bearer ${ACCESS_TOKEN}`,
+        userAgent: report.userAgent,
+        body: JSON.stringify({ project: PROJECT }),
+      },
+    ],
+    "the token, Antigravity's User-Agent and the account's project",
+  );
+  // Later reads, two at once, go to Code Assist only: no ACP request and no new process.
+  const before = (await readLog()).length;
+  const client = current;
+  assert.ok(client, "the Google sign-in has a client");
+  const later = await Promise.all(
+    [0, 1].map(() =>
+      runCauseEffect(
+        client.request(
+          "account/rateLimits/read",
+          { model: "gemini-3.8-flash-high" },
+          decodeAccountRateLimitsReadResult,
+        ),
+      ),
+    ),
+  );
+  const logAfter = await readLog();
+  report.googleSignIn = {
+    ...google,
+    readings: [...google.readings, ...later],
+    quotaRequests: [...quotaRequests],
+    acpMethodsDuringLaterReads: logAfter.slice(before).map((entry) => entry.method),
+  };
+  for (const reading of later) assert.deepEqual(reading.rateLimits, expectedGoogle);
+  assert.equal(quotaRequests.length, 6, "each read calls Code Assist twice");
+  assert.deepEqual(report.googleSignIn.acpMethodsDuringLaterReads, [], "a usage read sends nothing over ACP");
+  assert.equal(logAfter.filter((entry) => entry.method === "start").length, 1, "a usage read starts no process");
+  assert.ok(!logAfter.some((entry) => entry.method === "session/prompt"), "a usage read sends no prompt");
 
   // 2. Gemini 4 Argon has a group of its own. Its spent window is not Flash's, and Flash's room is
   // not Argon's. The dock's reading, with no model, is the "Gemini Models" group.
-  const weekly = (usedPercent: number, resetsAt: number) => ({
-    limitId: "antigravity",
-    primary: null,
-    secondary: { usedPercent, windowDurationMins: 10_080, resetsAt: resetsAt / 1_000 },
-  });
-  const flashRoom = weekly(0, Date.UTC(2026, 9, 31, 8, 19));
-  const argonSpent = weekly(100, Date.UTC(2026, 9, 30, 10, 0));
+  service.quota = ARGON_QUOTA;
+  const flashRoom = weekly(0, "2026-11-19T08:19:00Z");
+  const argonSpent = weekly(100, "2026-11-18T10:00:00Z");
   const perModel: UsageCase[] = [];
   report.perModel = perModel;
   for (const [model, expected] of [
@@ -214,7 +411,7 @@ try {
     [undefined, flashRoom],
     ["gemini-codename-x", null],
   ] as const) {
-    const reading = await readUsage("1.4.3", ARGON_ANSWER, 1, model);
+    const reading = await readUsage(cli, `model ${model ?? "of the dock"}`, 1, model);
     perModel.push(reading);
     assert.deepEqual(reading.readings[0]?.rateLimits ?? null, expected, `the reading of ${model ?? "the dock"}`);
   }
@@ -248,23 +445,64 @@ try {
   assert.equal(usageQuotaForModel(dock, ""), dock, "no model keeps the reading");
   assert.equal(usageQuotaForModel(dock, "gemini-codename-x"), undefined, "an unlisted model has no quota");
 
-  // 4. An API key sign-in has no plan quota.
-  const apiKey = await readUsage("1.4.1", API_KEY_ANSWER, 1);
-  report.apiKeySignIn = apiKey;
-  assert.deepEqual(apiKey.prompts, ["/usage"]);
-  assert.equal(apiKey.readings[0]?.rateLimits ?? null, null, "an API key sign-in gives no reading");
+  // 3b. A plan with no Gemini group: the dock shows the Claude and GPT group, so the account still has a
+  // ring, and a Gemini model has no reading, since that group's room does not say that it can run.
+  service.quota = NO_GEMINI_QUOTA;
+  const claudeRoom = weekly(4, "2026-11-17T11:59:31Z");
+  const noGeminiGroup: UsageCase[] = [];
+  report.noGeminiGroup = noGeminiGroup;
+  for (const [model, expected] of [
+    [undefined, claudeRoom],
+    ["claude-opus-4-6-thinking", claudeRoom],
+    ["gemini-3.8-flash-high", null],
+  ] as const) {
+    const reading = await readUsage(cli, `no Gemini group, model ${model ?? "of the dock"}`, 1, model);
+    noGeminiGroup.push(reading);
+    assert.deepEqual(reading.readings[0]?.rateLimits ?? null, expected, `no Gemini group: ${model ?? "the dock"}`);
+  }
+  const noGeminiUsage = normalizeAccountUsage(noGeminiGroup[0]?.readings[0] ?? null);
+  assert.ok(isAccountUsage(noGeminiUsage), "the reading with one group passes the IPC decoder");
+  assert.deepEqual(
+    noGeminiUsage.limits[0]?.groups?.map((group) => group.name),
+    ["Claude and GPT models"],
+    "the popover names the one group",
+  );
 
-  // 5. 1.3.0 sends `/usage` to the model, so it is never sent.
-  const older = await readUsage("1.3.0", GOOGLE_ANSWER, 1);
-  report.olderRuntime = older;
-  assert.deepEqual(older.prompts, [], "1.3.0 is not sent `/usage`");
-  assert.equal(older.readings[0]?.rateLimits ?? null, null, "1.3.0 gives no reading");
+  // 4. An API key sign-in has no plan quota, and its token is not sent.
+  service.quota = GOOGLE_QUOTA;
+  report.apiKeySignIn = await readUsage(cli, "API key sign-in", 1, undefined, {
+    ...NO_PROVIDER_CREDENTIALS,
+    apiKey: (provider) => (provider === "antigravity" ? "fake-gemini-key" : null),
+  });
+  assertNoUsage(report.apiKeySignIn, []);
+
+  // 5. An access token that expires within a minute, and the token that OpenBot imports from 1.4,
+  // which has none: the CLI refreshes them, and OpenBot does not.
+  await writeToken(ACCESS_TOKEN, new Date(Date.now() + 30_000).toISOString());
+  report.expiringToken = await readUsage(cli, "token expires within a minute", 1);
+  assertNoUsage(report.expiringToken, []);
+  await writeToken("", "2000-01-01T00:00:00Z");
+  report.importedToken = await readUsage(cli, "imported token", 1);
+  assertNoUsage(report.importedToken, []);
+
+  // 6. Google refuses the call: no reading and no error.
+  await writeToken(ACCESS_TOKEN, inOneHour());
+  service.status = 403;
+  report.forbidden = await readUsage(cli, "403", 1);
+  assertNoUsage(report.forbidden, ["/v1internal:loadCodeAssist"]);
+
+  // 7. An account with no Code Assist project: no quota call.
+  service.status = 200;
+  service.project = null;
+  report.missingProject = await readUsage(cli, "no project", 1);
+  assertNoUsage(report.missingProject, ["/v1internal:loadCodeAssist"]);
 
   report.passed = true;
 } finally {
   for (const client of clients) await runCauseEffect(client.stop()).catch(() => undefined);
+  await new Promise<void>((done) => server.close(() => done()));
   await mkdir(OUT, { recursive: true });
   await writeFile(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
   await rm(root, { recursive: true, force: true });
 }
-process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+process.stdout.write(`${report.passed ? "PASS" : "FAIL"} ${join(OUT, "report.json")}\n`);

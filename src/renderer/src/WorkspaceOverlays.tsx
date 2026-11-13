@@ -7,6 +7,8 @@ import {
   type ServerSummary,
 } from "@openbot/contracts/ipc";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
+import { PROVIDER_DETECTION_CAPABILITY } from "@openbot/contracts/team-protocol/provider-detection-v1";
+import { VAULT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
 import { VAULT_V3_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v3";
@@ -35,7 +37,9 @@ import { composerDraftKey } from "./features/conversation/conversation-keys";
 import { conversationPort } from "./features/conversation/conversation-port";
 import { useCustomAgents } from "./features/custom-agents/custom-agents-context";
 import { useCustomProviders } from "./features/custom-providers/custom-providers-context";
+import { desktopProviderDetectionCalls } from "./features/custom-providers/custom-providers-port";
 import { useProviderDetection } from "./features/custom-providers/provider-detection-context";
+import { createProviderDetectionStore } from "./features/custom-providers/stores/provider-detection-store";
 import type { ServerStorageOptions } from "./features/files/ServerStoragePanel";
 import { useSetup } from "./features/onboarding/onboarding-context";
 import { useRemoteDesktop } from "./features/remote-desktop/remote-desktop-context";
@@ -48,8 +52,14 @@ import {
 } from "./features/servers/hosted-server-upsell-controller";
 import { InstallServerOverlay } from "./features/servers/InstallServerOverlay";
 import { mcpToolRuntimeNote } from "./features/servers/mcp-servers";
+import type { ServerCopyOptions } from "./features/servers/ServerTransferPanel";
 import { useServerActions } from "./features/servers/server-actions";
-import { remoteMcpSignIn, serverCanAdminister, serverSupportsCapability } from "./features/servers/server-capabilities";
+import {
+  remoteMcpSignIn,
+  serverCanAdminister,
+  serverRotatesHostKey,
+  serverSupportsCapability,
+} from "./features/servers/server-capabilities";
 import { useServerSelection } from "./features/servers/server-selection";
 import { useServerSettings } from "./features/servers/server-settings";
 import { useServerSwitch } from "./features/servers/server-switch";
@@ -307,7 +317,8 @@ function InstallServer() {
 function AddServer() {
   const { servers, addServerOpen, addServerEntryPoint, setAddServerOpen, setJoinServerOpen } = useServers();
   const { select, createLocal, installServer } = useServerActions();
-  const { openAppSettings } = useSettings();
+  const { openAppSettings, setAppSettingsOpen } = useSettings();
+  const windowPage = useWindowPage();
   const onCreateLocal =
     createLocal &&
     (() => {
@@ -327,10 +338,15 @@ function AddServer() {
       entryPoint={addServerEntryPoint() ?? undefined}
       calls={appPort().hostedServers}
       license={appPort().license}
+      thisComputer
+      pricingPage={windowPage.pricing}
+      onOpenUrl={(url) => void appPort().openUrl(url)}
       servers={servers()}
       onClose={() => setAddServerOpen(false)}
       onOpenServer={(serverId) => {
         setAddServerOpen(false);
+        // The server menu can open this dialog over Settings; the server opens in front of them.
+        setAppSettingsOpen(false);
         void select(serverId);
       }}
       onContactUs={() => void appPort().openExternal("hosted-server-contact")}
@@ -449,7 +465,15 @@ function ServerSettings() {
   const windowPage = useWindowPage();
   const usageRows = usePlanLimitRows();
   const platform = usePlatform();
-  const { hostStatus, hostedServerIds, hostedServersAvailable, hostedServersLoaded, setAddServerOpen } = useServers();
+  const {
+    servers,
+    activeServer,
+    hostStatus,
+    hostedServerIds,
+    hostedServersAvailable,
+    hostedServersLoaded,
+    setAddServerOpen,
+  } = useServers();
   const { selectAgent, selectGlobalSearchMessage } = useNavigation();
   const { selectServer } = useServerSelection();
   const { setPendingAgentSelection } = useServerSwitch();
@@ -467,19 +491,52 @@ function ServerSettings() {
     cancelProviderSignIn,
     openProviderInstallGuide,
     setProviderOn,
+    providerUseServerId,
+    hostOffProviders,
+    refreshHostProviderUse,
     measureProviderDownload,
     removeProviderDownload,
     providerAccounts,
     restartProvider,
     cancelProviderRestart,
+    chooseInstalledCli,
     connection,
     providerKeys,
     hostCustomProviders,
+    customAgentsServerId,
+    hostCustomAgents,
   } = useProviders();
   const localEndpoints = useCustomProviders();
   const localAgents = useCustomAgents();
   const detection = useProviderDetection();
-  /** A custom agent is a command on this computer, so only the local server lists or runs one. */
+  /**
+   * What the host of the active joined server finds on its own computer, through
+   * `provider-detection-v1`, for an owner or admin. A detected row saves to the host's endpoints and
+   * custom agents, so the store needs both of them for the same server. A new store for each server
+   * keeps the settings and rows of one host from another.
+   */
+  // Keyed on the server id only: each servers event gives a new server object, and a new store would
+  // empty the found rows and the settings.
+  const hostDetectionServerId = createMemo(() => {
+    const serverId = customAgentsServerId();
+    const server = activeServer();
+    return serverId !== undefined &&
+      serverId === providerAdminServerId() &&
+      server?.id === serverId &&
+      serverCanAdminister(server, PROVIDER_DETECTION_CAPABILITY)
+      ? serverId
+      : undefined;
+  });
+  const hostDetection = createMemo(() => {
+    const serverId = hostDetectionServerId();
+    if (serverId === undefined) return undefined;
+    return createProviderDetectionStore({
+      api: () => desktopProviderDetectionCalls(serverId),
+      endpoints: hostCustomProviders,
+      agents: { customAgents: hostCustomAgents.customAgents, saveCustomAgent: hostCustomAgents.saveCustomAgent },
+    });
+  });
+  /** The custom agents of this computer. A joined server's host has its own, in `hostAgentSettings`. */
   const customAgents: CustomAgentSettingsApi = {
     get agents() {
       return localAgents.customAgents();
@@ -500,6 +557,29 @@ function ServerSettings() {
     },
     restart: () => restartProvider("acp"),
     cancelRestart: () => cancelProviderRestart("acp"),
+  };
+  /**
+   * The custom agents of a joined server's host, for an owner or admin, through `custom-agents-v1`.
+   * The host runs each command on its own computer. The contract has no trial start, so the form has
+   * no Check, and a restart of the host's providers is not offered here, as for the other providers.
+   */
+  const hostAgentSettings: CustomAgentSettingsApi = {
+    host: true,
+    get agents() {
+      return hostCustomAgents.customAgents();
+    },
+    save: hostCustomAgents.saveCustomAgent,
+    remove: hostCustomAgents.deleteCustomAgent,
+    // The settings of a joined server open on the active server, so this status is the host's.
+    get restartPending() {
+      return customAgents.restartPending;
+    },
+    get lastError() {
+      return customAgents.lastError;
+    },
+    get diagnostics() {
+      return customAgents.diagnostics;
+    },
   };
   /**
    * Whether the tool runtimes the providers context holds are this server's: this computer's, or,
@@ -572,18 +652,35 @@ function ServerSettings() {
   // A host that updates or rolls back keeps its id, so the API key kind follows this capability too.
   const vaultApiKeys = createMemo(() => serverCanAdminister(serverSettingsTarget(), VAULT_V2_CAPABILITY));
   const vaultTwoStep = createMemo(() => serverCanAdminister(serverSettingsTarget(), VAULT_V3_CAPABILITY));
+  const vaultImport = createMemo(() => serverCanAdminister(serverSettingsTarget(), VAULT_IMPORT_CAPABILITY));
   const vault = createMemo(() => {
     const serverId = vaultServerId();
     if (serverId === undefined) return undefined;
     const local = untrack(serverSettingsTarget)?.kind === "local";
     return {
-      store: createVaultStore(local ? desktopVaultCalls() : hostVaultCalls(serverId)),
+      store: createVaultStore(local ? desktopVaultCalls() : hostVaultCalls(serverId, vaultImport())),
       apiKeys: vaultApiKeys(),
       twoStep: vaultTwoStep(),
       // Link signs in on this computer only: a joined server's host has no Link account.
       link: local ? createLinkAccountStore() : undefined,
+      listAgents: () => appPort().agent.listAgents(serverId),
     };
   });
+  /**
+   * Copy to another server: each server that the user administers with `instance-transfer-v1`. Main
+   * holds the connections of all of them, so it reads from one and writes to another.
+   */
+  const copyOptions = (): ServerCopyOptions | undefined => {
+    const eligible = servers().filter((entry) => serverCanAdminister(entry, "instance-transfer-v1"));
+    if (eligible.length < 2) return undefined;
+    return {
+      servers: eligible,
+      onOpenServer: (serverId) => {
+        setServerSettingsOpen(false);
+        if (!eligible.find((entry) => entry.id === serverId)?.active) void selectServer(serverId);
+      },
+    };
+  };
   // The workspace belongs to the selected server. For another server, the switch comes first and
   // the agent is published for the scope it lands in; a message there opens as its agent's chat.
   const openOnServer = (server: ServerSummary, agentId: string, open: () => void) => {
@@ -609,6 +706,7 @@ function ServerSettings() {
       install: async (input) => {
         const result = await appPort().acpRegistry.install(input, server.id);
         if (server.kind === "local") await localAgents.refreshCustomAgents();
+        else if (server.id === customAgentsServerId()) await hostCustomAgents.refreshCustomAgents();
         return result;
       },
       cancel: (id) => appPort().acpRegistry.cancel(id, server.id),
@@ -625,6 +723,8 @@ function ServerSettings() {
      * `providerRuntimeDownloadsAvailable()`: a build without managed runtime downloads still has custom endpoints.
      */
     const endpoints = local ? localEndpoints : hostCustomProviders;
+    /** The detection of this computer, or of the host. Undefined while the host does not offer it. */
+    const detectionOf = () => (local ? detection : hostDetection());
     return {
       get defaultProvider() {
         const state = setupState();
@@ -676,7 +776,13 @@ function ServerSettings() {
       get onInstallProvider() {
         return local && providerRuntimeDownloadsAvailable() ? openProviderInstallGuide : undefined;
       },
-      onSetProviderOn: local ? setProviderOn : undefined,
+      // A joined server's host turns its providers off and on only with `provider-use-v1`.
+      get onSetProviderOn() {
+        return local || server.id === providerUseServerId() ? setProviderOn : undefined;
+      },
+      get offProviders() {
+        return local ? undefined : hostOffProviders();
+      },
       onMeasureProviderDownload: local ? measureProviderDownload : undefined,
       onRemoveProviderDownload: local ? removeProviderDownload : undefined,
       get providerUsers() {
@@ -716,23 +822,41 @@ function ServerSettings() {
       },
       onRestartProvider: local ? restartProvider : undefined,
       onCancelProviderRestart: local ? cancelProviderRestart : undefined,
+      onChooseInstalledCli: local ? chooseInstalledCli : undefined,
       get providerDetection() {
-        return local ? detection.detection() : undefined;
+        return detectionOf()?.detection();
       },
-      detectedProviderApi: local ? detection.api : undefined,
+      get detectedProviderApi() {
+        return detectionOf()?.api;
+      },
       get takenAgentIds() {
-        return detection.takenAgentIds();
+        // The IDs of the same computer's agents, so a duplicate is a field error before a round trip.
+        return detectionOf()?.takenAgentIds() ?? hostCustomAgents.customAgents().map((agent) => agent.id);
       },
-      customAgents: local ? customAgents : undefined,
+      // The host's agents need its capabilities, which can arrive after the section opens.
+      get customAgents() {
+        if (local) return customAgents;
+        return server.id === customAgentsServerId() ? hostAgentSettings : undefined;
+      },
       acpRegistry: serverCanAdminister(server, "acp-registry-v1") ? registryFor(server) : undefined,
       get detectionSettings() {
-        return local ? (detection.settingsValue() ?? undefined) : undefined;
+        return detectionOf()?.settingsValue() ?? undefined;
       },
-      onDetectionSettingsChange: detection.setSettings,
+      get onDetectionSettingsChange() {
+        return detectionOf()?.setSettings;
+      },
       get detectionSettingsError() {
-        return detection.settingsError();
+        return detectionOf()?.settingsError() ?? null;
       },
-      onShown: local ? () => void detection.scan() : undefined,
+      get onShown() {
+        const store = detectionOf();
+        const readsUse = !local && server.id === providerUseServerId();
+        if (!store && !readsUse) return undefined;
+        return () => {
+          if (store) void store.scan();
+          if (readsUse) refreshHostProviderUse();
+        };
+      },
     };
   };
 
@@ -807,7 +931,7 @@ function ServerSettings() {
           onRetry={() => refreshServerSettings(server().id)}
           onSaveIdentity={saveServerIdentity}
           onSetPublished={setServerPublished}
-          onRotateHostKey={server().kind === "local" ? rotateHostKey : undefined}
+          onRotateHostKey={serverRotatesHostKey(server()) ? rotateHostKey : undefined}
           onCreateInvite={createServerInvite}
           license={appPort().license}
           companySignIn={appPort().auth}
@@ -887,16 +1011,20 @@ function ServerSettings() {
           }
           hostUpdate={{}}
           hostTimezone={{}}
+          hostTurnLimits={{}}
           hostPersonality={{}}
           hostMemoryLimit={{}}
           memoryReview={{}}
           skillLearning={{}}
+          browsingMemory={{}}
           hostPromptCacheTtl={{}}
-          claudeUserSetup
+          claudeUserSetup={{}}
+          claudeCompactWindow={{}}
           hostModelVisibility={{}}
           hostDefaultProvider={{}}
           agentAccess={{ listAgents: () => appPort().agent.listAgents(server().id) }}
           serverAudit={{ listAgents: () => appPort().agent.listAgents(server().id) }}
+          agentDefaults={{ listAgents: () => appPort().agent.listAgents(server().id) }}
           initialSection={serverSettingsSection()}
           // Any member imports into this computer or a remote host with `agent-import-v1`.
           agentImport={
@@ -910,10 +1038,21 @@ function ServerSettings() {
           // Owners and admins move this computer's server, or a remote host with `instance-transfer-v1`.
           instanceTransfer={
             server().kind === "local"
-              ? { onSignIn: (provider) => void connection.connect(provider), history: true }
+              ? {
+                  onSignIn: (provider) => void connection.connect(provider),
+                  history: true,
+                  fullCopy: true,
+                  copy: copyOptions(),
+                }
               : serverCanAdminister(server(), "instance-transfer-v1")
-                ? // Only the transfer in parts carries the chat history.
-                  { history: serverCanAdminister(server(), "instance-transfer-chunks-v1") }
+                ? // Only the transfer in parts carries the chat history; the full copy chooses each part.
+                  {
+                    history: serverCanAdminister(server(), "instance-transfer-chunks-v1"),
+                    fullCopy:
+                      serverCanAdminister(server(), "instance-transfer-chunks-v1") &&
+                      serverCanAdminister(server(), "instance-transfer-full-copy-v1"),
+                    copy: copyOptions(),
+                  }
                 : undefined
           }
           // The feed listens on this computer, so a calendar app on another one cannot read it.

@@ -82,3 +82,8 @@ When the whole handler is that one route, bind it with `scopedHandler(decode, { 
 `scopedQueryHandler({ local, remote })` for a `scopedQuery` endpoint, from `./scoped-handler.ts`.
 Each branch gets the decoded payload, and `remote` also gets the server. Use `payloadHandler` with
 `agentRequest(decode)` only when the handler does work outside the route.
+
+A `remote` branch sends the request to the joined server. It throws only for a host that does not
+have the capability (`remoteServers.supportsCapability`). A branch that always throws, or that
+returns empty data, needs a reason that the feature cannot work on a server, written beside it. See
+[Joined servers](../../../AGENTS.md#joined-servers).

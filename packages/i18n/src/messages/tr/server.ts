@@ -335,11 +335,24 @@ export const messages = {
   "server.settings.later": "Daha sonra",
   "server.settings.setUp": "Ayarla",
   "server.settings.agents": "Ajanlar",
+  "server.settings.agentsDescription":
+    "Bir ajan için ayarlamadığınızda bu sunucudaki ajanların neler yapabileceğini seçin.",
   "server.settings.timezone": "Saat dilimi",
   "server.settings.timezoneDescription":
     "Mesaj gönderenin saat dilimini belirtmediğinde yeni rutinler bu saat dilimini kullanır.",
   "server.settings.timezoneAutomatic": "Otomatik ({zone})",
   "server.settings.timezoneLoadFailed": "Sunucunun saat dilimi yüklenemedi.",
+  "server.settings.turnLimit": "Aynı anda mesaj dizileri",
+  "server.settings.turnLimitDescription":
+    "Bu sunucuda aynı anda kaç ajan mesaj dizisinin çalışabileceği. Daha fazla dizi daha fazla bellek kullanır.",
+  "server.settings.turnLimitAutomatic": "Otomatik ({count})",
+  "server.settings.turnLimitAutomaticUnlimited": "Otomatik (sınırsız)",
+  "server.settings.turnLimitUnlimited": "Sınırsız",
+  "server.settings.turnLimitsLoadFailed": "Bu sunucunun mesaj dizisi sınırları yüklenemedi.",
+  "server.settings.agentTaskLimit": "Ajan başına paralel mesaj dizileri",
+  "server.settings.agentTaskLimitDescription":
+    "Kendi sınırı olmayan her ajanın aynı anda kaç mesaj dizisi çalıştırabileceği.",
+  "server.settings.agentTaskLimitDefault": "Varsayılan ({count})",
   "server.settings.memoryLimit": "Ajan başına bellek",
   "server.settings.memoryLimitDescription": "Bu sunucudaki her ajanın tutabileceği bellek sayısı.",
   "server.settings.memoryLimitLoadFailed": "Bu sunucunun bellek sınırı yüklenemedi.",
@@ -356,6 +369,10 @@ export const messages = {
   "server.settings.skillLearningAsk": "Önce sor",
   "server.settings.skillLearningOff": "Kapalı",
   "server.settings.skillLearningLoadFailed": "Beceri öğrenme ayarı yüklenemedi.",
+  "server.settings.browsingMemory": "Gezinmemden öğren",
+  "server.settings.browsingMemoryDescription":
+    "Bir ajanın tarayıcısını kontrol ettiğinizde, ajan kullandığınız sayfalardan ve düğmelerden sitelerin nasıl çalıştığını öğrenir. Yazdığınız metin saklanmaz.",
+  "server.settings.browsingMemoryLoadFailed": "Gezinme ayarı yüklenemedi.",
   "server.settings.remoteOnline": "Ana makine çevrim içi. Yayımlama sahibi tarafından kontrol edilir.",
   "server.settings.remoteOffline": "Ana makine çevrim dışı. Yayımlama sahibi tarafından kontrol edilir.",
   "server.settings.reachable": "Çevrim içi erişilebilir. Yalnızca davet edilen kişiler oturum açabilir.",
@@ -373,7 +390,7 @@ export const messages = {
   "server.settings.hostKeyRotated": "Sunucu anahtarı değiştirildi",
   "server.settings.hostKeyChanged": "Son değişiklik",
   "server.settings.hostKeyChangedDescription": "{date}. Önceki anahtar ve yeni anahtar bu değişikliği imzaladı.",
-  "server.settings.hostKeyLocalOnly": "Burada yalnızca bu bilgisayardaki sunucu anahtarını değiştirebilir.",
+  "server.settings.hostKeyOwnerOnly": "Sunucu anahtarını yalnızca sahip değiştirebilir.",
   "server.settings.removeTitle": "Sunucuyu kaldır",
   "server.settings.removeDescription":
     "Bu sunucuyu tüm üyeler için hesap hizmetinden kaldırın. Bilgisayarı artık kullanılamadığında bunu kullanın.",

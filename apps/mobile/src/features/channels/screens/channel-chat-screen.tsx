@@ -1,13 +1,14 @@
 import type { RespondToPromptInput } from "@openbot/contracts/ipc";
 import * as Crypto from "expo-crypto";
 import { useLocalSearchParams } from "expo-router";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChatView } from "@/features/chat/components/chat-view";
 import { useLeaveChat } from "@/features/chat/components/use-leave-chat";
 import { useMessageDelete } from "@/features/chat/components/use-message-delete";
 import { useQuestionPrompt } from "@/features/chat/components/use-question-prompt";
 import { projectChannelMessages } from "@/features/chat/model/chat-messages";
 import { type TurnStepsSummary, unansweredChannelTurnSummaries } from "@/features/chat/model/turn-thinking";
+import { useProgressUpdates } from "@/features/chat/model/use-progress-updates";
 import { useApprovalRequests, useBrowserRequests } from "@/features/workspace/components/use-live-workspace";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgentActivity, MobileAgentWaitReason } from "@/features/workspace/model/agent-activity";
@@ -15,6 +16,7 @@ import { showsOnline } from "@/features/workspace/model/server-status";
 import { useText } from "@/shared/lib/text";
 import { useChannels } from "../components/use-channels";
 import { channelTaskActivities, channelTasksNeedingAction } from "../model/channel-task-actions";
+import { firstUnreadChannelMessageId } from "../model/channel-unread";
 
 export function ChannelChatScreen() {
   const { channelId, serverId } = useLocalSearchParams<{ channelId: string; serverId: string }>();
@@ -39,9 +41,10 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
     () => serverAgents.filter((agent) => channel?.members.some((member) => member.agentId === agent.id)),
     [serverAgents, channel?.members],
   );
+  const progressUpdates = useProgressUpdates(serverId, serverAgents);
   const messages = useMemo(
-    () => projectChannelMessages(page?.messages ?? [], server?.membershipId ?? null),
-    [page?.messages, server?.membershipId],
+    () => projectChannelMessages(page?.messages ?? [], server?.membershipId ?? null, progressUpdates),
+    [page?.messages, server?.membershipId, progressUpdates],
   );
   // A host with channel-attention-v1 names the thread of each member in this channel. A request on
   // one of them belongs here, and not in the agent's own chat.
@@ -112,11 +115,57 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
     );
     return lastTurnSummaries.current;
   }, [page?.messages, memberWork]);
+  // The NEW line of this visit, as in an agent chat. The chat reads itself at once and the unread
+  // count goes to zero, so the line keeps the first unread message that the channel had when it
+  // opened. A page that the phone kept can be older than the count, so the line waits for the
+  // page that the host sends for this visit.
+  const [unreadLine, setUnreadLine] = useState<{ messageId: string | null } | null>(null);
+  const [freshPage, setFreshPage] = useState<"waiting" | "loaded" | "failed">("waiting");
+  const hasUnread = (summary?.unreadCount ?? 0) > 0;
+  const store = state.store;
+  const readsPage = online && hasUnread && unreadLine === null;
+  useEffect(() => {
+    if (!readsPage) return;
+    let active = true;
+    void store.refreshHistory(serverId, channelId).then(
+      () => active && setFreshPage("loaded"),
+      () => active && setFreshPage("failed"),
+    );
+    return () => {
+      active = false;
+    };
+  }, [readsPage, store, serverId, channelId]);
+  // The count that the phone kept can be old, so the line also waits for the host's channel list,
+  // or for its failure, as the store's own wait does.
+  if (
+    unreadLine === null &&
+    (state.listed || state.error) &&
+    page &&
+    summary &&
+    (!hasUnread || freshPage !== "waiting")
+  )
+    setUnreadLine({
+      messageId:
+        freshPage === "failed"
+          ? null
+          : firstUnreadChannelMessageId(page.messages, summary.unreadCount, server?.membershipId ?? null),
+    });
+  const unreadLineMessageId = unreadLine?.messageId ?? null;
+  // The line shows above the first of these messages that has a row.
+  const unreadLineMessageIds = useMemo(() => {
+    const entries = page?.messages ?? [];
+    const start = unreadLineMessageId ? entries.findIndex((entry) => entry.id === unreadLineMessageId) : -1;
+    return start < 0 ? null : new Set(entries.slice(start).map((entry) => entry.id));
+  }, [unreadLineMessageId, page?.messages]);
+  // The chat opens at the NEW line once, as on desktop. A chat that showed before the line, such as
+  // while the server connected, does not move to it later, under the reader.
+  const [unreadOpening, setUnreadOpening] = useState<"pending" | "done">("pending");
+  const placeUnreadLine = useCallback(() => setUnreadOpening("done"), []);
+  const opensAtUnread = unreadOpening === "pending" && online && (readsPage || unreadLineMessageIds !== null);
   const [olderLoading, setOlderLoading] = useState(false);
   const [olderError, setOlderError] = useState(false);
   const readThrough = useRef(0);
   const throughSequence = page?.throughSequence ?? 0;
-  const store = state.store;
   const markRead = useCallback(() => {
     if (throughSequence <= readThrough.current) return;
     readThrough.current = throughSequence;
@@ -163,8 +212,16 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
   );
   const name = channel?.name ?? t("mobile.channel.chat.fallbackName");
   const target = useMemo(
-    () => ({ kind: "channel" as const, id: channelId, serverId, name, members }),
-    [channelId, serverId, name, members],
+    () => ({
+      kind: "channel" as const,
+      id: channelId,
+      serverId,
+      name,
+      members,
+      icon: channel?.icon,
+      imageUrl: channel?.imageUrl,
+    }),
+    [channelId, serverId, name, members, channel?.icon, channel?.imageUrl],
   );
   return (
     <ChatView
@@ -187,6 +244,11 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
       onSelectQuestion={selectPrompt}
       approvals={approvals}
       channelThreadIds={threadIds}
+      unreadLineMessageIds={unreadLineMessageIds}
+      focusMessageId={opensAtUnread && unreadLineMessageIds ? unreadLineMessageId : null}
+      focusUnread
+      holdOpening={opensAtUnread}
+      onFocusPlaced={placeUnreadLine}
       readBoundary={throughSequence ? String(throughSequence) : null}
       markRead={markRead}
       fetchHistory={fetchHistory}

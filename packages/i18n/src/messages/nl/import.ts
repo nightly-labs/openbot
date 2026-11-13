@@ -35,8 +35,13 @@ export const messages = {
   "import.guide.hermesTitle": "Verhuis je agents vanuit Hermes Agent",
   "import.guide.hermesLede":
     "Elk Hermes-profiel wordt een agent. Lees de profielen op deze computer, of laat de exportvaardigheid in Hermes ze in één .zip-bestand verpakken.",
+  "import.guide.hermesLedeServer":
+    "Elk Hermes-profiel wordt een agent. Lees de profielen op de server, of laat de exportvaardigheid in Hermes ze in één .zip-bestand verpakken.",
+  "import.guide.hermesLedeExport":
+    "Elk Hermes-profiel wordt een agent. De exportvaardigheid in Hermes verpakt ze in één .zip-bestand.",
   "import.guide.hermesSetupLabel": "Zo haal je de profielen op",
   "import.guide.setupFolder": "Deze computer lezen",
+  "import.guide.setupServer": "Server lezen",
   "import.guide.setupCommand": "Installeren met opdracht",
   "import.guide.hermesStepFolder": "Lees de Hermes-map",
   "import.guide.hermesStep1": "Voeg de exportvaardigheid toe aan Hermes",
@@ -88,7 +93,10 @@ export const messages = {
   "import.result.warnings": "Sommige onderdelen zijn niet meegegaan",
   "import.source.title": "Waar staan je agents nu?",
   "import.source.lede": "OpenBot kopieert ze naar deze computer. Je ziet elk onderdeel voordat er iets verandert.",
+  "import.source.ledeServer": "OpenBot kopieert ze naar de server. Je ziet elk onderdeel voordat er iets verandert.",
   "import.source.hermesNote": "Lees de Hermes-map op deze computer, of exporteer een .zip-bestand uit Hermes.",
+  "import.source.hermesNoteServer": "Lees de Hermes-map op de server, of exporteer een .zip-bestand uit Hermes.",
+  "import.source.hermesNoteExport": "Exporteer een .zip-bestand uit Hermes.",
   "import.source.grokNote": "In de cloud. Een exportagent daar maakt een .zip-bestand.",
   "import.source.transfer": "Andere OpenBot-computer",
   "import.source.transferNote": "Gebruik Overdracht om agents en instellingen samen te verplaatsen.",
@@ -97,6 +105,9 @@ export const messages = {
   "import.hermes.notFound": "Geen Hermes-profielen op deze computer",
   "import.hermes.notFoundNote":
     "Als Hermes een andere map gebruikt, bijvoorbeeld een die HERMES_HOME instelt, kies dan die map.",
+  "import.hermes.notFoundServer": "Geen Hermes-profielen op deze server",
+  "import.hermes.notFoundServerNote":
+    "OpenBot leest de Hermes-map van de server. Exporteer een .zip-bestand uit Hermes om Hermes van deze computer te importeren.",
   "import.hermes.chooseFolder": "Hermes-map kiezen",
   "import.hermes.chooseAnother": "Andere map kiezen",
   "import.hermes.title": "Agents uit Hermes Agent",

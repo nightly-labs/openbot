@@ -40,6 +40,12 @@ export const BROWSER_DOCK_LIMITS = {
   label: 600,
 } as const;
 
+/**
+ * The width of the overlay while the box shows, in CSS pixels: the widest box (640 in `browser-dock.css`)
+ * and the room for its shadow at each side. On a narrow page, main makes the overlay as wide as the page.
+ */
+export const BROWSER_DOCK_OVERLAY_WIDTH = 688;
+
 /** The agent fields that the dock reads. */
 export interface BrowserDockAgent {
   id: string;
@@ -137,13 +143,23 @@ export interface BrowserDockGlass {
 }
 
 /**
+ * The dock is at the bottom centre of the page: the box, or the tab when the user hid the box. `width` is
+ * the space that it needs, centred on the page, in CSS pixels.
+ */
+export interface BrowserDockAnchor {
+  width: number;
+}
+
+/**
  * The space that the dock needs at the bottom of the page, in CSS pixels, and its glass shapes. `seq`
- * increases with each frame, so main ignores a frame that arrives late.
+ * increases with each frame, so main ignores a frame that arrives late. Without `anchor`, the overlay is
+ * at the bottom centre of the page with its first width.
  */
 export interface BrowserDockFrame {
   seq: number;
   height: number;
   glass: BrowserDockGlass[];
+  anchor?: BrowserDockAnchor;
 }
 
 export function isBrowserDockPresentation(value: unknown): value is BrowserDockPresentation {
@@ -207,8 +223,13 @@ export function isBrowserDockFrame(value: unknown): value is BrowserDockFrame {
     isDynamicRecord(value) &&
     integerInRange(value.seq, 0, Number.MAX_SAFE_INTEGER) &&
     isSize(value.height) &&
-    isList(value.glass, BROWSER_DOCK_LIMITS.glass, isGlass)
+    isList(value.glass, BROWSER_DOCK_LIMITS.glass, isGlass) &&
+    (value.anchor === undefined || isAnchor(value.anchor))
   );
+}
+
+function isAnchor(value: unknown): value is BrowserDockAnchor {
+  return isDynamicRecord(value) && isSize(value.width);
 }
 
 function isGlass(value: unknown): value is BrowserDockGlass {

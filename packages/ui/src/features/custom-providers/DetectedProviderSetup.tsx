@@ -17,6 +17,8 @@ interface DetectedProviderSetupProps {
   /** The provider to add or edit. `null` keeps both forms closed. */
   provider: DetectedProvider | null;
   api: DetectedProviderApi;
+  /** The agent command runs on a joined server, not on this computer. */
+  host?: boolean | undefined;
   takenProviderIds?: readonly string[] | undefined;
   takenAgentIds?: readonly string[] | undefined;
   /** The providers that can run an endpoint, for the "Runs on" field. Without it, OpenCode runs it. */
@@ -35,7 +37,7 @@ interface DetectedProviderSetupProps {
  * so the user sees and can change every value before OpenBot saves it.
  */
 export function DetectedProviderSetup(props: DetectedProviderSetupProps) {
-  const { t, errorMessage } = useText();
+  const { t, format, errorMessage } = useText();
   const [saving, setSaving] = createSignal(false);
   const [submitError, setSubmitError] = createSignal<string | null>(null);
   const [discovery, setDiscovery] = createSignal<ModelDiscovery>({ status: "idle" });
@@ -45,7 +47,7 @@ export function DetectedProviderSetup(props: DetectedProviderSetupProps) {
   const agent = () => (props.provider?.kind === "agent" ? props.provider : undefined);
   const modelsDraft = () => {
     const provider = models();
-    return provider ? detectedModelsDraft(provider) : undefined;
+    return provider ? detectedModelsDraft(provider, format) : undefined;
   };
   const agentDraft = () => {
     const provider = agent();
@@ -140,6 +142,7 @@ export function DetectedProviderSetup(props: DetectedProviderSetupProps) {
         submitError={submitError()}
         takenAgentIds={taken(props.takenAgentIds)}
         editing={Boolean(agent()?.added)}
+        host={props.host}
         onSubmit={(value) => void save({ kind: "agent", value })}
         onCancel={props.onClose}
       />

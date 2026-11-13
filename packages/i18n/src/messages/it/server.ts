@@ -326,11 +326,24 @@ export const messages = {
   "server.settings.later": "Più tardi",
   "server.settings.setUp": "Configura",
   "server.settings.agents": "Agenti",
+  "server.settings.agentsDescription":
+    "Scegli cosa possono fare gli agenti su questo server quando non lo imposti per un agente.",
   "server.settings.timezone": "Fuso orario",
   "server.settings.timezoneDescription":
     "Le nuove routine usano questo fuso orario quando il messaggio non indica quello del mittente.",
   "server.settings.timezoneAutomatic": "Automatico ({zone})",
   "server.settings.timezoneLoadFailed": "Impossibile caricare il fuso orario del server.",
+  "server.settings.turnLimit": "Thread contemporanei",
+  "server.settings.turnLimitDescription":
+    "Quanti thread degli agenti possono essere eseguiti contemporaneamente su questo server. Più thread usano più memoria.",
+  "server.settings.turnLimitAutomatic": "Automatico ({count})",
+  "server.settings.turnLimitAutomaticUnlimited": "Automatico (nessun limite)",
+  "server.settings.turnLimitUnlimited": "Nessun limite",
+  "server.settings.turnLimitsLoadFailed": "Impossibile caricare i limiti dei thread di questo server.",
+  "server.settings.agentTaskLimit": "Thread in parallelo per agente",
+  "server.settings.agentTaskLimitDescription":
+    "Quanti thread può eseguire contemporaneamente ogni agente senza un limite proprio.",
+  "server.settings.agentTaskLimitDefault": "Predefinito ({count})",
   "server.settings.memoryLimit": "Memorie per agente",
   "server.settings.memoryLimitDescription": "Quante memorie può conservare ogni agente su questo server.",
   "server.settings.memoryLimitLoadFailed": "Impossibile caricare il limite di memorie di questo server.",
@@ -346,6 +359,10 @@ export const messages = {
   "server.settings.skillLearningAsk": "Chiedi prima",
   "server.settings.skillLearningOff": "Disattivato",
   "server.settings.skillLearningLoadFailed": "Impossibile caricare l’impostazione di apprendimento delle skill.",
+  "server.settings.browsingMemory": "Impara dalla mia navigazione",
+  "server.settings.browsingMemoryDescription":
+    "Quando controlli il browser di un agente, l'agente impara come funzionano i siti dalle pagine e dai pulsanti che usi. Il testo digitato non viene conservato.",
+  "server.settings.browsingMemoryLoadFailed": "Impossibile caricare l'impostazione di navigazione.",
   "server.settings.remoteOnline": "L'host è online. La pubblicazione è controllata dal suo proprietario.",
   "server.settings.remoteOffline": "L'host è offline. La pubblicazione è controllata dal suo proprietario.",
   "server.settings.reachable": "Raggiungibile online. Solo le persone invitate possono accedere.",
@@ -364,7 +381,7 @@ export const messages = {
   "server.settings.hostKeyChanged": "Ultima modifica",
   "server.settings.hostKeyChangedDescription":
     "{date}. La chiave precedente e la nuova chiave hanno firmato questa modifica.",
-  "server.settings.hostKeyLocalOnly": "Qui solo il server su questo computer può cambiare la sua chiave.",
+  "server.settings.hostKeyOwnerOnly": "Solo il proprietario può cambiare la chiave del server.",
   "server.settings.removeTitle": "Rimuovi il server",
   "server.settings.removeDescription":
     "Rimuovi questo server dal servizio account per tutti i membri. Usalo quando il suo computer non è più disponibile.",

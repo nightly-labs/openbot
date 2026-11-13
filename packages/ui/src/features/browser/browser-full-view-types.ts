@@ -9,6 +9,19 @@ import type { BrowserShortcutPlatform } from "./browser-view-shortcuts";
 /** The profile of a tab. `proxy`: the name of its proxy, when the user can see the proxies of the server. */
 export type BrowserTabLabel = BrowserTabProfile & { proxy?: string | undefined };
 
+export interface BrowserTeachBarProps {
+  agentName: string;
+  /** When the recording started, in milliseconds. `null`: no recording yet. */
+  startedAt: number | null;
+  /** The host has not answered a start or a stop yet. */
+  pending: boolean;
+  onStart: () => void;
+  /** Ends the recording and gives its steps to the agent. */
+  onSave: () => void;
+  /** Ends the teach view. A recording is deleted. */
+  onClose: () => void;
+}
+
 export interface BrowserFullViewProps {
   open: boolean;
   /** Every tab, in the order of the top row. */
@@ -64,6 +77,11 @@ export interface BrowserFullViewProps {
    * user's browser, so it gives no platform.
    */
   shortcuts?: BrowserShortcutPlatform | undefined;
+  /**
+   * The user shows a task to the agent: a bar above the page starts, saves or discards the recording of
+   * the steps, and the dock is hidden. Absent: the usual view.
+   */
+  teach?: BrowserTeachBarProps | undefined;
   /** The island, the queue and the composer of the tab's agent, over the page. */
   dock?: JSX.Element;
   /**

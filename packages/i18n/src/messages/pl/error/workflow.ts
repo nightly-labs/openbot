@@ -19,6 +19,11 @@ export const messages = {
   "error.workflow.conditionUnclear": "Model nie odpowiedział tak ani nie.",
   "error.workflow.modelFailed": "Model nie mógł odpowiedzieć. Uruchom krok ponownie.",
   "error.workflow.modelBusy": "Trwa inne zapytanie do modelu. Uruchom krok ponownie za chwilę.",
+  "error.workflow.mediaFailed": "Model nie mógł utworzyć obrazu ani wideo. Uruchom krok ponownie.",
+  "error.workflow.pictureMissing": "Obrazu nie ma już na serwerze. Wyślij go ponownie.",
+  "error.workflow.pictureType": "Użyj obrazu PNG, JPEG lub WebP.",
+  "error.workflow.mediaInputMissing": "Obraz z wcześniejszego kroku jest niedostępny. Uruchom ten krok ponownie.",
+  "error.workflow.mediaInputNotImage": "Ten krok przyjmuje tylko obrazy, nie wideo. Usuń połączenie z wideo.",
   "error.workflow.stepMissing": "Ten krok już nie istnieje.",
   "error.workflow.nodeMissing": "Tego kroku nie ma w przepływie pracy.",
   "error.workflow.runMissing": "To uruchomienie już nie istnieje.",
@@ -65,4 +70,14 @@ export const messages = {
   "error.workflow.githubUncertain":
     "Zmiana zatrzymała się w drodze. Może już być w GitHub. Sprawdź tam, zanim ponownie uruchomisz krok.",
   "error.workflow.githubNoEvent": "W GitHub nie ma zgłoszenia ani pull requestu, dla którego startuje ten wyzwalacz.",
+  "error.workflow.sunraSignIn": "Zaloguj się do Sunra w Aplikacjach, aby używać modeli Sunra.",
+  "error.workflow.sunraNoCredits":
+    "Twoje konto Sunra nie ma wystarczającej liczby kredytów. Dodaj kredyty na sunra.ai/pricing, a potem uruchom krok ponownie.",
+  "error.workflow.sunraNeedsPlan":
+    "Ten model Sunra wymaga planu Sunra. Wybierz plan na sunra.ai/pricing albo inny model.",
+  "error.workflow.sunraTeamInputs":
+    "Sunra używa obrazów wejściowych tylko z kontem osobistym. Wybierz konto osobiste w Sunra albo usuń połączenia obrazów.",
+  "error.workflow.sunraFailed": "Sunra nie mogła utworzyć pliku: {reason}",
+  "error.workflow.sunraTimeout":
+    "Sunra nie skończyła pliku na czas. Sprawdź projekt OpenBot na sunra.ai, zanim uruchomisz krok ponownie.",
 } as const satisfies PartialTranslation<typeof source>;

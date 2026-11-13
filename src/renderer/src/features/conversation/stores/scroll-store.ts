@@ -22,10 +22,10 @@ import { currentText } from "@openbot/ui/text";
 import type { VirtualItem } from "@tanstack/virtual-core";
 import { createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js";
 import { formatMessageTime } from "../../../app-message-projection";
-import { groupAgentMessageMarkers, markOpenAgentMessages } from "../agent-message-timeline";
+import { groupAgentMessageMarkers, markOpenAgentMessages, teammateUpdateAnswers } from "../agent-message-timeline";
 import type { ConversationProps, ConversationTarget } from "../conversation-types";
 import { summarizeHostedSiteMessages } from "../hosted-site-timeline";
-import { narrationRows, placeTurnRowsByTime } from "../narration-rows";
+import { narrationRows, placeTurnRowsByTime, placeUpdatesAfterSteers } from "../narration-rows";
 import {
   expandRoutineRunGroups,
   groupRoutineRunMarkers,
@@ -35,6 +35,7 @@ import {
   routineRunTurnMessages,
   summarizeRoutineRunMessages,
 } from "../routine-run-timeline";
+import { groupSkillInstallMarkers } from "../skill-install-timeline";
 import { isTurnAnswer } from "../turn-steps";
 import { conversationOwnerId } from "./composer-store";
 
@@ -137,24 +138,31 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   const held = (message: AgentMessage): boolean =>
     heldWhileWritten(message) &&
     (!deps.props.channel || (message.senderAgentId !== undefined && channelWriters().has(message.senderAgentId)));
+  /* The quiet answers of a teammate update show under its marker, so they have no row of their own. */
+  const updateAnswers = createMemo(() => teammateUpdateAnswers(deps.props.messages));
+  const foldedAnswerIds = createMemo(
+    () => new Set([...updateAnswers().values()].flatMap((answers) => answers.map((answer) => answer.id))),
+  );
   const shownMessages = createMemo(() => {
     const progressUpdates = deps.props.responseStyle === "natural";
-    const channelTurnRows: AgentMessage[][] = [];
+    const turnRowsList: AgentMessage[][] = [];
     const listed = deps.props.messages.flatMap((message) => {
       if (message.kind === "thinking") {
         const rows = progressUpdates ? progressRows(message) : [];
         const showsSteps =
           message.turnId && !thinkingRowHiddenTurns().has(message.turnId) && message.items?.some((item) => item.trim());
         const turnRows = showsSteps ? [...rows, message] : rows;
-        if (!deps.props.channel) return turnRows;
-        channelTurnRows.push(turnRows);
-        return [];
+        turnRowsList.push(turnRows);
+        return deps.props.channel ? [] : turnRows;
       }
       if (message.kind === "memory-changes" && answeredTurns().has(message.turnId)) return [];
-      return silentAgentAnswer(message) ? [] : [message];
+      return silentAgentAnswer(message) || foldedAnswerIds().has(message.id) ? [] : [message];
     });
-    // Members of a channel work at the same time, so each update goes where its time puts it.
-    const shown = deps.props.channel ? placeTurnRowsByTime(listed, channelTurnRows) : listed;
+    // Members of a channel work at the same time, so each update goes where its time puts it. An agent
+    // chat keeps a turn's updates together, except those written after a steer.
+    const shown = deps.props.channel
+      ? placeTurnRowsByTime(listed, turnRowsList)
+      : placeUpdatesAfterSteers(listed, turnRowsList);
     // Natural shows an agent's text once it is complete, as one bubble, while the activity line
     // names the step. A bubble that grows as the text arrives moves the chat at each line.
     const complete = progressUpdates ? shown.filter((message) => !held(message)) : shown;
@@ -202,16 +210,22 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     const drawn = new Set(drawnMessages().map((message) => message.id));
     return deps.props.messages.slice(start).find((message) => drawn.has(message.id))?.id ?? null;
   });
-  /* A group of agent messages or routine runs stops at the unread divider, so the divider keeps its row. */
+  /* A group of agent messages, routine runs or skill installs stops at the unread divider, so the divider keeps its row. */
   const timelineMessages = createMemo(() => {
     const group = (messages: readonly AgentMessage[]) =>
-      groupRoutineRunMarkers(groupAgentMessageMarkers(messages, unreadBoundaryMessageId()), unreadBoundaryMessageId());
+      groupSkillInstallMarkers(
+        groupRoutineRunMarkers(
+          groupAgentMessageMarkers(messages, unreadBoundaryMessageId()),
+          unreadBoundaryMessageId(),
+        ),
+        unreadBoundaryMessageId(),
+      );
     const state = deps.props.contextState;
     const startedAt =
       state?.agentId === deps.props.agent?.id && state?.threadId === deps.props.agent?.threadId
         ? state?.compaction?.startedAt
         : undefined;
-    const messages = markOpenAgentMessages(drawnMessages(), openAgentMessages());
+    const messages = markOpenAgentMessages(drawnMessages(), openAgentMessages(), updateAnswers());
     const boundary =
       startedAt === undefined
         ? -1
@@ -430,6 +444,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     timelineMessages,
     toggleRoutineRun,
     toggleAgentMessage,
+    updateAnswers,
     timelineIndexById,
     unreadBoundaryMessageId,
     updateScrollFade,
@@ -445,7 +460,11 @@ export function createScrollStore(deps: ScrollStoreDeps) {
 /** Agent text that the host still writes. A plan, the subagents, a card and an image show while they run. */
 function heldWhileWritten(message: AgentMessage): boolean {
   return (
-    message.author === "agent" && message.streaming === true && message.kind === "text" && !message.imageGeneration
+    message.author === "agent" &&
+    message.streaming === true &&
+    message.kind === "text" &&
+    !message.imageGeneration &&
+    !message.videoGeneration
   );
 }
 

@@ -78,11 +78,26 @@
   --openbot-price-sheen-warm-clear: rgba(255, 184, 132, 0);
   --openbot-price-rim: rgba(255, 255, 255, 0.28);
   --openbot-price-rim-under: rgba(255, 255, 255, 0.1);
+  /* The accent of the pricing page: the frame of the order form and the glow behind it. The web page has the
+     same pink. */
+  --openbot-price-accent: #ec4899;
   --openbot-price-glow: rgba(180, 200, 255, 0.22);
   --openbot-bg-host-inset: #101216;
   --openbot-bg-notch: #000000;
   --openbot-mask-solid: #000000;
   --openbot-transparent: rgba(0, 0, 0, 0);
+  /* The wash front of the theme change, as a band that goes up the agent dock's edge strip while an
+     agent asks something. It is the same light in both themes. */
+  --openbot-wash-front: linear-gradient(
+    to top,
+    rgba(111, 255, 196, 0),
+    #6fffc4 20%,
+    #6db8ff 38%,
+    #bb66ff 56%,
+    #ff66c0 74%,
+    #ffb875 88%,
+    rgba(255, 184, 117, 0)
+  );
   /* The color picker draws real colors, so these stay the same in both themes: the rim and the
      ends of the saturation area, and the hue spectrum. */
   --openbot-color-picker-light: #ffffff;
@@ -235,6 +250,15 @@
      a white button as well as on a dark surface. Both themes use the same pair. */
   --openbot-star: #facc15;
   --openbot-star-edge: #ca8a04;
+  /* Controls over a video or an image. The media has its own colors and does not follow the theme,
+     so both themes use white controls on a dark scrim. */
+  --openbot-media-control-text: #ffffff;
+  --openbot-media-control-muted: rgba(255, 255, 255, 0.78);
+  --openbot-media-control-track: rgba(255, 255, 255, 0.3);
+  --openbot-media-control-hover: rgba(255, 255, 255, 0.16);
+  --openbot-media-control-surface: rgba(0, 0, 0, 0.5);
+  --openbot-media-control-surface-hover: rgba(0, 0, 0, 0.64);
+  --openbot-media-control-scrim: rgba(0, 0, 0, 0.55);
   /* The moving border of an offer, such as the hosted server offer: teal, blue, then pink. */
   --openbot-beam-teal: var(--openbot-file-teal);
   --openbot-beam-blue: var(--openbot-accent-text);
@@ -282,8 +306,14 @@
   --openbot-shadow-ring: rgba(228, 228, 228, 0.04);
   --openbot-border-on-light: rgba(20, 20, 20, 0.14);
   --openbot-hover: rgba(255, 255, 255, 0.06);
-  --openbot-font-sans: "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --openbot-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, monospace;
+  /* The default fonts. The desktop puts a font that the user chooses in Settings before them, in
+   * --openbot-font-sans and --openbot-font-mono, so a letter that the chosen font does not have still
+   * shows. Noto Sans Arabic draws Arabic on Linux, where the system fallback is often DejaVu Sans. */
+  --openbot-font-sans-default:
+    "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Arabic", sans-serif;
+  --openbot-font-mono-default: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, monospace;
+  --openbot-font-sans: var(--openbot-font-sans-default);
+  --openbot-font-mono: var(--openbot-font-mono-default);
   /* Six steps, one line-height each, named for the step it pairs with. The scale had
    * sixteen sizes and eight line-heights, four of them a single call site, which is how
    * an 11px size ended up paired with a 26px line-height. scripts/ui-foundation-check.ts
@@ -481,5 +511,9 @@
 }
 
 [data-provider="acp"] {
+  --openbot-provider-current: var(--openbot-text-primary);
+}
+
+[data-provider="sunra"] {
   --openbot-provider-current: var(--openbot-text-primary);
 }

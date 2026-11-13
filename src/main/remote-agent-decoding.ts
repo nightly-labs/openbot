@@ -1,12 +1,14 @@
 import {
   type AgentSessionSettings,
   decodeAgentAnalytics,
+  decodeGithubSkillSource,
   decodeHostAnalytics,
   decodeHostProviderAccounts,
   decodeInstalledSkills,
   decodeProviderUsageResetOutcome,
   decodeProviderUsageResets,
   decodeUsageCredits,
+  type GithubSkillSource,
   type HostDefaultProvider,
   type HostProviderAccounts,
   isAgentHostSettings,
@@ -16,6 +18,7 @@ import {
   isAgentTaskPage,
   isAgentTaskReadState,
   isAgentTasksSnapshot,
+  isAgentTaskWindow,
   isConversationSnapshot,
   isHiddenAgentsSnapshot,
   isSidebarPinsSnapshot,
@@ -30,6 +33,7 @@ import type {
   AgentFolderChange,
   AgentMemory,
   AgentNewChatSettings,
+  AgentProviderId,
   AgentStatus,
   AgentSummary,
   AgentTaskReadState,
@@ -72,6 +76,9 @@ import {
 import { decodeRecord, guardedDecoder, guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { isAgentThreadBranchLinks } from "@openbot/contracts/team-protocol/agent-thread-branches-v1";
+import { isAgentThreadQueues } from "@openbot/contracts/team-protocol/agent-thread-queue-v1";
+import { isAgentUsageLimits } from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
+import { decodeProviderUseResponse } from "@openbot/contracts/team-protocol/provider-use-v1";
 
 export const decodeAgentHostSettingsFromHost = guardedDecoder(isAgentHostSettings, "agent host settings response");
 export const decodeRemoteAgentColors = guardedDecoder(isAgentColors, "agent colors response");
@@ -85,8 +92,11 @@ export const decodeAgentNotificationLevelsFromHost = guardedDecoder(
 export const decodeRemoteAgentTasks = guardedDecoder(isAgentTasksSnapshot, "remote agent tasks");
 export const decodeRemoteAgentTask = guardedDecoder(isAgentTask, "remote agent task");
 export const decodeRemoteAgentThreadBranches = guardedDecoder(isAgentThreadBranchLinks, "remote thread branches");
+export const decodeRemoteAgentThreadQueues = guardedDecoder(isAgentThreadQueues, "remote thread queues");
+export const decodeRemoteAgentUsageLimits = guardedDecoder(isAgentUsageLimits, "remote usage limits");
 export const decodeRemoteTaskConversation = guardedDecoder(isConversationSnapshot, "remote task conversation");
 export const decodeRemoteTaskPage = guardedDecoder(isAgentTaskPage, "remote thread page");
+export const decodeRemoteTaskWindow = guardedDecoder(isAgentTaskWindow, "remote thread part");
 export const decodeRemoteTaskReadState = guardedDecoder(isAgentTaskReadState, "remote thread read state");
 const decodeTaskReadStates = guardedListDecoder(isAgentTaskReadState, "remote thread read states");
 export function decodeRemoteTaskReadStates(value: unknown): AgentTaskReadState[] {
@@ -208,6 +218,11 @@ export function decodeHostProviderAccountsFromHost(value: unknown): HostProvider
   return decodeHostProviderAccounts(value);
 }
 
+/** The `provider-use-v1` off list, as the web client also reads it: an unknown provider is left out. */
+export function decodeProviderUseFromHost(value: unknown): AgentProviderId[] {
+  return decodeProviderUseResponse(value);
+}
+
 /**
  * The `provider-default-v1` snapshot. A newer host can name a provider that this build does not know,
  * which reads as none, and its model with it.
@@ -268,6 +283,10 @@ export function decodeAgentSummaries(value: unknown): ClientAgentSummary[] {
 
 export function decodeInstalledSkillsFromHost(value: unknown): InstalledSkill[] {
   return decodeInstalledSkills(value);
+}
+
+export function decodeGithubSkillSourceFromHost(value: unknown): GithubSkillSource {
+  return decodeGithubSkillSource(value);
 }
 
 export function decodeAgentMemory(value: unknown): AgentMemory {

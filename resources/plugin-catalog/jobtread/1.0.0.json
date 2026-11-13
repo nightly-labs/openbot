@@ -1,0 +1,33 @@
+{
+  "slug": "jobtread",
+  "name": "JobTread",
+  "tagline": "Construction job management",
+  "description": "JobTread lets agents read and update jobs, budgets, daily logs, tasks, and documents in the signed-in JobTread organization. Each user signs in to their own JobTread account through the browser.",
+  "category": "productivity",
+  "creatorName": "JobTread",
+  "iconUrl": "https://www.jobtread.com/apple-touch-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-active-jobs", "text": "List my active jobs and their current status." },
+    { "id": "prompt-budget", "text": "Compare the budget and actual costs for the Smith kitchen remodel." },
+    { "id": "prompt-daily-log", "text": "Draft today's daily log for the Main Street job from these notes." }
+  ],
+  "apps": [
+    {
+      "id": "app-jobtread-mcp",
+      "name": "JobTread",
+      "description": "Jobs, budgets, daily logs, and tasks, over JobTread's MCP server with browser sign-in.",
+      "iconUrl": "https://www.jobtread.com/apple-touch-icon.png",
+      "server": {
+        "name": "jobtread",
+        "transport": "http",
+        "url": "https://api.jobtread.com/mcp",
+        "auth": [{ "id": "jobtread-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.jobtread.com",
+  "privacyPolicyUrl": "https://www.jobtread.com/privacy-policy",
+  "termsUrl": "https://www.jobtread.com/terms",
+  "skills": []
+}

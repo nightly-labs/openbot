@@ -33,35 +33,34 @@
   .image-generation-glow,
   .image-generation-canvas,
   .image-generation-preview,
-  .image-generation-label,
-  /* Matches the scoped shimmer above, which outranks the bare class on its own. */
-  .image-generation:not(.image-generation-ready, .image-generation-failed) .image-generation-label,
+  .media-generation-label[data-shine],
   .agent-activity-label {
     animation: none;
     transition: none;
   }
 
-  .image-generation-hover-download {
+  .media-generation-actions,
+  .media-generation-bar,
+  .ui-button.media-generation-play,
+  .media-generation-seek-fill {
     transition: none;
   }
 }
 
 @media (hover: none), (pointer: coarse) {
-  .image-generation-hover-download {
+  .media-generation-actions,
+  .media-generation-bar {
     opacity: 1;
-    pointer-events: auto;
-    transform: none;
   }
 }
 
 @media (max-width: 620px) {
-  .message-entry-agent .ui-bubble:has(.image-generation) {
+  .message-entry-agent .ui-bubble:has(:is(.image-generation, .media-generation)) {
     width: 100%;
     max-width: 100%;
   }
 
-  .image-generation-stage,
-  .image-generation-meta {
+  .image-generation-stage {
     width: 100%;
   }
 }
@@ -152,6 +151,10 @@
     0.99829 90%,
     1
   );
+
+  /* Half of the one-line height, so one line is a full pill. The cards above tuck in this far. */
+  --composer-pill-radius: 24px;
+
   position: relative;
   z-index: 11;
   display: grid;
@@ -159,14 +162,15 @@
   min-height: 96px;
   gap: 4px;
   margin: 0 auto;
-  border: 0.5px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-lg);
+  border: 1px solid var(--openbot-border-strong);
+  /* A taller draft has the corners of a card. One line is a pill; see `[data-compact]`. */
+  border-radius: var(--openbot-radius-card);
   background: var(--openbot-bg-surface);
   padding: 10px;
   box-shadow: none;
   transition:
     border-color var(--openbot-duration-hover) var(--openbot-ease-out),
-    box-shadow var(--openbot-duration-hover) var(--openbot-ease-out),
+    border-radius var(--composer-resize-duration) var(--composer-resize-ease),
     height var(--composer-resize-duration) var(--composer-resize-ease);
 }
 
@@ -175,12 +179,30 @@
   min-height: 48px;
   align-items: center;
   gap: 8px;
+  border-radius: var(--composer-pill-radius);
   padding: 8px 10px;
 }
 
+/*
+ * The input of a small panel (dock chat, diagram chat, side question): 40px, not the 48px of the
+ * chat. It has no button before the text, so the text starts 12px from the edge. The send button is
+ * 5px from the top, the bottom and the end. The cards above it tuck to its middle line.
+ */
+.composer[data-compact][data-small] {
+  min-height: 40px;
+  padding: 5px 5px 5px 12px;
+}
+
+.composer-wrap:has(> .composer[data-small]) {
+  --composer-stack-pill-half: 20px;
+}
+
+/*
+ * The input has the focus most of the time, so the focus line is quieter than
+ * `--openbot-border-focus`, and there is no ring round it.
+ */
 .composer:focus-within {
   border-color: var(--openbot-text-dim);
-  box-shadow: 0 0 0 3px var(--openbot-hover);
 }
 
 .composer:has(.composer-editor-surface[aria-disabled="true"]) {
@@ -808,7 +830,7 @@
  * from the composer's measured height, which changes as the input grows.
  */
 .mention-picker {
-  --mention-picker-overlap: 14px;
+  --mention-picker-overlap: 24px;
   --mention-picker-side-inset: calc(var(--openbot-space-1-5) + 12px);
   --mention-picker-row-height: 29px;
   --mention-picker-gutter: 5px;
@@ -820,13 +842,33 @@
   bottom: calc(var(--mention-picker-bottom, 0px) - var(--mention-picker-overlap));
   left: var(--mention-picker-side-inset);
   border: 1px solid var(--openbot-queue-border);
-  border-radius: var(--openbot-radius-lg);
+  border-radius: var(--openbot-radius-card);
   background: var(--openbot-queue-surface);
   padding-bottom: var(--mention-picker-overlap);
   color: var(--openbot-queue-text);
   box-shadow: none;
   transform-origin: bottom center;
   animation: mention-picker-in var(--openbot-duration-normal) cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+/*
+ * The cards stay open below the list, so the chat does not move. The list is at least as tall as
+ * the cards and covers them; its rows stay at the input. A browser without `anchor-size` keeps the
+ * shorter list, and the top of the cards shows above it.
+ */
+.composer-wrap {
+  anchor-scope: --composer-stack;
+}
+
+.composer-wrap > .composer-stack {
+  anchor-name: --composer-stack;
+}
+
+.composer-wrap > .mention-picker {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: anchor-size(--composer-stack height);
 }
 
 /*
@@ -928,6 +970,23 @@
   }
 }
 
+/* The copy of a closed list (`leavePicker`) goes back down. Its rows do not come in again. */
+.mention-picker[data-leaving] {
+  pointer-events: none;
+  animation: mention-picker-out var(--openbot-duration-fast) var(--openbot-ease-out) both;
+}
+
+.mention-picker[data-leaving] * {
+  animation: none;
+}
+
+@keyframes mention-picker-out {
+  to {
+    opacity: 0;
+    transform: translateY(4px) scaleY(0.96);
+  }
+}
+
 /* The queue panel's row rhythm and colors: a 29px row, a small leading glyph, muted trailing text. */
 .mention-picker-option {
   display: flex;
@@ -946,9 +1005,14 @@
   text-align: start;
 }
 
+/*
+ * A 16px glyph in a 14px slot, as in the cards above the input: the name starts on the text column
+ * of the input.
+ */
 .mention-picker-file-option .attachment-reference-visual {
-  width: 20px;
-  height: 20px;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  margin-inline: -1px;
 }
 
 /* A row that the query brings back fades in; the rows that stay do not move. */
@@ -965,16 +1029,18 @@
 .mention-picker-option .agent-avatar {
   --agent-avatar-optical-offset: -2px;
 
-  width: 20px;
-  height: 20px;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  margin-inline: -1px;
 }
 
 .mention-picker-skill-icon {
   display: grid;
-  width: 20px;
-  height: 20px;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
   flex: 0 0 auto;
   place-items: center;
+  margin-inline: -1px;
   color: var(--openbot-queue-action);
 }
 
@@ -1002,8 +1068,8 @@
   flex: 1 1 0;
   overflow: hidden;
   color: var(--openbot-queue-action);
-  font-size: var(--openbot-text-md);
-  line-height: 18px;
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1012,8 +1078,8 @@
 .mention-picker-slug {
   flex: 0 0 auto;
   color: var(--openbot-queue-action);
-  font-size: var(--openbot-text-md);
-  line-height: 18px;
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
   white-space: nowrap;
 }
 
@@ -1025,8 +1091,8 @@
   margin: 0;
   padding: 0 calc(var(--mention-picker-gutter) + 8px);
   color: var(--openbot-queue-action);
-  font-size: var(--openbot-text-md);
-  line-height: 18px;
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
 }
 
 /* While the user filters, the matched text stands out from the rest, as in the search dialog. */
@@ -1193,4 +1259,34 @@
   flex: none;
   margin-inline-end: -4px;
   color: var(--openbot-danger-text);
+}
+
+/* The record mark of "Teach a task" in the add menu: a ring with a filled centre, in the colour of the
+   recording controls. */
+.ui-action-menu [role="menuitem"] > svg.composer-add-record {
+  color: var(--openbot-danger);
+}
+
+.ui-action-menu [role="menuitem"] > svg.composer-add-record circle:last-of-type {
+  r: 4.5px;
+  fill: currentcolor;
+  stroke: none;
+}
+
+/* A one-row input with more than one line of text (`createComposerRowsResize`): card corners, as the
+   main input has with a long draft. */
+.composer[data-compact][data-multiline] {
+  border-radius: var(--openbot-radius-card);
+}
+
+/* While the height of such an input moves, the text stays at the top edge and moves with it, so no
+   line jumps. A new line comes into view with the lower edge, not over it. */
+.composer[data-rows-resizing] {
+  overflow: clip;
+  /* The row has the height of the input, so the text is at its top and the button at its middle. */
+  align-content: stretch;
+}
+
+.composer[data-rows-resizing] > .composer-input-label {
+  align-self: start;
 }

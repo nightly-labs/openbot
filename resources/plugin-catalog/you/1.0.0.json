@@ -1,0 +1,33 @@
+{
+  "slug": "you",
+  "name": "You.com",
+  "tagline": "Web search and research",
+  "description": "You.com lets agents search the web, read page contents, and run multi-step research with cited sources. Each user signs in to their own You.com account through the browser.",
+  "category": "research",
+  "creatorName": "You.com",
+  "iconUrl": "https://you.com/apple-icon.png?apple-icon.04pft1wem7rx8.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-news", "text": "What changed in EU AI regulation this month? Cite the sources." },
+    { "id": "prompt-compare", "text": "Compare the current pricing of the three largest managed Postgres providers." },
+    { "id": "prompt-read-page", "text": "Read this article and summarize its main claims." }
+  ],
+  "apps": [
+    {
+      "id": "app-you-mcp",
+      "name": "You.com",
+      "description": "Web search, page contents, and research, over You.com's MCP server with browser sign-in.",
+      "iconUrl": "https://you.com/apple-icon.png?apple-icon.04pft1wem7rx8.png",
+      "server": {
+        "name": "you",
+        "transport": "http",
+        "url": "https://api.you.com/mcp",
+        "auth": [{ "id": "you-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://you.com",
+  "privacyPolicyUrl": "https://you.com/privacy",
+  "termsUrl": "https://you.com/terms",
+  "skills": []
+}

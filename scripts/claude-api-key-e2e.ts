@@ -126,6 +126,8 @@ function unused(name: string) {
 function accountsHost(key: Pick<ProviderAccountsHost, "apiKey" | "defaultUsesApiKey">): ProviderAccountsHost {
   return {
     ...key,
+    accountKey: () => null,
+    saveAccountKey: unused("saveAccountKey"),
     scope: unused("scope"),
     cli: () => ({ executable, version: "2.1.310" }),
     defaultLogin: () => null,
@@ -248,8 +250,10 @@ try {
       listAgents: unused("listAgents"),
       updateAgent: unused("updateAgent"),
       signInProviderAccountOnHost: unused("signInProviderAccountOnHost"),
+      connectProviderAccountKey: unused("connectProviderAccountKey"),
       renameProviderAccount: unused("renameProviderAccount"),
       removeProviderAccount: unused("removeProviderAccount"),
+      setProviderAccountPool: unused("setProviderAccountPool"),
     },
     browser: { openPrivate: unused("openPrivate"), privateTab: unused("privateTab"), close: unused("close") },
   });

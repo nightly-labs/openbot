@@ -5,6 +5,7 @@ export const messages = {
   "error.billing.lifecycleFailed": "לא ניתן היה לשנות את תוכנית השרת. יש לרענן את החיוב ולנסות שוב.",
   "error.billing.confirmMismatch": "יש להקליד את שם השרת כדי למחוק אותו.",
   "error.billing.restartBusy": "אי אפשר להפעיל את השרת מחדש כעת. יש לנסות שוב בעוד דקה.",
+  "error.billing.restartUnavailable": "אי אפשר להפעיל מחדש את השרת הזה מכאן. יש לפנות לתמיכה.",
   "error.billing.planRequired": "התוכנית של השרת הזה הסתיימה. יש לחדש אותה כדי להפעיל את השרת.",
   "error.billing.planSoldOut": "התוכנית הזו אזלה. יש לבחור תוכנית אחרת.",
   "error.billing.licenseExists": "לחשבון הזה כבר יש רישיון. יש לשנות את מספר המשתמשים שלו במקום זאת.",

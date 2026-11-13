@@ -1,0 +1,33 @@
+{
+  "slug": "alphavantage",
+  "name": "Alpha Vantage",
+  "tagline": "Stock and market data",
+  "description": "Alpha Vantage lets agents look up stock prices, company fundamentals, forex and crypto rates, economic indicators, and technical indicators. Each user signs in to their own Alpha Vantage account through the browser.",
+  "category": "data-analytics",
+  "creatorName": "Alpha Vantage",
+  "iconUrl": "https://www.alphavantage.co/static/img/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-quote", "text": "What is the latest price and daily change for MSFT?" },
+    { "id": "prompt-earnings", "text": "Compare the last four quarters of earnings for AAPL and GOOGL." },
+    { "id": "prompt-rsi", "text": "Show the 14-day RSI for NVDA over the last month." }
+  ],
+  "apps": [
+    {
+      "id": "app-alphavantage-mcp",
+      "name": "Alpha Vantage",
+      "description": "Market prices, fundamentals, and indicators, over Alpha Vantage's MCP server with browser sign-in.",
+      "iconUrl": "https://www.alphavantage.co/static/img/favicon.ico",
+      "server": {
+        "name": "alphavantage",
+        "transport": "http",
+        "url": "https://mcp.alphavantage.co/mcp",
+        "auth": [{ "id": "alphavantage-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.alphavantage.co",
+  "privacyPolicyUrl": "https://www.alphavantage.co/privacy/",
+  "termsUrl": "https://www.alphavantage.co/terms_of_service/",
+  "skills": []
+}

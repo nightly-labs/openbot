@@ -78,23 +78,24 @@ export const messages = {
   "customProvider.field.apiKeyKeptHint": "Bir anahtar kayıtlı. Korumak için burayı boş bırakın.",
   "customProvider.models": "Modeller",
   "customProvider.model.id": "{number}. model kimliği",
+  "customProvider.model.idColumn": "Model kimliği",
   "customProvider.model.name": "{number}. model görünen adı",
   "customProvider.model.namePlaceholder": "Görünen Ad",
   "customProvider.model.contextWindow": "Model {number} bağlam penceresi",
   "customProvider.model.contextWindowPlaceholder": "Token'lar",
+  "customProvider.model.contextWindowColumn": "Bağlam penceresi",
   "customProvider.model.maxOutput": "Model {number} en fazla çıktı",
   "customProvider.model.maxOutputPlaceholder": "Token'lar",
+  "customProvider.model.maxOutputColumn": "En fazla çıktı",
   "customProvider.model.efforts": "Model {number} eforu",
   "customProvider.model.effortsLabel": "Efor",
-  "customProvider.model.effortsHintOpenCode":
-    "Her modelin kabul ettiği efor düzeylerini seçin. Seçim yoksa OpenCode Düşük, Orta ve Yüksek sunar.",
-  "customProvider.model.effortsHintPi":
-    "Her modelin kabul ettiği efor düzeylerini seçin. Seçim yoksa model akıl yürütmez.",
+  "customProvider.model.effortsDefault": "Varsayılan",
+  "customProvider.model.effortsNone": "Akıl yürütme yok",
   "customProvider.model.inputs": "Model {number} girdileri",
   "customProvider.model.inputsLabel": "Kabul eder",
   "customProvider.model.inputImage": "Görseller",
   "customProvider.model.inputPdf": "PDF",
-  "customProvider.model.inputsHint": "Her modelin metin dışında okuyabileceklerini seçin.",
+  "customProvider.model.inputsNone": "Yalnızca metin",
   "customProvider.model.foundValuesHint": "Bazı değerler uç noktadan geliyor. Bunları değiştirebilirsiniz.",
   "customProvider.model.remove": "{number}. modeli kaldır",
   "customProvider.model.add": "Model ekle",
@@ -116,7 +117,11 @@ export const messages = {
     other: "Uç nokta {count} model listeliyor. Eklenecek modelleri seçin.",
   },
   "customProvider.discovery.empty": "Uç nokta hiçbir model listelemiyor. Model kimliklerini kendiniz ekleyin.",
-  "customProvider.discovery.label": "Uç noktanın listelediği modeller",
+  "customProvider.discovery.choose": "Modelleri seç",
+  "customProvider.discovery.search": "Model ara",
+  "customProvider.discovery.selectAll": "Tümünü seç",
+  "customProvider.discovery.deselectAll": "Seçimi kaldır",
+  "customProvider.discovery.noMatch": "Aramanızla eşleşen model yok.",
 
   // Ekleme akışının ilk adımı: hazır bir ayar bir sonraki formu doldurur.
   "customProvider.preset.title": "Sağlayıcı veya ajan ekle",
@@ -142,6 +147,7 @@ export const messages = {
   // Sağlayıcı adımında ve Ayarlar'da otomatik algılama. OpenBot yerel model sunucularını
   // varsayılan adreslerinde ve PATH'teki bilinen ACP ajanı komutlarını arar.
   "customProvider.detected.title": "Bu bilgisayarda bulundu",
+  "customProvider.detected.titleServer": "Sunucuda bulundu",
   "customProvider.detected.scanning": "Yerel modeller ve ajanlar aranıyor.",
   "customProvider.detected.scanAgain": "Tekrar tara",
   "customProvider.detected.empty": "OpenBot yerel bir model sunucusu veya ACP ajanı bulamadı.",
@@ -166,6 +172,8 @@ export const messages = {
   "customProvider.detection.enabled": "Yerel modelleri ve ajanları ara",
   "customProvider.detection.enabledDescription":
     "OpenBot, Ollama ve LM Studio'nun varsayılan adreslerini kontrol eder ve PATH'inizde bilinen ACP ajanlarını arar.",
+  "customProvider.detection.enabledDescriptionServer":
+    "Sunucu, Ollama ve LM Studio'nun varsayılan adreslerini kontrol eder ve kendi PATH'inde bilinen ACP ajanlarını arar.",
   "customProvider.detection.addresses": "Diğer model sunucusu adresleri",
   "customProvider.detection.address.label": "{number}. adres",
   "customProvider.detection.address.remove": "{number}. adresi kaldır",
@@ -187,6 +195,7 @@ export const messages = {
   "customProvider.acp.agentIdHint": "Küçük harfler, rakamlar veya kısa çizgiler. Daha sonra değiştiremezsiniz.",
   "customProvider.acp.command": "Komut",
   "customProvider.acp.commandHint": "Başlatılacak program. OpenBot bunu PATH'inizde arar.",
+  "customProvider.acp.commandHintServer": "Başlatılacak program. Sunucu onu kendi PATH'inde arar.",
   "customProvider.acp.args": "Bağımsız değişkenler",
   "customProvider.acp.argsHint":
     "Bağımsız değişkenleri boşluklarla ayırın. Boşluk içeren bir bağımsız değişkenin etrafına tırnak işareti koyun.",
@@ -213,6 +222,9 @@ export const messages = {
   "customProvider.acp.trustTitle": "Bu komut bilgisayarınızda çalışır",
   "customProvider.acp.trustDescription":
     "OpenBot bunu kullanıcı hesabınızla başlatır. Ajan dosyaları okuyabilir, değiştirebilir ve komutlar çalıştırabilir. Yalnızca güvendiğiniz bir ajanı ekleyin.",
+  "customProvider.acp.hostTrustTitle": "Bu komut sunucuda çalışır",
+  "customProvider.acp.hostTrustDescription":
+    "OpenBot bunu sunucunun kullanıcı hesabıyla başlatır. Ajan sunucudaki dosyaları okuyabilir, değiştirebilir ve orada komutlar çalıştırabilir. Yalnızca güvendiğiniz bir ajanı ekleyin.",
   "customProvider.acp.submit": "Ajan ekle",
   "customProvider.acp.editTitle": "Özel ACP ajanını düzenle",
   "customProvider.acp.submitEdit": "Ajanı kaydet",
@@ -231,6 +243,7 @@ export const messages = {
   // Ayarlar'daki kullanıcının kendi ACP ajanları. Her biri OpenBot'un bu bilgisayarda başlattığı bir komuttur.
   "customProvider.agents.title": "Özel ajanlar",
   "customProvider.agents.description": "OpenBot'un bu bilgisayarda başlattığı ACP ajanları.",
+  "customProvider.agents.hostDescription": "OpenBot'un sunucunun bilgisayarında başlattığı ACP ajanları.",
   "customProvider.agents.empty": "Henüz özel ajan yok.",
   "customProvider.agents.add": "Ajan ekle",
   "customProvider.agents.restart": "Ajanları yeniden başlat",

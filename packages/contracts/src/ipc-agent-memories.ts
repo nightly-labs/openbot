@@ -15,7 +15,15 @@ export interface MemoryEntry {
   sourceTurnId: string | null;
   createdAt: string;
   updatedAt: string;
+  /**
+   * The site the memory is about: a lowercase host name without "www.". The browser shows the memory
+   * when the agent opens a page of that site or of a subdomain. Only agent memories have a site.
+   */
+  site?: string;
 }
+
+/** The longest host name that DNS permits, and the database CHECK on the site column. */
+export const MEMORY_SITE_MAX_LENGTH = 253;
 
 export interface AgentMemory extends MemoryEntry {
   agentId: string;
@@ -36,7 +44,9 @@ export function isMemoryEntry(value: unknown): value is MemoryEntry {
         value.sourceTurnId.length > 0 &&
         value.sourceTurnId.length <= INPUT_LIMITS.identifier)) &&
     isString(value.createdAt) &&
-    isString(value.updatedAt)
+    isString(value.updatedAt) &&
+    (value.site === undefined ||
+      (isString(value.site) && value.site.length > 0 && value.site.length <= MEMORY_SITE_MAX_LENGTH))
   );
 }
 
@@ -199,4 +209,31 @@ export function isAgentMemorySelectionState(value: unknown): value is AgentMemor
     value.budgetBytes === 8192 &&
     value.usedBytes <= value.budgetBytes
   );
+}
+
+/**
+ * "Learn from my browsing": while a person holds a tab of an agent (takeover or Take control), the
+ * host records which pages loaded and which controls they clicked, and the memory review learns how
+ * those sites work. It never records typed text. The default is off.
+ */
+export interface BrowsingMemoryPreference {
+  enabled: boolean;
+}
+
+export const DEFAULT_BROWSING_MEMORY_PREFERENCE: BrowsingMemoryPreference = { enabled: false };
+
+/** The setting of one server's agents (`browsing-memory-v1`). */
+export interface HostBrowsingMemory {
+  enabled: boolean;
+}
+
+export function hostBrowsingMemory({ enabled }: BrowsingMemoryPreference): HostBrowsingMemory {
+  return { enabled };
+}
+
+/** On the wire the route codec has already checked the fields; this fails closed on anything else. */
+export function decodeHostBrowsingMemory(value: unknown): HostBrowsingMemory {
+  if (!isDynamicRecord(value) || typeof value.enabled !== "boolean")
+    throw new Error("Invalid browsing memory setting.");
+  return { enabled: value.enabled };
 }

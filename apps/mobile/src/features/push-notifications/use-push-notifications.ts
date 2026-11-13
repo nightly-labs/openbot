@@ -1,3 +1,4 @@
+import { PUSH_NOTIFICATION_THREADS_ROUTES } from "@openbot/contracts/team-protocol/push-notification-threads-v1";
 import {
   ANDROID_PUSH_NOTIFICATIONS_ROUTES,
   type AndroidPushNotificationRegistration,
@@ -42,6 +43,8 @@ interface PushNotificationsInput {
   foreground: boolean;
   post(serverId: string, path: string, body: TeamProtocolV2Json): Promise<unknown>;
   supportsPush(serverId: string): boolean;
+  /** Whether the host notifies about the turns of side threads (`push-notification-threads-v1`). */
+  supportsThreads(serverId: string): boolean;
 }
 
 /** A request that failed is sent again after this time, or at the next change or connection. */
@@ -56,7 +59,8 @@ const ROUTES = isAndroid ? ANDROID_PUSH_NOTIFICATIONS_ROUTES : PUSH_NOTIFICATION
  * iPhone still registers without a token when the Live Activity plays the sound, because the host
  * decides when it does. A host keeps the registration also when it restarts, so the phone tells each
  * host again after each connection, and removes it when the user turns both off for that host or
- * signs out.
+ * signs out. A host that notifies about the turns of side threads also gets the user's choice for
+ * them, after the registration that it belongs to.
  */
 export function usePushNotifications({
   servers,
@@ -64,6 +68,7 @@ export function usePushNotifications({
   foreground,
   post,
   supportsPush,
+  supportsThreads,
 }: PushNotificationsInput): void {
   const preference = usePushNotificationPreference();
   // The level that the user chose for all of their devices replaces the level of this phone. The host
@@ -76,8 +81,11 @@ export function usePushNotifications({
   const environment = usePushEnvironment();
   const [token, setToken] = useState<string | null>(null);
   const [secret, setSecret] = useState<Uint8Array | null>(null);
-  /** What the phone last told each host, so an unchanged state is not sent again. */
-  const registered = useRef(new Map<string, { key: string; removed: boolean }>());
+  /**
+   * What the phone last told each host, so an unchanged state is not sent again. `threads` is the
+   * choice for side threads that the host has, or `null` when it has none.
+   */
+  const registered = useRef(new Map<string, { key: string; removed: boolean; threads: boolean | null }>());
   const postRef = useRef(post);
   postRef.current = post;
   const queues = useRef(new Map<string, Promise<void>>());
@@ -214,19 +222,32 @@ export function usePushNotifications({
       }
       // A retry after a failed request sends the state again.
       const key = `${attempt}:${JSON.stringify(registration)}`;
-      if (registered.current.get(server.id)?.key === key) continue;
-      registered.current.set(server.id, { key, removed: registration === null });
+      // The host keeps the choice for side threads with the registration, also when the phone
+      // registers again. So it goes once after each connection, and when the user changes it.
+      const threads = registration && supportsThreads(server.id) ? preference.threadReplies : null;
+      const last = registered.current.get(server.id);
+      const sendRegistration = last?.key !== key;
+      const replies = threads !== null && last?.threads !== threads ? threads : null;
+      if (!sendRegistration && replies === null) continue;
+      registered.current.set(server.id, { key, removed: registration === null, threads });
       const serverId = server.id;
       enqueue(serverId, async () => {
         try {
-          await postRef.current(
-            serverId,
-            registration ? ROUTES.register : ROUTES.remove,
-            registration ? { ...registration } : {},
-          );
+          if (sendRegistration) {
+            await postRef.current(
+              serverId,
+              registration ? ROUTES.register : ROUTES.remove,
+              registration ? { ...registration } : {},
+            );
+          }
+          if (replies !== null) await postRef.current(serverId, PUSH_NOTIFICATION_THREADS_ROUTES.set, { replies });
         } catch {
-          if (registered.current.get(serverId)?.key !== key) return;
-          registered.current.delete(serverId);
+          const current = registered.current.get(serverId);
+          if (current?.key === key) registered.current.delete(serverId);
+          // A later request has the registration of this one, but not the choice for side threads that
+          // this one did not deliver. The retry sends the choice again.
+          else if (current && replies !== null) current.threads = null;
+          else return;
           retry.current ??= setTimeout(() => {
             retry.current = null;
             setAttempt((count) => count + 1);
@@ -245,6 +266,7 @@ export function usePushNotifications({
     liveActivities,
     activityHost,
     supportsPush,
+    supportsThreads,
     enqueue,
     attempt,
   ]);

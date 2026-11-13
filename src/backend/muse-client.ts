@@ -505,9 +505,9 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
         id,
         tools,
         () => this.#threads.get(id)?.turn?.id ?? null,
-        (call, signal) =>
+        (call, signal, detachAfterMs) =>
           this.#requests
-            .call("item/tool/call", call, signal)
+            .call("item/tool/call", call, signal, detachAfterMs)
             .pipe(
               Effect.flatMap((value) =>
                 isToolResult(value)
@@ -520,7 +520,7 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
     const setup = Effect.gen({ self: this }, function* () {
       const resolved = yield* usableMcpServers(
         agentMcpServers(
-          this.#options.profileGeneration ? [] : (this.#options.mcpServers?.() ?? []),
+          this.#options.profileGeneration ? [] : (this.#options.mcpServers?.(mcpAgentParam(params)) ?? []),
           computerUseParam(params),
         ),
         this.#options.mcpToolRuntimes?.(),

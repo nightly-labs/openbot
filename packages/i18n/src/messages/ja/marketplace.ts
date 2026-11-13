@@ -116,6 +116,11 @@ export const messages = {
   "marketplace.app.remove.confirmTitle": "{name} を削除しますか？",
   "marketplace.app.remove.keep": "残す",
   "marketplace.app.connection": "接続",
+  "marketplace.app.access.use": "使用可能",
+  "marketplace.app.access.noAgents": "エージェントなし",
+  "marketplace.app.access.agentsOf": "{name} を使用できるエージェント",
+  "marketplace.app.access.chooseAgents": "{name}: {summary}。エージェントを選択",
+  "marketplace.app.access.level": "{name} に対する {role} のアクセス",
   "marketplace.app.setup.account": "ブラウザーで {name} アカウントにサインインします。",
   "marketplace.app.setup.key": "{name} アカウントの API キーが必要です。",
   "marketplace.app.setup.keySaved": "{field} は {host} に保存されています。",
@@ -196,6 +201,27 @@ export const messages = {
   "marketplace.plugin.cobrain.prompt.searchDecision": "価格について決めたことを Cobrain のメモから探してください。",
   "marketplace.plugin.cobrain.prompt.saveNote":
     "今日やったことと残っていることを Cobrain にメモとして保存してください。",
+  "marketplace.plugin.honcho.tagline": "AI ツールをまたぐあなたの記憶",
+  "marketplace.plugin.honcho.description":
+    "Plastic Labs の Honcho は、接続した他の AI ツールとも共有できる、あなたについての長期記憶をエージェントに与えます。エージェントは学んだことを保存し、Honcho はそれをもとに推論して、あなたの好み、目標、仕事の進め方のモデルを作ります。エージェントは作業を始める前に Honcho に質問します。OpenBot のエージェントにも独自の記憶があります。Honcho は他のツールでもあなたについていく記憶です。エージェントが保存したメッセージはあなたの Honcho アカウントに送られます。",
+  "marketplace.plugin.honcho.app": "1 つの MCP サーバーで、Honcho のワークスペースに長期記憶を保存して照会します。",
+  "marketplace.plugin.honcho.prompt.recall":
+    "始める前に、私の好きな仕事の進め方について Honcho が何を知っているか聞いてください。",
+  "marketplace.plugin.honcho.prompt.save": "このスレッドの決定事項を Honcho に保存してください。",
+  "marketplace.plugin.honcho.prompt.preferences":
+    "Honcho は私の文章のスタイルについて何と言っていますか？この下書きに活かしてください。",
+  "marketplace.plugin.honcho.hint.apiKey": "app.honcho.dev でキーを作成してください。",
+  "marketplace.plugin.hindsight.tagline": "時間とともに学ぶ記憶",
+  "marketplace.plugin.hindsight.description":
+    "Vectorize の Hindsight は、Hindsight Cloud にある長期記憶をエージェントに与えます。エージェントは事実や出来事を保持し、意味、時間、エンティティで呼び出し、それを振り返ってメンタルモデルを作ります。記憶はバンクに保管され、エージェントはプロジェクトや人ごとにバンクを作れます。OpenBot のエージェントにも独自の記憶があります。Hindsight は接続した他の AI ツールと共有できる記憶です。エージェントが保持した内容はあなたの Hindsight Cloud アカウントに送られます。",
+  "marketplace.plugin.hindsight.app":
+    "1 つの MCP サーバーで、Hindsight Cloud のバンクにある記憶を保持、呼び出し、振り返ります。",
+  "marketplace.plugin.hindsight.prompt.recall":
+    "始める前に、このプロジェクトについて分かっていることを Hindsight から呼び出してください。",
+  "marketplace.plugin.hindsight.prompt.retain": "このスレッドの決定事項と未解決の質問を Hindsight に保持してください。",
+  "marketplace.plugin.hindsight.prompt.reflect":
+    "私の Hindsight の記憶を振り返ってください。この 1 か月の私の仕事にどんなパターンがありますか？",
+  "marketplace.plugin.hindsight.hint.apiKey": "Hindsight Cloud の Connect ページでキーを作成してください。",
   "marketplace.plugin.figma.tagline": "デザインとプロトタイプ",
   "marketplace.plugin.figma.description":
     "Figma を使うと、エージェントはデザインファイルを読み取り、コンポーネント、スタイル、変数を調べ、本番用の仕様をエンジニアに渡せます。このコンピューターの Figma デスクトップアプリにある MCP サーバーに接続します。サーバーはデザインの読み取りのみ可能で、書き込みには現在対応中です。",
@@ -225,6 +251,15 @@ export const messages = {
   "marketplace.plugin.higgsfield.prompt.productShot":
     "Higgsfield で、木のテーブルに置いた陶器のマグカップの商品写真を作ってください。",
   "marketplace.plugin.higgsfield.prompt.clip": "Higgsfield で、夕暮れの波の 5 秒の動画を作ってください。",
+  "marketplace.plugin.sunra.tagline": "AI による画像、動画、音声、3D",
+  "marketplace.plugin.sunra.description":
+    "Sunra を使うと、エージェントは GPT Image、Nano Banana、Seedream、FLUX、Seedance、Kling、Veo などのモデルで画像、動画、音声、3D モデルを作成し、クレジット残高を確認し、結果を取得できます。結果はユーザーの Sunra アカウント内のプロジェクトに保存されます。各ユーザーはブラウザで自分の Sunra アカウントにサインインします。Sunra は生成ごとに先に費用を提示し、確認されてからそのアカウントのクレジットを使います。",
+  "marketplace.plugin.sunra.app":
+    "Sunra の MCP サーバー経由で、画像・動画・音声・3D の生成、クレジット、結果を扱います。ブラウザでサインインします。",
+  "marketplace.plugin.sunra.prompt.balance": "Sunra のクレジットはどれくらい残っていますか？",
+  "marketplace.plugin.sunra.prompt.poster": "Sunra で、雨の夜市のポスターを縦長で作ってください。",
+  "marketplace.plugin.sunra.prompt.clip":
+    "Sunra で、川を流れる紙の船の 5 秒の動画を作ってください。先に費用を教えてください。",
   "marketplace.plugin.elevenlabs.tagline": "音声、ボイス、音声エージェント",
   "marketplace.plugin.elevenlabs.description":
     "ElevenLabs を使うと、エージェントがテキストを音声に変換し、ボイスを扱い、ElevenLabs の音声エージェントとその会話を作成、テスト、確認できます。生成された音声は短時間だけ有効なダウンロードリンクで返されます。各ユーザーはブラウザーで自分の ElevenLabs アカウントにサインインし、生成ごとにそのアカウントのクレジットを使います。",
@@ -379,6 +414,24 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.segment": "VIP セグメントには何件の連絡先があり、今月どう変わりましたか?",
   "marketplace.plugin.omnisend.prompt.draftCampaign":
     "新しいコレクション用のキャンペーンの下書きを作成してください。ただし送信はしないでください。",
+  "marketplace.plugin.postiz.tagline": "SNS投稿の予約",
+  "marketplace.plugin.postiz.description":
+    "Postiz を使うと、エージェントが SNS チャンネルを一覧表示し、X、LinkedIn、Instagram、TikTok など 30 以上のネットワークで投稿の下書き、予約、公開を行えます。メディアのアップロードや AI による画像と動画の作成もできます。ブラウザで Postiz アカウントにサインインするか、Postiz の Settings › Developers にある API キーを貼り付けてください。Postiz のすべてのクラウドプランに API アクセスが含まれます。エージェントは投稿をすぐに公開できるため、承認する前に各投稿を確認してください。",
+  "marketplace.plugin.postiz.app":
+    "ブラウザでのサインインまたは API キーを使い、Postiz の MCP サーバー経由でチャンネル、下書き、予約投稿、メディアを扱います。",
+  "marketplace.plugin.postiz.prompt.channels": "Postiz に接続されている SNS チャンネルはどれですか?",
+  "marketplace.plugin.postiz.prompt.week": "来週に予約されている投稿はどれですか?",
+  "marketplace.plugin.postiz.prompt.draft":
+    "新しいリリースについての LinkedIn 投稿の下書きを作成して。ただし予約はしないで。",
+  "marketplace.plugin.trypost.tagline": "ソーシャルメディアの予約投稿",
+  "marketplace.plugin.trypost.description":
+    "TryPost を使うと、エージェントは接続済みのチャンネルを一覧し、X、LinkedIn、Instagram、Facebook、TikTok、YouTube、Threads、Bluesky、Mastodon、Pinterest などへの投稿を下書き、予約、キューへの追加、公開できます。分析の確認、アイデアと承認の管理、投稿時間の設定もできます。ブラウザで TryPost アカウントにサインインし、ワークスペースを選んでください。エージェントは投稿をすぐに公開できるため、承認する前に各投稿を確認してください。",
+  "marketplace.plugin.trypost.app":
+    "TryPost の MCP サーバーとブラウザでのサインインによる、チャンネル、投稿、キュー、アイデア、分析。",
+  "marketplace.plugin.trypost.prompt.week": "今週予約されている投稿はどれですか？",
+  "marketplace.plugin.trypost.prompt.draft":
+    "新しいリリースについての LinkedIn 投稿を下書きしてください。ただし予約はしないでください。",
+  "marketplace.plugin.trypost.prompt.analytics": "先月の投稿のうち、エンゲージメントが最も高かったのはどれですか？",
   "marketplace.plugin.composio.tagline": "Gmail、Slack、GitHub など 1,000 以上のアプリ",
   "marketplace.plugin.composio.description":
     "Composio は、1 つの MCP サーバーでエージェントを Gmail、Slack、GitHub など 1,000 以上のアプリに接続します。Composio アカウントでサインインしてください。エージェントがアプリを必要とすると、そのアプリの接続を求めます。",
@@ -539,6 +592,14 @@ export const messages = {
   "marketplace.skills.origin.local": "このコンピューターで作成",
   "marketplace.skills.origin.workspace": "このエージェントのフォルダー内",
   "marketplace.skills.origin.marketplace": "マーケットプレイスから · バージョン {version}",
+  "marketplace.skills.origin.github": "GitHub から · {repository}",
+  "marketplace.skills.github.search": "検索、または GitHub のリンクを貼り付け",
+  "marketplace.skills.github.reading": "リポジトリ内のスキルを探しています",
+  "marketplace.skills.github.trust":
+    "GitHub のスキルは OpenBot が確認したものではありません。追加する前にスキルの内容を読んでください。",
+  "marketplace.skills.github.source": "GitHub · {repository}（コミット {commit}）",
+  "marketplace.skills.github.open": "GitHub",
+  "marketplace.skills.github.openName": "GitHub で {repository} を開く",
   "marketplace.skills.status.notAdded": "未追加",
   "marketplace.skills.status.on": "{agents} でオン",
   "marketplace.skills.agentCount": { other: "エージェント {count} 件" },

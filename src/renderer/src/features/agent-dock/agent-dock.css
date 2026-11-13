@@ -1,0 +1,103 @@
+/* The strip at the screen edge while the agent dock is in the edge. See `AgentDockEdgeStrip.tsx`.
+
+   It has the dock fill, so it reads as the tip of the dock. `--agent-dock-strip-near` goes from 0 to 1
+   as the pointer comes near: the strip grows toward the shape of the dock, and the dock then slides out
+   over it. */
+.agent-dock-strip {
+  --agent-dock-strip-near: 0;
+
+  position: fixed;
+  /* Under the dock, so the dock comes out of the strip and covers it. */
+  z-index: calc(var(--openbot-layer-dropdown) - 1);
+  top: 50%;
+  right: 0;
+  width: calc(var(--agent-dock-strip-width) + 22px * var(--agent-dock-strip-near));
+  height: calc(
+    var(--agent-dock-strip-height, 240px) *
+    (var(--agent-dock-strip-rest) + (1 - var(--agent-dock-strip-rest)) * var(--agent-dock-strip-near))
+  );
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--openbot-radius-pill) 0 0 var(--openbot-radius-pill);
+  background: var(--window-solid-frame, var(--openbot-bg-frame));
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
+  /* The strip stays a moment while the dock comes out over it. */
+  transition:
+    width var(--openbot-duration-fast) var(--openbot-ease-out),
+    height var(--openbot-duration-fast) var(--openbot-ease-out),
+    opacity var(--openbot-duration-fast) var(--openbot-ease-out) var(--openbot-duration-fast);
+}
+
+.agent-dock-strip[data-side="left"] {
+  right: auto;
+  left: 0;
+  border-radius: 0 var(--openbot-radius-pill) var(--openbot-radius-pill) 0;
+}
+
+/* The strip comes back after the dock is in the edge. */
+.agent-dock-strip[data-shown] {
+  opacity: 1;
+  pointer-events: auto;
+  cursor: pointer;
+  transition:
+    width var(--openbot-duration-fast) var(--openbot-ease-out),
+    height var(--openbot-duration-fast) var(--openbot-ease-out),
+    opacity var(--openbot-duration-fast) var(--openbot-ease-out) var(--openbot-duration-normal);
+}
+
+/* Over the shared button: the strip keeps the dock fill on hover, and has the dock focus line. */
+.agent-dock-strip:hover:not(:disabled):not([data-disabled]) {
+  background: var(--window-solid-frame, var(--openbot-bg-frame));
+}
+
+.agent-dock-strip:focus-visible {
+  outline: 1px solid var(--openbot-border-focus);
+  outline-offset: 1px;
+  box-shadow: none;
+}
+
+/* An agent asks you something: the wash front of the theme change goes up through the dark strip. The
+   band waits below the strip, and only `translate` moves, so the wave runs on the compositor. */
+.agent-dock-strip::after {
+  position: absolute;
+  inset: 0 -4px;
+  content: "";
+  background: var(--openbot-wash-front);
+  opacity: 0;
+  pointer-events: none;
+  translate: 0 110%;
+  transition: opacity var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.agent-dock-strip[data-asks]::after {
+  opacity: 1;
+}
+
+/* One wave is two fronts. `AgentDockEdgeStrip` removes it at its end and starts the next after a rest.
+   A front has no pause at its end: the window draws each frame while the animation runs, also when
+   nothing moves. */
+.agent-dock-strip[data-asks][data-wave]::after {
+  animation: agent-dock-strip-wave 2.24s cubic-bezier(0.45, 0, 0.25, 1) 2;
+}
+
+@keyframes agent-dock-strip-wave {
+  0% {
+    translate: 0 105%;
+  }
+
+  100% {
+    translate: 0 -105%;
+  }
+}
+
+/* With reduced motion the wash fills the strip and does not move. */
+@media (prefers-reduced-motion: reduce) {
+  .agent-dock-strip[data-asks]::after,
+  .agent-dock-strip[data-asks][data-wave]::after {
+    animation: none;
+    translate: none;
+  }
+}

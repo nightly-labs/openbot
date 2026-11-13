@@ -1,0 +1,36 @@
+{
+  "slug": "helpscout",
+  "name": "Help Scout",
+  "tagline": "Support conversations and reports",
+  "description": "Help Scout lets agents search support conversations, pull reports, and search Docs articles in the signed-in Help Scout account. Access is read-only, and each user signs in through the browser.",
+  "category": "productivity",
+  "creatorName": "Help Scout",
+  "iconUrl": "https://www.helpscout.com/images/favicon/apple-touch-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-top-issues", "text": "What were the most common customer issues this week?" },
+    { "id": "prompt-report", "text": "Pull the response time report for last month." },
+    {
+      "id": "prompt-find-conversation",
+      "text": "Find the conversations where customers asked about refunds for annual plans."
+    }
+  ],
+  "apps": [
+    {
+      "id": "app-helpscout-mcp",
+      "name": "Help Scout",
+      "description": "Conversation search, reports, and Docs search, over Help Scout's MCP server with browser sign-in.",
+      "iconUrl": "https://www.helpscout.com/images/favicon/apple-touch-icon.png",
+      "server": {
+        "name": "helpscout",
+        "transport": "http",
+        "url": "https://mcp.helpscout.net/mcp",
+        "auth": [{ "id": "helpscout-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.helpscout.com",
+  "privacyPolicyUrl": "https://www.helpscout.com/company/legal/privacy/",
+  "termsUrl": "https://www.helpscout.com/company/legal/terms-of-service/"
+}

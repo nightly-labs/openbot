@@ -24,6 +24,9 @@ export const messages = {
   "channel.settings.isolated": "메모리를 이 채널에 유지",
   "channel.settings.isolatedDescription":
     "에이전트가 여기서 배운 내용은 채널 메모리로 저장되며, 다른 채팅에서는 보이지 않습니다.",
+  "channel.settings.browser": "브라우저",
+  "channel.settings.browserEveryone": "모든 멤버",
+  "channel.settings.browserNone": "없음",
   "channel.settings.memoryCount": { other: "{count}개 저장됨" },
   "channel.settings.newConversation.title": "새 대화",
   "channel.settings.newConversation.description": "멤버가 이전 메시지를 잊습니다. 채널 설정은 그대로입니다.",

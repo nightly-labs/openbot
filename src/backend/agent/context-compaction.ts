@@ -91,6 +91,11 @@ export interface ContextCompactionOptions {
     client: AgentClient,
     threadId: string,
   ): Effect.Effect<string | null, ThreadOperationFailed>;
+  /**
+   * Loads the session in `client` before a compaction. False when the next turn replaces the session.
+   * See `ThreadLifecycle.loadSessionForCompaction`.
+   */
+  loadSession(agentId: string, client: AgentClient, threadId: string): Effect.Effect<boolean, ThreadOperationFailed>;
   /** Whether `rotateSession` can replace this session. See `ThreadLifecycle.rotatesSession`. */
   rotatesSession(agentId: string, threadId: string): boolean;
   /** The service stops: its database can close before a provider stops reporting usage. */
@@ -103,6 +108,13 @@ export interface ContextCompactionOptions {
 /** Whether OpenBot can ask for a compaction of this client, automatically or for the user. */
 export function compactsOnRequest(mode: AgentClient["contextCompaction"]): boolean {
   return mode === "events" || mode === "request" || mode === "handoff";
+}
+
+/** A compaction that holds the lane of its provider thread. `client` is null until `request` takes it. */
+interface CompactionHold {
+  agentId: string;
+  client: AgentClient | null;
+  turnId: string | null;
 }
 
 /** A queue that Codex refused because a compaction turn runs on the provider thread of its key. */
@@ -132,6 +144,7 @@ export class ContextCompaction {
   readonly #emitError: (code: string, error: unknown, agentId?: string) => void;
   readonly #scheduleDrain: (agentId: string) => void;
   readonly #rotateSession: ContextCompactionOptions["rotateSession"];
+  readonly #loadSession: ContextCompactionOptions["loadSession"];
   readonly #rotatesSession: ContextCompactionOptions["rotatesSession"];
   readonly #isStopping: () => boolean;
   readonly #budgets = new Map<string, ThreadContextBudget>();
@@ -139,7 +152,7 @@ export class ContextCompaction {
    * The agent of each provider thread that compacts, and the client that runs it once `request` sends it.
    * `turnId`: the turn whose end made the `reserve` hold, until `request` takes the hold.
    */
-  readonly #compacting = new Map<string, { agentId: string; client: AgentClient | null; turnId: string | null }>();
+  readonly #compacting = new Map<string, CompactionHold>();
   readonly #refusals = new Map<string, RefusalHold>();
   readonly #timeoutMs: number;
   /** How long a started compaction runs before OpenBot stops it. */
@@ -148,6 +161,11 @@ export class ContextCompaction {
   readonly #graceMs: number;
   readonly #display = new Map<string, Omit<AgentContextState, "agentId" | "threadId">>();
   readonly #awaitingPostCompaction = new Set<string>();
+  /**
+   * Sessions in a compaction whose usage OpenBot compares: until it ends, Codex 0.167.0 reports an
+   * estimate of its result, which can be much smaller than the next request (#6845).
+   */
+  readonly #estimating = new Set<string>();
   readonly #durations = new Map<string, number>();
   readonly #changed: () => void;
   readonly #compacted: (threadId: string) => void;
@@ -165,6 +183,7 @@ export class ContextCompaction {
     this.#emitError = options.emitError;
     this.#scheduleDrain = options.scheduleDrain;
     this.#rotateSession = options.rotateSession;
+    this.#loadSession = options.loadSession;
     this.#rotatesSession = options.rotatesSession;
     this.#isStopping = options.isStopping;
   }
@@ -276,6 +295,8 @@ export class ContextCompaction {
       delete compaction.afterTokens;
     } else if (before !== undefined) compaction.beforeTokens = before;
     this.#awaitingPostCompaction.delete(threadId);
+    if (tokenComparison === "context" && status === "running") this.#estimating.add(threadId);
+    else this.#estimating.delete(threadId);
     if (tokenComparison === "context" && status === "completed" && compaction.afterTokens === undefined)
       this.#awaitingPostCompaction.add(threadId);
     if (status === "completed" && previous?.status === "running")
@@ -313,6 +334,11 @@ export class ContextCompaction {
     const usedTokens = finiteNumberOrNull(last?.totalTokens);
     const contextWindow = finiteNumberOrNull(usage?.modelContextWindow);
     if (usedTokens === null || usedTokens < 0 || contextWindow === null || contextWindow <= 0) return;
+
+    // Only the next request tells whether the compaction helped. The estimate reset the count of
+    // compactions that left the session almost full, so each turn compacted again. The display still
+    // shows it.
+    if (this.#estimating.has(threadId)) return;
 
     const budget = this.#budgets.get(threadId) ?? {
       usedTokens,
@@ -502,23 +528,44 @@ export class ContextCompaction {
       return;
     }
 
-    this.#compacting.set(threadId, { agentId, client, turnId: null });
+    const hold: CompactionHold = { agentId, client, turnId: null };
+    this.#compacting.set(threadId, hold);
     // A `request` compaction runs inside the request, so it starts now and the request waits as long.
     const runsInRequest = client.contextCompaction === "request";
-    this.#armDeadline(agentId, threadId, client, runsInRequest ? this.#runTimeoutMs : this.#timeoutMs);
 
-    yield* client
-      .request(
-        "thread/compact/start",
-        { threadId },
-        decodeRecordResponse,
-        runsInRequest ? this.#runTimeoutMs : undefined,
+    yield* this.#loadSession(agentId, client, threadId)
+      .pipe(
+        Effect.flatMap((loaded) => {
+          // The end of the client or of the thread ended this compaction while it loaded, and a new
+          // compaction of the thread can hold it now.
+          if (this.#compacting.get(threadId) !== hold || this.#budgets.get(threadId) !== budget)
+            return Effect.succeed(false);
+          if (!loaded) {
+            // The next turn replaces the session. Codex refused nothing, so no error and no count.
+            // The growth rule stops the next message from asking for this compaction again.
+            budget.lastCompactedTokens = budget.usedTokens;
+            this.observeCompaction(threadId, "failed");
+            this.#release(agentId, threadId);
+            this.#scheduleDrain(agentId);
+            return Effect.succeed(false);
+          }
+          // After the load, which has the request timeout of the client: the deadline is for the compaction.
+          this.#armDeadline(agentId, threadId, client, runsInRequest ? this.#runTimeoutMs : this.#timeoutMs);
+          return client
+            .request(
+              "thread/compact/start",
+              { threadId },
+              decodeRecordResponse,
+              runsInRequest ? this.#runTimeoutMs : undefined,
+            )
+            .pipe(Effect.as(true));
+        }),
       )
       .pipe(toContextCompactionFailed)
       .pipe(
-        Effect.tap(() =>
+        Effect.tap((started) =>
           Effect.sync(() => {
-            if (client.contextCompaction === "request" && budget.phase === "requested") {
+            if (started && client.contextCompaction === "request" && budget.phase === "requested") {
               this.markCompacted(threadId);
               this.finish(agentId, threadId, "completed");
             }
@@ -529,6 +576,9 @@ export class ContextCompaction {
             // Codex reported the compaction turn, so it runs whatever the answer was. Its end, or
             // the deadline, releases the queue.
             if (budget.phase === "running" || budget.phase === "stopping") return;
+            // A new compaction holds the thread: the client ended while this one loaded the session.
+            const current = this.#compacting.get(threadId);
+            if (current && current !== hold) return;
             budget.lastCompactedTokens = budget.usedTokens;
             this.#emitError("context_compaction_failed", failure.cause, agentId);
             // After the deadline abandoned it, the phase is idle and the deadline counted it.
@@ -597,6 +647,7 @@ export class ContextCompaction {
     const displayed = this.#display.delete(threadId);
     this.#durations.delete(threadId);
     this.#awaitingPostCompaction.delete(threadId);
+    this.#estimating.delete(threadId);
     if (displayed) this.#emitChanged();
     this.#clearTimer(threadId);
   }
@@ -659,6 +710,7 @@ export class ContextCompaction {
     this.#display.clear();
     this.#durations.clear();
     this.#awaitingPostCompaction.clear();
+    this.#estimating.clear();
   }
 
   /**

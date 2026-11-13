@@ -6,6 +6,8 @@
 // The stand-in holds its first turn's answer until the steer arrives. After both turns, the service
 // starts again and imports the session history. Before this change, the import added the steered
 // answer a second time: the live turn had a random id, and the history names the turn by the uuid.
+// The chat also shows the steered message after the running turn's answer and above its own answer,
+// live and after the import. Before that change, the message stayed in the running turn (#6673).
 // `bun run test:claude-late-steer`. Writes .openbot-build/claude-late-steer-e2e/report.json.
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
@@ -35,6 +37,8 @@ const CLAUDE_MODEL = defaultProviderModel("claude");
 const OLD_ANSWER = "Answer of the running turn.";
 const STEERED_ANSWER = "Answer of the steered message.";
 const STEERED_MESSAGE = "Steered message.";
+/** Each answer under the message it answers. */
+const SHOWN_ORDER = [OLD_ANSWER, STEERED_MESSAGE, STEERED_ANSWER];
 
 // Before the service modules load: the stores and the CLI search read these. The history reader
 // finds the transcript in CLAUDE_CONFIG_DIR, as Bun's `homedir()` does not follow HOME.
@@ -218,6 +222,8 @@ const report: {
   steerDeliveryId?: string;
   live?: { old: StoredAnswer[]; steered: StoredAnswer[] };
   afterImport?: { old: StoredAnswer[]; steered: StoredAnswer[] };
+  shownLive?: string[];
+  shownAfterImport?: string[];
   passed: boolean;
   error?: string;
 } = { passed: false };
@@ -284,6 +290,12 @@ function startService() {
       .all(threadId, author, text)
       .map((row) => ({ messageId: String(row.message_id), turnId: row.turn_id === null ? null : String(row.turn_id) }));
   const answers = (threadId: string, text: string) => messages(threadId, "assistant", text);
+  /** The checked texts of the chat, in the order the chat shows them. */
+  const shown = (agentId: string, threadId: string) =>
+    database
+      .readConversationPage(agentId, threadId, { type: "latest" }, 100)
+      .messages.map((message) => message.text)
+      .filter((text) => SHOWN_ORDER.includes(text));
   const idle = (agentId: string) =>
     !agents
       .listQueue(agentId)
@@ -293,7 +305,7 @@ function startService() {
     connection?.close();
     database.close();
   };
-  return { database, store, agents, messages, answers, idle, stop };
+  return { database, store, agents, messages, answers, shown, idle, stop };
 }
 
 await writeFile(claudeExecutable, STAND_IN_CLAUDE, { mode: 0o755 });
@@ -328,6 +340,8 @@ try {
     steerDeliveryId,
     "The CLI's turn for the steer keeps the uuid of the steered message.",
   );
+  report.shownLive = first.shown(agent.id, threadId);
+  assert.deepEqual(report.shownLive, SHOWN_ORDER, "The live chat shows the steered message above its own answer.");
   const sessions = first.database.listProviderSessions(threadId).map((session) => session.id);
   assert.equal(sessions.length, 1, "The chat has one Claude session.");
   await first.stop();
@@ -349,6 +363,12 @@ try {
     second.messages(threadId, "user", STEERED_MESSAGE).length,
     1,
     "The steered message is stored one time after the import.",
+  );
+  report.shownAfterImport = second.shown(agent.id, threadId);
+  assert.deepEqual(
+    report.shownAfterImport,
+    SHOWN_ORDER,
+    "The imported chat keeps the steered message above its answer.",
   );
   report.passed = true;
 } catch (error) {

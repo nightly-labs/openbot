@@ -1,0 +1,33 @@
+{
+  "slug": "roam",
+  "name": "Roam Research",
+  "tagline": "Graph notes and pages",
+  "description": "Roam Research lets agents search, read, and add blocks and pages in the Roam graphs of the signed-in user. Each user signs in to their own Roam account through the browser.",
+  "category": "productivity",
+  "creatorName": "Roam Research",
+  "iconUrl": "https://roamresearch.com/assets/astro-192.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-daily-notes", "text": "What did I write in my daily notes this week?" },
+    { "id": "prompt-backlinks", "text": "Find all blocks that link to [[Project Atlas]]." },
+    { "id": "prompt-add-notes", "text": "Add a block with today's meeting notes to my daily page." }
+  ],
+  "apps": [
+    {
+      "id": "app-roam-mcp",
+      "name": "Roam Research",
+      "description": "Graph search, pages, and blocks, over Roam Research's MCP server with browser sign-in.",
+      "iconUrl": "https://roamresearch.com/assets/astro-192.png",
+      "server": {
+        "name": "roam",
+        "transport": "http",
+        "url": "https://mcp.roamresearch.com/mcp",
+        "auth": [{ "id": "roam-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://roamresearch.com",
+  "privacyPolicyUrl": "https://roamresearch.com/#/app/help/page/bnQcAUM0i",
+  "termsUrl": "https://roamresearch.com/#/app/help/page/MHRK1dgTE"
+}

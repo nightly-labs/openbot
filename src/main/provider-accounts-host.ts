@@ -2,6 +2,7 @@
 
 import { type AgentProviderId, DEFAULT_PROVIDER_ACCOUNT_ID } from "@openbot/contracts/ipc";
 import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/claude-api-key-v1";
+import { PROVIDER_ACCOUNT_MODELS_LIMIT } from "@openbot/contracts/team-protocol/provider-account-models-v1";
 import { PROVIDER_ACCOUNTS_MESSAGE_LIMIT } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { Cause, Effect, Exit, Option, Semaphore } from "effect";
@@ -18,8 +19,10 @@ export interface ProviderAccountsHostDependencies {
     | "listAgents"
     | "updateAgent"
     | "signInProviderAccountOnHost"
+    | "connectProviderAccountKey"
     | "renameProviderAccount"
     | "removeProviderAccount"
+    | "setProviderAccountPool"
   >;
   browser: Pick<BrowserHost, "openPrivate" | "privateTab" | "close">;
 }
@@ -69,6 +72,41 @@ export class ProviderAccountsHost {
     return { providers, agents };
   }
 
+  /**
+   * The models that each account after the first serves and the provider's own sign-in does not
+   * (`provider-account-models-v1`). An account whose check listed none is left out.
+   */
+  models() {
+    const providers = (this.#dependencies.service.getStatus().providers ?? []).flatMap((row) => {
+      const accounts = (row.accounts ?? []).flatMap((account) =>
+        account.models?.length
+          ? [
+              {
+                accountId: account.id,
+                models: account.models
+                  .slice(0, PROVIDER_ACCOUNT_MODELS_LIMIT)
+                  .map(({ provider: _provider, listing: _listing, ...model }) => model),
+              },
+            ]
+          : [],
+      );
+      return accounts.length ? [{ provider: row.id, accounts }] : [];
+    });
+    return { providers };
+  }
+
+  /** The providers whose account pool is on, with the accounts left out and the account in use (`provider-account-pool-v1`). */
+  pools() {
+    const pools = (this.#dependencies.service.getStatus().providers ?? []).flatMap((row) =>
+      row.accounts && row.accountPool ? [{ provider: row.id, ...row.accountPool }] : [],
+    );
+    return { pools };
+  }
+
+  setPool(provider: AgentProviderId, enabled: boolean, leftOut: readonly string[]) {
+    return this.#dependencies.service.setProviderAccountPool(provider, enabled, leftOut).pipe(Effect.asVoid);
+  }
+
   /** The readings of the accounts after the first. The released usage routes give the provider's own. */
   readonly usage = Effect.fn("ProviderAccountsHost.usage")(function* (this: ProviderAccountsHost) {
     return yield* this.#dependencies.service.getProviderAccountUsage();
@@ -101,6 +139,11 @@ export class ProviderAccountsHost {
 
   signInStatus(provider: AgentProviderId) {
     return this.#pages.status(provider) ?? { tabId: null, result: { error: endedText(provider) } };
+  }
+
+  /** Gives an account its API key (`provider-account-keys-v1`): a new account when `accountId` is null. */
+  connectKey(provider: AgentProviderId, accountId: string | null, key: string) {
+    return this.#dependencies.service.connectProviderAccountKey(provider, accountId, key).pipe(Effect.asVoid);
   }
 
   /** The interrupt ends the sign-in, and a new account that did not sign in goes with it. */

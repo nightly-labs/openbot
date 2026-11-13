@@ -172,7 +172,8 @@ Cloudflare places that Worker near the mail host. The relay has no route and kee
 binding request carries the SMTP settings and the message. CI and `bun run api:deploy` deploy the
 relay before the production Worker. When you change `EMAIL_SMTP_HOST` or `EMAIL_SMTP_PORT`, also
 change `placement.host` in `wrangler.email-relay.jsonc`. The test Worker and local `vite dev` send
-from their own socket. To see where the relay runs, read the `colo` of its Workers Logs events.
+from their own socket. Workers Logs are off. To see where the relay runs, read the `colo` of its events in
+`bunx wrangler tail openbot-email-relay`.
 
 For a deployed Worker, `bun run api:deploy` decrypts `.env.production`. It sends
 `EMAIL_SMTP_PASSWORD`, `SKILLS_ADMIN_TOKEN`, `REMOTE_TICKET_PRIVATE_JWK`,
@@ -190,7 +191,7 @@ before remote changes. Test deployments do not send account analytics.
 PKCS #1 key; convert it with `openssl pkcs8 -topk8 -nocrypt -in <key>.pem`. With the key, the
 Worker gives the desktop installation tokens, so GitHub shows `openbotgit[bot]` as the author of an
 agent's work. The key also lets `POST /v1/feedback` open an approved bug report or feature idea from the app as
-an issue in `nightly-labs/openbot`, for any signed-in account, three times a minute (`FEEDBACK_RATE_LIMITER`) and 10 times a UTC day (`feedback_daily_counts` in D1). The Worker does not store or log the text. With no key, the route answers 503, the app
+an issue in `nightly-labs/openbot`, for any signed-in account, three times a minute (`FEEDBACK_RATE_LIMITER`) and 10 times a UTC day (`feedback_daily_counts` in D1). The Worker does not store or log the text. With `sameAs`, the report is a comment on that open app issue. Before the card, `POST /v1/feedback/similar` finds open app issues with a similar title, three times a minute for each account (the same limiter, with its own key); the title is in the body, so request logs do not keep it. With no key, the route answers 503, the app
 gives the GitHub form link instead, and the desktop acts as the signed-in user. In GitHub Actions the secret is
 `OPENBOT_GITHUB_APP_PRIVATE_KEY`, because GitHub refuses secret names that start with `GITHUB_`.
 Secrets are never passed as process arguments. The other values are Worker
@@ -208,6 +209,9 @@ Environment; a local deployment reads it from the encrypted `.env.production`.
 
 `SERVER_CLAIMS_ADMIN_TOKEN` lets an operator sign a new server in for a user without an email code: see
 [server claims](../../docs/self-hosted-server.md#sign-in-with-a-server-claim). Without it, the endpoint answers 401.
+The encrypted `.env.production` has it, so `scripts/hosting/leaseweb-pool.ts custom` can sign a custom
+server in for its owner. GitHub Actions reads it from the `cloudflare-production` Environment. When you
+change it, change it in both places and deploy the Worker.
 
 Use `bun run api:deploy:test` for the isolated `openbot-auth-api-test` Worker
 and the `openbot-auth-test` D1 database.
@@ -323,6 +327,12 @@ ticket names `REMOTE_SIGNAL_URL`, as before.
   until it sends that home's URL as `failedSignalUrl`. Session tickets of the host name the same
   home. Other host tickets (ingress, the webhook relay, released hosts) and hosts with no home use
   `REMOTE_SIGNAL_URL`, which stays the entry Signal.
+- `REMOTE_SIGNAL_HOME_LOCATIONS`: the place of each home, as `id=latitude:longitude,...`, for example
+  `a=60.17:24.94,us=37.34:-121.89`. Empty means no places. Otherwise it must name each home of
+  `REMOTE_SIGNAL_HOMES` one time, or each ticket request fails with `503 remote_not_configured`. With
+  places, a host gets one of the homes at most 1000 km farther from it than the nearest home, from the
+  Cloudflare request location. A host keeps its home while that home is near; otherwise it moves at its
+  next ticket. The variable has no effect when `REMOTE_SIGNAL_HOMES` is empty.
 - `REMOTE_AUTH_WEBHOOK_URLS`: each Signal that gets the auth events, as `url,url`. Empty means
   `REMOTE_AUTH_WEBHOOK_URL` only. The outbox deletes an event when each URL accepted it, and sends it
   again only to the URLs that failed.

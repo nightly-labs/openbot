@@ -13,7 +13,9 @@ import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { SettingsModal } from "../src/features/settings/SettingsModal";
 import type { SettingsTab } from "../src/features/settings/settings-tabs";
 import type { CodexLiveAccess } from "../src/features/speech/codex-live-access";
-import { STORY_SERVERS } from "../src/preview/fixtures";
+import { LayoutProvider } from "../src/layout";
+import { PlatformProvider } from "../src/platform";
+import { STORY_AGENTS, STORY_SERVERS } from "../src/preview/fixtures";
 import { createMockBilling } from "../src/preview/mock-billing";
 import type { MockVoiceOptions } from "../src/preview/mock-voice";
 import { createMockOpenBot } from "./mock-openbot";
@@ -47,6 +49,33 @@ const storyUpdateStatus: UpdateStatus = {
   errorCode: null,
 };
 
+function storyInitialUpdateStatus(props: {
+  scheduledRestart?: UpdateStatus["scheduledRestart"];
+  stagedVersion?: string;
+}): UpdateStatus {
+  if (props.scheduledRestart)
+    return {
+      ...storyUpdateStatus,
+      phase: "ready",
+      availableVersion: "0.3.0",
+      scheduledRestart: props.scheduledRestart,
+    };
+  if (props.stagedVersion)
+    return {
+      ...storyUpdateStatus,
+      phase: "up-to-date",
+      checkedAt: new Date().toISOString(),
+      stagedVersion: props.stagedVersion,
+    };
+  return storyUpdateStatus;
+}
+
+const storyAgentDock = {
+  server: { id: STORY_SERVERS[0].id, name: STORY_SERVERS[0].name },
+  agents: STORY_AGENTS,
+  hiddenAgentIds: new Set<string>(),
+};
+
 function SettingsModalStory(props: {
   initialOpen: boolean;
   /** Adds the Hosted servers tab with a stopped server and a server whose plan ended. */
@@ -57,10 +86,14 @@ function SettingsModalStory(props: {
   openTab?: SettingsTab;
   /** A restart that a server admin asked for. */
   scheduledRestart?: UpdateStatus["scheduledRestart"];
+  /** A release in its staged rollout that the automatic check did not offer. Check for updates gets it. */
+  stagedVersion?: string;
   /** The downloaded dictation models and the saved voice setting. */
   voice?: MockVoiceOptions;
   /** Whether Codex can open live voice. */
   codexLiveAccess?: CodexLiveAccess;
+  /** Adds the Agent dock tab with the agents of the first server. */
+  agentDock?: boolean;
 }) {
   const previousApi = window.openbot;
   const billingApi = createMockBilling();
@@ -81,11 +114,7 @@ function SettingsModalStory(props: {
   };
   const [open, setOpen] = createSignal(props.initialOpen);
   const [value, setValue] = createSignal({ ...storyGeneralSettings });
-  const [updateStatus, setUpdateStatus] = createSignal<UpdateStatus>(
-    props.scheduledRestart
-      ? { ...storyUpdateStatus, phase: "ready", availableVersion: "0.3.0", scheduledRestart: props.scheduledRestart }
-      : storyUpdateStatus,
-  );
+  const [updateStatus, setUpdateStatus] = createSignal<UpdateStatus>(storyInitialUpdateStatus(props));
   const [account, setAccount] = createSignal<CentralAuthUser>({ ...storyAccount });
   // The notification level and the mute of each server, as the server list of the app keeps them.
   const [servers, setServers] = createSignal<readonly ServerSummary[]>(STORY_SERVERS);
@@ -123,7 +152,13 @@ function SettingsModalStory(props: {
   }
 
   async function runUpdateAction(): Promise<void> {
-    setUpdateStatus({ ...storyUpdateStatus, phase: "up-to-date", checkedAt: new Date().toISOString() });
+    const checkedAt = new Date().toISOString();
+    // Check for updates gets a release that is in its staged rollout.
+    setUpdateStatus(
+      props.stagedVersion
+        ? { ...storyUpdateStatus, phase: "available", availableVersion: props.stagedVersion, checkedAt }
+        : { ...storyUpdateStatus, phase: "up-to-date", checkedAt },
+    );
   }
 
   /** A phone scans the code and signs in a few seconds after the code shows. */
@@ -152,76 +187,79 @@ function SettingsModalStory(props: {
   }
 
   return (
-    <>
-      <SettingsPageStory
-        title="Settings"
-        controls={
-          <Button variant="outline" type="button" onClick={() => setOpen(true)}>
-            Open settings
-          </Button>
-        }
-        onEscape={() => setOpen(false)}
-      >
-        {(page) => (
-          <SettingsModal
-            page={page()}
-            initialTab={props.initialTab}
-            openTab={props.openTab}
-            codexLiveAccess={props.codexLiveAccess}
-            onConnectCodex={() => setOpen(false)}
-            open={open()}
-            value={value()}
-            onValueChange={(next) => {
-              previewStorySoundSettings(value(), next);
-              setValue(next);
-            }}
-            appInfo={storyAppInfo}
-            servers={servers()}
-            onSetServerNotificationLevel={async (serverId, level) =>
-              updateServer(serverId, { notificationLevel: level })
-            }
-            onSetServerMuted={async (serverId, muted, durationMs) =>
-              updateServer(serverId, {
-                notificationsMuted: muted,
-                notificationsMutedUntil: muted && durationMs !== undefined ? Date.now() + durationMs : null,
-              })
-            }
-            updateStatus={updateStatus()}
-            onCancelScheduledRestart={async () => {
-              const { scheduledRestart: _cancelled, ...rest } = updateStatus();
-              setUpdateStatus(rest);
-            }}
-            account={account()}
-            onUpdateAccountName={updateAccountName}
-            onUpdateAccountAvatar={updateAccountAvatar}
-            onSetChatColor={async (chatColor) => {
-              setAccount((current) => ({ ...current, chatColor }));
-            }}
-            onCreateMobileConnect={createMobileConnect}
-            onCancelMobileConnect={async () => {
-              window.clearTimeout(scanTimer);
-              await mock.api.auth.cancelMobileConnect();
-            }}
-            onGetMobileConnectLink={mock.api.auth.getMobileConnectLink}
-            onCreateMobileConnectLink={mock.api.auth.createMobileConnectLink}
-            onRevokeMobileConnectLink={mock.api.auth.revokeMobileConnectLink}
-            onListMobileConnectedDevices={async () => mobileDevices()}
-            onListAccountSessions={mock.api.auth.listAccountSessions}
-            onRevokeAccountSession={mock.api.auth.revokeAccountSession}
-            onRevokeMobileConnectedDevice={async (sessionId) => {
-              setMobileDevices((current) => current.filter((device) => device.sessionId !== sessionId));
-            }}
-            onGetRemoteNetworkRoute={mock.api.getRemoteNetworkRoute}
-            onSetRemoteNetworkRoute={(route) => mock.api.setRemoteNetworkRoute({ route })}
-            onUpdateAction={runUpdateAction}
-            billingApi={billingApi}
-            hostedServersApi={props.hostedServers ? hostedServersApi : undefined}
-            onAddHostedServer={props.hostedServers ? fn() : undefined}
-          />
-        )}
-      </SettingsPageStory>
+    <PlatformProvider>
+      <LayoutProvider>
+        <SettingsPageStory
+          title="Settings"
+          controls={
+            <Button variant="outline" type="button" onClick={() => setOpen(true)}>
+              Open settings
+            </Button>
+          }
+          onEscape={() => setOpen(false)}
+        >
+          {(page) => (
+            <SettingsModal
+              page={page()}
+              initialTab={props.initialTab}
+              openTab={props.openTab}
+              codexLiveAccess={props.codexLiveAccess}
+              onConnectCodex={() => setOpen(false)}
+              open={open()}
+              value={value()}
+              onValueChange={(next) => {
+                previewStorySoundSettings(value(), next);
+                setValue(next);
+              }}
+              appInfo={storyAppInfo}
+              servers={servers()}
+              onSetServerNotificationLevel={async (serverId, level) =>
+                updateServer(serverId, { notificationLevel: level })
+              }
+              onSetServerMuted={async (serverId, muted, durationMs) =>
+                updateServer(serverId, {
+                  notificationsMuted: muted,
+                  notificationsMutedUntil: muted && durationMs !== undefined ? Date.now() + durationMs : null,
+                })
+              }
+              updateStatus={updateStatus()}
+              onCancelScheduledRestart={async () => {
+                const { scheduledRestart: _cancelled, ...rest } = updateStatus();
+                setUpdateStatus(rest);
+              }}
+              account={account()}
+              onUpdateAccountName={updateAccountName}
+              onUpdateAccountAvatar={updateAccountAvatar}
+              onSetChatColor={async (chatColor) => {
+                setAccount((current) => ({ ...current, chatColor }));
+              }}
+              onCreateMobileConnect={createMobileConnect}
+              onCancelMobileConnect={async () => {
+                window.clearTimeout(scanTimer);
+                await mock.api.auth.cancelMobileConnect();
+              }}
+              onGetMobileConnectLink={mock.api.auth.getMobileConnectLink}
+              onCreateMobileConnectLink={mock.api.auth.createMobileConnectLink}
+              onRevokeMobileConnectLink={mock.api.auth.revokeMobileConnectLink}
+              onListMobileConnectedDevices={async () => mobileDevices()}
+              onListAccountSessions={mock.api.auth.listAccountSessions}
+              onRevokeAccountSession={mock.api.auth.revokeAccountSession}
+              onRevokeMobileConnectedDevice={async (sessionId) => {
+                setMobileDevices((current) => current.filter((device) => device.sessionId !== sessionId));
+              }}
+              onGetRemoteNetworkRoute={mock.api.getRemoteNetworkRoute}
+              onSetRemoteNetworkRoute={(route) => mock.api.setRemoteNetworkRoute({ route })}
+              onUpdateAction={runUpdateAction}
+              billingApi={billingApi}
+              hostedServersApi={props.hostedServers ? hostedServersApi : undefined}
+              onAddHostedServer={props.hostedServers ? fn() : undefined}
+              agentDock={props.agentDock ? storyAgentDock : undefined}
+            />
+          )}
+        </SettingsPageStory>
+      </LayoutProvider>
       <Toaster />
-    </>
+    </PlatformProvider>
   );
 }
 
@@ -353,6 +391,11 @@ export const MobileConnect: Story = {
   render: () => <SettingsModalStory initialOpen initialTab="mobile-connect" />,
 };
 
+/** The agent dock above the other apps, with the switches for hiding it in the screen edge. */
+export const AgentDock: Story = {
+  render: () => <SettingsModalStory initialOpen agentDock initialTab="agent-dock" />,
+};
+
 /** No plan yet. Choose a plan: the mock then shows it as active, as after a Stripe payment. */
 export const Billing: Story = {
   render: () => <SettingsModalStory initialOpen initialTab="billing" />,
@@ -381,6 +424,10 @@ export const ScheduledRemoteUpdate: Story = {
       scheduledRestart={{ requestedBy: "Ada Lovelace", mode: "when-idle", waitingFor: ["agent-turn"] }}
     />
   ),
+};
+
+export const StagedRollout: Story = {
+  render: () => <SettingsModalStory initialOpen initialTab="updates" stagedVersion="0.3.0" />,
 };
 
 export const Interactive: Story = {

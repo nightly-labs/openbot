@@ -2,7 +2,8 @@
 // the login-shell PATH". OpenBot started the way Finder, the Dock or a login item starts it:
 // PATH=/usr/bin:/bin:/usr/sbin:/sbin. The Antigravity server starts by its absolute path, but the
 // stdio MCP servers that it starts are commands such as bare `node`, which must be found on the
-// login shell's PATH. The stand-in server runs a stand-in MCP command that is only in that folder.
+// login shell's PATH. The stand-in CLI answers `--version` as Antigravity CLI 1.5.4 does, and runs a
+// stand-in MCP command that is only in that folder.
 // The login shell is bash, set in $SHELL, and only `~/.bash_profile` adds the folder.
 // Bun reads HOME once, at start, so the cases run in a second process that starts with the stand-in
 // home. `bun run test:antigravity:login-path`; exit 0 = every case passed. Writes
@@ -13,7 +14,7 @@ import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import type { AgentClient } from "../src/backend/agent-client";
-import { ANTIGRAVITY_MANIFEST, type AntigravityCliInfo, resolveAntigravityCli } from "../src/backend/cli";
+import { type AntigravityCliInfo, resolveAntigravityCli } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { NO_PROVIDER_CREDENTIALS, requireProviderDriver } from "../src/backend/provider-drivers";
 
@@ -97,15 +98,14 @@ try {
   await writeFile(mcpCommand, `#!/bin/sh\nprintf %s "$PATH" > "${recorded}.tmp"\nmv "${recorded}.tmp" "${recorded}"\n`);
   await chmod(mcpCommand, 0o755);
 
-  // A managed install: the server is a native program by absolute path, and starts its MCP command by name.
-  const install = join(root, "antigravity");
-  const server = join(install, "bin", "localharness_external");
+  // A managed install: the CLI is a native program by absolute path, and starts its MCP command by name.
+  const server = join(root, "antigravity", "1.5.4", "bin", "antigravity");
   await mkdir(dirname(server), { recursive: true });
-  await writeFile(join(install, ANTIGRAVITY_MANIFEST), JSON.stringify({ version: "1.4.3" }));
   await writeFile(
     server,
     [
       "#!/bin/sh",
+      'if [ "$1" = "--version" ]; then echo 1.5.4; exit 0; fi',
       `${MCP_COMMAND} || { printf 'missing: %s' "$PATH" > "${recorded}.tmp"; mv "${recorded}.tmp" "${recorded}"; }`,
       "exec cat > /dev/null",
       "",

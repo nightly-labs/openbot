@@ -1,9 +1,9 @@
 // Electron side of `scripts/linux-gpu-fallback-e2e.ts`. It starts the GPU mode as `src/main/index.ts`
-// does and opens a window with a blurred backdrop.
+// does and opens a window with a blurred backdrop. It reports the WebGL renderer of the page.
 // It writes the state to `--ready-file` when the page has loaded. A "quit" line or the end of stdin
-// quits the app, so the app also quits when the test stops.
+// quits the app, so the app also quits when the test stops. A "crash" line crashes the main process.
 import { writeFileSync } from "node:fs";
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, crashReporter } from "electron";
 import { configureLinuxGpu } from "../src/main/linux-gpu-mode";
 
 function argument(name: string): string {
@@ -17,6 +17,8 @@ process.stdout.on("error", () => undefined);
 process.stderr.on("error", () => undefined);
 const userDataPath = argument("user-data");
 app.setPath("userData", userDataPath);
+// As `src/main/index.ts`, with its default `crashDumps` path: the next start reads the dumps.
+crashReporter.start({ uploadToServer: false });
 const mode = configureLinuxGpu({
   userDataPath,
   ownsInstance: true,
@@ -39,6 +41,15 @@ void app.whenReady().then(async () => {
         "<div style='margin:40px;height:200px;backdrop-filter:blur(24px)'>GPU fallback</div></body>",
     )}`,
   );
+  // The renderer name shows if WebGL runs on the GPU driver or on SwiftShader, or is null without WebGL.
+  const webglRenderer: string | null = await window.webContents.executeJavaScript(
+    `(() => {
+      const gl = document.createElement("canvas").getContext("webgl");
+      if (!gl) return null;
+      const info = gl.getExtension("WEBGL_debug_renderer_info");
+      return String(info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
+    })()`,
+  );
   writeFileSync(
     argument("ready-file"),
     JSON.stringify({
@@ -46,10 +57,13 @@ void app.whenReady().then(async () => {
       mode,
       hardwareAccelerationEnabled: app.isHardwareAccelerationEnabled(),
       gpuCompositing: app.getGPUFeatureStatus().gpu_compositing,
+      webglRenderer,
+      crashDumps: app.getPath("crashDumps"),
     }),
   );
   process.stdin.setEncoding("utf8");
   process.stdin.on("data", (chunk: string) => {
+    if (chunk.includes("crash")) process.crash();
     if (chunk.includes("quit")) app.quit();
   });
   process.stdin.on("end", () => app.quit());

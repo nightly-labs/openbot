@@ -6,6 +6,7 @@ import { StreamableHTTPClientTransport, StreamableHTTPError } from "@modelcontex
 import {
   AccessDeniedError,
   InvalidClientError,
+  InvalidClientMetadataError,
   UnauthorizedClientError,
 } from "@modelcontextprotocol/sdk/server/auth/errors.js";
 import type { FetchLike, Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
@@ -18,6 +19,7 @@ import { Effect, Result, Schema } from "effect";
 import { causeHelpers } from "./effect-boundary";
 import {
   isLoopback,
+  MCP_CLIENT_NAME,
   type McpOAuthAuthority,
   type McpSignIn,
   normalizeResource,
@@ -226,7 +228,11 @@ function describeProbeFailure(
 ): string {
   if (signIn?.cancelled()) return sourceText("error.backend.mcpSignInCancelled");
   if (signIn && isRegistrationRefusal(error, signIn)) return REGISTRATION_REFUSED;
-  if (signIn && httpStatus(error) === 401) return sourceText("error.backend.mcpSignInNotAccepted");
+  const status = httpStatus(error);
+  if (signIn && status === 401) return sourceText("error.backend.mcpSignInNotAccepted");
+  // The token endpoint refused the grant. Its status says nothing about the address the user typed.
+  if (signIn?.exchangeFailed() && status !== null && status >= 400 && status < 500)
+    return sourceText("error.backend.mcpSignInNotAccepted");
   // A key the user pasted into a header is theirs to fix; the sign-in would not replace it.
   if (challenge?.status === 401 && challenge.bearer && !hasCredentialHeader(config)) {
     const described = describeSignInChallenge(config.url, challenge.url, signInPlace);
@@ -397,7 +403,7 @@ function createTransport(
   }
   return new StdioClientTransport({
     command: server.command ?? config.command,
-    args: config.args,
+    args: server.args,
     // The resolved directory, not the stored one: process creation does not expand a leading `~`,
     // which the form's own example uses.
     ...(server.workingDirectory ? { cwd: server.workingDirectory } : {}),
@@ -607,6 +613,11 @@ function isAccessRefusal(status: number | null): boolean {
  *
  * RevenueCat answers each registration it did not approve with 400 `invalid_client` ("The client
  * is not registered.").
+ *
+ * Omnisend answers each name it did not approve with 400 `invalid_client_metadata` ("unknown
+ * application: OpenBot", #7722). That error also names metadata that OpenBot sent wrong, which the
+ * user cannot change either, but which this sentence would hide: only an answer that names OpenBot
+ * counts.
  */
 function isRegistrationRefusal(error: unknown, signIn: McpSignIn): boolean {
   if (signIn.registrationUnsupported()) return true;
@@ -618,7 +629,8 @@ function isRegistrationRefusal(error: unknown, signIn: McpSignIn): boolean {
   if (
     error instanceof AccessDeniedError ||
     error instanceof UnauthorizedClientError ||
-    error instanceof InvalidClientError
+    error instanceof InvalidClientError ||
+    (error instanceof InvalidClientMetadataError && error.message.includes(MCP_CLIENT_NAME))
   )
     return true;
   return isAccessRefusal(httpStatus(error));

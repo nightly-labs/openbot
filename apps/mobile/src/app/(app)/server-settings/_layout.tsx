@@ -39,6 +39,7 @@ export default function ServerSettingsLayout() {
       <Stack.Screen name="role" options={{ title: t("mobile.server.route.role") }} />
       <Stack.Screen name="audit" options={{ title: t("mobile.server.route.audit") }} />
       <Stack.Screen name="timezone" options={{ title: t("mobile.server.route.timezone") }} />
+      <Stack.Screen name="agents" options={{ title: t("mobile.server.route.agents") }} />
       {/* The page names its connector. */}
       <Stack.Screen name="connector" options={{ title: t("mobile.server.route.connectors") }} />
       <Stack.Screen
@@ -56,6 +57,7 @@ export default function ServerSettingsLayout() {
       <Stack.Screen name="provider" options={{ title: t("mobile.server.route.provider") }} />
       {/* The page names its provider. */}
       <Stack.Screen name="provider-models" options={{ title: t("mobile.server.route.providerModels") }} />
+      <Stack.Screen name="provider-key" options={{ title: t("mobile.server.providers.apiKey") }} />
       {/* The page names its provider, or says Add account. */}
       <Stack.Screen name="provider-sign-in" options={{ title: t("mobile.server.route.provider") }} />
       {/* The page names its account. */}
@@ -67,16 +69,22 @@ export default function ServerSettingsLayout() {
       <Stack.Screen name="custom-provider" options={{ title: t("mobile.server.route.provider") }} />
       <Stack.Screen name="mcp" options={{ title: t("mobile.server.route.mcp") }} />
       <Stack.Screen name="mcp-server" options={{ title: t("mobile.server.route.mcpServer") }} />
+      {/* The page names its MCP server. */}
+      <Stack.Screen name="mcp-server-agents" options={{ title: t("mobile.server.mcp.access.agents") }} />
       <Stack.Screen name="crop-logo" options={{ title: t("mobile.server.route.cropLogo") }} />
       <Stack.Screen name="vault" options={{ title: t("mobile.server.route.vault") }} />
       {/* The page names its item. */}
       <Stack.Screen name="vault-item" options={{ title: t("mobile.server.route.vault") }} />
+      <Stack.Screen name="vault-two-step" options={{ title: t("mobile.server.vault.twoStep.setupTitle") }} />
+      <Stack.Screen name="vault-two-step-scan" options={{ title: t("mobile.server.vault.twoStep.scan") }} />
+      <Stack.Screen name="vault-two-step-check" options={{ title: t("mobile.server.vault.twoStep.checkTitle") }} />
       <Stack.Screen name="import" options={{ title: t("mobile.server.route.import") }} />
       {/* The page names its source. */}
       <Stack.Screen name="import-guide" options={{ title: t("mobile.server.route.import") }} />
       <Stack.Screen name="transfer" options={{ title: t("mobile.server.route.transfer") }} />
       <Stack.Screen name="transfer-export" options={{ title: t("mobile.server.route.transferExport") }} />
       <Stack.Screen name="transfer-import" options={{ title: t("mobile.server.route.transferImport") }} />
+      <Stack.Screen name="transfer-copy" options={{ title: t("mobile.server.route.transferCopy") }} />
       <Stack.Screen name="browser-profiles" options={{ title: t("mobile.server.route.browserProfiles") }} />
       {/* The page names its profile. */}
       <Stack.Screen name="browser-profile" options={{ title: t("mobile.server.route.browserProfiles") }} />

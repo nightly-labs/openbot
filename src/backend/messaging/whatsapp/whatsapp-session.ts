@@ -10,6 +10,7 @@ import {
   fetchLatestWaWebVersion,
   type GroupMetadata,
   generateMessageIDV2,
+  jidNormalizedUser,
   type MiscMessageGenerationOptions,
   makeCacheableSignalKeyStore,
   proto,
@@ -41,6 +42,7 @@ export interface WhatsAppSocket {
   end(error: Error | undefined): void;
   groupFetchAllParticipating(): Promise<{ [jid: string]: GroupMetadata }>;
   groupMetadata(jid: string): Promise<GroupMetadata>;
+  onWhatsApp(...phoneNumbers: string[]): Promise<Array<{ jid: string; exists: boolean }> | undefined>;
   updateMediaMessage(message: WAMessage): Promise<WAMessage>;
   signalRepository: { lidMapping: { getPNForLID(lid: string): Promise<string | null> } };
 }
@@ -334,6 +336,20 @@ export class WhatsAppSession {
     });
     this.#groups.set(jid, { metadata, at: this.#now() });
     return metadata;
+  });
+
+  /** The user JIDs, without a device, that WhatsApp has an account for, of the phone numbers in digits. */
+  readonly registered = Effect.fn("WhatsAppSession.registered")(function* (
+    this: WhatsAppSession,
+    numbers: readonly string[],
+  ) {
+    const socket = this.socket();
+    if (!socket) return yield* new MessagingAdapterError({ cause: new Error("not_connected") });
+    const found = yield* Effect.tryPromise({
+      try: () => socket.onWhatsApp(...numbers),
+      catch: (cause) => new MessagingAdapterError({ cause }),
+    });
+    return (found ?? []).filter((result) => result.exists).map((result) => jidNormalizedUser(result.jid));
   });
 
   readonly groups = Effect.fn("WhatsAppSession.groups")(function* (this: WhatsAppSession) {

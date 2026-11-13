@@ -225,8 +225,12 @@ async function post(threads: MessagingThreads, connection: string, args: Dynamic
   const before = { requests: hostRequests.length, posts: posts.length };
   const response = await runCauseEffect(
     // The router passes the calling agent; a Discord post records no pings, so any id does.
-    threads.outboundTool("agent-embeds-e2e", "messaging_post", { connection, place: CHANNEL, ...args }, () =>
-      Effect.succeed([]),
+    threads.outboundTool(
+      "agent-embeds-e2e",
+      { threadId: "thread-embeds-e2e", turnId: "turn-embeds-e2e" },
+      "messaging_post",
+      { connection, place: CHANNEL, ...args },
+      () => Effect.succeed([]),
     ),
   );
   const text = response.contentItems[0]?.text ?? "{}";

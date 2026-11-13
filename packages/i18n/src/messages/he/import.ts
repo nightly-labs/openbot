@@ -33,8 +33,12 @@ export const messages = {
   "import.guide.hermesTitle": "העברת הסוכנים שלך מ-Hermes Agent",
   "import.guide.hermesLede":
     "כל פרופיל Hermes הופך לסוכן. אפשר לקרוא את הפרופילים במחשב הזה, או לתת למיומנות הייצוא ב-Hermes לארוז אותם בקובץ .zip אחד.",
+  "import.guide.hermesLedeServer":
+    "כל פרופיל Hermes הופך לסוכן. אפשר לקרוא את הפרופילים בשרת, או לתת למיומנות הייצוא ב-Hermes לארוז אותם בקובץ .zip אחד.",
+  "import.guide.hermesLedeExport": "כל פרופיל של Hermes הופך לסוכן. מיומנות הייצוא ב-Hermes אורזת אותם לקובץ zip. אחד.",
   "import.guide.hermesSetupLabel": "איך מביאים את הפרופילים",
   "import.guide.setupFolder": "קריאה מהמחשב הזה",
+  "import.guide.setupServer": "קריאה מהשרת",
   "import.guide.setupCommand": "התקנה בפקודה",
   "import.guide.hermesStepFolder": "קריאת תיקיית Hermes",
   "import.guide.hermesStep1": "הוספת מיומנות הייצוא ל-Hermes",
@@ -85,7 +89,10 @@ export const messages = {
   "import.result.warnings": "חלק מהפריטים לא הועברו",
   "import.source.title": "איפה הסוכנים שלך עכשיו?",
   "import.source.lede": "OpenBot מעתיק אותם למחשב הזה. תראו כל פריט לפני שמשהו משתנה.",
+  "import.source.ledeServer": "OpenBot מעתיק אותם לשרת. תראו כל פריט לפני שמשהו משתנה.",
   "import.source.hermesNote": "קריאת תיקיית Hermes במחשב הזה, או ייצוא קובץ .zip מ-Hermes.",
+  "import.source.hermesNoteServer": "קריאת תיקיית Hermes בשרת, או ייצוא קובץ .zip מ-Hermes.",
+  "import.source.hermesNoteExport": "יש לייצא קובץ zip. מ-Hermes.",
   "import.source.grokNote": "בענן. סוכן ייצוא שם יוצר קובץ .zip.",
   "import.source.transfer": "מחשב OpenBot אחר",
   "import.source.transferNote": "העברה מעבירה סוכנים והגדרות יחד.",
@@ -93,6 +100,9 @@ export const messages = {
   "import.hermes.readFailed": "לא ניתן לקרוא את תיקיית Hermes",
   "import.hermes.notFound": "אין פרופילי Hermes במחשב הזה",
   "import.hermes.notFoundNote": "אם Hermes משתמש בתיקייה אחרת, למשל כזו ש-HERMES_HOME מגדיר, יש לבחור את התיקייה הזו.",
+  "import.hermes.notFoundServer": "אין פרופילי Hermes בשרת הזה",
+  "import.hermes.notFoundServerNote":
+    "OpenBot קורא את תיקיית Hermes של השרת. כדי לייבא את Hermes מהמחשב הזה, יש לייצא קובץ .zip מ-Hermes.",
   "import.hermes.chooseFolder": "בחירת תיקיית Hermes",
   "import.hermes.chooseAnother": "בחירת תיקייה אחרת",
   "import.hermes.title": "סוכנים מ-Hermes Agent",

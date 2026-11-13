@@ -45,8 +45,6 @@ export interface AcpConnectionOptions {
   label(): string;
   redact(text: string): string;
   diagnostic(message: string, origin: DiagnosticOrigin): void;
-  /** A stderr line that must not become the exit detail, such as a sign-in prompt with OAuth state. */
-  privateDiagnostic?: RegExp | undefined;
   exit(error: Error): void;
   client(): Client;
 }
@@ -57,6 +55,7 @@ export class AcpConnection {
   #connection: ClientSideConnection | null = null;
   #ended: Deferred.Deferred<ProcessEnd> | null = null;
   #stopping = false;
+  #lastOutputAt = 0;
   readonly #stoppedProcesses = new WeakSet<ChildProcessWithoutNullStreams>();
   constructor(private readonly options: AcpConnectionOptions) {}
   get running(): boolean {
@@ -64,6 +63,10 @@ export class AcpConnection {
   }
   get ended(): Deferred.Deferred<ProcessEnd> | null {
     return this.#ended;
+  }
+  /** `Date.now()` when the process last wrote to its output or its error stream, or when it started. */
+  get lastOutputAt(): number {
+    return this.#lastOutputAt;
   }
   get connection(): ClientSideConnection | null {
     return this.#connection;
@@ -93,6 +96,12 @@ export class AcpConnection {
       }),
     );
     this.#process = child;
+    this.#lastOutputAt = Date.now();
+    const wrote = () => {
+      this.#lastOutputAt = Date.now();
+    };
+    child.stdout.on("data", wrote);
+    child.stderr.on("data", wrote);
     registerProviderProcess(child, this.options.provider);
     // A start that times out says nothing of the process. These lines show whether it ran, how long
     // it took to write anything, and how it ended, such as a Windows server that unpacks itself (#2311).
@@ -131,10 +140,8 @@ export class AcpConnection {
     const diagnostics = createDiagnosticStream({
       redact: (text) => this.options.redact(text),
       emit: (message) => {
-        if (!this.options.privateDiagnostic?.test(message)) {
-          lastDiagnostic = message;
-          if (crashDiagnostic === null && CRASH_LINE.test(message)) crashDiagnostic = message;
-        }
+        lastDiagnostic = message;
+        if (crashDiagnostic === null && CRASH_LINE.test(message)) crashDiagnostic = message;
         this.options.diagnostic(message, { duringStop: this.#stoppedProcesses.has(child) });
       },
     });
@@ -242,8 +249,12 @@ export class AcpConnection {
   }
 }
 
-/** Ends the agent process. A `.cmd` agent runs under `cmd.exe`, so Windows stops the whole tree. */
+/**
+ * Ends the agent process. A `.cmd` agent runs under `cmd.exe`, so Windows stops the whole tree. Its
+ * input stays open there: the end of input can end the wrapper first, and `taskkill /T` then finds
+ * no children (#6470). Node closes the input when the process exits.
+ */
 const endProcess = Effect.fn("AcpAgentClient.endProcess")(function* (child: ChildProcessWithoutNullStreams) {
-  child.stdin.end();
+  if (process.platform !== "win32") child.stdin.end();
   yield* endProcessTree(child).pipe(Effect.mapError((failure) => providerFailure(failure.cause)));
 });

@@ -406,6 +406,9 @@ export const messages = {
   "connector.whatsapp.ownNumber": "Личный номер",
   "connector.whatsapp.ownNumberDescription":
     "Писать могут только вы в чате «Сообщение себе» и люди, которым вы разрешили. Выключите, если номер только для OpenBot.",
+  "connector.whatsapp.workingMessage": "Сообщение «Уже работаю…»",
+  "connector.whatsapp.workingMessageDescription":
+    "OpenBot отправляет его, пока агент работает, а затем заменяет ответом. Выключите, чтобы отправлять только ответ.",
   "connector.whatsapp.orchestratorTitle": "Оркестратор WhatsApp",
   "connector.whatsapp.orchestratorDescription":
     "Этот агент получает сообщения для OpenBot со всех ваших привязанных номеров. Короткие он обрабатывает сам, остальную работу передаёт нужному агенту и отвечает в WhatsApp.",

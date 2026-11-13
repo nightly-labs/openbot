@@ -18,7 +18,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { Deferred, Effect, Exit, Result } from "effect";
+import { Deferred, Effect, Exit, Result, Semaphore } from "effect";
 import { agentDisplayEnvironment } from "./agent-display";
 import { CuaDriverActionTap, type ObservedAction, type ObservedPointer } from "./cua-driver-action-tap";
 import { CUA_DRIVER_VENDOR_CALLS_OFF } from "./cua-driver-artifact";
@@ -335,10 +335,10 @@ export class CuaDriverRuntime {
   /**
    * The address the agents are handed: OpenBot's own while it listens, the daemon's own otherwise.
    *
-   * The tap forwards every request unchanged, so the agent gets the same tools either way - and a
-   * tap that failed to listen costs the rim its answer, never the agent its tools. What it does
-   * cost is the JSON copy the tap adds to each tool answer, which a provider that shows the model
-   * only the result text needs to read window ids and snapshot ids.
+   * The tap forwards every request unchanged, so a tap that failed to listen costs the rim its
+   * answer, never the agent a tool that works. What it does cost is the JSON copy the tap adds to
+   * each tool answer, which a provider that shows the model only the result text needs to read
+   * window ids and snapshot ids, and the removal of the driver's cursor tools from the tool list.
    */
   tapAddress(): string {
     return this.#tap.address ?? this.socketPath();
@@ -454,7 +454,14 @@ export class CuaDriverRuntime {
     return this.#lifecycle.stop(() => this.#stop());
   }
 
-  readonly state = Effect.fn("CuaDriver.state")(function* (
+  /** One check at a time, because a check can stop the daemon that another check is asking. */
+  readonly #checks = Semaphore.makeUnsafe(1);
+
+  state(): Effect.Effect<ComputerUseState, CuaDriverFailure> {
+    return this.#checks.withPermit(this.#check());
+  }
+
+  readonly #check = Effect.fn("CuaDriver.state")(function* (
     this: CuaDriverRuntime,
   ): Effect.fn.Return<ComputerUseState, CuaDriverFailure> {
     if (!this.#options.supported) return this.#publish(this.#initialState());
@@ -493,7 +500,12 @@ export class CuaDriverRuntime {
     const granted = requiredPermissions(this.#options.platform).every((id) =>
       permissions.some((p) => p.id === id && p.granted),
     );
-    return this.#publish({ status: granted ? "ready" : "permissions-required", permissions, message: null });
+    const state = this.#publish({ status: granted ? "ready" : "permissions-required", permissions, message: null });
+    // macOS keeps a "not granted" answer for the life of the process that asked (#7937), so this
+    // daemon would not see a grant the user gives now. The next check starts a new one. The stop
+    // comes after the publish, which has already taken the entry back from the agents.
+    if (!granted) yield* this.stop().pipe(Effect.catch(() => Effect.void));
+    return state;
   }).bind(this);
 
   /**

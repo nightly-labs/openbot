@@ -107,9 +107,13 @@ export type AgentEvent =
   | { type: "vault-changed" }
   /** The named browser profiles of this server, or the profile of one of its agents, changed. */
   | { type: "browser-profiles-changed" }
+  /** A Library folder of this server, or the folder of one of its files, changed. Views read the folders again. */
+  | { type: "library-folders-changed" }
   /** Whether a provider account of this server works on credits changed. Views read the usage again. */
   | { type: "usage-credits-changed" }
   | { type: "agent-session-settings-changed"; agentId: string }
+  /** A pin of a chat of the agent changed. Views read the list of pins again. */
+  | { type: "message-pins-changed"; agentId: string }
   | { type: "channel-memories-changed"; channelId: string }
   | { type: "channel-routines-changed"; channelId: string }
   | { type: "sidebar-layout-changed"; layout: SidebarLayoutSnapshot }
@@ -189,12 +193,13 @@ export type AgentEvent =
   | { type: "turn-started"; agentId: string; threadId: string; turnId: string; origin?: AgentTurnOrigin }
   | AgentTurnCompletedEvent
   /**
-   * A non-quiet turn in a routine thread ended. `AgentTasks` keeps the turn's own `turn-completed`, so
-   * the state of the agent's chat does not change. The desktop notification, the phone notification and
-   * the completion sound read `turn` from this event, and a click opens the routine thread. Local only:
-   * the released Team API event adapters do not carry it.
+   * A non-quiet turn in a side thread ended. `AgentTasks` keeps the turn's own `turn-completed`, so
+   * the state of the agent's chat does not change. `routine` is true for the thread of a routine: the
+   * desktop notification, the phone notification and the completion sound read `turn` from this event,
+   * and a click opens the routine thread. For another side thread, only the phone notification reads
+   * it, and a tap opens the thread. Local only: the released Team API event adapters do not carry it.
    */
-  | { type: "routine-thread-turn-completed"; taskId: string; turn: AgentTurnCompletedEvent }
+  | { type: "thread-turn-completed"; taskId: string; routine: boolean; turn: AgentTurnCompletedEvent }
   | {
       type: "prompt";
       requestId: string | number;
@@ -202,6 +207,12 @@ export type AgentEvent =
       threadId: string;
       turnId: string;
       questions: AgentPromptQuestion[];
+      /**
+       * No turn waits for this question: the provider could not wait longer, so the card stays after
+       * its turn ends, and the answer starts a new turn. A client sees it in the runtime snapshot's
+       * `pendingPrompts`. Local only: the released Team API adapters do not carry it.
+       */
+      detached?: true;
     }
   | {
       type: "agent-input-resolved";
@@ -286,6 +297,7 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
     case "routines-changed":
       return isString(value.agentId) && value.agentId.length > 0 && value.agentId.length <= INPUT_LIMITS.identifier;
     case "agent-session-settings-changed":
+    case "message-pins-changed":
     case "skills-changed":
     case "routine-flows-changed":
       return isIdentifier(value.agentId);
@@ -293,6 +305,7 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
       return isIdentifier(value.workflowId) && (value.agentId === undefined || isIdentifier(value.agentId));
     case "vault-changed":
     case "browser-profiles-changed":
+    case "library-folders-changed":
     case "usage-credits-changed":
       return true;
     case "channel-memories-changed":
@@ -381,9 +394,10 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
         (value.activity === undefined || isBoundedString(value.activity, INPUT_LIMITS.identifier)) &&
         (value.error === undefined || isBoundedString(value.error, CONVERSATION_TRACE_TEXT_LIMIT))
       );
-    case "routine-thread-turn-completed":
+    case "thread-turn-completed":
       return (
         isIdentifier(value.taskId) &&
+        typeof value.routine === "boolean" &&
         isDynamicRecord(value.turn) &&
         value.turn.type === "turn-completed" &&
         isAgentEvent(value.turn)
@@ -406,7 +420,8 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
         isString(value.turnId) &&
         Array.isArray(value.questions) &&
         value.questions.length <= INPUT_LIMITS.promptQuestions &&
-        value.questions.every(isAgentPromptQuestion)
+        value.questions.every(isAgentPromptQuestion) &&
+        (value.detached === undefined || value.detached === true)
       );
     case "agent-input-resolved":
       return (

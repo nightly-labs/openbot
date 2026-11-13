@@ -486,6 +486,10 @@ export function mockWorkflows(
       emit(input.workflowId);
       return { secret: `whsec_preview_${crypto.randomUUID()}` };
     },
+    // The preview keeps no files: the draft id names the kept picture.
+    keepPicture: async (draftId) => draftId,
+    mediaProviders: async () => ({ sunra: true }),
+    mediaCredits: async () => ({ sunra: { available: 1240, quota: 2000 } }),
     githubCatalog: async () => structuredClone(PREVIEW_GITHUB_CATALOG),
     githubOptions: async (input) => {
       if (!PREVIEW_GITHUB_CATALOG.repositories.some((repository) => repository.fullName === input.repository))

@@ -384,6 +384,9 @@ export const messages = {
   "connector.whatsapp.ownNumber": "Número personal",
   "connector.whatsapp.ownNumberDescription":
     "Solo pueden escribir tu chat «Envíate un mensaje» y las personas que permitas. Desactívalo para un número solo para OpenBot.",
+  "connector.whatsapp.workingMessage": "Mensaje «Trabajando en ello…»",
+  "connector.whatsapp.workingMessageDescription":
+    "OpenBot lo envía mientras el agente trabaja y luego lo sustituye por la respuesta. Desactívalo para enviar solo la respuesta.",
   "connector.whatsapp.orchestratorTitle": "Orquestador de WhatsApp",
   "connector.whatsapp.orchestratorDescription":
     "Este agente recibe los mensajes para OpenBot de todos tus números vinculados. Responde él mismo a los cortos, asigna el resto del trabajo al agente adecuado y responde en WhatsApp.",

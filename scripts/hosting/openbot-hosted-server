@@ -150,12 +150,14 @@ export GNOME_KEYRING_CONTROL
 # display, and OpenBot shows its windows on a virtual display. xvfb-run adds the key of that display
 # to ~/.Xauthority, which already has the key of :0, so OpenBot and the processes it starts can open
 # both. lightdm keeps the other keys when it writes the file. After a resume, boat can start the
-# session after this service. A sandbox that has no desktop session uses two virtual displays.
+# session after this service. A sandbox that has no desktop session uses two virtual displays. A
+# machine with no display manager, such as a VPS of the pool, never has the session, and does not
+# wait for it.
 
 # OpenBot writes its PID for `--stop` before it starts.
 openbot=(bash -c 'echo "$$" >"$XDG_RUNTIME_DIR/openbot.pid" && exec "$@"' openbot-hosted-server
   /opt/OpenBot/app/openbot --password-store=gnome-libsecret)
-if [ "$mode" = hosted ]; then
+if [ "$mode" = hosted ] && [ -e /etc/systemd/system/display-manager.service ]; then
   # xauth locks ~/.Xauthority with ~/.Xauthority-c and ~/.Xauthority-l, and it does not remove a
   # lock that a stopped xauth left. xvfb-run then waits 20 to 40 s for xauth and exits with
   # status 1 at each start, and the unit starts again and again. An xauth holds the lock only while

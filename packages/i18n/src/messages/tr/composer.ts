@@ -83,6 +83,7 @@ export const messages = {
   "composer.placeholder.answer": "Yanıtınızı yazın",
   "composer.add.label": "İsteme ekle",
   "composer.add.files": "Dosya ekle",
+  "composer.add.teach": "Görev öğret",
   "composer.add.skill": "Bir beceri kullan",
   "composer.upload.cancel": "Yüklemeyi iptal et",
   "composer.upload.uploading": "{name} yükleniyor",
