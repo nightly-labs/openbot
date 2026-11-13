@@ -101,7 +101,10 @@ the worker claims after it loaded, so the origin stays tainted in that session. 
 page is open, no page of its origin in the same session fills. When it ends, a same-origin page of a
 connected popup or opener keeps that mark, each other open page of the origin must navigate before
 its own fill, and OpenBot clears the origin's Cache Storage and service workers. A fill waits for that purge, and runs it again when no other page of
-the origin is open. A page whose navigation a service worker handled must reload once. Cookies, localStorage and
+the origin is open. A page whose navigation a service worker handled must reload once with `navigate direction=reload`.
+That reload uses `reloadIgnoringCache`, which skips the service worker, also when the page registered it
+again after the purge (#8017). A normal reload, a reload from `evaluate`, or opening the address again
+can go through the worker and refuse the fill again. Cookies, localStorage and
 IndexedDB stay, because clearing them signs the user out and deletes offline data. So a site whose
 own code runs a stored value as code is not protected, as from any other script that the site
 loads. The same rules apply to `fill_card`. A login matches by 1Password's autofill rule, on the registrable domain
