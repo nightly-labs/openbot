@@ -25,6 +25,9 @@ const MEDIA_TYPES: ReadonlySet<string> = new Set([
   "image/webp",
   "image/avif",
   "audio/mpeg",
+  "audio/mp4",
+  "audio/wav",
+  "audio/aac",
   "video/quicktime",
   "video/mp4",
 ]);

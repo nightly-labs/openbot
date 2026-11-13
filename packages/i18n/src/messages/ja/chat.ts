@@ -337,6 +337,8 @@ export const messages = {
   "chat.video.time": "{elapsed} / {duration}",
   "chat.video.download": "動画をダウンロード",
   "chat.video.open": "動画を開く",
+  "chat.video.mute": "動画をミュート",
+  "chat.video.unmute": "動画のミュートを解除",
   "chat.message.you": "あなた",
   "chat.message.agentFallback": "エージェント",
   "chat.message.memberFallback": "チームメンバー",

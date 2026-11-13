@@ -68,6 +68,8 @@ export const messages = {
     "Die Komprimierung macht diesen Chat nicht kleiner: Nach zwei Komprimierungen nutzt er noch {percent}% des Kontextfensters des Modells, daher komprimiert OpenBot ihn nicht mehr. Tools und Anweisungen nutzen den größten Teil des Fensters. Schalte die MCP-Server oder die Computersteuerung aus, die dieser Agent nicht braucht, oder wähle ein Modell mit größerem Fenster. Starte dann einen neuen Chat.",
   "error.backend.contextCompactionStopped":
     "Zwei Komprimierungen dieses Chats sind nacheinander fehlgeschlagen, daher komprimiert OpenBot ihn nicht mehr automatisch. Jeder Versuch sendet den ganzen Chat an das Modell und verbraucht dein Planlimit. Wähle „Jetzt komprimieren“, um es erneut zu versuchen, oder starte einen neuen Chat.",
+  "error.backend.providerModelAtCapacity":
+    "Das Modell ist ausgelastet. Der Anbieter versucht es in einigen Minuten erneut. Um sofort weiterzumachen, stoppe den Durchlauf und wähle ein anderes Modell.",
   "error.backend.providerRetrying":
     "Der Anbieter hat diese Anfrage {attempts}-mal nicht ausgeführt und versucht es erneut. Wenn der Agent nicht weitermacht, stoppe den Durchlauf.",
   "error.backend.providerRetryingLargeContext":
@@ -381,6 +383,8 @@ export const messages = {
     "Der Proxy {name} hat die Anmeldung abgelehnt, daher wurde die Seite nicht geöffnet.",
   "error.backend.browserProxyComputerUnreachable":
     "Der Computer dieses Profils antwortet nicht, daher wurde die Seite nicht geöffnet.",
+  "error.backend.browserProxyComputerLocalAddress":
+    "Der Computer, den dieses Profil verwendet, öffnet nur öffentliche Websites. Adressen in einem lokalen Netzwerk öffnet er nicht, daher wurde die Seite nicht geöffnet.",
   "error.backend.browserCertificateUntrusted":
     "Das Sicherheitszertifikat dieser Website ist nicht vertrauenswürdig, daher wurde die Seite nicht geöffnet.",
   "error.backend.browserLowMemory":

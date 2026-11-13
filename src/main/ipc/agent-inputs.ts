@@ -55,6 +55,7 @@ import {
   type ReadAgentTaskAroundInput,
   type ReadAgentTaskPageInput,
   type ReadConversationPageInput,
+  type ReadPendingApprovalInput,
   type RenameAgentTaskInput,
   type ReorderQueueInput,
   type RespondToApprovalInput,
@@ -1103,6 +1104,22 @@ export function parsePromptResponse(value: unknown): RespondToPromptInput {
     answers[key] = answer;
   }
   return { requestId: value.requestId, answers };
+}
+
+export function parseReadPendingApprovalInput(value: unknown): ReadPendingApprovalInput {
+  if (
+    !isObject(value) ||
+    !isString(value.agentId) ||
+    value.agentId.length === 0 ||
+    value.agentId.length > INPUT_LIMITS.identifier ||
+    !(
+      (isString(value.requestId) && value.requestId.length > 0 && value.requestId.length <= INPUT_LIMITS.identifier) ||
+      (isNumber(value.requestId) && Number.isFinite(value.requestId))
+    )
+  ) {
+    throw new Error("Invalid pending approval request.");
+  }
+  return { agentId: value.agentId, requestId: value.requestId };
 }
 
 export function parseApprovalResponse(value: unknown): RespondToApprovalInput {

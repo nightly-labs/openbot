@@ -28,7 +28,9 @@ export type AppUpdate = { kind: "ready"; id: string } | { kind: "store"; id: str
 const IOS_STORE_URL = "itms-apps://apps.apple.com/app/id6807024266";
 const IOS_STORE_WEB_URL = "https://apps.apple.com/app/id6807024266";
 const ANDROID_STORE_URL = "market://details?id=run.openbot.mobile";
-const ANDROID_STORE_WEB_URL = "https://play.google.com/store/apps/details?id=run.openbot.mobile";
+// A phone with no Google Play has the app from the APK. The download page has the APK and the
+// Google Play link, so it is the fallback for each of the two.
+const ANDROID_STORE_WEB_URL = "https://openbot.run/download/android";
 
 /** The public changelog, for when the notes cannot load. */
 export const MOBILE_CHANGELOG_URL = "https://openbot.run/changelog?platform=mobile";

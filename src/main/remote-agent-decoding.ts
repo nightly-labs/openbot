@@ -1,11 +1,13 @@
 import {
   type AgentSessionSettings,
   decodeAgentAnalytics,
+  decodeGithubSkillSource,
   decodeHostAnalytics,
   decodeHostProviderAccounts,
   decodeInstalledSkills,
   decodeProviderUsageResetOutcome,
   decodeProviderUsageResets,
+  type GithubSkillSource,
   type HostDefaultProvider,
   type HostProviderAccounts,
   isAgentHostSettings,
@@ -273,6 +275,10 @@ export function decodeAgentSummaries(value: unknown): ClientAgentSummary[] {
 
 export function decodeInstalledSkillsFromHost(value: unknown): InstalledSkill[] {
   return decodeInstalledSkills(value);
+}
+
+export function decodeGithubSkillSourceFromHost(value: unknown): GithubSkillSource {
+  return decodeGithubSkillSource(value);
 }
 
 export function decodeAgentMemory(value: unknown): AgentMemory {

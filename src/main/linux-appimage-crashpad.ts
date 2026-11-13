@@ -6,7 +6,7 @@ import { readdirSync, readlinkSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 // `--appimage-extract-and-run` shares one extracted folder among launches and never unmounts it.
-function runsFromOwnMount(directory: string): boolean {
+export function runsFromOwnMount(directory: string): boolean {
   try {
     return statSync(directory).dev !== statSync(dirname(directory)).dev;
   } catch {

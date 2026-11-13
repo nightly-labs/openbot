@@ -64,6 +64,8 @@ export const messages = defineMessages("error.backend", {
     "Compaction does not make this chat smaller: after two compactions it still uses {percent}% of the model's context window, so OpenBot stops compacting it. Tools and instructions use most of the window. Turn off the MCP servers or computer use that this agent does not need, or select a model with a larger window. Then start a new chat.",
   "error.backend.contextCompactionStopped":
     "Two compactions of this chat failed in a row, so OpenBot stops compacting it automatically. Each try sends the whole chat to the model and uses your plan limit. Select Compact now to try again, or start a new chat.",
+  "error.backend.providerModelAtCapacity":
+    "The model is at capacity. The provider tries again in a few minutes. To continue now, stop the turn and choose a different model.",
   "error.backend.providerRetrying":
     "The provider failed this request {attempts} times and tries again. If the agent does not continue, stop the turn.",
   "error.backend.providerRetryingLargeContext":
@@ -355,6 +357,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserProxySignInRefused": "The proxy {name} refused the sign-in, so the page did not open.",
   "error.backend.browserProxyComputerUnreachable":
     "The computer that this profile uses does not answer, so the page did not open.",
+  "error.backend.browserProxyComputerLocalAddress":
+    "The computer that this profile uses opens only public sites. It does not open addresses on a local network, so the page did not open.",
   "error.backend.browserCertificateUntrusted":
     "The security certificate of this site is not trusted, so the page did not open.",
   "error.backend.browserLowMemory":

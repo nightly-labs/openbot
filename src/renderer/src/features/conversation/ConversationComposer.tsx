@@ -17,7 +17,7 @@ import {
 } from "@openbot/contracts/team-protocol/current";
 import { sourceText } from "@openbot/i18n/source";
 import { spentUsageWindow } from "@openbot/team-client/plan-limits";
-import { Button, Input } from "@openbot/ui";
+import { Button, CopyButton, Input, toast } from "@openbot/ui";
 import { AwaitingReplies } from "@openbot/ui/features/conversation/AwaitingReplies";
 import { ComposerAddMenu } from "@openbot/ui/features/conversation/ComposerAddMenu";
 import { ComposerAttachmentRow } from "@openbot/ui/features/conversation/ComposerAttachmentRow";
@@ -76,6 +76,7 @@ export function ConversationComposer() {
     currentChatErrorReference,
     currentChatErrorRun,
     currentChatErrorLink,
+    currentChatErrorDetails,
     currentDraft,
     dismissCurrentChatErrors,
     installedSkills,
@@ -294,6 +295,18 @@ export function ConversationComposer() {
         >
           {t("composer.verifyAccount.action")}
         </Button>
+      );
+    // The general sentence names no cause, so the user can copy the provider's text into a report (#6410).
+    const details = currentChatErrorDetails();
+    if (details)
+      return (
+        <CopyButton
+          value={details}
+          variant="outline"
+          size="sm"
+          label={t("agent.error.copyDetails")}
+          onCopyError={() => toast.error(t("app.clipboard.copyFailed"))}
+        />
       );
     return undefined;
   };

@@ -192,6 +192,8 @@ export const messages = {
     "OpenCode 的模型服务商报告上传请求无效。请改用其他模型继续；重新创建自动化任务前请先检查已保存的自动化任务。\n{detail}",
   "error.provider.opencodeUnreadableContent":
     "该模型无法读取该对话中的文件或图片。请选择能读取文件的模型，然后重新发送消息。",
+  "error.provider.opencodeContextTooSmall":
+    "此聊天超出了模型的上下文窗口。请在 Ollama 或 LM Studio 中以更大的上下文长度加载模型，并在 OpenBot 中该模型提供方的设置里填写相同的窗口。或者选择更大的模型。",
   "error.provider.opencodeFreeLimit":
     "OpenCode 免费模型已达到使用上限。所有免费模型共用这一上限。要继续，请在 OpenCode 设置中粘贴 OpenCode Go 密钥，或选择其他提供商的模型。",
   "error.provider.opencodeProviderFailed":
@@ -268,6 +270,10 @@ export const messages = {
   "error.provider.hermesNotStarted": "无法启动 Hermes Agent。请在终端中运行 `hermes --version`。",
   "error.provider.hermesVersionUnreadable": "无法读取 Hermes Agent 的版本。",
   "error.provider.hermesSignIn": "要使用 Hermes，请使用 Nous Portal 登录，或在终端中运行 `hermes setup`。",
+  "error.provider.hermesTurnFailed":
+    "Hermes 未能完成本轮。如果它的回复说明了原因，请按回复操作。如果没有，此智能体的某个 MCP 服务器可能不可用：请在 服务器设置 › MCP 中检查，然后重新发送消息。",
+  "error.provider.copilotThinkingRejected":
+    "GitHub Copilot 无法使用此模型：模型不接受其思考设置。请为此 Agent 选择其他模型，然后重新发送消息。",
   "error.provider.usageLimitReached": "该账号已达到用量上限。",
   "error.provider.claudeContextFull":
     "此聊天对 Claude 来说已经太长。OpenBot 已带着聊天记录开启新的 Claude Code 会话，请重试。",
@@ -300,6 +306,10 @@ export const messages = {
   "error.provider.acpSignInMethodMissing": "该服务商在这台电脑上不提供该登录方式。请更新服务商后重试。",
   "error.provider.httpsSignInLinkOnly": "只有 HTTPS 登录链接才能在浏览器中打开。",
   "error.provider.geminiKeyRefused": "Gemini 拒绝了已保存的 API 密钥。请在设置中更换或移除该密钥，然后重新连接。",
+  "error.provider.geminiAccountSettingsUnreadable":
+    "Gemini 无法打开此账号的设置文件，因此无法登录。请移除此账号，然后重新添加。",
+  "error.provider.geminiSettingsUnreadable":
+    "Gemini 无法打开此电脑上的设置文件，因此无法登录。请退出其他使用 Gemini 的应用，然后退出并重新打开 OpenBot。",
   "error.provider.geminiVerificationRequired":
     "Gemini 回答前，Google 需要验证你的账号。在浏览器中验证你的 Google 账号，然后重新发送消息。",
   "error.provider.keyProviderRefused": "{provider} 拒绝了已保存的 API 密钥。请在设置中更换或移除该密钥，然后重试。",
@@ -347,6 +357,11 @@ export const messages = {
   "error.provider.accountDefault": "第一个 {provider} 账号无法移除。",
   "error.provider.accountUsesKey":
     "此 {provider} 账号使用已保存的 API 密钥，没有登录。请在服务器设置 → 服务商中更改密钥。",
+  "error.provider.accountNeedsKey":
+    "新的 {provider} 账号需要 API 密钥。请更新这台设备上的 OpenBot，然后重新添加该账号。",
+  "error.provider.accountKeyRefused": "{provider} 未接受该 API 密钥。请检查密钥后重试。",
+  "error.provider.accountKeyUnreachable": "OpenBot 无法连接 {provider} 来检查 API 密钥。请检查网络连接后重试。",
+  "error.provider.accountKeySignedOut": "{provider} 不再接受该账号的 API 密钥。请为该账号提供新密钥。",
   "error.provider.accountInUse": "该账号上仍有助手在工作。请等该助手停止后重试。",
   "error.provider.accountsReadOnly": "无法读取已保存的服务商账号。请先更新 OpenBot 再修改。",
   "error.provider.accountSignedOut": "该 {provider} 账号已退出登录，请重新登录。",

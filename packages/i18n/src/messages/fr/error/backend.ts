@@ -68,6 +68,8 @@ export const messages = {
     "La compaction ne réduit pas ce chat : après deux compactions, il utilise encore {percent} % de la fenêtre de contexte du modèle, donc OpenBot arrête de le compacter. Les outils et les instructions occupent la plus grande partie de la fenêtre. Désactive les serveurs MCP ou le contrôle de l'ordinateur dont cet agent n'a pas besoin, ou choisis un modèle avec une fenêtre plus grande. Puis démarre un nouveau chat.",
   "error.backend.contextCompactionStopped":
     "Deux compactages de suite de cette discussion ont échoué, donc OpenBot ne la compacte plus automatiquement. Chaque essai envoie toute la discussion au modèle et consomme la limite de votre forfait. Sélectionnez « Compacter » pour réessayer, ou démarrez une nouvelle discussion.",
+  "error.backend.providerModelAtCapacity":
+    "Le modèle est saturé. Le fournisseur réessaiera dans quelques minutes. Pour continuer maintenant, arrête le tour et choisis un autre modèle.",
   "error.backend.providerRetrying":
     "Le fournisseur a échoué {attempts} fois sur cette requête et réessaie. Si l'agent ne continue pas, arrête le tour.",
   "error.backend.providerRetryingLargeContext":
@@ -375,6 +377,8 @@ export const messages = {
     "Le proxy {name} a refusé l’identification, la page ne s’est donc pas ouverte.",
   "error.backend.browserProxyComputerUnreachable":
     "L’ordinateur de ce profil ne répond pas, la page ne s’est donc pas ouverte.",
+  "error.backend.browserProxyComputerLocalAddress":
+    "L’ordinateur utilisé par ce profil n’ouvre que des sites publics. Il n’ouvre pas les adresses d’un réseau local, donc la page ne s’est pas ouverte.",
   "error.backend.browserCertificateUntrusted":
     "Le certificat de sécurité de ce site n’est pas fiable, la page ne s’est donc pas ouverte.",
   "error.backend.browserLowMemory":

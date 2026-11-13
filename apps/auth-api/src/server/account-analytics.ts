@@ -30,9 +30,10 @@ const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
  * `billing_snapshot`. A billing event without `product` is from a server plan. No generation 10
  * property changes. Generation 12 adds `email_sent`. Generation 13 adds the `license` kind of `email_sent`.
  * Generation 14 adds `email_fallback_sent`. Generation 15 adds the `ready` hosted server action, with
- * `duration_ms` and the `create` reason. Generation 16 adds `hosted_pool_snapshot`.
+ * `duration_ms` and the `create` reason. Generation 16 adds `hosted_pool_snapshot`. Generation 17 adds
+ * `machine` on the `provisioned`, `ready` and `setup_failed` hosted server actions.
  */
-export const ACCOUNT_ANALYTICS_SCHEMA_VERSION = 16;
+export const ACCOUNT_ANALYTICS_SCHEMA_VERSION = 17;
 const SEND_TIMEOUT_MS = 5_000;
 const ACCOUNT_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 
@@ -94,6 +95,8 @@ export function isAnalyticsLicenseUsers(value: unknown): value is number {
 }
 /** `create`: only on `ready`, for the first start of a new server. */
 const WAKE_REASONS = ["create", "message", "restart", "schedule", "retention"] as const;
+/** Where a new server starts: on a prepared machine of the operator's pool, or in a boat sandbox. */
+const HOSTED_MACHINES = ["pool", "boat"] as const;
 /**
  * The longest start that `ready` reports. A longer one is a start time that a Worker without the column
  * left behind, not a start.
@@ -150,11 +153,15 @@ export type AccountAnalyticsEvent =
       size?: HostedServerSize;
       reason?: (typeof WAKE_REASONS)[number];
       error?: HostedServerError | null;
-      /** On `ready`: from the request to boat until boat reported the sandbox as usable. */
+      /**
+       * On `ready`: from the request to boat until boat reported the sandbox as usable. For a `pool`
+       * machine: from the assignment until OpenBot on the machine signed in.
+       */
       durationMs?: number;
+      machine?: (typeof HOSTED_MACHINES)[number];
     }
   | { name: "email_sent" | "email_fallback_sent"; kind: EmailKind; result: EmailResult }
-  /** Each hour: the machines of the operator in one location and product, by state. */
+  /** Each 5 minutes: the machines of the operator in one location and product, by state. */
   | { name: "hosted_pool_snapshot"; group: HostedPoolGroup };
 
 /** Account events that only the Worker sees: new accounts, payments, hosted servers and email sends. */
@@ -313,6 +320,7 @@ function accountEventProperties(event: AccountAnalyticsEvent): AnalyticsProperti
   if (isOneOf(HOSTED_SERVER_SIZE_NAMES, event.size)) properties.size = event.size;
   if (isOneOf(WAKE_REASONS, event.reason)) properties.reason = event.reason;
   if (isOneOf(HOSTED_SERVER_ERRORS, event.error)) properties.error = event.error;
+  if (isOneOf(HOSTED_MACHINES, event.machine)) properties.machine = event.machine;
   const duration = event.durationMs;
   if (
     event.action === "ready" &&
@@ -330,6 +338,7 @@ const POOL_PRODUCT_PATTERN = /^(?:VPS\d{2}|all|unknown)$/u;
 const POOL_COUNTS = [
   "machines",
   "free",
+  "ready",
   "to_reinstall",
   "plan_ended",
   "cancel_scheduled",

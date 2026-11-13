@@ -771,33 +771,79 @@ const browser = () => {
   return chrome;
 };
 
-/** Pays a Checkout page with the Stripe test card and waits for the return to the Worker. */
+/**
+ * Pays a Checkout page with the Stripe test card and waits for the return to the Worker. Stripe shows
+ * the form in an embedded frame, or in the page itself: the field IDs are different.
+ */
 async function payCheckout(url: string, returnOrigin: string, screenshot: string) {
   const context = await (await browser()).newContext();
   try {
     const page = await context.newPage();
     await page.goto(url);
+    const frame = page.frameLocator('iframe[title="Secure embedded form frame"]');
+    const framed = frame.getByTestId("payment-form-submit-button");
+    const radio = page.getByRole("radio", { name: "Card", exact: true });
     try {
-      // With more than one payment method, Checkout shows the card fields after the card choice.
-      const card = page.getByRole("radio", { name: "Card", exact: true });
-      await Promise.race([card.waitFor(), page.locator("#cardNumber").waitFor()]);
-      if (await card.isVisible()) await card.check({ force: true });
-      await page.fill("#cardNumber", "4242424242424242");
+      await Promise.race([framed.waitFor(), radio.waitFor(), page.locator("#cardNumber").waitFor()]);
     } catch (error) {
       await page.screenshot({ path: join(ROOT, ".openbot-build", `failed-${screenshot}`), fullPage: true });
       throw error;
     }
-    await page.fill("#cardExpiry", "12 / 34");
-    await page.fill("#cardCvc", "123");
-    await page.fill("#billingName", "Stripe E2E");
-    const country = page.locator("#billingCountry");
+    const embedded = await framed.isVisible();
+    const form = embedded ? frame : page;
+    const id = embedded
+      ? {
+          number: "#payment-numberInput",
+          expiry: "#payment-expiryInput",
+          cvc: "#payment-cvcInput",
+          // Checkout asks for the full billing address only when the payment needs it.
+          name: "#billingAddress-nameInput, #payment-nameInput",
+          country: "#billingAddress-countryInput, #payment-countryInput",
+          line1: "#billingAddress-addressLine1Input",
+          zip: "#billingAddress-postalCodeInput",
+          city: "#billingAddress-localityInput",
+          save: "#payment-linkOptInInput",
+          terms: "#paymentForm-termsOfServiceConsentInput",
+          submit: "payment-form-submit-button",
+        }
+      : {
+          number: "#cardNumber",
+          expiry: "#cardExpiry",
+          cvc: "#cardCvc",
+          name: "#billingName",
+          country: "#billingCountry",
+          line1: "#billingAddressLine1",
+          zip: "#billingPostalCode",
+          city: "#billingLocality",
+          save: "#enableStripePass",
+          terms: "#termsOfServiceConsentCheckbox",
+          submit: "hosted-payment-submit-button",
+        };
+    // With more than one payment method, Checkout shows the card fields after the card choice.
+    if (embedded) {
+      if (!(await form.locator(id.number).isVisible())) await form.getByText("Card", { exact: true }).first().click();
+    } else if (await radio.isVisible()) await radio.check({ force: true });
+    await form.locator(id.number).fill("4242424242424242");
+    await form.locator(id.expiry).fill("12 / 34");
+    await form.locator(id.cvc).fill("123");
+    const country = form.locator(id.country).first();
     if (await country.count()) await country.selectOption("PL");
-    const zip = page.locator("#billingPostalCode");
-    if ((await zip.count()) && (await zip.isVisible())) await zip.fill("00-001");
-    const save = page.locator("#enableStripePass");
+    // The fields of the address depend on the country, so fill only the ones that the page shows.
+    for (const [field, value] of [
+      [id.name, "Stripe E2E"],
+      [id.line1, "Marszalkowska 1"],
+      [id.zip, "00-001"],
+      [id.city, "Warszawa"],
+    ] as const) {
+      const input = form.locator(field).first();
+      if ((await input.count()) && (await input.isVisible())) await input.fill(value);
+    }
+    const save = form.locator(id.save);
     if ((await save.count()) && (await save.isChecked())) await save.dispatchEvent("click");
+    const terms = form.locator(id.terms);
+    if ((await terms.count()) && !(await terms.isChecked())) await terms.dispatchEvent("click");
     await page.screenshot({ path: join(ROOT, ".openbot-build", screenshot) });
-    await page.getByTestId("hosted-payment-submit-button").dispatchEvent("click");
+    await form.getByTestId(id.submit).dispatchEvent("click");
     await page.waitForURL((current) => current.origin === returnOrigin, { timeout: 90_000 });
     return new URL(page.url()).pathname;
   } finally {

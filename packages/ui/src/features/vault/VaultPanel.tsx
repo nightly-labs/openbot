@@ -74,6 +74,7 @@ import type { UserErrorDetails } from "@openbot/user-errors";
 import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, createStore, For, Match, Show, Switch, untrack } from "solid-js";
 import { useText } from "../../text";
+import { type VaultAgentChoice, type VaultAgentScope, VaultAgentsButton } from "./VaultAgents";
 import { VaultLinkAccount, type VaultLinkAccountProps } from "./VaultLinkAccount";
 import {
   createDraftTwoStepCode,
@@ -111,7 +112,14 @@ export interface VaultPanelProps {
   menuMount?: HTMLElement | undefined;
   /** The Link account of this computer, above the cards. Absent for a joined server. */
   link?: Omit<VaultLinkAccountProps, "menuMount"> | undefined;
+  /**
+   * The agents of the server, so the user chooses the agents of each item. Absent while they did not
+   * load, or for a server that does not keep the agents of an item (`state.agentScope`).
+   */
+  agents?: readonly VaultAgentChoice[] | undefined;
 }
+
+export type { VaultAgentChoice };
 
 type Filter = VaultItemKind | "all";
 
@@ -282,7 +290,7 @@ function prefilled(draft: Draft, values: Readonly<Record<string, string>>): Draf
         email: value("email", draft.email),
       };
     case "apiKey":
-      return draft;
+      return { ...draft, name: value("name", draft.name) };
   }
 }
 
@@ -312,8 +320,17 @@ function twoStepKeyInput(draft: LoginDraft): { twoStepKey?: string } {
   return draft.twoStepRemoved ? { twoStepKey: "" } : {};
 }
 
+/**
+ * The item with its agents. Undefined agents keep the saved choice: a server without `vault-v4`, or a
+ * request from the chat, which makes an item for every agent.
+ */
+function saveInput(draft: Draft, id: string | null, agents: VaultAgentScope | undefined): VaultSaveInput {
+  const item = itemInput(draft, id);
+  return agents === undefined ? item : { ...item, agents: agents === null ? null : [...agents] };
+}
+
 /** An empty secret field keeps the saved value. */
-function saveInput(draft: Draft, id: string | null): VaultSaveInput {
+function itemInput(draft: Draft, id: string | null): VaultSaveInput {
   if (draft.kind === "login")
     return {
       kind: "login",
@@ -436,6 +453,11 @@ export function VaultPanel(props: VaultPanelProps) {
   const visible = (kind: Filter) =>
     props.state.items.filter((item) => (kind === "all" || item.kind === kind) && itemMatches(item, query()));
   const empty = () => props.state.items.length === 0;
+  /** The agents to choose from, when the server keeps the agents of each item. */
+  const agentChoices = () => (props.state.agentScope && props.agents?.length ? props.agents : undefined);
+  /** Changes only the agents of a saved item: each other field and secret keeps its saved value. */
+  const saveAgents = (item: VaultItemSummary, agents: VaultAgentScope) =>
+    run(() => props.onSave(saveInput(draftOf(item.kind, item), item.id, agents)));
 
   /** Runs one change of a confirm dialog. A failure stays in the dialog. */
   async function run(action: () => Promise<void>, fallback: AppTextKey = "vault.failed"): Promise<boolean> {
@@ -532,7 +554,7 @@ export function VaultPanel(props: VaultPanelProps) {
         <SlidingTabs.Root value={filter()} onChange={(value) => isFilter(value) && setFilter(value)}>
           <SettingsSection
             title={t("vault.items.title")}
-            description={t("vault.items.description")}
+            description={t(props.state.agentScope ? "vault.items.scopedDescription" : "vault.items.description")}
             actions={
               <NewItemMenu
                 kinds={filters().flatMap((item) => (item.value === "all" ? [] : [item.value]))}
@@ -640,6 +662,18 @@ export function VaultPanel(props: VaultPanelProps) {
                                 <ItemDescription class="vault-truncate">{itemSummary(item)}</ItemDescription>
                               </ItemContent>
                               <ItemActions class="integrations-hub-actions">
+                                <Show when={agentChoices()}>
+                                  {(agents) => (
+                                    <VaultAgentsButton
+                                      name={itemTitle(item)}
+                                      agents={agents()}
+                                      scope={item.agents ?? null}
+                                      onChange={async (scope) => {
+                                        await saveAgents(item, scope);
+                                      }}
+                                    />
+                                  )}
+                                </Show>
                                 <Show when={twoStepCodes.code(item.id)}>
                                   {(code) => (
                                     <TwoStepRowCode
@@ -691,6 +725,7 @@ export function VaultPanel(props: VaultPanelProps) {
             contactLine={contactLine}
             title={editingTitle(editing())}
             twoStep={props.onCodes !== undefined}
+            agents={agentChoices()}
             savedCode={editingCode()}
             onCopyCode={copyCode}
             onSave={(input) => props.onSave(input)}
@@ -1026,7 +1061,7 @@ function SecretInput(props: {
   saved: boolean;
   maxlength: number;
   inputMode?: "numeric";
-  placeholder?: string;
+  placeholder?: string | undefined;
   onChange: (value: string) => void;
   onReveal: () => Promise<string>;
   onRevealFailed: (error: unknown) => void;
@@ -1089,10 +1124,17 @@ function ItemDialog(props: {
   fromChat?: boolean | undefined;
   /** The server keeps two-step keys, so a login offers one. */
   twoStep?: boolean | undefined;
+  /** The agents to choose from. Absent: the item keeps its agents, and a new item is for every agent. */
+  agents?: readonly VaultAgentChoice[] | undefined;
   /** The current code of the saved key, from main. */
   savedCode?: LiveTwoStepCode | undefined;
   onCopyCode?: ((code: string) => void) | undefined;
-  onSave: (input: VaultSaveInput) => Promise<void>;
+  /** The choice of who can use a requested API key, which the dialog shows in place of the agents. */
+  scope?: VaultRequestScope | undefined;
+  /** The agent's hint for a requested API key, such as sk-…. */
+  keyPlaceholder?: string | undefined;
+  /** Saves the item, with the chosen option of `scope` when the dialog has one. */
+  onSave: (input: VaultSaveInput, scope?: string) => Promise<void>;
   onReveal: (request: VaultSecretRequest) => Promise<string>;
   onClose: () => void;
 }) {
@@ -1102,6 +1144,9 @@ function ItemDialog(props: {
   );
   const [saving, setSaving] = createSignal(false);
   const [failure, setFailure] = createSignal<UserErrorDetails | null>(null);
+  // A new item is for every agent; the user changes it here or later from its row.
+  const [scope, setScope] = createSignal<VaultAgentScope>(untrack(() => props.item?.agents ?? null));
+  const [requestScope, setRequestScope] = createSignal(untrack(() => props.scope?.value ?? ""));
   const set = <T extends Draft>(current: T, patch: Partial<T>) => setDraft((): Draft => ({ ...current, ...patch }));
   const loginDraft = () => {
     const current = draft();
@@ -1181,7 +1226,10 @@ function ItemDialog(props: {
     setSaving(true);
     setFailure(null);
     try {
-      await props.onSave(saveInput(draft(), props.item?.id ?? null));
+      await props.onSave(
+        saveInput(draft(), props.item?.id ?? null, props.agents ? scope() : undefined),
+        props.scope ? requestScope() : undefined,
+      );
       props.onClose();
     } catch (error) {
       setFailure(errorDetails(error, t("vault.failed")));
@@ -1189,6 +1237,31 @@ function ItemDialog(props: {
       setSaving(false);
     }
   }
+
+  /** The user finds a requested key at the service by its name, so its field has the name as label. */
+  const keyLabel = (apiKey: ApiKeyDraft) => (props.fromChat ? apiKey.name : t("vault.field.apiKey"));
+
+  const requestScopeField = () => (
+    <Show when={props.scope}>
+      {(choice) => (
+        <Field label={choice().label} class="vault-wide">
+          <NativeSelect value={requestScope()} onChange={(event) => setRequestScope(event.currentTarget.value)}>
+            <For each={choice().options}>{(option) => <option value={option}>{option}</option>}</For>
+          </NativeSelect>
+        </Field>
+      )}
+    </Show>
+  );
+
+  const agentsField = () => (
+    <Show when={props.agents}>
+      {(agents) => (
+        <Field label={t("vault.agents.label")} class="vault-wide">
+          <VaultAgentsButton name={props.title} agents={agents()} scope={scope()} onChange={setScope} />
+        </Field>
+      )}
+    </Show>
+  );
 
   const fields = (): JSX.Element => (
     <Switch>
@@ -1240,6 +1313,7 @@ function ItemDialog(props: {
                 />
               </Field>
             </Show>
+            {agentsField()}
           </div>
         )}
       </Match>
@@ -1328,6 +1402,7 @@ function ItemDialog(props: {
                 </ul>
               </fieldset>
             </Show>
+            {agentsField()}
           </div>
         )}
       </Match>
@@ -1415,45 +1490,54 @@ function ItemDialog(props: {
                 onValueChange={(email) => set(contact(), { email })}
               />
             </Field>
+            {agentsField()}
           </div>
         )}
       </Match>
       <Match when={apiKeyDraft()}>
         {(apiKey) => (
           <div class="vault-fields">
-            <Field label={t("vault.field.variableName")} description={t("vault.variableNameHint")} class="vault-wide">
-              <Input
-                placeholder={t("vault.placeholder.variableName")}
-                autocomplete="off"
-                spellcheck={false}
-                maxlength={64}
-                value={apiKey().name}
-                onInput={(event) => {
-                  // The field shows the capitals that it keeps, so the binding has no other text to restore.
-                  const input = event.currentTarget;
-                  const { selectionStart, selectionEnd } = input;
-                  input.value = input.value.toUpperCase();
-                  input.setSelectionRange(selectionStart, selectionEnd);
-                  set(apiKey(), { name: input.value });
-                }}
-              />
-            </Field>
-            <Field label={t("vault.field.apiKey")} class="vault-wide">
+            {/* A request names the key: the agent reads it by this name. */}
+            <Show when={!props.fromChat}>
+              <Field label={t("vault.field.variableName")} description={t("vault.variableNameHint")} class="vault-wide">
+                <Input
+                  placeholder={t("vault.placeholder.variableName")}
+                  autocomplete="off"
+                  spellcheck={false}
+                  maxlength={64}
+                  value={apiKey().name}
+                  onInput={(event) => {
+                    // The field shows the capitals that it keeps, so the binding has no other text to restore.
+                    const input = event.currentTarget;
+                    const { selectionStart, selectionEnd } = input;
+                    input.value = input.value.toUpperCase();
+                    input.setSelectionRange(selectionStart, selectionEnd);
+                    set(apiKey(), { name: input.value });
+                  }}
+                />
+              </Field>
+            </Show>
+            <Field label={keyLabel(apiKey())} class="vault-wide">
               <SecretInput
                 {...secretProps("key")}
+                placeholder={props.keyPlaceholder}
                 maxlength={VAULT_API_KEY_LIMIT}
                 value={apiKey().key}
                 onChange={(key) => set(apiKey(), { key })}
               />
             </Field>
-            <Field label={t("vault.field.notes")} class="vault-wide">
-              <Textarea
-                rows={2}
-                maxlength={VAULT_NOTES_LIMIT}
-                value={apiKey().notes}
-                onInput={(event) => set(apiKey(), { notes: event.currentTarget.value })}
-              />
-            </Field>
+            <Show when={!props.fromChat}>
+              <Field label={t("vault.field.notes")} class="vault-wide">
+                <Textarea
+                  rows={2}
+                  maxlength={VAULT_NOTES_LIMIT}
+                  value={apiKey().notes}
+                  onInput={(event) => set(apiKey(), { notes: event.currentTarget.value })}
+                />
+              </Field>
+            </Show>
+            {requestScopeField()}
+            {agentsField()}
           </div>
         )}
       </Match>
@@ -1549,16 +1633,27 @@ function ItemDialog(props: {
   );
 }
 
+/** Who can use a requested item, as the host gives the choice: its label, its options, and the first value. */
+export interface VaultRequestScope {
+  label: string;
+  options: readonly string[];
+  value: string;
+}
+
 /**
- * The Vault dialog for a request from the chat: a new login, card or contact, with the values that the
- * agent filled in. It has no billing address and no notes, which a request does not carry.
+ * The Vault dialog for a request from the chat: a new login, card, contact or API key, with the values
+ * that the agent filled in. It has no billing address and no notes, which a request does not carry.
  */
 export function VaultRequestDialog(props: {
-  kind: Exclude<VaultItemKind, "apiKey">;
+  kind: VaultItemKind;
   title: string;
   prefill: Readonly<Record<string, string>>;
+  /** Only for an API key: who can use it. */
+  scope?: VaultRequestScope | undefined;
+  /** Only for an API key: the agent's hint for the key, such as sk-…. */
+  keyPlaceholder?: string | undefined;
   /** Saves the item. A failure stays in the dialog, so the user can correct a value. */
-  onSave: (input: VaultSaveInput) => Promise<void>;
+  onSave: (input: VaultSaveInput, scope?: string) => Promise<void>;
   onClose: () => void;
 }) {
   const { countries } = useCountries();
@@ -1572,6 +1667,8 @@ export function VaultRequestDialog(props: {
       contactLine={() => ""}
       prefill={props.prefill}
       fromChat
+      scope={props.scope}
+      keyPlaceholder={props.keyPlaceholder}
       onSave={props.onSave}
       onReveal={() => Promise.resolve("")}
       onClose={props.onClose}

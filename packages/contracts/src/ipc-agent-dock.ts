@@ -77,9 +77,13 @@ export type AgentDockSeatState =
   | { kind: "routine"; phase: "running" | "queued" | "failed"; count: number }
   | { kind: "limited"; resetsAt: number | null };
 
+/**
+ * `temporary`: the user did not put the seat on the dock. It shows while it has a new message or waits
+ * for the user, when the user turned that on in Settings.
+ */
 export type AgentDockSeat =
-  | { kind: "agent"; agent: AgentDockAgent; mood: AgentDockMood; state: AgentDockSeatState | null }
-  | { kind: "channel"; channel: AgentDockChannel; state: AgentDockSeatState | null };
+  | { kind: "agent"; agent: AgentDockAgent; mood: AgentDockMood; state: AgentDockSeatState | null; temporary: boolean }
+  | { kind: "channel"; channel: AgentDockChannel; state: AgentDockSeatState | null; temporary: boolean };
 
 /**
  * A text message of the chat. `error` is a message that the app wrote because an action failed.
@@ -375,7 +379,8 @@ function isSeatRef(value: unknown): value is AgentDockSeatRef {
 }
 
 function isSeat(value: unknown): value is AgentDockSeat {
-  if (!isDynamicRecord(value) || !(value.state === null || isSeatState(value.state))) return false;
+  if (!isDynamicRecord(value) || !(value.state === null || isSeatState(value.state)) || !isBoolean(value.temporary))
+    return false;
   if (value.kind === "agent") return isAgent(value.agent) && isOneOf(AGENT_DOCK_MOODS, value.mood);
   return value.kind === "channel" && isChannel(value.channel);
 }

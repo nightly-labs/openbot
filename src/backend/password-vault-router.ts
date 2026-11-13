@@ -16,21 +16,21 @@ export function passwordVaultRouter(sources: ReadonlyArray<PasswordVaultSource>)
   const byPrefix = [...sources].sort((a, b) => b.prefix.length - a.prefix.length);
   return {
     connected: () => sources.some(({ vault }) => vault.connected()),
-    loginsFor: Effect.fn("PasswordVaultRouter.loginsFor")(function* (origin: string) {
+    loginsFor: Effect.fn("PasswordVaultRouter.loginsFor")(function* (origin: string, agentId?: string) {
       const found: VaultLogin[] = [];
       let any = false;
       for (const { prefix, vault } of sources) {
-        const list = yield* vault.loginsFor(origin);
+        const list = yield* vault.loginsFor(origin, agentId);
         if (list === null) continue;
         any = true;
         found.push(...list.map((login) => ({ ...login, id: `${prefix}${login.id}` })));
       }
       return any ? found : null;
     }),
-    secretFor: Effect.fn("PasswordVaultRouter.secretFor")(function* (id, origin, kind) {
+    secretFor: Effect.fn("PasswordVaultRouter.secretFor")(function* (id, origin, kind, agentId) {
       const source = byPrefix.find(({ prefix }) => id.startsWith(prefix));
       if (!source) return null;
-      return yield* source.vault.secretFor(id.slice(source.prefix.length), origin, kind);
+      return yield* source.vault.secretFor(id.slice(source.prefix.length), origin, kind, agentId);
     }),
   };
 }

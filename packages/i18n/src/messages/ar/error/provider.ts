@@ -201,6 +201,8 @@ export const messages = {
     "أبلغ مزوّد نموذج OpenCode عن طلب رفع غير صالح. اختر نموذجًا آخر وتابع. تحقق من المهام الدورية المحفوظة قبل إنشائها مرة أخرى.\n{detail}",
   "error.provider.opencodeUnreadableContent":
     "لا يستطيع هذا النموذج قراءة ملف أو صورة في هذه الدردشة. اختر نموذجًا يمكنه قراءة الملفات، ثم أرسل رسالتك مرة أخرى.",
+  "error.provider.opencodeContextTooSmall":
+    "هذه المحادثة لا تتسع في نافذة سياق النموذج. في Ollama أو LM Studio، حمّل النموذج بطول سياق أكبر، وأدخل النافذة نفسها في إعدادات مزوده في OpenBot. أو اختر نموذجًا أكبر.",
   "error.provider.opencodeFreeLimit":
     "بلغت نماذج OpenCode المجانية حد الاستخدام. تشترك جميع النماذج المجانية في هذا الحد. للمتابعة، الصق مفتاح OpenCode Go في إعدادات OpenCode، أو اختر نموذجًا من مزوّد آخر.",
   "error.provider.opencodeProviderFailed":
@@ -281,6 +283,10 @@ export const messages = {
   "error.provider.hermesVersionUnreadable": "تتعذّر قراءة إصدار Hermes Agent.",
   "error.provider.hermesSignIn":
     "سجّل الدخول باستخدام Nous Portal، أو شغّل `hermes setup` في نافذة طرفية، لاستخدام Hermes.",
+  "error.provider.hermesTurnFailed":
+    "لم يتمكن Hermes من إنهاء هذا الدور. إذا ذكر ردّه سببًا، فاتبع ما يقوله. وإلا فقد يكون أحد خوادم MCP لهذا الوكيل غير متاح: تحقق منه في إعدادات الخادم › MCP، ثم أرسل رسالتك مرة أخرى.",
+  "error.provider.copilotThinkingRejected":
+    "تعذّر على GitHub Copilot استخدام هذا النموذج: لم يقبل النموذج إعداد التفكير. اختر نموذجًا آخر لهذا الوكيل، ثم أرسل رسالتك مرة أخرى.",
   "error.provider.usageLimitReached": "بلغ الحساب حد الاستخدام.",
   "error.provider.claudeContextFull":
     "أصبحت هذه الدردشة طويلة جدًا على Claude. بدأ OpenBot جلسة Claude Code جديدة بسجل الدردشة. أعد المحاولة.",
@@ -316,6 +322,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "لا يمكن فتح سوى روابط تسجيل الدخول HTTPS في المتصفح.",
   "error.provider.geminiKeyRefused":
     "رفض Gemini مفتاح API المحفوظ. استبدل المفتاح أو أزله في الإعدادات، ثم اتصل مرة أخرى.",
+  "error.provider.geminiAccountSettingsUnreadable":
+    "لا يستطيع Gemini فتح ملف إعدادات هذا الحساب، لذا لا يمكنه تسجيل الدخول. أزل هذا الحساب ثم أضفه مرة أخرى.",
+  "error.provider.geminiSettingsUnreadable":
+    "لا يستطيع Gemini فتح ملف إعداداته على هذا الكمبيوتر، لذا لا يمكنه تسجيل الدخول. أغلق التطبيقات الأخرى التي تستخدم Gemini، ثم أغلق OpenBot وافتحه مرة أخرى.",
   "error.provider.geminiVerificationRequired":
     "يجب أن يتحقق Google من حسابك قبل أن يتمكن Gemini من الرد. تحقق من حساب Google في متصفح، ثم أرسل رسالتك مرة أخرى.",
   "error.provider.keyProviderRefused":
@@ -371,6 +381,12 @@ export const messages = {
   "error.provider.accountDefault": "لا يمكن إزالة حساب {provider} الأول.",
   "error.provider.accountUsesKey":
     "يستخدم حساب {provider} هذا مفتاح API المحفوظ وليس له تسجيل دخول. غيّر المفتاح في إعدادات الخادم ← المزوّدون.",
+  "error.provider.accountNeedsKey":
+    "يحتاج حساب {provider} الجديد إلى مفتاح API. حدّث OpenBot على هذا الجهاز، ثم أضف الحساب مرة أخرى.",
+  "error.provider.accountKeyRefused": "لم يقبل {provider} مفتاح API هذا. تحقّق من المفتاح، ثم أعد المحاولة.",
+  "error.provider.accountKeyUnreachable":
+    "تعذّر على OpenBot الوصول إلى {provider} للتحقق من مفتاح API. تحقّق من اتصال الإنترنت، ثم أعد المحاولة.",
+  "error.provider.accountKeySignedOut": "لم يعد {provider} يقبل مفتاح API لهذا الحساب. أدخل مفتاحًا جديدًا للحساب.",
   "error.provider.accountInUse": "يعمل وكيل على هذا الحساب. أعد المحاولة عندما يتوقف الوكيل.",
   "error.provider.accountsReadOnly": "تتعذّر قراءة حسابات المزوّد المحفوظة. حدّث OpenBot قبل تغييرها.",
   "error.provider.accountSignedOut": "تم تسجيل الخروج من حساب {provider} هذا. سجّل الدخول مرة أخرى.",

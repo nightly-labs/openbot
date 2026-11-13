@@ -40,6 +40,10 @@ import {
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import {
+  PROVIDER_ACCOUNT_KEYS_CAPABILITY,
+  PROVIDER_ACCOUNT_KEYS_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-keys-v1";
+import {
   PROVIDER_ACCOUNT_MODELS_CAPABILITY,
   PROVIDER_ACCOUNT_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-account-models-v1";
@@ -112,6 +116,7 @@ import {
 import type { IpcGroupHandlers } from "./define-ipc-group";
 import {
   parseConnectProviderAccountInput,
+  parseConnectProviderAccountKeyInput,
   parseDownloadableProviderId,
   parseProviderApiKeyInput,
   parseProviderUseInput,
@@ -160,6 +165,9 @@ interface RelayedSignIn {
   fiber: Fiber.Fiber<McpTestResult, unknown>;
   result: { error: string | null } | null;
 }
+
+/** As the host's long provider start (3 minutes), with the key check and the model list after it. */
+const ACCOUNT_KEY_CONNECT_TIMEOUT_MS = 4 * 60_000;
 
 export function providerAdminIpcHandlers({
   service,
@@ -452,6 +460,21 @@ export function providerAdminIpcHandlers({
         acceptEmpty,
         (provider) => ({ provider }),
       ),
+      connectAccountKey: scopedHandler(parseConnectProviderAccountKeyInput, {
+        local: () => Promise.reject(new Error(sourceText("error.team.providersUnsupported"))),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_KEYS_CAPABILITY))
+            throw new Error(sourceText("error.team.providersUnsupported"));
+          return runCauseEffect(
+            // The host answers after it checked the key in a new provider process, which can start slowly.
+            remoteServers.request(serverId, PROVIDER_ACCOUNT_KEYS_ROUTES.connect, acceptEmpty, {
+              method: "POST",
+              body: input,
+              timeoutMs: ACCOUNT_KEY_CONNECT_TIMEOUT_MS,
+            }),
+          );
+        },
+      }),
       renameAccount: accountsRequest(parseRenameProviderAccountInput, PROVIDER_ACCOUNTS_ROUTES.rename, acceptEmpty),
       removeAccount: accountsRequest(parseRemoveProviderAccountInput, PROVIDER_ACCOUNTS_ROUTES.remove, acceptEmpty),
       setAccountPool: scopedHandler(parseSetProviderAccountPoolInput, {

@@ -61,6 +61,8 @@ export const messages = {
     "压缩无法缩小这个聊天：压缩两次后，它仍占用模型上下文窗口的 {percent}%，所以 OpenBot 停止自动压缩。窗口的大部分被工具和指令占用。请关闭这个智能体不需要的 MCP 服务器或电脑操作，或选择窗口更大的模型。然后开始新的聊天。",
   "error.backend.contextCompactionStopped":
     "此对话的压缩连续失败了两次，因此 OpenBot 停止自动压缩它。每次尝试都会把整个对话发送给模型，并消耗你的套餐额度。选择“立即压缩”重试，或开始新对话。",
+  "error.backend.providerModelAtCapacity":
+    "该模型已满载。提供方会在几分钟后重试。要立即继续，请停止本轮并选择其他模型。",
   "error.backend.providerRetrying":
     "提供方已 {attempts} 次未能完成这个请求，正在重试。如果智能体没有继续，请停止本轮。",
   "error.backend.providerRetryingLargeContext":
@@ -324,6 +326,8 @@ export const messages = {
   "error.backend.browserProxyUnreachable": "代理 {name} 没有响应，因此页面没有打开。",
   "error.backend.browserProxySignInRefused": "代理 {name} 拒绝了登录，因此页面没有打开。",
   "error.backend.browserProxyComputerUnreachable": "此配置文件使用的计算机没有响应，因此页面没有打开。",
+  "error.backend.browserProxyComputerLocalAddress":
+    "此配置文件使用的计算机只打开公共网站。它不打开本地网络上的地址，因此页面没有打开。",
   "error.backend.browserCertificateUntrusted": "此网站的安全证书不受信任，因此页面没有打开。",
   "error.backend.browserLowMemory": "该服务器内存不足，浏览器无法再打开标签页。请关闭一个标签页，或等其他助手结束。",
   "error.backend.browserOpenFailed": "无法打开 {url}：{reason}",

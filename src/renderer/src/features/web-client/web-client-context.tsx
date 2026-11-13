@@ -48,7 +48,12 @@ import {
   isSafeConnectionError,
   type RemoteRecoveryStatus,
 } from "@openbot/team-client/remote-recovery";
-import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
+import {
+  approvalIsCut,
+  keepWholeApprovals,
+  reconcilePendingRequests,
+  withWholeApproval,
+} from "@openbot/team-client/runtime-attention";
 import { markRemoteSync } from "@openbot/team-client/sync-profile";
 import { duplicateSection as duplicateSectionWith } from "@openbot/ui/features/sidebar/duplicate-section";
 import { currentText } from "@openbot/ui/text";
@@ -417,6 +422,34 @@ export function createWebWorkspace(
     },
   });
   const hostNoticeListeners = new Set<(hostId: string, event: WebHostNotice, agents: ClientAgentSummary[]) => void>();
+  // A runtime snapshot cuts the long texts of an approval. The whole copy is read once for each cut
+  // request. Until it comes, and from a host without `pending-approval-v1`, the card offers only Deny.
+  const wholeApprovalReads = new Set<string>();
+  function readWholeApprovals(): void {
+    const read = runtime.readPendingApproval;
+    if (!read) return;
+    const current = generation;
+    for (const approval of state.approvals.filter(approvalIsCut)) {
+      const key = JSON.stringify([hostId, approval.agentId, approval.turnId, approval.requestId]);
+      if (wholeApprovalReads.has(key)) continue;
+      wholeApprovalReads.add(key);
+      void read({ agentId: approval.agentId, requestId: approval.requestId }).then(
+        (whole) => {
+          if (disposed) return;
+          // A read that a reconnect made stale, or that an older host refused, tries again at the next snapshot.
+          if (!whole || current !== generation) {
+            wholeApprovalReads.delete(key);
+            return;
+          }
+          setState((draft) => {
+            draft.approvals = [...withWholeApproval(draft.approvals, whole)];
+          });
+        },
+        // The next snapshot tries again.
+        () => wholeApprovalReads.delete(key),
+      );
+    }
+  }
   const runtime = (props.createRuntime ?? createWebWorkspaceRuntime)(
     props.accountId,
     {
@@ -550,9 +583,10 @@ export function createWebWorkspace(
         if (event.type === "runtime-snapshot") {
           const { attentionComplete } = event.snapshot;
           setState((draft) => {
+            // The snapshot cuts long texts. A whole copy from an `approval` event or a read stays in its place.
             draft.approvals = reconcilePendingRequests(
               draft.approvals,
-              event.snapshot.pendingApprovals,
+              keepWholeApprovals(draft.approvals, event.snapshot.pendingApprovals),
               attentionComplete,
             );
             draft.prompts = reconcilePendingRequests(
@@ -573,6 +607,7 @@ export function createWebWorkspace(
               (event.snapshot.threadContextStates ?? []).map((context) => [context.threadId, context]),
             );
           });
+          readWholeApprovals();
         } else if (event.type === "prompt") {
           setState((draft) => {
             draft.prompts = [...draft.prompts.filter((item) => item.requestId !== event.requestId), event];
@@ -1976,6 +2011,8 @@ export function createWebWorkspace(
             online: state.status === "online",
             restart: state.hostRestart?.state ?? null,
             version: state.hostRestart?.version ?? null,
+            // Until the agents load, the server could be new; a notice that waits shows after them.
+            firstRun: !state.agentsLoaded || state.agents.length === 0,
           },
         ]
       : [];

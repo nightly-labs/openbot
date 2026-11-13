@@ -14,6 +14,7 @@ import {
   decodeChannel,
   isChannelMessage,
   isChannelTask,
+  MCP_SIGN_IN_ITEM_TYPE_PREFIX,
   SIGNED_OUT_CHANNEL_MEMBER_ID,
   withBrowserMember,
 } from "@openbot/contracts/ipc";
@@ -195,6 +196,7 @@ export class ChannelStore {
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'channel-change'
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'context-reset'
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'commentary'
+                AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?
                 AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?) AS unread,
             (SELECT COUNT(*) FROM projection_channel_tasks AS t
               WHERE t.channel_id = c.channel_id
@@ -204,7 +206,13 @@ export class ChannelStore {
                 AND json_extract(t.task_json, '$.state') IN ('queued', 'waiting', 'running')) AS open
             FROM projection_channels AS c ORDER BY c.rowid`,
         )
-        .all(memberId, memberId, excludedId, `${CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX}%`),
+        .all(
+          memberId,
+          memberId,
+          excludedId,
+          `${CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX}%`,
+          `${MCP_SIGN_IN_ITEM_TYPE_PREFIX}%`,
+        ),
     );
     const threads = new Map<string, ChannelThread[]>();
     for (const row of databaseRows(

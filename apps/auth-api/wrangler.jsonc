@@ -10,8 +10,10 @@
     "enabled": true,
     "cross_version_cache": false
   },
+  // Workers Logs stay off: they kept one event for each request, and their cost was larger than the cost of
+  // the requests. `wrangler tail` still shows live events. `false` turns off a setting made earlier.
   "observability": {
-    "enabled": true
+    "enabled": false
   },
   // The Cloudflare Vite plugin emits and uploads Worker source maps unless this is false. The Worker
   // bundles the web app, and its maps pass the 60 MiB upload limit, so every deploy fails.

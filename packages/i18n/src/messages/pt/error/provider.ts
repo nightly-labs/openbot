@@ -220,6 +220,8 @@ export const messages = {
     "O provedor de modelos do OpenCode reportou uma requisição de upload inválida. Escolha outro modelo e continue. Verifique as rotinas salvas antes de recriá-las.\n{detail}",
   "error.provider.opencodeUnreadableContent":
     "Este modelo não consegue ler um arquivo ou uma imagem neste chat. Escolha um modelo que leia arquivos e envie sua mensagem de novo.",
+  "error.provider.opencodeContextTooSmall":
+    "Esta conversa não cabe na janela de contexto do modelo. No Ollama ou no LM Studio, carregue o modelo com um contexto maior e informe a mesma janela nas configurações do provedor no OpenBot. Ou escolha um modelo maior.",
   "error.provider.opencodeFreeLimit":
     "Os modelos gratuitos do OpenCode atingiram o limite de uso. Todos os modelos gratuitos compartilham esse limite. Para continuar, cole uma chave do OpenCode Go nas configurações do OpenCode ou escolha um modelo de outro provedor.",
   "error.provider.opencodeProviderFailed":
@@ -306,6 +308,10 @@ export const messages = {
     "Não foi possível iniciar o Hermes Agent. Execute `hermes --version` em um terminal.",
   "error.provider.hermesVersionUnreadable": "Não é possível ler a versão do Hermes Agent.",
   "error.provider.hermesSignIn": "Entre com o Nous Portal ou execute `hermes setup` em um terminal para usar o Hermes.",
+  "error.provider.hermesTurnFailed":
+    "O Hermes não conseguiu terminar este turno. Se a resposta dele der um motivo, siga o que ela diz. Se não, um servidor MCP deste agente pode estar indisponível: verifique-o em Configurações do servidor › MCP e envie sua mensagem de novo.",
+  "error.provider.copilotThinkingRejected":
+    "O GitHub Copilot não conseguiu usar este modelo: o modelo não aceitou a configuração de raciocínio. Selecione outro modelo para este agente e envie a mensagem de novo.",
   "error.provider.usageLimitReached": "A conta atingiu seu limite de uso.",
   "error.provider.claudeContextFull":
     "Este chat ficou longo demais para o Claude. O OpenBot iniciou uma nova sessão do Claude Code com o histórico do chat. Tente novamente.",
@@ -341,6 +347,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "Somente links de login HTTPS podem abrir no navegador.",
   "error.provider.geminiKeyRefused":
     "O Gemini recusou a chave de API salva. Substitua ou remova a chave nas Configurações e conecte novamente.",
+  "error.provider.geminiAccountSettingsUnreadable":
+    "O Gemini não consegue abrir o arquivo de configurações desta conta, então não consegue entrar. Remova esta conta e adicione-a novamente.",
+  "error.provider.geminiSettingsUnreadable":
+    "O Gemini não consegue abrir o arquivo de configurações dele neste computador, então não consegue entrar. Feche os outros apps que usam o Gemini e depois feche e abra o OpenBot novamente.",
   "error.provider.geminiVerificationRequired":
     "O Google precisa verificar sua conta antes que o Gemini possa responder. Verifique sua conta do Google em um navegador e envie sua mensagem novamente.",
   "error.provider.keyProviderRefused":
@@ -400,6 +410,13 @@ export const messages = {
   "error.provider.accountDefault": "A primeira conta de {provider} não pode ser removida.",
   "error.provider.accountUsesKey":
     "Esta conta de {provider} usa a chave de API salva e não tem login. Altere a chave em Configurações do servidor → Provedores.",
+  "error.provider.accountNeedsKey":
+    "Uma nova conta de {provider} precisa de uma chave de API. Atualize o OpenBot neste dispositivo e adicione a conta de novo.",
+  "error.provider.accountKeyRefused": "{provider} não aceitou esta chave de API. Verifique a chave e tente novamente.",
+  "error.provider.accountKeyUnreachable":
+    "O OpenBot não conseguiu acessar {provider} para verificar a chave de API. Verifique a conexão com a internet e tente novamente.",
+  "error.provider.accountKeySignedOut":
+    "{provider} não aceita mais a chave de API desta conta. Informe uma nova chave para a conta.",
   "error.provider.accountInUse":
     "Um agente que usa esta conta está trabalhando. Tente novamente quando o agente parar.",
   "error.provider.accountsReadOnly":

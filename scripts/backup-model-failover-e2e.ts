@@ -12,6 +12,7 @@
 //   5. After a restart, the agent goes back to its own model, with a note.
 // Also checks continuation after a usage limit interrupts partial work: on a backup, or with no
 // ready backup on the same model when its limit ends (#6660).
+// A spent credit balance moves to a backup with a note that names the spent model and what to do (#7965).
 // `bun run test:backup-model-failover`. Writes .openbot-build/backup-model-failover-e2e/report.json.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -228,7 +229,9 @@ const answer = (request) => {
         }
         if (current.includes("usage-wait")) return;
         if (limited) {
-          const error = { message: "You've hit your usage limit. Try again later.", codexErrorInfo: "usageLimitExceeded" };
+          const error = current.includes("usage-spent")
+            ? { message: "Your credit balance is too low to continue.", codexErrorInfo: "usageLimitExceeded" }
+            : { message: "You've hit your usage limit. Try again later.", codexErrorInfo: "usageLimitExceeded" };
           turn.error = error;
           write({ method: "error", params: { threadId: thread.id, turnId: turn.id, error, willRetry: false } });
           finish("failed");
@@ -797,6 +800,26 @@ try {
       return { outcome, backups: backups.map((turn) => turn.model), checkpoint: mode };
     });
   }
+
+  await check("a spent balance names the model it left and what to do", async () => {
+    await restart();
+    const agent = await createCodex("Spent balance", automaticBackups);
+    const outcome = await send(agent.id, "usage-spent case:spent");
+    assert.equal(outcome.status, "completed", `The task completes on its backup: ${outcome.error}`);
+    const moved = agentOf(agent.id);
+    assert.equal(moved.provider, "claude", "The agent is on its backup model.");
+    assert.equal(moved.usageLimitReturn ?? null, null, "The agent does not go back to a spent balance by itself.");
+    const spent =
+      service.listModels().find((option) => option.provider === "codex" && option.id === CODEX_MODEL)?.name ??
+      CODEX_MODEL;
+    const notes = await markers(agent.id, MODEL_SWITCH_ITEM_TYPES["provider-error"]);
+    assert.deepEqual(
+      notes,
+      [sourceText("status.agent.modelSwitchedForSpentBalance", { previous: spent, model: modelName(moved.model) })],
+      "The note names the spent model, the backup, and what to do.",
+    );
+    return { notes };
+  });
 
   await check("without a backup, partial work waits and continues when the limit ends", async () => {
     await restart();

@@ -360,6 +360,8 @@ export const messages = {
   "chat.video.time": "{elapsed} / {duration}",
   "chat.video.download": "הורדת הסרטון",
   "chat.video.open": "פתיחת הסרטון",
+  "chat.video.mute": "השתקת הסרטון",
+  "chat.video.unmute": "ביטול השתקת הסרטון",
   "chat.message.you": "אני",
   "chat.message.agentFallback": "סוכן",
   "chat.message.memberFallback": "חבר צוות",
