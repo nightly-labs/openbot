@@ -826,7 +826,7 @@ async function payCheckout(url: string, returnOrigin: string, screenshot: string
     await form.locator(id.number).fill("4242424242424242");
     await form.locator(id.expiry).fill("12 / 34");
     await form.locator(id.cvc).fill("123");
-    const country = form.locator(id.country);
+    const country = form.locator(id.country).first();
     if (await country.count()) await country.selectOption("PL");
     // The fields of the address depend on the country, so fill only the ones that the page shows.
     for (const [field, value] of [
@@ -835,7 +835,7 @@ async function payCheckout(url: string, returnOrigin: string, screenshot: string
       [id.zip, "00-001"],
       [id.city, "Warszawa"],
     ] as const) {
-      const input = form.locator(field);
+      const input = form.locator(field).first();
       if ((await input.count()) && (await input.isVisible())) await input.fill(value);
     }
     const save = form.locator(id.save);
