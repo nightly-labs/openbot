@@ -223,6 +223,9 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "הורדה אוטומטית של קבצים גדולים",
   "mobile.settings.conversations.largeFilesFooter":
     "תמונות, סרטונים וקובצי שמע גדולים מ-{small} יורדו רק אחרי הקשה עליהם. אפשר להפעיל כדי להוריד אותם מיד, עד {large}. הפעולה עשויה לצרוך הרבה נתונים סלולריים.",
+  "mobile.settings.conversations.fullQualityPhotos": "שליחת תמונות באיכות מלאה",
+  "mobile.settings.conversations.fullQualityPhotosFooter":
+    "כשהאפשרות כבויה, האפליקציה שולחת עותק קטן יותר של כל תמונה, עד 2048 פיקסלים בצלע הארוכה. הוא מגיע מהר יותר בחיבור איטי. הפעילו אותה כדי לשלוח את התמונה המקורית.",
   "mobile.settings.profile.nameUnsafe": "יש להסיר מהשם מעברי שורה ותווי בקרה.",
   "mobile.settings.profile.nameLength": "שם התצוגה חייב להכיל 3–20 תווים.",
   "mobile.settings.profile.saveFailed": "לא ניתן לשמור את השינויים. אפשר לנסות שוב.",
