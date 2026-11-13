@@ -1,7 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const { spawnSync } = require("node:child_process");
 const { IOSConfig, withDangerousMod, withXcodeProject } = require("expo/config-plugins");
+const { buildPage } = require("./with-share-target");
 
 // Adds the shortcuts of the app (List Agents and Send Message) to the iOS app target. The Swift
 // files in `shortcuts/` hold the App Intents, their snippets and the `AppShortcutsProvider`. They
@@ -10,25 +10,17 @@ const { IOSConfig, withDangerousMod, withXcodeProject } = require("expo/config-p
 //
 // Send Message sends without the JavaScript of the app, as the share extension does. So the app
 // target also gets the sender of that extension (`share-extension/ShareSender.swift`) and its page
-// `share-sender.html`, which `scripts/mobile-share-sender.ts` builds here. One source file serves
-// both targets, so both check the page's requests in the same way.
+// `share-sender.html`, from `with-share-target.js`. One source file serves both targets, so both
+// check the page's requests in the same way.
 //
 // The intents read the file that the app writes to the App Group
-// (`src/features/shortcuts/model/shortcut-directory.ts`) and the session of the share extension in
-// the keychain. `expo-widgets` and `with-share-target.js` add both entitlements, so this plugin adds none.
+// (`src/features/shortcuts/model/shortcut-directory.ts`), and the servers, the agent pictures and
+// the session of the share extension. `expo-widgets` and `with-share-target.js` add both entitlements, so this plugin adds none.
 
 const SOURCE_DIRECTORY = path.join(__dirname, "shortcuts");
 const SOURCES = ["ShortcutData.swift", "ShortcutIntents.swift", "ShortcutSend.swift", "ShortcutSnippets.swift"];
 const SENDER = path.join(__dirname, "share-extension", "ShareSender.swift");
 const PAGE = "share-sender.html";
-const PAGE_BUILD = path.resolve(__dirname, "../../../scripts/mobile-share-sender.ts");
-
-/** @param {string} output */
-function buildPage(output) {
-  const result = spawnSync("bun", [PAGE_BUILD, output], { stdio: "inherit" });
-  if (result.error) throw new Error(`The shortcut sender page needs Bun: ${result.error.message}`);
-  if (result.status !== 0) throw new Error("The shortcut sender page did not build.");
-}
 
 /** @type {import('expo/config-plugins').ConfigPlugin} */
 const withShortcutFiles = (config) =>

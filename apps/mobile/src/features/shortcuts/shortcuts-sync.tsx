@@ -2,6 +2,7 @@ import type { RemoteWorkspacePreferences } from "@openbot/team-client";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useCSSVariable } from "uniwind";
 import { useAppLock } from "@/features/app-lock/model/app-lock";
+import { shareAvatarName } from "@/features/share/model/share-extension";
 import type { MobileAgent, MobileServer } from "@/features/workspace/model/workspace-types";
 import { useText } from "@/shared/lib/text";
 import { loadShortcutAgent, useShortcutAgent } from "./model/shortcut-agent";
@@ -10,7 +11,6 @@ import {
   readShortcutDirectory,
   type ShortcutDirectory,
   type ShortcutDirectoryAgent,
-  shortcutAvatarName,
   writeShortcutDirectory,
 } from "./model/shortcut-directory";
 import { shortcutsSupported } from "./shortcuts-native";
@@ -28,9 +28,9 @@ interface ShortcutsSyncProps {
 
 /**
  * Keeps the data of the iOS shortcuts current. The App Intents run in native code with no
- * JavaScript, so they read from this: the servers and their agents, the agent of Settings >
- * Shortcuts, the app lock, and the text of the cards in the app's language. A server that did not
- * load keeps the agents that the app saw last. A hidden chat is not listed, as on the app icon: the
+ * JavaScript, so they read from this: the agents, the agent of Settings > Shortcuts, the app lock,
+ * and the text of the cards in the app's language. The servers and the agent pictures are the ones
+ * that `ShareExtensionSync` writes. A server that did not load keeps the agents that the app saw last. A hidden chat is not listed, as on the app icon: the
  * list shows outside the app.
  */
 export function ShortcutsSync(props: ShortcutsSyncProps): ReactNode {
@@ -84,9 +84,8 @@ function ShortcutsDirectorySync({
     let chosen: ShortcutDirectoryAgent | null = null;
     const isTarget = (agent: Pick<ShortcutDirectoryAgent, "serverId" | "id">) =>
       target !== null && agent.serverId === target.serverId && agent.id === target.agentId;
-    // Only a server with a key can be reached, as for the share extension.
-    const reachable = servers.filter((server) => server.publicKey);
-    for (const server of reachable) {
+    // Only a server with a key can be reached. The data of the share extension has the same servers.
+    for (const server of servers.filter((item) => item.publicKey)) {
       const loaded = agents.filter((agent) => agent.serverId === server.id);
       if (server.state !== "online" && loaded.length === 0) {
         // The server did not load, so the phone does not know its hidden chats: the saved list has none.
@@ -101,7 +100,8 @@ function ShortcutsDirectorySync({
           id: agent.id,
           name: agent.name,
           server: server.name,
-          avatar: shortcutAvatarName(agent),
+          // The share extension offers each agent, also a hidden one, so it has the picture.
+          avatar: shareAvatarName(agent),
         };
         // The agent of the setting stays reachable when its chat is hidden: the user chose it.
         if (isTarget(entry)) chosen = entry;
@@ -113,11 +113,6 @@ function ShortcutsDirectorySync({
       apiUrl,
       userId,
       locked,
-      servers: reachable.map((server) => ({
-        id: server.id,
-        publicKey: server.publicKey,
-        hosted: server.hosted === true,
-      })),
       agent: chosen,
       agents: listed,
       text,
@@ -131,8 +126,8 @@ function ShortcutsDirectorySync({
       if (locked) lockShortcutDirectory();
       return;
     }
-    writeShortcutDirectory(directory, agents);
-  }, [directory, agents, locked]);
+    writeShortcutDirectory(directory);
+  }, [directory, locked]);
 
   return null;
 }

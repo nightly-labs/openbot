@@ -3,8 +3,9 @@ import Security
 import UIKit
 
 /// What the app wrote for the shortcuts (`src/features/shortcuts/model/shortcut-directory.ts`): the
-/// servers and their agents, the agent that gets the shortcut messages, the app lock, and the text
-/// of the cards in the app's language. The intents read it, because they run without JavaScript.
+/// agents, the agent that gets the shortcut messages, the app lock, and the text of the cards in the
+/// app's language. The intents read it, because they run without JavaScript. The servers and the
+/// agent pictures are the ones that the app writes for its share extension.
 struct ShortcutDirectory: Decodable {
   struct Server: Decodable {
     let id: String
@@ -20,7 +21,7 @@ struct ShortcutDirectory: Decodable {
     let name: String
     /// The name of the agent's server, which the list shows under the agent.
     let server: String
-    /// The agent's picture, a file in `ShortcutDirectory.avatarFolder`.
+    /// The agent's picture, a file in the picture folder of the share extension.
     let avatar: String?
   }
 
@@ -29,7 +30,6 @@ struct ShortcutDirectory: Decodable {
   let userId: String
   /// The app lock is on. A shortcut then opens the app, which asks for the lock.
   let locked: Bool
-  let servers: [Server]
   /// The agent that gets the messages of the shortcuts. Null until the user chooses one.
   let agent: Agent?
   let agents: [Agent]
@@ -39,7 +39,16 @@ struct ShortcutDirectory: Decodable {
 
   private static let appGroup = "group.run.openbot.mobile"
   private static let directoryFile = "shortcuts.json"
-  private static let avatarFolder = "shortcut-avatars"
+  /// `src/features/share/model/share-extension.ts` writes this file and this folder.
+  private static let shareDirectoryFile = "share-extension.json"
+  private static let avatarFolder = "share-extension-avatars"
+
+  /// The part of the share extension file that Send Message needs.
+  private struct ShareFile: Decodable {
+    let apiUrl: String
+    let userId: String
+    let servers: [Server]
+  }
 
   private static var container: URL? {
     FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup)
@@ -53,6 +62,17 @@ struct ShortcutDirectory: Decodable {
       directory.version == 2
     else { return nil }
     return directory
+  }
+
+  /// The server of an agent, with the key to connect with. Nil when the share extension file is
+  /// missing or for another account, or it does not have the server.
+  func server(of agent: Agent) -> Server? {
+    guard let file = Self.container?.appendingPathComponent(Self.shareDirectoryFile),
+      let data = try? Data(contentsOf: file),
+      let share = try? JSONDecoder().decode(ShareFile.self, from: data),
+      share.apiUrl == apiUrl, share.userId == userId
+    else { return nil }
+    return share.servers.first { $0.id == agent.serverId }
   }
 
   static func avatar(_ name: String?) -> UIImage? {

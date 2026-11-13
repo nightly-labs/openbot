@@ -269,9 +269,10 @@ start, and iOS suspends the app soon after the intent returns.
   `plugins/with-shortcuts.js` adds them to the app target, because Xcode reads the shortcuts of an
   app from that target. iOS reads the names and the phrases of the shortcuts at build time, so they
   are English and not from the `@openbot/i18n` catalog. The text of the cards is from the catalog.
-- The app writes `shortcuts.json` and the agent pictures to the App Group
-  (`src/features/shortcuts/model/shortcut-directory.ts`): the servers with their public keys, the
-  agents, the agent of Settings > Shortcuts, the app lock and the card text. Sign-out deletes it.
+- The app writes `shortcuts.json` to the App Group
+  (`src/features/shortcuts/model/shortcut-directory.ts`): the agents, the agent of Settings >
+  Shortcuts, the app lock and the card text. Sign-out deletes it. The servers with their public
+  keys and the agent pictures are the ones that the app writes for the share extension.
 - List Agents reads that file. A tap on an agent opens its chat.
 - Send Message sends to the agent of Settings > Shortcuts with the sender of the share extension
   (`plugins/share-extension/ShareSender.swift` and the page `share-sender.html`, which the plugin

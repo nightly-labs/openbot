@@ -81,7 +81,7 @@ struct SendMessageIntent: AppIntent {
     // The intent returns when the server has the message. iOS suspends the app soon after an
     // intent returns, so a send that continued after it would not end.
     guard let directory, let agent = directory.agent,
-      let server = directory.servers.first(where: { $0.id == agent.serverId }),
+      let server = directory.server(of: agent),
       let session = ShortcutSession.read(for: directory)
     else {
       return .result(snippetIntent: ShortcutCardSnippetIntent(outcome: .failed, message: text))
