@@ -39,8 +39,8 @@ the `Agent` call. In a harness that has no model choice, use a lower reasoning e
 | Tier | Claude Code | Tasks |
 | --- | --- | --- |
 | Strong | the session model | Step 1 residue, gates A, B, C and E, gate F when `electron-updater` moved, the Step 3 verdict |
-| Medium | `sonnet` | gates D and G, gate F otherwise, Step 2b, the translation wording review, the Discord announcement draft |
-| Small | `haiku` | gate H, the `whats-new/<locale>.json` translations, mechanical `git grep` and file inventories |
+| Medium | `sonnet` | gates D and G, gate F otherwise, Step 2b, the Step 2c failure reading, the translation wording review, the Discord announcement draft |
+| Small | `haiku` | gate H, the Step 2c start and wait, the `whats-new/<locale>.json` translations, mechanical `git grep` and file inventories |
 
 - **Translations:** give each small-tier subagent a few locales, the English entry, and the
   [i18n.md terms](../../../docs/i18n.md#terms). Then run `bun scripts/whats-new-translations.ts <version>`
@@ -198,6 +198,39 @@ Ask two questions and report the answers with the table:
 Moving a pin needs the version assertion on a matching host, which `pin:bun-runtime` performs only
 for the target it runs on. [docs/RELEASING.md](../../../docs/RELEASING.md) holds the procedure.
 
+## Step 2c — the live provider check
+
+Not a gate of the audit: it reads no diff. It shows that the desktop app of the audited commit gets
+an answer from the real Codex, Claude and Gemini. No other check does this: the provider fakes and
+the `Provider CLI canary` use no provider account. Run it on the pull request of the release, before
+the merge and before the tag. Start it at the same time as the gates; it takes about 3 minutes.
+
+The `Provider live E2E` workflow runs only when somebody starts it. Start it on the branch that holds
+the audited commit, which must be pushed:
+
+```bash
+gh workflow run provider-live-e2e.yml --ref <branch> -f provider=all
+gh run list --workflow provider-live-e2e.yml --branch <branch> --event workflow_dispatch --limit 1 \
+  --json databaseId,headSha,status,conclusion,url
+gh run watch <databaseId> --exit-status
+```
+
+- Confirm that `headSha` of the run is the audited commit. A run of an older commit proves nothing.
+- Each run sends two short messages to each provider from the accounts of the Mac mini runner. Do
+  not start a second run while one is in progress.
+- On a failure, read the run summary and the `provider-live-e2e` artifact: `summary.md`, and the
+  `no-answer` picture of the failed provider, which shows the error in the chat.
+
+Report one row with the table, with the run URL:
+
+- **pass** — each provider answered.
+- **needs a human** — the provider or its account refused: no sign-in, an expired sign-in, a usage
+  limit, a provider outage. The release did not cause this. Name the provider and the message.
+- **stop** — a provider is available and signed in, and the app gets no answer or shows an error of
+  its own. Find the cause in the range before the version is cut.
+
+[docs/provider-live-e2e.md](../../../docs/provider-live-e2e.md) describes the test and the runner.
+
 ## Step 3 — report and hand off
 
 Report a table:
@@ -205,6 +238,8 @@ Report a table:
 | Gate | Triggered by | Verdict |
 | --- | --- | --- |
 | A. SQLite schema | *path, or "not triggered"* | pass / stop / needs a human |
+
+Add the Step 2b answers and the Step 2c row with its run URL.
 
 Then state the stops explicitly. Any one of these means **the version is not cuttable yet**:
 
@@ -214,7 +249,8 @@ Then state the stops explicitly. Any one of these means **the version is not cut
 - a DDL migration not mirrored into `LATEST_SCHEMA_SQL`;
 - a renamed on-disk file, or a bumped stored `version`, with no read path for the old one;
 - a D1 contraction without the two-step release;
-- a changed `appId`, `ElectronTeamID`, or `publish` target.
+- a changed `appId`, `ElectronTeamID`, or `publish` target;
+- a Step 2c **stop**: a signed-in, available provider that gives no answer in the app.
 
 If every gate passes, say so and hand off: `docs/RELEASING.md` owns the publish — the preflight
 checklist, the compatibility matrix, signing, notarization, the canary update and the size gates.

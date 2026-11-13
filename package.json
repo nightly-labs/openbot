@@ -267,6 +267,7 @@
     "test:muse-instructions-once": "bun scripts/muse-instructions-once-e2e.ts",
     "test:provider-conformance": "bun scripts/provider-conformance-e2e.ts",
     "test:provider-cli-canary": "bun scripts/provider-cli-canary.ts",
+    "test:provider-live": "bun scripts/provider-live-e2e.ts",
     "test:hermes-server": "bun scripts/hermes-server-e2e.ts",
     "test:custom-agents": "bun scripts/custom-acp-agent-e2e.ts",
     "test:custom-agents:login-path": "bun scripts/custom-acp-agent-login-path-e2e.ts",
@@ -528,6 +529,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.5.13",
     "@dotenvx/dotenvx": "^2.38.2",
+    "@e2e-dev/web": "0.15.5",
     "@electron/fuses": "1.8.0",
     "@fontsource-variable/inter": "catalog:",
     "@kobalte/core": "catalog:",
@@ -554,6 +556,7 @@
     "axe-core": "4.14.0",
     "class-variance-authority": "catalog:",
     "cuelume": "0.2.8",
+    "e2e": "0.23.0",
     "electron": "45.3.0",
     "electron-builder": "26.18.0",
     "electron-vite": "6.0.0",

@@ -32,6 +32,7 @@
       "!tools/ui-foundation/fixtures",
       "!!coverage",
       "!!.openbot-build",
+      "!!scripts/provider-live/.e2e",
       "!!Agents",
       "!!Bots",
       "!!Shared",
