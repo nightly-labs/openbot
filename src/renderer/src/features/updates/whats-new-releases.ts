@@ -14,6 +14,7 @@ import plUrl from "./whats-new/pl.json?url&no-inline";
 import ptUrl from "./whats-new/pt.json?url&no-inline";
 import ruUrl from "./whats-new/ru.json?url&no-inline";
 import trUrl from "./whats-new/tr.json?url&no-inline";
+import viUrl from "./whats-new/vi.json?url&no-inline";
 import zhUrl from "./whats-new/zh.json?url&no-inline";
 import { releaseVersion } from "./whats-new-history";
 import notesUrl from "./whats-new-releases.json?url&no-inline";
@@ -37,6 +38,7 @@ const TRANSLATED_NOTES_URLS: Record<Exclude<TranslatedLocale, "en">, string> = {
   pt: ptUrl,
   ru: ruUrl,
   tr: trUrl,
+  vi: viUrl,
   zh: zhUrl,
 };
 

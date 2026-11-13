@@ -1,0 +1,88 @@
+import type { PartialTranslation } from "../../message";
+import type { messages as source } from "../en/remoteDesktop";
+
+export const messages = {
+  "remoteDesktop.controlFailed": "Điều khiển từ xa thất bại. Hãy kết nối lại và thử lại.",
+  "remoteDesktop.startFailed": "Không thể bắt đầu điều khiển từ xa.",
+  "remoteDesktop.disconnectFailed": "Không thể ngắt điều khiển từ xa.",
+  "remoteDesktop.switchDisplayFailed": "Không thể chuyển màn hình đang chia sẻ.",
+  "remoteDesktop.workspaceLabel": "Điều khiển từ xa",
+  "remoteDesktop.displayLabel": "Màn hình từ xa",
+  "remoteDesktop.selectDisplay": "Chọn màn hình",
+  "remoteDesktop.backToOpenBot": "Quay lại OpenBot",
+  "remoteDesktop.disconnect": "Ngắt kết nối",
+  "remoteDesktop.viewerTitle": "Màn hình từ xa Sunshine",
+  "remoteDesktop.viewerLoadFailed": "Trình xem Moonlight không tải được.",
+  "remoteDesktop.streamNotReady":
+    "Máy chủ không khởi động được luồng. Sunshine có thể đã dừng trên máy chủ. Hãy thử lại.",
+  "remoteDesktop.hostOfflineTitle": "Máy chủ ngoại tuyến",
+  "remoteDesktop.hostOfflineMessage": "Kết nối lại với máy chủ trước khi mở màn hình của máy chủ đó.",
+  "remoteDesktop.openFailed": "Không thể mở màn hình máy tính",
+  "remoteDesktop.notSharingTitle": "{name} không chia sẻ màn hình",
+  "remoteDesktop.notSharingDescription":
+    "Máy chủ chặn OpenBot ghi hình màn hình. Trên máy chủ đó, mở System Settings → Privacy & Security → Screen Recording, bật OpenBot, rồi thử lại tại đây.",
+  "remoteDesktop.setup.check.screenRecording": "Ghi hình màn hình",
+  "remoteDesktop.setup.check.accessibility": "Trợ năng",
+  "remoteDesktop.setup.check.service": "Dịch vụ Sunshine",
+  "remoteDesktop.setup.check.displays": "Tình trạng màn hình",
+  "remoteDesktop.setup.check.guiSession": "Phiên người dùng macOS",
+  "remoteDesktop.setup.state.notChecked": "Chưa kiểm tra",
+  "remoteDesktop.setup.state.checking": "Đang kiểm tra…",
+  "remoteDesktop.setup.state.allowed": "Được cho phép",
+  "remoteDesktop.setup.state.blocked": "Bị chặn",
+  "remoteDesktop.setup.state.unavailable": "Không khả dụng",
+  "remoteDesktop.setup.state.failed": "Kiểm tra thất bại",
+  "remoteDesktop.setup.state.available": "Khả dụng",
+  "remoteDesktop.setup.checkFailed": "Không thể kiểm tra thiết lập màn hình từ xa.",
+  "remoteDesktop.setup.openFailed": "Không thể mở cài đặt macOS.",
+  "remoteDesktop.setup.cleanupUnconfirmed": "Kết nối thử nghiệm đã kết thúc trước khi xác nhận dọn dẹp.",
+  "remoteDesktop.setup.endSessionFirst": "Kết thúc phiên màn hình từ xa của máy tính này trước khi bắt đầu thử nghiệm.",
+  "remoteDesktop.setup.startFailed": "Không thể bắt đầu thử nghiệm màn hình từ xa.",
+  "remoteDesktop.setup.connectionLost": "Mất kết nối thử nghiệm.",
+  "remoteDesktop.setup.hostUpdateRequired":
+    "Cập nhật OpenBot trên máy chủ để kiểm tra quyền và thử nghiệm màn hình từ xa.",
+  "remoteDesktop.setup.permissions": "Quyền",
+  "remoteDesktop.setup.checked": "Đã kiểm tra",
+  "remoteDesktop.setup.checkAgain": "Kiểm tra lại",
+  "remoteDesktop.setup.grantAccess": "Cấp quyền truy cập cho {name}",
+  "remoteDesktop.setup.grant": "Cấp quyền",
+  "remoteDesktop.setup.grantHelp":
+    "Giữ tài khoản Sunshine đã đăng nhập trên máy Mac. Trong tài khoản đó, cấp quyền truy cập tại System Settings → Privacy & Security. Nút cấp quyền sẽ mở một cửa sổ trợ giúp. Kéo Sunshine.app vào danh sách quyền.",
+  "remoteDesktop.setup.restartRequired":
+    "Sunshine cần được khởi động lại. Kết thúc các phiên màn hình từ xa đang hoạt động, rồi kiểm tra lại. Các phiên đang hoạt động sẽ không được khởi động lại.",
+  "remoteDesktop.setup.showInFinder": "Hiện Sunshine trong Finder",
+  "remoteDesktop.setup.liveTest": "Kiểm tra kết nối trực tiếp",
+  "remoteDesktop.setup.liveTestLocal": "Kiểm tra hình ảnh, chuột và bàn phím trên máy Mac này.",
+  "remoteDesktop.setup.liveTestRemote":
+    "Bài kiểm tra mở một bảng tạm thời trên máy chủ. Các phiên từ xa khác phải kết thúc trước. Mọi thao tác nhập liệu chỉ nằm trong bảng đó.",
+  "remoteDesktop.setup.testSummary": "Video: {video} · Hình ảnh: {picture} · Chuột: {mouse} · Bàn phím: {keyboard}",
+  "remoteDesktop.setup.received": "đã nhận",
+  "remoteDesktop.setup.notReceived": "chưa nhận",
+  "remoteDesktop.setup.confirmed": "đã xác nhận",
+  "remoteDesktop.setup.notConfirmed": "chưa xác nhận",
+  "remoteDesktop.setup.notTested": "chưa kiểm tra",
+  "remoteDesktop.setup.waiting": "đang chờ",
+  "remoteDesktop.setup.testLocal": "Kiểm tra trên máy Mac này",
+  "remoteDesktop.setup.testRemote": "Kiểm tra màn hình từ xa",
+  "remoteDesktop.setup.videoFailed": "Kết nối video thử nghiệm thất bại.",
+  "remoteDesktop.setup.inputInstructions":
+    "Nhấn vào mục tiêu trong bảng thử nghiệm, rồi gõ {code}. Chuột: {mouse}. Bàn phím: {keyboard}.",
+  "remoteDesktop.setup.videoOnly": "Chỉ kiểm tra video. Kiểm tra chuột và bàn phím cần phiên bản Sunshine mới nhất.",
+  "remoteDesktop.setup.pictureConfirmed": "Đã xác nhận hình ảnh",
+  "remoteDesktop.setup.seeDesktop": "Tôi thấy màn hình máy tính của mình",
+  "remoteDesktop.setup.seeTestPanel": "Tôi thấy bảng thử nghiệm",
+  "remoteDesktop.setup.finishTest": "Kết thúc thử nghiệm",
+  // The native question on the host computer when a member asks to control it.
+  "remoteDesktop.host.questionTitle": "{name} muốn điều khiển máy tính này",
+  "remoteDesktop.host.questionDetail":
+    "{name} sẽ thấy màn hình và dùng chuột, bàn phím của bạn. Nếu bạn không trả lời trong 30 giây, OpenBot sẽ từ chối yêu cầu.",
+  "remoteDesktop.host.allow": "Cho phép",
+  "remoteDesktop.host.deny": "Từ chối",
+  // The system notification on the host computer when a member's remote desktop stream starts.
+  "remoteDesktop.host.startedTitle": "Đã bắt đầu điều khiển từ xa",
+  "remoteDesktop.host.startedBody": "{name} đang điều khiển máy tính này.",
+  // The tray or menu bar icon while a member controls the host computer.
+  "remoteDesktop.host.trayTooltip": "OpenBot: điều khiển từ xa đang bật",
+  "remoteDesktop.host.trayControlledBy": "{name} đang điều khiển máy tính này",
+  "remoteDesktop.host.stopAll": "Dừng toàn bộ điều khiển từ xa",
+} as const satisfies PartialTranslation<typeof source>;

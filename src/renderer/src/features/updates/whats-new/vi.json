@@ -1,0 +1,404 @@
+[
+  {
+    "version": "0.66.0",
+    "date": "2026-11-09",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Trợ lý tự học kỹ năng mới sau một lần sửa hoặc một phương pháp hiệu quả. Chọn Tự động, Hỏi trước hoặc Tắt trong Cài đặt máy chủ → Chung.",
+          "Thông tin đăng nhập trong Kho có thể lưu mã xác thực hai bước, và trợ lý có thể đăng nhập bằng mã đó.",
+          "Trên Windows, Dynamic Island và thanh trợ lý hiển thị trợ lý của bạn giống như trên Mac. Thanh trợ lý cũng có thể chứa các kênh.",
+          "Trợ lý có thể xem video trực tuyến công khai, ví dụ liên kết YouTube hoặc TikTok.",
+          "Chọn nhiều tệp trong Thư viện để tải xuống hoặc xóa cùng lúc.",
+          "Trợ lý có thể gửi báo cáo lỗi hoặc ý tưởng tính năng tới đội ngũ OpenBot giúp bạn."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Thành viên kênh trả lời trong khi làm việc ở cuộc trò chuyện của họ, và lời chào hoặc tin nhắn chưa rõ ràng sẽ đến người phụ trách.",
+          "Trợ lý mới mở ra cùng một lời chào ngắn và ba nhiệm vụ đầu tiên để bạn chọn.",
+          "Kết nối Composio bằng cách đăng nhập trong trình duyệt. Bạn không còn phải nhập URL và khóa API nữa.",
+          "Settings giờ có tên là Cài đặt của bạn, và Cài đặt máy chủ có thêm ô tìm kiếm.",
+          "Biểu tượng ứng dụng macOS có giao diện kính mới."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Hàng đợi của trợ lý không còn tự động bắt đầu lại cùng một tin nhắn khi trợ lý đang chờ câu trả lời của chính nó.",
+          "Trợ lý ChatGPT không còn nén ngữ cảnh lặp đi lặp lại, hoặc kẹt mãi ở \"Nén ngữ cảnh\" mà không kết thúc.",
+          "Trợ lý chạy trên Cursor và một số nhà cung cấp khác giữ nguyên các công cụ OpenBot sau khi OpenBot khởi động lại.",
+          "Trợ lý có thể dùng một máy chủ MCP từ xa mà bạn đã đăng nhập, ví dụ n8n, với phiên bản MCP mới nhất."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.65.0",
+    "date": "2026-11-08",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Trang Thư viện trên thanh điều hướng hiển thị mọi hình ảnh và tệp từ các cuộc trò chuyện của một máy chủ.",
+          "Xóa lịch sử của một cuộc trò chuyện hoặc một kênh trong phần cài đặt của nó. Thiết lập, trí nhớ và nhiệm vụ định kỳ vẫn được giữ lại.",
+          "Đọc to câu trả lời bằng ElevenLabs hoặc xAI, và ghi chính tả bằng Groq, với khóa API của bạn trong Cài đặt → Giọng nói.",
+          "Thêm Mistral làm nhà cung cấp.",
+          "Mở một trang do trợ lý tạo ra dưới dạng tab bên cạnh cuộc trò chuyện.",
+          "Chọn màu nền cuộc trò chuyện riêng cho chủ đề Sáng và chủ đề Tối trong Cài đặt → General."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Trợ lý dùng ít token hơn trong mỗi yêu cầu trên Claude, Codex, Pi, OpenCode, Grok và Hermes.",
+          "OpenBot dùng ít bộ nhớ hơn cho tab trình duyệt, trợ lý nhàn rỗi và cửa sổ ứng dụng.",
+          "Tab trình duyệt của trợ lý chờ các kiểm tra bot tự vượt qua, và hoàn tất các tác vụ ngắn trong ít bước hơn.",
+          "Thông báo có giao diện mới."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Trợ lý giờ dùng được thông tin đăng nhập mà bạn lưu trong trình quản lý mật khẩu hoặc Kho sau khi cuộc trò chuyện của trợ lý bắt đầu.",
+          "Máy chủ kết nối lại với Signal khi Signal không trả lời, nên các thiết bị không còn thấy \"The host is offline.\" cho tới khi khởi động lại.",
+          "Dynamic Island và thanh trợ lý không còn làm các ứng dụng khác bị giật trong khi trợ lý làm việc.",
+          "Trợ lý Claude dùng khóa API Anthropic giờ được hưởng khoản API credit khuyến mãi theo khóa."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.64.0",
+    "date": "2026-11-07",
+    "notices": [
+      "Nếu các trợ lý Claude của bạn dùng CLAUDE.md, kỹ năng hoặc hook của riêng bạn, hãy bật Cài đặt → Providers → Claude → Use my Claude Code setup."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Đặt trợ lý của bạn lên thanh trợ lý mới ở cạnh màn hình trên macOS. Tắt trong Cài đặt → Agent dock.",
+          "Trợ lý giờ viết cập nhật ngắn trong khi làm việc. Để dùng kiểu cũ, hãy chọn Classic trong Cài đặt máy chủ → Personality.",
+          "Bắt đầu một cuộc hội thoại mới hoặc nén ngữ cảnh của một kênh từ phần cài đặt của nó.",
+          "Thành viên của máy chủ đã tham gia có thể thêm các máy chủ MCP của riêng họ và kết nối các ứng dụng như Trello.",
+          "Chọn ai có thể điều khiển máy tính này bằng remote desktop trong Cài đặt máy chủ → Remote desktop.",
+          "Dùng OpenBot bằng tiếng Hebrew, và kết nối GitLab, Omnisend và ElevenLabs trong Marketplace."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Đính kèm tệp bất kỳ kiểu nào vào cuộc trò chuyện, ví dụ chứng chỉ hoặc hồ sơ VPN.",
+          "Web app mở và gửi tệp tối đa 100 MB.",
+          "Một tin nhắn hiển thị React, Trả lời và Thêm khi bạn di chuột qua. Tắt Cài đặt → General → Compact message actions để bật lại hàng đầy đủ.",
+          "Trên Mac, ⌘Q chỉ yêu cầu bạn giữ phím khi trợ lý đang làm việc."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Đề cập trong bài đăng Slack, Discord, Telegram và WhatsApp giờ thông báo cho người được nhắc.",
+          "Khi hạn mức của nhà cung cấp hết, trợ lý tiếp tục công việc trên mô hình dự phòng đầu tiên đã sẵn sàng.",
+          "Một cuộc trò chuyện mà đã nén lại sau mỗi lượt giờ ngừng tự động nén sau 2 lần liên tiếp.",
+          "OpenBot không còn đóng lại khi một hành động trình duyệt của trợ lý đang chờ trên một trang đang điều hướng.",
+          "Thông tin đăng nhập Proton Pass hoạt động sau khi OpenBot khởi động lại."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.63.0",
+    "date": "2026-11-06",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Chọn khi nào thẻ kế hoạch tự bắt đầu một tác vụ dài trong Cài đặt → Agents, hoặc chỉ bắt đầu khi bạn bấm Start.",
+          "Chọn tài khoản nhà cung cấp khi tạo trợ lý, nếu nhà cung cấp có nhiều hơn một tài khoản đã kết nối.",
+          "Đổi số yêu cầu mà các script cục bộ có thể gửi cho mỗi trợ lý trong một giờ trong Cài đặt → Agents → Local scripts.",
+          "Trang Usage có một tab Skill hiển thị tần suất trợ lý tải mỗi kỹ năng và nó tốn bao nhiêu.",
+          "Kết nối Higgsfield trong Marketplace để tạo hình ảnh, video và âm thanh."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Bộ chọn màu của đoạn chat có thêm 11 màu mới, và mã, bảng và thẻ trong một bong bóng màu sẽ lấy màu của nó.",
+          "Các thẻ mà trợ lý cần câu trả lời, ví dụ biểu mẫu khóa API, sẽ giống như các câu hỏi của trợ lý.",
+          "Yêu cầu trợ lý trong một kênh tạo một kênh mới hoặc đổi một kênh khác, và nó làm ngay ở đó."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Claude vẫn đăng nhập sau khi OpenBot khởi động lại hoặc cập nhật, và trợ lý Claude dùng ít của khung 5 giờ sử dụng hơn.",
+          "Các tin nhắn cũ mà bạn tải trong một cuộc trò chuyện dài vẫn được giữ. Cuộc trò chuyện không còn nhảy về các tin nhắn mới nhất.",
+          "Tự động nén ngữ cảnh của cuộc trò chuyện ChatGPT (Codex), Muse, Pi hoặc Antigravity dừng lại sau 2 lần thất bại liên tiếp, nên cuộc trò chuyện không còn dùng hết hạn mức gói.",
+          "GPT voice hoạt động với mọi trợ lý, cả khi trợ lý dùng mô hình Codex.",
+          "Trình duyệt tự điền thông tin đăng nhập đã lưu từ Proton Pass."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.62.0",
+    "date": "2026-11-05",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Gán cho một hồ sơ trình duyệt một proxy riêng trong Cài đặt máy chủ → Browser profiles, hoặc dùng chính máy tính này làm proxy trên máy chủ đã tham gia.",
+          "Kết nối Proton Pass trong Marketplace. Trình duyệt tự điền thông tin đăng nhập của Kho mà bạn chia sẻ với OpenBot.",
+          "Gõ @ trong cuộc trò chuyện của trợ lý để gắn thẻ một trong các tab trình duyệt hoặc luồng phụ của nó.",
+          "Cài đặt → Giọng nói có thêm hai mô hình ghi chính tả cục bộ: Parakeet Unified EN và Cohere Transcribe.",
+          "Một luồng hiển thị chấm xanh khi trợ lý đã viết trong đó mà bạn chưa đọc.",
+          "Trợ lý có thể gửi tệp tới các cuộc trò chuyện WhatsApp, Slack, Discord và Telegram, và tạo kho mã GitHub.",
+          "Tải Hermes Agent từ Cài đặt → Providers, và xóa một nhà cung cấp cùng CLI của nó bằng một nút."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Nhiệm vụ định kỳ chạy trong cuộc trò chuyện của trợ lý trở lại. Bật \"Run in a separate thread\" để giữ một nhiệm vụ định kỳ trong luồng riêng.",
+          "Câu hỏi của trợ lý hiển thị trong một bong bóng, một câu hỏi tại một thời điểm.",
+          "Khi trợ lý cần một khóa API, khóa được đưa vào Kho cho tất cả trợ lý theo mặc định.",
+          "Các biểu tượng có một độ dày nét, và chuyển sang màu trắng khi bạn trỏ vào."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot dùng ít năng lượng hơn khi mở mà không có việc nào.",
+          "Các cuộc trò chuyện dài cuộn mượt và mở nhanh hơn.",
+          "OpenBot không còn kẹt ở \"Connecting to OpenBot\" hoặc ở màn hình tải máy chủ khi khởi động.",
+          "Các lượt chạy nhiệm vụ định kỳ lại có Computer Use khi bật cho trợ lý."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.61.0",
+    "date": "2026-11-04",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Xóa một tin nhắn trong cuộc trò chuyện: nhấp chuột phải vào và chọn Delete. Hoạt động trong cuộc trò chuyện trợ lý, các tác vụ phụ và kênh.",
+          "Trợ lý có thể tạo, thay đổi và chạy quy trình, và bạn thấy nó xây dựng từng bước trên trang Workflows.",
+          "Nói chuyện với trợ lý Codex bằng Codex live voice. Bật trong Cài đặt → Giọng nói.",
+          "Devin và GitHub Copilot là các nhà cung cấp mới trong More providers.",
+          "Chọn màu cuộc trò chuyện riêng cho từng trợ lý và cho bạn. Trợ lý còn có nhiều màu ảnh đại diện hơn.",
+          "Trợ lý có thể lưu một khóa API hoặc mật khẩu mà bạn dán trong cuộc trò chuyện vào Kho.",
+          "Nhiệm vụ định kỳ Webhook chấp nhận các yêu cầu Standard Webhooks, ví dụ từ Composio, Svix, Clerk và Resend.",
+          "Kết nối Coinbase, Robinhood hoặc RevenueCat từ Apps marketplace."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Mỗi nhiệm vụ định kỳ của một trợ lý chạy trong luồng riêng, nên các nhiệm vụ định kỳ và cuộc trò chuyện không còn phải chờ nhau.",
+          "Trợ lý hoàn thành nhiều hơn một tác vụ trước khi dừng, và hỏi bằng thẻ xác nhận trước khi gửi, đăng, xóa hoặc thanh toán.",
+          "Các huy hiệu trên thanh bên mềm mại hơn, và một kênh được ghim hiển thị số tin nhắn chưa đọc của nó."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Một kênh có lịch sử dài mở lại nhanh chóng.",
+          "Trên Linux, OpenBot không còn yêu cầu bạn đăng nhập lại sau mỗi lần khởi động khi keyring không giữ được khóa.",
+          "Trên Windows, người phụ trách kênh định tuyến tin nhắn lại được, và bạn có thể tạo một máy chủ trên máy tính này.",
+          "Khi OpenBot cũ mở dữ liệu được lưu bởi phiên bản mới hơn, nó cài đặt phiên bản mới nhất."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.60.0",
+    "date": "2026-11-03",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Nói chuyện với trợ lý qua WhatsApp. Liên kết một số trong Marketplace → Apps → WhatsApp. Một số riêng an toàn hơn, vì WhatsApp có thể chặn các số mà nó coi là tự động.",
+          "Bắt đầu một quy trình khi có người nhắc đến OpenBot trong Slack hoặc trong một nhóm Telegram, và gửi kết quả về đó.",
+          "Dùng OpenBot bằng tiếng Arabic. Bố cục được lật từ phải sang trái.",
+          "Tắt mô hình trong Cài đặt máy chủ → Providers. Bộ chọn mô hình hiển thị các mô hình mới nhất trước, và các mô hình cũ nằm dưới một mục gập lại.",
+          "Cài đặt máy chủ có một Audit log về các thay đổi truy cập thành viên, vai trò và trợ lý.",
+          "Đăng nhập công ty: chủ máy chủ có thể kết nối Microsoft Entra ID, Okta, Google Workspace hoặc một nhà cung cấp OpenID Connect khác trong Thành viên → Đăng nhập công ty. Người có email công ty tham gia mà không cần lời mời.",
+          "Đặt cho một kênh một hình hoặc một biểu tượng trong cài đặt kênh.",
+          "Một kênh có thể lưu trí nhớ riêng, và một trợ lý có thể gửi một tác vụ tới một kênh từ cuộc trò chuyện trực tiếp của bạn.",
+          "Các luồng phụ có Trả lời trên từng tin nhắn.",
+          "Tải xuống và tải lên của một máy chủ đã tham gia hiển thị tiến trình, và một lần tải lên thất bại có nút Thử lại."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Tin nhắn trò chuyện dùng nhiều hơn của cửa sổ rộng.",
+          "Mỗi tệp mà bạn mở từ cuộc trò chuyện có tab riêng trong bảng bên.",
+          "Một đoạn văn bản dán dài hơn 4.000 ký tự trở thành tệp đính kèm pasted-text.txt, nên tin nhắn giữ toàn bộ văn bản.",
+          "OpenBot miễn phí cho mục đích cá nhân, và lần chạy đầu tiên sẽ nói điều đó."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Mã đăng nhập đến được với người dùng ở mọi khu vực.",
+          "Cửa sổ trắng sau một lần sự cố tự tải lại.",
+          "Khi Claude không thể tới máy chủ của nó, cuộc trò chuyện hiển thị các lần thử lại.",
+          "Trợ lý có mô hình dự phòng sẽ chuyển sang mô hình tiếp theo khi số dư tín dụng hoặc hạn mức hết trước khi nó bắt đầu viết."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.59.0",
+    "date": "2026-11-02",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Kimi là nhà cung cấp mới. OpenBot tải Kimi Code CLI và bạn đăng nhập bằng tài khoản Kimi Code của bạn.",
+          "Dùng Hermes Agent từ Nous Research làm nhà cung cấp, với trí nhớ, kỹ năng và thông tin đăng nhập của riêng bạn.",
+          "Trên Mac, OpenBot có biểu tượng trên thanh menu. Sau khi đóng cửa sổ, biểu tượng Dock ẩn đi và các tác vụ vẫn chạy.",
+          "Bắt đầu một quy trình khi có người nhắc đến OpenBot trong Discord, và gửi kết quả về dưới dạng trả lời, bài đăng hoặc phản ứng.",
+          "Thư mục trên thanh bên có thể chứa các thư mục, tối đa ba cấp. Kéo một cuộc trò chuyện hoặc một thư mục vào thư mục.",
+          "Chọn các mức suy luận None, Minimal và Ultra khi mô hình hỗ trợ.",
+          "Trợ lý và kênh được ghim giống nhau trên mọi thiết bị kết nối tới máy chủ.",
+          "Đính kèm hình ảnh SVG vào cuộc trò chuyện. Trợ lý đọc văn bản SVG.",
+          "Kết nối nhiều hơn một tài khoản Notion, và kết nối ClickUp từ Apps.",
+          "Một trợ lý có thể yêu cầu bạn thêm một thông tin đăng nhập, một thẻ hoặc một địa chỉ vào Kho. Bạn nhập bí mật, và trợ lý chỉ nhận được tên."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Trên Mac, giữ ⌘Q hoặc bấm hai lần để thoát. Một lần bấm nhầm không còn dừng trợ lý của bạn.",
+          "Trợ lý tự tiếp tục nhiều hơn khi gói của nó vẫn còn các bước đang mở.",
+          "Hình ảnh được dán hiển thị dưới dạng ảnh thu nhỏ phía trên ô tin nhắn, và hình ảnh đã gửi hiển thị cỡ đầy đủ.",
+          "Trợ lý chưa có ảnh giờ hiển thị robot mềm mại thể hiện việc trợ lý làm."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Đề cập trong Slack và tin nhắn trực tiếp lại đến được với OpenBot khi máy tính có workspace Slack tắt.",
+          "Các điện thoại và thiết bị khác có thể kết nối tới máy chủ của bạn cùng lúc sau khi máy tính thức dậy khỏi giấc ngủ.",
+          "Một lần tải lên cho một cuộc trò chuyện không còn chặn Send ở các cuộc trò chuyện khác.",
+          "Văn bản bạn sao chép từ OpenBot dán vào các ứng dụng khác không còn giữ màu của ứng dụng."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.58.0",
+    "date": "2026-11-01",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Bắt đầu một quy trình từ GitHub: trigger GitHub chạy trên các vấn đề mới, bình luận, pull request, review, kiểm tra thất bại hoặc một lần nhắc @openbotgit.",
+          "Thay đổi GitHub từ một quy trình: bình luận, gắn nhãn, gán, review, đóng hoặc tạo vấn đề với vai trò OpenBot GitHub App.",
+          "Marketplace có 17 trợ lý OpenBot mới, ví dụ QA Tester, PR Shepherd và Chief of Staff, và 15 kỹ năng mới cho họ.",
+          "Usage hiển thị hạn mức OpenCode Go hàng tháng thành thanh thứ ba."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Một máy chủ đã tham gia mở nhanh hơn rất nhiều. Các trợ lý và thanh bên từ lần truy cập trước của bạn hiển thị ngay trong khi ứng dụng kết nối.",
+          "Trên web, chuyển sang máy chủ khác chỉ mất khoảng 1 giây, thay vì 2 đến 3 giây.",
+          "Cửa sổ mở sớm khoảng 3 giây khi Dynamic Island đang bật."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Bạn có thể di chuyển một tin nhắn trong hàng đợi khi có hơn 32 tin nhắn đang chờ trong hàng đợi.",
+          "Một lượt của Pi không gửi gì trong 10 phút giờ dừng lại cùng một thông báo.",
+          "Một nhà cung cấp tùy chỉnh hiển thị trong bộ chọn mô hình khi OpenCode hoặc Pi chưa cài đặt.",
+          "Tên mô hình dài trong bộ chọn mô hình xuống dòng thứ hai."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.57.0",
+    "date": "2026-10-31",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Rẽ nhánh một cuộc hội thoại: nhấp chuột phải vào tin nhắn trợ lý cuối cùng của một lượt và chọn Branch from here. Một luồng mới mở ra với cuộc hội thoại tới tin nhắn đó.",
+          "Cài đặt trợ lý có một trang Instructions hiển thị tệp AGENTS.md của trợ lý. Khi trợ lý đổi chỉ dẫn của nó, cuộc trò chuyện hiển thị thay đổi kèm nút Hoàn tác.",
+          "Marketplace có trên openbot.run. Mỗi trợ lý và kỹ năng có trang riêng, và Copy link để chia sẻ.",
+          "Một trợ lý có thể trả lời cảnh báo hoặc xác nhận của một trang mà hành động trình duyệt của chính nó đã mở.",
+          "Một tác vụ kênh bị dừng hoặc thất bại có nút Cancel task."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Trí nhớ mở trong bảng cài đặt của trợ lý, với một tiêu đề ngắn cho mỗi trí nhớ và một ô tìm kiếm.",
+          "Trợ lý gửi ít token hơn trong mỗi yêu cầu, với mọi nhà cung cấp.",
+          "Mỗi nhiệm vụ định kỳ hiển thị thành một thẻ riêng với công tắc tạm dừng hoặc tiếp tục.",
+          "Cài đặt › Notifications hiển thị một thẻ cho mỗi máy chủ, với All, Needs me và Nothing thành một điều khiển."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Bản cập nhật trong ứng dụng cài được trên các Mac chậm, ví dụ Mac Intel.",
+          "Một tab trình duyệt trợ lý nhàn rỗi dùng ít bộ nhớ hơn rất nhiều.",
+          "Một trợ lý trên mô hình OpenCode Go chuyển sang mô hình dự phòng khi đạt giới hạn dùng Go.",
+          "Bảng xem trước tệp cập nhật khi trợ lý đổi tệp đang mở."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.56.0",
+    "date": "2026-10-30",
+    "notices": [],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Trợ lý làm nhiều thao tác trình duyệt trong một bước, ví dụ gõ một từ khóa tìm kiếm, bấm Enter và chờ kết quả. Các tác vụ trình duyệt hoàn tất sớm hơn và dùng ít token hơn.",
+          "Nhấp chuột phải vào một tin nhắn của trợ lý và chọn Mark unread để đọc lại sau.",
+          "Khi bạn có một máy chủ khác, bạn có thể ẩn máy chủ Local khỏi menu của nó. Trợ lý, cuộc trò chuyện và tệp của nó vẫn nằm trên máy tính của bạn.",
+          "Chọn âm thanh phát khi một tác vụ hoàn tất trong Cài đặt › Notifications."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Một nhà cung cấp dùng CLI mà bạn đã cài khi nó cùng phiên bản với bản sao của OpenBot hoặc mới hơn.",
+          "Câu trả lời phân tích của bạn theo tài khoản đi tới các thiết bị khác. Nếu bạn đã tắt phân tích trước phiên bản này, nó vẫn tắt trên máy tính này cho tới khi bạn đổi trong phần này.",
+          "Kéo tay nắm của ô Instructions để làm nó cao hơn."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Các kiểm tra của Cloudflare vượt qua trong trình duyệt tích hợp.",
+          "Mỗi CLI của nhà cung cấp dùng ít dung lượng ổ cứng hơn khoảng một nửa: OpenBot giữ một phiên bản.",
+          "Một tin nhắn mà bạn gửi cho một trợ lý đang ở giới hạn sử dụng thử lại nhà cung cấp ngay lập tức.",
+          "Trên thanh bên, một cuộc trò chuyện mà bạn kéo thả đáp xuống phần bên dưới con trỏ."
+        ]
+      }
+    ]
+  }
+]
