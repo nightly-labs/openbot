@@ -149,6 +149,8 @@ export const messages = {
     "Solo workspace richiede {tool}, che OpenBot non ha trovato. Installalo, oppure scegli Accesso completo nelle impostazioni dell'agente.",
   "error.agent.claudeSandboxUnavailable":
     "Solo workspace richiede la sandbox di Claude, che Claude non riesce ad avviare su questo computer: {reason}. Scegli Accesso completo o un altro provider nelle impostazioni dell'agente.",
+  "error.agent.claudeSandboxWindows":
+    "Solo workspace non funziona ancora per Claude su Windows, e nessuna impostazione di questo computer lo attiva. Scegli Accesso completo o un altro provider nelle impostazioni dell'agente.",
   "error.agent.screenCaptureOff":
     "L'acquisizione dello schermo è disattivata per questo agente. L'utente può attivare il Controllo del computer nelle impostazioni dell'agente.",
   "error.agent.screenCaptureUnavailable": "L'acquisizione dello schermo non è disponibile su questo computer.",

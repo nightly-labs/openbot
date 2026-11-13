@@ -139,6 +139,8 @@ export const messages = defineMessages("error.agent", {
     "Workspace only needs {tool}, which OpenBot did not find. Install it, or choose Full access in the agent settings.",
   "error.agent.claudeSandboxUnavailable":
     "Workspace only needs the Claude sandbox, which Claude cannot start on this computer: {reason}. Choose Full access or another provider in the agent settings.",
+  "error.agent.claudeSandboxWindows":
+    "Workspace only does not work for Claude on Windows yet, and no setting on this computer turns it on. Choose Full access or another provider in the agent settings.",
   "error.agent.screenCaptureOff":
     "Screen capture is off for this agent. The user can turn on Computer Use in the agent settings.",
   "error.agent.screenCaptureUnavailable": "Screen capture is not available on this computer.",

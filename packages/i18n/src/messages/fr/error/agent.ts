@@ -155,6 +155,8 @@ export const messages = {
     "« Espace de travail uniquement » nécessite {tool}, qu’OpenBot n’a pas trouvé. Installez-le, ou choisissez « Accès complet » dans les réglages de l’agent.",
   "error.agent.claudeSandboxUnavailable":
     "« Espace de travail uniquement » nécessite le bac à sable de Claude, que Claude ne peut pas démarrer sur cet ordinateur : {reason}. Choisissez « Accès complet » ou un autre fournisseur dans les réglages de l’agent.",
+  "error.agent.claudeSandboxWindows":
+    "« Espace de travail uniquement » ne fonctionne pas encore pour Claude sous Windows, et aucun réglage de cet ordinateur ne l’active. Choisissez « Accès complet » ou un autre fournisseur dans les réglages de l’agent.",
   "error.agent.screenCaptureOff":
     "La capture d’écran est désactivée pour cet agent. L’utilisateur peut activer Computer Use dans les réglages de l’agent.",
   "error.agent.screenCaptureUnavailable": "La capture d’écran n’est pas disponible sur cet ordinateur.",
