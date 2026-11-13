@@ -183,5 +183,5 @@ fi
 # `-noreset` keeps the arrow when the last client disconnects. A server whose update could not
 # install xsetroot starts with the "×".
 exec xvfb-run -a -s "-screen 0 $(display_size "$requested_size")x24 -nolisten tcp -wr -noreset" \
-  bash -c 'xsetroot -cursor_name left_ptr 2>/dev/null; export OPENBOT_AGENT_DISPLAY=$DISPLAY; exec xvfb-run -a -f "$XAUTHORITY" -s "-screen 0 1280x800x24 -nolisten tcp" "$@"' \
+  bash -c 'command -v xsetroot >/dev/null && xsetroot -cursor_name left_ptr; export OPENBOT_AGENT_DISPLAY=$DISPLAY; exec xvfb-run -a -f "$XAUTHORITY" -s "-screen 0 1280x800x24 -nolisten tcp" "$@"' \
   openbot-hosted-server "${openbot[@]}"
