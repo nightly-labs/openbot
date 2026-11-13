@@ -1652,15 +1652,15 @@ export class TurnLifecycle {
         ((mayRunAgain && this.#hooks.mayFailOver(agentId)) ||
           (mayContinue && this.#hooks.mayContinueOnBackup(agentId)));
       // Teammate results start a lead's turn, and nothing else wakes the team when that turn gives no
-      // answer (#7225). With no backup to take it, the turn runs once more on the same model. It did
-      // no step, so it repeats nothing. A second empty run shows the error.
+      // answer (#7225). With no backup to take it, the turn runs once more on the same model. A thread
+      // turn never moves to a backup, so it always runs once more here (#8503). It did no step, so it
+      // repeats nothing. A second empty run shows the error.
       const runsAgainHere =
         !failedOver &&
         mayRunAgain &&
         failover.context.causeCode === "empty_answer" &&
         failedKey !== null &&
         deliveries.length > 0 &&
-        !taskTurn &&
         !channelTurn &&
         deliveries.every(
           ({ delivery }) =>
@@ -1748,7 +1748,7 @@ export class TurnLifecycle {
         this.#hooks.scheduleDrain(agentId);
         return;
       }
-      // A thread turn does not run again, but the agent leaves the failing model before its next turn (#5220).
+      // A thread turn does not move to a backup, but the agent leaves the failing model before its next turn (#5220).
       if (failover && mayRunAgain && taskTurn && failedKey !== null && this.#hooks.mayFailOver(agentId))
         this.#markFailed(agentId, model, failover);
       // The turn did work that no backup continues, or nothing waits to run again: the error shows as

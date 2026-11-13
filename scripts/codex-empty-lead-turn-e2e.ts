@@ -8,6 +8,8 @@
 //   3. A person's message that gets an empty turn shows the error and does not run again.
 //   4. With backup models, an empty lead turn runs again on the backup model, with no error.
 //   5. A teammate update that wants no answer can end empty: it completes with no error.
+//   6. In a thread, an empty lead turn of a teammate result runs once more too, and its answer ends
+//      the thread's turn (#8503). A second empty run shows the error in the thread.
 // `bun run test:codex-empty-lead-turn`. Writes .openbot-build/codex-empty-lead-turn-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -58,8 +60,8 @@ const calls = (...items: FakeCall[]) => `<<CALLS${JSON.stringify(items)}CALLS>>`
 /**
  * A Codex app-server with the methods that the service calls. Each turn input decides the turn:
  * - `TEAM-RESULT mode:<mode>`: a lead turn with teammate results. It answers "Team done.", or ends
- *   with only its reasoning: always for `empty-always`, on the first run for `empty-once`, and on
- *   the primary model for `empty-on-primary`.
+ *   with only its reasoning: always for `empty-always` and `thread-empty-always`, on the first run
+ *   for `empty-once` and `thread-empty-once`, and on the primary model for `empty-on-primary`.
  * - `<<CALLS[...]CALLS>>`: calls the named OpenBot tools one at a time, then answers "Asked.".
  * - `TEAM-QUESTION mode:<mode>`: a teammate answers `TEAM-RESULT mode:<mode>`.
  * - `EMPTY-TURN`: ends with only its reasoning.
@@ -119,7 +121,7 @@ const decide = (text, model) => {
   if (result) {
     const mode = result[1];
     const run = nextRun(mode);
-    const empty = mode === "empty-always" || (mode === "empty-once" && run === 1) || (mode === "empty-on-primary" && model === PRIMARY);
+    const empty = mode === "empty-always" || mode === "thread-empty-always" || ((mode === "empty-once" || mode === "thread-empty-once") && run === 1) || (mode === "empty-on-primary" && model === PRIMARY);
     return { kind: "result", mode, calls: [], empty, reply: "Team done." };
   }
   const named = /<<CALLS([\\s\\S]*?)CALLS>>/.exec(text);
@@ -330,6 +332,43 @@ async function askTeam(leadId: string, teammateIds: string[], mode: string) {
   };
 }
 
+/**
+ * The lead asks one teammate from a new thread. Returns when the thread's turn of the result ended
+ * with an answer or a failure, not with a run again.
+ */
+async function askTeammateInThread(leadId: string, teammateId: string, mode: string) {
+  const since = events.length;
+  const task = await runCauseEffect(
+    agents.startTask({
+      agentId: leadId,
+      text: `Ask the team. ${calls({
+        tool: "send_message",
+        arguments: { recipientAgentIds: [teammateId], text: `TEAM-QUESTION mode:${mode}`, expectsReply: true },
+      })}`,
+    }),
+  );
+  const turns = () => fakeTurns().filter((turn) => turn.kind === "result" && turn.mode === mode);
+  await waitFor(`the thread's ${mode} result turn to end`, () => {
+    const last = turns().at(-1);
+    return events
+      .slice(since)
+      .some(
+        (event) =>
+          event.type === "thread-turn-completed" &&
+          event.taskId === task.id &&
+          event.turn.turnId === last?.turnId &&
+          (event.turn.status === "completed" || event.turn.status === "failed"),
+      );
+  });
+  const ended = await waitFor("the thread to be idle", () =>
+    agents.listTasks(leadId).tasks.find((entry) => entry.id === task.id && entry.state === "idle"),
+  );
+  const answer = agents
+    .readTask(leadId, task.id)
+    .messages.findLast((message) => message.author === "assistant" && message.itemType !== "commentary")?.text;
+  return { turns: turns(), outcome: ended.outcome, error: ended.error, answer, errors: errorsFor(leadId, since) };
+}
+
 async function lastAnswer(agentId: string): Promise<string | undefined> {
   const snapshot = await runCauseEffect(agents.readConversation(agentId));
   return snapshot.messages.findLast((message) => message.author === "assistant" && message.itemType !== "commentary")
@@ -440,6 +479,31 @@ try {
     assert.equal(fakeTurns().filter((turn) => turn.kind === "empty").length, emptyBefore + 1);
     assert.deepEqual(errorsFor(alpha.id, since), []);
     return { status: update.status };
+  });
+
+  await check("in a thread, an empty lead turn after a teammate result runs once more", async () => {
+    const outcome = await askTeammateInThread(lead.id, alpha.id, "thread-empty-once");
+    assert.deepEqual(
+      outcome.turns.map((turn) => [turn.model, turn.empty]),
+      [
+        [PRIMARY, true],
+        [PRIMARY, false],
+      ],
+      JSON.stringify(outcome),
+    );
+    assert.equal(outcome.outcome, "completed");
+    assert.equal(outcome.error, null, "The thread does not fail.");
+    assert.equal(outcome.answer, "Team done.");
+    assert.deepEqual(outcome.errors, []);
+    return outcome;
+  });
+
+  await check("in a thread, a second empty run of the same result shows the error", async () => {
+    const outcome = await askTeammateInThread(lead.id, alpha.id, "thread-empty-always");
+    assert.equal(outcome.turns.length, 2, `The result runs again only once: ${JSON.stringify(outcome)}`);
+    assert.equal(outcome.outcome, "failed");
+    assert.equal(outcome.error, NO_ANSWER);
+    return outcome;
   });
 
   report.passed = true;
