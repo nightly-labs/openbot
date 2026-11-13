@@ -1793,21 +1793,23 @@ export class TurnLifecycle {
         !routineSession &&
         (!taskTurn || laneTaskId !== null) &&
         this.#planContinues(agentId, laneTaskId, turnId, deliveries, latestAssistant?.text);
-      const continuation =
-        compactionContinuation ??
-        (planContinues
-          ? this.#planContinuation.consider({
-              agentId,
-              taskId: laneTaskId,
-              deliveryIds: deliveries.map(({ delivery }) => delivery.id),
-              plan: snapshot.messages.find((message) => message.id === `${turnId}:plan`)?.plan ?? null,
-              earlierPlan:
-                snapshot.messages.findLast(
-                  (message) => message.itemType === CONVERSATION_PLAN_ITEM_TYPE && message.turnId !== turnId,
-                )?.plan ?? null,
-              answer: latestAssistant?.text,
-            })
-          : null);
+      const considered = planContinues
+        ? this.#planContinuation.consider({
+            agentId,
+            taskId: laneTaskId,
+            deliveryIds: deliveries.map(({ delivery }) => delivery.id),
+            plan: snapshot.messages.find((message) => message.id === `${turnId}:plan`)?.plan ?? null,
+            earlierPlan:
+              snapshot.messages.findLast(
+                (message) => message.itemType === CONVERSATION_PLAN_ITEM_TYPE && message.turnId !== turnId,
+              )?.plan ?? null,
+            answer: latestAssistant?.text,
+          })
+        : null;
+      const continuation = compactionContinuation ?? (considered && considered.kind !== "stopped" ? considered : null);
+      // A chain that ends with open steps and no answer shows only a plan. The line says that the
+      // agent stopped, and what to do (#8263). A turn with an answer has told the user where it is.
+      const planStopped = considered?.kind === "stopped" && latestAssistant === undefined;
       if (!continuation) this.#planContinuation.cancel(agentId, laneTaskId);
       if (deliveries.length > 0) {
         const terminal = outcome === "failed" ? "failed" : outcome === "interrupted" ? "interrupted" : "completed";
@@ -1886,6 +1888,16 @@ export class TurnLifecycle {
                     limit: continuation.limit,
                   },
                 ),
+        });
+      } else if (planStopped) {
+        snapshot.messages.push({
+          id: `${turnId}:plan-stopped`,
+          author: "system",
+          source: "system",
+          status: "completed",
+          createdAt: new Date().toISOString(),
+          itemType: PLAN_CONTINUATION_ITEM_TYPE,
+          text: sourceText("status.agent.planStopped"),
         });
       }
       this.#conversation.emitConversation(snapshot, "turn.completed", { turnId, status: outcome });

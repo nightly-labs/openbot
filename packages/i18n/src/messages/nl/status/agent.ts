@@ -126,6 +126,7 @@ export const messages = {
   "status.agent.vaultField.email": "E-mailadres",
   "status.agent.nextStepContinues": "De agent stopte vóór de volgende stap en gaat verder ({current} van {limit}).",
   "status.agent.planContinues": "Het plan heeft open stappen. De agent gaat verder ({current} van {limit}).",
+  "status.agent.planStopped": "De agent is gestopt met open stappen in het plan. Stuur een bericht om verder te gaan.",
   "status.agent.compactionContinues":
     "De verbinding viel weg terwijl de agent zijn context comprimeerde. De agent gaat verder.",
   "status.agent.branchTitle": "Afgetakte chat",

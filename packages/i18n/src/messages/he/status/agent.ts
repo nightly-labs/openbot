@@ -121,6 +121,7 @@ export const messages = {
   "status.agent.vaultField.email": "כתובת אימייל",
   "status.agent.nextStepContinues": "הסוכן נעצר לפני השלב הבא שלו. הוא ממשיך ({current} מתוך {limit}).",
   "status.agent.planContinues": "בתוכנית יש שלבים פתוחים. הסוכן ממשיך ({current} מתוך {limit}).",
+  "status.agent.planStopped": "הסוכן עצר כשבתוכנית שלו יש שלבים פתוחים. שלחו הודעה כדי להמשיך.",
   "status.agent.compactionContinues": "החיבור נפסק בזמן שהסוכן כיווץ את ההקשר שלו. הסוכן ממשיך.",
   "status.agent.branchTitle": "צ'אט מסועף",
 } as const satisfies PartialTranslation<typeof source>;
