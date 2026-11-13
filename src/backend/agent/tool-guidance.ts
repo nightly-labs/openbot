@@ -187,6 +187,7 @@ function openbotGuidance(namespace: string, tool: string): string {
         RECIPIENT_RULE,
         "Replies are never forwarded automatically. In a channel task, use channel_assign, channel_transfer, channel_reply, or channel_result instead of openbot.send_message.",
         "With expectsReply true, OpenBot sends the result back once, in a later turn. Provider tools such as wait_agent wait only for provider subagents. Never send a request only to thank, to confirm receipt, or to say that you are done.",
+        "When independent work must not wait in the recipient's busy chat, set newThread: each recipient then gets its own side thread, the result names its task id, and a later reply to the result continues that thread.",
       ].join("\n");
     case "list_channels":
     case "send_to_channel":

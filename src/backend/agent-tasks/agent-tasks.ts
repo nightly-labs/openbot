@@ -23,6 +23,7 @@ import { z } from "zod";
 import type { ConversationRuntime } from "../agent/conversation-runtime";
 import type { TaskLanes } from "../agent/drain-scheduler";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "../agent/routine-tools";
+import { ToolOperationFailed } from "../agent/tool-operation";
 import {
   type AgentThreadOrigin,
   type AgentThreadRecord,
@@ -547,28 +548,9 @@ export class AgentTasks implements TaskLanes {
     const startedTaskId = started ? this.#mailbox.taskIdForDelivery(started.delivery.id) : null;
     const startedTask = startedTaskId ? this.#store.task(startedTaskId) : null;
     if (startedTask) return startedTaskResult(startedTask);
-    const open = this.#store.openTaskIds(caller.agentId).flatMap((taskId) => this.#store.task(taskId) ?? []);
-    const finished = open.filter((task) => this.#finished(task));
-    // A routine thread is the routine's own: its runs do not count as tasks that the agent started.
-    const unfinishedTasks = open.filter((task) => task.routineId === null && !finished.includes(task)).length;
-    if (unfinishedTasks >= AGENT_STARTED_UNFINISHED_TASKS)
-      return openBotToolFailure(
-        sourceText("error.backend.taskUnfinishedLimit", { count: AGENT_STARTED_UNFINISHED_TASKS }),
-      );
-    // The newest finished tasks that the agent started stay open, when the task list has a place for them
-    // and for the new task. The person's own tasks, branches and routine threads stay open.
-    const finishedByAgent = finished
-      .filter((task) => task.origin === "agent" && task.branch === null && task.routineId === null)
-      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
-    const others = open.length - finishedByAgent.length;
-    const kept = Math.max(0, Math.min(AGENT_STARTED_FINISHED_KEPT, INPUT_LIMITS.agentTasks - 1 - others));
-    const archived = finishedByAgent.slice(kept);
-    if (open.length - archived.length >= INPUT_LIMITS.agentTasks)
-      return openBotToolFailure(sourceText("error.backend.threadOpenLimitReached", { count: INPUT_LIMITS.agentTasks }));
-    // All of them close before the first yield, so no turn starts between the check and the close.
-    for (const task of archived) this.#closeQuietly(task);
-    const task = this.create(caller.agentId, input.title, "agent");
-    if (archived.length > 0) yield* this.#hooks.archived(caller.agentId, archived);
+    const prepared = yield* this.#preparedAgentTask(caller.agentId, input.title);
+    if ("refusal" in prepared) return openBotToolFailure(prepared.refusal);
+    const { task, archived } = prepared;
     const queued = yield* this.#mailbox
       .enqueue({
         sender: { kind: "agent", agentId: caller.agentId },
@@ -595,6 +577,68 @@ export class AgentTasks implements TaskLanes {
     this.changed(caller.agentId);
     this.#hooks.queued(caller.agentId);
     return startedTaskResult(task);
+  });
+
+  /**
+   * Checks the limits of a task that an agent starts, gives room by archiving its oldest finished
+   * ones, and creates the task. A refusal carries the localized message that the caller reports: the
+   * `start_task` tool returns it, and a teammate's new-thread send fails with it to its tool router.
+   * Calls run in the `#starts` permit of their caller.
+   */
+  readonly #preparedAgentTask = Effect.fn("AgentTasks.preparedAgentTask")(function* (
+    this: AgentTasks,
+    agentId: string,
+    title: string,
+  ): Effect.fn.Return<{ task: AgentThreadRecord; archived: AgentThreadRecord[] } | { refusal: string }> {
+    const open = this.#store.openTaskIds(agentId).flatMap((taskId) => this.#store.task(taskId) ?? []);
+    const finished = open.filter((task) => this.#finished(task));
+    // A routine thread is the routine's own: its runs do not count as tasks that the agent started.
+    const unfinishedTasks = open.filter((task) => task.routineId === null && !finished.includes(task)).length;
+    if (unfinishedTasks >= AGENT_STARTED_UNFINISHED_TASKS)
+      return {
+        refusal: sourceText("error.backend.taskUnfinishedLimit", { count: AGENT_STARTED_UNFINISHED_TASKS }),
+      };
+    // The newest finished tasks that the agent started stay open, when the task list has a place for them
+    // and for the new task. The person's own tasks, branches and routine threads stay open.
+    const finishedByAgent = finished
+      .filter((task) => task.origin === "agent" && task.branch === null && task.routineId === null)
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+    const others = open.length - finishedByAgent.length;
+    const kept = Math.max(0, Math.min(AGENT_STARTED_FINISHED_KEPT, INPUT_LIMITS.agentTasks - 1 - others));
+    const archived = finishedByAgent.slice(kept);
+    if (open.length - archived.length >= INPUT_LIMITS.agentTasks)
+      return { refusal: sourceText("error.backend.threadOpenLimitReached", { count: INPUT_LIMITS.agentTasks }) };
+    // All of them close before the first yield, so no turn starts between the check and the close.
+    for (const task of archived) this.#closeQuietly(task);
+    const task = this.create(agentId, title, "agent");
+    if (archived.length > 0) yield* this.#hooks.archived(agentId, archived);
+    return { task, archived };
+  });
+
+  /**
+   * The side thread that one recipient's independent teammate message runs in: the recipient owns it,
+   * and the title is the message's first line. It takes the same limits and archival as `start_task`,
+   * so a thread that another agent starts cannot fill the task list past it (#8134). A refusal or an
+   * empty title fails, because the caller is a tool path that reports the failure's message.
+   */
+  readonly teammateThread = Effect.fn("AgentTasks.teammateThread")(function* (
+    this: AgentTasks,
+    agentId: string,
+    text: string,
+  ): Effect.fn.Return<AgentThreadRecord, ToolOperationFailed> {
+    const title = taskTitle(text);
+    if (!title)
+      return yield* Effect.fail(
+        new ToolOperationFailed({ cause: new Error(sourceText("error.backend.threadTitleRequired")) }),
+      );
+    return yield* this.#starts.withPermit(
+      Effect.gen({ self: this }, function* () {
+        const prepared = yield* this.#preparedAgentTask(agentId, title);
+        if ("refusal" in prepared)
+          return yield* Effect.fail(new ToolOperationFailed({ cause: new Error(prepared.refusal) }));
+        return prepared.task;
+      }),
+    );
   });
 
   changed(agentId: string): void {

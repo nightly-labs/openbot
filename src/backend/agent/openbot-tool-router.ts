@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
@@ -66,6 +66,7 @@ import type { AgentClient, AgentProvider } from "../agent-client";
 import type { AgentTables } from "../agent-data/agent-tables";
 import type { AgentStore } from "../agent-store";
 import type { AgentTasks } from "../agent-tasks/agent-tasks";
+import type { AgentThreadRecord } from "../agent-threads/agent-thread-store";
 import type { AgentWaits } from "../agent-waits/agent-waits";
 import { attachmentCall, attachmentFailure } from "../attachment-effects";
 import { OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
@@ -2962,6 +2963,27 @@ export class OpenBotToolRouter {
       if (expectsReply !== undefined && typeof expectsReply !== "boolean") {
         throw new Error("expectsReply must be a boolean.");
       }
+      const newThread = params.arguments.newThread;
+      if (newThread !== undefined && typeof newThread !== "boolean") {
+        throw new Error("newThread must be a boolean.");
+      }
+      // A reply continues the thread of the message that it answers; a new thread starts one. The two
+      // destinations cannot share one call.
+      if (newThread && replyToMessageId !== undefined && replyToMessageId !== null) {
+        throw new Error(
+          "A reply continues the thread of the message that it answers, so a reply cannot also start a new thread. Send the new thread without replyToMessageId, or the reply without newThread.",
+        );
+      }
+      if (newThread) {
+        return yield* this.#sendMessageToNewThreads(
+          params,
+          senderAgentId,
+          recipientValues,
+          paths,
+          params.arguments.text,
+          expectsReply,
+        );
+      }
 
       const turnDeliveries = this.#mailbox.findDeliveriesByTurn(senderAgentId, params.turnId);
       // A request from a Slack turn: the teammate's answer goes back to that Slack thread.
@@ -3018,7 +3040,16 @@ export class OpenBotToolRouter {
         answeredRequestIds.map((requestId) => this.#mailbox.answerTaskId(senderAgentId, requestId, recipientValues)),
       );
       const [answerTaskId = null] = answerTaskIds.size === 1 ? answerTaskIds : [];
-      const taskId = answerTaskId && this.#tasks.threadId(answerTaskId) !== null ? answerTaskId : undefined;
+      // The thread belongs to the recipient: an answer to a request from its side thread runs in that
+      // thread, and a reply to a thread's result runs in that task (#8134).
+      const onlyRecipient = recipientValues.length === 1 ? recipientValues[0] : undefined;
+      const taskId =
+        answerTaskId &&
+        onlyRecipient !== undefined &&
+        this.#tasks.has(onlyRecipient, answerTaskId) &&
+        this.#tasks.threadId(answerTaskId) !== null
+          ? answerTaskId
+          : undefined;
       // The same rule for a request from a Slack thread or another external conversation (#5517).
       const messaging = this.#mailbox.answerReturn(answeredRequestIds, recipientValues);
       const text = params.arguments.text;
@@ -3062,7 +3093,125 @@ export class OpenBotToolRouter {
     Effect.catchDefect((cause) => Effect.fail(new ToolOperationFailed({ cause }))),
     Effect.uninterruptible,
   );
+
+  /**
+   * Sends one independent teammate message per recipient (#8134): each message starts a new side
+   * thread of its recipient and runs there as its first work, so it does not wait in the recipient's
+   * chat. The result still comes back to the sender. Every thread exists before any message is sent,
+   * so a limit refusal for one recipient sends nothing, and the agent can send the same request
+   * again. A retried call reuses the thread and the message that the first call made.
+   */
+  readonly #sendMessageToNewThreads = Effect.fn("OpenBotToolRouter.sendMessageToNewThreads")(function* (
+    this: OpenBotToolRouter,
+    params: DynamicToolCallParams,
+    senderAgentId: string,
+    recipientValues: readonly string[],
+    paths: string[],
+    text: string,
+    expectsReply: boolean | undefined,
+  ): Effect.fn.Return<OpenBotToolResponse, ToolOperationFailed> {
+    const turnDeliveries = this.#mailbox.findDeliveriesByTurn(senderAgentId, params.turnId);
+    // A request from a Slack turn: the teammate's answer goes back to that Slack thread.
+    const messagingReturn = turnDeliveries
+      .map(({ delivery }) => this.#mailbox.messagingOrigin(delivery.id))
+      .find((origin) => origin !== null);
+    // A request from a side thread: the teammate's answer goes back to that thread.
+    const senderTaskId = turnDeliveries
+      .map(({ delivery }) => this.#mailbox.taskIdForDelivery(delivery.id))
+      .find((taskId) => taskId !== null);
+    const idempotencyKeyOf = (recipient: string) =>
+      `teammate-thread:${createHash("sha256")
+        .update(JSON.stringify([senderAgentId, params.threadId, params.turnId, params.callId, recipient]))
+        .digest("hex")}`;
+    // One start runs at a time, like `start_task`, so parallel calls cannot pass the task limits.
+    const tasks: AgentThreadRecord[] = [];
+    const opened = yield* Effect.forEach(
+      recipientValues,
+      (recipient) =>
+        Effect.suspend(() => {
+          // The first call of this tool call made the thread; a retry reuses it.
+          const earlier = this.#mailbox.deliveryForKey(idempotencyKeyOf(recipient));
+          return earlier
+            ? toolStep(() => this.#tasks.require(recipient, this.#mailbox.taskIdForDelivery(earlier.delivery.id) ?? ""))
+            : this.#tasks.teammateThread(recipient, text).pipe(toToolOperationFailed);
+        }),
+      { concurrency: 1 },
+    ).pipe(
+      // A thread that no message took is removed, so a retry starts clean.
+      Effect.catch((failure) =>
+        Effect.sync(() => {
+          for (const task of tasks) {
+            this.#tasks.discard(task);
+            this.#tasks.changed(task.agentId);
+          }
+        }).pipe(Effect.asVoid, Effect.andThen(Effect.fail(failure))),
+      ),
+    );
+    tasks.push(...opened);
+    const threads: SentThread[] = [];
+    for (const task of tasks) {
+      const receipt = yield* this.#mailbox
+        .enqueue({
+          sender: { kind: "agent", agentId: senderAgentId },
+          recipientAgentIds: [task.agentId],
+          taskId: task.taskId,
+          text,
+          sourcePaths: paths,
+          replyToMessageId: null,
+          ...(expectsReply === undefined ? {} : { expectsReply }),
+          ...(messagingReturn ? { messagingReturn } : {}),
+          ...(senderTaskId ? { senderTaskId } : {}),
+          idempotencyKey: idempotencyKeyOf(task.agentId),
+        })
+        .pipe(
+          toToolOperationFailed,
+          // A thread whose message the mailbox could not take is removed, so a retry starts clean.
+          Effect.catch((failure) =>
+            Effect.sync(() => {
+              this.#tasks.discard(task);
+              this.#tasks.changed(task.agentId);
+            }).pipe(Effect.asVoid, Effect.andThen(Effect.fail(failure))),
+          ),
+        );
+      const delivery = receipt.deliveries[0];
+      if (!delivery) throw new Error(`The message for ${task.agentId} has no delivery.`);
+      threads.push({
+        recipientAgentId: task.agentId,
+        taskId: task.taskId,
+        threadId: task.threadId,
+        title: task.title,
+        messageId: receipt.messageId,
+        deliveryId: delivery.id,
+        status: delivery.status,
+        position: delivery.position,
+      });
+      // A task message does not steer the recipient's chat turn. The drain takes it in the task's lane.
+      this.#tasks.changed(task.agentId);
+      this.#mailboxSync.emitQueue(task.agentId);
+      this.#drain.scheduleDrain(task.agentId);
+    }
+    const snapshot = this.#conversation.ensureSnapshot(senderAgentId, params.threadId);
+    this.#mailboxSync.syncMailboxMessages(snapshot);
+    this.#conversation.emitConversation(snapshot);
+    return {
+      success: true,
+      contentItems: [{ type: "inputText", text: JSON.stringify({ threads }) }],
+    };
+  });
 }
+
+type SentThread = {
+  recipientAgentId: string;
+  /** The side thread of the recipient that the message starts and runs in. */
+  taskId: string;
+  threadId: string;
+  title: string;
+  /** The request that the thread runs first. A later reply to it continues the thread. */
+  messageId: string;
+  deliveryId: string;
+  status: QueuedMessageReceipt["deliveries"][number]["status"];
+  position: QueuedMessageReceipt["deliveries"][number]["position"];
+};
 
 type SentDelivery = QueuedMessageReceipt["deliveries"][number] & {
   outcome?: "steered" | "queued";
