@@ -161,7 +161,7 @@ export function WorkflowsCanvas(props: {
   });
   // The canvas is a direct child of the window page, which gives it the height of the pane.
   return (
-    <Show when={workflows.detail()} fallback={<WorkflowCanvasLoading />}>
+    <Show when={workflows.detail()} fallback={<WorkflowCanvasLoading error={workflows.loadError()} />}>
       {(workflow) => (
         <WorkflowCanvas
           workflow={workflow()}
@@ -178,7 +178,7 @@ export function WorkflowsCanvas(props: {
   );
 }
 
-function WorkflowCanvasLoading() {
+function WorkflowCanvasLoading(props: { error?: boolean }) {
   return (
     <main
       class="window-page workflow-page-loading"
@@ -186,11 +186,15 @@ function WorkflowCanvasLoading() {
       aria-busy="true"
       aria-label={currentText().t("common.loading")}
     >
-      <div class="workflow-page-loading-content" aria-hidden="true">
-        <Skeleton class="workflow-page-loading-title" />
-        <Skeleton class="workflow-page-loading-line" />
-        <Skeleton class="workflow-page-loading-line workflow-page-loading-line-short" />
-      </div>
+      <Show when={props.error} fallback={
+        <div class="workflow-page-loading-content" aria-hidden="true">
+          <Skeleton class="workflow-page-loading-title" />
+          <Skeleton class="workflow-page-loading-line" />
+          <Skeleton class="workflow-page-loading-line workflow-page-loading-line-short" />
+        </div>
+      }>
+        <p role="alert">{currentText().t("workflow.page.failed")}</p>
+      </Show>
     </main>
   );
 }
