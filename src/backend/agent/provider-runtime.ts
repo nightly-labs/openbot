@@ -128,6 +128,7 @@ import {
   updateProviderStatus,
   waitForSuccessfulProcess,
 } from "./provider-status";
+import { configuredProviderIdleReleaseMs } from "./provider-idle-timeout";
 import { hasZeroRealtimeLimit } from "./realtime-limit";
 import { providerForAgent, providerLabel } from "./thread-items";
 import { UsageReadGate } from "./usage-read-gate";
@@ -165,8 +166,6 @@ const accountReadDecoder = (provider: AgentProvider) =>
  * minutes, which costs more than a slow launch (#4995).
  */
 const LONG_START_TIMEOUT_MS = 180_000;
-/** How long a provider CLI stays running with nothing to do before its process is stopped. */
-const PROVIDER_IDLE_RELEASE_MS = 10 * 60_000;
 /**
  * The same for a provider no agent is set to. Every signed-in provider starts at launch to read its
  * models, and an unused OpenCode process alone held about 300 MB for the full idle time.
@@ -1010,10 +1009,13 @@ export class ProviderRuntime implements ProviderPort {
         this.#lastUsed.set(provider, now);
         continue;
       }
-      const limit = this.#hooks.isProviderAssigned(provider)
-        ? PROVIDER_IDLE_RELEASE_MS
-        : PROVIDER_UNASSIGNED_RELEASE_MS;
-      if (now - lastUsed < limit) continue;
+      const idleTimeout = configuredProviderIdleReleaseMs();
+      if (this.#hooks.isProviderAssigned(provider)) {
+        if (idleTimeout === null) continue;
+        if (now - lastUsed < idleTimeout) continue;
+      } else {
+        if (now - lastUsed < PROVIDER_UNASSIGNED_RELEASE_MS) continue;
+      }
       logger.info("Stopped an idle provider CLI.", { provider });
       yield* this.#releaseClient(provider, client);
     }
@@ -1023,7 +1025,9 @@ export class ProviderRuntime implements ProviderPort {
         continue;
       }
       if (this.#hooks.isAgentBusy(agentId)) confined.lastUsed = now;
-      if (now - confined.lastUsed < PROVIDER_IDLE_RELEASE_MS) continue;
+      const idleTimeout = configuredProviderIdleReleaseMs();
+      if (idleTimeout === null) continue;
+      if (now - confined.lastUsed < idleTimeout) continue;
       logger.info("Stopped an idle Workspace only provider process.", { provider: confined.client.provider, agentId });
       yield* this.#stopConfined(agentId, confined);
     }
