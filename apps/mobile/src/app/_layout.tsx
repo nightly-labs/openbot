@@ -23,6 +23,7 @@ import { loadOnboardingProgress } from "@/features/onboarding/model/onboarding-p
 import { resetNotificationAvatars } from "@/features/push-notifications/notification-avatars";
 import { installNotificationHandler } from "@/features/push-notifications/use-notification-taps";
 import { installQuickActions, resetQuickActions } from "@/features/quick-actions/quick-actions-native";
+import { ThemeSweep } from "@/features/settings/components/theme-sweep";
 import { loadAppLanguage } from "@/features/settings/model/app-language";
 import { loadAppearance, useAppearance } from "@/features/settings/model/appearance";
 import { loadChatOrderPreference } from "@/features/settings/model/chat-order";
@@ -191,6 +192,7 @@ function RootNavigator() {
           ) : null}
         </View>
         <BloubStage nativeSplashHidden={nativeHidden} onLayout={() => reportArtwork("stage")} />
+        <ThemeSweep />
         <AppLockOverlay />
       </View>
     </SplashContentReadyContext.Provider>
