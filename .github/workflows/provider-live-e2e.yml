@@ -6,6 +6,10 @@ name: Provider live E2E
 # by hand, never for a pull request: a pull request must not run its code on a computer that holds
 # provider sign-ins.
 on:
+  # TEMPORARY: remove before merge. It lets the branch run on the Mac mini before the merge.
+  push:
+    branches:
+      - t3/provider-e2e-ci
   workflow_dispatch:
     inputs:
       provider:
