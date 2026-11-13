@@ -241,6 +241,7 @@ function antigravityRefusedMcpTools(text: string, argv: readonly string[], sessi
 }
 
 export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
+  caseInsensitiveMcpServerNames: true,
   // Antigravity 1.5.6 starts the entry of its own `mcp_config.json` in place of a session server with
   // the same name, and does not start the session server. The user's entry and its tool limits then
   // decide what the agent can call: "tool COMPOSIO_SEARCH_TOOLS is not enabled for server composio"

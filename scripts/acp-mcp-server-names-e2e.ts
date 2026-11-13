@@ -10,18 +10,21 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
+import { AcpAgentClient } from "../src/backend/acp-client";
+import { ANTIGRAVITY_ACP_FLAVOR } from "../src/backend/acp-flavor-antigravity";
 import type { AgentClient } from "../src/backend/agent-client";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import type { McpServerDrop } from "../src/backend/mcp-provider-shapes";
 import { requireProviderDriver } from "../src/backend/provider-drivers";
 import { CustomAgentStore } from "../src/main/custom-agent-store";
-import { installFakeAgent, readJsonl, runTurn, startThread, stopClients, xorCipher } from "./provider-fakes/host";
+import { readJsonl, runTurn, startThread, stopClients, xorCipher } from "./provider-fakes/host";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/acp-mcp-server-names-e2e");
 
 interface SessionRequest {
   method: string;
   names: string[];
+  ownNames?: string[];
 }
 
 interface Report {
@@ -29,6 +32,7 @@ interface Report {
   requests?: SessionRequest[];
   drops?: McpServerDrop[];
   reply?: string;
+  antigravity?: { ownNames: string[]; names: string[]; reply: string };
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-acp-mcp-names-e2e-"));
@@ -52,11 +56,10 @@ function server(id: string, name: string): McpServerConfig {
 }
 
 try {
-  const executable = join(root, "bin", "fake-acp-agent");
+  const fakeAgent = resolve(import.meta.dirname, "provider-fakes/agents/mcp-names.ts");
   const workspace = join(root, "workspace");
   const log = join(root, "requests.jsonl");
   await mkdir(workspace);
-  await installFakeAgent(executable, "mcp-names");
 
   const store = new CustomAgentStore({ path: join(root, "custom-agents.json"), cipher: xorCipher });
   await runCauseEffect(store.load());
@@ -64,8 +67,8 @@ try {
     store.save({
       id: "names",
       name: "names",
-      command: executable,
-      args: [],
+      command: process.execPath,
+      args: [fakeAgent],
       env: [{ name: "FAKE_LOG", value: log }],
       usagePrompt: null,
     }),
@@ -125,6 +128,40 @@ try {
     ],
     "Each changed name that is taken is reported once.",
   );
+
+  const antigravityWorkspace = join(root, "antigravity-workspace");
+  const antigravityLog = join(root, "antigravity-requests.jsonl");
+  await mkdir(join(antigravityWorkspace, ".agents"), { recursive: true });
+  await writeFile(
+    join(antigravityWorkspace, ".agents", "mcp_config.json"),
+    JSON.stringify({ mcpServers: { ElevenLabs: {} } }),
+  );
+  const antigravity = new AcpAgentClient({ executable: process.execPath, version: "1.5.8", source: "system" }, 20_000, {
+    provider: "antigravity",
+    flavor: ANTIGRAVITY_ACP_FLAVOR,
+    argv: [fakeAgent],
+    env: { FAKE_LOG: antigravityLog },
+    signInMessage: "Sign in to the fake Antigravity agent.",
+    mcpServers: () => [server("elevenlabs", "elevenlabs")],
+  });
+  clients.push(antigravity);
+  antigravity.start();
+  const antigravityThread = await startThread(antigravity, { cwd: antigravityWorkspace });
+  const antigravityTurn = await runTurn(antigravity, antigravityThread, { text: "Reply with OK only." });
+  const antigravityRequests = await readJsonl<SessionRequest>(antigravityLog);
+  const antigravitySession = antigravityRequests.find(
+    (request) => request.method === "session/new" && request.names.length > 0,
+  );
+  assert.ok(antigravitySession, "Antigravity opens a session with the connector.");
+  report.antigravity = {
+    ownNames: antigravitySession.ownNames ?? [],
+    names: antigravitySession.names,
+    reply: antigravityTurn.reply,
+  };
+  assert.equal(antigravityTurn.error, null, "The Antigravity turn succeeds with the connector.");
+  assert.equal(antigravityTurn.reply, "OK", "Antigravity answers with the connector enabled.");
+  assert.deepEqual(antigravitySession.ownNames, ["ElevenLabs"]);
+  assert.deepEqual(antigravitySession.names, ["openbot_elevenlabs"]);
 
   report.passed = true;
 } finally {

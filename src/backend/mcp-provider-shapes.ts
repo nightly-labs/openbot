@@ -565,16 +565,27 @@ export type AcpMcpServer =
  * own files, travels as `openbot_<name>`, as for Codex (`codexMcpServerKey`). Computer Use keeps its
  * name, and so does a server whose renamed form is the user's too or is reserved.
  */
-export function acpMcpServerName(config: McpServerConfig, own: readonly string[] = []): string {
+function sameAcpMcpServerName(left: string, right: string, caseInsensitive: boolean): boolean {
+  return caseInsensitive ? left.toLowerCase() === right.toLowerCase() : left === right;
+}
+
+export function acpMcpServerName(
+  config: McpServerConfig,
+  own: readonly string[] = [],
+  caseInsensitive = false,
+): string {
   const name = providerMcpServerName(config.name);
-  if (config.id === COMPUTER_USE_MCP_SERVER_ID || !own.includes(name)) return name;
+  const ownHasName = (candidate: string) =>
+    own.some((serverName) => sameAcpMcpServerName(serverName, candidate, caseInsensitive));
+  if (config.id === COMPUTER_USE_MCP_SERVER_ID || !ownHasName(name)) return name;
   const renamed = `openbot_${name}`;
-  return own.includes(renamed) || isReservedMcpServerName(renamed) ? name : renamed;
+  return ownHasName(renamed) || isReservedMcpServerName(renamed) ? name : renamed;
 }
 
 export function acpMcpServers(
   servers: readonly UsableMcpServer[],
   own: readonly string[] = [],
+  caseInsensitive = false,
 ): McpHandoff<AcpMcpServer[]> {
   const entries: AcpMcpServer[] = [];
   const dropped: McpServerDrop[] = [];
@@ -585,10 +596,12 @@ export function acpMcpServers(
       continue;
     }
     const { config } = server;
-    const name = acpMcpServerName(config, own);
+    const name = acpMcpServerName(config, own, caseInsensitive);
     if (
-      entries.some((entry) => entry.name === name) ||
-      (name !== config.name && (configured.has(name) || isReservedMcpServerName(name)))
+      entries.some((entry) => sameAcpMcpServerName(entry.name, name, caseInsensitive)) ||
+      (name !== config.name &&
+        ([...configured].some((configuredName) => sameAcpMcpServerName(configuredName, name, caseInsensitive)) ||
+          isReservedMcpServerName(name)))
     ) {
       dropped.push({ name: config.name, reason: "name_conflict", detail: NAME_CONFLICT });
       continue;

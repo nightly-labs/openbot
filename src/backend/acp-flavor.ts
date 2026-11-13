@@ -232,6 +232,8 @@ export interface AcpFlavor {
    * the command line of the agent's process, which can name the folder of those files.
    */
   ownMcpServerNames?(cwd: string, argv: readonly string[]): readonly string[];
+  /** The agent resolves MCP server tool namespaces without regard to letter case. */
+  caseInsensitiveMcpServerNames?: true;
   /** Turns OpenBot's servers back on where the agent's own settings for `cwd` turned them off. */
   enableMcpServers?(cwd: string, names: readonly string[]): void;
   /** OpenBot compacts by replacing the session, for an agent that reports `usage_update` and has no compact request. */
