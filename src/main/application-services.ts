@@ -280,6 +280,7 @@ import { LanguageService } from "./language-service";
 import { LibraryFoldersService } from "./library-folders-service";
 import { LinkAccountService } from "./link-account-service";
 import { LinkAccountStore } from "./link-account-store";
+import { relaunchApp } from "./linux-appimage-relaunch";
 import { aboveAppsWindowKind, ozonePlatformArguments, setAboveAppsXWayland } from "./linux-wayland-output";
 import { localRoutineFeedDocument } from "./local-routine-calendar";
 import {
@@ -4328,7 +4329,7 @@ export async function createApplicationServices({
       // A development build only quits: its supervisor stops the stack, and a relaunched Electron
       // would run outside it with no renderer server.
       // The arguments of `process.argv`: after an XWayland start, they do not keep `--ozone-platform=x11`.
-      if (app.isPackaged) app.relaunch({ args: process.argv.slice(1) });
+      if (app.isPackaged) relaunchApp(app, process.argv.slice(1));
       app.quit();
     },
     log: (message) => logger.info(message),
