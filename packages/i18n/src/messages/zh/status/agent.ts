@@ -87,6 +87,7 @@ export const messages = {
   "status.agent.mcpServerEnable": "为该服务器上的每个助手开启 MCP 服务器 {name}。",
   "status.agent.mcpServerDisable": "为该服务器上的每个助手关闭 MCP 服务器 {name}。",
   "status.agent.mcpServerRemove": "从该服务器上的每个助手移除 MCP 服务器 {name} 及其登录。",
+  "status.agent.mcpToolCall": "运行 MCP 服务器 {name} 的工具 {tool}。",
   "status.agent.mcpSignInRequested": "MCP 服务器 {name} 需要登录。请在“服务器设置”的 MCP 中登录。",
   "status.agent.vaultAdded": "已保存到保险库：{name}",
   "status.agent.vaultUpdated": "已在保险库中修改：{name}",

@@ -140,6 +140,7 @@ import {
   DEFAULT_RESPONSE_STYLE,
   isContextResetMarker,
   isCustomProviderHarness,
+  isReservedMcpServerName,
   MODEL_SWITCH_ITEM_TYPES,
   type ModelSwitchReason,
   type QueueSteerFallback,
@@ -1946,7 +1947,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.visualPreview === undefined ? {} : { visualPreview: options.visualPreview }),
       ...(options.screenCapture === undefined ? {} : { screenCapture: options.screenCapture }),
       ...(options.videoReader === undefined ? {} : { videoReader: options.videoReader }),
-      mcpServers: mcpServersFromGateway(this.#mcp, options.prepareMcpTest),
+      // The saved http rows that the agent gets. The built-in servers are left out: OpenBot gives their
+      // tools another way, and their bearer is the main process's. A stdio server is left out too: a
+      // Workspace only provider starts it in its sandbox, and OpenBot would start it outside.
+      mcpServers: mcpServersFromGateway(this.#mcp, options.prepareMcpTest, (agentId) => {
+        const saved = new Set(this.#mcp.list().map((config) => config.id));
+        return this.enabledMcpServers(agentId).filter(
+          (config) => saved.has(config.id) && config.transport === "http" && !isReservedMcpServerName(config.name),
+        );
+      }),
       ...(options.marketplaceAppServer === undefined ? {} : { marketplaceAppServer: options.marketplaceAppServer }),
       githubConnected: () => Boolean(githubConnector?.mcpServer()),
       feedbackFacts: options.feedbackFacts ?? null,

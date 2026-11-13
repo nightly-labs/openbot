@@ -155,7 +155,7 @@ export interface DeveloperInstructionOptions {
   /**
    * The user's MCP servers whose tools the provider can defer. A code-mode-only Codex model gets them
    * in `exec`, and no request names them, so the instructions do (#4468). OpenCode 2.2.7 puts them
-   * in `execute`, behind its own `search(...)` (#7097).
+   * in `execute`, behind its own `search(...)` (#7097). Antigravity 1.5 leaves some out (#7427).
    */
   deferredMcpServers?: readonly string[];
   /** The name of the agent's instruction file in its workspace. Omitted, `AGENTS.md`. */
@@ -531,7 +531,11 @@ export function developerInstructions(
           // with openbot.tool_search found none and said that they were not enabled (#7097).
           agent.provider === "opencode"
             ? `Your MCP servers: ${options.deferredMcpServers.join(", ")}. Their tools are only in execute, and openbot.tool_search does not find them. When a tool of one is not listed there, find it with search(...) inside execute and call the path that it returns.`
-            : `Your MCP servers: ${options.deferredMcpServers.join(", ")}. When a tool of one is not in your tool list, find it with tool_search. When you have exec instead, read ALL_TOOLS in an exec cell, where MCP tool names start with mcp__, and call the tool on tools.`,
+            : // Antigravity 1.5 leaves the tools over its schema budget out of the tool list and of
+              // <mcp_servers>, with no call_mcp_tool for them, and the agent said they were not enabled (#7427).
+              agent.provider === "antigravity"
+              ? `Your MCP servers: ${options.deferredMcpServers.join(", ")}. Some of their tools can be missing from your tool list and from <mcp_servers>. Each tool has its schema in <appDataDir>/mcp/<server>/<tool>.json. Run a missing tool with openbot.tool_call: {"name":"<server>.<tool>","arguments":{...}}.`
+              : `Your MCP servers: ${options.deferredMcpServers.join(", ")}. When a tool of one is not in your tool list, find it with tool_search. When you have exec instead, read ALL_TOOLS in an exec cell, where MCP tool names start with mcp__, and call the tool on tools.`,
         ]
       : []),
     ...(options.httpMcpServers

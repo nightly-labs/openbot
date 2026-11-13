@@ -10,7 +10,7 @@ import {
   UnauthorizedClientError,
 } from "@modelcontextprotocol/sdk/server/auth/errors.js";
 import type { FetchLike, Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
+import { type CallToolRequest, ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
@@ -27,6 +27,7 @@ import {
 } from "./mcp-oauth-provider";
 import {
   clearMcpCommandCache,
+  type McpShapeFailed,
   type McpToolRuntimes,
   mcpHandoffHeaders,
   mcpLaunchEnvironment,
@@ -131,6 +132,65 @@ export const inspectMcpServer = Effect.fnUntraced(function* (
       }),
     (signIn) => Effect.sync(() => signIn?.abandon()),
   );
+});
+
+/** A call rarely takes long. The limit only stops a tool that never answers, as for GitHub's server. */
+const MCP_TOOL_CALL_TIMEOUT_MS = 5 * 60_000;
+
+export type McpToolCallResult = Awaited<ReturnType<Client["callTool"]>>;
+export type McpToolArguments = NonNullable<CallToolRequest["params"]["arguments"]>;
+
+/**
+ * Runs one tool of a server for an agent whose provider left that tool out (#7427). Silent like
+ * `inspectMcpServer`: the stored sign-in only, never a browser. One connection for the call, closed
+ * after it. A failure is a sentence with the secrets masked.
+ */
+export const callMcpServerTool = Effect.fnUntraced(function* (
+  config: McpServerConfig,
+  name: string,
+  args: McpToolArguments,
+  tools: McpToolRuntimes,
+  oauth?: Pick<McpOAuthAuthority, "accessToken">,
+): Effect.fn.Return<{ result: McpToolCallResult } | { error: string }, McpShapeFailed> {
+  const server = yield* usableMcpServer(
+    config,
+    tools,
+    oauth
+      ? (subject) =>
+          oauth
+            .accessToken(subject.url)
+            .pipe(Effect.map((authorization) => ({ url: subject.url, authorization, proxied: false })))
+      : undefined,
+  );
+  if (server.error !== undefined) return { error: boundedError(server.error) };
+  const timeoutMs = probeTimeoutMs(config);
+  const called = yield* Effect.result(
+    Effect.acquireUseRelease(
+      Effect.try({
+        try: () => ({
+          client: new Client({ name: "openbot", version: "1" }, { capabilities: {} }),
+          transport: createTransport(server, null, () => undefined),
+        }),
+        catch: (cause) => new McpProbeFailure({ cause }),
+      }),
+      ({ client, transport }) =>
+        probeIo((signal) => client.connect(transport, { signal })).pipe(
+          Effect.timeoutOrElse({
+            duration: timeoutMs,
+            orElse: () => Effect.fail(new McpProbeFailure({ cause: new McpTimeout(timeoutMs) })),
+          }),
+          Effect.andThen(
+            probeIo((signal) =>
+              client.callTool({ name, arguments: args }, undefined, { signal, timeout: MCP_TOOL_CALL_TIMEOUT_MS }),
+            ),
+          ),
+        ),
+      ({ client, transport }) => closeQuietlyEffect(client, transport),
+    ),
+  );
+  if (Result.isSuccess(called)) return { result: called.success };
+  const described = describeMcpError(called.failure.cause, config, timeoutMs);
+  return { error: boundedError(redactMcpValues(described, probeSecrets(server, null))) };
 });
 
 /** The last refusal an http server answered a connection without a sign-in provider. */

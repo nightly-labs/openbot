@@ -161,6 +161,8 @@ export const messages = {
     "画面キャプチャは Slack、Discord、Telegram の会話では使えません。ほかの人がそのファイルを受け取るためです。",
   "error.agent.screenCaptureDeclined":
     "ユーザーはこの画面キャプチャを許可しませんでした。何もキャプチャされていません。",
+  "error.agent.mcpToolDeclined":
+    "ユーザーはこの MCP ツールの呼び出しを許可しませんでした。ツールは実行されていません。",
   "error.agent.screenCaptureWindowMissing":
     "そのウィンドウは現在開いていません。list_capture_sources を呼び出して、現在のウィンドウ ID を取得してください。",
   "error.agent.screenCaptureDisplayMissing":

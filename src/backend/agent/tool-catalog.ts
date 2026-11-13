@@ -255,6 +255,14 @@ export const CODEX_DEFERRED_MCP_NOTE =
 export const OPENCODE_DEFERRED_MCP_NOTE =
   "The tools of your MCP servers are not in this catalog. They are in execute: when one is not listed there, find it with search(...) inside execute and call the path that it returns.";
 
+/**
+ * Antigravity 1.5 gives the model only the MCP tools that fit its schema budget, and leaves the others
+ * out of the tool list and of `<mcp_servers>`, with no `call_mcp_tool` for them (#7427). It still
+ * writes each schema to `<appDataDir>/mcp/<server>/<tool>.json`, and tool_call runs the tool.
+ */
+export const ANTIGRAVITY_DEFERRED_MCP_NOTE =
+  'The tools of your MCP servers are not in this catalog. When one is not in your tool list, read its schema in <appDataDir>/mcp/<server>/<tool>.json and run it with openbot.tool_call: {"name":"<server>.<tool>","arguments":{...}}.';
+
 function words(text: string): string[] {
   return text
     .toLowerCase()
@@ -434,6 +442,15 @@ export function resolveDeferredTool(
   const entry = catalogFor(provider).find((tool) => tool.name === name);
   if (!entry) return null;
   return { ...params, namespace: entry.namespace, tool: entry.tool, arguments: parsed.data.arguments };
+}
+
+/** The name and the arguments of a `tool_call`, read as `resolveDeferredTool` reads them, or `null`. */
+export function deferredCall(
+  params: DynamicToolCallParams,
+): { name: string; arguments: z.infer<typeof callShape.arguments> } | null {
+  const parsed = parseCall(params);
+  const name = parsed.success ? (parsed.data.name ?? parsed.data.tool)?.trim() : undefined;
+  return parsed.success && name ? { name, arguments: parsed.data.arguments } : null;
 }
 
 /** The lowercase queries of a tool search and their words, or `null` for invalid arguments. */
