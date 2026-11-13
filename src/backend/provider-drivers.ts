@@ -125,6 +125,12 @@ interface ProviderCliCommand {
    * which it calls in place of `logout`. Only for a sign-out.
    */
   readonly acpLogout?: true | AcpExtensionMethod;
+  /**
+   * On Windows, a sign-in at this computer also gives its page to OpenBot (`signInPageByOpenBot`).
+   * Only for a sign-in, and for a CLI that runs `BROWSER` with the page and then waits without a word
+   * when its own browser launch opens nothing.
+   */
+  readonly windowsPageByOpenBot?: true;
 }
 
 /**
@@ -204,6 +210,14 @@ interface ProviderAccountKeys {
 
 const CLAUDE_COMMAND_ENV = (cli: AgentCliInfo): Record<string, string> =>
   cli.source === "managed" ? { DISABLE_AUTOUPDATER: "1" } : {};
+
+/** The browser sign-in of Claude, for the first account and for each account after it. */
+const CLAUDE_SIGN_IN: ProviderCliCommand = {
+  argv: ["auth", "login", "--claudeai"],
+  env: CLAUDE_COMMAND_ENV,
+  timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+  windowsPageByOpenBot: true,
+};
 
 /**
  * The environment one OpenCode process gets, read at spawn time.
@@ -966,10 +980,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
   },
   {
     id: "claude",
-    signIn: {
-      kind: "cli-command",
-      command: { argv: ["auth", "login", "--claudeai"], env: CLAUDE_COMMAND_ENV, timeoutMs: CLI_LOGIN_TIMEOUT_MS },
-    },
+    // On Windows the CLI opens its page with `rundll32`. When that opens nothing, it waits for the
+    // whole timeout, and its link goes to an output that OpenBot does not read (#8454).
+    signIn: { kind: "cli-command", command: CLAUDE_SIGN_IN },
     // With no browser the CLI prints the link and a "Paste code here" prompt, on a terminal only.
     codeSignIn: {
       kind: "cli",
@@ -980,7 +993,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     // sign-out removes that item before OpenBot removes the folder.
     accounts: {
       homeVariable: "CLAUDE_CONFIG_DIR",
-      signIn: { argv: ["auth", "login", "--claudeai"], env: CLAUDE_COMMAND_ENV, timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+      signIn: CLAUDE_SIGN_IN,
       signOut: { argv: ["auth", "logout"], env: CLAUDE_COMMAND_ENV, timeoutMs: 30_000 },
     },
     // `claudeModelName` says why Claude Code's own model names are not used.
