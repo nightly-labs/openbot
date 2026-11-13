@@ -1070,39 +1070,16 @@ export function MessageActions(props: {
             <DropdownMenu.Trigger class="message-action-button" aria-label={t("chat.actions.addReaction")}>
               <ReactionIcon />
             </DropdownMenu.Trigger>
-            <DropdownMenu.Content
-              class="reaction-picker"
-              data-menu-layout="grid"
-              aria-label={t("chat.actions.chooseReaction")}
-              aria-hidden={props.pickerOpen ? undefined : "true"}
-            >
-              <div class="reaction-picker-row">
-                <DropdownMenu.RadioGroup class="reaction-picker-options" value={props.message.reaction ?? ""}>
-                  <For each={MESSAGE_REACTIONS}>
-                    {(emoji) => (
-                      <DropdownMenu.RadioItem
-                        value={emoji}
-                        aria-label={t("chat.actions.react", { emoji })}
-                        onSelect={() => props.onReact(props.message.reaction === emoji ? null : emoji)}
-                      >
-                        {emoji}
-                      </DropdownMenu.RadioItem>
-                    )}
-                  </For>
-                </DropdownMenu.RadioGroup>
-                <DropdownMenu.Item
-                  class="reaction-more-button"
-                  aria-label={t("chat.actions.moreEmoji")}
-                  closeOnSelect={false}
-                  onSelect={props.onExpandEmoji}
-                >
-                  <PlusIcon />
-                </DropdownMenu.Item>
-              </div>
-              <Show when={props.expandedEmoji}>
-                <div class="reaction-picker-row reaction-picker-more">
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content
+                class="reaction-picker"
+                data-menu-layout="grid"
+                aria-label={t("chat.actions.chooseReaction")}
+                aria-hidden={props.pickerOpen ? undefined : "true"}
+              >
+                <div class="reaction-picker-row">
                   <DropdownMenu.RadioGroup class="reaction-picker-options" value={props.message.reaction ?? ""}>
-                    <For each={MORE_MESSAGE_REACTIONS}>
+                    <For each={MESSAGE_REACTIONS}>
                       {(emoji) => (
                         <DropdownMenu.RadioItem
                           value={emoji}
@@ -1114,9 +1091,34 @@ export function MessageActions(props: {
                       )}
                     </For>
                   </DropdownMenu.RadioGroup>
+                  <DropdownMenu.Item
+                    class="reaction-more-button"
+                    aria-label={t("chat.actions.moreEmoji")}
+                    closeOnSelect={false}
+                    onSelect={props.onExpandEmoji}
+                  >
+                    <PlusIcon />
+                  </DropdownMenu.Item>
                 </div>
-              </Show>
-            </DropdownMenu.Content>
+                <Show when={props.expandedEmoji}>
+                  <div class="reaction-picker-row reaction-picker-more">
+                    <DropdownMenu.RadioGroup class="reaction-picker-options" value={props.message.reaction ?? ""}>
+                      <For each={MORE_MESSAGE_REACTIONS}>
+                        {(emoji) => (
+                          <DropdownMenu.RadioItem
+                            value={emoji}
+                            aria-label={t("chat.actions.react", { emoji })}
+                            onSelect={() => props.onReact(props.message.reaction === emoji ? null : emoji)}
+                          >
+                            {emoji}
+                          </DropdownMenu.RadioItem>
+                        )}
+                      </For>
+                    </DropdownMenu.RadioGroup>
+                  </div>
+                </Show>
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
           </DropdownMenu.Root>
         </div>
       </Show>
