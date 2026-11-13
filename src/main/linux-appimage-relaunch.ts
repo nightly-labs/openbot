@@ -14,8 +14,13 @@ const logger = createOpenBotLogger("linux-appimage-relaunch");
 // `$1` is the PID of this process. The helper stays its child until it dies; then the kernel gives
 // the helper a new parent. A second instance that starts sooner would only hand over to the old one.
 // Without `/proc` the read fails and the AppImage starts at once.
-const START_AFTER_PARENT_EXIT =
-  'while read -r _ _ _ parent _ </proc/self/stat && [ "$parent" = "$1" ]; do sleep 0.1; done; shift; exec "$@"';
+// Electron keeps the descriptors of the AppImage runtime open across `exec`. The new process must
+// not get them: they keep the old mount and its FUSE process alive for as long as it runs.
+const START_AFTER_PARENT_EXIT = [
+  'for fd in $(cd /proc/self/fd && echo *); do case $fd in *[!0-9]*|[012]) ;; *) eval "exec $fd>&-" ;; esac; done',
+  'while read -r _ _ _ parent _ </proc/self/stat && [ "$parent" = "$1" ]; do sleep 0.1; done',
+  'shift; exec "$@"',
+].join("\n");
 
 /**
  * `environment` without the entries that AppRun added for this mount (`PATH`, `LD_LIBRARY_PATH`,
@@ -49,12 +54,18 @@ export function relaunchApp(app: Pick<App, "relaunch">, args: string[]): void {
     return;
   }
   try {
-    const helper = spawn("/bin/sh", ["-c", START_AFTER_PARENT_EXIT, "sh", String(process.pid), appImage, ...args], {
-      detached: true,
-      stdio: "ignore",
-      env: withoutMountEntries(process.env, mount),
+    // bash, not sh: dash cannot close a descriptor above 9. AppRun finds bash on `PATH` in the same
+    // way. `-p` keeps `BASH_ENV` and exported functions out of the helper.
+    const helper = spawn(
+      "bash",
+      ["-p", "-c", START_AFTER_PARENT_EXIT, "bash", String(process.pid), appImage, ...args],
+      { detached: true, stdio: "ignore", env: withoutMountEntries(process.env, mount) },
+    );
+    // No bash: the error comes before the quit ends, so the relaunch of Electron still applies.
+    helper.on("error", (error) => {
+      logger.warn("The AppImage relaunch helper did not start.", toLogValue(error));
+      app.relaunch({ args });
     });
-    helper.on("error", (error) => logger.warn("The AppImage could not start again.", toLogValue(error)));
     helper.unref();
   } catch (error) {
     logger.warn("The AppImage relaunch helper did not start.", toLogValue(error));
