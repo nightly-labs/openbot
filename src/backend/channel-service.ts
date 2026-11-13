@@ -1726,7 +1726,23 @@ export class ChannelService {
                 .flatMap((match) => this.#typedAddress(eligible, task.instruction.slice(match.index))),
             ]),
           ];
-          if ("idle" in decision && !named.length) {
+          // A person's request is never idle: the lead takes it, as an unclear request, and can ask
+          // what they mean. Idle completed it with no owner and no reply, so the person saw only
+          // silence (#7908). A routine's request or an agent's handoff can still end quietly.
+          const request = task;
+          const fromPerson =
+            "idle" in decision &&
+            !named.length &&
+            channelResult(
+              yield* Effect.result(
+                channelSync(() =>
+                  channelRequester(request, root ? [request, root] : [request], (messageId) =>
+                    this.store.message(channelId, messageId),
+                  ),
+                ),
+              ),
+            ) !== null;
+          if ("idle" in decision && !named.length && !fromPerson) {
             channelResult(
               yield* Effect.result(
                 channelSync(() => this.store.update(channel, { tasks: [{ ...task, state: "completed" }] })),
@@ -1738,7 +1754,9 @@ export class ChannelService {
           const picked = [
             ...new Set(
               "idle" in decision
-                ? named
+                ? named.length
+                  ? named
+                  : [lead.id]
                 : "question" in decision
                   ? [lead.id]
                   : "agentId" in decision
