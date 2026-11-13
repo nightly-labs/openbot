@@ -222,6 +222,7 @@ const agents = new AgentService({
     signedIn: () => true,
     similar: () => Effect.succeed([]),
     send: () => Effect.die(new Error("No report is sent in this check.")),
+    withdraw: () => Effect.die(new Error("No report is removed in this check.")),
   },
 });
 

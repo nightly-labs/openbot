@@ -1,4 +1,4 @@
-import type { QueueDeliveryStatus } from "@openbot/contracts/ipc";
+import type { QueueDeliveryStatus, WithdrawFeedbackStatus } from "@openbot/contracts/ipc";
 import type { AppFormat, AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
   Button,
@@ -55,6 +55,13 @@ interface ChatActionMarkerProps {
   onOpenHostedSite?: ((url: string) => void) | undefined;
   /** Opens a web link outside the app, such as the issue of sent feedback. */
   onOpenLink?: ((url: string) => void) | undefined;
+  /** Takes the report of a thank-you card off GitHub, by the card's message id. Absent where this client cannot. */
+  onWithdrawFeedback?: ((messageId: string) => Promise<WithdrawFeedbackStatus>) | undefined;
+  /**
+   * Puts a request about a sent report in the composer, by its issue number: a corrected report, or,
+   * where `onWithdrawFeedback` is absent, a removal. Absent, a thank-you card offers no change.
+   */
+  onRequestFeedbackChange?: ((request: { number: number; change: "fix" | "remove" }) => void) | undefined;
   /** Opens or closes the messages of a run, or the runs of a group, whose marker sets `expanded`. */
   onToggleRoutineRun?: ((marker: RoutineRunToggleMarkerModel) => void) | undefined;
   /** Opens or closes the text of an agent message whose marker sets `expanded`, by its `messageId`. */
@@ -157,7 +164,23 @@ export function ChatActionMarker(props: ChatActionMarkerProps) {
                   title={sent().title}
                   number={sent().number}
                   url={sent().url}
+                  withdrawn={sent().withdrawn}
                   onOpenLink={props.onOpenLink}
+                  onWithdraw={
+                    props.onWithdrawFeedback
+                      ? () => props.onWithdrawFeedback?.(sent().messageId) ?? Promise.resolve("notFound")
+                      : undefined
+                  }
+                  onFix={
+                    props.onRequestFeedbackChange
+                      ? () => props.onRequestFeedbackChange?.({ number: sent().number, change: "fix" })
+                      : undefined
+                  }
+                  onAskRemove={
+                    props.onRequestFeedbackChange
+                      ? () => props.onRequestFeedbackChange?.({ number: sent().number, change: "remove" })
+                      : undefined
+                  }
                 />
               )}
             </Show>

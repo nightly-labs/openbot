@@ -38,8 +38,11 @@ import { isRoutineEventItem } from "./features/conversation/conversation-read-st
 
 /** The title in the host's thank-you text, which ends with it. Text from another host gives none. */
 function feedbackSentTitle(text: string): string {
-  const prefix = englishSourceText("status.agent.feedbackSent", { title: "" });
-  return text.startsWith(prefix) ? text.slice(prefix.length) : "";
+  for (const key of ["status.agent.feedbackSent", "status.agent.feedbackWithdrawn"] as const) {
+    const prefix = englishSourceText(key, { title: "" });
+    if (text.startsWith(prefix)) return text.slice(prefix.length);
+  }
+  return "";
 }
 
 export function toAgentProfile(stored: ClientAgentSummary): AgentProfile {
@@ -387,7 +390,13 @@ function chatActionMarker(
   if (install) return { kind: "server-install", ...install, timestamp: message.createdAt };
   const issue = feedbackSentIssue(message);
   if (issue)
-    return { kind: "feedback-sent", ...issue, title: feedbackSentTitle(message.text), timestamp: message.createdAt };
+    return {
+      kind: "feedback-sent",
+      messageId: message.id,
+      ...issue,
+      title: feedbackSentTitle(message.text),
+      timestamp: message.createdAt,
+    };
   if (routineEvent) {
     return {
       kind: "routine-lifecycle",

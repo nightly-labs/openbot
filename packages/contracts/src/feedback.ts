@@ -506,6 +506,8 @@ function noMentions(text: string): string {
 }
 
 const FEEDBACK_SENT_ITEM_TYPE_PREFIX = "feedback-sent:";
+/** The same card after the user took the report back. An older client shows its text. */
+const FEEDBACK_WITHDRAWN_ITEM_TYPE_PREFIX = "feedback-withdrawn:";
 
 /** The issue that the account service opened for approved feedback. */
 export interface FeedbackIssue {
@@ -513,19 +515,37 @@ export interface FeedbackIssue {
   readonly url: string;
 }
 
+/** The issue of a thank-you card, and whether the user took the report back. */
+export interface FeedbackCardIssue extends FeedbackIssue {
+  readonly withdrawn: boolean;
+}
+
+function feedbackItemType(prefix: string, number: number): string {
+  if (!Number.isSafeInteger(number) || number < 1) throw new Error("A valid issue number is required.");
+  return `${prefix}${number}`;
+}
+
 /** The item type of the chat card that thanks the user for sent feedback. It holds the issue number. */
 export function feedbackSentItemType(number: number): string {
-  if (!Number.isSafeInteger(number) || number < 1) throw new Error("A valid issue number is required.");
-  return `${FEEDBACK_SENT_ITEM_TYPE_PREFIX}${number}`;
+  return feedbackItemType(FEEDBACK_SENT_ITEM_TYPE_PREFIX, number);
+}
+
+/** The item type of a thank-you card whose report the user took off GitHub. */
+export function feedbackWithdrawnItemType(number: number): string {
+  return feedbackItemType(FEEDBACK_WITHDRAWN_ITEM_TYPE_PREFIX, number);
 }
 
 /** The issue of a thank-you card, or null for any other message. The URL comes from the number only. */
-export function feedbackSentIssue(message: ConversationMessage): FeedbackIssue | null {
+export function feedbackSentIssue(message: ConversationMessage): FeedbackCardIssue | null {
   if (message.author !== "system" || message.source !== "system" || message.status !== "completed") return null;
-  if (!message.itemType?.startsWith(FEEDBACK_SENT_ITEM_TYPE_PREFIX)) return null;
-  const digits = message.itemType.slice(FEEDBACK_SENT_ITEM_TYPE_PREFIX.length);
+  const itemType = message.itemType ?? "";
+  const withdrawn = itemType.startsWith(FEEDBACK_WITHDRAWN_ITEM_TYPE_PREFIX);
+  if (!withdrawn && !itemType.startsWith(FEEDBACK_SENT_ITEM_TYPE_PREFIX)) return null;
+  const digits = itemType.slice(
+    (withdrawn ? FEEDBACK_WITHDRAWN_ITEM_TYPE_PREFIX : FEEDBACK_SENT_ITEM_TYPE_PREFIX).length,
+  );
   if (!/^[1-9][0-9]{0,15}$/u.test(digits)) return null;
   const number = Number(digits);
   if (!Number.isSafeInteger(number)) return null;
-  return { number, url: `https://github.com/${FEEDBACK_REPOSITORY}/issues/${number}` };
+  return { number, url: `https://github.com/${FEEDBACK_REPOSITORY}/issues/${number}`, withdrawn };
 }

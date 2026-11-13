@@ -409,6 +409,7 @@ export const messages = {
   "error.backend.branchSourceBusy": "Остановите текущий ход, прежде чем создать ответвление этого чата.",
   "error.backend.branchMessageNotFound": "Ответвление можно создать только от завершённого ответа агента.",
   "error.backend.branchRemoteUnsupported": "Ответвления доступны только для агентов на этом компьютере.",
+  "error.backend.feedbackWithdrawRemoteUnsupported": "Чтобы удалить этот отчёт, попросите агента удалить его.",
   "error.backend.threadMoveRefused":
     "В новой ветке можно запустить только сообщение, которое вы отправили одному этому агенту.",
   "error.backend.taskTitleRequired": "Дайте задаче короткое название.",

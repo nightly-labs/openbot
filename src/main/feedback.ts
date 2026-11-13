@@ -11,10 +11,10 @@ import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Effect } from "effect";
 import { app } from "electron";
 import { version as developmentVersion } from "../../package.json";
-import type { AgentFeedback, FeedbackSendResult } from "../backend/agent/openbot-tool-router";
+import type { AgentFeedback, FeedbackSendResult, FeedbackWithdrawResult } from "../backend/agent/openbot-tool-router";
 import { type ToolOperationFailed, toToolOperationFailed } from "../backend/agent/tool-operation";
 import type { CentralAuthOperationError } from "./central-auth-effects";
-import { authApiRateLimit } from "./central-auth-manager";
+import { authApiErrorCode, authApiRateLimit } from "./central-auth-manager";
 
 const logger = createOpenBotLogger("feedback");
 
@@ -112,6 +112,42 @@ export function feedbackSender(auth: FeedbackAuth): AgentFeedback {
                 daily: limit.code === "feedback_daily_limit",
                 retryAfterSeconds: limit.retryAfterSeconds,
               } as const);
+            }),
+            toToolOperationFailed,
+          );
+      }),
+    withdraw: (number) =>
+      Effect.suspend((): Effect.Effect<FeedbackWithdrawResult, ToolOperationFailed> => {
+        if (auth.getState().status !== "signed_in") return Effect.succeed({ status: "signedOut" } as const);
+        return auth
+          .requestAuthorized(
+            "/v1/feedback/withdraw",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ number }),
+            },
+            (value) => {
+              decodeRecord(value, "Withdrawn feedback");
+              return { status: "withdrawn" } as const;
+            },
+          )
+          .pipe(
+            Effect.catch((error): Effect.Effect<FeedbackWithdrawResult, CentralAuthOperationError> => {
+              const code = authApiErrorCode(error.cause);
+              // Another account sent it, or the account service changed its key since the send.
+              if (code === "feedback_not_yours") return Effect.succeed({ status: "notYours" } as const);
+              // No private repository, no GitHub App, or no feedback on this account service.
+              if (
+                code === "feedback_withdraw_unavailable" ||
+                code === "github_app_unavailable" ||
+                code === "feedback_unavailable"
+              )
+                return Effect.succeed({ status: "unavailable" } as const);
+              const limit = authApiRateLimit(error.cause);
+              if (limit)
+                return Effect.succeed({ status: "limited", retryAfterSeconds: limit.retryAfterSeconds } as const);
+              return Effect.fail(error);
             }),
             toToolOperationFailed,
           );

@@ -69,6 +69,8 @@ import { chatSearchCanOpen, chatSearchOpensMessage } from "./chat-search";
 import { isChatVisualAppShortcut } from "./chat-visual-shortcuts";
 import { chatVisualPageUrl } from "./chat-visual-url";
 import { ApprovalCard, preloadConversationCards, QuestionPromptBubble, UiBlockPrompt } from "./conversation-cards";
+import { useConversationController } from "./conversation-controller-context";
+import { conversationPort } from "./conversation-port";
 import { isIncomingAgentMessage } from "./conversation-read-state";
 import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
@@ -233,6 +235,7 @@ export function ConversationTimeline() {
     messagePins,
   } = useConversationViewScope();
   const { t, format, sourceText } = useText();
+  const controller = useConversationController();
   // A named function, not a ternary in the prop: the compiler wraps a ternary prop in a memo, and
   // the avatar reads it in a tracked effect, where a new memo halts the reactive system.
   const waitingProviderName = () => {
@@ -382,6 +385,36 @@ export function ConversationTimeline() {
     if (!props.runtime && props.server?.kind === "local") return localInstructions;
     const serverId = instructionsServerId();
     return serverId === undefined ? undefined : agentInstructionsCalls(serverId, webInstructionsApi());
+  });
+  /**
+   * Remove on a thank-you card. The report went out with the account of this computer, so only the
+   * desktop's own agents have it; the agent of a joined server removes it with `withdraw_feedback`.
+   */
+  const withdrawFeedback = createMemo(() => {
+    const agentId = props.agent?.id;
+    const server = props.server;
+    if (props.runtime || channel || !agentId || server?.kind !== "local") return undefined;
+    return (messageId: string) =>
+      conversationPort()
+        .agent.withdrawFeedback({ agentId, messageId }, server.id)
+        .then(({ status }) => status);
+  });
+  /**
+   * Fix or remove on a thank-you card puts the request in the composer: the agent removes the report
+   * and sends the corrected text with `withdraw_feedback` and `send_feedback`. It is also how a joined
+   * server's report is removed.
+   */
+  const requestFeedbackChange = createMemo(() => {
+    const agentId = props.agent?.id;
+    const server = props.server;
+    if (channel || !agentId || !server) return undefined;
+    return (request: { number: number; change: "fix" | "remove" }) =>
+      controller.appendPluginPrompt(
+        { serverId: server.id, agentId },
+        t(request.change === "fix" ? "chat.feedbackSent.fixPrompt" : "chat.feedbackSent.removePrompt", {
+          number: String(request.number),
+        }),
+      );
   });
   /** The agent that asks in a card: in a channel, the working agent whose card shows. */
   const interactionAgentName = () => (channel ? channel.interactionAgentName() : props.agent?.name);
@@ -1122,6 +1155,8 @@ export function ConversationTimeline() {
                                                         openRoutineThread={openRoutineThread}
                                                         onOpenHostedSite={(url) => void openExternalMessageUrl(url)}
                                                         onOpenLink={(url) => void openExternalMessageUrl(url)}
+                                                        onWithdrawFeedback={withdrawFeedback()}
+                                                        onRequestFeedbackChange={requestFeedbackChange()}
                                                         onToggleRoutineRun={toggleRoutineRun}
                                                         onToggleAgentMessage={toggleAgentMessage}
                                                         agentMessageText={agentMessageText}

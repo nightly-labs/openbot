@@ -501,4 +501,31 @@ export const messages = {
   "chat.feedbackSent.badge": "Gesendet",
   "chat.feedbackSent.body": "Das OpenBot-Team liest es und kümmert sich darum 💜",
   "chat.feedbackSent.openNamed": "Issue #{number} auf GitHub öffnen",
+  "chat.feedbackSent.remove": "Entfernen",
+  "chat.feedbackSent.removeConfirm":
+    "Diesen Bericht von GitHub entfernen? Er wird für alle entfernt, und du kannst das nicht rückgängig machen.",
+  "chat.feedbackSent.fixOrRemove": "Korrigieren oder entfernen",
+  "chat.feedbackSent.fixChoice": "Korrigierten Bericht senden",
+  "chat.feedbackSent.fixChoiceHint":
+    "Der Agent entfernt diesen Bericht und sendet ihn ohne die Teile, die du wählst, erneut.",
+  "chat.feedbackSent.removeChoice": "Entfernen",
+  "chat.feedbackSent.removeChoiceHint": "Von GitHub entfernen. Das kannst du nicht rückgängig machen.",
+  "chat.feedbackSent.fixPrompt": "Entferne meinen Bericht #{number} von GitHub und sende ihn erneut ohne Folgendes:",
+  "chat.feedbackSent.removePrompt": "Entferne meinen Bericht #{number} von GitHub.",
+  "chat.feedbackSent.composerFilled":
+    "Die Anfrage steht in deinem Nachrichtenfeld. Vervollständige sie und sende sie dann.",
+  "chat.feedbackSent.keep": "Behalten",
+  "chat.feedbackSent.removing": "Wird entfernt…",
+  "chat.feedbackSent.removeFailed":
+    "OpenBot konnte ihn nicht entfernen. Prüfe deine Verbindung und versuche es erneut.",
+  "chat.feedbackSent.removeSignedOut": "Melde dich bei OpenBot an, um ihn zu entfernen.",
+  "chat.feedbackSent.removeNotYours":
+    "OpenBot kann diesen Bericht nicht entfernen. Er wurde gesendet, bevor Berichte entfernt werden konnten, oder mit einem anderen Konto.",
+  "chat.feedbackSent.removeUnavailable": "OpenBot kann gerade keine Berichte entfernen. Versuche es später erneut.",
+  "chat.feedbackSent.removeLimited": "Zu viele Versuche. Warte eine Minute und versuche es dann erneut.",
+  "chat.feedbackSent.removeNotFound": "OpenBot findet diesen Bericht nicht im Chat.",
+  "chat.feedbackWithdrawn.title": "Bericht entfernt",
+  "chat.feedbackWithdrawn.badge": "Entfernt",
+  "chat.feedbackWithdrawn.body":
+    "Dein Bericht ist nicht mehr auf GitHub. Um einen korrigierten Bericht zu senden, bitte den Agenten darum.",
 } as const satisfies PartialTranslation<typeof source>;

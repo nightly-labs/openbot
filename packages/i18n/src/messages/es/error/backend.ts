@@ -422,6 +422,7 @@ export const messages = {
   "error.backend.branchSourceBusy": "Detén el turno actual antes de crear una rama de este chat.",
   "error.backend.branchMessageNotFound": "Solo puedes crear una rama desde una respuesta terminada del agente.",
   "error.backend.branchRemoteUnsupported": "Las ramas solo están disponibles para los agentes de este equipo.",
+  "error.backend.feedbackWithdrawRemoteUnsupported": "Para eliminar este informe, pide al agente que lo elimine.",
   "error.backend.threadMoveRefused":
     "Solo un mensaje que enviaste únicamente a este agente puede ejecutarse en un hilo nuevo.",
   "error.backend.taskTitleRequired": "Dale a la tarea un título corto.",

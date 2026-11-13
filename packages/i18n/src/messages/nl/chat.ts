@@ -492,4 +492,30 @@ export const messages = {
   "chat.feedbackSent.badge": "Verzonden",
   "chat.feedbackSent.body": "Het OpenBot-team leest het en pakt het op 💜",
   "chat.feedbackSent.openNamed": "Issue #{number} openen op GitHub",
+  "chat.feedbackSent.remove": "Verwijderen",
+  "chat.feedbackSent.removeConfirm":
+    "Deze melding van GitHub verwijderen? Hij wordt voor iedereen verwijderd, en je kunt dit niet ongedaan maken.",
+  "chat.feedbackSent.fixOrRemove": "Verbeteren of verwijderen",
+  "chat.feedbackSent.fixChoice": "Verbeterde melding sturen",
+  "chat.feedbackSent.fixChoiceHint":
+    "De agent verwijdert deze melding en stuurt hem opnieuw zonder de delen die je kiest.",
+  "chat.feedbackSent.removeChoice": "Verwijderen",
+  "chat.feedbackSent.removeChoiceHint": "Van GitHub halen. Je kunt dit niet ongedaan maken.",
+  "chat.feedbackSent.fixPrompt": "Verwijder mijn melding #{number} van GitHub en stuur hem opnieuw zonder dit:",
+  "chat.feedbackSent.removePrompt": "Verwijder mijn melding #{number} van GitHub.",
+  "chat.feedbackSent.composerFilled": "Het verzoek staat in je berichtveld. Vul het aan en stuur het dan.",
+  "chat.feedbackSent.keep": "Bewaren",
+  "chat.feedbackSent.removing": "Verwijderen…",
+  "chat.feedbackSent.removeFailed":
+    "OpenBot kon hem niet verwijderen. Controleer je verbinding en probeer het opnieuw.",
+  "chat.feedbackSent.removeSignedOut": "Log in bij OpenBot om hem te verwijderen.",
+  "chat.feedbackSent.removeNotYours":
+    "OpenBot kan deze melding niet verwijderen. Hij is verstuurd voordat meldingen verwijderd konden worden, of met een ander account.",
+  "chat.feedbackSent.removeUnavailable": "OpenBot kan nu geen meldingen verwijderen. Probeer het later opnieuw.",
+  "chat.feedbackSent.removeLimited": "Te veel pogingen. Wacht een minuut en probeer het dan opnieuw.",
+  "chat.feedbackSent.removeNotFound": "OpenBot kan deze melding niet vinden in de chat.",
+  "chat.feedbackWithdrawn.title": "Melding verwijderd",
+  "chat.feedbackWithdrawn.badge": "Verwijderd",
+  "chat.feedbackWithdrawn.body":
+    "Je melding staat niet meer op GitHub. Vraag de agent om een verbeterde melding te sturen.",
 } as const satisfies PartialTranslation<typeof source>;

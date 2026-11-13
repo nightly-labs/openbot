@@ -38,6 +38,11 @@ export const messages = {
   "status.agent.feedbackRecentErrors": "Recente fouten in de chat:",
   "status.agent.feedbackSameAs": "Wordt toegevoegd aan issue #{issue}",
   "status.agent.feedbackSent": "Naar het OpenBot-team gestuurd: {title}",
+  "status.agent.feedbackWithdrawn": "Verwijderd van GitHub: {title}",
+  "status.agent.feedbackWithdrawCommand": "Melding #{issue} van GitHub verwijderen",
+  "status.agent.feedbackWithdrawReason":
+    "Niemand kan deze melding nog op GitHub zien. Je kunt dit niet ongedaan maken. Om de melding te verbeteren, kan de agent een verbeterde melding sturen.",
+  "status.agent.feedbackWithdrawing": "Je melding wordt van GitHub verwijderd…",
   "status.agent.serverInstallCommand":
     "Een eenmalige opdracht maken die OpenBot op een andere computer installeert als de server {name} en die aanmeldt bij je account. De agent voert hem daar uit.",
   "status.agent.serverInstallCard": "Installatieopdracht voor de server {name}",

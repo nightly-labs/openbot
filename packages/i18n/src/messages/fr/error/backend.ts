@@ -431,6 +431,7 @@ export const messages = {
     "Vous pouvez créer une branche uniquement à partir d'une réponse terminée de l'agent.",
   "error.backend.branchRemoteUnsupported":
     "Les branches sont disponibles uniquement pour les agents de cet ordinateur.",
+  "error.backend.feedbackWithdrawRemoteUnsupported": "Pour supprimer ce rapport, demandez à l’agent de le supprimer.",
   "error.backend.threadMoveRefused":
     "Seul un message envoyé uniquement à cet agent peut s’exécuter dans un nouveau fil.",
   "error.backend.taskTitleRequired": "Donnez un titre court à la tâche.",

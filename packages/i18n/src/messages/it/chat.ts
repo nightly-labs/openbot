@@ -491,4 +491,29 @@ export const messages = {
   "chat.feedbackSent.badge": "Inviato",
   "chat.feedbackSent.body": "Il team di OpenBot lo leggerà e se ne occuperà 💜",
   "chat.feedbackSent.openNamed": "Apri la issue #{number} su GitHub",
+  "chat.feedbackSent.remove": "Rimuovi",
+  "chat.feedbackSent.removeConfirm":
+    "Rimuovere questa segnalazione da GitHub? Viene rimossa per tutti e non puoi annullare.",
+  "chat.feedbackSent.fixOrRemove": "Correggi o rimuovi",
+  "chat.feedbackSent.fixChoice": "Invia una segnalazione corretta",
+  "chat.feedbackSent.fixChoiceHint":
+    "L’agente rimuove questa segnalazione e la invia di nuovo senza le parti che scegli.",
+  "chat.feedbackSent.removeChoice": "Rimuovila",
+  "chat.feedbackSent.removeChoiceHint": "Toglila da GitHub. Non puoi annullare.",
+  "chat.feedbackSent.fixPrompt": "Rimuovi la mia segnalazione #{number} da GitHub e inviala di nuovo senza questo:",
+  "chat.feedbackSent.removePrompt": "Rimuovi la mia segnalazione #{number} da GitHub.",
+  "chat.feedbackSent.composerFilled": "La richiesta è nella casella del messaggio. Completala, poi inviala.",
+  "chat.feedbackSent.keep": "Tienila",
+  "chat.feedbackSent.removing": "Rimozione…",
+  "chat.feedbackSent.removeFailed": "OpenBot non è riuscito a rimuoverla. Controlla la connessione e riprova.",
+  "chat.feedbackSent.removeSignedOut": "Accedi a OpenBot per rimuoverla.",
+  "chat.feedbackSent.removeNotYours":
+    "OpenBot non può rimuovere questa segnalazione. È stata inviata prima che fosse possibile rimuoverle, o con un altro account.",
+  "chat.feedbackSent.removeUnavailable": "OpenBot non può rimuovere segnalazioni ora. Riprova più tardi.",
+  "chat.feedbackSent.removeLimited": "Troppi tentativi. Attendi un minuto, poi riprova.",
+  "chat.feedbackSent.removeNotFound": "OpenBot non trova questa segnalazione nella chat.",
+  "chat.feedbackWithdrawn.title": "Segnalazione rimossa",
+  "chat.feedbackWithdrawn.badge": "Rimossa",
+  "chat.feedbackWithdrawn.body":
+    "La tua segnalazione non è più su GitHub. Per inviarne una corretta, chiedilo all’agente.",
 } as const satisfies PartialTranslation<typeof source>;

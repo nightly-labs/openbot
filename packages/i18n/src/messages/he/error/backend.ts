@@ -387,6 +387,7 @@ export const messages = {
   "error.backend.branchSourceBusy": "יש לעצור את התור הנוכחי לפני שמפצלים את הצ'אט הזה.",
   "error.backend.branchMessageNotFound": "אפשר לפצל רק מתשובה שהסוכן סיים.",
   "error.backend.branchRemoteUnsupported": "פיצולים זמינים רק לסוכנים שנמצאים במחשב הזה.",
+  "error.backend.feedbackWithdrawRemoteUnsupported": "כדי להסיר את הדיווח הזה, בקשו מהסוכן להסיר אותו.",
   "error.backend.threadMoveRefused": "רק הודעה ששלחת לסוכן הזה לבדו יכולה לרוץ בשרשור חדש.",
   "error.backend.taskTitleRequired": "יש לתת למשימה כותרת קצרה.",
   "error.backend.taskToolInvalid": "יש לתת למשימה כותרת של עד 120 תווים ותקציר שאומר מה לעשות.",

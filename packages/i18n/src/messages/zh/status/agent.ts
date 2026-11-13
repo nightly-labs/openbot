@@ -31,6 +31,11 @@ export const messages = {
   "status.agent.feedbackRecentErrors": "聊天中的最近错误：",
   "status.agent.feedbackSameAs": "添加到 issue #{issue}",
   "status.agent.feedbackSent": "已发送给 OpenBot 团队：{title}",
+  "status.agent.feedbackWithdrawn": "已从 GitHub 删除：{title}",
+  "status.agent.feedbackWithdrawCommand": "从 GitHub 删除报告 #{issue}",
+  "status.agent.feedbackWithdrawReason":
+    "任何人都无法再在 GitHub 上看到此报告。此操作无法撤销。如需修改，助手可以发送一份修正后的报告。",
+  "status.agent.feedbackWithdrawing": "正在从 GitHub 删除你的报告…",
   "status.agent.serverInstallCommand":
     "创建一个一次性命令，在另一台计算机上把 OpenBot 安装为服务器 {name}，并登录到你的账户。代理会在那里运行它。",
   "status.agent.serverInstallCard": "服务器 {name} 的安装命令",
