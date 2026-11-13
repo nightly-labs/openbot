@@ -33,6 +33,7 @@ import { BROWSING_MEMORY_CAPABILITY } from "@openbot/contracts/team-protocol/bro
 import { CONNECTORS_CAPABILITY } from "@openbot/contracts/team-protocol/connectors-v1";
 import {
   AGENT_HIDDEN_WORK_CAPABILITY,
+  AGENT_RELAY_CAPABILITY,
   AGENT_WELCOME_CAPABILITY,
   MCP_MEMBER_ACCESS_CAPABILITY,
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
@@ -98,6 +99,7 @@ import {
   remoteRecoveryMessage,
   runTeamEffect,
 } from "@openbot/team-client";
+import { runAgentRelayTick } from "@openbot/team-client/agent-relay";
 import { verifyEd25519Base64Url } from "@openbot/team-client/ed25519";
 import { createFocusUsePing } from "@openbot/team-client/focus-use";
 import { createHostedServerWake, WAKE_RECONNECT_DELAY_MS } from "@openbot/team-client/hosted-server-wake";
@@ -742,6 +744,25 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         .then(agentAvatarDataUrl),
     [request, queryClient, queryScope],
   );
+  // Cross-server relay (`agent-relay-v1`): while the app is in the foreground, this phone carries
+  // teammate envelopes between capable hosts. Routes are in memory; a lost route only delays a reply.
+  const relayRoutes = useRef(new Map<string, string>());
+  const relayTick = useCallback(async () => {
+    const hosts = serversRef.current.map((server) => ({
+      id: server.id,
+      name: server.name,
+      capable: showsOnline(server) && hasCapability(serverCapabilities.current, server.id, AGENT_RELAY_CAPABILITY),
+      agents: agentsRef.current.filter((agent) => agent.serverId === server.id),
+      request: <T,>(method: string, path: string, decode: (value: unknown) => T, body?: TeamProtocolV2Json) =>
+        request(method, path, decode, body, server.id),
+    }));
+    await runAgentRelayTick(hosts, relayRoutes.current).catch(() => undefined);
+  }, [request]);
+  useEffect(() => {
+    void relayTick();
+    const timer = setInterval(() => void relayTick(), 30_000);
+    return () => clearInterval(timer);
+  }, [relayTick]);
   const postLiveActivityAction = useCallback(
     (serverId: string, path: string, body: TeamProtocolV2Json) => request("POST", path, ignoreResponse, body, serverId),
     [request],
@@ -2575,6 +2596,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       agents,
       activeServer,
       activeAgents,
+      allAgents: agents,
       hiddenAgents,
       pinnedAgentIds,
       pinnedChannelIds,

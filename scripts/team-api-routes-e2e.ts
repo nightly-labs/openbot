@@ -128,6 +128,7 @@ import {
   AGENT_QUEUE_TASK_CAPABILITY,
   AGENT_QUEUE_TASK_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-queue-task-v1";
+import { AGENT_RELAY_CAPABILITY, AGENT_RELAY_ROUTES } from "@openbot/contracts/team-protocol/agent-relay-v1";
 import { AGENT_SPEED_CAPABILITY, AGENT_SPEED_ROUTES } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import {
   AGENT_TASK_LIMIT_CAPABILITY,
@@ -1006,6 +1007,10 @@ function pinnedSnapshot(agentId: string, messageIds: string[] = ["message-pinned
   };
 }
 
+// The relay fake: a member-bound outbox and a delivered set, as the real store keeps them.
+const relayDelivered = new Set<string>();
+const relayOutbox: Array<{ memberId: string; envelopeId: string }> = [];
+
 const fakeAgents: TeamApiAgents = {
   on: (_event, listener) => {
     agentEventListeners.add(listener);
@@ -1019,6 +1024,43 @@ const fakeAgents: TeamApiAgents = {
     throw new Error(`The status backend failed with ${FAKE_SECRET}.`);
   },
   listAgents: () => agents,
+  relayReplaceDirectory: (memberId, peers) => {
+    record("relayReplaceDirectory", memberId, peers);
+  },
+  relayClaim: (memberId) => {
+    record("relayClaim", memberId);
+    return relayOutbox
+      .filter((entry) => entry.memberId === memberId)
+      .map((entry) => ({
+        envelopeId: entry.envelopeId,
+        kind: "request" as const,
+        recipientAgentId: "peer-1",
+        originAgentId: "agent-ada",
+        originAgentName: "Ada",
+        originServerName: "Rosie",
+        text: "Relayed request.",
+        expectsReply: true,
+        createdAt: "2026-11-10T08:00:00.000Z",
+        expiresAt: "2026-11-11T08:00:00.000Z",
+      }));
+  },
+  relayAck: (memberId, envelopeId) => {
+    record("relayAck", memberId, envelopeId);
+    const index = relayOutbox.findIndex((entry) => entry.memberId === memberId && entry.envelopeId === envelopeId);
+    if (index >= 0) relayOutbox.splice(index, 1);
+    return index >= 0;
+  },
+  relayCancel: (envelopeId) => {
+    record("relayCancel", envelopeId);
+    return false;
+  },
+  relayDeliver: (memberId, envelope) =>
+    Effect.sync(() => {
+      record("relayDeliver", memberId, envelope);
+      const duplicate = relayDelivered.has(envelope.envelopeId);
+      relayDelivered.add(envelope.envelopeId);
+      return { messageId: "message-relay-1", duplicate };
+    }),
   listWaits: (agentId) => {
     record("listWaits", agentId);
     return {
@@ -3246,6 +3288,100 @@ try {
       "the hidden-agent routes without the capability get 400 agentHideUnsupported",
       errorIs(unsupported, 400, sourceText("error.team.agentHideUnsupported")),
       summary(unsupported),
+    );
+
+    // ---- Agent relay (agent-relay-v1) ----
+    const relayV9 = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const relayV8 = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises agent-relay-v1 to a protocol 9 peer only",
+      list(field(relayV9.body, "capabilities")).includes(AGENT_RELAY_CAPABILITY) &&
+        !list(field(relayV8.body, "capabilities")).includes(AGENT_RELAY_CAPABILITY),
+      [summary(relayV9), summary(relayV8)],
+    );
+    const relayEnvelope = {
+      envelopeId: "env-relay-deliver-1",
+      kind: "request",
+      recipientAgentId: "agent-ada",
+      originAgentId: "agent-on-rosie",
+      originAgentName: "Hermes",
+      originServerName: "Rosie",
+      text: "Please check the render queue.",
+      expectsReply: true,
+      createdAt: "2026-11-10T08:00:00.000Z",
+      expiresAt: "2999-11-11T08:00:00.000Z",
+    };
+    const relayDeliverCalls = callsOf("relayDeliver").length;
+    const relayUnsupported = await call("POST", AGENT_RELAY_ROUTES.deliver, {
+      token: bobToken,
+      json: relayEnvelope,
+      capabilities: [],
+    });
+    check(
+      "a relay delivery without the capability gets 400 agentRelayUnsupported and reaches no service",
+      errorIs(relayUnsupported, 400, sourceText("error.team.agentRelayUnsupported")) &&
+        callsOf("relayDeliver").length === relayDeliverCalls,
+      summary(relayUnsupported),
+    );
+    const relayDelivered = await call("POST", AGENT_RELAY_ROUTES.deliver, {
+      token: bobToken,
+      json: relayEnvelope,
+      capabilities: [AGENT_RELAY_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    const relayDuplicate = await call("POST", AGENT_RELAY_ROUTES.deliver, {
+      token: bobToken,
+      json: relayEnvelope,
+      capabilities: [AGENT_RELAY_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    check(
+      "a relay delivery reaches the agent once, and the same envelope again is a duplicate",
+      relayDelivered.status === 200 &&
+        field(relayDelivered.body, "duplicate") === false &&
+        relayDuplicate.status === 200 &&
+        field(relayDuplicate.body, "duplicate") === true &&
+        callsOf("relayDeliver").length === relayDeliverCalls + 2,
+      [summary(relayDelivered), summary(relayDuplicate)],
+    );
+    const relayUnknown = await call("POST", AGENT_RELAY_ROUTES.deliver, {
+      token: bobToken,
+      json: { ...relayEnvelope, envelopeId: "env-relay-unknown", recipientAgentId: "agent-missing" },
+      capabilities: [AGENT_RELAY_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    check(
+      "a relay delivery to an agent this host does not have gets 404 agentNotFound",
+      errorIs(relayUnknown, 404, notFound) && callsOf("relayDeliver").length === relayDeliverCalls + 2,
+      summary(relayUnknown),
+    );
+    relayOutbox.push({ memberId: String(bobId), envelopeId: "env-relay-claim-1" });
+    const relayDirectory = await call("POST", AGENT_RELAY_ROUTES.directory, {
+      token: bobToken,
+      json: { peers: [{ peerId: "peer-1", agentName: "Hermes", serverName: "Mack" }] },
+      capabilities: [AGENT_RELAY_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    const relayClaimBob = await call("POST", AGENT_RELAY_ROUTES.claim, {
+      token: bobToken,
+      json: {},
+      capabilities: [AGENT_RELAY_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    const relayClaimAda = await call("POST", AGENT_RELAY_ROUTES.claim, {
+      token: adaToken,
+      json: {},
+      capabilities: [AGENT_RELAY_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    check(
+      "only the member who pushed a relay directory can claim its outbox envelopes",
+      relayDirectory.status === 200 &&
+        list(field(relayClaimBob.body, "envelopes")).some(
+          (envelope) => field(envelope, "envelopeId") === "env-relay-claim-1",
+        ) &&
+        list(field(relayClaimAda.body, "envelopes")).length === 0,
+      [summary(relayDirectory), summary(relayClaimBob), summary(relayClaimAda)],
     );
     const memberSet = await call("POST", AGENT_HIDDEN_ROUTES.set, {
       token: bobToken,

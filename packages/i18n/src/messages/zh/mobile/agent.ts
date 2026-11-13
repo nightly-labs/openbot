@@ -568,6 +568,8 @@ export const messages = {
   "mobile.agent.home.noChatOpenBody": "请在列表中选择一个聊天。",
   "mobile.agent.home.chatListWidth": "聊天列表宽度",
   "mobile.agent.home.serverTitle": "{name}，打开服务器列表",
+  "mobile.agent.home.allServers": "Agents on your other servers",
+  "mobile.agent.home.onServer": "on {server}",
   "mobile.agent.home.waiting": "等待连接",
   "mobile.agent.home.waitingBody": "该服务器连接成功后就会加载助手列表。",
   "mobile.agent.home.noAgents": "该服务器上没有助手",

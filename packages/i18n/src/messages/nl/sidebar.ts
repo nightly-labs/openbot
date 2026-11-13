@@ -21,6 +21,8 @@ export const messages = {
   "sidebar.order.unreadFirst": "Ongelezen eerst in mappen",
   "sidebar.topbar.openSettings": "Instellingen voor {name} openen",
   "sidebar.topbar.localServer": "Lokaal",
+  "sidebar.allAgents.title": "Agents on your other servers",
+  "sidebar.allAgents.onServer": "on {server}",
   "sidebar.resizer.compactWidth": "Compact ({width}px)",
   "sidebar.topbar.expand": "Zijbalk uitvouwen",
   "sidebar.topbar.collapse": "Zijbalk invouwen",

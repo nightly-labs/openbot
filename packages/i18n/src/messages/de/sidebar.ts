@@ -21,6 +21,8 @@ export const messages = {
   "sidebar.order.unreadFirst": "Ungelesen zuerst in Ordnern",
   "sidebar.topbar.openSettings": "Einstellungen für {name} öffnen",
   "sidebar.topbar.localServer": "Lokal",
+  "sidebar.allAgents.title": "Agents on your other servers",
+  "sidebar.allAgents.onServer": "on {server}",
   "sidebar.resizer.compactWidth": "Kompakt ({width}px)",
   "sidebar.topbar.expand": "Seitenleiste ausklappen",
   "sidebar.topbar.collapse": "Seitenleiste einklappen",

@@ -145,7 +145,7 @@ import {
 } from "@openbot/team-client/team-admin-requests";
 import { clearAgentContext, type TeamApiRequest } from "@openbot/team-client/team-api-requests";
 import { classifyFailure } from "@openbot/telemetry";
-import { hasVisibleToasts, toast } from "@openbot/ui";
+import { Button, hasVisibleToasts, Text, toast } from "@openbot/ui";
 import type { GlobalSearchRoutine } from "@openbot/ui/components/GlobalSearch";
 import type { AgentMessage } from "@openbot/ui/data";
 import { accountUsageProviderRows } from "@openbot/ui/features/account/account-usage-view";
@@ -187,6 +187,7 @@ import {
   createMemo,
   createRoot,
   createSignal,
+  For,
   Loading,
   lazy,
   Match,
@@ -3284,6 +3285,32 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     onOpenMarketplace={openMarketplace}
                     footer={
                       <>
+                        {/* Agents of the hosts this tab has not opened, from their status
+                            connections. Selecting one opens its host. */}
+                        <For each={[...(workspace.runtime.agentsByHost?.() ?? new Map()).entries()]}>
+                          {([hostId, hostAgents]) => (
+                            <For each={hostAgents}>
+                              {(agent) => (
+                                <Button
+                                  variant="ghost"
+                                  onClick={() => {
+                                    const host = workspace.state.hosts.find((candidate) => candidate.hostId === hostId);
+                                    if (host) void workspace.connect(host);
+                                  }}
+                                >
+                                  <Text>{agent.name}</Text>
+                                  <Text variant="caption">
+                                    {t("sidebar.allAgents.onServer", {
+                                      server:
+                                        workspace.state.hosts.find((candidate) => candidate.hostId === hostId)?.name ??
+                                        hostId,
+                                    })}
+                                  </Text>
+                                </Button>
+                              )}
+                            </For>
+                          )}
+                        </For>
                         <SidebarAlertCards
                           cards={alertCards}
                           serverName={server()?.name ?? ""}

@@ -113,6 +113,8 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "تحديثات المضيف غير مدعومة في هذا الاتصال.",
   "error.team.hostTimezoneUnsupported": "المنطقة الزمنية للخادم غير مدعومة في هذا الاتصال.",
   "error.team.hostRestartUnsupported": "إعادة تشغيل الخادم غير مدعومة في هذا الاتصال.",
+  "error.team.agentRelayUnsupported": "Cross-server agent messages are not supported by this connection.",
+  "error.team.agentRelayExpired": "This cross-server message has expired.",
   "error.team.hostKeyRotationUnsupported": "تغييرات مفتاح الخادم غير مدعومة في هذا الاتصال.",
   "error.team.localServersUnsupported": "الخوادم على هذا الحاسوب غير مدعومة في هذا الاتصال.",
   "error.team.routineResultsUnsupported": "وجهات المهام الدورية غير مدعومة في هذا الاتصال.",

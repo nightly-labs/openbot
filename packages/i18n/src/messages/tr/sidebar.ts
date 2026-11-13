@@ -21,6 +21,8 @@ export const messages = {
   "sidebar.order.unreadFirst": "Klasörlerde önce okunmamışlar",
   "sidebar.topbar.openSettings": "{name} için ayarları aç",
   "sidebar.topbar.localServer": "Yerel",
+  "sidebar.allAgents.title": "Agents on your other servers",
+  "sidebar.allAgents.onServer": "on {server}",
   "sidebar.resizer.compactWidth": "Kompakt ({width}px)",
   "sidebar.topbar.expand": "Kenar çubuğunu genişlet",
   "sidebar.topbar.collapse": "Kenar çubuğunu daralt",

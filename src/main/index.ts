@@ -37,6 +37,7 @@ import { setDiskRestoreProbe } from "../backend/disk-restore";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { NewerDatabaseError } from "../backend/openbot-database-schema";
 import { OWNER_NOTIFICATION_KEY } from "./agent-notification-level-store";
+import { AgentRelayClient } from "./agent-relay-client";
 import { watchAppArchive } from "./app-archive-watch";
 import { readAppVariant, resolveAppIconPath, resolveLogoColorIconPath, resolveMenuBarIconPath } from "./app-icon";
 import { readSavedTransparentWindow } from "./appearance-service";
@@ -1850,6 +1851,17 @@ if (!hasSingleInstanceLock) {
       Effect.runFork(built.prewarmAgentDatabase);
       // After the load: `sendToRenderer` drops events aimed at a window that is still loading.
       await Effect.runPromise(remoteServers.startEventConnections());
+      // Cross-server teammate relay: this client carries envelopes between capable hosts.
+      const agentRelay = new AgentRelayClient({
+        servers: () => remoteServers.list(),
+        supportsCapability: (serverId, capability) => remoteServers.supportsCapability(serverId, capability),
+        request: (serverId, path, decoder, init) => remoteServers.request(serverId, path, decoder, init),
+        local: service,
+        userDataPath: app.getPath("userData"),
+        logError: (message, error) => logger.error(message, toLogValue(error)),
+      });
+      agentRelay.start();
+      teardown.push(0, "agent relay", () => agentRelay.dispose());
       screen.on("display-added", reconcileDynamicIsland);
       screen.on("display-removed", reconcileDynamicIsland);
       screen.on("display-metrics-changed", reconcileDynamicIsland);

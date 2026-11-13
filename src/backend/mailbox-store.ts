@@ -122,6 +122,11 @@ interface StoredMessage {
    * but no chat, queue or preview shows it. Absent on every other message.
    */
   welcome?: true;
+  /**
+   * A teammate message relayed from another server (`agent-relay-v1`). Display provenance only:
+   * the names come from the relaying client and grant nothing. `envelopeId` routes the reply back.
+   */
+  remote?: { envelopeId: string; agentName: string; serverName: string };
   createdAt: string;
 }
 
@@ -216,6 +221,7 @@ interface EnqueueInput {
   voiceRecordingDraftId?: string;
   sourcePaths?: string[];
   idempotencyKey?: string;
+  remote?: StoredMessage["remote"];
 }
 
 /** A file a chat message carries or an agent made, as the Storage view lists it. */
@@ -239,6 +245,8 @@ export interface DeliveryContext {
   channelId?: string;
   /** The side thread that an agent sent the message from. */
   senderTaskId?: string;
+  /** Provenance of a message relayed from another server, for the prompt framing. */
+  remote?: { envelopeId: string; agentName: string; serverName: string };
 }
 
 const EMPTY_STATE: StoredState = {
@@ -684,6 +692,7 @@ export class MailboxStore {
         replyToMessageId: input.replyToMessageId ?? null,
         ...(input.expectsReply === false ? { expectsReply: false as const } : {}),
         ...(input.welcome ? { welcome: true as const } : {}),
+        ...(input.remote ? { remote: input.remote } : {}),
         createdAt,
       };
       const deliveries = recipients.map<StoredDelivery>((recipientAgentId) => ({
@@ -2161,6 +2170,11 @@ export class MailboxStore {
     return this.#state.deliveries.find((delivery) => delivery.id === id)?.messageId ?? null;
   }
 
+  /** The relay provenance of a message from another server, or null for a local message. */
+  remoteOrigin(messageId: string): { envelopeId: string; agentName: string; serverName: string } | null {
+    return this.#state.messages.find((message) => message.id === messageId)?.remote ?? null;
+  }
+
   /** Whether the message's sender waits for an answer. Unknown messages count as expecting one. */
   expectsReply(messageId: string): boolean {
     return this.#state.messages.find((message) => message.id === messageId)?.expectsReply !== false;
@@ -2349,6 +2363,16 @@ export class MailboxStore {
       return yield* new StoredStateFailure({ cause });
     }
   }, Effect.uninterruptible).bind(this);
+
+  /** Cancel a message's delivery while it still queues. False once it runs or is done. */
+  cancelQueuedMessage(messageId: string): boolean {
+    const delivery = this.#state.deliveries.find(
+      (candidate) => candidate.messageId === messageId && candidate.status === "queued",
+    );
+    if (!delivery) return false;
+    this.cancelNow(delivery.recipientAgentId, delivery.id);
+    return true;
+  }
 
   cancelNow(agentId: string, deliveryId: string): void {
     this.#assertQueueNotUpdating(deliveryId);
@@ -3334,6 +3358,7 @@ export class MailboxStore {
       ...(delivery.planContinuation ? { planContinuation: delivery.planContinuation } : {}),
       ...(message.channelId ? { channelId: message.channelId } : {}),
       ...(message.senderTaskId ? { senderTaskId: message.senderTaskId } : {}),
+      ...(message.remote ? { remote: message.remote } : {}),
       managedAttachments: message.attachments.map((attachment) => ({
         ...toAttachmentSummary(attachment),
         path: attachment.path,

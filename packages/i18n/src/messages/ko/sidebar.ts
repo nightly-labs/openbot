@@ -21,6 +21,8 @@ export const messages = {
   "sidebar.order.unreadFirst": "폴더에서 읽지 않음 먼저",
   "sidebar.topbar.openSettings": "{name} 설정 열기",
   "sidebar.topbar.localServer": "로컬",
+  "sidebar.allAgents.title": "Agents on your other servers",
+  "sidebar.allAgents.onServer": "on {server}",
   "sidebar.resizer.compactWidth": "간략히({width}px)",
   "sidebar.topbar.expand": "사이드바 펼치기",
   "sidebar.topbar.collapse": "사이드바 접기",

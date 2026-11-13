@@ -103,6 +103,7 @@ import {
 } from "../workflows/workflow-tools";
 import { AgentInterruptTool } from "./agent-interrupt-tool";
 import type { AgentMemories } from "./agent-memories";
+import type { AgentRelayStore } from "./agent-relay-store";
 import { type ApprovalAutomationPolicy, NO_APPROVAL_AUTOMATION } from "./approval-automation";
 import type { AttachmentGateway } from "./attachment-gateway";
 import type { AttentionRegistry } from "./attention-registry";
@@ -433,6 +434,8 @@ export interface OpenBotToolRouterOptions {
   apiKeys?: AgentApiKeys | null | undefined;
   /** The Vault, where `save_api_key` keeps a key for every agent; null where this server has none. */
   vaultItems?: VaultItems | null | undefined;
+  /** Cross-server teammate relay (`agent-relay-v1`); absent where the host has no relay store. */
+  relay?: { store: AgentRelayStore; serverName: string } | undefined;
   hooks: OpenBotToolRouterHooks;
 }
 
@@ -484,6 +487,7 @@ export class OpenBotToolRouter {
   readonly #serverClaims: AgentServerClaims | null;
   readonly #apiKeys: AgentApiKeys | null;
   readonly #vaultItems: VaultItems | null;
+  readonly #relay: { store: AgentRelayStore; serverName: string } | null;
   readonly #hooks: OpenBotToolRouterHooks;
   readonly #interruptTool: AgentInterruptTool;
   /** Provider threads whose agent has the browser schemas, from a search or from a first browser result. */
@@ -540,6 +544,7 @@ export class OpenBotToolRouter {
     this.#serverClaims = options.serverClaims ?? null;
     this.#apiKeys = options.apiKeys ?? null;
     this.#vaultItems = options.vaultItems ?? null;
+    this.#relay = options.relay ?? null;
     this.#hooks = options.hooks;
     this.#interruptTool = new AgentInterruptTool({
       store: options.store,
@@ -1506,6 +1511,11 @@ export class OpenBotToolRouter {
    */
 
   readonly #readAgent = Effect.fn("OpenBotToolRouter.readAgent")(function* (this: OpenBotToolRouter, agentId: string) {
+    const peer = this.#relay?.store.peer(agentId);
+    if (peer) {
+      // A relay peer exposes its name and server label only; its profile stays on its own server.
+      return { id: peer.peerId, name: peer.agentName, remote: true, serverName: peer.serverName };
+    }
     const agent = yield* toolStep(() => this.#requireAgent(agentId));
     const computerUse = agentComputerUseEnabled(agent);
     const mcpServers = agentMcpServers(this.#hooks.enabledMcpServers(agentId), computerUse);
@@ -1834,7 +1844,17 @@ export class OpenBotToolRouter {
           ...(openWaits.has(agent.id) ? { openWaits: openWaits.get(agent.id) } : {}),
         };
       });
-      return openBotToolResult({ agents });
+      const peers = (this.#relay?.store.peers() ?? []).map((peer) => ({
+        id: peer.peerId,
+        name: peer.agentName,
+        title: "",
+        description: `Teammate on server ${peer.serverName}, reached through the user's client (agent-relay-v1). One recipient, no file paths.`,
+        status: "ready" as const,
+        queuedMessages: 0,
+        remote: true,
+        serverName: peer.serverName,
+      }));
+      return openBotToolResult({ agents: [...agents, ...peers] });
     }
 
     if (params.tool === "list_models") {
@@ -2936,8 +2956,10 @@ export class OpenBotToolRouter {
       const known = new Map(agents.map((agent) => [agent.id, agent]));
       for (const recipient of recipientValues) {
         const agent = known.get(recipient);
+        // A relay peer, or the sender of a relayed request this message answers, is not a local
+        // agent. Both are resolved in the relay branch below, after the reply reference is known.
         // Suggest only an agent that this tool takes: not the sender.
-        if (!agent)
+        if (!agent && !this.#relay)
           throw new Error(
             unknownAgentMessage(
               recipient,
@@ -3022,6 +3044,81 @@ export class OpenBotToolRouter {
       // The same rule for a request from a Slack thread or another external conversation (#5517).
       const messaging = this.#mailbox.answerReturn(answeredRequestIds, recipientValues);
       const text = params.arguments.text;
+      // Cross-server relay (`agent-relay-v1`): a peer recipient, or an answer to a relayed
+      // request, leaves this server as an outbox envelope for the user's client to carry. One
+      // recipient and no file paths: paths name files on this server only.
+      const relay = this.#relay;
+      const remoteOrigin = replyTo ? this.#mailbox.remoteOrigin(replyTo) : null;
+      const peerRecipient = recipientValues.length === 1 ? relay?.store.peer(recipientValues[0] ?? "") : null;
+      if (relay && (peerRecipient || remoteOrigin || recipientValues.some((id) => !known.has(id)))) {
+        if (recipientValues.length !== 1) {
+          throw new Error(
+            "A cross-server message has exactly one recipient. Send local and cross-server messages separately.",
+          );
+        }
+        if (paths.length > 0) {
+          throw new Error("A cross-server message cannot carry file paths. Send the text only.");
+        }
+        const recipient = recipientValues[0] ?? "";
+        const senderAgent = known.get(senderAgentId);
+        const outbound = {
+          originAgentId: senderAgentId,
+          originAgentName: senderAgent?.name ?? senderAgentId,
+          originServerName: relay.serverName,
+          text,
+          expectsReply: expectsReply ?? true,
+        };
+        const written = peerRecipient
+          ? relay.store.enqueueOutbound({
+              ...outbound,
+              memberId: peerRecipient.memberId,
+              kind: "request",
+              recipientAgentId: peerRecipient.peerId,
+            })
+          : remoteOrigin
+            ? (() => {
+                const memberId = relay.store.deliveredMemberId(remoteOrigin.envelopeId);
+                if (!memberId)
+                  throw new Error("No client can carry this reply back to its server now. Try again later.");
+                return relay.store.enqueueOutbound({
+                  ...outbound,
+                  memberId,
+                  kind: "reply",
+                  recipientAgentId: recipient,
+                  replyToEnvelopeId: remoteOrigin.envelopeId,
+                });
+              })()
+            : null;
+        if (!written) {
+          throw new Error(
+            unknownAgentMessage(
+              recipient,
+              agents.filter((candidate) => candidate.id !== senderAgentId),
+            ),
+          );
+        }
+        return {
+          success: true,
+          contentItems: [
+            {
+              type: "inputText" as const,
+              text: JSON.stringify({
+                messageId: written.localMessageId,
+                deliveries: [
+                  {
+                    id: written.envelopeId,
+                    recipientAgentId: recipient,
+                    status: "queued",
+                    position: null,
+                    outcome: "queued",
+                    note: "Queued for cross-server relay by the user's client. It is delivered when that client next connects to both servers; the reply comes back the same way.",
+                  },
+                ],
+              }),
+            },
+          ],
+        };
+      }
       const receipt = yield* this.#mailbox
         .enqueue({
           sender: { kind: "agent", agentId: senderAgentId },

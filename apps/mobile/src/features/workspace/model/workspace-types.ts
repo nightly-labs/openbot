@@ -405,6 +405,8 @@ export interface MobileWorkspaceContextValue {
   agents: MobileAgent[];
   activeServer: MobileServer;
   activeAgents: MobileAgent[];
+  /** Every server's agents in one list, each tagged with its server. */
+  allAgents: MobileAgent[];
   hiddenAgents: MobileAgent[];
   pinnedAgentIds: string[];
   pinnedChannelIds: string[];
@@ -1346,6 +1348,7 @@ type MobileWorkspaceStateKey =
   | "agents"
   | "activeServer"
   | "activeAgents"
+  | "allAgents"
   | "hiddenAgents"
   | "pinnedAgentIds"
   | "pinnedChannelIds"

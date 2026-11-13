@@ -21,6 +21,8 @@ export const messages = {
   "sidebar.order.unreadFirst": "文件夹内未读优先",
   "sidebar.topbar.openSettings": "打开 {name} 的设置",
   "sidebar.topbar.localServer": "本地",
+  "sidebar.allAgents.title": "Agents on your other servers",
+  "sidebar.allAgents.onServer": "on {server}",
   "sidebar.resizer.compactWidth": "紧凑（{width}px）",
   "sidebar.topbar.expand": "展开侧边栏",
   "sidebar.topbar.collapse": "收起侧边栏",
