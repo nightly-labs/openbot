@@ -1140,7 +1140,7 @@ export class SunshineMoonlightRuntime {
     // A file that is not there gives `error` and no `exit`. With no listener, Node throws it as an
     // uncaught exception. The child then counts as ended, so the readiness wait of the start fails.
     child.on("error", (error) => {
-      this.#options.onDiagnostic?.(source, `OpenBot: ${source} could not start (${error.message}).\n`);
+      this.#options.onDiagnostic?.(source, `OpenBot: ${source} had a process error (${error.message}).\n`);
     });
     child.once("exit", (code, signal) => {
       // A stop clears the field before it waits. A start in progress fails its own readiness wait.
