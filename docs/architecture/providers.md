@@ -1476,6 +1476,30 @@ Settings > Providers shows **Reset usage** in the ⋯ menu of a connected accoun
 The confirmation names the credits left, and the answer shows under the accounts. A joined server
 uses the optional `provider-usage-reset-v1` routes (see [Admin capabilities](servers.md#admin-capabilities)).
 
+### Work on credits
+
+A ChatGPT plan can have credits: when a plan window is spent, Codex keeps taking turns and spends
+them (issues #4013 and #6046). The `rateLimits` snapshot of `account/rateLimits/read` holds
+`credits: { hasCredits, unlimited, balance }` for the `codex` bucket; a model's own bucket has `null`.
+`decodeRateLimitCredits` (`src/backend/protocol.ts`) keeps only whether credits remain
+(`hasCredits || unlimited`), and `normalizeAccountUsage` puts it in `AccountUsageLimit.creditsAvailable`.
+A full reading with `null` sets `false`. An `account/rateLimits/updated` push with `null` keeps the
+last value, as Codex's own view does. OpenBot does not show the balance, and it does not read
+`ordinaryUsageAllowed`: a turn still goes to Codex, and Codex decides if it uses credits.
+
+`spentUsageWindow` (`packages/team-client/src/plan-limits.ts`) gives `onCredits` for such an account.
+Then the composer shows **Using credits** in place of **Usage limit reached**, with the plan reset
+time, and the model picker and the iPhone agent screen do not mark the model as stopped. A notice
+closed while on credits shows again when the credits run out.
+
+The released usage routes and the `usage-changed` event of the Team API send only `id`, `primary` and
+`secondary`. A joined server reads the flag with the optional `usage-credits-v1` route (see
+[Admin capabilities](servers.md#admin-capabilities)) each time it reads usage, and `withUsageCredits`
+adds it. A limit from an event has no flag, so `keepUsageCredits` keeps the last one. When the flag of
+a client's own quota changes, `ProviderRuntime.#noteCredits` sends `usage-credits-changed`, an event
+with no data that only `usage-credits-v1` peers get, and the client reads the usage again. A host
+without the capability gives no flag, and the client shows **Usage limit reached** as before.
+
 ### Disconnect the own sign-in
 
 Settings > Providers shows **Disconnect** in the ⋯ menu of the connected own sign-in of Claude,

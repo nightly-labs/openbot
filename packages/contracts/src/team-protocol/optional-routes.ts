@@ -133,6 +133,7 @@ import { STORAGE_CHANNEL_CODECS } from "./storage-channel-v1";
 import { STORAGE_DISK_CODECS } from "./storage-disk-v1";
 import { STORAGE_USER_FILES_CODECS } from "./storage-user-files-v1";
 import { THREAD_MESSAGE_SEARCH_CODECS } from "./thread-message-search-v1";
+import { USAGE_CREDITS_CODECS } from "./usage-credits-v1";
 import { VAULT_IMPORT_CODECS } from "./vault-import-v1";
 import { VAULT_CODECS } from "./vault-v1";
 import { VAULT_V2_CODECS } from "./vault-v2";
@@ -249,6 +250,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...PROVIDER_ACCOUNT_RELAY_CODECS,
   ...PROVIDER_ACCOUNT_RELAY_V2_CODECS,
   ...PROVIDER_USAGE_RESET_CODECS,
+  ...USAGE_CREDITS_CODECS,
   ...PROVIDER_SIGN_OUT_CODECS,
   ...ONEPASSWORD_CONNECTOR_CODECS,
   ...BITWARDEN_CONNECTOR_CODECS,
