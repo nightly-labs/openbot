@@ -21,7 +21,8 @@ export async function loadHapticsPreference(): Promise<void> {
   try {
     const [stored, storedReplies] = await Promise.all([
       SecureStore.getItemAsync(key),
-      SecureStore.getItemAsync(repliesKey),
+      // A failed read of the newer key must not lose the main setting.
+      SecureStore.getItemAsync(repliesKey).catch(() => null),
     ]);
     // A second startup read must not overwrite a change made in Settings.
     if (!useHapticsPreference.getState().ready) {
