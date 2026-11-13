@@ -3978,6 +3978,9 @@ export class ProviderRuntime implements ProviderPort {
                 if (!(failed instanceof ProviderTempDiskSpaceError) && this.#countStartFailure(provider, message))
                   return this.#showStartStopped(provider);
               }
+              // A signed-out process answered, so it ends the failed starts in a row: a later failure
+              // starts a new count, not the next wait.
+              if (failed instanceof ProviderSignInError) this.#startFailures.delete(provider);
               // OpenCode can fail a start on a slow computer, and a later start works. Without a retry
               // the provider stayed off until the user refreshed it (#4237).
               if (provider === "opencode" && isOpenCodeInternalFailure(failed))
