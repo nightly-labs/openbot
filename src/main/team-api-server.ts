@@ -198,6 +198,7 @@ import {
 import { MCP_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-access-v1";
 import { MCP_MANY_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-many-servers-v1";
 import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
+import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mistral-code-sign-in-v1";
 import { type OptionalTeamEvent, optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
@@ -2650,7 +2651,11 @@ export class TeamApiServer {
             capability === CUSTOM_PROVIDER_EDIT_CAPABILITY
           )
             return this.#options.admin?.providers !== undefined;
-          if (capability === CLAUDE_API_KEY_CAPABILITY || capability === CODEX_API_KEY_CAPABILITY)
+          if (
+            capability === CLAUDE_API_KEY_CAPABILITY ||
+            capability === CODEX_API_KEY_CAPABILITY ||
+            capability === MISTRAL_CODE_SIGN_IN_CAPABILITY
+          )
             return this.#options.admin?.providers !== undefined;
           if (capability === PROVIDERS_SIGN_IN_V3_CAPABILITY)
             return this.#options.admin?.providers?.pasteSignIn === true;

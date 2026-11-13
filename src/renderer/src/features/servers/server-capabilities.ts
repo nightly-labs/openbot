@@ -7,6 +7,7 @@ import {
   type ServerSummary,
 } from "@openbot/contracts/ipc";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
+import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mistral-code-sign-in-v1";
 import { PROVIDER_HOST_SIGN_IN_PROVIDERS } from "@openbot/contracts/team-protocol/provider-host-sign-in-v1";
 import { PROVIDERS_ADMIN_CODE_SIGN_IN_PROVIDERS } from "@openbot/contracts/team-protocol/providers-v1";
 import { PROVIDERS_SIGN_IN_V3_PROVIDERS } from "@openbot/contracts/team-protocol/providers-v3";
@@ -96,6 +97,7 @@ export function serverSupportsCapability(
       capability === "model-visibility-v1" ||
       capability === "claude-api-key-v1" ||
       capability === "codex-api-key-v1" ||
+      capability === "mistral-code-sign-in-v1" ||
       capability === "host-personality-v1" ||
       capability === "agent-access-v1" ||
       capability === "sidebar-folders-v1" ||
@@ -255,8 +257,9 @@ export function serverCanAdminister(
  *
  * A host with `providers-v8` also signs in each later provider that has a device code, such as Kimi
  * and Hermes: it takes any provider id, and the descriptor's `localCodeSignIn` mirrors the driver's
- * code sign-in. A provider that the relay already signs in, such as Muse, keeps the relay. The
- * mobile app's `codeSignInProviders` uses the same rule.
+ * code sign-in. A provider that the relay already signs in, such as Muse, keeps the relay. Mistral's
+ * code sign-in is a page, not a device code, so it needs `mistral-code-sign-in-v1`. The mobile app's
+ * `codeSignInProviders` uses the same rule.
  */
 export function serverCodeRouteProviders(server: ServerSummary | undefined): readonly AgentProviderId[] {
   if (server?.kind !== "remote") return [];
@@ -270,7 +273,8 @@ export function serverCodeRouteProviders(server: ServerSummary | undefined): rea
     return AGENT_PROVIDERS.filter(
       (provider) =>
         v4.includes(provider) ||
-        (agentProviderDescriptor(provider).localCodeSignIn === "device" && !earlier.includes(provider)),
+        (agentProviderDescriptor(provider).localCodeSignIn === "device" && !earlier.includes(provider)) ||
+        (provider === "mistral" && serverSupportsCapability(server, MISTRAL_CODE_SIGN_IN_CAPABILITY)),
     );
   }
   if (serverSupportsCapability(server, "providers-v3")) return PROVIDERS_SIGN_IN_V3_PROVIDERS;

@@ -36,7 +36,7 @@ export interface CliCodeLogin {
 }
 
 /** How long the CLI has to print its link. A pinned CLI prints it in well under a second. */
-const PROMPT_TIMEOUT_MS = 30_000;
+export const PROMPT_TIMEOUT_MS = 30_000;
 /** The link and the prompt are in the first lines. Output past this is not read or kept. */
 const MAX_OUTPUT_CHARS = 64 * 1024;
 const MAX_CODE_LENGTH = 2048;

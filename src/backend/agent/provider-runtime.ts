@@ -96,7 +96,7 @@ import { shortenDiagnostic } from "./../stderr-diagnostics";
 import { stopProcessTree } from "../windows-process-tree";
 import { normalizeAccountUsage, usageWindowHasReset, usageWindowResetSince } from "./account-usage";
 import { captureBrowser } from "./browser-capture";
-import { startCliCodeLogin } from "./cli-code-login";
+import { CliCodeLoginFailed, type CliCodePrompt, PROMPT_TIMEOUT_MS, startCliCodeLogin } from "./cli-code-login";
 import { CliLoginFailed, CliLoginFlow, toCliLoginFailed } from "./cli-login-flow";
 import { CodexLoginFlow, toCodexLoginFailed } from "./codex-login";
 import type { ConversationRuntime } from "./conversation-runtime";
@@ -2253,6 +2253,47 @@ export class ProviderRuntime implements ProviderPort {
         .startCode(
           provider,
           (cli) => startMuseDeviceLogin({ cli, timeoutMs: codeSignIn.timeoutMs }),
+          codeSignIn.timeoutMs,
+        )
+        .pipe(toProviderOperationFailed);
+    }
+    if (codeSignIn.kind === "acp-delegated") {
+      const page = Deferred.makeUnsafe<string>();
+      const noLink = () => new CliCodeLoginFailed({ cause: new Error(sourceText("error.provider.codeLoginNoLink")) });
+      return yield* this.#cliLogin
+        .startCode(
+          provider,
+          (cli) =>
+            startAcpAuthentication({
+              executable: cli.executable,
+              argv: codeSignIn.argv,
+              env: { ...codeSignIn.env },
+              methodId: codeSignIn.methodId,
+              timeoutMs: codeSignIn.timeoutMs,
+              onSignInUrl: (url) => Deferred.doneUnsafe(page, Effect.succeed(url)),
+            }).pipe(
+              Effect.map(({ child, done }) => ({
+                child,
+                done,
+                // The server's page, null when it signed in with no page, or the reason it stopped first.
+                prompt: Effect.raceFirst(
+                  Deferred.await(page).pipe(
+                    Effect.map((verificationUrl): CliCodePrompt => ({ flow: "link", verificationUrl })),
+                  ),
+                  done.pipe(
+                    Effect.as(null),
+                    Effect.mapError((cause) => new CliCodeLoginFailed({ cause })),
+                  ),
+                ).pipe(
+                  Effect.timeoutOrElse({ duration: PROMPT_TIMEOUT_MS, orElse: () => Effect.fail(noLink()) }),
+                  // A sign-in with no page stops, as a CLI code sign-in does.
+                  Effect.tapError(() => stopProcessTree(child).pipe(Effect.ignore)),
+                ),
+                submit() {
+                  throw new Error(sourceText("error.provider.codeLoginNotWaiting"));
+                },
+              })),
+            ),
           codeSignIn.timeoutMs,
         )
         .pipe(toProviderOperationFailed);

@@ -269,6 +269,7 @@ import {
 import { MEMORY_REVIEW_CAPABILITY, MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { MESSAGE_PINS_CAPABILITY, MESSAGE_PINS_ROUTES } from "@openbot/contracts/team-protocol/message-pins-v1";
+import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mistral-code-sign-in-v1";
 import {
   PASSWORD_MANAGERS_CAPABILITY,
   PASSWORD_MANAGERS_CODECS,
@@ -531,6 +532,9 @@ let providerDefault: { provider: AgentProviderId | null; model: AgentModelId | n
 function check(name: string, passed: boolean, detail: unknown = null): void {
   checks.push({ name, passed, detail });
 }
+
+/** The page of a Mistral sign-in, as Vibe's `browser-auth-delegated` gives it. */
+const MISTRAL_SIGN_IN_PAGE = "https://console.mistral.ai/vibe/sign-in/e2e";
 
 function record(method: string, ...args: unknown[]): void {
   calls.push({ method, args });
@@ -2420,7 +2424,12 @@ try {
       // A credential store in memory. The service runs the change as the host's does.
       providers: {
         service: {
-          startProviderCodeLogin: unused("providers.startProviderCodeLogin"),
+          // Mistral's code sign-in answers with the page that the user opens on any device.
+          startProviderCodeLogin: (provider) => {
+            record("startProviderCodeLogin", provider);
+            if (provider !== "mistral") throw new Error(sourceText("error.provider.noCodeSignIn", { provider }));
+            return Effect.succeed({ kind: "link", verificationUrl: MISTRAL_SIGN_IN_PAGE, expiresAt: 1 });
+          },
           submitProviderCodeLogin: unused("providers.submitProviderCodeLogin"),
           cancelProviderCodeLogin: unused("providers.cancelProviderCodeLogin"),
           changeProviderCredential: (provider, change) => {
@@ -7251,6 +7260,43 @@ try {
         typeof bobId === "string" &&
         machine.pending(bobId).length === 0,
       [first, delivered],
+    );
+  }
+
+  // ---- Mistral code sign-in (mistral-code-sign-in-v1) ----
+  {
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises mistral-code-sign-in-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(MISTRAL_CODE_SIGN_IN_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(MISTRAL_CODE_SIGN_IN_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const v9 = {
+      token: adaToken,
+      protocol: TEAM_PROTOCOL_V9,
+      capabilities: [PROVIDERS_V8_CAPABILITY, MISTRAL_CODE_SIGN_IN_CAPABILITY],
+    };
+    const started = await call("POST", PROVIDERS_V8_ROUTES.codeLoginStart, { ...v9, json: { provider: "mistral" } });
+    check(
+      "an admin starts the Mistral sign-in on providers-v8 and gets the Mistral page as a link",
+      started.status === 200 &&
+        field(started.body, "kind") === "link" &&
+        field(started.body, "verificationUrl") === MISTRAL_SIGN_IN_PAGE &&
+        isDeepStrictEqual(callsOf("startProviderCodeLogin"), [["mistral"]]),
+      summary(started),
+    );
+    const member = await call("POST", PROVIDERS_V8_ROUTES.codeLoginStart, {
+      ...v9,
+      token: bobToken,
+      json: { provider: "mistral" },
+    });
+    check(
+      "a member gets 403 and starts no Mistral sign-in",
+      member.status === 403 && callsOf("startProviderCodeLogin").length === 1,
+      summary(member),
     );
   }
 
