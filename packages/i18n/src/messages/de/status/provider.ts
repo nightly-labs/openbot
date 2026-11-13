@@ -12,6 +12,10 @@ export const messages = {
   "status.provider.retryServerError":
     "Der {provider}-Server ist ausgelastet oder hat einen Fehler. Versuch {attempt} von {maxAttempts}.",
   "status.provider.retryRecovered": "{provider} erhält wieder Antworten von seinem Server.",
+  "status.provider.retryNoLimit": "Der {provider}-Server ist ausgelastet oder hat einen Fehler. Versuch {attempt}.",
+  "status.provider.noAnswerYet": "{provider} hat noch nicht geantwortet. OpenBot wartet weiter.",
+  "status.provider.promptSentAgain":
+    "{provider} hat nicht geantwortet, daher hat OpenBot deine Nachricht erneut gesendet.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude hat mit normaler Geschwindigkeit geantwortet. Der Schnellmodus nutzt mit einem Claude-Abo Nutzungsguthaben. Schalte es in deinem Claude-Konto ein.",
   "status.provider.claudeFastModeNotOnPlan":

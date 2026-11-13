@@ -10,6 +10,9 @@ export const messages = {
   "status.provider.retryUnreachable": "لا يستطيع {provider} الاتصال بخادمه. المحاولة {attempt} من {maxAttempts}.",
   "status.provider.retryServerError": "خادم {provider} مشغول أو به خطأ. المحاولة {attempt} من {maxAttempts}.",
   "status.provider.retryRecovered": "يتلقى {provider} الإجابات من خادمه مجددًا.",
+  "status.provider.retryNoLimit": "خادم {provider} مشغول أو به خطأ. المحاولة {attempt}.",
+  "status.provider.noAnswerYet": "لم يُجب {provider} بعد. ما زال OpenBot ينتظر.",
+  "status.provider.promptSentAgain": "لم يُجب {provider}، لذا أرسل OpenBot رسالتك مجددًا.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "أجاب Claude بالسرعة العادية. مع اشتراك Claude، يستخدم الوضع السريع أرصدة الاستخدام. شغّلها في حسابك على Claude.",
   "status.provider.claudeFastModeNotOnPlan": "أجاب Claude بالسرعة العادية. لا تتضمن خطة Claude الخاصة بك الوضع السريع.",

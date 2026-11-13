@@ -11,6 +11,9 @@ export const messages = {
   "status.provider.retryServerError":
     "{provider} sunucusu meşgul veya bir hata verdi. Yeniden deneme {attempt}/{maxAttempts}.",
   "status.provider.retryRecovered": "{provider} sunucusundan yeniden yanıt alıyor.",
+  "status.provider.retryNoLimit": "{provider} sunucusu meşgul veya bir hata verdi. Yeniden deneme {attempt}.",
+  "status.provider.noAnswerYet": "{provider} henüz yanıt vermedi. OpenBot beklemeye devam ediyor.",
+  "status.provider.promptSentAgain": "{provider} yanıt vermedi, bu yüzden OpenBot mesajınızı yeniden gönderdi.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude standart hızda yanıt verdi. Claude aboneliğinde hızlı mod kullanım kredisi harcar. Bunu Claude hesabınızda açın.",
   "status.provider.claudeFastModeNotOnPlan": "Claude standart hızda yanıt verdi. Claude planınız hızlı modu içermiyor.",

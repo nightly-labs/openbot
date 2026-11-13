@@ -10,6 +10,9 @@ export const messages = {
   "status.provider.retryUnreachable": "{provider} לא מצליח להתחבר לשרת שלו. ניסיון {attempt} מתוך {maxAttempts}.",
   "status.provider.retryServerError": "השרת של {provider} עמוס או שיש בו שגיאה. ניסיון {attempt} מתוך {maxAttempts}.",
   "status.provider.retryRecovered": "{provider} מקבל שוב תשובות מהשרת שלו.",
+  "status.provider.retryNoLimit": "השרת של {provider} עמוס או שיש בו שגיאה. ניסיון {attempt}.",
+  "status.provider.noAnswerYet": "{provider} עדיין לא ענה. OpenBot ממשיך להמתין.",
+  "status.provider.promptSentAgain": "{provider} לא ענה, ולכן OpenBot שלח שוב את ההודעה שלך.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude ענה במהירות הרגילה. עם מינוי Claude, המצב המהיר משתמש בקרדיטים לשימוש. יש להפעיל אותם בחשבון Claude.",
   "status.provider.claudeFastModeNotOnPlan": "Claude ענה במהירות הרגילה. תוכנית Claude שלך לא כוללת את המצב המהיר.",

@@ -141,6 +141,11 @@ export interface AcpFlavor {
     failedSession(stderrLine: string): string | undefined;
     /** The start of an answer that is the failure text, when no stderr line came. */
     answerIsFailure: RegExp;
+    /**
+     * The number of the failed model request that an answer chunk reports while the agent tries it
+     * again, or `null`. The chunk is a status of the turn, not its answer and not yet its failure.
+     */
+    retryNotice?(text: string): number | null;
     /** The failure text of a model step that ended with neither text nor tool calls. */
     emptyOutputFailure?: RegExp;
     /** The message of a turn that failed in this way, from the failure text. */
