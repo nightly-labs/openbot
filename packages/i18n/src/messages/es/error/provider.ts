@@ -266,6 +266,8 @@ export const messages = {
     "El servidor de Gemini de OPENBOT_ANTIGRAVITY_PATH no existe o no es ejecutable. Corrige la ruta o elimina la variable y reinicia OpenBot.",
   "error.provider.antigravityVersionUnreadable": "No se pudo leer la versión del servidor de Gemini.",
   "error.provider.antigravitySignIn": "Inicia sesión con Google para usar Gemini.",
+  "error.provider.antigravityModelAtCapacity":
+    "Google no tiene capacidad libre para este modelo de Gemini ahora. La cuota de tu plan no es la causa. Vuelve a intentarlo en unos minutos o elige otro modelo.\n{detail}",
   "error.provider.antigravityRateLimited":
     "Gemini rechazó la solicitud porque se alcanzó un límite de frecuencia o la cuota del plan. Espera unos minutos o elige otro modelo y vuelve a intentarlo.\n{detail}",
   "error.provider.antigravityQuotaReached":

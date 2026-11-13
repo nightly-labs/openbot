@@ -259,6 +259,8 @@ export const messages = {
     "De Gemini-server in OPENBOT_ANTIGRAVITY_PATH ontbreekt of is niet uitvoerbaar. Corrigeer het pad of verwijder de variabele en start OpenBot daarna opnieuw.",
   "error.provider.antigravityVersionUnreadable": "Kan de versie van de Gemini-server niet lezen.",
   "error.provider.antigravitySignIn": "Log in met Google om Gemini te gebruiken.",
+  "error.provider.antigravityModelAtCapacity":
+    "Google heeft nu geen vrije capaciteit voor dit Gemini-model. Het quotum van je abonnement is niet de oorzaak. Probeer het over een paar minuten opnieuw, of kies een ander model.\n{detail}",
   "error.provider.antigravityRateLimited":
     "Gemini heeft het verzoek geweigerd, omdat een limiet op het aantal verzoeken of het quotum van het abonnement is bereikt. Wacht een paar minuten of kies een ander model, en probeer het opnieuw.\n{detail}",
   "error.provider.antigravityQuotaReached":

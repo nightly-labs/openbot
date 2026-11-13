@@ -93,8 +93,17 @@ function geminiMcpLoadFailure(text: string): { name: string; reason: string } | 
  * or `HTTP`: a bare 404 or "unavailable" can be an MCP server or a tool. Antigravity does not
  * document its failure texts. A proxy's answer in the stream comes as a raw status line with the
  * HTTP version, such as `HTTP/1.0 502 Bad Gateway` (#5752).
+ *
+ * A model at capacity comes as RESOURCE_EXHAUSTED or UNAVAILABLE with the reason
+ * MODEL_CAPACITY_EXHAUSTED and "No capacity available for model …". It is not the plan's quota,
+ * so it is matched before the rate limit (#8554). Not the word "capacity" alone: Google's quota
+ * text "You have exhausted your capacity on this model" is a spent quota.
  */
 const GEMINI_REQUEST_FAILURES = [
+  [
+    "error.provider.antigravityModelAtCapacity",
+    /\bMODEL_CAPACITY_EX(?:HAUSTED|CEEDED)\b|\b[Nn]o capacity available for model\b/u,
+  ],
   ["error.provider.antigravityRateLimited", /\bRESOURCE_EXHAUSTED\b/u],
   [
     "error.provider.antigravityRateLimited",

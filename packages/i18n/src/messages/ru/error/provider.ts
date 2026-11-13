@@ -252,6 +252,8 @@ export const messages = {
     "Сервер Gemini из OPENBOT_ANTIGRAVITY_PATH не найден или не является исполняемым. Исправьте путь или удалите переменную, затем перезапустите OpenBot.",
   "error.provider.antigravityVersionUnreadable": "Не удалось прочитать версию сервера Gemini.",
   "error.provider.antigravitySignIn": "Войдите через Google, чтобы использовать Gemini.",
+  "error.provider.antigravityModelAtCapacity":
+    "Сейчас у Google нет свободных мощностей для этой модели Gemini. Квота тарифа здесь ни при чём. Повторите попытку через несколько минут или выберите другую модель.\n{detail}",
   "error.provider.antigravityRateLimited":
     "Gemini отклонил запрос: достигнут лимит частоты запросов или квота тарифа. Подождите несколько минут или выберите другую модель и повторите попытку.\n{detail}",
   "error.provider.antigravityQuotaReached":
