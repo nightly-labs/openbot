@@ -1083,8 +1083,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               }),
             );
           }),
+        // A CLI that lists part of its models at start gives the check of a new account process such a
+        // list (#6318), which is no proof that a model is gone; its agents move at the provider's start.
         onAccountModelsListed: (provider, accountId) =>
-          this.#endpoints.moveAccountAgentsOffUnlistedModels(provider, accountId),
+          requireProviderDriver(provider).catalog?.partialListAtStart
+            ? Effect.void
+            : this.#endpoints.moveAccountAgentsOffUnlistedModels(provider, accountId),
         onProviderResumed: (provider) => {
           for (const agent of this.#store.list()) {
             if (providerForAgent(agent) === provider) this.#drain.scheduleDrain(agent.id);
