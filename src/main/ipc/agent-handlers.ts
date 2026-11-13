@@ -5,6 +5,10 @@ import {
 } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_HIDDEN_CAPABILITY, AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidden-v1";
 import {
+  AGENT_PENDING_RUNTIME_CAPABILITY,
+  AGENT_PENDING_RUNTIME_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-pending-runtime-v1";
+import {
   AGENT_SESSION_SETTINGS_CAPABILITY,
   AGENT_SESSION_SETTINGS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
@@ -249,6 +253,15 @@ const USAGE_LIMIT_MOVE_FIELDS: ReadonlySet<string> = new Set([
   "reasoningEffort",
   "providerAccountId",
   "leaveUsageLimit",
+]);
+
+/** The fields of a change of the runtime alone, which `agent-pending-runtime-v1` keeps for the next turn. */
+const RUNTIME_CHANGE_FIELDS: ReadonlySet<string> = new Set([
+  "agentId",
+  "provider",
+  "model",
+  "reasoningEffort",
+  "providerAccountId",
 ]);
 
 /** Its lines also go to the provider log. See `PROVIDER_LOG_PREFIXES`. */
@@ -914,6 +927,39 @@ export function agentIpcHandlers({
             if (!moved) throw new Error(sourceText("error.team.agentNotFound"));
             const agent = remoteServers.agentWithColor(serverId, moved);
             return providerAccountId && providerAccountId !== DEFAULT_PROVIDER_ACCOUNT_ID
+              ? { ...agent, providerAccountId }
+              : agent;
+          }
+          // While the agent works, the released agent route refuses a provider change. A change of the
+          // runtime alone goes on `agent-pending-runtime-v1`, which keeps it for the next turn, with the
+          // account in the same change.
+          if (
+            remoteServers.supportsCapability(serverId, AGENT_PENDING_RUNTIME_CAPABILITY) &&
+            Object.entries(input).some(([key, value]) => key !== "agentId" && value !== undefined) &&
+            Object.entries(input).every(([key, value]) => value === undefined || RUNTIME_CHANGE_FIELDS.has(key))
+          ) {
+            const { agentId, provider, model, reasoningEffort, providerAccountId } = input;
+            await runCauseEffect(
+              remoteServers.request(serverId, AGENT_PENDING_RUNTIME_ROUTES.update, acceptEmpty, {
+                method: "POST",
+                body: {
+                  agentId,
+                  ...(provider === undefined ? {} : { provider }),
+                  ...(model === undefined ? {} : { model }),
+                  ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
+                  ...(providerAccountId === undefined
+                    ? {}
+                    : { providerAccountId: providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID }),
+                },
+              }),
+            );
+            const changed = (
+              await runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries))
+            ).find((agent) => agent.id === agentId);
+            if (!changed) throw new Error(sourceText("error.team.agentNotFound"));
+            const agent = remoteServers.agentWithColor(serverId, changed);
+            // The released agent list does not carry the account. A queued account is in `pendingRuntime`.
+            return !agent.pendingRuntime && providerAccountId && providerAccountId !== DEFAULT_PROVIDER_ACCOUNT_ID
               ? { ...agent, providerAccountId }
               : agent;
           }

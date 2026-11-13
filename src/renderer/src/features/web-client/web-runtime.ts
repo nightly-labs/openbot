@@ -97,6 +97,10 @@ import {
   AGENT_FAST_MODE_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
+import {
+  AGENT_PENDING_RUNTIME_CAPABILITY,
+  AGENT_PENDING_RUNTIME_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-pending-runtime-v1";
 import { AGENT_SPEED_CAPABILITY, AGENT_SPEED_ROUTES } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import {
   AGENT_USAGE_LIMIT_CAPABILITY,
@@ -557,6 +561,15 @@ const USAGE_LIMIT_MOVE_FIELDS: ReadonlySet<string> = new Set([
   "reasoningEffort",
   "providerAccountId",
   "leaveUsageLimit",
+]);
+
+/** The fields of a change of the runtime alone, which `agent-pending-runtime-v1` keeps for the next turn. */
+const RUNTIME_CHANGE_FIELDS: ReadonlySet<string> = new Set([
+  "agentId",
+  "provider",
+  "model",
+  "reasoningEffort",
+  "providerAccountId",
 ]);
 
 function hostProtocolKey(accountId: string, hostId: string): string {
@@ -1794,6 +1807,26 @@ export function createWebWorkspaceRuntime(
           model,
           reasoningEffort,
           ...(providerAccountId ? { providerAccountId } : {}),
+        });
+        return;
+      }
+      // While the agent works, the released agent route refuses a provider change. A change of the runtime
+      // alone goes on `agent-pending-runtime-v1`, which keeps it for the next turn, with the account in the
+      // same change.
+      if (
+        capabilities.includes(AGENT_PENDING_RUNTIME_CAPABILITY) &&
+        Object.entries(input).some(([key, value]) => key !== "agentId" && value !== undefined) &&
+        Object.entries(input).every(([key, value]) => value === undefined || RUNTIME_CHANGE_FIELDS.has(key))
+      ) {
+        const { agentId, provider, model, reasoningEffort, providerAccountId } = input;
+        await request("POST", AGENT_PENDING_RUNTIME_ROUTES.update, {
+          agentId,
+          ...(provider === undefined ? {} : { provider }),
+          ...(model === undefined ? {} : { model }),
+          ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
+          ...(providerAccountId === undefined
+            ? {}
+            : { providerAccountId: providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID }),
         });
         return;
       }

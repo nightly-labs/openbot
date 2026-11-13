@@ -20,6 +20,7 @@ import { AGENT_MEMORIES_CAPABILITY } from "./agent-memories-v1";
 import { AGENT_MEMORY_LIMIT_CAPABILITY } from "./agent-memory-limit-v1";
 import { AGENT_NEW_CHAT_CAPABILITY } from "./agent-new-chat-v1";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "./agent-notification-levels-v1";
+import { AGENT_PENDING_RUNTIME_CAPABILITY } from "./agent-pending-runtime-v1";
 import { AGENT_PLAN_CARD_CAPABILITY } from "./agent-plan-card-v1";
 import { AGENT_PUBLISH_CAPABILITY } from "./agent-publish-v1";
 import { AGENT_QUEUE_TASK_CAPABILITY } from "./agent-queue-task-v1";
@@ -272,6 +273,7 @@ export {
   AGENT_MEMORY_LIMIT_CAPABILITY,
   AGENT_NEW_CHAT_CAPABILITY,
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
+  AGENT_PENDING_RUNTIME_CAPABILITY,
   AGENT_PLAN_CARD_CAPABILITY,
   AGENT_PUBLISH_CAPABILITY,
   AGENT_QUEUE_TASK_CAPABILITY,
@@ -644,6 +646,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   USAGE_CREDITS_CAPABILITY,
   CHANNEL_TASK_WAITS_CAPABILITY,
   ROUTINE_FLOW_STOP_CAPABILITY,
+  AGENT_PENDING_RUNTIME_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -875,7 +878,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== PROVIDER_ACCOUNT_KEYS_CAPABILITY &&
     capability !== USAGE_CREDITS_CAPABILITY &&
     capability !== CHANNEL_TASK_WAITS_CAPABILITY &&
-    capability !== ROUTINE_FLOW_STOP_CAPABILITY,
+    capability !== ROUTINE_FLOW_STOP_CAPABILITY &&
+    capability !== AGENT_PENDING_RUNTIME_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -983,6 +987,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   USAGE_CREDITS_CAPABILITY,
   CHANNEL_TASK_WAITS_CAPABILITY,
   ROUTINE_FLOW_STOP_CAPABILITY,
+  AGENT_PENDING_RUNTIME_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1173,6 +1178,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== PROVIDER_ACCOUNT_KEYS_CAPABILITY &&
       capability !== USAGE_CREDITS_CAPABILITY &&
       capability !== CHANNEL_TASK_WAITS_CAPABILITY &&
-      capability !== ROUTINE_FLOW_STOP_CAPABILITY,
+      capability !== ROUTINE_FLOW_STOP_CAPABILITY &&
+      capability !== AGENT_PENDING_RUNTIME_CAPABILITY,
   );
 }

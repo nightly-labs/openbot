@@ -121,6 +121,10 @@ import {
   AGENT_NOTIFICATION_LEVELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import {
+  AGENT_PENDING_RUNTIME_CAPABILITY,
+  AGENT_PENDING_RUNTIME_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-pending-runtime-v1";
+import {
   AGENT_PLAN_CARD_CAPABILITY,
   AGENT_PLAN_CARD_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
@@ -1190,21 +1194,32 @@ const fakeAgents: TeamApiAgents = {
   committedAgentDuplication: unused("committedAgentDuplication"),
   duplicateAgent: unused("duplicateAgent"),
   commitAgentDuplication: unused("commitAgentDuplication"),
-  // Only an exact colour (`agent-colors-v1`), a chat colour (`chat-colors-v1`) or a move at a usage
-  // limit (`agent-usage-limit-v1`) reaches this writer in this run. A chat colour change sends
-  // `agents-changed`, as the agent service does.
-  updateAgent: (input) =>
+  // Only an exact colour (`agent-colors-v1`), a chat colour (`chat-colors-v1`), a move at a usage
+  // limit (`agent-usage-limit-v1`) or a runtime change (`agent-pending-runtime-v1`) reaches this writer
+  // in this run. A chat colour change sends `agents-changed`, as the agent service does. A runtime change
+  // is kept for the next turn, as for an agent that works.
+  updateAgent: (input, _initiatingAgentId, queueWhileBusy) =>
     Effect.sync(() => {
-      record(
-        input.leaveUsageLimit
-          ? "updateAgentModel"
-          : input.chatColor === undefined
-            ? "updateAgentColor"
-            : "updateAgentChatColor",
-        input,
-      );
+      const runtime = !input.leaveUsageLimit && (input.provider ?? input.model ?? input.reasoningEffort) !== undefined;
+      if (runtime) record("updateAgentRuntime", input, queueWhileBusy);
+      else
+        record(
+          input.leaveUsageLimit
+            ? "updateAgentModel"
+            : input.chatColor === undefined
+              ? "updateAgentColor"
+              : "updateAgentChatColor",
+          input,
+        );
       const target = agents.find((item) => item.id === input.agentId);
       if (!target) throw new Error("Agent not found.");
+      if (runtime && input.provider && input.model && input.reasoningEffort)
+        target.pendingRuntime = {
+          provider: input.provider,
+          model: input.model,
+          reasoningEffort: input.reasoningEffort,
+          ...(input.providerAccountId ? { providerAccountId: input.providerAccountId } : {}),
+        };
       if (input.avatarColor === null) delete target.avatarColor;
       else if (input.avatarColor !== undefined) target.avatarColor = input.avatarColor;
       if (input.chatColor === null) delete target.chatColor;
@@ -11362,6 +11377,91 @@ try {
         ]),
       [summary(moved), summary(adminMoved)],
     );
+  }
+
+  // ---- A runtime change that waits for the next turn (agent-pending-runtime-v1) ----
+  {
+    const capabilities = [AGENT_PENDING_RUNTIME_CAPABILITY];
+    const v9 = { capabilities, protocol: TEAM_PROTOCOL_V9 };
+    const change = { agentId: "agent-ada", provider: "grok", model: "grok-4", reasoningEffort: "high" };
+    const changesBefore = callsOf("updateAgentRuntime").length;
+    const unsupported = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, { token: bobToken, json: change });
+    const hiddenAgent = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, {
+      token: bobToken,
+      capabilities,
+      protocol: 6,
+      json: { ...change, agentId: "agent-pi" },
+    });
+    const empty = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada" },
+    });
+    accessLevels = { revision: 28, everyone: { "agent-ada": "chat" }, roles: [] };
+    const chatOnly = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, { token: bobToken, ...v9, json: change });
+    accessLevels = { revision: 29, everyone: {}, roles: [] };
+    const namedAccount = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, {
+      token: bobToken,
+      ...v9,
+      json: { ...change, providerAccountId: "a0123456789abcdef" },
+    });
+    check(
+      "the runtime change route without the capability, with no change, of a hidden agent, for a member with only chat, or to a named account by a member is refused",
+      errorIs(unsupported, 400, sourceText("error.team.providersUnsupported")) &&
+        empty.status === 400 &&
+        errorIs(hiddenAgent, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(chatOnly, 403, sourceText("error.team.agentManageDenied")) &&
+        errorIs(namedAccount, 403, sourceText("error.team.adminRequired")) &&
+        callsOf("updateAgentRuntime").length === changesBefore,
+      [summary(unsupported), summary(empty), summary(hiddenAgent), summary(chatOnly), summary(namedAccount)],
+    );
+    const effortOnly = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", reasoningEffort: "low" },
+    });
+    const ownSignIn = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, {
+      token: bobToken,
+      ...v9,
+      json: { ...change, providerAccountId: "default" },
+    });
+    const adminChanged = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, {
+      token: adaToken,
+      ...v9,
+      json: { ...change, providerAccountId: "a0123456789abcdef" },
+    });
+    const changed = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, { token: bobToken, ...v9, json: change });
+    check(
+      "a member with manage access changes the runtime or the effort alone, and an admin names an account; the host may keep each change for the next turn",
+      effortOnly.status === 200 &&
+        ownSignIn.status === 200 &&
+        adminChanged.status === 200 &&
+        changed.status === 200 &&
+        isDeepStrictEqual(callsOf("updateAgentRuntime").slice(changesBefore), [
+          [{ agentId: "agent-ada", reasoningEffort: "low" }, true],
+          [{ ...change, providerAccountId: null }, true],
+          [{ ...change, providerAccountId: "a0123456789abcdef" }, true],
+          [change, true],
+        ]),
+      [summary(effortOnly), summary(ownSignIn), summary(adminChanged), summary(changed)],
+    );
+    const pendingOf = (reply: Reply) => list(reply.body).find((item) => field(item, "id") === "agent-ada");
+    const withCapability = await call("GET", TEAM_API_ROUTES.agents.all, { token: bobToken, ...v9 });
+    const released = await call("GET", TEAM_API_ROUTES.agents.all, { token: bobToken, protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the agent list carries the change that waits only for a client with the capability",
+      withCapability.status === 200 &&
+        isDeepStrictEqual(field(pendingOf(withCapability), "pendingRuntime"), {
+          provider: "grok",
+          model: "grok-4",
+          reasoningEffort: "high",
+        }) &&
+        released.status === 200 &&
+        field(pendingOf(released), "pendingRuntime") === undefined,
+      [summary(withCapability), summary(released)],
+    );
+    const ada = agents.find((item) => item.id === "agent-ada");
+    if (ada) delete ada.pendingRuntime;
   }
 
   // ---- The Hermes folder of the host (hermes-import-v1) ----
