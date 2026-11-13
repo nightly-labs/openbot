@@ -1077,17 +1077,24 @@ async function networkCases(auth: Awaited<ReturnType<typeof startAuthorizationSe
   assert.equal(away, sourceText("error.backend.oauthResponseTooLarge", { origin: localBase }));
 
   // A sign-in request follows a 308 to its own `www.` host, as Lunch Flow's token endpoint sends
-  // (#8436), and still stops at any other origin. A stand-in network gives the https answers.
+  // (#8436). It still stops at another origin, at a 302 that drops the body, and at a second
+  // `www.` label. A stand-in network gives the https answers of the `.example` hosts.
   const realFetch = globalThis.fetch;
-  const moves: Record<string, string> = { "lunch.example": "www.lunch.example", "away.example": "other.example" };
+  const moves: Record<string, [status: number, host: string]> = {
+    "lunch.example": [308, "www.lunch.example"],
+    "away.example": [308, "other.example"],
+    "found.example": [302, "www.found.example"],
+    "www.deep.example": [308, "www.www.deep.example"],
+  };
   const sent: string[] = [];
   globalThis.fetch = Object.assign(
     async (input: Parameters<typeof fetch>[0], init?: RequestInit): Promise<Response> => {
       const target = new URL(input instanceof Request ? input.url : input);
+      if (!target.hostname.endsWith(".example")) return realFetch(input, init);
       sent.push(`${init?.method} ${target.href} ${String(init?.body)}`);
-      const moved = moves[target.hostname];
-      if (!moved) return Response.json({ access_token: "moved", token_type: "Bearer" });
-      return new Response(null, { status: 308, headers: { location: `https://${moved}${target.pathname}` } });
+      const move = moves[target.hostname];
+      if (!move) return Response.json({ access_token: "moved", token_type: "Bearer" });
+      return new Response(null, { status: move[0], headers: { location: `https://${move[1]}${target.pathname}` } });
     },
     realFetch,
   );
@@ -1099,9 +1106,11 @@ async function networkCases(auth: Awaited<ReturnType<typeof startAuthorizationSe
       `POST https://lunch.example/api/mcp/token ${signIn.body}`,
       `POST https://www.lunch.example/api/mcp/token ${signIn.body}`,
     ]);
-    const elsewhere = await refusal(secureOAuthFetch()("https://away.example/api/mcp/token", signIn));
-    assert.equal(elsewhere, sourceText("error.backend.oauthRedirectOrigin", { origin: "https://other.example" }));
-    assert.equal(sent.length, 3, "A refused redirect was followed.");
+    for (const [from, [, to]] of Object.entries(moves).slice(1)) {
+      const refused = await refusal(secureOAuthFetch()(`https://${from}/api/mcp/token`, signIn));
+      assert.equal(refused, sourceText("error.backend.oauthRedirectOrigin", { origin: `https://${to}` }));
+    }
+    assert.equal(sent.length, 5, "A refused redirect was followed.");
   } finally {
     globalThis.fetch = realFetch;
   }
@@ -1122,6 +1131,11 @@ async function networkCases(auth: Awaited<ReturnType<typeof startAuthorizationSe
       exchangeAtMcpUrlLimited: true,
       crossOriginHopLimited: true,
     },
-    credentialRedirect: { ownWwwHostFollowed: true, otherOriginRefused: true },
+    credentialRedirect: {
+      ownWwwHostFollowed: true,
+      otherOriginRefused: true,
+      bodyDroppingRedirectRefused: true,
+      secondWwwLabelRefused: true,
+    },
   };
 }

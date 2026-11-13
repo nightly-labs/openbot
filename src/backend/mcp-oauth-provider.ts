@@ -1968,7 +1968,9 @@ const secureOAuthRequest = Effect.fn("McpOAuth.secureFetch")(function* (
     if (hop >= MAX_OAUTH_REDIRECTS)
       return yield* mcpFailure(new Error(sourceText("error.backend.oauthTooManyRedirects")));
     const next = yield* mcpSync(() => new URL(location, url));
-    if (next.origin !== url.origin && carriesCredential(request) && !movesToOwnWwwHost(url, next, response.status))
+    // Only a sign-in request may move to its own `www.` host: MCP traffic keeps its origin rule.
+    const ownWwwHost = !mcpTraffic && movesToOwnWwwHost(url, next, response.status);
+    if (next.origin !== url.origin && carriesCredential(request) && !ownWwwHost)
       return yield* mcpFailure(new Error(sourceText("error.backend.oauthRedirectOrigin", { origin: next.origin })));
     url = next;
     request = redirected(request, response.status);
@@ -2072,7 +2074,8 @@ function movesToOwnWwwHost(from: URL, to: URL, status: number): boolean {
   if (status !== 307 && status !== 308) return false;
   if (from.protocol !== "https:" || to.protocol !== "https:" || from.port !== to.port) return false;
   if (from.pathname !== to.pathname || from.search !== to.search) return false;
-  return to.hostname === `www.${from.hostname}` || from.hostname === `www.${to.hostname}`;
+  const ownWww = (bare: string, www: string) => www === `www.${bare}` && !bare.startsWith("www.");
+  return ownWww(from.hostname, to.hostname) || ownWww(to.hostname, from.hostname);
 }
 
 /** Where a credential may be sent: an https endpoint, or one on the user's own machine. */
