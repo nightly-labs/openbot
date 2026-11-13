@@ -1,4 +1,5 @@
 import { WORKFLOW_MEDIA_MODELS } from "@openbot/contracts/ipc";
+import { Skeleton } from "@openbot/ui";
 import { providerAvailability, providerTurnedOff } from "@openbot/ui/components/provider-model-options";
 import { WorkflowCanvas } from "@openbot/ui/features/workflows/WorkflowCanvas";
 import {
@@ -160,7 +161,7 @@ export function WorkflowsCanvas(props: {
   });
   // The canvas is a direct child of the window page, which gives it the height of the pane.
   return (
-    <Show when={workflows.detail()}>
+    <Show when={workflows.detail()} fallback={<WorkflowCanvasLoading />}>
       {(workflow) => (
         <WorkflowCanvas
           workflow={workflow()}
@@ -174,5 +175,22 @@ export function WorkflowsCanvas(props: {
         />
       )}
     </Show>
+  );
+}
+
+function WorkflowCanvasLoading() {
+  return (
+    <main
+      class="window-page workflow-page-loading"
+      role="status"
+      aria-busy="true"
+      aria-label={currentText().t("common.loading")}
+    >
+      <div class="workflow-page-loading-content" aria-hidden="true">
+        <Skeleton class="workflow-page-loading-title" />
+        <Skeleton class="workflow-page-loading-line" />
+        <Skeleton class="workflow-page-loading-line workflow-page-loading-line-short" />
+      </div>
+    </main>
   );
 }

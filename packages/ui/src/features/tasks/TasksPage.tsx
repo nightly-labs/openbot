@@ -19,6 +19,7 @@ import {
   Mic,
   Popover,
   Search,
+  Skeleton,
   X,
 } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
@@ -873,7 +874,9 @@ export function TasksPage(props: TasksPageProps) {
           <div class="tasks-page-took-slot" aria-live="polite">
             <Show when={props.took}>{(took) => <TaskTookLine {...props} took={took()} />}</Show>
           </div>
-          <TasksList {...props} />
+          <Show when={props.loaded !== false} fallback={<TasksLoading />}>
+            <TasksList {...props} />
+          </Show>
           <Show when={empty()}>
             <TasksEmptyBoard agents={props.agents} />
           </Show>
@@ -889,5 +892,17 @@ export function TasksPage(props: TasksPageProps) {
         onResizeEnd={props.onSideResizeEnd}
       />
     </section>
+  );
+}
+
+function TasksLoading() {
+  const { t } = useText();
+  return (
+    <div class="tasks-page-loading" role="status" aria-busy="true" aria-label={t("common.loading")}>
+      <Skeleton class="tasks-page-loading-heading" />
+      <Skeleton class="tasks-page-loading-row" />
+      <Skeleton class="tasks-page-loading-row" />
+      <Skeleton class="tasks-page-loading-row tasks-page-loading-row-short" />
+    </div>
   );
 }
