@@ -1076,6 +1076,36 @@ async function networkCases(auth: Awaited<ReturnType<typeof startAuthorizationSe
   );
   assert.equal(away, sourceText("error.backend.oauthResponseTooLarge", { origin: localBase }));
 
+  // A sign-in request follows a 308 to its own `www.` host, as Lunch Flow's token endpoint sends
+  // (#8436), and still stops at any other origin. A stand-in network gives the https answers.
+  const realFetch = globalThis.fetch;
+  const moves: Record<string, string> = { "lunch.example": "www.lunch.example", "away.example": "other.example" };
+  const sent: string[] = [];
+  globalThis.fetch = Object.assign(
+    async (input: Parameters<typeof fetch>[0], init?: RequestInit): Promise<Response> => {
+      const target = new URL(input instanceof Request ? input.url : input);
+      sent.push(`${init?.method} ${target.href} ${String(init?.body)}`);
+      const moved = moves[target.hostname];
+      if (!moved) return Response.json({ access_token: "moved", token_type: "Bearer" });
+      return new Response(null, { status: 308, headers: { location: `https://${moved}${target.pathname}` } });
+    },
+    realFetch,
+  );
+  const signIn = { method: "POST", body: "grant_type=authorization_code&code=moved" };
+  try {
+    const moved = await secureOAuthFetch()("https://lunch.example/api/mcp/token", signIn);
+    assert.equal((await moved.json()).access_token, "moved");
+    assert.deepEqual(sent, [
+      `POST https://lunch.example/api/mcp/token ${signIn.body}`,
+      `POST https://www.lunch.example/api/mcp/token ${signIn.body}`,
+    ]);
+    const elsewhere = await refusal(secureOAuthFetch()("https://away.example/api/mcp/token", signIn));
+    assert.equal(elsewhere, sourceText("error.backend.oauthRedirectOrigin", { origin: "https://other.example" }));
+    assert.equal(sent.length, 3, "A refused redirect was followed.");
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+
   return {
     addressClassifier: { checked: Object.keys(addressTable).length },
     privateEndpoint: {
@@ -1092,5 +1122,6 @@ async function networkCases(auth: Awaited<ReturnType<typeof startAuthorizationSe
       exchangeAtMcpUrlLimited: true,
       crossOriginHopLimited: true,
     },
+    credentialRedirect: { ownWwwHostFollowed: true, otherOriginRefused: true },
   };
 }
