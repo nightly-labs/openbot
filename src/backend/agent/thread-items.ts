@@ -50,7 +50,12 @@ export function isNonActionableCodexWarning(message: string): boolean {
     // a Git source on a computer without Git (`codex-rs/core-plugins/src/manager.rs`). It has no
     // thread, the chat works, and the plugins stay at their version, so it showed a false
     // "Provider error" toast (#6976). The text covers `marketplace `name`:` and `marketplaces:`.
-    message.startsWith("Codex could not update marketplace")
+    message.startsWith("Codex could not update marketplace") ||
+    // Codex sends this on `thread/resume` when the last turn of the thread used another model
+    // (`codex-rs/core/src/session/mod.rs`). OpenBot changes the model on purpose: the user picked a
+    // new one, or a backup model ran. The turn continues, but the red banner looked like a failure and
+    // told the user to switch back (#8135).
+    message.startsWith("This session was recorded with model ")
   );
 }
 
