@@ -1,4 +1,5 @@
 import type { AppFormat, MobileTranslate } from "@openbot/i18n/mobile";
+import { messageDay, startOfDay } from "./message-time";
 
 /**
  * The separators of the chat, as on desktop (`packages/ui/src/features/conversation/chat-day-markers.ts`):
@@ -11,34 +12,6 @@ import type { AppFormat, MobileTranslate } from "@openbot/i18n/mobile";
 const DAY_MS = 86_400_000;
 const TIME = { hour: "numeric", minute: "2-digit" } as const;
 const DATE = { weekday: "short", month: "short", day: "numeric" } as const;
-
-function startOfDay(value: Date): number {
-  return new Date(value.getFullYear(), value.getMonth(), value.getDate()).getTime();
-}
-
-const MAX_KEPT_DAYS = 4000;
-/** The start of the day of each time that a row had, or NaN for a time that is not a date. */
-const keptDays = new Map<string, number>();
-let keptTimeZoneOffset: number | null = null;
-
-/**
- * The start of the day of a row. The labels are found again on each streamed chunk, for each loaded
- * row, and the local date of a time is slow to find, so each time is read once. A change of the time
- * zone gives each time another day.
- */
-function dayOf(createdAt: string, timeZoneOffset: number): number {
-  if (keptTimeZoneOffset !== timeZoneOffset || keptDays.size >= MAX_KEPT_DAYS) {
-    keptDays.clear();
-    keptTimeZoneOffset = timeZoneOffset;
-  }
-  let day = keptDays.get(createdAt);
-  if (day === undefined) {
-    const created = new Date(createdAt);
-    day = Number.isNaN(created.getTime()) ? Number.NaN : startOfDay(created);
-    keptDays.set(createdAt, day);
-  }
-  return day;
-}
 
 /** The label of each message that opens a day, by message ID. One pass over the loaded rows. */
 export function chatDayLabels(
@@ -53,7 +26,7 @@ export function chatDayLabels(
   let skipFirst = hasOlder;
   for (const row of rows) {
     if (!row.createdAt) continue;
-    const day = dayOf(row.createdAt, timeZoneOffset);
+    const day = messageDay(row.createdAt, timeZoneOffset);
     if (Number.isNaN(day) || day === previousDay) continue;
     previousDay = day;
     if (skipFirst) {

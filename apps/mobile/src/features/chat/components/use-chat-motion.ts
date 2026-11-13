@@ -161,9 +161,10 @@ export function useChatMotion(
   // While the chat opens, the list keeps the latest message in view: older rows come above the
   // first rows and get their sizes, and the latest page can add messages after the kept ones.
   const [openingFollow, setOpeningFollow] = useState(!holdOpening);
-  // The reader asked for the latest message with the button. The list then keeps the end in view
-  // while a reply grows, so the button does not come back after each new line. A drag or a sent
-  // message ends it: the reader then chooses the place again, or the sent message takes its own.
+  // The reader asked for the latest message with the button (`pinToLatest`, or `returnToLatest`
+  // from a window around a searched message). The list then keeps the end in view while a reply
+  // grows, so the button does not come back after each new line. A drag or a sent message ends it:
+  // the reader then chooses the place again, or the sent message takes its own.
   const [pinnedToLatest, setPinnedToLatest] = useState(false);
   const heldOpening = useRef(holdOpening);
   const current = useRef({ lastUserId });
@@ -441,8 +442,9 @@ export function useChatMotion(
     [leaveLatest, header, reveal, followFrom],
   );
   /** Positions the chat at the latest message again, after the latest page replaces a window around a searched message. */
-  const returnToLatest = useCallback(() => {
+  const returnToLatest = useCallback((pin = false) => {
     followLatest.current = true;
+    setPinnedToLatest(pin);
     setKeyboardLiftBehavior("whenAtEnd");
     setLatestGeneration((generation) => generation + 1);
   }, []);
@@ -454,10 +456,14 @@ export function useChatMotion(
   );
   const scrollToLatest = useCallback(() => {
     followLatest.current = true;
-    setPinnedToLatest(true);
     setKeyboardLiftBehavior("whenAtEnd");
     void listRef.current?.scrollToEnd({ animated: !reducedMotion });
   }, [reducedMotion]);
+  /** Goes to the latest message for the button, and keeps the end in view while a reply grows. */
+  const pinToLatest = useCallback(() => {
+    setPinnedToLatest(true);
+    scrollToLatest();
+  }, [scrollToLatest]);
 
   return useMemo(
     () => ({
@@ -496,6 +502,7 @@ export function useChatMotion(
       beginSend,
       cancelSend,
       scrollToLatest,
+      pinToLatest,
       openAt,
       returnToLatest,
       latestGeneration,
@@ -529,6 +536,7 @@ export function useChatMotion(
       beginSend,
       cancelSend,
       scrollToLatest,
+      pinToLatest,
       openAt,
       returnToLatest,
       latestGeneration,

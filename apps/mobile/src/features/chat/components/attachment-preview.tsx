@@ -26,7 +26,7 @@ import {
   useAttachmentDownload,
 } from "../model/large-files";
 import { shareFilesNative } from "../model/share-files-native";
-import { mediaFile } from "./use-media-file";
+import { mediaFile, writeMediaFile } from "./use-media-file";
 
 // Sizes outlive the downloaded file and the launch. A chat that scrolls an image back into view,
 // or opens again, then reserves its real shape at once instead of a guess.
@@ -112,8 +112,7 @@ async function keepFile(
     const file = mediaFile(serverId, attachment);
     if (!file.exists || file.size !== attachment.size) {
       file.parentDirectory.create({ intermediates: true, idempotent: true });
-      // Not `writeSync`: it decodes and writes megabytes on the JS thread, which also places the chat rows.
-      await file.write(data.base64, { encoding: "base64" });
+      await writeMediaFile(file, data.base64);
     }
     return file.uri;
   } catch {

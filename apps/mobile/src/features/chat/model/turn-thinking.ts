@@ -1,5 +1,6 @@
 import { type ChannelMessage, type ConversationMessage, isAgentAnswer } from "@openbot/contracts/ipc";
 import { isTurnThought, type TurnStepLine, type TurnStepLines } from "@/features/workspace/model/turn-step-lines";
+import { messageTime } from "./message-time";
 
 export type TurnThinkingStep =
   | { id: string; kind: "thought"; text: string; createdAt: string; streaming: boolean }
@@ -95,23 +96,6 @@ function silentAnswer(message: ConversationMessage): boolean {
   );
 }
 
-const MAX_KEPT_TIMES = 4000;
-const keptTimes = new Map<string, number>();
-
-/**
- * `Date.parse` of the time of a message. The summaries are found again on each streamed chunk, for
- * each loaded message, so each time is parsed once.
- */
-function timeOf(createdAt: string): number {
-  let at = keptTimes.get(createdAt);
-  if (at === undefined) {
-    at = Date.parse(createdAt);
-    if (keptTimes.size >= MAX_KEPT_TIMES) keptTimes.clear();
-    keptTimes.set(createdAt, at);
-  }
-  return at;
-}
-
 interface TurnTally {
   thoughts: number;
   /** The row of the turn's first thought. */
@@ -145,7 +129,7 @@ function tallyTurns<T>(
       turn.thoughts += 1;
     } else if (answer) turn.answerId ??= message.id;
     else if (silentAnswer(message)) turn.silent = true;
-    const at = timeOf(message.createdAt);
+    const at = messageTime(message.createdAt);
     if (!Number.isFinite(at)) continue;
     turn.startedAt = Math.min(turn.startedAt ?? at, at);
     if (thought || answer) turn.endedAt = Math.max(turn.endedAt ?? at, at);

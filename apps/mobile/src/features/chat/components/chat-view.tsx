@@ -647,12 +647,18 @@ export function ChatView({
   );
   const atLatest = motion.atLatest;
   // The end of a window around a searched message is not the latest message.
-  const showLatest = () => {
+  // `pin` is the button: the chat then also keeps the end in view while a reply grows. A sent
+  // message takes its own place.
+  const showLatest = (pin: boolean) => {
     if (!detached || !showLatestMessages) {
-      motion.scrollToLatest();
+      if (pin) motion.pinToLatest();
+      else motion.scrollToLatest();
       return;
     }
-    void showLatestMessages().then(motion.returnToLatest, () => undefined);
+    void showLatestMessages().then(
+      () => motion.returnToLatest(pin),
+      () => undefined,
+    );
   };
   const liquidGlassAvailable = isLiquidGlassAvailable() && !reducedTransparency;
   // A quiet return to the app counts as online: the chat keeps its look, and its requests wait.
@@ -982,7 +988,7 @@ export function ChatView({
     setSendError(null);
     setSelection(null);
     // The reply comes at the latest message, which a window around a searched message does not show.
-    if (detached) showLatest();
+    if (detached) showLatest(false);
     // The send animation starts from the loaded history. Without it, as offline, the row shows at once:
     // the animation would hide the first message until a history that does not load.
     if (!sendsToQueue && ready) motion.beginSend();
@@ -1290,7 +1296,7 @@ export function ChatView({
                     accessibilityLabel={t("mobile.chat.scrollToLatest")}
                     fallbackBackground={fieldBackground}
                     liquidGlassAvailable={liquidGlassAvailable}
-                    onPress={showLatest}
+                    onPress={() => showLatest(true)}
                   >
                     <ArrowDown color={String(foreground)} size={22} />
                   </ChatGlassIconButton>
