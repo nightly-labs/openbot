@@ -71,7 +71,8 @@ const SEARCH_TERMS = /"([^"]+)"|(\S+)/gu;
  */
 function searchTerms(query: string): string[] {
   return [...query.toLowerCase().matchAll(SEARCH_TERMS)].flatMap((match) => {
-    const term = (match[1] ?? match[2] ?? "").trim();
+    // A quote with no pair is not part of the word.
+    const term = (match[1] ?? match[2]?.replace(/^"+|"+$/gu, "") ?? "").trim();
     return term ? [term] : [];
   });
 }
@@ -403,7 +404,9 @@ export class HistoryTools {
         break;
       }
     }
-    if (result.messages.length === 0) result.next = `${NO_MATCH_HINT} ${result.next}`;
+    // With a cursor, older messages of this chat are not scanned yet and can still match.
+    if (result.messages.length === 0 && result.nextCursor === undefined)
+      result.next = `${NO_MATCH_HINT} ${result.next}`;
     return openBotToolResult(result);
   }).bind(this);
 
