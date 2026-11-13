@@ -1055,6 +1055,10 @@ processes share. That process outlives OpenBot and is outside a Workspace only s
 Cline process, the sign-in included, gets `CLINE_SESSION_BACKEND_MODE=local` and
 `CLINE_NO_AUTO_UPDATE=1` (`CLINE_ENV` in `provider-drivers.ts`). Sign in is an ACP `authenticate`
 call with `cline`, as for Gemini. `CLINE_API_KEY` in the environment also signs the CLI in.
+`cline --acp` lists only the models of the session's provider, which is `cline` (Cline Credits)
+after that sign-in. `clineFreeModels` (`cline-free-models.ts`) adds the ClinePass and free models of
+Cline's public recommended-models list. Each one sets the session's `provider` option (`cline-pass`
+or `cline`) before the model, and a listed model sets the session's own provider back.
 `clineStatePaths` lets a confined process write `~/.cline/data` and protects the global settings,
 the MCP and connector settings, and the cron, task and connector databases there. The agents,
 skills, hooks and plugins in `~/.cline` and `~/Documents/Cline` stay read-only. Cline answers a lost

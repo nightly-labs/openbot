@@ -230,7 +230,8 @@ starts the Cursor editor. Set `OPENBOT_CURSOR_PATH` to select an executable your
 agents stay on this computer: team members do not see them.
 
 Cline uses a Cline account, which has free models with limits for each model. The provider of a
-free model can use your prompts to train models. OpenBot downloads and pins the Cline CLI (`cline`) when you
+free model can use your prompts to train models. With a ClinePass subscription, select a model with
+"(ClinePass)" in its name: it runs on the subscription, and other paid models use Cline Credits. OpenBot downloads and pins the Cline CLI (`cline`) when you
 select Download on the Cline row in More providers, and starts it with `cline --acp`. Sign in opens
 Cline's sign-in page in your browser. You can also set `CLINE_API_KEY` in the environment used to
 launch OpenBot. If you installed `cline` 3.0.68 or newer yourself, OpenBot uses it until a download
