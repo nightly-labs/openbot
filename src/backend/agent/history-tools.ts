@@ -194,7 +194,7 @@ export const HISTORY_TOOL_DEFINITIONS = [
   {
     name: "history_read",
     description:
-      "Read this chat, or one by taskId, after its latest reset. Read a messageId with offset for large text or for the page text of a visual reply; for older messages, before is nextCursor or a messageId. Optional captured work steps contain no raw reasoning; continue them with workStepsOffset from nextWorkStepsOffset. Channels use channel_history.",
+      "Read this chat, or one by taskId, after its latest reset. Read a messageId with offset for large text; for older messages, before is nextCursor or a messageId. Optional captured work steps contain no raw reasoning; continue them with workStepsOffset from nextWorkStepsOffset. Channels use channel_history.",
     shape: readShape,
   },
 ];
