@@ -46,6 +46,9 @@ export type AgentApiKeyVault = Pick<VaultItems, "ready" | "apiKeys" | "saveApiKe
  * turn, so a key that the user deleted, or took from the agent, is never written again after its
  * removal. The Vault registers its values for redaction itself.
  *
+ * The scope controls which agents get a key file, not which agents can read it: every agent runs as the
+ * same system user, so an agent can read the files of the other agents. The Vault text says so.
+ *
  * Without a Vault (no OS encryption, or a damaged Vault file), a key for one agent is a plain file,
  * `<root>/<agentId>/<NAME>`, readable only by the user, as before the Vault had agents. When the Vault
  * can be used, each such file moves into it as a key for that agent, and the file is deleted after the
