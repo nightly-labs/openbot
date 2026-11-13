@@ -5,6 +5,11 @@ import {
 } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_HIDDEN_CAPABILITY, AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidden-v1";
 import {
+  AGENT_PENDING_RUNTIME_CAPABILITY,
+  AGENT_PENDING_RUNTIME_ROUTES,
+  pendingRuntimeUpdateBody,
+} from "@openbot/contracts/team-protocol/agent-pending-runtime-v1";
+import {
   AGENT_SESSION_SETTINGS_CAPABILITY,
   AGENT_SESSION_SETTINGS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
@@ -914,6 +919,30 @@ export function agentIpcHandlers({
             if (!moved) throw new Error(sourceText("error.team.agentNotFound"));
             const agent = remoteServers.agentWithColor(serverId, moved);
             return providerAccountId && providerAccountId !== DEFAULT_PROVIDER_ACCOUNT_ID
+              ? { ...agent, providerAccountId }
+              : agent;
+          }
+          // While the agent works, the released agent route refuses a provider change. A change of the
+          // runtime alone goes on `agent-pending-runtime-v1`, which keeps it for the next turn, with the
+          // account in the same change.
+          const runtimeChange = remoteServers.supportsCapability(serverId, AGENT_PENDING_RUNTIME_CAPABILITY)
+            ? pendingRuntimeUpdateBody(input)
+            : null;
+          if (runtimeChange) {
+            const { agentId, providerAccountId } = input;
+            await runCauseEffect(
+              remoteServers.request(serverId, AGENT_PENDING_RUNTIME_ROUTES.update, acceptEmpty, {
+                method: "POST",
+                body: runtimeChange,
+              }),
+            );
+            const changed = (
+              await runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries))
+            ).find((agent) => agent.id === agentId);
+            if (!changed) throw new Error(sourceText("error.team.agentNotFound"));
+            const agent = remoteServers.agentWithColor(serverId, changed);
+            // The released agent list does not carry the account. A queued account is in `pendingRuntime`.
+            return !agent.pendingRuntime && providerAccountId && providerAccountId !== DEFAULT_PROVIDER_ACCOUNT_ID
               ? { ...agent, providerAccountId }
               : agent;
           }

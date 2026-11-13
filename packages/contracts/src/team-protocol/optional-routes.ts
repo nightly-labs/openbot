@@ -20,6 +20,7 @@ import { AGENT_MEMORIES_CODECS } from "./agent-memories-v1";
 import { AGENT_MEMORY_LIMIT_CODECS } from "./agent-memory-limit-v1";
 import { AGENT_NEW_CHAT_CODECS } from "./agent-new-chat-v1";
 import { AGENT_NOTIFICATION_LEVELS_CODECS } from "./agent-notification-levels-v1";
+import { AGENT_PENDING_RUNTIME_CODECS } from "./agent-pending-runtime-v1";
 import { AGENT_PLAN_CARD_CODECS } from "./agent-plan-card-v1";
 import { AGENT_PUBLISH_CODECS } from "./agent-publish-v1";
 import { AGENT_QUEUE_TASK_CODECS } from "./agent-queue-task-v1";
@@ -231,6 +232,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...GITHUB_SKILLS_CODECS,
   ...AGENT_THREAD_QUEUE_CODECS,
   ...AGENT_USAGE_LIMIT_CODECS,
+  ...AGENT_PENDING_RUNTIME_CODECS,
   ...HERMES_IMPORT_CODECS,
   ...PROVIDER_DETECTION_CODECS,
   ...AGENT_QUEUE_TASK_CODECS,
