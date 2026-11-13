@@ -1067,6 +1067,13 @@ export class RoutineScheduler implements RoutineDueSource {
       if (!deliveryId)
         return yield* new RoutineOperationFailed({ cause: new Error("Unable to create the routine delivery.") });
       const queued = yield* routineStep(() => {
+        // The user stopped the run while its delivery was made: the delivery goes, and the run keeps
+        // how it ended. Attaching it would open the run again.
+        if (!this.#routines.activeRuns(run.agentId, run.routineId).some((entry) => entry.id === run.id)) {
+          if (this.#mailbox.getDelivery(deliveryId)?.delivery.status === "queued")
+            this.#mailbox.cancelNow(agent.id, deliveryId);
+          return this.#routines.listRuns(run.agentId, run.routineId).find((entry) => entry.id === run.id) ?? null;
+        }
         try {
           return this.#routines.attachDelivery(run.id, deliveryId);
         } catch (error) {
@@ -1078,6 +1085,10 @@ export class RoutineScheduler implements RoutineDueSource {
           throw error;
         }
       });
+      if (queued?.deliveryId !== deliveryId) {
+        yield* routineStep(() => this.#hooks.emitQueue(agent.id));
+        return queued ?? { ...run, status: "cancelled" as const };
+      }
       yield* routineStep(() => this.#waits.wakeForRun(run, deliveryId, waitId));
       // A run in the routine's thread shows in that thread's queue, and the chat keeps its preview.
       if (thread) {
