@@ -70,6 +70,12 @@ export interface AppServerRequest {
    * as an MCP client whose tool call timed out. An answer after that reaches nobody.
    */
   signal?: AbortSignal;
+  /**
+   * In process only, never on the wire. The provider stops waiting for the answer after a fixed time
+   * that OpenBot cannot extend, such as an MCP client that asked for no progress notifications. A
+   * question that waits longer than this answers the call first and stays open (#6230).
+   */
+  detachAfterMs?: number;
 }
 
 /** The account type of Claude's own sign-in when it runs on the saved key, with no claude.ai account. */

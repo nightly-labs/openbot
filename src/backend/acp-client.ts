@@ -1702,7 +1702,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           requestedThreadId ?? randomUUID(),
           dynamicTools,
           () => threadRef?.activeTurn?.id ?? null,
-          (call, signal) => this.#callDynamicTool(call, signal),
+          (call, signal, detachAfterMs) => this.#callDynamicTool(call, signal, detachAfterMs),
           this.#flavor.mcpServersPerDirectory ? cwd : undefined,
         )
         .pipe(toProviderClientOperationError),
@@ -3783,6 +3783,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       arguments: unknown;
     },
     signal: AbortSignal,
+    detachAfterMs: number | undefined,
   ): Effect.fn.Return<DynamicToolResult, ProviderClientOperationError> {
     if (this.#historyReplays.has(params.threadId)) {
       return { success: false, contentItems: [{ type: "inputText", text: "History replay cannot execute tools." }] };
@@ -3790,7 +3791,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const turn = this.#threads.get(params.threadId)?.activeTurn;
     if (turn) turn.answered = true;
     const result = yield* this.#serverRequests
-      .call("item/tool/call", params, signal)
+      .call("item/tool/call", params, signal, detachAfterMs)
       .pipe(toProviderClientOperationError);
     if (!isDynamicToolResult(result))
       return yield* providerFailure(new Error("OpenBot returned an invalid dynamic tool result."));

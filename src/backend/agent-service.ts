@@ -1214,6 +1214,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       apiKeys: options.agentApiKeys ?? null,
       // The turn lifecycle is made later; a request comes only from a running turn, after both exist.
       codexSubagentParent: (childThreadId) => this.#turn.codexSubagentParent(childThreadId),
+      // A routine thread takes runs, not messages, so its questions wait in their calls.
+      lateAnswerTarget: (agentId, publicThreadId) => {
+        if (store.list().find((candidate) => candidate.id === agentId)?.threadId === publicThreadId) return {};
+        const taskId = this.#tasks.taskForThread(publicThreadId);
+        return taskId && !this.#tasks.isRoutineThreadId(publicThreadId) ? { taskId } : null;
+      },
+      sendLateAnswer: (agentId, target, text, sender) =>
+        Effect.runFork(
+          this.sendMessage({ agentId, text, ...target }, sender).pipe(
+            Effect.catch((failure) => Effect.sync(() => this.#emitError("late_answer_failed", failure.cause, agentId))),
+            Effect.forkIn(this.#scope, { startImmediately: true }),
+          ),
+        ),
     });
     this.#duplication = new DuplicationGate({
       store,

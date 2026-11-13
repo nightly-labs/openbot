@@ -87,8 +87,10 @@ import {
   browserTakeoverError,
   browserTakeoverResult,
   commandText,
+  detachedPromptResult,
   dynamicPromptResult,
   expiredPromptResult,
+  lateAnswerText,
   MCP_TOOL_CONSENT_ALLOW_ONCE,
   mcpElicitationQuestions,
   mcpElicitationResult,
@@ -125,6 +127,21 @@ interface PendingPrompt {
   saving?: boolean;
   /** The block's own answer, and the timer that gives it. Removing the prompt clears the timer. */
   autoAnswer?: { state: UiBlockAutoAnswer; timer: ReturnType<typeof setTimeout> };
+  /**
+   * The timer that answers a call which the provider cannot wait for (`AppServerRequest.detachAfterMs`),
+   * and the chat that then gets the user's answer. Removing the prompt clears the timer.
+   */
+  detach?: { target: LateAnswerTarget; timer: ReturnType<typeof setTimeout> };
+  /**
+   * The call was answered with `detachedPromptResult`, so no provider waits for this question. The card
+   * stays until the user answers it, and the answer reaches the agent as a new message in this chat.
+   */
+  detached?: LateAnswerTarget;
+}
+
+/** The chat that a new message reaches: a task of the agent, or its own chat without `taskId`. */
+export interface LateAnswerTarget {
+  taskId?: string;
 }
 
 /**
@@ -478,6 +495,18 @@ export interface AttentionRegistryOptions {
    * thread. A subagent asks for consent from that thread, which OpenBot did not start.
    */
   codexSubagentParent?(childThreadId: string): CodexSubagentParent | undefined;
+  /**
+   * The chat that a new message from the user reaches for this thread: the agent's own chat or a task.
+   * Null for another thread, such as a channel's: a question there cannot outlive its call.
+   */
+  lateAnswerTarget?(agentId: string, publicThreadId: string): LateAnswerTarget | null;
+  /** Sends the answer to a detached question as a message from the person who answered. */
+  sendLateAnswer?(
+    agentId: string,
+    target: LateAnswerTarget,
+    text: string,
+    sender: ConversationMessageSender | undefined,
+  ): void;
 }
 
 export interface CodexSubagentParent {
@@ -526,6 +555,8 @@ export class AttentionRegistry {
   readonly #noteVaultChange: (agentId: string, threadId: string, turnId: string, text: string) => void;
   readonly #apiKeys: AgentApiKeys | null;
   readonly #codexSubagentParent: (childThreadId: string) => CodexSubagentParent | undefined;
+  readonly #lateAnswerTarget: (agentId: string, publicThreadId: string) => LateAnswerTarget | null;
+  readonly #sendLateAnswer: NonNullable<AttentionRegistryOptions["sendLateAnswer"]>;
   readonly #prompts = new Map<RequestId, PendingPrompt>();
   readonly #approvals = new Map<RequestId, PendingApproval>();
   readonly #takeovers = new Map<RequestId, PendingBrowserTakeover>();
@@ -548,6 +579,8 @@ export class AttentionRegistry {
     this.#agentName = options.agentName ?? (() => undefined);
     this.#noteVaultChange = options.noteVaultChange ?? (() => undefined);
     this.#apiKeys = options.apiKeys ?? null;
+    this.#lateAnswerTarget = options.lateAnswerTarget ?? (() => null);
+    this.#sendLateAnswer = options.sendLateAnswer ?? (() => undefined);
     this.#codexSubagentParent = options.codexSubagentParent ?? (() => undefined);
   }
 
@@ -639,6 +672,7 @@ export class AttentionRegistry {
       threadId: pending.publicThreadId,
       turnId: pending.turnId,
       questions: pending.questions.map(compactRuntimeQuestion),
+      ...(pending.detached ? { detached: true as const } : {}),
     }));
     remainingAttention -= pendingPrompts.length;
     const pendingApprovals = [...this.#approvals.values()]
@@ -692,9 +726,11 @@ export class AttentionRegistry {
                       Object.entries(input.answers).map(([id, values]) => [id, { answers: values }]),
                     ),
                   };
-      pending.client.respond(pending.id, result);
+      // A detached question has no call to answer: its answer goes to the chat as a message, below.
+      if (!pending.detached) pending.client.respond(pending.id, result);
       this.#prompts.delete(input.requestId);
       clearTimeout(pending.autoAnswer?.timer);
+      clearTimeout(pending.detach?.timer);
       this.#emitInputResolved("prompt", input.requestId, pending.agentId);
       try {
         if (pending.uiBlock) {
@@ -727,6 +763,9 @@ export class AttentionRegistry {
       } catch (error) {
         this.#emitError("prompt_persistence_failed", error, pending.agentId);
       }
+      const lateAnswer = pending.detached ? lateAnswerText(pending.questions, input.answers) : "";
+      if (pending.detached && lateAnswer)
+        this.#sendLateAnswer(pending.agentId, pending.detached, lateAnswer, responder?.sender);
       this.#emitRuntimeSnapshot();
     });
   }).bind(this);
@@ -1659,7 +1698,7 @@ export class AttentionRegistry {
     }
 
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions);
-    this.#prompts.set(request.id, {
+    const pending: PendingPrompt = {
       client,
       id: request.id,
       responseKind: "dynamic-tool",
@@ -1669,7 +1708,18 @@ export class AttentionRegistry {
       turnId,
       messageId,
       questions,
-    });
+    };
+    // A secret answer must not show in a chat message, so a secret question waits in its call.
+    const target =
+      request.detachAfterMs === undefined || questions.some((question) => question.isSecret)
+        ? null
+        : this.#lateAnswerTarget(agentId, publicThreadId);
+    if (target)
+      pending.detach = {
+        target,
+        timer: setTimeout(() => this.#detachPrompt(request.id, pending), request.detachAfterMs),
+      };
+    this.#prompts.set(request.id, pending);
     this.#routines.markNeedsAttention(turnId);
     this.#emit({
       type: "prompt",
@@ -1905,13 +1955,15 @@ export class AttentionRegistry {
   /**
    * A turn ending expires its questions, drops its approvals and cancels its takeovers. Each removal
    * emits its resolved event: a compaction turn sends no `turn-completed`, so a client learns about
-   * the removal only from that event.
+   * the removal only from that event. A detached question stays when the turn `completed`: its answer
+   * starts the next turn. A Stop or a failure expires it.
    */
-  clearForTurn(threadId: string, turnId: string): void {
+  clearForTurn(threadId: string, turnId: string, completed: boolean): void {
     for (const [requestId, pending] of this.#prompts) {
       const pendingThreadId = getString(pending.params, "threadId");
       const pendingTurnId = getString(pending.params, "turnId");
-      if (pendingThreadId === threadId && pendingTurnId === turnId) this.#expirePrompt(requestId, pending);
+      if (pendingThreadId !== threadId || pendingTurnId !== turnId || (completed && pending.detached)) continue;
+      this.#expirePrompt(requestId, pending);
     }
     for (const [requestId, pending] of this.#approvals) {
       const pendingThreadId = getString(pending.params, "threadId") ?? getString(pending.params, "conversationId");
@@ -1940,7 +1992,8 @@ export class AttentionRegistry {
     for (const [requestId, pending] of this.#prompts) {
       if (pending.agentId !== agentId || pending.publicThreadId !== publicThreadId || pending.turnId !== turnId)
         continue;
-      if (pending.saving || pending.responseKind === "mcp-elicitation") continue;
+      // A detached question holds no call, so the turn reads the message, and the card stays.
+      if (pending.saving || pending.detached || pending.responseKind === "mcp-elicitation") continue;
       this.#routines.markRunningForTurn(turnId);
       // The card shows as the user's own skip does.
       this.#closePrompt(
@@ -1971,7 +2024,8 @@ export class AttentionRegistry {
   cancelRequest(client: AgentClient, requestId: RequestId): void {
     let changed = false;
     const prompt = this.#prompts.get(requestId);
-    if (prompt?.client === client) {
+    // A detached question answered its call already, so a later cancel of that call does not reach it.
+    if (prompt?.client === client && !prompt.detached) {
       this.#routines.markRunningForTurn(prompt.turnId);
       this.#expirePrompt(requestId, prompt);
       changed = true;
@@ -1990,6 +2044,27 @@ export class AttentionRegistry {
       }
     }
     if (changed) this.#emitRuntimeSnapshot();
+  }
+
+  /**
+   * The provider cannot wait longer for this question (#6230). Its call gets `detachedPromptResult`,
+   * and the card stays open: the turn goes on, and the user's answer reaches the agent as a message.
+   */
+  #detachPrompt(requestId: RequestId, pending: PendingPrompt): void {
+    const target = pending.detach?.target;
+    if (this.#prompts.get(requestId) !== pending || !target) return;
+    delete pending.detach;
+    pending.detached = target;
+    this.#routines.markRunningForTurn(pending.turnId);
+    if (pending.client.running) {
+      try {
+        pending.client.respond(pending.id, detachedPromptResult());
+      } catch (error) {
+        logger.warn("Unable to answer a detached prompt", { error: toLogValue(error) });
+      }
+    }
+    // The snapshot marks the card detached, so a client keeps it when the turn ends.
+    this.#emitRuntimeSnapshot();
   }
 
   /**
@@ -2022,8 +2097,9 @@ export class AttentionRegistry {
   ): void {
     this.#prompts.delete(requestId);
     clearTimeout(pending.autoAnswer?.timer);
+    clearTimeout(pending.detach?.timer);
     this.#emitInputResolved("prompt", requestId, pending.agentId);
-    if (pending.client.running) {
+    if (pending.client.running && !pending.detached) {
       try {
         pending.client.respond(pending.id, result);
       } catch (error) {
