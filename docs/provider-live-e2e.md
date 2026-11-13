@@ -65,16 +65,19 @@ with a wait of up to 60 seconds between two.
 
 ## In CI
 
-The `Provider live E2E` workflow runs the test on the Mac mini runner (`runs-on: [self-hosted, macOS]`):
+The `Provider live E2E` workflow runs the test on the Mac mini runner (`runs-on: [self-hosted, macOS]`).
+It runs only when a person with write access starts it (`workflow_dispatch`):
 
-- before a release, when the release preparation reaches `main`. Only that commit changes
-  `CHANGELOG.md`, so the trigger is a push to `main` that changes this file. The run does not stop
-  the tag workflow: look at its result before you push the tag.
-- by hand (`workflow_dispatch`).
+```sh
+gh workflow run provider-live-e2e.yml --ref <branch> -f provider=all
+```
 
-It has no provider secret: the providers use the sign-ins of the runner's user. It does not run for
-a pull request, because a pull request must not run its code on a computer that holds provider
-sign-ins.
+Before a release, the [release-upgrade-safety](../.agents/skills/release-upgrade-safety/SKILL.md)
+skill starts it on the pull request branch of the release (Step 2c), before the merge and the tag.
+
+It has no provider secret: the providers use the sign-ins of the runner's user. It has no
+`pull_request` trigger, because a pull request must not start its own code on a computer that holds
+provider sign-ins.
 
 ## Add a provider
 

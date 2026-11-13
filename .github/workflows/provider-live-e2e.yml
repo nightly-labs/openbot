@@ -2,16 +2,11 @@ name: Provider live E2E
 
 # One real turn on Codex, Claude and Gemini, each in its own desktop app, at the same time
 # (`bun run test:provider-live`, docs/provider-live-e2e.md). The job runs on the Mac mini runner: each
-# provider uses the sign-in of the runner's user, so the job has no provider secret. It runs when
-# the release preparation reaches `main` (only that commit changes `CHANGELOG.md`), before the tag,
-# and by hand. It never runs for a pull request: a pull request must not run its code on a computer
-# that holds provider sign-ins.
+# provider uses the sign-in of the runner's user, so the job has no provider secret. It runs only
+# when a person with write access starts it. The release-upgrade-safety skill starts it on the pull
+# request branch of a release, before the merge and the tag. It has no `pull_request` trigger: a
+# pull request must not start its own code on a computer that holds provider sign-ins.
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - CHANGELOG.md
   workflow_dispatch:
     inputs:
       provider:

@@ -595,9 +595,9 @@ git tag -a vX.Y.Z -m "OpenBot vX.Y.Z"
 git push origin vX.Y.Z
 ```
 
-The push of the preparation to `main` also starts the `Provider live E2E` workflow, which sends one real
-message to each provider ([Live provider test](provider-live-e2e.md)). Look at its result before you
-push the tag. It does not stop the tag workflow.
+Before the merge of the preparation, the release-upgrade-safety skill starts the `Provider live E2E`
+workflow on that branch (Step 2c). It sends one real message to each provider
+([Live provider test](provider-live-e2e.md)). Do not push the tag when it has a stop.
 
 Pushing the version tag runs `.github/workflows/release.yml`.
 The tag workflow builds nothing until `https://openbot.run/join` and the Apple association file return
