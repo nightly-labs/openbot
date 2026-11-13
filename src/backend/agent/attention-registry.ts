@@ -2009,6 +2009,23 @@ export class AttentionRegistry {
   }
 
   /**
+   * Expires the detached questions of an agent, of one thread, or of both. Call it when a task closes or
+   * is deleted, or when the agent is deleted: no message can reach them there, and a hidden question
+   * would block duplication and plan continuation.
+   */
+  expireDetached(agentId: string | null, publicThreadId: string | null): void {
+    let changed = false;
+    for (const [requestId, pending] of this.#prompts) {
+      if (!pending.detached) continue;
+      if (agentId !== null && pending.agentId !== agentId) continue;
+      if (publicThreadId !== null && pending.publicThreadId !== publicThreadId) continue;
+      this.#expirePrompt(requestId, pending);
+      changed = true;
+    }
+    if (changed) this.#emitRuntimeSnapshot();
+  }
+
+  /**
    * Expires the prompts of one lost provider client, or of all clients when none is given. A detached
    * question holds no call of the client, so it stays: an idle provider stops after 10 minutes, and
    * the answer starts the next turn on a new process.
