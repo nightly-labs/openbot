@@ -1829,21 +1829,36 @@ export class ThreadLifecycle {
     // Every thread of this agent, not only `agent.threadId`: a channel turn runs on an execution
     // thread of its own, and its provider session holds the same stale runtime as the agent's.
     const threadIds = this.#store.database.activeProviderSessionThreads(agent.id);
+    const reloadProvider = RUNTIME_RELOADED_ON_RESUME.has(agent.provider) ? agent.provider : null;
     for (const threadId of threadIds) {
       // A running turn owns its provider session, so the refresh waits for it. The mark stays, and
-      // the next drain of this agent refreshes the thread that was busy this time.
-      if (this.#activeTurnOf(agent.id, threadId)) deferred = true;
-      else
-        yield* this.#refreshThreadRuntime(
-          threadId,
-          RUNTIME_RELOADED_ON_RESUME.has(agent.provider) ? agent.provider : null,
-        );
+      // the next drain of this agent refreshes the thread that was busy this time. A reload closes
+      // the process, which also ends the background subagents and commands of a finished turn, so
+      // it waits for them in the same way (#8484).
+      if (this.#activeTurnOf(agent.id, threadId) || (reloadProvider && (yield* this.#runsBackgroundWork(threadId))))
+        deferred = true;
+      else yield* this.#refreshThreadRuntime(threadId, reloadProvider);
     }
     if (!deferred) {
       this.#pendingRuntimeRefreshes.delete(agent.id);
       this.#store.clearSessionSettingReset(agent.id, settingsIdentity);
     }
   }, Effect.uninterruptible).bind(this);
+
+  /** Whether a loaded session of this thread runs background work. A failed check keeps the session. */
+  readonly #runsBackgroundWork = Effect.fn("ThreadLifecycle.runsBackgroundWork")(function* (
+    this: ThreadLifecycle,
+    threadId: string,
+  ) {
+    for (const session of this.#store.database.listProviderSessions(threadId)) {
+      if (session.state !== "active") continue;
+      const client = this.#conversation.openClientFor(session.externalSessionId);
+      if (!client?.holdsBackgroundWork) continue;
+      const background = yield* Effect.result(client.holdsBackgroundWork(session.externalSessionId));
+      if (Result.isFailure(background) || background.success) return true;
+    }
+    return false;
+  });
 
   /**
    * Whether a provider turn may own a session of this agent's own thread, as the checks of
