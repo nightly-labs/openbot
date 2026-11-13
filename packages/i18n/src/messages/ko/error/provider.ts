@@ -353,6 +353,8 @@ export const messages = {
     "{provider}가 저장된 API 키를 거부했어요. 설정에서 키를 교체하거나 제거한 후 다시 시도하세요.",
   "error.provider.keyProviderNoBalance":
     "저장된 API 키의 {provider} 계정에 잔액이 없어요. 계정에 크레딧을 추가한 후 다시 시도하세요.",
+  "error.provider.keyProviderLowCredit":
+    "저장된 API 키의 {provider} 계정에 이 모델의 응답에 필요한 크레딧이 부족해요. 계정에 크레딧을 추가하거나 다른 모델을 선택한 후 다시 시도하세요.",
   "error.provider.modelServiceRefused":
     "모델 서비스가 요청을 거부했어요. 다른 모델을 선택하거나 서비스에서 이 모델에 대한 접근 권한을 확인하세요.",
   "error.provider.modelServiceRefusedReason":

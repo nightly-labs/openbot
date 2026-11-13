@@ -367,6 +367,8 @@ export const messages = {
     "{provider} は保存された API キーを拒否しました。設定でキーを置き換えるか削除してから、もう一度お試しください。",
   "error.provider.keyProviderNoBalance":
     "保存された API キーの {provider} アカウントに残高がありません。アカウントにクレジットを追加してから、もう一度お試しください。",
+  "error.provider.keyProviderLowCredit":
+    "保存された API キーの {provider} アカウントには、このモデルの応答に必要なクレジットが足りません。アカウントにクレジットを追加するか、別のモデルを選択してから、もう一度お試しください。",
   "error.provider.modelServiceRefused":
     "モデルサービスがリクエストを拒否しました。別のモデルを選択するか、サービスでこのモデルへのアクセス権を確認してください。",
   "error.provider.modelServiceRefusedReason":

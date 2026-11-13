@@ -361,6 +361,8 @@ export const messages = {
     "{provider} kayıtlı API anahtarını reddetti. Ayarlar'da anahtarı değiştirin veya kaldırın, ardından yeniden deneyin.",
   "error.provider.keyProviderNoBalance":
     "Kayıtlı API anahtarının {provider} hesabında bakiye yok. Hesaba kredi ekleyin, ardından yeniden deneyin.",
+  "error.provider.keyProviderLowCredit":
+    "Kayıtlı API anahtarının {provider} hesabında bu modelin yanıtı için yeterli kredi yok. Hesaba kredi ekleyin veya başka bir model seçin, ardından yeniden deneyin.",
   "error.provider.modelServiceRefused":
     "Model hizmeti isteği reddetti. Başka bir model seçin veya hizmette bu modele erişiminizi kontrol edin.",
   "error.provider.modelServiceRefusedReason":

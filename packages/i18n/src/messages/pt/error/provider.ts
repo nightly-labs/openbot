@@ -359,6 +359,8 @@ export const messages = {
     "O {provider} recusou a chave de API salva. Substitua ou remova a chave nas Configurações e tente novamente.",
   "error.provider.keyProviderNoBalance":
     "A conta do {provider} da chave de API salva não tem saldo. Adicione crédito à conta e tente novamente.",
+  "error.provider.keyProviderLowCredit":
+    "A conta do {provider} da chave de API salva não tem crédito suficiente para uma resposta deste modelo. Adicione crédito à conta ou selecione outro modelo e tente novamente.",
   "error.provider.modelServiceRefused":
     "O serviço do modelo recusou a solicitação. Escolha outro modelo ou verifique seu acesso a este modelo no serviço.",
   "error.provider.modelServiceRefusedReason":

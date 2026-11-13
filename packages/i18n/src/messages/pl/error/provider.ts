@@ -350,6 +350,8 @@ export const messages = {
     "{provider} odrzucił zapisany klucz API. Zastąp lub usuń klucz w Ustawieniach, a następnie spróbuj ponownie.",
   "error.provider.keyProviderNoBalance":
     "Konto {provider} zapisanego klucza API nie ma środków. Doładuj konto, a następnie spróbuj ponownie.",
+  "error.provider.keyProviderLowCredit":
+    "Konto {provider} zapisanego klucza API nie ma dość środków na odpowiedź tego modelu. Doładuj konto albo wybierz inny model, a następnie spróbuj ponownie.",
   "error.provider.modelServiceRefused":
     "Usługa modelu odrzuciła żądanie. Wybierz inny model albo sprawdź swój dostęp do tego modelu w usłudze.",
   "error.provider.modelServiceRefusedReason":

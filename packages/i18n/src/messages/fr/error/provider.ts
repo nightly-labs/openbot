@@ -376,6 +376,8 @@ export const messages = {
     "{provider} a refusé la clé d’API enregistrée. Remplacez ou supprimez la clé dans les Réglages, puis réessayez.",
   "error.provider.keyProviderNoBalance":
     "Le compte {provider} de la clé d’API enregistrée n’a pas de solde. Ajoutez du crédit au compte, puis réessayez.",
+  "error.provider.keyProviderLowCredit":
+    "Le compte {provider} de la clé d’API enregistrée n’a pas assez de crédit pour une réponse de ce modèle. Ajoutez du crédit au compte ou sélectionnez un autre modèle, puis réessayez.",
   "error.provider.modelServiceRefused":
     "Le service du modèle a refusé la requête. Choisissez un autre modèle ou vérifiez votre accès à ce modèle auprès du service.",
   "error.provider.modelServiceRefusedReason":

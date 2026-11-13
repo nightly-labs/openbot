@@ -359,6 +359,8 @@ export const messages = {
     "{provider} ha rifiutato la chiave API salvata. Sostituisci o rimuovi la chiave nelle Impostazioni, poi riprova.",
   "error.provider.keyProviderNoBalance":
     "L’account {provider} della chiave API salvata non ha credito. Aggiungi credito all’account, poi riprova.",
+  "error.provider.keyProviderLowCredit":
+    "L’account {provider} della chiave API salvata non ha credito sufficiente per una risposta di questo modello. Aggiungi credito all’account o scegli un altro modello, poi riprova.",
   "error.provider.modelServiceRefused":
     "Il servizio del modello ha rifiutato la richiesta. Scegli un altro modello o controlla il tuo accesso a questo modello presso il servizio.",
   "error.provider.modelServiceRefusedReason":
