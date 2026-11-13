@@ -369,6 +369,8 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "プロキシ {name} がサインインを拒否したため、ページを開けませんでした。",
   "error.backend.browserProxyComputerUnreachable":
     "このプロファイルが使うコンピューターが応答しないため、ページを開けませんでした。",
+  "error.backend.browserProxyComputerLocalAddress":
+    "このプロファイルが使うコンピューターは公開サイトだけを開きます。ローカルネットワーク上のアドレスは開かないため、ページは開きませんでした。",
   "error.backend.browserCertificateUntrusted":
     "このサイトのセキュリティ証明書が信頼されていないため、ページを開けませんでした。",
   "error.backend.browserLowMemory":
