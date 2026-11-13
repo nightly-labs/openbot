@@ -91,6 +91,11 @@ export interface ContextCompactionOptions {
     client: AgentClient,
     threadId: string,
   ): Effect.Effect<string | null, ThreadOperationFailed>;
+  /**
+   * Loads the session in `client` before a compaction. False when the next turn replaces the session.
+   * See `ThreadLifecycle.loadSessionForCompaction`.
+   */
+  loadSession(agentId: string, client: AgentClient, threadId: string): Effect.Effect<boolean, ThreadOperationFailed>;
   /** Whether `rotateSession` can replace this session. See `ThreadLifecycle.rotatesSession`. */
   rotatesSession(agentId: string, threadId: string): boolean;
   /** The service stops: its database can close before a provider stops reporting usage. */
@@ -132,6 +137,7 @@ export class ContextCompaction {
   readonly #emitError: (code: string, error: unknown, agentId?: string) => void;
   readonly #scheduleDrain: (agentId: string) => void;
   readonly #rotateSession: ContextCompactionOptions["rotateSession"];
+  readonly #loadSession: ContextCompactionOptions["loadSession"];
   readonly #rotatesSession: ContextCompactionOptions["rotatesSession"];
   readonly #isStopping: () => boolean;
   readonly #budgets = new Map<string, ThreadContextBudget>();
@@ -170,6 +176,7 @@ export class ContextCompaction {
     this.#emitError = options.emitError;
     this.#scheduleDrain = options.scheduleDrain;
     this.#rotateSession = options.rotateSession;
+    this.#loadSession = options.loadSession;
     this.#rotatesSession = options.rotatesSession;
     this.#isStopping = options.isStopping;
   }
@@ -519,18 +526,33 @@ export class ContextCompaction {
     const runsInRequest = client.contextCompaction === "request";
     this.#armDeadline(agentId, threadId, client, runsInRequest ? this.#runTimeoutMs : this.#timeoutMs);
 
-    yield* client
-      .request(
-        "thread/compact/start",
-        { threadId },
-        decodeRecordResponse,
-        runsInRequest ? this.#runTimeoutMs : undefined,
+    yield* this.#loadSession(agentId, client, threadId)
+      .pipe(
+        Effect.flatMap((loaded) => {
+          // The deadline, the end of the client or of the thread ended this compaction while it loaded.
+          if (budget.phase !== "requested" || this.#budgets.get(threadId) !== budget) return Effect.succeed(false);
+          if (!loaded) {
+            // The next turn replaces the session, so nothing failed: no error, and no count.
+            this.observeCompaction(threadId, "failed");
+            this.#release(agentId, threadId);
+            this.#scheduleDrain(agentId);
+            return Effect.succeed(false);
+          }
+          return client
+            .request(
+              "thread/compact/start",
+              { threadId },
+              decodeRecordResponse,
+              runsInRequest ? this.#runTimeoutMs : undefined,
+            )
+            .pipe(Effect.as(true));
+        }),
       )
       .pipe(toContextCompactionFailed)
       .pipe(
-        Effect.tap(() =>
+        Effect.tap((started) =>
           Effect.sync(() => {
-            if (client.contextCompaction === "request" && budget.phase === "requested") {
+            if (started && client.contextCompaction === "request" && budget.phase === "requested") {
               this.markCompacted(threadId);
               this.finish(agentId, threadId, "completed");
             }
