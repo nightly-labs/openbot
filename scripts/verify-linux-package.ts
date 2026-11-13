@@ -25,6 +25,8 @@ const HOSTED_SCRIPTS = [
   "openbot-boat-pre-stop",
   // Not installed on a server: `install-server.sh` runs it from the unpacked release.
   "openbot-server-setup",
+  // Not installed on a server: the server and the container run it from the release (#7892).
+  "openbot-agent-desktop",
 ];
 const HOSTED_UNITS = [
   "openbot.service",
@@ -88,6 +90,8 @@ await Promise.all([
     access(resolve(resourcesPath, "hosting", file)),
   ),
   ...HOSTED_SCRIPTS.map((file) => access(resolve(resourcesPath, "hosting", file), constants.X_OK)),
+  // The window manager and panel settings that openbot-agent-desktop reads.
+  ...["openbox.xml", "tint2rc"].map((file) => access(resolve(resourcesPath, "hosting/agent-desktop", file))),
   // The Computer Use driver of this architecture.
   access(resolve(resourcesPath, `cua-driver/linux/${architecture}/cua-driver`)),
   access(resolve(resourcesPath, `cua-driver/linux/${architecture}/wayland-helper/winrects@cua/extension.js`)),
