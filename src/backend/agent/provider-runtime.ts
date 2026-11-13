@@ -213,12 +213,12 @@ const PROVIDER_RESTART_POLL_MS = 1_000;
  */
 const FAILED_MODEL_LIST_RETRY_DELAYS_MS = [2_000, 15_000];
 /**
- * How old the model list of a running provider can be before the idle check reads it again. A CLI
- * changes its list while it runs: a model that the user adds in its own settings, such as a GitHub
- * Copilot model with the user's own key. With active agents the process never stops, so the
- * picker kept the old list until a restart, and a joined server has no refresh action (#8495).
- * An ACP agent reads its list in a probe session, so the wait is the idle release time: a process
- * that no turn uses stops after it, and the next turn starts it again and reads its list.
+ * How old the model list of a running provider with `relistWhileRunning` can be before the idle
+ * check reads it again. Such a CLI changes its list while it runs: a model that the user adds in its
+ * own settings, such as a GitHub Copilot model with the user's own key. With active agents the
+ * process never stops, so the picker kept the old list until a restart, and a joined server has no
+ * refresh action (#8495). An ACP agent reads its list in a probe session, so the wait is the idle
+ * release time: a process that no turn uses stops after it, and the next turn reads its list.
  */
 const MODEL_LIST_REREAD_MS = PROVIDER_IDLE_RELEASE_MS;
 /** The start failure of OpenCode 1 on a database that OpenCode 2 made. */
@@ -1571,10 +1571,17 @@ export class ProviderRuntime implements ProviderPort {
 
   readonly start = Effect.fn("ProviderRuntime.start")(function* (this: ProviderRuntime) {
     if (this.#scope.state._tag === "Closed") this.#scope = Scope.makeUnsafe();
-    this.#idleCheck ??= setInterval(() => {
-      Effect.runFork(this.#releaseIdleProviders().pipe(Effect.forkIn(this.#scope)));
-      Effect.runFork(this.#rereadModels().pipe(Effect.forkIn(this.#scope)));
-    }, PROVIDER_IDLE_CHECK_MS);
+    // The model lists are read after the release, so a process that this check stops is not read.
+    this.#idleCheck ??= setInterval(
+      () =>
+        Effect.runFork(
+          Effect.exit(this.#releaseIdleProviders()).pipe(
+            Effect.andThen(this.#rereadModels()),
+            Effect.forkIn(this.#scope),
+          ),
+        ),
+      PROVIDER_IDLE_CHECK_MS,
+    );
     this.#idleCheck.unref?.();
     this.#watchSignInFiles();
     // All providers together start a process each, and a version check before it, in the same second.
@@ -4591,10 +4598,11 @@ export class ProviderRuntime implements ProviderPort {
   });
 
   /**
-   * Reads the model list of each running provider again when the last read is older than
-   * `MODEL_LIST_REREAD_MS`. Each provider reads with `relist`, so a client that another one replaced
-   * changes nothing, and only a fresh list replaces the provider's models. The read is quiet: the
-   * user did not ask for it, so a failure stays in the log. The status goes out only when a list
+   * Reads the model list of each running provider with `relistWhileRunning` again when the last read
+   * is older than `MODEL_LIST_REREAD_MS`. Each provider reads with `relist`, so a client that another
+   * one replaced changes nothing, and only a fresh list replaces the provider's models. The read is
+   * quiet: the user did not ask for it, so a failure stays in the log. A fresh list clears an older
+   * error of the provider, as `#relistModels` does. The status goes out only when a list or an error
    * changed.
    */
   readonly #rereadModels = Effect.fn("ProviderRuntime.rereadModels")(function* (this: ProviderRuntime) {
@@ -4603,20 +4611,33 @@ export class ProviderRuntime implements ProviderPort {
     if (now - this.#modelsReadAt < MODEL_LIST_REREAD_MS) return;
     this.#modelsReadAt = now;
     const providers = [...this.#clients.keys()].filter(
-      (provider) => !this.#off.has(provider) && !this.#relisting.has(provider),
+      (provider) =>
+        BUILT_IN_PROVIDER_DRIVERS.find((driver) => driver.id === provider)?.catalog?.relistWhileRunning &&
+        !this.#off.has(provider) &&
+        !this.#relisting.has(provider),
     );
     if (providers.length === 0) return;
-    const before = JSON.stringify(this.#modelCatalog.list());
+    const errorSerialAtStart = this.#errorSerial;
+    const listOf = (provider: AgentProvider) =>
+      JSON.stringify(this.#modelCatalog.list().filter((model) => model.provider === provider));
+    let changed = false;
     for (const provider of providers) this.#relisting.add(provider);
     yield* Effect.forEach(
       providers,
       (provider) =>
-        this.#modelCatalog
-          .relist(provider, { quiet: true })
-          .pipe(Effect.ensuring(Effect.sync(() => this.#relisting.delete(provider)))),
+        Effect.gen({ self: this }, function* () {
+          const before = listOf(provider);
+          if (!(yield* this.#modelCatalog.relist(provider, { quiet: true }))) return;
+          if (listOf(provider) !== before) changed = true;
+          const lastError = this.#lastErrors.get(provider);
+          if (lastError && lastError.serial <= errorSerialAtStart) {
+            this.#lastErrors.delete(provider);
+            changed = true;
+          }
+        }).pipe(Effect.ensuring(Effect.sync(() => this.#relisting.delete(provider)))),
       { concurrency: "unbounded", discard: true },
     );
-    if (JSON.stringify(this.#modelCatalog.list()) !== before) this.#setStatus({});
+    if (changed) this.#setStatus({});
   });
 
   /** Shows a provider failure to the user and keeps it on the provider row. */

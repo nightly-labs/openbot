@@ -213,7 +213,8 @@ export class ModelCatalog {
    * the activation of the new client reads its own list.
    *
    * `quiet`: a read that the user did not cause. A failed one goes only to the log, and the provider
-   * row keeps the list that it has, with no error.
+   * row keeps the list that it has, with no error. An empty one is not fresh: a running CLI that lists
+   * no model for a moment must not empty the picker.
    */
   readonly relist = Effect.fn("ModelCatalog.relist")(function* (
     this: ModelCatalog,
@@ -238,7 +239,7 @@ export class ModelCatalog {
     }
     const { models, listed } = result.success;
     logger.info("A provider listed its models.", { provider, count: models.length, durationMs });
-    if (catalog.fallback && listed === 0) return false;
+    if ((catalog.fallback || options.quiet) && listed === 0) return false;
     const current = this.#models;
     this.#models = BUILT_IN_PROVIDER_DRIVERS.flatMap(({ id }) =>
       id === provider ? models : current.filter((model) => model.provider === id),
