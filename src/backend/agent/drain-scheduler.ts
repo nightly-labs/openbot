@@ -438,17 +438,6 @@ export class DrainScheduler {
     });
   }
 
-  /**
-   * The chat names a provider restart that holds its queue (#8209). Nothing in the queue changes while
-   * the restart holds it, so the queue is sent again when that hold starts and when it ends.
-   */
-  #emitProviderRestartChange(lane: Lane, previous: string | undefined): void {
-    const current = this.#reportedHolds.get(laneKey(lane));
-    if (lane.taskId !== null || current === previous) return;
-    if (previous === "provider-cli-replaced" || current === "provider-cli-replaced")
-      this.#mailboxSync.emitQueue(lane.agentId);
-  }
-
   /** Why the next message of this task waits, or null when it can start or nothing waits. */
   taskHold(agentId: string, taskId: string): string | null {
     const lane = { agentId, taskId };
@@ -505,11 +494,7 @@ export class DrainScheduler {
       (this.#drainingLanes.has(key) && "drain-running") ||
       this.#heldBy(lane) ||
       (this.#heldByMachine(lane) && "machine");
-    if (hold) {
-      const previous = this.#reportedHolds.get(key);
-      this.#reportHold(lane, hold);
-      this.#emitProviderRestartChange(lane, previous);
-    }
+    if (hold) this.#reportHold(lane, hold);
     // The sign-in hold reads the provider the agent has now. A provider change that waits for the
     // next turn applies first, and the drain that follows reads the new provider (#6862).
     if (followUsageLimit && hold === "sign-in" && this.#hooks.followPendingRuntime(lane.agentId)) return true;
@@ -621,7 +606,6 @@ export class DrainScheduler {
     if (this.#hooks.isStopping()) return;
     const { agentId, taskId } = lane;
     const key = laneKey(lane);
-    const previous = this.#reportedHolds.get(key);
     const hold =
       (this.#drainingLanes.has(key) && "drain-running") ||
       this.#heldBy(lane) ||
@@ -635,11 +619,9 @@ export class DrainScheduler {
       (this.#heldByMachine(lane) && "machine");
     if (hold) {
       this.#reportHold(lane, hold);
-      this.#emitProviderRestartChange(lane, previous);
       return;
     }
     this.#reportedHolds.delete(key);
-    this.#emitProviderRestartChange(lane, previous);
     this.#drainingLanes.add(key);
     yield* Effect.gen({ self: this }, function* () {
       if (this.#laneTurnActive(lane)) return;

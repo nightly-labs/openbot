@@ -344,6 +344,8 @@ export interface ProviderHooks {
    * so deliveries held back during it are delivered.
    */
   onProviderResumed(provider: AgentProvider): void;
+  /** Runs when a CLI replacement, or a restart or an update that waits for turns, starts to hold the provider's turns. */
+  onProviderHeld?(provider: AgentProvider): void;
   /**
    * Runs once a new client for this provider is the one the app uses, with the catalogue it reported
    * already read. A client that failed to start, or one dropped for a client that was there before,
@@ -2386,6 +2388,7 @@ export class ProviderRuntime implements ProviderPort {
         Effect.gen({ self: this }, function* () {
           this.#removingCustomRuntime = true;
           this.#replacingCli.add("acp");
+          this.#hooks.onProviderHeld?.("acp");
           recordRestartActivity();
           return yield* Effect.gen({ self: this }, function* () {
             const start = this.#providerStarts.get("acp");
@@ -2464,6 +2467,7 @@ export class ProviderRuntime implements ProviderPort {
         cause: new Error(sourceText("error.provider.cliBusyRetry", { provider: providerLabel(provider) })),
       });
     this.#replacingCli.add(provider);
+    this.#hooks.onProviderHeld?.(provider);
     recordRestartActivity();
     yield* change().pipe(
       Effect.tapError(() =>
@@ -2527,6 +2531,7 @@ export class ProviderRuntime implements ProviderPort {
       if (!this.#hooks.isProviderBusy(provider)) return;
       if (!this.#updatesWhenIdle.has(provider)) {
         this.#updatesWhenIdle.add(provider);
+        this.#hooks.onProviderHeld?.(provider);
         recordRestartActivity();
         onWait();
       }
@@ -2901,6 +2906,7 @@ export class ProviderRuntime implements ProviderPort {
     }
     yield* providerStep(() => {
       this.#restartsWhenIdle.set(provider, null);
+      this.#hooks.onProviderHeld?.(provider);
       recordRestartActivity();
       this.#setStatus({});
     });
@@ -3679,6 +3685,7 @@ export class ProviderRuntime implements ProviderPort {
       providerStep(() => {
         this.#setProviderConnectionState(provider, "connecting", false);
         this.#replacingCli.add(provider);
+        this.#hooks.onProviderHeld?.(provider);
         recordRestartActivity();
       }),
       () =>
