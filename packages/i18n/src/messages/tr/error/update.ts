@@ -27,6 +27,7 @@ export const messages = {
   "error.update.siblingCheckFailed": "Diğer OpenBot oturumları doğrulanamadı. Yüklemeden önce tekrar deneyin.",
   "error.update.readOnlyLocation":
     "OpenBot bu konumdan güncelleme yükleyemez. OpenBot'tan çıkın. Finder'da OpenBot'u Uygulamalar klasörüne sürükleyin (zaten oradaysa dışarı sürükleyip geri koyun). Ardından OpenBot'u açın ve güncellemeyi yeniden yükleyin.",
+  "error.update.notApplied": "Güncelleme yüklenmedi. Yeniden denemek için yeniden başlatın.",
   // Katılınan bir sunucunun yöneticisi bunları ana makineden okur.
   "error.update.remoteDisabled": "Sunucu yöneticilerinden gelen güncellemeler bu bilgisayarda kapalı.",
   "error.update.restartStarted": "OpenBot, güncellemeyi yüklemek için zaten yeniden başlatılıyor.",

@@ -76,6 +76,12 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
   // Host-managed tenants watch the status but never act on it.
   const managed = createMemo(() => props.updateStatus.managedByHost === true);
   const ready = createMemo(() => !failed() && (phase() === "ready" || phase() === "installing"));
+  // A "ready" status with a message: the last restart did not install this update.
+  const readyText = createMemo(() =>
+    phase() === "ready" && !managed() && props.updateStatus.message?.trim()
+      ? formatErrorMessage(props.updateStatus.message, t("account.update.ready"))
+      : t("account.update.ready"),
+  );
   const progress = createMemo(() => {
     const value = props.updateStatus.progress;
     return value === null ? null : Math.min(100, Math.max(0, Math.round(value)));
@@ -160,8 +166,8 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
           <strong data-text="available" aria-hidden={ready() || failed() ? "true" : undefined}>
             {t("account.update.available")}
           </strong>
-          <strong data-text="ready" aria-hidden={ready() && !failed() ? undefined : "true"}>
-            {t("account.update.ready")}
+          <strong data-text="ready" aria-hidden={ready() && !failed() ? undefined : "true"} title={readyText()}>
+            {readyText()}
           </strong>
           <strong data-text="error" aria-hidden={failed() ? undefined : "true"} title={errorMessage()}>
             {errorMessage()}

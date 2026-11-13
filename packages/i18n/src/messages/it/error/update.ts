@@ -27,6 +27,7 @@ export const messages = {
     "Impossibile verificare le altre sessioni di OpenBot. Riprova prima di installare.",
   "error.update.readOnlyLocation":
     "OpenBot non può installare aggiornamenti da questa posizione. Esci da OpenBot. Nel Finder, trascina OpenBot nella cartella Applicazioni (se è già lì, trascinalo fuori e poi di nuovo dentro). Quindi apri OpenBot e installa di nuovo l’aggiornamento.",
+  "error.update.notApplied": "L’aggiornamento non è stato installato. Riavvia per riprovare.",
   "error.update.remoteDisabled":
     "Gli aggiornamenti dagli amministratori del server sono disattivati su questo computer.",
   "error.update.restartStarted": "OpenBot si sta già riavviando per installare l'aggiornamento.",

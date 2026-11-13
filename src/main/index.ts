@@ -1440,6 +1440,7 @@ if (!hasSingleInstanceLock) {
       quitting: isQuitting,
       hasMainWindow,
       started: services !== null,
+      installingUpdate: process.platform === "darwin" && services?.updater.getStatus().phase === "installing",
     });
     if (response === "present" && window) showMainWindow(window);
     else if (response === "reopen") reopenMainWindow();

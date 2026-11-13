@@ -28,6 +28,7 @@ export const messages = {
     "Kan andere OpenBot-sessies niet controleren. Probeer het opnieuw voordat je installeert.",
   "error.update.readOnlyLocation":
     "OpenBot kan vanaf deze locatie geen updates installeren. Sluit OpenBot af. Sleep OpenBot in de Finder naar de map Apps (staat het er al, sleep het er dan uit en weer in). Open OpenBot daarna en installeer de update opnieuw.",
+  "error.update.notApplied": "De update is niet geïnstalleerd. Start opnieuw om het nog eens te proberen.",
   "error.update.remoteDisabled": "Updates door serverbeheerders staan uit op deze computer.",
   "error.update.restartStarted": "OpenBot herstart al om de update te installeren.",
   "error.update.alreadyRestarting": "OpenBot herstart al.",

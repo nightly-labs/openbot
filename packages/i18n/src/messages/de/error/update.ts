@@ -29,6 +29,7 @@ export const messages = {
     "Andere OpenBot-Sitzungen konnten nicht überprüft werden. Versuche es vor der Installation erneut.",
   "error.update.readOnlyLocation":
     "OpenBot kann von diesem Ort aus keine Aktualisierungen installieren. Beende OpenBot. Ziehe OpenBot im Finder in den Ordner „Programme“ (wenn es schon dort ist, ziehe es heraus und wieder hinein). Öffne OpenBot dann und installiere die Aktualisierung erneut.",
+  "error.update.notApplied": "Die Aktualisierung wurde nicht installiert. Starte neu, um es erneut zu versuchen.",
   "error.update.remoteDisabled": "Aktualisierungen durch Serveradministratoren sind auf diesem Computer deaktiviert.",
   "error.update.restartStarted": "OpenBot startet bereits zur Installation der Aktualisierung neu.",
   "error.update.alreadyRestarting": "OpenBot startet bereits neu.",

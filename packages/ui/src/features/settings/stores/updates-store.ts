@@ -72,7 +72,8 @@ export function createSettingsUpdatesStore(props: UpdatesStoreProps) {
               progress: format.percent(Math.round(props.updateStatus.progress) / 100),
             });
       case "ready":
-        return t("settings.updates.status.ready", { target: targetUpdate() });
+        // A message says that the last restart did not install this update.
+        return errorMessage(props.updateStatus.message, t("settings.updates.status.ready", { target: targetUpdate() }));
       case "installing":
         return t("settings.updates.status.installing", { target: targetUpdate() });
       case "up-to-date":
