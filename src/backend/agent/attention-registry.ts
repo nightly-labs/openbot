@@ -2008,10 +2008,14 @@ export class AttentionRegistry {
     if (changed) this.#emitRuntimeSnapshot();
   }
 
-  /** Expires the prompts of one lost provider client, or of all clients when none is given. */
+  /**
+   * Expires the prompts of one lost provider client, or of all clients when none is given. A detached
+   * question holds no call of the client, so it stays: an idle provider stops after 10 minutes, and
+   * the answer starts the next turn on a new process.
+   */
   clearPrompts(client?: AgentClient): void {
     for (const [requestId, pending] of this.#prompts) {
-      if (client && pending.client !== client) continue;
+      if (client && (pending.client !== client || pending.detached)) continue;
       this.#expirePrompt(requestId, pending);
     }
   }
