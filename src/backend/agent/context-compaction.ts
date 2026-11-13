@@ -110,6 +110,13 @@ export function compactsOnRequest(mode: AgentClient["contextCompaction"]): boole
   return mode === "events" || mode === "request" || mode === "handoff";
 }
 
+/** A compaction that holds the lane of its provider thread. `client` is null until `request` takes it. */
+interface CompactionHold {
+  agentId: string;
+  client: AgentClient | null;
+  turnId: string | null;
+}
+
 /** A queue that Codex refused because a compaction turn runs on the provider thread of its key. */
 interface RefusalHold {
   agentId: string;
@@ -145,7 +152,7 @@ export class ContextCompaction {
    * The agent of each provider thread that compacts, and the client that runs it once `request` sends it.
    * `turnId`: the turn whose end made the `reserve` hold, until `request` takes the hold.
    */
-  readonly #compacting = new Map<string, { agentId: string; client: AgentClient | null; turnId: string | null }>();
+  readonly #compacting = new Map<string, CompactionHold>();
   readonly #refusals = new Map<string, RefusalHold>();
   readonly #timeoutMs: number;
   /** How long a started compaction runs before OpenBot stops it. */
@@ -521,23 +528,29 @@ export class ContextCompaction {
       return;
     }
 
-    this.#compacting.set(threadId, { agentId, client, turnId: null });
+    const hold: CompactionHold = { agentId, client, turnId: null };
+    this.#compacting.set(threadId, hold);
     // A `request` compaction runs inside the request, so it starts now and the request waits as long.
     const runsInRequest = client.contextCompaction === "request";
-    this.#armDeadline(agentId, threadId, client, runsInRequest ? this.#runTimeoutMs : this.#timeoutMs);
 
     yield* this.#loadSession(agentId, client, threadId)
       .pipe(
         Effect.flatMap((loaded) => {
-          // The deadline, the end of the client or of the thread ended this compaction while it loaded.
-          if (budget.phase !== "requested" || this.#budgets.get(threadId) !== budget) return Effect.succeed(false);
+          // The end of the client or of the thread ended this compaction while it loaded, and a new
+          // compaction of the thread can hold it now.
+          if (this.#compacting.get(threadId) !== hold || this.#budgets.get(threadId) !== budget)
+            return Effect.succeed(false);
           if (!loaded) {
-            // The next turn replaces the session, so nothing failed: no error, and no count.
+            // The next turn replaces the session. Codex refused nothing, so no error and no count.
+            // The growth rule stops the next message from asking for this compaction again.
+            budget.lastCompactedTokens = budget.usedTokens;
             this.observeCompaction(threadId, "failed");
             this.#release(agentId, threadId);
             this.#scheduleDrain(agentId);
             return Effect.succeed(false);
           }
+          // After the load, which has the request timeout of the client: the deadline is for the compaction.
+          this.#armDeadline(agentId, threadId, client, runsInRequest ? this.#runTimeoutMs : this.#timeoutMs);
           return client
             .request(
               "thread/compact/start",
@@ -563,6 +576,9 @@ export class ContextCompaction {
             // Codex reported the compaction turn, so it runs whatever the answer was. Its end, or
             // the deadline, releases the queue.
             if (budget.phase === "running" || budget.phase === "stopping") return;
+            // A new compaction holds the thread: the client ended while this one loaded the session.
+            const current = this.#compacting.get(threadId);
+            if (current && current !== hold) return;
             budget.lastCompactedTokens = budget.usedTokens;
             this.#emitError("context_compaction_failed", failure.cause, agentId);
             // After the deadline abandoned it, the phase is idle and the deadline counted it.
