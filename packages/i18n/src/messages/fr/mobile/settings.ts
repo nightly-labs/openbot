@@ -229,6 +229,9 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Télécharger les gros fichiers automatiquement",
   "mobile.settings.conversations.largeFilesFooter":
     "Les images, vidéos et fichiers audio de plus de {small} ne se téléchargent que lorsque vous les touchez. Activez cette option pour les télécharger directement, jusqu’à {large}. Cela peut utiliser beaucoup de données mobiles.",
+  "mobile.settings.conversations.fullQualityPhotos": "Envoyer les photos en qualité maximale",
+  "mobile.settings.conversations.fullQualityPhotosFooter":
+    "Si cette option est désactivée, l’app envoie une copie plus petite de chaque photo, jusqu’à 2048 pixels sur le grand côté. Elle arrive plus vite sur une connexion lente. Activez-la pour envoyer la photo d’origine.",
   "mobile.settings.profile.nameUnsafe": "Retirez les sauts de ligne et les caractères de contrôle de votre nom.",
   "mobile.settings.profile.nameLength": "Utilisez 3 à 20 caractères pour votre nom affiché.",
   "mobile.settings.profile.saveFailed": "Impossible d’enregistrer les modifications. Réessayez.",

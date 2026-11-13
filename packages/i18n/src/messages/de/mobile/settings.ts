@@ -233,6 +233,9 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Große Dateien automatisch laden",
   "mobile.settings.conversations.largeFilesFooter":
     "Bilder, Videos und Audio über {small} werden erst geladen, wenn du darauf tippst. Schalte dies ein, um sie bis {large} sofort zu laden. Das kann viele mobile Daten verbrauchen.",
+  "mobile.settings.conversations.fullQualityPhotos": "Fotos in voller Qualität senden",
+  "mobile.settings.conversations.fullQualityPhotosFooter":
+    "Wenn dies aus ist, sendet die App eine kleinere Kopie jedes Fotos, bis zu 2048 Pixel an der langen Seite. Sie kommt bei einer langsamen Verbindung schneller an. Schalte dies ein, um das Originalfoto zu senden.",
   "mobile.settings.profile.nameUnsafe": "Entferne Zeilenumbrüche und Steuerzeichen aus deinem Namen.",
   "mobile.settings.profile.nameLength": "Verwende 3–20 Zeichen für deinen Anzeigenamen.",
   "mobile.settings.profile.saveFailed": "Die Änderungen konnten nicht gespeichert werden. Versuche es erneut.",

@@ -236,6 +236,9 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Скачивать большие файлы автоматически",
   "mobile.settings.conversations.largeFilesFooter":
     "Изображения, видео и аудио больше {small} скачиваются только по нажатию. Включите, чтобы скачивать их сразу, до {large}. Это может расходовать много мобильного трафика.",
+  "mobile.settings.conversations.fullQualityPhotos": "Отправлять фото в полном качестве",
+  "mobile.settings.conversations.fullQualityPhotosFooter":
+    "Когда это выключено, приложение отправляет уменьшенную копию каждого фото, до 2048 пикселей по длинной стороне. Она быстрее доходит при медленном соединении. Включите, чтобы отправлять исходное фото.",
   "mobile.settings.profile.nameUnsafe": "Уберите из имени переносы строк и управляющие символы.",
   "mobile.settings.profile.nameLength": "Имя должно содержать от 3 до 20 символов.",
   "mobile.settings.profile.saveFailed": "Не удалось сохранить изменения. Повторите попытку.",
