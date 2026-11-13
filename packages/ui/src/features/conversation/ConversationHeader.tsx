@@ -8,7 +8,7 @@ import { PinnedMessages, type PinnedMessagesProps } from "@openbot/ui/features/c
 import { SidePanelToggle, type SidePanelToggleProps } from "@openbot/ui/features/conversation/SidePanel";
 import { useText } from "@openbot/ui/text";
 import type { ComponentProps, JSX } from "@solidjs/web";
-import { onSettled, Show } from "solid-js";
+import { createEffect, onSettled, Show } from "solid-js";
 
 export interface ConversationHeaderProps {
   agent: AgentProfile | null | undefined;
@@ -60,18 +60,25 @@ const AGENT_TITLE_MIN_EM = 4;
 function AgentTitle(props: { title: string }) {
   let room: HTMLSpanElement | undefined;
   let title: HTMLSpanElement | undefined;
+  let schedule: (() => void) | undefined;
+  // A hidden title resizes no observed part when its text changes, so a new text is measured too.
+  createEffect(
+    () => props.title,
+    () => schedule?.(),
+  );
   onSettled(() => {
     const header = room?.closest(".conversation-header");
     if (!room || !header) return;
     // The next frame measures, not the observer, because hiding the title resizes observed parts.
     let frame = 0;
-    const observer = new ResizeObserver(() => {
+    schedule = () => {
       if (frame === 0)
         frame = requestAnimationFrame(() => {
           frame = 0;
           measure();
         });
-    });
+    };
+    const observer = new ResizeObserver(schedule);
     const measure = () => {
       if (!room) return;
       // The thread row can mount after the title. Observing a part again has no effect.
@@ -94,6 +101,7 @@ function AgentTitle(props: { title: string }) {
     observer.observe(header);
     measure();
     return () => {
+      schedule = undefined;
       observer.disconnect();
       cancelAnimationFrame(frame);
     };
