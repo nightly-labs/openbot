@@ -1006,8 +1006,9 @@ the accounts that have the Signal machines are `LEASEWEB_API_KEY_US` and `LEASEW
 ### Move a server from boat
 
 A move is a manual operator action on one row. The setup of a VPS can take hours, so the Worker
-never waits for one. Move only Standard and Pro servers: Starter servers stay on boat for now
-(developer decision, 2026-11-11). Two columns of `hosted_servers` (migration 0052) hold the record:
+never waits for one. A Starter server moves to a VPS 1, a Standard server to a VPS 2 and a Pro server
+to a VPS 3 (developer decisions, 2026-11-11 and 2026-11-13). Two columns of `hosted_servers`
+(migration 0052) hold the record:
 
 | Column | Value |
 | --- | --- |
@@ -1209,17 +1210,21 @@ The VPS is not the same machine as the sandbox:
 
   | Plan | Machine | Disk | User sees | Disk above that |
   | --- | --- | --- | --- | --- |
+  | Starter | Leaseweb VPS 1 | 100 GB | 25 GB | about 53 GB |
   | Starter (only after a change down from Standard or Pro) | Leaseweb VPS 2 | 200 GB | 25 GB | about 153 GB |
   | Standard | Leaseweb VPS 2 | 200 GB | 75 GB | about 103 GB |
   | Pro | Leaseweb VPS 3 | 300 GB | 150 GB | about 128 GB |
 
   The 200 GB is from the Leaseweb API (`rootDiskSize`, 2026-11-11). The VPS 3 (8 vCPU, 24 GB,
   300 GB) is from the Leaseweb product page; no VPS 3 was bought on 2026-11-11, so its disk is not
-  measured. The system part of a VPS was not measured; the 22 GB is from the boat servers.
+  measured. The VPS 1 (4 vCPU, 6 GB, 100 GB, EUR 4.49 a month in AMS-01) is from the order API
+  (`GET /ordering/v1/products/vps?location=AMS-01`, 2026-11-13); its disk is not measured either. The
+  system part of a VPS was not measured; the 22 GB is from the boat servers.
 - Move a Pro server to a VPS 3. A plan change does not change the machine of a moved server. After a
   change to Pro, a server on a VPS 2 shows 150 GB at once and has about 28 GB of disk above that,
   until the operator moves it to a VPS 3. Nothing tells the operator about the plan change: look for
-  `plan = 'pro'` rows whose machine is a VPS 2.
+  `plan = 'pro'` rows whose machine is a VPS 2. A change up from Starter on a VPS 1 is worse: a
+  Standard server shows 75 GB on a 100 GB disk. Move it to a VPS 2 soon.
 - The clients show the vCPU and the memory of the boat size of the plan (2 and 4 GB, 4 and 8 GB, 8
   and 16 GB) also for a moved server. A VPS has more: the VPS 2 in FRA-01 showed 6 vCPU and 16 GiB.
 - After the owner deletes the server, OpenBot still runs on the VPS with a session that is ended. It
@@ -1408,7 +1413,7 @@ Then `remove` and `add`.
 | --- | --- |
 | `host_id` | `leaseweb:<VPS ID>`, as in `hosted_servers.operator_host`. |
 | `location` | The Leaseweb data center, such as `AMS-01`. |
-| `product` | `VPS02` or `VPS03`, from the Leaseweb pack. |
+| `product` | `VPS01`, `VPS02` or `VPS03`, from the Leaseweb pack. |
 | `added_at` | When the operator added the machine. |
 | `removed_at` | When the machine left the pool. `NULL` while it is in the pool. |
 

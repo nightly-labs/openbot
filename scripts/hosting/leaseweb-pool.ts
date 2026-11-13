@@ -62,8 +62,8 @@ const SANDBOX_USABLE = new Set(["ready", "idle", "running"]);
 const SANDBOX_PATTERN = /^bx_[a-z0-9]{4,40}$/u;
 const STATE_PATTERN = /^[a-z_]{1,32}$/u;
 const VERSION_PATTERN = /^\d+\.\d+\.\d+$/u;
-/** The machine of each plan that moves. Starter servers stay on boat. */
-const PRODUCT_OF_PLAN: Record<string, string> = { standard: "VPS02", pro: "VPS03" };
+/** The machine of each plan that moves. */
+const PRODUCT_OF_PLAN: Record<string, string> = { starter: "VPS01", standard: "VPS02", pro: "VPS03" };
 const AUTH_API_URL = {
   production: "https://api.openbot.run",
   test: "https://openbot-auth-api-test.internal9671.workers.dev",
@@ -825,7 +825,7 @@ exit "$status"`;
     );
     if (!row) throw new Error(`There is no server ${serverId}.`);
     const product = PRODUCT_OF_PLAN[row.plan];
-    if (!product) throw new Error(`Server ${serverId} has the plan ${row.plan}. Only Standard and Pro servers move.`);
+    if (!product) throw new Error(`Server ${serverId} has the plan ${row.plan}. No machine is set for this plan.`);
     if (row.desired_state !== "running" && row.desired_state !== "idle") {
       throw new Error(`Server ${serverId} is ${row.desired_state}. Move only a server that is running or idle.`);
     }
