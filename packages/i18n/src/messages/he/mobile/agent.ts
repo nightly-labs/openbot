@@ -599,6 +599,8 @@ export const messages = {
   "mobile.agent.home.noChatOpenBody": "יש לבחור צ'אט ברשימה.",
   "mobile.agent.home.chatListWidth": "רוחב רשימת הצ'אטים",
   "mobile.agent.home.serverTitle": "{name}, פתיחת שרתים",
+  "mobile.agent.home.allServers": "Agents on your other servers",
+  "mobile.agent.home.onServer": "on {server}",
   "mobile.agent.home.waiting": "ממתין לחיבור",
   "mobile.agent.home.waitingBody": "רשימת הסוכנים תיטען כשהשרת הזה יתחבר.",
   "mobile.agent.home.noAgents": "אין סוכנים בשרת הזה",

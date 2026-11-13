@@ -21,6 +21,8 @@ export const messages = {
   "sidebar.order.unreadFirst": "フォルダー内で未読を先頭に",
   "sidebar.topbar.openSettings": "{name} の設定を開く",
   "sidebar.topbar.localServer": "ローカル",
+  "sidebar.allAgents.title": "Agents on your other servers",
+  "sidebar.allAgents.onServer": "on {server}",
   "sidebar.resizer.compactWidth": "コンパクト（{width}px）",
   "sidebar.topbar.expand": "サイドバーを展開",
   "sidebar.topbar.collapse": "サイドバーを折りたたむ",

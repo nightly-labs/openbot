@@ -487,7 +487,8 @@
     "dist:linux": "bun run voice:prepare-runtime && bun scripts/prepare-remote-desktop-runtime.ts linux x64 && bun run verify:remote-desktop-runtime --linux && bun scripts/install-cua-driver.ts linux x64 && bun run build && electron-builder --linux AppImage --x64 --publish never",
     "dist:linux:arm64": "bun run voice:prepare-runtime && bun scripts/install-cua-driver.ts linux arm64 && bun run build && electron-builder --linux AppImage --arm64 --publish never",
     "dist:release": "bun run voice:prepare-runtime && bun run prepare:remote-desktop-runtime && bun run verify:remote-desktop-runtime && bun run prepare:cua-driver && bun run build && electron-builder --mac --publish never",
-    "typecheck:telemetry": "bun run --cwd packages/telemetry typecheck"
+    "typecheck:telemetry": "bun run --cwd packages/telemetry typecheck",
+    "test:agent-relay": "bun scripts/agent-relay-e2e.ts"
   },
   "dependencies": {
     "@1password/sdk": "0.5.0",

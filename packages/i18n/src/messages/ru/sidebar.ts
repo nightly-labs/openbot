@@ -21,6 +21,8 @@ export const messages = {
   "sidebar.order.unreadFirst": "Непрочитанные первыми в папках",
   "sidebar.topbar.openSettings": "Открыть настройки: {name}",
   "sidebar.topbar.localServer": "Локальный",
+  "sidebar.allAgents.title": "Agents on your other servers",
+  "sidebar.allAgents.onServer": "on {server}",
   "sidebar.resizer.compactWidth": "Компактная ({width}px)",
   "sidebar.topbar.expand": "Развернуть боковую панель",
   "sidebar.topbar.collapse": "Свернуть боковую панель",

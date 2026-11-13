@@ -21,6 +21,8 @@ export const messages = {
   "sidebar.order.unreadFirst": "לא נקראו ראשונים בתיקיות",
   "sidebar.topbar.openSettings": "פתיחת ההגדרות של {name}",
   "sidebar.topbar.localServer": "מקומי",
+  "sidebar.allAgents.title": "Agents on your other servers",
+  "sidebar.allAgents.onServer": "on {server}",
   "sidebar.resizer.compactWidth": "קומפקטי ({width}px)",
   "sidebar.topbar.expand": "הרחבת סרגל הצד",
   "sidebar.topbar.collapse": "כיווץ סרגל הצד",

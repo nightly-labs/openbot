@@ -252,6 +252,7 @@
     "./team-protocol/local-servers-v1": "./src/team-protocol/local-servers-v1.ts",
     "./team-protocol/host-timezone-v1": "./src/team-protocol/host-timezone-v1.ts",
     "./team-protocol/host-turn-limits-v1": "./src/team-protocol/host-turn-limits-v1.ts",
+    "./team-protocol/agent-relay-v1": "./src/team-protocol/agent-relay-v1.ts",
     "./team-protocol/host-restart-v1": "./src/team-protocol/host-restart-v1.ts",
     "./team-protocol/host-personality-v1": "./src/team-protocol/host-personality-v1.ts",
     "./team-protocol/host-update-v1": "./src/team-protocol/host-update-v1.ts",

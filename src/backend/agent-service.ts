@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { readFile } from "node:fs/promises";
+import { hostname } from "node:os";
 import { join } from "node:path";
 import { AGENT_PROVIDERS, agentProviderDescriptor, customAgentIdOfModel } from "@openbot/contracts/agent-providers";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
@@ -164,6 +165,7 @@ import { createOpenBotLogger } from "@openbot/logging";
 import { classifyFailure } from "@openbot/telemetry";
 import { Cause, Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
 import { AgentMemories } from "./agent/agent-memories";
+import { AgentRelayStore, type RelayEnvelope, type RelayPeer } from "./agent/agent-relay-store";
 import { AgentRemoval, AgentRemovalFailed } from "./agent/agent-removal";
 import { AgentSettingsRefused } from "./agent/agent-settings-refused";
 import type { ApprovalAutomationPolicy } from "./agent/approval-automation";
@@ -639,6 +641,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #duplication: DuplicationGate;
   readonly #removal: AgentRemoval;
   readonly #tools: OpenBotToolRouter;
+  /** Cross-server teammate relay state (`agent-relay-v1`). */
+  readonly #relay: AgentRelayStore;
   readonly #sidebarLayout: AgentSidebar | null;
   readonly #libraryFolders: AgentLibraryFolders | null;
   readonly #localSkillTools: (() => LocalSkillTools) | undefined;
@@ -739,6 +743,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ),
     });
     this.#mailbox = mailbox;
+    this.#relay = new AgentRelayStore(store.database.userDataPath);
+    this.#relay.onExpired = (envelope) => this.#relayExpired(envelope);
     this.#browser = browser;
     this.#prepareAgentWorkspace = prepareAgentWorkspace;
     this.#conversation = new ConversationRuntime(
@@ -1823,6 +1829,24 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         scheduleDrain: (agentId) => this.#drain.scheduleDrain(agentId),
         steerAgentMessage: (recipientAgentId, deliveryId) =>
           this.#steerAgentMessage(recipientAgentId, deliveryId, false).pipe(Effect.asVoid),
+        relayRemoteResult: ({ agentId, recipientAgentId, envelopeId, text }) =>
+          Effect.sync(() => {
+            if (this.#relay.hasReplyFor(envelopeId)) return;
+            const memberId = this.#relay.deliveredMemberId(envelopeId);
+            if (!memberId) return;
+            const agent = this.listAgents().find((candidate) => candidate.id === agentId);
+            this.#relay.enqueueOutbound({
+              memberId,
+              kind: "reply",
+              recipientAgentId,
+              originAgentId: agentId,
+              originAgentName: agent?.name ?? agentId,
+              originServerName: hostname(),
+              text,
+              expectsReply: false,
+              replyToEnvelopeId: envelopeId,
+            });
+          }),
         dropRefusedSession: (agentId, externalThreadId) =>
           this.#threads.dropRefusedProviderSession(agentId, externalThreadId),
         listAgents: () => this.listAgents(),
@@ -1944,6 +1968,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(this.#workflowTools === undefined ? {} : { workflowTools: this.#workflowTools }),
       ...(options.approvalAutomation === undefined ? {} : { approvalAutomation: options.approvalAutomation }),
       ...(options.visualPreview === undefined ? {} : { visualPreview: options.visualPreview }),
+      relay: { store: this.#relay, serverName: hostname() },
       ...(options.screenCapture === undefined ? {} : { screenCapture: options.screenCapture }),
       ...(options.videoReader === undefined ? {} : { videoReader: options.videoReader }),
       mcpServers: mcpServersFromGateway(this.#mcp, options.prepareMcpTest),
@@ -6228,6 +6253,102 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * key is a hash, so it fits the identifier bound whatever the ids are, and has no `:`-separated
    * turn id for the mailbox to read.
    */
+  // ---- Cross-server teammate relay (`agent-relay-v1`) ----
+  // The Team API route checks the member and the agent level; these methods own the mailbox work.
+
+  relayReplaceDirectory(memberId: string, peers: RelayPeer[]): void {
+    this.#relay.replaceDirectory(memberId, peers);
+  }
+
+  relayClaim(memberId: string): RelayEnvelope[] {
+    return this.#relay.claim(memberId);
+  }
+
+  relayAck(memberId: string, envelopeId: string): boolean {
+    return this.#relay.ack(memberId, envelopeId);
+  }
+
+  /** Cancel a delivered envelope's queued delivery. A running turn is not stopped. */
+  relayCancel(envelopeId: string): boolean {
+    const messageId = this.#relay.deliveredMessageId(envelopeId);
+    return messageId ? this.#mailbox.cancelQueuedMessage(messageId) : false;
+  }
+
+  relayDeliver(memberId: string, envelope: RelayEnvelope) {
+    return this.#relayDeliver(memberId, envelope);
+  }
+
+  readonly #relayDeliver = Effect.fn("AgentService.relayDeliver")(function* (
+    this: AgentService,
+    memberId: string,
+    envelope: RelayEnvelope,
+  ): Effect.fn.Return<{ messageId: string; duplicate: boolean }, AgentLifecycleFailed> {
+    const existing = this.#relay.deliveredMessageId(envelope.envelopeId);
+    if (existing) return { messageId: existing, duplicate: true };
+    if (Date.parse(envelope.expiresAt) <= Date.now()) {
+      return yield* new AgentLifecycleFailed({
+        operation: "relay deliver",
+        cause: new Error(sourceText("error.team.agentRelayExpired")),
+      });
+    }
+    const replyToMessageId =
+      envelope.kind === "reply" && envelope.replyToEnvelopeId
+        ? this.#relay.localMessageIdFor(envelope.replyToEnvelopeId)
+        : null;
+    const receipt = yield* this.#mailbox
+      .enqueue({
+        sender: { kind: "agent", agentId: envelope.originAgentId },
+        recipientAgentIds: [envelope.recipientAgentId],
+        text: envelope.text,
+        replyToMessageId,
+        expectsReply: envelope.expectsReply,
+        remote: {
+          envelopeId: envelope.envelopeId,
+          agentName: envelope.originAgentName,
+          serverName: envelope.originServerName,
+        },
+        idempotencyKey: `agent-relay:${envelope.envelopeId}`,
+      })
+      .pipe(Effect.mapError((cause) => new AgentLifecycleFailed({ operation: "relay deliver", cause })));
+    this.#relay.recordDelivered(envelope.envelopeId, receipt.messageId, memberId);
+    for (const delivery of receipt.deliveries) {
+      yield* this.#steerAgentMessage(delivery.recipientAgentId, delivery.id, false).pipe(Effect.asVoid);
+      this.#mailboxSync.emitQueue(delivery.recipientAgentId);
+      this.#drain.scheduleDrain(delivery.recipientAgentId);
+    }
+    return { messageId: receipt.messageId, duplicate: false };
+  }, Effect.uninterruptible);
+
+  /** An unsent envelope expired: its sender gets the blocked note a failed local request gives. */
+  #relayExpired(envelope: RelayEnvelope & { localMessageId: string }): void {
+    if (!this.listAgents().some((agent) => agent.id === envelope.originAgentId)) return;
+    Effect.runFork(
+      this.#mailbox
+        .enqueue({
+          sender: { kind: "agent", agentId: envelope.recipientAgentId },
+          recipientAgentIds: [envelope.originAgentId],
+          text: [
+            "Status: blocked",
+            "Result: OpenBot note, not written by this teammate: the cross-server message expired before a client relayed it. Both servers and a signed-in client must be online for delivery.",
+            "Evidence: none",
+            "Unblock: Ask the user to open OpenBot with both servers online, then send the request again.",
+          ].join("\n"),
+          replyToMessageId: envelope.localMessageId,
+          expectsReply: false,
+          idempotencyKey: `agent-relay-expired:${envelope.envelopeId}`,
+        })
+        .pipe(
+          Effect.tap((receipt) =>
+            Effect.sync(() => {
+              for (const delivery of receipt.deliveries) this.#drain.scheduleDrain(delivery.recipientAgentId);
+            }),
+          ),
+          Effect.catch(() => Effect.void),
+          Effect.forkIn(this.#scope),
+        ),
+    );
+  }
+
   readonly sendMessage = Effect.fn("AgentService.sendMessage")(function* (
     this: AgentService,
     input: SendMessageInput,

@@ -206,6 +206,16 @@ export interface TurnHooks {
    * busy-message mode is "steer". Otherwise the message waits in the queue.
    */
   steerAgentMessage(recipientAgentId: string, deliveryId: string): Effect.Effect<void>;
+  /**
+   * Sends a turn's automatic result back across servers (`agent-relay-v1`) when the request came
+   * by relay and the agent sent no explicit reply. Absent where the host has no relay store.
+   */
+  relayRemoteResult?(input: {
+    agentId: string;
+    recipientAgentId: string;
+    envelopeId: string;
+    text: string;
+  }): Effect.Effect<void>;
   /** Closes a provider session the provider refuses; the next turn opens a new one with the transcript. */
   dropRefusedSession(agentId: string, externalThreadId: string): Effect.Effect<void, TurnOperationFailed>;
   listAgents(): AgentSummary[];
@@ -2221,7 +2231,23 @@ export class TurnLifecycle {
     const originAgentId = this.#mailbox.chainOriginAgentId(messageId);
     const recipientAgentId = delivery.delivery.sender.agentId;
     // The user deleted the agent that asked. A result for it would make the agent again (#6106).
-    if (!this.#store.list().some((agent) => agent.id === recipientAgentId)) return;
+    if (!this.#store.list().some((agent) => agent.id === recipientAgentId)) {
+      // A request relayed from another server: its automatic result goes back by relay instead.
+      if (
+        delivery.remote &&
+        this.#hooks.relayRemoteResult &&
+        this.#mailbox.expectsReply(messageId) &&
+        !this.#mailbox.hasReplyFrom(agentId, messageId)
+      ) {
+        yield* this.#hooks.relayRemoteResult({
+          agentId,
+          recipientAgentId,
+          envelopeId: delivery.remote.envelopeId,
+          text: text ?? noResult,
+        });
+      }
+      return;
+    }
     // The requests of this sender that the turn read. A reply to one of them answers only that one.
     const requestIds = new Set(
       turnDeliveries

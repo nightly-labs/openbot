@@ -24,6 +24,7 @@ import { useAgents } from "../agents/agents-context";
 import { useChannels } from "../channels/channels-context";
 import { useConversation } from "../conversation/conversation-context";
 import { useDirectMessages } from "../conversation/direct-messages-context";
+import { AllAgentsSection } from "../servers/all-agents-context";
 import { useServerActions } from "../servers/server-actions";
 import { serverRoleCanAdminister } from "../servers/server-capabilities";
 import { useServerScope } from "../servers/server-scope";
@@ -322,6 +323,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         onOpenSearch={() => setGlobalSearchVisibility(true)}
         footer={
           <>
+            <AllAgentsSection />
             {/* One card at a time. A machine over its alert level comes first, then a disk that is
              * almost full; the community card waits until the mobile app card is dismissed. */}
             <SidebarAlertCards

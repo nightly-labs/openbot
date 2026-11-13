@@ -21,6 +21,8 @@ export const messages = {
   "sidebar.order.unreadFirst": "Non lues en tête des dossiers",
   "sidebar.topbar.openSettings": "Ouvrir les réglages de {name}",
   "sidebar.topbar.localServer": "Local",
+  "sidebar.allAgents.title": "Agents on your other servers",
+  "sidebar.allAgents.onServer": "on {server}",
   "sidebar.resizer.compactWidth": "Compacte ({width}px)",
   "sidebar.topbar.expand": "Développer la barre latérale",
   "sidebar.topbar.collapse": "Réduire la barre latérale",

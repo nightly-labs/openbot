@@ -457,6 +457,8 @@ export interface WebWorkspaceRuntime {
    * a host with a status connection. `levels` is null on a host without `agent-notification-levels-v1`.
    */
   notificationSettings?: (hostId: string) => Promise<WebHostNotificationSettings>;
+  /** The last agent list of each host this tab has not opened, for the cross-server view. */
+  agentsByHost?: () => ReadonlyMap<string, ClientAgentSummary[]>;
   /** Sets the user's own level for one agent of a host. Needs `agent-notification-levels-v1`. */
   setHostAgentNotificationLevel?: (
     hostId: string,
@@ -1669,6 +1671,9 @@ export function createWebWorkspaceRuntime(
       if (!capabilities.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY))
         throw new Error(currentText().t("error.team.agentNotificationLevelsUnsupported"));
       return runTeamEffect(setAgentNotificationLevel(teamApi, input).pipe(Effect.mapError((error) => error.cause)));
+    },
+    agentsByHost() {
+      return hosts?.agentsByHost() ?? new Map();
     },
     async notificationSettings(hostId) {
       if (hostId !== lockedHostId) {

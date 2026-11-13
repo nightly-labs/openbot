@@ -1011,6 +1011,33 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
                     </PinnedAgentsGrid>
                   </AgentListRowReveal>
                 }
+                ListFooterComponent={
+                  // One view of every server's agents: the other servers' agents, under this
+                  // server's own list. A tap switches to that server, where the agent opens.
+                  servers.length > 1 ? (
+                    <View className="gap-1 px-4 pt-6">
+                      <Typography.Heading type="h4">{t("mobile.agent.home.allServers")}</Typography.Heading>
+                      {servers
+                        .filter((server) => server.id !== activeServer.id)
+                        .flatMap((server) =>
+                          agents
+                            .filter((agent) => agent.serverId === server.id)
+                            .map((agent) => (
+                              <Pressable
+                                key={`${server.id}:${agent.id}`}
+                                onPress={() => workspace().selectServer(server.id)}
+                                className="flex-row items-center justify-between py-2"
+                              >
+                                <Typography.Paragraph>{agent.name}</Typography.Paragraph>
+                                <Typography.Paragraph className="text-text-secondary">
+                                  {t("mobile.agent.home.onServer", { server: server.name })}
+                                </Typography.Paragraph>
+                              </Pressable>
+                            )),
+                        )}
+                    </View>
+                  ) : undefined
+                }
                 ListEmptyComponent={
                   serverDirectoryState === "error" && servers.length === 0 ? (
                     <View className="flex-1 items-center justify-center gap-5 px-8 py-16">

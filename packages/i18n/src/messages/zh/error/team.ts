@@ -110,6 +110,8 @@ export const messages = {
   "error.team.hostUpdateUnsupported": "当前连接不支持主机更新。",
   "error.team.hostTimezoneUnsupported": "当前连接不支持服务器时区。",
   "error.team.hostRestartUnsupported": "当前连接不支持重启服务器。",
+  "error.team.agentRelayUnsupported": "Cross-server agent messages are not supported by this connection.",
+  "error.team.agentRelayExpired": "This cross-server message has expired.",
   "error.team.hostKeyRotationUnsupported": "当前连接不支持更改服务器密钥。",
   "error.team.localServersUnsupported": "当前连接不支持此电脑上的服务器。",
   "error.team.routineResultsUnsupported": "当前连接不支持自动化任务的结果去向。",

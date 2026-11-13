@@ -601,6 +601,8 @@ export const messages = {
   "mobile.agent.home.noChatOpenBody": "Scegli una chat nell'elenco.",
   "mobile.agent.home.chatListWidth": "Larghezza elenco chat",
   "mobile.agent.home.serverTitle": "{name}, apri i server",
+  "mobile.agent.home.allServers": "Agents on your other servers",
+  "mobile.agent.home.onServer": "on {server}",
   "mobile.agent.home.waiting": "In attesa della connessione",
   "mobile.agent.home.waitingBody": "L'elenco degli agenti si caricherà quando questo server sarà connesso.",
   "mobile.agent.home.noAgents": "Nessun agente su questo server",

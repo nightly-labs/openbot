@@ -10,11 +10,13 @@ import {
 import { guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
+import { AGENT_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/agent-relay-v1";
 import { teamProtocolUpdateDirection } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
 import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
 import { runTeamEffect } from "@openbot/team-client";
 import { agentEventCanNotify } from "@openbot/team-client/agent-notifications";
+import { runAgentRelayTick } from "@openbot/team-client/agent-relay";
 import type { RemoteTeamHost } from "@openbot/team-client/remote-directory";
 import type { createRemoteTeamPeer, RemoteTeamPeerActions } from "@openbot/team-client/remote-peer";
 import { createRemoteConnectionRecovery } from "@openbot/team-client/remote-recovery";
@@ -135,6 +137,8 @@ export interface WebHostConnections {
     hostId: string,
     level: ServerNotificationLevel | null,
   ): Promise<AgentNotificationLevelsSnapshot>;
+  /** The last agent list read from each host this tab has not opened, for the cross-server view. */
+  agentsByHost(): ReadonlyMap<string, ClientAgentSummary[]>;
   dispose(): Promise<void>;
 }
 
@@ -176,6 +180,30 @@ export function createWebHostConnections(options: {
   let hosts: readonly RemoteTeamHost[] = [];
   let selected: { hostId: string; state: WebHostState; held: boolean } | null = null;
   let disposed = false;
+  // Cross-server relay between the hosts this tab has not opened (`agent-relay-v1`). The opened
+  // host has no status peer here; another client, or this tab after a switch, carries its mail.
+  const relayRoutes = new Map<string, string>();
+  const relayTimer = setInterval(() => {
+    if (disposed) return;
+    const relayHosts = [...entries.values()].flatMap((entry) => {
+      if (!entry.capabilities?.includes(AGENT_RELAY_CAPABILITY) || !entry.peer) return [];
+      try {
+        const { request } = hostRequest(entry.host.hostId);
+        return [
+          {
+            id: entry.host.hostId,
+            name: entry.host.name ?? entry.host.hostId,
+            capable: true,
+            agents: entry.agents,
+            request,
+          },
+        ];
+      } catch {
+        return [];
+      }
+    });
+    void runAgentRelayTick(relayHosts, relayRoutes).catch(() => undefined);
+  }, 30_000);
 
   function post(message: WebHostTabMessage): void {
     try {
@@ -502,8 +530,12 @@ export function createWebHostConnections(options: {
         throw new Error(currentText().t("error.team.agentNotificationLevelsUnsupported"));
       return runTeamEffect(setOwnServerNotificationLevel(request, level).pipe(Effect.mapError((error) => error.cause)));
     },
+    agentsByHost() {
+      return new Map([...entries.values()].map((entry) => [entry.host.hostId, entry.agents] as const));
+    },
     async dispose() {
       disposed = true;
+      clearInterval(relayTimer);
       channel.removeEventListener("message", listen);
       for (const timer of restTimers) clearTimeout(timer);
       restTimers.clear();

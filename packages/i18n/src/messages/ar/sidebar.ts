@@ -21,6 +21,8 @@ export const messages = {
   "sidebar.order.unreadFirst": "غير المقروءة أولًا في المجلدات",
   "sidebar.topbar.openSettings": "فتح إعدادات {name}",
   "sidebar.topbar.localServer": "محلي",
+  "sidebar.allAgents.title": "Agents on your other servers",
+  "sidebar.allAgents.onServer": "on {server}",
   "sidebar.resizer.compactWidth": "مضغوط ({width}px)",
   "sidebar.topbar.expand": "توسيع الشريط الجانبي",
   "sidebar.topbar.collapse": "طي الشريط الجانبي",

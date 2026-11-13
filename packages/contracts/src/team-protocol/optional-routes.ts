@@ -23,6 +23,7 @@ import { AGENT_NOTIFICATION_LEVELS_CODECS } from "./agent-notification-levels-v1
 import { AGENT_PLAN_CARD_CODECS } from "./agent-plan-card-v1";
 import { AGENT_PUBLISH_CODECS } from "./agent-publish-v1";
 import { AGENT_QUEUE_TASK_CODECS } from "./agent-queue-task-v1";
+import { AGENT_RELAY_CODECS } from "./agent-relay-v1";
 import { AGENT_SESSION_SETTINGS_CODECS } from "./agent-session-settings-v1";
 import { AGENT_SPEED_CODECS } from "./agent-speed-v1";
 import { AGENT_TASK_LIMIT_CODECS } from "./agent-task-limit-v1";
@@ -188,6 +189,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...DISCORD_ACCESS_CODECS,
   ...HOST_RELEASE_CODECS,
   ...HOST_RESTART_CODECS,
+  ...AGENT_RELAY_CODECS,
   ...HOST_MEMBER_UPDATE_CODECS,
   ...CONTEXT_RESET_CODECS,
   ...EVENTS_CODECS,

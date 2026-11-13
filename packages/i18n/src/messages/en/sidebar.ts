@@ -20,6 +20,8 @@ export const messages = defineMessages("sidebar", {
   "sidebar.order.unreadFirst": "Unread first in folders",
   "sidebar.topbar.openSettings": "Open settings for {name}",
   "sidebar.topbar.localServer": "Local",
+  "sidebar.allAgents.title": "Agents on your other servers",
+  "sidebar.allAgents.onServer": "on {server}",
   "sidebar.resizer.compactWidth": "Compact ({width}px)",
   "sidebar.topbar.expand": "Expand sidebar",
   "sidebar.topbar.collapse": "Collapse sidebar",
