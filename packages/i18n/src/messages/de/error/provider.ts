@@ -272,6 +272,8 @@ export const messages = {
     "Der Gemini-Server in OPENBOT_ANTIGRAVITY_PATH fehlt oder ist nicht ausführbar. Korrigiere den Pfad oder entferne die Variable und starte OpenBot dann neu.",
   "error.provider.antigravityVersionUnreadable": "Die Version des Gemini-Servers konnte nicht gelesen werden.",
   "error.provider.antigravitySignIn": "Melde dich mit Google an, um Gemini zu verwenden.",
+  "error.provider.antigravityModelAtCapacity":
+    "Google hat für dieses Gemini-Modell gerade keine freie Kapazität. Das Kontingent deines Tarifs ist nicht die Ursache. Versuche es in ein paar Minuten erneut oder wähle ein anderes Modell.\n{detail}",
   "error.provider.antigravityRateLimited":
     "Gemini hat die Anfrage abgelehnt, weil ein Ratenlimit oder das Kontingent des Tarifs erreicht ist. Warte ein paar Minuten oder wähle ein anderes Modell und versuche es dann erneut.\n{detail}",
   "error.provider.antigravityQuotaReached":
@@ -371,6 +373,8 @@ export const messages = {
     "{provider} hat den gespeicherten API-Schlüssel abgelehnt. Ersetze oder entferne den Schlüssel in den Einstellungen und versuche es dann erneut.",
   "error.provider.keyProviderNoBalance":
     "Das {provider}-Konto des gespeicherten API-Schlüssels hat kein Guthaben. Lade Guthaben auf das Konto und versuche es dann erneut.",
+  "error.provider.keyProviderLowCredit":
+    "Das {provider}-Konto des gespeicherten API-Schlüssels hat nicht genug Guthaben für eine Antwort dieses Modells. Lade Guthaben auf das Konto oder wähle ein anderes Modell und versuche es dann erneut.",
   "error.provider.modelServiceRefused":
     "Der Modelldienst hat die Anfrage abgelehnt. Wähle ein anderes Modell oder prüfe deinen Zugriff auf dieses Modell beim Dienst.",
   "error.provider.modelServiceRefusedReason":

@@ -265,6 +265,8 @@ export const messages = {
     "OPENBOT_ANTIGRAVITY_PATH の Gemini サーバーが見つからないか、実行できません。パスを修正するか変数を削除してから、OpenBot を再起動してください。",
   "error.provider.antigravityVersionUnreadable": "Gemini サーバーのバージョンを読み取れません。",
   "error.provider.antigravitySignIn": "Gemini を使うには Google でサインインしてください。",
+  "error.provider.antigravityModelAtCapacity":
+    "現在、Google にはこの Gemini モデルの空き容量がありません。プランの割り当てが原因ではありません。数分後にもう一度お試しいただくか、別のモデルを選んでください。\n{detail}",
   "error.provider.antigravityRateLimited":
     "レート制限またはプランの割り当てに達したため、Gemini がリクエストを拒否しました。数分待つか別のモデルを選んでから、もう一度お試しください。\n{detail}",
   "error.provider.antigravityQuotaReached":
@@ -367,6 +369,8 @@ export const messages = {
     "{provider} は保存された API キーを拒否しました。設定でキーを置き換えるか削除してから、もう一度お試しください。",
   "error.provider.keyProviderNoBalance":
     "保存された API キーの {provider} アカウントに残高がありません。アカウントにクレジットを追加してから、もう一度お試しください。",
+  "error.provider.keyProviderLowCredit":
+    "保存された API キーの {provider} アカウントには、このモデルの応答に必要なクレジットが足りません。アカウントにクレジットを追加するか、別のモデルを選択してから、もう一度お試しください。",
   "error.provider.modelServiceRefused":
     "モデルサービスがリクエストを拒否しました。別のモデルを選択するか、サービスでこのモデルへのアクセス権を確認してください。",
   "error.provider.modelServiceRefusedReason":

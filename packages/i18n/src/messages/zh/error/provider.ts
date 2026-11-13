@@ -228,6 +228,8 @@ export const messages = {
     "OPENBOT_ANTIGRAVITY_PATH 中的 Gemini 服务器不存在或不可执行。请更正路径或删除该变量，然后重启 OpenBot。",
   "error.provider.antigravityVersionUnreadable": "无法读取 Gemini 服务器版本。",
   "error.provider.antigravitySignIn": "请使用 Google 账号登录以使用 Gemini。",
+  "error.provider.antigravityModelAtCapacity":
+    "Google 目前没有此 Gemini 模型的空闲容量。原因不是你的套餐配额。请几分钟后重试，或改用其他模型。\n{detail}",
   "error.provider.antigravityRateLimited":
     "由于触发速率限制或套餐配额用尽，Gemini 拒绝了该请求。请等待几分钟或改用其他模型后重试。\n{detail}",
   "error.provider.antigravityQuotaReached":
@@ -316,6 +318,8 @@ export const messages = {
     "Gemini 回答前，Google 需要验证你的账号。在浏览器中验证你的 Google 账号，然后重新发送消息。",
   "error.provider.keyProviderRefused": "{provider} 拒绝了已保存的 API 密钥。请在设置中更换或移除该密钥，然后重试。",
   "error.provider.keyProviderNoBalance": "已保存 API 密钥的 {provider} 账户没有余额。请为账户充值，然后重试。",
+  "error.provider.keyProviderLowCredit":
+    "已保存 API 密钥的 {provider} 账户余额不足以支付该模型的回复。请为账户充值，或选择其他模型，然后重试。",
   "error.provider.modelServiceRefused": "模型服务拒绝了该请求。请选择其他模型，或在该服务中检查你对此模型的访问权限。",
   "error.provider.modelServiceRefusedReason":
     "模型服务拒绝了该请求：{reason}。请选择其他模型，或在该服务中检查你对此模型的访问权限。",

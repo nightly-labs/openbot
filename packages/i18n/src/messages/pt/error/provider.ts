@@ -262,6 +262,8 @@ export const messages = {
     "O servidor do Gemini em OPENBOT_ANTIGRAVITY_PATH não existe ou não é executável. Corrija o caminho ou remova a variável e reinicie o OpenBot.",
   "error.provider.antigravityVersionUnreadable": "Não foi possível ler a versão do servidor do Gemini.",
   "error.provider.antigravitySignIn": "Entre com o Google para usar o Gemini.",
+  "error.provider.antigravityModelAtCapacity":
+    "O Google não tem capacidade livre para este modelo do Gemini agora. A cota do seu plano não é a causa. Tente novamente em alguns minutos ou escolha outro modelo.\n{detail}",
   "error.provider.antigravityRateLimited":
     "O Gemini recusou a solicitação porque um limite de requisições ou a cota do plano foi atingido. Aguarde alguns minutos ou escolha outro modelo e tente novamente.\n{detail}",
   "error.provider.antigravityQuotaReached":
@@ -359,6 +361,8 @@ export const messages = {
     "O {provider} recusou a chave de API salva. Substitua ou remova a chave nas Configurações e tente novamente.",
   "error.provider.keyProviderNoBalance":
     "A conta do {provider} da chave de API salva não tem saldo. Adicione crédito à conta e tente novamente.",
+  "error.provider.keyProviderLowCredit":
+    "A conta do {provider} da chave de API salva não tem crédito suficiente para uma resposta deste modelo. Adicione crédito à conta ou selecione outro modelo e tente novamente.",
   "error.provider.modelServiceRefused":
     "O serviço do modelo recusou a solicitação. Escolha outro modelo ou verifique seu acesso a este modelo no serviço.",
   "error.provider.modelServiceRefusedReason":

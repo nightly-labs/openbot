@@ -266,6 +266,8 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
 
   /**
    * Pi starts an API error with its HTTP status. A key provider's 401 and 402 point at the saved key.
+   * OpenRouter's 402 "can only afford N" means that the account has credit, but not for the output
+   * that the request asked for, so "no balance" is not true (#8578).
    * A 403 is the model service's refusal, not an OpenBot permission: the text keeps the service's
    * reason, which the generic permission sentence dropped (#6649).
    */
@@ -273,6 +275,9 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     if (message && this.provider !== "pi") {
       const provider = agentProviderName(this.provider);
       if (/^401\b/u.test(message)) return sourceText("error.provider.keyProviderRefused", { provider });
+      if (/^402\b/u.test(message) && /\bcan only afford\b/iu.test(message)) {
+        return sourceText("error.provider.keyProviderLowCredit", { provider });
+      }
       if (/^402\b/u.test(message)) return sourceText("error.provider.keyProviderNoBalance", { provider });
     }
     const refused = message === null ? null : /^403\b:?\s*([\s\S]*)$/u.exec(message);

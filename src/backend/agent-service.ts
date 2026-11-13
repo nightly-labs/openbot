@@ -284,7 +284,7 @@ import { type AgentThreadRecord, AgentThreadStore } from "./agent-threads/agent-
 import { AgentWaitStore } from "./agent-waits/agent-wait-store";
 import { AgentWaits } from "./agent-waits/agent-waits";
 import { automationRunCommand } from "./automation-command";
-import { toChannelOperationError } from "./channel-effects";
+import { channelSync, toChannelOperationError } from "./channel-effects";
 import { type ChannelImageFile, ChannelImages } from "./channel-images";
 import { ChannelRoutineScheduler } from "./channel-routine-scheduler";
 import { ChannelService } from "./channel-service";
@@ -4513,7 +4513,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     });
   }, Effect.uninterruptible).bind(this);
 
-  /** "Delete history" of a channel. The members forget it, as for `clearChannelContext`. */
+  /**
+   * "Delete history" of a channel. Each member's channel thread holds the channel text that its turns
+   * read and wrote, so its messages go as for `deleteAgentHistory`; the thread itself stays. The
+   * members forget the channel, as for `clearChannelContext`.
+   */
   readonly deleteChannelHistory = Effect.fn("AgentService.deleteChannelHistory")(function* (
     this: AgentService,
     channelId: string,
@@ -4523,18 +4527,35 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         const agents = new Map(this.#store.list().map((agent) => [agent.id, agent]));
         return contexts.some(({ agentId, threadId }) => this.#channelSessionBusy(agents.get(agentId), threadId));
       },
-      end: (threadIds) =>
+      forget: (contexts) =>
         Effect.forEach(
-          threadIds,
-          (threadId) => {
-            // The messages are gone, so the files that their turns used open from no other link.
-            this.#turn.fileHistory.forgetThread(threadId);
-            return this.#threads.endThreadContext(threadId);
-          },
+          contexts,
+          ({ agentId, threadId }) =>
+            Effect.gen({ self: this }, function* () {
+              // Also for a deleted agent: the channel keeps its thread until the channel goes.
+              yield* channelSync(() => this.#deleteChannelThreadHistory(agentId, threadId));
+              // The messages are gone, so the files that their turns used open from no other link.
+              this.#turn.fileHistory.forgetThread(threadId);
+              yield* this.#threads.endThreadContext(threadId);
+            }),
           { discard: true },
         ),
     });
   }, Effect.uninterruptible).bind(this);
+
+  /**
+   * Deletes the messages of one member's channel thread. A loaded copy in memory loses them too,
+   * so no reader shows them again.
+   */
+  #deleteChannelThreadHistory(agentId: string, threadId: string): void {
+    const revision = this.#store.database.deleteThreadHistory({ agentId, threadId });
+    this.#conversation.forgetDeletedHistory(threadId);
+    const loaded = this.#conversation.loadedExecutionSnapshot(threadId);
+    if (!loaded) return;
+    const snapshot = { ...loaded, messages: [], revision };
+    this.#conversation.setSnapshot(agentId, snapshot);
+    this.#conversation.publishConversation(snapshot);
+  }
 
   /** Whether a member's channel session runs a turn, or a compaction or a refused start holds it. */
   #channelSessionBusy(agent: AgentSummary | undefined, threadId: string): boolean {

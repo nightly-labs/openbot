@@ -261,6 +261,8 @@ export const messages = {
     "OPENBOT_ANTIGRAVITY_PATH içindeki Gemini sunucusu yok veya çalıştırılabilir değil. Yolu düzeltin ya da değişkeni kaldırın, ardından OpenBot'u yeniden başlatın.",
   "error.provider.antigravityVersionUnreadable": "Gemini sunucu sürümü okunamıyor.",
   "error.provider.antigravitySignIn": "Gemini'yi kullanmak için Google ile oturum açın.",
+  "error.provider.antigravityModelAtCapacity":
+    "Google'ın şu anda bu Gemini modeli için boş kapasitesi yok. Sebep planınızın kotası değil. Birkaç dakika sonra yeniden deneyin ya da başka bir model seçin.\n{detail}",
   "error.provider.antigravityRateLimited":
     "Bir hız sınırına veya planın kotasına ulaşıldığı için Gemini isteği reddetti. Birkaç dakika bekleyin ya da başka bir model seçin, sonra yeniden deneyin.\n{detail}",
   "error.provider.antigravityQuotaReached":
@@ -361,6 +363,8 @@ export const messages = {
     "{provider} kayıtlı API anahtarını reddetti. Ayarlar'da anahtarı değiştirin veya kaldırın, ardından yeniden deneyin.",
   "error.provider.keyProviderNoBalance":
     "Kayıtlı API anahtarının {provider} hesabında bakiye yok. Hesaba kredi ekleyin, ardından yeniden deneyin.",
+  "error.provider.keyProviderLowCredit":
+    "Kayıtlı API anahtarının {provider} hesabında bu modelin yanıtı için yeterli kredi yok. Hesaba kredi ekleyin veya başka bir model seçin, ardından yeniden deneyin.",
   "error.provider.modelServiceRefused":
     "Model hizmeti isteği reddetti. Başka bir model seçin veya hizmette bu modele erişiminizi kontrol edin.",
   "error.provider.modelServiceRefusedReason":

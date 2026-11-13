@@ -217,7 +217,7 @@ See [account service setup](apps/auth-api/README.md) for loading and deployment 
 ### Leaseweb servers
 
 Take only a Leaseweb VPS that has no reference, and set its reference before any other work on it.
-Never take a VPS that has a reference, also `pool-free`. The reference scheme is in
+Never take a VPS that has a reference, also `pool`. The reference scheme is in
 [Leaseweb references](docs/hosted-servers.md#leaseweb-references). To set up a VPS as the server of one
 customer, use the [custom-server](.agents/skills/custom-server/SKILL.md) skill. The customer is the
 owner, through a server claim; never sign the server in to an operator account.

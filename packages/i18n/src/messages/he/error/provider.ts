@@ -239,6 +239,8 @@ export const messages = {
     "שרת Gemini ב-OPENBOT_ANTIGRAVITY_PATH חסר או שאינו ניתן להרצה. יש לתקן את הנתיב או להסיר את המשתנה, ואז להפעיל מחדש את OpenBot.",
   "error.provider.antigravityVersionUnreadable": "לא ניתן לקרוא את הגרסה של שרת Gemini.",
   "error.provider.antigravitySignIn": "יש להתחבר עם Google כדי להשתמש ב-Gemini.",
+  "error.provider.antigravityModelAtCapacity":
+    "ל-Google אין כרגע קיבולת פנויה למודל Gemini הזה. מכסת התוכנית שלך אינה הסיבה. יש לנסות שוב בעוד כמה דקות, או לבחור מודל אחר.\n{detail}",
   "error.provider.antigravityRateLimited":
     "Gemini דחה את הבקשה כי הושגה מגבלת קצב או מכסת התוכנית. יש להמתין כמה דקות או לבחור מודל אחר, ואז לנסות שוב.\n{detail}",
   "error.provider.antigravityQuotaReached":
@@ -334,6 +336,8 @@ export const messages = {
     "{provider} דחה את מפתח ה-API השמור. יש להחליף או להסיר את המפתח בהגדרות, ואז לנסות שוב.",
   "error.provider.keyProviderNoBalance":
     "בחשבון {provider} של מפתח ה-API השמור אין יתרה. יש להוסיף קרדיט לחשבון ואז לנסות שוב.",
+  "error.provider.keyProviderLowCredit":
+    "בחשבון {provider} של מפתח ה-API השמור אין מספיק קרדיט לתשובה מהמודל הזה. יש להוסיף קרדיט לחשבון או לבחור מודל אחר, ואז לנסות שוב.",
   "error.provider.modelServiceRefused":
     "שירות המודל דחה את הבקשה. יש לבחור מודל אחר, או לבדוק את הגישה שלך למודל הזה בשירות.",
   "error.provider.modelServiceRefusedReason":

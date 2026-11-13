@@ -43,6 +43,7 @@ import { AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-
 import { AGENT_INSTRUCTIONS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-instructions-v1";
 import { AGENT_NEW_CHAT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-new-chat-v1";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
+import { AGENT_PENDING_RUNTIME_CAPABILITY } from "@openbot/contracts/team-protocol/agent-pending-runtime-v1";
 import { AGENT_PLAN_CARD_CAPABILITY } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
 import { AGENT_QUEUE_TASK_CAPABILITY } from "@openbot/contracts/team-protocol/agent-queue-task-v1";
 import { AGENT_SESSION_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
@@ -311,6 +312,7 @@ import { routeAgentInstructions } from "./team-api/route-agent-instructions";
 import { routeAgentMemoryPage } from "./team-api/route-agent-memories";
 import { routeAgentMemoryLimit } from "./team-api/route-agent-memory-limit";
 import { routeAgentNotificationLevels } from "./team-api/route-agent-notification-levels";
+import { routeAgentPendingRuntime } from "./team-api/route-agent-pending-runtime";
 import { routeAgentPublish } from "./team-api/route-agent-publish";
 import { routeAgentQueueTask } from "./team-api/route-agent-queue-task";
 import { routeAgentSessionSettings } from "./team-api/route-agent-session-settings";
@@ -1257,6 +1259,7 @@ export class TeamApiServer {
       if ((await routeAgentThreadQueue(context, this.#options.agentTasks, this.#options.agents, hidden)) === "handled")
         return;
       if ((await routeAgentUsageLimit(context, this.#options.agents, hidden)) === "handled") return;
+      if ((await routeAgentPendingRuntime(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeAgentThreads(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentThreadReads(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentThreadFiles(context, this.#options.agentTasks, hidden)) === "handled") return;
@@ -1538,6 +1541,7 @@ export class TeamApiServer {
         browserSignIn: capabilities.has(BROWSER_SIGN_IN_CAPABILITY),
         contextUsage: capabilities.has(TEAM_CONTEXT_USAGE_CAPABILITY),
         usageTertiary: capabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
+        agentPendingRuntime: capabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
         // Only the V7 and V8 encoders read them.
         uiBlocks: capabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
         subagents: capabilities.has(TEAM_SUBAGENTS_CAPABILITY),
@@ -2323,6 +2327,7 @@ export class TeamApiServer {
       promptMultiSelect: route.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
       videoGeneration: route.capabilities.has(TEAM_VIDEO_GENERATION_CAPABILITY),
       usageTertiary: route.capabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
+      agentPendingRuntime: route.capabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
     };
     // The body is encoded before the head is written. A response the negotiated protocol cannot
     // represent - a route its frozen adapter does not classify - makes the encoder throw, and with

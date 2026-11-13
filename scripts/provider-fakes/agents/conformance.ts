@@ -4,6 +4,7 @@
 //   the agent does not have (`gone-…`). Each form is the one that the provider's flavor recognizes.
 //   `hermes` acts as Hermes Agent 0.21.5: it advertises `session/resume`, which makes a new session for
 //   a missing one, and `session/load` of a missing session answers null. Each session it opens has `modes`.
+//   `antigravity` advertises `session/resume`, as Antigravity 1.5.7 does.
 //   It lists its provider as an auth method only when it is signed in, and its stderr is a Python log.
 // - `FAKE_SIGNED_OUT=1` refuses each new session, as an agent does before its sign-in. Hermes refuses
 //   it with "Internal error", and writes the cause only to stderr. Devin CLI 3000.11.234 opens the
@@ -36,8 +37,11 @@ const MISSING_ERRORS: Readonly<Partial<Record<string, (sessionId: string) => Acp
     message: `Invalid params: session not found: ${sessionId}`,
     data: { sessionId },
   }),
-  // Antigravity 1.3.0, on a load or a resume.
-  antigravity: (sessionId) => ({ code: -32002, message: "Resource not found", data: { sessionId } }),
+  // Antigravity 1.5.7, on a resume. It sends no data (#8468).
+  antigravity: (sessionId) => ({
+    code: -32603,
+    message: `Failed to read session ${sessionId}; retry, or load it with session/load`,
+  }),
   // Kimi CLI 1.52.0.
   kimi: () => ({ code: -32602, message: "Invalid params", data: { session_id: "Session not found" } }),
   // Devin CLI 3000.11.234.
@@ -61,6 +65,7 @@ const MISSING_ERRORS: Readonly<Partial<Record<string, (sessionId: string) => Acp
 };
 
 const hermes = process.env.FAKE_MISSING === "hermes";
+const antigravity = process.env.FAKE_MISSING === "antigravity";
 const devin = process.env.FAKE_MISSING === "devin";
 const mistral = process.env.FAKE_MISSING === "mistral";
 /** What Hermes 0.21.5 lists: its provider while that provider's credential resolves, and its terminal setup. */
@@ -123,7 +128,10 @@ serveFakeAcpAgent(
       peer.reply(request, {
         protocolVersion: 1,
         agentInfo: { name: "conformance", version: "1.0.0" },
-        agentCapabilities: { loadSession: true, ...(hermes ? { sessionCapabilities: { resume: {} } } : {}) },
+        agentCapabilities: {
+          loadSession: true,
+          ...(hermes || antigravity ? { sessionCapabilities: { resume: {} } } : {}),
+        },
         authMethods: hermes ? HERMES_AUTH_METHODS.filter((method) => !signedOut || method.id === "hermes-setup") : [],
       }),
     "session/new": (request, peer) => {

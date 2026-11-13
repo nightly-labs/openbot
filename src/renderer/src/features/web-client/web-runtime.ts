@@ -97,6 +97,11 @@ import {
   AGENT_FAST_MODE_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
+import {
+  AGENT_PENDING_RUNTIME_CAPABILITY,
+  AGENT_PENDING_RUNTIME_ROUTES,
+  pendingRuntimeUpdateBody,
+} from "@openbot/contracts/team-protocol/agent-pending-runtime-v1";
 import { AGENT_SPEED_CAPABILITY, AGENT_SPEED_ROUTES } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import {
   AGENT_USAGE_LIMIT_CAPABILITY,
@@ -1795,6 +1800,16 @@ export function createWebWorkspaceRuntime(
           reasoningEffort,
           ...(providerAccountId ? { providerAccountId } : {}),
         });
+        return;
+      }
+      // While the agent works, the released agent route refuses a provider change. A change of the runtime
+      // alone goes on `agent-pending-runtime-v1`, which keeps it for the next turn, with the account in the
+      // same change.
+      const runtimeChange = capabilities.includes(AGENT_PENDING_RUNTIME_CAPABILITY)
+        ? pendingRuntimeUpdateBody(input)
+        : null;
+      if (runtimeChange) {
+        await request("POST", AGENT_PENDING_RUNTIME_ROUTES.update, runtimeChange);
         return;
       }
       // The released agent route ignores the account, so it goes on `provider-accounts-v1` after the

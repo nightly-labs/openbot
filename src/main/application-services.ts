@@ -364,6 +364,7 @@ import {
   createRemoteNetworkRoutePreferenceStore,
   type RemoteNetworkRoutePreferenceStore,
 } from "./remote-network-route-preference-store";
+import { watchServerClaims } from "./remote-server-host-directory";
 import { RemoteServerManager } from "./remote-server-manager";
 import { RemoteSessionCache } from "./remote-session-cache";
 import {
@@ -1353,7 +1354,17 @@ export async function createApplicationServices({
         void Effect.runPromise(remoteServers.invalidateDirectory());
     },
     (serverId, server) => remoteServers.hostedServerStarting(serverId, server),
+    (expiresAt) => serverClaimWatch.add(expiresAt),
   );
+  // An install command's server can sign in while this computer has no Signal socket to hear it.
+  const serverClaimWatch = watchServerClaims({
+    serverIds: () =>
+      remoteServers
+        .list()
+        .filter((server) => server.kind === "remote")
+        .map((server) => server.id),
+    refresh: () => remoteServers.requestDirectoryRefresh(),
+  });
   const sidebarLayout = new SidebarLayoutStore(join(app.getPath("userData"), SIDEBAR_LAYOUT_FILE));
   await runCauseEffect(sidebarLayout.initialize());
   const libraryFolders = new LibraryFoldersStore(join(app.getPath("userData"), LIBRARY_FOLDERS_FILE));
@@ -3927,7 +3938,10 @@ export async function createApplicationServices({
   // than at the next account check. The refresh itself belongs to the entry point, which owns the
   // account check and its coalescing; this only forwards the notice to it.
   teamWebRtcBridge.on("accountServersChanged", () => void Effect.runPromise(remoteServers.invalidateDirectory()));
-  teardown.push(TEARDOWN_ORDER.remoteServers, "the remote servers", () => runCauseEffect(remoteServers.stop()));
+  teardown.push(TEARDOWN_ORDER.remoteServers, "the remote servers", () => {
+    serverClaimWatch.stop();
+    return runCauseEffect(remoteServers.stop());
+  });
   // This computer's connection, for the computer proxies of the joined servers that the user shares it with.
   const browserEgressClient = new BrowserEgressClient(teamWebRtcBridge, {
     serverIds: () => remoteServers.list().map((server) => server.id),

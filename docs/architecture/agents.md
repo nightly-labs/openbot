@@ -687,12 +687,14 @@ a queued message waits is stored on the agent as `pendingRuntime`. The running w
 sessions. When the drain is about to start the next message and no work has started,
 `AgentService` applies the queued runtime first (the `next-turn` move), then retires the provider
 sessions of the chat and of each task thread, so each one gets a handoff on the new provider. A
-queued change that fails on an idle agent, such as for a provider that is now off, is removed. An
-update that also changes other fields, a move to a backup model, a Team API request (its released
-protocol has no `pendingRuntime`), and the automatic usage-limit, provider-error and endpoint moves
-still wait for idle work (`error.agent.waitForTasksBeforeProviderChange` /
-`error.agent.waitBeforeProviderChange`). A Team API model or effort change keeps the queued
-change, because the remote client cannot see it. The channel threads of the agent
+queued change that fails on an idle agent, such as for a provider that is now off, is removed. A
+joined server's client queues the same change on `agent-pending-runtime-v1` (see
+[team-api.md](team-api.md)). An update that also changes other fields, a move to a backup model, a
+request on the released agent route (its released protocol has no `pendingRuntime`), and the
+automatic usage-limit, provider-error and endpoint moves still wait for idle work
+(`error.agent.waitForTasksBeforeProviderChange` / `error.agent.waitBeforeProviderChange`). A model or
+effort change on the released agent route keeps the queued change, because an older remote client
+cannot see it. The channel threads of the agent
 (`ChannelStore.contextThreadsForAgent`) are retired too, and their work steps are saved. A channel
 turn also carries its own self-contained context packet. The instance transfer file keeps `taskLimit`, and its server
 preferences keep the host turn limits.
@@ -795,8 +797,9 @@ with the `empty_answer` cause, as an ACP turn with no answer fails, unless the t
 (a quiet teammate update or routine run), compacted, showed a plan, continues a plan, or was stopped
 by the user. The error waits for the end
 of the turn, also with no backup model. A backup model then runs the turn again, as for a provider
-error. With no backup, a turn that only teammate results started runs once more on the same model;
-the turn did no step, so it repeats nothing. A second empty run, or an empty turn from the person,
+error. With no backup, a turn that only teammate results started runs once more on the same model.
+A thread turn never moves to a backup, so it always runs once more on the same model (#8503). The
+turn did no step, so it repeats nothing. A second empty run, or an empty turn from the person,
 shows the error. `scripts/codex-empty-lead-turn-e2e.ts` checks these paths.
 
 A message to an agent that runs a turn follows the busy-message mode: "steer" takes it into the

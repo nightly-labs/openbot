@@ -238,6 +238,8 @@ export const messages = {
     "خادم Gemini في OPENBOT_ANTIGRAVITY_PATH غير موجود أو غير قابل للتنفيذ. صحّح المسار أو احذف المتغير، ثم أعد تشغيل OpenBot.",
   "error.provider.antigravityVersionUnreadable": "تتعذّر قراءة إصدار خادم Gemini.",
   "error.provider.antigravitySignIn": "سجّل الدخول باستخدام Google لاستخدام Gemini.",
+  "error.provider.antigravityModelAtCapacity":
+    "لا تتوفر لدى Google سعة متاحة لنموذج Gemini هذا الآن. حصة خطتك ليست السبب. أعد المحاولة بعد بضع دقائق، أو اختر نموذجًا آخر.\n{detail}",
   "error.provider.antigravityRateLimited":
     "رفض Gemini الطلب لبلوغ حد المعدل أو حصة الخطة. انتظر بضع دقائق أو اختر نموذجًا آخر، ثم أعد المحاولة.\n{detail}",
   "error.provider.antigravityQuotaReached":
@@ -334,6 +336,8 @@ export const messages = {
     "رفض {provider} مفتاح API المحفوظ. استبدل المفتاح أو أزله في الإعدادات، ثم أعد المحاولة.",
   "error.provider.keyProviderNoBalance":
     "لا يوجد رصيد في حساب {provider} الخاص بمفتاح API المحفوظ. أضف رصيدًا إلى الحساب، ثم أعد المحاولة.",
+  "error.provider.keyProviderLowCredit":
+    "لا يكفي رصيد حساب {provider} الخاص بمفتاح API المحفوظ لردّ من هذا النموذج. أضف رصيدًا إلى الحساب، أو اختر نموذجًا آخر، ثم أعد المحاولة.",
   "error.provider.modelServiceRefused":
     "رفضت خدمة النموذج الطلب. اختر نموذجًا آخر، أو تحقق من صلاحية وصولك إلى هذا النموذج لدى الخدمة.",
   "error.provider.modelServiceRefusedReason":

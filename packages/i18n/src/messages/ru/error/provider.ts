@@ -252,6 +252,8 @@ export const messages = {
     "Сервер Gemini из OPENBOT_ANTIGRAVITY_PATH не найден или не является исполняемым. Исправьте путь или удалите переменную, затем перезапустите OpenBot.",
   "error.provider.antigravityVersionUnreadable": "Не удалось прочитать версию сервера Gemini.",
   "error.provider.antigravitySignIn": "Войдите через Google, чтобы использовать Gemini.",
+  "error.provider.antigravityModelAtCapacity":
+    "Сейчас у Google нет свободных мощностей для этой модели Gemini. Квота тарифа здесь ни при чём. Повторите попытку через несколько минут или выберите другую модель.\n{detail}",
   "error.provider.antigravityRateLimited":
     "Gemini отклонил запрос: достигнут лимит частоты запросов или квота тарифа. Подождите несколько минут или выберите другую модель и повторите попытку.\n{detail}",
   "error.provider.antigravityQuotaReached":
@@ -350,6 +352,8 @@ export const messages = {
     "{provider} отклонил сохранённый ключ API. Замените или удалите ключ в настройках, затем повторите попытку.",
   "error.provider.keyProviderNoBalance":
     "На аккаунте {provider} для сохранённого ключа API нет средств. Пополните баланс аккаунта, затем повторите попытку.",
+  "error.provider.keyProviderLowCredit":
+    "На аккаунте {provider} для сохранённого ключа API недостаточно средств для ответа этой модели. Пополните баланс аккаунта или выберите другую модель, затем повторите попытку.",
   "error.provider.modelServiceRefused":
     "Сервис модели отклонил запрос. Выберите другую модель или проверьте свой доступ к этой модели в сервисе.",
   "error.provider.modelServiceRefusedReason":
