@@ -258,8 +258,13 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   approvedEditSweep: /^\s*Tool call was approved but never executed\.?\s*$/u,
   // Antigravity 1.3.0 has three exact forms: a load or resume puts the ID in data.sessionId, a
   // configuration change uses the SDK's resource URI `session <id>`, and a prompt raises a plain
-  // error that the SDK wraps as an internal error.
+  // error that the SDK wraps as an internal error. The 1.5 CLI sends no data: a resume answers
+  // "Failed to read session <id>; retry, or load it with session/load", and a prompt "Session not
+  // found: <id>". Its `session/load` of a missing session opens an empty one, so the hint is not
+  // followed: OpenBot opens a new session and gives it the chat (#8468).
   sessionNotFound: (error, sessionId) => {
+    if (error.code === -32603 && error.message.startsWith(`Failed to read session ${sessionId};`)) return true;
+    if (error.code === -32602 && error.message === `Session not found: ${sessionId}`) return true;
     if (!isRecord(error.data)) return false;
     if (error.code === -32603) return error.data.details === `Session not found: ${sessionId}`;
     return error.code === -32002 && (error.data.sessionId === sessionId || error.data.uri === `session ${sessionId}`);
