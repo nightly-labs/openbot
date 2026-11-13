@@ -76,8 +76,9 @@ voice prompts show an error. Use a newer distribution. The arm64 AppImage needs 
 
 On Linux, OpenBot uses the GPU until the GPU fails on your computer. If the GPU process crashes, or a
 start stops in its first 30 seconds, OpenBot writes `gpu-crash.json` or `gpu-start.json` in
-`~/.config/OpenBot`. While one of these files is there, OpenBot renders on the CPU. An update with a
-new Chromium version tries the GPU again. A GPU process restart after a lost GPU context, for example
+`~/.config/OpenBot`. While one of these files is there, OpenBot renders on the CPU. A start that
+stops with no crash, for example a kill or a power loss, gets one more try with the GPU; a second
+stop in a row turns it off. An update with a new Chromium version tries the GPU again. A GPU process restart after a lost GPU context, for example
 after suspend, does not count. A server (`OPENBOT_SERVER=1` or a hosted server) always renders on the
 CPU, and its browser runs WebGL on the CPU (SwiftShader) for sites such as the Figma editor. A GPU
 process crash on a server writes `gpu-crash.json` and turns off WebGL at the next start. Chromium
@@ -328,6 +329,11 @@ When the desktop app closes by itself, look in the `logs` folder of its user dat
 - `main/main.log` has a `Quitting: <reason>.` line when OpenBot quit by itself or was closed.
 - `trace.ndjson` has an `exit` line with the same reason, and a `crash` line for each renderer or
   helper process that stopped.
+
+When OpenBot or a server freezes again and again, `stall-profiles.ndjson` in the same folder has a line
+for a minute in which the main process stopped for 2 seconds or more, twice in a row. The line names
+the OpenBot functions that used the time (`top`) and their callers (`stack`). It holds no paths and
+none of your data, so you can attach it to a report.
 
 A dump in the `Crashpad` folder next to `logs` means a process crashed. Tell us that a dump exists,
 but do not attach it publicly: it can hold secrets. When neither file has a reason and there is no

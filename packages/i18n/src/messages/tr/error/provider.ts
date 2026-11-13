@@ -310,6 +310,8 @@ export const messages = {
     "Hermes'i kullanmak için Nous Portal ile oturum açın veya bir terminalde `hermes setup` komutunu çalıştırın.",
   "error.provider.hermesTurnFailed":
     "Hermes bu turu bitiremedi. Yanıtı bir neden veriyorsa onu izleyin. Vermiyorsa bu ajanın bir MCP sunucusu kullanılamıyor olabilir: Sunucu ayarları › MCP bölümünden kontrol edin, sonra mesajınızı yeniden gönderin.",
+  "error.provider.copilotThinkingRejected":
+    "GitHub Copilot bu modeli kullanamadı: model, düşünme ayarını kabul etmedi. Bu ajan için başka bir model seçin, sonra mesajınızı yeniden gönderin.",
   "error.provider.usageLimitReached": "Hesap kullanım sınırına ulaştı.",
   "error.provider.claudeContextFull":
     "Bu sohbet Claude için çok uzun hale geldi. OpenBot sohbet geçmişiyle yeni bir Claude Code oturumu başlattı. Tekrar deneyin.",
@@ -408,6 +410,14 @@ export const messages = {
   "error.provider.accountDefault": "İlk {provider} hesabı kaldırılamaz.",
   "error.provider.accountUsesKey":
     "Bu {provider} hesabı kayıtlı API anahtarını kullanır ve oturum açma içermez. Anahtarı Sunucu ayarları → Sağlayıcılar bölümünde değiştirin.",
+  "error.provider.accountNeedsKey":
+    "Yeni bir {provider} hesabı için API anahtarı gerekir. Bu cihazda OpenBot'u güncelleyin, sonra hesabı yeniden ekleyin.",
+  "error.provider.accountKeyRefused":
+    "{provider} bu API anahtarını kabul etmedi. Anahtarı kontrol edin, sonra tekrar deneyin.",
+  "error.provider.accountKeyUnreachable":
+    "OpenBot, API anahtarını kontrol etmek için {provider} hizmetine ulaşamadı. İnternet bağlantısını kontrol edin, sonra tekrar deneyin.",
+  "error.provider.accountKeySignedOut":
+    "{provider} bu hesabın API anahtarını artık kabul etmiyor. Hesaba yeni bir anahtar verin.",
   "error.provider.accountInUse": "Bu hesabı kullanan bir ajan çalışıyor. Ajan durduğunda tekrar deneyin.",
   "error.provider.accountsReadOnly":
     "Kayıtlı sağlayıcı hesapları okunamıyor. Bunları değiştirmeden önce OpenBot'u güncelleyin.",

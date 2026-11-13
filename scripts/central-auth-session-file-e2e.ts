@@ -2,6 +2,8 @@
 // Keychain cannot decrypt at startup, or a later write that fails, must leave the session file on
 // disk: before this, both deleted it and the app was signed out after the next restart. A failed
 // write after an email sign-in must still remove a file that holds the previous session.
+// A start also shows the account from the profile in the file before the account service answers,
+// and a session that the service then refuses signs the device out.
 //
 // Run: bun scripts/central-auth-session-file-e2e.ts
 // It writes .openbot-build/central-auth-session-file-e2e/report.json and exits non-zero on a failure.
@@ -20,6 +22,29 @@ const SESSION_TOKEN = "s".repeat(48);
 const NEW_SESSION_TOKEN = "n".repeat(48);
 const HOST_ID = "00000000-0000-4000-8000-000000000001";
 
+/** While set, `/v1/me` does not answer: the account service is slow or out of reach. */
+let meHold: { seen: () => void; release: Promise<void> } | null = null;
+let meRevoked = false;
+
+function holdMe() {
+  let seen = () => {};
+  let open = () => {};
+  const asked = new Promise<void>((done) => {
+    seen = done;
+  });
+  const release = new Promise<void>((done) => {
+    open = done;
+  });
+  meHold = { seen, release };
+  return {
+    asked,
+    open: () => {
+      meHold = null;
+      open();
+    },
+  };
+}
+
 const server = createServer((request, response) => {
   const answer = (status: number, body: unknown) => {
     response.writeHead(status, { "Content-Type": "application/json" });
@@ -33,8 +58,16 @@ const server = createServer((request, response) => {
     });
   }
   if (request.headers.authorization !== `Bearer ${SESSION_TOKEN}`) return answer(401, { error: "unauthorized" });
-  if (request.url === "/v1/me")
-    return answer(200, { id: "user-1", email: "a@example.com", name: null, avatarUrl: null });
+  if (request.url === "/v1/me") {
+    const me = () =>
+      meRevoked
+        ? answer(401, { error: "unauthorized" })
+        : answer(200, { id: "user-1", email: "a@example.com", name: null, avatarUrl: null });
+    if (!meHold) return me();
+    meHold.seen();
+    void meHold.release.then(me);
+    return;
+  }
   if (request.url === "/v2/remote/hosts/register") {
     return answer(200, {
       hostId: HOST_ID,
@@ -55,12 +88,13 @@ const stored = Buffer.from(JSON.stringify({ version: 2, sessionToken: SESSION_TO
 const logLines: string[] = [];
 const stopLog = teeLogLines(["central-auth"], (line) => logLines.push(line));
 
-function manager(options: { decrypt?: () => string; encrypt?: () => Buffer } = {}) {
+function manager(options: { decrypt?: () => string; encrypt?: () => Buffer; confirmSessionAtStart?: boolean } = {}) {
   return new CentralAuthManager({
     apiUrl: `http://127.0.0.1:${address && typeof address === "object" ? address.port : 0}`,
     storagePath,
     encrypt: options.encrypt ?? ((value) => Buffer.from(value)),
     decrypt: options.decrypt ?? ((value) => value.toString()),
+    ...(options.confirmSessionAtStart === undefined ? {} : { confirmSessionAtStart: options.confirmSessionAtStart }),
   });
 }
 
@@ -85,6 +119,12 @@ try {
   const unlocked = manager();
   results.nextStart = (await runCauseEffect(unlocked.initialize())).status;
   assert.equal(results.nextStart, "signed_in");
+  // The start put the profile in the file, beside the same session.
+  await runCauseEffect(unlocked.dispose());
+  const storedWithProfile = await readFile(storagePath, "utf8");
+  const profileFile = JSON.parse(Buffer.from(storedWithProfile, "base64").toString());
+  assert.equal(profileFile.sessionToken, SESSION_TOKEN);
+  assert.equal(profileFile.user.email, "a@example.com", "the start must store the profile");
 
   // 3. A write after sign-in fails, as the host registration write does.
   let failWrites = false;
@@ -100,15 +140,54 @@ try {
     failing.registerRemoteHost({ hostId: HOST_ID, name: "Host", ownerMembershipId: "m-1" }),
   );
   await runCauseEffect(failing.dispose());
-  await runCauseEffect(unlocked.dispose());
   assert.equal(registered.authEpoch, 2);
-  assert.equal(await readFile(storagePath, "utf8"), stored, "a failed write must keep the session file");
+  assert.equal(await readFile(storagePath, "utf8"), storedWithProfile, "a failed write must keep the session file");
 
   // 4. The restart after the failed write is still signed in.
   const restarted = manager();
   results.afterWriteFailure = (await runCauseEffect(restarted.initialize())).status;
   await runCauseEffect(restarted.dispose());
   assert.equal(results.afterWriteFailure, "signed_in");
+
+  // 4a. The account service does not answer. The start shows the account from the stored profile.
+  const slowService = holdMe();
+  const offline = manager();
+  const offlineState = await runCauseEffect(offline.initialize());
+  results.startWithoutService = offlineState.status;
+  assert.equal(offlineState.status, "signed_in", "the stored profile must sign the start in");
+  assert.equal(offlineState.status === "signed_in" ? offlineState.user.email : null, "a@example.com");
+  await slowService.asked;
+  slowService.open();
+  await runCauseEffect(offline.dispose());
+  assert.equal(offline.getState().status, "signed_in");
+
+  // 4b. A hosted server waits for the account service, because its claim depends on the answer.
+  const hostedService = holdMe();
+  const hosted = manager({ confirmSessionAtStart: true });
+  const hostedStart = runCauseEffect(hosted.initialize());
+  await hostedService.asked;
+  results.hostedBeforeAnswer = hosted.getState().status;
+  assert.equal(results.hostedBeforeAnswer, "loading");
+  hostedService.open();
+  results.hostedAfterAnswer = (await hostedStart).status;
+  await runCauseEffect(hosted.dispose());
+  assert.equal(results.hostedAfterAnswer, "signed_in");
+
+  // 4c. The account service refuses the stored session. The device signs out and the file goes.
+  meRevoked = true;
+  const revoked = manager();
+  const signedOut = new Promise<void>((done) => {
+    revoked.on("changed", (state) => {
+      if (state.status === "signed_out") done();
+    });
+  });
+  results.revokedStart = (await runCauseEffect(revoked.initialize())).status;
+  assert.equal(results.revokedStart, "signed_in");
+  await signedOut;
+  await runCauseEffect(revoked.dispose());
+  await assert.rejects(readFile(storagePath), { code: "ENOENT" }, "a refused session must not stay on disk");
+  meRevoked = false;
+  await writeFile(storagePath, storedWithProfile);
 
   // 5. An email sign-in cannot store its new session. The file holds the previous one, which the next
   // start must not sign in to.

@@ -285,6 +285,12 @@
       "detailSha256": "b3240d4ee6c9aea1eaad99aecd02e92773657b48918776f07a9cb25d0ab76e8b"
     },
     {
+      "slug": "adobe-analytics",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "152f37abfb2a3b385ad46fc03ba0405cd48cc9230f8c513b5c11b9b8dc526943"
+    },
+    {
       "slug": "adspirer",
       "version": "1.0.0",
       "featured": false,

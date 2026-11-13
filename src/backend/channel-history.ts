@@ -8,6 +8,7 @@ import {
   channelRoutingConversationEvent,
   isChannelChangeMarker,
   isContextResetMarker,
+  mcpSignInEvent,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -184,6 +185,8 @@ function conversation(all: ChannelMessage[]): ChannelMessage[] {
     (message) =>
       channelRoutingConversationEvent(message.message) === null &&
       !isChannelChangeMarker(message.message) &&
+      // A Sign in card is for the person, not a member's answer.
+      mcpSignInEvent(message.message) === null &&
       !isMemberThinking(message) &&
       !(
         message.message.itemType === "commentary" &&

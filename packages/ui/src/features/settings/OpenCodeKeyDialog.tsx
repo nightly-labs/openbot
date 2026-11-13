@@ -88,10 +88,16 @@ const KEY_TEXT = {
     descriptionHost: "provider.openrouterKey.descriptionHost",
     label: "provider.openrouterKey.label",
   },
-} as const satisfies Record<
-  string,
-  { name: string; title: AppTextKey; description: AppTextKey; descriptionHost?: AppTextKey; label: AppTextKey }
->;
+} as const satisfies Record<string, KeyDialogText>;
+
+/** The text of one key: `descriptionHost` is for a key that goes to the host of a joined server. */
+export interface KeyDialogText {
+  name: string;
+  title: AppTextKey;
+  description: AppTextKey;
+  descriptionHost?: AppTextKey;
+  label: AppTextKey;
+}
 
 /** A provider whose API key this dialog saves. */
 export type KeyDialogProvider = keyof typeof KEY_TEXT;
@@ -124,6 +130,11 @@ export interface ProviderKeyApi {
 export interface OpenCodeKeyDialogProps {
   api: ProviderKeyApi;
   provider?: KeyDialogProvider;
+  /**
+   * The text of a key that is not the one saved key of `provider`, such as the key of one more
+   * account. The `api` then saves that key.
+   */
+  text?: KeyDialogText | undefined;
   onClose: () => void;
   /**
    * Retries the connection without touching credentials. Without it a failed free provider with
@@ -138,10 +149,10 @@ type DialogPhase = "idle" | "loading" | "saving" | "removing";
 export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
   const { t, errorMessage } = useText();
   const provider = () => props.provider ?? "opencode";
-  const text = () => KEY_TEXT[provider()];
+  const text = (): KeyDialogText => props.text ?? KEY_TEXT[provider()];
   // The key is saved where the provider runs, which for a joined server is the host.
   const description = (): AppTextKey => {
-    const entry: { description: AppTextKey; descriptionHost?: AppTextKey } = text();
+    const entry = text();
     return (props.api.onHost ? entry.descriptionHost : undefined) ?? entry.description;
   };
   const [key, setKey] = createSignal("");

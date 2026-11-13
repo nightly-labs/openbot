@@ -1,5 +1,45 @@
 [
   {
+    "version": "0.70.0",
+    "date": "2026-11-13",
+    "notices": [
+      "Update each joined server to this version too. Restart server, agent defaults, thread limits and the new Workflows steps work on a server only when it has this version."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Restart a server that you host yourself from the app: as an owner or admin, select Restart server in the server menu.",
+          "Choose which agents can use each login, card, contact and API key in Server Settings > Vault. An agent sees and fills only the items that it can use.",
+          "Workflows have Image and Video steps. Make pictures and short videos with GPT Image, Grok Imagine or Sunra models, and connect pictures as references.",
+          "Connect Sunra and TryPost from the Apps marketplace. Agents can then make media with your Sunra credits, and draft and publish social media posts.",
+          "Owners and admins can set how many threads run at the same time, on the server and for each agent, in Server Settings > General.",
+          "Show agents with new messages on the dock: turn it on in Settings > Agent dock. Right-click such an agent and select Add to the dock to keep it there.",
+          "Add more than one Cursor account. Each agent can use a different account."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "An API key that you save for only one agent is now kept in the encrypted Vault. The keys that agents read have a new path, so a script that has the old path must use the new one.",
+          "The agent settings, such as Steer agents while they work, are now in Server Settings > Agents for each server, this computer too.",
+          "In the full browser view, the message box is at the bottom centre of the page again.",
+          "The chat header shows the agent's title after its name, for example \"Brock · Store manager\"."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot opens faster when your chats are long.",
+          "On Windows and Linux, OpenBot asks before it quits while agents work. Select Keep Running to hide the window and let the agents finish.",
+          "Devices connect to a server again when the connection of one device stops during setup. The live view of an agent's browser on a joined server also stays open on a slow connection.",
+          "When you ask an agent for a screenshot of a web page, it now attaches the image to its reply.",
+          "OpenCode free models answer again when an OpenCode Go key is saved."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.69.0",
     "date": "2026-11-12",
     "notices": [

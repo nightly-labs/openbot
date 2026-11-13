@@ -1,7 +1,7 @@
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { Typography } from "heroui-native";
 import ChevronDown from "lucide-react-native/icons/chevron-down";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Pressable, View } from "react-native";
 import Animated, {
   cancelAnimation,
@@ -25,6 +25,7 @@ import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
 import { ThinkingTextGradient } from "./thinking-text-gradient";
+import { useKeptOpen } from "./use-kept-open";
 
 type PlanMessage = Extract<ChatMessage, { kind: "plan" }>;
 
@@ -227,10 +228,11 @@ export function ChatPlan({ message }: { message: PlanMessage }) {
   const { t } = useText();
   const colors = usePlanColors();
   const reducedMotion = useReducedMotion();
-  const [open, setOpen] = useState(true);
-  const openness = useSharedValue(1);
-  const opening = useSharedValue(true);
-  // -1 until the steps are measured: the panel keeps its natural height until then.
+  const [open, setOpen] = useKeptOpen(`plan:${message.id}`, true);
+  // A list that the reader closed mounts closed when its row scrolls back into view.
+  const openness = useSharedValue(open ? 1 : 0);
+  const opening = useSharedValue(open);
+  // -1 until the steps are measured: an open panel keeps its natural height until then.
   const contentHeight = useSharedValue(-1);
   useEffect(() => {
     opening.set(open);
@@ -244,7 +246,9 @@ export function ChatPlan({ message }: { message: PlanMessage }) {
   }, [open, opening, openness]);
   const panelStyle = useAnimatedStyle(() => {
     const height = contentHeight.get();
-    return height < 0 ? {} : { height: height * openness.get() };
+    // A panel that mounts closed has no height before its steps are measured.
+    if (height < 0) return openness.get() === 0 ? { height: 0 } : {};
+    return { height: height * openness.get() };
   });
   const total = message.steps.length;
   const done = message.steps.filter((step) => step.state === "done").length;

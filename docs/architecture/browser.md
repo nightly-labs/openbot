@@ -120,7 +120,8 @@ The browser session and service-worker fallback remove the `OpenBot/` and `Elect
 tokens. They keep the installed Chromium major version and host platform, and give the other version
 parts as `0.0.0` (`Chrome/156.0.0.0`), as Chrome does: some bot checks refuse the full version that
 Electron sends. The `Accept-Language` header adds the base language of each regional language
-(`en-GB,en;q=0.9`), also as Chrome does. Requests to `accounts.google.com`
+(`en-GB,en;q=0.9`), also as Chrome does. The session sets it, not the request hook, so a value that
+a page sets on its own request stays: a site can sign that header. Requests to `accounts.google.com`
 keep the `Electron/` token because Google rejects the account identifier step without it. This
 exception does not change the page identity or the identity sent to other sites.
 Electron provides native `navigator.userAgentData` but no client-hint request headers. On HTTPS and

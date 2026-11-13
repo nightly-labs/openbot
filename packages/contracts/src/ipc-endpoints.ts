@@ -116,6 +116,7 @@ import type {
   AgentProviderId,
   AgentStatus,
   ConnectProviderAccountInput,
+  ConnectProviderAccountKeyInput,
   HostProviderAccounts,
   PasteProviderRelaySignInInput,
   ProviderApiKeyState,
@@ -903,6 +904,13 @@ export const IPC_ENDPOINTS = {
      * `connecting` account cancels its sign-in.
      */
     connectProviderAccount: request<ConnectProviderAccountInput, AgentStatus>()("app:connect-provider-account"),
+    /**
+     * Adds one more account of a provider from an API key, or gives an account a new key. It answers
+     * when the provider accepted the key, and fails with the reason when it did not.
+     */
+    connectProviderAccountKey: request<ConnectProviderAccountKeyInput, AgentStatus>()(
+      "app:connect-provider-account-key",
+    ),
     /** Stops a `connecting` account's sign-in: a new account goes, another one shows as signed out. */
     cancelProviderAccountSignIn: request<RemoveProviderAccountInput, AgentStatus>()(
       "app:cancel-provider-account-sign-in",
@@ -1189,6 +1197,10 @@ export const IPC_ENDPOINTS = {
       "provider-admin:account-sign-in-status",
     ),
     cancelAccountSignIn: scopedRequest<AgentProviderId, void, "required">()("provider-admin:cancel-account-sign-in"),
+    // An account of a joined server's host that is an API key (`provider-account-keys-v1`).
+    connectAccountKey: scopedRequest<ConnectProviderAccountKeyInput, void, "required">()(
+      "provider-admin:connect-account-key",
+    ),
     // The provider that a new agent of a joined server's host starts on (`provider-default-v1`).
     // This computer's own is `app.saveSetup`.
     hostDefaultProvider: scopedQuery<HostDefaultProvider, "required">()("provider-admin:host-default-provider"),

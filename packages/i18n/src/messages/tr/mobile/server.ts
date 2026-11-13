@@ -1077,6 +1077,13 @@ export const messages = {
   "mobile.server.providers.status.ready": "Yüklü",
   "mobile.server.providers.status.notInstalled": "Yüklü değil",
   "mobile.server.providers.status.checking": "Denetleniyor",
+  "mobile.server.providers.accountsKeyHint":
+    "Her ajan bir hesap kullanır. Hesabı ajanın ayarlarından seçin. Yeni bir hesap için o hesabın API anahtarı gerekir.",
+  "mobile.server.providers.accountChangeKey": "Anahtarı değiştir",
+  "mobile.server.providers.accountKeyHint":
+    "{provider} hesabının bir API anahtarını yapıştırın. Anahtar sunucuya gider. Bu telefon onu saklamaz.",
+  "mobile.server.providers.accountKeyChecking": "Anahtar denetleniyor…",
+  "mobile.server.providers.accountKeyAddFailed": "Hesap eklenemedi. Tekrar deneyin.",
   "mobile.server.providers.pool": "Hesapları havuzla",
   "mobile.server.providers.poolHint":
     "Ajanlar bir hesabı kullanım sınırına yaklaşana kadar kullanır, sonra sınırı ilk sıfırlanan hesaba geçer.",
