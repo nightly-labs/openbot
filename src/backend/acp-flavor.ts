@@ -2,7 +2,7 @@ import { win32 } from "node:path";
 import type { LoadSessionResponse, NewSessionRequest, PromptResponse, RequestError } from "@agentclientprotocol/sdk";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import type { CauseCode } from "@openbot/telemetry";
+import { type CauseCode, classifyFailure } from "@openbot/telemetry";
 import type { GeneratedMediaKind } from "./agent/image-generation";
 import { enableCursorMcpServers } from "./cursor-mcp-disabled";
 import { grokMediaItem, grokMediaKind, grokMediaToolKind } from "./grok-media";
@@ -78,9 +78,10 @@ export interface AcpFlavor {
   /**
    * The cause of a turn's failure that the agent names in a structured field, such as an error name
    * in the error's data or a stop reason that means another thing for this agent. `null` gives the
-   * decision to the protocol's rules. It is a fixed code; it never carries the error's text.
+   * decision to the protocol's rules. It is a fixed code; it never carries the error's text. `answer`
+   * is the answer text that the turn ended with, for an agent that gives the reason only there.
    */
-  failureCause?(error: unknown): CauseCode | null;
+  failureCause?(error: unknown, answer: string): CauseCode | null;
   /**
    * The message of a turn that ended with no answer text, or `null` when that turn succeeds.
    * Absent: such a turn succeeds.
@@ -401,6 +402,39 @@ function hermesTurnFailure(error: unknown, detail: string): string {
     : detail;
 }
 
+/** The cause codes of Hermes Agent (`FailoverReason`) that have an OpenBot cause. */
+const HERMES_FAILURE_REASONS: Readonly<Partial<Record<string, CauseCode>>> = {
+  auth: "authentication",
+  auth_permanent: "authentication",
+  billing: "billing",
+  rate_limit: "rate_limit",
+  upstream_rate_limit: "rate_limit",
+  overloaded: "provider_unavailable",
+  server_error: "provider_unavailable",
+  timeout: "timeout",
+};
+
+/** The provider's own error in the failure summary of Hermes Agent: its last "Provider said:" line. */
+const HERMES_PROVIDER_SAID = /^[\s\S]*\n\nProvider said: ([^\n]+)/u;
+
+/**
+ * The cause of a Hermes turn that failed with only `admitted_turn_failed`: a backup model did not
+ * take a turn that a usage limit failed (#8293). A newer Hermes names the cause in
+ * `data.failure_reason`, with its summary in `data.message`. Hermes Agent 0.23.1 sends the summary
+ * only as the end of the answer text. The "Provider said:" line of the summary decides, so answer
+ * text of the model does not. A failure with no such line, such as an MCP server that did not
+ * connect, keeps its cause.
+ */
+function hermesFailureCause(error: unknown, answer: string): CauseCode | null {
+  if (!isRecord(error) || !isRecord(error.data) || error.data.details !== "admitted_turn_failed") return null;
+  const { failure_reason: reason, message } = error.data;
+  const named = typeof reason === "string" ? HERMES_FAILURE_REASONS[reason] : undefined;
+  if (named) return named;
+  const said = HERMES_PROVIDER_SAID.exec(typeof message === "string" && message ? message : answer)?.[1];
+  const cause = said ? classifyFailure(said) : "unknown";
+  return cause === "unknown" ? null : cause;
+}
+
 /**
  * Hermes Agent 0.23 runs ACP through its gateway. A prompt, load or resume of a session that the
  * process does not hold fails with an internal error and only `not_found` in `data.details`, not with
@@ -429,6 +463,7 @@ export const HERMES_ACP_FLAVOR: AcpFlavor = {
   // Its `delegate_task` call is titled `delegate_task: <goal>`, and its subagents send no events.
   subagentTools: ["delegate_task"],
   turnFailure: hermesTurnFailure,
+  failureCause: hermesFailureCause,
 };
 
 /**
@@ -555,6 +590,7 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
     lostTurns: HERMES_LOST_TURNS,
     resendsAnswer: true,
     turnFailure: hermesTurnFailure,
+    failureCause: hermesFailureCause,
   },
 };
 
