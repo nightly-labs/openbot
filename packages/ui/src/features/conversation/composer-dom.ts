@@ -129,6 +129,14 @@ export function insertPlainText(editor: HTMLDivElement, text: string): void {
   // Native deletion can put the caret before the previous newline. Restore the edit's endpoint.
   const caretRange = rangeFromTextOffsets(editor, caretOffset, caretOffset);
   if (!caretRange) return;
+  // Set the caret only when it is not already there. Chromium removes its spelling marks when a
+  // script sets the selection, so after each typed key the message box showed no misspelled words.
+  if (
+    selection?.isCollapsed &&
+    selection.anchorNode === caretRange.startContainer &&
+    selection.anchorOffset === caretRange.startOffset
+  )
+    return;
   selection?.removeAllRanges();
   selection?.addRange(caretRange);
 }
