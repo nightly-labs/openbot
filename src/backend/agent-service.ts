@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { AGENT_PROVIDERS, agentProviderDescriptor, customAgentIdOfModel } from "@openbot/contracts/agent-providers";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
@@ -378,6 +379,12 @@ export interface AgentServiceOptions {
   hostedSites?: AgentHostedSites | null;
   /** Draws pages for `html_preview`. Without it the tool tells the agent to show the page unchecked. */
   visualPreview?: ChatVisualPreviewHost | null;
+  /**
+   * Decodes a picture, makes its flat background clear (`clearFlatBackground`) and gives it back as a
+   * PNG; null when the picture has no flat background. Without it a transparent Grok image keeps the
+   * flat colour that the step asks for.
+   */
+  clearPictureBackground?: ((bytes: Uint8Array) => Uint8Array | null) | undefined;
   /** Captures the desktop for `capture_screen`; null where this process has no desktop. */
   screenCapture?: ScreenCaptureHost | null;
   /** Downloads and reads online videos for `read_video`; null where this process cannot decode them. */
@@ -602,6 +609,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly routineRecords: RoutineRecords;
   readonly #mcp: McpGateway;
   readonly #mcpAgentAccess: AgentServiceOptions["mcpAgentAccess"];
+  readonly #clearPictureBackground: AgentServiceOptions["clearPictureBackground"];
   readonly #providers: ProviderRuntime;
   readonly #providerUseChanges = Semaphore.makeUnsafe(1);
   readonly #endpoints: CustomEndpoints;
@@ -653,6 +661,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   constructor(options: AgentServiceOptions) {
     super();
     this.#mcpAgentAccess = options.mcpAgentAccess;
+    this.#clearPictureBackground = options.clearPictureBackground;
     const {
       store,
       mailbox,
@@ -1074,6 +1083,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               }),
             );
           }),
+        // A CLI that lists part of its models at start gives the check of a new account process such a
+        // list (#6318), which is no proof that a model is gone; its agents move at the provider's start.
+        onAccountModelsListed: (provider, accountId) =>
+          requireProviderDriver(provider).catalog?.partialListAtStart
+            ? Effect.void
+            : this.#endpoints.moveAccountAgentsOffUnlistedModels(provider, accountId),
         onProviderResumed: (provider) => {
           for (const agent of this.#store.list()) {
             if (providerForAgent(agent) === provider) this.#drain.scheduleDrain(agent.id);
@@ -1167,6 +1182,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
       scheduleDrain: (agentId) => this.#drain.scheduleDrain(agentId),
       rotateSession: (agentId, client, threadId) => this.#threads.rotateProviderSession(agentId, client, threadId),
+      loadSession: (agentId, client, threadId) => this.#threads.loadSessionForCompaction(agentId, client, threadId),
       rotatesSession: (agentId, threadId) => this.#threads.rotatesSession(agentId, threadId),
       isStopping: () => this.#stopping,
       compacted: (threadId) => {
@@ -1196,6 +1212,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       // The router is made later; a note comes only from a tool call, after both exist.
       noteVaultChange: (agentId, threadId, turnId, text) => this.#tools.postVaultNote(agentId, threadId, turnId, text),
       apiKeys: options.agentApiKeys ?? null,
+      // The turn lifecycle is made later; a request comes only from a running turn, after both exist.
+      codexSubagentParent: (childThreadId) => this.#turn.codexSubagentParent(childThreadId),
     });
     this.#duplication = new DuplicationGate({
       store,
@@ -2659,6 +2677,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#emit({ type: "browser-profiles-changed" });
   }
 
+  /**
+   * A Library folder, or the folder of a file, changed. The Library of this window and of each joined
+   * client reads the folders again (`library-folders-events-v1`).
+   */
+  notifyLibraryFoldersChanged(): void {
+    this.#emit({ type: "library-folders-changed" });
+  }
+
   notifyWorkflowRunEnded(end: WorkflowRunEnd): void {
     this.emit("workflowRun", end);
   }
@@ -2995,6 +3021,29 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         return yield* failed(failure ?? sourceText("error.workflow.mediaFailed"));
       const savedPath = getString(item, "saved_path");
       const result = input.kind === "image" ? getString(item, "result") : null;
+      // Grok makes the flat colour that the step asks for; the host makes it clear.
+      const clear = this.#clearPictureBackground;
+      if (input.specs.transparent && provider === "grok" && clear && (savedPath || result)) {
+        const source = savedPath
+          ? yield* Effect.tryPromise({ try: () => readFile(savedPath), catch: () => null }).pipe(
+              Effect.orElseSucceed(() => null),
+            )
+          : yield* Effect.try({ try: () => decodeGeneratedImage(result ?? ""), catch: () => null }).pipe(
+              Effect.orElseSucceed(() => null),
+            );
+        const bytes = source
+          ? yield* Effect.try({ try: () => clear(source), catch: () => null }).pipe(Effect.orElseSucceed(() => null))
+          : null;
+        // When the background stays or the clear copy cannot be saved, the step keeps the picture that
+        // the model made, as a step with a solid background does.
+        const attachment = bytes
+          ? yield* Effect.result(
+              this.#mailbox.storeGeneratedAttachment({ bytes, name: "generated-image.png", mimeType: "image/png" }),
+            )
+          : null;
+        if (attachment && Result.isSuccess(attachment)) return attachment.success.id;
+        logger.warn("Could not make the background of a Grok image clear.");
+      }
       const stored = savedPath
         ? yield* Effect.result(
             this.#mailbox.storeGeneratedAttachment({
@@ -3701,6 +3750,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           : previous?.usageLimitReturn?.cause === "provider-error"
             ? "provider-error-ended"
             : "usage-limit-ended",
+        leaving && spentBalance ? previousChoice : undefined,
       );
     const profileChanged = standingProfileChanged(previous, agent, this.#store.agentDefaults());
     const activeSession = this.#store.activeProviderSession(agent.id);
@@ -4151,13 +4201,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   /**
    * A note in the agent's chat that it left its model for a usage limit or a provider error, or went back to it. Each
-   * channel whose work waits for the agent gets the same note.
+   * channel whose work waits for the agent gets the same note. `spent` is the model that the agent left because its
+   * balance is spent: the agent does not go back to it by itself, so the note names it and says what to do (#7965).
    */
-  #appendModelSwitchMarker(agent: AgentSummary, reason: ModelSwitchReason): void {
-    const model =
-      this.#agentModels(agent).find((option) => option.provider === agent.provider && option.id === agent.model)
-        ?.name ?? agent.model;
-    const text = sourceText(MODEL_SWITCH_TEXT[reason], { model });
+  #appendModelSwitchMarker(agent: AgentSummary, reason: ModelSwitchReason, spent?: AgentModelChoice): void {
+    const modelName = (choice: AgentModelChoice) =>
+      this.#agentModels(choice).find((option) => option.provider === choice.provider && option.id === choice.model)
+        ?.name ?? choice.model;
+    const model = modelName(agent);
+    const text = spent
+      ? sourceText("status.agent.modelSwitchedForSpentBalance", { previous: modelName(spent), model })
+      : sourceText(MODEL_SWITCH_TEXT[reason], { model });
     try {
       this.channels.noteModelSwitch(agent.id, text, MODEL_SWITCH_ITEM_TYPES[reason]);
     } catch (error) {
@@ -4528,8 +4582,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   /**
    * The local user can open files outside a workspace when access is unrestricted, and in the agent's
-   * added folders in Workspace only. `exactPath` does not
-   * use a file with the same name from the thread's tool history, so an inline image shows no older file.
+   * added folders in Workspace only. `exactPath` does not use a file with the same name from the thread's
+   * tool history or an added folder, so an inline image shows no older file.
    */
   readonly resolveLocalWorkspaceFile = Effect.fn("AgentService.resolveLocalWorkspaceFile")(function* (
     this: AgentService,
@@ -4540,7 +4594,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const agent = yield* lifecycleStep("find workspace agent", () => this.#agentForFile(agentId));
     return yield* resolveWorkspaceFile(agent, inputPath, {
       ...localWorkspaceAccess(agent),
-      ...(options.exactPath ? {} : { fileHistory: this.#turn.fileHistory.paths(agent.id, agent.threadId) }),
+      ...(options.exactPath
+        ? { exactPath: true }
+        : { fileHistory: this.#turn.fileHistory.paths(agent.id, agent.threadId) }),
     }).pipe(
       Effect.mapError(
         (failure) => new AgentLifecycleFailed({ operation: "resolve local workspace file", cause: failure.cause }),

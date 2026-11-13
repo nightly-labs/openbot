@@ -19,6 +19,7 @@ import { RoutineFlowStore } from "../backend/routine-flows/routine-flow-store";
 import { createRoutineFlows, type RoutineFlowsHandle } from "../backend/routine-flows/routine-flows";
 import { RoutineResultStore } from "../backend/routine-results/routine-result-store";
 import { createRoutineResults, type RoutineResultsHandle } from "../backend/routine-results/routine-results";
+import { clearFlatBackground } from "../backend/workflows/flat-background";
 import { WorkflowGitHubStore } from "../backend/workflows/workflow-github-store";
 import { WorkflowRunStore } from "../backend/workflows/workflow-run-store";
 import { WorkflowStore } from "../backend/workflows/workflow-store";
@@ -156,6 +157,7 @@ import { SidebarLayoutStore } from "../backend/sidebar-layout-store";
 import { StorageUsageScanner, StorageUsageService } from "../backend/storage-usage";
 import { TeamChatStore } from "../backend/team-chat-store";
 import { UserBrowsingLog } from "../backend/user-browsing-log";
+import { UserFilesBytes } from "../backend/user-files-bytes";
 import { AGENT_ACCESS_FILE, AgentAccessStore } from "./agent-access-store";
 import {
   type AgentDefaultsPreferenceStore,
@@ -318,7 +320,7 @@ import { MCP_ACCESS_FILE, type McpAccessControl, McpAccessStore, sameMcpAgents }
 import { McpHostSignIns } from "./mcp-host-sign-ins";
 import { McpOAuthProxySettingsFile } from "./mcp-oauth-proxy-store";
 import {
-  MCP_OAUTH_REDIRECT_PATH,
+  MCP_OAUTH_REDIRECT_PATHS,
   MCP_OAUTH_REDIRECT_PORT,
   startMcpOAuthRedirectServer,
 } from "./mcp-oauth-redirect-server";
@@ -1386,7 +1388,8 @@ export async function createApplicationServices({
     ? join(process.resourcesPath, "agent-runtime", "cpu-limit.cjs")
     : resolve(__dirname, "../../resources/agent-runtime/cpu-limit.cjs");
   // Every provider process also gets the system roots that this process trusts, so a Python agent CLI
-  // reaches an MCP server behind a TLS-inspecting network as OpenBot's test does (#6616).
+  // reaches an MCP server behind a TLS-inspecting network as OpenBot's test does (#6616). Codex reads
+  // the system roots itself, so its driver leaves the file out (#8112).
   const certificateEnvironment = await Effect.runPromise(
     agentCertificateEnvironment(join(app.getPath("userData"), AGENT_CERTIFICATES_FILE)).pipe(
       Effect.catch((error) =>
@@ -1804,7 +1807,7 @@ export async function createApplicationServices({
     language,
     ownListener: () =>
       mcpOAuthRedirect
-        ? { port: Number(new URL(mcpOAuthRedirect.redirectUrl).port), path: MCP_OAUTH_REDIRECT_PATH }
+        ? { port: Number(new URL(mcpOAuthRedirect.redirectUrl).port), paths: MCP_OAUTH_REDIRECT_PATHS }
         : null,
   });
   performance.mark("openbot:services.mcp-sign-in-file");
@@ -2142,6 +2145,15 @@ export async function createApplicationServices({
     mailbox,
     browser,
     visualPreview: new ChatVisualPreviewer(),
+    clearPictureBackground: (bytes) => {
+      // Skia decodes the PNG or JPEG; its bitmap is premultiplied, as `clearFlatBackground` writes it.
+      const picture = nativeImage.createFromBuffer(Buffer.from(bytes));
+      if (picture.isEmpty()) return null;
+      const size = picture.getSize();
+      const pixels = picture.toBitmap();
+      if (!clearFlatBackground(pixels, size.width, size.height)) return null;
+      return nativeImage.createFromBitmap(pixels, size).toPNG();
+    },
     videoReader: new VideoReader({
       runtimeDirectory: join(app.getPath("userData"), "runtimes", "yt-dlp"),
       target: runtimeTarget(process.platform, process.arch),
@@ -2655,6 +2667,8 @@ export async function createApplicationServices({
   // reconciling against the agents alone would read every channel as gone and drop where it sits.
   performance.mark("openbot:services.messaging");
   await runCauseEffect(sidebarLayout.reconcileAgents(service.sidebarChatIds()));
+  // Each saved folder change, from any source, reaches the Library of this window and of joined clients.
+  libraryFolders.onChanged(() => service.notifyLibraryFoldersChanged());
   await runCauseEffect(libraryFolders.reconcileAgents(new Set(service.listAgents().map((agent) => agent.id))));
   await runCauseEffect(
     libraryFolders.reconcileFiles(new Set(mailbox.listStoredFiles().map((stored) => stored.attachment.id))),
@@ -2753,6 +2767,9 @@ export async function createApplicationServices({
             })),
           )
         : null,
+    // Only a hosted server counts its plan storage from the user's files. A computer or a server of
+    // the user shows its own disk, and a scan of its home folder would read files that are not OpenBot's.
+    ...(hostedServer ? { userFiles: new UserFilesBytes(userData, homedir()) } : {}),
   };
   const storageUsage = new StorageUsageService(new StorageUsageScanner(storageSources), storageSources);
   teardown.push(TEARDOWN_ORDER.storageUsage, "storage scans", () => Effect.runPromise(storageUsage.dispose()));

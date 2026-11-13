@@ -100,6 +100,7 @@ import { HOSTED_SITES_CAPABILITY } from "./hosted-sites-v1";
 import { INSTANCE_TRANSFER_CHUNKS_CAPABILITY } from "./instance-transfer-chunks-v1";
 import { INSTANCE_TRANSFER_FULL_COPY_CAPABILITY } from "./instance-transfer-full-copy-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "./instance-transfer-v1";
+import { LIBRARY_FOLDERS_EVENTS_CAPABILITY } from "./library-folders-events-v1";
 import { LIBRARY_FOLDERS_CAPABILITY } from "./library-folders-v1";
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "./live-activity-push-v1";
 import { LIVE_VOICE_CAPABILITY } from "./live-voice-v1";
@@ -158,6 +159,7 @@ import { SKILLS_ADMIN_CAPABILITY } from "./skills-admin-v1";
 import { SKILLS_EVENTS_CAPABILITY } from "./skills-events-v1";
 import { STORAGE_CHANNEL_CAPABILITY } from "./storage-channel-v1";
 import { STORAGE_DISK_CAPABILITY } from "./storage-disk-v1";
+import { STORAGE_USER_FILES_CAPABILITY } from "./storage-user-files-v1";
 import { TEAM_SUBAGENTS_CAPABILITY } from "./subagents-v1";
 import { THREAD_MESSAGE_SEARCH_CAPABILITY } from "./thread-message-search-v1";
 import { TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY } from "./ui-block-auto-answer-v1";
@@ -180,6 +182,7 @@ import { WORKFLOWS_CHANNELS_CAPABILITY } from "./workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "./workflows-chats-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "./workflows-github-v1";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "./workflows-media-account-v1";
+import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "./workflows-media-transparent-v1";
 import { WORKFLOWS_MEDIA_CAPABILITY } from "./workflows-media-v1";
 import { WORKFLOWS_SUNRA_CAPABILITY } from "./workflows-sunra-v1";
 import { WORKFLOWS_CAPABILITY } from "./workflows-v1";
@@ -327,6 +330,7 @@ export {
   INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
   INSTANCE_TRANSFER_FULL_COPY_CAPABILITY,
   LIBRARY_FOLDERS_CAPABILITY,
+  LIBRARY_FOLDERS_EVENTS_CAPABILITY,
   LIVE_ACTIVITY_PUSH_CAPABILITY,
   LOCAL_SERVERS_CAPABILITY,
   MACHINE_RESOURCES_CAPABILITY,
@@ -376,6 +380,7 @@ export {
   STORAGE_CAPABILITY,
   STORAGE_CHANNEL_CAPABILITY,
   STORAGE_DISK_CAPABILITY,
+  STORAGE_USER_FILES_CAPABILITY,
   TEAM_BROWSER_NAVIGATION_CAPABILITY,
   TEAM_BROWSER_VIEW_CAPABILITY,
   TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
@@ -411,6 +416,7 @@ export {
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY,
   WORKFLOWS_MEDIA_CAPABILITY,
+  WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
   WORKFLOWS_SUNRA_CAPABILITY,
   WORKSPACE_DIRECTORY_CAPABILITY,
 };
@@ -607,6 +613,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   STORAGE_CHANNEL_CAPABILITY,
   WHATSAPP_WORKING_MESSAGE_CAPABILITY,
   LIBRARY_FOLDERS_CAPABILITY,
+  LIBRARY_FOLDERS_EVENTS_CAPABILITY,
   PROVIDER_ACCOUNT_POOL_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
   CHANNEL_SEEN_SUBTASKS_CAPABILITY,
@@ -621,6 +628,8 @@ export const TEAM_CURRENT_CAPABILITIES = [
   WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
   HOST_TURN_LIMITS_CAPABILITY,
+  STORAGE_USER_FILES_CAPABILITY,
+  WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -831,6 +840,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== STORAGE_CHANNEL_CAPABILITY &&
     capability !== WHATSAPP_WORKING_MESSAGE_CAPABILITY &&
     capability !== LIBRARY_FOLDERS_CAPABILITY &&
+    capability !== LIBRARY_FOLDERS_EVENTS_CAPABILITY &&
     capability !== PROVIDER_ACCOUNT_POOL_CAPABILITY &&
     capability !== TEAM_VIDEO_GENERATION_CAPABILITY &&
     capability !== CHANNEL_SEEN_SUBTASKS_CAPABILITY &&
@@ -844,7 +854,9 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== WORKFLOWS_SUNRA_CAPABILITY &&
     capability !== WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY &&
     capability !== TEAM_USAGE_TERTIARY_CAPABILITY &&
-    capability !== HOST_TURN_LIMITS_CAPABILITY,
+    capability !== HOST_TURN_LIMITS_CAPABILITY &&
+    capability !== STORAGE_USER_FILES_CAPABILITY &&
+    capability !== WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -930,6 +942,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   STORAGE_CHANNEL_CAPABILITY,
   WHATSAPP_WORKING_MESSAGE_CAPABILITY,
   LIBRARY_FOLDERS_CAPABILITY,
+  LIBRARY_FOLDERS_EVENTS_CAPABILITY,
   PROVIDER_ACCOUNT_POOL_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
   CHANNEL_SEEN_SUBTASKS_CAPABILITY,
@@ -944,6 +957,8 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
   HOST_TURN_LIMITS_CAPABILITY,
+  STORAGE_USER_FILES_CAPABILITY,
+  WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1113,6 +1128,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== STORAGE_CHANNEL_CAPABILITY &&
       capability !== WHATSAPP_WORKING_MESSAGE_CAPABILITY &&
       capability !== LIBRARY_FOLDERS_CAPABILITY &&
+      capability !== LIBRARY_FOLDERS_EVENTS_CAPABILITY &&
       capability !== PROVIDER_ACCOUNT_POOL_CAPABILITY &&
       capability !== TEAM_VIDEO_GENERATION_CAPABILITY &&
       capability !== CHANNEL_SEEN_SUBTASKS_CAPABILITY &&
@@ -1126,6 +1142,8 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== WORKFLOWS_SUNRA_CAPABILITY &&
       capability !== WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY &&
       capability !== TEAM_USAGE_TERTIARY_CAPABILITY &&
-      capability !== HOST_TURN_LIMITS_CAPABILITY,
+      capability !== HOST_TURN_LIMITS_CAPABILITY &&
+      capability !== STORAGE_USER_FILES_CAPABILITY &&
+      capability !== WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
   );
 }

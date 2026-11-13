@@ -2206,6 +2206,9 @@ export class HostService extends EventEmitter<HostEvents> {
    */
   channelPersonIsRemote(personId: string): boolean {
     if (personId === SIGNED_OUT_CHANNEL_MEMBER_ID || personId === this.#findCurrentMemberId()) return false;
+    // A server on this computer has no account session. Its owner is the password member that only
+    // the desktop app on this computer logs in as.
+    if (this.#options.passwordOwner === true && personId === this.#options.store.getOwnerMemberId()) return false;
     try {
       return personId !== `local-user:${this.#options.getSignedInUser().id}`;
     } catch {

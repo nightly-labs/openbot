@@ -51,6 +51,18 @@ says "Storage almost full" and can be closed until the next level; under 2% free
 is red and cannot be closed. "Free up space" opens Server settings › Storage. A host without the
 capability shows no card.
 
+The optional `storage-user-files-v1` capability (`team-protocol/storage-user-files-v1.ts`, protocol 9
+only) adds `POST /v1/storage/user-files`. It answers the same free and total bytes, plus `userBytes`:
+the bytes that the home folder and the temporary folders of the server's user use on that disk. The
+frozen `storage-disk-v1` reply cannot get a new field, so this is a new route. Only a hosted server
+measures it (`src/backend/user-files-bytes.ts`, `nice -n 19 du -s -x -c`), at most each 10 minutes,
+in the background after the first value. It is null on another host, and on a machine with Docker,
+because `du` cannot read the Docker folder. The clients count the plan storage that is left
+(`hostedPlanDisk` in `@openbot/contracts/hosted-servers`) from `userBytes`. When it is null or the
+host does not have the capability, they subtract `HOSTED_SERVER_BASE_IMAGE_GB` for the system, which
+is correct only for a boat sandbox. Every member can read it. The desktop, the web client and mobile
+prefer this route and use `storage-disk-v1` with an older host.
+
 The optional `library-folders-v1` capability (`team-protocol/library-folders-v1.ts`, protocol 9 only)
 adds `POST /v1/library-folders` and `POST /v1/library-folders/actions` for the folders of the Library
 page. Each agent has folders for its files, five levels in all, and a file is in one folder of its
@@ -65,8 +77,8 @@ access to it, and gets 403 without it; an owner or an admin changes all folders.
 has, and no file that is in one, as in `storage-v1`. An action that names an agent that they cannot see, a folder of one or a file in
 one gets 404. A refused change is 404 for
 an agent, a folder or a file that the host does not have, and 400 for each other rule. Each route
-answers the full snapshot that the member can see. There is no event: a client reads the snapshot
-again. The read is a passive route. A deleted agent loses its folders, and a file that an owner or
+answers the full snapshot that the member can see. `library-folders-v1` has no event; see
+[Library folder events](#library-folder-events). The read is a passive route. A deleted agent loses its folders, and a file that an owner or
 admin deletes leaves its folder. A host without the capability reads as null, and a change is refused
 before any request. The instance transfer does not carry the folders.
 
@@ -331,6 +343,14 @@ agents, and removes the file. Each side uses the routes above, in parts when its
 `instance-transfer-v1` takes at most 100 MB, the Shared folder included. An agent whose name is already on the destination is
 added beside it. The browser client has no copy: it connects to one host at a time.
 
+The mobile app has the same copy in Server settings > Transfer > Copy to another server. The source
+is the server of the page, and the destination is another online server that the user administers
+with `instance-transfer-v1`. The phone downloads the file from the source with the export route,
+sends it to the destination with the upload route, and applies all of its agents. The phone uses
+only `instance-transfer-v1`, so the file is at most 100 MB. The file stays in memory on the phone and
+is not written to its storage. A token that the destination keeps when the page closes before the
+apply is discarded.
+
 After a restart, the first upload or export removes old files from `instance-transfer-uploads/`,
 including unfinished `.part` files and the parts of `instance-transfer-chunks-v1`, before it writes a
 new file. Concurrent uploads and exports wait
@@ -420,6 +440,14 @@ lists them. An empty field and `default` mean the provider's own sign-in. When t
 that account, the step fails with "account not found"; the host never makes the file on another
 account. A Sunra model ignores the field. The capability adds no route. A client shows the accounts
 in the model picker only on a host that advertises it, because an older host ignores the field.
+
+`workflows-media-transparent-v1` lets an image step of GPT Image or Grok Imagine have a transparent
+background. The node reads one more field, `background`; with `transparent` the host makes a picture
+with clear pixels around the subject. Codex's image tool makes the clear pixels itself. Grok's tool
+cannot, so the host asks Grok for one flat colour and removes it before it keeps the file. A video,
+another model and any other value keep the model's own background. The capability adds no route. A
+client shows the Background chip only on a host that advertises it, because an older host ignores
+the field.
 
 The optional event `workflows-changed { workflowId }` names the workflow that changed, so the
 client reads it again. A client without the capability shows `serverTooOld` on the Workflows page.
@@ -707,12 +735,26 @@ for 5 minutes, so a host without a phone of the member does not learn when the m
 computer. The web client cannot read the idle time of the computer and does not send it. The owner of
 the host computer needs no report: the host reads `powerMonitor` itself (`hostComputerInUse`).
 
+### Library folder events
+
+`library-folders-events-v1` (`team-protocol/library-folders-events-v1.ts`, protocol 9 only) adds one
+optional event, `library-folders-changed`, with no data. `LibraryFoldersStore` calls its `onChanged`
+listeners after each change that it saves: a change from a member through the route or the IPC, an
+agent that saves a file into a folder path, and the start-up removal of the folders of deleted agents
+and of the entries of deleted files. `application-services.ts` emits the event through `AgentService`,
+so this computer's windows get it too. The host advertises the capability with `library-folders-v1`.
+A client reads `POST /v1/library-folders` again: the desktop Library (`library-folders.ts`), the web
+client and the phone (`apps/mobile/src/features/servers/model/use-library-folders.ts`) show a change
+made on another device or by an agent while the page is open. A client of an older host reads the
+folders again after a storage scan only. The phone also scans again when the folders name a file
+that its last scan does not have, as after an agent saved a new file into a folder.
+
 ### Admin capabilities
 
 An owner or admin of a joined server manages its host through optional `POST /v1/admin/...` routes.
 Each capability has a frozen codec in `team-protocol/<name>-v1.ts`, registered in
 `team-protocol/optional-routes.ts`, and both transports use it. Every route calls `requireAdmin`,
-except those that also answer a member: `/v1/browser/tab-profiles`, `storage-disk-v1`,
+except those that also answer a member: `/v1/browser/tab-profiles`, `storage-disk-v1`, `storage-user-files-v1`,
 `storage-channel-v1`, `library-folders-v1`, `agent-fast-mode-v1` and `agent-speed-v1`. The
 host advertises a capability only when its `TeamApiAdmin` member exists.
 

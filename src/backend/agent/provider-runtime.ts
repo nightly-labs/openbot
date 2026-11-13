@@ -351,6 +351,8 @@ export interface ProviderHooks {
    * they were at `configRevision`, which is what `captureConfigRevision` answered when it spawned.
    */
   onProviderActivated(provider: AgentProvider, configRevision: number): Effect.Effect<void, ProviderOperationFailed>;
+  /** Runs after an account after the first listed its models, which `accountModels` now answers. */
+  onAccountModelsListed?(provider: AgentProvider, accountId: string): Effect.Effect<void>;
   /**
    * The configuration a process spawning now reads. A CLI reads the endpoint files once, at spawn,
    * so a change made while it starts is not in the process that arrives.
@@ -716,6 +718,12 @@ export class ProviderRuntime implements ProviderPort {
               Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })),
             ),
           changed: () => this.#setStatus({}),
+          // Forked: the hook can move agents, and the check that listed the models must not wait for that.
+          modelsListed: (provider, accountId) =>
+            (this.#hooks.onAccountModelsListed?.(provider, accountId) ?? Effect.void).pipe(
+              Effect.forkIn(this.#scope),
+              Effect.asVoid,
+            ),
           usageChanged: (limit) => this.#emit({ type: "usage-changed", usage: { limits: [structuredClone(limit)] } }),
           redact: (text) => this.#redactMcp(redactText(text)),
         })
@@ -2086,6 +2094,12 @@ export class ProviderRuntime implements ProviderPort {
     // A turned-off provider offers no model, as `listModels` does.
     if (this.#off.has(provider)) return [];
     return this.#providerAccounts?.models(provider, accountId) ?? [];
+  }
+
+  /** As `accountModels`, but null while an account after the first has not listed its models yet. */
+  listedAccountModels(provider: AgentProvider, accountId: string | undefined): AgentModelOption[] | null {
+    if (this.#off.has(provider)) return [];
+    return this.#providerAccounts?.listedModels(provider, accountId) ?? [];
   }
 
   /** True when `accountId` names an account after the first that this computer holds. */
@@ -4166,6 +4180,9 @@ export class ProviderRuntime implements ProviderPort {
     });
     client.on("notification", (notification) => {
       if (notification.method === "configWarning") this.#reportConfigWarning(client, notification.params);
+      if (notification.method === "mcpServer/startupStatus/updated") {
+        this.#reportMcpStartupStatus(client, notification.params);
+      }
     });
     client.once("exit", (error) => this.#handleExit(client, error));
   }
@@ -4185,6 +4202,32 @@ export class ProviderRuntime implements ProviderPort {
       provider: client.provider,
       message: shortenDiagnostic(this.#redactMcp(summary)),
     });
+  }
+
+  /**
+   * Codex's report that an MCP server did not start, with the server named. The stderr line of the
+   * same failure can name neither the server nor its URL, such as the `rmcp` worker's `Unexpected
+   * content type: … when send initialized notification` (#7895), so `#configuredMcpServerIn` finds
+   * no server in it. Codex names a server by its key (`codexMcpServerKey`): the name in the form it
+   * accepts, or that name with `openbot_` in front when the user's own Codex file has the key. Each
+   * server of that file goes to Codex turned off (`codexDisabledServers`), so it does not start and
+   * a failure under either key is the failure of OpenBot's server. A key that matches no row, and a
+   * built-in server, go to the log only, as from stderr.
+   */
+  #reportMcpStartupStatus(client: AgentClient, params: unknown): void {
+    const key = getString(params, "name");
+    if (getString(params, "status") !== "failed" || !key) return;
+    const message = shortenDiagnostic(this.#redactMcp(getString(params, "error") ?? ""));
+    const config = this.#credentials.mcpServers().find((row) => {
+      const name = providerMcpServerName(row.name);
+      return key === name || key === `openbot_${name}`;
+    });
+    const builtIn = config?.id === COMPUTER_USE_MCP_SERVER_ID || config?.id === GITHUB_CONNECTOR_MCP_SERVER_ID;
+    const server = config && !builtIn ? config.name : null;
+    stderrLogger.warn("A provider reported an MCP server failure.", { provider: client.provider, server, message });
+    if (!server) return;
+    const signIn = getString(params, "failureReason") === "reauthenticationRequired" || isMcpSignInDiagnostic(message);
+    this.#reportMcpServerFailure(client.provider, server, message, signIn);
   }
 
   #handleExit(client: AgentClient, exit: Error): void {
@@ -4481,8 +4524,12 @@ export class ProviderRuntime implements ProviderPort {
    * provider works without the server, so its row keeps no error, and the toast sends the user to
    * the MCP settings, where Sign in and Test connection give the cause.
    */
-  #reportMcpServerFailure(provider: AgentProvider, server: string, message: string): void {
-    const signIn = isMcpSignInDiagnostic(message);
+  #reportMcpServerFailure(
+    provider: AgentProvider,
+    server: string,
+    message: string,
+    signIn = isMcpSignInDiagnostic(message),
+  ): void {
     const key = [provider, server, signIn].join("\u0000");
     if (this.#reportedMcpFailures.has(key)) return;
     this.#reportedMcpFailures.add(key);

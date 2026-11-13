@@ -17,6 +17,14 @@ export interface AcpCustomEndpoint {
   readonly stallMs?: number;
 }
 
+/** An MCP server that the agent could not start for one session, as `AcpFlavor.mcpServerFailure` reads it. */
+export interface AcpMcpServerFailure {
+  readonly sessionId: string;
+  /** The name that the server travels under to the agent. */
+  readonly name: string;
+  readonly reason: string;
+}
+
 /**
  * What one ACP agent does differently from the protocol. `AcpAgentClient` reads each hook at the
  * place that the agent's behavior changes; an absent hook is the protocol's own behavior. Add a hook
@@ -214,6 +222,11 @@ export interface AcpFlavor {
    */
   relayStdioMcpServers?: true;
   /**
+   * The MCP server that an extension notification reports as not started, or `null`. The agent
+   * leaves the server out of the session with no error, so OpenBot reports it as a dropped server.
+   */
+  mcpServerFailure?(method: string, params: DynamicRecord): AcpMcpServerFailure | null;
+  /**
    * The MCP server names in the agent's own files for `cwd`. The agent starts its own entry in place
    * of a session server with the same name, so that server travels as `openbot_<name>`. `argv` is
    * the command line of the agent's process, which can name the folder of those files.
@@ -301,6 +314,22 @@ function noAnswerUnlessPlanOrCompaction(
 }
 
 /**
+ * Grok CLI 1.0.77 sends `x.ai/mcp/server_status` for each MCP server of a session. A server whose
+ * first start fails, by a crash or by no answer in its start time, is `unavailable` with the reason
+ * `handshake_failed`, and its detail names the cause. Grok then answers `search_tool` as complete
+ * without the server, so the agent and the user did not learn why its tools were missing (#8083).
+ * Only the first start counts: the `restart_failed` statuses after it, and those of a session that
+ * closes, repeat a failure or come from the close.
+ */
+function grokMcpServerFailure(method: string, params: DynamicRecord): AcpMcpServerFailure | null {
+  if (method !== "x.ai/mcp/server_status" || params.status !== "unavailable" || params.reason !== "handshake_failed")
+    return null;
+  if (typeof params.sessionId !== "string" || typeof params.name !== "string") return null;
+  const reason = typeof params.detail === "string" && params.detail.trim() ? params.detail.trim() : params.reason;
+  return { sessionId: params.sessionId, name: params.name, reason };
+}
+
+/**
  * Grok CLI 1.0.22 and 1.0.70 send no `usage` in the `session/prompt` result and no `usage_update`.
  * The result's `_meta.usage` holds the tokens and the cost of this prompt's model calls (#4827).
  */
@@ -314,6 +343,7 @@ export const GROK_ACP_FLAVOR: AcpFlavor = {
   // Grok CLI 1.0.77 accepts an answer of only spaces and line breaks, and ends the prompt as done.
   // The chat then showed no answer and no error (#6529).
   emptyAnswerFailure: noAnswerUnlessPlanOrCompaction,
+  mcpServerFailure: grokMcpServerFailure,
   // Grok CLI 1.0.77 reads the reply of `ask_user_question` as an enum with the tag `outcome`, and
   // fails the tool on a reply without it. `accepted` has the answers by question text, each a text
   // or a list of texts, and `annotations`. `cancelled` tells the model that the user did not answer.
@@ -357,6 +387,17 @@ function hermesTurnFailure(error: unknown, detail: string): string {
 }
 
 /**
+ * Hermes Agent 0.23 runs ACP through its gateway. A prompt, load or resume of a session that the
+ * process does not hold fails with an internal error and only `not_found` in `data.details`, not with
+ * ACP's `-32002`, so each message to that agent failed (#8078). A refused prompt only makes the next
+ * message load the session again, and a session that the gateway still stores keeps its history.
+ * Only a refused load replaces the session. Other codes and details keep it.
+ */
+function hermesSessionNotFound(error: RequestError): boolean | null {
+  return error.code === -32603 && isRecord(error.data) && error.data.details === "not_found" ? true : null;
+}
+
+/**
  * Hermes Agent 0.21.5 answers a `session/resume` of a missing session with a new session, and the
  * reply does not give its id: each later prompt to the saved id then ends as "refusal". Its
  * `session/load` of a missing session answers null, which the SDK gives as an empty reply. A load of
@@ -364,6 +405,7 @@ function hermesTurnFailure(error: unknown, detail: string): string {
  */
 export const HERMES_ACP_FLAVOR: AcpFlavor = {
   loadInsteadOfResume: { missing: (response) => response.modes == null },
+  sessionNotFound: hermesSessionNotFound,
   lostTurns: HERMES_LOST_TURNS,
   // Hermes Agent 0.23.0 streams the answer, and then sends all of it again when a plugin rewrote it
   // (`transform_llm_output`). The rewrite has the streamed message's ID, so the answer showed two
@@ -489,10 +531,16 @@ const CUSTOM_ACP_FLAVOR: AcpFlavor = {
 
 const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
   omp: OMP_ACP_FLAVOR,
-  // Hermes Agent added as a custom agent (`hermes acp`) keeps the custom rules. Its lost turns are
-  // discarded, its answer sent again replaces the streamed one, and its failed turn is explained, as
-  // for the Hermes provider.
-  hermes: { ...CUSTOM_ACP_FLAVOR, lostTurns: HERMES_LOST_TURNS, resendsAnswer: true, turnFailure: hermesTurnFailure },
+  // Hermes Agent added as a custom agent (`hermes acp`) keeps the custom rules. Its missing session
+  // is found, its lost turns are discarded, its answer sent again replaces the streamed one, and its
+  // failed turn is explained, as for the Hermes provider.
+  hermes: {
+    ...CUSTOM_ACP_FLAVOR,
+    sessionNotFound: (error, sessionId) => hermesSessionNotFound(error) ?? ompSessionNotFound(error, sessionId),
+    lostTurns: HERMES_LOST_TURNS,
+    resendsAnswer: true,
+    turnFailure: hermesTurnFailure,
+  },
 };
 
 /**

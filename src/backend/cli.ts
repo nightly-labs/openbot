@@ -442,17 +442,24 @@ export const resolveHermesCli: (input?: {
     for (const candidate of candidates) {
       if (!(yield* isExecutable(candidate.executable))) continue;
       found = true;
-      const attempt = yield* Effect.result(
+      const read = (args: readonly string[]) =>
         Effect.gen(function* () {
-          const { stdout, launch } = yield* readCliVersion(candidate, "hermes");
+          const { stdout, launch } = yield* readCliVersion(candidate, "hermes", args);
           return {
             executable: candidate.executable,
             version: parseHermesVersion(stdout),
             source: "system" as const,
             ...launch,
           };
-        }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
-      );
+        }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))));
+      // `hermes --version` waits for a network update check, which can take more than the limit and
+      // then never saves its result, so every check timed out (#7989). `hermes acp --version` prints
+      // only the version. A Hermes before 0.14 refuses that flag at once and gets `--version`.
+      const quick = yield* Effect.result(read(["acp", "--version"]));
+      const attempt =
+        Result.isSuccess(quick) || isCliTimeout(quick.failure.cause)
+          ? quick
+          : yield* Effect.result(read(["--version"]));
       if (Result.isSuccess(attempt)) return attempt.success;
       const error = attempt.failure.cause;
 
@@ -468,11 +475,12 @@ export const resolveHermesCli: (input?: {
 );
 
 /**
- * Hermes prints its release and its build on the first line, such as
+ * `hermes acp --version` prints only the version, such as `0.21.5+5805.g54bc5e5`. `hermes --version`
+ * prints its release and its build on the first line, such as
  * `Hermes Agent v0.21.5+5805.g54bc5e5 (2026.9.24) · upstream 54bc5e50`. A line about an update can follow.
  */
 function parseHermesVersion(output: string): string {
-  const version = output.match(/^Hermes Agent v(\d+\.\d+\.\d+)\b/mu)?.[1];
+  const version = output.match(/^(?:Hermes Agent v)?(\d+\.\d+\.\d+)\b/mu)?.[1];
   if (!version) throw new CodexCliError(sourceText("error.provider.hermesVersionUnreadable"), "invalid");
   return version;
 }
@@ -1335,12 +1343,14 @@ function isCliTimeout(error: unknown): error is CodexCliError {
 }
 
 /**
- * Runs `--version` with the `PATH` that the CLI's processes get, so a `#!/usr/bin/env node` CLI that
- * starts here also starts as the provider. `launch` holds that `PATH` for the resolved CLI info.
+ * Runs `--version` (or the fixed `args` that print the version) with the `PATH` that the CLI's
+ * processes get, so a `#!/usr/bin/env node` CLI that starts here also starts as the provider.
+ * `launch` holds that `PATH` for the resolved CLI info.
  */
 const readCliVersion = Effect.fn("Cli.readVersion")(function* (
   { executable: candidate, source }: { executable: string; source: "system" | "managed" },
   provider: AgentProviderId,
+  args: readonly string[] = ["--version"],
 ) {
   const launchPath = yield* cliLaunchPath(candidate, source);
   const launch = launchPath ? { launchPath } : {};
@@ -1350,7 +1360,7 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
     target
       ? execFileAsync(
           process.env.ComSpec?.trim() || "cmd.exe",
-          ["/d", "/s", "/c", `""${candidate.replaceAll("%", "%%")}" --version"`],
+          ["/d", "/s", "/c", `""${candidate.replaceAll("%", "%%")}" ${args.join(" ")}"`],
           {
             timeout,
             maxBuffer: 64 * 1024,
@@ -1358,7 +1368,7 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
             windowsVerbatimArguments: true,
           },
         )
-      : execFileAsync(candidate, ["--version"], {
+      : execFileAsync(candidate, [...args], {
           timeout,
           maxBuffer: 64 * 1024,
           windowsHide: process.platform === "win32",

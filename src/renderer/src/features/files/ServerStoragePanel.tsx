@@ -1,3 +1,4 @@
+import { hostedPlanDisk } from "@openbot/contracts/hosted-servers";
 import {
   LOCAL_SERVER_ID,
   type RemovableRuntimes,
@@ -11,7 +12,7 @@ import { createEffect, createSignal, Show } from "solid-js";
 import { type FilesPort, filesPort } from "./files-port";
 import { createMachineResources } from "./machine-resources";
 import { createServerBackgroundProcesses } from "./server-background-processes";
-import { createServerAgents, createStorageUsage, planDisk } from "./storage-usage";
+import { createServerAgents, createStorageUsage } from "./storage-usage";
 
 export interface ServerStorageOptions {
   /** The computer the numbers belong to, such as "This Mac" or the server name. */
@@ -119,7 +120,9 @@ export function ServerStoragePanel(
     const scan = storage.state.usage;
     const read = disk();
     if (!scan) return null;
-    return props.storageGb && read?.scan === scan ? planDisk(read.disk, props.storageGb).freeBytes : scan.freeBytes;
+    return props.storageGb && read?.scan === scan
+      ? hostedPlanDisk(read.disk, props.storageGb).freeBytes
+      : scan.freeBytes;
   };
 
   const usage = () => storage.state.usage;

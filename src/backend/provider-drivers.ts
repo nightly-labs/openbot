@@ -535,7 +535,7 @@ export interface ProviderClientContext {
    * the server memory guard and `src/main/background-processes.ts` find leftover processes by, and on
    * a server the CPU limit module for Node (`agentProcessEnvironment` in `src/main/server-memory.ts`),
    * and the file of system root certificates (`agentCertificateEnvironment` in
-   * `src/main/system-certificates.ts`). Fixed while the app runs. They are not part of `agentEnvironment`: Codex gets that in each thread
+   * `src/main/system-certificates.ts`), which Codex does not get. Fixed while the app runs. They are not part of `agentEnvironment`: Codex gets that in each thread
    * configuration and replaces a session whose variables change, so Codex gets these in the spawn
    * environment of its app-server instead.
    */
@@ -880,17 +880,23 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     },
     catalog: { paged: true, modelFields: serviceTierFields },
     resolveCli: resolveCodexCli,
-    createClient: (cli, requestTimeoutMs, context) =>
-      new CodexAppServerClient(
+    createClient: (cli, requestTimeoutMs, context) => {
+      // Codex reads the system roots itself and skips a root that it cannot parse. With
+      // `SSL_CERT_FILE` it reads only that file and stops at start on one such root, such as a GOST
+      // root on Windows, with "workspace routing discovery failed" (#8112). So Codex does not get
+      // OpenBot's file. A file that the user set is not in `serverEnvironment` and still applies.
+      const { SSL_CERT_FILE: _openBotRoots, ...serverEnvironment } = context.serverEnvironment ?? {};
+      return new CodexAppServerClient(
         cli.executable,
         requestTimeoutMs,
         {
           ...cliPathEnvironment(cli),
-          ...context.serverEnvironment,
+          ...serverEnvironment,
           ...context.accountEnvironment,
         },
         context.codexTurnContext,
-      ),
+      );
+    },
     authState: (account) => ({ kind: "chatgpt", email: account?.email ?? null }),
     // An API-key login has no plan usage to read.
     validateAccount: (account) => {

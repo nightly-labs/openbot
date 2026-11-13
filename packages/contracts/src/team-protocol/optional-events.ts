@@ -13,6 +13,7 @@ import { type BrowserUserControlEvent, browserUserControlEvent } from "./browser
 import { type ChannelEvent, channelEvent } from "./channels-v1";
 import { type ChatColorsEvent, chatColorsEvent } from "./chat-colors-v1";
 import { type HostRestartEvent, hostRestartEvent } from "./host-update-v1";
+import { type LibraryFoldersEvent, libraryFoldersEvent } from "./library-folders-events-v1";
 import { type LiveVoiceEvent, liveVoiceEvent } from "./live-voice-v1";
 import { type MachineAlertEvent, machineAlertEvent } from "./machine-resources-v1";
 import { type MessagePinsEvent, messagePinsEvent } from "./message-pins-v1";
@@ -37,6 +38,7 @@ export type OptionalTeamEvent =
   | AgentTasksEvent
   | ChannelEvent
   | HostRestartEvent
+  | LibraryFoldersEvent
   | LiveVoiceEvent
   | MachineAlertEvent
   | MessagePinsEvent
@@ -71,6 +73,7 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
     agentTasksEvent(value) ??
     channelEvent(value) ??
     hostRestartEvent(value) ??
+    libraryFoldersEvent(value) ??
     liveVoiceEvent(value) ??
     machineAlertEvent(value) ??
     messagePinsEvent(value) ??

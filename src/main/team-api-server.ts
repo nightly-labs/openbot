@@ -188,6 +188,7 @@ import {
   type HostRestartState,
 } from "@openbot/contracts/team-protocol/host-update-v1";
 import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
+import { LIBRARY_FOLDERS_EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/library-folders-events-v1";
 import { LIBRARY_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/library-folders-v1";
 import { LIVE_VOICE_CAPABILITY } from "@openbot/contracts/team-protocol/live-voice-v1";
 import {
@@ -216,6 +217,7 @@ import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sideba
 import { withSkillSuggestionNames } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { STORAGE_CHANNEL_CAPABILITY } from "@openbot/contracts/team-protocol/storage-channel-v1";
 import { STORAGE_DISK_CAPABILITY } from "@openbot/contracts/team-protocol/storage-disk-v1";
+import { STORAGE_USER_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/storage-user-files-v1";
 import {
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
   withUiBlockAutoAnswers,
@@ -2568,7 +2570,9 @@ export class TeamApiServer {
           if (capability === PROVIDER_SIGN_OUT_CAPABILITY) return this.#options.providerSignOut !== undefined;
           if (capability === STORAGE_CAPABILITY) return this.#options.storage !== undefined;
           if (capability === STORAGE_DISK_CAPABILITY) return this.#options.storage !== undefined;
-          if (capability === LIBRARY_FOLDERS_CAPABILITY) return this.#options.libraryFolders !== undefined;
+          if (capability === STORAGE_USER_FILES_CAPABILITY) return this.#options.storage !== undefined;
+          if (capability === LIBRARY_FOLDERS_CAPABILITY || capability === LIBRARY_FOLDERS_EVENTS_CAPABILITY)
+            return this.#options.libraryFolders !== undefined;
           if (capability === STORAGE_CHANNEL_CAPABILITY)
             return this.#options.storage !== undefined && this.#options.channels !== undefined;
           if (capability === MACHINE_RESOURCES_CAPABILITY) return this.#options.machine !== undefined;
@@ -2864,6 +2868,7 @@ function eventCapability(event: AgentEvent): TeamCurrentCapability | null {
   if (event.type === "workflows-changed") return WORKFLOWS_CAPABILITY;
   if (event.type === "vault-changed") return VAULT_CAPABILITY;
   if (event.type === "browser-profiles-changed") return BROWSER_PROFILES_EVENTS_CAPABILITY;
+  if (event.type === "library-folders-changed") return LIBRARY_FOLDERS_EVENTS_CAPABILITY;
   if (event.type === "turn-progress") return TEAM_AGENT_ACTIVITY_CAPABILITY;
   if (event.type === "runtime-snapshot") return "agent-runtime-snapshots";
   if (event.type === "sidebar-layout-changed") return "sidebar-layout";

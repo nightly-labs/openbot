@@ -377,6 +377,8 @@ export const messages = {
     "Le proxy {name} a refusé l’identification, la page ne s’est donc pas ouverte.",
   "error.backend.browserProxyComputerUnreachable":
     "L’ordinateur de ce profil ne répond pas, la page ne s’est donc pas ouverte.",
+  "error.backend.browserProxyComputerLocalAddress":
+    "L’ordinateur utilisé par ce profil n’ouvre que des sites publics. Il n’ouvre pas les adresses d’un réseau local, donc la page ne s’est pas ouverte.",
   "error.backend.browserCertificateUntrusted":
     "Le certificat de sécurité de ce site n’est pas fiable, la page ne s’est donc pas ouverte.",
   "error.backend.browserLowMemory":

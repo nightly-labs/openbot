@@ -423,6 +423,15 @@ export const messages = {
   "marketplace.plugin.postiz.prompt.week": "来週に予約されている投稿はどれですか?",
   "marketplace.plugin.postiz.prompt.draft":
     "新しいリリースについての LinkedIn 投稿の下書きを作成して。ただし予約はしないで。",
+  "marketplace.plugin.trypost.tagline": "ソーシャルメディアの予約投稿",
+  "marketplace.plugin.trypost.description":
+    "TryPost を使うと、エージェントは接続済みのチャンネルを一覧し、X、LinkedIn、Instagram、Facebook、TikTok、YouTube、Threads、Bluesky、Mastodon、Pinterest などへの投稿を下書き、予約、キューへの追加、公開できます。分析の確認、アイデアと承認の管理、投稿時間の設定もできます。ブラウザで TryPost アカウントにサインインし、ワークスペースを選んでください。エージェントは投稿をすぐに公開できるため、承認する前に各投稿を確認してください。",
+  "marketplace.plugin.trypost.app":
+    "TryPost の MCP サーバーとブラウザでのサインインによる、チャンネル、投稿、キュー、アイデア、分析。",
+  "marketplace.plugin.trypost.prompt.week": "今週予約されている投稿はどれですか？",
+  "marketplace.plugin.trypost.prompt.draft":
+    "新しいリリースについての LinkedIn 投稿を下書きしてください。ただし予約はしないでください。",
+  "marketplace.plugin.trypost.prompt.analytics": "先月の投稿のうち、エンゲージメントが最も高かったのはどれですか？",
   "marketplace.plugin.composio.tagline": "Gmail、Slack、GitHub など 1,000 以上のアプリ",
   "marketplace.plugin.composio.description":
     "Composio は、1 つの MCP サーバーでエージェントを Gmail、Slack、GitHub など 1,000 以上のアプリに接続します。Composio アカウントでサインインしてください。エージェントがアプリを必要とすると、そのアプリの接続を求めます。",

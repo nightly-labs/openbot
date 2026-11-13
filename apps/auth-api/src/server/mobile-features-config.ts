@@ -31,8 +31,10 @@ export const MOBILE_LATEST_VERSIONS: MobileLatestVersions = {
  * The first Android version that has its APK on GitHub, from the `Stage the Android APK` workflow.
  * From this version on, the site offers the APK of the newest Google Play version above, for a phone
  * with no Google Play (`apps/auth-api/src/lib/android-apk.ts`). A change of this file on main makes
- * the APK of that version public (the `Publish the Android APK` workflow). 1.4.9 is from before
- * these workflows. To offer an older version, stage its APK with the first workflow, then lower
- * this value. `null` hides the APK download.
+ * the APK of that version public (the `Publish the Android APK` workflow).
+ *
+ * `null` hides the APK download. The first APK is build 24 of 1.4.9, staged by hand (run
+ * 43390367490). Each later version needs its draft release before it is marked as available: else
+ * the site links to a file that is not there, and `Publish the Android APK` fails.
  */
-export const ANDROID_APK_FIRST_VERSION: string | null = "1.4.10";
+export const ANDROID_APK_FIRST_VERSION: string | null = "1.4.9";

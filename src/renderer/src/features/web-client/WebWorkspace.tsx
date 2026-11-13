@@ -1514,6 +1514,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const storageCalls: FilesPort = {
     agent: { listAgents: () => workspace.runtime.listAgents() },
     hostAdmin: machineCalls.hostAdmin,
+    // The web client has one server, so each host event is of the page's server.
+    onLibraryFoldersChanged: (_serverId, listener) =>
+      workspace.onHostEvent((event) => {
+        if (event.type === "library-folders-changed") listener();
+      }),
     storage: {
       getMachineMetrics: machineCalls.storage.getMachineMetrics,
       getLibraryFolders: machineCalls.storage.getLibraryFolders,
@@ -3723,6 +3728,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       },
                       approvals: () => workspace.state.approvals,
                       takeovers: () => workspace.state.takeovers,
+                      prompts: () => workspace.state.prompts,
                       pausedAgentIds,
                     });
                     return (
