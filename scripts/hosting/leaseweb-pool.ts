@@ -1586,6 +1586,12 @@ echo "key=$(cat "$d/key.pub")"
 echo "ids=$(id -u user):$(id -g user)"
 echo "version=$(sed -n 's/^X-AppImage-Version=//p' /opt/OpenBot/app/*.desktop | head -n 1)"
 echo "containers=$(find /var/lib/docker/containers -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)"
+if ids=$(docker ps -aq 2>/dev/null); then
+  echo "docker_running=$(docker ps -q | wc -l)"
+  restart=0
+  [ -n "$ids" ] && restart=$(docker inspect -f '{{.HostConfig.RestartPolicy.Name}}' $ids | awk '$0 != "no" { n++ } END { print n + 0 }')
+  echo "docker_restart=$restart"
+fi
 bash "$d/move-from-boat.sh" packages`,
       );
       const values = keyValues(output);
@@ -1610,8 +1616,23 @@ bash "$d/move-from-boat.sh" packages`,
           `The sandbox has ${containers} Docker containers. The VPS has no Docker, and the move does not copy them.`,
         );
       }
-      if (containers > 0)
-        logger.warn(`The sandbox has ${containers} Docker containers. An operator moves them by hand.`);
+      if (containers > 0) {
+        // The operator stops each container and sets its restart policy to `no` first. A container that runs
+        // or restarts makes the boat stop fail during the downtime. When the Docker daemon does not answer,
+        // no container runs or restarts.
+        const running = Number(values.get("docker_running") ?? "0");
+        const restarting = Number(values.get("docker_restart") ?? "0");
+        if (!Number.isInteger(running) || !Number.isInteger(restarting)) {
+          throw new Error("The sandbox did not give the state of its Docker containers.");
+        }
+        if (running > 0 || restarting > 0) {
+          throw new Error(
+            `The sandbox has ${running} running Docker containers and ${restarting} with a restart policy other ` +
+              "than no. Stop each container and set its restart policy to no before the move.",
+          );
+        }
+        logger.warn(`The sandbox has ${containers} stopped Docker containers. An operator moves them by hand.`);
+      }
       const sandboxVersion = values.get("version") ?? "";
       if (values.get("ids") !== machineState.ids) {
         throw new Error(

@@ -1288,7 +1288,8 @@ still uses the sandbox. The downtime is the export, the copy, the import and the
    `/var/lib/docker/containers`): the VPS has no Docker, and the archive has no containers or images.
    With `--docker`, an operator moves them by hand and the move continues. Stop each container first
    and set its restart policy to `no`, or boat cannot pause a container that restarts and the stop
-   fails. Save the volumes in the home, so that the archive has them.
+   fails. The move stops before the downtime when a container runs or has another restart policy.
+   Save the volumes in the home, so that the archive has them.
 
    After the move, give the VPS rootless Docker for `user` (done on 2026-11-13 for one server, Ubuntu
    26.04). As root: install `docker-ce`, `docker-ce-cli`, `containerd.io`, `docker-compose-plugin`,
