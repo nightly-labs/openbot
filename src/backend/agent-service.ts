@@ -4580,18 +4580,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   ) {
     const contexts = yield* this.channels.compactTargets(channelId);
     // A provider process stops after some minutes with no turn, and only its process compacts a session.
-    // It starts again as for a turn; a process that a turn would replace is not touched.
-    const stoppedMembers = this.#store
-      .list()
-      .filter(
-        (agent) =>
-          contexts.some(
-            ({ agentId, threadId }) =>
-              agentId === agent.id && this.#store.database.activeProviderSession(threadId, agent.provider),
-          ) &&
-          !this.#providers.agentClientRunning(agent) &&
-          this.#providers.agentClientCurrent(agent),
-      );
+    // It starts again as for a turn; a process that a turn would replace is not touched. A busy channel
+    // refuses first, so it starts no process.
+    const { agents: members, candidates: found } = yield* lifecycleStep("find channel compact members", () =>
+      this.#channelCompactCandidates(contexts),
+    );
+    const stoppedMembers = [...new Set(found.map(({ agentId }) => members.get(agentId)))].filter(
+      (agent): agent is AgentSummary =>
+        agent !== undefined && !this.#providers.agentClientRunning(agent) && this.#providers.agentClientCurrent(agent),
+    );
     yield* Effect.forEach(
       stoppedMembers,
       (agent) =>
@@ -4606,14 +4603,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       { discard: true },
     );
     const sessions = yield* lifecycleStep("compact channel context", () => {
-      const agents = new Map(this.#store.list().map((agent) => [agent.id, agent]));
-      const candidates = contexts.flatMap(({ agentId, threadId }) => {
-        const agent = agents.get(agentId);
-        const session = agent ? this.#store.database.activeProviderSession(threadId, agent.provider) : null;
-        return agent && session ? [{ agentId, threadId, externalSessionId: session.externalSessionId }] : [];
-      });
-      if (candidates.some(({ agentId, threadId }) => this.#channelSessionBusy(agents.get(agentId), threadId)))
-        throw new ContextCompactRefusedError(sourceText("error.backend.channelWaitBeforeCompact"));
+      // Again: a turn can start while a process starts.
+      const { agents, candidates } = this.#channelCompactCandidates(contexts);
       const reserved = candidates.filter(({ agentId, externalSessionId }) =>
         this.#compaction.reserve(agentId, externalSessionId, true),
       );
@@ -4627,6 +4618,22 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       { discard: true, concurrency: "unbounded" },
     );
   }, Effect.uninterruptible).bind(this);
+
+  /** The members' channel sessions that can compact. Throws while one of them is busy. */
+  #channelCompactCandidates(contexts: ReadonlyArray<{ agentId: string; threadId: string }>): {
+    agents: Map<string, AgentSummary>;
+    candidates: Array<{ agentId: string; threadId: string; externalSessionId: string }>;
+  } {
+    const agents = new Map(this.#store.list().map((agent) => [agent.id, agent]));
+    const candidates = contexts.flatMap(({ agentId, threadId }) => {
+      const agent = agents.get(agentId);
+      const session = agent ? this.#store.database.activeProviderSession(threadId, agent.provider) : null;
+      return agent && session ? [{ agentId, threadId, externalSessionId: session.externalSessionId }] : [];
+    });
+    if (candidates.some(({ agentId, threadId }) => this.#channelSessionBusy(agents.get(agentId), threadId)))
+      throw new ContextCompactRefusedError(sourceText("error.backend.channelWaitBeforeCompact"));
+    return { agents, candidates };
+  }
 
   /**
    * Why no member of a channel compacts. A member with no session has nothing to compact yet. A member

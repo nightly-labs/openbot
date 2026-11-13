@@ -504,11 +504,11 @@ export class ContextCompaction {
     if (mode === "handoff" && !this.#rotatesSession(agentId, threadId)) return false;
     // The budget is in memory only, so a session has none after a restart until its next usage report.
     // The user's request does not need one: it starts as a rotated session does, with no known window.
-    if (manual && !this.#budgets.has(threadId)) this.#budgets.set(threadId, unknownBudget());
-    const budget = this.#budgets.get(threadId);
+    const budget = this.#budgets.get(threadId) ?? (manual ? unknownBudget() : undefined);
     if (!(budget?.pending || (manual && budget)) || budget.phase !== "idle" || this.#compacting.has(threadId)) {
       return false;
     }
+    this.#budgets.set(threadId, budget);
     budget.phase = "requested";
     this.#compacting.set(threadId, { agentId, client: null, turnId });
     this.observeCompaction(threadId, "running");
