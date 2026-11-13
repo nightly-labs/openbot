@@ -49,6 +49,12 @@ export const messages = {
   "sidebar.section.nameUnique": "Nazwy folderów muszą być unikalne.",
   "sidebar.section.saveFailed": "Nie udało się zapisać tego folderu. Spróbuj ponownie.",
   "sidebar.section.unassigned": "Bez folderu",
+  "sidebar.section.chatCount": {
+    one: "{count} czat",
+    few: "{count} czaty",
+    many: "{count} czatów",
+    other: "{count} czatu",
+  },
   "sidebar.section.people": "Osoby",
   "sidebar.section.fallback": "Folder",
   "sidebar.folder.newInside": "Nowy podfolder",

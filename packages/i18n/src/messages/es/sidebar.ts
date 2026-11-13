@@ -49,6 +49,7 @@ export const messages = {
   "sidebar.section.nameUnique": "Los nombres de las carpetas deben ser únicos.",
   "sidebar.section.saveFailed": "No se pudo guardar esta carpeta. Vuelve a intentarlo.",
   "sidebar.section.unassigned": "Sin asignar",
+  "sidebar.section.chatCount": { one: "{count} chat", other: "{count} chats" },
   "sidebar.section.people": "Personas",
   "sidebar.section.fallback": "Carpeta",
   "sidebar.folder.newInside": "Nueva subcarpeta",

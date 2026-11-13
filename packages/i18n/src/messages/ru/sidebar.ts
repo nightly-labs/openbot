@@ -49,6 +49,12 @@ export const messages = {
   "sidebar.section.nameUnique": "Названия папок должны быть уникальными.",
   "sidebar.section.saveFailed": "Не удалось сохранить папку. Повторите попытку.",
   "sidebar.section.unassigned": "Без папки",
+  "sidebar.section.chatCount": {
+    one: "{count} чат",
+    few: "{count} чата",
+    many: "{count} чатов",
+    other: "{count} чата",
+  },
   "sidebar.section.people": "Люди",
   "sidebar.section.fallback": "Папка",
   "sidebar.folder.newInside": "Новая вложенная папка",

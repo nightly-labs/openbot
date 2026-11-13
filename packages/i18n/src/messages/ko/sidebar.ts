@@ -49,6 +49,7 @@ export const messages = {
   "sidebar.section.nameUnique": "폴더 이름은 겹치지 않아야 해요.",
   "sidebar.section.saveFailed": "이 폴더를 저장할 수 없어요. 다시 시도해 주세요.",
   "sidebar.section.unassigned": "미지정",
+  "sidebar.section.chatCount": { other: "채팅 {count}개" },
   "sidebar.section.people": "사람",
   "sidebar.section.fallback": "폴더",
   "sidebar.folder.newInside": "새 하위 폴더",

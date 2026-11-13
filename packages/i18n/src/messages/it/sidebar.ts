@@ -49,6 +49,7 @@ export const messages = {
   "sidebar.section.nameUnique": "I nomi delle cartelle devono essere univoci.",
   "sidebar.section.saveFailed": "Impossibile salvare questa cartella. Riprova.",
   "sidebar.section.unassigned": "Non assegnati",
+  "sidebar.section.chatCount": { one: "{count} chat", other: "{count} chat" },
   "sidebar.section.people": "Persone",
   "sidebar.section.fallback": "Cartella",
   "sidebar.folder.newInside": "Nuova sottocartella",
