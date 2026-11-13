@@ -142,7 +142,7 @@ upstream provider CLIs, which reach users without an OpenBot release; see
 [Provider CLI updates](architecture/providers.md#provider-cli-updates).
 
 The `Provider live E2E` workflow is not a pull request check either. It runs only by hand. On the Mac
-mini runner, it sends one real message to Codex, Claude, Gemini and OpenCode through the desktop app
+mini runner, it sends one real message to Codex, Claude and Gemini through the desktop app
 (`bun run test:provider-live`). See [Live provider test](provider-live-e2e.md).
 
 The `Release regression report` workflow is not a pull request check either. Once a day, it compares

@@ -48,7 +48,7 @@ export default {
       },
     },
   })),
-  // One app for each provider, and the four tests at the same time.
+  // One app for each provider, and the tests at the same time.
   workers: LIVE_PROVIDERS.length,
   // An app serves one attempt: a second attempt would need a new app.
   retries: 0,

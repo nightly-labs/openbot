@@ -1,6 +1,6 @@
 # Live provider test
 
-`bun run test:provider-live` sends one real message to Codex, Claude, Gemini and OpenCode and waits
+`bun run test:provider-live` sends one real message to Codex, Claude and Gemini and waits
 for the answer of each real model. It shows that a user of the desktop app can get a reply from each
 provider. The provider fakes and the `Provider CLI canary` do not show this: they use no provider
 account.
@@ -11,7 +11,7 @@ The runner is the [e2e](https://e2e.com/docs) framework. The files are in `scrip
 
 1. `scripts/provider-live-e2e.ts` starts the local account service when this worktree has none,
    builds the desktop app, and runs `e2e run`.
-2. e2e starts one app for each provider (`start-app.ts`), four at the same time. Each app has its own
+2. e2e starts one app for each provider (`start-app.ts`), all at the same time. Each app has its own
    profile in `.openbot-build/provider-live/<provider>/profile` and its own DevTools port.
 3. `provider-answers.e2e.ts` runs one time for each app. It waits until the provider is available,
    makes an agent on a low-cost model (`LIVE_MODELS` in `targets.ts`), types a message in the chat,
@@ -21,15 +21,15 @@ The report is in `scripts/provider-live/.e2e/`: `report.json`, `summary.md`, `ju
 each app, and for each test a `trace.md` with its screenshots.
 
 ```sh
-bun run test:provider-live                      # the four providers
+bun run test:provider-live                      # all providers   
 bun run test:provider-live --target=claude      # one provider; Gemini is `antigravity`
 ```
 
 ## What the computer must have
 
 - A sign-in to each provider, made one time by the user who runs the test: Codex, Claude, Gemini.
-  OpenCode uses its free model and needs no account. The test does not sign in. A provider with no
-  sign-in fails its test with the state that the app reports.
+  The test does not sign in. A provider with no sign-in fails its test with the state that the app
+  reports.
 - The provider CLIs are optional. The app downloads a CLI that is missing; the first run is then slower.
 
 Each run sends two short messages to each provider and uses the subscription of the signed-in

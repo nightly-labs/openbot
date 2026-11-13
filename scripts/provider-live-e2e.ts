@@ -1,10 +1,10 @@
-// The live provider test: one real turn on Codex, Claude, Gemini and OpenCode, each in its own
+// The live provider test: one real turn on Codex, Claude and Gemini, each in its own
 // desktop app, at the same time. The e2e framework (https://e2e.com/docs) is the runner; it drives
 // each app window through the DevTools port. See docs/provider-live-e2e.md.
 //
 // Each provider uses the sign-in of the user who runs the test, and each run sends two short
 // messages to each provider.
-// `bun run test:provider-live`; `--target=<codex|claude|antigravity|opencode>` runs one provider.
+// `bun run test:provider-live`; `--target=<codex|claude|antigravity>` runs one provider.
 // Writes scripts/provider-live/.e2e/report.json, summary.md, junit.xml and a trace for each test.
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { join, resolve } from "node:path";
@@ -18,7 +18,7 @@ const API_START_MS = 180_000;
 const POLL_MS = 500;
 
 const parsed = readScriptArguments({
-  usage: "Usage: bun scripts/provider-live-e2e.ts [--target=<codex|claude|antigravity|opencode>]",
+  usage: "Usage: bun scripts/provider-live-e2e.ts [--target=<codex|claude|antigravity>]",
   options: { target: { type: "string" } },
 });
 if (!parsed) process.exit(0);

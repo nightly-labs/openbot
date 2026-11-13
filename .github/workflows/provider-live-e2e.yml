@@ -1,6 +1,6 @@
 name: Provider live E2E
 
-# One real turn on Codex, Claude, Gemini and OpenCode, each in its own desktop app, at the same time
+# One real turn on Codex, Claude and Gemini, each in its own desktop app, at the same time
 # (`bun run test:provider-live`, docs/provider-live-e2e.md). The job runs on the Mac mini runner: each
 # provider uses the sign-in of the runner's user, so the job has no provider secret. It runs only
 # by hand, never for a pull request: a pull request must not run its code on a computer that holds
@@ -21,7 +21,6 @@ on:
           - codex
           - claude
           - antigravity
-          - opencode
 
 permissions: {}
 

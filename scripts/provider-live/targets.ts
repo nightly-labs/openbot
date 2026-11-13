@@ -7,7 +7,7 @@ export const PROJECT_ROOT = resolve(import.meta.dirname, "../..");
 export const RENDERER_HOST = "127.0.0.1";
 
 /** Gemini is the `antigravity` provider in the code. */
-export const LIVE_PROVIDERS = ["codex", "claude", "antigravity", "opencode"] as const satisfies AgentProviderId[];
+export const LIVE_PROVIDERS = ["codex", "claude", "antigravity"] as const satisfies AgentProviderId[];
 export type LiveProvider = (typeof LIVE_PROVIDERS)[number];
 
 export function isLiveProvider(value: unknown): value is LiveProvider {
@@ -24,7 +24,6 @@ export const LIVE_MODELS: Record<LiveProvider, string> = {
   codex: "gpt-6-luna",
   claude: "claude-haiku-5-5",
   antigravity: "gemini-3.8-flash",
-  opencode: "opencode/beam-free",
 };
 
 /** The path of the DevTools socket that `start-app.ts` serves on the renderer port. */
