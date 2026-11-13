@@ -97,6 +97,7 @@ import {
   type BrowserProxyRelay,
   openBrowserProxyRelay,
   type RelayExit,
+  type RelayExitFailure,
   socksExit,
 } from "./browser-profiles/browser-proxy-relay";
 import type { BrowserProxyConnection } from "./browser-profiles/browser-proxy-store";
@@ -3341,7 +3342,7 @@ export class BrowserHost {
   }
 
   /** Why a page load through the proxy of a tab failed, from the error that Chromium gives. */
-  #tabProxyFailure(tab: BrowserHostTab, error: BrowserProxyFailure): BrowserProxyFailure {
+  #tabProxyFailure(tab: BrowserHostTab, error: BrowserProxyFailure): RelayExitFailure {
     if (this.#proxySignInRefused.has(tab)) return "signIn";
     // Through a relay, Chromium sees only a failed tunnel. The relay knows whether the proxy refused the sign-in.
     return this.#tabRelay(tab)?.exitFailure() ?? error;
@@ -3365,7 +3366,15 @@ export class BrowserHost {
     const proxyError = proxyErrorInText(String(failure.cause));
     if (proxy === null || proxyError === undefined) return failure;
     if (proxy.kind === "computer")
-      return browserFailure(new Error(sourceText("error.backend.browserProxyComputerUnreachable")));
+      return browserFailure(
+        new Error(
+          sourceText(
+            this.#tabRelay(tab)?.exitFailure() === "address"
+              ? "error.backend.browserProxyComputerLocalAddress"
+              : "error.backend.browserProxyComputerUnreachable",
+          ),
+        ),
+      );
     // The network error of this load came first and recorded why. Chromium commits its error page
     // before the load fails here, and that commit clears the sign-in mark of the tab.
     const reason = this.#proxyFailures.get(proxy.proxyId) ?? this.#tabProxyFailure(tab, proxyError);
@@ -3516,8 +3525,11 @@ export class BrowserHost {
     target.webRequest.onErrorOccurred((details) => {
       const tab = [...this.#tabs.values()].find((candidate) => candidate.contents.id === details.webContentsId);
       const proxyError = PROXY_ERRORS.get(details.error);
-      if (tab && details.resourceType === "mainFrame" && proxyError !== undefined)
-        this.#noteProxyLoad(tab, this.#tabProxyFailure(tab, proxyError));
+      if (tab && details.resourceType === "mainFrame" && proxyError !== undefined) {
+        const failure = this.#tabProxyFailure(tab, proxyError);
+        // A computer that refused a local address answered, so its proxy does not fail.
+        this.#noteProxyLoad(tab, failure === "address" ? null : failure);
+      }
       if (!tab || tab.secret) return;
       // The page or a navigation cancelled a subresource request: it did not fail. Live pages cancel
       // many. A cancelled page load can be a blocked navigation, so it stays an error.

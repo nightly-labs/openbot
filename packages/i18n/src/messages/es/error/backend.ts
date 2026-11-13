@@ -369,6 +369,8 @@ export const messages = {
     "El proxy {name} rechazó el inicio de sesión, así que la página no se abrió.",
   "error.backend.browserProxyComputerUnreachable":
     "El ordenador que usa este perfil no responde, así que la página no se abrió.",
+  "error.backend.browserProxyComputerLocalAddress":
+    "El ordenador que usa este perfil solo abre sitios públicos. No abre direcciones de una red local, por eso la página no se abrió.",
   "error.backend.browserCertificateUntrusted":
     "El certificado de seguridad de este sitio no es de confianza, así que la página no se abrió.",
   "error.backend.browserLowMemory":
