@@ -135,7 +135,8 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
       active = false;
     };
   }, [readsPage, store, serverId, channelId]);
-  if (unreadLine === null && page && summary && (!hasUnread || freshPage !== "waiting"))
+  // The count that the phone kept can be old, so the line also waits for the host's channel list.
+  if (unreadLine === null && state.listed && page && summary && (!hasUnread || freshPage !== "waiting"))
     setUnreadLine({
       messageId:
         freshPage === "failed"
