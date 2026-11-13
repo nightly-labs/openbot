@@ -179,6 +179,9 @@ export function createWebServerSettings(options: {
       draft.members = [];
       draft.invites = [];
       draft.mcp = [];
+      // Read again with the rows when the MCP section opens. Old sign-ins with new rows could show a
+      // sign-in for an address that has none.
+      draft.mcpSignIns = {};
       draft.mcpError = null;
       draft.error = null;
     });

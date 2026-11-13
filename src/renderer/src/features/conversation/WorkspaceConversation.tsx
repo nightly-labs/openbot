@@ -43,6 +43,7 @@ import { useChannels } from "../channels/channels-context";
 import { useConnectors } from "../connectors/connectors-context";
 import { useCustomAgents } from "../custom-agents/custom-agents-context";
 import { useRemoteDesktop } from "../remote-desktop/remote-desktop-context";
+import { mcpRowSignedIn } from "../servers/mcp-servers";
 import { useServerActions } from "../servers/server-actions";
 import { remoteMcpSignIn, serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import { createServerResponseStyle } from "../servers/server-personality";
@@ -548,11 +549,9 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
           if (!server || (server.kind === "remote" && !remoteMcpSignIn(server))) return undefined;
           return (mcpServerId: string, trigger: HTMLElement | null) => openMcpSignIn(server.id, mcpServerId, trigger);
         })()}
-        // The sign-ins and the rows are read together, so the row says which address a sign-in is for.
         mcpSignedIn={(mcpServerId, url) =>
           serverSettingsTargetId() === activeServer()?.id &&
-          serverSettingsMcpSignIns()[mcpServerId]?.signedIn === true &&
-          serverSettingsMcp().some((row) => row.id === mcpServerId && row.url === url)
+          mcpRowSignedIn(serverSettingsMcpSignIns(), serverSettingsMcp(), mcpServerId, url)
         }
         serverInstall={{
           get servers() {

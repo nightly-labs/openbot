@@ -33,7 +33,8 @@ export function createMcpServersStore(deps: McpServersStoreDeps) {
       threads?.conversation,
       ...(threads?.side.tabs ?? []).map((tab) => threads?.side.thread(tab.id)?.conversation),
     ].flatMap((conversation) => conversation?.messages ?? []);
-    // Sorted and without repeats, so a tab that moves or opens reads nothing again.
+    // Sorted and without repeats, so a tab that moves reads nothing again. A tab or older history that
+    // brings cards reads the list once more.
     const ids = new Set([
       ...deps.props.messages.flatMap((message) => (message.actionMarker?.kind === "mcp-sign-in" ? [message.id] : [])),
       ...threadMessages.flatMap((message) => (mcpSignInEvent(message) ? [message.id] : [])),

@@ -267,6 +267,7 @@ import { createRoutineTimezonePrompt } from "../schedule/routine-timezone-prompt
 import type { ScheduleRoutine } from "../schedule/SchedulePanel";
 import { AddServerOverlay, type AddServerResume } from "../servers/AddServerOverlay";
 import { createHostedUpsellOffline, HostedServerUpsell } from "../servers/hosted-server-upsell-controller";
+import { mcpRowSignedIn } from "../servers/mcp-servers";
 import { saveRemoteFrameChannels } from "../servers/remote-workspace-frame";
 import type { HostAgentDefaultsCalls } from "../servers/ServerAgentsSection";
 import type { HostServerAuditCalls } from "../servers/ServerAuditSection";
@@ -3896,8 +3897,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   onOpenNotificationSettings={(serverId) => openNotificationSettings(serverId)}
                   onOpenMcpSignIn={openMcpSignInFromChat()}
                   mcpSignedIn={(mcpServerId, url) =>
-                    serverSettings.state.mcpSignIns[mcpServerId]?.signedIn === true &&
-                    serverSettings.state.mcp.some((row) => row.id === mcpServerId && row.url === url)
+                    mcpRowSignedIn(serverSettings.state.mcpSignIns, serverSettings.state.mcp, mcpServerId, url)
                   }
                   onOpenUsage={(trigger) => {
                     const id = server()?.id;
