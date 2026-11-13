@@ -733,6 +733,11 @@
   height: var(--wfn-height);
 }
 
+/* A picture with clear pixels shows whole, never cropped. */
+.wfn-node .wfn-card[data-media][data-clear] .wfn-media {
+  object-fit: contain;
+}
+
 .wfn-node[data-height] .wfn-card[data-media] .wfn-asset-trigger > .wfn-media {
   position: absolute;
   inset: 0;
@@ -750,8 +755,8 @@
 }
 
 /*
- * A picture with clear pixels: no fill and no ring, so the canvas and its lines show through it. The
- * whole picture shows, never cropped. The ring comes back on hover, so the edge of the node shows.
+ * A picture with clear pixels: no fill and no ring, so the canvas and its lines show through it.
+ * The ring comes back on hover, so the edge of the node shows.
  */
 .wfn-stage .wfn-card[data-clear],
 .wfn-stage .wfn-card[data-clear] .wfn-asset-trigger:not([data-dropping]) {
@@ -760,10 +765,6 @@
 
 .wfn-stage .wfn-card[data-clear] {
   box-shadow: none;
-}
-
-.wfn-node .wfn-card[data-media][data-clear] .wfn-media {
-  object-fit: contain;
 }
 
 /* A file from the computer over the card: the card takes the hover fill. */
