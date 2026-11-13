@@ -754,7 +754,13 @@ export class ConversationRuntime {
 
   #changedMessages(snapshot: ConversationSnapshot): ConversationMessage[] {
     const cached = this.#cachedSnapshot(snapshot);
-    if (!cached) return structuredClone(snapshot.messages);
+    // A caller can keep a snapshot while a provider read, an eviction or another thread replaces the
+    // cached one. Write only what stores differently: writing it whole put every unchanged message in
+    // the event log again (#8166).
+    if (!cached)
+      return snapshot.threadId
+        ? this.#store.database.changedConversationMessages(snapshot.threadId, snapshot.messages)
+        : structuredClone(snapshot.messages);
     const changed = new Set<ConversationMessage>();
     const untracked: ConversationMessage[] = [];
     for (const message of snapshot.messages) {
