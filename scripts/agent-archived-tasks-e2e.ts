@@ -51,11 +51,7 @@ hold(
 
 const listed = store.list(agentId);
 const listedIds = listed.map((task) => task.taskId);
-hold(
-  "list holds the archived task",
-  listedIds.includes(archivedTask.taskId),
-  `list=${listedIds.join(",")}`,
-);
+hold("list holds the archived task", listedIds.includes(archivedTask.taskId), `list=${listedIds.join(",")}`);
 hold(
   "list orders open before archived",
   listedIds.indexOf(openTask.taskId) < listedIds.indexOf(archivedTask.taskId),
@@ -114,8 +110,11 @@ hold(
 );
 
 const failed = results.filter((result) => !result.ok);
-for (const result of results) console.log(`${result.ok ? "PASS" : "FAIL"} ${result.check} (${result.detail})`);
-console.log(`VERDICT ${failed.length === 0 ? "PASS" : "FAIL"} (${results.length} checks, ${failed.length} failed)`);
+for (const result of results)
+  process.stdout.write(`${result.ok ? "PASS" : "FAIL"} ${result.check} (${result.detail})\n`);
+process.stdout.write(
+  `VERDICT ${failed.length === 0 ? "PASS" : "FAIL"} (${results.length} checks, ${failed.length} failed)\n`,
+);
 
 rmSync(root, { recursive: true, force: true });
 if (failed.length > 0) process.exit(1);

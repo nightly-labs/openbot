@@ -21,10 +21,8 @@ describe("sideThreadDestination", () => {
   it("opens the thread when the list answers within the window", async () => {
     const destination = await sideThreadDestination(
       target,
-      sources(() =>
-        new Promise((done) =>
-          setTimeout(() => done([{ id: "task-1", threadId: "openbot-thread-1" }]), 20),
-        ),
+      sources(
+        () => new Promise((done) => setTimeout(() => done([{ id: "task-1", threadId: "openbot-thread-1" }]), 20)),
       ),
       5_000,
     );
@@ -34,10 +32,8 @@ describe("sideThreadDestination", () => {
   it("stays in the chat when the list answers after the window", async () => {
     const destination = await sideThreadDestination(
       target,
-      sources(() =>
-        new Promise((done) =>
-          setTimeout(() => done([{ id: "task-1", threadId: "openbot-thread-1" }]), 80),
-        ),
+      sources(
+        () => new Promise((done) => setTimeout(() => done([{ id: "task-1", threadId: "openbot-thread-1" }]), 80)),
       ),
       40,
     );
