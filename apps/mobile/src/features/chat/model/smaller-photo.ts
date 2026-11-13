@@ -2,7 +2,7 @@ import { File } from "expo-file-system";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import { loadPhotoQualityPreference, usePhotoQualityPreference } from "@/features/settings/model/photo-quality";
 
-/** The long edge of a sent photo. It keeps text in a screenshot or a document photo readable. */
+/** The long edge of a sent photo. It keeps text in a photo of a document readable. */
 const PHOTO_LONG_EDGE = 2048;
 const PHOTO_QUALITY = 0.8;
 /** A photo of this size or less goes as it is. */
@@ -31,14 +31,17 @@ export async function smallerPhoto(uri: string, name: string): Promise<{ uri: st
     natives.add(decode);
     const source = await decode.renderAsync();
     natives.add(source);
-    const base = ImageManipulator.manipulate(source);
-    natives.add(base);
-    const context =
-      Math.max(source.width, source.height) <= PHOTO_LONG_EDGE
-        ? base
-        : base.resize(source.width >= source.height ? { width: PHOTO_LONG_EDGE } : { height: PHOTO_LONG_EDGE });
-    const image = await context.renderAsync();
-    natives.add(image);
+    let image = source;
+    if (Math.max(source.width, source.height) > PHOTO_LONG_EDGE) {
+      const base = ImageManipulator.manipulate(source);
+      natives.add(base);
+      const context = base.resize(
+        source.width >= source.height ? { width: PHOTO_LONG_EDGE } : { height: PHOTO_LONG_EDGE },
+      );
+      natives.add(context);
+      image = await context.renderAsync();
+      natives.add(image);
+    }
     const saved = await image.saveAsync({ format: SaveFormat.JPEG, compress: PHOTO_QUALITY });
     const copy = new File(saved.uri);
     if (size !== null && copy.size >= size) {
