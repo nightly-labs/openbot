@@ -51,6 +51,10 @@ export const messages = defineMessages("server", {
     "The host supports only older protocols than this app. Update the host, then try again.",
   "server.compatibility.unsafeDataDescription":
     "OpenBot stopped this connection because a known payload was invalid. Your current workspace data was not changed.",
+  "server.compatibility.unsafeDataUpdateHostDescription":
+    "{name} runs an older OpenBot version, and this app cannot read some of its data. Install the OpenBot update on {name}, then try again. Your workspace data was not changed.",
+  "server.compatibility.unsafeDataUpdateClientDescription":
+    "{name} runs a newer OpenBot version, and this app cannot read some of its data. Update this app, then try again. Your workspace data was not changed.",
   "server.compatibility.clientVersion": "Client version",
   "server.compatibility.hostVersion": "Host version",
   "server.compatibility.negotiatedProtocol": "Negotiated protocol",

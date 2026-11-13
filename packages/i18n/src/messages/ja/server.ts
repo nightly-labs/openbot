@@ -53,6 +53,10 @@ export const messages = {
     "ホストはこのアプリより古いプロトコルにのみ対応しています。ホストを更新してから、もう一度お試しください。",
   "server.compatibility.unsafeDataDescription":
     "既知のペイロードが無効だったため、OpenBot はこの接続を停止しました。現在のワークスペースのデータは変更されていません。",
+  "server.compatibility.unsafeDataUpdateHostDescription":
+    "{name} は古いバージョンの OpenBot を実行しているため、このアプリは一部のデータを読み取れません。{name} に OpenBot のアップデートをインストールしてから、もう一度お試しください。ワークスペースのデータは変更されていません。",
+  "server.compatibility.unsafeDataUpdateClientDescription":
+    "{name} は新しいバージョンの OpenBot を実行しているため、このアプリは一部のデータを読み取れません。このアプリをアップデートしてから、もう一度お試しください。ワークスペースのデータは変更されていません。",
   "server.compatibility.clientVersion": "クライアントのバージョン",
   "server.compatibility.hostVersion": "ホストのバージョン",
   "server.compatibility.negotiatedProtocol": "ネゴシエートされたプロトコル",

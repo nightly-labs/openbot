@@ -54,6 +54,10 @@ export const messages = {
     "L’hôte prend en charge uniquement des protocoles plus anciens que ceux de cette application. Mettez à jour l’hôte, puis réessayez.",
   "server.compatibility.unsafeDataDescription":
     "OpenBot a arrêté cette connexion, car des données connues étaient invalides. Les données de votre espace de travail actuel n’ont pas été modifiées.",
+  "server.compatibility.unsafeDataUpdateHostDescription":
+    "{name} utilise une version plus ancienne d’OpenBot, et cette app ne peut pas lire certaines de ses données. Installez la mise à jour d’OpenBot sur {name}, puis réessayez. Les données de votre espace de travail n’ont pas été modifiées.",
+  "server.compatibility.unsafeDataUpdateClientDescription":
+    "{name} utilise une version plus récente d’OpenBot, et cette app ne peut pas lire certaines de ses données. Mettez à jour cette app, puis réessayez. Les données de votre espace de travail n’ont pas été modifiées.",
   "server.compatibility.clientVersion": "Version du client",
   "server.compatibility.hostVersion": "Version de l’hôte",
   "server.compatibility.negotiatedProtocol": "Protocole négocié",

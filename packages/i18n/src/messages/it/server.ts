@@ -53,6 +53,10 @@ export const messages = {
     "L'host supporta solo protocolli più vecchi di quelli di questa app. Aggiorna l'host, poi riprova.",
   "server.compatibility.unsafeDataDescription":
     "OpenBot ha interrotto questa connessione perché un payload noto non era valido. I dati attuali del tuo workspace non sono stati modificati.",
+  "server.compatibility.unsafeDataUpdateHostDescription":
+    "{name} usa una versione precedente di OpenBot e questa app non può leggere alcuni dei suoi dati. Installa l’aggiornamento di OpenBot su {name}, poi riprova. I dati del tuo workspace non sono stati modificati.",
+  "server.compatibility.unsafeDataUpdateClientDescription":
+    "{name} usa una versione più recente di OpenBot e questa app non può leggere alcuni dei suoi dati. Aggiorna questa app, poi riprova. I dati del tuo workspace non sono stati modificati.",
   "server.compatibility.clientVersion": "Versione del client",
   "server.compatibility.hostVersion": "Versione dell'host",
   "server.compatibility.negotiatedProtocol": "Protocollo negoziato",

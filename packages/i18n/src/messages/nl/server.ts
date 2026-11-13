@@ -55,6 +55,10 @@ export const messages = {
     "De host ondersteunt alleen oudere protocollen dan deze app. Werk de host bij en probeer het opnieuw.",
   "server.compatibility.unsafeDataDescription":
     "OpenBot heeft deze verbinding gestopt omdat een bekende payload ongeldig was. De gegevens van je huidige werkruimte zijn niet gewijzigd.",
+  "server.compatibility.unsafeDataUpdateHostDescription":
+    "{name} gebruikt een oudere versie van OpenBot en deze app kan een deel van de gegevens niet lezen. Installeer de OpenBot-update op {name} en probeer het opnieuw. De gegevens van je werkruimte zijn niet gewijzigd.",
+  "server.compatibility.unsafeDataUpdateClientDescription":
+    "{name} gebruikt een nieuwere versie van OpenBot en deze app kan een deel van de gegevens niet lezen. Werk deze app bij en probeer het opnieuw. De gegevens van je werkruimte zijn niet gewijzigd.",
   "server.compatibility.clientVersion": "Clientversie",
   "server.compatibility.hostVersion": "Hostversie",
   "server.compatibility.negotiatedProtocol": "Overeengekomen protocol",

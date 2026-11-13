@@ -53,6 +53,10 @@ export const messages = {
     "El host solo admite protocolos anteriores a los de esta aplicación. Actualiza el host y vuelve a intentarlo.",
   "server.compatibility.unsafeDataDescription":
     "OpenBot detuvo esta conexión porque un mensaje de un tipo conocido contenía datos no válidos. Los datos de tu espacio de trabajo actual no se modificaron.",
+  "server.compatibility.unsafeDataUpdateHostDescription":
+    "{name} usa una versión anterior de OpenBot y esta app no puede leer algunos de sus datos. Instala la actualización de OpenBot en {name} y vuelve a intentarlo. Los datos de tu espacio de trabajo no se modificaron.",
+  "server.compatibility.unsafeDataUpdateClientDescription":
+    "{name} usa una versión más reciente de OpenBot y esta app no puede leer algunos de sus datos. Actualiza esta app y vuelve a intentarlo. Los datos de tu espacio de trabajo no se modificaron.",
   "server.compatibility.clientVersion": "Versión del cliente",
   "server.compatibility.hostVersion": "Versión del host",
   "server.compatibility.negotiatedProtocol": "Protocolo negociado",

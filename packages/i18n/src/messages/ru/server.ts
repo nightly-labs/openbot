@@ -54,6 +54,10 @@ export const messages = {
     "Хост поддерживает только более старые протоколы, чем это приложение. Обновите хост и повторите попытку.",
   "server.compatibility.unsafeDataDescription":
     "OpenBot прервал это подключение, потому что известные данные оказались недопустимыми. Данные вашего текущего рабочего пространства не изменены.",
+  "server.compatibility.unsafeDataUpdateHostDescription":
+    "На {name} работает более старая версия OpenBot, и это приложение не может прочитать часть её данных. Установите обновление OpenBot на {name} и попробуйте снова. Данные рабочего пространства не изменены.",
+  "server.compatibility.unsafeDataUpdateClientDescription":
+    "На {name} работает более новая версия OpenBot, и это приложение не может прочитать часть её данных. Обновите это приложение и попробуйте снова. Данные рабочего пространства не изменены.",
   "server.compatibility.clientVersion": "Версия клиента",
   "server.compatibility.hostVersion": "Версия хоста",
   "server.compatibility.negotiatedProtocol": "Согласованный протокол",

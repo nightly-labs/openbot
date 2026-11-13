@@ -50,6 +50,10 @@ export const messages = {
     "המארח תומך רק בפרוטוקולים ישנים יותר מהאפליקציה הזו. יש לעדכן את המארח ולנסות שוב.",
   "server.compatibility.unsafeDataDescription":
     "OpenBot עצר את החיבור הזה כי מטען ידוע לא היה תקין. נתוני סביבת העבודה הנוכחית שלך לא השתנו.",
+  "server.compatibility.unsafeDataUpdateHostDescription":
+    "ב-{name} פועלת גרסה ישנה יותר של OpenBot, והאפליקציה הזו לא יכולה לקרוא חלק מהנתונים שלה. התקן את העדכון של OpenBot ב-{name} ונסה שוב. נתוני סביבת העבודה שלך לא השתנו.",
+  "server.compatibility.unsafeDataUpdateClientDescription":
+    "ב-{name} פועלת גרסה חדשה יותר של OpenBot, והאפליקציה הזו לא יכולה לקרוא חלק מהנתונים שלה. עדכן את האפליקציה הזו ונסה שוב. נתוני סביבת העבודה שלך לא השתנו.",
   "server.compatibility.clientVersion": "גרסת הלקוח",
   "server.compatibility.hostVersion": "גרסת המארח",
   "server.compatibility.negotiatedProtocol": "הפרוטוקול שסוכם",

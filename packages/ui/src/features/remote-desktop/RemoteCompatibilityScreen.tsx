@@ -9,12 +9,22 @@ import { For, Show } from "solid-js";
  * props rather than reading `useServers()`: the shell already holds the server
  * in a keyed `<Show>` so that a different blocked server remounts this screen,
  * and a context read here would quietly re-derive what that key already decided.
+ *
+ * `olderSide` is the side that runs the older OpenBot release, when the two releases differ. Data
+ * that this app cannot use then says which side to update (#8059).
  */
-export function RemoteCompatibilityScreen(props: { server: ServerSummary; onRetry: () => Promise<void> }) {
+export function RemoteCompatibilityScreen(props: {
+  server: ServerSummary;
+  olderSide?: "client" | "host" | null;
+  onRetry: () => Promise<void>;
+}) {
   const { t, sourceText } = useText();
+  const updateSide = () => (props.server.issue?.code === "protocol_error" ? (props.olderSide ?? null) : null);
   const title = () => {
-    if (props.server.issue?.code === "client_update_required") return t("server.compatibility.updateClientTitle");
-    if (props.server.issue?.code === "host_update_required") {
+    if (props.server.issue?.code === "client_update_required" || updateSide() === "client") {
+      return t("server.compatibility.updateClientTitle");
+    }
+    if (props.server.issue?.code === "host_update_required" || updateSide() === "host") {
       return t("server.compatibility.updateHostTitle", { name: props.server.name });
     }
     if (props.server.issue?.code === "protocol_error") return t("server.compatibility.unsafeDataTitle");
@@ -30,6 +40,12 @@ export function RemoteCompatibilityScreen(props: { server: ServerSummary; onRetr
     if (props.server.issue?.code !== "protocol_error") {
       const message = props.server.issue?.message;
       return message === undefined ? t("error.remote.hostUnreachable") : sourceText(message);
+    }
+    if (updateSide() === "host") {
+      return t("server.compatibility.unsafeDataUpdateHostDescription", { name: props.server.name });
+    }
+    if (updateSide() === "client") {
+      return t("server.compatibility.unsafeDataUpdateClientDescription", { name: props.server.name });
     }
     return t("server.compatibility.unsafeDataDescription");
   };

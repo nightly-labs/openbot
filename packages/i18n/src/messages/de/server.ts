@@ -54,6 +54,10 @@ export const messages = {
     "Der Host unterstützt nur ältere Protokolle als diese App. Aktualisiere den Host und versuche es erneut.",
   "server.compatibility.unsafeDataDescription":
     "OpenBot hat diese Verbindung beendet, weil Daten eines bekannten Nachrichtentyps ungültig waren. Deine aktuellen Arbeitsbereichsdaten wurden nicht geändert.",
+  "server.compatibility.unsafeDataUpdateHostDescription":
+    "Auf {name} läuft eine ältere OpenBot-Version, und diese App kann einige ihrer Daten nicht lesen. Installiere das OpenBot-Update auf {name} und versuche es dann erneut. Deine Arbeitsbereichsdaten wurden nicht geändert.",
+  "server.compatibility.unsafeDataUpdateClientDescription":
+    "Auf {name} läuft eine neuere OpenBot-Version, und diese App kann einige ihrer Daten nicht lesen. Aktualisiere diese App und versuche es dann erneut. Deine Arbeitsbereichsdaten wurden nicht geändert.",
   "server.compatibility.clientVersion": "Client-Version",
   "server.compatibility.hostVersion": "Host-Version",
   "server.compatibility.negotiatedProtocol": "Ausgehandeltes Protokoll",

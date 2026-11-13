@@ -55,6 +55,10 @@ export const messages = {
     "Host obsługuje tylko starsze protokoły niż ta aplikacja. Zaktualizuj hosta i spróbuj ponownie.",
   "server.compatibility.unsafeDataDescription":
     "OpenBot przerwał to połączenie, ponieważ znany ładunek był nieprawidłowy. Dane bieżącego obszaru roboczego nie zostały zmienione.",
+  "server.compatibility.unsafeDataUpdateHostDescription":
+    "{name} używa starszej wersji OpenBot i ta aplikacja nie może odczytać części jego danych. Zainstaluj aktualizację OpenBot na {name}, a potem spróbuj ponownie. Dane obszaru roboczego nie zostały zmienione.",
+  "server.compatibility.unsafeDataUpdateClientDescription":
+    "{name} używa nowszej wersji OpenBot i ta aplikacja nie może odczytać części jego danych. Zaktualizuj tę aplikację, a potem spróbuj ponownie. Dane obszaru roboczego nie zostały zmienione.",
   "server.compatibility.clientVersion": "Wersja klienta",
   "server.compatibility.hostVersion": "Wersja hosta",
   "server.compatibility.negotiatedProtocol": "Uzgodniony protokół",
