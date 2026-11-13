@@ -1,0 +1,39 @@
+{
+  "slug": "podstatus",
+  "name": "Podstatus",
+  "tagline": "Podcast analytics for podcasting teams",
+  "description": "Podcast analytics for podcasters, podcast producers and podcasting teams. Read Apple Podcasts, Spotify and iVoox rankings, listener reviews and tracked keyword positions for your podcasts in Podstatus. Downloads and audience analytics require an OP3 connection and available data. Draft text updates from these results. Connect your own Podstatus account with OAuth and read-only permissions. This connection does not generate paid PDF reports or spend report credits. Requires a Professional or Network plan with API access enabled. API and MCP clients share the account's request limits.",
+  "category": "data-analytics",
+  "creatorName": "Podstatus",
+  "iconUrl": "https://podstatus.com/marketing_assets/icons/apple-touch-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-podcasts", "text": "List my tracked podcasts in Podstatus." },
+    {
+      "id": "prompt-rankings",
+      "text": "Compare my podcast rankings this week with last week. Include the platform, country, category and observation dates."
+    },
+    {
+      "id": "prompt-weekly-update",
+      "text": "Draft a weekly text update from my podcast rankings and listener reviews. State any missing data."
+    }
+  ],
+  "apps": [
+    {
+      "id": "app-podstatus-mcp",
+      "name": "Podstatus",
+      "description": "Read podcast rankings, reviews, keyword positions and available OP3 analytics through Podstatus's MCP server with browser sign-in.",
+      "iconUrl": "https://podstatus.com/marketing_assets/icons/apple-touch-icon.png",
+      "server": {
+        "name": "podstatus",
+        "transport": "http",
+        "url": "https://podstatus.com/mcp",
+        "auth": [{ "id": "podstatus-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://podstatus.com",
+  "privacyPolicyUrl": "https://podstatus.com/privacy",
+  "termsUrl": "https://podstatus.com/legal",
+  "skills": []
+}

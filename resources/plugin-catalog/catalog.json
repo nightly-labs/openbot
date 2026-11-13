@@ -1119,6 +1119,12 @@
       "detailSha256": "3f35a72d41508525759008658e57e0ca916c69f1922fc59166b33d588a0e48ee"
     },
     {
+      "slug": "podstatus",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "7b7acb7764fc4df1bc0af7cd112fee256bb534eb4d2ba6ef92387eb80c23c382"
+    },
+    {
       "slug": "postman",
       "version": "1.0.0",
       "featured": false,

@@ -16,7 +16,7 @@ export interface PluginCatalogIndex {
 export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
   schemaVersion: 1,
   catalogVersion: "v1",
-  updatedAt: "2026-11-10T00:00:00.000Z",
+  updatedAt: "2026-11-11T00:00:00.000Z",
   plugins: [
     {
       slug: "aave",
@@ -1133,6 +1133,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       version: "1.0.0",
       featured: false,
       detailSha256: "3f35a72d41508525759008658e57e0ca916c69f1922fc59166b33d588a0e48ee",
+    },
+    {
+      slug: "podstatus",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "7b7acb7764fc4df1bc0af7cd112fee256bb534eb4d2ba6ef92387eb80c23c382",
     },
     {
       slug: "postman",
@@ -8236,6 +8242,47 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://www.plaud.ai",
     privacyPolicyUrl: "https://www.plaud.ai/policies/privacy-policy",
     termsUrl: "https://www.plaud.ai/policies/terms-of-service",
+    skills: [],
+  },
+  podstatus: {
+    slug: "podstatus",
+    name: "Podstatus",
+    tagline: "Podcast analytics for podcasting teams",
+    description:
+      "Podcast analytics for podcasters, podcast producers and podcasting teams. Read Apple Podcasts, Spotify and iVoox rankings, listener reviews and tracked keyword positions for your podcasts in Podstatus. Downloads and audience analytics require an OP3 connection and available data. Draft text updates from these results. Connect your own Podstatus account with OAuth and read-only permissions. This connection does not generate paid PDF reports or spend report credits. Requires a Professional or Network plan with API access enabled. API and MCP clients share the account's request limits.",
+    category: "data-analytics",
+    creatorName: "Podstatus",
+    iconUrl: "https://podstatus.com/marketing_assets/icons/apple-touch-icon.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-podcasts", text: "List my tracked podcasts in Podstatus." },
+      {
+        id: "prompt-rankings",
+        text: "Compare my podcast rankings this week with last week. Include the platform, country, category and observation dates.",
+      },
+      {
+        id: "prompt-weekly-update",
+        text: "Draft a weekly text update from my podcast rankings and listener reviews. State any missing data.",
+      },
+    ],
+    apps: [
+      {
+        id: "app-podstatus-mcp",
+        name: "Podstatus",
+        description:
+          "Read podcast rankings, reviews, keyword positions and available OP3 analytics through Podstatus's MCP server with browser sign-in.",
+        iconUrl: "https://podstatus.com/marketing_assets/icons/apple-touch-icon.png",
+        server: {
+          name: "podstatus",
+          transport: "http",
+          url: "https://podstatus.com/mcp",
+          auth: [{ id: "podstatus-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://podstatus.com",
+    privacyPolicyUrl: "https://podstatus.com/privacy",
+    termsUrl: "https://podstatus.com/legal",
     skills: [],
   },
   postman: {
