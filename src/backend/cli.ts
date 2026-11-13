@@ -1330,9 +1330,17 @@ export function cliSpawnTarget(
 /**
  * A busy computer can take many seconds to start a CLI, so the limit is generous. A timeout is
  * reported apart from a failure: the CLI is not broken, and reinstalling it does not help. The
- * provider runtime tries again later, so this limit only has to cover one slow answer.
+ * provider runtime tries again later, with `SLOW_CLI_VERSION_TIMEOUT_MS`.
  */
 const CLI_VERSION_TIMEOUT_MS = 10_000;
+/**
+ * The limit of a version read after a read of the same CLI timed out. The first read from a cold disk
+ * cache took 85 s, and 3 reads with `CLI_VERSION_TIMEOUT_MS` in a row stopped the provider (#8548). The
+ * longer limit stays after a read in time: the files can leave the disk cache again.
+ */
+const SLOW_CLI_VERSION_TIMEOUT_MS = 120_000;
+/** The executables whose version read timed out. Their next reads wait `SLOW_CLI_VERSION_TIMEOUT_MS`. */
+const slowVersionReads = new Set<string>();
 
 /**
  * A busy computer makes every candidate slow, so the resolvers report the first timeout and do not
@@ -1355,7 +1363,9 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
   const launchPath = yield* cliLaunchPath(candidate, source);
   const launch = launchPath ? { launchPath } : {};
   const target = process.platform === "win32" && [".bat", ".cmd"].includes(extname(candidate).toLowerCase());
-  const timeout = providerCheckTimeoutMs(CLI_VERSION_TIMEOUT_MS);
+  const timeout = providerCheckTimeoutMs(
+    slowVersionReads.has(candidate) ? SLOW_CLI_VERSION_TIMEOUT_MS : CLI_VERSION_TIMEOUT_MS,
+  );
   const output = yield* providerCall(() =>
     target
       ? execFileAsync(
@@ -1375,16 +1385,16 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
           env: { ...process.env, ...cliPathEnvironment(launch) },
         }),
   ).pipe(
-    Effect.mapError((failure) =>
-      isDynamicRecord(failure.cause) && failure.cause.killed === true
-        ? providerFailure(
-            new CodexCliError(
-              sourceText("error.provider.cliTimedOutRefresh", { provider: agentProviderName(provider) }),
-              "timeout",
-            ),
-          )
-        : failure,
-    ),
+    Effect.mapError((failure) => {
+      if (!(isDynamicRecord(failure.cause) && failure.cause.killed === true)) return failure;
+      slowVersionReads.add(candidate);
+      return providerFailure(
+        new CodexCliError(
+          sourceText("error.provider.cliTimedOutRefresh", { provider: agentProviderName(provider) }),
+          "timeout",
+        ),
+      );
+    }),
   );
   return { stdout: output.stdout, launch };
 });
