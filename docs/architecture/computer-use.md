@@ -84,10 +84,15 @@ no cursor.
 
 A self-hosted server and the container start two Xvfb displays, and name the agent display in
 `OPENBOT_AGENT_DISPLAY`. The agent display has a white root (Xvfb `-wr`), because remote desktop
-shows a black root as if no video came. A boat hosted server names its desktop `:0`, and OpenBot
-runs on an Xvfb display. Electron keeps its own `DISPLAY`: the built-in browser draws its tabs in
-the OpenBot window, and under Xvfb a hidden view gives no capture and no clicks, so OpenBot cannot
-only hide its window. On Linux, `agent-display.ts` sets `DISPLAY` to the agent display for the
+shows a black root as if no video came. `openbot-agent-desktop` starts openbox and a tint2 panel on
+it (settings in `scripts/hosting/agent-desktop`), so that remote desktop shows a desktop, and agent
+windows have title bars and show in the panel. The openbox settings keep one desktop and no desktop
+menu. The panel has no launchers, because a server has no desktop programs. Both programs stay
+connected, so Xvfb does not reset the display (and its background) when the last other program
+disconnects. A server that does not have the packages keeps the bare display. A boat hosted server
+names its desktop `:0`, and OpenBot runs on an Xvfb display. Electron keeps its own `DISPLAY`: the
+built-in browser draws its tabs in the OpenBot window, and under Xvfb a hidden view gives no capture
+and no clicks, so OpenBot cannot only hide its window. On Linux, `agent-display.ts` sets `DISPLAY` to the agent display for the
 driver daemon, for Sunshine, and in `agentEnvironment` for every agent process. The driver and
 Sunshine open the display that `DISPLAY` names, so a screenshot, an input event and the remote
 desktop stream all use the agent display, and a program that an agent starts opens there. The

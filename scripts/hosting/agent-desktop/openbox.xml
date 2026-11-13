@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The openbox settings of the agent display on a server (openbot-agent-desktop). The other settings
+  are the defaults of openbox: windows have title bars that move, resize, minimize and close them.
+  The defaults have no desktop menu. The menu of the openbox package has programs that a server does
+  not have, and an item that stops openbox.
+  One desktop: with more, a scroll on the background moves the open windows out of view.
+-->
+<openbox_config xmlns="http://openbox.org/3.4/rc">
+  <desktops>
+    <number>1</number>
+  </desktops>
+</openbox_config>

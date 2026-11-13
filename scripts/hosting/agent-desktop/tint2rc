@@ -1,0 +1,58 @@
+# The panel of the agent display on a server (openbot-agent-desktop): the open windows and a clock.
+# It has no launchers: a server has no desktop programs, and a launcher that does nothing confuses.
+
+# Background 1: the panel.
+rounded = 0
+border_width = 0
+background_color = #1f2329 100
+border_color = #000000 0
+
+# Background 2: the active window in the list.
+rounded = 3
+border_width = 0
+background_color = #ffffff 20
+border_color = #000000 0
+
+panel_items = TC
+panel_size = 100% 32
+panel_margin = 0 0
+panel_padding = 4 2 4
+panel_background_id = 1
+panel_position = bottom center horizontal
+panel_layer = top
+panel_monitor = all
+strut_policy = follow_size
+autohide = 0
+wm_menu = 0
+panel_dock = 0
+disable_transparency = 1
+tooltip = 0
+
+taskbar_mode = single_desktop
+taskbar_padding = 0 0 4
+taskbar_background_id = 0
+taskbar_active_background_id = 0
+taskbar_name = 0
+
+task_text = 1
+task_icon = 1
+task_centered = 0
+task_maximum_size = 220 28
+task_padding = 6 2 6
+task_font = sans 9
+task_font_color = #ffffff 80
+task_active_font_color = #ffffff 100
+task_iconified_font_color = #ffffff 50
+task_background_id = 0
+task_active_background_id = 2
+mouse_left = toggle_iconify
+mouse_middle = none
+mouse_right = none
+mouse_scroll_up = none
+mouse_scroll_down = none
+
+time1_format = %H:%M
+time1_font = sans 10
+clock_font_color = #ffffff 90
+clock_padding = 8 0
+clock_background_id = 0
