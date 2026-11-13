@@ -1,0 +1,18 @@
+#!/bin/bash
+# Starts a small desktop on the agent display that DISPLAY names, and returns at once:
+# the openbox window manager, and a tint2 panel with the open windows and a clock.
+# openbot-hosted-server and openbot-container run it when the agent display is ready.
+#
+# Without it, remote desktop showed an empty white display, and the windows that agents opened had
+# no title bars, so a person could not move, close or find them (#7892). Both programs stay
+# connected to the display, so Xvfb does not reset the display when another program disconnects.
+# They stop when the display stops. A server that does not have a package keeps the bare display.
+set -u
+desktop="$(dirname "$0")/agent-desktop"
+if command -v openbox >/dev/null; then
+  openbox --sm-disable --config-file "$desktop/openbox.xml" >/dev/null 2>&1 &
+fi
+if command -v tint2 >/dev/null; then
+  tint2 -c "$desktop/tint2rc" >/dev/null 2>&1 &
+fi
+exit 0

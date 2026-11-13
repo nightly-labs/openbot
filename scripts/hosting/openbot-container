@@ -64,6 +64,8 @@ for display in :0 :1; do
   done
   xdpyinfo -display "$display" >/dev/null 2>&1 || fail "The virtual display $display did not start."
 done
+# A window manager and a panel on :1, so that remote desktop shows a desktop (#7892). tini adopts them.
+DISPLAY=:1 "$(dirname "$0")/openbot-agent-desktop"
 
 # Each data volume makes its own keyring password on its first start. The password only lets the
 # daemon open the keyring without a person; the file is 0600. A keyring with no password file is not

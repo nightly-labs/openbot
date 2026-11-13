@@ -12,6 +12,9 @@ openssl
 x11-utils
 xauth
 xvfb
+# The window manager and the panel of the agent display, which remote desktop shows.
+openbox
+tint2
 # The Codex sandbox. Without it on PATH, Codex uses its bundled copy and reports an error.
 bubblewrap
 # The Hermes Agent installer clones Hermes with git, and the Node.js that it downloads needs
