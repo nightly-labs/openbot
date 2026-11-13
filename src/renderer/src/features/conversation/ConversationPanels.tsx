@@ -14,7 +14,6 @@ import { VoicePanel } from "@openbot/ui/features/conversation/VoicePanel";
 import { McpSignInRelayDialog } from "@openbot/ui/features/settings/McpSignInPage";
 import { useText } from "@openbot/ui/text";
 import { actionToast } from "../../action-toast";
-import { BROWSER_PREVIEW_WIDTH_KEY, savePanelWidth } from "../../components/panel-width-storage";
 import { deviceQuoteShortcut } from "../../send-shortcut-preference";
 import { type AgentTemplatePublishCalls, agentTemplatesPort } from "../agent-templates/agent-templates-port";
 import { createPublishAgent } from "../agent-templates/PublishAgent";
@@ -29,6 +28,7 @@ import { cycleSpeechSpeed, speechSpeed } from "../speech/speech-speed";
 import { ConversationSideThread } from "./ConversationSideThread";
 import { isChatVisualAppShortcut } from "./chat-visual-shortcuts";
 import { htmlAttachmentPageHtml, htmlAttachmentPageUrl } from "./chat-visual-url";
+import { BROWSER_PANEL_DEFAULT } from "./conversation-controller";
 import { useConversationController } from "./conversation-controller-context";
 import { type AgentNotificationLevelCalls, conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
@@ -39,8 +39,6 @@ import { type CodexLivePort, createCodexLiveConversation } from "./stores/codex-
 import type { VoiceConversationKind } from "./stores/voice-session-store";
 
 const BROWSER_PANEL_DEFAULT_RATIO = 0.5;
-/** The default width of the Browser pane (`defaultWidth` of `BrowserPreviewSidebar` below). */
-const BROWSER_PANEL_DEFAULT = 320;
 const BROWSER_PANEL_MIN = 220;
 const BROWSER_PANEL_MAX = 1600;
 const CONVERSATION_PANEL_MIN = 96;
@@ -558,7 +556,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
           class="browser-panel side-panel-empty"
           aria-label={t("conversation.sidePanel.label")}
         >
-          {/* The list has the width of the Browser pane, so the Browser pane opens at the width set here. */}
+          {/* The list has no saved width: each pane keeps its own, so a drag here does not change a pane's width. */}
           <PanelResizer
             class="right-panel-resizer"
             label={t("conversation.sidePanel.resize")}
@@ -569,7 +567,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
             min={BROWSER_PANEL_MIN}
             max={browserPanelMaxWidth}
             onResize={setBrowserPanelWidth}
-            onResizeEnd={(width) => savePanelWidth(BROWSER_PREVIEW_WIDTH_KEY, width)}
+            onResizeEnd={setBrowserPanelWidth}
           />
           <SidePanelLauncher
             available={sidePanelPanes()}
@@ -708,7 +706,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
           hidden={browserExpandedOpen()}
           suspended={props.browserVisibilitySuspended || props.globalOverlayOpen || props.remoteDesktopVisible}
           contextKey={`${props.server?.id ?? "local"}:${props.agent?.id ?? ""}`}
-          defaultWidth={() => BROWSER_PANEL_DEFAULT}
+          defaultWidth={() => 320}
           maxWidth={browserPanelMaxWidth}
           onWidthChange={setBrowserPanelWidth}
           capturePreview={props.runtime?.browser.capturePreview}
