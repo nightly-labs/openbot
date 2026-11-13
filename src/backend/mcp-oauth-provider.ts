@@ -262,6 +262,11 @@ export interface McpSignIn {
    * "cancelled" instead, because that is what the user did.
    */
   cancelled: () => boolean;
+  /**
+   * Whether the token endpoint answered the grant with a failure. Its timeout is not one: that has
+   * its own words. Supabase refuses a grant with a 404, which must not read as a wrong address.
+   */
+  exchangeFailed: () => boolean;
 }
 
 /**
@@ -487,6 +492,7 @@ export class McpOAuth implements McpOAuthAuthority {
     // browser afterwards nor wait out a grant nobody will answer.
     let abandoned = false;
     let cancelled = false;
+    let exchangeFailed = false;
     const resource = mcpOAuthServerUrl(key);
     const provider = this.#provider(key, state, () => abandoned, open, unanswered);
     const abandon = () => {
@@ -555,6 +561,12 @@ export class McpOAuth implements McpOAuthAuthority {
                   authorizationCode: code,
                   fetchFn: this.#fetch(key, controller.signal),
                 }),
+              ).pipe(
+                Effect.tapError(() =>
+                  Effect.sync(() => {
+                    exchangeFailed = true;
+                  }),
+                ),
               ),
               this.#options.refreshTimeoutMs ?? MCP_TOKEN_TIMEOUT_MS,
               sourceText("error.backend.mcpSignInResponseTimedOut"),
@@ -575,6 +587,7 @@ export class McpOAuth implements McpOAuthAuthority {
       registrationStatus: () => provider.registrationStatus,
       watchRegistration: (fetch) => provider.watchRegistration(fetch),
       cancelled: () => cancelled,
+      exchangeFailed: () => exchangeFailed,
     };
   }
 
