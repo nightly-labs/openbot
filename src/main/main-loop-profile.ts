@@ -13,8 +13,7 @@ import { AnalyticsOperationFailure } from "./analytics-effects";
 /** A minute whose longest main-loop delay is at least this long can start or keep a profile. */
 export const PROFILE_STALL_MS = 2_000;
 /** The functions of one summary in the local file. An analytics event takes the first five. */
-export const PROFILE_TOP_COUNT = 20;
-export const PROFILE_EVENT_TOP_COUNT = 5;
+const PROFILE_TOP_COUNT = 20;
 
 const SAMPLING_INTERVAL_US = 10_000;
 const STACK_DEPTH = 8;
@@ -35,7 +34,7 @@ const FRAME_PATTERN =
 const STACK_SEPARATOR = " < ";
 const MAX_STACK_LENGTH = 900;
 
-export interface CpuProfileNode {
+interface CpuProfileNode {
   id: number;
   callFrame: { functionName: string; url: string; lineNumber: number };
   children?: readonly number[];
@@ -50,7 +49,7 @@ export interface CpuProfile {
   timeDeltas?: readonly number[];
 }
 
-export interface ProfileFunction {
+interface ProfileFunction {
   /** `name place`: the place is `native`, `node:<module>`, `npm:<package>` or `app:<file>:<line>`. */
   frame: string;
   /** The share of the profiled time that ran in this function itself. */
