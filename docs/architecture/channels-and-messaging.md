@@ -11,8 +11,15 @@ its activity with the active host (`live-activity-push-v1`, `POST /v1/live-activ
 with `away: true` when it leaves the foreground. `LiveActivityPushService` in `src/main` keeps the
 registration in memory for that session. While the phone is away, each agent event (at most once a
 second) reads the runtime snapshot of the agents the member can see and the member's read state,
-builds the props, and sends a change. A change of state has priority 10; a change inside a state
-waits 5 seconds and has priority 5. An unchanged state is sent again every 10 minutes, so its stale
+builds the props, and sends a change. iOS has a budget of priority 10 updates for each
+hour and can delay or drop the updates above it, and several agents change the state often. So priority
+10 is only for an alert, a new request, failure or reply, and an agent that finishes its work. Each
+other change has priority 5, which does not use the budget: work that starts, a request that someone
+answered on another device, and a count or a text that changes. The first update after the phone
+says that it goes away also has priority 5, because it repeats the view that the phone showed a moment
+before; after a closed connection the phone can show an old view, so a request, a failure or a reply
+has priority 10 then. A priority 5 change inside a state
+waits 5 seconds. An unchanged state is sent again every 10 minutes, so its stale
 date moves on; a host that sleeps stops this, and the view then shows that it is out of date. An idle
 state ends the activity.
 
@@ -734,8 +741,10 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   that no reply opened. A thread `message` event that mentions OpenBot is
   left to its `app_mention` event, so the order of the two events does not decide the route.
 - **Quiet answer.** In Slack threads the guidance lets the agent answer only `NO_REPLY` when a
-  message needs no answer. `finalPost` then keeps the reaction and posts nothing, and the adapter's
-  `remove` deletes the status post. An adapter without `remove` edits it to the no-answer text.
+  message needs no answer. In WhatsApp chats it does so when the agent must not answer, for example
+  when its instructions say not to answer a contact. `finalPost` then keeps the reaction and posts
+  nothing, and the adapter's `remove` deletes the status post. An adapter without `remove` edits it
+  to the no-answer text.
 - **Order.** The one-turn-per-agent rule is unchanged, so Slack requests wait behind the agent's own
   work and behind channel work that holds the host. The Slack thread shows a waiting post.
 - **Replies.** `MessagingThreads` reports each turn start and end. `MessagingService` posts a status

@@ -62,6 +62,14 @@ describe("decodeVaultState", () => {
     expect(() => decodeVaultState({ status: "ready", items: [{ ...LOGIN, addedBy: 7 }] })).toThrow();
   });
 
+  it("keeps the agents of an item and whether the Vault keeps them", () => {
+    const state = { status: "ready", items: [{ ...API_KEY, agents: ["a1", "a2"] }, LOGIN], agentScope: true };
+    expect(decodeVaultState(state)).toEqual(state);
+    expect(() => decodeVaultState({ status: "ready", items: [{ ...LOGIN, agents: "a1" }] })).toThrow();
+    expect(() => decodeVaultState({ status: "ready", items: [{ ...LOGIN, agents: [1] }] })).toThrow();
+    expect(() => decodeVaultState({ status: "ready", items: [], agentScope: "yes" })).toThrow();
+  });
+
   it("refuses a card whose last four are not four digits", () => {
     expect(() => decodeVaultState({ status: "ready", items: [{ ...CARD, last4: "4242424242424242" }] })).toThrow();
   });

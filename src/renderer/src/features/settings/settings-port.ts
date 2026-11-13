@@ -24,10 +24,8 @@ export interface SettingsPort {
   onApprovalAutomation: OpenBotDesktopApi["onApprovalAutomation"];
   onOpenSettings: OpenBotDesktopApi["onOpenSettings"];
   onOpenUpdateSettings: OpenBotDesktopApi["onOpenUpdateSettings"];
-  setAgentDefaults: OpenBotDesktopApi["setAgentDefaults"];
   setAnalyticsPreference: OpenBotDesktopApi["setAnalyticsPreference"];
   setAppBehaviorPreference: OpenBotDesktopApi["setAppBehaviorPreference"];
-  setBusyMessageModePreference: OpenBotDesktopApi["setBusyMessageModePreference"];
   setExternalLinkPreference: OpenBotDesktopApi["setExternalLinkPreference"];
   setRemoteNetworkRoute: OpenBotDesktopApi["setRemoteNetworkRoute"];
   setRemoteSessionReusePreference: OpenBotDesktopApi["setRemoteSessionReusePreference"];
@@ -35,7 +33,6 @@ export interface SettingsPort {
     OpenBotDesktopApi["agent"],
     "listAgents" | "updateAgent" | "listAgentNotificationLevels" | "setAgentNotificationLevel" | "onScopedEvent"
   >;
-  backgroundProcesses: OpenBotDesktopApi["backgroundProcesses"];
   dynamicIsland: Pick<
     OpenBotDesktopApi["dynamicIsland"],
     "getBuiltInDisplayGeometry" | "getPreference" | "onPreference" | "setPreference" | "setXWayland"

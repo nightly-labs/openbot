@@ -83,6 +83,7 @@ export const messages = {
   "agent.error.settingsFailed": "エージェントの設定を保存できませんでした",
   "agent.error.adminOnly": "エージェントの設定を変更できるのはサーバー管理者だけです。",
   "agent.error.continueFailed": "エージェントは続行できませんでした。もう一度お試しください。",
+  "agent.error.copyDetails": "詳細をコピー",
   "agent.error.mcpNotStarted": "MCP サーバーが起動していません",
   "agent.error.openMcpSettings": "MCP 設定を開く",
   "agent.error.provider": "プロバイダーのエラー",

@@ -25,6 +25,8 @@ export const messages = {
   "prompt.approval.allow": "Autoriser",
   "prompt.approval.alwaysAllow": "Toujours autoriser",
   "prompt.approval.deny": "Refuser",
+  "prompt.approval.cut":
+    "Cette carte n’affiche que le début de la demande : elle propose donc seulement Refuser. Si Autoriser n’apparaît pas bientôt, mettez à jour OpenBot sur le serveur.",
   "prompt.approval.report.bugHeadline": "Un bug ? Corrigeons-le.",
   "prompt.approval.report.ideaHeadline": "Une idée ? Concrétisons-la.",
   "prompt.approval.report.dontSend": "Pas maintenant",

@@ -9,7 +9,14 @@ import { zipSync } from "fflate";
 import { parse as parseYaml } from "yaml";
 import { causeHelpers } from "../backend/effect-boundary";
 import { MANAGED_SKILL_SLUGS } from "./managed-skill-service";
-import { archiveDirectory, inspectArchive, normalizedFiles, SKILL_FRONTMATTER } from "./skill-package";
+import {
+  archiveDirectory,
+  inspectArchive,
+  normalizedFiles,
+  readSkillArchive,
+  SKILL_FRONTMATTER,
+  skillZippable,
+} from "./skill-package";
 
 /** Owns immutable local revisions. A revision exists only after its directory is published. */
 export class LocalSkillLibrary {
@@ -292,11 +299,11 @@ function parsesAsYaml(text: string): boolean {
  * The folder in the workspace does not change.
  */
 function withQuotedFrontmatter(bytes: Uint8Array): Uint8Array {
-  const files = normalizedFiles(bytes);
+  const { files, executable } = readSkillArchive(bytes);
   const skillFile = files["SKILL.md"];
   if (!skillFile) return bytes;
   const quoted = quotedSkillMarkdown(skillFile);
-  return quoted ? zipSync({ ...files, "SKILL.md": quoted }, { level: 6 }) : bytes;
+  return quoted ? zipSync(skillZippable({ ...files, "SKILL.md": quoted }, executable), { level: 6 }) : bytes;
 }
 
 /** The `SKILL.md` as `withQuotedFrontmatter` saves it, or null when a save keeps it unchanged. */

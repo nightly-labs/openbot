@@ -147,6 +147,7 @@ export const messages = {
   "settings.planStart.set": "Ayarla",
   "settings.automationLimit.sectionTitle": "Sınır",
   "settings.automationLimit.sectionDescription": "Bu bilgisayardaki tüm ajanlar için geçerlidir.",
+  "settings.automationLimit.sectionDescriptionServer": "Bu sunucudaki tüm ajanlar için geçerlidir.",
   "settings.automationLimit.title": "Saatlik istek",
   "settings.automationLimit.option": "Saatte {limit}",
   "settings.automationLimit.note":
@@ -268,6 +269,9 @@ export const messages = {
     "Yuvanın gizlendiği yerde ince bir şerit kalır. Yuvayı göstermek için işaretçiyi yaklaştırın. Bir ajan size bir şey sorduğunda şeritten bir renk dalgası geçer.",
   "settings.agentDock.results.title": "Biten işleri göster",
   "settings.agentDock.results.description": "Ajanların bitirdiği sonuçlar kısa bir süre yuvanın yanında görünür.",
+  "settings.agentDock.activeSeats.title": "Yenilikleri olan ajanları göster",
+  "settings.agentDock.activeSeats.description":
+    "Yuvada olmayan bir ajan veya kanal, yeni bir mesajı olduğu ya da seni beklediği sürece yuvada görünür.",
   "settings.agentDock.agents.title": "Yuvadaki ajanlar",
   "settings.agentDock.agents.description": "{server} sunucusunun ajanları. Her sunucunun kendi yuvası vardır.",
   "settings.agentDock.agents.empty": "Bu sunucuda henüz ajan yok.",
@@ -704,12 +708,26 @@ export const messages = {
   "settings.transfer.count.noSettings": "Sunucu ayarı yok",
   "settings.transfer.includeAgent": "Dahil et: {name}",
   "settings.transfer.export.title": "Bu sunucuyu dışa aktar",
-  "settings.transfer.export.files": "Çalışma alanı dosyalarını dahil et",
-  "settings.transfer.export.filesDescription":
-    "Ajanlarınızın oluşturduğu dosyalar ve paylaşılan klasör. Küçük bir dosya için kapatın.",
-  "settings.transfer.export.settings": "Sunucu ayarlarını dahil et",
+  "settings.transfer.preset.label": "Dosyaya neler girer",
+  "settings.transfer.preset.templates": "Şablonlar",
+  "settings.transfer.preset.everything": "Tümü",
+  "settings.transfer.meter.files": "/ {total} (çalışma alanı dosyaları)",
+  "settings.transfer.part.agents": "Ajanlar ve kurulumları",
+  "settings.transfer.part.agentsDescription": "{contents}. Her zaman dosyada.",
+  "settings.transfer.part.settings": "Sunucu ayarları",
+  "settings.transfer.part.chats": "Sohbet geçmişi",
+  "settings.transfer.part.chatsDescription":
+    "Sohbetler ve yan ileti dizileri ile dosyaları, ayrıca rutinlerin çalıştırma geçmişi. Ajanlar bu sohbetlere bağlamlarıyla devam eder.",
+  "settings.transfer.part.channels": "Kanal mesajları",
+  "settings.transfer.part.channelsDescription":
+    "Dışa aktarılan ajanların bulunduğu kanalların mesajları, dosyaları ve kanal rutinlerinin çalıştırma geçmişiyle birlikte.",
+  "settings.transfer.part.files": "Çalışma alanı dosyaları",
+  "settings.transfer.part.filesDescription": "Ajanlarınızın oluşturduğu dosyalar ve paylaşılan klasör.",
+  "settings.transfer.part.preferences": "Sunucu tercihleri",
+  "settings.transfer.part.preferencesDescription":
+    "Ad, logo, saat dilimi, kişilik, ajan varsayılanları, model seçimleri, bellek ve beceri ayarları ile her kişinin bildirim düzeyleri ve sabitlemeleri.",
   "settings.transfer.export.settingsDescription":
-    "MCP sunucuları, özel model sağlayıcıları, kenar çubuğu bölümleri ve rutin akışları.",
+    "MCP sunucuları, özel model sağlayıcıları, kenar çubuğu bölümleri, rutin akışları ve paylaşılan beceriler.",
   "settings.transfer.export.chooseAgents": "Ajanları seç ({selected}/{total})",
   "settings.transfer.export.hideAgents": "Ajanları gizle",
   "settings.transfer.export.agentsLabel": "Dışa aktarılacak ajanlar",
@@ -736,8 +754,11 @@ export const messages = {
   "settings.transfer.import.agentsLabel": "Dosyadaki ajanlar",
   "settings.transfer.import.nameExists": "Ad zaten kullanılıyor",
   "settings.transfer.import.settings": "Sunucu ayarlarını içe aktar",
-  "settings.transfer.import.settingsDescription":
-    "Bu sunucuda olmayan MCP sunucularını, özel model sağlayıcılarını ve kenar çubuğu bölümlerini ekler.",
+  "settings.transfer.import.settingsAndPreferences":
+    "Bu sunucuda olmayan MCP sunucularını, özel model sağlayıcılarını, kenar çubuğu bölümlerini ve paylaşılan becerileri ekler.",
+  "settings.transfer.import.preferences": "Sunucu tercihlerini içe aktar",
+  "settings.transfer.import.preferencesDescription":
+    "Bu sunucunun adını, logosunu ve tercihlerini, ayrıca her kişinin bildirim düzeylerini ve sabitlenmiş öğelerini dosyadakilerle değiştirir.",
   "settings.transfer.import.submit": {
     one: "{count} ajanı içe aktar",
     other: "{count} ajanı içe aktar",

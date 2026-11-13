@@ -62,6 +62,8 @@ export const messages = {
     "הדחיסה אינה מקטינה את הצ'אט הזה: אחרי שתי דחיסות הוא עדיין תופס {percent}% מחלון ההקשר של המודל, ולכן OpenBot מפסיק לדחוס אותו. כלים והנחיות תופסים את רוב החלון. יש לכבות את שרתי ה-MCP או את השליטה במחשב שהסוכן הזה לא צריך, או לבחור מודל עם חלון גדול יותר. אחר כך יש להתחיל צ'אט חדש.",
   "error.backend.contextCompactionStopped":
     "שתי דחיסות של הצ'אט הזה נכשלו ברצף, ולכן OpenBot מפסיק לדחוס אותו אוטומטית. כל ניסיון שולח את כל הצ'אט למודל וצורך ממגבלת התוכנית שלך. יש לבחור Compact now כדי לנסות שוב, או להתחיל צ'אט חדש.",
+  "error.backend.providerModelAtCapacity":
+    "המודל בעומס מלא. הספק ינסה שוב בעוד כמה דקות. כדי להמשיך עכשיו, עצור את התור ובחר מודל אחר.",
   "error.backend.providerRetrying":
     "הספק נכשל בבקשה הזו {attempts} פעמים ומנסה שוב. אם הסוכן אינו ממשיך, יש לעצור את התור.",
   "error.backend.providerRetryingLargeContext":
@@ -335,6 +337,8 @@ export const messages = {
   "error.backend.browserProxyUnreachable": "הפרוקסי {name} אינו עונה, ולכן הדף לא נפתח.",
   "error.backend.browserProxySignInRefused": "הפרוקסי {name} דחה את ההתחברות, ולכן הדף לא נפתח.",
   "error.backend.browserProxyComputerUnreachable": "המחשב שהפרופיל הזה משתמש בו אינו עונה, ולכן הדף לא נפתח.",
+  "error.backend.browserProxyComputerLocalAddress":
+    "המחשב שהפרופיל הזה משתמש בו פותח רק אתרים ציבוריים. הוא לא פותח כתובות ברשת מקומית, ולכן הדף לא נפתח.",
   "error.backend.browserCertificateUntrusted": "תעודת האבטחה של האתר הזה אינה מהימנה, ולכן הדף לא נפתח.",
   "error.backend.browserLowMemory":
     "בשרת הזה נותר מעט זיכרון, ולכן הדפדפן אינו יכול לפתוח לשונית נוספת. יש לסגור לשונית או להמתין לסיום העבודה של סוכנים אחרים.",

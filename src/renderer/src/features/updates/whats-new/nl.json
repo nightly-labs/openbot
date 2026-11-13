@@ -1,5 +1,85 @@
 [
   {
+    "version": "0.70.0",
+    "date": "2026-11-13",
+    "notices": [
+      "Update ook elke server waarmee je verbonden bent naar deze versie. Server herstarten, standaardinstellingen van agents, limieten voor threads en de nieuwe stappen van Workflows werken op een server alleen als die deze versie heeft."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Herstart een server die je zelf host vanuit de app: kies als eigenaar of beheerder Server herstarten in het servermenu.",
+          "Kies welke agents elk login, elke kaart, elk contact en elke API-sleutel mogen gebruiken in Serverinstellingen → Kluis. Een agent ziet en vult alleen de items die hij mag gebruiken.",
+          "Workflows hebben stappen voor Afbeelding en Video. Maak afbeeldingen en korte video's met de modellen GPT Image, Grok Imagine of Sunra, en koppel afbeeldingen als referentie.",
+          "Koppel Sunra en TryPost via de Apps in de Marktplaats. Agents kunnen dan media maken met je Sunra-tegoed, en social-mediaberichten opstellen en publiceren.",
+          "Eigenaars en beheerders kunnen instellen hoeveel threads tegelijk draaien, op de server en per agent, in Serverinstellingen → Algemeen.",
+          "Toon agents met nieuwe berichten in het dock: zet dit aan in Instellingen → Agentdock. Klik met de rechtermuisknop op zo'n agent en kies Aan het dock toevoegen om hem daar te houden.",
+          "Voeg meer dan één Cursor-account toe. Elke agent kan een ander account gebruiken."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Een API-sleutel die je voor slechts één agent opslaat, wordt nu bewaard in de versleutelde Kluis. De sleutels die agents lezen hebben een nieuw pad, dus een script met het oude pad moet het nieuwe gebruiken.",
+          "De agentinstellingen, zoals Stuur agents bij terwijl ze werken, staan nu in Serverinstellingen → Agents voor elke server, ook voor deze computer.",
+          "In de volledige browserweergave staat het berichtvak weer onderaan in het midden van de pagina.",
+          "De chatkop toont de titel van de agent na zijn naam, bijvoorbeeld “Brock · Winkelmanager”."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot opent sneller als je chats lang zijn.",
+          "Op Windows en Linux vraagt OpenBot om bevestiging voordat het afsluit terwijl agents werken. Kies Laat draaien om het venster te verbergen en de agents hun werk te laten afmaken.",
+          "Apparaten maken weer verbinding met een server wanneer de verbinding van één apparaat tijdens de installatie stopt. De live weergave van de browser van een agent op een server waarmee je verbonden bent, blijft ook open bij een trage verbinding.",
+          "Wanneer je een agent om een screenshot van een webpagina vraagt, voegt hij de afbeelding nu toe aan zijn antwoord.",
+          "Gratis OpenCode-modellen antwoorden weer wanneer een OpenCode Go-sleutel is opgeslagen."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.69.0",
+    "date": "2026-11-12",
+    "notices": [
+      "Verborgen agents blijven nu werken. OpenBot heeft de routines uitgezet van agents die je vóór deze versie hebt verborgen, dus zet de routines aan die je wilt."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Zet een bericht in de chat van een agent vast: klik er met de rechtermuisknop op en kies Vastmaken. De knop voor vastgemaakte berichten in de chatkop toont de vastgemaakte berichten van alle chats van de agent.",
+          "De Bibliotheek heeft mappen en drie weergaven. Een agent kan ook de bestanden die hij bijvoegt opslaan in een map die je kiest.",
+          "Een taak aanleren: kies Een taak aanleren in het menu +, en doe daarna de taak in de browser van de agent. De agent slaat de stappen op als vaardigheid.",
+          "Bundel de accounts van een aanbieder in Instellingen. Agents gebruiken één account tot het bijna een gebruikslimiet bereikt, en daarna het volgende account.",
+          "Voeg vaardigheden toe vanuit GitHub: plak de link van een openbare repository in het zoekveld voor vaardigheden in de Marktplaats.",
+          "Serverinstellingen → Overdracht kan een volledige kopie van een server exporteren, en agents in één stap naar een andere server kopiëren.",
+          "Demp een agent via zijn menu in de zijbalk. Een gedempte agent stuurt geen meldingen en speelt geen geluid af."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Een bericht dat je naar een agent stuurt terwijl hij werkt, stuurt nu de lopende beurt bij. Om het zoals voorheen in de wachtrij te zetten, zet je Stuur agents bij terwijl ze werken uit in Instellingen → Agents.",
+          "Een verborgen agent blijft werken. Hij voert zijn routines uit en staat in Heeft je nodig als hij op je antwoord wacht.",
+          "De geopende server staat als logo onderaan de paginabalk. De knop Nieuw staat aan het einde van het zoekveld van de zijbalk.",
+          "OpenBot gebruikt Electron 45.3.0 met Chromium 156, en meer sites met een botcontrole laden in de browser van de agent."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot start sneller, vooral op Windows, en een trage computer blijft bruikbaar na de start.",
+          "OpenBot blijft reageren na een herstart als je veel taken of threads hebt.",
+          "Op Linux en Windows voltooit OpenBot zijn afsluiting wanneer je het hoofdvenster sluit.",
+          "Routines draaien op tijd nadat de klok van de computer is gecorrigeerd.",
+          "Tekst die je uit een chat kopieert, heeft niet langer lege regels aan het begin of het einde."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.68.0",
     "date": "2026-11-11",
     "notices": [],

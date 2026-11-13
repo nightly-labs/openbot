@@ -14,3 +14,10 @@ export interface NotificationOpenedEvent {
   /** The channel of a channel notification. The renderer opens the channel, not the agent chat. */
   channelId?: string;
 }
+
+// The workflow a clicked workflow notification was about, such as a step that waits for approval.
+// The renderer opens it.
+export interface WorkflowNotificationOpenedEvent {
+  serverId: string;
+  workflowId: string;
+}

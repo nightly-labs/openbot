@@ -1661,6 +1661,42 @@ button.chat-action-target:active,
   inset: 0;
 }
 
+/* A player with full screen is a manual popover. Until it opens, it has none of the browser's popover styles. */
+.media-generation-player[popover]:not(:popover-open) {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
+
+/* Full screen: the video fills the app window. */
+.media-generation-player:popover-open {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  overflow: hidden;
+  border: 0;
+  padding: 0;
+  background: var(--openbot-bg-control);
+  color: inherit;
+  -webkit-app-region: no-drag;
+}
+
+.media-generation-player:popover-open::backdrop {
+  background: transparent;
+}
+
 .media-generation-player video {
   display: block;
   width: 100%;

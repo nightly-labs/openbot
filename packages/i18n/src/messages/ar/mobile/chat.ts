@@ -455,7 +455,14 @@ export const messages = {
   "mobile.chat.approval.effect.permissions":
     "«سماح» يمنح {name} هذه الأذونات على {server}. «رفض» يبقي الأذونات الحالية.",
   "mobile.chat.approval.partial":
-    "هذا الطلب أطول من أن يُعرض على الهاتف. للسماح به، افتح OpenBot على {server}. يمكنك رفضه هنا.",
+    "يرسل {server} بداية هذا الطلب فقط إلى الهاتف. للسماح به، حدّث OpenBot على {server}، أو افتح هذه الدردشة في تطبيق OpenBot لسطح المكتب. يمكنك رفضه هنا.",
+  "mobile.chat.approval.loading": "جارٍ تحميل الطلب كاملًا…",
+  "mobile.chat.approval.loadFailed": "تعذّر تحميل الطلب كاملًا. يمكنك رفضه هنا.",
+  "mobile.chat.approval.retry": "إعادة المحاولة",
+  "mobile.chat.approval.report.bugHeadline": "وجدت خطأً؟ لنُصلحه.",
+  "mobile.chat.approval.report.ideaHeadline": "لديك فكرة؟ لنحققها.",
+  "mobile.chat.approval.report.dontSend": "ليس الآن",
+  "mobile.chat.approval.report.send": "إرسال إلى فريق OpenBot",
   "mobile.chat.approval.allow": "سماح",
   "mobile.chat.approval.deny": "رفض",
   "mobile.chat.approval.reconnect": "اتصل بـ {server} للإجابة عن هذا الطلب.",

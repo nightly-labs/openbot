@@ -2,7 +2,6 @@ import type { AppInfo } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Bell,
-  Bot,
   CircleArrowDown,
   CreditCard,
   Mic,
@@ -17,7 +16,6 @@ import {
 
 export type SettingsTab =
   | "general"
-  | "agents"
   | "notifications"
   | "voice"
   | "dynamic-island"
@@ -89,19 +87,6 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
       { titleKey: "settings.restoreWorkspace.title", descriptionKey: "settings.restoreWorkspace.description" },
       { titleKey: "settings.quitGuard.title", descriptionKey: "settings.quitGuard.description", macOS: true },
       { titleKey: "settings.analytics.title", descriptionKey: "settings.analytics.description" },
-    ],
-  },
-  {
-    value: "agents",
-    titleKey: "settings.tab.agents.title",
-    descriptionKey: "settings.tab.agents.description",
-    icon: Bot,
-    rows: [
-      { titleKey: "agentSettings.automation.title" },
-      { titleKey: "agentSettings.agentNewChat.title" },
-      { titleKey: "agentSettings.quickAcknowledgement.title" },
-      { titleKey: "settings.busyMessage.title", descriptionKey: "settings.busyMessage.description" },
-      { titleKey: "settings.backgroundProcesses.title", descriptionKey: "settings.backgroundProcesses.description" },
     ],
   },
   {

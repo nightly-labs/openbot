@@ -11,8 +11,12 @@ import { create } from "zustand";
 import { devFeatureOverride, devLatestAppVersion } from "@/shared/lib/dev-feature-overrides";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 
-/** A screen that opens often reads the flags again at most this often. */
-const FLAGS_TTL_MS = 60_000;
+/**
+ * A screen that opens often, or the app when it comes to the front, reads the flags again at most this
+ * often. Flags seldom change, and each read is a request to the account service. A screen that must
+ * have the current flags, such as the hosted server plans, asks with `force`.
+ */
+const FLAGS_TTL_MS = 10 * 60_000;
 const FLAGS_TIMEOUT_MS = 10_000;
 
 /**

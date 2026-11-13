@@ -6,6 +6,7 @@ import {
 } from "@openbot/contracts/ipc";
 import {
   Button,
+  ExternalLink,
   Input,
   Item,
   ItemActions,
@@ -29,6 +30,7 @@ import { AddToAgents, type DialogSkill } from "./MarketplaceAgentsDialog";
 import { useInstalls } from "./MarketplaceCards";
 import { CopyListingLink, DetailState, SkillIcon, TryCard } from "./MarketplaceParts";
 import { VerifiedMark } from "./MarketplaceSkills";
+import { GithubTrustNote, githubOrigin } from "./marketplace-github";
 import { CATEGORY_LABELS } from "./marketplace-listing";
 import type { MarketplaceAgent, MarketplaceModel } from "./marketplace-model";
 import { agentsWith, canSwitch, isOn, matches, outdated, useSkillWords } from "./marketplace-skill-state";
@@ -204,15 +206,27 @@ function SkillInformation(props: { skill: MarketplaceSkillSummary }) {
     props.skill.verified === true
       ? t("marketplace.skills.source.verifiedLong")
       : t("marketplace.skills.source.publicLong");
-  const facts = () => [
+  const updated = () => ({
+    label: t("marketplace.properties.updated"),
+    value: format.date(new Date(props.skill.updatedAt), { dateStyle: "medium" }),
+  });
+  /* A skill from GitHub has no catalog category, version or install count: its source is the commit. */
+  const githubFacts = (origin: { repository: string; commit: string }) => [
+    { label: t("marketplace.properties.creator"), value: props.skill.creatorName },
+    { label: t("marketplace.skills.sourceLabel"), value: t("marketplace.skills.github.source", origin) },
+    updated(),
+  ];
+  const facts = () => {
+    const origin = githubOrigin(props.skill.id);
+    if (origin) return githubFacts(origin);
+    return catalogFacts();
+  };
+  const catalogFacts = () => [
     { label: t("marketplace.properties.creator"), value: props.skill.creatorName },
     { label: t("marketplace.skills.sourceLabel"), value: source() },
     { label: t("marketplace.properties.category"), value: t(CATEGORY_LABELS[props.skill.category]) },
     { label: t("marketplace.properties.version"), value: format.number(props.skill.version) },
-    {
-      label: t("marketplace.properties.updated"),
-      value: format.date(new Date(props.skill.updatedAt), { dateStyle: "medium" }),
-    },
+    updated(),
     { label: t("marketplace.properties.installs"), value: installs(props.skill.installs) },
   ];
   return (
@@ -256,6 +270,7 @@ export function MarketplaceSkillPage(props: { scope: MarketplaceScope; listing: 
   /* The loaded detail can be newer than the listing, and the Try card sends its instructions. */
   const skill = () => detail.value() ?? props.listing;
   const current = () => status(skill().id, skill().version);
+  const origin = () => githubOrigin(skill().id);
   // An effect, not `onSettled`: the read goes through the owner's props, and a prop that the
   // owner computes makes a memo, which `onSettled` refuses.
   createEffect(
@@ -321,30 +336,51 @@ export function MarketplaceSkillPage(props: { scope: MarketplaceScope; listing: 
         subtitle={skill().description}
         actions={
           <>
-            <CopyListingLink model={model()} link={{ kind: "skill", id: skill().slug }} />
+            <Show
+              when={origin()}
+              fallback={<CopyListingLink model={model()} link={{ kind: "skill", id: skill().slug }} />}
+            >
+              {(github) => (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  aria-label={t("marketplace.skills.github.openName", { repository: github().repository })}
+                  onClick={() => model().openUrl(github().url)}
+                >
+                  {t("marketplace.skills.github.open")}
+                  <ExternalLink aria-hidden="true" />
+                </Button>
+              )}
+            </Show>
             <AddToAgents model={model()} skill={skill()} />
           </>
         }
         intro={
-          <DetailState
-            status={detail.status()}
-            reference={detail.reference()}
-            loadingLabel={t("marketplace.skill.loading")}
-            onRetry={detail.retry}
-          >
-            <Show when={detail.value()}>
-              {(full) => (
-                <TryCard
-                  seed={skill().name}
-                  chip={{ kind: "skill", name: skill().name, icon: <SkillIcon url={skill().iconUrl} /> }}
-                  requests={[{ id: "example", text: skillExamplePrompt(full(), t) }]}
-                  tryLabel={tryLabel}
-                  onTry={tryHandler(full())}
-                  caption={reason()}
-                />
-              )}
+          <>
+            <Show when={origin()}>
+              <GithubTrustNote />
             </Show>
-          </DetailState>
+            <DetailState
+              status={detail.status()}
+              reference={detail.reference()}
+              loadingLabel={t("marketplace.skill.loading")}
+              onRetry={detail.retry}
+            >
+              <Show when={detail.value()}>
+                {(full) => (
+                  <TryCard
+                    seed={skill().name}
+                    chip={{ kind: "skill", name: skill().name, icon: <SkillIcon url={skill().iconUrl} /> }}
+                    requests={[{ id: "example", text: skillExamplePrompt(full(), t) }]}
+                    tryLabel={tryLabel}
+                    onTry={tryHandler(full())}
+                    caption={reason()}
+                  />
+                )}
+              </Show>
+            </DetailState>
+          </>
         }
         details={<SkillInformation skill={skill()} />}
       >

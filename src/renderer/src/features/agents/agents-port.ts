@@ -15,8 +15,6 @@ export interface AgentsPort {
     | "updateAgentHostSettings"
     | "getAgentBackupModels"
     | "updateAgentBackupModels"
-    | "getAgentTaskLimit"
-    | "updateAgentTaskLimit"
     | "getAgentNewChat"
     | "updateAgentNewChat"
     | "getAgentPlanCard"

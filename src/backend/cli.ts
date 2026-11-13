@@ -442,17 +442,24 @@ export const resolveHermesCli: (input?: {
     for (const candidate of candidates) {
       if (!(yield* isExecutable(candidate.executable))) continue;
       found = true;
-      const attempt = yield* Effect.result(
+      const read = (args: readonly string[]) =>
         Effect.gen(function* () {
-          const { stdout, launch } = yield* readCliVersion(candidate, "hermes");
+          const { stdout, launch } = yield* readCliVersion(candidate, "hermes", args);
           return {
             executable: candidate.executable,
             version: parseHermesVersion(stdout),
             source: "system" as const,
             ...launch,
           };
-        }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
-      );
+        }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))));
+      // `hermes --version` waits for a network update check, which can take more than the limit and
+      // then never saves its result, so every check timed out (#7989). `hermes acp --version` prints
+      // only the version. A Hermes before 0.14 refuses that flag at once and gets `--version`.
+      const quick = yield* Effect.result(read(["acp", "--version"]));
+      const attempt =
+        Result.isSuccess(quick) || isCliTimeout(quick.failure.cause)
+          ? quick
+          : yield* Effect.result(read(["--version"]));
       if (Result.isSuccess(attempt)) return attempt.success;
       const error = attempt.failure.cause;
 
@@ -468,11 +475,12 @@ export const resolveHermesCli: (input?: {
 );
 
 /**
- * Hermes prints its release and its build on the first line, such as
+ * `hermes acp --version` prints only the version, such as `0.21.5+5805.g54bc5e5`. `hermes --version`
+ * prints its release and its build on the first line, such as
  * `Hermes Agent v0.21.5+5805.g54bc5e5 (2026.9.24) · upstream 54bc5e50`. A line about an update can follow.
  */
 function parseHermesVersion(output: string): string {
-  const version = output.match(/^Hermes Agent v(\d+\.\d+\.\d+)\b/mu)?.[1];
+  const version = output.match(/^(?:Hermes Agent v)?(\d+\.\d+\.\d+)\b/mu)?.[1];
   if (!version) throw new CodexCliError(sourceText("error.provider.hermesVersionUnreadable"), "invalid");
   return version;
 }
@@ -898,24 +906,53 @@ export function resolveInstalledFirst<Cli extends AgentCliInfo, E>(
   resolve: (input: { bundledExecutable?: string | null }) => Effect.Effect<Cli, E>,
   bundledExecutable: string | null | undefined,
   preferInstalled: boolean,
+  installedChosen = false,
 ): Effect.Effect<Cli, E> {
+  return chooseInstalledFirst(resolve, bundledExecutable, preferInstalled, installedChosen).pipe(
+    Effect.map((choice) => choice.cli),
+  );
+}
+
+/**
+ * The CLI that runs, and the one the user can switch to: the CLI the user installed while OpenBot's
+ * copy runs, or the newer copy while the user's CLI runs because they chose it.
+ */
+export interface InstalledFirstChoice<Cli> {
+  readonly cli: Cli;
+  readonly passedOver: { readonly source: "system" | "managed"; readonly version: string } | null;
+}
+
+/**
+ * `resolveInstalledFirst`, with the CLI it passed over. `installedChosen`: the user chose their own
+ * CLI, so it runs also when the copy is newer. A launcher of the user's, such as a script that picks
+ * Pi's settings folder, then still runs after an update (#6327).
+ */
+export function chooseInstalledFirst<Cli extends AgentCliInfo, E>(
+  resolve: (input: { bundledExecutable?: string | null }) => Effect.Effect<Cli, E>,
+  bundledExecutable: string | null | undefined,
+  preferInstalled: boolean,
+  installedChosen = false,
+): Effect.Effect<InstalledFirstChoice<Cli>, E> {
   const copy = resolve(bundledExecutable === undefined ? {} : { bundledExecutable });
-  if (!preferInstalled) return copy;
   const installedCli = resolve({ bundledExecutable: null }).pipe(Effect.orElseSucceed(() => null));
-  const choose = (resolved: Cli, installed: Cli | null): Cli =>
-    resolved.source === "managed" &&
-    installed?.source === "system" &&
-    (installed.version === resolved.version || olderVersion(resolved.version, installed.version))
-      ? installed
-      : resolved;
+  const choose = (resolved: Cli, installed: Cli | null): InstalledFirstChoice<Cli> => {
+    if (resolved.source !== "managed" || installed?.source !== "system") return { cli: resolved, passedOver: null };
+    const asNew = installed.version === resolved.version || olderVersion(resolved.version, installed.version);
+    if (preferInstalled && (asNew || installedChosen)) {
+      const copyNewer = olderVersion(installed.version, resolved.version);
+      return { cli: installed, passedOver: copyNewer ? { source: "managed", version: resolved.version } : null };
+    }
+    return { cli: resolved, passedOver: { source: "system", version: installed.version } };
+  };
   return Effect.gen(function* () {
     // With a copy, the two probes run at once: the user's CLI adds no wait unless it is the slower one.
+    // An update starts the copy, but still reads the user's CLI, so that it can offer it afterwards.
     if (bundledExecutable) {
       const [resolved, installed] = yield* Effect.all([copy, installedCli], { concurrency: 2 });
       return choose(resolved, installed);
     }
     const resolved = yield* copy;
-    return resolved.source === "managed" ? choose(resolved, yield* installedCli) : resolved;
+    return resolved.source === "managed" ? choose(resolved, yield* installedCli) : { cli: resolved, passedOver: null };
   });
 }
 
@@ -1306,12 +1343,14 @@ function isCliTimeout(error: unknown): error is CodexCliError {
 }
 
 /**
- * Runs `--version` with the `PATH` that the CLI's processes get, so a `#!/usr/bin/env node` CLI that
- * starts here also starts as the provider. `launch` holds that `PATH` for the resolved CLI info.
+ * Runs `--version` (or the fixed `args` that print the version) with the `PATH` that the CLI's
+ * processes get, so a `#!/usr/bin/env node` CLI that starts here also starts as the provider.
+ * `launch` holds that `PATH` for the resolved CLI info.
  */
 const readCliVersion = Effect.fn("Cli.readVersion")(function* (
   { executable: candidate, source }: { executable: string; source: "system" | "managed" },
   provider: AgentProviderId,
+  args: readonly string[] = ["--version"],
 ) {
   const launchPath = yield* cliLaunchPath(candidate, source);
   const launch = launchPath ? { launchPath } : {};
@@ -1321,7 +1360,7 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
     target
       ? execFileAsync(
           process.env.ComSpec?.trim() || "cmd.exe",
-          ["/d", "/s", "/c", `""${candidate.replaceAll("%", "%%")}" --version"`],
+          ["/d", "/s", "/c", `""${candidate.replaceAll("%", "%%")}" ${args.join(" ")}"`],
           {
             timeout,
             maxBuffer: 64 * 1024,
@@ -1329,7 +1368,7 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
             windowsVerbatimArguments: true,
           },
         )
-      : execFileAsync(candidate, ["--version"], {
+      : execFileAsync(candidate, [...args], {
           timeout,
           maxBuffer: 64 * 1024,
           windowsHide: process.platform === "win32",

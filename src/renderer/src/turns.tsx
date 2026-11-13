@@ -7,6 +7,7 @@ import type {
   QueueSnapshot,
   RoutineFields,
 } from "@openbot/contracts/ipc";
+import { approvalIsCut, withWholeApproval } from "@openbot/team-client/runtime-attention";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, untrack } from "solid-js";
 import { desktopAnalytics } from "./analytics";
@@ -140,6 +141,36 @@ const Turns = createSimpleContext({
           : current,
       );
     }
+    // A runtime snapshot cuts the long texts of an approval. Main reads the whole copy once for each cut
+    // request. Until it comes, and when the server cannot send it, the card offers only Deny.
+    const wholeApprovalReads = new Set<string>();
+    createEffect(
+      () => approvals().filter(approvalIsCut),
+      (cut) => {
+        for (const approval of cut) {
+          const key = JSON.stringify([scopeServerId, approval.agentId, approval.turnId, approval.requestId]);
+          if (wholeApprovalReads.has(key)) continue;
+          wholeApprovalReads.add(key);
+          void turnsPort()
+            .agent.readPendingApproval({ agentId: approval.agentId, requestId: approval.requestId })
+            .then((whole) => {
+              // Before a joined server connects, main does not know its capabilities and returns null. The
+              // next change of the approvals tries again.
+              if (!whole) {
+                wholeApprovalReads.delete(key);
+                return;
+              }
+              if (!scopeIsCurrent()) return;
+              setApprovals((current) => {
+                const next = withWholeApproval(current, whole);
+                return next === current ? current : [...next];
+              });
+            })
+            // The next change of the approvals tries again.
+            .catch(() => wholeApprovalReads.delete(key));
+        }
+      },
+    );
     const completedTurnByAgent = new Map<string, string>();
     const queueSnapshotRequests = new Map<string, number>();
     const waitSnapshotRequests = new Map<string, number>();

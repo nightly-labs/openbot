@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useHapticsPreference } from "@/features/settings/model/haptics";
 import { haptics } from "@/shared/lib/haptics";
 import { replyWordFeedback } from "../model/reply-reveal";
 
@@ -10,7 +11,10 @@ const FLUSH_KNOCKS = [
 ] as const;
 
 /** Feedback follows local playback, never network chunks or row layout events. */
-export function useReplyHaptics(enabled: boolean) {
+export function useReplyHaptics(active: boolean) {
+  // Settings > Haptics can turn off reply feedback and keep the other haptics.
+  const replies = useHapticsPreference((state) => state.replies);
+  const enabled = active && replies;
   return useMemo(
     () => ({
       onWord(word: string, index: number) {

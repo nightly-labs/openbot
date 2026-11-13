@@ -60,6 +60,12 @@ export function isAgentApproval(value: unknown): value is AgentApproval {
   );
 }
 
+/** The approval to read whole: the runtime snapshot carries a cut copy of it. */
+export interface ReadPendingApprovalInput {
+  agentId: string;
+  requestId: string | number;
+}
+
 export interface RespondToApprovalInput {
   requestId: string | number;
   decision: "accept" | "decline";

@@ -15,16 +15,19 @@ const PART_LENGTH = 400;
 
 /**
  * The text in parts that `speak` takes. Parts end at a sentence where they can, and a sentence that
- * is too long for one part ends at a comma or a space.
+ * is too long for one part ends at a comma or a space. `speed` is the playback speed, where 1 is
+ * normal: a part that plays faster leaves less time to synthesize the next part, so the parts grow
+ * more slowly. The first part does not change with the speed.
  */
-export function speechParts(text: string, locale: string): string[] {
+export function speechParts(text: string, locale: string, speed = 1): string[] {
   const segmenter = new Intl.Segmenter(locale, { granularity: "sentence" });
   const parts: string[] = [];
   let current = "";
+  const growth = PART_GROWTH / Math.max(1, speed);
   const limit = () => {
     const last = parts.at(-1);
     if (last === undefined) return FIRST_PART_LENGTH;
-    return Math.min(PART_LENGTH, Math.max(FIRST_PART_LENGTH, last.length * PART_GROWTH));
+    return Math.min(PART_LENGTH, Math.max(FIRST_PART_LENGTH, Math.floor(last.length * growth)));
   };
   const flush = () => {
     if (current.trim()) parts.push(current.trim());

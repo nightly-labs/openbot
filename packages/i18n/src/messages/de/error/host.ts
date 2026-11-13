@@ -24,6 +24,7 @@ export const messages = {
   "error.host.identityLocalOnly":
     "Name und Logo des Servers können nur auf dem Computer geändert werden, auf dem er läuft.",
   "error.host.timezoneInvalid": "Diese Zeitzone ist unbekannt.",
+  "error.host.turnLimitInvalid": "Dieses Thread-Limit ist ungültig.",
   "error.host.maintenanceInterrupted":
     "Die Host-Wartung wurde unterbrochen. Prüfe die Anwendung und setze den Host-Zustand zurück, bevor du es erneut versuchst.",
   "error.host.updateFailed":

@@ -1,4 +1,4 @@
-import { canAdministerServer, type StoredFileRow } from "@openbot/contracts/ipc";
+import { canAdministerServer, libraryFolderPath, type StoredFileRow } from "@openbot/contracts/ipc";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import {
   FILE_TYPE_FILTER_VALUES,
@@ -18,7 +18,7 @@ import FileImage from "lucide-react-native/icons/file-image";
 import FilePlay from "lucide-react-native/icons/file-play";
 import FileSpreadsheet from "lucide-react-native/icons/file-spreadsheet";
 import FileText from "lucide-react-native/icons/file-text";
-import { type ReactNode, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, useWindowDimensions, View, type ViewInstance } from "react-native";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -28,8 +28,16 @@ import { useAttachmentFile } from "@/features/chat/components/attachment-preview
 import { ChatGalleryTile } from "@/features/chat/components/chat-image-gallery";
 import { ChatImageViewerProvider, isViewableImage } from "@/features/chat/components/chat-image-viewer";
 import { useAttachmentPreview } from "@/features/chat/components/use-attachment-preview";
+import { LibraryPathCapsule, useLibraryCapsuleRoom } from "@/features/servers/components/library-path-capsule";
 import { bentoBlocks } from "@/features/servers/model/library-bento";
-import { useServerStorage } from "@/features/servers/model/use-server-storage";
+import {
+  canHoldFolder,
+  filesOfPlace,
+  fromRemovedAgent,
+  resolveLibraryPlace,
+  useLibraryPlace,
+} from "@/features/servers/model/library-place";
+import { useLibrary } from "@/features/servers/model/use-library-folders";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { AndroidBlurTarget } from "@/shared/components/android-header-blur";
 import { LargeTitle, LargeTitleBar, useLargeTitleScroll } from "@/shared/components/large-title";
@@ -81,13 +89,22 @@ function isLibraryPicture(file: StoredFileRow): boolean {
  * first, as the desktop Library shows them. A picture opens in the image viewer of the chat, and a
  * swipe goes through the pictures of the filter. Another file opens on the preview screen, or in the
  * share sheet when the phone cannot show it.
+ *
+ * On a host with `library-folders-v1`, the folder capsule at the bottom chooses the place: all files,
+ * an agent, a folder, or the files of deleted agents. A file moves into a folder from its menu. The
+ * host sends `library-folders-changed` after each change, so a change on the desktop, on another
+ * phone or by an agent shows here at once.
  */
 export function ServerLibraryScreen() {
   const { t, errorMessage } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
   const { servers, agents } = useMobileWorkspace();
   const server = servers.find((item) => item.id === serverId);
-  const { available, query, rescan } = useServerStorage(serverId);
+  const { storage, folders, canOrganize } = useLibrary(serverId);
+  const { available, query, rescan } = storage;
+  const snapshot = folders.snapshot;
+  const living = folders.livingAgentIds;
+  const capsuleRoom = useLibraryCapsuleRoom();
   const scroll = useLargeTitleScroll();
   const insets = useSafeAreaInsets();
   const dimensions = useWindowDimensions();
@@ -99,10 +116,20 @@ export function ServerLibraryScreen() {
 
   // As on desktop, a file that is gone from the disk does not show.
   const files = useMemo(() => (query.data?.files ?? []).filter((file) => file.status !== "missing"), [query.data]);
-  const counts = useMemo(() => fileTypeCounts(files), [files]);
+  const removedFilesExist = useMemo(() => files.some((file) => fromRemovedAgent(file, living)), [files, living]);
+  const storedPlace = useLibraryPlace(serverId);
+  const place = useMemo(
+    () => resolveLibraryPlace(storedPlace, snapshot, living, removedFilesExist),
+    [storedPlace, snapshot, living, removedFilesExist],
+  );
+  const placeFiles = useMemo(() => filesOfPlace(files, place, snapshot, living), [files, place, snapshot, living]);
+  const counts = useMemo(() => fileTypeCounts(placeFiles), [placeFiles]);
   // A type that a new measurement leaves empty is no longer selected.
   const selected = counts[type] > 0 ? type : "all";
-  const shown = useMemo(() => queryFiles(files, { search: "", type: selected, sort: "newest" }), [files, selected]);
+  const shown = useMemo(
+    () => queryFiles(placeFiles, { search: "", type: selected, sort: "newest" }),
+    [placeFiles, selected],
+  );
   const pictures = useMemo(() => shown.filter(isLibraryPicture), [shown]);
 
   const gridWidth = Math.max(width - PADDING * 2, 1);
@@ -112,12 +139,48 @@ export function ServerLibraryScreen() {
     [shown, gridWidth, columns],
   );
   const canDelete = server ? canAdministerServer(server.role) : false;
-  const title = t("mobile.app.route.library");
   const agentName = (agentId: string | null) =>
     agentId ? agents.find((agent) => agent.id === agentId && agent.serverId === serverId)?.name : undefined;
+  // The page title is the place; the caption is the server, or the agent and the folders above a folder.
+  const folderPath = place.kind === "folder" && snapshot ? libraryFolderPath(snapshot.folders, place.folderId) : [];
+  const placeAgent = place.kind === "agent" || place.kind === "folder" ? (agentName(place.agentId) ?? "") : "";
+  const title =
+    place.kind === "removed"
+      ? t("mobile.server.library.folders.removedAgents")
+      : place.kind === "agent"
+        ? placeAgent
+        : (folderPath.at(-1)?.name ?? t("mobile.app.route.library"));
+  const caption =
+    place.kind === "folder"
+      ? [placeAgent, ...folderPath.slice(0, -1).map((folder) => folder.name)].join(" / ")
+      : server?.name;
+  const segments =
+    place.kind === "all"
+      ? [t("mobile.server.library.folders.allFiles")]
+      : place.kind === "removed"
+        ? [t("mobile.server.library.folders.removedAgents")]
+        : [placeAgent, ...folderPath.map((folder) => folder.name)];
+  const placeFolderId = place.kind === "folder" ? place.folderId : undefined;
+  const placeAgentId = place.kind === "agent" || place.kind === "folder" ? place.agentId : null;
+  const addAgentId =
+    snapshot !== null && canOrganize(placeAgentId) && canHoldFolder(snapshot.folders, placeFolderId)
+      ? placeAgentId
+      : null;
+
+  // An agent can save a file into a folder before this phone's scan lists the file: scan again once.
+  const knownFileIds = useMemo(() => new Set((query.data?.files ?? []).map((file) => file.id)), [query.data]);
+  const rescannedRevision = useRef<number | null>(null);
+  useEffect(() => {
+    // A cut list does not hold every file, so a missing file is no reason to scan again.
+    if (!snapshot || !query.data || query.data.truncated || rescannedRevision.current === snapshot.revision) return;
+    if (!Object.keys(snapshot.placement).some((fileId) => !knownFileIds.has(fileId))) return;
+    rescannedRevision.current = snapshot.revision;
+    void rescan().catch(() => undefined);
+  }, [snapshot, query.data, knownFileIds, rescan]);
 
   function refresh() {
     setRefreshing(true);
+    if (snapshot) void folders.query.refetch();
     rescan()
       .catch(() => undefined)
       .finally(() => setRefreshing(false));
@@ -139,6 +202,14 @@ export function ServerLibraryScreen() {
     )
   ) : files.length === 0 ? (
     <LibraryNote title={t("mobile.server.library.emptyTitle")} body={t("mobile.server.library.emptyBody")} />
+  ) : placeFiles.length === 0 && place.kind === "folder" ? (
+    <LibraryNote
+      title={t("mobile.server.library.folders.emptyTitle")}
+      body={t("mobile.server.library.folders.emptyBody", {
+        agent: placeAgent,
+        path: folderPath.map((folder) => folder.name).join("/"),
+      })}
+    />
   ) : shown.length === 0 ? (
     <LibraryNote title={t("mobile.server.library.noMatches")} />
   ) : null;
@@ -158,8 +229,12 @@ export function ServerLibraryScreen() {
             alwaysBounceVertical={false}
             contentInsetAdjustmentBehavior={scroll.ownsInset ? "never" : "always"}
             contentContainerClassName="pb-safe-offset-5"
-            // Without a content inset from iOS, the content starts below the transparent header.
-            contentContainerStyle={scroll.ownsInset ? { paddingTop: scroll.headerHeight } : undefined}
+            // Without a content inset from iOS, the content starts below the transparent header. The
+            // last tiles scroll above the folder capsule.
+            contentContainerStyle={{
+              ...(scroll.ownsInset ? { paddingTop: scroll.headerHeight } : null),
+              ...(snapshot ? { paddingBottom: capsuleRoom } : null),
+            }}
             scrollEventThrottle={16}
             showsVerticalScrollIndicator={false}
             onScroll={scroll.onScroll}
@@ -197,6 +272,7 @@ export function ServerLibraryScreen() {
                         height={tile.height}
                         canDelete={canDelete && file.deletable}
                         source={file.conversation?.title ?? agentName(file.agentId)}
+                        canMove={snapshot !== null && canOrganize(file.agentId)}
                         onChanged={changed}
                       />
                     </View>
@@ -206,7 +282,7 @@ export function ServerLibraryScreen() {
             )}
             ListHeaderComponent={
               <>
-                <LargeTitle scroll={scroll} title={title} caption={server?.name} />
+                <LargeTitle scroll={scroll} title={title} caption={caption} />
                 {files.length > 0 ? <TypeFilters counts={counts} value={selected} onChange={setType} /> : null}
                 {note}
               </>
@@ -221,6 +297,21 @@ export function ServerLibraryScreen() {
           />
         </AndroidBlurTarget>
         <LargeTitleBar scroll={scroll} title={title} surface="sheet" blurTarget={blurTarget} />
+        {snapshot && query.data ? (
+          <LibraryPathCapsule
+            segments={segments}
+            onOpen={() => router.push({ pathname: "/library-folders", params: { serverId } })}
+            onAdd={
+              addAgentId
+                ? () =>
+                    router.push({
+                      pathname: "/library-folders/name",
+                      params: { serverId, agentId: addAgentId, ...(placeFolderId ? { parentId: placeFolderId } : {}) },
+                    })
+                : undefined
+            }
+          />
+        ) : null}
       </View>
     </ChatImageViewerProvider>
   );
@@ -322,6 +413,7 @@ function LibraryTile({
   width,
   height,
   canDelete,
+  canMove,
   source,
   onChanged,
 }: {
@@ -330,6 +422,8 @@ function LibraryTile({
   width: number;
   height: number;
   canDelete: boolean;
+  /** The file's agent has folders that this person organizes. */
+  canMove: boolean;
   /** The chat of the file, or its agent when it is in no chat. */
   source: string | undefined;
   onChanged: () => void;
@@ -350,6 +444,7 @@ function LibraryTile({
       title: t("mobile.server.library.showInChat"),
       image: "bubble.left.and.bubble.right",
     });
+  if (canMove) actions.push({ id: "move", title: t("mobile.server.library.folders.moveTo"), image: "folder" });
   actions.push({
     id: "share",
     title: t("mobile.server.library.share"),
@@ -366,6 +461,7 @@ function LibraryTile({
 
   function run(action: string) {
     if (action === "share") attachment.share();
+    else if (action === "move") router.push({ pathname: "/library-folders", params: { serverId, fileId: file.id } });
     else if (action === "delete") confirmDelete();
     else if (action === "showInChat" && agentId && messageId)
       // As on desktop and in search, a file opens the message that carries it.

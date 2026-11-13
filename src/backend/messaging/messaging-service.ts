@@ -1714,7 +1714,7 @@ export class MessagingService {
     if (!live?.identity) return { error: MESSAGING_NOT_RUNNING };
     const whatsApp = live.record.platform === "whatsapp";
     return yield* live.adapter.places().pipe(
-      Effect.map((places) => (whatsApp && !places.length ? { places, note: WHATSAPP_NO_PLACES } : { places })),
+      Effect.map((places) => (whatsApp ? { places, note: WHATSAPP_ALLOWED_PLACES } : { places })),
       Effect.catch((failure) => Effect.succeed({ error: refusal(failure) })),
     );
   });
@@ -1752,13 +1752,18 @@ export class MessagingService {
   readonly #outboundPost = Effect.fn("MessagingService.outboundPost")(function* (
     this: MessagingService,
     connectionId: string,
-    target: MessageTarget,
+    named: MessageTarget,
     markdown: string,
     files: MessagingAnswerFile[] = [],
     embeds: DiscordEmbed[] = [],
   ) {
     const live = this.#live.get(connectionId);
     if (!live?.identity) return { error: MESSAGING_NOT_RUNNING, failure: "not-running" as const };
+    // An agent can write a WhatsApp number as a person types it, not as the place id.
+    const target = {
+      ...named,
+      platformChannelId: live.adapter.placeId?.(named.platformChannelId) ?? named.platformChannelId,
+    };
     const postEmbeds = live.adapter.postEmbeds;
     if (embeds.length && !postEmbeds)
       return { error: "Only a Discord post can have embeds. Post the text alone.", failure: "refused" as const };
@@ -2433,9 +2438,12 @@ function redactEmbed(embed: DiscordEmbed): DiscordEmbed {
   };
 }
 
-/** Why a WhatsApp number has no places: it lists only the chats that the user allowed, not all its chats. */
-const WHATSAPP_NO_PLACES =
-  "OpenBot posts only to WhatsApp chats that the user allowed, and this number allows none. Tell the user to open Marketplace, then Apps, then WhatsApp, and to use Add contact or Add group for this number.";
+/**
+ * Why a WhatsApp number lists few places: it lists only the chats that the user allowed, not all its chats.
+ * A personal number always lists "Message yourself", so the list is not empty when the user allowed no chat.
+ */
+const WHATSAPP_ALLOWED_PLACES =
+  "This list has only the WhatsApp chats that the user allowed, not all chats of this number. For a chat that is not in it, tell the user to open Marketplace, then Apps, then WhatsApp, and to use Add contact or Add group for this number.";
 
 /** A WhatsApp number that is not linked, or whose connection is down now: for a post and for its places. */
 const WHATSAPP_NOT_CONNECTED =

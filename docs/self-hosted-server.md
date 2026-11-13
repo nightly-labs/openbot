@@ -114,7 +114,9 @@ in a terminal, for the same reason.
   answer, make a new claim.
 
 Anyone with the admin token can get a session for any email, also of an existing account. Keep the
-token on the operator's computer only. The owner sees each claimed server session in their account
+token on the operator's computer only: it is in the encrypted `apps/auth-api/.env.production`. For a
+Leaseweb VPS, `leaseweb-pool.ts custom` makes the claim and does all the other steps
+(see [Leaseweb VPS](hosted-servers.md#leaseweb-vps)). The owner sees each claimed server session in their account
 sessions, and can revoke it there.
 
 Install options go after `sudo bash -s --`:
@@ -147,6 +149,12 @@ open a database that a newer one migrated. It also refuses a computer that is a 
 | `sudo openbot uninstall` | Sign out and remove OpenBot. The data stays (see [Remove](#remove)). |
 | `openbot version` | Show the installed version. |
 
+An owner or admin can also restart the server from the app: select Restart server in the server
+menu, or in Server settings on the phone. OpenBot closes, and `openbot.service` starts it again after
+about 10 seconds. In Docker, the container must have a restart policy, such as `--restart
+unless-stopped`; without one, the container stays stopped. When the server does not answer, use
+`sudo openbot restart`.
+
 Run the account commands with `sudo` or as the service user. Other users cannot open the control
 socket.
 
@@ -155,8 +163,9 @@ socket.
 A self-hosted server uses the memory guards of a hosted server (see
 [Memory](hosted-servers.md#memory)). When free memory is low, new turns wait in the queue and start
 again when memory is available. A message from a person starts first. The browser opens no new tab
-and unloads idle pages sooner. A fixed number of turns run at the same time: 2 up to 5 GiB of memory,
-8 up to 10 GiB, and 16 above.
+and unloads idle pages sooner. By default, a fixed number of turns run at the same time: 2 up to
+5 GiB of memory, 8 up to 10 GiB, and 16 above. An owner or admin can choose another number, 1 to 128, or
+Unlimited, in Server Settings > General > Threads at the same time. Low memory still holds a new turn.
 
 The memory ceiling is the smaller of the machine memory and the limit of `openbot.service`
 (`MemoryMax=90%`). To give OpenBot less memory, lower the limit with

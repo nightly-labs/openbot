@@ -344,8 +344,8 @@ export interface AgentSummary {
   busyMessageMode?: BusyMessageMode;
   /**
    * How many tasks of the agent run a turn at the same time, 1 to `AGENT_TASK_LIMIT_MAX`. Local-only,
-   * like `access`; an owner or admin of a joined server reads it on `agent-task-limit-v1`. Absent
-   * means `AGENT_TASK_LIMIT_DEFAULT`; see `agentTaskLimit`.
+   * like `access`; an owner or admin of a joined server reads it on `agent-task-limit-v1`.
+   * Absent means the host default (`HostTurnLimits.agentTaskLimit`); see `agentTaskLimit`.
    */
   taskLimit?: number;
   /**

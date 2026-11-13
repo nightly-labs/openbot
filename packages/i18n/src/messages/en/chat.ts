@@ -344,6 +344,8 @@ export const messages = defineMessages("chat", {
   "chat.video.time": "{elapsed} / {duration}",
   "chat.video.download": "Download video",
   "chat.video.open": "Open video",
+  "chat.video.mute": "Mute video",
+  "chat.video.unmute": "Unmute video",
   "chat.message.you": "You",
   "chat.message.agentFallback": "Agent",
   "chat.message.memberFallback": "Team member",

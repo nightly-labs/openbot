@@ -8,6 +8,7 @@ import {
   AGENT_SESSION_SETTINGS_CAPABILITY,
   AGENT_SESSION_SETTINGS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
+import { AGENT_SPEED_CAPABILITY, AGENT_SPEED_ROUTES } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import {
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SECRET_VAULT_ROUTES,
@@ -134,6 +135,11 @@ import {
   MESSAGE_PINS_ROUTES,
 } from "@openbot/contracts/team-protocol/message-pins-v1";
 import {
+  decodePendingApprovalResponse,
+  PENDING_APPROVAL_CAPABILITY,
+  PENDING_APPROVAL_ROUTES,
+} from "@openbot/contracts/team-protocol/pending-approval-v1";
+import {
   PROVIDER_ACCOUNTS_CAPABILITY,
   PROVIDER_ACCOUNTS_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-accounts-v1";
@@ -213,6 +219,7 @@ import {
   parseReadAgentTaskAround,
   parseReadAgentTaskPage,
   parseReadConversationPage,
+  parseReadPendingApprovalInput,
   parseRenameAgentTask,
   parseReorderQueue,
   parseRunQueuedMessageAsTask,
@@ -460,14 +467,20 @@ export function agentIpcHandlers({
           const models = remoteServers.request(serverId, TEAM_API_ROUTES.agents.models, (value) =>
             decodeAgentModelOptions(logRejectedModels(value, "remote")),
           );
-          // The released model list drops the fast tier and the picker listing, so a host with
-          // `agent-fast-mode-v1` or `model-visibility-v1` gives them on their own routes. Both are
-          // optional: when a route fails, the picker gets the models with no Fast switch or listing.
+          // The released model list drops the fast tiers and the picker listing, so a host with
+          // `agent-speed-v1` (or the older `agent-fast-mode-v1`) or `model-visibility-v1` gives them on
+          // their own routes. Both are optional: when a route fails, the picker gets the models with
+          // no Speed select or listing. Only `agent-speed-v1` lists Ultrafast tiers and Claude models.
+          const fastRoute = remoteServers.supportsCapability(serverId, AGENT_SPEED_CAPABILITY)
+            ? AGENT_SPEED_ROUTES.models
+            : remoteServers.supportsCapability(serverId, AGENT_FAST_MODE_CAPABILITY)
+              ? AGENT_FAST_MODE_ROUTES.models
+              : null;
           return runCauseEffect(
             Effect.gen(function* () {
-              const fast = remoteServers.supportsCapability(serverId, AGENT_FAST_MODE_CAPABILITY)
+              const fast = fastRoute
                 ? remoteServers
-                    .request(serverId, AGENT_FAST_MODE_ROUTES.models, decodeAgentFastModels, {
+                    .request(serverId, fastRoute, decodeAgentFastModels, {
                       method: "POST",
                       body: {},
                     })
@@ -852,7 +865,7 @@ export function agentIpcHandlers({
           if (input.busyMessageMode !== undefined) {
             throw new Error(sourceText("error.agent.busyMessageModeLocalOnly"));
           }
-          // The released agent route does not carry the task limit; the renderer sends it on `agent-task-limit-v1`.
+          // The released agent route does not carry the task limit; mobile sets it on `agent-task-limit-v1`.
           if (input.taskLimit !== undefined) {
             throw new Error(sourceText("error.agent.taskLimitLocalOnly"));
           }
@@ -1527,6 +1540,23 @@ export function agentIpcHandlers({
               body: parsed,
             }),
           ),
+      }),
+      // A joined server sends the whole copy through `pending-approval-v1`. An older host cannot, so the
+      // card keeps the cut copy and offers only Deny.
+      readPendingApproval: scopedHandler(parseReadPendingApprovalInput, {
+        local: ({ agentId, requestId }) => {
+          const approval = service.pendingApproval(requestId);
+          return approval?.agentId === agentId ? approval : null;
+        },
+        remote: (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, PENDING_APPROVAL_CAPABILITY)) return null;
+          return runCauseEffect(
+            remoteServers.request(serverId, PENDING_APPROVAL_ROUTES.read, decodePendingApprovalResponse, {
+              method: "POST",
+              body: { ...parsed },
+            }),
+          );
+        },
       }),
       respondToBrowserSecret: scopedHandler(parseLocalBrowserSecretResponse, {
         local: (parsed) => runCauseEffect(service.respondToBrowserSecret(parsed)),

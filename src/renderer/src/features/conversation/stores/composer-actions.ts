@@ -1009,9 +1009,11 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     return true;
   }
 
-  /** A message that a card in the chat sends for the user, such as Continue after a sign-in. */
-  function sendCardMessage(body: string): boolean {
-    const target = deps.currentTarget();
+  /**
+   * A message that a card in the chat sends for the user, such as Continue after a sign-in. A card
+   * that waits before it sends gives the chat of the click as `target`.
+   */
+  function sendCardMessage(body: string, target = deps.currentTarget()): boolean {
     if (!target || deps.submitting() || !deps.agentReady()) return false;
     queueSend(target, { text: body, attachments: [], replyToMessageId: null }, body);
     return true;

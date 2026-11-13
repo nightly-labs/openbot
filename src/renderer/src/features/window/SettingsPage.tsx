@@ -4,8 +4,13 @@ import { createSignal, For, flush, onCleanup, Show } from "solid-js";
 import { useI18n } from "../../i18n-context";
 import { usePlatform } from "../../platform";
 import { useAuth } from "../account/account-context";
+import { canManageStorage, serverHasBackgroundProcesses } from "../files/storage-usage";
 import type { ServerSettingsSection } from "../servers/ServerSettingsModal";
-import { activeServerHasProviderSettings, serverSupportsCapability } from "../servers/server-capabilities";
+import {
+  activeServerHasProviderSettings,
+  serverHasAgentDefaults,
+  serverSupportsCapability,
+} from "../servers/server-capabilities";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
@@ -29,8 +34,11 @@ type PersonalRow = {
   macOS?: boolean;
 };
 
-/** A section of the active server's settings. A user looks for providers in the user settings too. */
-type ServerRow = { section: ServerSettingsSection; titleKey: AppTextKey; descriptionKey: AppTextKey };
+/**
+ * A section, or a row of a section, of the active server's settings. A user looks for providers and
+ * agent settings in the user settings too.
+ */
+type ServerRow = { section: ServerSettingsSection; titleKey: AppTextKey; descriptionKey?: AppTextKey };
 
 type SearchRow = PersonalRow | ServerRow;
 
@@ -50,6 +58,22 @@ const IMPORT_ROW: ServerRow = {
   section: "import",
   titleKey: "server.settings.importTitle",
   descriptionKey: "server.settings.importDescription",
+};
+
+/** Server Settings > Agents, then its rows. */
+const AGENTS_ROWS: ReadonlyArray<ServerRow> = [
+  { section: "agents", titleKey: "server.settings.agents", descriptionKey: "server.settings.agentsDescription" },
+  { section: "agents", titleKey: "agentSettings.automation.title" },
+  { section: "agents", titleKey: "agentSettings.agentNewChat.title" },
+  { section: "agents", titleKey: "agentSettings.quickAcknowledgement.title" },
+  { section: "agents", titleKey: "settings.busyMessage.title", descriptionKey: "settings.busyMessage.description" },
+];
+
+/** Server Settings > Storage lists the background processes of the server. */
+const BACKGROUND_PROCESSES_ROW: ServerRow = {
+  section: "storage",
+  titleKey: "settings.backgroundProcesses.title",
+  descriptionKey: "settings.backgroundProcesses.description",
 };
 
 /** A broad query shows a short list, not every row. */
@@ -106,6 +130,12 @@ export function SettingsPage(props: { kind: SettingsKind }) {
       ...personal,
       ...(activeServerHasProviderSettings(server) ? [PROVIDERS_ROW] : []),
       ...(serverSupportsCapability(server, "agent-import-v1") ? [IMPORT_ROW] : []),
+      ...(serverHasAgentDefaults(server) ? AGENTS_ROWS : []),
+      ...(serverHasBackgroundProcesses(server) &&
+      canManageStorage(server) &&
+      (server.kind === "local" || server.state === "online")
+        ? [BACKGROUND_PROCESSES_ROW]
+        : []),
     ];
   };
   const results = () =>

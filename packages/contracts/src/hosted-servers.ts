@@ -14,6 +14,7 @@ import {
 } from "./billing";
 import { INPUT_LIMITS } from "./input-limits";
 import type { ConversationMessage } from "./ipc-conversation-messages";
+import type { StorageDisk } from "./ipc-storage";
 import { type LicenseOrder, parseLicenseOrder } from "./license";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 import { slugifyTeamServerName } from "./validation";
@@ -41,6 +42,24 @@ export const HOSTED_PLAN_SIZE: Readonly<Record<BillingPlanId, HostedServerSize>>
  * running servers on 2026-11-09: 19 to 22 GB). The plan storage does not count it: it is on top of the plan.
  */
 export const HOSTED_SERVER_BASE_IMAGE_GB = 22;
+
+const GB = 1024 ** 3;
+
+/**
+ * The disk of a hosted server against its plan: the total is the plan storage, and the free space is
+ * what the plan has left after the files of its users. The free space is never more than the disk has.
+ *
+ * A host with `storage-user-files-v1` measures the user's files (`userBytes`). A VPS of the operator
+ * has a disk much larger than the plan, and its system part is not the base image of a boat sandbox.
+ * Without that value, the files of the users are what the disk uses above the base image.
+ */
+export function hostedPlanDisk(disk: StorageDisk, storageGb: number): StorageDisk {
+  const { freeBytes, totalBytes } = disk;
+  if (freeBytes === null || totalBytes === null) return disk;
+  const planBytes = storageGb * GB;
+  const userBytes = disk.userBytes ?? Math.max(0, totalBytes - freeBytes - HOSTED_SERVER_BASE_IMAGE_GB * GB);
+  return { freeBytes: Math.max(0, Math.min(freeBytes, planBytes - userBytes)), totalBytes: planBytes };
+}
 
 export const HOSTED_SERVER_STATES = [
   /** The row exists, and the account server waits for Stripe to confirm the first payment. */
