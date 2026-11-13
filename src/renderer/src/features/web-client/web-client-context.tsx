@@ -435,7 +435,12 @@ export function createWebWorkspace(
       wholeApprovalReads.add(key);
       void read({ agentId: approval.agentId, requestId: approval.requestId }).then(
         (whole) => {
-          if (!whole || disposed || current !== generation) return;
+          if (disposed) return;
+          // A read that a reconnect made stale, or that an older host refused, tries again at the next snapshot.
+          if (!whole || current !== generation) {
+            wholeApprovalReads.delete(key);
+            return;
+          }
           setState((draft) => {
             draft.approvals = [...withWholeApproval(draft.approvals, whole)];
           });

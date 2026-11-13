@@ -154,7 +154,13 @@ const Turns = createSimpleContext({
           void turnsPort()
             .agent.readPendingApproval({ agentId: approval.agentId, requestId: approval.requestId })
             .then((whole) => {
-              if (!whole || !scopeIsCurrent()) return;
+              // Before a joined server connects, main does not know its capabilities and returns null. The
+              // next change of the approvals tries again.
+              if (!whole) {
+                wholeApprovalReads.delete(key);
+                return;
+              }
+              if (!scopeIsCurrent()) return;
               setApprovals((current) => {
                 const next = withWholeApproval(current, whole);
                 return next === current ? current : [...next];

@@ -4,4 +4,4 @@
 
 ### Added
 
-- The mobile app can read the full text of a long approval from a joined server and then allow it. **To use this on a joined server, update the server to this version too.**
+- A server sends the full text of a long approval to the mobile app and the web client, so they can show it and allow it. **Update each joined server to this version to use it there.**

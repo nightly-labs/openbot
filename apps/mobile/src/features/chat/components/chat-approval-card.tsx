@@ -92,18 +92,27 @@ export function ChatApprovalCard({
     if (!reading) return;
     let current = true;
     setWholeFailed(false);
-    loadWholeRef.current().catch((error: unknown) => {
-      if (current && wholeReadFailed(error)) setWholeFailed(true);
-    });
+    loadWholeRef.current().then(
+      // A whole copy replaces this cut one, so the flag shows only when the copy did not match it.
+      () => {
+        if (current) setWholeFailed(true);
+      },
+      (error: unknown) => {
+        if (current && wholeReadFailed(error)) setWholeFailed(true);
+      },
+    );
     return () => {
       current = false;
     };
   }, [reading]);
   function retryWhole() {
     setWholeFailed(false);
-    loadWhole().catch((error: unknown) => {
-      if (wholeReadFailed(error)) setWholeFailed(true);
-    });
+    loadWhole().then(
+      () => setWholeFailed(true),
+      (error: unknown) => {
+        if (wholeReadFailed(error)) setWholeFailed(true);
+      },
+    );
   }
   const permissions = approval.kind === "permissions" ? approval.permissions : null;
   const permissionDetails = permissions
@@ -117,9 +126,11 @@ export function ChatApprovalCard({
   const effect = partial
     ? !readsWhole
       ? t("mobile.chat.approval.partial", names)
-      : wholeFailed
-        ? t("mobile.chat.approval.loadFailed")
-        : t("mobile.chat.approval.loading")
+      : !reading
+        ? null
+        : wholeFailed
+          ? t("mobile.chat.approval.loadFailed")
+          : t("mobile.chat.approval.loading")
     : report
       ? null
       : approval.kind === "command"

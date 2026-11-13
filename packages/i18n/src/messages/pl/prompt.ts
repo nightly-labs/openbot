@@ -26,7 +26,7 @@ export const messages = {
   "prompt.approval.alwaysAllow": "Zawsze zezwalaj",
   "prompt.approval.deny": "Odrzuć",
   "prompt.approval.cut":
-    "Ta karta pokazuje tylko początek żądania. Możesz teraz odmówić. Przycisk Zezwól pojawi się po wczytaniu całego żądania.",
+    "Ta karta pokazuje tylko początek żądania, więc można je tylko odrzucić. Jeśli przycisk Zezwól nie pojawi się wkrótce, zaktualizuj OpenBot na serwerze.",
   "prompt.approval.report.bugHeadline": "Znalazłeś błąd? Naprawmy go.",
   "prompt.approval.report.ideaHeadline": "Masz pomysł? Zróbmy to.",
   "prompt.approval.report.dontSend": "Nie teraz",

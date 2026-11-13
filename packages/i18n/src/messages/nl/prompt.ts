@@ -26,7 +26,7 @@ export const messages = {
   "prompt.approval.alwaysAllow": "Altijd toestaan",
   "prompt.approval.deny": "Weigeren",
   "prompt.approval.cut":
-    "Deze kaart toont alleen het begin van het verzoek. Je kunt het nu weigeren. Toestaan verschijnt zodra het volledige verzoek is geladen.",
+    "Deze kaart toont alleen het begin van het verzoek en biedt daarom alleen Weigeren. Verschijnt Toestaan niet snel, werk OpenBot dan bij op de server.",
   "prompt.approval.report.bugHeadline": "Een bug gevonden? Laten we hem oplossen.",
   "prompt.approval.report.ideaHeadline": "Een idee? Laten we het waarmaken.",
   "prompt.approval.report.dontSend": "Niet nu",

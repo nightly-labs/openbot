@@ -26,7 +26,7 @@ export const messages = {
   "prompt.approval.alwaysAllow": "Всегда разрешать",
   "prompt.approval.deny": "Отклонить",
   "prompt.approval.cut":
-    "На этой карточке только начало запроса. Отклонить его можно сейчас. Кнопка «Разрешить» появится, когда загрузится полный запрос.",
+    "На этой карточке только начало запроса, поэтому его можно только отклонить. Если кнопка «Разрешить» скоро не появится, обновите OpenBot на сервере.",
   "prompt.approval.report.bugHeadline": "Нашли ошибку? Давайте исправим.",
   "prompt.approval.report.ideaHeadline": "Есть идея? Давайте воплотим.",
   "prompt.approval.report.dontSend": "Не сейчас",

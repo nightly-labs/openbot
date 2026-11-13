@@ -25,7 +25,8 @@ export const messages = {
   "prompt.approval.allow": "سماح",
   "prompt.approval.alwaysAllow": "السماح دائمًا",
   "prompt.approval.deny": "رفض",
-  "prompt.approval.cut": "تعرض هذه البطاقة بداية الطلب فقط. يمكنك رفضه الآن. يظهر زر السماح عند تحميل الطلب كاملًا.",
+  "prompt.approval.cut":
+    "تعرض هذه البطاقة بداية الطلب فقط، لذلك تقدّم الرفض فقط. إذا لم يظهر زر السماح قريبًا، فحدّث OpenBot على الخادم.",
   "prompt.approval.report.bugHeadline": "وجدت خطأً؟ لنُصلحه.",
   "prompt.approval.report.ideaHeadline": "لديك فكرة؟ لنحققها.",
   "prompt.approval.report.dontSend": "ليس الآن",
