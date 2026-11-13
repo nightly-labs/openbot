@@ -220,7 +220,7 @@ export const messages = {
   "error.provider.opencodeUnreadableContent":
     "Bu model, bu sohbetteki bir dosyayı veya görseli okuyamıyor. Dosya okuyabilen bir model seçin, ardından mesajınızı yeniden gönderin.",
   "error.provider.opencodeContextTooSmall":
-    "Bu sohbet modelin bağlam penceresine sığmıyor, bu yüzden model yanıt veremiyor. Yerel model sunucuları modeli çoğu zaman küçük bir pencereyle yükler. Modeli Ollama veya LM Studio'da daha büyük bir bağlam uzunluğuyla yükleyin ve OpenBot'ta sağlayıcı ayarlarında model için aynı bağlam penceresini girin. Ya da daha büyük pencereli bir model seçin. Sonra mesajınızı yeniden gönderin.",
+    "Bu sohbet modelin bağlam penceresine sığmıyor. Ollama veya LM Studio'da modeli daha büyük bir bağlam uzunluğuyla yükleyin ve OpenBot'taki sağlayıcı ayarlarına aynı pencereyi girin. Ya da daha büyük bir model seçin.",
   "error.provider.opencodeFreeLimit":
     "Ücretsiz OpenCode modelleri kullanım sınırına ulaştı. Tüm ücretsiz modeller bu sınırı paylaşır. Devam etmek için OpenCode ayarlarına bir OpenCode Go anahtarı yapıştırın veya başka bir sağlayıcının modelini seçin.",
   "error.provider.opencodeProviderFailed":

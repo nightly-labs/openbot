@@ -210,7 +210,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.opencodeUnreadableContent":
     "This model cannot read a file or image in this chat. Choose a model that can read files, then send your message again.",
   "error.provider.opencodeContextTooSmall":
-    "This chat does not fit in the model's context window, so the model cannot answer. Local model servers often load a model with a small window. Load the model with a larger context length in Ollama or LM Studio, and enter the same context window for the model in its provider settings in OpenBot. Or choose a model with a larger window. Then send your message again.",
+    "This chat does not fit in the model's context window. In Ollama or LM Studio, load the model with a larger context length, and enter the same window in its OpenBot provider settings. Or choose a larger model.",
   "error.provider.opencodeFreeLimit":
     "The free OpenCode models reached their usage limit. All free models share this limit. To continue, paste an OpenCode Go key in the OpenCode settings, or choose a model from another provider.",
   "error.provider.opencodeProviderFailed":

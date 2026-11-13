@@ -223,7 +223,7 @@ export const messages = {
   "error.provider.opencodeUnreadableContent":
     "このモデルは、このチャット内のファイルまたは画像を読み取れません。ファイルを読み取れるモデルを選択してから、メッセージをもう一度送信してください。",
   "error.provider.opencodeContextTooSmall":
-    "このチャットはモデルのコンテキストウィンドウに収まらないため、モデルは応答できません。ローカルのモデルサーバーは小さいウィンドウでモデルを読み込むことがよくあります。Ollama または LM Studio で、より大きいコンテキスト長でモデルを読み込み、OpenBot のプロバイダー設定でもそのモデルに同じコンテキストウィンドウを入力してください。または、ウィンドウの大きいモデルを選んでください。そのあと、メッセージをもう一度送信してください。",
+    "このチャットはモデルのコンテキストウィンドウに収まりません。Ollama または LM Studio で、より大きいコンテキスト長でモデルを読み込み、OpenBot のプロバイダー設定に同じウィンドウを入力してください。または、より大きいモデルを選んでください。",
   "error.provider.opencodeFreeLimit":
     "OpenCode の無料モデルが使用量の上限に達しました。この上限はすべての無料モデルで共有されます。続けるには、OpenCode の設定に OpenCode Go のキーを貼り付けるか、別のプロバイダーのモデルを選択してください。",
   "error.provider.opencodeProviderFailed":

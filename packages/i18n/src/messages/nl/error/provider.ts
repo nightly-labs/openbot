@@ -218,7 +218,7 @@ export const messages = {
   "error.provider.opencodeUnreadableContent":
     "Dit model kan een bestand of afbeelding in deze chat niet lezen. Kies een model dat bestanden kan lezen en stuur je bericht opnieuw.",
   "error.provider.opencodeContextTooSmall":
-    "Deze chat past niet in het contextvenster van het model, dus het model kan niet antwoorden. Lokale modelservers laden een model vaak met een klein venster. Laad het model met een grotere contextlengte in Ollama of LM Studio, en vul hetzelfde contextvenster in voor het model in de instellingen van de provider in OpenBot. Of kies een model met een groter venster. Stuur je bericht daarna opnieuw.",
+    "Deze chat past niet in het contextvenster van het model. Laad het model in Ollama of LM Studio met een grotere contextlengte, en vul hetzelfde venster in bij de providerinstellingen in OpenBot. Of kies een groter model.",
   "error.provider.opencodeFreeLimit":
     "De gratis OpenCode-modellen hebben hun gebruikslimiet bereikt. Alle gratis modellen delen deze limiet. Plak een OpenCode Go-sleutel in de OpenCode-instellingen om door te gaan, of kies een model van een andere aanbieder.",
   "error.provider.opencodeProviderFailed":

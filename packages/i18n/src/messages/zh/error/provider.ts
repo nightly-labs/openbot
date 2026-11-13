@@ -193,7 +193,7 @@ export const messages = {
   "error.provider.opencodeUnreadableContent":
     "该模型无法读取该对话中的文件或图片。请选择能读取文件的模型，然后重新发送消息。",
   "error.provider.opencodeContextTooSmall":
-    "此聊天超出了模型的上下文窗口，因此模型无法回答。本地模型服务器经常以较小的窗口加载模型。请在 Ollama 或 LM Studio 中以更大的上下文长度加载模型，并在 OpenBot 中该模型提供方的设置里填写相同的上下文窗口。或者选择窗口更大的模型。然后再次发送消息。",
+    "此聊天超出了模型的上下文窗口。请在 Ollama 或 LM Studio 中以更大的上下文长度加载模型，并在 OpenBot 中该模型提供方的设置里填写相同的窗口。或者选择更大的模型。",
   "error.provider.opencodeFreeLimit":
     "OpenCode 免费模型已达到使用上限。所有免费模型共用这一上限。要继续，请在 OpenCode 设置中粘贴 OpenCode Go 密钥，或选择其他提供商的模型。",
   "error.provider.opencodeProviderFailed":

@@ -233,7 +233,7 @@ export const messages = {
   "error.provider.opencodeUnreadableContent":
     "Ce modèle ne peut pas lire un fichier ou une image de cette conversation. Choisissez un modèle qui sait lire les fichiers, puis envoyez à nouveau votre message.",
   "error.provider.opencodeContextTooSmall":
-    "Cette conversation ne tient pas dans la fenêtre de contexte du modèle, donc le modèle ne peut pas répondre. Les serveurs de modèles locaux chargent souvent un modèle avec une petite fenêtre. Chargez le modèle avec une longueur de contexte plus grande dans Ollama ou LM Studio, puis saisissez la même fenêtre de contexte pour ce modèle dans les réglages de son fournisseur dans OpenBot. Ou choisissez un modèle avec une fenêtre plus grande. Envoyez ensuite votre message à nouveau.",
+    "Cette conversation ne tient pas dans la fenêtre de contexte du modèle. Dans Ollama ou LM Studio, chargez le modèle avec un contexte plus long, puis saisissez la même fenêtre dans les réglages de son fournisseur dans OpenBot. Ou choisissez un modèle plus grand.",
   "error.provider.opencodeFreeLimit":
     "Les modèles gratuits d’OpenCode ont atteint leur limite d’utilisation. Tous les modèles gratuits partagent cette limite. Pour continuer, collez une clé OpenCode Go dans les réglages d’OpenCode, ou choisissez un modèle d’un autre fournisseur.",
   "error.provider.opencodeProviderFailed":
