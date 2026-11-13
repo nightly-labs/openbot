@@ -2624,7 +2624,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         // The host shows a failed upload, so the canvas adds no node for it.
         board.upload(picture).then(
           (file) => {
-            if (!deleted() && !frozen()) addNode("asset", point, { file: file.name, fileId: file.id });
+            if (!deleted() && !frozen() && allows("asset"))
+              addNode("asset", point, { file: file.name, fileId: file.id });
           },
           () => undefined,
         );

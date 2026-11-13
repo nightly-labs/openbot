@@ -3017,13 +3017,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         const bytes = source
           ? yield* Effect.try({ try: () => clear(source), catch: () => null }).pipe(Effect.orElseSucceed(() => null))
           : null;
-        if (!bytes) logger.warn("Could not make the background of a Grok image clear.");
-        else {
-          const attachment = yield* this.#mailbox
-            .storeGeneratedAttachment({ bytes, name: "generated-image.png", mimeType: "image/png" })
-            .pipe(Effect.mapError(() => failed(sourceText("error.workflow.mediaFailed"))));
-          return attachment.id;
-        }
+        // When the background stays or the clear copy cannot be saved, the step keeps the picture that
+        // the model made, as a step with a solid background does.
+        const attachment = bytes
+          ? yield* Effect.result(
+              this.#mailbox.storeGeneratedAttachment({ bytes, name: "generated-image.png", mimeType: "image/png" }),
+            )
+          : null;
+        if (attachment && Result.isSuccess(attachment)) return attachment.success.id;
+        logger.warn("Could not make the background of a Grok image clear.");
       }
       const stored = savedPath
         ? yield* Effect.result(

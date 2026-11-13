@@ -27,9 +27,10 @@ function median(values: number[]): number {
 
 /**
  * Makes the background of `pixels` clear, in place. `pixels` holds four bytes for each pixel with the
- * alpha last; the order of the three colour bytes does not matter. The background is each pixel near
- * the edge colour that the edge or a pixel of exactly that colour reaches, so a hole between an arm and
- * the body clears too, but a small patch of a similar colour inside the subject stays. A pixel at the
+ * alpha last; the order of the three colour bytes does not matter. The background grows from the edge
+ * and from each pixel within `CLEAR_DISTANCE` of the edge colour, so a hole between an arm and the body
+ * clears too. A subject part of nearly the key colour clears with it: the step asks the model for a key
+ * colour that the subject does not have. A pixel at the
  * border of the subject gets part alpha, and the background colour is taken out of its colour. The
  * result is premultiplied, as Skia's bitmaps hold it.
  *
@@ -49,7 +50,7 @@ export function clearFlatBackground(pixels: Uint8Array, width: number, height: n
   const flat = edge.filter((pixel) => distance(pixels, pixel * 4, key) < CLEAR_DISTANCE).length;
   if (flat < edge.length * FLAT_EDGE_SHARE) return false;
 
-  // The background grows from the edge and from each pixel of the exact colour, through the pixels
+  // The background grows from the edge and from each pixel near the key colour, through the pixels
   // that are not clearly subject.
   const reached = new Uint8Array(count);
   const queue = new Int32Array(count);

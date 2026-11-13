@@ -762,7 +762,7 @@
   box-shadow: none;
 }
 
-.wfn-node .wfn-card[data-media][data-clear] .wfn-asset-trigger > .wfn-media {
+.wfn-node .wfn-card[data-media][data-clear] .wfn-media {
   object-fit: contain;
 }
 

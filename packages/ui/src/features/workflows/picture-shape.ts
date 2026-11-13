@@ -42,18 +42,25 @@ async function pictureShape(url: string): Promise<PictureShape | undefined> {
   }
 }
 
-/** The shape of the picture at the URL, once it is known. Until then, and on a failure, none. */
+/**
+ * The shape of the picture at the URL, once it is known; on a failure, none. While the next picture
+ * loads, the last shape stays, so the card does not flash between two clear results.
+ */
 export function usePictureShape(url: () => string | undefined) {
   const [shape, setShape] = createSignal<PictureShape>();
   createEffect(url, (current) => {
-    setShape(undefined);
-    if (!current) return;
+    if (!current) {
+      setShape(undefined);
+      return;
+    }
     let live = true;
     pictureShape(current).then(
       (next) => {
         if (live) setShape(next);
       },
-      () => undefined,
+      () => {
+        if (live) setShape(undefined);
+      },
     );
     return () => {
       live = false;
