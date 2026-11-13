@@ -1856,8 +1856,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             if (this.#flavor.authRequiredSignsOut && error instanceof RequestError && error.code === -32000) {
               const keyRefused = this.options.savedKeyRefusedMessage?.();
               if (keyRefused) return yield* providerFailure(new ProviderSignInError({ message: keyRefused }));
+              // A refusal that a sign-in cannot repair ends the client too, so the row shows it.
               const blocked = this.options.authBlockedMessage?.();
-              if (blocked) return yield* providerFailure(new Error(blocked));
+              if (blocked) {
+                this.emit("exit", new Error(blocked));
+                return yield* providerFailure(new Error(blocked));
+              }
               this.#signedIn = false;
               this.emit("exit", new Error(this.options.signInMessage));
             }

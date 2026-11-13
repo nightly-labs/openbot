@@ -50,8 +50,8 @@ const FAKE_VERSION = "1.5.4";
 // `FAKE_AGY_UNPACK_MS` before it reads a request, then answers as an ACP server with one model.
 // While the file `FAKE_AGY_HOLD` exists, a `session/new` after the first one, as the catalogue
 // refresh of a started process sends, waits for that file to go and writes its pid to `<file>.held`.
-// With `FAKE_AGY_AUTH_REQUIRED` set, `session/new` answers `authRequired`, as the CLI does when it cannot open its
-// `settings.json`.
+// While the file `FAKE_AGY_AUTH_REQUIRED` exists, `session/new` answers `authRequired`, as the CLI does when it
+// cannot open its `settings.json`.
 // With `FAKE_AGY_KEY_AUTH=hang`, `initialize` offers the Gemini API key sign-in and `authenticate` never answers.
 // With `FAKE_AGY_SIGN_IN=wait`, `initialize` offers the Google sign-in, and `authenticate` gives Google's page to
 // the `open` (macOS) or `xdg-open` (Linux) command on PATH, as Antigravity CLI 1.5.4 does, and never answers. The
@@ -93,7 +93,7 @@ function handle(message) {
     } else process.stderr.write("OpenBot's opener is not first on PATH." + NL);
     return;
   }
-  if (message.method === "session/new" && process.env.FAKE_AGY_AUTH_REQUIRED) {
+  if (message.method === "session/new" && process.env.FAKE_AGY_AUTH_REQUIRED && fs.existsSync(process.env.FAKE_AGY_AUTH_REQUIRED)) {
     write({ id: message.id, error: { code: -32000, message: "Authentication required" } });
     return;
   }
@@ -190,6 +190,12 @@ interface Report {
   settingsUnreadable?: {
     attempts: number;
     spawns: number;
+    state: string | undefined;
+    message: string | null | undefined;
+  };
+  settingsUnreadableAfterStart?: {
+    before: string | undefined;
+    chatError: string | null;
     state: string | undefined;
     message: string | null | undefined;
   };
@@ -639,8 +645,10 @@ try {
   // the action that repairs it, and the row keeps that action after the start limit, not "refresh".
   await rm(log, { force: true });
   const settings = join(root, "gemini", "antigravity-acp", "settings.json");
+  const refused = join(root, "auth-required");
   await mkdir(settings, { recursive: true });
-  process.env.FAKE_AGY_AUTH_REQUIRED = "1";
+  await writeFile(refused, "");
+  process.env.FAKE_AGY_AUTH_REQUIRED = refused;
   const unreadable = runtime(join(root, "temp-settings"), () => Number.MAX_SAFE_INTEGER).providers;
   const settingsAttempts = 6;
   for (let attempt = 0; attempt < settingsAttempts; attempt += 1)
@@ -652,12 +660,45 @@ try {
     state: unreadableRow?.state,
     message: unreadableRow?.message,
   };
-  delete process.env.FAKE_AGY_AUTH_REQUIRED;
   await stopAll(unreadable);
   await rm(settings, { recursive: true, force: true });
+  await rm(refused);
   assert.equal(report.settingsUnreadable.spawns, 3, "three failed starts, then no more");
   assert.equal(unreadableRow?.state, "error");
   assert.equal(unreadableRow?.message, sourceText("error.provider.geminiSettingsUnreadable"));
+
+  // 14. The file becomes unreadable after a good start. A new chat fails with the same action, and the row
+  // shows it too, not "Connected".
+  const later = runtime(join(root, "temp-settings-later"), () => Number.MAX_SAFE_INTEGER).providers;
+  await runCauseEffect(later.ensureProvider("antigravity"));
+  const startedState = antigravityRow(later)?.state;
+  await mkdir(settings, { recursive: true });
+  await writeFile(refused, "");
+  const laterClient = later.clientFor("antigravity");
+  assert.ok(laterClient, "the started provider has a client");
+  const opened = await Effect.runPromise(
+    Effect.result(laterClient.request("thread/start", { cwd: root, model: "gemini-fake" }, (value) => value)),
+  );
+  const chatError = Result.isFailure(opened)
+    ? opened.failure.cause instanceof Error
+      ? opened.failure.cause.message
+      : String(opened.failure.cause)
+    : null;
+  await waitFor("the row to show the refusal", async () => antigravityRow(later)?.state === "error");
+  const laterRow = antigravityRow(later);
+  report.settingsUnreadableAfterStart = {
+    before: startedState,
+    chatError,
+    state: laterRow?.state,
+    message: laterRow?.message,
+  };
+  delete process.env.FAKE_AGY_AUTH_REQUIRED;
+  await stopAll(later);
+  await rm(settings, { recursive: true, force: true });
+  await rm(refused);
+  assert.equal(startedState, "available");
+  assert.equal(chatError, sourceText("error.provider.geminiSettingsUnreadable"));
+  assert.equal(laterRow?.message, sourceText("error.provider.geminiSettingsUnreadable"));
 
   report.passed = true;
 } finally {
