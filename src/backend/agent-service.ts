@@ -4532,8 +4532,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           contexts,
           ({ agentId, threadId }) =>
             Effect.gen({ self: this }, function* () {
-              if (this.#store.list().some((agent) => agent.id === agentId))
-                yield* channelSync(() => this.#deleteChannelThreadHistory(agentId, threadId));
+              // Also for a deleted agent: the channel keeps its thread until the channel goes.
+              yield* channelSync(() => this.#deleteChannelThreadHistory(agentId, threadId));
               // The messages are gone, so the files that their turns used open from no other link.
               this.#turn.fileHistory.forgetThread(threadId);
               yield* this.#threads.endThreadContext(threadId);
