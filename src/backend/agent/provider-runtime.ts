@@ -198,12 +198,24 @@ function signInFileVersion(paths: readonly string[]): string {
 }
 /**
  * Starts that fail in a row before OpenBot stops starting a provider by itself. A start that fails,
- * that times out, or whose process ends within `STABLE_RUN_MS` counts. Only a user action starts the
- * provider again: each start of the Windows Gemini server unpacks about 310 MB, and a loop of starts
- * filled the disk.
+ * that times out, or whose process ends within `STABLE_RUN_MS` counts. Each start of the Windows
+ * Gemini server unpacks about 310 MB, and a loop of starts filled the disk. A user action starts the
+ * provider again at once; else the next request after `START_STOP_WAITS_MS` does (#8071).
  */
 const START_FAILURE_LIMIT = 3;
 const STABLE_RUN_MS = 2 * 60_000;
+/**
+ * How long a stopped provider waits before a request can start it again, by each stop in a row. A
+ * short failure, such as a slow account check, must not stop scheduled routines until a user acts.
+ */
+const START_STOP_WAITS_MS = [5 * 60_000, 15 * 60_000, 30 * 60_000, 60 * 60_000] as const;
+
+/** A start failure that each later start repeats until the user fixes the system (#4848). */
+function userMustFixStart(reason: string | null | undefined): boolean {
+  return (
+    reason === sourceText("error.provider.realtimeLimitZero") || reason === sourceText("error.provider.cpuUnsupported")
+  );
+}
 /** How often a restart the user asked for checks whether the provider's turns have ended. */
 const PROVIDER_RESTART_POLL_MS = 1_000;
 /** The start failure of OpenCode 1 on a database that OpenCode 2 made. */
@@ -544,6 +556,9 @@ export class ProviderRuntime implements ProviderPort {
   readonly #restartAttempts = new Map<AgentProvider, number>();
   /** Starts in a row that failed (`START_FAILURE_LIMIT`). A user action clears them. */
   readonly #startFailures = new Map<AgentProvider, number>();
+  /** When a request can start a stopped provider again (`START_STOP_WAITS_MS`). Infinity: only a user action. */
+  readonly #startStoppedUntil = new Map<AgentProvider, number>();
+  readonly #now: () => number;
   /** Providers that did not answer `initialize` in time, and how long their next start waits (`#countSlowStart`). */
   readonly #slowStarts = new Map<AgentProvider, number>();
   /** When each provider's current client became its client. */
@@ -582,6 +597,8 @@ export class ProviderRuntime implements ProviderPort {
     emitError: (code: string, error: unknown, agentId?: string, context?: FailureContext) => void;
     requestTimeoutMs: number;
     longStartTimeoutMs?: number;
+    /** The clock of the wait after a stop (`START_STOP_WAITS_MS`). */
+    now?: () => number;
     preferredProvider: AgentProvider;
     preferredModel?: AgentModelId | null;
     clientFactory: AgentClientFactory | null;
@@ -601,6 +618,7 @@ export class ProviderRuntime implements ProviderPort {
     this.#emitError = options.emitError;
     this.#requestTimeoutMs = options.requestTimeoutMs;
     this.#longStartTimeoutMs = options.longStartTimeoutMs ?? LONG_START_TIMEOUT_MS;
+    this.#now = options.now ?? Date.now;
     this.#preferredProvider = options.preferredProvider;
     this.#preferredModel = options.preferredModel ?? null;
     this.#clientFactory = options.clientFactory;
@@ -1597,9 +1615,9 @@ export class ProviderRuntime implements ProviderPort {
 
   /**
    * Only a signed-out row is checked again: the CLI also writes the file to refresh a token, and a
-   * provider that stopped at `START_FAILURE_LIMIT` must wait for the user. A change that comes while
-   * a check runs keeps its new version, so a later poll checks it. A sign-in or a Connect that
-   * OpenBot started checks the account itself when it ends.
+   * provider that stopped at `START_FAILURE_LIMIT` must wait for the user or for its wait to end. A
+   * change that comes while a check runs keeps its new version, so a later poll checks it. A sign-in
+   * or a Connect that OpenBot started checks the account itself when it ends.
    */
   #checkSignInFiles(): void {
     if (this.#status.phase === "starting" || this.#status.phase === "restarting" || this.#providerRefresh) return;
@@ -1663,7 +1681,7 @@ export class ProviderRuntime implements ProviderPort {
 
   /**
    * `automatic`: the app asked, not the user, so a provider that OpenBot stopped starting
-   * (`START_FAILURE_LIMIT`) stays stopped.
+   * (`START_FAILURE_LIMIT`) stays stopped until its wait ends.
    */
   readonly refreshProviders = Effect.fn("ProviderRuntime.refreshProviders")(function* (
     this: ProviderRuntime,
@@ -3956,7 +3974,7 @@ export class ProviderRuntime implements ProviderPort {
               if (!(failed instanceof CodexCliError || failed instanceof ProviderSignInError)) {
                 this.#emitProviderError(provider, "start_failed", failed);
                 // No process started, and the row keeps the reason the user can act on.
-                if (!(failed instanceof ProviderTempDiskSpaceError) && this.#countStartFailure(provider))
+                if (!(failed instanceof ProviderTempDiskSpaceError) && this.#countStartFailure(provider, message))
                   return this.#showStartStopped(provider);
               }
               // OpenCode can fail a start on a slow computer, and a later start works. Without a retry
@@ -4243,7 +4261,7 @@ export class ProviderRuntime implements ProviderPort {
     // A process that ran for a while was a good start, and its exit is not one more failure.
     const ranFor = Date.now() - (this.#activatedAt.get(client.provider) ?? 0);
     if (ranFor >= STABLE_RUN_MS) this.#startFailures.delete(client.provider);
-    const startStopped = ranFor < STABLE_RUN_MS && this.#countStartFailure(client.provider);
+    const startStopped = ranFor < STABLE_RUN_MS && this.#countStartFailure(client.provider, error.message);
     const attempts = this.#restartAttempts.get(client.provider) ?? 0;
     const stopped = startStopped || attempts >= 3;
     const providers = updateProviderStatus(this.#status.providers, client.provider, {
@@ -4341,27 +4359,32 @@ export class ProviderRuntime implements ProviderPort {
   }
 
   #startStopped(provider: AgentProvider): boolean {
-    return (this.#startFailures.get(provider) ?? 0) >= START_FAILURE_LIMIT;
+    if ((this.#startFailures.get(provider) ?? 0) < START_FAILURE_LIMIT) return false;
+    return this.#now() < (this.#startStoppedUntil.get(provider) ?? Number.POSITIVE_INFINITY);
   }
 
-  /** Counts one failed start, and answers whether OpenBot now stops starting the provider. */
-  #countStartFailure(provider: AgentProvider): boolean {
+  /**
+   * Counts one failed start, and answers whether OpenBot now stops starting the provider. `reason` is
+   * the failure's message: a failure that only the user can fix stops it until the user acts.
+   */
+  #countStartFailure(provider: AgentProvider, reason?: string | null): boolean {
     const failures = (this.#startFailures.get(provider) ?? 0) + 1;
     this.#startFailures.set(provider, failures);
     if (failures < START_FAILURE_LIMIT) return false;
     clearTimeout(this.#restartTimers.get(provider));
     this.#restartTimers.delete(provider);
-    if (failures === START_FAILURE_LIMIT) logger.warn("OpenBot stopped starting a provider.", { provider, failures });
+    const waitMs = userMustFixStart(reason)
+      ? Number.POSITIVE_INFINITY
+      : (START_STOP_WAITS_MS[failures - START_FAILURE_LIMIT] ?? START_STOP_WAITS_MS[3]);
+    this.#startStoppedUntil.set(provider, this.#now() + waitMs);
+    logger.warn("OpenBot stopped starting a provider.", { provider, failures, waitMs });
     return true;
   }
 
   #startStoppedMessage(provider: AgentProvider, reason?: string | null): string {
     // Each start ends in the same way until the user fixes the system, so the fix stays on the row (#4848).
-    const realtimeLimitZero = sourceText("error.provider.realtimeLimitZero");
-    if (reason === realtimeLimitZero) return realtimeLimitZero;
-    const cpuUnsupported = sourceText("error.provider.cpuUnsupported");
-    if (reason === cpuUnsupported) return cpuUnsupported;
-    return sourceText("error.provider.startStopped", { provider: providerLabel(provider) });
+    if (reason && userMustFixStart(reason)) return reason;
+    return sourceText("error.provider.startPaused", { provider: providerLabel(provider) });
   }
 
   /** Shows on the provider row that OpenBot stopped starting it, and answers the message. */

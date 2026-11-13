@@ -140,6 +140,7 @@ interface Report {
   stoppedProcess?: { tempRoot: string; envInRoot: boolean; unpackedWhileRunning: boolean; leftAfterStop: string[] };
   startCap?: { attempts: number; spawns: number; state: string | undefined; message: string | null | undefined };
   automaticRefresh?: { spawns: number };
+  afterWait?: { spawns: number; message: string | null | undefined };
   userRefresh?: { spawns: number };
   leftInTempRoot?: string[];
   launchSweep?: { left: string[] };
@@ -184,6 +185,8 @@ interface Report {
 const root = await mkdtemp(join(tmpdir(), "openbot-antigravity-start-e2e-"));
 const log = join(root, "agy.jsonl");
 const report: Report = { passed: false };
+/** The clock of the wait after a stop. Step 3 moves it past the first wait. */
+let clockMs = Date.now();
 process.env.FAKE_AGY_LOG = log;
 // The driver reads and writes the sign-in in the Gemini home. Keep it off the user's `~/.gemini`.
 process.env.GEMINI_HOME = join(root, "gemini");
@@ -249,6 +252,7 @@ function runtime(
     emit: () => undefined,
     emitError: () => undefined,
     requestTimeoutMs: 5_000,
+    now: () => clockMs,
     ...(firstInstall ? { longStartTimeoutMs: FIRST_INSTALL_START_TIMEOUT_MS } : {}),
     ...(savedKey ? { longStartTimeoutMs: KEY_AUTH_START_TIMEOUT_MS } : {}),
     preferredProvider: "antigravity",
@@ -332,16 +336,25 @@ try {
   };
   assert.equal(report.startCap.spawns, 3, "three failed starts, then no more");
   assert.equal(capRow?.state, "error");
-  assert.equal(capRow?.message, sourceText("error.provider.startStopped", { provider: "Gemini" }));
+  assert.equal(capRow?.message, sourceText("error.provider.startPaused", { provider: "Gemini" }));
 
   // 3. An automatic refresh, such as the one an auth error asks for, does not start it again.
   await runCauseEffect(providers.refreshProviders({ automatic: true }).pipe(Effect.ignore));
   report.automaticRefresh = { spawns: (await starts()).length - 3 };
   assert.equal(report.automaticRefresh.spawns, 0);
 
+  // 3a. After the first wait (5 minutes), a request starts it once more, as a scheduled routine does
+  // (#8071). That start fails too, so the next requests wait again.
+  clockMs += 5 * 60_000;
+  for (let attempt = 0; attempt < attempts; attempt += 1)
+    await runCauseEffect(providers.ensureProvider("antigravity").pipe(Effect.ignore));
+  report.afterWait = { spawns: (await starts()).length - 3, message: antigravityRow(providers)?.message };
+  assert.equal(report.afterWait.spawns, 1, "one start after the wait, then no more");
+  assert.equal(report.afterWait.message, sourceText("error.provider.startPaused", { provider: "Gemini" }));
+
   // 4. A refresh the user asks for starts it once more.
   await runCauseEffect(providers.refreshProviders({ automatic: false }).pipe(Effect.ignore));
-  report.userRefresh = { spawns: (await starts()).length - 3 };
+  report.userRefresh = { spawns: (await starts()).length - 4 };
   assert.equal(report.userRefresh.spawns, 1);
   await runCauseEffect(providers.dispose());
   await waitFor(

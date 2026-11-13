@@ -154,6 +154,8 @@ export const messages = {
   "error.provider.acpModelsTimedOut": "لم يعرض {provider} نماذجه خلال {seconds} ث. قد يكون الحاسوب مشغولًا.",
   "error.provider.startStopped":
     "فشل تشغيل {provider} عدة مرات متتالية، لذا توقف OpenBot عن المحاولة. حدّث المزوّدين لإعادة المحاولة.",
+  "error.provider.startPaused":
+    "فشل تشغيل {provider} عدة مرات متتالية. سيحاول OpenBot مرة أخرى لاحقًا. للمحاولة الآن، حدّث المزوّدين.",
   "error.provider.tempDiskSpace":
     "يحتاج {provider} إلى 1 GB على الأقل من مساحة القرص الفارغة ليعمل. حرّر مساحة، ثم حدّث المزوّدين.",
   "error.provider.noCodeSignIn": "لا يمكن تسجيل الدخول إلى {provider} برمز.",

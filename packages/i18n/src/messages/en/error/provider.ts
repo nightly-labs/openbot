@@ -162,6 +162,8 @@ export const messages = defineMessages("error.provider", {
     "{provider} did not list its models within {seconds} s. The computer may be busy.",
   "error.provider.startStopped":
     "{provider} did not start several times in a row, so OpenBot stopped trying. Refresh the providers to try again.",
+  "error.provider.startPaused":
+    "{provider} did not start several times in a row. OpenBot will try again later. To try now, refresh the providers.",
   "error.provider.tempDiskSpace":
     "{provider} needs at least 1 GB of free disk space to start. Free up space, then refresh the providers.",
   "error.provider.noCodeSignIn": "{provider} cannot be signed in with a code.",
