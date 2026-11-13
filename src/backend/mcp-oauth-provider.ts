@@ -1968,7 +1968,9 @@ const secureOAuthRequest = Effect.fn("McpOAuth.secureFetch")(function* (
     if (hop >= MAX_OAUTH_REDIRECTS)
       return yield* mcpFailure(new Error(sourceText("error.backend.oauthTooManyRedirects")));
     const next = yield* mcpSync(() => new URL(location, url));
-    if (next.origin !== url.origin && carriesCredential(request))
+    // Only a sign-in request may move to its own `www.` host: MCP traffic keeps its origin rule.
+    const ownWwwHost = !mcpTraffic && movesToOwnWwwHost(url, next, response.status);
+    if (next.origin !== url.origin && carriesCredential(request) && !ownWwwHost)
       return yield* mcpFailure(new Error(sourceText("error.backend.oauthRedirectOrigin", { origin: next.origin })));
     url = next;
     request = redirected(request, response.status);
@@ -2060,6 +2062,20 @@ function withoutHash(url: URL): string {
 function carriesCredential(request: RequestInit): boolean {
   if (request.body !== undefined && request.body !== null) return true;
   return new Headers(request.headers).has("authorization");
+}
+
+/**
+ * Whether a redirect only moves the same https request between a host and its own `www.` host.
+ * Lunch Flow's metadata names `lunchflow.app`, which answers each request with a 308 to the same
+ * path on `www.lunchflow.app` (#8436). The server that redirects already has the request, and a
+ * 307 or 308 keeps the method and the body. Any other origin change still refuses a credential.
+ */
+function movesToOwnWwwHost(from: URL, to: URL, status: number): boolean {
+  if (status !== 307 && status !== 308) return false;
+  if (from.protocol !== "https:" || to.protocol !== "https:" || from.port !== to.port) return false;
+  if (from.pathname !== to.pathname || from.search !== to.search) return false;
+  const ownWww = (bare: string, www: string) => www === `www.${bare}` && !bare.startsWith("www.");
+  return ownWww(from.hostname, to.hostname) || ownWww(to.hostname, from.hostname);
 }
 
 /** Where a credential may be sent: an https endpoint, or one on the user's own machine. */
