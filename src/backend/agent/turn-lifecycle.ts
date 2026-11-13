@@ -989,6 +989,7 @@ export class TurnLifecycle {
             ).pipe(Effect.forkIn(this.#scope, { startImmediately: true }));
         }
         if (item.type === "collabAgentToolCall") this.#applyCodexSubagents(agentId, threadId, turnId, item);
+        if (item.type === "subAgentActivity") this.#applyCodexSubagentActivity(agentId, threadId, turnId, item);
         const threadItem = toThreadItem(item);
         if (!threadItem) return;
         yield* this.#applyItem(agentId, threadId, turnId, threadItem, notification.method === "item/completed");
@@ -2459,6 +2460,23 @@ export class TurnLifecycle {
       if (subagent.status === "running") this.#codexChildren.set(subagent.id, { agentId, threadId, turnId });
       else this.#codexChildren.delete(subagent.id);
     this.#applySubagents(agentId, threadId, turnId, clamped);
+  }
+
+  /**
+   * Codex with multi-agent v2 reports a subagent as `subAgentActivity` items of the parent thread. Only
+   * the link to the parent is kept: the subagent's own requests name its thread (#8188).
+   */
+  #applyCodexSubagentActivity(agentId: string, threadId: string, turnId: string, item: DynamicRecord): void {
+    const childThreadId = getString(item, "agentThreadId");
+    if (!childThreadId) return;
+    const kind = getString(item, "kind");
+    if (kind === "completed" || kind === "interrupted") this.#codexChildren.delete(childThreadId);
+    else this.#codexChildren.set(childThreadId, { agentId, threadId, turnId });
+  }
+
+  /** The agent, thread and turn of a running Codex subagent, by the subagent's own thread. */
+  codexSubagentParent(childThreadId: string): { agentId: string; threadId: string; turnId: string } | undefined {
+    return this.#codexChildren.get(childThreadId);
   }
 
   /**
