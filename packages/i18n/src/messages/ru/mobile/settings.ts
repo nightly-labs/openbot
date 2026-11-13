@@ -154,6 +154,9 @@ export const messages = {
     "Результаты и сообщения поиска плавно появляются и исчезают с лёгким размытием, когда меняются. Когда движение уменьшено, они только плавно появляются и исчезают. Если выключено, они меняются сразу.",
   "mobile.settings.feedback.footer": "Тактильный отклик на действия в приложении на этом устройстве.",
   "mobile.settings.feedback.haptics": "Вибрация",
+  "mobile.settings.feedback.replies": "Вибрация ответов",
+  "mobile.settings.feedback.repliesFooter":
+    "Вибрация, пока в чате появляется ответ агента. Остальная вибрация остаётся включённой.",
   "mobile.settings.feedback.retry": "Повторить сохранение настройки вибрации",
   "mobile.settings.liveActivities.title": "Live Activities",
   "mobile.settings.liveActivities.footer":

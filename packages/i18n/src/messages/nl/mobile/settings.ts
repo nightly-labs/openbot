@@ -144,6 +144,9 @@ export const messages = {
     "Zoekresultaten en zoekberichten faden in en uit met een korte vervaging als ze veranderen. Als beweging beperkt is, faden ze alleen. Als dit uitstaat, veranderen ze direct.",
   "mobile.settings.feedback.footer": "Tastbare feedback voor acties in de app op dit apparaat.",
   "mobile.settings.feedback.haptics": "Haptische feedback",
+  "mobile.settings.feedback.replies": "Haptiek bij antwoorden",
+  "mobile.settings.feedback.repliesFooter":
+    "Tikjes terwijl het antwoord van een agent in een chat verschijnt. De andere haptiek blijft aan.",
   "mobile.settings.feedback.retry": "Opslaan van haptische instelling opnieuw proberen",
   "mobile.settings.liveActivities.title": "Live activiteiten",
   "mobile.settings.liveActivities.footer":

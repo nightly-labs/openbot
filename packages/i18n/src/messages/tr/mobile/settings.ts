@@ -144,6 +144,9 @@ export const messages = {
     "Arama sonuçları ve arama mesajları değiştiğinde kısa bir bulanıklıkla belirip kaybolur. Hareket azaltıldığında yalnızca solarak değişir. Bu kapalıyken hemen değişir.",
   "mobile.settings.feedback.footer": "Bu cihazda, uygulamadaki eylemler için dokunma geri bildirimi.",
   "mobile.settings.feedback.haptics": "Dokunsal",
+  "mobile.settings.feedback.replies": "Yanıt titreşimi",
+  "mobile.settings.feedback.repliesFooter":
+    "Sohbette bir ajanın yanıtı görünürken titreşim. Diğer titreşimler açık kalır.",
   "mobile.settings.feedback.retry": "Dokunsal ayarını kaydetmeyi tekrar dene",
   "mobile.settings.liveActivities.title": "Canlı Etkinlikler",
   "mobile.settings.liveActivities.footer":

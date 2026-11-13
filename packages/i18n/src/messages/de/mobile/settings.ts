@@ -149,6 +149,9 @@ export const messages = {
     "Suchergebnisse und Suchhinweise blenden mit einer kurzen Unschärfe ein und aus, wenn sie sich ändern. Wenn Bewegungen reduziert sind, blenden sie nur ein und aus. Wenn dies aus ist, ändern sie sich sofort.",
   "mobile.settings.feedback.footer": "Haptisches Feedback für Aktionen in der App auf diesem Gerät.",
   "mobile.settings.feedback.haptics": "Haptik",
+  "mobile.settings.feedback.replies": "Antwort-Haptik",
+  "mobile.settings.feedback.repliesFooter":
+    "Vibration, während die Antwort eines Agenten im Chat erscheint. Die übrige Haptik bleibt an.",
   "mobile.settings.feedback.retry": "Haptikeinstellung erneut speichern",
   "mobile.settings.liveActivities.title": "Live-Aktivitäten",
   "mobile.settings.liveActivities.footer":

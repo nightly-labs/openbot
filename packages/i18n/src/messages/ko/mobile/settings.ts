@@ -143,6 +143,9 @@ export const messages = {
     "검색 결과와 검색 메시지가 바뀔 때 짧은 흐림 효과와 함께 나타나고 사라져요. 동작이 줄어든 경우에는 페이드만 적용돼요. 끄면 바로 바뀌어요.",
   "mobile.settings.feedback.footer": "이 기기에서 앱의 동작에 대한 터치 피드백이에요.",
   "mobile.settings.feedback.haptics": "햅틱",
+  "mobile.settings.feedback.replies": "답장 햅틱",
+  "mobile.settings.feedback.repliesFooter":
+    "채팅에 에이전트 답장이 표시되는 동안의 진동입니다. 다른 햅틱은 그대로 켜져 있습니다.",
   "mobile.settings.feedback.retry": "햅틱 설정 다시 저장",
   "mobile.settings.liveActivities.title": "실시간 현황",
   "mobile.settings.liveActivities.footer":
