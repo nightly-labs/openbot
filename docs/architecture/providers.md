@@ -685,12 +685,16 @@ the provider's serialized connection command. It refuses a provider that is runn
 deliveries while it writes, and reports success only after a new process runs with the new key.
 
 OpenCode reports OpenCode Zen and OpenCode Go as a single catalog, on the separate endpoints
-`opencode.ai/zen/v1` and `opencode.ai/zen/go/v1`, and OpenBot supports only Go. So `isOpencodeModelUnusableWithStoredKey` in `src/backend/agent/provider-models.ts`
-drops the paid Zen models from `ModelCatalog.refresh` (through the OpenCode driver's
-`catalog.usableWithStoredKey`) while OpenBot is the one supplying the key;
-with no key stored those models can only come from the user's own OpenCode sign-in, which does
-buy them. Neither `/models` endpoint authenticates, so entitlement cannot be read back and the
-split is a product rule rather than a check.
+`opencode.ai/zen/v1` and `opencode.ai/zen/go/v1`, and OpenBot supports only Go. The saved key goes
+only to the `opencode-go` provider, so OpenCode lists a paid Zen model only when the user signed in
+to Zen in OpenCode itself (`opencode auth login`). That sign-in buys the model, so the catalog shows
+each model that OpenCode lists. Checked in OpenCode 2.2.5 and 2.3.0: a key on `opencode-go` lists
+the Go models and no paid Zen model (#6185).
+
+OpenCode first lists the models of a cached or built-in catalog and fetches the new catalog in the
+background, about 3 s later. A first start of OpenCode 2.2.5 listed 80 of 88 models. The OpenCode
+driver thus sets `catalog.relistAfterStart`: the list is read again 5 s after each start, and agents
+do not leave a model that only the first list lacks.
 
 The CLI reports no Go quota over ACP. `readOpenCodeGoUsage` (`src/backend/opencode-usage.ts`)
 sends `opencode.ai/zen/go/v1/usage` the key the CLI uses. A saved key is the only key: the CLI

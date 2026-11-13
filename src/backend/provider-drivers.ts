@@ -28,12 +28,7 @@ import { ANTIGRAVITY_ACP_FLAVOR, antigravityGeminiHome, GEMINI_DIR_FLAG } from "
 import { OPENCODE_ACP_FLAVOR } from "./acp-flavor-opencode";
 import type { AcpArgv, AcpExtensionMethod } from "./acp-sign-in";
 import { readMuseAccount } from "./agent/muse-login";
-import {
-  claudeModelName,
-  isOpencodeModelUnusableWithStoredKey,
-  modelsAfterOpenCodeDiscoveryFailure,
-  serviceTierFields,
-} from "./agent/provider-models";
+import { claudeModelName, modelsAfterOpenCodeDiscoveryFailure, serviceTierFields } from "./agent/provider-models";
 import type { TurnContext } from "./agent/turn-context";
 import type { AgentClient } from "./agent-client";
 import { ANTIGRAVITY_TOKEN_FILE, importAntigravityToken } from "./antigravity-token-import";
@@ -702,8 +697,6 @@ interface ProviderModelCatalog {
   modelName?(id: string): string | null;
   /** Fields that only this provider's CLI reports. */
   modelFields?(model: ModelListResponse["data"][number]): { fastServiceTier?: string; ultrafastServiceTier?: string };
-  /** False drops a model that the stored API key cannot use. Runs only while a key is stored. */
-  usableWithStoredKey?(id: string, name: string): boolean;
   /**
    * The models to keep when the list failed, timed out or came back empty. Without this hook a
    * failed list keeps the previous models, and an empty list is a real answer.
@@ -1071,11 +1064,13 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     // optional OpenCode Go key is pasted into OpenBot instead. Nothing is required to sign in:
     // with no credential at all the CLI still lists the free models and answers a turn.
     signIn: { kind: "external" },
-    // A stored key is an OpenCode Go key, and `isOpencodeModelUnusableWithStoredKey` says why that
-    // drops models. The free tier stays in the picker when discovery fails or answers empty.
+    // The free tier stays in the picker when discovery fails or answers empty. OpenCode 2.2.5 and
+    // 2.3.0 first list the models of a cached or built-in catalogue and fetch the new catalogue in the
+    // background, about 3 s later. A first start of 2.2.5 listed 80 of 88 models (#6185).
     catalog: {
       hiddenWhenSignedOut: true,
-      usableWithStoredKey: (id, name) => !isOpencodeModelUnusableWithStoredKey(id, name),
+      partialListAtStart: true,
+      relistAfterStart: true,
       fallback: modelsAfterOpenCodeDiscoveryFailure,
     },
     resolveCli: resolveOpencodeCli,

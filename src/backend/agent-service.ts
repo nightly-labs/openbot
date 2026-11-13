@@ -558,6 +558,7 @@ const TASK_STOP_WAIT_MS = 15_000;
  * How long after a list that lacks an agent's model a `catalog.partialListAtStart` provider is asked
  * again. Grok 1.0.70 has its whole catalogue about a second after it starts on an expired sign-in.
  * Mistral Vibe 3.1.0 saves its account catalogue while its probe session is open (`probeCloseDelayMs`).
+ * OpenCode 2.2.5 and 2.3.0 list their new catalogue about 3 s after they start (#6185).
  */
 const PARTIAL_LIST_RECHECK_MS = 5_000;
 /**

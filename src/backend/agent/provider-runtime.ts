@@ -745,7 +745,6 @@ export class ProviderRuntime implements ProviderPort {
     this.#modelCatalog = new ModelCatalog({
       client: (provider) => (this.#off.has(provider) ? undefined : this.#clients.get(provider)),
       isSignedOut: (provider) => this.signInRequired(provider),
-      credentials: this.#credentials,
       requestTimeoutMs: this.#requestTimeoutMs,
       recordProviderError: (provider, error) => this.#recordProviderError(provider, error),
     });
