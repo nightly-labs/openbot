@@ -1,5 +1,45 @@
 [
   {
+    "version": "0.70.0",
+    "date": "2026-11-13",
+    "notices": [
+      "Aktualisiere jeden verbundenen Server auf diese Version. Server neu starten, Agenten-Standardwerte, Thread-Limits und die neuen Workflow-Schritte funktionieren auf einem Server nur, wenn er diese Version hat."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Starte einen Server, den du selbst hostest, aus der App neu: Wähle als Inhaber oder Admin im Servermenü Server neu starten.",
+          "Wähle unter Servereinstellungen > Vault, welche Agenten jeden Login, jede Karte, jeden Kontakt und jeden API-Schlüssel nutzen dürfen. Ein Agent sieht und füllt nur die Einträge, die er nutzen darf.",
+          "Workflows haben Schritte für Bilder und Videos. Erstelle Bilder und kurze Videos mit den Modellen GPT Image, Grok Imagine oder Sunra und verbinde Bilder als Referenzen.",
+          "Verbinde Sunra und TryPost aus dem Marktplatz unter Apps. Agenten können dann Medien mit deinen Sunra-Credits erstellen sowie Social-Media-Beiträge entwerfen und veröffentlichen.",
+          "Inhaber und Admins können in Servereinstellungen > Allgemein festlegen, wie viele Threads gleichzeitig laufen, für den Server und für jeden Agenten.",
+          "Zeige Agenten mit neuen Nachrichten im Dock: Schalte es in Einstellungen > Agenten-Dock ein. Klicke einen solchen Agenten mit der rechten Maustaste an und wähle Zum Dock hinzufügen, damit er dort bleibt.",
+          "Füge mehr als ein Cursor-Konto hinzu. Jeder Agent kann ein anderes Konto nutzen."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Ein API-Schlüssel, den du nur für einen Agenten speicherst, wird jetzt im verschlüsselten Vault aufbewahrt. Die Schlüssel, die Agenten lesen, haben einen neuen Pfad. Ein Skript mit dem alten Pfad muss den neuen Pfad verwenden.",
+          "Die Agenteneinstellungen, etwa Agenten während der Arbeit steuern, stehen jetzt für jeden Server in Servereinstellungen > Agenten, auch für diesen Computer.",
+          "In der vollen Browser-Ansicht steht das Nachrichtenfeld wieder mittig unten auf der Seite.",
+          "Die Chat-Kopfzeile zeigt den Titel des Agenten nach seinem Namen, zum Beispiel „Brock · Filialleiter“."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot öffnet schneller, wenn deine Chats lang sind.",
+          "Unter Windows und Linux fragt OpenBot nach, bevor es beendet wird, während Agenten arbeiten. Wähle Weiterlaufen, um das Fenster auszublenden und die Agenten fertig arbeiten zu lassen.",
+          "Geräte verbinden sich wieder mit einem Server, wenn die Verbindung eines Geräts während der Einrichtung abbricht. Die Live-Ansicht des Browsers eines Agenten auf einem beigetretenen Server bleibt bei einer langsamen Verbindung ebenfalls geöffnet.",
+          "Wenn du einen Agenten um einen Screenshot einer Webseite bittest, hängt er das Bild jetzt an seine Antwort an.",
+          "Kostenlose OpenCode-Modelle antworten wieder, wenn ein OpenCode-Go-Schlüssel gespeichert ist."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.69.0",
     "date": "2026-11-12",
     "notices": [

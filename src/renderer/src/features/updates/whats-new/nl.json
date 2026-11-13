@@ -1,5 +1,45 @@
 [
   {
+    "version": "0.70.0",
+    "date": "2026-11-13",
+    "notices": [
+      "Update ook elke server waarmee je verbonden bent naar deze versie. Server herstarten, standaardinstellingen van agents, limieten voor threads en de nieuwe stappen van Workflows werken op een server alleen als die deze versie heeft."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Herstart een server die je zelf host vanuit de app: kies als eigenaar of beheerder Server herstarten in het servermenu.",
+          "Kies welke agents elk login, elke kaart, elk contact en elke API-sleutel mogen gebruiken in Serverinstellingen → Kluis. Een agent ziet en vult alleen de items die hij mag gebruiken.",
+          "Workflows hebben stappen voor Afbeelding en Video. Maak afbeeldingen en korte video's met de modellen GPT Image, Grok Imagine of Sunra, en koppel afbeeldingen als referentie.",
+          "Koppel Sunra en TryPost via de Apps in de Marktplaats. Agents kunnen dan media maken met je Sunra-tegoed, en social-mediaberichten opstellen en publiceren.",
+          "Eigenaars en beheerders kunnen instellen hoeveel threads tegelijk draaien, op de server en per agent, in Serverinstellingen → Algemeen.",
+          "Toon agents met nieuwe berichten in het dock: zet dit aan in Instellingen → Agentdock. Klik met de rechtermuisknop op zo'n agent en kies Aan het dock toevoegen om hem daar te houden.",
+          "Voeg meer dan één Cursor-account toe. Elke agent kan een ander account gebruiken."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Een API-sleutel die je voor slechts één agent opslaat, wordt nu bewaard in de versleutelde Kluis. De sleutels die agents lezen hebben een nieuw pad, dus een script met het oude pad moet het nieuwe gebruiken.",
+          "De agentinstellingen, zoals Stuur agents bij terwijl ze werken, staan nu in Serverinstellingen → Agents voor elke server, ook voor deze computer.",
+          "In de volledige browserweergave staat het berichtvak weer onderaan in het midden van de pagina.",
+          "De chatkop toont de titel van de agent na zijn naam, bijvoorbeeld “Brock · Winkelmanager”."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot opent sneller als je chats lang zijn.",
+          "Op Windows en Linux vraagt OpenBot om bevestiging voordat het afsluit terwijl agents werken. Kies Laat draaien om het venster te verbergen en de agents hun werk te laten afmaken.",
+          "Apparaten maken weer verbinding met een server wanneer de verbinding van één apparaat tijdens de installatie stopt. De live weergave van de browser van een agent op een server waarmee je verbonden bent, blijft ook open bij een trage verbinding.",
+          "Wanneer je een agent om een screenshot van een webpagina vraagt, voegt hij de afbeelding nu toe aan zijn antwoord.",
+          "Gratis OpenCode-modellen antwoorden weer wanneer een OpenCode Go-sleutel is opgeslagen."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.69.0",
     "date": "2026-11-12",
     "notices": [
