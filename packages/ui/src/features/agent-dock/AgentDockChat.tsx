@@ -119,7 +119,7 @@ export function AgentDockChat(props: {
   onDraftChange: (value: string) => void;
   onSend: () => void;
   onClose: () => void;
-  /** True while the chat stays open when the dock window loses the focus. */
+  /** True while the chat stays open when the dock window loses the focus. The pin's label says what a click does. */
   pinned?: boolean | undefined;
   /** The header shows "Keep open" only when it is set. */
   onPinChange?: ((pinned: boolean) => void) | undefined;
@@ -291,7 +291,6 @@ export function AgentDockChat(props: {
               label={props.pinned ? t("agent.dock.closeOnLeave") : t("agent.dock.keepOpen")}
               variant="ghost"
               class="agent-dock-icon"
-              aria-pressed={props.pinned ? "true" : "false"}
               onClick={() => change()(!props.pinned)}
             >
               <Show when={props.pinned} fallback={<Pin aria-hidden="true" />}>

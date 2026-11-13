@@ -275,7 +275,10 @@ interface DockState {
   sending: Record<string, boolean>;
   /** Raised by one to put the caret in the composer. */
   focus: number;
-  /** The user keeps the open chat open when the dock window loses the focus. A close clears it. */
+  /**
+   * The user keeps the panel open when the dock window loses the focus. The pin belongs to the panel, so
+   * it stays when the user opens the chat of another seat; a close clears it.
+   */
   pinned: boolean;
 }
 

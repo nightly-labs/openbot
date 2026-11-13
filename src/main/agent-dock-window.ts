@@ -69,6 +69,8 @@ interface DockWindow {
   displayId: number;
   /** X11 and Windows: the last input region of the renderer, in CSS px. A new zoom changes its size in window px. */
   shape?: AgentDockInputRect[];
+  /** The window takes key input: the renderer has a chat or a menu open. */
+  keyboard?: boolean;
 }
 
 export class AgentDockWindowController {
@@ -195,14 +197,18 @@ export class AgentDockWindowController {
    * only while the chat composer needs it: a panel becomes key without activating the app.
    */
   setInteractive(rendererId: number, input: SetAgentDockInteractiveInput): void {
-    const window = this.#liveWindows().find((entry) => entry.rendererId === rendererId)?.window;
-    if (!window) return;
+    const entry = this.#liveWindows().find((item) => item.rendererId === rendererId);
+    if (!entry) return;
+    const { window } = entry;
     // On X11 the window shape lets the pointer through: a window that ignores the pointer gets no moves.
     if (this.#options.windowKind !== "x11")
       letPointerThrough(this.#options.pointerForwarding, window, !input.interactive);
     const keyboard = input.keyboard === true;
     window.setFocusable(keyboard);
-    if (keyboard && !window.isFocused()) window.focus();
+    // The window takes the focus only when a chat or a menu opens. A pinned chat stays open when another
+    // window takes the focus, and a later pointer move on the dock must not take the focus back.
+    if (keyboard && !entry.keyboard && !window.isFocused()) window.focus();
+    entry.keyboard = keyboard;
   }
 
   /**
@@ -493,6 +499,8 @@ export class AgentDockWindowController {
    * renderer stops reading it. Its drag ends too.
    */
   #release(entry: DockWindow): void {
+    // A new renderer has no chat or menu open.
+    entry.keyboard = false;
     if (this.#drag?.rendererId === entry.rendererId) this.#drag = null;
     if (this.#chatOwner !== entry.rendererId) return;
     this.#chatOwner = null;
