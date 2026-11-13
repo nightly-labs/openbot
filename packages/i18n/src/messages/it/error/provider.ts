@@ -227,6 +227,8 @@ export const messages = {
     "Il provider del modello è andato in errore dal suo lato. La tua connessione non c'entra. Riprova più tardi o scegli un altro modello.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "La risposta del modello si è interrotta o non era valida. Invia di nuovo il messaggio o scegli un altro modello.\n{detail}",
+  "error.provider.opencodeReasoningOverlap":
+    "OpenCode non è riuscito a leggere il ragionamento di questo modello con questo impegno. Seleziona un impegno minore o un altro modello, poi invia di nuovo il messaggio.",
   "error.provider.opencodeNetwork":
     "OpenCode non è riuscito a connettersi al provider del modello. Controlla la connessione di rete del computer che esegue OpenBot, poi riprova.\n{detail}",
   "error.provider.codexStateBusy":

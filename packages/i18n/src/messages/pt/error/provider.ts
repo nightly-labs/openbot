@@ -228,6 +228,8 @@ export const messages = {
     "Ocorreu uma falha no provedor do modelo. Sua conexão não é a causa. Tente novamente mais tarde ou escolha outro modelo.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "A resposta do modelo foi interrompida ou não era válida. Envie sua mensagem de novo ou escolha outro modelo.\n{detail}",
+  "error.provider.opencodeReasoningOverlap":
+    "O OpenCode não conseguiu ler o raciocínio deste modelo com este esforço. Selecione um esforço menor ou outro modelo e envie sua mensagem de novo.",
   "error.provider.opencodeNetwork":
     "O OpenCode não conseguiu se conectar ao provedor do modelo. Verifique a conexão de rede do computador que executa o OpenBot e tente novamente.\n{detail}",
   "error.provider.codexStateBusy":
