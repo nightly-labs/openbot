@@ -208,10 +208,11 @@ const STABLE_RUN_MS = 2 * 60_000;
  * How long a stopped provider waits before a request can start it again, by each stop in a row. A
  * short failure, such as a slow account check, must not stop scheduled routines until a user acts.
  */
-const START_STOP_WAITS_MS = [5 * 60_000, 15 * 60_000, 30 * 60_000, 60 * 60_000] as const;
+const LONGEST_START_STOP_WAIT_MS = 60 * 60_000;
+const START_STOP_WAITS_MS = [5 * 60_000, 15 * 60_000, 30 * 60_000, LONGEST_START_STOP_WAIT_MS] as const;
 
 /** A start failure that each later start repeats until the user fixes the system (#4848). */
-function userMustFixStart(reason: string | null | undefined): boolean {
+function userMustFixStart(reason: string | null | undefined): reason is string {
   return (
     reason === sourceText("error.provider.realtimeLimitZero") || reason === sourceText("error.provider.cpuUnsupported")
   );
@@ -4375,7 +4376,7 @@ export class ProviderRuntime implements ProviderPort {
     this.#restartTimers.delete(provider);
     const waitMs = userMustFixStart(reason)
       ? Number.POSITIVE_INFINITY
-      : (START_STOP_WAITS_MS[failures - START_FAILURE_LIMIT] ?? START_STOP_WAITS_MS[3]);
+      : (START_STOP_WAITS_MS[failures - START_FAILURE_LIMIT] ?? LONGEST_START_STOP_WAIT_MS);
     this.#startStoppedUntil.set(provider, this.#now() + waitMs);
     logger.warn("OpenBot stopped starting a provider.", { provider, failures, waitMs });
     return true;
@@ -4383,7 +4384,9 @@ export class ProviderRuntime implements ProviderPort {
 
   #startStoppedMessage(provider: AgentProvider, reason?: string | null): string {
     // Each start ends in the same way until the user fixes the system, so the fix stays on the row (#4848).
-    if (reason && userMustFixStart(reason)) return reason;
+    // A stop with a wait says that OpenBot tries again, also when the row kept such a fix from before.
+    const waitsForUser = this.#startStoppedUntil.get(provider) === Number.POSITIVE_INFINITY;
+    if (waitsForUser && userMustFixStart(reason)) return reason;
     return sourceText("error.provider.startPaused", { provider: providerLabel(provider) });
   }
 

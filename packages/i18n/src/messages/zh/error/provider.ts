@@ -147,7 +147,7 @@ export const messages = {
   "error.provider.acpStartTimedOut": "{provider} 未在 {seconds} 秒内完成启动，电脑可能正忙。",
   "error.provider.acpModelsTimedOut": "{provider} 未在 {seconds} 秒内列出模型，电脑可能正忙。",
   "error.provider.startStopped": "{provider} 连续多次启动失败，OpenBot 已停止尝试。请刷新服务商以重试。",
-  "error.provider.startPaused": "{provider} 连续多次未能启动。OpenBot 稍后会再试。要立即重试，请刷新提供方。",
+  "error.provider.startPaused": "{provider} 连续多次启动失败。OpenBot 稍后会再试。要立即重试，请刷新服务商。",
   "error.provider.tempDiskSpace": "{provider} 启动至少需要 1 GB 可用磁盘空间。请清理空间后刷新服务商。",
   "error.provider.noCodeSignIn": "{provider} 不支持用验证码登录。",
   "error.provider.codeLoginNoLink": "服务商没有显示登录链接，请重试。",
