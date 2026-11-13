@@ -109,6 +109,11 @@ test("the agent answers a message", async ({ app, screen, browser }) => {
     // The answer is in the message and in the chat list.
     await expect(screen.getByText(ANSWER).first()).toBeVisible({ timeout: ANSWER_MS });
     await app.screenshot("answered");
+  } catch (error) {
+    // The chat shows the error of the provider. The picture at the failure is too late: the agent
+    // is deleted by then.
+    await app.screenshot("no-answer").catch(() => undefined);
+    throw error;
   } finally {
     // The agent has a folder in the user's OpenBot home, outside the profile.
     await browser
