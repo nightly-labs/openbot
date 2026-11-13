@@ -27,7 +27,7 @@ import type { LanguageService } from "./language-service";
 import { type CallbackAnswer, startLoopbackCallbackServer } from "./loopback-callback-server";
 
 /** The path that a sign-in registers first. */
-export const MCP_OAUTH_REDIRECT_PATH = "/mcp-auth";
+const MCP_OAUTH_REDIRECT_PATH = "/mcp-auth";
 
 /**
  * The paths this listener answers. Everything else is a 404, including `/`. A server that refuses
