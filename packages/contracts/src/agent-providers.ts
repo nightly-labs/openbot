@@ -172,7 +172,8 @@ export interface AgentProviderDescriptor {
   readonly workspaceEnforcement: "tool-sandbox" | "command-sandbox" | "confined-process";
   /**
    * How the CLI takes a message into a running turn. `native`: it reads the message at its next
-   * step (Grok through its `x.ai/interject` ACP extension). `deferred`: the protocol has no steer
+   * step (Grok through its `x.ai/interject` ACP extension, Antigravity through a second
+   * `session/prompt`). `deferred`: the protocol has no steer
    * request (ACP), so the message can wait until the turn ends. Only a `native` provider steers a
    * message sent in `steer` mode; the others queue it.
    */
@@ -325,7 +326,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     homeSkills: "instructions",
     workspaceInstructionFiles: [],
     workspaceEnforcement: "confined-process",
-    steer: "deferred",
+    steer: "native",
     concurrentTurns: true,
     reportsUsage: true,
     approvalsInFullAccess: true,
