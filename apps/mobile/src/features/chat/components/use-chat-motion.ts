@@ -386,10 +386,15 @@ export function useChatMotion(
     reveal();
     cancelSend();
   }, [leaveLatest, reveal, cancelSend]);
-  /** Opens the chat with row `index` under the header, instead of at the latest message. */
+  /**
+   * Opens the chat with row `index` under the header, instead of at the latest message. A message
+   * from search is the reader's choice of place. The NEW line (`unread`) is not: as on desktop, the
+   * chat still reads itself, and it follows the latest message when its end is in view.
+   */
   const openAt = useCallback(
-    async (index: number): Promise<void> => {
-      leaveLatest();
+    async (index: number, unread = false): Promise<void> => {
+      if (unread) followLatest.current = false;
+      else leaveLatest();
       const startDrags = drags.current;
       let shown: number | null = null;
       try {
@@ -410,8 +415,18 @@ export function useChatMotion(
         // A failed scroll keeps the position that the list has. The chat still shows.
       }
       reveal();
+      const state = unread && drags.current === startDrags ? listRef.current?.getState() : undefined;
+      if (!state) return;
+      const m = measurements.current;
+      followLatest.current = chatContentIsVisible(
+        m.content,
+        m.viewport,
+        state.scroll,
+        m.composer + Math.max(0, keyboardHeight.get() - keyboardOffset),
+      );
+      setKeyboardLiftBehavior(followLatest.current ? "whenAtEnd" : "never");
     },
-    [leaveLatest, header, reveal],
+    [leaveLatest, header, reveal, keyboardHeight, keyboardOffset],
   );
   /** Positions the chat at the latest message again, after the latest page replaces a window around a searched message. */
   const returnToLatest = useCallback(() => {

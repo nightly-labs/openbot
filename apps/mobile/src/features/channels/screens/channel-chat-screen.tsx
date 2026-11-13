@@ -1,7 +1,7 @@
 import type { RespondToPromptInput } from "@openbot/contracts/ipc";
 import * as Crypto from "expo-crypto";
 import { useLocalSearchParams } from "expo-router";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChatView } from "@/features/chat/components/chat-view";
 import { useLeaveChat } from "@/features/chat/components/use-leave-chat";
 import { useMessageDelete } from "@/features/chat/components/use-message-delete";
@@ -16,6 +16,7 @@ import { showsOnline } from "@/features/workspace/model/server-status";
 import { useText } from "@/shared/lib/text";
 import { useChannels } from "../components/use-channels";
 import { channelTaskActivities, channelTasksNeedingAction } from "../model/channel-task-actions";
+import { firstUnreadChannelMessageId } from "../model/channel-unread";
 
 export function ChannelChatScreen() {
   const { channelId, serverId } = useLocalSearchParams<{ channelId: string; serverId: string }>();
@@ -114,6 +115,28 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
     );
     return lastTurnSummaries.current;
   }, [page?.messages, memberWork]);
+  // The NEW line of this visit, as in an agent chat. The chat reads itself at once and the unread
+  // count goes to zero, so the line keeps the first unread message that the channel had when its page came.
+  const [unreadLine, setUnreadLine] = useState<{ messageId: string | null } | null>(null);
+  if (unreadLine === null && page && summary)
+    setUnreadLine({
+      messageId: firstUnreadChannelMessageId(page.messages, summary.unreadCount, server?.membershipId ?? null),
+    });
+  const unreadLineMessageId = unreadLine?.messageId ?? null;
+  // The line shows above the first of these messages that has a row.
+  const unreadLineMessageIds = useMemo(() => {
+    const entries = page?.messages ?? [];
+    const start = unreadLineMessageId ? entries.findIndex((entry) => entry.id === unreadLineMessageId) : -1;
+    return start < 0 ? null : new Set(entries.slice(start).map((entry) => entry.id));
+  }, [unreadLineMessageId, page?.messages]);
+  // The chat opens at the NEW line once, as on desktop. Offline, it shows what the phone has, and it
+  // does not move to the line later, under the reader.
+  const [unreadOpening, setUnreadOpening] = useState<"pending" | "done">("pending");
+  const placeUnreadLine = useCallback(() => setUnreadOpening("done"), []);
+  useEffect(() => {
+    if (!online) setUnreadOpening("done");
+  }, [online]);
+  const opensAtUnread = unreadOpening === "pending" && online && unreadLineMessageIds !== null;
   const [olderLoading, setOlderLoading] = useState(false);
   const [olderError, setOlderError] = useState(false);
   const readThrough = useRef(0);
@@ -197,6 +220,11 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
       onSelectQuestion={selectPrompt}
       approvals={approvals}
       channelThreadIds={threadIds}
+      unreadLineMessageIds={unreadLineMessageIds}
+      focusMessageId={opensAtUnread ? unreadLineMessageId : null}
+      focusUnread
+      holdOpening={opensAtUnread}
+      onFocusPlaced={placeUnreadLine}
       readBoundary={throughSequence ? String(throughSequence) : null}
       markRead={markRead}
       fetchHistory={fetchHistory}

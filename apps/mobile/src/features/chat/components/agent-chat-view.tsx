@@ -150,10 +150,21 @@ export function MobileChatView({
   const [historyLoadFailed, setHistoryLoadFailed] = useState(false);
   const [catchingUp, setCatchingUp] = useState(false);
   // The message from search, until the chat shows it. `loaded` is set when its page is in the store.
-  const [focus, setFocus] = useState(focusMessageId ? { messageId: focusMessageId, loaded: false } : null);
+  // Without one, a chat with unread messages opens at its NEW line (`unread`), as on desktop.
+  const [focus, setFocus] = useState<{ messageId: string; loaded: boolean; unread: boolean } | null>(() =>
+    focusMessageId
+      ? { messageId: focusMessageId, loaded: false, unread: false }
+      : firstUnreadMessageId
+        ? { messageId: firstUnreadMessageId, loaded: false, unread: true }
+        : null,
+  );
   const focusRef = useRef(focus);
   focusRef.current = focus;
   const clearFocus = useCallback(() => setFocus(null), []);
+  // Offline, the chat shows what the phone has. It does not move to the NEW line later, under the reader.
+  useEffect(() => {
+    if (!online) setFocus((current) => (current?.unread ? null : current));
+  }, [online]);
   const request = useRef(0);
   const fetchHistory = useCallback(() => {
     if (!online) return;
@@ -171,7 +182,7 @@ export function MobileChatView({
       }
       // The list can show the message, and clear the focus, before the request ends.
       if (messageId && request.current === id)
-        setFocus((current) => (current?.messageId === messageId ? { messageId, loaded: true } : current));
+        setFocus((current) => (current?.messageId === messageId ? { ...current, loaded: true } : current));
       // Events keep a loaded chat up to date while the connection stays, so it opens without a read.
       if (conversationStore.isUpToDate(agent.id)) return;
       // The chat shows the messages that the phone kept while the latest page loads.
@@ -208,8 +219,9 @@ export function MobileChatView({
     };
   }, [fetchHistory]);
   const detached = conversation?.detached ?? false;
-  // A message in the store that the chat shows no row for, such as a thinking step.
-  const focusRowMissing = focus?.loaded === true && chatRowIndex(messages, focus.messageId) < 0;
+  // A message in the store that the chat shows no row for, such as a thinking step. The NEW line
+  // moves to the next row that has one, and the list opens at the latest message when none has.
+  const focusRowMissing = focus?.loaded === true && !focus.unread && chatRowIndex(messages, focus.messageId) < 0;
   useEffect(() => {
     if (!focusRowMissing) return;
     setFocus(null);
@@ -393,7 +405,9 @@ export function MobileChatView({
       olderLoading={conversation?.olderLoading ?? false}
       olderError={conversation?.olderError ?? false}
       loadOlder={loadOlder}
-      focusMessageId={focus?.messageId ?? null}
+      // The NEW line waits for its page: the messages that the phone kept can end before it.
+      focusMessageId={focus && (!focus.unread || focus.loaded) ? focus.messageId : null}
+      focusUnread={focus?.unread ?? false}
       // Offline, the chat shows what the phone has and moves to the message when its page loads.
       holdOpening={focus !== null && online}
       catchingUp={catchingUp}
