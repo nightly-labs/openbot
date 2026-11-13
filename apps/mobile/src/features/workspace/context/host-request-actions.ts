@@ -173,6 +173,7 @@ import {
   STORAGE_USER_FILES_ROUTES,
 } from "@openbot/contracts/team-protocol/storage-user-files-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
+import { USAGE_CREDITS_CAPABILITY } from "@openbot/contracts/team-protocol/usage-credits-v1";
 import type { TeamProtocolV1Capability } from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { decodeTeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
@@ -1508,7 +1509,8 @@ export function createHostRequestActions({
             ),
           )
         : null,
-    loadPlanLimits: (serverId, accounts) => runTeamRequest(readPlanLimits(teamApi(serverId), accounts)),
+    loadPlanLimits: (serverId, accounts) =>
+      runTeamRequest(readPlanLimits(teamApi(serverId), accounts, has(serverId, USAGE_CREDITS_CAPABILITY))),
     setAgentProviderAccount: async (input, serverId) => {
       requireCapability(
         capabilities,
