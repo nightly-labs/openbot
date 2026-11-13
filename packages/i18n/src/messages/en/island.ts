@@ -20,6 +20,8 @@ export const messages = defineMessages("island", {
   "island.badge.takeover": "Take over",
   "island.badge.failed": "Failed",
   "island.status.replied": "replied",
+  // The app name at the top of an open island on a display without a notch.
+  "island.header.app": "OpenBot",
   "island.status.failed": "failed",
   "island.status.needsYou": "needs you",
   "island.status.needsApproval": "needs approval",

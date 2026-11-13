@@ -20,6 +20,7 @@ export const messages = {
   "island.badge.takeover": "Devral",
   "island.badge.failed": "Başarısız",
   "island.status.replied": "yanıtladı",
+  "island.header.app": "OpenBot",
   "island.status.failed": "başarısız oldu",
   "island.status.needsYou": "size ihtiyacı var",
   "island.status.needsApproval": "onay bekliyor",
