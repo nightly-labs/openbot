@@ -223,7 +223,7 @@ const post = (session: Session, method: string, params?: { interval: number }) =
 const ProfileNode = Schema.Struct({
   id: Schema.Number,
   callFrame: Schema.Struct({ functionName: Schema.String, url: Schema.String, lineNumber: Schema.Number }),
-  children: Schema.optional(Schema.Array(Schema.Number)),
+  children: Schema.optionalKey(Schema.Array(Schema.Number)),
 });
 const decodeStopResult = Schema.decodeUnknownOption(
   Schema.Struct({
@@ -231,8 +231,8 @@ const decodeStopResult = Schema.decodeUnknownOption(
       nodes: Schema.Array(ProfileNode),
       startTime: Schema.Number,
       endTime: Schema.Number,
-      samples: Schema.optional(Schema.Array(Schema.Number)),
-      timeDeltas: Schema.optional(Schema.Array(Schema.Number)),
+      samples: Schema.optionalKey(Schema.Array(Schema.Number)),
+      timeDeltas: Schema.optionalKey(Schema.Array(Schema.Number)),
     }),
   }),
 );
