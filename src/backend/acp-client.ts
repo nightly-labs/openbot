@@ -38,7 +38,7 @@ import {
   sessionSettingsSnapshot,
 } from "./acp-configuration";
 import { AcpConnection, type AcpConnectionOptions } from "./acp-connection";
-import type { AcpCustomEndpoint, AcpFlavor } from "./acp-flavor";
+import type { AcpCustomEndpoint, AcpFlavor, AcpMcpServerFailure } from "./acp-flavor";
 import {
   foldAcpSubagentTool,
   foldOpenCodeChildUpdate,
@@ -568,6 +568,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   /** Whether `#endIfUnresponsive` waits for its probe. */
   #probing = false;
   readonly #bridge = new LocalMcpBridge();
+  /**
+   * The MCP server failures of each session that is opening. The agent answers `session/new` before
+   * its servers start, so a server that fails at once is reported before the thread is in `#threads`.
+   */
+  readonly #openingMcpFailures = new Map<string, AcpMcpServerFailure[]>();
   readonly #threads = new IdleThreadPool<AcpThread, ReleasedAcpThread>({
     scope: () => this.#scope,
     releaseAfterMs: ACP_SESSION_IDLE_RELEASE_MS,
@@ -1683,6 +1688,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     let transport: AcpConnection | null = null;
     let closeRelays: Effect.Effect<void> | null = null;
     let retained = false;
+    let openingId: string | null = null;
     return yield* Effect.acquireUseRelease(
       this.#bridge
         .createSession(
@@ -1777,6 +1783,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               configOptions = response.configOptions ?? [];
               currentModelId = currentModelFromSessionSetup(response);
             }
+            if (this.#flavor.mcpServerFailure) {
+              openingId = id;
+              this.#openingMcpFailures.set(id, []);
+            }
             // The turn would run with no OpenBot tools, and the model would make up their errors (#3058).
             if (this.#flavor.mcpServersLoadWithSession && !mcp.reached())
               throw new Error(sourceText("error.provider.acpMcpNotLoaded", { provider: this.#label }));
@@ -1826,6 +1836,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             if (sessionTransport && !this.running) throw new Error("ACP client is not running.");
             this.#threads.add(thread);
             retained = true;
+            const early = this.#openingMcpFailures.get(id) ?? [];
+            this.#openingMcpFailures.delete(id);
+            for (const failure of early) this.#reportMcpServerFailure(thread, failure);
             return { thread: { id } };
           } catch (error) {
             // Antigravity CLI 1.5.4 refreshes its token when a session opens, and answers `authRequired`
@@ -1844,6 +1857,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       (mcp) =>
         Effect.gen({ self: this }, function* () {
           if (transport) this.#openingSessionProcesses.delete(transport);
+          if (openingId) this.#openingMcpFailures.delete(openingId);
           if (retained) return;
           mcp.close();
           if (closeRelays) yield* closeRelays;
@@ -2738,6 +2752,30 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return undefined;
   }
 
+  /**
+   * Reports a server that the agent left out of the session, by the name that the user saved, as the
+   * other dropped servers are reported. A server of the agent's own settings is not OpenBot's to
+   * report, and OpenBot's own servers are in no settings that the user can change: theirs goes to the
+   * diagnostics only.
+   */
+  #reportMcpServerFailure(thread: AcpThread, { name, reason }: AcpMcpServerFailure): void {
+    const server = thread.restore.mcpServers.find((entry) => entry.name === name);
+    if (!server) return;
+    if (thread.mcp.servers.some((bridge) => bridge === server)) {
+      this.emit("diagnostic", this.#redact(`${this.#label} could not start OpenBot's MCP server ${name}: ${reason}`));
+      return;
+    }
+    const own = this.#ownMcpServerNames(thread.cwd);
+    const configured = this.options.mcpServers?.().find((config) => acpMcpServerName(config, own) === name);
+    this.options.reportMcpDrops?.(this.provider, [
+      {
+        name: configured?.name ?? name,
+        reason: "failed_to_start",
+        detail: sourceText("error.backend.mcpServerFailedToStart", { reason }),
+      },
+    ]);
+  }
+
   /** The names in the agent's own MCP files for `cwd`. A file that cannot be read gives no names. */
   #ownMcpServerNames(cwd: string): readonly string[] {
     return this.#flavor.ownMcpServerNames?.(cwd, this.options.argv) ?? [];
@@ -3381,8 +3419,20 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
   }
 
-  /** ACP extension notifications. OpenBot reads only OpenCode's updates of its subagents' sessions. */
+  /**
+   * ACP extension notifications. OpenBot reads the MCP servers that an agent could not start
+   * (`AcpFlavor.mcpServerFailure`), and OpenCode's updates of its subagents' sessions.
+   */
   #extNotification(method: string, params: DynamicRecord): void {
+    const failure = this.#flavor.mcpServerFailure?.(method.replace(/^_/, ""), params);
+    if (failure) {
+      const opening = this.#openingMcpFailures.get(failure.sessionId);
+      const thread = this.#threads.get(failure.sessionId);
+      if (opening) opening.push(failure);
+      // A session that is closed or released has no thread, and its failure no longer matters.
+      else if (thread) this.#reportMcpServerFailure(thread, failure);
+      return;
+    }
     if (method.replace(/^_/, "") !== OPENCODE_CHILD_UPDATE_METHOD || !this.#flavor.childSessionUpdates) return;
     const thread = isString(params.rootSessionId) ? this.#threads.get(params.rootSessionId) : undefined;
     const turn = thread?.activeTurn ?? null;
