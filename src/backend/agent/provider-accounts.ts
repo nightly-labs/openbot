@@ -174,10 +174,10 @@ export class ProviderAccounts {
     return this.#support(provider) !== undefined;
   }
 
-  /** The support of a provider whose connected CLI reads the home folder variable. */
+  /** The support of a provider whose connected CLI reads the home folder variable, or keeps a key account apart. */
   #support(provider: AgentProviderId): ProviderAccountSupport | undefined {
     const support = ProviderAccounts.support(provider);
-    if (!support || isKeyAccountSupport(support) || !support.supports) return support;
+    if (!support?.supports) return support;
     const cli = this.#host.cli(provider);
     return cli && support.supports(cli) ? support : undefined;
   }

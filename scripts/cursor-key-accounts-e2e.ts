@@ -167,6 +167,7 @@ interface Report {
   newKey?: { state: string };
   removed?: { accounts: number; key: string | null; rows: string[] | undefined };
   unreadableFile?: { error: string | null; fileKept: boolean };
+  oldCli?: { accounts: boolean; error: string | null; keyProcesses: number };
   exchanges?: string[];
   errors?: string[];
 }
@@ -347,6 +348,28 @@ try {
   assert.deepEqual(report.unreadableFile, {
     error: sourceText("error.provider.credentialFileUnreadable"),
     fileKept: true,
+  });
+
+  // 11. A Cursor CLI before 2026.10.01 can save the tokens of a key as the own sign-in, so it offers
+  // no account after the first.
+  await stop(runtime);
+  await installFakeAgent(executable, "cursor-key-accounts", {
+    FAKE_LOG: log,
+    FAKE_GOOD_KEY: GOOD_KEY,
+    FAKE_VERSION: "2026.09.30-e373342",
+  });
+  runtime = createRuntime(restartedStore, restartedCredentials);
+  await runCauseEffect(runtime.ensureProvider("cursor"));
+  seen = (await starts()).length;
+  report.oldCli = {
+    accounts: rows(runtime) !== undefined,
+    error: await failureOf(runtime.connectProviderAccountKey("cursor", null, GOOD_KEY)),
+    keyProcesses: (await acpStarts(seen)).filter((entry) => entry.key !== "absent").length,
+  };
+  assert.deepEqual(report.oldCli, {
+    accounts: false,
+    error: sourceText("error.provider.accountsUnsupported", { provider: "Cursor" }),
+    keyProcesses: 0,
   });
 
   // No request held a key that was not one of this run, and no error reached the user unasked.

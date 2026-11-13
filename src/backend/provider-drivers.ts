@@ -144,6 +144,9 @@ interface ProviderSignInCommand extends Omit<ProviderCliCommand, "argv" | "env">
 
 const CLI_LOGIN_TIMEOUT_MS = 10 * 60_000;
 
+/** The first Cursor CLI on which a key account was checked: `AGENT_CLI_CREDENTIAL_STORE=memory` works. */
+const CURSOR_KEY_ACCOUNTS_MIN_VERSION = "2026.10.01";
+
 /**
  * How a provider keeps more than one account on this computer. Its CLI keeps the credentials,
  * sessions and settings of one account in a home folder that one variable names, so each account
@@ -182,6 +185,8 @@ export interface ProviderKeyAccountSupport {
    * another failure. Fails when the provider did not answer.
    */
   readonly checkKey?: (key: string) => Effect.Effect<boolean, { readonly cause: unknown }>;
+  /** False for a CLI version whose `keyEnvironment` does not keep the process from the CLI's own sign-in. */
+  supports?(cli: AgentCliInfo): boolean;
 }
 
 export type ProviderAccountSupport = ProviderHomeAccountSupport | ProviderKeyAccountSupport;
@@ -1240,6 +1245,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     accounts: {
       keyEnvironment: (key) => ({ CURSOR_API_KEY: key, CURSOR_AUTH_TOKEN: "", AGENT_CLI_CREDENTIAL_STORE: "memory" }),
       checkKey: checkCursorApiKey,
+      // The memory store is checked from 2026.10.01. An older CLI can save the tokens of the key as
+      // the sign-in of the computer user. A version starts with its date, so the text compares.
+      supports: (cli) => cli.version >= CURSOR_KEY_ACCOUNTS_MIN_VERSION,
     },
     resolveCli: resolveCursorCli,
     createClient: (cli, timeout, context, confinement) =>

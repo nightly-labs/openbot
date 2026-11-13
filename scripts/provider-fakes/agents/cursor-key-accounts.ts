@@ -19,7 +19,7 @@ const start: Record<string, LogValue> = {
 logEntry(start);
 
 if (process.argv.includes("--version")) {
-  process.stdout.write("2026.10.01-e373342\n");
+  process.stdout.write(`${process.env.FAKE_VERSION ?? "2026.10.01-e373342"}\n`);
   process.exit(0);
 }
 
