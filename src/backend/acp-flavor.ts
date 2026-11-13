@@ -164,6 +164,12 @@ export interface AcpFlavor {
   };
   /** A stop finishes the turn locally, and the next prompt opens the session again first. */
   cancelLocallyThenResume?: true;
+  /**
+   * The CLI version from which a second `session/prompt` during a running turn joins that turn. The
+   * CLI answers the first prompt with `end_turn` at once, and the work goes on under the new prompt.
+   * Without it, ACP has no steer request, and a second prompt can cancel the running turn.
+   */
+  steerByPromptSince?: string;
   /** A turn that does not complete marks its open tool calls as stopped. */
   interruptToolsOnStop?: true;
   /** Answer text is shown at once, not only when `session/prompt` answers. */

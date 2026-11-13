@@ -166,6 +166,18 @@ const ACP_FIRST_UPDATE_MS = 3 * 60_000;
 /** The result of a prompt that got no update within `ACP_FIRST_UPDATE_MS`. */
 const SILENT_PROMPT = Symbol("silent prompt");
 
+/** Whether a CLI version such as `1.5.8` is `minimum` or later. Only the first three numbers count. */
+function versionAtLeast(version: string, minimum: string): boolean {
+  const numbers = (text: string) => text.split(/[.+-]/u, 3).map((part) => Number.parseInt(part, 10) || 0);
+  const have = numbers(version);
+  const need = numbers(minimum);
+  for (let index = 0; index < 3; index += 1) {
+    const difference = (have[index] ?? 0) - (need[index] ?? 0);
+    if (difference) return difference > 0;
+  }
+  return true;
+}
+
 /**
  * Updates about the session, not about the prompt. An agent can send them at any time after a session
  * opens or resumes, so they do not show that the prompt arrived.
@@ -274,6 +286,8 @@ interface AcpTurn {
   readonly stop: AbortController;
   completing: boolean;
   task: Fiber.Fiber<void, ProviderClientOperationError> | null;
+  /** The reply to the last prompt that steered this turn (`AcpFlavor.steerByPromptSince`), until the turn takes it. */
+  steerReply: Deferred.Deferred<Result.Result<PromptResponse, ProviderClientOperationError>> | null;
   /** When the agent last sent an update for this turn, or the user last answered it. */
   lastActivityAt: number;
   /** The agent sent an update, a question or a tool call for the prompt that it has now. */
@@ -1285,22 +1299,34 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         return yield* providerSync(() => decoder(response));
       }
       case "turn/steer": {
-        // A second ACP prompt can cancel the active turn. Keep deferred input in the mailbox.
+        // Most ACP agents cancel the active turn on a second prompt. Keep deferred input in the mailbox.
         const steer = this.options.steer;
-        if (!steer) return yield* providerFailure(new Error(sourceText("error.backend.steerUnsupported")));
+        const byPrompt = this.#steersByPrompt;
+        if (!steer && !byPrompt) return yield* providerFailure(new Error(sourceText("error.backend.steerUnsupported")));
         const threadId = yield* providerSync(() => requiredString(params, "threadId"));
         const thread = this.#threads.get(threadId);
         const turn = thread?.activeTurn;
         // A stopped turn drops the message, and an agent that has ended its turn starts the message
         // as a turn of its own, which OpenBot did not start. The message then waits in the queue.
-        if (!thread || !turn || turn.id !== getString(params, "expectedTurnId") || turn.stopped || turn.completing)
+        // A prompt also closes the agent's open question or approval, and the agent's own turn has
+        // no prompt reply to end it, so a steer by prompt waits for those too.
+        if (
+          !thread ||
+          !turn ||
+          turn.id !== getString(params, "expectedTurnId") ||
+          turn.stopped ||
+          turn.completing ||
+          (!steer && (turn.unprompted || turn.waitingOnUser > 0))
+        )
           return yield* providerFailure(new Error(sourceText("error.backend.steerTurnChanged")));
         const blocks = yield* promptBlocksEffect(params, this.#acceptsAudio);
-        yield* steer(this.#sessionConnection(thread), {
-          sessionId: threadId,
-          messageId: getString(params, "clientUserMessageId"),
-          blocks,
-        });
+        if (steer)
+          yield* steer(this.#sessionConnection(thread), {
+            sessionId: threadId,
+            messageId: getString(params, "clientUserMessageId"),
+            blocks,
+          });
+        else yield* this.#steerByPrompt(thread, turn, blocks);
         turn.lastActivityAt = Date.now();
         return yield* providerSync(() => decoder({ turnId: turn.id }));
       }
@@ -1594,6 +1620,13 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   /** Whether the agent takes audio blocks in a prompt. Antigravity does; Grok and OpenCode do not. */
   get #acceptsAudio(): boolean {
     return this.#initialization?.agentCapabilities?.promptCapabilities?.audio === true;
+  }
+
+  /** Whether a second prompt joins the running turn (`AcpFlavor.steerByPromptSince`). */
+  get #steersByPrompt(): boolean {
+    const since = this.#flavor.steerByPromptSince;
+    const version = this.#initialization?.agentInfo?.version;
+    return since !== undefined && typeof version === "string" && versionAtLeast(version, since);
   }
 
   /** Whether the agent can resume without replaying its transcript, and OpenBot uses that resume. */
@@ -2418,6 +2451,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       stop: new AbortController(),
       completing: false,
       task: null,
+      steerReply: null,
       lastActivityAt: Date.now(),
       answered: false,
       waitingOnUser: 0,
@@ -2478,19 +2512,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       while (providerResult(yield* Effect.result(this.#leaveOutFailedMcpServer(thread, turn, response, params))))
         response = providerResult(yield* send());
       if (thread.activeTurn !== turn || turn.completing) return;
-      // `promptId` names this result: a delivery that runs again keeps its turn ID.
-      const usage = this.#flavor.promptUsage ? this.#flavor.promptUsage(response) : response.usage;
-      if (usage)
-        this.emit("notification", {
-          method: "openbot/usage",
-          params: {
-            threadId: thread.id,
-            turnId: turn.id,
-            promptId: randomUUID(),
-            usage,
-            ...(turn.reportedCost === null ? {} : { cost: turn.reportedCost }),
-          },
-        });
+      // A steer by prompt ends the prompt before it with `end_turn`, and the work goes on under the
+      // steer's prompt. The turn ends with the reply to the last one.
+      while (turn.steerReply) {
+        const steer = turn.steerReply;
+        this.#reportPromptUsage(thread, turn, response);
+        response = providerResult(yield* Deferred.await(steer));
+        if (turn.steerReply === steer) turn.steerReply = null;
+        if (thread.activeTurn !== turn || turn.completing) return;
+      }
+      this.#reportPromptUsage(thread, turn, response);
       // A flavor can fail a turn that ended with no answer (OpenCode, custom agents). A turn told not
       // to answer ends empty on purpose, and an error there costs no answer the user waits for. A
       // stopped turn ends as interrupted, also when the agent answers the cancel with `end_turn`.
@@ -2560,6 +2591,45 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       }
       yield* this.#completeTurn(thread, turn, turn.stopped ? "interrupted" : "failed", turn.stopped ? null : failure);
     }
+  });
+
+  /** Reports the usage of one prompt reply. `promptId` names it: a delivery that runs again keeps its turn ID. */
+  #reportPromptUsage(thread: AcpThread, turn: AcpTurn, response: PromptResponse): void {
+    const usage = this.#flavor.promptUsage ? this.#flavor.promptUsage(response) : response.usage;
+    if (!usage) return;
+    this.emit("notification", {
+      method: "openbot/usage",
+      params: {
+        threadId: thread.id,
+        turnId: turn.id,
+        promptId: randomUUID(),
+        usage,
+        ...(turn.reportedCost === null ? {} : { cost: turn.reportedCost }),
+      },
+    });
+  }
+
+  /**
+   * Sends a message into the running turn as a second `session/prompt` (`AcpFlavor.steerByPromptSince`).
+   * The agent answers the prompt before it at once, and `#consumePrompt` then waits for this reply.
+   * The request returns when the prompt is sent: its reply comes at the end of the turn.
+   */
+  readonly #steerByPrompt = Effect.fn("AcpAgentClient.steerByPrompt")(function* (
+    this: AcpAgentClient,
+    thread: AcpThread,
+    turn: AcpTurn,
+    prompt: ContentBlock[],
+  ): Effect.fn.Return<void> {
+    const reply = Deferred.makeUnsafe<Result.Result<PromptResponse, ProviderClientOperationError>>();
+    turn.steerReply = reply;
+    yield* Effect.forkIn(
+      providerCall(() => this.#sessionConnection(thread).prompt({ sessionId: thread.id, prompt })).pipe(
+        Effect.result,
+        Effect.flatMap((result) => Deferred.succeed(reply, result)),
+      ),
+      this.#scope,
+      { startImmediately: true },
+    );
   });
 
   /**

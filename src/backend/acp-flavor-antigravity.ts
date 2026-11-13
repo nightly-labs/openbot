@@ -307,6 +307,9 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   // Its SDK waits for FULLY_IDLE even after halt_request. Stop waiting locally, then rebuild the
   // harness through session/resume before accepting another prompt.
   cancelLocallyThenResume: true,
+  // `agy acp` 1.5.0 steers a running turn with another prompt. A probe of 1.5.8: the first prompt
+  // answered `end_turn` at once, its shell command ran on, and the model read the new message.
+  steerByPromptSince: "1.5.0",
   // A stopped stream cannot provide another tool result. Preserve its last output without
   // reporting successful execution.
   interruptToolsOnStop: true,
