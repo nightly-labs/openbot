@@ -75,6 +75,8 @@ export const messages = {
   "error.team.routinesOnceUnsupported": "Bu bağlantı bir kez çalışan rutinleri kaydedemez.",
   "error.team.routineRunCommandUnsupported": "Bu bağlantı bir rutinin çalıştırma komutunu veremez.",
   "error.team.threadQueueUnsupported": "Bu bağlantı bir yan konunun kuyruğunu gösteremez.",
+  "error.team.hostTurnLimitsUnsupported":
+    "Bu bağlantı sunucunun mesaj dizisi sınırlarını gösteremez veya değiştiremez.",
   "error.team.usageLimitUnsupported": "Bu bağlantı ajanların kullanım sınırlarını gösteremez veya değiştiremez.",
   "error.team.hermesImportUnsupported": "Bu bağlantı sunucudan Hermes profillerini içe aktaramaz.",
   "error.team.providerDetectionUnsupported": "Bu bağlantı sunucunun model sunucularını ve ajanlarını bulamaz.",

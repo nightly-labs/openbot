@@ -243,6 +243,16 @@ export const messages = {
     "Maak met Higgsfield een productfoto van een keramische mok op een houten tafel.",
   "marketplace.plugin.higgsfield.prompt.clip":
     "Maak met Higgsfield een video van 5 seconden met golven bij zonsondergang.",
+  "marketplace.plugin.sunra.tagline": "AI-afbeeldingen, -video's, -audio en 3D",
+  "marketplace.plugin.sunra.description":
+    "Met Sunra maken agents afbeeldingen, video's, audio en 3D-modellen met modellen zoals GPT Image, Nano Banana, Seedream, FLUX, Seedance, Kling en Veo, controleren ze het creditsaldo en halen ze de resultaten op. Resultaten komen in een project in het Sunra-account van de gebruiker. Elke gebruiker meldt zich in de browser aan bij een eigen Sunra-account. Sunra noemt eerst de kosten van elke generatie en gebruikt pas na bevestiging credits van dat account.",
+  "marketplace.plugin.sunra.app":
+    "Afbeeldingen, video, audio en 3D genereren, credits en resultaten, via de MCP-server van Sunra met aanmelden in de browser.",
+  "marketplace.plugin.sunra.prompt.balance": "Hoeveel Sunra-credits heb ik?",
+  "marketplace.plugin.sunra.prompt.poster":
+    "Maak met Sunra een poster van een nachtmarkt in de regen, in staand formaat.",
+  "marketplace.plugin.sunra.prompt.clip":
+    "Maak met Sunra een video van 5 seconden van een papieren bootje op een rivier. Vertel me eerst wat het kost.",
   "marketplace.plugin.elevenlabs.tagline": "Spraak, stemmen en spraakagenten",
   "marketplace.plugin.elevenlabs.description":
     "Met ElevenLabs zetten agenten tekst om in spraak, werken ze met stemmen, en maken, testen en bekijken ze ElevenLabs-spraakagenten en hun gesprekken. Gegenereerde audio komt terug als een kortlevende downloadlink. Elke gebruiker meldt zich in de browser aan bij een eigen ElevenLabs-account, en elke generatie gebruikt credits van dat account.",
@@ -405,6 +415,15 @@ export const messages = {
   "marketplace.plugin.postiz.prompt.week": "Welke berichten zijn voor volgende week ingepland?",
   "marketplace.plugin.postiz.prompt.draft":
     "Stel een LinkedIn-bericht op over onze nieuwe release, maar plan het niet in.",
+  "marketplace.plugin.trypost.tagline": "Socialemediaplanning",
+  "marketplace.plugin.trypost.description":
+    "Met TryPost kunnen agents je gekoppelde kanalen weergeven en posts opstellen, inplannen, in de wachtrij zetten en publiceren op X, LinkedIn, Instagram, Facebook, TikTok, YouTube, Threads, Bluesky, Mastodon, Pinterest en meer. Agents kunnen ook statistieken lezen, ideeën en goedkeuringen beheren en publicatietijden instellen. Log in de browser in op je TryPost-account en kies een workspace. Agents kunnen een post direct publiceren, dus controleer elke post voordat je hem goedkeurt.",
+  "marketplace.plugin.trypost.app":
+    "Kanalen, posts, wachtrij, ideeën en statistieken, via de MCP-server van TryPost met inloggen in de browser.",
+  "marketplace.plugin.trypost.prompt.week": "Welke posts staan deze week ingepland?",
+  "marketplace.plugin.trypost.prompt.draft":
+    "Schrijf een concept voor een LinkedIn-post over onze nieuwe release, maar plan hem niet in.",
+  "marketplace.plugin.trypost.prompt.analytics": "Welke van mijn posts van vorige maand hadden de meeste interactie?",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub en meer dan 1000 andere apps",
   "marketplace.plugin.composio.description":
     "Composio koppelt je agents via één MCP-server met Gmail, Slack, GitHub en meer dan 1000 andere apps. Log in met je Composio-account. Als een agent een app nodig heeft, vraagt hij je die app te koppelen.",

@@ -4,6 +4,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { ReadBuffer, serializeMessage } from "@modelcontextprotocol/sdk/shared/stdio.js";
 import { Effect } from "effect";
+import { cliSpawnTarget } from "./cli";
 import { type ProviderClientOperationError, providerCall, providerFailure } from "./provider-client-effects";
 import { endProcessGroupOnExit, PROVIDER_PROCESS_GROUP } from "./provider-process-group";
 
@@ -136,11 +137,15 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
 
 /** The server process of one session. Its exit ends the session. */
 function startServer(launch: StdioMcpLaunch, transport: StreamableHTTPServerTransport): ChildProcess {
-  const child = spawn(launch.command, [...launch.args], {
+  // A Windows `npx.cmd` starts only through `cmd.exe`.
+  const target = cliSpawnTarget(launch.command, launch.args);
+  const child = spawn(target.command, target.args, {
     ...(launch.cwd ? { cwd: launch.cwd } : {}),
     env: launch.env,
     stdio: ["pipe", "pipe", "ignore"],
     detached: PROVIDER_PROCESS_GROUP,
+    windowsVerbatimArguments: target.windowsVerbatimArguments,
+    windowsHide: true,
   });
   endProcessGroupOnExit(child);
   const buffer = new ReadBuffer();

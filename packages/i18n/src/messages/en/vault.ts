@@ -130,6 +130,8 @@ export const messages = defineMessages("vault", {
   "vault.request.addLogin": "Add login",
   "vault.request.addCard": "Add card",
   "vault.request.addContact": "Add address",
+  "vault.request.addApiKey": "Add API key",
+  "vault.request.apiKeyPrivate": "Goes to your Vault, not into the chat.",
   "vault.request.saved": "Saved to Vault",
   // Two-step (TOTP) code of a login: the live code, and the setup of its key in the login dialog.
   "vault.twoStep.title": "Two-step code",

@@ -7,6 +7,7 @@ import { AGENT_ACCESS_CAPABILITY } from "./agent-access-v1";
 import { AGENT_ADMIN_CAPABILITY } from "./agent-admin-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "./agent-backup-models-v1";
 import { AGENT_COLORS_CAPABILITY } from "./agent-colors-v1";
+import { AGENT_DEFAULTS_CAPABILITY } from "./agent-defaults-v1";
 import { AGENT_FAST_MODE_CAPABILITY } from "./agent-fast-mode-v1";
 import { AGENT_FOLDERS_CAPABILITY } from "./agent-folders-v1";
 import { AGENT_HIDDEN_CAPABILITY } from "./agent-hidden-v1";
@@ -23,6 +24,7 @@ import { AGENT_PLAN_CARD_CAPABILITY } from "./agent-plan-card-v1";
 import { AGENT_PUBLISH_CAPABILITY } from "./agent-publish-v1";
 import { AGENT_QUEUE_TASK_CAPABILITY } from "./agent-queue-task-v1";
 import { AGENT_SESSION_SETTINGS_CAPABILITY } from "./agent-session-settings-v1";
+import { AGENT_SPEED_CAPABILITY } from "./agent-speed-v1";
 import { AGENT_TASK_LIMIT_CAPABILITY } from "./agent-task-limit-v1";
 import { AGENT_TASK_UI_BLOCKS_CAPABILITY } from "./agent-task-ui-blocks-v1";
 import { AGENT_TASKS_CAPABILITY } from "./agent-tasks-v1";
@@ -92,6 +94,7 @@ import { HOST_PERSONALITY_CAPABILITY } from "./host-personality-v1";
 import { HOST_RELEASE_CAPABILITY } from "./host-release-v1";
 import { HOST_RESTART_CAPABILITY } from "./host-restart-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "./host-timezone-v1";
+import { HOST_TURN_LIMITS_CAPABILITY } from "./host-turn-limits-v1";
 import { HOST_UPDATE_CAPABILITY } from "./host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "./hosted-sites-v1";
 import { INSTANCE_TRANSFER_CHUNKS_CAPABILITY } from "./instance-transfer-chunks-v1";
@@ -156,11 +159,13 @@ import { SKILLS_ADMIN_CAPABILITY } from "./skills-admin-v1";
 import { SKILLS_EVENTS_CAPABILITY } from "./skills-events-v1";
 import { STORAGE_CHANNEL_CAPABILITY } from "./storage-channel-v1";
 import { STORAGE_DISK_CAPABILITY } from "./storage-disk-v1";
+import { STORAGE_USER_FILES_CAPABILITY } from "./storage-user-files-v1";
 import { TEAM_SUBAGENTS_CAPABILITY } from "./subagents-v1";
 import { THREAD_MESSAGE_SEARCH_CAPABILITY } from "./thread-message-search-v1";
 import { TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY } from "./ui-block-auto-answer-v1";
 import { TEAM_UI_BLOCK_VAULT_CAPABILITY } from "./ui-block-vault-v1";
 import { TEAM_UI_BLOCKS_CAPABILITY } from "./ui-blocks-v1";
+import { TEAM_USAGE_TERTIARY_CAPABILITY } from "./usage-tertiary-v1";
 import { TEAM_OPEN_PROVIDERS_CAPABILITY } from "./v8";
 import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9_CAPABILITIES } from "./v9";
 import { VAULT_IMPORT_CAPABILITY } from "./vault-import-v1";
@@ -176,7 +181,10 @@ import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "./whatsapp-working-message-
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "./workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "./workflows-chats-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "./workflows-github-v1";
+import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "./workflows-media-account-v1";
+import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "./workflows-media-transparent-v1";
 import { WORKFLOWS_MEDIA_CAPABILITY } from "./workflows-media-v1";
+import { WORKFLOWS_SUNRA_CAPABILITY } from "./workflows-sunra-v1";
 import { WORKFLOWS_CAPABILITY } from "./workflows-v1";
 import { WORKSPACE_DIRECTORY_CAPABILITY } from "./workspace-directory-v1";
 
@@ -246,6 +254,7 @@ export {
   AGENT_ADMIN_CAPABILITY,
   AGENT_BACKUP_MODELS_CAPABILITY,
   AGENT_COLORS_CAPABILITY,
+  AGENT_DEFAULTS_CAPABILITY,
   AGENT_FAST_MODE_CAPABILITY,
   AGENT_FOLDERS_CAPABILITY,
   AGENT_HIDDEN_CAPABILITY,
@@ -262,6 +271,7 @@ export {
   AGENT_PUBLISH_CAPABILITY,
   AGENT_QUEUE_TASK_CAPABILITY,
   AGENT_SESSION_SETTINGS_CAPABILITY,
+  AGENT_SPEED_CAPABILITY,
   AGENT_TASK_LIMIT_CAPABILITY,
   AGENT_TASK_UI_BLOCKS_CAPABILITY,
   AGENT_TASKS_CAPABILITY,
@@ -313,6 +323,7 @@ export {
   HOST_RELEASE_CAPABILITY,
   HOST_RESTART_CAPABILITY,
   HOST_TIMEZONE_CAPABILITY,
+  HOST_TURN_LIMITS_CAPABILITY,
   HOST_UPDATE_CAPABILITY,
   HOSTED_SITES_CAPABILITY,
   INSTANCE_TRANSFER_CAPABILITY,
@@ -369,6 +380,7 @@ export {
   STORAGE_CAPABILITY,
   STORAGE_CHANNEL_CAPABILITY,
   STORAGE_DISK_CAPABILITY,
+  STORAGE_USER_FILES_CAPABILITY,
   TEAM_BROWSER_NAVIGATION_CAPABILITY,
   TEAM_BROWSER_VIEW_CAPABILITY,
   TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
@@ -386,6 +398,7 @@ export {
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
+  TEAM_USAGE_TERTIARY_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
   THREAD_MESSAGE_SEARCH_CAPABILITY,
   VAULT_CAPABILITY,
@@ -401,7 +414,10 @@ export {
   WORKFLOWS_CHANNELS_CAPABILITY,
   WORKFLOWS_CHATS_CAPABILITY,
   WORKFLOWS_GITHUB_CAPABILITY,
+  WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY,
   WORKFLOWS_MEDIA_CAPABILITY,
+  WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
+  WORKFLOWS_SUNRA_CAPABILITY,
   WORKSPACE_DIRECTORY_CAPABILITY,
 };
 
@@ -606,6 +622,14 @@ export const TEAM_CURRENT_CAPABILITIES = [
   HOST_RESTART_CAPABILITY,
   VAULT_V4_CAPABILITY,
   WORKFLOWS_MEDIA_CAPABILITY,
+  AGENT_DEFAULTS_CAPABILITY,
+  AGENT_SPEED_CAPABILITY,
+  WORKFLOWS_SUNRA_CAPABILITY,
+  WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY,
+  TEAM_USAGE_TERTIARY_CAPABILITY,
+  HOST_TURN_LIMITS_CAPABILITY,
+  STORAGE_USER_FILES_CAPABILITY,
+  WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -824,7 +848,15 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== GITHUB_SKILLS_CAPABILITY &&
     capability !== HOST_RESTART_CAPABILITY &&
     capability !== VAULT_V4_CAPABILITY &&
-    capability !== WORKFLOWS_MEDIA_CAPABILITY,
+    capability !== WORKFLOWS_MEDIA_CAPABILITY &&
+    capability !== AGENT_DEFAULTS_CAPABILITY &&
+    capability !== AGENT_SPEED_CAPABILITY &&
+    capability !== WORKFLOWS_SUNRA_CAPABILITY &&
+    capability !== WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY &&
+    capability !== TEAM_USAGE_TERTIARY_CAPABILITY &&
+    capability !== HOST_TURN_LIMITS_CAPABILITY &&
+    capability !== STORAGE_USER_FILES_CAPABILITY &&
+    capability !== WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -919,6 +951,14 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   HOST_RESTART_CAPABILITY,
   VAULT_V4_CAPABILITY,
   WORKFLOWS_MEDIA_CAPABILITY,
+  AGENT_DEFAULTS_CAPABILITY,
+  AGENT_SPEED_CAPABILITY,
+  WORKFLOWS_SUNRA_CAPABILITY,
+  WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY,
+  TEAM_USAGE_TERTIARY_CAPABILITY,
+  HOST_TURN_LIMITS_CAPABILITY,
+  STORAGE_USER_FILES_CAPABILITY,
+  WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1096,6 +1136,14 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== GITHUB_SKILLS_CAPABILITY &&
       capability !== HOST_RESTART_CAPABILITY &&
       capability !== VAULT_V4_CAPABILITY &&
-      capability !== WORKFLOWS_MEDIA_CAPABILITY,
+      capability !== WORKFLOWS_MEDIA_CAPABILITY &&
+      capability !== AGENT_DEFAULTS_CAPABILITY &&
+      capability !== AGENT_SPEED_CAPABILITY &&
+      capability !== WORKFLOWS_SUNRA_CAPABILITY &&
+      capability !== WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY &&
+      capability !== TEAM_USAGE_TERTIARY_CAPABILITY &&
+      capability !== HOST_TURN_LIMITS_CAPABILITY &&
+      capability !== STORAGE_USER_FILES_CAPABILITY &&
+      capability !== WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
   );
 }

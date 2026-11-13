@@ -1,4 +1,4 @@
-import { isKeyOnlyProvider } from "@openbot/contracts/agent-providers";
+import { isKeyOnlyProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
 import {
   type AgentProviderId,
   type AgentStatus,
@@ -459,6 +459,11 @@ const Providers = createSimpleContext({
       await changeProviderRestart(provider, providersPort().cancelProviderRestart);
     }
 
+    /** Runs the CLI the user installed (`installed`), or OpenBot's newer copy, from the provider's restart. */
+    async function chooseInstalledCli(provider: ManagedProviderId, installed: boolean): Promise<void> {
+      await changeProviderRestart(provider, () => providersPort().chooseInstalledCli({ provider, installed }));
+    }
+
     /** A failed restart is also on the provider's status; this reports a request that main refused. */
     async function changeProviderRestart(
       provider: AgentProviderId,
@@ -620,6 +625,7 @@ const Providers = createSimpleContext({
       providerAccounts,
       restartProvider,
       cancelProviderRestart,
+      chooseInstalledCli,
     };
   },
 });

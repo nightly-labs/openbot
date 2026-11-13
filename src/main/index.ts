@@ -613,6 +613,7 @@ const windows = createMainWindowController({
   quitFromShortcut: () => quitFor("shortcut"),
   workingAgents,
   quitGuard,
+  onHiddenWhileWorking: (hidden) => backgroundTray?.setHiddenWhileWorking(hidden),
 });
 
 let appIconColorImage: NativeImage | undefined;
@@ -761,6 +762,7 @@ function registerIpcHandlers({
   approvalAutomation,
   agentAdminSettings,
   agentHostSettings,
+  agentDefaultsSettings,
   agentFolders,
   agentInstructions,
   browserProfiles,
@@ -780,6 +782,7 @@ function registerIpcHandlers({
   serverAudit,
   teamStore,
   serverTimezone,
+  hostTurnLimits,
   serverPersonality,
   promptCacheTtl,
   claudeUserSetup,
@@ -1011,6 +1014,7 @@ function registerIpcHandlers({
     ...agentAdminIpcHandlers({
       settings: agentAdminSettings,
       hostSettings: agentHostSettings,
+      defaultsSettings: agentDefaultsSettings,
       browserProfiles,
       skills,
       marketplaceAgents,
@@ -1021,6 +1025,7 @@ function registerIpcHandlers({
       host,
       remoteServers,
       serverTimezone,
+      hostTurnLimits,
       serverPersonality,
       agentMemoryLimit,
       memoryReview,

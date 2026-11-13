@@ -77,6 +77,7 @@ export const messages = {
   "error.team.routinesOnceUnsupported": "Deze verbinding kan geen eenmalige routines opslaan.",
   "error.team.routineRunCommandUnsupported": "Deze verbinding kan de uitvoeropdracht van een routine niet geven.",
   "error.team.threadQueueUnsupported": "Deze verbinding kan de wachtrij van een zijthread niet tonen.",
+  "error.team.hostTurnLimitsUnsupported": "Deze verbinding kan de threadlimieten van de server niet tonen of wijzigen.",
   "error.team.usageLimitUnsupported": "Deze verbinding kan de gebruikslimieten van agents niet tonen of wijzigen.",
   "error.team.hermesImportUnsupported": "Deze verbinding kan geen Hermes-profielen van de server importeren.",
   "error.team.providerDetectionUnsupported": "Deze verbinding kan de modelservers en agents van de server niet vinden.",

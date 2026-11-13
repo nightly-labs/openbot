@@ -265,6 +265,14 @@ export const messages = {
   "marketplace.plugin.higgsfield.prompt.credits": "كم لديّ من أرصدة Higgsfield؟",
   "marketplace.plugin.higgsfield.prompt.productShot": "أنشئ في Higgsfield صورة منتج لكوب خزفي على طاولة خشبية.",
   "marketplace.plugin.higgsfield.prompt.clip": "أنشئ في Higgsfield فيديو مدته 5 ثوانٍ لأمواج عند الغروب.",
+  "marketplace.plugin.sunra.tagline": "صور وفيديو وصوت ونماذج ثلاثية الأبعاد بالذكاء الاصطناعي",
+  "marketplace.plugin.sunra.description":
+    "يتيح Sunra للوكلاء إنشاء الصور والفيديو والصوت والنماذج ثلاثية الأبعاد بنماذج مثل GPT Image وNano Banana وSeedream وFLUX وSeedance وKling وVeo، والتحقق من رصيد الأرصدة، وقراءة النتائج. تُحفظ النتائج في مشروع داخل حساب المستخدم في Sunra. يسجّل كل مستخدم الدخول إلى حسابه في Sunra عبر المتصفح. يعرض Sunra تكلفة كل عملية إنشاء أولًا، ولا يستهلك أرصدة ذلك الحساب إلا بعد تأكيدها.",
+  "marketplace.plugin.sunra.app":
+    "إنشاء الصور والفيديو والصوت والنماذج ثلاثية الأبعاد، والأرصدة والنتائج، عبر خادم MCP الخاص بـ Sunra مع تسجيل الدخول في المتصفح.",
+  "marketplace.plugin.sunra.prompt.balance": "كم لديّ من أرصدة Sunra؟",
+  "marketplace.plugin.sunra.prompt.poster": "أنشئ في Sunra ملصقًا لسوق ليلي تحت المطر، بتنسيق عمودي.",
+  "marketplace.plugin.sunra.prompt.clip": "أنشئ في Sunra فيديو مدته 5 ثوانٍ لقارب ورقي على نهر. أخبرني بالتكلفة أولًا.",
   "marketplace.plugin.elevenlabs.tagline": "الكلام والأصوات ووكلاء الصوت",
   "marketplace.plugin.elevenlabs.description":
     "يتيح ElevenLabs للوكلاء تحويل النص إلى كلام، والعمل مع الأصوات، وإنشاء وكلاء صوت ElevenLabs واختبارهم ومراجعتهم ومراجعة محادثاتهم. يعود الصوت المُنشأ كرابط تنزيل صالح لمدة قصيرة. يسجّل كل مستخدم الدخول إلى حساب ElevenLabs الخاص به عبر المتصفح، وكل عملية إنشاء تستهلك أرصدة ذلك الحساب.",
@@ -410,6 +418,14 @@ export const messages = {
   "marketplace.plugin.postiz.prompt.channels": "ما قنوات التواصل الاجتماعي المتصلة بـ Postiz؟",
   "marketplace.plugin.postiz.prompt.week": "ما المنشورات المجدولة للأسبوع القادم؟",
   "marketplace.plugin.postiz.prompt.draft": "اكتب مسودة منشور على LinkedIn عن إصدارنا الجديد، لكن لا تجدوله.",
+  "marketplace.plugin.trypost.tagline": "جدولة وسائل التواصل الاجتماعي",
+  "marketplace.plugin.trypost.description":
+    "يتيح TryPost للوكلاء عرض قنواتك المتصلة، وكتابة المنشورات وجدولتها وإضافتها إلى قائمة الانتظار ونشرها على X وLinkedIn وInstagram وFacebook وTikTok وYouTube وThreads وBluesky وMastodon وPinterest وغيرها. ويمكن للوكلاء أيضًا قراءة التحليلات وإدارة الأفكار والموافقات وتحديد أوقات النشر. سجّل الدخول إلى حسابك في TryPost عبر المتصفح واختر مساحة عمل. يمكن للوكلاء نشر منشور فورًا، لذا راجع كل منشور قبل الموافقة عليه.",
+  "marketplace.plugin.trypost.app":
+    "القنوات والمنشورات وقائمة الانتظار والأفكار والتحليلات، عبر خادم MCP الخاص بـ TryPost مع تسجيل الدخول من المتصفح.",
+  "marketplace.plugin.trypost.prompt.week": "ما المنشورات المجدولة لهذا الأسبوع؟",
+  "marketplace.plugin.trypost.prompt.draft": "اكتب مسودة منشور على LinkedIn عن إصدارنا الجديد، لكن لا تجدوله.",
+  "marketplace.plugin.trypost.prompt.analytics": "أي من منشوراتي في الشهر الماضي حصل على أكبر تفاعل؟",
   "marketplace.plugin.composio.tagline": "Gmail وSlack وGitHub وأكثر من 1000 تطبيق آخر",
   "marketplace.plugin.composio.description":
     "يربط Composio وكلاءك بـ Gmail وSlack وGitHub وأكثر من 1000 تطبيق آخر عبر خادم MCP واحد. سجّل الدخول بحساب Composio. عندما يحتاج وكيل إلى تطبيق، يطلب منك ربط ذلك التطبيق.",

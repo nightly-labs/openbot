@@ -96,6 +96,8 @@ export interface ProviderAccountsHost {
   resetCredits(client: AgentClient): number | null | undefined;
   consumeUsageReset(client: AgentClient): Effect.Effect<ProviderUsageResetOutcome, ProviderAccountFailed>;
   changed(): void;
+  /** Runs after an account check listed the account's models. */
+  modelsListed?(provider: AgentProviderId, accountId: string): Effect.Effect<void>;
   /** Sends the reading of an account check: after a sign-in, and when the provider's own sign-in connects. */
   usageChanged(limit: AccountUsageLimit): void;
   redact(text: string): string;
@@ -197,8 +199,15 @@ export class ProviderAccounts {
 
   /** The models of an account after the first, from its last check; empty before one listed them. */
   models(provider: AgentProviderId, accountId: string | undefined): AgentModelOption[] {
+    return this.listedModels(provider, accountId) ?? [];
+  }
+
+  /** As `models`, but null while an account after the first has not listed its models yet. */
+  listedModels(provider: AgentProviderId, accountId: string | undefined): AgentModelOption[] | null {
     const account = this.account(provider, accountId);
-    return account ? structuredClone(this.#models.get(account.id) ?? []) : [];
+    if (!account) return [];
+    const models = this.#models.get(account.id);
+    return models ? structuredClone(models) : null;
   }
 
   /**
@@ -682,6 +691,7 @@ export class ProviderAccounts {
           if (models && this.#states.has(account.id)) {
             this.#models.set(account.id, models);
             this.#host.changed();
+            if (this.#host.modelsListed) yield* this.#host.modelsListed(provider, account.id);
           }
         }),
       ({ client }) => this.#host.stopClient(client),

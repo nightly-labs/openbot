@@ -93,6 +93,7 @@ import {
   AGENT_FAST_MODE_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
+import { AGENT_SPEED_CAPABILITY, AGENT_SPEED_ROUTES } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import {
   AGENT_USAGE_LIMIT_CAPABILITY,
   AGENT_USAGE_LIMIT_ROUTES,
@@ -1683,9 +1684,12 @@ export function createWebWorkspaceRuntime(
       // The fast tiers and the picker listing are optional: when a route fails, the picker gets the
       // models with no Fast switch or listing.
       const [fast, listings] = await Promise.all([
-        capabilities.includes(AGENT_FAST_MODE_CAPABILITY)
-          ? request("POST", AGENT_FAST_MODE_ROUTES.models, {}).then(decodeAgentFastModels, () => [])
-          : [],
+        // Only `agent-speed-v1` lists Ultrafast tiers and Claude models; an older host keeps `agent-fast-mode-v1`.
+        capabilities.includes(AGENT_SPEED_CAPABILITY)
+          ? request("POST", AGENT_SPEED_ROUTES.models, {}).then(decodeAgentFastModels, () => [])
+          : capabilities.includes(AGENT_FAST_MODE_CAPABILITY)
+            ? request("POST", AGENT_FAST_MODE_ROUTES.models, {}).then(decodeAgentFastModels, () => [])
+            : [],
         capabilities.includes(MODEL_VISIBILITY_CAPABILITY)
           ? request("POST", MODEL_VISIBILITY_ROUTES.listing, {}).then(decodeAgentModelListings, () => [])
           : [],

@@ -1709,6 +1709,7 @@ export const messages = {
   "mobile.server.route.transfer": "Перенос",
   "mobile.server.route.transferExport": "Экспорт",
   "mobile.server.route.transferImport": "Импорт",
+  "mobile.server.route.transferCopy": "Копировать на другой сервер",
   "mobile.server.transfer.unsupported": "Обновите OpenBot на этом сервере, чтобы выполнить перенос отсюда.",
   "mobile.server.transfer.unavailable":
     "Подключитесь к этому серверу как владелец или администратор, чтобы выполнить перенос.",
@@ -1783,4 +1784,28 @@ export const messages = {
     "Вход в этих провайдеров был выполнен на другом сервере, но не здесь. Войдите в них в разделе Настройки сервера › Провайдеры.",
   "mobile.server.transfer.notImported": "Не импортировано",
   "mobile.server.transfer.warnings": "Проверьте",
+  "mobile.server.transfer.copy": "Копировать на другой сервер",
+  "mobile.server.transfer.copyNote": "Отправьте агентов на другой ваш сервер.",
+  "mobile.server.transfer.copyTo": "Куда",
+  "mobile.server.transfer.copyNoAgents": "На этом сервере нет агентов.",
+  "mobile.server.transfer.copyNotMoved":
+    "Их каналы и общая папка тоже копируются. Ключи API, входы в аккаунты, коннекторы и история чатов не копируются. Настройте их заново на другом сервере.",
+  "mobile.server.transfer.copySubmit": {
+    one: "Копировать {count} агента",
+    few: "Копировать {count} агентов",
+    many: "Копировать {count} агентов",
+    other: "Копировать {count} агента",
+  },
+  "mobile.server.transfer.copying": "Копирование…",
+  "mobile.server.transfer.copyFailed": "Копирование не завершено.",
+  "mobile.server.transfer.copied": {
+    one: "{count} агент скопирован на {server}.",
+    few: "{count} агента скопированы на {server}.",
+    many: "{count} агентов скопированы на {server}.",
+    other: "{count} агента скопированы на {server}.",
+  },
+  "mobile.server.transfer.copyAgents": "Агенты для копирования",
+  "mobile.server.transfer.copyNext": "Скопированные агенты используют правила подтверждения сервера {server}.",
+  "mobile.server.transfer.copyNoServer":
+    "Подключитесь к другому серверу как владелец или администратор, чтобы скопировать на него агентов.",
 } as const satisfies PartialTranslation<typeof source>;

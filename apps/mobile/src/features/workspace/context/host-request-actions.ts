@@ -1,17 +1,20 @@
 import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import {
   type AvatarColor,
+  agentSpeed,
   assertStorageUsageScope,
   CHANNEL_CHATS_CAPABILITY,
   canAdministerServer,
   decodeAgentAdminSettings,
   decodeAgentBackupModelSettings,
+  decodeAgentDefaultsOverview,
   decodeAgentFastModels,
   decodeAgentFastModeSettings,
   decodeAgentHostSettings,
   decodeAgentInstructionsFileFromMain,
   decodeAgentNewChatSettings,
   decodeAgentPlanCardSettings,
+  decodeAgentSpeedSettings,
   decodeAgentTaskLimitSettings,
   decodeChannelRoutineRuns,
   decodeChannelRoutines,
@@ -19,6 +22,7 @@ import {
   decodeInstalledSkills,
   decodeLibraryFoldersSnapshot,
   decodeMachineMetrics,
+  decodeStorageDisk,
   decodeStorageUsage,
   type HiddenAgent,
   isAgentMemory,
@@ -50,6 +54,7 @@ import {
   type AgentColorsSnapshot,
   decodeAgentColorsSnapshot,
 } from "@openbot/contracts/team-protocol/agent-colors-v1";
+import { AGENT_DEFAULTS_CAPABILITY, AGENT_DEFAULTS_ROUTES } from "@openbot/contracts/team-protocol/agent-defaults-v1";
 import {
   AGENT_FAST_MODE_CAPABILITY,
   AGENT_FAST_MODE_ROUTES,
@@ -77,6 +82,7 @@ import {
 } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
 import { AGENT_PUBLISH_CAPABILITY } from "@openbot/contracts/team-protocol/agent-publish-v1";
 import { AGENT_SESSION_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
+import { AGENT_SPEED_CAPABILITY, AGENT_SPEED_ROUTES } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import {
   AGENT_TASK_LIMIT_CAPABILITY,
   AGENT_TASK_LIMIT_ROUTES,
@@ -90,6 +96,11 @@ import { AGENT_THREAD_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { AGENT_THREAD_READS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
 import { AGENT_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { AGENT_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-update-v1";
+import {
+  BACKGROUND_PROCESSES_CAPABILITY,
+  BACKGROUND_PROCESSES_ROUTES,
+  decodeBackgroundProcessesResponse,
+} from "@openbot/contracts/team-protocol/background-processes-v1";
 import { BITWARDEN_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/bitwarden-connector-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
@@ -156,6 +167,11 @@ import { SHARED_TABLES_CAPABILITY } from "@openbot/contracts/team-protocol/share
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { SKILL_LEARNING_CAPABILITY } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
+import { STORAGE_DISK_CAPABILITY, STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-disk-v1";
+import {
+  STORAGE_USER_FILES_CAPABILITY,
+  STORAGE_USER_FILES_ROUTES,
+} from "@openbot/contracts/team-protocol/storage-user-files-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import type { TeamProtocolV1Capability } from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
@@ -419,6 +435,7 @@ type HostRequestActions = Pick<
   | "loadServerStorage"
   | "loadLibraryFolders"
   | "changeLibraryFolders"
+  | "loadServerDisk"
   | "loadMachineMetrics"
   | "clearServerStorage"
   | "loadAgentAdminSettings"
@@ -433,8 +450,13 @@ type HostRequestActions = Pick<
   | "updateAgentNewChat"
   | "loadAgentPlanCard"
   | "updateAgentPlanCard"
-  | "loadAgentFastMode"
-  | "updateAgentFastMode"
+  | "loadAgentDefaults"
+  | "updateAgentDefaults"
+  | "setAgentDefaultChoice"
+  | "loadBackgroundProcesses"
+  | "stopBackgroundProcess"
+  | "loadAgentSpeed"
+  | "updateAgentSpeed"
   | "loadAgentInstructions"
   | "saveAgentInstructions"
   | "loadProviderAccounts"
@@ -1150,13 +1172,19 @@ export function createHostRequestActions({
         undefined,
         serverId,
       );
-      // The released model list drops the fast tier, so a host with `agent-fast-mode-v1` gives it on
-      // its own route, as for desktop. The tiers are optional: when that route fails, the models
-      // show with no Fast mode switch.
-      if (!has(serverId, AGENT_FAST_MODE_CAPABILITY)) return models;
+      // The released model list drops the fast tiers, so a host with `agent-speed-v1` (or the older
+      // `agent-fast-mode-v1`) gives them on its own route, as for desktop. Only `agent-speed-v1` lists
+      // Ultrafast tiers and Claude models. The tiers are optional: when that route fails, the models
+      // show with no Speed choice.
+      const fastRoute = has(serverId, AGENT_SPEED_CAPABILITY)
+        ? AGENT_SPEED_ROUTES.models
+        : has(serverId, AGENT_FAST_MODE_CAPABILITY)
+          ? AGENT_FAST_MODE_ROUTES.models
+          : null;
+      if (!fastRoute) return models;
       const [options, fast] = await Promise.all([
         models,
-        request("POST", AGENT_FAST_MODE_ROUTES.models, decodeAgentFastModels, {}, serverId).catch(() => []),
+        request("POST", fastRoute, decodeAgentFastModels, {}, serverId).catch(() => []),
       ]);
       return withFastServiceTiers(options, fast);
     },
@@ -1307,6 +1335,13 @@ export function createHostRequestActions({
         serverId,
       );
     },
+    loadServerDisk: async (serverId) => {
+      if (has(serverId, STORAGE_USER_FILES_CAPABILITY))
+        return request("POST", STORAGE_USER_FILES_ROUTES.disk, decodeStorageDisk, {}, serverId);
+      if (has(serverId, STORAGE_DISK_CAPABILITY))
+        return request("POST", STORAGE_DISK_ROUTES.disk, decodeStorageDisk, {}, serverId);
+      return null;
+    },
     loadMachineMetrics: async (serverId) => {
       requireCapability(capabilities, serverId, MACHINE_RESOURCES_CAPABILITY, "mobile.server.machine.unsupported");
       return request("POST", MACHINE_RESOURCES_ROUTES.metrics, decodeMachineMetrics, {}, serverId);
@@ -1378,13 +1413,60 @@ export function createHostRequestActions({
       requireCapability(capabilities, serverId, AGENT_PLAN_CARD_CAPABILITY, "mobile.agent.host.unsupported");
       return request("POST", AGENT_PLAN_CARD_ROUTES.update, decodeAgentPlanCardSettings, { ...input }, serverId);
     },
-    loadAgentFastMode: async (agentId, serverId) =>
-      has(serverId, AGENT_FAST_MODE_CAPABILITY)
-        ? request("POST", AGENT_FAST_MODE_ROUTES.settings, decodeAgentFastModeSettings, { agentId }, serverId)
+    loadAgentDefaults: async (serverId) =>
+      has(serverId, AGENT_DEFAULTS_CAPABILITY)
+        ? request("POST", AGENT_DEFAULTS_ROUTES.settings, decodeAgentDefaultsOverview, {}, serverId)
         : null,
-    updateAgentFastMode: async (input, serverId) => {
+    updateAgentDefaults: async (input, serverId) => {
+      requireCapability(capabilities, serverId, AGENT_DEFAULTS_CAPABILITY, "mobile.agent.host.unsupported");
+      return request("POST", AGENT_DEFAULTS_ROUTES.update, decodeAgentDefaultsOverview, { ...input }, serverId);
+    },
+    setAgentDefaultChoice: async (input, serverId) => {
+      requireCapability(capabilities, serverId, AGENT_DEFAULTS_CAPABILITY, "mobile.agent.host.unsupported");
+      return request(
+        "POST",
+        AGENT_DEFAULTS_ROUTES.choice,
+        decodeAgentDefaultsOverview,
+        { agentIds: [...input.agentIds], setting: input.setting, choice: input.choice },
+        serverId,
+      );
+    },
+    loadBackgroundProcesses: async (serverId) => {
+      requireCapability(capabilities, serverId, BACKGROUND_PROCESSES_CAPABILITY, "mobile.agent.host.unsupported");
+      return request("POST", BACKGROUND_PROCESSES_ROUTES.list, decodeBackgroundProcessesResponse, {}, serverId);
+    },
+    stopBackgroundProcess: async (id, serverId) => {
+      requireCapability(capabilities, serverId, BACKGROUND_PROCESSES_CAPABILITY, "mobile.agent.host.unsupported");
+      await request("POST", BACKGROUND_PROCESSES_ROUTES.stop, ignoreResponse, { id }, serverId);
+    },
+    loadAgentSpeed: async (agentId, serverId) => {
+      if (has(serverId, AGENT_SPEED_CAPABILITY))
+        return request("POST", AGENT_SPEED_ROUTES.settings, decodeAgentSpeedSettings, { agentId }, serverId);
+      if (!has(serverId, AGENT_FAST_MODE_CAPABILITY)) return null;
+      const settings = await request(
+        "POST",
+        AGENT_FAST_MODE_ROUTES.settings,
+        decodeAgentFastModeSettings,
+        { agentId },
+        serverId,
+      );
+      return { speed: agentSpeed(settings) };
+    },
+    updateAgentSpeed: async ({ agentId, speed }, serverId) => {
+      if (has(serverId, AGENT_SPEED_CAPABILITY))
+        return request("POST", AGENT_SPEED_ROUTES.update, decodeAgentSpeedSettings, { agentId, speed }, serverId);
+      // An older host has only Fast: `agent-fast-mode-v1` cannot carry Ultrafast.
+      if (speed === "ultrafast")
+        requireCapability(capabilities, serverId, AGENT_SPEED_CAPABILITY, "mobile.agent.host.unsupported");
       requireCapability(capabilities, serverId, AGENT_FAST_MODE_CAPABILITY, "mobile.agent.host.unsupported");
-      return request("POST", AGENT_FAST_MODE_ROUTES.update, decodeAgentFastModeSettings, { ...input }, serverId);
+      const settings = await request(
+        "POST",
+        AGENT_FAST_MODE_ROUTES.update,
+        decodeAgentFastModeSettings,
+        { agentId, fastMode: speed === "fast" },
+        serverId,
+      );
+      return { speed: agentSpeed(settings) };
     },
     loadAgentInstructions: async (agentId, serverId) => {
       requireCapability(

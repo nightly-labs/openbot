@@ -333,11 +333,24 @@ export const messages = {
   "server.settings.later": "Później",
   "server.settings.setUp": "Skonfiguruj",
   "server.settings.agents": "Agenci",
+  "server.settings.agentsDescription":
+    "Wybierz, co mogą robić agenci na tym serwerze, gdy nie ustawisz tego dla agenta.",
   "server.settings.timezone": "Strefa czasowa",
   "server.settings.timezoneDescription":
     "Nowe rutyny używają tej strefy czasowej, gdy wiadomość nie podaje strefy czasowej nadawcy.",
   "server.settings.timezoneAutomatic": "Automatycznie ({zone})",
   "server.settings.timezoneLoadFailed": "Nie udało się wczytać strefy czasowej serwera.",
+  "server.settings.turnLimit": "Wątki jednocześnie",
+  "server.settings.turnLimitDescription":
+    "Ile wątków agentów może działać jednocześnie na tym serwerze. Więcej wątków zużywa więcej pamięci.",
+  "server.settings.turnLimitAutomatic": "Automatycznie ({count})",
+  "server.settings.turnLimitAutomaticUnlimited": "Automatycznie (bez limitu)",
+  "server.settings.turnLimitUnlimited": "Bez limitu",
+  "server.settings.turnLimitsLoadFailed": "Nie udało się wczytać limitów wątków tego serwera.",
+  "server.settings.agentTaskLimit": "Równoległe wątki na agenta",
+  "server.settings.agentTaskLimitDescription":
+    "Ile wątków może jednocześnie prowadzić każdy agent, który nie ma własnego limitu.",
+  "server.settings.agentTaskLimitDefault": "Domyślnie ({count})",
   "server.settings.memoryLimit": "Wspomnienia na agenta",
   "server.settings.memoryLimitDescription": "Ile wspomnień może przechowywać każdy agent na tym serwerze.",
   "server.settings.memoryLimitLoadFailed": "Nie udało się wczytać limitu wspomnień tego serwera.",

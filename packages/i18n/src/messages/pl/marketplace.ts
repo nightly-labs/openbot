@@ -266,6 +266,15 @@ export const messages = {
   "marketplace.plugin.higgsfield.prompt.productShot":
     "Zrób w Higgsfield zdjęcie produktowe ceramicznego kubka na drewnianym stole.",
   "marketplace.plugin.higgsfield.prompt.clip": "Zrób w Higgsfield 5-sekundowe wideo fal o zachodzie słońca.",
+  "marketplace.plugin.sunra.tagline": "Obrazy, wideo, audio i 3D z AI",
+  "marketplace.plugin.sunra.description":
+    "Sunra pozwala agentom tworzyć obrazy, wideo, audio i modele 3D modelami takimi jak GPT Image, Nano Banana, Seedream, FLUX, Seedance, Kling i Veo, sprawdzać saldo kredytów i pobierać wyniki. Wyniki trafiają do projektu na koncie Sunra użytkownika. Każdy użytkownik loguje się do własnego konta Sunra w przeglądarce. Sunra najpierw podaje koszt każdego generowania, a kredyty tego konta zużywa dopiero po potwierdzeniu.",
+  "marketplace.plugin.sunra.app":
+    "Generowanie obrazów, wideo, audio i 3D, kredyty i wyniki przez serwer MCP Sunra z logowaniem w przeglądarce.",
+  "marketplace.plugin.sunra.prompt.balance": "Ile mam kredytów w Sunra?",
+  "marketplace.plugin.sunra.prompt.poster": "Zrób w Sunra plakat nocnego targu w deszczu, w formacie pionowym.",
+  "marketplace.plugin.sunra.prompt.clip":
+    "Zrób w Sunra 5-sekundowe wideo papierowej łódki na rzece. Najpierw podaj mi koszt.",
   "marketplace.plugin.elevenlabs.tagline": "Mowa, głosy i agenci głosowi",
   "marketplace.plugin.elevenlabs.description":
     "ElevenLabs pozwala agentom zamieniać tekst na mowę, pracować z głosami oraz tworzyć, testować i przeglądać agentów głosowych ElevenLabs i ich rozmowy. Wygenerowane audio wraca jako krótko ważny link do pobrania. Każdy użytkownik loguje się do własnego konta ElevenLabs w przeglądarce, a każde generowanie zużywa kredyty tego konta.",
@@ -422,6 +431,16 @@ export const messages = {
   "marketplace.plugin.postiz.prompt.week": "Jakie posty są zaplanowane na przyszły tydzień?",
   "marketplace.plugin.postiz.prompt.draft":
     "Przygotuj szkic posta na LinkedIn o naszym nowym wydaniu, ale go nie planuj.",
+  "marketplace.plugin.trypost.tagline": "Planowanie mediów społecznościowych",
+  "marketplace.plugin.trypost.description":
+    "TryPost pozwala agentom wyświetlać połączone kanały oraz pisać, planować, dodawać do kolejki i publikować posty na X, LinkedIn, Instagramie, Facebooku, TikToku, YouTube, Threads, Bluesky, Mastodonie, Pintereście i w innych sieciach. Agenci mogą też czytać statystyki, zarządzać pomysłami i zatwierdzeniami oraz ustawiać godziny publikacji. Zaloguj się do konta TryPost w przeglądarce i wybierz workspace. Agenci mogą od razu opublikować post, więc sprawdź każdy post przed zatwierdzeniem.",
+  "marketplace.plugin.trypost.app":
+    "Kanały, posty, kolejka, pomysły i statystyki przez serwer MCP TryPost z logowaniem w przeglądarce.",
+  "marketplace.plugin.trypost.prompt.week": "Które posty są zaplanowane na ten tydzień?",
+  "marketplace.plugin.trypost.prompt.draft":
+    "Napisz szkic posta na LinkedIn o naszym nowym wydaniu, ale go nie planuj.",
+  "marketplace.plugin.trypost.prompt.analytics":
+    "Które z moich postów z zeszłego miesiąca miały największe zaangażowanie?",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub i ponad 1000 innych aplikacji",
   "marketplace.plugin.composio.description":
     "Composio łączy twoich agentów z Gmailem, Slackiem, GitHubem i ponad 1000 innych aplikacji przez jeden serwer MCP. Zaloguj się kontem Composio. Gdy agent potrzebuje aplikacji, poprosi cię o jej połączenie.",

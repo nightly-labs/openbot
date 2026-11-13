@@ -709,6 +709,47 @@ const HIGGSFIELD: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/higgsfield",
 };
 
+const SUNRA: MarketplacePluginDetail = {
+  id: "plugin-sunra",
+  slug: "sunra",
+  name: "Sunra",
+  tagline: "AI images, videos, audio and 3D",
+  description:
+    "Sunra lets agents make images, videos, audio and 3D models with models such as GPT Image, Nano Banana, Seedream, FLUX, Seedance, Kling and Veo, check the credit balance, and read the results. Results go to a project in the user's Sunra account. Each user signs in to their own Sunra account through the browser. Sunra first quotes the cost of each generation, and spends credits of that account only after it is confirmed.",
+  category: "design",
+  creatorName: "Sunra",
+  iconUrl: "https://sunra.ai/apple-icon.png",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-balance", text: "How many Sunra credits do I have?" },
+    { id: "prompt-poster", text: "Make a Sunra poster of a night market in the rain, in portrait format." },
+    { id: "prompt-clip", text: "Make a 5-second Sunra video of a paper boat on a river. Tell me the cost first." },
+  ],
+  apps: [
+    {
+      id: "app-sunra-mcp",
+      name: "Sunra",
+      description:
+        "Image, video, audio and 3D generation, credits and results, over Sunra's MCP server with browser sign-in.",
+      iconUrl: "https://sunra.ai/apple-icon.png",
+      server: {
+        name: "sunra",
+        transport: "http",
+        url: "https://mcp.sunra.ai",
+        auth: [{ id: "sunra-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://sunra.ai",
+  privacyPolicyUrl: "https://sunra.ai/privacy",
+  termsUrl: "https://sunra.ai/terms",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-11-10T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/sunra",
+};
+
 const ELEVENLABS: MarketplacePluginDetail = {
   id: "plugin-elevenlabs",
   slug: "elevenlabs",
@@ -1753,6 +1794,46 @@ const POSTIZ: MarketplacePluginDetail = {
   featured: false,
   updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/postiz",
+};
+
+const TRYPOST: MarketplacePluginDetail = {
+  id: "plugin-trypost",
+  slug: "trypost",
+  name: "TryPost",
+  tagline: "Social media scheduling",
+  description:
+    "TryPost lets agents list your connected channels, and draft, schedule, queue and publish posts on X, LinkedIn, Instagram, Facebook, TikTok, YouTube, Threads, Bluesky, Mastodon, Pinterest and more. Agents can also read analytics, manage ideas and approvals, and set posting times. Sign in to your TryPost account through the browser and choose a workspace. Agents can publish a post immediately, so review each post before you approve it.",
+  category: "automation",
+  creatorName: "TryPost",
+  iconUrl: "https://app.trypost.it/images/integrations/openbot.png",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-week", text: "Which posts are scheduled for this week?" },
+    { id: "prompt-draft", text: "Draft a LinkedIn post about our new release, but do not schedule it." },
+    { id: "prompt-analytics", text: "Which of my posts from last month had the most engagement?" },
+  ],
+  apps: [
+    {
+      id: "app-trypost-mcp",
+      name: "TryPost",
+      description: "Channels, posts, queue, ideas and analytics, over TryPost's MCP server with browser sign-in.",
+      iconUrl: "https://app.trypost.it/images/integrations/openbot.png",
+      server: {
+        name: "trypost",
+        transport: "http",
+        url: "https://app.trypost.it/mcp/trypost",
+        auth: [{ id: "trypost-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://trypost.it",
+  privacyPolicyUrl: "https://trypost.it/en/privacy",
+  termsUrl: "https://trypost.it/en/terms",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-11-10T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/trypost",
 };
 
 const COMPOSIO: MarketplacePluginDetail = {
@@ -10372,6 +10453,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   FIGMA,
   PAPER,
   HIGGSFIELD,
+  SUNRA,
   ELEVENLABS,
   APPLE_APPS,
   SENTRY,
@@ -10395,6 +10477,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   RESEND,
   OMNISEND,
   POSTIZ,
+  TRYPOST,
   COMPOSIO,
   CLICKUP,
   COINBASE,

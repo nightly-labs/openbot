@@ -49,11 +49,12 @@ const PRESENTATION: AgentDockPresentation = {
   sizePercent: 120,
   offsets: [{ displayId: 1, offset: 0.25 }],
   seats: [
-    { kind: "agent", agent: AGENT, mood: "working", state: { kind: "working" } },
+    { kind: "agent", agent: AGENT, mood: "working", state: { kind: "working" }, temporary: false },
     {
       kind: "channel",
       channel: { id: "channel-1", name: "Launch", title: "", members: ["agent-1"], icon: null, imageUrl: null },
       state: { kind: "unread", count: 1 },
+      temporary: false,
     },
   ],
   available: [],

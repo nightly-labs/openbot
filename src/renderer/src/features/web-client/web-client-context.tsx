@@ -1976,6 +1976,8 @@ export function createWebWorkspace(
             online: state.status === "online",
             restart: state.hostRestart?.state ?? null,
             version: state.hostRestart?.version ?? null,
+            // Until the agents load, the server could be new; a notice that waits shows after them.
+            firstRun: !state.agentsLoaded || state.agents.length === 0,
           },
         ]
       : [];

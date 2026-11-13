@@ -1515,8 +1515,8 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.acpRegistry.updateFailed": "Could not update the agent. Try again.",
   "mobile.server.acpRegistry.removeFailed": "Could not remove the runtime. Try again.",
   "mobile.server.acpRegistry.cancelFailed": "Could not cancel the install. Try again.",
-  // Custom providers: OpenAI-compatible endpoints that the host serves. The Team API has no edit route,
-  // so the phone adds and removes them.
+  // Custom providers: OpenAI-compatible endpoints that the host serves. The phone adds and removes
+  // them, and edits them on a host with `custom-provider-edit-v1`.
   "mobile.server.customProviders.title": "Custom providers",
   "mobile.server.customProviders.description":
     "Models from an OpenAI-compatible endpoint, such as Ollama or LM Studio on the computer of this server.",
@@ -1551,6 +1551,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.customProviders.id": "Provider ID",
   "mobile.server.customProviders.idHint":
     "Lowercase letters, numbers, hyphens or underscores. You cannot change it later.",
+  "mobile.server.customProviders.idSavedHint": "You cannot change the ID of a saved endpoint.",
   "mobile.server.customProviders.idPattern":
     "Use lowercase letters, numbers, hyphens or underscores, starting with a letter or number.",
   "mobile.server.customProviders.idBuiltIn": "OpenBot already has a provider called {id}. Choose another ID.",
@@ -1565,6 +1566,8 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.customProviders.apiKeyPlaceholder": "Optional",
   "mobile.server.customProviders.apiKeyHint":
     "Leave it empty if the endpoint needs no key. The key goes to the server, and this phone does not keep it.",
+  "mobile.server.customProviders.apiKeyKeptHint":
+    "A key is saved. Leave this empty to keep it. The key goes to the server, and this phone does not keep it.",
   "mobile.server.customProviders.models": "Models",
   "mobile.server.customProviders.modelsHint": "The model IDs that the endpoint serves. Add at least one.",
   "mobile.server.customProviders.modelName": "Display name",
@@ -1578,6 +1581,8 @@ export const messages = defineMessages("mobile.server", {
     "This model ID cannot be used. Remove spaces, quotes and other punctuation.",
   "mobile.server.customProviders.headers": "Headers",
   "mobile.server.customProviders.headersHint": "Optional. The server sends them with each request to the endpoint.",
+  "mobile.server.customProviders.headersKeptHint":
+    "Leave the value of a saved header empty to keep it. Remove a header to delete it from the server.",
   "mobile.server.customProviders.headerValue": "Value",
   "mobile.server.customProviders.headerNameLabel": "Header {position} name",
   "mobile.server.customProviders.headerValueLabel": "Header {position} value",
@@ -1588,7 +1593,9 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.customProviders.headerDuplicate": "This provider already sets {name}.",
   "mobile.server.customProviders.headerValueRequired": "Enter a header value.",
   "mobile.server.customProviders.saveFailed": "OpenBot could not add this endpoint.",
+  "mobile.server.customProviders.updateFailed": "OpenBot could not save this endpoint.",
   "mobile.server.customProviders.runsOn": "Runs on",
+  // A host without `custom-provider-edit-v1` has no edit route.
   "mobile.server.customProviders.editHint": "To change this endpoint, remove it and add it again.",
   "mobile.server.customProviders.remove": "Remove",
   "mobile.server.customProviders.removeTitle": "Remove {name}?",
@@ -1961,6 +1968,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.route.transfer": "Transfer",
   "mobile.server.route.transferExport": "Export",
   "mobile.server.route.transferImport": "Import",
+  "mobile.server.route.transferCopy": "Copy to another server",
   "mobile.server.transfer.unsupported": "Update OpenBot on this server to transfer it here.",
   "mobile.server.transfer.unavailable": "Connect to this server as an owner or admin to transfer it.",
   "mobile.server.transfer.title": "Move this server to another computer",
@@ -2024,4 +2032,20 @@ export const messages = defineMessages("mobile.server", {
     "These providers were signed in on the other server and are not signed in here. Sign in to them in Server settings › Providers.",
   "mobile.server.transfer.notImported": "Not imported",
   "mobile.server.transfer.warnings": "Check these",
+  "mobile.server.transfer.copy": "Copy to another server",
+  "mobile.server.transfer.copyNote": "Send agents to another of your servers.",
+  "mobile.server.transfer.copyTo": "To",
+  "mobile.server.transfer.copyNoAgents": "This server has no agents.",
+  "mobile.server.transfer.copyNotMoved":
+    "Their channels and the Shared folder are copied too. API keys, sign-ins, connectors, and chat history are not copied. Set them up again on the other server.",
+  "mobile.server.transfer.copySubmit": { one: "Copy {count} agent", other: "Copy {count} agents" },
+  "mobile.server.transfer.copying": "Copying…",
+  "mobile.server.transfer.copyFailed": "The copy did not finish.",
+  "mobile.server.transfer.copied": {
+    one: "{count} agent copied to {server}.",
+    other: "{count} agents copied to {server}.",
+  },
+  "mobile.server.transfer.copyAgents": "Agents to copy",
+  "mobile.server.transfer.copyNext": "Copied agents use the approval rules of {server}.",
+  "mobile.server.transfer.copyNoServer": "Connect to another server as an owner or admin to copy agents to it.",
 });

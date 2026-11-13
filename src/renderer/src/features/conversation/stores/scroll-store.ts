@@ -25,7 +25,7 @@ import { formatMessageTime } from "../../../app-message-projection";
 import { groupAgentMessageMarkers, markOpenAgentMessages, teammateUpdateAnswers } from "../agent-message-timeline";
 import type { ConversationProps, ConversationTarget } from "../conversation-types";
 import { summarizeHostedSiteMessages } from "../hosted-site-timeline";
-import { narrationRows, placeTurnRowsByTime } from "../narration-rows";
+import { narrationRows, placeTurnRowsByTime, placeUpdatesAfterSteers } from "../narration-rows";
 import {
   expandRoutineRunGroups,
   groupRoutineRunMarkers,
@@ -145,22 +145,24 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   );
   const shownMessages = createMemo(() => {
     const progressUpdates = deps.props.responseStyle === "natural";
-    const channelTurnRows: AgentMessage[][] = [];
+    const turnRowsList: AgentMessage[][] = [];
     const listed = deps.props.messages.flatMap((message) => {
       if (message.kind === "thinking") {
         const rows = progressUpdates ? progressRows(message) : [];
         const showsSteps =
           message.turnId && !thinkingRowHiddenTurns().has(message.turnId) && message.items?.some((item) => item.trim());
         const turnRows = showsSteps ? [...rows, message] : rows;
-        if (!deps.props.channel) return turnRows;
-        channelTurnRows.push(turnRows);
-        return [];
+        turnRowsList.push(turnRows);
+        return deps.props.channel ? [] : turnRows;
       }
       if (message.kind === "memory-changes" && answeredTurns().has(message.turnId)) return [];
       return silentAgentAnswer(message) || foldedAnswerIds().has(message.id) ? [] : [message];
     });
-    // Members of a channel work at the same time, so each update goes where its time puts it.
-    const shown = deps.props.channel ? placeTurnRowsByTime(listed, channelTurnRows) : listed;
+    // Members of a channel work at the same time, so each update goes where its time puts it. An agent
+    // chat keeps a turn's updates together, except those written after a steer.
+    const shown = deps.props.channel
+      ? placeTurnRowsByTime(listed, turnRowsList)
+      : placeUpdatesAfterSteers(listed, turnRowsList);
     // Natural shows an agent's text once it is complete, as one bubble, while the activity line
     // names the step. A bubble that grows as the text arrives moves the chat at each line.
     const complete = progressUpdates ? shown.filter((message) => !held(message)) : shown;

@@ -144,6 +144,7 @@ export const messages = {
   "settings.planStart.set": "הגדרה",
   "settings.automationLimit.sectionTitle": "מגבלה",
   "settings.automationLimit.sectionDescription": "חלה על כל הסוכנים במחשב הזה.",
+  "settings.automationLimit.sectionDescriptionServer": "חלה על כל הסוכנים בשרת הזה.",
   "settings.automationLimit.title": "בקשות לשעה",
   "settings.automationLimit.option": "{limit} לשעה",
   "settings.automationLimit.note": "המספר המרבי של הודעות והרצות שגרה ששקריפטים מקומיים יכולים לשלוח לכל סוכן בשעה.",
@@ -261,6 +262,9 @@ export const messages = {
     "פס דק נשאר במקום שבו המעגן נעלם. קירוב המצביע אליו מציג את המעגן. גל צבע עולה בפס כשסוכן שואל אותך משהו.",
   "settings.agentDock.results.title": "הצגת עבודה שהסתיימה",
   "settings.agentDock.results.description": "תוצאות שסוכנים מסיימים מוצגות לצד המעגן לזמן קצר.",
+  "settings.agentDock.activeSeats.title": "הצגת סוכנים עם חדשות",
+  "settings.agentDock.activeSeats.description":
+    "סוכן או ערוץ שאינם במעגן מוצגים בו כל עוד יש להם הודעה חדשה או שהם מחכים לך.",
   "settings.agentDock.agents.title": "סוכנים במעגן",
   "settings.agentDock.agents.description": "הסוכנים של {server}. לכל שרת יש מעגן משלו.",
   "settings.agentDock.agents.empty": "עדיין אין סוכנים בשרת הזה.",

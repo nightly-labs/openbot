@@ -1550,6 +1550,7 @@ export const messages = {
   "mobile.server.route.transfer": "Transferir",
   "mobile.server.route.transferExport": "Exportar",
   "mobile.server.route.transferImport": "Importar",
+  "mobile.server.route.transferCopy": "Copiar a otro servidor",
   "mobile.server.transfer.unsupported": "Actualiza OpenBot en este servidor para transferirlo aquí.",
   "mobile.server.transfer.unavailable": "Conéctate a este servidor como propietario o administrador para transferirlo.",
   "mobile.server.transfer.title": "Trasladar este servidor a otro equipo",
@@ -1613,4 +1614,21 @@ export const messages = {
     "Estos proveedores tenían la sesión iniciada en el otro servidor, pero aquí no. Inicia sesión en ellos en Ajustes del servidor › Proveedores.",
   "mobile.server.transfer.notImported": "No importados",
   "mobile.server.transfer.warnings": "Revisa esto",
+  "mobile.server.transfer.copy": "Copiar a otro servidor",
+  "mobile.server.transfer.copyNote": "Envía agentes a otro de tus servidores.",
+  "mobile.server.transfer.copyTo": "A",
+  "mobile.server.transfer.copyNoAgents": "Este servidor no tiene agentes.",
+  "mobile.server.transfer.copyNotMoved":
+    "Sus canales y la carpeta compartida también se copian. Las claves de API, los inicios de sesión, los conectores y el historial de chats no se copian. Configúralos de nuevo en el otro servidor.",
+  "mobile.server.transfer.copySubmit": { one: "Copiar {count} agente", other: "Copiar {count} agentes" },
+  "mobile.server.transfer.copying": "Copiando…",
+  "mobile.server.transfer.copyFailed": "La copia no terminó.",
+  "mobile.server.transfer.copied": {
+    one: "{count} agente copiado a {server}.",
+    other: "{count} agentes copiados a {server}.",
+  },
+  "mobile.server.transfer.copyAgents": "Agentes para copiar",
+  "mobile.server.transfer.copyNext": "Los agentes copiados usan las reglas de aprobación de {server}.",
+  "mobile.server.transfer.copyNoServer":
+    "Conéctate a otro servidor como propietario o administrador para copiar agentes en él.",
 } as const satisfies PartialTranslation<typeof source>;

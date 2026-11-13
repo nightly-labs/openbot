@@ -77,6 +77,8 @@ export const messages = {
   "error.team.routinesOnceUnsupported": "Esta conexión no puede guardar rutinas que se ejecutan una vez.",
   "error.team.routineRunCommandUnsupported": "Esta conexión no puede dar el comando de ejecución de una rutina.",
   "error.team.threadQueueUnsupported": "Esta conexión no puede mostrar la cola de un hilo lateral.",
+  "error.team.hostTurnLimitsUnsupported":
+    "Esta conexión no puede mostrar ni cambiar los límites de hilos del servidor.",
   "error.team.usageLimitUnsupported": "Esta conexión no puede mostrar ni cambiar los límites de uso de los agentes.",
   "error.team.hermesImportUnsupported": "Esta conexión no puede importar perfiles de Hermes desde el servidor.",
   "error.team.providerDetectionUnsupported":

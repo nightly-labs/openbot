@@ -54,7 +54,7 @@ export interface ServersPort {
     | "stopRemoteControl"
     | "updateIdentity"
   >;
-  notifications: Pick<OpenBotDesktopApi["notifications"], "onOpened">;
+  notifications: Pick<OpenBotDesktopApi["notifications"], "onOpened" | "onWorkflowOpened">;
   remoteDesktop: Pick<
     OpenBotDesktopApi["remoteDesktop"],
     "checkSetup" | "connect" | "disconnect" | "list" | "openSetup" | "test"

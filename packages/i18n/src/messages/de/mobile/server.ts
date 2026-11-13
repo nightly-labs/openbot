@@ -1570,6 +1570,7 @@ export const messages = {
   "mobile.server.route.transfer": "Übertragung",
   "mobile.server.route.transferExport": "Exportieren",
   "mobile.server.route.transferImport": "Importieren",
+  "mobile.server.route.transferCopy": "Auf einen anderen Server kopieren",
   "mobile.server.transfer.unsupported": "Aktualisiere OpenBot auf diesem Server, um ihn hierher zu übertragen.",
   "mobile.server.transfer.unavailable":
     "Verbinde dich als Eigentümer oder Admin mit diesem Server, um ihn zu übertragen.",
@@ -1635,4 +1636,21 @@ export const messages = {
     "Bei diesen Anbietern warst du auf dem anderen Server angemeldet, hier aber nicht. Melde dich unter Servereinstellungen › Anbieter bei ihnen an.",
   "mobile.server.transfer.notImported": "Nicht importiert",
   "mobile.server.transfer.warnings": "Bitte prüfen",
+  "mobile.server.transfer.copy": "Auf einen anderen Server kopieren",
+  "mobile.server.transfer.copyNote": "Agenten an einen anderen deiner Server senden.",
+  "mobile.server.transfer.copyTo": "Nach",
+  "mobile.server.transfer.copyNoAgents": "Dieser Server hat keine Agenten.",
+  "mobile.server.transfer.copyNotMoved":
+    "Ihre Kanäle und der gemeinsame Ordner werden ebenfalls kopiert. API-Schlüssel, Anmeldungen, Connectors und der Chatverlauf werden nicht kopiert. Richte sie auf dem anderen Server neu ein.",
+  "mobile.server.transfer.copySubmit": { one: "{count} Agenten kopieren", other: "{count} Agenten kopieren" },
+  "mobile.server.transfer.copying": "Wird kopiert…",
+  "mobile.server.transfer.copyFailed": "Das Kopieren wurde nicht abgeschlossen.",
+  "mobile.server.transfer.copied": {
+    one: "{count} Agent auf {server} kopiert.",
+    other: "{count} Agenten auf {server} kopiert.",
+  },
+  "mobile.server.transfer.copyAgents": "Zu kopierende Agenten",
+  "mobile.server.transfer.copyNext": "Kopierte Agenten verwenden die Genehmigungsregeln von {server}.",
+  "mobile.server.transfer.copyNoServer":
+    "Verbinde dich als Eigentümer oder Admin mit einem anderen Server, um Agenten dorthin zu kopieren.",
 } as const satisfies PartialTranslation<typeof source>;

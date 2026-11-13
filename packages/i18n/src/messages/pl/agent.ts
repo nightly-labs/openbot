@@ -88,6 +88,7 @@ export const messages = {
   "agent.error.settingsFailed": "Nie udało się zapisać ustawień agenta",
   "agent.error.adminOnly": "Ustawienia agenta może zmienić tylko administrator serwera.",
   "agent.error.continueFailed": "Agent nie mógł kontynuować. Spróbuj ponownie.",
+  "agent.error.copyDetails": "Kopiuj szczegóły",
   "agent.error.mcpNotStarted": "Serwer MCP nie został uruchomiony",
   "agent.error.openMcpSettings": "Otwórz ustawienia MCP",
   "agent.error.provider": "Błąd dostawcy",

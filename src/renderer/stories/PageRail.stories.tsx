@@ -3,6 +3,7 @@ import { ServerMenu } from "@openbot/ui/features/servers/ServerMenu";
 import { HelpMenu } from "@openbot/ui/features/updates/HelpMenu";
 import {
   type CustomAgentUsageRailRow,
+  type MediaCreditsRailRow,
   PageRail,
   type PageRailPage,
   type PageRailPinnablePage,
@@ -54,12 +55,19 @@ const customAgentUsage: CustomAgentUsageRailRow[] = [
   { id: "devin", name: "Devin", text: "Plan: Team\nACUs used this cycle: 42 of 250\nThe cycle resets in 12 days." },
 ];
 
+/** On the Canvas page: a Sunra team member with 120 of a 500-credit quota left. */
+const teamCredits: MediaCreditsRailRow[] = [{ provider: "sunra", name: "Sunra", available: 120, quota: 500 }];
+
+/** A personal Sunra account has no quota of its own. */
+const personalCredits: MediaCreditsRailRow[] = [{ provider: "sunra", name: "Sunra", available: 2140, quota: null }];
+
 /** The page rail as the desktop window shows it, with the menu of the open server at its end. Hover a button, or move to it with Tab, to see its tooltip. */
 function RailPreview(props: {
   updateReady?: boolean;
   logo?: PageRailProps["logo"];
   customAgentUsage?: readonly CustomAgentUsageRailRow[];
   usageRows?: PageRailProps["usageRows"];
+  mediaCredits?: readonly MediaCreditsRailRow[];
 }) {
   const { t } = useText();
   const [current, setCurrent] = createSignal<PageRailPage | null>("agents");
@@ -77,6 +85,8 @@ function RailPreview(props: {
           }
           usageRows={props.usageRows ?? usageRows}
           customAgentUsage={props.customAgentUsage}
+          mediaCredits={props.mediaCredits}
+          onMediaCredits={fn()}
           onAgents={() => setCurrent("agents")}
           onRoutines={() => setCurrent("routines")}
           onSchedule={() => setCurrent("schedule")}
@@ -151,4 +161,14 @@ export const WebLogo: Story = {
 /** Windows and Linux: the logo is in the top row, with no link. */
 export const DesktopLogo: Story = {
   args: { logo: { variant: "production" } },
+};
+
+/** The Canvas page with a Sunra team quota: a ring with the part that is left. Hover it to see the credits. */
+export const MediaCreditsQuota: Story = {
+  args: { mediaCredits: teamCredits },
+};
+
+/** The Canvas page with a personal Sunra account: the logo with no ring. The card has the number. */
+export const MediaCreditsPersonal: Story = {
+  args: { mediaCredits: personalCredits },
 };

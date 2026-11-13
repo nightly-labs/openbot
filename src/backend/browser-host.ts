@@ -97,6 +97,7 @@ import {
   type BrowserProxyRelay,
   openBrowserProxyRelay,
   type RelayExit,
+  type RelayExitFailure,
   socksExit,
 } from "./browser-profiles/browser-proxy-relay";
 import type { BrowserProxyConnection } from "./browser-profiles/browser-proxy-store";
@@ -497,7 +498,7 @@ function runBrowserTool<Name extends BrowserToolName>(
 }
 
 const AGENT_CODE_CARD_FILL =
-  "Card fill is unavailable while a script from evaluate can still run in this page or in another open page of this site. Reload this page, close or navigate each other tab where you ran evaluate on this site, take a fresh snapshot, and call fill_card again, or use request_takeover.";
+  "Card fill is unavailable while a script from evaluate can still run in this page or in another open page of this site. Reload this page with navigate direction=reload, not with evaluate or by opening its address again, close or navigate each other tab where you ran evaluate on this site, take a fresh snapshot, and call fill_card again, or use request_takeover.";
 
 /**
  * The origins of the documents in the page. A frame whose renderer is gone, for example after a crash,
@@ -1261,8 +1262,10 @@ export class BrowserHost {
         Effect.gen({ self: this }, function* () {
           return yield* untilStopped(
             tab,
+            // A reload gets the page's files from the site again. A site can send a bad file that
+            // the browser keeps for hours (#7772); a normal reload used it again and the page stayed blank.
             navigateAndWait(tab.contents, () => {
-              tab.contents.reload();
+              tab.contents.reloadIgnoringCache();
               return true;
             }),
           );
@@ -1600,8 +1603,9 @@ export class BrowserHost {
     if (args.method !== "password" && args.digits < 4)
       return yield* browserFailure(new Error(sourceText("error.backend.authDigitsRange")));
     if (
-      (args.method === "password" && args.targets.length !== 1) ||
-      (args.targets.length !== 1 && args.targets.length !== args.digits) ||
+      (args.method === "password"
+        ? args.targets.length > 2
+        : args.targets.length !== 1 && args.targets.length !== args.digits) ||
       (args.submission === "click") !== Boolean(args.submitTarget)
     )
       return yield* browserFailure(
@@ -1611,7 +1615,7 @@ export class BrowserHost {
             : args.submission !== "click" && args.submitTarget
               ? "Invalid authentication targets: submitTarget is only for submission=click."
               : args.method === "password"
-                ? "Invalid authentication targets: method=password needs exactly one field target."
+                ? "Invalid authentication targets: method=password needs one field target, or a password and its confirmation field."
                 : `Invalid authentication targets: use one field target for the whole code, or ${args.digits} digit field targets.`,
         ),
       );
@@ -1629,7 +1633,13 @@ export class BrowserHost {
             tab.diagnostics.clearDiagnostics();
             return yield* boundEngineOperation(
               tab,
-              tab.engine.prepareSecret(args.targets, url.origin, args.submission, args.submitTarget),
+              tab.engine.prepareSecret(
+                args.targets,
+                url.origin,
+                args.method === "password",
+                args.submission,
+                args.submitTarget,
+              ),
               10_000,
               "Authentication target resolution timed out.",
               keepQueueBlocked,
@@ -1658,7 +1668,10 @@ export class BrowserHost {
               return yield* browserFailure(new Error(sourceText("error.backend.authExpired")));
             // A connected page can navigate to the secret's site while the card is open.
             yield* browserSync(() => this.#requireIsolatedFromConnectedTabs(tab, url.origin));
-            if (args.method !== "password" && !new RegExp(`^[0-9]{${args.digits}}$`, "u").test(secret))
+            // A saved authenticator code has the length of its key, which a page often does not state.
+            // One field takes the whole code; digit fields keep their count.
+            const length = vault && args.method === "authenticator" && args.targets.length === 1 ? "4,12" : args.digits;
+            if (args.method !== "password" && !new RegExp(`^[0-9]{${length}}$`, "u").test(secret))
               return yield* browserFailure(new Error(sourceText("error.backend.authDigitsRequired")));
             protection.submitted = true;
             this.#invalidateViews(tab);
@@ -2053,7 +2066,7 @@ export class BrowserHost {
                   return;
                 case "reload":
                   yield* navigateAndWait(tab.contents, () => {
-                    tab.contents.reload();
+                    tab.contents.reloadIgnoringCache();
                     return true;
                   });
               }
@@ -2869,7 +2882,7 @@ export class BrowserHost {
             yield* navigateAndWait(
               tab.contents,
               () => {
-                tab.contents.reload();
+                tab.contents.reloadIgnoringCache();
                 return true;
               },
               operationTimeout,
@@ -3329,7 +3342,7 @@ export class BrowserHost {
   }
 
   /** Why a page load through the proxy of a tab failed, from the error that Chromium gives. */
-  #tabProxyFailure(tab: BrowserHostTab, error: BrowserProxyFailure): BrowserProxyFailure {
+  #tabProxyFailure(tab: BrowserHostTab, error: BrowserProxyFailure): RelayExitFailure {
     if (this.#proxySignInRefused.has(tab)) return "signIn";
     // Through a relay, Chromium sees only a failed tunnel. The relay knows whether the proxy refused the sign-in.
     return this.#tabRelay(tab)?.exitFailure() ?? error;
@@ -3353,7 +3366,15 @@ export class BrowserHost {
     const proxyError = proxyErrorInText(String(failure.cause));
     if (proxy === null || proxyError === undefined) return failure;
     if (proxy.kind === "computer")
-      return browserFailure(new Error(sourceText("error.backend.browserProxyComputerUnreachable")));
+      return browserFailure(
+        new Error(
+          sourceText(
+            this.#tabRelay(tab)?.exitFailure() === "address"
+              ? "error.backend.browserProxyComputerLocalAddress"
+              : "error.backend.browserProxyComputerUnreachable",
+          ),
+        ),
+      );
     // The network error of this load came first and recorded why. Chromium commits its error page
     // before the load fails here, and that commit clears the sign-in mark of the tab.
     const reason = this.#proxyFailures.get(proxy.proxyId) ?? this.#tabProxyFailure(tab, proxyError);
@@ -3504,8 +3525,11 @@ export class BrowserHost {
     target.webRequest.onErrorOccurred((details) => {
       const tab = [...this.#tabs.values()].find((candidate) => candidate.contents.id === details.webContentsId);
       const proxyError = PROXY_ERRORS.get(details.error);
-      if (tab && details.resourceType === "mainFrame" && proxyError !== undefined)
-        this.#noteProxyLoad(tab, this.#tabProxyFailure(tab, proxyError));
+      if (tab && details.resourceType === "mainFrame" && proxyError !== undefined) {
+        const failure = this.#tabProxyFailure(tab, proxyError);
+        // A computer that refused a local address answered, so its proxy does not fail.
+        this.#noteProxyLoad(tab, failure === "address" ? null : failure);
+      }
       if (!tab || tab.secret) return;
       // The page or a navigation cancelled a subresource request: it did not fail. Live pages cancel
       // many. A cancelled page load can be a blocked navigation, so it stays an error.
@@ -4186,21 +4210,40 @@ export class BrowserHost {
     if (background === this.#mainViewsInBackground) return false;
     const from = this.#nativeParent(window);
     if (background) {
-      this.#backgroundWindow ??= createBackgroundWindow();
+      this.#backgroundWindow ??= this.#openBackgroundWindow();
       this.#backgroundWindow.setBounds(this.#backgroundBounds(window));
       this.#backgroundWindow.showInactive();
     }
     this.#mainViewsInBackground = background;
-    const to = this.#nativeParent(window);
+    this.#moveMainViews(from, this.#nativeParent(window), background);
+    if (!background) this.#backgroundWindow?.hide();
+    return true;
+  }
+
+  /**
+   * A window manager can close the background window, for example on Wayland (#8027). Its views then
+   * go back to the main window, and the next background sync opens a new background window.
+   */
+  #openBackgroundWindow(): BaseWindow {
+    const background = createBackgroundWindow();
+    background.once("closed", () => {
+      if (this.#backgroundWindow !== background) return;
+      this.#backgroundWindow = null;
+      if (!this.#mainViewsInBackground) return;
+      this.#mainViewsInBackground = false;
+      if (!this.#window.isDestroyed()) this.#moveMainViews(background, this.#window, false);
+    });
+    return background;
+  }
+
+  #moveMainViews(from: BaseWindow, to: BaseWindow, background: boolean): void {
     for (const [view, owner] of this.#mountedViews) {
-      if (owner !== window) continue;
+      if (owner !== this.#window) continue;
       if (!from.isDestroyed()) from.contentView.removeChildView(view);
       to.contentView.addChildView(view);
       if (SHOWS_VIEWS_IN_BACKGROUND)
         view.setVisible(background || (view === this.#attachedView && this.#attachedViewShown));
     }
-    if (!background) this.#backgroundWindow?.hide();
-    return true;
   }
 
   /**

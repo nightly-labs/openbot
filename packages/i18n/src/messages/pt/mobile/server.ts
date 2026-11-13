@@ -1545,6 +1545,7 @@ export const messages = {
   "mobile.server.route.transfer": "Transferência",
   "mobile.server.route.transferExport": "Exportar",
   "mobile.server.route.transferImport": "Importar",
+  "mobile.server.route.transferCopy": "Copiar para outro servidor",
   "mobile.server.transfer.unsupported": "Atualize o OpenBot neste servidor para transferi-lo aqui.",
   "mobile.server.transfer.unavailable":
     "Conecte-se a este servidor como proprietário ou administrador para transferi-lo.",
@@ -1610,4 +1611,21 @@ export const messages = {
     "Estes provedores estavam conectados no outro servidor e não estão conectados aqui. Entre neles em Configurações do servidor › Provedores.",
   "mobile.server.transfer.notImported": "Não importado",
   "mobile.server.transfer.warnings": "Verifique estes itens",
+  "mobile.server.transfer.copy": "Copiar para outro servidor",
+  "mobile.server.transfer.copyNote": "Envie agentes para outro dos seus servidores.",
+  "mobile.server.transfer.copyTo": "Para",
+  "mobile.server.transfer.copyNoAgents": "Este servidor não tem agentes.",
+  "mobile.server.transfer.copyNotMoved":
+    "Os canais deles e a pasta Shared também são copiados. Chaves de API, logins, conectores e o histórico de chats não são copiados. Configure-os de novo no outro servidor.",
+  "mobile.server.transfer.copySubmit": { one: "Copiar {count} agente", other: "Copiar {count} agentes" },
+  "mobile.server.transfer.copying": "Copiando…",
+  "mobile.server.transfer.copyFailed": "A cópia não terminou.",
+  "mobile.server.transfer.copied": {
+    one: "{count} agente copiado para {server}.",
+    other: "{count} agentes copiados para {server}.",
+  },
+  "mobile.server.transfer.copyAgents": "Agentes para copiar",
+  "mobile.server.transfer.copyNext": "Os agentes copiados usam as regras de aprovação de {server}.",
+  "mobile.server.transfer.copyNoServer":
+    "Conecte-se a outro servidor como proprietário ou administrador para copiar agentes para ele.",
 } as const satisfies PartialTranslation<typeof source>;

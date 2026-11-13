@@ -1712,6 +1712,7 @@ export const messages = {
   "mobile.server.route.transfer": "Przeniesienie",
   "mobile.server.route.transferExport": "Eksport",
   "mobile.server.route.transferImport": "Import",
+  "mobile.server.route.transferCopy": "Kopiuj na inny serwer",
   "mobile.server.transfer.unsupported": "Zaktualizuj OpenBot na tym serwerze, aby go tutaj przenieść.",
   "mobile.server.transfer.unavailable":
     "Połącz się z tym serwerem jako właściciel lub administrator, aby go przenieść.",
@@ -1787,4 +1788,28 @@ export const messages = {
     "Ci dostawcy byli zalogowani na innym serwerze, a tutaj nie są. Zaloguj się do nich w Ustawienia serwera › Dostawcy.",
   "mobile.server.transfer.notImported": "Nie zaimportowano",
   "mobile.server.transfer.warnings": "Sprawdź te elementy",
+  "mobile.server.transfer.copy": "Kopiuj na inny serwer",
+  "mobile.server.transfer.copyNote": "Wyślij agentów na inny ze swoich serwerów.",
+  "mobile.server.transfer.copyTo": "Do",
+  "mobile.server.transfer.copyNoAgents": "Ten serwer nie ma agentów.",
+  "mobile.server.transfer.copyNotMoved":
+    "Ich kanały i folder współdzielony też są kopiowane. Klucze API, logowania, konektory i historia czatów nie są kopiowane. Skonfiguruj je ponownie na drugim serwerze.",
+  "mobile.server.transfer.copySubmit": {
+    one: "Kopiuj {count} agenta",
+    few: "Kopiuj {count} agentów",
+    many: "Kopiuj {count} agentów",
+    other: "Kopiuj {count} agenta",
+  },
+  "mobile.server.transfer.copying": "Kopiowanie…",
+  "mobile.server.transfer.copyFailed": "Kopiowanie nie zostało ukończone.",
+  "mobile.server.transfer.copied": {
+    one: "Skopiowano {count} agenta na {server}.",
+    few: "Skopiowano {count} agentów na {server}.",
+    many: "Skopiowano {count} agentów na {server}.",
+    other: "Skopiowano {count} agenta na {server}.",
+  },
+  "mobile.server.transfer.copyAgents": "Agenci do skopiowania",
+  "mobile.server.transfer.copyNext": "Skopiowani agenci używają reguł zatwierdzania serwera {server}.",
+  "mobile.server.transfer.copyNoServer":
+    "Połącz się z innym serwerem jako właściciel lub administrator, aby skopiować na niego agentów.",
 } as const satisfies PartialTranslation<typeof source>;

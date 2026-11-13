@@ -182,6 +182,8 @@ export const messages = {
   "provider.geminiKey.title": "Ключ API Gemini",
   "provider.geminiKey.description":
     "Сохраните ключ API Gemini на этом компьютере. Сохранённый ключ используется вместо аккаунта Google. Чтобы войти через Google, удалите ключ и нажмите «Подключить» в строке Gemini.",
+  "provider.geminiKey.descriptionHost":
+    "Сохраните ключ API Gemini на хосте. Сохранённый ключ используется вместо аккаунта Google. Чтобы войти через Google, удалите ключ и нажмите «Подключить» в строке Gemini.",
   "provider.geminiKey.label": "Ключ API Gemini",
   "provider.claudeKey.title": "Ключ API Anthropic",
   "provider.claudeKey.description":
@@ -190,14 +192,20 @@ export const messages = {
   "provider.inceptionKey.title": "Ключ API Inception",
   "provider.inceptionKey.description":
     "Сохраните ключ API Inception на этом компьютере, чтобы использовать модели Mercury. OpenBot запускает их в загруженном Pi CLI.",
+  "provider.inceptionKey.descriptionHost":
+    "Сохраните ключ API Inception на хосте, чтобы использовать модели Mercury. OpenBot запускает их в загруженном Pi CLI.",
   "provider.inceptionKey.label": "Ключ API Inception",
   "provider.deepseekKey.title": "Ключ API DeepSeek",
   "provider.deepseekKey.description":
     "Сохраните ключ API DeepSeek на этом компьютере, чтобы использовать модели DeepSeek. OpenBot запускает их в загруженном Pi CLI.",
+  "provider.deepseekKey.descriptionHost":
+    "Сохраните ключ API DeepSeek на хосте, чтобы использовать модели DeepSeek. OpenBot запускает их в загруженном Pi CLI.",
   "provider.deepseekKey.label": "Ключ API DeepSeek",
   "provider.openrouterKey.title": "Ключ API OpenRouter",
   "provider.openrouterKey.description":
     "Сохраните ключ API OpenRouter на этом компьютере, чтобы использовать модели OpenRouter. OpenBot запускает их в загруженном Pi CLI.",
+  "provider.openrouterKey.descriptionHost":
+    "Сохраните ключ API OpenRouter на хосте, чтобы использовать модели OpenRouter. OpenBot запускает их в загруженном Pi CLI.",
   "provider.openrouterKey.label": "Ключ API OpenRouter",
 
   "provider.openCodeKey.title": "Вход в OpenCode Go",
@@ -268,6 +276,10 @@ export const messages = {
     "Вместо входа через Google используется сохранённый ключ Gemini API. Чтобы использовать тариф Google и его модели, удалите ключ.",
   "provider.settings.versionInstalledByUser": "{version} · установлена вами",
   "provider.settings.versionDownloaded": "{version} · загружена OpenBot",
+  "provider.settings.otherVersionInstalledByUser": "Не используется: {version} · установлена вами",
+  "provider.settings.otherVersionDownloaded": "Не используется: {version} · загружена OpenBot",
+  "provider.settings.useInstalledVersion": "Использовать свою",
+  "provider.settings.useDownloadedVersion": "Использовать от OpenBot",
   "provider.settings.cache": "Кэш",
   "provider.settings.promptCache": "Кэш промптов",
   "provider.settings.promptCacheDescription": "Как долго Claude хранит контекст агента в кэше между ходами.",

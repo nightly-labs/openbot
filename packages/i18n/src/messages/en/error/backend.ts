@@ -357,6 +357,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserProxySignInRefused": "The proxy {name} refused the sign-in, so the page did not open.",
   "error.backend.browserProxyComputerUnreachable":
     "The computer that this profile uses does not answer, so the page did not open.",
+  "error.backend.browserProxyComputerLocalAddress":
+    "The computer that this profile uses opens only public sites. It does not open addresses on a local network, so the page did not open.",
   "error.backend.browserCertificateUntrusted":
     "The security certificate of this site is not trusted, so the page did not open.",
   "error.backend.browserLowMemory":

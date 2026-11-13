@@ -1,18 +1,20 @@
 /** A media step: an image or a video that a model makes from a description. */
 
-import { ProviderLogo } from "@openbot/brand";
 import {
+  WORKFLOW_MEDIA_ASPECTS,
   WORKFLOW_MEDIA_KINDS,
   WORKFLOW_VIDEO_DURATIONS,
-  WORKFLOW_VIDEO_RESOLUTIONS,
   WORKFLOW_VIDEO_VOICES,
+  type WorkflowMediaAspect,
   type WorkflowMediaKind,
+  workflowMediaAspects,
+  workflowMediaResolutions,
+  workflowMediaSpecs,
+  workflowVideoDurations,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
   Button,
-  buttonVariants,
-  ChevronDown,
   Download,
   DropdownMenu,
   Film,
@@ -31,9 +33,10 @@ import { useText } from "../../text";
 import { ImageLightbox, type ImageLightboxOpening } from "../conversation/ImageLightbox";
 import { MediaGenerationCanvas } from "../conversation/media-generation-frame";
 import { VideoPlayer } from "../conversation/VideoPlayer";
+import { usePictureShape } from "./picture-shape";
+import { MediaModelPicker } from "./WorkflowMediaModelPicker";
 import { type PickerGroup, PickerMenu } from "./WorkflowPicker";
 import { resultValue, useBoard } from "./workflow-board";
-import type { WorkflowImageModel } from "./workflow-model";
 import {
   asBoolean,
   asString,
@@ -49,10 +52,12 @@ import {
   type WfnInputPort,
 } from "./workflow-node-parts";
 
-const ASPECTS = ["1:1", "4:3", "16:9", "9:16"] as const;
-type Aspect = (typeof ASPECTS)[number];
-type Duration = (typeof WORKFLOW_VIDEO_DURATIONS)[number];
-type Resolution = (typeof WORKFLOW_VIDEO_RESOLUTIONS)[number];
+type Aspect = WorkflowMediaAspect;
+
+/** A length in whole seconds. The model of the step sets which lengths it takes. */
+const asSeconds = (value: unknown): number | undefined =>
+  typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined;
+const asText = (value: unknown): string | undefined => (typeof value === "string" && value ? value : undefined);
 
 function aspectRatio(aspect: Aspect): string {
   return aspect.replace(":", " / ");
@@ -64,6 +69,15 @@ const ASPECT_SHAPE = {
   "16:9": "workflow.image.aspect.wide",
   "9:16": "workflow.image.aspect.portrait",
 } as const satisfies Record<Aspect, AppTextKey>;
+
+/** The background of an image: the model's own, or clear pixels around the subject. */
+const BACKGROUNDS = ["solid", "transparent"] as const;
+type Background = (typeof BACKGROUNDS)[number];
+
+const BACKGROUND_TEXT = {
+  solid: "workflow.image.background.solid",
+  transparent: "workflow.image.background.transparent",
+} as const satisfies Record<Background, AppTextKey>;
 
 /** The text of each media kind. */
 const KIND_TEXT = {
@@ -85,10 +99,10 @@ const KIND_TEXT = {
   },
 } as const satisfies Record<WorkflowMediaKind, Record<string, AppTextKey>>;
 
-/** Each aspect ratio with its frame, drawn with the longer side one icon long. */
-const aspectGroups = (t: AppTranslate): readonly PickerGroup<Aspect>[] => [
+/** Each aspect ratio of the model with its frame, drawn with the longer side one icon long. */
+const aspectGroups = (t: AppTranslate, aspects: readonly Aspect[]): readonly PickerGroup<Aspect>[] => [
   {
-    options: ASPECTS.map((aspect) => {
+    options: aspects.map((aspect) => {
       const [width = 1, height = 1] = aspect.split(":").map(Number);
       const long = Math.max(width, height);
       return {
@@ -141,58 +155,6 @@ function ChipMenu<T extends string>(props: {
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <PickerMenu label={props.title} groups={props.groups} value={props.value} onSelect={props.onSelect} />
-      </DropdownMenu.Portal>
-    </DropdownMenu.Root>
-  );
-}
-
-/** The model that makes the media, in the same pill as the agent and effort choices. */
-function MediaModelPill(props: {
-  kind: WorkflowMediaKind;
-  model: WorkflowImageModel | undefined;
-  disabled?: boolean;
-  onChange: (model: WorkflowImageModel) => void;
-}) {
-  const board = useBoard();
-  const { t } = useText();
-  const models = () => board.catalogs().imageModels.filter((choice) => choice.kinds.includes(props.kind));
-  const name = () => props.model?.name ?? t("workflow.image.chooseModel");
-  return (
-    <DropdownMenu.Root placement="bottom-start" gutter={6}>
-      <DropdownMenu.Trigger
-        class={`${buttonVariants({ variant: "ghost", size: "xs" })} wfn-pill`}
-        aria-label={t("workflow.model.label", { name: name() })}
-        disabled={props.disabled}
-      >
-        <Show when={props.model}>{(model) => <ProviderLogo provider={model().provider} class="wfn-model-logo" />}</Show>
-        <span>{name()}</span>
-        <ChevronDown aria-hidden="true" />
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Portal>
-        <PickerMenu
-          label={t(KIND_TEXT[props.kind].models)}
-          groups={[
-            {
-              options: models().map((choice) => ({
-                value: choice.id,
-                label: choice.name,
-                tile: () => <ProviderLogo provider={choice.provider} class="wfn-model-logo" />,
-                chips: [
-                  {
-                    text: choice.apiKey
-                      ? t("workflow.media.apiKey", { name: choice.maker })
-                      : t("workflow.media.subscription", { name: choice.subscription }),
-                  },
-                ],
-              })),
-            },
-          ]}
-          value={props.model?.id}
-          onSelect={(id) => {
-            const model = models().find((choice) => choice.id === id);
-            if (model) props.onChange(model);
-          }}
-        />
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
   );
@@ -272,28 +234,29 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
     () => props.id,
     "aspect",
     untrack(() => props.aspect ?? "1:1"),
-    oneOf(ASPECTS),
+    oneOf(WORKFLOW_MEDIA_ASPECTS),
   );
-  const [duration, setDuration] = useField<Duration>(
-    () => props.id,
-    "duration",
-    WORKFLOW_VIDEO_DURATIONS[0],
-    oneOf(WORKFLOW_VIDEO_DURATIONS),
-  );
-  const [resolution, setResolution] = useField<Resolution>(
-    () => props.id,
-    "resolution",
-    "720p",
-    oneOf(WORKFLOW_VIDEO_RESOLUTIONS),
-  );
+  const [duration, setDuration] = useField<number>(() => props.id, "duration", WORKFLOW_VIDEO_DURATIONS[0], asSeconds);
+  const [resolution, setResolution] = useField<string>(() => props.id, "resolution", "720p", asText);
+  const [background, setBackground] = useField<Background>(() => props.id, "background", "solid", oneOf(BACKGROUNDS));
   const models = () => board.catalogs().imageModels.filter((choice) => choice.kinds.includes(kind()));
-  const [modelId, setModelId] = useField(
+  const [modelId] = useField(
     () => props.id,
     "model",
     untrack(() => models()[0]?.id ?? ""),
     asString,
   );
   const model = () => models().find((candidate) => candidate.id === modelId());
+  /** The account of the model's provider that pays, or "" for the provider's own sign-in. */
+  const [account] = useField(() => props.id, "account", "", asString);
+  /** What the model gets: a choice that it does not make shows as the one it makes in its place. */
+  const specs = () =>
+    workflowMediaSpecs(
+      { aspect: aspect(), duration: duration(), resolution: resolution(), background: background() },
+      kind(),
+      model(),
+    );
+  const resolutions = () => workflowMediaResolutions(model(), kind());
   const [firstFrame] = useField(() => props.id, "firstFrame", "", asString);
   const [lastFrame] = useField(() => props.id, "lastFrame", "", asString);
   const [voice, setVoice] = useField(() => props.id, "voice", "", asString);
@@ -338,6 +301,10 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
     return shown ? resultValue(shown) : props.image;
   };
   const shownUrl = () => urlOf(shownValue());
+  /** An image with clear pixels shows on the canvas with no card behind it. */
+  const shape = usePictureShape(() => (kind() === "image" ? shownUrl() : undefined));
+  const clear = () => kind() === "image" && !run.running() && shape()?.clear === true;
+  const backgroundText = () => t(BACKGROUND_TEXT[specs().transparent ? "transparent" : "solid"]);
   /** The name that a download of the media takes. */
   const fileName = () => (kind() === "video" ? "video.mp4" : "image.png");
   const [viewer, setViewer] = createSignal<ImageLightboxOpening>();
@@ -366,7 +333,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
   };
   const making = () => run.running();
   const specsDisabled = () => locked() || making();
-  const durationText = (value: Duration) => t("workflow.video.seconds", { value: String(value) });
+  const durationText = (value: number) => t("workflow.video.seconds", { value: String(value) });
   return (
     <>
       <NodeShell
@@ -374,11 +341,12 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
         label={text("title")}
         kind="image"
         media
+        clear={clear()}
         thumb={(result) => (kind() === "image" ? urlOf(result.value) : undefined)}
         inputs={["text", "image"]}
         inputPorts={kind() === "video" ? videoPorts(t) : undefined}
         output={kind() === "video" ? "file" : "image"}
-        style={{ "--wfn-aspect": aspectRatio(aspect()), "--wfn-width": cardWidth(kind(), aspect()) }}
+        style={{ "--wfn-aspect": aspectRatio(specs().aspect), "--wfn-width": cardWidth(kind(), specs().aspect) }}
         toolbar={
           <NodeToolbar id={props.id} name={text("name")} locked={locked()} onLock={setLocked}>
             <Show when={kind() === "image" && shownUrl()}>
@@ -447,14 +415,14 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                 <VideoPlayer
                   src={url()}
                   label={prompt() || text("description")}
-                  durationSeconds={duration()}
+                  durationSeconds={specs().duration}
                   fullControls
                   ref={(element) => {
                     media = element;
                   }}
                 />
                 <span class="wfn-clip-length" aria-hidden="true">
-                  {clock(duration())}
+                  {clock(specs().duration)}
                 </span>
               </Show>
             )}
@@ -469,23 +437,23 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
             </Show>
             <span class="wfn-media-specs">
               <ChipMenu
-                label={t("workflow.image.aspectLabel", { value: aspect() })}
+                label={t("workflow.image.aspectLabel", { value: specs().aspect })}
                 title={t("workflow.image.aspect")}
-                text={aspect()}
-                value={aspect()}
-                groups={aspectGroups(t)}
+                text={specs().aspect}
+                value={specs().aspect}
+                groups={aspectGroups(t, workflowMediaAspects(model()))}
                 disabled={specsDisabled()}
                 onSelect={setAspect}
               />
               <Show when={kind() === "video"}>
                 <ChipMenu
-                  label={t("workflow.video.lengthLabel", { value: durationText(duration()) })}
+                  label={t("workflow.video.lengthLabel", { value: durationText(specs().duration) })}
                   title={t("workflow.video.length")}
-                  text={durationText(duration())}
-                  value={String(duration())}
+                  text={durationText(specs().duration)}
+                  value={String(specs().duration)}
                   groups={[
                     {
-                      options: WORKFLOW_VIDEO_DURATIONS.map((value) => ({
+                      options: workflowVideoDurations(model()).map((value) => ({
                         value: String(value),
                         label: durationText(value),
                       })),
@@ -493,19 +461,36 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                   ]}
                   disabled={specsDisabled()}
                   onSelect={(value) => {
-                    const next = WORKFLOW_VIDEO_DURATIONS.find((option) => String(option) === value);
+                    const next = workflowVideoDurations(model()).find((option) => String(option) === value);
                     if (next !== undefined) setDuration(next);
                   }}
                 />
+              </Show>
+              <Show when={specs().resolution}>
+                {(current) => (
+                  <ChipMenu
+                    label={t("workflow.video.resolutionLabel", { value: current() })}
+                    title={t("workflow.video.resolution")}
+                    text={current()}
+                    value={current()}
+                    groups={[{ options: resolutions().map((value) => ({ value, label: value })) }]}
+                    disabled={specsDisabled()}
+                    onSelect={setResolution}
+                  />
+                )}
+              </Show>
+              <Show when={kind() === "image" && model()?.transparent}>
                 <ChipMenu
-                  label={t("workflow.video.resolutionLabel", { value: resolution() })}
-                  title={t("workflow.video.resolution")}
-                  text={resolution()}
-                  value={resolution()}
-                  groups={[{ options: WORKFLOW_VIDEO_RESOLUTIONS.map((value) => ({ value, label: value })) }]}
+                  label={t("workflow.image.backgroundLabel", { value: backgroundText() })}
+                  title={t("workflow.image.background")}
+                  text={backgroundText()}
+                  value={specs().transparent ? "transparent" : "solid"}
+                  groups={[{ options: BACKGROUNDS.map((value) => ({ value, label: t(BACKGROUND_TEXT[value]) })) }]}
                   disabled={specsDisabled()}
-                  onSelect={setResolution}
+                  onSelect={setBackground}
                 />
+              </Show>
+              <Show when={kind() === "video"}>
                 <Show when={model()?.voices}>
                   <ChipMenu
                     label={t("workflow.video.voiceLabel", { value: voiceText() })}
@@ -566,11 +551,16 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                 onValueChange={setPrompt}
               />
               <div class="wfn-field-foot">
-                <MediaModelPill
+                <MediaModelPicker
                   kind={kind()}
+                  models={models()}
                   model={model()}
+                  account={account()}
+                  title={t(KIND_TEXT[kind()].models)}
                   disabled={specsDisabled()}
-                  onChange={(next) => setModelId(next.id)}
+                  onChange={(next, accountId) =>
+                    board.setFields(props.id, { model: next.id, account: accountId ?? "" })
+                  }
                 />
                 <Show
                   when={run.stop()}

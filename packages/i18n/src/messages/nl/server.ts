@@ -340,11 +340,23 @@ export const messages = {
   "server.settings.later": "Later",
   "server.settings.setUp": "Instellen",
   "server.settings.agents": "Agents",
+  "server.settings.agentsDescription":
+    "Kies wat de agents op deze server mogen doen als je het niet per agent instelt.",
   "server.settings.timezone": "Tijdzone",
   "server.settings.timezoneDescription":
     "Nieuwe routines gebruiken deze tijdzone als het bericht de tijdzone van de afzender niet geeft.",
   "server.settings.timezoneAutomatic": "Automatisch ({zone})",
   "server.settings.timezoneLoadFailed": "Kan de tijdzone van de server niet laden.",
+  "server.settings.turnLimit": "Threads tegelijk",
+  "server.settings.turnLimitDescription":
+    "Hoeveel agentthreads tegelijk kunnen draaien op deze server. Meer threads gebruiken meer geheugen.",
+  "server.settings.turnLimitAutomatic": "Automatisch ({count})",
+  "server.settings.turnLimitAutomaticUnlimited": "Automatisch (geen limiet)",
+  "server.settings.turnLimitUnlimited": "Geen limiet",
+  "server.settings.turnLimitsLoadFailed": "Kan de threadlimieten van deze server niet laden.",
+  "server.settings.agentTaskLimit": "Parallelle threads per agent",
+  "server.settings.agentTaskLimitDescription": "Hoeveel threads elke agent zonder eigen limiet tegelijk kan draaien.",
+  "server.settings.agentTaskLimitDefault": "Standaard ({count})",
   "server.settings.memoryLimit": "Herinneringen per agent",
   "server.settings.memoryLimitDescription": "Hoeveel herinneringen elke agent op deze server kan bewaren.",
   "server.settings.memoryLimitLoadFailed": "Kan de geheugenlimiet van deze server niet laden.",

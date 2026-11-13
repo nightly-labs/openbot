@@ -684,9 +684,16 @@ export const messages = {
   "mobile.agent.folders.locateHere": "Usa",
   "mobile.agent.folders.notAddedTitle": "Cartella non aggiunta",
   "mobile.agent.folders.notExcludedTitle": "Cartella non esclusa",
-  "mobile.agent.fastMode.label": "Modalità veloce",
   "mobile.agent.fastMode.footer":
     "L’agente chiede risposte più veloci al suo provider. Una modifica vale dal turno successivo.",
+  "mobile.agent.fastMode.speed": "Velocità",
+  "mobile.agent.fastMode.standard": "Standard",
+  "mobile.agent.fastMode.fast": "Veloce",
+  "mobile.agent.fastMode.ultrafast": "Ultraveloce",
+  "mobile.agent.fastMode.confirmTitle": "Attivare la modalità veloce?",
+  "mobile.agent.fastMode.confirmBody":
+    "Claude risponde più velocemente, ma ogni token costa di più. Con un abbonamento Claude, la modalità veloce usa sempre i crediti di utilizzo, anche quando il tuo piano ha ancora utilizzo disponibile.",
+  "mobile.agent.fastMode.confirm": "Attiva",
   "mobile.agent.compact.title": "Compatta contesto",
   "mobile.agent.compact.compacting": "Avvio della compattazione…",
   "mobile.agent.compact.footer": "Il provider accorcia il contesto di questa chat. I messaggi restano.",

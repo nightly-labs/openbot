@@ -1532,6 +1532,7 @@ export const messages = {
   "mobile.server.route.transfer": "Trasferimento",
   "mobile.server.route.transferExport": "Esporta",
   "mobile.server.route.transferImport": "Importa",
+  "mobile.server.route.transferCopy": "Copia su un altro server",
   "mobile.server.transfer.unsupported": "Aggiorna OpenBot su questo server per trasferirlo da qui.",
   "mobile.server.transfer.unavailable":
     "Connettiti a questo server come proprietario o amministratore per trasferirlo.",
@@ -1596,4 +1597,21 @@ export const messages = {
     "Avevi effettuato l'accesso a questi provider sull'altro server, ma non qui. Accedi in Impostazioni server › Provider.",
   "mobile.server.transfer.notImported": "Non importati",
   "mobile.server.transfer.warnings": "Da controllare",
+  "mobile.server.transfer.copy": "Copia su un altro server",
+  "mobile.server.transfer.copyNote": "Invia agenti a un altro dei tuoi server.",
+  "mobile.server.transfer.copyTo": "A",
+  "mobile.server.transfer.copyNoAgents": "Questo server non ha agenti.",
+  "mobile.server.transfer.copyNotMoved":
+    "Vengono copiati anche i loro canali e la cartella condivisa. Chiavi API, accessi, connettori e cronologia delle chat non vengono copiati. Configurali di nuovo sull'altro server.",
+  "mobile.server.transfer.copySubmit": { one: "Copia {count} agente", other: "Copia {count} agenti" },
+  "mobile.server.transfer.copying": "Copia in corso…",
+  "mobile.server.transfer.copyFailed": "La copia non è terminata.",
+  "mobile.server.transfer.copied": {
+    one: "{count} agente copiato su {server}.",
+    other: "{count} agenti copiati su {server}.",
+  },
+  "mobile.server.transfer.copyAgents": "Agenti da copiare",
+  "mobile.server.transfer.copyNext": "Gli agenti copiati usano le regole di approvazione di {server}.",
+  "mobile.server.transfer.copyNoServer":
+    "Connettiti a un altro server come proprietario o amministratore per copiarvi gli agenti.",
 } as const satisfies PartialTranslation<typeof source>;

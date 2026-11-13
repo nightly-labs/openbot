@@ -359,6 +359,8 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "Proxy {name} odrzuciło logowanie, więc strona się nie otworzyła.",
   "error.backend.browserProxyComputerUnreachable":
     "Komputer, którego używa ten profil, nie odpowiada, więc strona się nie otworzyła.",
+  "error.backend.browserProxyComputerLocalAddress":
+    "Komputer używany przez ten profil otwiera tylko publiczne witryny. Nie otwiera adresów w sieci lokalnej, więc strona się nie otworzyła.",
   "error.backend.browserCertificateUntrusted":
     "Certyfikat bezpieczeństwa tej witryny nie jest zaufany, więc strona się nie otworzyła.",
   "error.backend.browserLowMemory":

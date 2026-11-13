@@ -44,6 +44,7 @@ import {
   chatRowIndex,
   latestReadBoundaryMessage,
   projectChatMessages,
+  withQuestionContext,
 } from "@/features/chat/model/chat-messages";
 import type { AgentChatTarget } from "@/features/chat/model/chat-target";
 import { finishedTurnSummaries, type TurnStepsSummary } from "@/features/chat/model/turn-thinking";
@@ -212,14 +213,17 @@ function AgentTaskChat({
   const memberId = server?.membershipId ?? null;
   const accountUserId = useMobileSession().session?.user.id ?? null;
   const progressUpdates = useProgressUpdates(serverId, serverAgents, agentId);
+  const activeTurnId = task?.activeTurnId ?? null;
   const messages = useMemo(
     () =>
       conversation.data
-        ? projectChatMessages(conversation.data.messages, memberId, accountUserId, progressUpdates)
+        ? withQuestionContext(
+            projectChatMessages(conversation.data.messages, memberId, accountUserId, progressUpdates),
+            activeTurnId,
+          )
         : NO_MESSAGES,
-    [conversation.data, memberId, accountUserId, progressUpdates],
+    [conversation.data, memberId, accountUserId, progressUpdates, activeTurnId],
   );
-  const activeTurnId = task?.activeTurnId ?? null;
   const branching = useBranchThread({
     serverId,
     agentId,

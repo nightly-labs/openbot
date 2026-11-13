@@ -525,6 +525,71 @@ To build a signed `.aab` on your computer, run `bun run mobile:android:build:loc
 and the Android SDK, and writes `/private/tmp/openbot-play.aab`.
 See [Fastlane Google Play upload](https://docs.fastlane.tools/actions/upload_to_play_store/).
 
+### Android APK
+
+openbot.run offers the Android app as an APK, for a phone with no Google Play: the "Get the APK"
+link on the Android card of the home page, the "Android · APK" entry of its download menu, and the
+second button on `/download/android`. They open `/download/android/latest`, which redirects to the
+file on GitHub.
+
+The file is the universal APK that Google Play makes from the store bundle. Google Play signs it
+with the app signing key, so it has the signature of the app on Google Play: a user can change
+between the two without removing the app, and no second key or second build is necessary.
+
+The APK is not public after the build. It becomes public when the version is marked as available.
+
+**Stage, after the build.** After each upload, `Release Android to Google Play` calls the
+`Stage the Android APK` workflow (`release-android-apk.yml`) with the build number:
+
+1. Fastlane (`fastlane android apk`) downloads the universal APK of that `versionCode` from Google
+   Play, with the `GOOGLE_PLAY_SERVICE_ACCOUNT_KEY` of the `release-android` environment.
+2. `scripts/android-apk-release.ts stage` reads the package, the version and the build number in
+   the file and checks its signature. It stops when the file is not that build.
+3. The script puts the file on the draft GitHub release `android-v<version>` as
+   `OpenBot-<version>.apk`. Only people who can write to the repository see a draft. A second build
+   of a version replaces the file of the first. The release notes have the SHA-256 of the file and
+   of the signing certificate.
+
+The workflow saves no workflow artifact of the APK: each signed-in GitHub user can download the
+artifacts of a public repository. The signed `.aab` of the build is such an artifact for seven days.
+
+**Publish, when the version is marked as available.** The site offers the APK of
+`MOBILE_LATEST_VERSIONS.android` (`apps/auth-api/src/server/mobile-features-config.ts`), so the APK
+and Google Play give the same version. `bun run mobile:release:published android` sets that version.
+When that change is on `main`, the `Publish the Android APK` workflow (`publish-android-apk.yml`)
+makes the draft of that version public (`scripts/android-apk-release.ts publish`). The account
+Worker deploys at the end of CI, some minutes later, so the file is there before the site links to
+it. The release is a GitHub prerelease, as the remote desktop runtime releases are: a prerelease
+cannot become the "latest" release, so desktop downloads and updates do not change, and the notes
+of the next desktop release do not start from it. The workflow fails if the "latest" release changed.
+Do not publish the draft by hand in the GitHub page with the prerelease mark cleared.
+
+The site makes the link from the version and does not ask GitHub. So the publish workflow fails when
+the version has no release: the link on the site is then dead. Stage the APK of that version, then
+start `Publish the Android APK` again. `ANDROID_APK_FIRST_VERSION` in the same file hides the APK
+download while the newest Google Play version is from before these workflows.
+
+When the stage job fails, the store build and its record are not affected. Run the failed jobs
+again. To stage the APK of a bundle that Google Play already has, such as a build that you uploaded
+in Play Console, start the workflow with its build number:
+
+```bash
+gh workflow run release-android-apk.yml --ref main -f version_code=<versionCode>
+gh workflow run publish-android-apk.yml --ref main   # only when the site already offers this version
+```
+
+A release that is public keeps its file. To replace it with another build of the same version, add
+`-f replace=true` to the first command.
+
+A build with `upload` cleared has no APK until Google Play has its bundle. If Google Play has more
+than one signing key for the app, Fastlane stops and lists them; the lane does not select one.
+
+A phone with the APK gets over-the-air updates as a phone with the store app does. For a new store
+version, Update in the app opens the `market://` link of the app. When no app on the phone opens
+that link, it opens `/download/android`. Another store app can take the link and show no result
+(not tested on a device); the user then downloads the APK from the site. Notifications use Firebase Cloud Messaging, so a phone with no Google Play services gets none.
+See [Fastlane universal APK download](https://docs.fastlane.tools/actions/download_universal_apk_from_google_play/).
+
 ### Discord announcement
 
 Each store gets its own post in the OpenBot Discord when users of that store can see the version.

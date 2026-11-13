@@ -30,7 +30,7 @@ import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 import { useSidebar } from "../sidebar/sidebar-context";
 import { readDictatedReplies } from "../speech/speech-replies";
-import { claimErrorToast, providerErrorTitle, readableAgentError } from "./agent-error-text";
+import { agentErrorDetails, claimErrorToast, providerErrorTitle, readableAgentError } from "./agent-error-text";
 import { createAgentEventSounds } from "./agent-event-sounds";
 import {
   attentionAgentId,
@@ -420,8 +420,14 @@ export function AgentEventBridge() {
             provider && event.model ? currentText().t("agent.error.run", { provider, model: event.model }) : provider;
           // Google asks the user to verify the account in a browser before Gemini answers (#2419).
           const link = event.link;
+          // The general sentence hides the cause, so the user can copy it into a report (#6410).
+          const details = agentErrorDetails(event.message, message);
           setConversationErrorRuns((current) => {
-            if (run || link) return { ...current, [key]: { message, run, ...(link ? { link } : {}) } };
+            if (run || link || details)
+              return {
+                ...current,
+                [key]: { message, run, ...(link ? { link } : {}), ...(details ? { details } : {}) },
+              };
             if (!(key in current)) return current;
             const { [key]: _replaced, ...next } = current;
             return next;

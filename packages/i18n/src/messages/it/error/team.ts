@@ -82,6 +82,8 @@ export const messages = {
   "error.team.routineRunCommandUnsupported":
     "Questa connessione non può fornire il comando di esecuzione di una routine.",
   "error.team.threadQueueUnsupported": "Questa connessione non può mostrare la coda di un thread secondario.",
+  "error.team.hostTurnLimitsUnsupported":
+    "Questa connessione non può mostrare né modificare i limiti dei thread del server.",
   "error.team.usageLimitUnsupported":
     "Questa connessione non può mostrare né modificare i limiti di utilizzo degli agenti.",
   "error.team.hermesImportUnsupported": "Questa connessione non può importare profili Hermes dal server.",

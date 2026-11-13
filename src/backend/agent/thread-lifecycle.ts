@@ -1615,6 +1615,39 @@ export class ThreadLifecycle {
   }
 
   /**
+   * Loads a Codex session in `client` before a compaction of it. Codex compacts only a thread that its
+   * process holds, and answers `thread not found` for one that an idle release or a process restart
+   * unloaded (#7894). A turn resumes it in `ensureThread`; a compaction before the turn did not.
+   * False when the next turn replaces the session, so a compaction of it has no use: its tools
+   * changed, or Codex has no rollout to resume it from.
+   */
+  readonly loadSessionForCompaction = Effect.fn("ThreadLifecycle.loadSessionForCompaction")(function* (
+    this: ThreadLifecycle,
+    agentId: string,
+    client: AgentClient,
+    externalThreadId: string,
+  ) {
+    // Only Codex: the other clients load their sessions themselves. A session marked for reload is
+    // still loaded in Codex, and its next turn resumes it.
+    if (client.provider !== "codex" || this.#conversation.openClientFor(externalThreadId) === client) return true;
+    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+    if (!agent) return false;
+    const publicThreadId = this.#conversation.publicThreadId(agentId, externalThreadId);
+    if (!(yield* this.hasCurrentToolsEffect(this.#sessionAgent(agent, publicThreadId), client, externalThreadId)))
+      return false;
+    const resumed = yield* Effect.result(
+      Effect.acquireUseRelease(
+        Effect.sync(() => this.holdRuntimeRefresh(agentId, this.#conversation.isSideThread(publicThreadId))),
+        () => this.resumeThread(agent, client, externalThreadId),
+        (release) => Effect.sync(release),
+      ),
+    );
+    if (Result.isSuccess(resumed)) return true;
+    if (isMissingProviderSessionError(resumed.failure.cause, client.provider)) return false;
+    return yield* resumed.failure;
+  }, Effect.uninterruptible).bind(this);
+
+  /**
    * Compacts the context of a provider that cannot compact on request: the session ends, and a new
    * one on the same public thread starts from the history handoff, or from the complete packet on a
    * channel thread. The agent, its thread, and its messages stay. Returns the new session, or `null`

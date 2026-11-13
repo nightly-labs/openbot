@@ -75,6 +75,7 @@ export const messages = {
   "error.team.routinesOnceUnsupported": "To połączenie nie może zapisać jednorazowych rutyn.",
   "error.team.routineRunCommandUnsupported": "To połączenie nie może podać polecenia uruchomienia rutyny.",
   "error.team.threadQueueUnsupported": "To połączenie nie może pokazać kolejki wątku pobocznego.",
+  "error.team.hostTurnLimitsUnsupported": "To połączenie nie może pokazać ani zmienić limitów wątków serwera.",
   "error.team.usageLimitUnsupported": "To połączenie nie może pokazać ani zmienić limitów użycia agentów.",
   "error.team.hermesImportUnsupported": "To połączenie nie może zaimportować profili Hermes z serwera.",
   "error.team.providerDetectionUnsupported": "To połączenie nie może znaleźć serwerów modeli i agentów serwera.",

@@ -1579,6 +1579,7 @@ export const messages = {
   "mobile.server.customProviders.namePlaceholder": "مزوّدي",
   "mobile.server.customProviders.id": "معرّف المزوّد",
   "mobile.server.customProviders.idHint": "أحرف لاتينية صغيرة أو أرقام أو شرطات أو شرطات سفلية. لا يمكنك تغييره لاحقًا.",
+  "mobile.server.customProviders.idSavedHint": "لا يمكنك تغيير معرّف نقطة نهاية محفوظة.",
   "mobile.server.customProviders.idPattern":
     "استخدم أحرفًا لاتينية صغيرة أو أرقامًا أو شرطات أو شرطات سفلية، تبدأ بحرف أو رقم.",
   "mobile.server.customProviders.idBuiltIn": "يملك OpenBot مسبقًا مزوّدًا باسم {id}. اختر معرّفًا آخر.",
@@ -1592,6 +1593,8 @@ export const messages = {
   "mobile.server.customProviders.apiKeyPlaceholder": "اختياري",
   "mobile.server.customProviders.apiKeyHint":
     "اتركه فارغًا إذا لم تحتج نقطة النهاية إلى مفتاح. يُرسل المفتاح إلى الخادم، ولا يحتفظ به هذا الهاتف.",
+  "mobile.server.customProviders.apiKeyKeptHint":
+    "يوجد مفتاح محفوظ. اترك الحقل فارغًا للاحتفاظ به. يُرسل المفتاح إلى الخادم، ولا يحتفظ به هذا الهاتف.",
   "mobile.server.customProviders.models": "النماذج",
   "mobile.server.customProviders.modelsHint": "معرّفات النماذج التي تقدّمها نقطة النهاية. أضف واحدًا على الأقل.",
   "mobile.server.customProviders.modelName": "الاسم المعروض",
@@ -1605,6 +1608,8 @@ export const messages = {
     "لا يمكن استخدام معرّف النموذج هذا. أزل المسافات وعلامات الاقتباس وعلامات الترقيم الأخرى.",
   "mobile.server.customProviders.headers": "الترويسات",
   "mobile.server.customProviders.headersHint": "اختياري. يرسلها الخادم مع كل طلب إلى نقطة النهاية.",
+  "mobile.server.customProviders.headersKeptHint":
+    "اترك قيمة الترويسة المحفوظة فارغة للاحتفاظ بها. أزل ترويسة لحذفها من الخادم.",
   "mobile.server.customProviders.headerValue": "القيمة",
   "mobile.server.customProviders.headerNameLabel": "اسم الترويسة {position}",
   "mobile.server.customProviders.headerValueLabel": "قيمة الترويسة {position}",
@@ -1615,6 +1620,7 @@ export const messages = {
   "mobile.server.customProviders.headerDuplicate": "يعيّن هذا المزوّد {name} مسبقًا.",
   "mobile.server.customProviders.headerValueRequired": "أدخل قيمة ترويسة.",
   "mobile.server.customProviders.saveFailed": "تعذّر على OpenBot إضافة نقطة النهاية هذه.",
+  "mobile.server.customProviders.updateFailed": "تعذّر على OpenBot حفظ نقطة النهاية هذه.",
   "mobile.server.customProviders.runsOn": "يعمل على",
   "mobile.server.customProviders.editHint": "لتغيير نقطة النهاية هذه، أزلها ثم أضفها مجددًا.",
   "mobile.server.customProviders.remove": "إزالة",
@@ -2076,6 +2082,7 @@ export const messages = {
   "mobile.server.route.transfer": "النقل",
   "mobile.server.route.transferExport": "التصدير",
   "mobile.server.route.transferImport": "الاستيراد",
+  "mobile.server.route.transferCopy": "النسخ إلى خادم آخر",
   "mobile.server.transfer.unsupported": "حدّث OpenBot على هذا الخادم لنقله من هنا.",
   "mobile.server.transfer.unavailable": "اتصل بهذا الخادم بصفتك مالكًا أو مسؤولًا لنقله.",
   "mobile.server.transfer.title": "نقل هذا الخادم إلى حاسوب آخر",
@@ -2152,4 +2159,31 @@ export const messages = {
     "كان هؤلاء المزوّدون مسجّلي الدخول على الخادم الآخر وليسوا مسجّلي الدخول هنا. سجّل الدخول إليهم في إعدادات الخادم › المزوّدون.",
   "mobile.server.transfer.notImported": "غير مستورد",
   "mobile.server.transfer.warnings": "تحقق من هذه",
+  "mobile.server.transfer.copy": "النسخ إلى خادم آخر",
+  "mobile.server.transfer.copyNote": "أرسل الوكلاء إلى خادم آخر من خوادمك.",
+  "mobile.server.transfer.copyTo": "إلى",
+  "mobile.server.transfer.copyNoAgents": "لا يوجد وكلاء على هذا الخادم.",
+  "mobile.server.transfer.copyNotMoved":
+    "تُنسخ قنواتهم والمجلد المشترك أيضًا. لا يتم نسخ مفاتيح API وتسجيلات الدخول والموصلات وسجل المحادثات. أعد إعدادها على الخادم الآخر.",
+  "mobile.server.transfer.copySubmit": {
+    zero: "لا وكلاء للنسخ",
+    one: "نسخ وكيل واحد",
+    two: "نسخ وكيلين",
+    few: "نسخ {count} وكلاء",
+    many: "نسخ {count} وكيلًا",
+    other: "نسخ {count} وكيل",
+  },
+  "mobile.server.transfer.copying": "جارٍ النسخ…",
+  "mobile.server.transfer.copyFailed": "لم يكتمل النسخ.",
+  "mobile.server.transfer.copied": {
+    zero: "لم يُنسخ أي وكيل إلى {server}.",
+    one: "نُسخ وكيل واحد إلى {server}.",
+    two: "نُسخ وكيلان إلى {server}.",
+    few: "نُسخ {count} وكلاء إلى {server}.",
+    many: "نُسخ {count} وكيلًا إلى {server}.",
+    other: "نُسخ {count} وكيل إلى {server}.",
+  },
+  "mobile.server.transfer.copyAgents": "الوكلاء المطلوب نسخهم",
+  "mobile.server.transfer.copyNext": "يستخدم الوكلاء المنسوخون قواعد الموافقة لـ {server}.",
+  "mobile.server.transfer.copyNoServer": "اتصل بخادم آخر بصفتك مالكًا أو مسؤولًا لنسخ الوكلاء إليه.",
 } as const satisfies PartialTranslation<typeof source>;

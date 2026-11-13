@@ -10,8 +10,8 @@ import type {
   AgentAnalyticsInput,
   AgentBackupModelSettings,
   AgentBrowserProfile,
+  AgentDefaultsOverview,
   AgentExclusionChange,
-  AgentFastModeSettings,
   AgentFolderBrowse,
   AgentFolderChange,
   AgentFolderInput,
@@ -29,6 +29,7 @@ import type {
   AgentProviderId,
   AgentReasoningEffort,
   AgentSessionSettings,
+  AgentSpeedSettings,
   AgentTask,
   AgentTaskInput,
   AgentTaskLimitSettings,
@@ -42,6 +43,7 @@ import type {
   AvatarColor,
   AvatarHue,
   AvatarImageInput,
+  BackgroundProcess,
   BitwardenConnectorStatus,
   BitwardenHostConnectInput,
   BranchAgentTaskInput,
@@ -124,6 +126,7 @@ import type {
   SaveWorkflowGraphInput,
   ServerAuditLog,
   ServerNotificationLevel,
+  SetAgentDefaultChoiceInput,
   SetAgentMemoryInclusionInput,
   SetAgentNotificationLevelInput,
   SetAgentProviderAccountInput,
@@ -142,16 +145,18 @@ import type {
   SidebarPin,
   SignInRelayStatus,
   StartWhatsAppLinkInput,
+  StorageDisk,
   StorageUsage,
   UninstallSkillInput,
   UpdateAgentAdminSettingsInput,
   UpdateAgentBackupModelsInput,
   UpdateAgentBrowserProfileInput,
-  UpdateAgentFastModeInput,
+  UpdateAgentDefaultsInput,
   UpdateAgentHostSettingsInput,
   UpdateAgentInput,
   UpdateAgentNewChatInput,
   UpdateAgentPlanCardInput,
+  UpdateAgentSpeedInput,
   UpdateAgentTaskLimitInput,
   UpdateBrowserProfileInput,
   UpdateRestartMode,
@@ -254,6 +259,8 @@ export interface MobileServer {
   memberLimit?: number;
   /** A hosted server, which its owner and its admins can restart. Absent when the account server did not say. */
   hosted?: boolean;
+  /** The plan storage of a hosted server in GB. Absent for each other server, or when the account server gave none. */
+  storageGb?: number;
   /** False for a hosted server that the account service cannot restart. Absent for each other server. */
   restartAvailable?: boolean;
   /** When the host last changed its key, from a handover that both keys signed. Absent when it did not. */
@@ -880,6 +887,11 @@ export interface MobileWorkspaceContextValue {
   loadLibraryFolders: (serverId: string) => Promise<LibraryFoldersSnapshot>;
   /** Applies one folder change. The host answers with all folders that this member can see. */
   changeLibraryFolders: (action: LibraryFolderAction, serverId: string) => Promise<LibraryFoldersSnapshot>;
+  /**
+   * The disk of the host data, with the bytes of the user's files from a host with
+   * `storage-user-files-v1`. Null when the host has neither that nor `storage-disk-v1`.
+   */
+  loadServerDisk: (serverId: string) => Promise<StorageDisk | null>;
   /** Owners and admins only; the host refuses a member. */
   clearServerStorage: (category: ClearableStorageCategory, serverId: string) => Promise<void>;
   /** Null when the host does not advertise `agent-admin-v1`. Owners and admins only; the host refuses a member. */
@@ -933,13 +945,37 @@ export interface MobileWorkspaceContextValue {
   loadAgentPlanCard: (agentId: string, serverId: string) => Promise<AgentPlanCardSettings | null>;
   /** Owners and admins only; the host refuses a member. Resolves with the setting the host saved. */
   updateAgentPlanCard: (input: UpdateAgentPlanCardInput, serverId: string) => Promise<AgentPlanCardSettings>;
+  /** An owner or admin of an online host that serves `agent-defaults-v1`. The host checks the role again. */
+  canManageAgentDefaults: (serverId: string) => boolean;
   /**
-   * Null when the host does not advertise `agent-fast-mode-v1`. A member with view access reads the
-   * setting, and with manage access changes it, as the model. The host checks the access.
+   * Settings > Agents of the host: its agent defaults and the own value of each agent that this member
+   * sees. Null when the host does not advertise `agent-defaults-v1`. Owners and admins only.
    */
-  loadAgentFastMode: (agentId: string, serverId: string) => Promise<AgentFastModeSettings | null>;
-  /** Resolves with the setting the host saved. It applies from the next turn. */
-  updateAgentFastMode: (input: UpdateAgentFastModeInput, serverId: string) => Promise<AgentFastModeSettings>;
+  loadAgentDefaults: (serverId: string) => Promise<AgentDefaultsOverview | null>;
+  /** Changes the given defaults. Owners and admins only. Resolves with the overview the host saved. */
+  updateAgentDefaults: (input: UpdateAgentDefaultsInput, serverId: string) => Promise<AgentDefaultsOverview>;
+  /** Gives one choice for one setting to each named agent. Owners and admins only. */
+  setAgentDefaultChoice: (input: SetAgentDefaultChoiceInput, serverId: string) => Promise<AgentDefaultsOverview>;
+  /** An owner or admin of an online host that serves `background-processes-v1`. The host checks the role again. */
+  canManageBackgroundProcesses: (serverId: string) => boolean;
+  /**
+   * The programs that the host's agents left running, such as a dev server. Null when the host cannot
+   * find them, as on Windows. Owners and admins only.
+   */
+  loadBackgroundProcesses: (serverId: string) => Promise<BackgroundProcess[] | null>;
+  /** Stops one of these programs with its children. A program that ended is not an error. Owners and admins only. */
+  stopBackgroundProcess: (id: string, serverId: string) => Promise<void>;
+  /**
+   * The speed of an agent, from `agent-speed-v1`, or from `agent-fast-mode-v1` on an older host. Null
+   * when the host advertises neither. A member with view access reads the setting, and with manage
+   * access changes it, as the model. The host checks the access.
+   */
+  loadAgentSpeed: (agentId: string, serverId: string) => Promise<AgentSpeedSettings | null>;
+  /**
+   * Resolves with the setting the host saved. It applies from the next turn. "ultrafast" needs
+   * `agent-speed-v1`; an older host has no Ultrafast tier in its model list, so no screen offers it.
+   */
+  updateAgentSpeed: (input: UpdateAgentSpeedInput, serverId: string) => Promise<AgentSpeedSettings>;
   /** An owner or admin of an online host that serves `agent-instructions-v1`. The host checks the role again. */
   canManageAgentInstructions: (serverId: string) => boolean;
   /** The instruction file at the root of the agent's workspace on the host. Owners and admins only. */
@@ -1282,6 +1318,8 @@ type ServerCheckKey =
   | "canManageAgentTaskLimit"
   | "canManageAgentNewChat"
   | "canManageAgentPlanCard"
+  | "canManageAgentDefaults"
+  | "canManageBackgroundProcesses"
   | "canManageAgentInstructions"
   | "canPublishAgent"
   | "canManageProviderAccounts";
