@@ -166,6 +166,9 @@ interface RelayedSignIn {
   result: { error: string | null } | null;
 }
 
+/** As the host's long provider start (3 minutes), with the key check and the model list after it. */
+const ACCOUNT_KEY_CONNECT_TIMEOUT_MS = 4 * 60_000;
+
 export function providerAdminIpcHandlers({
   service,
   credentials,
@@ -463,9 +466,11 @@ export function providerAdminIpcHandlers({
           if (!remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_KEYS_CAPABILITY))
             throw new Error(sourceText("error.team.providersUnsupported"));
           return runCauseEffect(
+            // The host answers after it checked the key in a new provider process, which can start slowly.
             remoteServers.request(serverId, PROVIDER_ACCOUNT_KEYS_ROUTES.connect, acceptEmpty, {
               method: "POST",
               body: input,
+              timeoutMs: ACCOUNT_KEY_CONNECT_TIMEOUT_MS,
             }),
           );
         },

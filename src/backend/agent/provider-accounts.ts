@@ -741,7 +741,9 @@ export class ProviderAccounts {
     const support = ProviderAccounts.support(provider);
     if (isKeyAccountSupport(support) && support.checkKey) {
       const name = providerLabel(provider);
-      const accepted = yield* support.checkKey(this.#host.accountKey(provider, account.id) ?? "").pipe(
+      const key = this.#host.accountKey(provider, account.id);
+      // An account whose key cannot be read has no key to ask about.
+      const accepted = yield* (key ? support.checkKey(key) : Effect.succeed(false)).pipe(
         Effect.mapError((error) => {
           logger.warn("A provider did not answer a key check.", {
             provider,

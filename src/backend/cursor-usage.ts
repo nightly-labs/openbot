@@ -137,11 +137,12 @@ export const checkCursorApiKey = Effect.fn("Cursor.checkApiKey")(function* (key:
         });
         // The answer holds the tokens of the key. Nothing reads them here.
         yield* Effect.promise(() => response.body?.cancel() ?? Promise.resolve()).pipe(Effect.ignore);
-        if (response.status >= 500)
-          return yield* new CursorUsageFailed({
-            cause: new Error(`Cursor key check returned HTTP ${response.status}.`),
-          });
-        return response.ok;
+        if (response.ok) return true;
+        // Only these mean a refused key. A rate limit or the answer of a proxy says nothing about the key.
+        if (response.status === 401 || response.status === 403) return false;
+        return yield* new CursorUsageFailed({
+          cause: new Error(`Cursor key check returned HTTP ${response.status}.`),
+        });
       }),
     (controller) => Effect.sync(() => controller.abort()),
   );

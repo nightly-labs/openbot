@@ -113,6 +113,9 @@ export class ProviderCredentialStore {
     const name = accountKeyName(provider, accountId);
     return this.#edit((keys) => {
       if (key === null) return keys.delete(name);
+      // A save into a file that could not be read replaces every provider key in it. The key dialog of
+      // a provider warns before that; an account key has no such warning, so it does not replace the file.
+      if (this.#loadError) throw new Error(sourceText("error.provider.credentialFileUnreadable"));
       registerSecretValue(key);
       keys.set(name, key);
       return true;

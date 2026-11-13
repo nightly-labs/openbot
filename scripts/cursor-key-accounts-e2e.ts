@@ -7,7 +7,7 @@
 // account lists its own models; that a browser sign-in for a Cursor account is refused; that a refused
 // new key keeps the last key; that the key is encrypted in the credential file and survives a restart;
 // that a key that Cursor refuses later shows the account as signed out; and that Remove deletes the
-// account and its key.
+// account and its key; and that an account key does not replace a credential file that cannot be read.
 // `bun run test:cursor-key-accounts`. Writes .openbot-build/cursor-key-accounts-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -166,6 +166,7 @@ interface Report {
   revoked?: { state: string; message: string | null };
   newKey?: { state: string };
   removed?: { accounts: number; key: string | null; rows: string[] | undefined };
+  unreadableFile?: { error: string | null; fileKept: boolean };
   exchanges?: string[];
   errors?: string[];
 }
@@ -327,6 +328,26 @@ try {
     rows: rows(runtime)?.map((row) => row.id),
   };
   assert.deepEqual(report.removed, { accounts: 0, key: null, rows: ["default"] });
+
+  // 10. A credential file that cannot be read holds the keys of other providers. An account key does
+  // not replace it: the save fails, and the file stays as it was.
+  const lockedPath = join(root, "profile", "locked-credentials.json");
+  const lockedFile = `${JSON.stringify({ version: 1, credentials: { opencode: "bm90LWZvci10aGlzLWNpcGhlcg==" } })}\n`;
+  await writeFile(lockedPath, lockedFile);
+  const locked = new ProviderCredentialStore(lockedPath, {
+    encrypt: cipher.encrypt,
+    decrypt: () => {
+      throw new Error("the keychain refused");
+    },
+  });
+  assert.ok(await Effect.runPromise(locked.load()), "the file must be unreadable for this case");
+  const lockedSave = await failureOf(locked.setAccountKey("cursor", account.id, GOOD_KEY));
+  await Effect.runPromise(locked.setAccountKey("cursor", account.id, null));
+  report.unreadableFile = { error: lockedSave, fileKept: (await readFile(lockedPath, "utf8")) === lockedFile };
+  assert.deepEqual(report.unreadableFile, {
+    error: sourceText("error.provider.credentialFileUnreadable"),
+    fileKept: true,
+  });
 
   // No request held a key that was not one of this run, and no error reached the user unasked.
   report.exchanges = exchanges;

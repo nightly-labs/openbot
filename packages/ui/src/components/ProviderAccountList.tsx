@@ -82,7 +82,9 @@ export function ProviderAccountList(props: ProviderAccountListProps) {
               !own() &&
               !isProviderKeyAccount(props.provider, account().id) &&
               (state() === "signed-out" || state() === "error");
-            const connecting = () => !own() && state() === "connecting";
+            // The check of a new key has no sign-in to cancel.
+            const connecting = () =>
+              !own() && !isProviderKeyAccount(props.provider, account().id) && state() === "connecting";
             return (
               <li class="provider-picker-account">
                 <span class="provider-picker-account-copy">
