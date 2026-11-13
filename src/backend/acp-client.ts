@@ -1774,6 +1774,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
                     connection,
                     { sessionId: requestedThreadId, cwd, ...directories, mcpServers, ...meta },
                     this.#supportsSessionResume ? "resume" : "load",
+                    sessionTransport ?? undefined,
                   ),
                 ),
               );
@@ -1932,13 +1933,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     connection: () => ClientSideConnection,
     request: LoadSessionRequest,
     method: "load" | "resume",
+    transport: AcpConnection = this.#transport,
   ): Effect.fn.Return<LoadSessionResponse | ResumeSessionResponse, ProviderClientOperationError> {
     const restore = (current: ClientSideConnection) =>
       providerCall(() =>
         method === "resume"
           ? current.resumeSession(request satisfies ResumeSessionRequest)
           : current.loadSession(request),
-      );
+      ).pipe(this.#whileProcessWrites(transport));
     let failure: unknown;
     let recovery: "wait-for-start" | "list-sessions" | null = null;
     let restored: LoadSessionResponse | ResumeSessionResponse | undefined;
@@ -2618,6 +2620,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       () => this.#sessionConnection(thread),
       { sessionId: thread.id, ...restore },
       "resume",
+      thread.transport ?? undefined,
     );
     thread.restore = restore;
     thread.configOptions = restored.configOptions ?? thread.configOptions;
@@ -3203,6 +3206,33 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     yield* this.#endAgentProcess(sourceText("error.provider.acpUnresponsive", { provider: this.#label }));
     return true;
   });
+
+  /**
+   * Fails a `session/resume` or `session/load` that waits while the process writes nothing at all for
+   * the stall limit (`ACP_TURN_STALL_MS`), and ends that process, so the next message opens the
+   * session on a new one. The request had no limit, so a Grok process that stopped left the next
+   * message waiting with no error until the user ended the process (#8246). A process that still
+   * writes, such as one that replays a long session, has no limit, as before.
+   */
+  #whileProcessWrites(transport: AcpConnection) {
+    return <A>(request: Effect.Effect<A, ProviderClientOperationError>) => {
+      const limit = this.options.turnStallMs ?? ACP_TURN_STALL_MS;
+      const startedAt = Date.now();
+      const silent = Effect.gen({ self: this }, function* () {
+        for (;;) {
+          const silentFor = Date.now() - Math.max(startedAt, transport.lastOutputAt);
+          if (silentFor >= limit) break;
+          yield* Effect.sleep(limit - silentFor);
+        }
+        const message = sourceText("error.provider.acpUnresponsive", { provider: this.#label });
+        this.emit("diagnostic", `${this.#label} wrote nothing for ${limit} ms while a session opened.`);
+        if (transport === this.#transport) yield* this.#endAgentProcess(message);
+        else yield* transport.stop(Effect.void).pipe(Effect.ignore);
+        return yield* providerFailure(new TimeoutError(message));
+      });
+      return Effect.raceFirst(request, silent);
+    };
+  }
 
   /** Ends the agent's own process with this message. The runtime starts a new one. */
   #endAgentProcess(message: string): Effect.Effect<void> {
