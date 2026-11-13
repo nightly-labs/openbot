@@ -130,6 +130,13 @@ const RESTORE_START_RETRY_MS = 2_000;
 /** How many `session/list` pages OpenBot reads to find a session before it stops looking. */
 const SESSION_LIST_PAGES = 50;
 
+/**
+ * How long a failed MCP server waits for its session to open (`#unclaimedMcpFailures`), and how
+ * many wait. An open takes seconds; a closed session never claims its failures.
+ */
+const UNCLAIMED_MCP_FAILURE_MS = 60_000;
+const UNCLAIMED_MCP_FAILURE_LIMIT = 50;
+
 /** Maximum replay work waiting for the storage consumer before the import fails safely. */
 const ACP_HISTORY_REPLAY_QUEUE_LIMIT = 256;
 
@@ -569,10 +576,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   #probing = false;
   readonly #bridge = new LocalMcpBridge();
   /**
-   * The MCP server failures of each session that is opening. The agent answers `session/new` before
-   * its servers start, so a server that fails at once is reported before the thread is in `#threads`.
+   * MCP server failures of sessions that are not in `#threads`. The agent starts the servers when it
+   * answers `session/new`, so a server that fails at once can be reported before the session is
+   * added. The open takes them when it adds the session; the others expire.
    */
-  readonly #openingMcpFailures = new Map<string, AcpMcpServerFailure[]>();
+  #unclaimedMcpFailures: Array<AcpMcpServerFailure & { at: number }> = [];
   readonly #threads = new IdleThreadPool<AcpThread, ReleasedAcpThread>({
     scope: () => this.#scope,
     releaseAfterMs: ACP_SESSION_IDLE_RELEASE_MS,
@@ -1688,7 +1696,6 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     let transport: AcpConnection | null = null;
     let closeRelays: Effect.Effect<void> | null = null;
     let retained = false;
-    let openingId: string | null = null;
     return yield* Effect.acquireUseRelease(
       this.#bridge
         .createSession(
@@ -1783,10 +1790,6 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               configOptions = response.configOptions ?? [];
               currentModelId = currentModelFromSessionSetup(response);
             }
-            if (this.#flavor.mcpServerFailure) {
-              openingId = id;
-              this.#openingMcpFailures.set(id, []);
-            }
             // The turn would run with no OpenBot tools, and the model would make up their errors (#3058).
             if (this.#flavor.mcpServersLoadWithSession && !mcp.reached())
               throw new Error(sourceText("error.provider.acpMcpNotLoaded", { provider: this.#label }));
@@ -1836,8 +1839,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             if (sessionTransport && !this.running) throw new Error("ACP client is not running.");
             this.#threads.add(thread);
             retained = true;
-            const early = this.#openingMcpFailures.get(id) ?? [];
-            this.#openingMcpFailures.delete(id);
+            const early = this.#unclaimedMcpFailures.filter((failure) => failure.sessionId === id);
+            this.#unclaimedMcpFailures = this.#unclaimedMcpFailures.filter((failure) => failure.sessionId !== id);
             for (const failure of early) this.#reportMcpServerFailure(thread, failure);
             return { thread: { id } };
           } catch (error) {
@@ -1857,7 +1860,6 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       (mcp) =>
         Effect.gen({ self: this }, function* () {
           if (transport) this.#openingSessionProcesses.delete(transport);
-          if (openingId) this.#openingMcpFailures.delete(openingId);
           if (retained) return;
           mcp.close();
           if (closeRelays) yield* closeRelays;
@@ -2684,11 +2686,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const failed = this.#failedMcpServer(thread, turn.text);
     if (!failed) return false;
     const { server, detail, started } = failed;
-    const own = this.#ownMcpServerNames(thread.cwd);
-    const configured = this.options.mcpServers?.().find((config) => acpMcpServerName(config, own) === server.name);
-    this.options.reportMcpDrops?.(this.provider, [
-      { name: configured?.name ?? server.name, reason: "failed_to_start", detail },
-    ]);
+    this.#reportFailedMcpServer(thread, server.name, detail);
     // Antigravity 1.5.6 keeps the servers that a session's process started, also after a resume
     // without them. A server that started leaves only with that process (#7228).
     const stale = thread.transport;
@@ -2765,14 +2763,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       this.emit("diagnostic", this.#redact(`${this.#label} could not start OpenBot's MCP server ${name}: ${reason}`));
       return;
     }
+    this.#reportFailedMcpServer(thread, name, sourceText("error.backend.mcpServerFailedToStart", { reason }));
+  }
+
+  /** Reports a server that OpenBot gave and the agent did not start, by the name that the user saved. */
+  #reportFailedMcpServer(thread: AcpThread, name: string, detail: string): void {
     const own = this.#ownMcpServerNames(thread.cwd);
     const configured = this.options.mcpServers?.().find((config) => acpMcpServerName(config, own) === name);
     this.options.reportMcpDrops?.(this.provider, [
-      {
-        name: configured?.name ?? name,
-        reason: "failed_to_start",
-        detail: sourceText("error.backend.mcpServerFailedToStart", { reason }),
-      },
+      { name: configured?.name ?? name, reason: "failed_to_start", detail },
     ]);
   }
 
@@ -3426,11 +3425,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   #extNotification(method: string, params: DynamicRecord): void {
     const failure = this.#flavor.mcpServerFailure?.(method.replace(/^_/, ""), params);
     if (failure) {
-      const opening = this.#openingMcpFailures.get(failure.sessionId);
       const thread = this.#threads.get(failure.sessionId);
-      if (opening) opening.push(failure);
-      // A session that is closed or released has no thread, and its failure no longer matters.
-      else if (thread) this.#reportMcpServerFailure(thread, failure);
+      if (thread) {
+        this.#reportMcpServerFailure(thread, failure);
+        return;
+      }
+      // A session that is opening, or one that closed: the failure of a closed one expires unused.
+      const now = Date.now();
+      this.#unclaimedMcpFailures = [
+        ...this.#unclaimedMcpFailures.filter((entry) => now - entry.at < UNCLAIMED_MCP_FAILURE_MS),
+        { ...failure, at: now },
+      ].slice(-UNCLAIMED_MCP_FAILURE_LIMIT);
       return;
     }
     if (method.replace(/^_/, "") !== OPENCODE_CHILD_UPDATE_METHOD || !this.#flavor.childSessionUpdates) return;
