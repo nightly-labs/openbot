@@ -167,6 +167,7 @@ import { THREAD_MESSAGE_SEARCH_CAPABILITY } from "./thread-message-search-v1";
 import { TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY } from "./ui-block-auto-answer-v1";
 import { TEAM_UI_BLOCK_VAULT_CAPABILITY } from "./ui-block-vault-v1";
 import { TEAM_UI_BLOCKS_CAPABILITY } from "./ui-blocks-v1";
+import { USAGE_CREDITS_CAPABILITY } from "./usage-credits-v1";
 import { TEAM_USAGE_TERTIARY_CAPABILITY } from "./usage-tertiary-v1";
 import { TEAM_OPEN_PROVIDERS_CAPABILITY } from "./v8";
 import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9_CAPABILITIES } from "./v9";
@@ -404,6 +405,7 @@ export {
   TEAM_USAGE_TERTIARY_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
   THREAD_MESSAGE_SEARCH_CAPABILITY,
+  USAGE_CREDITS_CAPABILITY,
   VAULT_CAPABILITY,
   VAULT_IMPORT_CAPABILITY,
   VAULT_V2_CAPABILITY,
@@ -635,6 +637,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
   PENDING_APPROVAL_CAPABILITY,
   PROVIDER_ACCOUNT_KEYS_CAPABILITY,
+  USAGE_CREDITS_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -863,7 +866,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== STORAGE_USER_FILES_CAPABILITY &&
     capability !== WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY &&
     capability !== PENDING_APPROVAL_CAPABILITY &&
-    capability !== PROVIDER_ACCOUNT_KEYS_CAPABILITY,
+    capability !== PROVIDER_ACCOUNT_KEYS_CAPABILITY &&
+    capability !== USAGE_CREDITS_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -968,6 +972,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
   PENDING_APPROVAL_CAPABILITY,
   PROVIDER_ACCOUNT_KEYS_CAPABILITY,
+  USAGE_CREDITS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1155,6 +1160,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== STORAGE_USER_FILES_CAPABILITY &&
       capability !== WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY &&
       capability !== PENDING_APPROVAL_CAPABILITY &&
-      capability !== PROVIDER_ACCOUNT_KEYS_CAPABILITY,
+      capability !== PROVIDER_ACCOUNT_KEYS_CAPABILITY &&
+      capability !== USAGE_CREDITS_CAPABILITY,
   );
 }

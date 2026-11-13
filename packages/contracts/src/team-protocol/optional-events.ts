@@ -22,6 +22,7 @@ import { type RoutineFlowsEvent, routineFlowsEvent } from "./routine-flows-v1";
 import { type SidebarFoldersEvent, sidebarFoldersEvent } from "./sidebar-folders-v1";
 import { type SidebarPinsEvent, sidebarPinsEvent } from "./sidebar-pins-v1";
 import { type SkillsEvent, skillsEvent } from "./skills-events-v1";
+import { type UsageCreditsEvent, usageCreditsEvent } from "./usage-credits-v1";
 import { type VaultEvent, vaultEvent } from "./vault-v1";
 import { type WorkflowsEvent, workflowsEvent } from "./workflows-v1";
 
@@ -47,6 +48,7 @@ export type OptionalTeamEvent =
   | SkillsEvent
   | QuietTurnCompletedEvent
   | RoutineFlowsEvent
+  | UsageCreditsEvent
   | VaultEvent
   | WorkflowsEvent;
 
@@ -82,6 +84,7 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
     skillsEvent(value) ??
     quietTurnEvent(value) ??
     routineFlowsEvent(value) ??
+    usageCreditsEvent(value) ??
     vaultEvent(value) ??
     workflowsEvent(value);
   return event && options?.agentTaskUiBlocks ? withAgentTaskEventUiBlocks(event, value) : event;
