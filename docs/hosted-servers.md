@@ -1073,7 +1073,8 @@ The Worker cannot connect to a machine, and it has no Leaseweb key. So the machi
 2. The unit sends `POST /v2/hosting/pool/assignment` with `{hostId, token}` each 10 seconds. The Worker
    compares the hash, stores the time in `operator_hosts.seen_at` (at most one write each 60 seconds)
    and answers `{"state":"waiting"}`. A wrong token gets `401 hosted_pool_token_invalid`; the unit then
-   removes the token and stops.
+   removes the token and stops. `leaseweb-pool.ts remove` clears the token in D1, so a machine that left
+   the pool gets the same answer and stops asking.
 3. A machine is **ready** when it is in the pool, no server names it, it has a token, and it asked in
    the last 150 seconds (`POOL_SEEN_WITHIN_MS`).
 4. At the payment, the Worker reads the ready machines with the product of the plan: `VPS01` for
@@ -1125,6 +1126,14 @@ A machine of the pool is not the boat image:
 - It shows the storage of a moved server (25, 75 and 150 GB), which is more than the plan table of
   the pricing page.
 - The clients show no restart action, and the server does not stop when it is not in use.
+
+Measured on the test Worker with a real Leaseweb VPS 2 (smoke, 2026-11-13): `prepare` of a clean
+machine takes about 3 minutes. OpenBot on the machine signed in 9 seconds after the payment, and the
+server was online after 13 seconds. A start on boat took 25 seconds to the sign-in. A server whose
+machine did not start OpenBot went to boat 270 seconds after the payment and signed in 15 seconds
+later; the late start of OpenBot on that machine got "The server claim is invalid or used."
+`prepare --reinstall` made that machine ready again in 213 seconds, and after `remove` the unit on
+the machine stopped at its next question.
 
 `bun run test:hosted-pool-assignment` checks the assignment, the request of the machine, the sign-in,
 the two fallbacks to boat and a payment for two servers at the same time, on the real service with

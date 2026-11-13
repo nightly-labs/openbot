@@ -12,7 +12,8 @@
 //       Adds machines to the pool, with the location and the product from the Leaseweb API. A machine
 //       with no reference gets `pool-free`.
 //   bun scripts/hosting/leaseweb-pool.ts remove <VPS ID>... [--apply]
-//       Takes free machines out of the pool, before their Leaseweb contract ends.
+//       Takes free machines out of the pool, before their Leaseweb contract ends. It also ends the
+//       offer of the machine for a new server.
 //   bun scripts/hosting/leaseweb-pool.ts sync [--apply]
 //       Stops OpenBot on each machine whose plan ended, starts it on each renewed one, and reinstalls each
 //       machine whose server is deleted. Then it writes the result in D1. A reinstall erases the disk.
@@ -529,7 +530,7 @@ class Pool {
         continue;
       }
       const changes = this.#write(
-        `UPDATE operator_hosts SET removed_at = ${literal(Date.now())}
+        `UPDATE operator_hosts SET removed_at = ${literal(Date.now())}, assign_token_hash = NULL, seen_at = NULL
          WHERE host_id = ${host} AND removed_at IS NULL
            AND NOT EXISTS(SELECT 1 FROM hosted_servers WHERE operator_host = ${host})`,
       );
