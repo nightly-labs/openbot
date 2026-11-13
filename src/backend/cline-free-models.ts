@@ -87,7 +87,9 @@ function clinePassModel(entry: RecommendedModel): AcpModel {
 }
 
 function tierModel(entry: RecommendedModel, tier: string, provider: string): AcpModel {
-  const name = entry.name?.trim() || entry.id;
+  // Cline names some entries by their id. The tier in the name replaces the id's tier prefix.
+  const given = entry.name?.trim();
+  const name = given && given !== entry.id ? given : entry.id.slice(entry.id.indexOf("/") + 1);
   return {
     id: entry.id,
     // As the Cline CLI names them, and what the picker's search for the tier finds.

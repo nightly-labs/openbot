@@ -107,9 +107,9 @@ try {
     [
       { id: "anthropic/claude-sonnet-5.5", name: "Claude Sonnet 5.5" },
       { id: "openai/gpt-6-astra", name: "GPT-6 Astra" },
-      { id: "cline-pass/glm-5.3", name: "cline-pass/glm-5.3 (ClinePass)" },
+      { id: "cline-pass/glm-5.3", name: "glm-5.3 (ClinePass)" },
       { id: "cline-free/minimax-m3.1-flash", name: "Minimax M3.1 Flash (free)" },
-      { id: "cline-free/nemotron-3.5-super-vl", name: "cline-free/nemotron-3.5-super-vl (free)" },
+      { id: "cline-free/nemotron-3.5-super-vl", name: "nemotron-3.5-super-vl (free)" },
     ],
     "The picker lists the CLI's models, then Cline's ClinePass and valid free models.",
   );
