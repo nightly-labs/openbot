@@ -1667,7 +1667,10 @@ export class BrowserHost {
               return yield* browserFailure(new Error(sourceText("error.backend.authExpired")));
             // A connected page can navigate to the secret's site while the card is open.
             yield* browserSync(() => this.#requireIsolatedFromConnectedTabs(tab, url.origin));
-            if (args.method !== "password" && !new RegExp(`^[0-9]{${args.digits}}$`, "u").test(secret))
+            // A saved authenticator code has the length of its key, which a page often does not state.
+            // One field takes the whole code; digit fields keep their count.
+            const length = vault && args.method === "authenticator" && args.targets.length === 1 ? "4,12" : args.digits;
+            if (args.method !== "password" && !new RegExp(`^[0-9]{${length}}$`, "u").test(secret))
               return yield* browserFailure(new Error(sourceText("error.backend.authDigitsRequired")));
             protection.submitted = true;
             this.#invalidateViews(tab);
