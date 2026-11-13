@@ -73,6 +73,11 @@ const POOL_REFERENCE = "pool";
 const LEGACY_POOL_REFERENCE = "pool-free";
 const isPoolReference = (reference: string | null) =>
   reference === POOL_REFERENCE || reference === LEGACY_POOL_REFERENCE;
+/** The reference that `move` and `sync` give to a pool machine with a server: `<owner email> <8 characters>`. */
+const isOwnerReference = (reference: string) => {
+  const [email, server, ...rest] = reference.split(" ");
+  return rest.length === 0 && EMAIL_PATTERN.test((email ?? "").toLowerCase()) && /^[0-9a-f]{8}$/u.test(server ?? "");
+};
 const IMAGE = "UBUNTU_26_04_64BIT";
 const REINSTALL_WAIT_MS = 15 * 60_000;
 const VPS_ID_PATTERN = /^\d{1,20}$/u;
@@ -604,12 +609,17 @@ class Pool {
       await this.#setReference(await this.#vps(id), `${row.email} ${row.server_id.slice(0, 8)}`);
     }
     // A pool machine leaves the pool only with `remove`, so the reference of a free one is `pool`. A move that
-    // went back after its end left the owner reference on its machine (12728981, 2026-11-13).
+    // went back after its end leaves the owner reference on its machine. Only the old `pool-free` and an owner
+    // reference change: another reference can belong to a VPS that this D1 does not know as used.
     for (const { host_id: host } of free) {
       const id = host.replace("leaseweb:", "");
       const reference = references.get(id);
+      if (reference === undefined) logger.warn(`No Leaseweb key in the environment shows VPS ${id}.`);
       if (reference === undefined || reference === POOL_REFERENCE) continue;
-      if (reference !== LEGACY_POOL_REFERENCE) logger.warn(`Free VPS ${id} has the reference of an owner.`);
+      if (reference !== LEGACY_POOL_REFERENCE && !isOwnerReference(reference)) {
+        logger.warn(`Free VPS ${id} has a reference that is not of the pool. Examine it by hand.`);
+        continue;
+      }
       logger.info(`Set the reference of free VPS ${id} to ${POOL_REFERENCE}.`);
       if (!this.#apply) continue;
       // A new server can get the machine in this moment. `pool` is then correct too.
@@ -1401,15 +1411,15 @@ exit "$status"`;
     ).map(({ host_id }) => host_id.replace("leaseweb:", ""));
   }
 
-  /** The first of `ids` that is a free machine of `product` with an address. With one ID, its error. */
-  async #firstFreeMachine(ids: readonly string[], product: string) {
+  /** The first of `ids` that is a free machine of `product` with an address. With `named`, the error of the one ID. */
+  async #firstFreeMachine(ids: readonly string[], product: string, named = false) {
     for (const id of ids) {
       try {
         const machine = await this.#freeMachine(id, product);
         if (!machine.address) throw new Error(`VPS ${id} has no public IPv4 address.`);
         return machine;
       } catch (error) {
-        if (ids.length === 1) throw error;
+        if (named) throw error;
         logger.warn(`VPS ${id} is not usable for the move.`, toLogValue(error));
       }
     }
@@ -1443,7 +1453,7 @@ exit "$status"`;
     if (!sandbox || !SANDBOX_PATTERN.test(sandbox)) throw new Error(`Server ${serverId} has no boat sandbox.`);
     // A list of planned machines goes out of date: a new customer can get a machine at each moment.
     const candidates = vpsArg === "auto" ? this.#moveCandidates(product, row.currency) : [vpsArg];
-    let machine = await this.#firstFreeMachine(candidates, product);
+    let machine = await this.#firstFreeMachine(candidates, product, vpsArg !== "auto");
     let vpsId = machine.id;
     const release = await this.#release();
     let state = this.#machineState(machine);
@@ -1458,6 +1468,8 @@ exit "$status"`;
     // First: the account service must not give the machine to a new customer during the move. With `auto`,
     // a machine that a new customer got since the selection is skipped.
     for (;;) {
+      // A machine that is not prepared needs the operator keys. Stop before its offer goes away.
+      if (!state?.user) this.#operatorKeys();
       try {
         this.#withdrawOffer(vpsId);
         break;
