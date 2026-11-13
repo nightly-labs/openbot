@@ -34,11 +34,16 @@ type MarkdownMessageTextProps = Omit<RichMessageTextProps, "showCitationFooter">
    * text, with no highlight, toolbar or live preview.
    */
   excerpt?: boolean | undefined;
+  /**
+   * The text of a file, not a message. A message can name one folder for the file names after it;
+   * a file names its paths from the workspace, so its folder paths change no other path (#8536).
+   */
+  document?: boolean | undefined;
 };
 
 type MarkdownContentProps = Omit<
   MarkdownMessageTextProps,
-  "body" | "showCitationFooter" | "streaming" | "streamingTailAfter"
+  "body" | "showCitationFooter" | "streaming" | "streamingTailAfter" | "document"
 > & {
   fileDirectory: FileDirectoryContext | null;
 };
@@ -267,7 +272,7 @@ export function MarkdownMessageText(props: MarkdownMessageTextProps) {
   });
   // A memo, so each revealed word of a streaming reply does not give the kept blocks a new
   // `content` object and run their reads again. Only a new directory changes it.
-  const fileDirectory = createMemo(() => messageFileDirectory(props.body), {
+  const fileDirectory = createMemo(() => (props.document === true ? null : messageFileDirectory(props.body)), {
     equals: (previous, next) => previous?.path === next?.path && previous?.kind === next?.kind,
   });
   const contentProps = createMemo(

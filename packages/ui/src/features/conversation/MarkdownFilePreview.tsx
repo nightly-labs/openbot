@@ -41,6 +41,7 @@ export function MarkdownFilePreview(props: MarkdownFilePreviewProps) {
       >
         <article class={props.renderedClass} data-selection-file-quote={props.selectionQuoteId}>
           <MarkdownMessageText
+            document
             body={props.body}
             agents={props.agents}
             attachments={[]}
