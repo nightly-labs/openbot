@@ -71,6 +71,7 @@ export function remoteServerSummaries(
         compatibility: status.compatibility,
         issue: status.issue,
         connectionSequence: status.connectionSequence,
+        ...(status.capabilitiesPending ? { capabilitiesPending: true as const } : {}),
         hostRestart: status.hostRestart ?? null,
         hostedSleep: status.hostedSleep ?? null,
         hostedIssue: status.hostedIssue ?? null,

@@ -1805,6 +1805,39 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
+    slug: "adobe-analytics",
+    name: "Adobe Analytics",
+    tagline: "Web analytics reports and segments",
+    description:
+      "Adobe Analytics lets agents find report suites, dimensions, metrics, segments and Workspace projects, and run ranked and trended reports. Each user signs in with their own Adobe ID through the browser and selects an organization. An Adobe administrator must first give the account MCP Read-only Access or MCP Full Access. With MCP Full Access, agents can also create and update segments, calculated metrics, date ranges and Workspace projects.",
+    category: "data-analytics",
+    creatorName: "Adobe",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-top-pages", text: "Which pages had the most visits last week?" },
+      { id: "prompt-trend", text: "Show the daily orders for this month and compare them with last month." },
+      { id: "prompt-segment", text: "Which segments do we have for mobile visitors, and how are they defined?" },
+    ],
+    websiteUrl: "https://business.adobe.com/products/analytics/adobe-analytics.html",
+    privacyPolicyUrl: "https://www.adobe.com/privacy/policy.html",
+    termsUrl: "https://www.adobe.com/legal/terms.html",
+    featured: false,
+    apps: [
+      {
+        id: "app-adobe-analytics-mcp",
+        name: "Adobe Analytics",
+        description:
+          "Report suites, reports, segments and Workspace projects, over Adobe's MCP server with browser sign-in.",
+        server: {
+          name: "adobe-analytics",
+          transport: "http",
+          url: "https://aa-mcp.adobe.io/mcp",
+          auth: [{ id: "adobe-analytics-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+  },
+  {
     slug: "adspirer",
     name: "Adspirer",
     tagline: "Ad campaign reporting",
