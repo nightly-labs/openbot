@@ -2069,6 +2069,10 @@ export const messages = {
     two: "העתקת שני סוכנים",
     other: "העתקת {count} סוכנים",
   },
+  "mobile.server.transfer.copyDuplicatesTitle": "להעתיק סוכנים כפולים?",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "ב-{server} כבר יש סוכנים בשמות האלה: {names}. ההעתקה מוסיפה סוכן שני לכל אחד מהם. כל עותק הוא סוכן נפרד עם צ'אטים, קבצים וזיכרונות משלו.",
+  "mobile.server.transfer.copyDuplicatesConfirm": "העתקת כפילויות",
   "mobile.server.transfer.copying": "מעתיק…",
   "mobile.server.transfer.copyFailed": "ההעתקה לא הסתיימה.",
   "mobile.server.transfer.copied": {

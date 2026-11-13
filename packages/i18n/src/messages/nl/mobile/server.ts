@@ -1582,6 +1582,10 @@ export const messages = {
   "mobile.server.transfer.copyNotMoved":
     "Hun kanalen en de map Shared worden ook gekopieerd. API-sleutels, aanmeldingen, connectors en chatgeschiedenis worden niet gekopieerd. Stel ze opnieuw in op de andere server.",
   "mobile.server.transfer.copySubmit": { one: "Kopieer {count} agent", other: "Kopieer {count} agents" },
+  "mobile.server.transfer.copyDuplicatesTitle": "Dubbele agents kopiëren?",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "{server} heeft al agents met deze namen: {names}. De kopie voegt voor elk een tweede agent toe. Elke kopie is een aparte agent met eigen chats, bestanden en herinneringen.",
+  "mobile.server.transfer.copyDuplicatesConfirm": "Dubbele kopiëren",
   "mobile.server.transfer.copying": "Kopiëren…",
   "mobile.server.transfer.copyFailed": "Het kopiëren is niet voltooid.",
   "mobile.server.transfer.copied": {

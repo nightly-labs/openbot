@@ -803,6 +803,10 @@ export const messages = {
   "settings.transfer.copy.notCopied":
     "Leurs canaux et le dossier partagé sont aussi copiés. Les clés d’API, les connexions, les connecteurs et l’historique des chats ne sont pas copiés. Configurez-les à nouveau sur l’autre serveur.",
   "settings.transfer.copy.submit": { one: "Copier {count} agent", other: "Copier {count} agents" },
+  "settings.transfer.copy.duplicatesTitle": "Copier des agents en double ?",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} a déjà des agents avec ces noms : {names}. La copie ajoute un deuxième agent pour chacun. Chaque copie est un agent distinct, avec ses propres discussions, fichiers et souvenirs.",
+  "settings.transfer.copy.duplicatesConfirm": "Copier les doublons",
   "settings.transfer.copy.copying": "Copie…",
   "settings.transfer.copy.done": {
     one: "{count} agent copié vers {server}.",

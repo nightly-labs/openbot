@@ -831,6 +831,10 @@ export const messages = {
     many: "Kopiuj {count} agentów",
     other: "Kopiuj {count} agenta",
   },
+  "settings.transfer.copy.duplicatesTitle": "Skopiować zduplikowanych agentów?",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} ma już agentów o tych nazwach: {names}. Kopiowanie doda drugiego agenta dla każdego z nich. Każda kopia to osobny agent z własnymi czatami, plikami i wspomnieniami.",
+  "settings.transfer.copy.duplicatesConfirm": "Kopiuj duplikaty",
   "settings.transfer.copy.copying": "Kopiowanie…",
   "settings.transfer.copy.done": {
     one: "Skopiowano {count} agenta na {server}.",

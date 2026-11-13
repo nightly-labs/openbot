@@ -790,6 +790,10 @@ export const messages = {
   "settings.transfer.copy.notCopied":
     "גם הערוצים שלהם ותיקיית Shared מועתקים. מפתחות API, התחברויות, מחברים והיסטוריית צ׳אט לא מועתקים. יש להגדיר אותם מחדש בשרת השני.",
   "settings.transfer.copy.submit": { one: "העתקת סוכן אחד", two: "העתקת שני סוכנים", other: "העתקת {count} סוכנים" },
+  "settings.transfer.copy.duplicatesTitle": "להעתיק סוכנים כפולים?",
+  "settings.transfer.copy.duplicatesDescription":
+    "ב-{server} כבר יש סוכנים בשמות האלה: {names}. ההעתקה מוסיפה סוכן שני לכל אחד מהם. כל עותק הוא סוכן נפרד עם צ'אטים, קבצים וזיכרונות משלו.",
+  "settings.transfer.copy.duplicatesConfirm": "העתקת כפילויות",
   "settings.transfer.copy.copying": "מעתיק…",
   "settings.transfer.copy.done": {
     one: "סוכן אחד הועתק אל {server}.",

@@ -16,6 +16,7 @@ import {
   Checkbox,
   ChevronLeft,
   CircleCheck,
+  ConfirmDialog,
   Download,
   FolderOpen,
   ItemGroup,
@@ -488,6 +489,15 @@ function ImportReview(props: {
   const [settings, setSettings] = createSignal(props.preview.hasSettings);
   const [preferences, setPreferences] = createSignal(untrack(() => props.preferencesAvailable));
   const selected = createMemo(() => props.preview.agents.filter((agent) => !excluded().has(agent.key)));
+  // An agent whose name is already on this server imports as a second, separate agent: the user accepts that first.
+  const duplicates = createMemo(() => selected().filter((agent) => agent.nameExists));
+  const [confirmingDuplicates, setConfirmingDuplicates] = createSignal(false);
+  const startImport = () =>
+    props.onImport(
+      selected().map((agent) => agent.key),
+      settings(),
+      props.preferencesAvailable && preferences(),
+    );
   const totals = () => ({
     agents: selected().length,
     skills: selected().reduce((total, agent) => total + agent.skillCount, 0),
@@ -564,13 +574,7 @@ function ImportReview(props: {
           disabled={selected().length === 0 && !settings() && !(props.preferencesAvailable && preferences())}
           loading={props.importing}
           loadingLabel={t("settings.transfer.import.importing")}
-          onClick={() =>
-            props.onImport(
-              selected().map((agent) => agent.key),
-              settings(),
-              props.preferencesAvailable && preferences(),
-            )
-          }
+          onClick={() => (duplicates().length > 0 ? setConfirmingDuplicates(true) : startImport())}
         >
           {selected().length > 0
             ? t("settings.transfer.import.submit", { count: selected().length })
@@ -580,6 +584,24 @@ function ImportReview(props: {
           {t("common.cancel")}
         </Button>
       </div>
+      <ConfirmDialog
+        open={confirmingDuplicates()}
+        tone="default"
+        initialFocus="cancel"
+        title={t("import.review.duplicatesTitle")}
+        description={t("import.review.duplicatesDescription", {
+          names: duplicates()
+            .map((agent) => agent.name)
+            .join(", "),
+        })}
+        cancelLabel={t("common.cancel")}
+        confirmLabel={t("import.review.duplicatesConfirm")}
+        onCancel={() => setConfirmingDuplicates(false)}
+        onConfirm={() => {
+          setConfirmingDuplicates(false);
+          startImport();
+        }}
+      />
     </>
   );
 }

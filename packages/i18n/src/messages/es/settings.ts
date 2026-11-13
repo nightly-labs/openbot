@@ -794,6 +794,10 @@ export const messages = {
   "settings.transfer.copy.notCopied":
     "Sus canales y la carpeta compartida también se copian. Las claves de API, los inicios de sesión, los conectores y el historial de chats no se copian. Configúralos de nuevo en el otro servidor.",
   "settings.transfer.copy.submit": { one: "Copiar {count} agente", other: "Copiar {count} agentes" },
+  "settings.transfer.copy.duplicatesTitle": "¿Copiar agentes duplicados?",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} ya tiene agentes con estos nombres: {names}. La copia añade un segundo agente por cada uno. Cada copia es un agente independiente con sus propios chats, archivos y recuerdos.",
+  "settings.transfer.copy.duplicatesConfirm": "Copiar duplicados",
   "settings.transfer.copy.copying": "Copiando…",
   "settings.transfer.copy.done": {
     one: "{count} agente copiado a {server}.",

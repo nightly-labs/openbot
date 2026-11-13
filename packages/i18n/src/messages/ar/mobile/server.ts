@@ -2180,6 +2180,10 @@ export const messages = {
     many: "نسخ {count} وكيلًا",
     other: "نسخ {count} وكيل",
   },
+  "mobile.server.transfer.copyDuplicatesTitle": "هل تريد نسخ وكلاء مكررين؟",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "يحتوي {server} بالفعل على وكلاء بهذه الأسماء: {names}. يضيف النسخ وكيلًا ثانيًا لكل واحد منهم. كل نسخة وكيل منفصل له دردشاته وملفاته وذكرياته.",
+  "mobile.server.transfer.copyDuplicatesConfirm": "نسخ المكررين",
   "mobile.server.transfer.copying": "جارٍ النسخ…",
   "mobile.server.transfer.copyFailed": "لم يكتمل النسخ.",
   "mobile.server.transfer.copied": {

@@ -1589,6 +1589,10 @@ export const messages = {
   "mobile.server.transfer.copyNotMoved":
     "エージェントのチャンネルと共有フォルダーもコピーされます。API キー、サインイン、コネクタ、チャット履歴はコピーされません。別のサーバーで設定し直してください。",
   "mobile.server.transfer.copySubmit": { other: "エージェント {count} 件をコピー" },
+  "mobile.server.transfer.copyDuplicatesTitle": "重複するエージェントをコピーしますか？",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "{server} には次の名前のエージェントがすでにあります: {names}。コピーすると、それぞれ 2 つ目のエージェントが追加されます。各コピーは別のエージェントで、チャット、ファイル、メモリーはそれぞれ独立しています。",
+  "mobile.server.transfer.copyDuplicatesConfirm": "重複をコピー",
   "mobile.server.transfer.copying": "コピー中…",
   "mobile.server.transfer.copyFailed": "コピーが完了しませんでした。",
   "mobile.server.transfer.copied": { other: "エージェント {count} 件を {server} にコピーしました。" },

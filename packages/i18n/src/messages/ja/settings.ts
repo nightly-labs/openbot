@@ -779,6 +779,10 @@ export const messages = {
   "settings.transfer.copy.notCopied":
     "エージェントのチャンネルと共有フォルダーもコピーされます。API キー、サインイン、コネクタ、チャット履歴はコピーされません。別のサーバーで設定し直してください。",
   "settings.transfer.copy.submit": { other: "エージェント {count} 件をコピー" },
+  "settings.transfer.copy.duplicatesTitle": "重複するエージェントをコピーしますか？",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} には次の名前のエージェントがすでにあります: {names}。コピーすると、それぞれ 2 つ目のエージェントが追加されます。各コピーは別のエージェントで、チャット、ファイル、メモリーはそれぞれ独立しています。",
+  "settings.transfer.copy.duplicatesConfirm": "重複をコピー",
   "settings.transfer.copy.copying": "コピー中…",
   "settings.transfer.copy.done": { other: "エージェント {count} 件を {server} にコピーしました。" },
   "settings.transfer.copy.open": "{server} を開く",
