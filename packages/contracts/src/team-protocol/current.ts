@@ -65,6 +65,7 @@ import { CHANNEL_BROWSER_CAPABILITY } from "./channel-browser-v1";
 import { CHANNEL_ISOLATION_CAPABILITY } from "./channel-isolation-v1";
 import { CHANNEL_PICTURE_CAPABILITY } from "./channel-picture-v1";
 import { CHANNEL_SEEN_SUBTASKS_CAPABILITY } from "./channel-seen-subtasks-v1";
+import { CHANNEL_TASK_WAITS_CAPABILITY } from "./channel-task-waits-v1";
 import { CHAT_COLORS_CAPABILITY } from "./chat-colors-v1";
 import { CHAT_HISTORY_CAPABILITY } from "./chat-history-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "./claude-api-key-v1";
@@ -305,6 +306,7 @@ export {
   CHANNEL_PICTURE_CAPABILITY,
   CHANNEL_SEEN_SUBTASKS_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
+  CHANNEL_TASK_WAITS_CAPABILITY,
   CHAT_COLORS_CAPABILITY,
   CHAT_HISTORY_CAPABILITY,
   COMPUTER_ACTIVITY_CAPABILITY,
@@ -635,6 +637,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
   PENDING_APPROVAL_CAPABILITY,
   PROVIDER_ACCOUNT_KEYS_CAPABILITY,
+  CHANNEL_TASK_WAITS_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -863,7 +866,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== STORAGE_USER_FILES_CAPABILITY &&
     capability !== WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY &&
     capability !== PENDING_APPROVAL_CAPABILITY &&
-    capability !== PROVIDER_ACCOUNT_KEYS_CAPABILITY,
+    capability !== PROVIDER_ACCOUNT_KEYS_CAPABILITY &&
+    capability !== CHANNEL_TASK_WAITS_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -968,6 +972,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
   PENDING_APPROVAL_CAPABILITY,
   PROVIDER_ACCOUNT_KEYS_CAPABILITY,
+  CHANNEL_TASK_WAITS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1155,6 +1160,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== STORAGE_USER_FILES_CAPABILITY &&
       capability !== WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY &&
       capability !== PENDING_APPROVAL_CAPABILITY &&
-      capability !== PROVIDER_ACCOUNT_KEYS_CAPABILITY,
+      capability !== PROVIDER_ACCOUNT_KEYS_CAPABILITY &&
+      capability !== CHANNEL_TASK_WAITS_CAPABILITY,
   );
 }

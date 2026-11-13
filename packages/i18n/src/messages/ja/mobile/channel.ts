@@ -41,6 +41,8 @@ export const messages = {
   "mobile.channel.deleted.restoreFailedBody": "このチャンネルを復元できませんでした。もう一度お試しください。",
   "mobile.channel.chat.fallbackName": "チャンネル",
   "mobile.channel.chat.deletedNotice": "削除したチャンネルです。プレビューのみです。",
+  "mobile.channel.chat.waitBusy": "待機中 - {name} は {channel} で作業しています",
+  "mobile.channel.chat.waitFull": "待機中 - 実行中のタスクが終わると {name} が開始します",
   "mobile.channel.records.connect": "このチャンネルを編集するには、サーバーに接続してください。",
   "mobile.channel.records.loadFailed": "チャンネルの設定を読み込めませんでした。",
   "mobile.channel.records.gone": "この項目は利用できなくなりました。",

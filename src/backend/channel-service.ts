@@ -2149,18 +2149,26 @@ export class ChannelService {
   }
 
   /**
-   * A page for this computer's reader, with the reason that each queued task waits. The pump skips
-   * such a task and keeps no reason, so the channel showed a request that did not start and nothing
-   * more (#6067). Work of the owner in this channel is not a reason here: the channel shows it.
+   * A page for this computer's reader, with the reason that each queued task waits. An older page adds
+   * only messages: the view keeps the tasks of the first page.
    */
   page(channelId: string, before?: number): ChannelPage {
     const stored = this.store.page(channelId, before);
-    // An older page adds only messages: the view keeps the tasks of the first page.
     if (before !== undefined) return stored;
     const page = { ...stored, tasks: this.store.withSeenDependencies(channelId, stored.tasks) };
+    const waits = this.taskWaits(channelId, page.tasks);
+    return waits.length ? { ...page, waits } : page;
+  }
+
+  /**
+   * Why each queued task of `tasks` that has an owner does not start. The pump skips such a task and
+   * keeps no reason, so the channel showed a request that did not start and nothing more (#6067).
+   * Work of the owner in this channel is not a reason here: the channel shows it.
+   */
+  taskWaits(channelId: string, tasks: readonly ChannelTask[]): ChannelTaskWait[] {
     const assignments = this.store.assignments(channelId).filter(activeAssignment);
-    const byId = new Map(page.tasks.map((task) => [task.id, task]));
-    const waits = page.tasks.flatMap((task): ChannelTaskWait[] => {
+    const byId = new Map(tasks.map((task) => [task.id, task]));
+    return tasks.flatMap((task): ChannelTaskWait[] => {
       const agentId = task.ownerAgentId;
       if (task.state !== "queued" || !agentId) return [];
       const root = byId.get(task.rootTaskId);
@@ -2174,12 +2182,11 @@ export class ChannelService {
             agentId,
             reason: "agent-busy",
             channelId: elsewhere.channel.id,
-            channelName: elsewhere.channel.title.trim() || elsewhere.channel.name,
+            channelName: elsewhere.channel.name,
           },
         ];
       return assignments.length >= CHANNEL_PARALLEL_LIMIT ? [{ taskId: task.id, agentId, reason: "channel-full" }] : [];
     });
-    return waits.length ? { ...page, waits } : page;
   }
 
   deliveryFailed(deliveryId: string, reason: string): Effect.Effect<void, ChannelOperationError> {
