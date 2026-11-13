@@ -534,7 +534,11 @@ export class HistoryTools {
               mimeType: redact(file.mimeType),
               size: file.size,
             })),
-        ...(visual && !read?.messageId ? { page: "history_read with this messageId gives the page text." } : {}),
+        ...(visual && !read?.messageId
+          ? {
+              page: "history_read with this messageId, and the taskId of this entry if it has one, gives the page text.",
+            }
+          : {}),
       };
       if (read?.includeWorkSteps) {
         const session = sessions.find((candidate) => candidate.id === row.providerSessionId);

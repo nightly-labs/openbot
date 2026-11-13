@@ -1,10 +1,11 @@
 /** Elements with no text for a reader. The message text already holds the page title. */
-const HIDDEN_END: Readonly<Record<string, RegExp>> = {
-  script: /<\/script\s*>/giu,
-  style: /<\/style\s*>/giu,
-  template: /<\/template\s*>/giu,
-  head: /<\/head\s*>/giu,
-};
+const HIDDEN_END: ReadonlyMap<string, RegExp> = new Map([
+  ["script", /<\/script\s*>/giu],
+  ["style", /<\/style\s*>/giu],
+  ["template", /<\/template\s*>/giu],
+  // The end tag of `head` is optional: the body starts without it.
+  ["head", /<\/head\s*>|(?=<body\b)/giu],
+]);
 const CELLS = new Set(["td", "th"]);
 const BLOCKS = new Set(
   "p div br hr li ul ol dl dt dd tr table h1 h2 h3 h4 h5 h6 section article header footer main aside nav blockquote pre figure figcaption details summary text".split(
@@ -32,6 +33,19 @@ function entity(match: string, name: string): string {
   return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : match;
 }
 
+/** The index of the `>` that ends the tag at `open`, or -1. A `>` in a quoted attribute value is not the end. */
+function tagEnd(html: string, open: number): number {
+  let quote = "";
+  for (let index = open + 1; index < html.length; index += 1) {
+    const character = html[index];
+    if (quote) {
+      if (character === quote) quote = "";
+    } else if (character === '"' || character === "'") quote = character;
+    else if (character === ">") return index;
+  }
+  return -1;
+}
+
 /**
  * The page without its tags, comments and hidden elements: a block tag becomes a line break. One
  * pass that reads each character once, because a page can be large and its markup can be incorrect.
@@ -57,13 +71,14 @@ function withoutTags(html: string): string {
       index = open + 1;
       continue;
     }
-    const close = html.indexOf(">", open);
+    // A tag with no end stops the loop, so at most one search reads to the end of the page.
+    const close = name ? tagEnd(html, open) : html.indexOf(">", open);
     if (close < 0) continue;
     index = close + 1;
     if (!name) continue;
-    const hiddenEnd = html[open + 1] === "/" ? undefined : HIDDEN_END[name];
+    const hiddenEnd = html[open + 1] === "/" ? undefined : HIDDEN_END.get(name);
     if (hiddenEnd) {
-      // As in a browser, an element with no end tag hides the rest of the page.
+      // An element with no end hides the rest of the page.
       hiddenEnd.lastIndex = index;
       index = hiddenEnd.exec(html) ? hiddenEnd.lastIndex : html.length;
     } else if (CELLS.has(name)) parts.push(" ");
