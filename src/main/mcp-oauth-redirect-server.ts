@@ -22,11 +22,18 @@
  * repeated it would put a credential in the browser's history.
  */
 
+import { MCP_OAUTH_CALLBACK_PATH } from "../backend/mcp-oauth-provider";
 import type { LanguageService } from "./language-service";
 import { type CallbackAnswer, startLoopbackCallbackServer } from "./loopback-callback-server";
 
-/** The one path this listener answers. Everything else is a 404, including `/`. */
-export const MCP_OAUTH_REDIRECT_PATH = "/mcp-auth";
+/** The path that a sign-in registers first. */
+const MCP_OAUTH_REDIRECT_PATH = "/mcp-auth";
+
+/**
+ * The paths this listener answers. Everything else is a 404, including `/`. A server that refuses
+ * `/mcp-auth` gets the `/callback` form (`MCP_OAUTH_CALLBACK_PATH`).
+ */
+export const MCP_OAUTH_REDIRECT_PATHS = [MCP_OAUTH_REDIRECT_PATH, MCP_OAUTH_CALLBACK_PATH] as const;
 
 /** The port tried first. Not assigned by IANA as far as this was checked; any other works the same. */
 export const MCP_OAUTH_REDIRECT_PORT = 28_417;
@@ -68,7 +75,7 @@ export async function startMcpOAuthRedirectServer({
   preferredPort,
 }: McpOAuthRedirectServerOptions): Promise<McpOAuthRedirectServer> {
   const server = await startLoopbackCallbackServer({
-    path: MCP_OAUTH_REDIRECT_PATH,
+    paths: MCP_OAUTH_REDIRECT_PATHS,
     receive: (url) => receiveGrant(url, deliver, relayRefusal),
     language,
     port: { preferred: preferredPort },
