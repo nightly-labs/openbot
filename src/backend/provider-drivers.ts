@@ -728,6 +728,12 @@ interface ProviderModelCatalog {
    * it, because models that come later belong in the model picker too.
    */
   readonly relistAfterStart?: true;
+  /**
+   * The user can change the list while the CLI runs, in the CLI's own settings. The idle check reads
+   * the list again when it is old (`MODEL_LIST_REREAD_MS`), so a process that agents keep busy does
+   * not keep the list it had at its start (#8495).
+   */
+  readonly relistWhileRunning?: true;
   /** The name to show for a model, before the name the CLI gives. Null keeps the CLI's name. */
   modelName?(id: string): string | null;
   /** Fields that only this provider's CLI reports. */
@@ -1501,6 +1507,8 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     // A sign-in writes `loggedInUsers` and `lastLoggedInUser` in `config.json`, and the token in the
     // keychain.
     signInFiles: () => [join(copilotHomeDirectory(), "config.json")],
+    // A model with the user's own key is added in Copilot's settings while the CLI runs.
+    catalog: { relistWhileRunning: true },
     resolveCli: resolveCopilotCli,
     createClient: (cli, timeout, context, confinement) =>
       new AcpAgentClient(cli, timeout, {

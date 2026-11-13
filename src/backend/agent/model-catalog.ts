@@ -211,8 +211,16 @@ export class ModelCatalog {
    * fresh. Only a fresh list replaces the provider's models, so a failed read cannot put an older
    * list back over a fresh one. A client that another one replaced during the read changes nothing:
    * the activation of the new client reads its own list.
+   *
+   * `quiet`: a read that the user did not cause. A failed one goes only to the log, and the provider
+   * row keeps the list that it has, with no error. An empty one is not fresh: a running CLI that lists
+   * no model for a moment must not empty the picker.
    */
-  readonly relist = Effect.fn("ModelCatalog.relist")(function* (this: ModelCatalog, provider: AgentProvider) {
+  readonly relist = Effect.fn("ModelCatalog.relist")(function* (
+    this: ModelCatalog,
+    provider: AgentProvider,
+    options: { quiet?: boolean } = {},
+  ) {
     const client = this.#options.client(provider);
     const catalog = BUILT_IN_PROVIDER_DRIVERS.find((driver) => driver.id === provider)?.catalog ?? {};
     if (!client) return false;
@@ -221,7 +229,7 @@ export class ModelCatalog {
     if (this.#options.client(provider) !== client) return false;
     const durationMs = Math.round(performance.now() - startedAt);
     if (Result.isFailure(result)) {
-      this.#options.recordProviderError(provider, result.failure.cause);
+      if (!options.quiet) this.#options.recordProviderError(provider, result.failure.cause);
       logger.warn("A provider did not list its models.", {
         provider,
         durationMs,
@@ -231,7 +239,7 @@ export class ModelCatalog {
     }
     const { models, listed } = result.success;
     logger.info("A provider listed its models.", { provider, count: models.length, durationMs });
-    if (catalog.fallback && listed === 0) return false;
+    if ((catalog.fallback || options.quiet) && listed === 0) return false;
     const current = this.#models;
     this.#models = BUILT_IN_PROVIDER_DRIVERS.flatMap(({ id }) =>
       id === provider ? models : current.filter((model) => model.provider === id),
