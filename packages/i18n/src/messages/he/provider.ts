@@ -177,6 +177,12 @@ export const messages = {
   "provider.codexKey.descriptionHost":
     "Codex שומר את המפתח במארח. OpenAI מחייבת כל בקשה במפתח, ולא בתוכנית ChatGPT שלך. כדי לחזור להשתמש בתוכנית, יש לנתק את החשבון ולחבר את ChatGPT.",
   "provider.codexKey.label": "מפתח OpenAI API",
+  "provider.cursorKey.title": "מפתח Cursor API",
+  "provider.cursorKey.description":
+    "כל חשבון Cursor אחרי הראשון משתמש במפתח API. יש ליצור מפתח בלוח הבקרה של Cursor, תחת Integrations, ולהדביק אותו כאן. המפתח נשמר במחשב הזה.",
+  "provider.cursorKey.descriptionHost":
+    "כל חשבון Cursor אחרי הראשון משתמש במפתח API. יש ליצור מפתח בלוח הבקרה של Cursor, תחת Integrations, ולהדביק אותו כאן. המפתח נשמר במארח.",
+  "provider.cursorKey.label": "מפתח Cursor API",
   "provider.inceptionKey.title": "מפתח Inception API",
   "provider.inceptionKey.description":
     "אפשר לשמור מפתח Inception API במחשב הזה כדי להשתמש במודלים של Mercury. OpenBot מריץ אותם ב-Pi CLI שהוא מוריד.",

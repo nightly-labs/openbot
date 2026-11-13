@@ -267,6 +267,7 @@ import { toUsageReadFailed, UsageLimitGate, type UsageLimitKey } from "./agent/u
 import type { VideoReaderHost } from "./agent/video-reader";
 import { WarmGenerations } from "./agent/warm-generations";
 import type { WebhookRoutineWriter } from "./agent/webhook-routine-tool";
+import { confinedWritesAllowed } from "./agent/workspace-sandbox";
 import type { AgentApiKeys } from "./agent-api-keys";
 import type { AgentProvider } from "./agent-client";
 import type { AgentTables } from "./agent-data/agent-tables";
@@ -557,6 +558,7 @@ const TASK_STOP_WAIT_MS = 15_000;
  * How long after a list that lacks an agent's model a `catalog.partialListAtStart` provider is asked
  * again. Grok 1.0.70 has its whole catalogue about a second after it starts on an expired sign-in.
  * Mistral Vibe 3.1.0 saves its account catalogue while its probe session is open (`probeCloseDelayMs`).
+ * OpenCode 2.2.5 and 2.3.0 list their new catalogue about 3 s after they start (#6185).
  */
 const PARTIAL_LIST_RECHECK_MS = 5_000;
 /**
@@ -1201,6 +1203,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         const agent = store.list().find((candidate) => candidate.id === agentId);
         return agent !== undefined && workspaceAccessEnforced(agent);
       },
+      confinedWritesAllowed: (agentId, paths) => {
+        const agent = store.list().find((candidate) => candidate.id === agentId);
+        return agent !== undefined && confinedWritesAllowed(agent, store.sharedRoot, paths);
+      },
       messagingThread: (threadId) => this.messaging.store.linkForThread(threadId) !== null,
       messagingRequestTurn: (agentId, turnId) => this.#mailbox.answersMessagingRequest(agentId, turnId),
       emit: (event) => this.#emit(event),
@@ -1215,6 +1221,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       apiKeys: options.agentApiKeys ?? null,
       // The turn lifecycle is made later; a request comes only from a running turn, after both exist.
       codexSubagentParent: (childThreadId) => this.#turn.codexSubagentParent(childThreadId),
+      // A routine thread takes runs, not messages, so its questions wait in their calls.
+      lateAnswerTarget: (agentId, publicThreadId) => {
+        if (store.list().find((candidate) => candidate.id === agentId)?.threadId === publicThreadId) return {};
+        const taskId = this.#tasks.taskForThread(publicThreadId);
+        return taskId && !this.#tasks.isRoutineThreadId(publicThreadId) ? { taskId } : null;
+      },
+      sendLateAnswer: (agentId, target, text, sender) =>
+        Effect.runFork(
+          this.sendMessage({ agentId, text, ...target }, sender).pipe(
+            Effect.catch((failure) => Effect.sync(() => this.#emitError("late_answer_failed", failure.cause, agentId))),
+            Effect.forkIn(this.#scope, { startImmediately: true }),
+          ),
+        ),
     });
     this.#duplication = new DuplicationGate({
       store,
@@ -1872,6 +1891,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         listAgents: () => this.listAgents(),
         deleteTasks: (agentId) =>
           Effect.gen({ self: this }, function* () {
+            // A deleted agent takes no message, so its questions that wait for one expire.
+            this.#attention.expireDetached(agentId, null);
             const threadIds = yield* lifecycleStep("list agent tasks", () => this.#tasks.threadIdsForAgent(agentId));
             for (const threadId of threadIds) yield* this.#forgetExecutionThread(threadId);
             yield* lifecycleStep("delete agent tasks", () => this.#tasks.deleteForAgent(agentId));
@@ -4861,6 +4882,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
+  /** See `ProviderRuntime.connectProviderAccountKey`. */
+  connectProviderAccountKey(
+    provider: AgentProvider,
+    accountId: string | null,
+    key: string,
+  ): Effect.Effect<AgentStatus, AgentLifecycleFailed> {
+    return this.#providers
+      .connectProviderAccountKey(provider, accountId, key)
+      .pipe(
+        Effect.mapError(
+          (failure) => new AgentLifecycleFailed({ operation: "connectProviderAccount", cause: failure.cause }),
+        ),
+      );
+  }
+
   /** See `ProviderRuntime.signInProviderAccountOnHost`. */
   signInProviderAccountOnHost(
     provider: AgentProvider,
@@ -5911,6 +5947,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       return found;
     });
     this.#tasks.close(task);
+    // A closed thread takes no message, so a question that waits for one there expires.
+    this.#attention.expireDetached(task.agentId, task.threadId);
     yield* this.#memoryReview.threadClosed(task.agentId, task.threadId);
     // A task lane that waited for a free task can start now.
     this.#drain.scheduleDrain(task.agentId);
@@ -5966,6 +6004,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       if (wasOpen) this.#tasks.close(found);
       return { task: found, wasOpen };
     });
+    // Before the thread's messages go, so the question's card can still record that it expired.
+    this.#attention.expireDetached(task.agentId, task.threadId);
     // A deleted thread is not reviewed: the person discarded it.
     yield* this.#memoryReview.forgetThread(task.agentId, task.threadId);
     yield* this.#returnTaskAnswers(task);

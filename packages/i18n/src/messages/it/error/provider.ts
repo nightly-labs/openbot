@@ -405,6 +405,14 @@ export const messages = {
   "error.provider.accountDefault": "Il primo account {provider} non può essere rimosso.",
   "error.provider.accountUsesKey":
     "Questo account {provider} usa la chiave API salvata e non ha un accesso. Cambia la chiave in Impostazioni server → Provider.",
+  "error.provider.accountNeedsKey":
+    "Un nuovo account {provider} ha bisogno di una chiave API. Aggiorna OpenBot su questo dispositivo, poi aggiungi di nuovo l'account.",
+  "error.provider.accountKeyRefused":
+    "{provider} non ha accettato questa chiave API. Controlla la chiave, poi riprova.",
+  "error.provider.accountKeyUnreachable":
+    "OpenBot non è riuscito a raggiungere {provider} per controllare la chiave API. Controlla la connessione a internet, poi riprova.",
+  "error.provider.accountKeySignedOut":
+    "{provider} non accetta più la chiave API di questo account. Dai all'account una nuova chiave.",
   "error.provider.accountInUse": "Un agente che usa questo account è al lavoro. Riprova quando l'agente si ferma.",
   "error.provider.accountsReadOnly":
     "Gli account salvati dei provider non sono leggibili. Aggiorna OpenBot prima di modificarli.",

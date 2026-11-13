@@ -321,6 +321,24 @@ export class StripeClient {
       currency: input.currency,
       // Card collection stays on, so a plan that a code discounts only at the start can still renew.
       allow_promotion_codes: "true",
+      // `hosted` is the name of `hosted_page` before API version 2026-03-25.dahlia.
+      ui_mode: "hosted",
+      origin_context: "web",
+      submit_type: "auto",
+      payment_method_collection: "always",
+      billing_address_collection: "auto",
+      "phone_number_collection[enabled]": "false",
+      "automatic_tax[enabled]": "false",
+      "tax_id_collection[enabled]": "true",
+      "tax_id_collection[required]": "never",
+      // Stripe refuses tax ID collection for an existing customer without these two.
+      "customer_update[name]": "auto",
+      "customer_update[address]": "auto",
+      "consent_collection[terms_of_service]": "required",
+      // No `name_collection[business]`: with it, Checkout hides the "I'm purchasing as a business"
+      // checkbox, and thus the tax ID field, until the buyer types a business name.
+      "name_collection[individual][enabled]": "true",
+      "name_collection[individual][optional]": "true",
       success_url: input.successUrl,
       cancel_url: input.cancelUrl,
       expires_at: String(input.nowSeconds + CHECKOUT_LIFETIME_SECONDS),

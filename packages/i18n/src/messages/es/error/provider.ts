@@ -413,6 +413,13 @@ export const messages = {
   "error.provider.accountDefault": "No se puede eliminar la primera cuenta de {provider}.",
   "error.provider.accountUsesKey":
     "Esta cuenta de {provider} usa la clave de API guardada y no tiene inicio de sesión. Cambia la clave en Ajustes del servidor → Proveedores.",
+  "error.provider.accountNeedsKey":
+    "Una cuenta nueva de {provider} necesita una clave de API. Actualiza OpenBot en este dispositivo y añade la cuenta de nuevo.",
+  "error.provider.accountKeyRefused": "{provider} no aceptó esta clave de API. Revisa la clave e inténtalo de nuevo.",
+  "error.provider.accountKeyUnreachable":
+    "OpenBot no pudo conectar con {provider} para comprobar la clave de API. Revisa la conexión a internet e inténtalo de nuevo.",
+  "error.provider.accountKeySignedOut":
+    "{provider} ya no acepta la clave de API de esta cuenta. Pon una clave nueva en la cuenta.",
   "error.provider.accountInUse":
     "Un agente que usa esta cuenta está trabajando. Inténtalo de nuevo cuando el agente se detenga.",
   "error.provider.accountsReadOnly":

@@ -377,6 +377,12 @@ export const messages = {
   "error.provider.accountDefault": "لا يمكن إزالة حساب {provider} الأول.",
   "error.provider.accountUsesKey":
     "يستخدم حساب {provider} هذا مفتاح API المحفوظ وليس له تسجيل دخول. غيّر المفتاح في إعدادات الخادم ← المزوّدون.",
+  "error.provider.accountNeedsKey":
+    "يحتاج حساب {provider} الجديد إلى مفتاح API. حدّث OpenBot على هذا الجهاز، ثم أضف الحساب مرة أخرى.",
+  "error.provider.accountKeyRefused": "لم يقبل {provider} مفتاح API هذا. تحقّق من المفتاح، ثم أعد المحاولة.",
+  "error.provider.accountKeyUnreachable":
+    "تعذّر على OpenBot الوصول إلى {provider} للتحقق من مفتاح API. تحقّق من اتصال الإنترنت، ثم أعد المحاولة.",
+  "error.provider.accountKeySignedOut": "لم يعد {provider} يقبل مفتاح API لهذا الحساب. أدخل مفتاحًا جديدًا للحساب.",
   "error.provider.accountInUse": "يعمل وكيل على هذا الحساب. أعد المحاولة عندما يتوقف الوكيل.",
   "error.provider.accountsReadOnly": "تتعذّر قراءة حسابات المزوّد المحفوظة. حدّث OpenBot قبل تغييرها.",
   "error.provider.accountSignedOut": "تم تسجيل الخروج من حساب {provider} هذا. سجّل الدخول مرة أخرى.",

@@ -174,6 +174,12 @@ export const messages = {
   "provider.claudeKey.description":
     'Ana bilgisayara bir Anthropic API anahtarı kaydedin. Anthropic her isteği Claude planınıza değil, anahtarın API kredisine faturalar. Bir ajan için kullanmak üzere ajanın model menüsünde "API anahtarı" hesabını seçin. Claude\'da oturum açık değilse tüm ajanlar anahtarı kullanır.',
   "provider.claudeKey.label": "Anthropic API anahtarı",
+  "provider.cursorKey.title": "Cursor API anahtarı",
+  "provider.cursorKey.description":
+    "İlkinden sonraki her Cursor hesabı bir API anahtarı kullanır. Cursor panelinde, Integrations bölümünde bir anahtar oluşturun ve buraya yapıştırın. Anahtar bu bilgisayara kaydedilir.",
+  "provider.cursorKey.descriptionHost":
+    "İlkinden sonraki her Cursor hesabı bir API anahtarı kullanır. Cursor panelinde, Integrations bölümünde bir anahtar oluşturun ve buraya yapıştırın. Anahtar ana makineye kaydedilir.",
+  "provider.cursorKey.label": "Cursor API anahtarı",
   "provider.inceptionKey.title": "Inception API anahtarı",
   "provider.inceptionKey.description":
     "Mercury modellerini kullanmak için bu bilgisayara bir Inception API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",

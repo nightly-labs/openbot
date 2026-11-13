@@ -236,6 +236,40 @@ Troubleshooting:
 - A self-hosted TryPost: add an MCP server with the address of the instance followed by
   `/mcp/trypost`, in the MCP servers settings, and select Sign in.
 
+## Adobe Analytics
+
+The listing connects to Adobe's own MCP server at `https://aa-mcp.adobe.io/mcp`
+(<https://developer.adobe.com/analytics-mcp/docs/aa/>). It answers 401 with a `Bearer` challenge. The
+authorization server metadata names Adobe IMS (`ims-na1.adobelogin.com`) and has dynamic client
+registration with S256, so the user signs in with an Adobe ID through the browser and types no key.
+A registration with the loopback address gets the `offline_access` scope and the `refresh_token`
+grant (checked 2026-11-13). A user whose Adobe ID is in more than one organization selects one at
+sign-in.
+
+The metadata does not list `offline_access` in `scopes_supported`, so OpenBot does not ask for it
+(`withOfflineAccess` in `src/backend/mcp-oauth-provider.ts`). Adobe's authorize endpoint accepts the
+request with or without that scope. Not confirmed with an Adobe account: whether the token answer
+then has a refresh token. Without one, the user signs in again when the access token expires.
+
+An Adobe administrator must add `MCP Read-only Access` or `MCP Full Access` to a product profile of
+the user, in Admin Console > Products > Adobe Analytics > Permissions > Analytics Tools. A product
+administrator always has full access. Full access adds `upsertSegment`, `upsertCalculatedMetric`,
+`createDateRange` and `upsertProject`. The server has no delete tools.
+
+Adobe's server-to-server path (`client_credentials`) is not in the listing. It needs four headers
+(`Authorization`, `x-api-key`, `x-gw-ims-org-id`, `x-global-company-id`), a key flow has at most two
+fields, and its access token expires, so a saved token stops working.
+
+Customer Journey Analytics has a separate server, `https://cja-mcp.adobe.io/mcp`, with the same
+sign-in. It has no listing; the user adds it in the MCP servers settings and selects Sign in.
+
+Troubleshooting:
+
+- The sign-in succeeds but the tools are refused: the account has no MCP permission item. Ask the
+  Adobe administrator, then sign out and sign in again; Adobe says a change can take some time.
+- The agent sees the wrong report suites: the connection uses another organization or login company.
+  Sign out, sign in, and select the correct organization. `findCompanies` lists the login companies.
+
 ## ElevenLabs
 
 The listing connects to ElevenLabs' hosted MCP server at `https://api.elevenlabs.io/v1/mcp`

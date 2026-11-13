@@ -424,6 +424,14 @@ export const messages = {
   "error.provider.accountDefault": "Das erste {provider}-Konto kann nicht entfernt werden.",
   "error.provider.accountUsesKey":
     "Dieses {provider}-Konto verwendet den gespeicherten API-Schlüssel und hat keine Anmeldung. Ändere den Schlüssel in Servereinstellungen → Anbieter.",
+  "error.provider.accountNeedsKey":
+    "Ein neues {provider}-Konto braucht einen API-Schlüssel. Aktualisiere OpenBot auf diesem Gerät und füge das Konto dann erneut hinzu.",
+  "error.provider.accountKeyRefused":
+    "{provider} hat diesen API-Schlüssel nicht akzeptiert. Prüfe den Schlüssel und versuche es erneut.",
+  "error.provider.accountKeyUnreachable":
+    "OpenBot konnte {provider} nicht erreichen, um den API-Schlüssel zu prüfen. Prüfe die Internetverbindung und versuche es erneut.",
+  "error.provider.accountKeySignedOut":
+    "{provider} akzeptiert den API-Schlüssel dieses Kontos nicht mehr. Gib dem Konto einen neuen Schlüssel.",
   "error.provider.accountInUse":
     "Ein Agent mit diesem Konto arbeitet gerade. Versuche es erneut, wenn der Agent anhält.",
   "error.provider.accountsReadOnly":

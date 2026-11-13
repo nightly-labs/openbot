@@ -122,6 +122,7 @@ import { voiceIpcHandlers } from "./ipc/voice-handlers";
 import { workflowIpcHandlers } from "./ipc/workflow-handlers";
 import { KeepAwake } from "./keep-awake";
 import { stopAppImageCrashpadHandlerAtExit } from "./linux-appimage-crashpad";
+import { relaunchApp } from "./linux-appimage-relaunch";
 import { installLinuxDesktopEntry } from "./linux-desktop-entry";
 import { configureLinuxGpu, readLinuxGpuMode } from "./linux-gpu-mode";
 import { configureLinuxPasswordStore } from "./linux-password-store";
@@ -1459,7 +1460,7 @@ if (!hasSingleInstanceLock) {
       const isLink = (value: string) => parseDeepLink(value, inviteLinkOptions) !== null;
       const link = argv.find(isLink);
       const args = process.argv.slice(1).filter((value) => !isLink(value));
-      app.relaunch({ args: link ? [...args, link] : args });
+      relaunchApp(app, link ? [...args, link] : args);
     }
   });
 

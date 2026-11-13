@@ -1,5 +1,45 @@
 [
   {
+    "version": "0.70.0",
+    "date": "2026-11-13",
+    "notices": [
+      "Actualiza cada servidor unido a esta versión. Reiniciar servidor, los valores predeterminados de los agentes, los límites de hilos y los nuevos pasos de Flujos de trabajo solo funcionan en un servidor que tenga esta versión."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Reinicia desde la app un servidor que alojas tú mismo: como propietario o administrador, selecciona Reiniciar servidor en el menú del servidor.",
+          "Elige qué agentes pueden usar cada inicio de sesión, tarjeta, contacto y clave de API en Ajustes del servidor > Vault. Un agente ve y completa solo los elementos que puede usar.",
+          "Los flujos de trabajo tienen pasos de Imagen y Video. Crea imágenes y videos cortos con los modelos GPT Image, Grok Imagine o Sunra, y conecta imágenes como referencias.",
+          "Conecta Sunra y TryPost desde Marketplace, en Apps. Los agentes pueden entonces crear medios con tus créditos de Sunra, y redactar y publicar publicaciones en redes sociales.",
+          "Los propietarios y administradores pueden definir cuántos hilos se ejecutan al mismo tiempo, en el servidor y para cada agente, en Ajustes del servidor > General.",
+          "Muestra los agentes con mensajes nuevos en el dock: actívalo en Ajustes > Dock de agentes. Haz clic derecho en ese agente y selecciona Añadir al dock para mantenerlo ahí.",
+          "Añade más de una cuenta de Cursor. Cada agente puede usar una cuenta distinta."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Una clave de API que guardas para un solo agente ahora se guarda en el Vault cifrado. Las claves que leen los agentes tienen una nueva ruta, así que un script con la ruta antigua debe usar la nueva.",
+          "Los ajustes de los agentes, como Orientar a los agentes mientras trabajan, están ahora en Ajustes del servidor > Agentes, para cada servidor, también en este equipo.",
+          "En la vista completa del navegador, el cuadro de mensaje vuelve a estar en el centro inferior de la página.",
+          "El encabezado del chat muestra el título del agente después de su nombre, por ejemplo «Brock · Gerente de tienda»."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot abre más rápido cuando tus chats son largos.",
+          "En Windows y Linux, OpenBot pregunta antes de salir mientras los agentes trabajan. Selecciona Seguir para ocultar la ventana y dejar que los agentes terminen.",
+          "Los dispositivos vuelven a conectarse a un servidor cuando se corta la conexión de un dispositivo durante la configuración. La vista en vivo del navegador de un agente en un servidor unido también se mantiene abierta con una conexión lenta.",
+          "Cuando pides a un agente una captura de pantalla de una página web, ahora adjunta la imagen a su respuesta.",
+          "Los modelos gratuitos de OpenCode vuelven a responder cuando se guarda una clave de OpenCode Go."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.69.0",
     "date": "2026-11-12",
     "notices": [

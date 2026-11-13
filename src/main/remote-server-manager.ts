@@ -516,14 +516,26 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.#clearHostedStart(serverId);
       this.#hostedStartExpired.delete(serverId);
       this.#connections.markConnected(serverId);
-      this.#emitChanged();
       const server = this.#store.find(serverId);
+      const capabilityRead = server ? this.#connections.startCapabilityRead(serverId) : null;
+      this.#emitChanged();
       this.#background(
         this.#owned(
           Effect.gen({ self: this }, function* () {
-            if (server) yield* this.#client.refreshWebRtcCompatibility(server).pipe(Effect.catch(() => Effect.void));
+            if (server && capabilityRead !== null)
+              yield* this.#client.refreshWebRtcCompatibility(server).pipe(
+                Effect.catch(() => Effect.void),
+                // The renderer holds the workspace load until it sees the end of the read, so the end
+                // and its event stay together on each exit.
+                Effect.ensuring(
+                  Effect.sync(() => {
+                    this.#connections.endCapabilityRead(serverId, capabilityRead);
+                    this.#emitChanged();
+                  }),
+                ),
+              );
             this.#connectTrace?.mark(serverId, "compatibility");
-            this.#emitChanged();
+            if (capabilityRead === null) this.#emitChanged();
             yield* Effect.all(
               [
                 // Another device of the user can have changed the levels while this one was away.

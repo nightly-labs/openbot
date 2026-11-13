@@ -419,6 +419,14 @@ export const messages = {
   "error.provider.accountDefault": "最初の {provider} アカウントは削除できません。",
   "error.provider.accountUsesKey":
     "この {provider} アカウントは保存された API キーを使うため、サインインはありません。キーはサーバーの設定 → プロバイダーで変更してください。",
+  "error.provider.accountNeedsKey":
+    "新しい {provider} アカウントには API キーが必要です。このデバイスの OpenBot を更新してから、もう一度アカウントを追加してください。",
+  "error.provider.accountKeyRefused":
+    "{provider} はこの API キーを受け付けませんでした。キーを確認して、もう一度お試しください。",
+  "error.provider.accountKeyUnreachable":
+    "API キーを確認するための {provider} への接続に失敗しました。インターネット接続を確認して、もう一度お試しください。",
+  "error.provider.accountKeySignedOut":
+    "{provider} はこのアカウントの API キーを受け付けなくなりました。アカウントに新しいキーを設定してください。",
   "error.provider.accountInUse":
     "このアカウントを使うエージェントが作業中です。エージェントが停止してからもう一度お試しください。",
   "error.provider.accountsReadOnly":

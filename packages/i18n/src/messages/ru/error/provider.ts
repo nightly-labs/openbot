@@ -399,6 +399,13 @@ export const messages = {
   "error.provider.accountDefault": "Первый аккаунт {provider} нельзя удалить.",
   "error.provider.accountUsesKey":
     "Этот аккаунт {provider} использует сохранённый API-ключ и не имеет входа. Измените ключ в Настройки сервера → Провайдеры.",
+  "error.provider.accountNeedsKey":
+    "Новому аккаунту {provider} нужен API-ключ. Обновите OpenBot на этом устройстве, затем добавьте аккаунт ещё раз.",
+  "error.provider.accountKeyRefused": "{provider} не принял этот API-ключ. Проверьте ключ и попробуйте ещё раз.",
+  "error.provider.accountKeyUnreachable":
+    "OpenBot не смог связаться с {provider}, чтобы проверить API-ключ. Проверьте подключение к интернету и попробуйте ещё раз.",
+  "error.provider.accountKeySignedOut":
+    "{provider} больше не принимает API-ключ этого аккаунта. Укажите для аккаунта новый ключ.",
   "error.provider.accountInUse": "Агент с этим аккаунтом сейчас работает. Попробуйте ещё раз, когда агент остановится.",
   "error.provider.accountsReadOnly":
     "Не удаётся прочитать сохранённые аккаунты провайдеров. Обновите OpenBot, прежде чем их менять.",

@@ -390,6 +390,13 @@ export const messages = defineMessages("error.provider", {
   "error.provider.accountDefault": "The first {provider} account cannot be removed.",
   "error.provider.accountUsesKey":
     "This {provider} account uses the saved API key and has no sign-in. Change the key in Server settings → Providers.",
+  "error.provider.accountNeedsKey":
+    "A {provider} account after the first uses an API key. Update OpenBot on this device, then try again.",
+  "error.provider.accountKeyRefused": "{provider} did not accept this API key. Check the key, then try again.",
+  "error.provider.accountKeyUnreachable":
+    "OpenBot could not reach {provider} to check the API key. Check the internet connection, then try again.",
+  "error.provider.accountKeySignedOut":
+    "{provider} no longer accepts the API key of this account. Give the account a new key.",
   "error.provider.accountInUse": "An agent on this account is working. Try again when the agent stops.",
   "error.provider.accountsReadOnly":
     "The saved provider accounts cannot be read. Update OpenBot before you change them.",

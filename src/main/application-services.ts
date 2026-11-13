@@ -280,6 +280,7 @@ import { LanguageService } from "./language-service";
 import { LibraryFoldersService } from "./library-folders-service";
 import { LinkAccountService } from "./link-account-service";
 import { LinkAccountStore } from "./link-account-store";
+import { relaunchApp } from "./linux-appimage-relaunch";
 import { aboveAppsWindowKind, ozonePlatformArguments, setAboveAppsXWayland } from "./linux-wayland-output";
 import { localRoutineFeedDocument } from "./local-routine-calendar";
 import {
@@ -1232,6 +1233,7 @@ export async function createApplicationServices({
     keyringChanged: () => secretStorage().madeKeyFile(),
     // The system browser, where the user is signed in to the company. The language loads below.
     companySignInBrowser: { open: (url) => shell.openExternal(url), language: () => language },
+    confirmSessionAtStart: hostedServer !== null && hostedServer !== undefined,
   });
   // Registered before `initialize()`, which publishes `{ status: "loading" }` synchronously: the
   // listener therefore runs on the next line with most of this function's services still unbuilt.
@@ -2255,6 +2257,10 @@ export async function createApplicationServices({
     developmentDefaults: appVariant === "dev",
     credentials: {
       apiKey: (provider) => providerCredentials.get(provider),
+      accountKeys: {
+        get: (provider, accountId) => providerCredentials.accountKey(provider, accountId),
+        set: (provider, accountId, key) => providerCredentials.setAccountKey(provider, accountId, key),
+      },
       // Read at each Claude spawn, so a change from Server settings applies to the next process.
       promptCacheTtl: () => promptCacheTtl.get().ttl,
       // Also read at each Claude spawn, from Settings > Providers > Claude of this computer.
@@ -3703,6 +3709,7 @@ export async function createApplicationServices({
     tabProcessIds: () => browser.tabProcessIds(),
     appWindowContents: () => BrowserWindow.getAllWindows().map((window) => window.webContents),
     turnRunning: () => service.earliestRunningTurnStartedAt() !== null,
+    appPath: app.getAppPath(),
   });
   teardown.push(TEARDOWN_ORDER.resourceMonitor, "the resource monitor", () =>
     Effect.runPromise(resourceMonitor.close()),
@@ -3791,7 +3798,10 @@ export async function createApplicationServices({
   analytics.flushPending();
   service.on("failure", (failure) => analytics.handleFailure(failure));
   reportWebhookDelivery = (report) => analytics.handleWebhookDelivery(report);
-  resourceMonitor.start(() => analytics.checkResources());
+  resourceMonitor.start(
+    () => analytics.checkResources(),
+    (profile) => analytics.handleMainLoopProfile(profile),
+  );
   const startup = localServerChild
     ? null
     : new StartupTiming({
@@ -4324,7 +4334,7 @@ export async function createApplicationServices({
       // A development build only quits: its supervisor stops the stack, and a relaunched Electron
       // would run outside it with no renderer server.
       // The arguments of `process.argv`: after an XWayland start, they do not keep `--ozone-platform=x11`.
-      if (app.isPackaged) app.relaunch({ args: process.argv.slice(1) });
+      if (app.isPackaged) relaunchApp(app, process.argv.slice(1));
       app.quit();
     },
     log: (message) => logger.info(message),

@@ -302,6 +302,7 @@ export type TeamApiProviderAccounts = Pick<
   | "startSignIn"
   | "signInStatus"
   | "cancelSignIn"
+  | "connectKey"
   | "rename"
   | "remove"
   | "setAgentAccount"

@@ -84,6 +84,7 @@ import { ProviderSignInError } from "../provider-client-effects";
 import {
   antigravityTemp,
   BUILT_IN_PROVIDER_DRIVERS,
+  isKeyAccountSupport,
   type ProviderClientContext,
   requireProviderDriver,
   savedCustomAgents,
@@ -655,6 +656,19 @@ export class ProviderRuntime implements ProviderPort {
             return account ? { email: account.email ?? null, organization: account.organization ?? null } : null;
           },
           apiKey: (provider) => this.#credentials.apiKey(provider),
+          accountKey: (provider, accountId) => this.#credentials.accountKeys?.get(provider, accountId) ?? null,
+          saveAccountKey: (provider, accountId, key) =>
+            this.#credentials.accountKeys
+              ? this.#credentials.accountKeys
+                  .set(provider, accountId, key)
+                  .pipe(Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })))
+              : Effect.fail(
+                  new ProviderAccountFailed({
+                    cause: new Error(
+                      sourceText("error.provider.accountsUnsupported", { provider: providerLabel(provider) }),
+                    ),
+                  }),
+                ),
           defaultUsesApiKey: (provider) => this.ownSignInUsesKey(provider),
           signInTemp: (provider) => {
             const temp = provider === "antigravity" ? antigravityTemp(this.#credentials) : undefined;
@@ -731,7 +745,6 @@ export class ProviderRuntime implements ProviderPort {
     this.#modelCatalog = new ModelCatalog({
       client: (provider) => (this.#off.has(provider) ? undefined : this.#clients.get(provider)),
       isSignedOut: (provider) => this.signInRequired(provider),
-      credentials: this.#credentials,
       requestTimeoutMs: this.#requestTimeoutMs,
       recordProviderError: (provider, error) => this.#recordProviderError(provider, error),
     });
@@ -1193,7 +1206,15 @@ export class ProviderRuntime implements ProviderPort {
             const released = this.#released.has(provider) && !this.#clients.has(provider);
             const cli = this.#cli.get(provider);
             const accounts = ProviderAccounts.support(provider);
-            if (released && !this.#usageUnreported.has(provider) && cli && accounts && !accounts.usageLeavesSession) {
+            // A provider with key accounts reads its own usage as before them: from the kept reading.
+            if (
+              released &&
+              !this.#usageUnreported.has(provider) &&
+              cli &&
+              accounts &&
+              !isKeyAccountSupport(accounts) &&
+              !accounts.usageLeavesSession
+            ) {
               // The CLI stopped when idle. A short process reads the usage, as for an account after the first,
               // so use outside OpenBot shows and the CLI stays stopped (#6818). The gate paces these reads.
               usage = yield* Effect.acquireUseRelease(
@@ -1215,7 +1236,15 @@ export class ProviderRuntime implements ProviderPort {
               // first does, so it does not leave the rail.
               const first = usage.limits[0];
               const last = this.#lastUsage.get(provider);
-              if (accounts?.usageLeavesSession && last && !first?.primary && !first?.secondary) return last;
+              if (
+                accounts &&
+                !isKeyAccountSupport(accounts) &&
+                accounts.usageLeavesSession &&
+                last &&
+                !first?.primary &&
+                !first?.secondary
+              )
+                return last;
             }
           }
           const limit = usage.limits[0];
@@ -1903,6 +1932,22 @@ export class ProviderRuntime implements ProviderPort {
         ),
         Effect.forkIn(this.#scope),
       );
+    return this.status();
+  }).bind(this);
+
+  /**
+   * Gives a provider account after the first its API key: a new account when `accountId` is null.
+   * Answers when the provider accepted the key, and fails with the reason when it did not.
+   */
+  readonly connectProviderAccountKey = Effect.fn("ProviderRuntime.connectProviderAccountKey")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+    accountId: string | null,
+    key: string,
+  ) {
+    yield* providerStep(() => this.requireProviderOn(provider));
+    const accounts = yield* this.#requireAccounts(provider);
+    yield* accounts.connectKey(provider, accountId, key).pipe(toProviderOperationFailed);
     return this.status();
   }).bind(this);
 

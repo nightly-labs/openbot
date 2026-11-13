@@ -987,6 +987,12 @@ no review reads are deleted after 30 days. Turning the setting off deletes all r
   command lines or paths. It is kept to two files of 1 MB each and is never sent.
   `~/Library/Application Support/OpenBot/openbot-resource-summary-v1.json` holds the totals of
   today and of the previous day for the daily analytics summary and the diagnostics export.
+- `~/Library/Application Support/OpenBot/logs/stall-profiles.ndjson` holds one line for a minute in
+  which the main process froze for 2 seconds or more, twice in a row: the functions of OpenBot's code
+  that used the time, and their callers. A line holds function names, the file name of an OpenBot
+  file, package names and Node module names. It holds no directories, arguments, values, queries or
+  text of the user. It is kept to two files of 256 KB each. The five heaviest functions of a line
+  also go out as one product analytics event, at most once in 6 hours.
 - `~/Library/Application Support/OpenBot/openbot-push-notifications-v1.json` holds, for each member
   phone that gets notifications from this host, the session ID, the member ID, the Apple or Firebase
   push token, the secret that seals the notifications, the interface language, and the notification
@@ -1722,6 +1728,15 @@ from the Keychain item `cursor-access-token`, else from the CLI's `auth.json`. O
 token only to Cursor (`api2.cursor.sh`, or `CURSOR_API_ENDPOINT` when you set it for the CLI), in
 the same usage request that the CLI sends. The request contains no conversation, file, or model
 data. OpenBot does not store, log, or send the token or the usage to its maintainer.
+
+A Cursor account after the first is a Cursor API key that you type under Providers › Cursor › Add
+account. OpenBot keeps the key encrypted on the OpenBot computer, in the same file as the other
+provider API keys, and deletes it when you remove the account. For a joined server, the key goes to
+that server's host over the encrypted Team channel and is kept there. To check a key, OpenBot sends
+it to Cursor (`api2.cursor.sh`, or `CURSOR_API_ENDPOINT`), in the request with which the CLI signs a
+key in, and does not keep the answer. The CLI processes of the agents on that account get the key in
+their environment. Those processes keep their sign-in in memory only: they do not read or change the
+CLI's own login. OpenBot does not log the key or send it to its maintainer.
 
 ### Cline
 
