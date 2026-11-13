@@ -251,6 +251,9 @@ export const messages = {
   "server.role.owner": "Proprietario",
   "server.settings.generalTitle": "Generali",
   "server.settings.generalDescription": "Gestisci nome, logo e preferenze di questo server.",
+  "server.settings.vaultTitle": "Cassaforte",
+  "server.settings.vaultDescription":
+    "Salva accessi, carte e dati di contatto che ogni agente su questo server può compilare nelle pagine.",
   "server.settings.membersTitle": "Membri",
   "server.settings.membersDescription": "Pubblica questo server, invita persone e gestisci l'accesso.",
   "server.settings.desktopTitle": "Desktop remoto",
@@ -350,6 +353,12 @@ export const messages = {
   "server.settings.browsingMemoryDescription":
     "Quando controlli il browser di un agente, l'agente impara come funzionano i siti dalle pagine e dai pulsanti che usi. Il testo digitato non viene conservato.",
   "server.settings.browsingMemoryLoadFailed": "Impossibile caricare l'impostazione di navigazione.",
+  "server.settings.rolesTitle": "Autorizzazioni",
+  "server.settings.rolesDescription":
+    "Scegli gli agenti che i membri possono usare. Un membro riceve l’accesso più alto tra «Tutti» e i propri ruoli. Proprietari e amministratori possono usare tutti gli agenti.",
+  "server.settings.auditTitle": "Registro di controllo",
+  "server.settings.auditDescription":
+    "Modifiche a membri, ruoli e accesso agli agenti di questo server, dalla più recente. L’host conserva le ultime 500 modifiche.",
   "server.settings.remoteOnline": "L'host è online. La pubblicazione è controllata dal suo proprietario.",
   "server.settings.remoteOffline": "L'host è offline. La pubblicazione è controllata dal suo proprietario.",
   "server.settings.reachable": "Raggiungibile online. Solo le persone invitate possono accedere.",
