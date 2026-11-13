@@ -22,7 +22,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger } from "@openbot/logging";
+import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { type CauseCode, classifyFailure, isCauseCode } from "@openbot/telemetry";
 import { userErrorMessage } from "@openbot/user-errors";
 import { Cause, Deferred, Effect, Exit, Schema, Scope } from "effect";
@@ -1834,8 +1834,15 @@ export class TurnLifecycle {
         // A turn can start with the answers of several teammates. `#relayAgentResult` skips each one
         // that wants no answer, so only a teammate that asked for a result gets one.
         if (!continuation && !this.#conversation.isExecutionThread(snapshot.threadId) && terminal === "completed") {
+          // A turn with no answer text can still have run tools and made files. The note says so, or
+          // the agent that asked sends the same work again (#8214).
+          const noResult = latestAssistant
+            ? ""
+            : noResultNote(snapshot.messages, turnId, trace, subagents?.subagents, (text) =>
+                redactText(this.#hooks.redactMcp(text)),
+              );
           for (const delivery of deliveries)
-            yield* this.#relayAgentResult(agentId, turnId, delivery, deliveries, latestAssistant?.text);
+            yield* this.#relayAgentResult(agentId, turnId, delivery, deliveries, latestAssistant?.text, noResult);
         }
         // A failed turn sends no result, so the agent that asked gets the failure as its answer.
         if (!continuation && terminal === "failed") {
@@ -2181,6 +2188,7 @@ export class TurnLifecycle {
     delivery: DeliveryContext,
     turnDeliveries: readonly DeliveryContext[],
     text: string | undefined,
+    noResult: string,
   ) {
     if (delivery.delivery.sender.kind !== "agent") return;
     const messageId = delivery.delivery.messageId;
@@ -2221,7 +2229,7 @@ export class TurnLifecycle {
         recipientAgentIds: [recipientAgentId],
         // A turn that ended with no answer still answers, so the agent that asked does not wait for a
         // result that never comes (#6044).
-        text: text ?? NO_RESULT_NOTE,
+        text: text ?? noResult,
         replyToMessageId: messageId,
         ...(taskId ? { taskId } : {}),
         // The requested result, not a new request. The chain-origin guard above already stops a
@@ -2624,13 +2632,63 @@ export class TurnOperationFailed extends Schema.TaggedError<TurnOperationFailed>
 
 const { sync: turnStep, rewrap: toTurnOperationFailed } = causeHelpers(TurnOperationFailed);
 
-/** The answer for a teammate request when the turn ended with no answer, in the reply format. */
-const NO_RESULT_NOTE = [
-  "Status: blocked",
-  "Result: OpenBot note, not written by this teammate: the teammate's turn ended with no result and no error. The requested work can be unfinished.",
-  "Evidence: none",
-  "Unblock: Check what is done, then finish the rest yourself or send the teammate a narrower request.",
-].join("\n");
+const NO_RESULT_STEP_LIMIT = 6;
+const NO_RESULT_FILE_LIMIT = 8;
+const NO_RESULT_TEXT_LIMIT = 160;
+
+/**
+ * The answer for a teammate request when the turn ended with no answer, in the reply format. It
+ * names the work that the host saw in the turn: the tool steps, the files, and the subagents that
+ * still run. A turn with none of these gets `Evidence: none`. Each value is redacted before it is
+ * cut, because a cut secret no longer matches.
+ */
+function noResultNote(
+  messages: readonly ConversationMessage[],
+  turnId: string,
+  trace: ConversationTurnTrace | null,
+  subagents: readonly ConversationSubagent[] | undefined,
+  redact: (text: string) => string,
+): string {
+  const line = (text: string) => redact(text).replace(/\s+/gu, " ").trim().slice(0, NO_RESULT_TEXT_LIMIT);
+  const steps = trace?.steps.filter((step) => step.kind === "tool") ?? [];
+  const files = messages
+    .filter((message) => message.author === "assistant" && message.turnId === turnId)
+    .flatMap((message) => message.attachments ?? [])
+    .map((file) => line(file.name));
+  const running = (subagents ?? []).filter((subagent) => subagent.status === "running");
+  const evidence: string[] = [];
+  if (steps.length > 0) {
+    const failed = steps.filter((step) => step.failed).length;
+    const shown = steps
+      .slice(-NO_RESULT_STEP_LIMIT)
+      .map(
+        (step) =>
+          `${line(step.command ?? step.text ?? "") || "tool"} (${step.endedAt === null ? "not finished" : step.failed ? "failed" : "completed"})`,
+      );
+    evidence.push(`Tool steps in the turn: ${steps.length}, failed: ${failed}. Last steps: ${shown.join("; ")}.`);
+  }
+  if (files.length > 0)
+    evidence.push(`Files that the turn made (${files.length}): ${files.slice(-NO_RESULT_FILE_LIMIT).join(", ")}.`);
+  if (running.length > 0)
+    evidence.push(
+      `Background work of the turn still runs (${running.length}): ${running
+        .slice(0, NO_RESULT_STEP_LIMIT)
+        .map((subagent) => line(subagent.title) || "subagent")
+        .join("; ")}.`,
+    );
+  const unblock =
+    running.length > 0
+      ? "Do not send the same request again while the background work runs. Wait for it, or ask the teammate for its state."
+      : evidence.length > 0
+        ? "Do not send the same request again. Check the steps and files above first, then finish the rest yourself or ask the teammate only for the part that is missing."
+        : "Check what is done, then finish the rest yourself or send the teammate a narrower request.";
+  return [
+    "Status: blocked",
+    "Result: OpenBot note, not written by this teammate: the teammate's turn ended with no written result and no error. The requested work can be unfinished.",
+    `Evidence: ${evidence.length > 0 ? evidence.join(" ") : "none"}`,
+    `Unblock: ${unblock}`,
+  ].join("\n");
+}
 
 /**
  * Whether running the turn again would repeat this item: a tool step, or answer text. Thinking and
