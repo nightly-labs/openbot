@@ -119,6 +119,7 @@ import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "./onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "./password-managers-v1";
 import { PROMPT_CACHE_TTL_CAPABILITY } from "./prompt-cache-ttl-v1";
 import { TEAM_PROMPT_MULTI_SELECT_CAPABILITY } from "./prompt-multi-select-v1";
+import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "./provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "./provider-account-models-v1";
 import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "./provider-account-pool-v1";
 import { PROVIDER_ACCOUNT_RELAY_CAPABILITY } from "./provider-account-relay-v1";
@@ -630,6 +631,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   HOST_TURN_LIMITS_CAPABILITY,
   STORAGE_USER_FILES_CAPABILITY,
   WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
+  PROVIDER_ACCOUNT_KEYS_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -856,7 +858,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== TEAM_USAGE_TERTIARY_CAPABILITY &&
     capability !== HOST_TURN_LIMITS_CAPABILITY &&
     capability !== STORAGE_USER_FILES_CAPABILITY &&
-    capability !== WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
+    capability !== WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY &&
+    capability !== PROVIDER_ACCOUNT_KEYS_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -959,6 +962,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   HOST_TURN_LIMITS_CAPABILITY,
   STORAGE_USER_FILES_CAPABILITY,
   WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
+  PROVIDER_ACCOUNT_KEYS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1144,6 +1148,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== TEAM_USAGE_TERTIARY_CAPABILITY &&
       capability !== HOST_TURN_LIMITS_CAPABILITY &&
       capability !== STORAGE_USER_FILES_CAPABILITY &&
-      capability !== WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
+      capability !== WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY &&
+      capability !== PROVIDER_ACCOUNT_KEYS_CAPABILITY,
   );
 }

@@ -404,6 +404,14 @@ export const messages = {
   "error.provider.accountDefault": "İlk {provider} hesabı kaldırılamaz.",
   "error.provider.accountUsesKey":
     "Bu {provider} hesabı kayıtlı API anahtarını kullanır ve oturum açma içermez. Anahtarı Sunucu ayarları → Sağlayıcılar bölümünde değiştirin.",
+  "error.provider.accountNeedsKey":
+    "Yeni bir {provider} hesabı için API anahtarı gerekir. Bu cihazda OpenBot'u güncelleyin, sonra hesabı yeniden ekleyin.",
+  "error.provider.accountKeyRefused":
+    "{provider} bu API anahtarını kabul etmedi. Anahtarı kontrol edin, sonra tekrar deneyin.",
+  "error.provider.accountKeyUnreachable":
+    "OpenBot, API anahtarını kontrol etmek için {provider} hizmetine ulaşamadı. İnternet bağlantısını kontrol edin, sonra tekrar deneyin.",
+  "error.provider.accountKeySignedOut":
+    "{provider} bu hesabın API anahtarını artık kabul etmiyor. Hesaba yeni bir anahtar verin.",
   "error.provider.accountInUse": "Bu hesabı kullanan bir ajan çalışıyor. Ajan durduğunda tekrar deneyin.",
   "error.provider.accountsReadOnly":
     "Kayıtlı sağlayıcı hesapları okunamıyor. Bunları değiştirmeden önce OpenBot'u güncelleyin.",

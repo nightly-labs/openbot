@@ -401,6 +401,14 @@ export const messages = {
   "error.provider.accountDefault": "Het eerste {provider}-account kan niet worden verwijderd.",
   "error.provider.accountUsesKey":
     "Dit {provider}-account gebruikt de opgeslagen API-sleutel en heeft geen inlog. Wijzig de sleutel in Serverinstellingen → Aanbieders.",
+  "error.provider.accountNeedsKey":
+    "Een nieuw {provider}-account heeft een API-sleutel nodig. Werk OpenBot op dit apparaat bij en voeg het account dan opnieuw toe.",
+  "error.provider.accountKeyRefused":
+    "{provider} heeft deze API-sleutel niet geaccepteerd. Controleer de sleutel en probeer het opnieuw.",
+  "error.provider.accountKeyUnreachable":
+    "OpenBot kon {provider} niet bereiken om de API-sleutel te controleren. Controleer de internetverbinding en probeer het opnieuw.",
+  "error.provider.accountKeySignedOut":
+    "{provider} accepteert de API-sleutel van dit account niet meer. Geef het account een nieuwe sleutel.",
   "error.provider.accountInUse": "Een agent op dit account is aan het werk. Probeer het opnieuw als de agent stopt.",
   "error.provider.accountsReadOnly":
     "De opgeslagen accounts van aanbieders kunnen niet worden gelezen. Werk OpenBot bij voordat je ze wijzigt.",

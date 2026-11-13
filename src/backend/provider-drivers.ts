@@ -61,7 +61,7 @@ import {
   resolvePiCli,
 } from "./cli";
 import { clineFreeModels } from "./cline-free-models";
-import { readCursorUsage } from "./cursor-usage";
+import { checkCursorApiKey, readCursorUsage } from "./cursor-usage";
 import { CustomAcpAgentsClient, type CustomAgentConfig, type CustomAgentSource } from "./custom-acp-agents-client";
 import { GrokAgentClient } from "./grok-client";
 import { hermesSettingsEnvironment } from "./hermes-settings";
@@ -149,7 +149,7 @@ const CLI_LOGIN_TIMEOUT_MS = 10 * 60_000;
  * sessions and settings of one account in a home folder that one variable names, so each account
  * after the first gets a folder of its own. The first account stays in the CLI's default folder.
  */
-export interface ProviderAccountSupport {
+export interface ProviderHomeAccountSupport {
   /** The variable that names the CLI's home folder. */
   readonly homeVariable: string;
   /** Signs a new, empty home folder in through the browser: a CLI command, or an ACP `authenticate`. */
@@ -164,6 +164,41 @@ export interface ProviderAccountSupport {
    * to read usage.
    */
   readonly usageLeavesSession?: boolean;
+}
+
+/**
+ * For a CLI that keeps one sign-in for each computer user, with no folder variable: each account
+ * after the first is one API key of the provider, which OpenBot stores (`ProviderAccountKeys`). No
+ * browser sign-in and no CLI sign-out apply to it, and it reports no usage.
+ */
+export interface ProviderKeyAccountSupport {
+  /**
+   * The environment of a process that runs on the key only. It must also keep the process from the
+   * CLI's own sign-in: an empty key signs the process out, it does not fall back to that sign-in.
+   */
+  readonly keyEnvironment: (key: string) => Readonly<Record<string, string>>;
+  /**
+   * Asks the provider whether it accepts the key, for a CLI that does not tell a refused key from
+   * another failure. Fails when the provider did not answer.
+   */
+  readonly checkKey?: (key: string) => Effect.Effect<boolean, { readonly cause: unknown }>;
+}
+
+export type ProviderAccountSupport = ProviderHomeAccountSupport | ProviderKeyAccountSupport;
+
+export function isKeyAccountSupport(support: ProviderAccountSupport | undefined): support is ProviderKeyAccountSupport {
+  return support !== undefined && "keyEnvironment" in support;
+}
+
+/** The stored keys of the provider accounts that are a key (`ProviderKeyAccountSupport`). */
+export interface ProviderAccountKeys {
+  get(provider: AgentProviderId, accountId: string): string | null;
+  /** Saves the key, or removes it when `key` is null. */
+  set(
+    provider: AgentProviderId,
+    accountId: string,
+    key: string | null,
+  ): Effect.Effect<void, { readonly cause: unknown }>;
 }
 
 const CLAUDE_COMMAND_ENV = (cli: AgentCliInfo): Record<string, string> =>
@@ -464,6 +499,11 @@ const MISTRAL_ARGV: readonly string[] = [];
  */
 export interface ProviderClientContext {
   apiKey(provider: AgentProviderId): string | null;
+  /**
+   * Optional for the same reason as `reportMcpDrops`: without it no provider account that is a key
+   * can be added.
+   */
+  readonly accountKeys?: ProviderAccountKeys;
   /** Durable provider-history ports, selected by the external provider id. */
   readonly history?: (provider: AgentProviderId) => AcpHistoryPersistence | undefined;
   readonly customProviders: CustomProviderSource;
@@ -1193,6 +1233,14 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       command: { argv: ["login"], env: () => ({ NO_OPEN_BROWSER: "1" }), timeoutMs: CLI_LOGIN_TIMEOUT_MS },
     },
     signOut: { argv: ["logout"], env: () => ({}), timeoutMs: 30_000 },
+    // The CLI keeps one sign-in for each computer user: `auth.json` in a fixed folder, or the login
+    // Keychain on macOS. `CURSOR_CONFIG_DIR` moves its settings only. With the memory store, a process
+    // does not read that sign-in, and does not replace it with the tokens it gets for the key. An
+    // inherited `CURSOR_AUTH_TOKEN` would win over the key.
+    accounts: {
+      keyEnvironment: (key) => ({ CURSOR_API_KEY: key, CURSOR_AUTH_TOKEN: "", AGENT_CLI_CREDENTIAL_STORE: "memory" }),
+      checkKey: checkCursorApiKey,
+    },
     resolveCli: resolveCursorCli,
     createClient: (cli, timeout, context, confinement) =>
       new AcpAgentClient(cli, timeout, {
@@ -1201,15 +1249,25 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         argv: ["acp"],
         env: {},
         ...(confinement ? { confine: (target) => confineSpawnTarget(target, confinement, cursorStatePaths()) } : {}),
-        extraEnv: () => ({ ...context.agentEnvironment?.(), ...(confinement ? cursorConfinedEnv() : {}) }),
+        extraEnv: () => ({
+          ...context.agentEnvironment?.(),
+          ...(confinement ? cursorConfinedEnv() : {}),
+          ...context.accountEnvironment,
+        }),
         signInMessage: sourceText("error.provider.cursorSignIn"),
+        ...(context.accountEnvironment
+          ? { savedKeyRefusedMessage: () => sourceText("error.provider.accountKeyRefused", { provider: "Cursor" }) }
+          : {
+              // The reading comes from the CLI's own sign-in, so it is not the reading of a key account.
+              readRateLimits: () =>
+                readCursorUsage().pipe(Effect.mapError((failure) => providerFailure(failure.cause))),
+            }),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
         history: context.history?.("cursor"),
-        readRateLimits: () => readCursorUsage().pipe(Effect.mapError((failure) => providerFailure(failure.cause))),
       }),
     createProfileClient: (cli, timeout, context) =>
       new AcpAgentClient(cli, timeout, {
@@ -1218,6 +1276,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         argv: ["acp"],
         profileGeneration: true,
         env: {},
+        ...(context.accountEnvironment ? { extraEnv: () => ({ ...context.accountEnvironment }) } : {}),
         signInMessage: sourceText("error.provider.cursorSignIn"),
         servesModel: context.servesModel,
       }),

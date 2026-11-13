@@ -274,6 +274,10 @@ import {
   PASSWORD_MANAGERS_ROUTES,
 } from "@openbot/contracts/team-protocol/password-managers-v1";
 import {
+  PROVIDER_ACCOUNT_KEYS_CAPABILITY,
+  PROVIDER_ACCOUNT_KEYS_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-keys-v1";
+import {
   PROVIDER_ACCOUNT_MODELS_CAPABILITY,
   PROVIDER_ACCOUNT_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-account-models-v1";
@@ -731,6 +735,10 @@ const ARGON_MODEL: AgentModelOption = {
   supportedReasoningEfforts: ["low", "high"],
   listing: "new",
 };
+/** The key that the fake host's Cursor refuses (`provider-account-keys-v1`). */
+const REFUSED_ACCOUNT_KEY = "key_e2e_refused";
+const ACCOUNT_KEY = "key_e2e_accepted";
+
 /** The fake host's Gemini pool (`provider-account-pool-v1`): off until the pool update route turns it on. */
 let antigravityPool: ProviderAccountPool | undefined;
 function accountModelsStatus(): AgentStatus {
@@ -2564,6 +2572,18 @@ try {
         listAgents: () => [],
         updateAgent: unused("providerAccounts.updateAgent"),
         signInProviderAccountOnHost: unused("providerAccounts.signInProviderAccountOnHost"),
+        // As the backend: Cursor refuses one key, and each other key gives an account.
+        connectProviderAccountKey: (provider, accountId, key) => {
+          record("connectProviderAccountKey", { provider, accountId, keyLength: key.length });
+          return key === REFUSED_ACCOUNT_KEY
+            ? Effect.fail(
+                new AgentLifecycleFailed({
+                  operation: "connectProviderAccount",
+                  cause: new Error(sourceText("error.provider.accountKeyRefused", { provider: "Cursor" })),
+                }),
+              )
+            : Effect.sync(accountModelsStatus);
+        },
         renameProviderAccount: unused("providerAccounts.renameProviderAccount"),
         removeProviderAccount: unused("providerAccounts.removeProviderAccount"),
       },
@@ -3907,6 +3927,79 @@ try {
       "an admin turns the pool off again",
       offAgain.status === 200 && isDeepStrictEqual(cleared.body, { pools: [] }),
       [summary(offAgain), summary(cleared)],
+    );
+  }
+
+  // ---- Account keys (provider-account-keys-v1) ----
+  {
+    const v9 = { capabilities: [PROVIDER_ACCOUNT_KEYS_CAPABILITY], protocol: TEAM_PROTOCOL_V9 };
+    const connect = PROVIDER_ACCOUNT_KEYS_ROUTES.connect;
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises provider-account-keys-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(PROVIDER_ACCOUNT_KEYS_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(PROVIDER_ACCOUNT_KEYS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const body = { provider: "cursor", accountId: null, key: ACCOUNT_KEY };
+    const unsupported = await call("POST", connect, { token: adaToken, json: body, protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the account key route without the capability gets 400 providersUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.providersUnsupported")),
+      summary(unsupported),
+    );
+    const writes = callsOf("connectProviderAccountKey").length;
+    const member = await call("POST", connect, { token: bobToken, json: body, ...v9 });
+    check(
+      "a member cannot give an account a key, and the host saves nothing",
+      errorIs(member, 403, sourceText("error.team.adminRequired")) &&
+        callsOf("connectProviderAccountKey").length === writes,
+      summary(member),
+    );
+    const noKey = await call("POST", connect, { token: adaToken, json: { ...body, key: "  " }, ...v9 });
+    const badAccount = await call("POST", connect, {
+      token: adaToken,
+      json: { ...body, accountId: "not-an-account" },
+      ...v9,
+    });
+    const longKey = await call("POST", connect, { token: adaToken, json: { ...body, key: "k".repeat(513) }, ...v9 });
+    check(
+      "an empty key, a key that is too long and an account id that is not one get 400, and the host saves nothing",
+      noKey.status === 400 &&
+        badAccount.status === 400 &&
+        longKey.status === 400 &&
+        callsOf("connectProviderAccountKey").length === writes,
+      [summary(noKey), summary(badAccount), summary(longKey)],
+    );
+    const added = await call("POST", connect, { token: adaToken, json: body, ...v9 });
+    const replaced = await call("POST", connect, {
+      token: adaToken,
+      json: { ...body, accountId: ULTRA_ACCOUNT, key: ` ${ACCOUNT_KEY} ` },
+      ...v9,
+    });
+    check(
+      "an admin adds an account from a key and gives an account a new key; the answer holds no key",
+      added.status === 200 &&
+        isDeepStrictEqual(added.body, {}) &&
+        replaced.status === 200 &&
+        isDeepStrictEqual(callsOf("connectProviderAccountKey").slice(writes), [
+          [{ provider: "cursor", accountId: null, keyLength: ACCOUNT_KEY.length }],
+          [{ provider: "cursor", accountId: ULTRA_ACCOUNT, keyLength: ACCOUNT_KEY.length }],
+        ]),
+      [summary(added), summary(replaced)],
+    );
+    const refused = await call("POST", connect, {
+      token: adaToken,
+      json: { ...body, key: REFUSED_ACCOUNT_KEY },
+      ...v9,
+    });
+    check(
+      "a key that the provider refuses fails with the reason, and the answer does not repeat the key",
+      errorIs(refused, 409, sourceText("error.provider.accountKeyRefused", { provider: "Cursor" })) &&
+        !JSON.stringify(refused.body).includes(REFUSED_ACCOUNT_KEY),
+      summary(refused),
     );
   }
 

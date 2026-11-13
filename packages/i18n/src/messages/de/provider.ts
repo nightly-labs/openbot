@@ -177,6 +177,12 @@ export const messages = {
   "provider.claudeKey.description":
     "Speichere einen Anthropic-API-Schlüssel auf dem Host. Anthropic berechnet jede Anfrage über das API-Guthaben des Schlüssels, nicht über dein Claude-Abo. Um ihn für einen Agenten zu verwenden, wähle das Konto „API-Schlüssel“ im Modellmenü des Agenten. Wenn Claude nicht angemeldet ist, verwenden alle Agenten den Schlüssel.",
   "provider.claudeKey.label": "Anthropic-API-Schlüssel",
+  "provider.cursorKey.title": "Cursor-API-Schlüssel",
+  "provider.cursorKey.description":
+    "Jedes Cursor-Konto nach dem ersten verwendet einen API-Schlüssel. Erstelle einen Schlüssel im Cursor-Dashboard unter Integrations und füge ihn hier ein. Der Schlüssel wird auf diesem Computer gespeichert.",
+  "provider.cursorKey.descriptionHost":
+    "Jedes Cursor-Konto nach dem ersten verwendet einen API-Schlüssel. Erstelle einen Schlüssel im Cursor-Dashboard unter Integrations und füge ihn hier ein. Der Schlüssel wird auf dem Host gespeichert.",
+  "provider.cursorKey.label": "Cursor-API-Schlüssel",
   "provider.inceptionKey.title": "Inception-API-Schlüssel",
   "provider.inceptionKey.description":
     "Speichere einen Inception-API-Schlüssel auf diesem Computer, um die Mercury-Modelle zu verwenden. OpenBot führt sie in der Pi-CLI aus, die es herunterlädt.",

@@ -112,6 +112,41 @@ const postDashboard = Effect.fn("Cursor.postDashboard")(function* (
   );
 });
 
+const EXCHANGE_API_KEY_PATH = "/auth/exchange_user_api_key";
+
+/**
+ * Whether Cursor accepts the API key: the request with which the Cursor CLI signs a key in. The CLI
+ * itself answers a refused key and a failed connection with the same internal error, so the account
+ * of a key asks here first. Fails when Cursor did not answer or had a server error.
+ */
+export const checkCursorApiKey = Effect.fn("Cursor.checkApiKey")(function* (key: string) {
+  const endpoint = process.env.CURSOR_API_ENDPOINT?.trim() || CURSOR_API_ENDPOINT;
+  return yield* Effect.acquireUseRelease(
+    Effect.sync(() => new AbortController()),
+    (controller) =>
+      Effect.gen(function* () {
+        const response = yield* Effect.tryPromise({
+          try: () =>
+            fetch(`${endpoint.replace(/\/+$/u, "")}${EXCHANGE_API_KEY_PATH}`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+              body: "{}",
+              signal: AbortSignal.any([controller.signal, AbortSignal.timeout(CURSOR_USAGE_TIMEOUT_MS)]),
+            }),
+          catch: (cause) => new CursorUsageFailed({ cause }),
+        });
+        // The answer holds the tokens of the key. Nothing reads them here.
+        yield* Effect.promise(() => response.body?.cancel() ?? Promise.resolve()).pipe(Effect.ignore);
+        if (response.status >= 500)
+          return yield* new CursorUsageFailed({
+            cause: new Error(`Cursor key check returned HTTP ${response.status}.`),
+          });
+        return response.ok;
+      }),
+    (controller) => Effect.sync(() => controller.abort()),
+  );
+});
+
 const MergedPlan = Schema.Struct({ isMerged: Schema.Literal(true) });
 
 export const readCursorUsage = Effect.fn("Cursor.readUsage")(function* () {

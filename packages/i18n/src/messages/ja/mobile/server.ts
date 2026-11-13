@@ -1053,6 +1053,13 @@ export const messages = {
   "mobile.server.providers.status.ready": "インストール済み",
   "mobile.server.providers.status.notInstalled": "未インストール",
   "mobile.server.providers.status.checking": "確認中",
+  "mobile.server.providers.accountsKeyHint":
+    "各エージェントは1つのアカウントを使います。エージェントの設定で選んでください。新しいアカウントには、そのアカウントの API キーが必要です。",
+  "mobile.server.providers.accountChangeKey": "キーを変更",
+  "mobile.server.providers.accountKeyHint":
+    "{provider} アカウントの API キーを貼り付けてください。キーはサーバーに送られます。このスマートフォンには保存されません。",
+  "mobile.server.providers.accountKeyChecking": "キーを確認中…",
+  "mobile.server.providers.accountKeyAddFailed": "アカウントを追加できませんでした。もう一度お試しください。",
   "mobile.server.providers.pool": "アカウントをプール",
   "mobile.server.providers.poolHint":
     "エージェントは使用量の上限に近づくまで 1 つのアカウントを使い、その後は上限が最初にリセットされるアカウントを使います。",

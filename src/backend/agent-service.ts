@@ -4830,6 +4830,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
+  /** See `ProviderRuntime.connectProviderAccountKey`. */
+  connectProviderAccountKey(
+    provider: AgentProvider,
+    accountId: string | null,
+    key: string,
+  ): Effect.Effect<AgentStatus, AgentLifecycleFailed> {
+    return this.#providers
+      .connectProviderAccountKey(provider, accountId, key)
+      .pipe(
+        Effect.mapError(
+          (failure) => new AgentLifecycleFailed({ operation: "connectProviderAccount", cause: failure.cause }),
+        ),
+      );
+  }
+
   /** See `ProviderRuntime.signInProviderAccountOnHost`. */
   signInProviderAccountOnHost(
     provider: AgentProvider,

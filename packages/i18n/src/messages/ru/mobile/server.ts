@@ -1182,6 +1182,13 @@ export const messages = {
   "mobile.server.providers.status.ready": "Установлено",
   "mobile.server.providers.status.notInstalled": "Не установлено",
   "mobile.server.providers.status.checking": "Проверка",
+  "mobile.server.providers.accountsKeyHint":
+    "Каждый агент использует один аккаунт. Выберите его в настройках агента. Новому аккаунту нужен API-ключ этого аккаунта.",
+  "mobile.server.providers.accountChangeKey": "Сменить ключ",
+  "mobile.server.providers.accountKeyHint":
+    "Вставьте API-ключ аккаунта {provider}. Ключ передаётся на сервер. Этот телефон его не хранит.",
+  "mobile.server.providers.accountKeyChecking": "Проверка ключа…",
+  "mobile.server.providers.accountKeyAddFailed": "Не удалось добавить аккаунт. Повторите попытку.",
   "mobile.server.providers.pool": "Объединить аккаунты",
   "mobile.server.providers.poolHint":
     "Агенты используют один аккаунт, пока он не приблизится к лимиту, а затем аккаунт, чей лимит сбросится раньше всех.",

@@ -421,6 +421,13 @@ export const messages = {
   "error.provider.accountDefault": "Le premier compte {provider} ne peut pas être supprimé.",
   "error.provider.accountUsesKey":
     "Ce compte {provider} utilise la clé API enregistrée et n'a pas de connexion. Changez la clé dans Réglages du serveur → Fournisseurs.",
+  "error.provider.accountNeedsKey":
+    "Un nouveau compte {provider} a besoin d’une clé d’API. Mettez à jour OpenBot sur cet appareil, puis ajoutez le compte de nouveau.",
+  "error.provider.accountKeyRefused": "{provider} n’a pas accepté cette clé d’API. Vérifiez la clé, puis réessayez.",
+  "error.provider.accountKeyUnreachable":
+    "OpenBot n’a pas pu joindre {provider} pour vérifier la clé d’API. Vérifiez la connexion internet, puis réessayez.",
+  "error.provider.accountKeySignedOut":
+    "{provider} n’accepte plus la clé d’API de ce compte. Donnez une nouvelle clé au compte.",
   "error.provider.accountInUse": "Un agent qui utilise ce compte est au travail. Réessayez quand l’agent s’arrête.",
   "error.provider.accountsReadOnly":
     "Les comptes enregistrés du fournisseur sont illisibles. Mettez à jour OpenBot avant de les modifier.",
