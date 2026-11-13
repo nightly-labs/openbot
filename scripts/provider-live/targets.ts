@@ -14,9 +14,13 @@ export function isLiveProvider(value: unknown): value is LiveProvider {
   return LIVE_PROVIDERS.some((provider) => provider === value);
 }
 
-/** The profile of one provider's app. It is under `.openbot-build`, which git ignores. */
+/**
+ * The profile of one provider's app. It is under `.openbot-build`, which git ignores. CI names a folder
+ * outside the checkout in `OPENBOT_PROVIDER_LIVE_DIR`: other jobs of the runner clean the checkout.
+ */
 export function profilePath(provider: LiveProvider): string {
-  return join(PROJECT_ROOT, ".openbot-build", "provider-live", provider, "profile");
+  const base = process.env.OPENBOT_PROVIDER_LIVE_DIR || join(PROJECT_ROOT, ".openbot-build", "provider-live");
+  return join(base, provider, "profile");
 }
 
 /** The model of each provider's test agent: a cheap one. The first listed model replaces a model that the provider does not list. */

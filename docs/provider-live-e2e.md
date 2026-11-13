@@ -13,6 +13,8 @@ The runner is the [e2e](https://e2e.com/docs) framework. The files are in `scrip
    builds the desktop app, and runs `e2e run`.
 2. e2e starts one app for each provider (`start-app.ts`), all at the same time. Each app has its own
    profile in `.openbot-build/provider-live/<provider>/profile` and its own DevTools port.
+   `OPENBOT_PROVIDER_LIVE_DIR` names another folder for the profiles; CI sets it to a folder outside
+   the checkout, because other jobs of the runner clean the checkout.
 3. `provider-answers.e2e.ts` runs one time for each app. It waits until the provider is available,
    makes an agent on a low-cost model (`LIVE_MODELS` in `targets.ts`), types a message in the chat,
    and waits for the word that only the model can give. Then it deletes the agent.
