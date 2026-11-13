@@ -218,11 +218,13 @@ function assertSkipRecord(
   fixture: Fixture,
   routine: Routine,
   reason: "status.agent.routineSkippedLimit" | "status.agent.routineSkippedBusy",
+  count = 1,
 ): void {
   const records = fixture.runs
     .listRuns(fixture.agentId, routine.id, 50, true)
-    .filter((run) => run.missed?.count === 1 && run.error === sourceText(reason));
+    .filter((run) => run.missed && run.error === sourceText(reason));
   assert.equal(records.length, 1, `The history records the skipped occurrence: ${reason}.`);
+  assert.equal(records[0]?.missed?.count, count, "Consecutive skips for one reason share one history row.");
 }
 
 async function raceCase(fixture: Fixture, kind: ScheduleKind, mutation: Mutation): Promise<void> {
@@ -381,6 +383,10 @@ async function raceCase(fixture: Fixture, kind: ScheduleKind, mutation: Mutation
     await runCauseEffect(fixture.scheduler.processDue(new Date(current.trigger.nextRunAt)));
     assert.equal(deliveryCount(fixture, saved.changed), before, "An unfinished run prevents a second queued run.");
     assertSkipRecord(fixture, saved.changed, "status.agent.routineSkippedBusy");
+    const later = fixture.runs.get(fixture.agentId, saved.changed.id);
+    assert.ok(later);
+    await runCauseEffect(fixture.scheduler.processDue(new Date(later.trigger.nextRunAt)));
+    assertSkipRecord(fixture, saved.changed, "status.agent.routineSkippedBusy", 2);
   }
   assert.deepEqual(fixture.errors, []);
 }
