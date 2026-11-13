@@ -80,6 +80,10 @@ export const messages = {
   "error.backend.channelWaitBeforeDeleteHistory": "انتظر حتى يتوقف العمل في هذه القناة، ثم احذف سجلها.",
   "error.backend.channelCompactUnavailable":
     "لا يمكن لأي عضو في هذه القناة ضغط سياقه الآن. يجب أن يرد العضو في القناة أولًا، وأن يدعم مزوده الضغط.",
+  "error.backend.channelCompactNoSession":
+    "لا توجد لأعضاء هذه القناة محادثة لضغطها بعد. اضغطها بعد أن يرد عضو في القناة.",
+  "error.backend.channelCompactNotSupported":
+    "لا يمكن لأي عضو في هذه القناة الضغط عند الطلب. الأعضاء الذين يدعمونه يضغطون سياقهم تلقائيًا عندما يكاد يمتلئ.",
   "error.backend.channelArchived": "استعد هذه القناة قبل إرسال الرسائل أو تغيير المهام.",
   "error.backend.channelReferenceUnavailable": "رسالة القناة المشار إليها غير متاحة.",
   "error.backend.channelTaskNotFound": "لم يتم العثور على مهمة القناة.",

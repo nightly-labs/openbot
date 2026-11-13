@@ -52,6 +52,24 @@ const INEFFECTIVE_COMPACTION_LIMIT = 2;
  */
 const FAILED_COMPACTION_LIMIT = 2;
 
+/**
+ * The budget of a session that reported no usage yet. A window of 1 marks it: the readers of the
+ * window skip it, and the first usage report sets both values.
+ */
+function unknownBudget(): ThreadContextBudget {
+  return {
+    usedTokens: 0,
+    contextWindow: 1,
+    pending: false,
+    phase: "idle",
+    compactionTurnId: null,
+    lastCompactedTokens: null,
+    ineffectiveCompactions: 0,
+    failedCompactions: 0,
+    awaitingUsage: false,
+  };
+}
+
 /** Whether OpenBot asks for no more automatic compactions of this session. "Compact now" still works. */
 function stopped(budget: ThreadContextBudget): boolean {
   return (
@@ -484,6 +502,9 @@ export class ContextCompaction {
     const mode = agent ? this.#providers.clientForAgent(agent)?.contextCompaction : undefined;
     if (!agent || !compactsOnRequest(mode)) return false;
     if (mode === "handoff" && !this.#rotatesSession(agentId, threadId)) return false;
+    // The budget is in memory only, so a session has none after a restart until its next usage report.
+    // The user's request does not need one: it starts as a rotated session does, with no known window.
+    if (manual && !this.#budgets.has(threadId)) this.#budgets.set(threadId, unknownBudget());
     const budget = this.#budgets.get(threadId);
     if (!(budget?.pending || (manual && budget)) || budget.phase !== "idle" || this.#compacting.has(threadId)) {
       return false;
@@ -774,14 +795,9 @@ export class ContextCompaction {
     // above the threshold does not rotate again at each turn.
     if (next)
       this.#budgets.set(next, {
-        usedTokens: 0,
-        contextWindow: 1,
-        pending: false,
-        phase: "idle",
-        compactionTurnId: null,
+        ...unknownBudget(),
         lastCompactedTokens: compactedTokens,
         ineffectiveCompactions: this.#budgets.get(threadId)?.ineffectiveCompactions ?? 0,
-        failedCompactions: 0,
         awaitingUsage: true,
       });
     // A session that was not replaced keeps its budget; the growth rule stops an immediate retry.

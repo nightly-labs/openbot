@@ -92,6 +92,10 @@ export const messages = {
     "Aguarde o trabalho neste canal terminar e depois exclua o histórico.",
   "error.backend.channelCompactUnavailable":
     "Nenhum membro deste canal pode compactar o contexto agora. Um membro precisa responder no canal primeiro, e o provedor dele precisa suportar compactação.",
+  "error.backend.channelCompactNoSession":
+    "Os membros deste canal ainda não têm uma conversa para compactar. Compacte depois que um membro responder no canal.",
+  "error.backend.channelCompactNotSupported":
+    "Nenhum membro deste canal pode compactar sob demanda. Os membros que suportam isso compactam o contexto automaticamente quando ele está quase cheio.",
   "error.backend.channelArchived": "Restaure este canal antes de enviar mensagens ou alterar tarefas.",
   "error.backend.channelReferenceUnavailable": "A mensagem do canal usada como referência está indisponível.",
   "error.backend.channelTaskNotFound": "Tarefa do canal não encontrada.",

@@ -87,6 +87,10 @@ export const messages = {
     "Poczekaj, aż praca w tym kanale się zakończy, a potem usuń jego historię.",
   "error.backend.channelCompactUnavailable":
     "Żaden członek tego kanału nie może teraz skompaktować kontekstu. Członek musi najpierw odpowiedzieć w kanale, a jego dostawca musi obsługiwać kompaktowanie.",
+  "error.backend.channelCompactNoSession":
+    "Członkowie tego kanału nie mają jeszcze rozmowy do skompaktowania. Skompaktuj go, gdy członek odpowie w kanale.",
+  "error.backend.channelCompactNotSupported":
+    "Żaden członek tego kanału nie może kompaktować na żądanie. Członkowie, którzy to obsługują, kompaktują kontekst automatycznie, gdy jest prawie pełny.",
   "error.backend.channelArchived": "Przywróć ten kanał, zanim wyślesz wiadomości lub zmienisz zadania.",
   "error.backend.channelReferenceUnavailable": "Wskazana wiadomość kanału jest niedostępna.",
   "error.backend.channelTaskNotFound": "Nie znaleziono zadania kanału.",

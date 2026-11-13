@@ -78,6 +78,8 @@ export const messages = {
   "error.backend.channelWaitBeforeDeleteHistory": "请等此频道中的工作停止后再删除其历史记录。",
   "error.backend.channelCompactUnavailable":
     "此频道现在没有成员可以压缩上下文。成员必须先在频道中回答,且其提供方必须支持压缩。",
+  "error.backend.channelCompactNoSession": "此频道的成员还没有可压缩的对话。请在成员于频道中回答后再压缩。",
+  "error.backend.channelCompactNotSupported": "此频道没有成员可以按需压缩。支持的成员会在上下文快满时自动压缩。",
   "error.backend.channelArchived": "请先恢复该频道，再发送消息或更改任务。",
   "error.backend.channelReferenceUnavailable": "引用的频道消息不可用。",
   "error.backend.channelTaskNotFound": "未找到该频道任务。",

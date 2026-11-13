@@ -79,6 +79,9 @@ export const messages = {
   "error.backend.channelWaitBeforeDeleteHistory": "המתינו עד שהעבודה בערוץ הזה תיפסק, ואז מחקו את ההיסטוריה שלו.",
   "error.backend.channelCompactUnavailable":
     "אף חבר בערוץ הזה לא יכול לדחוס את ההקשר שלו כעת. חבר צריך לענות בערוץ קודם, והספק שלו צריך לתמוך בדחיסה.",
+  "error.backend.channelCompactNoSession": "לחברי הערוץ הזה אין עדיין שיחה לדחוס. דחסו אותו אחרי שחבר עונה בערוץ.",
+  "error.backend.channelCompactNotSupported":
+    "אף חבר בערוץ הזה לא יכול לדחוס לפי בקשה. חברים שתומכים בזה דוחסים את ההקשר שלהם אוטומטית כשהוא כמעט מלא.",
   "error.backend.channelArchived": "יש לשחזר את הערוץ הזה לפני שליחת הודעות או שינוי משימות.",
   "error.backend.channelReferenceUnavailable": "הודעת הערוץ שאליה מפנים אינה זמינה.",
   "error.backend.channelTaskNotFound": "משימת הערוץ לא נמצאה.",

@@ -84,6 +84,10 @@ export const messages = defineMessages("error.backend", {
   "error.backend.channelWaitBeforeDeleteHistory": "Wait until the work in this channel stops, then delete its history.",
   "error.backend.channelCompactUnavailable":
     "No member of this channel can compact its context now. A member must answer in the channel first, and its provider must support compaction.",
+  "error.backend.channelCompactNoSession":
+    "The members of this channel have no conversation to compact yet. Compact it after a member answers in the channel.",
+  "error.backend.channelCompactNotSupported":
+    "No member of this channel can compact on request. Members that support it compact their context automatically when it is almost full.",
   "error.backend.channelArchived": "Restore this channel before sending messages or changing tasks.",
   "error.backend.channelReferenceUnavailable": "The referenced channel message is unavailable.",
   "error.backend.channelTaskNotFound": "Channel task not found.",

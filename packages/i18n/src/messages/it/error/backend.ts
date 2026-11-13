@@ -86,6 +86,10 @@ export const messages = {
     "Attendi che il lavoro in questo canale finisca, poi elimina la sua cronologia.",
   "error.backend.channelCompactUnavailable":
     "Nessun membro di questo canale può compattare il contesto ora. Un membro deve prima rispondere nel canale e il suo provider deve supportare la compattazione.",
+  "error.backend.channelCompactNoSession":
+    "I membri di questo canale non hanno ancora una conversazione da compattare. Compattalo dopo che un membro ha risposto nel canale.",
+  "error.backend.channelCompactNotSupported":
+    "Nessun membro di questo canale può compattare su richiesta. I membri che lo supportano compattano il contesto automaticamente quando è quasi pieno.",
   "error.backend.channelArchived": "Ripristina questo canale prima di inviare messaggi o modificare le attività.",
   "error.backend.channelReferenceUnavailable": "Il messaggio del canale a cui si fa riferimento non è disponibile.",
   "error.backend.channelTaskNotFound": "Attività del canale non trovata.",

@@ -87,6 +87,10 @@ export const messages = {
     "このチャンネルの作業が終わるまで待ってから、履歴を削除してください。",
   "error.backend.channelCompactUnavailable":
     "今はこのチャンネルのどのメンバーもコンテキストを圧縮できません。メンバーがまずチャンネルで回答し、そのプロバイダーが圧縮に対応している必要があります。",
+  "error.backend.channelCompactNoSession":
+    "このチャンネルのメンバーには、まだ圧縮する会話がありません。メンバーがチャンネルで回答した後に圧縮してください。",
+  "error.backend.channelCompactNotSupported":
+    "このチャンネルのどのメンバーも、要求に応じて圧縮できません。対応しているメンバーは、コンテキストがほぼいっぱいになると自動で圧縮します。",
   "error.backend.channelArchived":
     "メッセージを送信したりタスクを変更したりする前に、このチャンネルを復元してください。",
   "error.backend.channelReferenceUnavailable": "参照先のチャンネルメッセージを使用できません。",

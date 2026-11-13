@@ -179,7 +179,7 @@ import { BootRecovery } from "./agent/boot-recovery";
 import { BrowserUploads } from "./agent/browser-uploads";
 import type { ChatVisualPreviewHost } from "./agent/chat-visual-preview";
 import { CodexIdleSessions } from "./agent/codex-idle-sessions";
-import { ContextCompaction } from "./agent/context-compaction";
+import { ContextCompaction, compactsOnRequest } from "./agent/context-compaction";
 import { ConversationReader } from "./agent/conversation-reader";
 import { ConversationRuntime } from "./agent/conversation-runtime";
 import { CustomEndpoints, toEndpointChangeFailed } from "./agent/custom-endpoints";
@@ -4579,6 +4579,32 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     channelId: string,
   ) {
     const contexts = yield* this.channels.compactTargets(channelId);
+    // A provider process stops after some minutes with no turn, and only its process compacts a session.
+    // It starts again as for a turn; a process that a turn would replace is not touched.
+    const stoppedMembers = this.#store
+      .list()
+      .filter(
+        (agent) =>
+          contexts.some(
+            ({ agentId, threadId }) =>
+              agentId === agent.id && this.#store.database.activeProviderSession(threadId, agent.provider),
+          ) &&
+          !this.#providers.agentClientRunning(agent) &&
+          this.#providers.agentClientCurrent(agent),
+      );
+    yield* Effect.forEach(
+      stoppedMembers,
+      (agent) =>
+        this.#providers.ensureAgentClient(agent).pipe(
+          Effect.asVoid,
+          Effect.catch(() =>
+            Effect.sync(() =>
+              logger.warn("A channel member's provider did not start to compact.", { agentId: agent.id }),
+            ),
+          ),
+        ),
+      { discard: true },
+    );
     const sessions = yield* lifecycleStep("compact channel context", () => {
       const agents = new Map(this.#store.list().map((agent) => [agent.id, agent]));
       const candidates = contexts.flatMap(({ agentId, threadId }) => {
@@ -4591,7 +4617,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       const reserved = candidates.filter(({ agentId, externalSessionId }) =>
         this.#compaction.reserve(agentId, externalSessionId, true),
       );
-      if (!reserved.length) throw new ContextCompactRefusedError(sourceText("error.backend.channelCompactUnavailable"));
+      if (!reserved.length) throw new ContextCompactRefusedError(this.#channelCompactRefusal(candidates, agents));
       return reserved;
     });
     yield* Effect.forEach(
@@ -4601,6 +4627,26 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       { discard: true, concurrency: "unbounded" },
     );
   }, Effect.uninterruptible).bind(this);
+
+  /**
+   * Why no member of a channel compacts. A member with no session has nothing to compact yet. A member
+   * whose provider compacts by itself, or not at all, cannot compact on request. A provider that did
+   * not start can, so it gets the general refusal.
+   */
+  #channelCompactRefusal(
+    candidates: ReadonlyArray<{ agentId: string }>,
+    agents: ReadonlyMap<string, AgentSummary>,
+  ): string {
+    if (!candidates.length) return sourceText("error.backend.channelCompactNoSession");
+    const onRequest = candidates.some(({ agentId }) => {
+      const agent = agents.get(agentId);
+      const client = agent ? this.#providers.clientForAgent(agent) : null;
+      return !client || compactsOnRequest(client.contextCompaction);
+    });
+    return sourceText(
+      onRequest ? "error.backend.channelCompactUnavailable" : "error.backend.channelCompactNotSupported",
+    );
+  }
 
   /**
    * The new chat that the agent asked for with `start_new_chat`. The drain calls it when the agent's
