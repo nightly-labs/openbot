@@ -357,6 +357,8 @@ interface ChatMessageListProps {
   outboxStatuses?: ReadonlyMap<string, OutboxRowStatus>;
   /** A message from search. The chat opens at its row. */
   focusMessageId?: string | null;
+  /** `focusMessageId` is the first unread message: the chat opens at the NEW line, with no highlight. */
+  focusUnread?: boolean;
   onFocusPlaced?: () => void;
 }
 
@@ -1332,6 +1334,7 @@ export const ChatMessageList = memo(function ChatMessageList({
   onSelectionChange,
   onDismissSelection,
   focusMessageId = null,
+  focusUnread = false,
   onFocusPlaced,
 }: ChatMessageListProps) {
   const { t, format, sourceText } = useText();
@@ -1442,11 +1445,12 @@ export const ChatMessageList = memo(function ChatMessageList({
         ),
         {
           unreadMessageIds: unreadLineMessageIds,
-          focusMessageId,
+          // The NEW line already ends a group, so the group of the first unread message stays folded.
+          focusMessageId: focusUnread ? null : focusMessageId,
           branchRowId: branchDivider?.afterId,
         },
       ),
-    [messages, turnSummaries, unreadLineMessageIds, focusMessageId, branchDivider?.afterId],
+    [messages, turnSummaries, unreadLineMessageIds, focusMessageId, focusUnread, branchDivider?.afterId],
   );
   // One pass over the loaded rows when they change; the rows read their label from the context.
   const dayLabels = useMemo(
@@ -1471,7 +1475,14 @@ export const ChatMessageList = memo(function ChatMessageList({
     [rowsShown, openingShown, startsAtEnd, visibleMessages],
   );
   const tailIndex = rows.findLastIndex((message) => message.kind === "message" && message.author === "user");
-  const focusIndex = focusMessageId ? chatRowIndex(rows, focusMessageId) : -1;
+  // The NEW line stands on the first unread message that has a row, as the line does.
+  const focusIndex = !focusMessageId
+    ? -1
+    : focusUnread
+      ? unreadLineMessageIds
+        ? firstChatRowOf(rows, unreadLineMessageIds)
+        : -1
+      : chatRowIndex(rows, focusMessageId);
   const canLoadOlder = online && hasOlder && !olderLoading;
   useFoldScrollAnchor(motion.listRef);
   // The chat opens at the row of a message from search after the list has its rows in place.
@@ -1487,11 +1498,20 @@ export const ChatMessageList = memo(function ChatMessageList({
     if (!focusId || !motion.listPlaced || placedFocus.current === focusId) return;
     placedFocus.current = focusId;
     // The search hold ends after the row is in view, so the chat does not move to the latest message first.
-    void focusHandlers.current.openAt(focusIndex).then(() => {
-      setHighlightedRowId(focusId);
+    void focusHandlers.current.openAt(focusIndex, focusUnread).then(() => {
+      if (!focusUnread) setHighlightedRowId(focusId);
       focusHandlers.current.onFocusPlaced?.();
     });
-  }, [focusId, focusIndex, motion.listPlaced]);
+  }, [focusId, focusIndex, focusUnread, motion.listPlaced]);
+  // The loaded rows do not show the NEW line, so the chat opens at the latest message.
+  const unreadRowMissing =
+    focusUnread && Boolean(focusMessageId) && historyState === "ready" && rowsShown && focusIndex < 0;
+  // The chat showed without the NEW line, such as while the server connected. It does not move to
+  // the line later, under the reader.
+  const shownWithoutUnread = focusUnread && motion.historyVisible && placedFocus.current === null;
+  useEffect(() => {
+    if (unreadRowMissing || shownWithoutUnread) focusHandlers.current.onFocusPlaced?.();
+  }, [unreadRowMissing, shownWithoutUnread]);
   const header = topInset + 84;
   // The latest user message can always move to the top of the chat: the list adds blank space
   // under it while the rows after it are shorter than the screen.
