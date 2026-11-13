@@ -74,6 +74,8 @@ export const messages = {
   "error.team.agentColorsUnsupported": "Esta conexão não oferece suporte a cores de agentes.",
   "error.team.chatColorsUnsupported": "Esta conexão não oferece suporte a cores de chat.",
   "error.team.routineRunPlaceUnsupported": "Esta conexão não pode alterar onde uma rotina é executada.",
+  "error.team.routineRunsQuietUnsupported":
+    "Esta conexão não pode mostrar quais execuções de rotina não tinham nada a relatar.",
   "error.team.routinesOnceUnsupported": "Esta conexão não pode salvar rotinas que são executadas uma vez.",
   "error.team.routineRunCommandUnsupported": "Esta conexão não pode fornecer o comando de execução de uma rotina.",
   "error.team.threadQueueUnsupported": "Esta conexão não pode mostrar a fila de uma thread paralela.",

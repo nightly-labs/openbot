@@ -11,6 +11,7 @@ import type {
   DeleteRoutineInput,
   ListRoutineRunsInput,
   QueueDelivery,
+  QuietRoutineRunsInput,
   Routine,
   RoutineConversationEventAction,
   RoutineRun,
@@ -249,6 +250,12 @@ export class RoutineScheduler implements RoutineDueSource {
   quietRunForDelivery(deliveryId: string): boolean {
     const run = this.#routines.runForDelivery(deliveryId);
     return run !== null && quietRoutineRun(run);
+  }
+
+  /** Records that the run of this delivery ended with nothing to report, so its chat row can say so. */
+  markQuietRunForDelivery(deliveryId: string): void {
+    const run = this.#routines.runForDelivery(deliveryId);
+    if (run && !run.quiet) this.#routines.markRunQuiet(run.id);
   }
 
   duplicate(sourceAgentId: string, targetAgentId: string, now: Date): Map<string, Routine> {
@@ -505,6 +512,12 @@ export class RoutineScheduler implements RoutineDueSource {
     if (!this.#routines.getRecord(agentId, routineId))
       throw new RoutineInputError(sourceText("error.backend.routineGone"));
     return this.#routines.importRuns(agentId, routineId, runs);
+  }
+
+  /** The ids in `input.runIds` of the agent's runs that ended with nothing to report. */
+  quietRunIds(input: QuietRoutineRunsInput): string[] {
+    this.#conversation.requireKnownAgent(input.agentId);
+    return this.#routines.quietRunIds(input.agentId, input.runIds);
   }
 
   listRuns(input: ListRoutineRunsInput, withSkipped = false): RoutineRun[] {

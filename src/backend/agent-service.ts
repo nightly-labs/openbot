@@ -81,6 +81,7 @@ import type {
   ProviderUsageResets,
   QueuedMessageReceipt,
   QueueSnapshot,
+  QuietRoutineRunsInput,
   ReadAgentTaskAroundInput,
   ReadAgentTaskPageInput,
   RemoveMcpServerInput,
@@ -1832,6 +1833,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         mayContinueOnBackup: (agentId) => this.#mayContinueStoppedWork(agentId),
         requeueChannelDelivery: (deliveryId, continueWork) => this.#requeueChannelDelivery(deliveryId, continueWork),
         quietRoutineDelivery: (deliveryId) => this.#routines.quietRunForDelivery(deliveryId),
+        markQuietRoutineRun: (deliveryId) => this.#routines.markQuietRunForDelivery(deliveryId),
         closeRoutineSession: (externalThreadId) => this.#threads.closeRoutineThread(externalThreadId),
         conversationTurnEnded: (agentId, sideThreadId, counts, memoryCommitted) =>
           this.#memoryReview.turnEnded(agentId, sideThreadId, counts, memoryCommitted),
@@ -2427,6 +2429,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /** Writes the finished runs of an imported channel routine. Returns the new run ids in order. */
   importChannelRoutineRuns(channelId: string, routineId: string, runs: readonly ImportedRoutineRun[]): string[] {
     return this.#channelRoutines.importRuns(channelId, routineId, runs);
+  }
+
+  /** The ids in `input.runIds` of the agent's runs that ended with nothing to report. */
+  quietRoutineRunIds(input: QuietRoutineRunsInput): string[] {
+    return this.#routines.quietRunIds(input);
   }
 
   /** `withSkipped` adds the skipped-run records, which only the local history shows. */

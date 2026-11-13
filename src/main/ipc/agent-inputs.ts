@@ -52,6 +52,7 @@ import {
   type PasteMessageLinkInput,
   type PreviewSharedFileInput,
   type PreviewWorkspaceFileInput,
+  type QuietRoutineRunsInput,
   type ReadAgentTaskAroundInput,
   type ReadAgentTaskPageInput,
   type ReadConversationPageInput,
@@ -379,6 +380,14 @@ export function parseListRoutineRuns(value: unknown): ListRoutineRunsInput {
     throw new Error("Invalid routine history limit.");
   }
   return { ...input, limit };
+}
+
+export function parseQuietRoutineRuns(value: unknown): QuietRoutineRunsInput {
+  if (!isObject(value)) throw new Error("Invalid quiet routine runs request.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    runIds: parseIdentifierList(value.runIds, "run ids", INPUT_LIMITS.routineRunsPage),
+  };
 }
 
 function parseRoutineSchedule(value: unknown): CreateRoutineInput["schedule"] {

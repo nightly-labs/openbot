@@ -221,6 +221,11 @@ export interface ConversationProps {
   availableRoutineIds?: readonly string[] | undefined;
   /** The agent's routines, for the chat card of a routine the agent created or changed. */
   routines?: readonly RoutineFields[] | undefined;
+  /**
+   * The ids of the given runs of the agent's routines that ended with nothing to report, so their rows
+   * can say so. Absent on a joined server without `routine-runs-quiet-v1`.
+   */
+  quietRoutineRuns?: ((runIds: readonly string[]) => Promise<readonly string[]>) | undefined;
   modelOptions: ClientAgentModelOption[];
   messages: readonly AgentMessage[];
   messageReferences?: Record<string, AgentMessage> | undefined;

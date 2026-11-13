@@ -1,7 +1,7 @@
 import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
 
 /**
- * What turn state reaches in main: the queue, the routine ids, and the answers to prompts,
+ * What turn state reaches in main: the queue, the routine ids and runs, and the answers to prompts,
  * approvals and browser takeovers.
  */
 export interface TurnsPort {
@@ -17,6 +17,7 @@ export interface TurnsPort {
     | "listQueue"
     | "listRoutines"
     | "listWaits"
+    | "quietRoutineRuns"
     | "readPendingApproval"
     | "reorderQueue"
     | "respondToApproval"

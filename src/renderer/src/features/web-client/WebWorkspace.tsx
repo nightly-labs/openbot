@@ -85,6 +85,7 @@ import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/p
 import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RUN_PLACE_CAPABILITY } from "@openbot/contracts/team-protocol/routine-run-place-v1";
+import { ROUTINE_RUNS_QUIET_CAPABILITY } from "@openbot/contracts/team-protocol/routine-runs-quiet-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
 import { SIDE_QUESTION_CAPABILITY } from "@openbot/contracts/team-protocol/side-question-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
@@ -142,7 +143,7 @@ import {
   stopHostBackgroundProcess,
   updateAgentAdminSettings,
 } from "@openbot/team-client/team-admin-requests";
-import { clearAgentContext, type TeamApiRequest } from "@openbot/team-client/team-api-requests";
+import { clearAgentContext, type TeamApiRequest, teamAgentRoutinesApi } from "@openbot/team-client/team-api-requests";
 import { classifyFailure } from "@openbot/telemetry";
 import { hasVisibleToasts, toast } from "@openbot/ui";
 import type { GlobalSearchRoutine } from "@openbot/ui/components/GlobalSearch";
@@ -2476,6 +2477,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         loadSelectedRoutines(event.agentId);
     }),
   );
+  /** Which runs of the selected agent's routines had nothing to report, on a host with `routine-runs-quiet-v1`. */
+  const quietRoutineRuns = createMemo(() => {
+    const agentId = workspace.state.selectedId;
+    if (!agentId || !workspace.runtime.admin || !workspace.state.capabilities.includes(ROUTINE_RUNS_QUIET_CAPABILITY))
+      return undefined;
+    return (runIds: readonly string[]) =>
+      teamAgentRoutinesApi(hostRequest()).quietRoutineRuns({ agentId, runIds: [...runIds] });
+  });
   const routineSnapshot = () => {
     const snapshot = selectedRoutines();
     return snapshot && snapshot.agentId === workspace.state.selectedId ? snapshot : undefined;
@@ -3908,6 +3917,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   mentionAgents={mentionAgents()}
                   availableRoutineIds={availableRoutineIds()}
                   routines={routineSnapshot()?.routines}
+                  quietRoutineRuns={quietRoutineRuns()}
                   modelOptions={models()}
                   threads={threads()}
                   messages={view.messages}

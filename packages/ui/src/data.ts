@@ -100,6 +100,8 @@ export interface RoutineRunMarkerModel {
   previousTransitions?: RoutineRunMarkerTransition[];
   /** Set when the run has messages in the chat: whether they show under the run. */
   expanded?: boolean;
+  /** Set when the run ended with nothing to report. */
+  quiet?: true;
 }
 
 export type ChatActionMarkerModel =

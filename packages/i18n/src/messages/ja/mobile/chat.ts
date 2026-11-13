@@ -32,6 +32,8 @@ export const messages = {
   "mobile.chat.routine.created": "ルーティンを作成しました",
   "mobile.chat.routine.updated": "ルーティンを更新しました",
   "mobile.chat.routine.deleted": "ルーティンを削除しました",
+  "mobile.chat.routine.nothingToReport": "報告することはありません",
+  "mobile.chat.routine.quietUnsupported": "この接続では、報告することがなかったルーティンの実行を表示できません。",
   "mobile.chat.routine.group.title": "ルーティンのアクティビティ",
   "mobile.chat.routine.group.count": { other: "{count} 件のイベント" },
   "mobile.chat.contextReset": "新しいチャットを開始しました",

@@ -208,6 +208,7 @@ export const messages = {
   "chat.marker.run.failed": "ルーティンが失敗しました",
   "chat.marker.run.interrupted": "ルーティンが中断されました",
   "chat.marker.run.cancelled": "ルーティンはキャンセルされました",
+  "chat.marker.run.nothingToReport": "報告することはありません",
   "chat.marker.runGroup.count": { other: "{count} 回の実行" },
   "chat.marker.runGroup.timeRange": "{start}–{end}",
   "chat.marker.runGroup.show": { other: "{name} の {count} 回の実行を表示" },

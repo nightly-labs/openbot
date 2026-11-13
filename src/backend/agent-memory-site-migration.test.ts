@@ -83,7 +83,7 @@ function siteIndex(db: DatabaseSync) {
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 61 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 62 });
   expect(siteIndex(db)).toEqual([{ name: "agent_memories_site" }]);
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
@@ -152,9 +152,9 @@ describe("agent memory site migration", () => {
     seed(db);
     const before = contents(db);
     const columnsBefore = columns(db);
-    db.exec("INSERT INTO schema_migrations VALUES(62,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(63,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=62; DELETE FROM schema_migrations WHERE version=57");
+    db.exec("DELETE FROM schema_migrations WHERE version=63; DELETE FROM schema_migrations WHERE version=57");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 57");
     expect(contents(db)).toEqual(before);
     expect(columns(db)).toEqual(columnsBefore);
@@ -166,8 +166,8 @@ describe("agent memory site migration", () => {
     seed(db);
     migrateOpenBotDatabase(db);
     const after = contents(db);
-    // An application one release newer than an older one adds 62: this one is the older application for it.
-    db.exec("INSERT INTO schema_migrations VALUES(62,'now')");
+    // An application one release newer than an older one adds 63: this one is the older application for it.
+    db.exec("INSERT INTO schema_migrations VALUES(63,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
     expect(contents(db)).toEqual(after);
   });

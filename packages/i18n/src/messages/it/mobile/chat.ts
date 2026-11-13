@@ -32,6 +32,9 @@ export const messages = {
   "mobile.chat.routine.created": "Routine creata",
   "mobile.chat.routine.updated": "Routine aggiornata",
   "mobile.chat.routine.deleted": "Routine eliminata",
+  "mobile.chat.routine.nothingToReport": "Niente da segnalare",
+  "mobile.chat.routine.quietUnsupported":
+    "Questa connessione non può mostrare quali esecuzioni di routine non avevano nulla da segnalare.",
   "mobile.chat.routine.group.title": "Attività delle routine",
   "mobile.chat.routine.group.count": { one: "{count} evento", other: "{count} eventi" },
   "mobile.chat.contextReset": "Nuova chat iniziata",

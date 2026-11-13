@@ -72,6 +72,7 @@ export const messages = defineMessages("error.team", {
   "error.team.agentColorsUnsupported": "Agent colors are not supported by this connection.",
   "error.team.chatColorsUnsupported": "Chat colors are not supported by this connection.",
   "error.team.routineRunPlaceUnsupported": "This connection cannot change where a routine runs.",
+  "error.team.routineRunsQuietUnsupported": "This connection cannot show which routine runs had nothing to report.",
   "error.team.routinesOnceUnsupported": "This connection cannot save routines that run once.",
   "error.team.routineRunCommandUnsupported": "This connection cannot give the run command of a routine.",
   "error.team.threadQueueUnsupported": "This connection cannot show the queue of a side thread.",

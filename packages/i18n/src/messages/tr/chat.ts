@@ -213,6 +213,7 @@ export const messages = {
   "chat.marker.run.failed": "Başarısız rutin",
   "chat.marker.run.interrupted": "Kesintiye uğrayan rutin",
   "chat.marker.run.cancelled": "İptal edilen rutin",
+  "chat.marker.run.nothingToReport": "Bildirilecek bir şey yok",
   "chat.marker.runGroup.count": { one: "{count} çalıştırma", other: "{count} çalıştırma" },
   "chat.marker.runGroup.timeRange": "{start}–{end}",
   "chat.marker.runGroup.show": {

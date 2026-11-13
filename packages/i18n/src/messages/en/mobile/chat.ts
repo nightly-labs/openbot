@@ -31,6 +31,8 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.routine.created": "Created routine",
   "mobile.chat.routine.updated": "Updated routine",
   "mobile.chat.routine.deleted": "Deleted routine",
+  "mobile.chat.routine.nothingToReport": "Nothing to report",
+  "mobile.chat.routine.quietUnsupported": "This connection cannot show which routine runs had nothing to report.",
   "mobile.chat.routine.group.title": "Routine activity",
   "mobile.chat.routine.group.count": { one: "{count} event", other: "{count} events" },
   "mobile.chat.contextReset": "New chat started",

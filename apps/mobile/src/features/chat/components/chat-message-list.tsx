@@ -67,6 +67,7 @@ import { CHAT_ROW_GAP, type ChatMotion } from "@/features/chat/components/use-ch
 import { useFoldScrollAnchor } from "@/features/chat/components/use-fold-scroll-anchor";
 import { useMessageArrivals } from "@/features/chat/components/use-message-arrivals";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
+import { useQuietRoutineRuns } from "@/features/chat/components/use-quiet-routine-runs";
 import {
   type ChatBubbleMessage,
   type ChatMarkerGroup,
@@ -77,6 +78,7 @@ import {
   groupExchangeMarkers,
   groupRoutineRunMarkers,
   indexChatMessages,
+  withQuietRoutineRuns,
 } from "@/features/chat/model/chat-messages";
 import type { TurnStepsSummary } from "@/features/chat/model/turn-thinking";
 import { readableOn } from "@/features/onboarding/model/onboarding-colors";
@@ -1501,11 +1503,15 @@ export const ChatMessageList = memo(function ChatMessageList({
     return { backgroundColor: `rgb(${r}, ${g}, ${b})` };
   });
 
+  const quietRunIds = useQuietRoutineRuns(target.serverId, target.kind === "agent" ? target.id : null, messages);
   const visibleMessages = useMemo(
     () =>
       groupRoutineRunMarkers(
         groupExchangeMarkers(
-          messages.filter((message) => message.kind !== "thinking" || turnSummaries?.has(message.id)),
+          withQuietRoutineRuns(
+            messages.filter((message) => message.kind !== "thinking" || turnSummaries?.has(message.id)),
+            quietRunIds,
+          ),
         ),
         {
           unreadMessageIds: unreadLineMessageIds,
@@ -1514,7 +1520,7 @@ export const ChatMessageList = memo(function ChatMessageList({
           branchRowId: branchDivider?.afterId,
         },
       ),
-    [messages, turnSummaries, unreadLineMessageIds, focusMessageId, focusUnread, branchDivider?.afterId],
+    [messages, turnSummaries, quietRunIds, unreadLineMessageIds, focusMessageId, focusUnread, branchDivider?.afterId],
   );
   // One pass over the loaded rows when they change; the rows read their label from the context.
   const dayLabels = useMemo(

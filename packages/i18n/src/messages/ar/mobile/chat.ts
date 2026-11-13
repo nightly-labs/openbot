@@ -30,6 +30,9 @@ export const messages = {
   "mobile.chat.routine.created": "تم إنشاء مهمة دورية",
   "mobile.chat.routine.updated": "تم تحديث المهمة الدورية",
   "mobile.chat.routine.deleted": "تم حذف المهمة الدورية",
+  "mobile.chat.routine.nothingToReport": "لا جديد للإبلاغ عنه",
+  "mobile.chat.routine.quietUnsupported":
+    "لا يمكن لهذا الاتصال عرض عمليات تشغيل المهمة الدورية التي لم يكن لديها ما تبلغ عنه.",
   "mobile.chat.routine.group.title": "نشاط المهام الدورية",
   "mobile.chat.routine.group.count": {
     zero: "لا أحداث",

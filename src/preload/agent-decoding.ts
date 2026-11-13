@@ -64,6 +64,7 @@ export const decodeAgentHostSettingsFromMain = guardedDecoder(isAgentHostSetting
 export const decodeRoutines = guardedListDecoder(isRoutine, "routine list response");
 export const decodeRoutineRun = guardedDecoder(isRoutineRun, "routine run response");
 export const decodeRoutineRuns = guardedListDecoder(isRoutineRun, "routine history response");
+export const decodeQuietRoutineRunIds = guardedListDecoder(isString, "quiet routine runs response");
 export const decodeAutomationRunCommand = guardedDecoder(isString, "run command response");
 export const decodeSideQuestionAnswer = guardedDecoder(isString, "side question answer");
 export const decodeRoutineCalendar = guardedDecoder(isRoutineCalendar, "routine calendar response");

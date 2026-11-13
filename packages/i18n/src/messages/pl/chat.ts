@@ -288,6 +288,7 @@ export const messages = {
   "chat.marker.run.failed": "Rutyna nie powiodła się",
   "chat.marker.run.interrupted": "Przerwano rutynę",
   "chat.marker.run.cancelled": "Anulowano rutynę",
+  "chat.marker.run.nothingToReport": "Nic do zgłoszenia",
   "chat.marker.runGroup.count": {
     one: "{count} uruchomienie",
     few: "{count} uruchomienia",

@@ -138,6 +138,10 @@ import {
   ROUTINE_RUN_PLACE_ROUTES,
   type RoutineRunPlaceEntry,
 } from "@openbot/contracts/team-protocol/routine-run-place-v1";
+import {
+  decodeQuietRoutineRunIds,
+  ROUTINE_RUNS_QUIET_ROUTES,
+} from "@openbot/contracts/team-protocol/routine-runs-quiet-v1";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import type { RemoteFileUpload } from "./file-upload";
 import {
@@ -948,7 +952,13 @@ const decodeRoutineRuns = guardedListDecoder(isRoutineRun, "routine run list");
 /** The agent routine calls of the desktop IPC surface, which a remote desktop sends to the host the same way. */
 export type TeamAgentRoutinesApi = Pick<
   OpenBotDesktopApi["agent"],
-  "listRoutines" | "createRoutine" | "updateRoutine" | "deleteRoutine" | "testRoutine" | "listRoutineRuns"
+  | "listRoutines"
+  | "createRoutine"
+  | "updateRoutine"
+  | "deleteRoutine"
+  | "testRoutine"
+  | "listRoutineRuns"
+  | "quietRoutineRuns"
 >;
 
 /** Gives each routine the place where the host runs it, from the `routine-run-place-v1` list. */
@@ -1041,6 +1051,9 @@ export function teamAgentRoutinesApi(
       request("POST", TEAM_API_ROUTES.agent.routineTest(agentId, routineId), decodeRoutineRun),
     listRoutineRuns: ({ agentId, routineId, limit }) =>
       request("GET", `${TEAM_API_ROUTES.agent.routineRuns(agentId, routineId)}?limit=${limit}`, decodeRoutineRuns),
+    // Send it only to a host with `routine-runs-quiet-v1`.
+    quietRoutineRuns: ({ agentId, runIds }) =>
+      request("POST", ROUTINE_RUNS_QUIET_ROUTES.list, decodeQuietRoutineRunIds, { agentId, runIds }),
   };
 }
 

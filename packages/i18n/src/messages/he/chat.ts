@@ -215,6 +215,7 @@ export const messages = {
   "chat.marker.run.failed": "השגרה נכשלה",
   "chat.marker.run.interrupted": "השגרה הופסקה",
   "chat.marker.run.cancelled": "שגרה בוטלה",
+  "chat.marker.run.nothingToReport": "אין מה לדווח",
   "chat.marker.runGroup.count": { one: "הרצה אחת", two: "שתי הרצות", other: "{count} הרצות" },
   "chat.marker.runGroup.timeRange": "{start}–{end}",
   "chat.marker.runGroup.show": {

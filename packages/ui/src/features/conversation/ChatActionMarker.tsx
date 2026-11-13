@@ -381,6 +381,7 @@ function RoutineRunGroupMarker(props: {
 }) {
   const { t, format } = useText();
   const count = () => props.group.runs.length;
+  const allQuiet = () => props.group.runs.every((run) => run.marker.quiet);
   const firstTimestamp = () => props.group.runs[0]?.marker.timestamp ?? props.group.timestamp;
   const timeRange = () =>
     t("chat.marker.runGroup.timeRange", {
@@ -390,11 +391,11 @@ function RoutineRunGroupMarker(props: {
   return (
     <MarkerGroup
       class="chat-action-marker chat-action-marker-routine-run chat-action-marker-routine-run-group"
-      label={t("chat.marker.runGroup.accessible", {
-        count: count(),
-        name: props.group.routineName,
-        time: timeRange(),
-      })}
+      label={withNothingToReport(
+        t("chat.marker.runGroup.accessible", { count: count(), name: props.group.routineName, time: timeRange() }),
+        allQuiet(),
+        t,
+      )}
       listLabel={t("chat.marker.runGroup.runs")}
       entries={props.group.runs}
       drawnCount={props.drawnRunCount}
@@ -418,6 +419,9 @@ function RoutineRunGroupMarker(props: {
             <span class="chat-action-marker-label chat-action-run-group-count">
               {t("chat.marker.runGroup.count", { count: count() })}
             </span>
+            <Show when={allQuiet()}>
+              <span class="chat-action-marker-label">{t("chat.marker.run.nothingToReport")}</span>
+            </Show>
             <time class="chat-action-marker-time chat-action-run-group-time" datetime={props.group.timestamp}>
               {timeRange()}
             </time>
@@ -521,6 +525,9 @@ function SingleChatActionMarker(
                 onOpenRoutine={props.onOpenRoutine}
               />
             )}
+          </Show>
+          <Show when={props.marker.kind === "routine-run" && props.marker.quiet}>
+            <span class="chat-action-marker-label">{t("chat.marker.run.nothingToReport")}</span>
           </Show>
           <Show when={props.marker.kind === "channel-routing" && props.marker}>
             {(marker) => (
@@ -1168,7 +1175,13 @@ function markerAccessibleLabel(
   }
   if (marker.kind === "hosted-site")
     return t("chat.marker.accessible.named", { label, name: marker.hostname ?? marker.title });
-  return t("chat.marker.accessible.named", { label, name: marker.routineName });
+  const named = t("chat.marker.accessible.named", { label, name: marker.routineName });
+  return withNothingToReport(named, marker.kind === "routine-run" && marker.quiet === true, t);
+}
+
+/** The accessible label of a run row, with "Nothing to report" when the row says it. */
+function withNothingToReport(label: string, quiet: boolean, t: AppTranslate): string {
+  return quiet ? t("chat.marker.accessible.named", { label, name: t("chat.marker.run.nothingToReport") }) : label;
 }
 
 function hostedSiteMarkerStatus(

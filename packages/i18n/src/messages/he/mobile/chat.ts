@@ -32,6 +32,8 @@ export const messages = {
   "mobile.chat.routine.created": "שגרה שנוצרה",
   "mobile.chat.routine.updated": "שגרה שעודכנה",
   "mobile.chat.routine.deleted": "שגרה שנמחקה",
+  "mobile.chat.routine.nothingToReport": "אין מה לדווח",
+  "mobile.chat.routine.quietUnsupported": "החיבור הזה לא יכול להציג אילו הרצות של שגרות לא היה להן מה לדווח.",
   "mobile.chat.routine.group.title": "פעילות שגרות",
   "mobile.chat.routine.group.count": { one: "אירוע אחד", two: "שני אירועים", other: "{count} אירועים" },
   "mobile.chat.contextReset": "צ'אט חדש התחיל",

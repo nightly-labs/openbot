@@ -2982,6 +2982,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         return clone(run);
       },
       listRoutineRuns: async (input) => clone((routineRuns.get(input.routineId) ?? []).slice(0, input.limit)),
+      quietRoutineRuns: async (input) =>
+        [...routineRuns.values()].flat().flatMap((run) => (run.quiet && input.runIds.includes(run.id) ? [run.id] : [])),
       automationRunCommand: async (input) =>
         `curl -sS -X POST "$(cat '/mock/automation/url')/v1/agents/${input.agentId}/routines/${input.routineId}/run" -H @'/mock/automation/headers' -H 'Content-Type: application/json' -d '{"payload":""}'`,
       routineCalendar: async (input) => mockRoutineCalendar(input, routines, routineRuns),

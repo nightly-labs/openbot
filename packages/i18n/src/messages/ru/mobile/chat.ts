@@ -31,6 +31,9 @@ export const messages = {
   "mobile.chat.routine.created": "Создана регулярная задача",
   "mobile.chat.routine.updated": "Регулярная задача обновлена",
   "mobile.chat.routine.deleted": "Регулярная задача удалена",
+  "mobile.chat.routine.nothingToReport": "Нечего сообщить",
+  "mobile.chat.routine.quietUnsupported":
+    "Это подключение не может показать, какие запуски регулярных задач завершились без новостей.",
   "mobile.chat.routine.group.title": "Активность регулярных задач",
   "mobile.chat.routine.group.count": {
     one: "{count} событие",

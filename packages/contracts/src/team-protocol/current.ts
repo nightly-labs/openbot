@@ -149,6 +149,7 @@ import { ROUTINE_RECOVERY_CAPABILITY } from "./routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "./routine-results-v1";
 import { ROUTINE_RUN_COMMAND_CAPABILITY } from "./routine-run-command-v1";
 import { ROUTINE_RUN_PLACE_CAPABILITY } from "./routine-run-place-v1";
+import { ROUTINE_RUNS_QUIET_CAPABILITY } from "./routine-runs-quiet-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "./routines-once-v1";
 import { SERVER_AUDIT_CAPABILITY } from "./server-audit-v1";
 import { SHARED_TABLES_CAPABILITY } from "./shared-tables-v1";
@@ -371,6 +372,7 @@ export {
   ROUTINE_RECOVERY_CAPABILITY,
   ROUTINE_RESULTS_CAPABILITY,
   ROUTINE_RUN_PLACE_CAPABILITY,
+  ROUTINE_RUNS_QUIET_CAPABILITY,
   ROUTINES_ONCE_CAPABILITY,
   SERVER_AUDIT_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
@@ -638,6 +640,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   PENDING_APPROVAL_CAPABILITY,
   PROVIDER_ACCOUNT_KEYS_CAPABILITY,
   USAGE_CREDITS_CAPABILITY,
+  ROUTINE_RUNS_QUIET_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -867,7 +870,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY &&
     capability !== PENDING_APPROVAL_CAPABILITY &&
     capability !== PROVIDER_ACCOUNT_KEYS_CAPABILITY &&
-    capability !== USAGE_CREDITS_CAPABILITY,
+    capability !== USAGE_CREDITS_CAPABILITY &&
+    capability !== ROUTINE_RUNS_QUIET_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -973,6 +977,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   PENDING_APPROVAL_CAPABILITY,
   PROVIDER_ACCOUNT_KEYS_CAPABILITY,
   USAGE_CREDITS_CAPABILITY,
+  ROUTINE_RUNS_QUIET_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1161,6 +1166,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY &&
       capability !== PENDING_APPROVAL_CAPABILITY &&
       capability !== PROVIDER_ACCOUNT_KEYS_CAPABILITY &&
-      capability !== USAGE_CREDITS_CAPABILITY,
+      capability !== USAGE_CREDITS_CAPABILITY &&
+      capability !== ROUTINE_RUNS_QUIET_CAPABILITY,
   );
 }

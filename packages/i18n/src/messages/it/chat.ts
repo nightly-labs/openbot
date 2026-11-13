@@ -220,6 +220,7 @@ export const messages = {
   "chat.marker.run.failed": "Routine non riuscita",
   "chat.marker.run.interrupted": "Routine interrotta",
   "chat.marker.run.cancelled": "Routine annullata",
+  "chat.marker.run.nothingToReport": "Niente da segnalare",
   "chat.marker.runGroup.count": { one: "{count} esecuzione", other: "{count} esecuzioni" },
   "chat.marker.runGroup.timeRange": "{start}–{end}",
   "chat.marker.runGroup.show": {

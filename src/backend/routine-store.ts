@@ -66,6 +66,8 @@ export interface RoutineTables {
   limitMessage: string;
   /** Only agent routines have the `run_in` column. A channel routine runs in its channel. */
   runInColumn: boolean;
+  /** Only agent routine runs have the `quiet` column. */
+  quietRunColumn: boolean;
 }
 
 /** A routine read back with the owner column it was stored under. */
@@ -90,6 +92,8 @@ export interface ImportedRoutineRun {
   status: RoutineRunStatus;
   error: string | null;
   missed?: { count: number; until: string | null };
+  /** The run ended with nothing to report. Only an agent routine run keeps it. */
+  quiet?: true;
   createdAt: string;
   updatedAt: string;
 }
@@ -204,8 +208,8 @@ export class RoutineStore {
 
   protected get runColumns(): string {
     return `run_id, routine_id, ${this.tables.ownerColumn}, trigger_id, run_kind, scheduled_for, routine_name,
-            instruction, ${this.tables.handleColumn}, status, error, missed_count, missed_until, run_source, created_at,
-            updated_at`;
+            instruction, ${this.tables.handleColumn}, status, error, missed_count, missed_until, run_source,
+            ${this.tables.quietRunColumn ? "quiet, " : ""}created_at, updated_at`;
   }
 
   protected listRoutines(ownerId: string): OwnedRoutine[] {
@@ -942,7 +946,7 @@ export class RoutineStore {
    */
   protected importRunRows(routineId: string, ownerId: string, runs: readonly ImportedRoutineRun[]): string[] {
     if (runs.length === 0) return [];
-    const { commandPrefix, eventPrefix, runAggregate, runTable, ownerColumn } = this.tables;
+    const { commandPrefix, eventPrefix, runAggregate, runTable, ownerColumn, quietRunColumn } = this.tables;
     const runIds = runs.map(() => randomUUID());
     return this.database.dispatch(
       `${commandPrefix}-run:import:${routineId}:${randomUUID()}`,
@@ -956,8 +960,8 @@ export class RoutineStore {
         const insert = db.prepare(
           `INSERT INTO ${runTable} (
              run_id, routine_id, ${ownerColumn}, trigger_id, run_kind, run_source, scheduled_for, routine_name,
-             instruction, status, error, missed_count, missed_until, created_at, updated_at, last_event_sequence
-           ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             instruction, status, error, missed_count, missed_until, created_at, updated_at, last_event_sequence${quietRunColumn ? ", quiet" : ""}
+           ) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${quietRunColumn ? ", ?" : ""})`,
         );
         for (const [index, run] of runs.entries())
           insert.run(
@@ -976,6 +980,7 @@ export class RoutineStore {
             run.createdAt,
             run.updatedAt,
             sequences[index] ?? 0,
+            ...(quietRunColumn ? [run.quiet ? 1 : 0] : []),
           );
         return runIds;
       },
@@ -1061,6 +1066,15 @@ export class RoutineStore {
         `UPDATE ${this.tables.runTable} SET status = ?, error = ?, updated_at = ?, last_event_sequence = ?
          WHERE run_id = ?`,
       ).run(status, error, now, sequence, runId);
+    });
+  }
+
+  /** Records that the run ended with nothing to report. Only for a table with `quietRunColumn`. */
+  protected markRunQuietRow(runId: string): OwnedRoutineRun {
+    return this.#mutateRun(runId, `${this.tables.eventPrefix}.run-quiet`, (db, sequence, now) => {
+      db.prepare(
+        `UPDATE ${this.tables.runTable} SET quiet = 1, updated_at = ?, last_event_sequence = ? WHERE run_id = ?`,
+      ).run(now, sequence, runId);
     });
   }
 
@@ -1195,6 +1209,7 @@ export class RoutineStore {
       handleId: optionalStringColumn(row, this.tables.handleColumn),
       status,
       error: optionalStringColumn(row, "error"),
+      ...(row.quiet === 1 ? { quiet: true as const } : {}),
       ...(missedCount === null
         ? {}
         : {

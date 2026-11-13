@@ -140,6 +140,7 @@ type TeamApiAgentMethods = Pick<
   | "deleteRoutine"
   | "testRoutine"
   | "listRoutineRuns"
+  | "quietRoutineRunIds"
   | "listChannelMemories"
   | "createChannelMemory"
   | "updateChannelMemory"

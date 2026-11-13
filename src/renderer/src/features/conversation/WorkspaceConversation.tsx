@@ -253,6 +253,15 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     return () => turnsPort().agent.clearContext(agent.id, server.id);
   });
 
+  /** Which runs of the agent's routines had nothing to report: here, or on a host with `routine-runs-quiet-v1`. */
+  const activeQuietRoutineRuns = createMemo(() => {
+    const agent = activeAgent();
+    const server = activeServer();
+    if (!agent || !server || !serverSupportsCapability(server, "routine-runs-quiet-v1")) return undefined;
+    return (runIds: readonly string[]) =>
+      turnsPort().agent.quietRoutineRuns({ agentId: agent.id, runIds: [...runIds] }, server.id);
+  });
+
   /** This computer, an owner or admin, or a member with manage access to the agent. */
   const deletesAnyAgentMessage = createAgentMessageDeleteAccess(desktopAgentMessageDeleteAccess(activeServer));
 
@@ -577,6 +586,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         mentionAgents={agentList().filter((agent) => !userPausedAgentIds().has(agent.id))}
         availableRoutineIds={activeRoutineIds()}
         routines={activeRoutines()}
+        quietRoutineRuns={activeQuietRoutineRuns()}
         modelOptions={modelOptions()}
         messages={activeMessages()}
         messageReferences={activeAgent() ? (conversations[activeAgent()?.id ?? ""]?.references ?? {}) : {}}

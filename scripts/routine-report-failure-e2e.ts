@@ -4,8 +4,8 @@
 // names in `<<CALLS[...]CALLS>>`, logs each result, and then answers. The check asserts that a called
 // run ends `failed` with the redacted reason while its delivery stays `completed` and its answer shows in its routine thread,
 // that a later queue change keeps it failed, that a run with no call succeeds, that a provider failure
-// still wins, that a failed script run is never quiet, that the tool fails outside a routine run, that
-// a teammate's update that wants no answer can end quiet (#6821), that
+// still wins, that a failed script run is never quiet and only a quiet run records it, that the tool fails
+// outside a routine run, that a teammate's update that wants no answer can end quiet (#6821), that
 // a flow skips the agents after a failed owner or linked step, and that a result destination gets the
 // answer of a reported failure but not of a provider failure.
 // `bun scripts/routine-report-failure-e2e.ts`. Writes .openbot-build/routine-report-failure-e2e/report.json.
@@ -198,7 +198,7 @@ interface LogEntry {
 }
 
 const report: {
-  runs: Record<string, Pick<RoutineRun, "status" | "error"> & { deliveryStatus?: string | null }>;
+  runs: Record<string, Pick<RoutineRun, "status" | "error"> & { deliveryStatus?: string | null; quiet?: boolean }>;
   flowSteps: Record<string, { agent: string; status: string; error: string | null }[]>;
   resultRuns: string[];
   checks: { name: string; passed: boolean }[];
@@ -337,7 +337,12 @@ async function settledRun(name: string, run: RoutineRun) {
       .find((entry) => entry.id === run.id);
     return found && !["queued", "running"].includes(found.status) ? found : null;
   });
-  report.runs[name] = { status: ranRun.status, error: ranRun.error, deliveryStatus: delivery.status };
+  report.runs[name] = {
+    status: ranRun.status,
+    error: ranRun.error,
+    deliveryStatus: delivery.status,
+    quiet: ranRun.quiet === true,
+  };
   return { delivery, run: ranRun };
 }
 
@@ -615,6 +620,18 @@ try {
     noUpdateAfterFailure?.contentItems.some((item) => item.text.includes('"shown"')) === true &&
       failedThenQuietRun.run.status === "failed",
     noUpdateAfterFailure,
+  );
+  // The chat row of a quiet run says that it had nothing to report, so only that run records it.
+  pass(
+    "Only the quiet script run records that it had nothing to report",
+    quietOkRun.run.quiet === true &&
+      quietFailedRun.run.quiet === undefined &&
+      failedThenQuietRun.run.quiet === undefined,
+    {
+      quietOk: quietOkRun.run.quiet,
+      quietFailed: quietFailedRun.run.quiet,
+      failedThenQuiet: failedThenQuietRun.run.quiet,
+    },
   );
   // A quiet run keeps no normal answer in its routine thread: its answers are dropped or marked quiet.
   const shownAnswers = (routineId: string, turnId: string | null) => {

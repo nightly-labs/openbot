@@ -396,6 +396,7 @@ import { routeRoutineFlows } from "./team-api/route-routine-flows";
 import { routeRoutineResults } from "./team-api/route-routine-results";
 import { routeRoutineRunCommand } from "./team-api/route-routine-run-command";
 import { routeRoutineRunPlace } from "./team-api/route-routine-run-place";
+import { routeRoutineRunsQuiet } from "./team-api/route-routine-runs-quiet";
 import { routeRoutinesOnce } from "./team-api/route-routines-once";
 import { routeServerAudit } from "./team-api/route-server-audit";
 import { routeSharedTables } from "./team-api/route-shared-tables";
@@ -1217,6 +1218,7 @@ export class TeamApiServer {
         "handled"
       )
         return;
+      if ((await routeRoutineRunsQuiet(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeRoutinesOnce(context, this.#options.agents, this.#options.channels, hidden)) === "handled")
         return;
       if ((await routeAgentSessionSettings(context, this.#options.admin, hidden)) === "handled") return;

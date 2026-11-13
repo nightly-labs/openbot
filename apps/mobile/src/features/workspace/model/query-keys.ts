@@ -265,6 +265,14 @@ export const queryKeys = {
   ],
   /** The pinned messages of all chats of one agent, from `message-pins-v1`. `message-pins-changed` invalidates it. */
   messagePins: (scope: QueryScope, serverId: string, agentId: string) => ["message-pins", ...scope, serverId, agentId],
+  /** Which of `runIds`, runs of one agent's routines, ended with nothing to report, from `routine-runs-quiet-v1`. */
+  quietRoutineRuns: (scope: QueryScope, serverId: string, agentId: string, runIds: readonly string[]) => [
+    "quiet-routine-runs",
+    ...scope,
+    serverId,
+    agentId,
+    ...runIds,
+  ],
   agentTaskConversation: (scope: QueryScope, serverId: string, taskId: string) => [
     ...queryKeys.serverTasks(scope, serverId),
     "task",

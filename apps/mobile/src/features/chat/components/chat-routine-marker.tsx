@@ -92,7 +92,13 @@ export function RoutineMarkerRow({ message, muted }: { message: RoutineMarker; m
   return (
     <View
       accessible
-      accessibilityLabel={`${t(message.label)}, ${message.routineName}`}
+      accessibilityLabel={[
+        t(message.label),
+        message.routineName,
+        message.quiet ? t("mobile.chat.routine.nothingToReport") : null,
+      ]
+        .filter(Boolean)
+        .join(", ")}
       className="flex-row flex-wrap items-center justify-center gap-1.5 py-2"
     >
       <Icon size={16} color={color} strokeWidth={1.75} />
@@ -102,6 +108,11 @@ export function RoutineMarkerRow({ message, muted }: { message: RoutineMarker; m
       <Typography.Paragraph type="body-sm" className="font-medium" style={{ color: muted }}>
         {message.routineName}
       </Typography.Paragraph>
+      {message.quiet ? (
+        <Typography.Paragraph type="body-sm" style={{ color: muted }}>
+          {t("mobile.chat.routine.nothingToReport")}
+        </Typography.Paragraph>
+      ) : null}
     </View>
   );
 }
@@ -178,6 +189,7 @@ export function RoutineRunGroupRow({ group, muted }: { group: RoutineRunGroup; m
   const color = useMarkerColor(lead?.event ?? "updated", muted);
   const title = group.routineName ?? t("mobile.chat.routine.group.title");
   const count = group.runs.length;
+  const allQuiet = group.runs.every((run) => run.quiet);
   return (
     <View className="items-center">
       <Pressable
@@ -187,6 +199,7 @@ export function RoutineRunGroupRow({ group, muted }: { group: RoutineRunGroup; m
           title,
           lead?.event === "failed" ? t(lead.label) : null,
           t("mobile.chat.routine.group.count", { count }),
+          allQuiet ? t("mobile.chat.routine.nothingToReport") : null,
         ]
           .filter(Boolean)
           .join(", ")}
@@ -219,6 +232,11 @@ export function RoutineRunGroupRow({ group, muted }: { group: RoutineRunGroup; m
             {format.number(count)}
           </Typography.Paragraph>
         </View>
+        {allQuiet ? (
+          <Typography.Paragraph type="body-sm" style={{ color: muted }}>
+            {t("mobile.chat.routine.nothingToReport")}
+          </Typography.Paragraph>
+        ) : null}
         <Animated.View
           style={{
             transform: [{ rotate: open ? "180deg" : "0deg" }],

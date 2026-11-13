@@ -212,6 +212,7 @@ export const messages = {
   "chat.marker.run.failed": "루틴 실패",
   "chat.marker.run.interrupted": "루틴 중단됨",
   "chat.marker.run.cancelled": "루틴을 취소함",
+  "chat.marker.run.nothingToReport": "보고할 내용 없음",
   "chat.marker.runGroup.count": { other: "실행 {count}회" },
   "chat.marker.runGroup.timeRange": "{start}–{end}",
   "chat.marker.runGroup.show": { other: "{name}의 실행 {count}회 보기" },
