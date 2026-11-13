@@ -1280,6 +1280,14 @@ still uses the sandbox. The downtime is the export, the copy, the import and the
    stays on boat. On 2026-11-12 an export failed because such a service wrote to the home during the
    archive.
 
+   The move also stops before the downtime when the sandbox has a Docker container (a directory in
+   `/var/lib/docker/containers`): the VPS has no Docker, and the archive has no containers or images.
+   It refuses, before it changes anything, a sandbox whose stop at boat is failing
+   (`stop.status: "failing"`): each new try of boat stops OpenBot, and a try during the downtime looks
+   like a stop that ended. On 2026-11-13 a move of a sandbox with a Docker container that restarted
+   started OpenBot on the VPS while boat cancelled the stop, and the sandbox started OpenBot again. It
+   was rolled back.
+
    The archive also has the SHA-256 of `openbot.db`, `agent-data.db`, `login.keyring` and
    `keyring-password`, the names of the npm commands and groups of the sandbox, and the Ubuntu
    version. It does not have:
@@ -1330,7 +1338,10 @@ still uses the sandbox. The downtime is the export, the copy, the import and the
    `computer` MCP server of the desktop in the Claude, Codex and Pi settings, the boat blocks in the
    shell files, and the Pi MCP extension when no other MCP server uses it. On the VPS, a Pi that
    called the desktop waited for it, and its start timed out.
-7. Stop the sandbox at boat. Do not start it again while the VPS runs: two hosts would have one ID.
+7. Stop the sandbox at boat, and wait for the state `archived`. `archiving` is not enough: boat can
+   cancel the stop after it, and the sandbox then runs again. `leaseweb-pool.ts move` waits for
+   `archived` and stops when the stop becomes `failing`. Do not start the sandbox again while the VPS
+   runs: two hosts would have one ID.
 8. On the VPS: `move-from-boat.sh start`. It refuses when the import is not complete or when
    `openbot.db` changed after the import, then enables and starts `openbot.service`. A machine with
    no display manager does not wait for the boat desktop: OpenBot uses two virtual displays at once.
