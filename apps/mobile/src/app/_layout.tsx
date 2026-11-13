@@ -39,6 +39,8 @@ import { loadPushNotificationPreference } from "@/features/settings/model/push-n
 import { loadRoutineCollapsePreference } from "@/features/settings/model/routine-collapse";
 import { loadTextSize } from "@/features/settings/model/text-size";
 import { resetShareExtension } from "@/features/share/model/share-extension";
+import { resetShortcutDirectory } from "@/features/shortcuts/model/shortcut-directory";
+import { installShortcuts, resetShortcuts } from "@/features/shortcuts/shortcuts-native";
 import { installSupportLog } from "@/features/support/model/support-log-capture";
 import { checkRecognitionModels } from "@/features/voice/model/recognition-models";
 import { supertonicModel } from "@/features/voice/model/supertonic-model";
@@ -64,6 +66,7 @@ export const unstable_settings = {
 
 installSupportLog();
 installQuickActions();
+installShortcuts();
 installAppLock();
 installNotificationHandler();
 
@@ -119,11 +122,13 @@ function RootNavigator() {
 
   // A quick action stays on the app icon after the session ends, such as one that another device revoked.
   // The share extension keeps its copy of the session and the share sheet its agents, so both go too,
-  // with the agent pictures of the notifications.
+  // with the agents of the shortcuts and the agent pictures of the notifications.
   useEffect(() => {
     if (loading || session) return;
     resetQuickActions();
     resetShareExtension();
+    resetShortcutDirectory();
+    resetShortcuts();
     resetNotificationAvatars();
   }, [loading, session]);
 
