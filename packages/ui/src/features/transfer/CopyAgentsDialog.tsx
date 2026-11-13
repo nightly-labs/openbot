@@ -83,6 +83,8 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
   const duplicates = createMemo(() => selected().filter((agent) => takenNames().has(agent.name.toLowerCase())));
   const [confirmingDuplicates, setConfirmingDuplicates] = createSignal(false);
   const startCopy = () => props.onCopy(selected().map((agent) => agent.id));
+  // The duplicate check needs the destination's agents. When they cannot be read, the copy can still start.
+  const readingDestination = () => props.toAgents === null && !props.loadError;
   const busy = () => props.phase === "copying";
   const done = () => props.phase === "done";
   const from = () => props.servers.find((server) => server.id === props.fromId) ?? null;
@@ -252,7 +254,7 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
                     </Button>
                     <Button
                       type="button"
-                      disabled={!to() || selected().length === 0}
+                      disabled={!to() || selected().length === 0 || readingDestination()}
                       loading={busy()}
                       loadingLabel={t("settings.transfer.copy.copying")}
                       onClick={() => (duplicates().length > 0 ? setConfirmingDuplicates(true) : startCopy())}

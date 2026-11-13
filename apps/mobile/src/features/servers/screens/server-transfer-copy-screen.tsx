@@ -125,6 +125,8 @@ export function ServerTransferCopyScreen() {
   const busy = phase !== "idle";
   const selected = data.agents.filter((agent) => !excluded.has(agent.id));
   const usedNames = new Set(destination.data?.agents.map((agent) => agent.name.toLowerCase()) ?? []);
+  // The duplicate check needs the destination's agents. When they cannot be read, the copy can still start.
+  const readingDestination = destination.isPending && destination.fetchStatus !== "idle";
 
   async function copy(to: { id: string; name: string }) {
     if (running.current) return;
@@ -246,7 +248,7 @@ export function ServerTransferCopyScreen() {
       <SettingsSection footer={error ?? undefined}>
         <SettingsRow
           disclosure={false}
-          disabled={busy || selected.length === 0 || !target}
+          disabled={busy || selected.length === 0 || !target || readingDestination}
           onPress={() => {
             if (target) confirmAndCopy({ id: target.id, name: target.name });
           }}
