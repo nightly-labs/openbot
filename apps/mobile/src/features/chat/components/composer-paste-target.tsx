@@ -16,23 +16,30 @@ interface NativeProps extends ViewProps {
   /** Android stops a copy one byte after this, so a large file is refused without a full copy. */
   maxBytes: number;
   onPasteFiles: (event: NativeSyntheticEvent<PastedFiles>) => void;
+  onSubmitKey: (event: NativeSyntheticEvent<{ text: string }>) => void;
 }
 
-/** `modules/composer-paste`. A build without it, such as Expo Go, pastes text only. */
+/**
+ * `modules/composer-paste`. A build without it, such as Expo Go, pastes text only, and Return on a
+ * hardware keyboard adds a line break.
+ */
 const NativePasteTarget = requireOptionalNativeModule("OpenBotComposerPaste")
   ? requireNativeView<NativeProps>("OpenBotComposerPaste")
   : null;
 
 /**
  * Wraps the composer field, so a paste of photos, videos or other files adds them as attachments.
- * It takes the field's place in the layout.
+ * Return on a hardware keyboard, such as on an iPad, sends `onSubmitKey` with the text of the field.
+ * Shift+Return adds a line break. It takes the field's place in the layout.
  */
 export function ComposerPasteTarget({
   children,
   onPasteFiles,
+  onSubmitKey,
 }: {
   children: ReactNode;
   onPasteFiles: (pasted: PastedFiles) => void;
+  onSubmitKey: (text: string) => void;
 }) {
   if (!NativePasteTarget) return children;
   return (
@@ -41,6 +48,7 @@ export function ComposerPasteTarget({
       extensions={ATTACHMENT_FILE_EXTENSIONS}
       maxBytes={MOBILE_ATTACHMENT_BYTES}
       onPasteFiles={({ nativeEvent }) => onPasteFiles(nativeEvent)}
+      onSubmitKey={({ nativeEvent }) => onSubmitKey(nativeEvent.text)}
     >
       {children}
     </NativePasteTarget>
