@@ -401,6 +401,14 @@ All notable changes to OpenBot will be documented here. The project follows
   a saved Go key hid all paid Zen models.
 - A new OpenCode model shows in the model list a few seconds after OpenCode starts. Before, the
   list could miss a model that OpenCode released after its last start.
+- A message to a Grok agent no longer waits without end when the Grok process stops answering.
+  OpenBot now ends that process after 5 minutes with no output, shows "Grok did not answer in time, so
+  OpenBot ended its process.", and starts Grok again for the next message.
+- On the Linux AppImage, OpenBot keeps its files after it restarts itself (a restart when idle, or a
+  restart for the dock above other apps). Before, remote desktop, Computer Use and the update check
+  stopped working after such a restart, until you quit OpenBot and opened it again.
+- When a remote desktop component is missing, remote desktop reports that it did not start. Before,
+  OpenBot showed a JavaScript error box.
 
 ## [0.69.0] - 2026-11-12
 
