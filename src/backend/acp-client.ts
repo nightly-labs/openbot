@@ -447,6 +447,18 @@ export const OPENBOT_ACP_CLIENT_CAPABILITIES = {
 
 export const OPENBOT_ACP_CLIENT_INFO = { name: "openbot", title: "OpenBot", version: "0.1.0" } as const;
 
+/** Each check answers that it found no refusal when it cannot tell. */
+export interface AcpSavedSignInCheck {
+  /**
+   * Whether the agent's server refuses the saved sign-in, after a turn with no answer on `model`:
+   * `lasting` when the refusal holds until a new sign-in, `turn` when it is sure for this turn only,
+   * or null.
+   */
+  refusedAfterEmptyAnswer(model: string | null): Effect.Effect<"lasting" | "turn" | null>;
+  /** Whether a `lasting` refusal holds for the saved sign-in still. */
+  refusedAtStart(): Effect.Effect<boolean>;
+}
+
 export interface AcpProviderOptions {
   provider: AgentProvider;
   /** Durable history supplied by the database. ACP never owns a full conversation snapshot. */
@@ -539,6 +551,11 @@ export interface AcpProviderOptions {
    * must say what to do: the sign-in succeeds, and the next process is refused again.
    */
   authBlockedMessage?: () => string | null;
+  /**
+   * A check of the saved sign-in, for an agent that ends a turn with no answer and no error when its
+   * server refuses that sign-in (Kimi CLI 1.52.0, #8555).
+   */
+  savedSignInCheck?: AcpSavedSignInCheck;
   /**
    * Reads optional identity fields that ACP does not define. A provider extension failing must not
    * turn a working authenticated process into a signed-out one, so account/read falls back to null
@@ -1431,6 +1448,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       }
       if (this.#models.length === 0 && !this.options.allowNoModels) {
         throw new Error(sourceText("error.provider.acpNoModels"));
+      }
+      // The agent lists models also for a saved sign-in that its server refused.
+      if (yield* this.options.savedSignInCheck?.refusedAtStart() ?? Effect.succeed(false)) {
+        this.#models = [];
+        this.#signedIn = false;
+        return;
       }
       this.#signedIn = true;
     } catch (error) {
@@ -2498,7 +2521,21 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         response.stopReason === "end_turn" && !turn.receivedOutput && !turn.answerOptional && !turn.stopped
           ? (this.#flavor.emptyAnswerFailure?.(turn, this.#label) ?? null)
           : null;
-      if (emptyAnswerFailure !== null) {
+      const savedSignInCheck = emptyAnswerFailure === null ? undefined : this.options.savedSignInCheck;
+      const refusal = savedSignInCheck ? yield* savedSignInCheck.refusedAfterEmptyAnswer(thread.currentModelId) : null;
+      if (savedSignInCheck && (thread.activeTurn !== turn || turn.completing)) return;
+      // A stop during the check ends the turn as interrupted, below.
+      if (emptyAnswerFailure !== null && !turn.stopped) {
+        if (refusal !== null) {
+          logger.warn("An ACP agent's server refused its saved sign-in.", { provider: this.provider, refusal });
+          turn.failureCause = "authentication";
+          yield* this.#completeTurn(thread, turn, "failed", this.options.signInMessage);
+          if (refusal === "turn") return;
+          // The next process starts signed out, so the provider offers its sign-in.
+          this.#signedIn = false;
+          yield* this.#endAgentProcess(this.options.signInMessage);
+          return;
+        }
         turn.failureCause = "empty_answer";
         yield* this.#completeTurn(thread, turn, "failed", emptyAnswerFailure);
         return;
