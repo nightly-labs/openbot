@@ -69,4 +69,14 @@ export const messages = {
   "error.workflow.githubUncertain":
     "변경이 도중에 멈췄어요. GitHub에 이미 반영됐을 수 있어요. 단계를 다시 실행하기 전에 GitHub를 확인하세요.",
   "error.workflow.githubNoEvent": "이 트리거가 시작할 이슈나 풀 리퀘스트가 GitHub에 없어요.",
+  "error.workflow.sunraSignIn": "Sunra 모델을 사용하려면 앱에서 Sunra에 로그인하세요.",
+  "error.workflow.sunraNoCredits":
+    "Sunra 계정의 크레딧이 부족합니다. sunra.ai/pricing에서 크레딧을 추가한 다음 단계를 다시 실행하세요.",
+  "error.workflow.sunraNeedsPlan":
+    "이 Sunra 모델에는 Sunra 플랜이 필요합니다. sunra.ai/pricing에서 플랜을 선택하거나 다른 모델을 선택하세요.",
+  "error.workflow.sunraTeamInputs":
+    "Sunra는 개인 계정에서만 입력 이미지를 사용합니다. Sunra에서 개인 계정을 선택하거나 이미지 연결을 제거하세요.",
+  "error.workflow.sunraFailed": "Sunra가 파일을 만들지 못했습니다: {reason}",
+  "error.workflow.sunraTimeout":
+    "Sunra가 제시간에 파일을 완성하지 못했습니다. 단계를 다시 실행하기 전에 sunra.ai의 OpenBot 프로젝트를 확인하세요.",
 } as const satisfies PartialTranslation<typeof source>;

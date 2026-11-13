@@ -1,5 +1,4 @@
 import {
-  AGENT_DEFAULT_KEYS,
   type ApprovalAutomationPreference,
   agentAutoApprovalEnabled,
   type DynamicIslandGeometry,
@@ -348,23 +347,8 @@ const Settings = createSimpleContext({
         if (previous.notificationPreview !== value.notificationPreview)
           persistField("notificationPreview", saved, (preference) => preference.messagePreview);
       }
-      if (previous.busyMessageMode !== value.busyMessageMode) {
-        busyMessageModeChanged = true;
-        persistField(
-          "busyMessageMode",
-          settingsPort().setBusyMessageModePreference({ mode: value.busyMessageMode }),
-          (preference) => preference.mode,
-        );
-      }
-      if (
-        AGENT_DEFAULT_KEYS.some((key) => previous.agentDefaults[key] !== value.agentDefaults[key]) ||
-        previous.agentDefaults.planStartAfterMs !== value.agentDefaults.planStartAfterMs ||
-        previous.agentDefaults.automationRunsPerHour !== value.agentDefaults.automationRunsPerHour ||
-        previous.agentDefaults.commitCoAuthor !== value.agentDefaults.commitCoAuthor
-      ) {
-        agentDefaultsChanged = true;
-        persistField("agentDefaults", settingsPort().setAgentDefaults({ ...value.agentDefaults }), (saved) => saved);
-      }
+      // `busyMessageMode` and `agentDefaults` are not saved here: Server Settings > Agents saves them
+      // through the host, and the `agents-changed` listener below reads them again.
       // A hidden switch is null and cannot change.
       if (value.launchAtLogin !== null && previous.launchAtLogin !== value.launchAtLogin) {
         launchAtLoginChanged = true;
@@ -550,25 +534,46 @@ const Settings = createSimpleContext({
           ...islandSettings(preference),
         }));
       });
-      // An owner or admin can change the agent defaults of this computer from a phone or the web client.
-      // The host then sends `agents-changed`. Main answers in the order of the calls, so a read that
-      // starts before a change of this window does not come after the answer of that change.
+      // Server Settings > Agents of this computer, a phone or the web client change the agent defaults of
+      // this computer. The host then sends `agents-changed`, and new chats here read the defaults from
+      // these settings. Main answers in the order of the calls, so a read that starts before a change
+      // does not come after the answer of that change.
+      // Many changes send `agents-changed`, such as a queued message, so the events of a burst share
+      // one read: an event during a read starts one more read after it, which sees the last change.
+      let agentDefaultsRead: Promise<void> | null = null;
+      let agentDefaultsReadAgain = false;
+      const readAgentDefaults = (): void => {
+        if (agentDefaultsRead) {
+          agentDefaultsReadAgain = true;
+          return;
+        }
+        agentDefaultsRead = Promise.all([
+          settingsPort()
+            .getAgentDefaults()
+            .then((defaults) => {
+              agentDefaultsChanged = true;
+              setGeneralSettings((current) => ({ ...current, agentDefaults: defaults }));
+            }),
+          settingsPort()
+            .getBusyMessageModePreference()
+            .then((preference) => {
+              busyMessageModeChanged = true;
+              setGeneralSettings((current) => ({ ...current, busyMessageMode: preference.mode }));
+            }),
+        ])
+          .then(
+            () => undefined,
+            () => undefined,
+          )
+          .finally(() => {
+            agentDefaultsRead = null;
+            if (!agentDefaultsReadAgain) return;
+            agentDefaultsReadAgain = false;
+            readAgentDefaults();
+          });
+      };
       const unsubscribeAgentDefaults = settingsPort().agent.onScopedEvent(({ serverId, event }) => {
-        if (serverId !== LOCAL_SERVER_ID || event.type !== "agents-changed" || !appSettingsOpen()) return;
-        void settingsPort()
-          .getAgentDefaults()
-          .then((defaults) => {
-            agentDefaultsChanged = true;
-            setGeneralSettings((current) => ({ ...current, agentDefaults: defaults }));
-          })
-          .catch(() => undefined);
-        void settingsPort()
-          .getBusyMessageModePreference()
-          .then((preference) => {
-            busyMessageModeChanged = true;
-            setGeneralSettings((current) => ({ ...current, busyMessageMode: preference.mode }));
-          })
-          .catch(() => undefined);
+        if (serverId === LOCAL_SERVER_ID && event.type === "agents-changed") readAgentDefaults();
       });
       // A page can open from main with no click here, such as a sign-in page, so main sends the notice.
       const unsubscribeLinkFallback = settingsPort().onExternalLinkFallback(({ name }) => {

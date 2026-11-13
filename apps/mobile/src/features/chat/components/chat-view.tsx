@@ -181,6 +181,11 @@ export interface ChatViewProps {
   loadOlder: () => void;
   /** A message from search that the chat opens at, once its page is loaded. */
   focusMessageId?: string | null;
+  /**
+   * `focusMessageId` is the first unread message: the chat opens at the NEW line, without the
+   * highlight of a message from search.
+   */
+  focusUnread?: boolean;
   /** True while the chat opens at a message from search, also before its page loads. */
   holdOpening?: boolean;
   /** True while the chat shows the messages that the phone kept and reads its latest page. */
@@ -288,6 +293,7 @@ export function ChatView({
   olderError,
   loadOlder,
   focusMessageId = null,
+  focusUnread = false,
   holdOpening = false,
   catchingUp = false,
   onFocusPlaced,
@@ -1189,6 +1195,7 @@ export function ChatView({
               topInset={insets.top}
               onRetryHistory={fetchHistory}
               focusMessageId={focusMessageId}
+              focusUnread={focusUnread}
               onFocusPlaced={onFocusPlaced}
               upload={listUpload}
               outboxStatuses={outboxStatuses}

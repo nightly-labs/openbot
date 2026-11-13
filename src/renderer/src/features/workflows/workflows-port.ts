@@ -10,6 +10,8 @@ import {
   WORKFLOW_PICTURE_TYPES,
   type WorkflowMediaKind,
 } from "@openbot/contracts/ipc";
+import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-account-v1";
+import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
 import type {
   WorkflowChannel,
   WorkflowDiscordServer,
@@ -27,8 +29,8 @@ import { serverCanAdminister, serverRoleCanAdminister, serverSupportsCapability 
 
 type WorkflowsApi = OpenBotDesktopApi["workflows"];
 /** The methods that take only the server. */
-type NoInputMethod = "list" | "githubCatalog";
-/** Each method with its input only; `list` and `githubCatalog` take none. */
+type NoInputMethod = "list" | "githubCatalog" | "mediaProviders" | "mediaCredits";
+/** Each method with its input only; `list`, `githubCatalog`, `mediaProviders` and `mediaCredits` take none. */
 type BoundWorkflowsApi = {
   [Name in Exclude<keyof WorkflowsApi, NoInputMethod>]: (
     input: Parameters<WorkflowsApi[Name]>[0],
@@ -84,6 +86,18 @@ export interface WorkflowHost {
    * it advertises `workflows-media-v1`.
    */
   mediaSupported(): boolean;
+  /**
+   * Whether the host makes an image or a video on the account that the step chooses: this computer
+   * always, and a joined server only when it advertises `workflows-media-account-v1`. An older host
+   * makes each file on the provider's own sign-in.
+   */
+  mediaAccountSupported(): boolean;
+  /**
+   * Whether an image step can have a transparent background: this computer always, and a joined
+   * server only when it advertises `workflows-media-transparent-v1`. An older host makes the image
+   * with the model's own background.
+   */
+  mediaTransparentSupported(): boolean;
   /**
    * The pictures of the host's Library that an asset step can use: this computer's, or a joined
    * server's when it serves `storage-v1`. The host gives a member only the files of the agents that
@@ -143,6 +157,11 @@ export function keptPicture(fileId: string, file: File, previewUrl: string | nul
  * The desktop adapter for one server. `window.openbot` and `server` are read on each call: tests and
  * stories replace them per case, and a role can change.
  */
+/** The media credits of one server: this computer, or a joined server through main. */
+export function desktopMediaCredits(serverId: string) {
+  return window.openbot.workflows.mediaCredits(serverId);
+}
+
 export function desktopWorkflowHost(serverId: string, server: () => ServerSummary | undefined): WorkflowHost {
   const api = () => window.openbot.workflows;
   /** A server that has not loaded yet is this computer, as the page reads it. */
@@ -155,6 +174,10 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
   const options = () => window.openbot.routineResults.options(serverId);
   const githubSupported = () => serverSupportsCapability(server(), "workflows-github-v1");
   const mediaSupported = () => local() || serverSupportsCapability(server(), "workflows-media-v1");
+  const mediaAccountSupported = () =>
+    mediaSupported() && (local() || serverSupportsCapability(server(), WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY));
+  const mediaTransparentSupported = () =>
+    mediaSupported() && (local() || serverSupportsCapability(server(), WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY));
   // A joined server without GitHub workflows gets no call: its port rejects before main.
   const hostGitHub = hostGitHubConnectorPort(() => (githubSupported() ? serverId : undefined));
   // A joined server's attachment comes through main, which downloads it from the host.
@@ -187,6 +210,10 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
       githubHistory: (workflowId) => api().githubHistory(workflowId, serverId),
       githubRunLastEvent: (input) => api().githubRunLastEvent(input, serverId),
       keepPicture: (draftId) => api().keepPicture(draftId, serverId),
+      // Main answers `{ sunra: false }` for a joined server without `workflows-sunra-v1`.
+      mediaProviders: () => api().mediaProviders(serverId),
+      // Main answers `{ sunra: null }` for a joined server without `workflows-sunra-v1`.
+      mediaCredits: () => api().mediaCredits(serverId),
     },
     onChanged(changed) {
       const unsubscribe = window.openbot.agent.onScopedEvent((scoped) => {
@@ -293,6 +320,8 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
     },
     githubSupported,
     mediaSupported,
+    mediaAccountSupported,
+    mediaTransparentSupported,
     mediaUrl,
     get githubConnector() {
       return local() ? githubConnectorPort() : hostGitHub;

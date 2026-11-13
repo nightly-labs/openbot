@@ -71,4 +71,14 @@ export const messages = {
   "error.workflow.githubUncertain":
     "Değişiklik yolda durdu. GitHub'da olabilir. Adımı yeniden çalıştırmadan önce orayı kontrol edin.",
   "error.workflow.githubNoEvent": "GitHub'da bu tetikleyicinin başladığı bir sorun veya çekme isteği yok.",
+  "error.workflow.sunraSignIn": "Sunra modellerini kullanmak için Uygulamalar'da Sunra'ya giriş yapın.",
+  "error.workflow.sunraNoCredits":
+    "Sunra hesabınızda yeterli kredi yok. sunra.ai/pricing adresinden kredi ekleyin, sonra adımı yeniden çalıştırın.",
+  "error.workflow.sunraNeedsPlan":
+    "Bu Sunra modeli bir Sunra planı gerektirir. sunra.ai/pricing adresinden bir plan seçin veya başka bir model seçin.",
+  "error.workflow.sunraTeamInputs":
+    "Sunra giriş resimlerini yalnızca kişisel hesapla kullanır. Sunra'da kişisel hesabınızı seçin veya resim bağlantılarını kaldırın.",
+  "error.workflow.sunraFailed": "Sunra dosyayı oluşturamadı: {reason}",
+  "error.workflow.sunraTimeout":
+    "Sunra dosyayı zamanında bitirmedi. Adımı yeniden çalıştırmadan önce sunra.ai üzerindeki OpenBot projesine bakın.",
 } as const satisfies PartialTranslation<typeof source>;

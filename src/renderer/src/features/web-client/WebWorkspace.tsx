@@ -23,7 +23,7 @@ import {
   decodeAgentNewChatSettings,
   decodeAgentPlanCardSettings,
   decodeAgentSpeedSettings,
-  decodeAgentTaskLimitSettings,
+  decodeHostTurnLimits,
   LEGACY_RESPONSE_STYLE,
   type RoutineFields,
   type ServerConnectionState,
@@ -43,7 +43,6 @@ import { AGENT_NEW_CHAT_ROUTES } from "@openbot/contracts/team-protocol/agent-ne
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { AGENT_PLAN_CARD_ROUTES } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
 import { AGENT_SPEED_CAPABILITY, AGENT_SPEED_ROUTES } from "@openbot/contracts/team-protocol/agent-speed-v1";
-import { AGENT_TASK_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
 import { AGENT_THREAD_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
 import { AGENT_USAGE_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
@@ -74,6 +73,7 @@ import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
 import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-release-v1";
 import { HOST_RESTART_CAPABILITY } from "@openbot/contracts/team-protocol/host-restart-v1";
+import { HOST_TURN_LIMITS_ROUTES } from "@openbot/contracts/team-protocol/host-turn-limits-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { INSTANCE_TRANSFER_CHUNKS_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
 import { INSTANCE_TRANSFER_FULL_COPY_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-full-copy-v1";
@@ -277,6 +277,7 @@ import type { HostAgentAccessCalls } from "../servers/ServerRolesSection";
 import type { ServerHostedSitesOptions, ServerSettingsSection } from "../servers/ServerSettingsModal";
 import type { HostSkillLearningCalls } from "../servers/ServerSkillLearningSetting";
 import type { HostTimezoneCalls } from "../servers/ServerTimezoneSetting";
+import type { HostTurnLimitsCalls } from "../servers/ServerTurnLimitsSetting";
 import type { HostUpdateCalls } from "../servers/ServerUpdatePanel";
 import {
   remoteAdminServer,
@@ -315,6 +316,7 @@ import {
   SettingsSearchField,
 } from "../window/SettingsPageFrame";
 import type { SettingsKind, WindowPage } from "../window/window-page-context";
+import { createWorkflowMediaCredits } from "../workflows/workflow-media-credits";
 import { WebAgentSettings } from "./WebAgentSettings";
 import { WebConnectComputer } from "./WebConnectComputer";
 import { WebMobileNavigation, type WebMobilePane } from "./WebMobileNavigation";
@@ -1119,13 +1121,6 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
             }),
           },
         }),
-      getAgentTaskLimit: (agentId, serverId) =>
-        hostRequest(serverId)("POST", AGENT_TASK_LIMIT_ROUTES.settings, decodeAgentTaskLimitSettings, { agentId }),
-      updateAgentTaskLimit: ({ agentId, taskLimit }, serverId) =>
-        hostRequest(serverId)("POST", AGENT_TASK_LIMIT_ROUTES.update, decodeAgentTaskLimitSettings, {
-          agentId,
-          taskLimit,
-        }),
       getAgentNewChat: (agentId, serverId) =>
         hostRequest(serverId)("POST", AGENT_NEW_CHAT_ROUTES.settings, decodeAgentNewChatSettings, { agentId }),
       updateAgentNewChat: ({ agentId, allowNewChat }, serverId) =>
@@ -1181,7 +1176,6 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     const busyMessageMode = remoteAgentAdmin.busyMessageMode();
     const backupModels = remoteAgentAdmin.backupModels();
     const usageLimitReturn = remoteAgentAdmin.usageLimitReturn();
-    const taskLimit = remoteAgentAdmin.taskLimit();
     const quickAcknowledgement = remoteAgentAdmin.quickAcknowledgement();
     const fastMode = remoteAgentAdmin.fastMode();
     const ultrafast = remoteAgentAdmin.ultrafast();
@@ -1195,7 +1189,6 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           ...(busyMessageMode ? { busyMessageMode } : {}),
           ...(backupModels ? { backupModels } : {}),
           ...(usageLimitReturn ? { usageLimitReturn } : {}),
-          ...(typeof taskLimit === "number" ? { taskLimit } : {}),
           ...(quickAcknowledgement === undefined ? {} : { quickAcknowledgement }),
           ...(typeof fastMode === "boolean" ? { fastMode, ultrafast } : {}),
           ...(computerUse === undefined ? {} : { computerUse }),
@@ -1320,6 +1313,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     githubConnector: githubPort,
     attachmentMedia: runtime.attachmentMedia,
   });
+  // As on desktop: the rail shows the Sunra credits of the host while the Canvas page is open.
+  const mediaCredits = createWorkflowMediaCredits(
+    () => (page() === "workflows" && workspace.state.status === "online" ? (server()?.id ?? null) : null),
+    () => workflowHost.workflows.mediaCredits(),
+  );
   const librarySupported = () => workspace.state.capabilities.includes(STORAGE_CAPABILITY);
   // As the Tasks page: an older host has no storage routes and no Library button.
   createEffect(
@@ -1516,6 +1514,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const storageCalls: FilesPort = {
     agent: { listAgents: () => workspace.runtime.listAgents() },
     hostAdmin: machineCalls.hostAdmin,
+    // The web client has one server, so each host event is of the page's server.
+    onLibraryFoldersChanged: (_serverId, listener) =>
+      workspace.onHostEvent((event) => {
+        if (event.type === "library-folders-changed") listener();
+      }),
     storage: {
       getMachineMetrics: machineCalls.storage.getMachineMetrics,
       getLibraryFolders: machineCalls.storage.getLibraryFolders,
@@ -1631,6 +1634,15 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       runTeamEffect(getHostTimezone(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
     setTimezone: async (timezone, serverId) =>
       runTeamEffect(setHostTimezone(hostRequest(serverId), timezone).pipe(Effect.mapError((error) => error.cause))),
+  };
+  const hostTurnLimitsCalls: HostTurnLimitsCalls = {
+    getTurnLimits: async (serverId) =>
+      hostRequest(serverId)("POST", HOST_TURN_LIMITS_ROUTES.settings, decodeHostTurnLimits, {}),
+    setTurnLimits: async ({ turnLimit, agentTaskLimit }, serverId) =>
+      hostRequest(serverId)("POST", HOST_TURN_LIMITS_ROUTES.update, decodeHostTurnLimits, {
+        turnLimit,
+        agentTaskLimit,
+      }),
   };
   const hostPersonalityCalls: HostPersonalityCalls = {
     // A host before host-personality-v1 uses the classic prompt.
@@ -2896,6 +2908,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 const id = server()?.id;
                 if (id) void openHostPage(id, "usage", button);
               }}
+              mediaCredits={mediaCredits()}
+              onMediaCredits={(provider) => {
+                setSuggestedApp({ appId: provider, connect: false });
+                openMarketplace();
+              }}
               onMarketplace={workspace.state.status === "online" ? openMarketplace : undefined}
               onSettings={openAccountSettings}
               server={
@@ -3326,6 +3343,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     onClose={hostedServers.closeAddServer}
                     onOpenServer={(serverId) => {
                       hostedServers.closeAddServer();
+                      // Billing can open this dialog; the server opens in front of it.
+                      setBillingOpen(false);
                       selectServer(serverId);
                     }}
                     onContactUs={() => window.location.assign(HOSTED_SERVER_CONTACT_URL)}
@@ -3486,6 +3505,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         providers={providerSettings()}
                         hostUpdate={{ calls: hostUpdateCalls }}
                         hostTimezone={{ calls: hostTimezoneCalls }}
+                        hostTurnLimits={{ calls: hostTurnLimitsCalls }}
                         hostPersonality={{ calls: hostPersonalityCalls }}
                         hostMemoryLimit={{ calls: hostMemoryLimitCalls }}
                         memoryReview={{ calls: hostMemoryReviewCalls }}
@@ -3708,6 +3728,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       },
                       approvals: () => workspace.state.approvals,
                       takeovers: () => workspace.state.takeovers,
+                      prompts: () => workspace.state.prompts,
                       pausedAgentIds,
                     });
                     return (
@@ -3989,7 +4010,6 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   onAlwaysAllowApproval={view.alwaysAllowApproval()}
                   agentAutoApproves={remoteAgentAdmin.autoApproves()}
                   remoteBackupModelsLoaded={remoteAgentAdmin.backupModels() !== undefined}
-                  remoteTaskLimitLoaded={remoteAgentAdmin.taskLimit() !== undefined}
                   remotePlanCardLoaded={remoteAgentAdmin.quickAcknowledgement() !== undefined}
                   remoteComputerUseLoaded={remoteAgentAdmin.computerUse() !== undefined}
                   remoteNewChatLoaded={remoteAgentAdmin.allowNewChat() !== undefined}

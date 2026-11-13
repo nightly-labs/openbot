@@ -337,6 +337,17 @@ export const messages = {
     "Las rutinas nuevas usan esta zona horaria cuando el mensaje no indica la zona horaria del remitente.",
   "server.settings.timezoneAutomatic": "Automática ({zone})",
   "server.settings.timezoneLoadFailed": "No se pudo cargar la zona horaria del servidor.",
+  "server.settings.turnLimit": "Hilos a la vez",
+  "server.settings.turnLimitDescription":
+    "Cuántos hilos de agentes pueden ejecutarse a la vez en este servidor. Más hilos usan más memoria.",
+  "server.settings.turnLimitAutomatic": "Automático ({count})",
+  "server.settings.turnLimitAutomaticUnlimited": "Automático (sin límite)",
+  "server.settings.turnLimitUnlimited": "Sin límite",
+  "server.settings.turnLimitsLoadFailed": "No se pudieron cargar los límites de hilos de este servidor.",
+  "server.settings.agentTaskLimit": "Hilos en paralelo por agente",
+  "server.settings.agentTaskLimitDescription":
+    "Cuántos hilos puede ejecutar a la vez cada agente que no tiene un límite propio.",
+  "server.settings.agentTaskLimitDefault": "Predeterminado ({count})",
   "server.settings.memoryLimit": "Recuerdos por agente",
   "server.settings.memoryLimitDescription": "Cuántos recuerdos puede guardar cada agente en este servidor.",
   "server.settings.memoryLimitLoadFailed": "No se pudo cargar el límite de recuerdos de este servidor.",

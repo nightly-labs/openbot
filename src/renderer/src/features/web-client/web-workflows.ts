@@ -19,10 +19,16 @@ import {
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_GITHUB_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-github-v1";
+import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-account-v1";
+import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
 import {
   WORKFLOWS_MEDIA_CAPABILITY,
   WORKFLOWS_MEDIA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-v1";
+import {
+  WORKFLOWS_SUNRA_CAPABILITY,
+  WORKFLOWS_SUNRA_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-sunra-v1";
 import { WORKFLOWS_CAPABILITY, WORKFLOWS_ROUTES } from "@openbot/contracts/team-protocol/workflows-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import { bytesToBase64 } from "@openbot/team-client/base64";
@@ -44,6 +50,8 @@ import {
   decodeRemoteWorkflowGitHubHistory,
   decodeRemoteWorkflowGitHubOptions,
   decodeRemoteWorkflowList,
+  decodeRemoteWorkflowMediaCredits,
+  decodeRemoteWorkflowMediaProviders,
   decodeRemoteWorkflowPicture,
   decodeRemoteWorkflowRunDetail,
   decodeRemoteWorkflowRunPage,
@@ -148,6 +156,15 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
       githubRunLastEvent: (input) =>
         postGitHub(WORKFLOWS_GITHUB_ROUTES.runLastEvent, decodeRemoteWorkflowRunDetail, input),
       keepPicture: (draftId) => postMedia(WORKFLOWS_MEDIA_ROUTES.keepPicture, decodeRemoteWorkflowPicture, { draftId }),
+      // A host without `workflows-sunra-v1` does not run the Sunra models.
+      mediaProviders: async () =>
+        has(WORKFLOWS_SUNRA_CAPABILITY)
+          ? post(WORKFLOWS_SUNRA_ROUTES.providers, decodeRemoteWorkflowMediaProviders, {})
+          : { sunra: false },
+      mediaCredits: async () =>
+        has(WORKFLOWS_SUNRA_CAPABILITY)
+          ? post(WORKFLOWS_SUNRA_ROUTES.credits, decodeRemoteWorkflowMediaCredits, {})
+          : { sunra: null },
     },
     onChanged(changed) {
       const events = options.onHostEvent((event) => {
@@ -240,6 +257,8 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     },
     githubSupported,
     mediaSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY),
+    mediaAccountSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY),
+    mediaTransparentSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY),
     mediaUrl(attachmentId, kind) {
       const media = options.attachmentMedia;
       if (!media) return undefined;

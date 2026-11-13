@@ -273,6 +273,9 @@ export const messages = {
     "Een smalle strook blijft waar het dock verdwijnt. Beweeg de aanwijzer ernaartoe om het dock te tonen. Een kleurgolf gaat door de strook als een agent je iets vraagt.",
   "settings.agentDock.results.title": "Klaar werk tonen",
   "settings.agentDock.results.description": "Resultaten van agents verschijnen kort naast het dock.",
+  "settings.agentDock.activeSeats.title": "Agents met nieuws tonen",
+  "settings.agentDock.activeSeats.description":
+    "Een agent of kanaal dat niet in het dock staat, verschijnt erin zolang het een nieuw bericht heeft of op je wacht.",
   "settings.agentDock.agents.title": "Agents in het dock",
   "settings.agentDock.agents.description": "De agents van {server}. Elke server heeft een eigen dock.",
   "settings.agentDock.agents.empty": "Deze server heeft nog geen agents.",

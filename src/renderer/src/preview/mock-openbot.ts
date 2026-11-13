@@ -233,6 +233,7 @@ import { createMockEvents } from "./mock-events";
 import { createMockGitHubConnector } from "./mock-github-connector";
 import { createMockHostPersonality } from "./mock-host-personality";
 import { createMockHostTimezone } from "./mock-host-timezone";
+import { createMockHostTurnLimits } from "./mock-host-turn-limits";
 import { createMockHostUpdate, type MockHostUpdateOptions } from "./mock-host-update";
 import { createMockHostedServers } from "./mock-hosted-servers";
 import { createMockLicense } from "./mock-license";
@@ -515,6 +516,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let approvalAutomation = clone<ApprovalAutomationPreference>(DEFAULT_APPROVAL_AUTOMATION_PREFERENCE);
   let busyMessageMode: BusyMessageModePreference = { mode: DEFAULT_BUSY_MESSAGE_MODE };
   let agentDefaults: AgentDefaults = { ...DEFAULT_AGENT_DEFAULTS };
+  const hostTurnLimits = createMockHostTurnLimits();
   let agentMemoryLimit: AgentMemoryLimitPreference = { limit: DEFAULT_AGENT_MEMORY_LIMIT };
   let memoryReview: MemoryReviewPreference = { interval: DEFAULT_MEMORY_REVIEW_INTERVAL };
   let skillLearning: SkillLearningPreference = { mode: DEFAULT_SKILL_LEARNING_MODE };
@@ -1363,16 +1365,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       remoteNetworkRoute = { ...remoteNetworkRoute, route };
       return clone(remoteNetworkRoute);
     },
-    setBusyMessageModePreference: async ({ mode }) => {
-      busyMessageMode = { mode };
-      return clone(busyMessageMode);
-    },
     getAgentDefaults: async () => clone(agentDefaults),
-    setAgentDefaults: async (next) => {
-      agentDefaults = { ...next };
-      emitAgentEvent({ type: "agents-changed", agents });
-      return clone(agentDefaults);
-    },
     getAgentMemoryLimitPreference: async () => clone(agentMemoryLimit),
     onAgentMemoryLimitPreference: (listener) => {
       agentMemoryLimitListeners.add(listener);
@@ -1530,6 +1523,25 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     },
     restartProvider: async () => clone(agentStatus),
     cancelProviderRestart: async () => clone(agentStatus),
+    // The preview runs no CLI: the two versions trade places, as a restart on the other CLI would show.
+    chooseInstalledCli: async ({ provider, installed }) => {
+      if (agentStatus.providers)
+        agentStatus = {
+          ...agentStatus,
+          providers: agentStatus.providers.map((row) =>
+            row.id === provider && row.otherCliVersion && (row.cliSource === "system") !== installed
+              ? {
+                  ...row,
+                  cliSource: installed ? "system" : "managed",
+                  version: row.otherCliVersion,
+                  ...(row.version ? { otherCliVersion: row.version } : {}),
+                }
+              : row,
+          ),
+        };
+      emitAgentEvent({ type: "status", status: clone(agentStatus) });
+      return clone(agentStatus);
+    },
     // A code that never completes: the preview has no provider to finish the sign-in, so this shows
     // the waiting screen and leaves it there. Claude signs in with a code its page shows, which the
     // user pastes back, Cursor with a page that signs its CLI in by itself, and Hermes with a Nous
@@ -2328,15 +2340,6 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       revealAgentInstructions: async (agentId) => {
         requireMockAgent(agentId);
       },
-      getAgentTaskLimit: async (agentId) => {
-        const agent = agents.find((candidate) => candidate.id === agentId);
-        if (!agent) throw new Error("Agent not found");
-        return { taskLimit: agent.taskLimit ?? null };
-      },
-      updateAgentTaskLimit: async (input) => {
-        await api.agent.updateAgent(input);
-        return api.agent.getAgentTaskLimit(input.agentId);
-      },
       getAgentNewChat: async (agentId) => {
         const agent = agents.find((candidate) => candidate.id === agentId);
         if (!agent) throw new Error("Agent not found");
@@ -2426,6 +2429,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       updateAgentDefaultsOverview: async ({ busyMessageMode: mode, ...changes }, serverId) => {
         if (mode) busyMessageMode = { mode };
         agentDefaults = { ...agentDefaults, ...changes };
+        // Main sends this after each change, and the settings of the window read the defaults again.
+        emitAgentEvent({ type: "agents-changed", agents });
         return api.agent.getAgentDefaultsOverview(serverId);
       },
       setAgentDefaultChoice: async ({ agentIds, setting, choice }, serverId) => {
@@ -3620,6 +3625,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       test: async () => undefined,
       openSettings: async () => undefined,
       onOpened: () => () => undefined,
+      onWorkflowOpened: () => () => undefined,
     },
     maintenance: {
       exportData: async () => ({ saved: true }),
@@ -3659,6 +3665,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       restartHost: async () => {},
       ...createMockHostUpdate(options),
       ...createMockHostTimezone(),
+      ...hostTurnLimits,
       ...createMockHostPersonality(),
       // Preview has one host, so every server shares one limit. Main tells the window, as here.
       getAgentMemoryLimit: async () => hostAgentMemoryLimit(agentMemoryLimit),
@@ -3749,7 +3756,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       getAuditLog: async () => ({ entries: clone(serverAudit) }),
     },
-    storage: createMockStorage(),
+    storage: createMockStorage(() => emitAgentEvent({ type: "library-folders-changed" })),
     agentImport: {
       choose: async () => clone(AGENT_IMPORT_PREVIEW),
       apply: async ({ token, keys, channelKeys }) => {

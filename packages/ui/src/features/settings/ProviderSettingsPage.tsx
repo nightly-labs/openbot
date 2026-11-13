@@ -5,7 +5,7 @@
  */
 
 import { ProviderLogo } from "@openbot/brand";
-import { isManagedRuntimeProvider } from "@openbot/contracts/agent-providers";
+import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
 import {
   type AgentModelId,
   type AgentProviderId,
@@ -94,7 +94,7 @@ import { useText } from "../../text";
 import { toast } from "../../toast";
 import { AccountUsageWindowList } from "../account/AccountUsageDetails";
 import type { AccountUsageProviderRow, AccountUsageWindowRow } from "../account/account-usage-view";
-import { providerUpdateAvailable } from "../provider-updates/provider-update";
+import { providerUpdateAvailable, providerVersionLabel } from "../provider-updates/provider-update";
 import { DangerZone, DetailHeader, type IntegrationStatus } from "./IntegrationLayout";
 
 /** The provider page on screen. The settings window puts "Providers ›" before its title. */
@@ -161,6 +161,11 @@ export interface ProviderSettingsPageProps extends ProviderRowHost {
     | undefined;
   disabled?: boolean | undefined;
   onCancelProviderRestart?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
+  /**
+   * Runs the CLI the user installed (`installed`), also when OpenBot's copy is newer, or the newer copy
+   * again. The provider restarts when its turns end. This computer only.
+   */
+  onChooseInstalledCli?: ((provider: ManagedProviderId, installed: boolean) => void | Promise<void>) | undefined;
   /** Turns a provider on or off. A provider that an agent uses stays on and names its agents. */
   onSetProviderOn?: ((provider: AgentProviderId, on: boolean) => void | Promise<void>) | undefined;
   /** What `onRemoveProviderDownload` frees now: nothing while the provider is on. */
@@ -971,6 +976,16 @@ const VERSION_SOURCE = {
   managed: "provider.settings.versionDownloaded",
 } as const satisfies Record<NonNullable<AgentProviderStatus["cliSource"]>, keyof AppMessages>;
 
+/** The CLI the user can switch to, named by its owner: the opposite of the one that runs. */
+const OTHER_VERSION = {
+  managed: "provider.settings.otherVersionInstalledByUser",
+  system: "provider.settings.otherVersionDownloaded",
+} as const satisfies Record<NonNullable<AgentProviderStatus["cliSource"]>, keyof AppMessages>;
+const OTHER_VERSION_ACTION = {
+  managed: "provider.settings.useInstalledVersion",
+  system: "provider.settings.useDownloadedVersion",
+} as const satisfies Record<NonNullable<AgentProviderStatus["cliSource"]>, keyof AppMessages>;
+
 /** One account. Its text says what is wrong; the right edge has at most one button, then the ⋯ menu. */
 function AccountRow(
   props: SectionProps & {
@@ -1556,6 +1571,20 @@ function RuntimeSection(props: SectionProps) {
     const source = props.option.cliSource;
     return installed && source ? t(VERSION_SOURCE[source], { version: installed }) : installed;
   };
+  /**
+   * The CLI the provider can run instead, while nothing downloads or restarts: the user's own after an
+   * update started OpenBot's copy, so that a launcher of theirs runs again (#6327), or the copy back.
+   */
+  const otherCli = () => {
+    const source = props.option.cliSource;
+    const version = props.option.otherCliVersion;
+    const provider = props.option.id;
+    if (!source || !version || !props.onChooseInstalledCli || !isManagedRuntimeProvider(provider)) return null;
+    const current = runtime();
+    if (storeAction() || props.option.restartPending || current?.phase !== "ready") return null;
+    // Written as the Version line writes the version that runs.
+    return { source, version: providerVersionLabel({ ...current, version }, { t }) ?? version, provider };
+  };
   /** The sign-in card already shows a check error, so the same text does not show twice. */
   const lastError = () =>
     props.option.lastError && props.option.lastError !== props.option.checkError ? props.option.lastError : null;
@@ -1576,6 +1605,11 @@ function RuntimeSection(props: SectionProps) {
                     </ItemDescription>
                   )}
                 </Show>
+                <Show when={otherCli()}>
+                  {(other) => (
+                    <ItemDescription>{t(OTHER_VERSION[other().source], { version: other().version })}</ItemDescription>
+                  )}
+                </Show>
                 <Show when={progress() !== null}>
                   <Progress
                     class="provider-settings-progress"
@@ -1585,6 +1619,19 @@ function RuntimeSection(props: SectionProps) {
                 </Show>
               </ItemContent>
               <ItemActions>
+                <Show when={otherCli()}>
+                  {(other) => (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={props.disabled || row().connecting()}
+                      onClick={() => void props.onChooseInstalledCli?.(other().provider, other().source === "managed")}
+                    >
+                      {t(OTHER_VERSION_ACTION[other().source])}
+                    </Button>
+                  )}
+                </Show>
                 <Show
                   when={storeAction()}
                   fallback={

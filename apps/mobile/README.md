@@ -567,7 +567,13 @@ Do not publish the draft by hand in the GitHub page with the prerelease mark cle
 The site makes the link from the version and does not ask GitHub. So the publish workflow fails when
 the version has no release: the link on the site is then dead. Stage the APK of that version, then
 start `Publish the Android APK` again. `ANDROID_APK_FIRST_VERSION` in the same file hides the APK
-download while the newest Google Play version is from before these workflows.
+download while it is `null` or newer than the newest Google Play version. It is "1.4.9": the first
+APK is build 24 of 1.4.9. Before you mark a later version as available, make sure that its draft
+release exists (`gh release view android-v<version>`).
+
+The service account must have the Play Console permission to download the generated APKs of the
+app. Without it, Google Play answers "The caller does not have permission" (run 43252109769). The
+account of 2026-11-12 has it: run 43385420725 downloaded the APK of build 25.
 
 When the stage job fails, the store build and its record are not affected. Run the failed jobs
 again. To stage the APK of a bundle that Google Play already has, such as a build that you uploaded

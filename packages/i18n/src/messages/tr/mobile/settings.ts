@@ -144,6 +144,9 @@ export const messages = {
     "Arama sonuçları ve arama mesajları değiştiğinde kısa bir bulanıklıkla belirip kaybolur. Hareket azaltıldığında yalnızca solarak değişir. Bu kapalıyken hemen değişir.",
   "mobile.settings.feedback.footer": "Bu cihazda, uygulamadaki eylemler için dokunma geri bildirimi.",
   "mobile.settings.feedback.haptics": "Dokunsal",
+  "mobile.settings.feedback.replies": "Yanıt titreşimi",
+  "mobile.settings.feedback.repliesFooter":
+    "Sohbette bir ajanın yanıtı görünürken titreşim. Diğer titreşimler açık kalır.",
   "mobile.settings.feedback.retry": "Dokunsal ayarını kaydetmeyi tekrar dene",
   "mobile.settings.liveActivities.title": "Canlı Etkinlikler",
   "mobile.settings.liveActivities.footer":
@@ -226,6 +229,9 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Büyük dosyaları otomatik indir",
   "mobile.settings.conversations.largeFilesFooter":
     "{small} üzerindeki görseller, videolar ve sesler yalnızca dokunduğunuzda iner. {large} boyutuna kadar hemen indirmek için bunu açın. Bu çok mobil veri kullanabilir.",
+  "mobile.settings.conversations.fullQualityPhotos": "Fotoğrafları tam kalitede gönder",
+  "mobile.settings.conversations.fullQualityPhotosFooter":
+    "Bu kapalıyken uygulama her fotoğrafın daha küçük bir kopyasını gönderir, uzun kenarda en fazla 2048 piksel. Yavaş bağlantıda daha hızlı ulaşır. Orijinal fotoğrafı göndermek için açın.",
   "mobile.settings.profile.nameUnsafe": "Adınızdaki satır sonlarını ve kontrol karakterlerini kaldırın.",
   "mobile.settings.profile.nameLength": "Görünen adınız için 3–20 karakter kullanın.",
   "mobile.settings.profile.saveFailed": "Değişiklikler kaydedilemedi. Tekrar deneyin.",

@@ -154,6 +154,9 @@ export const messages = {
     "Wyniki i komunikaty wyszukiwania pojawiają się i znikają z krótkim rozmyciem, gdy się zmieniają. Gdy ruch jest ograniczony, tylko się przenikają. Gdy to jest wyłączone, zmieniają się od razu.",
   "mobile.settings.feedback.footer": "Wibracje przy akcjach w aplikacji na tym urządzeniu.",
   "mobile.settings.feedback.haptics": "Haptyka",
+  "mobile.settings.feedback.replies": "Haptyka odpowiedzi",
+  "mobile.settings.feedback.repliesFooter":
+    "Wibracje podczas pojawiania się odpowiedzi agenta na czacie. Pozostała haptyka zostaje włączona.",
   "mobile.settings.feedback.retry": "Ponów zapis ustawienia haptyki",
   "mobile.settings.liveActivities.title": "Aktywności na żywo",
   "mobile.settings.liveActivities.footer":
@@ -236,6 +239,9 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Automatycznie pobieraj duże pliki",
   "mobile.settings.conversations.largeFilesFooter":
     "Obrazy, filmy i dźwięki większe niż {small} pobierają się dopiero po stuknięciu. Włącz, aby pobierać je od razu, do {large}. Może to zużyć dużo danych komórkowych.",
+  "mobile.settings.conversations.fullQualityPhotos": "Wysyłaj zdjęcia w pełnej jakości",
+  "mobile.settings.conversations.fullQualityPhotosFooter":
+    "Gdy to jest wyłączone, aplikacja wysyła mniejszą kopię każdego zdjęcia, do 2048 pikseli na dłuższym boku. Dociera szybciej przy wolnym połączeniu. Włącz, aby wysyłać oryginalne zdjęcie.",
   "mobile.settings.profile.nameUnsafe": "Usuń z imienia podziały wierszy i znaki sterujące.",
   "mobile.settings.profile.nameLength": "Wyświetlana nazwa musi mieć 3–20 znaków.",
   "mobile.settings.profile.saveFailed": "Nie udało się zapisać zmian. Spróbuj ponownie.",

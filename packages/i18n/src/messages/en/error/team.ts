@@ -75,6 +75,7 @@ export const messages = defineMessages("error.team", {
   "error.team.routinesOnceUnsupported": "This connection cannot save routines that run once.",
   "error.team.routineRunCommandUnsupported": "This connection cannot give the run command of a routine.",
   "error.team.threadQueueUnsupported": "This connection cannot show the queue of a side thread.",
+  "error.team.hostTurnLimitsUnsupported": "This connection cannot show or change the thread limits of the server.",
   "error.team.usageLimitUnsupported": "This connection cannot show or change the usage limits of agents.",
   "error.team.hermesImportUnsupported": "This connection cannot import Hermes profiles from the server.",
   "error.team.providerDetectionUnsupported": "This connection cannot find the model servers and agents of the server.",

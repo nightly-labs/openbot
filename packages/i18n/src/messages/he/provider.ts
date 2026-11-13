@@ -164,6 +164,8 @@ export const messages = {
   "provider.geminiKey.title": "מפתח Gemini API",
   "provider.geminiKey.description":
     "אפשר לשמור מפתח Gemini API במחשב הזה. מפתח שמור בא במקום חשבון Google שלך. כדי להתחבר עם Google, יש להסיר את המפתח ולבחור חיבור בשורה של Gemini.",
+  "provider.geminiKey.descriptionHost":
+    "אפשר לשמור מפתח Gemini API במארח. מפתח שמור בא במקום חשבון Google שלך. כדי להתחבר עם Google, יש להסיר את המפתח ולבחור חיבור בשורה של Gemini.",
   "provider.geminiKey.label": "מפתח Gemini API",
   "provider.claudeKey.title": "מפתח Anthropic API",
   "provider.claudeKey.description":
@@ -178,14 +180,20 @@ export const messages = {
   "provider.inceptionKey.title": "מפתח Inception API",
   "provider.inceptionKey.description":
     "אפשר לשמור מפתח Inception API במחשב הזה כדי להשתמש במודלים של Mercury. OpenBot מריץ אותם ב-Pi CLI שהוא מוריד.",
+  "provider.inceptionKey.descriptionHost":
+    "אפשר לשמור מפתח Inception API במארח כדי להשתמש במודלים של Mercury. OpenBot מריץ אותם ב-Pi CLI שהוא מוריד.",
   "provider.inceptionKey.label": "מפתח Inception API",
   "provider.deepseekKey.title": "מפתח DeepSeek API",
   "provider.deepseekKey.description":
     "אפשר לשמור מפתח DeepSeek API במחשב הזה כדי להשתמש במודלים של DeepSeek. OpenBot מריץ אותם ב-Pi CLI שהוא מוריד.",
+  "provider.deepseekKey.descriptionHost":
+    "אפשר לשמור מפתח DeepSeek API במארח כדי להשתמש במודלים של DeepSeek. OpenBot מריץ אותם ב-Pi CLI שהוא מוריד.",
   "provider.deepseekKey.label": "מפתח DeepSeek API",
   "provider.openrouterKey.title": "מפתח OpenRouter API",
   "provider.openrouterKey.description":
     "אפשר לשמור מפתח OpenRouter API במחשב הזה כדי להשתמש במודלים ש-OpenRouter מספקת. OpenBot מריץ אותם ב-Pi CLI שהוא מוריד.",
+  "provider.openrouterKey.descriptionHost":
+    "אפשר לשמור מפתח OpenRouter API במארח כדי להשתמש במודלים ש-OpenRouter מספקת. OpenBot מריץ אותם ב-Pi CLI שהוא מוריד.",
   "provider.openrouterKey.label": "מפתח OpenRouter API",
   "provider.openCodeKey.title": "התחברות ל-OpenCode Go",
   "provider.openCodeKey.description": "מודלים חינמיים לא דורשים חשבון. מפתח פותח את מודלי Go בתשלום.",
@@ -299,6 +307,10 @@ export const messages = {
   "provider.settings.versionAvailable": "{installed} · {available} זמינה",
   "provider.settings.versionInstalledByUser": "{version} · הותקנה על ידיך",
   "provider.settings.versionDownloaded": "{version} · הורדה על ידי OpenBot",
+  "provider.settings.otherVersionInstalledByUser": "לא בשימוש: {version} · הותקנה על ידיך",
+  "provider.settings.otherVersionDownloaded": "לא בשימוש: {version} · הורדה על ידי OpenBot",
+  "provider.settings.useInstalledVersion": "השתמש בגרסה המותקנת",
+  "provider.settings.useDownloadedVersion": "השתמש בגרסה של OpenBot",
   "provider.settings.update": "עדכון",
   "provider.settings.downloadLabel": "הורדת {name}",
   "provider.settings.diagnostics": "אבחון",

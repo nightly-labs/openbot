@@ -160,6 +160,8 @@ export const messages = {
   "provider.geminiKey.title": "Chave de API do Gemini",
   "provider.geminiKey.description":
     "Salve uma chave de API do Gemini neste computador. Uma chave salva é usada no lugar da sua conta Google. Para entrar com o Google, remova a chave e selecione Conectar na linha do Gemini.",
+  "provider.geminiKey.descriptionHost":
+    "Salve uma chave de API do Gemini no host. Uma chave salva é usada no lugar da sua conta Google. Para entrar com o Google, remova a chave e selecione Conectar na linha do Gemini.",
   "provider.geminiKey.label": "Chave de API do Gemini",
   "provider.claudeKey.title": "Chave de API da Anthropic",
   "provider.claudeKey.description":
@@ -168,14 +170,20 @@ export const messages = {
   "provider.inceptionKey.title": "Chave de API da Inception",
   "provider.inceptionKey.description":
     "Salve uma chave de API da Inception neste computador para usar os modelos Mercury. O OpenBot os executa na CLI do Pi que ele baixa.",
+  "provider.inceptionKey.descriptionHost":
+    "Salve uma chave de API da Inception no host para usar os modelos Mercury. O OpenBot os executa na CLI do Pi que ele baixa.",
   "provider.inceptionKey.label": "Chave de API da Inception",
   "provider.deepseekKey.title": "Chave de API da DeepSeek",
   "provider.deepseekKey.description":
     "Salve uma chave de API da DeepSeek neste computador para usar os modelos da DeepSeek. O OpenBot os executa na CLI do Pi que ele baixa.",
+  "provider.deepseekKey.descriptionHost":
+    "Salve uma chave de API da DeepSeek no host para usar os modelos da DeepSeek. O OpenBot os executa na CLI do Pi que ele baixa.",
   "provider.deepseekKey.label": "Chave de API da DeepSeek",
   "provider.openrouterKey.title": "Chave de API do OpenRouter",
   "provider.openrouterKey.description":
     "Salve uma chave de API do OpenRouter neste computador para usar os modelos do OpenRouter. O OpenBot os executa na CLI do Pi que ele baixa.",
+  "provider.openrouterKey.descriptionHost":
+    "Salve uma chave de API do OpenRouter no host para usar os modelos do OpenRouter. O OpenBot os executa na CLI do Pi que ele baixa.",
   "provider.openrouterKey.label": "Chave de API do OpenRouter",
   "provider.openCodeKey.title": "Entrar no OpenCode Go",
   "provider.openCodeKey.description":
@@ -240,6 +248,10 @@ export const messages = {
     "Uma chave de API do Gemini salva é usada no lugar de um login do Google. Para usar um plano do Google e os modelos dele, remova a chave.",
   "provider.settings.versionInstalledByUser": "{version} · instalada por você",
   "provider.settings.versionDownloaded": "{version} · baixada pelo OpenBot",
+  "provider.settings.otherVersionInstalledByUser": "Sem uso: {version} · instalada por você",
+  "provider.settings.otherVersionDownloaded": "Sem uso: {version} · baixada pelo OpenBot",
+  "provider.settings.useInstalledVersion": "Usar a instalada",
+  "provider.settings.useDownloadedVersion": "Usar a do OpenBot",
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Cache de prompts",
   "provider.settings.promptCacheDescription":

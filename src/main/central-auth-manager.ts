@@ -2470,8 +2470,11 @@ export function authApiRateLimit(error: unknown): { code: string; retryAfterSeco
   return { code: error.code, retryAfterSeconds: error.retryAfterSeconds ?? null };
 }
 
-/** A client error that the same request cannot change. A timeout and a rate limit can pass later. */
-function isFinalClientError(error: unknown): boolean {
+/**
+ * A client error that the same request cannot change, such as a machine token that the account service
+ * no longer accepts (401). A timeout and a rate limit can pass later.
+ */
+export function isFinalClientError(error: unknown): boolean {
   return (
     error instanceof AuthApiError &&
     error.status >= 400 &&

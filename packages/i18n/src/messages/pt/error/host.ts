@@ -22,6 +22,7 @@ export const messages = {
   "error.host.noServer": "Este computador não tem um servidor para alterar.",
   "error.host.identityLocalOnly": "O nome e o logotipo do servidor só podem ser alterados no computador que o executa.",
   "error.host.timezoneInvalid": "Este fuso horário não é conhecido.",
+  "error.host.turnLimitInvalid": "Este limite de threads não é válido.",
   "error.host.maintenanceInterrupted":
     "A manutenção do computador anfitrião foi interrompida. Verifique o aplicativo e redefina o estado do computador anfitrião antes de tentar novamente.",
   "error.host.updateFailed":

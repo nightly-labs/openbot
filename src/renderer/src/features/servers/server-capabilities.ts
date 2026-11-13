@@ -85,6 +85,7 @@ export function serverSupportsCapability(
       capability === "host-member-update-v1" ||
       capability === "host-release-v1" ||
       capability === "host-timezone-v1" ||
+      capability === "host-turn-limits-v1" ||
       capability === "host-restart-v1" ||
       capability === "agent-memory-limit-v1" ||
       capability === "memory-review-v1" ||
@@ -313,6 +314,14 @@ export function remoteAdminServer(
  */
 export function activeServerHasProviderSettings(server: ServerSummary): boolean {
   return server.kind === "local" || remoteAdminServer(server, "providers-v1") !== undefined;
+}
+
+/**
+ * Server Settings > Agents shows: this computer, or an online joined server that this account
+ * administers and whose host serves `agent-defaults-v1`.
+ */
+export function serverHasAgentDefaults(server: ServerSummary): boolean {
+  return serverCanAdminister(server, "agent-defaults-v1") && (server.kind === "local" || server.state === "online");
 }
 
 /**

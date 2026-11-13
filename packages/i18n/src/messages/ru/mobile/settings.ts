@@ -154,6 +154,9 @@ export const messages = {
     "Результаты и сообщения поиска плавно появляются и исчезают с лёгким размытием, когда меняются. Когда движение уменьшено, они только плавно появляются и исчезают. Если выключено, они меняются сразу.",
   "mobile.settings.feedback.footer": "Тактильный отклик на действия в приложении на этом устройстве.",
   "mobile.settings.feedback.haptics": "Вибрация",
+  "mobile.settings.feedback.replies": "Вибрация ответов",
+  "mobile.settings.feedback.repliesFooter":
+    "Вибрация, пока в чате появляется ответ агента. Остальная вибрация остаётся включённой.",
   "mobile.settings.feedback.retry": "Повторить сохранение настройки вибрации",
   "mobile.settings.liveActivities.title": "Live Activities",
   "mobile.settings.liveActivities.footer":
@@ -236,6 +239,9 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Скачивать большие файлы автоматически",
   "mobile.settings.conversations.largeFilesFooter":
     "Изображения, видео и аудио больше {small} скачиваются только по нажатию. Включите, чтобы скачивать их сразу, до {large}. Это может расходовать много мобильного трафика.",
+  "mobile.settings.conversations.fullQualityPhotos": "Отправлять фото в полном качестве",
+  "mobile.settings.conversations.fullQualityPhotosFooter":
+    "Когда это выключено, приложение отправляет уменьшенную копию каждого фото, до 2048 пикселей по длинной стороне. Она быстрее доходит при медленном соединении. Включите, чтобы отправлять исходное фото.",
   "mobile.settings.profile.nameUnsafe": "Уберите из имени переносы строк и управляющие символы.",
   "mobile.settings.profile.nameLength": "Имя должно содержать от 3 до 20 символов.",
   "mobile.settings.profile.saveFailed": "Не удалось сохранить изменения. Повторите попытку.",

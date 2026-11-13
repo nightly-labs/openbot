@@ -9,6 +9,8 @@ export const messages = {
   "status.agent.modelSwitchedForLimit": "Gebruikslimiet bereikt. Overgeschakeld naar {model}.",
   "status.agent.modelReturnedAfterLimit": "Gebruikslimiet voorbij. Teruggeschakeld naar {model}.",
   "status.agent.modelSwitchedForError": "Fout bij de aanbieder. Overgeschakeld naar {model}.",
+  "status.agent.modelSwitchedForSpentBalance":
+    "{previous} heeft geen tegoed meer. Overgeschakeld naar {model}. Voeg tegoed toe en selecteer het daarna om het weer te gebruiken.",
   "status.agent.modelReturnedAfterError": "Teruggeschakeld naar {model} na de fout bij de aanbieder.",
   "status.agent.marketplaceSuggested": "Een app uit de marktplaats voorgesteld: {app}.",
   "status.agent.channelMemberAdded": "{agent} heeft {member} aan het kanaal toegevoegd. {person} vroeg erom.",

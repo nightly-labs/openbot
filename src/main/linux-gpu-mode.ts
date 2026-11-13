@@ -12,6 +12,7 @@
 // A new Chromium major version tries the GPU again, because it can fix the driver problem. An Electron
 // patch release keeps the Chromium major version, so it does not make a failing computer stop again.
 // `OPENBOT_DISABLE_GPU=1` always uses software rendering. `OPENBOT_DISABLE_GPU=0` always uses the GPU.
+// On a Wayland session, software rendering starts OpenBot again on XWayland (`linux-wayland-output.ts`).
 // A server (`OPENBOT_SERVER=1` or a hosted server) runs under a virtual display with no GPU, so it
 // always composites on the CPU. It keeps hardware acceleration for WebGL on SwiftShader (#6404): the
 // browser of its agents opens sites such as the Figma editor, which stop without WebGL. A server
@@ -99,6 +100,19 @@ export interface ConfigureLinuxGpuOptions {
   startConfirmMs?: number;
 }
 
+/** Reads the evidence and decides if this start uses hardware acceleration. It changes nothing. */
+export function readLinuxGpuMode(userDataPath: string, server: boolean): LinuxGpuMode {
+  const linux = process.platform === "linux";
+  return resolveLinuxGpuMode({
+    platform: process.platform,
+    server,
+    disableGpu: process.env.OPENBOT_DISABLE_GPU,
+    chromiumMajor: chromiumMajorVersion(),
+    crash: linux ? readGpuFailure(join(userDataPath, GPU_CRASH_FILE)) : undefined,
+    unfinishedStart: linux ? readGpuFailure(join(userDataPath, GPU_START_FILE)) : undefined,
+  });
+}
+
 /**
  * Reads the evidence, turns off hardware acceleration when it failed before, and records new
  * failures. Call it before the app is ready and after `userData` has its final path.
@@ -106,15 +120,8 @@ export interface ConfigureLinuxGpuOptions {
 export function configureLinuxGpu(options: ConfigureLinuxGpuOptions): LinuxGpuMode {
   const startPath = join(options.userDataPath, GPU_START_FILE);
   const crashPath = join(options.userDataPath, GPU_CRASH_FILE);
-  const chromiumMajor = process.versions.chrome?.split(".")[0] ?? "";
-  const mode = resolveLinuxGpuMode({
-    platform: process.platform,
-    server: options.server,
-    disableGpu: process.env.OPENBOT_DISABLE_GPU,
-    chromiumMajor,
-    crash: process.platform === "linux" ? readGpuFailure(crashPath) : undefined,
-    unfinishedStart: process.platform === "linux" ? readGpuFailure(startPath) : undefined,
-  });
+  const chromiumMajor = chromiumMajorVersion();
+  const mode = readLinuxGpuMode(options.userDataPath, options.server);
   if (mode.reason === "not-linux") return mode;
   if (!mode.hardwareAcceleration) {
     app.disableHardwareAcceleration();
@@ -150,6 +157,10 @@ export function configureLinuxGpu(options: ConfigureLinuxGpuOptions): LinuxGpuMo
     writeGpuFailure(crashPath, chromiumMajor);
   });
   return mode;
+}
+
+function chromiumMajorVersion(): string {
+  return process.versions.chrome?.split(".")[0] ?? "";
 }
 
 function readGpuFailure(path: string): GpuFailureRecord | undefined {

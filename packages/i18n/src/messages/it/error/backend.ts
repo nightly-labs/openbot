@@ -367,6 +367,8 @@ export const messages = {
     "Il proxy {name} ha rifiutato l’accesso, quindi la pagina non si è aperta.",
   "error.backend.browserProxyComputerUnreachable":
     "Il computer di questo profilo non risponde, quindi la pagina non si è aperta.",
+  "error.backend.browserProxyComputerLocalAddress":
+    "Il computer usato da questo profilo apre solo siti pubblici. Non apre indirizzi di una rete locale, quindi la pagina non si è aperta.",
   "error.backend.browserCertificateUntrusted":
     "Il certificato di sicurezza di questo sito non è attendibile, quindi la pagina non si è aperta.",
   "error.backend.browserLowMemory":

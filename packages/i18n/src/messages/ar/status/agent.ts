@@ -8,6 +8,8 @@ export const messages = {
   "status.agent.modelSwitchedForLimit": "تم بلوغ حد الاستخدام. تم التبديل إلى {model}.",
   "status.agent.modelReturnedAfterLimit": "انتهى حد الاستخدام. تمت العودة إلى {model}.",
   "status.agent.modelSwitchedForError": "خطأ في المزوّد. تم التبديل إلى {model}.",
+  "status.agent.modelSwitchedForSpentBalance":
+    "لم يتبق رصيد في {previous}. تم التبديل إلى {model}. لاستخدامه مرة أخرى، أضف رصيدًا ثم اختره.",
   "status.agent.modelReturnedAfterError": "تمت العودة إلى {model} بعد خطأ المزوّد.",
   "status.agent.marketplaceSuggested": "اقترح تطبيقًا من المتجر: {app}.",
   "status.agent.channelMemberAdded": "أضاف {agent} العضو {member} إلى القناة. بطلب من {person}.",

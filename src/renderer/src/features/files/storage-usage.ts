@@ -1,12 +1,11 @@
-import { HOSTED_SERVER_BASE_IMAGE_GB } from "@openbot/contracts/hosted-servers";
 import {
   type ClearableStorageCategory,
   type GetStorageUsageInput,
   type ServerSummary,
   STORAGE_CAPABILITY,
-  type StorageDisk,
   type StorageUsage,
 } from "@openbot/contracts/ipc";
+import { BACKGROUND_PROCESSES_CAPABILITY } from "@openbot/contracts/team-protocol/background-processes-v1";
 import { STORAGE_CHANNEL_CAPABILITY } from "@openbot/contracts/team-protocol/storage-channel-v1";
 import { classifyFailure } from "@openbot/telemetry";
 import type { AgentProfile } from "@openbot/ui/data";
@@ -23,34 +22,25 @@ export function serverHasStorage(server: ServerSummary | undefined): server is S
   return Boolean(server && (server.kind === "local" || serverSupportsCapability(server, STORAGE_CAPABILITY)));
 }
 
+/**
+ * Server Settings > Storage lists the programs that agents left running: this computer, or a joined
+ * server that serves `background-processes-v1`. Only an owner or admin sees the list.
+ */
+export function serverHasBackgroundProcesses(server: ServerSummary | undefined): server is ServerSummary {
+  return (
+    serverHasStorage(server) &&
+    (server.kind === "local" || serverSupportsCapability(server, BACKGROUND_PROCESSES_CAPABILITY))
+  );
+}
+
 /** This computer, or a joined server that serves the files of one channel (`storage-channel-v1`). */
 export function serverHasChannelStorage(server: ServerSummary | undefined): server is ServerSummary {
   return Boolean(server && (server.kind === "local" || serverSupportsCapability(server, STORAGE_CHANNEL_CAPABILITY)));
 }
 
-const GB = 1024 ** 3;
-
-/**
- * The disk of a hosted server holds its base image (the system and the preinstalled tools) and the
- * files of its users. The plan storage counts only the files of its users.
- */
-const HOSTED_BASE_IMAGE_BYTES = HOSTED_SERVER_BASE_IMAGE_GB * GB;
-
 /** The plan storage in GB of a hosted server, or null for a server that is not hosted. */
 export function hostedPlanStorageGb(server: ServerSummary | undefined): number | null {
   return server?.hosted === true && server.storageGb !== undefined ? server.storageGb : null;
-}
-
-/**
- * The disk of a hosted server against its plan: the total is the plan storage, and the free space is
- * what the plan has left after the files of its users. The free space is never more than the disk has.
- */
-export function planDisk(disk: StorageDisk, storageGb: number): StorageDisk {
-  const { freeBytes, totalBytes } = disk;
-  if (freeBytes === null || totalBytes === null) return disk;
-  const planBytes = storageGb * GB;
-  const userBytes = Math.max(0, totalBytes - freeBytes - HOSTED_BASE_IMAGE_BYTES);
-  return { freeBytes: Math.max(0, Math.min(freeBytes, planBytes - userBytes)), totalBytes: planBytes };
 }
 
 /** Every member reads storage; the host lets only an owner or admin delete or clear. */

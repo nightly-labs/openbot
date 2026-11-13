@@ -79,6 +79,8 @@ export const messages = {
   "error.team.routinesOnceUnsupported": "Diese Verbindung kann keine Routinen speichern, die einmal laufen.",
   "error.team.routineRunCommandUnsupported": "Diese Verbindung kann den Ausführungsbefehl einer Routine nicht liefern.",
   "error.team.threadQueueUnsupported": "Diese Verbindung kann die Warteschlange eines Nebenthreads nicht anzeigen.",
+  "error.team.hostTurnLimitsUnsupported":
+    "Diese Verbindung kann die Thread-Limits des Servers nicht anzeigen oder ändern.",
   "error.team.usageLimitUnsupported":
     "Diese Verbindung kann die Nutzungslimits von Agenten nicht anzeigen oder ändern.",
   "error.team.hermesImportUnsupported": "Diese Verbindung kann keine Hermes-Profile vom Server importieren.",

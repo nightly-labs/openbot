@@ -61,6 +61,13 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
       <label>Recovery code<input id="recovery-otp" name="recoveryOtp" type="text"></label>
       <label>SMS code<input id="sms-otp" name="smsOtp" type="text"></label>
       <label>Phone<input id="two-factor-phone" name="twoFactorPhone" type="tel"></label>
+      <form><h2>Verify with Google Authenticator</h2><p>Enter the temporary code generated in your Google Authenticator app.</p><label for="okta-code">Enter code</label><input id="okta-code" name="credentials.passcode" type="text" autocomplete="off"><a href="#">Verify with something else</a></form>
+      <form><h2>Verify with your email</h2><p>We sent an email to you.</p><label for="okta-second-code">Enter code</label><input id="okta-second-code" name="credentials.passcode" type="text" autocomplete="off"></form>
+      <form><p>We emailed you a code.</p><label>Enter code<input id="fallback-code" type="text"></label><a href="#">Use an authenticator app instead</a></form>
+      <form><label>Authentication code<input id="squarespace-code" name="code" type="text"></label></form>
+      <form><input id="userid" type="number" placeholder="••••••"><label for="userid">External TOTP</label></form>
+      <form><p>Open your Google Authenticator app.</p><label>Enter code<input id="answer" name="answer" type="text"></label><label>Promo code<input id="promo-code" type="text"></label></form>
+      <form><script>const totpEnabled = true;</script><p hidden>Authenticator</p><label>Enter code<input id="plain-form-code" type="text"></label></form>
       <form method="post" action="/session"><label>Post password<input id="post-password" type="password"></label></form>
       <form method="post" action="/session"><label>Masked password<input id="masked-password" type="text" style="-webkit-text-security: disc"></label></form>
       <form action="/search" onsubmit="event.preventDefault(); location.href = '/complete'"><label>Script password<input id="script-password" name="password" type="password"></label></form>
@@ -195,10 +202,21 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
       }
     }
     // A vault code goes only to a code field. An older Keycloak page names it otp with no
-    // autocomplete="one-time-code"; a recovery, SMS, or phone field or a plain numeric field does not take it.
+    // autocomplete="one-time-code"; Okta names it passcode, and Squarespace and Kite name it only in its
+    // label (#8320). A field named only "code" or "passcode" takes it in a form whose visible text names
+    // an authenticator app and no email. A recovery, SMS, phone, or promo field, an email code field, or
+    // a plain code field in another form does not take it, also when hidden text names an app.
     for (const [selector, fillable] of [
       ["#otp", true],
       ["#totpmfa", true],
+      ["#okta-code", true],
+      ["#okta-second-code", false],
+      ["#fallback-code", false],
+      ["#squarespace-code", true],
+      ["#userid", true],
+      ["#answer", true],
+      ["#promo-code", false],
+      ["#plain-form-code", false],
       ["#recovery-otp", false],
       ["#sms-otp", false],
       ["#two-factor-phone", false],

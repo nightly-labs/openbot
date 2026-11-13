@@ -51,7 +51,6 @@ import type {
   AgentHostSettings,
   AgentNewChatSettings,
   AgentPlanCardSettings,
-  AgentTaskLimitSettings,
   SetAgentDefaultChoiceInput,
   UpdateAgentAdminSettingsInput,
   UpdateAgentBackupModelsInput,
@@ -60,7 +59,6 @@ import type {
   UpdateAgentHostSettingsInput,
   UpdateAgentNewChatInput,
   UpdateAgentPlanCardInput,
-  UpdateAgentTaskLimitInput,
 } from "./ipc-agent-admin";
 import type { AgentAnalytics, AgentAnalyticsInput } from "./ipc-agent-analytics";
 import type {
@@ -361,6 +359,7 @@ import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
 import type { HostPersonality } from "./ipc-host-personality";
 import type { HostReleaseStatus } from "./ipc-host-release";
 import type { HostTimezoneSettings } from "./ipc-host-timezone";
+import type { HostTurnLimits, HostTurnLimitsInput } from "./ipc-host-turn-limits";
 import type {
   DeleteHostedSiteInput,
   HostedSiteList,
@@ -446,7 +445,11 @@ import type {
   WhatsAppSenderInput,
 } from "./ipc-messaging";
 import type { ProviderModelVisibility, ProviderModelVisibilityChange } from "./ipc-model-visibility";
-import type { NotificationOpenedEvent, NotificationPreference } from "./ipc-notifications";
+import type {
+  NotificationOpenedEvent,
+  NotificationPreference,
+  WorkflowNotificationOpenedEvent,
+} from "./ipc-notifications";
 import type {
   OnePasswordConnectInput,
   OnePasswordConnectorStatus,
@@ -624,6 +627,8 @@ import type {
   StartWorkflowRunInput,
   WorkflowDetail,
   WorkflowGraph,
+  WorkflowMediaCredits,
+  WorkflowMediaProviders,
   WorkflowRunDetail,
   WorkflowRunPage,
   WorkflowRunsInput,
@@ -748,11 +753,7 @@ export const IPC_ENDPOINTS = {
     // window instead of the window only reading the value at start.
     approvalAutomation: event<ApprovalAutomationPreference>()("app:approval-automation"),
     getBusyMessageModePreference: request<undefined, BusyMessageModePreference>()("app:get-busy-message-mode"),
-    setBusyMessageModePreference: request<BusyMessageModePreference, BusyMessageModePreference>()(
-      "app:set-busy-message-mode",
-    ),
     getAgentDefaults: request<undefined, AgentDefaults>()("app:get-agent-defaults"),
-    setAgentDefaults: request<AgentDefaults, AgentDefaults>()("app:set-agent-defaults"),
     getAgentMemoryLimitPreference: request<undefined, AgentMemoryLimitPreference>()("app:get-agent-memory-limit"),
     // Server settings set the limit of this computer (`hostAdmin.setAgentMemoryLimit`), here or from a
     // joined admin, so main tells the window.
@@ -861,6 +862,13 @@ export const IPC_ENDPOINTS = {
      */
     restartProvider: request<AgentProviderId, AgentStatus>()("app:restart-provider"),
     cancelProviderRestart: request<AgentProviderId, AgentStatus>()("app:cancel-provider-restart"),
+    /**
+     * `installed`: runs the CLI the user installed, also when OpenBot's copy is newer; false runs the
+     * newer of the two. The provider restarts when its turns end. Only a provider of this computer.
+     */
+    chooseInstalledCli: request<{ provider: ManagedProviderId; installed: boolean }, AgentStatus>()(
+      "app:choose-installed-cli",
+    ),
     /**
      * Runs the provider CLI's own updater, for a CLI the user installed themselves. It is their copy,
      * so the version they end on is whatever that updater fetches, which owes nothing to the version
@@ -1389,6 +1397,8 @@ export const IPC_ENDPOINTS = {
     // The server timezone. `null` is automatic: the host system zone.
     getTimezone: scopedQuery<HostTimezoneSettings, "required">()("host-admin:get-timezone"),
     setTimezone: scopedRequest<string | null, HostTimezoneSettings, "required">()("host-admin:set-timezone"),
+    getTurnLimits: scopedQuery<HostTurnLimits, "required">()("host-admin:get-turn-limits"),
+    setTurnLimits: scopedRequest<HostTurnLimitsInput, HostTurnLimits, "required">()("host-admin:set-turn-limits"),
     // The server personality: how the server's agents talk while they work. Any member can read it;
     // only an owner or admin can set it.
     getPersonality: scopedQuery<HostPersonality, "required">()("host-admin:get-personality"),
@@ -1688,6 +1698,7 @@ export const IPC_ENDPOINTS = {
     // system that has no such page.
     openSettings: request<undefined, void>()("notifications:open-settings"),
     opened: event<NotificationOpenedEvent>()("notifications:opened-event"),
+    workflowOpened: event<WorkflowNotificationOpenedEvent>()("notifications:workflow-opened-event"),
   },
   agent: {
     getStatus: scopedQuery<AgentStatus>()("agent:get-status"),
@@ -1927,6 +1938,16 @@ export const IPC_ENDPOINTS = {
      * `workflows-media-v1`.
      */
     keepPicture: scopedRequest<string, string>()("workflows:keep-picture"),
+    /**
+     * Whether the host can use Sunra for an image step now. A joined server answers through
+     * `workflows-sunra-v1`; an older one has no Sunra.
+     */
+    mediaProviders: scopedQuery<WorkflowMediaProviders>()("workflows:media-providers"),
+    /**
+     * The credits that the host's Sunra sign-in can spend now. A joined server answers through
+     * `workflows-sunra-v1`; an older one has none.
+     */
+    mediaCredits: scopedQuery<WorkflowMediaCredits>()("workflows:media-credits"),
   },
   /**
    * Routine results: an agent routine's answer sent on to a messaging place. Only this computer's host
@@ -2088,11 +2109,6 @@ export const IPC_ENDPOINTS = {
     updateAgentBackupModels: scopedRequest<UpdateAgentBackupModelsInput, AgentBackupModelSettings>()(
       "agent:admin:update-backup-models",
     ),
-    // Task limit: `agent-task-limit-v1` on a joined server.
-    getAgentTaskLimit: scopedRequest<string, AgentTaskLimitSettings>()("agent:admin:get-task-limit"),
-    updateAgentTaskLimit: scopedRequest<UpdateAgentTaskLimitInput, AgentTaskLimitSettings>()(
-      "agent:admin:update-task-limit",
-    ),
     // Whether the agent starts a new chat itself: `agent-new-chat-v1` on a joined server.
     getAgentNewChat: scopedRequest<string, AgentNewChatSettings>()("agent:admin:get-new-chat"),
     updateAgentNewChat: scopedRequest<UpdateAgentNewChatInput, AgentNewChatSettings>()("agent:admin:update-new-chat"),
@@ -2126,7 +2142,7 @@ export const IPC_ENDPOINTS = {
     updateAgentBrowserProfile: scopedRequest<UpdateAgentBrowserProfileInput, AgentBrowserProfile>()(
       "agent:admin:update-browser-profile",
     ),
-    // Settings › Agents: the agent defaults of a computer. `agent-defaults-v1` on a joined server.
+    // Server Settings › Agents: the agent defaults of this computer. `agent-defaults-v1` on a joined server.
     getAgentDefaultsOverview: scopedQuery<AgentDefaultsOverview, "required">()("agent:admin:get-agent-defaults"),
     updateAgentDefaultsOverview: scopedRequest<UpdateAgentDefaultsInput, AgentDefaultsOverview, "required">()(
       "agent:admin:update-agent-defaults",

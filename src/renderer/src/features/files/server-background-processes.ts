@@ -6,14 +6,14 @@ import type { FilesPort } from "./files-port";
 
 export interface ServerBackgroundProcessesTarget {
   serverId: string;
-  /** False for a member, for this computer, and for a host without `background-processes-v1`. */
+  /** False for a member and for a joined server without `background-processes-v1`. */
   shown: boolean;
 }
 
 /**
- * The programs that agents left running on a joined server, with Stop, for an owner or admin. This
- * computer shows its own programs in Settings > Agents. `processes` is null while the list is not
- * shown, and on a Windows host, which does not list its programs.
+ * The programs that agents left running on this computer or on a joined server, with Stop, for an
+ * owner or admin. `processes` is null while the list is not shown, and on a Windows host, which does
+ * not list its programs.
  */
 export function createServerBackgroundProcesses(target: () => ServerBackgroundProcessesTarget, calls: () => FilesPort) {
   const [state, setState] = createStore<{
