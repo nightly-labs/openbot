@@ -57,7 +57,8 @@ try {
   // The app signs a development account in on the local account service. It starts with no secrets.
   let port = await accountServicePort();
   if (port === null) {
-    startedService = spawn("bun", [join(ROOT, "scripts/dev-services.ts"), "api"], {
+    // `process.execPath` is Bun. With the name "bun", knip reads the argument "api" as a binary.
+    startedService = spawn(process.execPath, [join(ROOT, "scripts/dev-services.ts"), "api"], {
       cwd: ROOT,
       env: environment,
       stdio: "inherit",
