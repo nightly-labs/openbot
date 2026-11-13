@@ -15,7 +15,10 @@ builds the props, and sends a change. iOS has a budget of priority 10 updates fo
 hour and can delay or drop the updates above it, and several agents change the state often. So priority
 10 is only for an alert, a new request, failure or reply, and an agent that finishes its work. Each
 other change has priority 5, which does not use the budget: work that starts, a request that someone
-answered on another device, and a count or a text that changes. A priority 5 change inside a state
+answered on another device, and a count or a text that changes. The first update after the phone
+says that it goes away also has priority 5, because it repeats the view that the phone showed a moment
+before; after a closed connection the phone can show an old view, so a request, a failure or a reply
+has priority 10 then. A priority 5 change inside a state
 waits 5 seconds. An unchanged state is sent again every 10 minutes, so its stale
 date moves on; a host that sleeps stops this, and the view then shows that it is out of date. An idle
 state ends the activity.

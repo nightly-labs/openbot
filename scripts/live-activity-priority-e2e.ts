@@ -184,35 +184,38 @@ const service = new LiveActivityPushService({
   randomBytes,
 });
 
+/** The phone gives its token again. With `away`, it says that it leaves the foreground. */
+function register(away: boolean): void {
+  service.register(
+    SESSION,
+    {
+      memberId: "fixture-member",
+      hiddenAgentIds: () => new Set<string>(),
+      readOptions: {
+        excludeRoutineEvents: true,
+        excludeRoutineRunEvents: true,
+        excludeHostedSiteEvents: true,
+        excludeRoutineQuietAnswers: true,
+      },
+    },
+    {
+      serverId: "fixture-server",
+      token: "ab".repeat(32),
+      environment: "development",
+      secret: encodeLiveActivityBytes(secret),
+      locale: "en",
+      away,
+      photos: [],
+    },
+  );
+}
+
 let passed = false;
 try {
-  await step(
-    "a phone that goes away while two agents work gets the work with priority 5",
-    () =>
-      service.register(
-        SESSION,
-        {
-          memberId: "fixture-member",
-          hiddenAgentIds: () => new Set<string>(),
-          readOptions: {
-            excludeRoutineEvents: true,
-            excludeRoutineRunEvents: true,
-            excludeHostedSiteEvents: true,
-            excludeRoutineQuietAnswers: true,
-          },
-        },
-        {
-          serverId: "fixture-server",
-          token: "ab".repeat(32),
-          environment: "development",
-          secret: encodeLiveActivityBytes(secret),
-          locale: "en",
-          away: true,
-          photos: [],
-        },
-      ),
-    { mode: "working", priority: 5 },
-  );
+  await step("a phone that goes away while two agents work gets the work with priority 5", () => register(true), {
+    mode: "working",
+    priority: 5,
+  });
 
   await step(
     "a new approval has priority 10",
@@ -290,6 +293,25 @@ try {
       changed(FIRST);
     },
     { mode: null, priority: 10 },
+  );
+
+  await step(
+    "a phone that says that it goes away gets the reply that it already shows with priority 5",
+    () => {
+      replies.set(FIRST, "reply-a-2");
+      register(true);
+    },
+    { mode: "message", priority: 5 },
+  );
+
+  await step(
+    "a phone whose connection closes can show an old view, so the reply has priority 10",
+    () => {
+      // The app is on screen again and shows its own view. Then iOS suspends it before it says so.
+      register(false);
+      service.disconnected(SESSION);
+    },
+    { mode: "message", priority: 10 },
   );
   passed = true;
 } catch {

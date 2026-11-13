@@ -291,8 +291,13 @@ export class LiveActivityPushService {
     const shownWorkers = sent?.workers ?? null;
     // An agent that the last update showed at work is not in the work of this one.
     const finished = shownWorkers !== null && (workers === null || shownWorkers.some((id) => !workers.includes(id)));
+    // A phone that says that it goes away showed its own view a moment before, so the first update
+    // repeats that view. A phone whose connection closed can show an old view: iOS can suspend the app
+    // before it gets the last event.
+    const repeats = !sent && registration.value.away && registration.connected;
     // The first update after the phone went away can end an activity that still shows work.
-    const urgent = alert !== null || (item !== null && item !== sent?.item) || finished || (!props && !sent);
+    const urgent =
+      alert !== null || (item !== null && !repeats && item !== sent?.item) || finished || (!props && !sent);
     if (!urgent && sent && sent.mode === mode && now - sent.at < SAME_MODE_INTERVAL_MS) {
       this.#schedule(registration, sent.at + SAME_MODE_INTERVAL_MS - now);
       return;
