@@ -1506,9 +1506,12 @@ export const ChatMessageList = memo(function ChatMessageList({
   // The loaded rows do not show the NEW line, so the chat opens at the latest message.
   const unreadRowMissing =
     focusUnread && Boolean(focusMessageId) && historyState === "ready" && rowsShown && focusIndex < 0;
+  // The chat showed without the NEW line, such as while the server connected. It does not move to
+  // the line later, under the reader.
+  const shownWithoutUnread = focusUnread && motion.historyVisible && placedFocus.current === null;
   useEffect(() => {
-    if (unreadRowMissing) focusHandlers.current.onFocusPlaced?.();
-  }, [unreadRowMissing]);
+    if (unreadRowMissing || shownWithoutUnread) focusHandlers.current.onFocusPlaced?.();
+  }, [unreadRowMissing, shownWithoutUnread]);
   const header = topInset + 84;
   // The latest user message can always move to the top of the chat: the list adds blank space
   // under it while the rows after it are shorter than the screen.

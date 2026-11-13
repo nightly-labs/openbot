@@ -116,11 +116,31 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
     return lastTurnSummaries.current;
   }, [page?.messages, memberWork]);
   // The NEW line of this visit, as in an agent chat. The chat reads itself at once and the unread
-  // count goes to zero, so the line keeps the first unread message that the channel had when its page came.
+  // count goes to zero, so the line keeps the first unread message that the channel had when it
+  // opened. A page that the phone kept can be older than the count, so the line waits for the
+  // page that the host sends for this visit.
   const [unreadLine, setUnreadLine] = useState<{ messageId: string | null } | null>(null);
-  if (unreadLine === null && page && summary)
+  const [freshPage, setFreshPage] = useState<"waiting" | "loaded" | "failed">("waiting");
+  const hasUnread = (summary?.unreadCount ?? 0) > 0;
+  const store = state.store;
+  const readsPage = online && hasUnread && unreadLine === null;
+  useEffect(() => {
+    if (!readsPage) return;
+    let active = true;
+    void store.refreshHistory(serverId, channelId).then(
+      () => active && setFreshPage("loaded"),
+      () => active && setFreshPage("failed"),
+    );
+    return () => {
+      active = false;
+    };
+  }, [readsPage, store, serverId, channelId]);
+  if (unreadLine === null && page && summary && (!hasUnread || freshPage !== "waiting"))
     setUnreadLine({
-      messageId: firstUnreadChannelMessageId(page.messages, summary.unreadCount, server?.membershipId ?? null),
+      messageId:
+        freshPage === "failed"
+          ? null
+          : firstUnreadChannelMessageId(page.messages, summary.unreadCount, server?.membershipId ?? null),
     });
   const unreadLineMessageId = unreadLine?.messageId ?? null;
   // The line shows above the first of these messages that has a row.
@@ -129,19 +149,15 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
     const start = unreadLineMessageId ? entries.findIndex((entry) => entry.id === unreadLineMessageId) : -1;
     return start < 0 ? null : new Set(entries.slice(start).map((entry) => entry.id));
   }, [unreadLineMessageId, page?.messages]);
-  // The chat opens at the NEW line once, as on desktop. Offline, it shows what the phone has, and it
-  // does not move to the line later, under the reader.
+  // The chat opens at the NEW line once, as on desktop. A chat that showed before the line, such as
+  // while the server connected, does not move to it later, under the reader.
   const [unreadOpening, setUnreadOpening] = useState<"pending" | "done">("pending");
   const placeUnreadLine = useCallback(() => setUnreadOpening("done"), []);
-  useEffect(() => {
-    if (!online) setUnreadOpening("done");
-  }, [online]);
-  const opensAtUnread = unreadOpening === "pending" && online && unreadLineMessageIds !== null;
+  const opensAtUnread = unreadOpening === "pending" && online && (readsPage || unreadLineMessageIds !== null);
   const [olderLoading, setOlderLoading] = useState(false);
   const [olderError, setOlderError] = useState(false);
   const readThrough = useRef(0);
   const throughSequence = page?.throughSequence ?? 0;
-  const store = state.store;
   const markRead = useCallback(() => {
     if (throughSequence <= readThrough.current) return;
     readThrough.current = throughSequence;
@@ -221,7 +237,7 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
       approvals={approvals}
       channelThreadIds={threadIds}
       unreadLineMessageIds={unreadLineMessageIds}
-      focusMessageId={opensAtUnread ? unreadLineMessageId : null}
+      focusMessageId={opensAtUnread && unreadLineMessageIds ? unreadLineMessageId : null}
       focusUnread
       holdOpening={opensAtUnread}
       onFocusPlaced={placeUnreadLine}
