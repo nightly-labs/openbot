@@ -4198,21 +4198,40 @@ export class BrowserHost {
     if (background === this.#mainViewsInBackground) return false;
     const from = this.#nativeParent(window);
     if (background) {
-      this.#backgroundWindow ??= createBackgroundWindow();
+      this.#backgroundWindow ??= this.#openBackgroundWindow();
       this.#backgroundWindow.setBounds(this.#backgroundBounds(window));
       this.#backgroundWindow.showInactive();
     }
     this.#mainViewsInBackground = background;
-    const to = this.#nativeParent(window);
+    this.#moveMainViews(from, this.#nativeParent(window), background);
+    if (!background) this.#backgroundWindow?.hide();
+    return true;
+  }
+
+  /**
+   * A window manager can close the background window, for example on Wayland (#8027). Its views then
+   * go back to the main window, and the next background sync opens a new background window.
+   */
+  #openBackgroundWindow(): BaseWindow {
+    const background = createBackgroundWindow();
+    background.once("closed", () => {
+      if (this.#backgroundWindow !== background) return;
+      this.#backgroundWindow = null;
+      if (!this.#mainViewsInBackground) return;
+      this.#mainViewsInBackground = false;
+      if (!this.#window.isDestroyed()) this.#moveMainViews(background, this.#window, false);
+    });
+    return background;
+  }
+
+  #moveMainViews(from: BaseWindow, to: BaseWindow, background: boolean): void {
     for (const [view, owner] of this.#mountedViews) {
-      if (owner !== window) continue;
+      if (owner !== this.#window) continue;
       if (!from.isDestroyed()) from.contentView.removeChildView(view);
       to.contentView.addChildView(view);
       if (SHOWS_VIEWS_IN_BACKGROUND)
         view.setVisible(background || (view === this.#attachedView && this.#attachedViewShown));
     }
-    if (!background) this.#backgroundWindow?.hide();
-    return true;
   }
 
   /**
