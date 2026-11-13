@@ -1104,7 +1104,7 @@ When a step fails, the customer still gets a server:
 
 | Fault | Result |
 | --- | --- |
-| No ready machine of the product, or the pool query fails | The Worker makes the boat sandbox in the same request, as before. |
+| No ready machine of the product, or the pool query fails | The Worker makes the boat sandbox in the same request, as before, and sends a [pool alert](#pool-alerts). |
 | The machine does not start OpenBot, or OpenBot does not sign in, in 4 minutes (`POOL_START_LOST_AFTER_MS`) | The cron takes the server off the machine and makes a boat sandbox for it. The claim of the machine stops working. The machine loses its token, because its disk can have the start of a server; `status` shows it as not ready. Run `prepare --reinstall` for it. |
 | The plan ends before the sign-in | The row gets `error` and no machine. A renewal sets the server up again. |
 | The owner deletes the server before the sign-in | The delete is the usual one. `sync` reinstalls the machine. |
@@ -1623,6 +1623,7 @@ bunx dotenvx run -f apps/auth-api/.env.production -fk <root>/.env.keys -- \
 | Command | Work |
 | --- | --- |
 | `status` | Read only. Free and ready machines of each location and product, each free machine that is not ready, each new server that waits for its sign-in, and the work of `sync`. |
+| `boat` | Read only. Each server on boat with a paid plan that does not end: `move` it. Also the number of servers on boat whose plan ends, is past due, or ended. A customer who takes back a cancel, or pays a past-due plan, comes back on this list. |
 | `add <VPS ID>...` | Adds bought machines. It reads the location and the product from Leaseweb, and sets the reference `pool` when the machine has none. It refuses a machine with another reference. |
 | `remove <VPS ID>...` | Takes a free machine out of the pool, for example before its contract ends. It refuses a machine that a server has. |
 | `sync` | Stops OpenBot where a plan ended, starts it where the owner renewed, and reinstalls each machine of a deleted server. It reinstalls only a machine of the pool. It also sets the reference of each machine on which a new server started, and `pool` on each free machine with the old `pool-free` or an owner reference. It changes no other reference. |
@@ -1656,6 +1657,27 @@ that server. A server that names a machine that is not in the
 pool is in the group `unknown`: add the machine. When `ready` is 0 for a product, the next customer of
 that plan starts on boat. `bun run test:hosted-operator-pool` checks the
 delete, the snapshot and its event on the real service with a fake Stripe and a fake boat.
+
+#### Pool alerts
+
+With the Worker secret `HOSTED_POOL_ALERT_WEBHOOK_URL` (a Discord webhook, HTTPS only), the Worker
+sends the operator one message:
+
+| Event | Message | Action |
+| --- | --- | --- |
+| A purchase takes a machine and leaves 0 or 1 free machines of that product in that location | `Pool <location> <product>: <n> free machines left.` | Buy and `prepare` machines. |
+| A purchase starts on boat: no ready machine, or the pool query failed | `A <plan> server (<currency>, <server ID prefix>) starts on boat: <reason>.` | `move` it when a machine is ready. `leaseweb-pool.ts boat` lists it. |
+| A pool start is lost (no sign-in in 4 minutes) | `A <plan> server (<server ID prefix>) did not start on pool machine <host ID> ...` | `prepare --reinstall` the machine, then `move` the server. |
+
+A message has no account, email or name. A retry of a boat attempt does not ask the pool and sends
+no message. A failed send logs one line and is not sent again. Without the secret there are no
+messages. Set it one time; a deploy keeps it:
+
+```sh
+cd apps/auth-api && bunx wrangler secret put HOSTED_POOL_ALERT_WEBHOOK_URL
+```
+
+`bun run test:hosted-pool-assignment` checks the messages.
 
 ## Not confirmed
 

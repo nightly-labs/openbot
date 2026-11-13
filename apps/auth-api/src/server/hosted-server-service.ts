@@ -50,6 +50,7 @@ import {
   verifyBoatWebhookSignature,
 } from "./boat-client";
 import { constantTimeEqual, deriveSecret, hmacSha256, randomToken, sha256 } from "./crypto";
+import { createHostedPoolAlert, type HostedPoolAlert } from "./hosted-pool-alert";
 import type { RemoteFailure } from "./remote-control-plane";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
 import { priceHasCurrency } from "./stripe-client";
@@ -103,6 +104,8 @@ const POOL_SEEN_WRITE_AFTER_MS = 60_000;
  * time, the cron takes the server off the machine and makes a boat sandbox for it.
  */
 const POOL_START_LOST_AFTER_MS = 4 * 60_000;
+/** A purchase that leaves this many free machines, or fewer, in its pool group alerts the operator. */
+const LOW_POOL_FREE = 1;
 /** A machine that another purchase took in the same moment is skipped. After this many, boat is used. */
 const POOL_CANDIDATES = 3;
 /**
@@ -187,6 +190,7 @@ export type HostedServerBindings = Pick<
   | "BOAT_API_KEY"
   | "BOAT_WEBHOOK_SECRET"
   | "REMOTE_TICKET_PRIVATE_JWK"
+  | "HOSTED_POOL_ALERT_WEBHOOK_URL"
 >;
 
 export class HostedServerServiceError extends Schema.TaggedError<HostedServerServiceError>()(
@@ -352,6 +356,7 @@ export class HostedServerService {
   readonly #now: () => number;
   readonly #billing: HostedServerBilling | null;
   readonly #analytics: AccountAnalytics;
+  readonly #poolAlert: HostedPoolAlert | null;
 
   constructor(bindings: HostedServerBindings, options: HostedServerServiceOptions = {}) {
     const database = bindings.DB;
@@ -376,6 +381,10 @@ export class HostedServerService {
     const removeHost = options.removeHost ?? null;
     this.#billing = options.billing ?? null;
     this.#analytics = options.analytics ?? NO_ACCOUNT_ANALYTICS;
+    this.#poolAlert = createHostedPoolAlert(
+      bindings.HOSTED_POOL_ALERT_WEBHOOK_URL,
+      options.fetch ?? ((input, init) => fetch(input, init)),
+    );
     this.#layer = Layer.succeed(HostedServerDependencies, {
       database,
       boat: this.#boat,
@@ -1897,13 +1906,12 @@ export class HostedServerService {
     if (pool && secret) {
       const assigned = yield* this.#assignPoolMachine(row, secret).pipe(
         Effect.catch((error) =>
-          Effect.sync(() => {
+          Effect.sync(() =>
             console.warn("Hosted server pool assignment failed.", {
               serverId: row.server_id,
               error: safeErrorCode(error),
-            });
-            return false;
-          }),
+            }),
+          ).pipe(Effect.andThen(this.#alertBoatStart(row, "the pool query failed")), Effect.as(false)),
         ),
       );
       if (assigned) return;
@@ -2027,16 +2035,16 @@ export class HostedServerService {
     const candidates = yield* hostedCall(() =>
       dependencies.database
         .prepare(
-          `SELECT o.host_id FROM operator_hosts o
+          `SELECT o.host_id, o.location FROM operator_hosts o
          WHERE o.removed_at IS NULL AND o.product = ? AND o.assign_token_hash IS NOT NULL AND o.seen_at > ?
            AND o.location IN (${locations.map(() => "?").join(", ")})
            AND NOT EXISTS(SELECT 1 FROM hosted_servers h WHERE h.operator_host = o.host_id)
          ORDER BY (o.location = ?) DESC, o.added_at, o.host_id LIMIT ?`,
         )
         .bind(POOL_PRODUCT_OF_PLAN[row.plan], seenAfter, ...locations, locations[0], POOL_CANDIDATES)
-        .all<{ host_id: string }>(),
+        .all<{ host_id: string; location: string }>(),
     );
-    for (const { host_id: hostId } of candidates.results) {
+    for (const { host_id: hostId, location } of candidates.results) {
       // The claim names the machine, so another machine or a boat sandbox of this server cannot use it.
       const claim = yield* hostedPoolClaim(secret, row.server_id, hostId).pipe(Effect.mapError(hostedFailure));
       const claimHash = yield* sha256(claim).pipe(Effect.mapError(hostedFailure));
@@ -2064,9 +2072,60 @@ export class HostedServerService {
         size: row.size,
         machine: "pool",
       });
+      yield* this.#alertLowPool(POOL_PRODUCT_OF_PLAN[row.plan], location, seenAfter);
       return true;
     }
+    yield* this.#alertBoatStart(row, `no ready ${POOL_PRODUCT_OF_PLAN[row.plan]} in ${locations.join(", ")}`);
     return false;
+  });
+
+  /** A server on boat must move to a pool machine by hand later (docs/hosted-servers.md#move-a-server-from-boat). */
+  #alertBoatStart(row: HostedServerRow, reason: string): Effect.Effect<void, never, HostedServerDependencies> {
+    return this.#alertPool(
+      `A ${row.plan} server (${row.currency}, ${row.server_id.slice(0, 8)}) starts on boat: ${reason}.`,
+    );
+  }
+
+  /** Tells the operator when a purchase leaves at most one free machine of its product in that location. */
+  readonly #alertLowPool = Effect.fn("HostedServerService.alertLowPool")(function* (
+    this: HostedServerService,
+    product: string,
+    location: string,
+    seenAfter: number,
+  ): Effect.fn.Return<void, never, HostedServerDependencies> {
+    if (!this.#poolAlert) return;
+    const dependencies = yield* HostedServerDependencies;
+    // The alert never changes the purchase, so a failed count only logs.
+    const free = yield* hostedCall(() =>
+      dependencies.database
+        .prepare(
+          `SELECT count(*) AS n FROM operator_hosts o
+         WHERE o.removed_at IS NULL AND o.product = ? AND o.location = ? AND o.assign_token_hash IS NOT NULL
+           AND o.seen_at > ? AND NOT EXISTS(SELECT 1 FROM hosted_servers h WHERE h.operator_host = o.host_id)`,
+        )
+        .bind(product, location, seenAfter)
+        .first<{ n: number }>(),
+    ).pipe(
+      Effect.map((result) => result?.n ?? null),
+      Effect.catch(() =>
+        Effect.sync(() => {
+          console.warn("Hosted pool count failed.");
+          return null;
+        }),
+      ),
+    );
+    if (free === null || free > LOW_POOL_FREE) return;
+    yield* this.#alertPool(`Pool ${location} ${product}: ${free} free machine${free === 1 ? "" : "s"} left.`);
+  });
+
+  /** Sends an operator message after the current work, as analytics does. */
+  readonly #alertPool = Effect.fn("HostedServerService.alertPool")(function* (
+    this: HostedServerService,
+    text: string,
+  ): Effect.fn.Return<void, never, HostedServerDependencies> {
+    if (!this.#poolAlert) return;
+    const dependencies = yield* HostedServerDependencies;
+    dependencies.schedule(this.#poolAlert(text));
   });
 
   /**
@@ -2112,7 +2171,11 @@ export class HostedServerService {
       machine: "pool",
     });
     const current = yield* this.#requireRow(row.server_id);
-    if (current.observed_state !== "awaiting_payment") return false;
+    const toBoat = current.observed_state === "awaiting_payment";
+    yield* this.#alertPool(
+      `A ${row.plan} server (${row.server_id.slice(0, 8)}) did not start on pool machine ${hostId}${toBoat ? " and starts on boat" : ""}. Prepare the machine again.`,
+    );
+    if (!toBoat) return false;
     yield* this.#provision(current, false);
     return true;
   });
