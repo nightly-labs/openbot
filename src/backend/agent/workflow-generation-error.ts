@@ -6,12 +6,14 @@ import { providerLabel } from "./thread-items";
 /**
  * The text that a failed workflow model step or condition shows: what went wrong and what to do.
  * The provider's own text (the cause of the generation's error) decides first, because it says why
- * a turn failed or retried until the deadline. The generation's own failure decides next. Any
- * other failure keeps the general text (#7992).
+ * a turn failed or retried until the deadline. The generation's own failure decides next: a request
+ * error, such as a `thread/start` that timed out, has no provider text under it. Any other failure
+ * keeps the general text (#7992).
  */
 export function workflowGenerationError(cause: unknown, provider: AgentProvider): string {
   const failure = cause instanceof Error ? cause : null;
-  switch (failure?.cause instanceof Error ? classifyFailure(failure.cause) : "unknown") {
+  const providerCause = failure?.cause instanceof Error ? classifyFailure(failure.cause) : "unknown";
+  switch (providerCause === "unknown" ? classifyFailure(failure) : providerCause) {
     case "authentication":
       return sourceText("error.provider.signInExpired", { provider: providerLabel(provider) });
     case "model_not_found":
@@ -24,7 +26,6 @@ export function workflowGenerationError(cause: unknown, provider: AgentProvider)
     case "timeout":
       return sourceText("error.workflow.modelTimedOut");
   }
-  if (failure?.message === sourceText("error.agent.profileTimedOut")) return sourceText("error.workflow.modelTimedOut");
   if (failure?.message === sourceText("error.agent.profileToolUse")) return sourceText("error.workflow.modelToolUse");
   return sourceText("error.workflow.modelFailed");
 }
