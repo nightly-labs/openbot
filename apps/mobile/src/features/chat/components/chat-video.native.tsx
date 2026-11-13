@@ -13,6 +13,7 @@ import { haptics } from "@/shared/lib/haptics";
 import { type MobileText, useText } from "@/shared/lib/text";
 import { attachmentFrame, FILL, FRAME_RADIUS, MAX_FRAME_WIDTH } from "../model/attachment-frame";
 import { playbackTime } from "../model/playback-time";
+import { knownImageDimensions, rememberImageDimensions } from "./attachment-preview";
 import { useListSettled } from "./use-list-settled";
 import { useMediaFile } from "./use-media-file";
 import { VideoViewer } from "./video-viewer";
@@ -140,7 +141,15 @@ export function ChatVideoAttachment({
   const [viewing, setViewing] = useState(false);
   const [busy, setBusy] = useState(false);
   const maxWidth = Math.min(MAX_FRAME_WIDTH, width - 80);
-  const frame = attachmentFrame(poster?.thumbnail ?? null, maxWidth, unknownRatio);
+  // The phone keeps the shape of a video that it showed before, as it does for an image. The frame
+  // then has its final size before the video downloads, also in a later launch.
+  const posterWidth = poster?.thumbnail.width;
+  const posterHeight = poster?.thumbnail.height;
+  useEffect(() => {
+    if (posterWidth && posterHeight)
+      rememberImageDimensions(attachment.id, { width: posterWidth, height: posterHeight });
+  }, [attachment.id, posterWidth, posterHeight]);
+  const frame = attachmentFrame(poster?.thumbnail ?? knownImageDimensions(attachment.id), maxWidth, unknownRatio);
   const failed = Boolean(query.error);
 
   async function share() {

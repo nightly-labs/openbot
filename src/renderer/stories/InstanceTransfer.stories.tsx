@@ -63,15 +63,26 @@ export const InServerSettings: Story = {
   name: "Server settings",
   render: () => (
     <ServerSettingsStory
-      settings={{ ...serverSettingsArgs(), instanceTransfer: { onSignIn: fn() }, initialSection: "transfer" }}
+      settings={{
+        ...serverSettingsArgs(),
+        instanceTransfer: { onSignIn: fn(), history: true, fullCopy: true },
+        initialSection: "transfer",
+      }}
     />
   ),
 };
 
 export const Home: Story = { name: "Which computer", render: () => <Stage args={viewArgs()} /> };
 
+/** This computer, or a host with `instance-transfer-full-copy-v1`: each part has its own switch. */
 export const Export: Story = {
   name: "Export",
+  render: () => <Stage args={viewArgs({ screen: "export", historyAvailable: true, fullCopyAvailable: true })} />,
+};
+
+/** A host with only `instance-transfer-chunks-v1`: the chat history also carries the channel messages. */
+export const ExportOlderHost: Story = {
+  name: "Export: older host",
   render: () => <Stage args={viewArgs({ screen: "export", historyAvailable: true })} />,
 };
 

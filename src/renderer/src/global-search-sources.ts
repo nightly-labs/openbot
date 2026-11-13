@@ -15,6 +15,7 @@ import { globalSearchChannels } from "./features/channels/global-search-channels
 import {
   activeServerHasProviderSettings,
   serverCanAdminister,
+  serverHasAgentDefaults,
   serverSupportsCapability,
 } from "./features/servers/server-capabilities";
 import { useServerSettings } from "./features/servers/server-settings";
@@ -221,6 +222,16 @@ export function useGlobalSearchSources(open: () => boolean) {
             group: "settings",
             icon: BookMarked,
             run: () => openServerSettings(server.id, globalSearchOpener(), "general"),
+          });
+        }
+        if (serverHasAgentDefaults(server)) {
+          list.push({
+            id: "server:agents",
+            label: t("server.settings.agents"),
+            detail: server.name,
+            group: "settings",
+            icon: Bot,
+            run: () => openServerSettings(server.id, globalSearchOpener(), "agents"),
           });
         }
         if (activeServerHasProviderSettings(server)) {

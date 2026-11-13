@@ -1,4 +1,4 @@
-import { isKeyOnlyProvider } from "@openbot/contracts/agent-providers";
+import { isKeyOnlyProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
 import {
   type AgentProviderId,
   type AgentStatus,
@@ -11,6 +11,7 @@ import {
 import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import { CODEX_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/codex-api-key-v1";
 import { CUSTOM_PROVIDER_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
+import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import {
   type ProviderAccountRelay,
@@ -380,6 +381,10 @@ const Providers = createSimpleContext({
     const accountPoolServerId = createMemo(
       () => remoteAdminServer(activeServer(), PROVIDER_ACCOUNT_POOL_CAPABILITY)?.id,
     );
+    /** The joined server whose host takes an API key as a provider account (`provider-account-keys-v1`). */
+    const accountKeysServerId = createMemo(
+      () => remoteAdminServer(activeServer(), PROVIDER_ACCOUNT_KEYS_CAPABILITY)?.id,
+    );
 
     /**
      * The accounts of the providers of this computer, or of a joined server's host that serves
@@ -422,6 +427,12 @@ const Providers = createSimpleContext({
                   changed(providerAdmin().setAccountPool({ provider, enabled, leftOut: [...leftOut] }, hostServerId)),
               }
             : {}),
+          ...(accountKeysServerId() === hostServerId
+            ? {
+                connectKey: (provider: AgentProviderId, accountId: string | null, key: string) =>
+                  changed(providerAdmin().connectAccountKey({ provider, accountId, key }, hostServerId)),
+              }
+            : {}),
         };
       }
       if (activeServer()?.kind !== "local") return undefined;
@@ -436,6 +447,8 @@ const Providers = createSimpleContext({
         connect: async (provider, accountId) => {
           await providersPort().connectProviderAccount({ provider, accountId });
         },
+        connectKey: (provider, accountId, key) =>
+          apply(providersPort().connectProviderAccountKey({ provider, accountId, key })),
         cancel: async (provider, accountId) => {
           await providersPort().cancelProviderAccountSignIn({ provider, accountId });
         },
@@ -457,6 +470,11 @@ const Providers = createSimpleContext({
 
     async function cancelProviderRestart(provider: AgentProviderId): Promise<void> {
       await changeProviderRestart(provider, providersPort().cancelProviderRestart);
+    }
+
+    /** Runs the CLI the user installed (`installed`), or OpenBot's newer copy, from the provider's restart. */
+    async function chooseInstalledCli(provider: ManagedProviderId, installed: boolean): Promise<void> {
+      await changeProviderRestart(provider, () => providersPort().chooseInstalledCli({ provider, installed }));
     }
 
     /** A failed restart is also on the provider's status; this reports a request that main refused. */
@@ -620,6 +638,7 @@ const Providers = createSimpleContext({
       providerAccounts,
       restartProvider,
       cancelProviderRestart,
+      chooseInstalledCli,
     };
   },
 });

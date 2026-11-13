@@ -13,6 +13,7 @@ import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-
 import { AGENT_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { agentColorsEvent } from "@openbot/contracts/team-protocol/agent-colors-v1";
+import { AGENT_DEFAULTS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-defaults-v1";
 import { AGENT_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_HOST_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
 import { AGENT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v1";
@@ -24,6 +25,7 @@ import { AGENT_PLAN_CARD_CAPABILITY } from "@openbot/contracts/team-protocol/age
 import { AGENT_PUBLISH_CAPABILITY } from "@openbot/contracts/team-protocol/agent-publish-v1";
 import { AGENT_TASK_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { AGENT_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-update-v1";
+import { BACKGROUND_PROCESSES_CAPABILITY } from "@openbot/contracts/team-protocol/background-processes-v1";
 import { BITWARDEN_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/bitwarden-connector-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
@@ -42,6 +44,7 @@ import { HOST_KEY_ROTATION_CAPABILITY } from "@openbot/contracts/team-protocol/h
 import { HOST_MEMBER_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-member-update-v1";
 import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
 import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-release-v1";
+import { HOST_RESTART_CAPABILITY } from "@openbot/contracts/team-protocol/host-restart-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "@openbot/contracts/team-protocol/host-timezone-v1";
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
@@ -54,6 +57,7 @@ import { MCP_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-acce
 import { MEMORY_REVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "@openbot/contracts/team-protocol/password-managers-v1";
+import { PENDING_APPROVAL_CAPABILITY } from "@openbot/contracts/team-protocol/pending-approval-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v1";
 import { PUSH_NOTIFICATION_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/push-notification-threads-v1";
@@ -77,6 +81,7 @@ import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9
 import { VAULT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
+import { VAULT_V3_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v3";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
 import { sourceText } from "@openbot/i18n/source";
 import {
@@ -97,6 +102,7 @@ import { verifyEd25519Base64Url } from "@openbot/team-client/ed25519";
 import { createFocusUsePing } from "@openbot/team-client/focus-use";
 import { createHostedServerWake, WAKE_RECONNECT_DELAY_MS } from "@openbot/team-client/hosted-server-wake";
 import type { RemoteFileUpload, RemoteLargeDownload, RemoteTeamEvent } from "@openbot/team-client/remote-peer";
+import { withWholeApproval } from "@openbot/team-client/runtime-attention";
 import {
   createHostLocalServer,
   deleteHostLocalServer,
@@ -112,6 +118,7 @@ import {
   deleteAgent,
   discardAttachmentDraft,
   interruptAgentTurn,
+  readPendingApproval,
   respondToApproval,
   respondToBrowserSecret,
   respondToBrowserTakeover,
@@ -138,6 +145,7 @@ import { useSyncedNotificationLevelsLoader } from "@/features/push-notifications
 import { QuickActionsSync } from "@/features/quick-actions/quick-actions-sync";
 import { setSyncedNotificationLevels } from "@/features/settings/model/notification-levels";
 import { ShareExtensionSync } from "@/features/share/share-extension-sync";
+import { ShortcutsSync } from "@/features/shortcuts/shortcuts-sync";
 import { fetch } from "@/features/support/model/logged-fetch";
 import { supportLog } from "@/features/support/model/support-log";
 import type { RemoteTeamTransportRef } from "@/features/workspace/components/remote-team-transport";
@@ -1887,6 +1895,25 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           throw new Error(currentText().t("mobile.workspace.error.approvalOffline"));
         await sendApproval(serverId, input);
       },
+      readsWholeApprovals: (serverId) =>
+        hasCapability(serverCapabilities.current, serverId, PENDING_APPROVAL_CAPABILITY),
+      readWholeApproval: async (serverId, approval) => {
+        if (!hasCapability(serverCapabilities.current, serverId, PENDING_APPROVAL_CAPABILITY)) return;
+        const whole = await runTeamRequest(
+          readPendingApproval(teamApi(serverId), { agentId: approval.agentId, requestId: approval.requestId }),
+        ).catch((error: unknown) => {
+          // Another device answered it, or its turn ended. The request is gone on the host too.
+          if (error instanceof InactiveRequestError)
+            liveState.update("approvalRequests", (current) => dropApproval(current, serverId, approval.requestId));
+          throw error;
+        });
+        liveState.update("approvalRequests", (current) => {
+          const previous = current[serverId];
+          if (!previous) return current;
+          const next = withWholeApproval(previous, whole);
+          return next === previous ? current : { ...current, [serverId]: next };
+        });
+      },
       respondToBrowserTakeover: (serverId, input) => runTeamRequest(respondToBrowserTakeover(teamApi(serverId), input)),
       respondToBrowserSecret: (serverId, input) => runTeamRequest(respondToBrowserSecret(teamApi(serverId), input)),
       selectServer: (id) => {
@@ -2447,6 +2474,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         canCreateLocalServers: (serverId) =>
           servers.find((candidate) => candidate.id === serverId)?.role === "owner" &&
           administers(serverId, LOCAL_SERVERS_CAPABILITY),
+        canRestartServerItself: (serverId) => administers(serverId, HOST_RESTART_CAPABILITY),
         canManageServerTimezone: (serverId) => administers(serverId, HOST_TIMEZONE_CAPABILITY),
         canReadMachineMetrics: (serverId) => administers(serverId, MACHINE_RESOURCES_CAPABILITY),
         canManageAgentMemoryLimit: (serverId) => administers(serverId, AGENT_MEMORY_LIMIT_CAPABILITY),
@@ -2484,6 +2512,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           hasCapability(capabilities, serverId, AGENT_IMPORT_CAPABILITY),
         canTransferServer: (serverId) => administers(serverId, INSTANCE_TRANSFER_CAPABILITY),
         canManageVaultApiKeys: (serverId) => administers(serverId, VAULT_V2_CAPABILITY),
+        canManageVaultTwoStep: (serverId) => administers(serverId, VAULT_V3_CAPABILITY),
         canManageBrowserProfiles: (serverId) => administers(serverId, BROWSER_PROFILES_CAPABILITY),
         canManageBrowserProxies: (serverId) => administers(serverId, BROWSER_PROXIES_CAPABILITY),
         // The same rule as the Updates section of the desktop Server Settings.
@@ -2523,6 +2552,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         canManageAgentTaskLimit: (serverId) => administers(serverId, AGENT_TASK_LIMIT_CAPABILITY),
         canManageAgentNewChat: (serverId) => administers(serverId, AGENT_NEW_CHAT_CAPABILITY),
         canManageAgentPlanCard: (serverId) => administers(serverId, AGENT_PLAN_CARD_CAPABILITY),
+        canManageAgentDefaults: (serverId) => administers(serverId, AGENT_DEFAULTS_CAPABILITY),
+        canManageBackgroundProcesses: (serverId) => administers(serverId, BACKGROUND_PROCESSES_CAPABILITY),
         canManageAgentInstructions: (serverId) => administers(serverId, AGENT_INSTRUCTIONS_CAPABILITY),
         canPublishAgent: (serverId) => administers(serverId, AGENT_PUBLISH_CAPABILITY),
         canManageProviderAccounts: (serverId) => administers(serverId, PROVIDER_ACCOUNTS_CAPABILITY),
@@ -2610,6 +2641,14 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             servers={orderedServers}
             serversReady={serverDirectoryState === "ready"}
             agents={agents}
+          />
+          <ShortcutsSync
+            apiUrl={session.apiUrl}
+            userId={session.user.id}
+            servers={orderedServers}
+            serversReady={serverDirectoryState === "ready"}
+            agents={agents}
+            preferences={visiblePreferences}
           />
           <NotificationAvatarSync servers={servers} serversReady={serverDirectoryState === "ready"} agents={agents} />
           {servers.map((server) => (

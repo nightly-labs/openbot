@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.view.KeyEvent
 import android.view.View
 import android.webkit.MimeTypeMap
 import android.widget.EditText
@@ -29,9 +30,20 @@ private val copier = Executors.newSingleThreadExecutor()
 /**
  * Wraps the chat composer field. The React Native field pastes text only, so a paste or keyboard
  * insert of photos, videos or other files in it is copied to the cache and sent to JavaScript.
+ * Enter on a hardware keyboard sends the draft. Shift+Enter adds a line break.
  */
 class ComposerPasteView(context: Context, appContext: AppContext) : ExpoView(context, appContext) {
   private val onPasteFiles by EventDispatcher()
+  private val onSubmitKey by EventDispatcher()
+
+  private val submitKey = View.OnKeyListener { field, keyCode, event ->
+    if (!isSubmitKey(keyCode, event) || field !is EditText || !field.isEnabled) return@OnKeyListener false
+    // The key down sends. The key up of the same key must not add a line break after it.
+    if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+      onSubmitKey(mapOf("text" to field.text.toString()))
+    }
+    true
+  }
 
   /** The largest file that the app attaches. The copy thread reads it. */
   @Volatile var maxBytes = Long.MAX_VALUE - 1
@@ -51,12 +63,26 @@ class ComposerPasteView(context: Context, appContext: AppContext) : ExpoView(con
 
   override fun onViewAdded(child: View) {
     super.onViewAdded(child)
-    if (child is EditText) ViewCompat.setOnReceiveContentListener(child, FILE_TYPES, receiver)
+    if (child is EditText) {
+      ViewCompat.setOnReceiveContentListener(child, FILE_TYPES, receiver)
+      child.setOnKeyListener(submitKey)
+    }
   }
 
   override fun onViewRemoved(child: View) {
     super.onViewRemoved(child)
-    if (child is EditText) ViewCompat.setOnReceiveContentListener(child, null, null)
+    if (child is EditText) {
+      ViewCompat.setOnReceiveContentListener(child, null, null)
+      child.setOnKeyListener(null)
+    }
+  }
+
+  /** Enter and Ctrl+Enter from a hardware keyboard. A screen keyboard adds a line break, as before. */
+  private fun isSubmitKey(keyCode: Int, event: KeyEvent): Boolean {
+    if (keyCode != KeyEvent.KEYCODE_ENTER && keyCode != KeyEvent.KEYCODE_NUMPAD_ENTER) return false
+    if ((event.flags and KeyEvent.FLAG_SOFT_KEYBOARD) != 0 || event.device?.isVirtual != false) return false
+    val modifiers = event.modifiers and KeyEvent.META_CTRL_MASK.inv()
+    return KeyEvent.metaStateHasNoModifiers(modifiers)
   }
 
   private fun copyFiles(files: ContentInfoCompat) {
@@ -113,7 +139,7 @@ class ComposerPasteModule : Module() {
     Name("OpenBotComposerPaste")
 
     View(ComposerPasteView::class) {
-      Events("onPasteFiles")
+      Events("onPasteFiles", "onSubmitKey")
 
       Prop("maxBytes") { view: ComposerPasteView, maxBytes: Int ->
         view.maxBytes = maxBytes.toLong()

@@ -46,4 +46,18 @@ platform :android do
       skip_upload_screenshots: true
     )
   end
+
+  desc "Download the universal APK that Google Play makes from an uploaded bundle"
+  lane :apk do
+    version_code = ENV.fetch("VERSION_CODE")
+    UI.user_error!("VERSION_CODE must be the build number of a bundle on Google Play") unless version_code.match?(/\A\d+\z/)
+
+    # Google Play signs this APK with the app signing key, so it has the signature of the store app.
+    download_universal_apk_from_google_play(
+      package_name: "run.openbot.mobile",
+      version_code: version_code,
+      json_key_data: ENV.fetch("GOOGLE_PLAY_SERVICE_ACCOUNT_KEY"),
+      destination: ENV.fetch("APK_PATH")
+    )
+  end
 end

@@ -404,7 +404,14 @@ export const messages = {
   "mobile.chat.approval.effect.permissions":
     "허용하면 {name}에게 {server}에서 이 권한을 부여해요. 거부하면 현재 권한이 유지돼요.",
   "mobile.chat.approval.partial":
-    "이 요청은 너무 길어서 휴대폰에 표시할 수 없어요. 허용하려면 {server}에서 OpenBot을 열어 주세요. 여기서는 거부할 수 있어요.",
+    "{server}는 이 요청의 앞부분만 휴대폰으로 보내요. 허용하려면 {server}의 OpenBot을 업데이트하거나 OpenBot 데스크톱 앱에서 이 채팅을 열어 주세요. 여기서는 거부할 수 있어요.",
+  "mobile.chat.approval.loading": "전체 요청을 불러오는 중…",
+  "mobile.chat.approval.loadFailed": "전체 요청을 불러오지 못했어요. 여기서는 거부할 수 있어요.",
+  "mobile.chat.approval.retry": "다시 시도",
+  "mobile.chat.approval.report.bugHeadline": "버그를 찾으셨나요? 고쳐 봅시다.",
+  "mobile.chat.approval.report.ideaHeadline": "아이디어가 있나요? 실현해 봅시다.",
+  "mobile.chat.approval.report.dontSend": "나중에",
+  "mobile.chat.approval.report.send": "OpenBot 팀에 보내기",
   "mobile.chat.approval.allow": "허용",
   "mobile.chat.approval.deny": "거부",
   "mobile.chat.approval.reconnect": "이 요청에 응답하려면 {server}에 연결해 주세요.",

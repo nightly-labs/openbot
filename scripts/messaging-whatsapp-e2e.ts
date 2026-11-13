@@ -849,7 +849,19 @@ try {
         const ids = messaging.whatsappOverview().accounts[0]?.allowedSenders.map((sender) => sender.id) ?? [];
         assert.ok(ids.includes(BRAZIL_ACCOUNT), "The contact was not saved in the form that WhatsApp has.");
         assert.ok(!ids.includes(BRAZIL_TYPED), "The contact was saved as typed.");
-        return { saved: BRAZIL_ACCOUNT };
+        // An agent writes the number as the person typed it: the post goes to the form that WhatsApp has.
+        const posted = await runCauseEffect(
+          agents.messaging.outboundTool(
+            "agent-whatsapp-e2e",
+            { threadId: "thread-whatsapp-e2e", turnId: "turn-whatsapp-e2e" },
+            "messaging_post",
+            { connection: connectionId(agents), place: "+55 31 9 8888-7777", text: "Lembrete" },
+            () => Effect.succeed([]),
+          ),
+        );
+        assert.ok(posted.success, posted.contentItems[0]?.text);
+        await until(() => phone.textsTo(accountJid).includes("Lembrete"), "the post to the typed number");
+        return { saved: BRAZIL_ACCOUNT, postedTo: accountJid };
       },
     );
 

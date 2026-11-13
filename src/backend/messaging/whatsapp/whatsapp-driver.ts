@@ -3,6 +3,7 @@ import { stat } from "node:fs/promises";
 import { extname } from "node:path";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
+import { parseWhatsAppPhoneNumber } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { WhatsAppStoreUnreadable } from "@openbot/whatsapp/auth-store";
 import {
@@ -38,7 +39,7 @@ import {
 import { imageSize } from "./whatsapp-image-size";
 import { whatsAppChunks, whatsAppText } from "./whatsapp-render";
 import type { WhatsAppConnectionHandle, WhatsAppRuntime } from "./whatsapp-runtime";
-import { allowsContact } from "./whatsapp-senders";
+import { allowsContact, whatsAppNumberForms } from "./whatsapp-senders";
 import { WhatsAppTransport } from "./whatsapp-transport";
 
 /** WhatsApp takes larger files, but a phone on mobile data should not have to. */
@@ -190,6 +191,13 @@ class WhatsAppAdapter implements MessagingAdapter {
     });
   });
 
+  /** Deletes a status post for everyone, so a quiet answer leaves no "finished" text in the chat. */
+  readonly remove = Effect.fnUntraced(function* (this: WhatsAppAdapter, target: MessageTarget, messageId: string) {
+    yield* this.#session().send(target.platformChannelId, { delete: this.#ownKey(target, messageId) });
+    this.#handle.chats.forgetMenu(messageId);
+    this.#sentAt.delete(messageId);
+  });
+
   /** WhatsApp has no message that only one person sees, so the text is a reply in the chat. */
   postPrivate(target: MessageTarget, _userId: string, text: string): Effect.Effect<void, MessagingAdapterError> {
     return this.post(target, { text }).pipe(Effect.asVoid);
@@ -234,10 +242,7 @@ class WhatsAppAdapter implements MessagingAdapter {
       firstId = yield* this.#send(target, { text: first, ...firstMentions });
       // The status post would stay as "Working on it…" above the answer, so it goes. After the post:
       // when the post fails, the status post stays for the next attempt.
-      if (replaceMessageId)
-        yield* this.#session()
-          .send(target.platformChannelId, { delete: this.#ownKey(target, replaceMessageId) })
-          .pipe(Effect.catch(() => Effect.void));
+      if (replaceMessageId) yield* this.remove(target, replaceMessageId).pipe(Effect.catch(() => Effect.void));
     }
     for (const chunk of rest) yield* this.#send(target, { text: chunk, ...this.#mentions(chunk) });
     return firstId;
@@ -372,6 +377,21 @@ class WhatsAppAdapter implements MessagingAdapter {
       for (const group of rules.groups) places.push({ id: group, name: yield* this.placeName(group), kind: "channel" });
       return places;
     });
+  }
+
+  /**
+   * The chat of the owner or of an allowed contact, for a number with a plus, spaces or dashes, or in
+   * its other Brazilian form. WhatsApp delivers only to the form that has the account, which is the saved one.
+   */
+  placeId(placeId: string): string {
+    const [user = "", domain] = placeId.split("@");
+    if (domain !== undefined && domain !== "s.whatsapp.net") return placeId;
+    const number = parseWhatsAppPhoneNumber(user.split(":")[0]);
+    const identity = whatsAppIdentity(this.#handle);
+    if (!number || !identity) return placeId;
+    const rules = this.#runtime.policy.rules(identity.number);
+    const saved = whatsAppNumberForms(number).find((form) => form === identity.number || rules.contacts.has(form));
+    return saved ? userJid(saved) : placeId;
   }
 
   /** WhatsApp notifies a person for `@<number>` when the post also lists them; `post` does that. */

@@ -7,11 +7,15 @@
 // the evidence, because the main process can stop before it sees the GPU process go:
 // - `gpu-start.json` is written before the app is ready. It is removed when the app has run for
 //   `startConfirmMs`, or when a quit starts. If the file is there at the next start, that start stopped.
+//   A stop with no crash dump since the file was written is a kill or a power loss, not the #992 crash,
+//   which Crashpad records: the next start tries the GPU once more and marks its own file `retried`.
+//   A start that stops again keeps software rendering on, so a stop that Crashpad misses costs one start (#6208).
 // - `gpu-crash.json` is written when the GPU process crashes.
 // Either file keeps software rendering on at each later start with the same Chromium major version.
 // A new Chromium major version tries the GPU again, because it can fix the driver problem. An Electron
 // patch release keeps the Chromium major version, so it does not make a failing computer stop again.
 // `OPENBOT_DISABLE_GPU=1` always uses software rendering. `OPENBOT_DISABLE_GPU=0` always uses the GPU.
+// On a Wayland session, software rendering starts OpenBot again on XWayland (`linux-wayland-output.ts`).
 // A server (`OPENBOT_SERVER=1` or a hosted server) runs under a virtual display with no GPU, so it
 // always composites on the CPU. It keeps hardware acceleration for WebGL on SwiftShader (#6404): the
 // browser of its agents opens sites such as the Figma editor, which stop without WebGL. A server
@@ -20,12 +24,13 @@
 // hardware acceleration on a server; `OPENBOT_DISABLE_GPU=0` does not change a server.
 // The renderer sandbox stays on in all cases.
 
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { app, type Details } from "electron";
 import { isMissingFileError } from "../backend/file-errors";
+import { countCrashDumps } from "./run-marker";
 
 const GPU_START_FILE = "gpu-start.json";
 const GPU_CRASH_FILE = "gpu-crash.json";
@@ -46,6 +51,14 @@ const logger = createOpenBotLogger("linux-gpu");
 /** One GPU failure on this computer, with the Chromium major version that had it. */
 interface GpuFailureRecord {
   chromium: string;
+  /** Start file only: that start was the one retry after a stop with no crash dump. */
+  retried: boolean;
+}
+
+/** A start file that an earlier start left. */
+interface UnfinishedStart extends GpuFailureRecord {
+  /** Crashpad wrote a dump after the file was written. */
+  crashed: boolean;
 }
 
 type LinuxGpuModeReason =
@@ -55,6 +68,7 @@ type LinuxGpuModeReason =
   | "environment-on"
   | "gpu-process-crash"
   | "unfinished-start"
+  | "unfinished-start-retry"
   | "default";
 
 export interface LinuxGpuMode {
@@ -69,7 +83,7 @@ interface LinuxGpuModeInput {
   disableGpu: string | undefined;
   chromiumMajor: string;
   crash: GpuFailureRecord | undefined;
-  unfinishedStart: GpuFailureRecord | undefined;
+  unfinishedStart: UnfinishedStart | undefined;
 }
 
 /** Decides if this start uses hardware acceleration. It reads no files and changes nothing. */
@@ -82,7 +96,10 @@ function resolveLinuxGpuMode(input: LinuxGpuModeInput): LinuxGpuMode {
   }
   if (input.server) return { hardwareAcceleration: true, reason: "server" };
   if (input.unfinishedStart?.chromium === input.chromiumMajor) {
-    return { hardwareAcceleration: false, reason: "unfinished-start" };
+    if (input.unfinishedStart.crashed || input.unfinishedStart.retried) {
+      return { hardwareAcceleration: false, reason: "unfinished-start" };
+    }
+    return { hardwareAcceleration: true, reason: "unfinished-start-retry" };
   }
   return { hardwareAcceleration: true, reason: "default" };
 }
@@ -99,6 +116,19 @@ export interface ConfigureLinuxGpuOptions {
   startConfirmMs?: number;
 }
 
+/** Reads the evidence and decides if this start uses hardware acceleration. It changes nothing. */
+export function readLinuxGpuMode(userDataPath: string, server: boolean): LinuxGpuMode {
+  const linux = process.platform === "linux";
+  return resolveLinuxGpuMode({
+    platform: process.platform,
+    server,
+    disableGpu: process.env.OPENBOT_DISABLE_GPU,
+    chromiumMajor: chromiumMajorVersion(),
+    crash: linux ? readGpuFailure(join(userDataPath, GPU_CRASH_FILE)) : undefined,
+    unfinishedStart: linux ? readUnfinishedStart(join(userDataPath, GPU_START_FILE)) : undefined,
+  });
+}
+
 /**
  * Reads the evidence, turns off hardware acceleration when it failed before, and records new
  * failures. Call it before the app is ready and after `userData` has its final path.
@@ -106,15 +136,8 @@ export interface ConfigureLinuxGpuOptions {
 export function configureLinuxGpu(options: ConfigureLinuxGpuOptions): LinuxGpuMode {
   const startPath = join(options.userDataPath, GPU_START_FILE);
   const crashPath = join(options.userDataPath, GPU_CRASH_FILE);
-  const chromiumMajor = process.versions.chrome?.split(".")[0] ?? "";
-  const mode = resolveLinuxGpuMode({
-    platform: process.platform,
-    server: options.server,
-    disableGpu: process.env.OPENBOT_DISABLE_GPU,
-    chromiumMajor,
-    crash: process.platform === "linux" ? readGpuFailure(crashPath) : undefined,
-    unfinishedStart: process.platform === "linux" ? readGpuFailure(startPath) : undefined,
-  });
+  const chromiumMajor = chromiumMajorVersion();
+  const mode = readLinuxGpuMode(options.userDataPath, options.server);
   if (mode.reason === "not-linux") return mode;
   if (!mode.hardwareAcceleration) {
     app.disableHardwareAcceleration();
@@ -128,6 +151,9 @@ export function configureLinuxGpu(options: ConfigureLinuxGpuOptions): LinuxGpuMo
     }
     return mode;
   }
+  if (options.ownsInstance && mode.reason === "unfinished-start-retry") {
+    logger.warn("The previous start stopped before it was confirmed, with no crash dump. The GPU gets one more start.");
+  }
   if (mode.reason === "server") {
     // `disableHardwareAcceleration()` also turns off WebGL, and Chromium has no automatic SwiftShader
     // WebGL fallback. Compositing, raster, 2D canvas and video stay on the CPU, as with that call.
@@ -136,7 +162,7 @@ export function configureLinuxGpu(options: ConfigureLinuxGpuOptions): LinuxGpuMo
   }
   if (!options.ownsInstance) return mode;
   if (mode.reason !== "server") {
-    writeGpuFailure(startPath, chromiumMajor);
+    writeGpuFailure(startPath, chromiumMajor, mode.reason === "unfinished-start-retry");
     const confirmStart = () => removeFile(startPath);
     void app.whenReady().then(() => setTimeout(confirmStart, options.startConfirmMs ?? DEFAULT_START_CONFIRM_MS));
     // Not `will-quit`: it fires only after the teardown, which can take longer than a stop allows
@@ -152,6 +178,10 @@ export function configureLinuxGpu(options: ConfigureLinuxGpuOptions): LinuxGpuMo
   return mode;
 }
 
+function chromiumMajorVersion(): string {
+  return process.versions.chrome?.split(".")[0] ?? "";
+}
+
 function readGpuFailure(path: string): GpuFailureRecord | undefined {
   let text: string;
   try {
@@ -163,17 +193,31 @@ function readGpuFailure(path: string): GpuFailureRecord | undefined {
   try {
     const parsed = JSON.parse(text);
     if (!isDynamicRecord(parsed) || parsed.version !== 1 || !isString(parsed.chromium)) return undefined;
-    return { chromium: parsed.chromium };
+    return { chromium: parsed.chromium, retried: parsed.retried === true };
   } catch {
     return undefined;
   }
 }
 
+function readUnfinishedStart(path: string): UnfinishedStart | undefined {
+  const record = readGpuFailure(path);
+  if (!record) return undefined;
+  // With no time, every dump counts: the start then keeps software rendering, as before #6208.
+  let writtenAt = 0;
+  try {
+    writtenAt = statSync(path).mtimeMs;
+  } catch (error) {
+    logger.warn(`Unable to read the time of ${path}:`, toLogValue(error));
+  }
+  // No upper limit: a clock that goes back after a reboot must not hide a dump.
+  return { ...record, crashed: countCrashDumps(app.getPath("crashDumps"), writtenAt, Number.POSITIVE_INFINITY) > 0 };
+}
+
 // Synchronous: the first write runs before the app is ready, and a crash can stop the process soon after.
-function writeGpuFailure(path: string, chromiumMajor: string): void {
+function writeGpuFailure(path: string, chromiumMajor: string, retried = false): void {
   try {
     mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
-    writeFileSync(path, JSON.stringify({ version: 1, chromium: chromiumMajor }));
+    writeFileSync(path, JSON.stringify({ version: 1, chromium: chromiumMajor, ...(retried ? { retried } : {}) }));
   } catch (error) {
     logger.warn(`Unable to write ${path}:`, toLogValue(error));
   }

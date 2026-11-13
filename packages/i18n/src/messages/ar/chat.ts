@@ -504,6 +504,8 @@ export const messages = {
   "chat.video.time": "{elapsed} / {duration}",
   "chat.video.download": "تنزيل الفيديو",
   "chat.video.open": "فتح الفيديو",
+  "chat.video.mute": "كتم صوت الفيديو",
+  "chat.video.unmute": "إلغاء كتم صوت الفيديو",
   "chat.message.you": "أنت",
   "chat.message.agentFallback": "وكيل",
   "chat.message.memberFallback": "عضو في الفريق",

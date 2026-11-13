@@ -172,12 +172,11 @@ const tickSalesAnalytics = Effect.fn("SalesAnalytics.tick")(function* (bindings:
 });
 
 /**
- * Each hour, the machines of the operator by location, product and state, for the "Server pool" dashboard
- * (docs/hosted-servers.md#reuse-a-pool-machine). The scheduled handler has no `waitUntil`, so the run waits
- * for each send.
+ * Each 5 minutes, the machines of the operator by location, product and state, for the "Server pool"
+ * dashboard (docs/hosted-servers.md#reuse-a-pool-machine). The scheduled handler has no `waitUntil`, so the
+ * run waits for each send.
  */
 const tickHostedPool = Effect.fn("HostedPool.tick")(function* (bindings: SalesBindings, now: number) {
-  if (new Date(now).getUTCMinutes() !== 0) return;
   if (!bindings.OPENPANEL_CLIENT_ID?.trim() || !bindings.OPENPANEL_CLIENT_SECRET?.trim()) return;
   const groups = yield* readHostedPool(bindings.DB, now);
   if (groups.length === 0) return;

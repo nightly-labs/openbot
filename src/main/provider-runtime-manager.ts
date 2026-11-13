@@ -349,8 +349,12 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     if (this.#target) {
       for (const provider of PROVIDERS) {
         const version = this.#targetSpec(provider, this.#target).version;
-        // Agent status names a system fallback until the managed candidate is activated.
-        const installed = this.#systemVersions.get(provider) ?? providers[provider].version;
+        // Agent status names a system fallback until the managed candidate is activated. A user who
+        // chose their own CLI runs it also when the copy is newer, and the copy then has no update
+        // to offer until a release is newer than it (#6327).
+        const system = this.#systemVersions.get(provider);
+        const copy = providers[provider].phase === "ready" ? providers[provider].version : null;
+        const installed = system && copy && olderVersion(system, copy) ? copy : (system ?? providers[provider].version);
         const offer = installed !== null && installed !== undefined && olderVersion(installed, version);
         // After an app upgrade the first check updates an installed CLI itself, so it is not offered
         // until that check has started its download.

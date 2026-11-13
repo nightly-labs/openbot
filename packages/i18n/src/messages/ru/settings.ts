@@ -148,6 +148,7 @@ export const messages = {
   "settings.planStart.set": "Задать",
   "settings.automationLimit.sectionTitle": "Лимит",
   "settings.automationLimit.sectionDescription": "Действует для всех агентов на этом компьютере.",
+  "settings.automationLimit.sectionDescriptionServer": "Действует для всех агентов на этом сервере.",
   "settings.automationLimit.title": "Запросов в час",
   "settings.automationLimit.option": "{limit} в час",
   "settings.automationLimit.note":
@@ -274,6 +275,9 @@ export const messages = {
     "Там, где прячется док, остаётся тонкая полоска. Подведите к ней указатель, чтобы показать док. Когда агент о чём-то спрашивает, по полоске проходит цветная волна.",
   "settings.agentDock.results.title": "Показывать готовую работу",
   "settings.agentDock.results.description": "Результаты агентов ненадолго появляются рядом с доком.",
+  "settings.agentDock.activeSeats.title": "Показывать агентов с новостями",
+  "settings.agentDock.activeSeats.description":
+    "Агент или канал, которого нет в доке, появляется в нём, пока у него есть новое сообщение или он ждёт вас.",
   "settings.agentDock.agents.title": "Агенты в доке",
   "settings.agentDock.agents.description": "Агенты сервера {server}. У каждого сервера свой док.",
   "settings.agentDock.agents.empty": "На этом сервере пока нет агентов.",
@@ -730,12 +734,26 @@ export const messages = {
   "settings.transfer.count.noSettings": "Нет настроек сервера",
   "settings.transfer.includeAgent": "Включить в перенос: {name}",
   "settings.transfer.export.title": "Экспорт этого сервера",
-  "settings.transfer.export.files": "Включить файлы рабочих пространств",
-  "settings.transfer.export.filesDescription":
-    "Файлы, созданные агентами, и общая папка. Выключите, чтобы файл был меньше.",
-  "settings.transfer.export.settings": "Включить настройки сервера",
+  "settings.transfer.preset.label": "Что попадёт в файл",
+  "settings.transfer.preset.templates": "Шаблоны",
+  "settings.transfer.preset.everything": "Всё",
+  "settings.transfer.meter.files": "из {total} в файлах рабочих пространств",
+  "settings.transfer.part.agents": "Агенты и их настройка",
+  "settings.transfer.part.agentsDescription": "{contents}. Всегда в файле.",
+  "settings.transfer.part.settings": "Настройки сервера",
+  "settings.transfer.part.chats": "История чатов",
+  "settings.transfer.part.chatsDescription":
+    "Чаты и боковые ветки с их файлами, а также история запусков регулярных задач. Агенты продолжат эти чаты с их контекстом.",
+  "settings.transfer.part.channels": "Сообщения каналов",
+  "settings.transfer.part.channelsDescription":
+    "Сообщения каналов, в которых состоят экспортируемые агенты, с их файлами и историей запусков регулярных задач каналов.",
+  "settings.transfer.part.files": "Файлы рабочих пространств",
+  "settings.transfer.part.filesDescription": "Файлы, созданные агентами, и общая папка.",
+  "settings.transfer.part.preferences": "Параметры сервера",
+  "settings.transfer.part.preferencesDescription":
+    "Название, логотип, часовой пояс, характер, настройки агентов по умолчанию, выбор моделей, настройки памяти и навыков, а также уровни уведомлений и закрепления каждого участника.",
   "settings.transfer.export.settingsDescription":
-    "Серверы MCP, собственные провайдеры моделей, разделы боковой панели и схемы регулярных задач.",
+    "Серверы MCP, собственные провайдеры моделей, разделы боковой панели, схемы регулярных задач и общие навыки.",
   "settings.transfer.export.chooseAgents": "Выбрать агентов ({selected} из {total})",
   "settings.transfer.export.hideAgents": "Скрыть агентов",
   "settings.transfer.export.agentsLabel": "Агенты для экспорта",
@@ -762,8 +780,11 @@ export const messages = {
   "settings.transfer.import.agentsLabel": "Агенты в файле",
   "settings.transfer.import.nameExists": "Имя уже занято",
   "settings.transfer.import.settings": "Импортировать настройки сервера",
-  "settings.transfer.import.settingsDescription":
-    "Добавляет серверы MCP, собственные провайдеры моделей и разделы боковой панели, которых нет на этом сервере.",
+  "settings.transfer.import.settingsAndPreferences":
+    "Добавляет серверы MCP, собственные провайдеры моделей, разделы боковой панели и общие навыки, которых нет на этом сервере.",
+  "settings.transfer.import.preferences": "Импортировать параметры сервера",
+  "settings.transfer.import.preferencesDescription":
+    "Заменяет название, логотип и параметры этого сервера, а также уровни уведомлений и закреплённые элементы каждого человека на те, что в файле.",
   "settings.transfer.import.submit": {
     one: "Импортировать {count} агента",
     few: "Импортировать {count} агентов",

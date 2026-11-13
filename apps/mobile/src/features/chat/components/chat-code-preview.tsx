@@ -31,6 +31,12 @@ const PREVIEW_ASPECT = 2;
 const DIAGRAM_MIN_HEIGHT = 72;
 /** The card is as wide as the bubble allows, as an image attachment is. */
 const CARD_SIDE_SPACE = 80;
+/**
+ * The inner width that a card last had, by the width of the window. The list draws a card again
+ * each time its row scrolls into view. With this width the card has its picture, at its final
+ * height, from its first layout; else its row would have two heights each time.
+ */
+const knownCardWidths = new Map<number, number>();
 
 /**
  * A ```html or ```mermaid block in a reply, or the page of a visual reply: a card with a header and
@@ -65,8 +71,8 @@ export const ChatCodePreview = memo(function ChatCodePreview({
   const foreground = tone?.foreground ?? themeForeground;
   const line = tone ? { borderColor: tone.line } : undefined;
   const [pressed, setPressed] = useState(false);
-  const [width, setWidth] = useState(0);
   const screen = useWindowDimensions();
+  const [width, setWidth] = useState(() => knownCardWidths.get(screen.width) ?? 0);
   const previewHeight = Math.round(width / PREVIEW_ASPECT);
   const title = kind === "html" ? t("mobile.chat.preview.htmlTitle") : t("mobile.chat.preview.mermaidTitle");
   const lineCount = text.split("\n").length;
@@ -80,7 +86,11 @@ export const ChatCodePreview = memo(function ChatCodePreview({
       onPressOut={() => setPressed(false)}
       style={{ width: screen.width - CARD_SIDE_SPACE, maxWidth: "100%" }}
       // The picture fills the card inside its 1-point border.
-      onLayout={(event) => setWidth(Math.round(event.nativeEvent.layout.width) - 2)}
+      onLayout={(event) => {
+        const inner = Math.round(event.nativeEvent.layout.width) - 2;
+        if (inner > 0) knownCardWidths.set(screen.width, inner);
+        setWidth(inner);
+      }}
       onPress={() => {
         void haptics.impact("soft");
         const previewId = storeCodePreview({ kind, source: text, language, ...(file ? { file } : {}) });
@@ -128,7 +138,11 @@ export const ChatCodePreview = memo(function ChatCodePreview({
         <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           {streaming ? (
             <CodeExcerpt text={text} color={tone?.muted} />
-          ) : width <= 0 ? null : !settled || (kind === "html" && !historyShown) ? (
+          ) : width <= 0 ? (
+            // The first card of a window width has no width yet. The space of the picture is kept by
+            // its shape, so the card does not grow when its width is known.
+            <View style={{ aspectRatio: PREVIEW_ASPECT }} />
+          ) : !settled || (kind === "html" && !historyShown) ? (
             <View style={{ height: previewHeight }} />
           ) : kind === "html" ? (
             <HtmlCardPreview text={text} title={title} height={previewHeight} />

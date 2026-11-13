@@ -317,7 +317,7 @@ function InstallServer() {
 function AddServer() {
   const { servers, addServerOpen, addServerEntryPoint, setAddServerOpen, setJoinServerOpen } = useServers();
   const { select, createLocal, installServer } = useServerActions();
-  const { openAppSettings } = useSettings();
+  const { openAppSettings, setAppSettingsOpen } = useSettings();
   const windowPage = useWindowPage();
   const onCreateLocal =
     createLocal &&
@@ -345,6 +345,8 @@ function AddServer() {
       onClose={() => setAddServerOpen(false)}
       onOpenServer={(serverId) => {
         setAddServerOpen(false);
+        // The server menu can open this dialog over Settings; the server opens in front of them.
+        setAppSettingsOpen(false);
         void select(serverId);
       }}
       onContactUs={() => void appPort().openExternal("hosted-server-contact")}
@@ -497,6 +499,7 @@ function ServerSettings() {
     providerAccounts,
     restartProvider,
     cancelProviderRestart,
+    chooseInstalledCli,
     connection,
     providerKeys,
     hostCustomProviders,
@@ -660,6 +663,7 @@ function ServerSettings() {
       twoStep: vaultTwoStep(),
       // Link signs in on this computer only: a joined server's host has no Link account.
       link: local ? createLinkAccountStore() : undefined,
+      listAgents: () => appPort().agent.listAgents(serverId),
     };
   });
   /**
@@ -818,6 +822,7 @@ function ServerSettings() {
       },
       onRestartProvider: local ? restartProvider : undefined,
       onCancelProviderRestart: local ? cancelProviderRestart : undefined,
+      onChooseInstalledCli: local ? chooseInstalledCli : undefined,
       get providerDetection() {
         return detectionOf()?.detection();
       },
@@ -1006,6 +1011,7 @@ function ServerSettings() {
           }
           hostUpdate={{}}
           hostTimezone={{}}
+          hostTurnLimits={{}}
           hostPersonality={{}}
           hostMemoryLimit={{}}
           memoryReview={{}}
@@ -1018,6 +1024,7 @@ function ServerSettings() {
           hostDefaultProvider={{}}
           agentAccess={{ listAgents: () => appPort().agent.listAgents(server().id) }}
           serverAudit={{ listAgents: () => appPort().agent.listAgents(server().id) }}
+          agentDefaults={{ listAgents: () => appPort().agent.listAgents(server().id) }}
           initialSection={serverSettingsSection()}
           // Any member imports into this computer or a remote host with `agent-import-v1`.
           agentImport={
@@ -1031,10 +1038,21 @@ function ServerSettings() {
           // Owners and admins move this computer's server, or a remote host with `instance-transfer-v1`.
           instanceTransfer={
             server().kind === "local"
-              ? { onSignIn: (provider) => void connection.connect(provider), history: true, copy: copyOptions() }
+              ? {
+                  onSignIn: (provider) => void connection.connect(provider),
+                  history: true,
+                  fullCopy: true,
+                  copy: copyOptions(),
+                }
               : serverCanAdminister(server(), "instance-transfer-v1")
-                ? // Only the transfer in parts carries the chat history.
-                  { history: serverCanAdminister(server(), "instance-transfer-chunks-v1"), copy: copyOptions() }
+                ? // Only the transfer in parts carries the chat history; the full copy chooses each part.
+                  {
+                    history: serverCanAdminister(server(), "instance-transfer-chunks-v1"),
+                    fullCopy:
+                      serverCanAdminister(server(), "instance-transfer-chunks-v1") &&
+                      serverCanAdminister(server(), "instance-transfer-full-copy-v1"),
+                    copy: copyOptions(),
+                  }
                 : undefined
           }
           // The feed listens on this computer, so a calendar app on another one cannot read it.

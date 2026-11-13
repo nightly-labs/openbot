@@ -147,6 +147,7 @@ export const messages = {
   "settings.planStart.set": "Instellen",
   "settings.automationLimit.sectionTitle": "Limiet",
   "settings.automationLimit.sectionDescription": "Dit geldt voor alle agents op deze computer.",
+  "settings.automationLimit.sectionDescriptionServer": "Dit geldt voor alle agents op deze server.",
   "settings.automationLimit.title": "Verzoeken per uur",
   "settings.automationLimit.option": "{limit} per uur",
   "settings.automationLimit.note":
@@ -272,6 +273,9 @@ export const messages = {
     "Een smalle strook blijft waar het dock verdwijnt. Beweeg de aanwijzer ernaartoe om het dock te tonen. Een kleurgolf gaat door de strook als een agent je iets vraagt.",
   "settings.agentDock.results.title": "Klaar werk tonen",
   "settings.agentDock.results.description": "Resultaten van agents verschijnen kort naast het dock.",
+  "settings.agentDock.activeSeats.title": "Agents met nieuws tonen",
+  "settings.agentDock.activeSeats.description":
+    "Een agent of kanaal dat niet in het dock staat, verschijnt erin zolang het een nieuw bericht heeft of op je wacht.",
   "settings.agentDock.agents.title": "Agents in het dock",
   "settings.agentDock.agents.description": "De agents van {server}. Elke server heeft een eigen dock.",
   "settings.agentDock.agents.empty": "Deze server heeft nog geen agents.",
@@ -697,12 +701,26 @@ export const messages = {
   "settings.transfer.count.noSettings": "Geen serverinstellingen",
   "settings.transfer.includeAgent": "{name} meenemen",
   "settings.transfer.export.title": "Exporteer deze server",
-  "settings.transfer.export.files": "Neem werkruimtebestanden mee",
-  "settings.transfer.export.filesDescription":
-    "Bestanden die je agents hebben gemaakt, en de map Shared. Zet uit voor een klein bestand.",
-  "settings.transfer.export.settings": "Neem serverinstellingen mee",
+  "settings.transfer.preset.label": "Wat er in het bestand komt",
+  "settings.transfer.preset.templates": "Sjablonen",
+  "settings.transfer.preset.everything": "Alles",
+  "settings.transfer.meter.files": "van {total} aan werkruimtebestanden",
+  "settings.transfer.part.agents": "Agents en hun inrichting",
+  "settings.transfer.part.agentsDescription": "{contents}. Altijd in het bestand.",
+  "settings.transfer.part.settings": "Serverinstellingen",
+  "settings.transfer.part.chats": "Chatgeschiedenis",
+  "settings.transfer.part.chatsDescription":
+    "De chats en zijthreads met hun bestanden, en de rungeschiedenis van de routines. De agents zetten deze chats voort met hun context.",
+  "settings.transfer.part.channels": "Kanaalberichten",
+  "settings.transfer.part.channelsDescription":
+    "De berichten van de kanalen waarin de geëxporteerde agents zitten, met hun bestanden en de rungeschiedenis van de kanaalroutines.",
+  "settings.transfer.part.files": "Werkruimtebestanden",
+  "settings.transfer.part.filesDescription": "Bestanden die je agents hebben gemaakt, en de map Shared.",
+  "settings.transfer.part.preferences": "Servervoorkeuren",
+  "settings.transfer.part.preferencesDescription":
+    "Naam, logo, tijdzone, persoonlijkheid, standaarden voor agents, modelkeuzes, instellingen voor herinneringen en vaardigheden, en de meldingsniveaus en vastgezette items van elke persoon.",
   "settings.transfer.export.settingsDescription":
-    "MCP-servers, aangepaste modelaanbieders, zijbalkonderdelen en routineflows.",
+    "MCP-servers, aangepaste modelaanbieders, zijbalkonderdelen, routineflows en gedeelde vaardigheden.",
   "settings.transfer.export.chooseAgents": "Kies agents ({selected} van {total})",
   "settings.transfer.export.hideAgents": "Verberg agents",
   "settings.transfer.export.agentsLabel": "Agents om te exporteren",
@@ -730,8 +748,11 @@ export const messages = {
   "settings.transfer.import.agentsLabel": "Agents in het bestand",
   "settings.transfer.import.nameExists": "Naam al in gebruik",
   "settings.transfer.import.settings": "Importeer serverinstellingen",
-  "settings.transfer.import.settingsDescription":
-    "Voegt de MCP-servers, aangepaste modelaanbieders en zijbalkonderdelen toe die deze server nog niet heeft.",
+  "settings.transfer.import.settingsAndPreferences":
+    "Voegt de MCP-servers, aangepaste modelaanbieders, zijbalkonderdelen en gedeelde vaardigheden toe die deze server nog niet heeft.",
+  "settings.transfer.import.preferences": "Servervoorkeuren importeren",
+  "settings.transfer.import.preferencesDescription":
+    "Vervangt de naam, het logo en de voorkeuren van deze server, en de meldingsniveaus en vastgezette items van elke persoon, door die uit het bestand.",
   "settings.transfer.import.submit": { one: "Importeer {count} agent", other: "Importeer {count} agents" },
   "settings.transfer.import.submitSettings": "Importeer serverinstellingen",
   "settings.transfer.import.importing": "Importeren…",

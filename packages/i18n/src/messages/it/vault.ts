@@ -5,6 +5,13 @@ export const messages = {
   "vault.items.title": "Elementi salvati",
   "vault.items.description":
     "Ogni agente su questo server può usare questi elementi. OpenBot digita password, numeri di carta e codici di sicurezza nella pagina, così gli agenti non li vedono mai. Gli agenti leggono le chiavi API da un file privato, non dalla chat.",
+  "vault.items.scopedDescription":
+    "Ogni elemento è per gli agenti che scegli. OpenBot digita password, numeri di carta e codici di sicurezza nella pagina, così gli agenti non li vedono mai. Gli agenti leggono le chiavi API da un file, non dalla chat.",
+  "vault.agents.label": "Agenti",
+  "vault.agents.all": "Tutti gli agenti",
+  "vault.agents.some": "{chosen} su {total}",
+  "vault.agents.choose": "Scegli gli agenti per {name}: {agents}",
+  "vault.agents.list": "Agenti che possono usare {name}",
   "vault.newItem": "Nuovo elemento",
   "vault.kind.login": "Accesso",
   "vault.kind.card": "Carta",
@@ -124,6 +131,8 @@ export const messages = {
   "vault.request.addLogin": "Aggiungi accesso",
   "vault.request.addCard": "Aggiungi carta",
   "vault.request.addContact": "Aggiungi indirizzo",
+  "vault.request.addApiKey": "Aggiungi chiave API",
+  "vault.request.apiKeyPrivate": "Va nella tua Cassaforte, non nella chat.",
   "vault.request.saved": "Salvato nella Cassaforte",
   "vault.twoStep.title": "Codice a due fattori",
   "vault.twoStep.on": "Attivo",

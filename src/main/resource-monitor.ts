@@ -17,6 +17,12 @@ import {
 import { providerProcessIds } from "../backend/provider-processes";
 import type { AnalyticsResourceSource } from "./analytics";
 import { AnalyticsOperationFailure, toAnalyticsOperationFailure } from "./analytics-effects";
+import {
+  MainLoopProfiler,
+  type MainLoopProfileSummary,
+  PROFILE_STALL_MS,
+  summarizeCpuProfile,
+} from "./main-loop-profile";
 import { readPreferenceFile, writePreferenceFile } from "./preference-file";
 import {
   addCount,
@@ -53,6 +59,11 @@ const PERSIST_INTERVAL_MS = 15 * 60_000;
 const RESOURCE_SUMMARY_FILE = "openbot-resource-summary-v1.json";
 const SAMPLES_FILE = "resources.ndjson";
 const MAX_SAMPLES_BYTES = 1024 * 1024;
+const STALL_PROFILES_FILE = "stall-profiles.ndjson";
+const MAX_STALL_PROFILES_BYTES = 256 * 1024;
+// A profile starts in a minute that follows a stall, so only stalls that come again are profiled.
+const PROFILE_START_INTERVAL_MS = 30 * 60_000;
+const PROFILE_KEEP_INTERVAL_MS = 6 * 60 * 60_000;
 const PS_TIMEOUT_MS = 5_000;
 const PS_MAX_BUFFER = 8 * 1024 * 1024;
 const MAX_ACTIVE_TURNS = 1_000;
@@ -91,6 +102,16 @@ export interface ResourceMonitorOptions {
    * completion event, so the loop rest asks the turns themselves.
    */
   turnRunning: () => boolean;
+  /** The directory of the application's own code. A profile names only the files in it. */
+  appPath: string;
+}
+
+/** The summary of one profiled minute with a stall, as `stall-profiles.ndjson` and analytics get it. */
+export interface MainLoopStallProfile extends MainLoopProfileSummary {
+  stallMs: number;
+  phase: LoopPhase;
+  turnActive: boolean;
+  hostKind: DeviceClass["hostKind"];
 }
 
 /** One sample as `resources.ndjson` and the diagnostics export hold it. Group and provider names only. */
@@ -121,6 +142,12 @@ export class ResourceMonitor implements AnalyticsResourceSource {
   readonly #summaryPath: string;
   readonly #samplesFile: { directory: string; path: string; maxBytes: number };
   readonly #device: DeviceClass;
+  readonly #profilesFile: { directory: string; path: string; maxBytes: number };
+  readonly #profiler = new MainLoopProfiler();
+  #profileStartedAt: number | null = null;
+  #profileKeptAt: number | null = null;
+  #lastStallProfile: (MainLoopStallProfile & { at: string }) | null = null;
+  #onStallProfile: (profile: MainLoopStallProfile) => void = () => {};
   readonly #loop = monitorEventLoopDelay({ resolution: LOOP_RESOLUTION_MS });
   readonly #activeTurns = new Set<string>();
   readonly #writes = Semaphore.makeUnsafe(1);
@@ -164,6 +191,11 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     this.#summaryPath = join(options.userDataPath, RESOURCE_SUMMARY_FILE);
     const directory = join(options.userDataPath, "logs");
     this.#samplesFile = { directory, path: join(directory, SAMPLES_FILE), maxBytes: MAX_SAMPLES_BYTES };
+    this.#profilesFile = {
+      directory,
+      path: join(directory, STALL_PROFILES_FILE),
+      maxBytes: MAX_STALL_PROFILES_BYTES,
+    };
     this.#device = deviceClass({
       totalMemoryBytes: totalmem(),
       cpuCount: cpus().length,
@@ -173,8 +205,9 @@ export class ResourceMonitor implements AnalyticsResourceSource {
   }
 
   /** Loads the saved days and starts sampling. `onDayClosed` runs when a closed day waits to be sent. */
-  start(onDayClosed: () => void): void {
+  start(onDayClosed: () => void, onStallProfile: (profile: MainLoopStallProfile) => void = () => {}): void {
     if (this.#closed || this.#timer) return;
+    this.#onStallProfile = onStallProfile;
     this.#onDayClosed = onDayClosed;
     app.on("render-process-gone", this.#rendererGone);
     app.on("child-process-gone", this.#childGone);
@@ -239,6 +272,7 @@ export class ResourceMonitor implements AnalyticsResourceSource {
       device: this.#device,
       sampleIntervalMs: SAMPLE_INTERVAL_MS,
       lastSample: this.#lastSample,
+      lastStallProfile: this.#lastStallProfile,
       today: summarizeDay(this.#day),
       previousDay: this.#previous ? summarizeDay(this.#previous) : null,
     };
@@ -255,6 +289,7 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     powerMonitor.off("resume", this.#resume);
     app.off("browser-window-focus", this.#measureLoop);
     this.#loop.disable();
+    this.#profiler.discard();
     yield* Scope.close(this.#scope, Exit.void);
     if (this.#loaded) yield* this.#persist().pipe(Effect.ignore);
   });
@@ -287,7 +322,10 @@ export class ResourceMonitor implements AnalyticsResourceSource {
   }
 
   // Sleep is not load. The first sample after a resume has no CPU baseline, so it records no CPU.
-  readonly #suspend = () => this.#unschedule();
+  readonly #suspend = () => {
+    this.#profiler.discard();
+    this.#unschedule();
+  };
   readonly #resume = () => {
     this.#lastSampleAt = null;
     this.#previousCpuSeconds = null;
@@ -313,6 +351,7 @@ export class ResourceMonitor implements AnalyticsResourceSource {
    * has no window and runs on mains power, and its remote clients feel each stall, so it never rests.
    */
   #restLoop(): void {
+    if (this.#profiler.running) return;
     if (this.#options.server || this.#options.turnRunning() || BrowserWindow.getFocusedWindow() !== null) return;
     this.#loop.disable();
   }
@@ -388,6 +427,46 @@ export class ResourceMonitor implements AnalyticsResourceSource {
       )
       .pipe(toAnalyticsOperationFailure, Effect.uninterruptible);
   }
+
+  /**
+   * Ends the profile of the minute that this sample closes, and keeps its summary when that minute
+   * had a stall. Then starts a profile for the next minute when this one had a stall. The loop
+   * histogram and the profile cover the same minute, because both start and end at a sample.
+   */
+  readonly #profileStalls = Effect.fn("ResourceMonitor.profileStalls")(function* (
+    this: ResourceMonitor,
+    mainLoopMs: { max: number; phase: LoopPhase } | null,
+    turnActive: boolean,
+  ) {
+    const stalled = mainLoopMs !== null && mainLoopMs.max >= PROFILE_STALL_MS;
+    const now = Date.now();
+    if (this.#profiler.running) {
+      const profile = yield* this.#profiler.stop();
+      if (!profile || !stalled) return;
+      this.#profileKeptAt = now;
+      const summary: MainLoopStallProfile = {
+        stallMs: Math.round(mainLoopMs.max),
+        phase: mainLoopMs.phase,
+        turnActive,
+        hostKind: this.#device.hostKind,
+        ...summarizeCpuProfile(profile, this.#options.appPath),
+      };
+      this.#lastStallProfile = { at: new Date(now).toISOString(), ...summary };
+      yield* this.#writes
+        .withPermit(appendRotatingLines(this.#profilesFile, [JSON.stringify(this.#lastStallProfile)]))
+        .pipe(Effect.ignore);
+      this.#onStallProfile(summary);
+      return;
+    }
+    // The start of the app and a wake from sleep stall once; a profile of the next minute shows nothing.
+    if (!stalled || mainLoopMs.phase === "startup" || mainLoopMs.phase === "resume") return;
+    if (this.#profileStartedAt !== null && now - this.#profileStartedAt < PROFILE_START_INTERVAL_MS) return;
+    if (this.#profileKeptAt !== null && now - this.#profileKeptAt < PROFILE_KEEP_INTERVAL_MS) return;
+    this.#profileStartedAt = now;
+    yield* this.#profiler.start();
+    // The rest check ran before this start. The next sample needs the histogram to judge the profile.
+    this.#measureLoop();
+  });
 
   readonly #sample = Effect.fn("ResourceMonitor.sample")(function* (this: ResourceMonitor) {
     const now = new Date();
@@ -499,6 +578,8 @@ export class ResourceMonitor implements AnalyticsResourceSource {
       }
     }
 
+    // A profile must not cost the sample, also when its summary throws.
+    yield* this.#profileStalls(mainLoopMs, turnInLoopWindow).pipe(Effect.ignoreCause);
     const statements = this.#options.statementTimings.drain();
     for (const duration of statements) recordValue(day, METRIC.database, duration);
     if (statements.length > 0) {

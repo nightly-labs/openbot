@@ -240,12 +240,16 @@ export function ServerConnectionSection({
 }) {
   const { t } = useText();
   const serverId = server.id;
-  const { refreshServer, hostedServerStarting } = useMobileWorkspace();
+  const { refreshServer, hostedServerStarting, canRestartServerItself, restartServerItself } = useMobileWorkspace();
   const { session } = useMobileSession();
   const action = useLockedAction();
   const { busy, error } = action;
   const [restarting, setRestarting] = useState(false);
   const [restarted, setRestarted] = useState<string | null>(null);
+  // A hosted server restarts through the account server. A self-hosted server restarts itself: it
+  // answers, then closes, and its service manager starts it again.
+  const hosted = canRestartServer(server, hostedServerIds);
+  const selfHosted = !hosted && canRestartServerItself(serverId);
   function perform(operation: () => Promise<void>, failure?: (error: unknown) => string) {
     setRestarted(null);
     return action.perform(operation, failure);
@@ -262,8 +266,8 @@ export function ServerConnectionSection({
           {busy && !restarting ? t("mobile.server.settings.refreshing") : t("mobile.server.settings.refresh")}
         </Typography.Paragraph>
       </SettingsRow>
-      {canRestartServer(server, hostedServerIds) ? (
-        // The account server stops the hosted server and starts it again. The app connects again after it.
+      {hosted || selfHosted ? (
+        // The app connects again after the server starts.
         <SettingsRow
           leading={<RowIcon icon={RotateCcw} tone="accent" />}
           disclosure={false}
@@ -279,18 +283,21 @@ export function ServerConnectionSection({
                   onPress: () =>
                     void perform(
                       async () => {
-                        if (!session) throw new Error(currentText().t("mobile.server.hosted.restartFailed"));
                         setRestarting(true);
                         try {
-                          const hosted = await hostedServerCalls(session).restart(serverId);
-                          // The connection drops when the server stops. The app connects again, as after a wake.
-                          if (WAKE_RECONNECT_STATES.has(hosted.state)) hostedServerStarting(serverId);
+                          if (selfHosted) await restartServerItself(serverId);
+                          else {
+                            if (!session) throw new Error(currentText().t("mobile.server.hosted.restartFailed"));
+                            const restart = await hostedServerCalls(session).restart(serverId);
+                            // The connection drops when the server stops. The app connects again, as after a wake.
+                            if (WAKE_RECONNECT_STATES.has(restart.state)) hostedServerStarting(serverId);
+                          }
                         } finally {
                           setRestarting(false);
                         }
                         setRestarted(currentText().t("mobile.server.settings.restarted", { name: server.name }));
                       },
-                      // The account server explains a refusal, such as a server that cannot restart now.
+                      // The account server or the host explains a refusal, such as a server that cannot restart now.
                       (caught) => {
                         const text = currentText();
                         return text.errorMessage(caught, text.t("mobile.server.hosted.restartFailed"));

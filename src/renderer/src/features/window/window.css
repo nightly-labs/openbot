@@ -687,6 +687,12 @@
     -webkit-app-region: no-drag;
   }
 
+  /* Close sits in the top corner of the window, at the end of the page, above the end of the card. The
+   * page clips its overflow, so a negative margin would cut the button. */
+  .app-frame-edge[data-window-page-kind="settings"] > .window-page > .settings-page > .settings-page-close {
+    margin-inline-end: 0;
+  }
+
   .app-frame-edge[data-window-page-kind="settings"] > .window-page > .settings-page > .settings-page-path-row {
     padding-block: 0;
     padding-inline-start: 0;

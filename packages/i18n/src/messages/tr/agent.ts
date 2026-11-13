@@ -84,6 +84,7 @@ export const messages = {
   "agent.error.settingsFailed": "Ajan ayarları kaydedilemedi",
   "agent.error.adminOnly": "Ajan ayarları yalnızca bir sunucu yöneticisi tarafından değiştirilebilir.",
   "agent.error.continueFailed": "Ajan devam edemedi. Tekrar deneyin.",
+  "agent.error.copyDetails": "Ayrıntıları kopyala",
   "agent.error.mcpNotStarted": "MCP sunucusu başlatılmadı",
   "agent.error.openMcpSettings": "MCP ayarlarını aç",
   "agent.error.provider": "Sağlayıcı hatası",

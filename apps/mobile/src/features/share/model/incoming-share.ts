@@ -10,6 +10,7 @@ import {
   type ResolvedSharePayload,
   type SharePayload,
 } from "expo-sharing";
+import { smallerPhoto } from "@/features/chat/model/smaller-photo";
 import { isAndroid } from "@/shared/lib/platform";
 
 /** A file that another app shared. It is a copy in this app's cache, which the receiver deletes. */
@@ -112,6 +113,14 @@ async function sharedFile(file: File, name: string, folder: Directory): Promise<
   const kept = { uri: file.uri, name, size: file.exists ? file.size : null };
   if (!/\.(heic|heif)$/iu.test(name)) return kept;
   try {
+    // The smaller copy is already a JPEG, so the photo is decoded one time only.
+    const smaller = await smallerPhoto(file.uri, name);
+    if (smaller.uri !== file.uri) {
+      const jpeg = new File(smaller.uri);
+      await jpeg.move(new File(folder, smaller.name));
+      file.delete();
+      return { uri: jpeg.uri, name: smaller.name, size: jpeg.size };
+    }
     return await compatibleImage(file, name, folder);
   } catch {
     // The receiver refuses the HEIC file by name, as it does in the picker.

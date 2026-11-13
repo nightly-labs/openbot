@@ -4,8 +4,8 @@ import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Check from "lucide-react-native/icons/check";
 import Copy from "lucide-react-native/icons/copy";
-import { memo, useEffect, useRef, useState } from "react";
-import { type ColorValue, View } from "react-native";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { type ColorValue, Text, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { haptics } from "@/shared/lib/haptics";
@@ -17,6 +17,47 @@ import { useListSettled } from "./use-list-settled";
 
 /** A streaming block grows each frame. Highlight it at most this often; the new tail stays plain until then. */
 const STREAMING_HIGHLIGHT_INTERVAL_MS = 250;
+/**
+ * Each highlight reads the whole block again, so a long block waits longer for the next one: the time
+ * that the highlight takes stays a small part of the time between two of them.
+ */
+const STREAMING_HIGHLIGHT_CHARACTERS_PER_MS = 40;
+
+function streamingHighlightInterval(length: number): number {
+  return Math.max(STREAMING_HIGHLIGHT_INTERVAL_MS, Math.round(length / STREAMING_HIGHLIGHT_CHARACTERS_PER_MS));
+}
+
+/** A run of code in one colour. `color` is unset for code in the colour of the block. */
+interface CodeRun {
+  offset: number;
+  text: string;
+  color: ColorValue | undefined;
+}
+
+/**
+ * The tokens as runs of one colour. Many token types share a colour, and most tokens have the colour
+ * of the block, so a block has far fewer runs than tokens. The list draws a block again each time
+ * its row scrolls into view, and each run that has a colour is a text span to make.
+ */
+function codeRuns(
+  tokens: readonly CodeToken[],
+  colors: Partial<Record<ShjToken, ColorValue>>,
+  foreground: ColorValue,
+): CodeRun[] {
+  const runs: CodeRun[] = [];
+  let last: CodeRun | undefined;
+  for (const token of tokens) {
+    const tokenColor = token.type ? colors[token.type] : undefined;
+    const color = tokenColor === undefined || tokenColor === foreground ? undefined : tokenColor;
+    if (last && last.color === color) {
+      last.text += token.text;
+      continue;
+    }
+    last = { offset: token.offset, text: token.text, color };
+    runs.push(last);
+  }
+  return runs;
+}
 
 interface ChatCodeBlockProps {
   text: string;
@@ -83,7 +124,9 @@ const CodeBlockBody = memo(function CodeBlockBody({
         });
     };
     const last = lastHighlight.current;
-    const delay = last === null ? 0 : Math.max(0, STREAMING_HIGHLIGHT_INTERVAL_MS - (Date.now() - last));
+    // The text of a finished block does not change again: it gets its colours at once.
+    const interval = finished ? STREAMING_HIGHLIGHT_INTERVAL_MS : streamingHighlightInterval(text.length);
+    const delay = last === null ? 0 : Math.max(0, interval - (Date.now() - last));
     const timer = delay === 0 ? null : setTimeout(run, delay);
     if (timer === null) run();
     return () => {
@@ -97,6 +140,7 @@ const CodeBlockBody = memo(function CodeBlockBody({
       : highlight.text === text
         ? highlight.tokens
         : [...highlight.tokens, { text: text.slice(highlight.text.length), offset: highlight.text.length }];
+  const runs = useMemo(() => codeRuns(tokens, colors, foreground), [tokens, colors, foreground]);
   const copied = copiedText === text;
   async function copy() {
     try {
@@ -149,19 +193,17 @@ const CodeBlockBody = memo(function CodeBlockBody({
           className="bg-transparent p-0"
           style={[CODE_TEXT_STYLE, { color: foreground, fontSize: 14, lineHeight: 20 }]}
         >
-          {tokens.map((token) => (
-            <Typography.Code
-              key={token.offset}
-              className="bg-transparent p-0"
-              style={{
-                color: token.type ? (colors[token.type] ?? foreground) : foreground,
-                fontSize: 14,
-                lineHeight: 20,
-              }}
-            >
-              {token.text}
-            </Typography.Code>
-          ))}
+          {runs.map((run) =>
+            run.color === undefined ? (
+              run.text
+            ) : (
+              // A plain native span in the font of the block around it, not a `Typography`: a long
+              // block has hundreds of runs, and each `Typography` adds four components to the row.
+              <Text key={run.offset} style={{ color: run.color }}>
+                {run.text}
+              </Text>
+            ),
+          )}
         </Typography.Code>
       </View>
     </View>

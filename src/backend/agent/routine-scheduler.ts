@@ -31,7 +31,13 @@ import { causeHelpers } from "../effect-boundary";
 import type { MailboxStore } from "../mailbox-store";
 import type { DynamicToolCallParams } from "../protocol";
 import { recordRestartActivity } from "../restart-activity";
-import type { OwnedRoutineRecord, ReceivedWebhookEvent, RoutineHoldWindow, RoutineRecordInput } from "../routine-store";
+import type {
+  ImportedRoutineRun,
+  OwnedRoutineRecord,
+  ReceivedWebhookEvent,
+  RoutineHoldWindow,
+  RoutineRecordInput,
+} from "../routine-store";
 import type { RoutineDueSource, RoutineTimer } from "../routine-timer";
 import {
   type ConversationRuntime,
@@ -492,6 +498,14 @@ export class RoutineScheduler implements RoutineDueSource {
     yield* routineStep(() => this.stateChanged(input.agentId));
     return queued;
   }, Effect.uninterruptible);
+
+  /** Writes the finished runs that a server transfer brought. Returns the new run ids in order. */
+  importRuns(agentId: string, routineId: string, runs: readonly ImportedRoutineRun[]): string[] {
+    this.#conversation.requireKnownAgent(agentId);
+    if (!this.#routines.getRecord(agentId, routineId))
+      throw new RoutineInputError(sourceText("error.backend.routineGone"));
+    return this.#routines.importRuns(agentId, routineId, runs);
+  }
 
   listRuns(input: ListRoutineRunsInput, withSkipped = false): RoutineRun[] {
     this.#conversation.requireKnownAgent(input.agentId);
