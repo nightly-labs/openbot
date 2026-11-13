@@ -734,8 +734,10 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   that no reply opened. A thread `message` event that mentions OpenBot is
   left to its `app_mention` event, so the order of the two events does not decide the route.
 - **Quiet answer.** In Slack threads the guidance lets the agent answer only `NO_REPLY` when a
-  message needs no answer. `finalPost` then keeps the reaction and posts nothing, and the adapter's
-  `remove` deletes the status post. An adapter without `remove` edits it to the no-answer text.
+  message needs no answer. In WhatsApp chats it does so when the agent must not answer, for example
+  when its instructions say not to answer a contact. `finalPost` then keeps the reaction and posts
+  nothing, and the adapter's `remove` deletes the status post. An adapter without `remove` edits it
+  to the no-answer text.
 - **Order.** The one-turn-per-agent rule is unchanged, so Slack requests wait behind the agent's own
   work and behind channel work that holds the host. The Slack thread shows a waiting post.
 - **Replies.** `MessagingThreads` reports each turn start and end. `MessagingService` posts a status

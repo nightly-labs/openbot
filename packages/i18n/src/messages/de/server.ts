@@ -334,11 +334,24 @@ export const messages = {
   "server.settings.later": "Später",
   "server.settings.setUp": "Einrichten",
   "server.settings.agents": "Agenten",
+  "server.settings.agentsDescription":
+    "Legen Sie fest, was die Agenten auf diesem Server tun können, wenn Sie es nicht für einen Agenten festlegen.",
   "server.settings.timezone": "Zeitzone",
   "server.settings.timezoneDescription":
     "Neue Routinen verwenden diese Zeitzone, wenn die Nachricht die Zeitzone des Absenders nicht angibt.",
   "server.settings.timezoneAutomatic": "Automatisch ({zone})",
   "server.settings.timezoneLoadFailed": "Die Zeitzone des Servers konnte nicht geladen werden.",
+  "server.settings.turnLimit": "Threads gleichzeitig",
+  "server.settings.turnLimitDescription":
+    "Wie viele Agent-Threads auf diesem Server gleichzeitig laufen können. Mehr Threads brauchen mehr Arbeitsspeicher.",
+  "server.settings.turnLimitAutomatic": "Automatisch ({count})",
+  "server.settings.turnLimitAutomaticUnlimited": "Automatisch (kein Limit)",
+  "server.settings.turnLimitUnlimited": "Kein Limit",
+  "server.settings.turnLimitsLoadFailed": "Die Thread-Limits dieses Servers konnten nicht geladen werden.",
+  "server.settings.agentTaskLimit": "Parallele Threads pro Agent",
+  "server.settings.agentTaskLimitDescription":
+    "Wie viele Threads jeder Agent gleichzeitig ausführen kann, wenn er kein eigenes Limit hat.",
+  "server.settings.agentTaskLimitDefault": "Standard ({count})",
   "server.settings.memoryLimit": "Erinnerungen pro Agent",
   "server.settings.memoryLimitDescription": "Wie viele Erinnerungen jeder Agent auf diesem Server behalten kann.",
   "server.settings.memoryLimitLoadFailed": "Das Erinnerungslimit dieses Servers konnte nicht geladen werden.",

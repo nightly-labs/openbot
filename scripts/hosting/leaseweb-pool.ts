@@ -5,6 +5,8 @@
 //
 //   bun scripts/hosting/leaseweb-pool.ts status
 //       Read only. The machines of each location and product, and the work that `sync` does.
+//   bun scripts/hosting/leaseweb-pool.ts free
+//       Read only. Each VPS with no reference on the four Leaseweb accounts, such as a VPS just bought.
 //   bun scripts/hosting/leaseweb-pool.ts add <VPS ID>... [--apply]
 //       Adds machines to the pool, with the location and the product from the Leaseweb API. A machine
 //       with no reference gets `pool-free`.
@@ -24,6 +26,13 @@
 //       prepared (then `--keys` is necessary). It needs `BOAT_API_KEY`. The move does not copy the
 //       systemd units of the customer, so it stops when the sandbox has one. `--units` names the units
 //       that an operator moves by hand, and the move then continues.
+//   bun scripts/hosting/leaseweb-pool.ts custom <VPS ID> --owner=<email> --customer=<word> \
+//       --name=<server name> --keys=<file> [--apply]
+//       Sets up a VPS with no reference as the server of one customer, not in the pool
+//       (docs/hosted-servers.md#leaseweb-vps): the next `custom-<NN>` reference, the hostname, OpenBot
+//       signed in with a server claim for the owner, the bootstrap, a restart, and the checks. It needs
+//       `SERVER_CLAIMS_ADMIN_TOKEN` and the key of each Leaseweb account. A second run continues a run
+//       that stopped.
 //
 // With no `--apply`, the script only shows what it would do. `--env=test` uses the D1 of the test Worker.
 // Each Leaseweb account has its own key; the script tries each `LEASEWEB_API_KEY_<ACCOUNT>` of the
@@ -76,6 +85,19 @@ const MACHINE_ARCHIVE = "/root/openbot-move.tar";
 const EXPORT_WAIT_MS = 3 * 60 * 60_000;
 // boat restores the disk of an archived sandbox after the resume. Seen on 2026-11-12: some minutes.
 const RESTORE_WAIT_MS = 30 * 60_000;
+/** Each Leaseweb account. `custom` reads all of them, so that a `custom-<NN>` number is never used again. */
+const LEASEWEB_ACCOUNTS = ["NL", "DE", "US", "AU"];
+const CUSTOM_NUMBER_PATTERN = /^custom-(\d{2,}) /u;
+const CUSTOMER_PATTERN = /^[a-z0-9]{1,32}$/u;
+// No quote and no space, so that the email can go in a D1 literal and in a reference.
+const EMAIL_PATTERN = /^[a-z0-9._%+-]{1,64}@[a-z0-9-]{1,63}(\.[a-z0-9-]{1,63})+$/u;
+// The server name of `openbot name`: 6 to 32 characters. Only characters that need no shell quote.
+const SERVER_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 ._-]{4,30}[A-Za-z0-9.]$/u;
+const CLAIM_PATTERN = /^[A-Za-z0-9_-]{16,512}$/u;
+const ACCOUNT_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
+const REMOTE_HOST_PATTERN = /^[A-Za-z0-9-]{8,64}$/u;
+const ONLINE_WAIT_MS = 5 * 60_000;
+const ROOT = resolve(HOSTING, "../..");
 
 /** A SQL literal of a checked value. Wrangler takes no bound values, so each text must match a pattern. */
 function literal(value: string | number, pattern?: RegExp): string {
@@ -182,6 +204,60 @@ echo "enabled=$(systemctl is-enabled openbot.service 2>/dev/null || true)"
 if [ -e /home/user/.config/OpenBot ] || [ -e /srv/openbot-hosted/keyrings ]; then echo data=yes; else echo data=no; fi
 echo "hostkey=$(cut -d' ' -f1,2 /etc/ssh/ssh_host_ed25519_key.pub)"`;
 
+/**
+ * The state of a custom server, for `bash -s`. `account` is the `Account:` line of `openbot status`,
+ * and `hosts` the OpenBot server IDs of the team server state. The output has the email of the
+ * owner: never write it in a log.
+ */
+const CUSTOM_STATE = `export LC_ALL=C
+echo "hostname=$(hostname)"
+if [ -s /etc/ssh/openbot-operator-keys/root ]; then echo bootstrap=yes; else echo bootstrap=no; fi
+user=$(cat /opt/OpenBot/hosted/service-user 2>/dev/null || true)
+if [ -n "$user" ] && command -v openbot >/dev/null && systemctl is-active --quiet openbot.service; then
+  status=$(runuser -u "$user" -- openbot status 2>/dev/null || true)
+  echo "version=$(sed -n 's/^OpenBot //p' <<<"$status" | head -n 1)"
+  echo "account=$(sed -n 's/^Account: //p' <<<"$status" | head -n 1)"
+  echo "server=$(sed -n 's/^Server: //p' <<<"$status" | head -n 1)"
+  home=$(getent passwd "$user" | cut -d: -f6)
+  echo "hosts=$(grep -o '"serverId": *"[^"]*"' "$home/.config/OpenBot/openbot-team-server-v2.json" 2>/dev/null |
+    sed 's/.*"\\([^"]*\\)"$/\\1/' | paste -sd, -)"
+fi`;
+
+interface CustomState {
+  hostname: string;
+  bootstrapped: boolean;
+  version: string;
+  /** The email of the signed-in account, in small letters, or "" when no account is signed in. */
+  account: string;
+  online: boolean;
+  hosts: string[];
+}
+
+function signedIn(state: CustomState, owner: string) {
+  if (state.account === "") return "not signed in";
+  return state.account === owner ? "signed in to the owner" : "signed in to another account";
+}
+
+function toCustomState(output: string): CustomState {
+  const values = keyValues(output);
+  const account = values.get("account") ?? "";
+  return {
+    hostname: values.get("hostname") ?? "",
+    bootstrapped: values.get("bootstrap") === "yes",
+    version: values.get("version") ?? "",
+    account: account.includes("@") ? account.toLowerCase() : "",
+    // `Server: <name> (online)`, or `Server: online` with no name.
+    online: /(^| \()online\)?$/u.test(values.get("server") ?? ""),
+    hosts: (values.get("hosts") ?? "").split(",").filter((host) => REMOTE_HOST_PATTERN.test(host)),
+  };
+}
+
+interface CustomOptions {
+  owner: string;
+  customer: string;
+  name: string;
+}
+
 /** The ssh of the sandbox to the machine, with the key of the move. `$d` is the move directory. */
 const SANDBOX_SSH = `ssh -i "$d/key" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \\
   -o UserKnownHostsFile="$d/known-hosts" -o ConnectTimeout=20 -o ServerAliveInterval=15`;
@@ -262,6 +338,7 @@ class Pool {
   readonly #found = new Map<string, Vps>();
   readonly #operatorKeysFile: string | undefined;
   readonly #boatKey: string | undefined;
+  readonly #claimsToken: string | undefined;
 
   constructor(
     apply: boolean,
@@ -273,6 +350,7 @@ class Pool {
     this.#testDatabase = testDatabase;
     this.#operatorKeysFile = operatorKeysFile;
     this.#boatKey = environment.BOAT_API_KEY || undefined;
+    this.#claimsToken = environment.SERVER_CLAIMS_ADMIN_TOKEN || undefined;
     this.#keys = Object.entries(environment).flatMap(([name, key]) =>
       /^LEASEWEB_API_KEY_[A-Z]+$/u.test(name) && key ? [{ name, key }] : [],
     );
@@ -289,11 +367,11 @@ class Pool {
     return changes;
   }
 
-  #leaseweb(key: string, path: string, init: RequestInit = {}): Promise<Response> {
+  #leaseweb(key: string, path: string, init: RequestInit = {}, timeoutMs = 30_000): Promise<Response> {
     return fetch(`${LEASEWEB_API}${path}`, {
       ...init,
       headers: { "X-LSW-Auth": key, "content-type": "application/json" },
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   }
 
@@ -302,8 +380,17 @@ class Pool {
     if (!VPS_ID_PATTERN.test(id)) throw new Error(`Not a VPS ID: ${id}`);
     const known = this.#found.get(id);
     const accounts = known ? this.#keys.filter(({ key }) => key === known.key) : this.#keys;
+    const slow: string[] = [];
     for (const account of accounts) {
-      const response = await this.#leaseweb(account.key, `/${id}`);
+      let response: Response;
+      try {
+        response = await this.#leaseweb(account.key, `/${id}`, {}, 60_000);
+      } catch (error) {
+        // The API of one account can be slow (2026-11-12): the VPS can be on another account.
+        if (!(error instanceof Error && error.name === "TimeoutError")) throw error;
+        slow.push(account.name);
+        continue;
+      }
       // A key that Leaseweb refuses (401) must not stop the work on the machines of the other accounts.
       if (response.status === 401 || response.status === 403 || response.status === 404) continue;
       if (!response.ok) throw new Error(`Leaseweb answered ${response.status} for VPS ${id} (${account.name}).`);
@@ -311,6 +398,7 @@ class Pool {
       this.#found.set(id, machine);
       return machine;
     }
+    if (slow.length > 0) throw new Error(`Leaseweb did not answer for ${slow.join(", ")}. Run the command again.`);
     throw new Error(`No Leaseweb key in the environment has VPS ${id}.`);
   }
 
@@ -362,7 +450,14 @@ class Pool {
         continue;
       }
       if (!this.#apply) continue;
-      if (machine.reference === null) await this.#setReference(machine, POOL_FREE);
+      if (machine.reference === null) {
+        await this.#setReference(machine, POOL_FREE);
+        // `custom` can take the same VPS at the same time: the reference read again tells who has it.
+        if ((await this.#vps(id)).reference !== POOL_FREE) {
+          logger.warn(`Another operator took VPS ${id}. It stays out of the pool.`);
+          continue;
+        }
+      }
       this.#write(
         `INSERT INTO operator_hosts(host_id, location, product, added_at, removed_at)
          VALUES (${literal(`leaseweb:${id}`, HOST_ID_PATTERN)}, ${literal(machine.location, LOCATION_PATTERN)},
@@ -751,6 +846,286 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
     if (!this.#apply) logger.info("Nothing changed. Run again with --apply.");
   }
 
+  /** True when the hosted pool has the VPS. A pool machine is never a custom server. */
+  #inPool(id: string) {
+    const host = literal(`leaseweb:${id}`, HOST_ID_PATTERN);
+    return (
+      this.#rows(
+        `SELECT host_id FROM operator_hosts WHERE host_id = ${host} AND removed_at IS NULL`,
+        z.object({ host_id: z.string() }),
+      ).length > 0
+    );
+  }
+
+  /**
+   * The references of all VPS on all Leaseweb accounts. Each account must answer: a missing account
+   * could hide the highest `custom-<NN>`, and a number must never be used again.
+   */
+  async #allReferences() {
+    const missing = LEASEWEB_ACCOUNTS.filter(
+      (account) => !this.#keys.some(({ name }) => name === `LEASEWEB_API_KEY_${account}`),
+    );
+    if (missing.length > 0) throw new Error(`The environment has no LEASEWEB_API_KEY_${missing.join(", _")}.`);
+    const pageSchema = z.object({
+      _metadata: z.object({ totalCount: z.number() }),
+      vps: z.array(
+        z.object({
+          id: z.string(),
+          reference: z.string().nullable(),
+          state: z.string(),
+          datacenter: z.string(),
+          pack: z.string(),
+          ips: z.array(ipSchema),
+        }),
+      ),
+    });
+    const references: {
+      id: string;
+      reference: string;
+      account: string;
+      state: string;
+      location: string;
+      product: string;
+      address: string;
+    }[] = [];
+    for (const account of this.#keys) {
+      for (let offset = 0; ; offset += 50) {
+        // The list of the US and AU accounts can take more than 30 seconds (2026-11-12).
+        const response = await this.#leaseweb(account.key, `?limit=50&offset=${offset}`, {}, 90_000);
+        if (!response.ok) throw new Error(`Leaseweb answered ${response.status} for the VPS of ${account.name}.`);
+        const page = pageSchema.parse(await response.json());
+        for (const vps of page.vps)
+          references.push({
+            id: vps.id,
+            reference: vps.reference ?? "",
+            account: account.name.replace("LEASEWEB_API_KEY_", ""),
+            state: vps.state,
+            location: vps.datacenter,
+            product: vps.pack,
+            address: vps.ips.find((ip) => ip.version === 4 && ip.mainIp)?.ip ?? "",
+          });
+        if (page.vps.length === 0 || offset + page.vps.length >= page._metadata.totalCount) break;
+      }
+    }
+    return references;
+  }
+
+  /** Read only. Each VPS with no reference on all accounts: a new VPS that an operator can take. */
+  async free() {
+    const free = (await this.#allReferences()).filter(({ reference }) => reference === "");
+    if (free.length === 0) logger.info("No VPS on the four Leaseweb accounts is without a reference.");
+    for (const vps of free)
+      logger.info(
+        `VPS ${vps.id} has no reference: account ${vps.account}, ${vps.location}, ${vps.product}, ${vps.state}, address ${vps.address || "none"}.`,
+      );
+  }
+
+  /** The next `custom-<NN>`: one more than the highest number on all accounts. */
+  async #nextCustomNumber() {
+    let highest = 0;
+    for (const { reference } of await this.#allReferences()) {
+      const number = Number(CUSTOM_NUMBER_PATTERN.exec(reference)?.[1] ?? 0);
+      if (number > highest) highest = number;
+    }
+    return String(highest + 1).padStart(2, "0");
+  }
+
+  /** The state of a custom server, with a key of this computer, else with `password`. Null when neither signs in. */
+  #customState(machine: Vps, password?: string): CustomState | null {
+    try {
+      return toCustomState(
+        this.#remote(machine, "bash -s", { input: CUSTOM_STATE, capture: true, quiet: true, password }),
+      );
+    } catch {
+      return null;
+    }
+  }
+
+  /** A one-time claim for `owner` (docs/self-hosted-server.md#sign-in-with-a-server-claim). It works for 15 minutes. */
+  async #serverClaim(owner: string) {
+    if (!this.#claimsToken) throw new Error("SERVER_CLAIMS_ADMIN_TOKEN is not in the environment.");
+    const authApi = this.#testDatabase ? AUTH_API_URL.test : AUTH_API_URL.production;
+    const response = await fetch(`${authApi}/v2/admin/server-claims`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${this.#claimsToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ email: owner }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!response.ok) throw new Error(`The account service answered ${response.status} for the server claim.`);
+    const { claim } = z.object({ claim: z.string().regex(CLAIM_PATTERN) }).parse(await response.json());
+    return claim;
+  }
+
+  /** Checks in D1 that `owner` owns one OpenBot server of the machine, with an active owner membership. */
+  #checkOwner(owner: string, hosts: string[]) {
+    const [user] = this.#rows(
+      `SELECT id FROM users WHERE email = ${literal(owner, EMAIL_PATTERN)}`,
+      z.object({ id: z.string().regex(ACCOUNT_ID_PATTERN) }),
+    );
+    if (!user) throw new Error("The owner has no account.");
+    for (const host of hosts) {
+      const hostId = literal(host, REMOTE_HOST_PATTERN);
+      const [row] = this.#rows(
+        `SELECT owner_user_id FROM remote_hosts WHERE host_id = ${hostId}`,
+        z.object({ owner_user_id: z.string() }),
+      );
+      if (row?.owner_user_id !== user.id) continue;
+      const [membership] = this.#rows(
+        `SELECT role, status, removed_at FROM remote_memberships
+         WHERE host_id = ${hostId} AND user_id = ${literal(user.id, ACCOUNT_ID_PATTERN)}`,
+        z.object({ role: z.string(), status: z.string(), removed_at: z.number().nullable() }),
+      );
+      if (membership?.role === "owner" && membership.status === "active" && membership.removed_at === null) return host;
+    }
+    throw new Error("D1 shows no OpenBot server of this machine that the owner owns.");
+  }
+
+  /** Waits until `openbot status` shows the server online. */
+  async #waitOnline(machine: Vps) {
+    const deadline = Date.now() + ONLINE_WAIT_MS;
+    for (;;) {
+      const state = this.#customState(machine);
+      if (state?.online) return state;
+      if (Date.now() > deadline) throw new Error(`OpenBot on VPS ${machine.id} is not online after 5 minutes.`);
+      await delay(10_000);
+    }
+  }
+
+  /**
+   * Sets up a VPS with no reference as a custom server of one customer, as
+   * docs/hosted-servers.md#leaseweb-vps says. The customer is the owner: the server signs in with a
+   * server claim for the owner's email. A second run continues the work of a run that stopped.
+   */
+  async custom(id: string, options: CustomOptions) {
+    const owner = options.owner.toLowerCase();
+    if (!EMAIL_PATTERN.test(owner)) throw new Error("Give the owner's email with --owner=<email>.");
+    if (!CUSTOMER_PATTERN.test(options.customer)) {
+      throw new Error("Give --customer=<word>: one word in small letters and digits.");
+    }
+    if (!SERVER_NAME_PATTERN.test(options.name)) {
+      throw new Error("Give --name=<server name>: 6 to 32 letters, digits, spaces, '.', '_' or '-'.");
+    }
+    const keys = this.#operatorKeys();
+    if (!this.#claimsToken) throw new Error("SERVER_CLAIMS_ADMIN_TOKEN is not in the environment.");
+    if (this.#inPool(id)) throw new Error(`VPS ${id} is in the hosted pool. It is not for a custom server.`);
+
+    let machine = await this.#vps(id);
+    if (machine.state !== "RUNNING") throw new Error(`VPS ${id} is ${machine.state}, not RUNNING.`);
+    const suffix = ` ${options.customer} ${owner}`;
+    // A reference that this command set: the run continues the work of a run that stopped.
+    const resumed = machine.reference !== null && CUSTOM_NUMBER_PATTERN.test(machine.reference);
+    if (machine.reference !== null && !(resumed && machine.reference.endsWith(suffix))) {
+      throw new Error(`VPS ${id} has a reference. Take only a VPS with no reference.`);
+    }
+    const reference = machine.reference ?? `custom-${await this.#nextCustomNumber()}${suffix}`;
+    const label = `${reference.split(" ")[0]} ${options.customer}`;
+    if (!this.#apply) {
+      logger.info(
+        resumed
+          ? `VPS ${id} is ${label} already. --apply continues its setup.`
+          : `VPS ${id} would get the reference ${label} <owner>, the hostname lsw-${id}, OpenBot with a claim for the owner, the bootstrap, and a restart.`,
+      );
+      if (resumed) this.#showCustomState(machine, owner);
+      logger.info("Nothing changed. Run again with --apply.");
+      return;
+    }
+
+    if (!resumed) {
+      await this.#setReference(machine, reference);
+      machine = await this.#vps(id);
+      if (machine.reference !== reference) throw new Error(`Another operator took VPS ${id}. Select another one.`);
+      const number = CUSTOM_NUMBER_PATTERN.exec(reference)?.[1];
+      const twins = (await this.#allReferences()).filter(
+        (item) => item.id !== id && CUSTOM_NUMBER_PATTERN.exec(item.reference)?.[1] === number,
+      );
+      if (twins.length > 0) {
+        await this.#setReference(machine, "");
+        throw new Error(`VPS ${twins[0]?.id} took custom-${number} at the same time. Run the command again.`);
+      }
+      // `add` can take the same VPS at the same time: it reads the reference again before its D1 row.
+      if (this.#inPool(id)) {
+        throw new Error(`VPS ${id} went in the hosted pool at the same time. Check its reference by hand.`);
+      }
+      logger.info(`VPS ${id} has the reference ${label} <owner>.`);
+      // A new VPS can have the address of a deleted one, with other host keys.
+      this.#forgetHostKeys(machine);
+    }
+
+    let password: string | undefined;
+    let before = this.#customState(machine);
+    if (before === null) {
+      password = await this.#rootPassword(machine);
+      before = this.#customState(machine, password);
+      if (before === null) {
+        throw new Error(
+          `No key of this computer and not the root password sign in to VPS ${id}. Ask the operator who ran the bootstrap.`,
+        );
+      }
+      logger.info(`VPS ${id} has no key of this computer. Sign in one time with the root password.`);
+    }
+    if (before.account !== "" && before.account !== owner) {
+      throw new Error(`OpenBot on VPS ${id} is signed in to another account. Stop and check the server by hand.`);
+    }
+
+    const install = before.account === "";
+    const hostname = `lsw-${id}`;
+    const claim = install ? await this.#serverClaim(owner) : "";
+    const authApi = this.#testDatabase ? ` --auth-api-url '${AUTH_API_URL.test}'` : "";
+    const script = `${this.#hostingCopy()}
+hostnamectl set-hostname ${hostname}
+${
+  install
+    ? `${writeFileCommand(`${MACHINE_HOSTING}/install-server.sh`, readFileSync(join(ROOT, "scripts/install-server.sh"), "utf8"))}
+{ printf 'OPENBOT_CLAIM=%s\\n' '${claim}'; cat ${MACHINE_HOSTING}/install-server.sh; } | bash -s -- --name '${options.name}'${authApi} 2>&1 |
+  sed -u 's/[^[:space:]]*@[^[:space:]]*/<email>/g'`
+    : ""
+}
+bash ${MACHINE_HOSTING}/leaseweb-bootstrap.sh '${keys}'
+`;
+    logger.info(
+      install
+        ? `VPS ${id}: install OpenBot with a claim for the owner, then run the bootstrap.`
+        : `VPS ${id}: OpenBot is signed in to the owner. Run the bootstrap again.`,
+    );
+    this.#remote(machine, "bash -s", { input: script, password });
+
+    // `openbot login` and `openbot status` show the email, so the install output goes through sed, and
+    // pipefail keeps the exit code of the install.
+    // A new bootstrap writes GRUB again, and a new hostname needs a new start of OpenBot.
+    const restart = install || !before.bootstrapped || before.hostname !== hostname;
+    logger.info(`VPS ${id}: check the bootstrap${restart ? " and restart the machine" : ""}.`);
+    execFileSync(
+      "bun",
+      [
+        join(HOSTING, "leaseweb-bootstrap-e2e.ts"),
+        `--host=root@${machine.address}`,
+        `--restart=${restart ? "yes" : "no"}`,
+      ],
+      { cwd: ROOT, stdio: "inherit" },
+    );
+
+    const after = await this.#waitOnline(machine);
+    if (after.account !== owner) throw new Error(`OpenBot on VPS ${id} is not signed in to the owner.`);
+    const remoteHost = this.#checkOwner(owner, after.hosts);
+    logger.info(
+      `VPS ${id} is ${label}: OpenBot ${after.version}, online, server ${remoteHost} of the owner. Address ${machine.address}.`,
+    );
+  }
+
+  /** Shows the state of a custom server with a key of this computer, with no email. */
+  #showCustomState(machine: Vps, owner: string) {
+    const state = this.#customState(machine);
+    if (state === null) {
+      logger.info(`No key of this computer signs in to VPS ${machine.id}: the bootstrap did not run.`);
+      return;
+    }
+    logger.info(
+      `VPS ${machine.id}: hostname ${state.hostname}, bootstrap ${state.bootstrapped ? "done" : "not done"}, ` +
+        `OpenBot ${state.version || "not running"}, ${signedIn(state, owner)}, ` +
+        `${state.online ? "online" : "not online"}.`,
+    );
+  }
+
   async #boat(method: string, path: string, body?: unknown, timeoutMs = 60_000): Promise<unknown> {
     if (!this.#boatKey) throw new Error("BOAT_API_KEY is not in the environment.");
     const response = await fetch(`${BOAT_API}${path}`, {
@@ -1097,27 +1472,27 @@ systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/ru
 }
 
 const USAGE =
-  "Usage: leaseweb-pool.ts status | add <VPS ID>... | remove <VPS ID>... | sync | prepare <VPS ID>... --keys=<file> | move <server ID> <VPS ID> [--keys=<file>] [--units=<unit>,...] [--apply] [--env=test]";
+  "Usage: leaseweb-pool.ts status | free | add <VPS ID>... | remove <VPS ID>... | sync | prepare <VPS ID>... --keys=<file> | move <server ID> <VPS ID> [--keys=<file>] [--units=<unit>,...] | custom <VPS ID> --owner=<email> --customer=<word> --name=<server name> --keys=<file> [--apply] [--env=test]";
 
 async function main(args: string[]) {
   const [command, ...operands] = args.filter((arg) => !arg.startsWith("--"));
-  const keys = args.find((arg) => arg.startsWith("--keys="))?.slice("--keys=".length);
+  const option = (name: string) => args.find((arg) => arg.startsWith(`--${name}=`))?.slice(name.length + 3);
+  const keys = option("keys");
   const pool = new Pool(args.includes("--apply"), args.includes("--env=test"), process.env, keys);
   if (command === "status") pool.status();
+  else if (command === "free") await pool.free();
   else if (command === "add" && operands.length > 0) await pool.add(operands);
   else if (command === "remove" && operands.length > 0) pool.remove(operands);
   else if (command === "sync") await pool.sync();
   else if (command === "prepare" && operands.length > 0) await pool.prepare(operands);
   else if (command === "move" && operands.length === 2 && operands[0] && operands[1])
-    await pool.move(
-      operands[0],
-      operands[1],
-      args
-        .find((arg) => arg.startsWith("--units="))
-        ?.slice("--units=".length)
-        .split(",")
-        .filter(Boolean),
-    );
+    await pool.move(operands[0], operands[1], option("units")?.split(",").filter(Boolean));
+  else if (command === "custom" && operands.length === 1 && operands[0])
+    await pool.custom(operands[0], {
+      owner: option("owner") ?? "",
+      customer: option("customer") ?? "",
+      name: option("name") ?? "",
+    });
   else throw new Error(USAGE);
 }
 

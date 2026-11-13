@@ -1,5 +1,45 @@
 [
   {
+    "version": "0.69.0",
+    "date": "2026-11-12",
+    "notices": [
+      "Ukryci agenci nadal pracują. OpenBot wyłączył rutyny agentów ukrytych przed tą wersją, więc włącz rutyny, które chcesz."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Przypnij wiadomość w czacie agenta: kliknij ją prawym przyciskiem myszy i wybierz Przypnij. Przycisk przypiętych wiadomości w nagłówku czatu pokazuje przypięte wiadomości wszystkich czatów agenta.",
+          "Biblioteka ma foldery i trzy widoki. Agent może też zapisywać załączane pliki w folderze, który wskażesz.",
+          "Naucz zadania: w menu + wybierz Naucz zadania, a potem wykonaj zadanie w przeglądarce agenta. Agent zapisze kroki jako umiejętność.",
+          "Połącz konta dostawcy w pulę w Ustawieniach. Agenci używają jednego konta, dopóki nie zbliży się ono do limitu użycia, a potem następnego.",
+          "Dodaj umiejętności z GitHub: wklej link do publicznego repozytorium w polu wyszukiwania Umiejętności w Marketplace.",
+          "Ustawienia serwera → Przeniesienie może wyeksportować pełną kopię serwera i w jednym kroku skopiować agentów na inny serwer.",
+          "Wycisz agenta z jego menu w pasku bocznym. Wyciszony agent nie wysyła powiadomień i nie odtwarza dźwięku."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Wiadomość, którą wyślesz do agenta, gdy pracuje, kieruje teraz bieżącą turą. Aby ustawić ją w kolejce jak dawniej, wyłącz Kieruj agentami podczas pracy w Ustawienia → Agenci.",
+          "Ukryty agent działa dalej. Uruchamia swoje rutyny i pojawia się w Potrzebują cię, gdy czeka na twoją odpowiedź.",
+          "Otwarty serwer pokazuje się jako logo na dole paska stron. Przycisk Nowy jest na końcu pola wyszukiwania paska bocznego.",
+          "OpenBot używa Electron 45.3.0 z Chromium 156, a więcej stron z weryfikacją antybotową ładuje się w przeglądarce agenta."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot uruchamia się szybciej, przede wszystkim na Windows, a wolny komputer pozostaje używalny po starcie.",
+          "OpenBot pozostaje responsywny po ponownym uruchomieniu, gdy masz wiele zadań lub wątków.",
+          "Na Linuxie i Windows OpenBot kończy zamykanie, gdy zamkniesz główne okno.",
+          "Rutyny uruchamiają się o czasie po poprawieniu zegara komputera.",
+          "Tekst skopiowany z czatu nie ma już pustych linii na początku ani na końcu."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.68.0",
     "date": "2026-11-11",
     "notices": [],

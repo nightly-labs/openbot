@@ -109,6 +109,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "d527206a8519ea548c3438fa2ee3c4c158a33c85557a650fc62686b257236271",
     },
     {
+      slug: "sunra",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "d66c81db753e40551fde452f985a625e22e5681d63a8a4f87ed76ba5746dafdb",
+    },
+    {
       slug: "elevenlabs",
       version: "1.0.0",
       featured: false,
@@ -245,6 +251,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       version: "1.0.0",
       featured: false,
       detailSha256: "7a0d7ffb21a2bffd98f2b8e08e7dd9e778ee5054a96cfd69d791d77233aafd12",
+    },
+    {
+      slug: "trypost",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "872298599d7dedfa1d31e1f83a293a6d992b54a444809546d84e98cea0668765",
     },
     {
       slug: "composio",
@@ -2136,6 +2148,41 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     termsUrl: "https://higgsfield.ai/terms-of-use-agreement",
     skills: [],
   },
+  sunra: {
+    slug: "sunra",
+    name: "Sunra",
+    tagline: "AI images, videos, audio and 3D",
+    description:
+      "Sunra lets agents make images, videos, audio and 3D models with models such as GPT Image, Nano Banana, Seedream, FLUX, Seedance, Kling and Veo, check the credit balance, and read the results. Results go to a project in the user's Sunra account. Each user signs in to their own Sunra account through the browser. Sunra first quotes the cost of each generation, and spends credits of that account only after it is confirmed.",
+    category: "design",
+    creatorName: "Sunra",
+    iconUrl: "https://sunra.ai/apple-icon.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-balance", text: "How many Sunra credits do I have?" },
+      { id: "prompt-poster", text: "Make a Sunra poster of a night market in the rain, in portrait format." },
+      { id: "prompt-clip", text: "Make a 5-second Sunra video of a paper boat on a river. Tell me the cost first." },
+    ],
+    apps: [
+      {
+        id: "app-sunra-mcp",
+        name: "Sunra",
+        description:
+          "Image, video, audio and 3D generation, credits and results, over Sunra's MCP server with browser sign-in.",
+        iconUrl: "https://sunra.ai/apple-icon.png",
+        server: {
+          name: "sunra",
+          transport: "http",
+          url: "https://mcp.sunra.ai",
+          auth: [{ id: "sunra-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://sunra.ai",
+    privacyPolicyUrl: "https://sunra.ai/privacy",
+    termsUrl: "https://sunra.ai/terms",
+    skills: [],
+  },
   elevenlabs: {
     slug: "elevenlabs",
     name: "ElevenLabs",
@@ -3052,6 +3099,40 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://postiz.com",
     privacyPolicyUrl: "https://postiz.com/privacy",
     termsUrl: "https://postiz.com/terms",
+    skills: [],
+  },
+  trypost: {
+    slug: "trypost",
+    name: "TryPost",
+    tagline: "Social media scheduling",
+    description:
+      "TryPost lets agents list your connected channels, and draft, schedule, queue and publish posts on X, LinkedIn, Instagram, Facebook, TikTok, YouTube, Threads, Bluesky, Mastodon, Pinterest and more. Agents can also read analytics, manage ideas and approvals, and set posting times. Sign in to your TryPost account through the browser and choose a workspace. Agents can publish a post immediately, so review each post before you approve it.",
+    category: "automation",
+    creatorName: "TryPost",
+    iconUrl: "https://app.trypost.it/images/integrations/openbot.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-week", text: "Which posts are scheduled for this week?" },
+      { id: "prompt-draft", text: "Draft a LinkedIn post about our new release, but do not schedule it." },
+      { id: "prompt-analytics", text: "Which of my posts from last month had the most engagement?" },
+    ],
+    apps: [
+      {
+        id: "app-trypost-mcp",
+        name: "TryPost",
+        description: "Channels, posts, queue, ideas and analytics, over TryPost's MCP server with browser sign-in.",
+        iconUrl: "https://app.trypost.it/images/integrations/openbot.png",
+        server: {
+          name: "trypost",
+          transport: "http",
+          url: "https://app.trypost.it/mcp/trypost",
+          auth: [{ id: "trypost-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://trypost.it",
+    privacyPolicyUrl: "https://trypost.it/en/privacy",
+    termsUrl: "https://trypost.it/en/terms",
     skills: [],
   },
   composio: {

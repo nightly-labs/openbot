@@ -287,7 +287,8 @@ from another window, returns at once; a press after the skill line saves nothing
 above is not added after a suggestion that a later skill line already saved. When the host saves
 nothing (the message is gone, no model, the writer or the save fails, or a joined host does not serve
 `skill-learning-v1`), the call returns `saved: false`, and the card sends a short yes as the user's
-message, which the note turns into the save. On a joined server and in the web client, Save sends
+message, which the note turns into the save. The yes goes to the chat of the press, also when the
+user opened another chat while the host wrote. On a joined server and in the web client, Save sends
 `POST /v1/skill-suggestions/save` to the host, which runs the same save. The card is busy from the press, and done
 when a skill line for the same skill follows (created for a new skill; revised or installed with the
 same id for an update). After a user message that saved nothing, the card has no action, because a
@@ -550,7 +551,14 @@ the one Update button, and one entry point in the runtime store, `startProviderU
 runs behind it, whoever owns the CLI: the download installs the managed copy and
 `updateProviderCli` activates it with `preferInstalled: false`, so it starts the copy it downloaded.
 Later resolutions keep that copy while it is newer than the system install, which is left where it
-is; when the user's CLI catches up, the user's CLI runs again. When the user's CLI goes away, main calls
+is; when the user's CLI catches up, the user's CLI runs again. The user's CLI can be a launcher that
+sets up its own environment, such as a `pi` script that picks `PI_CODING_AGENT_DIR` (#6327). The
+status row therefore names the other CLI in `otherCliVersion`, and the Runtime section offers "Use
+installed version". `chooseInstalledCli` saves the choice in the `installed` list of
+`openbot-provider-use-v1.json`, and `chooseInstalledFirst` then runs the user's CLI also when the copy
+is newer. The row then offers "Use OpenBot's version", and an update clears the choice. The offer
+compares the release with the newer of the two CLIs, so a copy that is already the newest offers no
+update. When the user's CLI goes away, main calls
 `providerUseChanged`, which stamps the copy again, or reads the store when a sibling collected it. OpenBot never runs the CLI's own updater, so no version it offers depends
 on another release channel. An explicit `OPENBOT_*_PATH` suppresses the offer, because that path
 names the binary to run and the managed copy is not it. The owner comes from the last resolution of
@@ -658,24 +666,26 @@ fail with `ServiceUnavailableError` while the CLI starts (OpenCode issue #57204)
 more after two seconds; and a model name starts with the provider id, not its name, so
 `openCodeModelName` restores the group name.
 
-OpenCode has no login step OpenBot can drive, because the account is one environment variable: a
-spawn without `OPENCODE_API_KEY` lists the free OpenCode Go models, and a spawn with one lists the
-paid catalog. So `AcpAgentClient` derives `#signedIn` from the models `session/new` returns, not
-from a credential, and a keyless OpenCode reports `available`. `AcpProviderOptions.extraEnv` is read
-at every spawn, which is what lets a key saved in Settings reach the next process with no other
-plumbing, and what carries `OPENCODE_DISABLE_AUTOUPDATE` to a managed install so the CLI cannot
-update past the pin. `src/main/provider-credential-store.ts` holds that optional key, encrypted by
-`safeStorage` in a `0o600` envelope under `userData`. Only a status (`missing`, `saved` or
-`unreadable`) crosses IPC; no getter returns the key. A file the store cannot read does not stop
+OpenCode has no login step OpenBot can drive, because the account is one key: a spawn without it
+lists the free models, and a spawn with it lists the paid Go catalog. OpenBot sends the stored key
+only as `options.apiKey` of the `opencode-go` provider in `OPENCODE_CONFIG_CONTENT`, never as
+`OPENCODE_API_KEY` or on the free `opencode` provider. OpenCode gives the free tier its anonymous key
+only while that provider has no key, so a refused key there failed every free model with
+"provider authentication required" (#7550). So `AcpAgentClient` derives `#signedIn` from the models
+`session/new` returns, not from a credential, and a keyless OpenCode reports `available`.
+`AcpProviderOptions.extraEnv` is read at every spawn, which is what lets a key saved in Settings
+reach the next process with no other plumbing, and what carries `OPENCODE_DISABLE_AUTOUPDATE` to a
+managed install so the CLI cannot update past the pin. `src/main/provider-credential-store.ts` holds
+that optional key, encrypted by `safeStorage` in a `0o600` envelope under `userData`.
+Only a status (`missing`, `saved` or `unreadable`) crosses IPC; no getter returns the key. A file the store cannot read does not stop
 startup: OpenCode runs keyless, Settings reports the key as unreadable, and the file stays until the
 user saves or removes a key. The store writes a change to disk before it changes memory, so a
 failed write changes neither. `ProviderRuntime.changeProviderCredential` applies a key change inside
 the provider's serialized connection command. It refuses a provider that is running a turn, holds
 deliveries while it writes, and reports success only after a new process runs with the new key.
 
-That one variable turns on two products: OpenCode reports OpenCode Zen and OpenCode Go as a single
-catalog, on the separate endpoints `opencode.ai/zen/v1` and `opencode.ai/zen/go/v1`, and OpenBot
-supports only Go. So `isOpencodeModelUnusableWithStoredKey` in `src/backend/agent/provider-models.ts`
+OpenCode reports OpenCode Zen and OpenCode Go as a single catalog, on the separate endpoints
+`opencode.ai/zen/v1` and `opencode.ai/zen/go/v1`, and OpenBot supports only Go. So `isOpencodeModelUnusableWithStoredKey` in `src/backend/agent/provider-models.ts`
 drops the paid Zen models from `ModelCatalog.refresh` (through the OpenCode driver's
 `catalog.usableWithStoredKey`) while OpenBot is the one supplying the key;
 with no key stored those models can only come from the user's own OpenCode sign-in, which does
@@ -721,15 +731,16 @@ one with `-32000` "provider authentication required" and no provider ID. `OPENCO
 maps that code to `error.provider.opencodeAuthRequired`, which names the provider from the model ID
 before its first `/` and lists the fixes: a Free model, a Go key, or `opencode auth login`.
 
-#### Turns of a background subagent
+#### Turns of a background subagent or shell command
 
 OpenCode 2.2.0 sends session updates only for the execution that a `session/prompt` starts. When a
 background subagent ends, OpenCode answers its result in a turn of its own (a `synthetic` row with
-`source: subagent` in its store), and no update of that turn reaches the client (#3406). The flag
+`source: subagent` in its store), and no update of that turn reaches the client (#3406). A shell
+command that runs in the background does the same when it ends (#7713). The flag
 `unsentBackgroundTurns` of `OPENCODE_ACP_FLAVOR` turns on the recovery in `acp-client.ts`:
 
-- A tool call that ends with `rawOutput.metadata.status` "running" and a `sessionID` started a
-  background task. OpenBot then watches the session for 30 minutes, and longer while it changes.
+- A tool call that ends with `rawOutput.metadata.status` "running" and a `sessionID` (a subagent)
+  or a `shellID` (a shell command, OpenCode 2.2.7) started a background task. OpenBot then watches the session for 30 minutes, and longer while it changes.
   The idle pool does not close a watched session, because a closed one never reports the result.
 - Every 2 seconds, when no prompt runs or opens, OpenBot reads `session/list`. When the session's
   `updatedAt` changes, it sends `session/load` with the session's own MCP servers, and collects the

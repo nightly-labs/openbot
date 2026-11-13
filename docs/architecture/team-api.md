@@ -427,7 +427,7 @@ dev server, with Stop. Only owners and admins can use them (else 403). The host 
 line before it leaves `src/main/background-processes.ts`, cuts it to 500 characters, sends at most
 200 programs and 64 ports each, and never sends the environment of a program. `processes` is null on a
 Windows host, which cannot find these programs. Stop signals only a program that is in the list at
-that time; an unknown id does nothing. This computer shows its own programs in Settings > Agents.
+that time; an unknown id does nothing. This computer shows its own programs in the same place.
 
 The optional `provider-use-v1` capability (protocol 9 only) adds `POST /v1/admin/provider-use/list`
 and `POST /v1/admin/provider-use/set` (`provider`, `on`). They are the on/off switch of the host's

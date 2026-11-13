@@ -276,6 +276,15 @@ export const messages = {
   "marketplace.plugin.higgsfield.prompt.productShot":
     "Сделайте в Higgsfield предметное фото керамической кружки на деревянном столе.",
   "marketplace.plugin.higgsfield.prompt.clip": "Сделайте в Higgsfield 5-секундное видео волн на закате.",
+  "marketplace.plugin.sunra.tagline": "ИИ-изображения, видео, аудио и 3D",
+  "marketplace.plugin.sunra.description":
+    "Sunra позволяет агентам создавать изображения, видео, аудио и 3D-модели с помощью таких моделей, как GPT Image, Nano Banana, Seedream, FLUX, Seedance, Kling и Veo, проверять баланс кредитов и получать результаты. Результаты сохраняются в проекте в аккаунте Sunra пользователя. Каждый пользователь входит в свой аккаунт Sunra в браузере. Sunra сначала называет стоимость каждой генерации и списывает кредиты этого аккаунта только после подтверждения.",
+  "marketplace.plugin.sunra.app":
+    "Создание изображений, видео, аудио и 3D, кредиты и результаты через MCP-сервер Sunra со входом в браузере.",
+  "marketplace.plugin.sunra.prompt.balance": "Сколько у меня кредитов Sunra?",
+  "marketplace.plugin.sunra.prompt.poster": "Сделайте в Sunra постер ночного рынка под дождём в вертикальном формате.",
+  "marketplace.plugin.sunra.prompt.clip":
+    "Сделайте в Sunra 5-секундное видео бумажного кораблика на реке. Сначала скажите, сколько это стоит.",
   "marketplace.plugin.elevenlabs.tagline": "Речь, голоса и голосовые агенты",
   "marketplace.plugin.elevenlabs.description":
     "ElevenLabs позволяет агентам превращать текст в речь, работать с голосами, а также создавать, тестировать и просматривать голосовых агентов ElevenLabs и их разговоры. Созданное аудио приходит как ссылка для скачивания с коротким сроком действия. Каждый пользователь входит в свой аккаунт ElevenLabs в браузере, и каждая генерация расходует кредиты этого аккаунта.",
@@ -430,6 +439,16 @@ export const messages = {
   "marketplace.plugin.postiz.prompt.week": "Какие посты запланированы на следующую неделю?",
   "marketplace.plugin.postiz.prompt.draft":
     "Подготовь черновик поста в LinkedIn о нашем новом релизе, но не планируй его.",
+  "marketplace.plugin.trypost.tagline": "Планирование публикаций в соцсетях",
+  "marketplace.plugin.trypost.description":
+    "TryPost позволяет агентам просматривать подключённые каналы, а также готовить, планировать, ставить в очередь и публиковать посты в X, LinkedIn, Instagram, Facebook, TikTok, YouTube, Threads, Bluesky, Mastodon, Pinterest и других сетях. Агенты также могут читать аналитику, управлять идеями и согласованиями и задавать время публикаций. Войдите в аккаунт TryPost в браузере и выберите рабочее пространство. Агенты могут опубликовать пост сразу, поэтому проверяйте каждый пост перед одобрением.",
+  "marketplace.plugin.trypost.app":
+    "Каналы, посты, очередь, идеи и аналитика через MCP-сервер TryPost со входом в браузере.",
+  "marketplace.plugin.trypost.prompt.week": "Какие посты запланированы на эту неделю?",
+  "marketplace.plugin.trypost.prompt.draft":
+    "Подготовь черновик поста в LinkedIn о нашем новом релизе, но не планируй его.",
+  "marketplace.plugin.trypost.prompt.analytics":
+    "Какие из моих постов за прошлый месяц получили больше всего вовлечённости?",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub и ещё более 1000 приложений",
   "marketplace.plugin.composio.description":
     "Composio подключает ваших агентов к Gmail, Slack, GitHub и ещё более чем 1000 приложений через один сервер MCP. Войдите с аккаунтом Composio. Когда агенту нужно приложение, он попросит вас подключить его.",

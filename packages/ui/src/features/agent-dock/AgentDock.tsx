@@ -115,10 +115,25 @@ export interface AgentDockChannel {
   imageUrl: string | null;
 }
 
-/** `state` is the badge on the seat: the same state as the agent's or channel's badge in the sidebar. */
+/**
+ * `state` is the badge on the seat: the same state as the agent's or channel's badge in the sidebar.
+ * A `temporary` seat is not on the dock: it shows while it has a new message or waits for the user. Its
+ * menus add it to the dock in place of removing it.
+ */
 export type AgentDockSeat =
-  | { kind: "agent"; agent: ComposerAgent; mood: AvatarMood; state: SidebarAgentState | undefined }
-  | { kind: "channel"; channel: AgentDockChannel; state: SidebarAgentState | undefined };
+  | {
+      kind: "agent";
+      agent: ComposerAgent;
+      mood: AvatarMood;
+      state: SidebarAgentState | undefined;
+      temporary?: boolean | undefined;
+    }
+  | {
+      kind: "channel";
+      channel: AgentDockChannel;
+      state: SidebarAgentState | undefined;
+      temporary?: boolean | undefined;
+    };
 
 /**
  * The dock body in the document: the part between and around the seats that takes the pointer. It has the
@@ -1292,10 +1307,20 @@ export function AgentDock(props: AgentDockProps) {
                                 )}
                               </Show>
                               <ContextMenu.Separator />
-                              <ContextMenu.Item onSelectAfterClose={() => props.onRemove(refOfKey(id))}>
-                                <PanelRight aria-hidden="true" />
-                                {t("agent.dock.remove")}
-                              </ContextMenu.Item>
+                              <Show
+                                when={seat().temporary}
+                                fallback={
+                                  <ContextMenu.Item onSelectAfterClose={() => props.onRemove(refOfKey(id))}>
+                                    <PanelRight aria-hidden="true" />
+                                    {t("agent.dock.remove")}
+                                  </ContextMenu.Item>
+                                }
+                              >
+                                <ContextMenu.Item onSelectAfterClose={() => props.onAdd(refOfKey(id))}>
+                                  <Plus aria-hidden="true" />
+                                  {t("agent.dock.add")}
+                                </ContextMenu.Item>
+                              </Show>
                               <Show when={props.onHide}>
                                 {(hide) => (
                                   <ContextMenu.Item
@@ -1467,6 +1492,7 @@ export function AgentDock(props: AgentDockProps) {
                     onSend={() => void send()}
                     onClose={() => closeChat()}
                     onRemove={() => props.onRemove(refOfKey(id))}
+                    onAdd={() => props.onAdd(refOfKey(id))}
                     onOpenInMain={() => {
                       closeChat(false);
                       props.onOpenInMain(refOfKey(id));

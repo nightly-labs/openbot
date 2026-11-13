@@ -15,7 +15,7 @@ import { readJson, requireAdmin, stringField } from "./request-helpers";
 /**
  * The programs that the host's agents left running, and Stop on one of them, from a joined server.
  * Only an owner or admin can use them. The command line is redacted where the list is made, as for
- * Settings > Agents on this computer. An agent that this peer cannot see is not named. Frozen by
+ * Server Settings > Storage on this computer. An agent that this peer cannot see is not named. Frozen by
  * `background-processes-v1`.
  */
 export async function routeBackgroundProcesses(

@@ -86,6 +86,11 @@ also renders on the CPU when it blocks the GPU driver, for example in a remote d
 When OpenBot renders on the CPU, dialogs and panels do not blur what is behind them, and agent
 avatars do not move. These two effects used the most CPU time.
 
+On a Wayland session, a start that renders on the CPU opens OpenBot again on XWayland: on Wayland,
+Chromium can leave the window empty, and KDE then shows only a 1x1 taskbar entry. The log then shows
+"Software rendering is on, so OpenBot uses XWayland". Without XWayland (no `DISPLAY`), OpenBot stays
+on Wayland. To stay on Wayland, start OpenBot with `--ozone-platform=wayland`.
+
 - To try the GPU again, for example after a driver update, remove the file. The log names it.
 - To always use the GPU, start OpenBot with `OPENBOT_DISABLE_GPU=0`. A server ignores this value.
 - If OpenBot stops at each start, start it with `OPENBOT_DISABLE_GPU=1` to always render on the CPU.

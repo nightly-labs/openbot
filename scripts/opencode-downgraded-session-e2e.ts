@@ -88,13 +88,14 @@ try {
   assert.equal(keptReport.error, sourceText("error.provider.opencodeServiceFailure"));
 
   // 3. OpenCode 2.x copies 1.x sessions once, so it does not have a session that 1.x wrote later.
-  // That session is replaced; a session of another directory is not.
+  // That session is replaced. A session of another directory cannot reopen in the agent's workspace,
+  // so it is replaced too (#7622).
   report.newerVersion = {
     missing: isMissingProviderSessionError(await resumeFailure(client, "v1only-1", workspace), "opencode"),
     otherDirectory: isMissingProviderSessionError(await resumeFailure(client, "othercwd-1", workspace), "opencode"),
   };
   assert.equal(report.newerVersion.missing, true, "A session that OpenCode 2.x does not have is replaced.");
-  assert.equal(report.newerVersion.otherDirectory, false, "A session of another directory is not replaced.");
+  assert.equal(report.newerVersion.otherDirectory, true, "A session of another directory is replaced.");
 
   report.passed = true;
 } finally {

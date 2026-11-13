@@ -275,6 +275,15 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.higgsfield.prompt.productShot":
     "Make a Higgsfield product photo of a ceramic mug on a wooden table.",
   "marketplace.plugin.higgsfield.prompt.clip": "Make a 5-second Higgsfield video of waves at sunset.",
+  "marketplace.plugin.sunra.tagline": "AI images, videos, audio and 3D",
+  "marketplace.plugin.sunra.description":
+    "Sunra lets agents make images, videos, audio and 3D models with models such as GPT Image, Nano Banana, Seedream, FLUX, Seedance, Kling and Veo, check the credit balance, and read the results. Results go to a project in the user's Sunra account. Each user signs in to their own Sunra account through the browser. Sunra first quotes the cost of each generation, and spends credits of that account only after it is confirmed.",
+  "marketplace.plugin.sunra.app":
+    "Image, video, audio and 3D generation, credits and results, over Sunra's MCP server with browser sign-in.",
+  "marketplace.plugin.sunra.prompt.balance": "How many Sunra credits do I have?",
+  "marketplace.plugin.sunra.prompt.poster": "Make a Sunra poster of a night market in the rain, in portrait format.",
+  "marketplace.plugin.sunra.prompt.clip":
+    "Make a 5-second Sunra video of a paper boat on a river. Tell me the cost first.",
   "marketplace.plugin.elevenlabs.tagline": "Speech, voices and voice agents",
   "marketplace.plugin.elevenlabs.description":
     "ElevenLabs lets agents turn text into speech, work with voices, and create, test and review ElevenLabs voice agents and their conversations. Generated audio comes back as a short-lived download link. Each user signs in to their own ElevenLabs account through the browser, and each generation uses credits of that account.",
@@ -428,6 +437,14 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.postiz.prompt.channels": "Which social media channels are connected to Postiz?",
   "marketplace.plugin.postiz.prompt.week": "Which posts are scheduled for next week?",
   "marketplace.plugin.postiz.prompt.draft": "Draft a LinkedIn post about our new release, but do not schedule it.",
+  "marketplace.plugin.trypost.tagline": "Social media scheduling",
+  "marketplace.plugin.trypost.description":
+    "TryPost lets agents list your connected channels, and draft, schedule, queue and publish posts on X, LinkedIn, Instagram, Facebook, TikTok, YouTube, Threads, Bluesky, Mastodon, Pinterest and more. Agents can also read analytics, manage ideas and approvals, and set posting times. Sign in to your TryPost account through the browser and choose a workspace. Agents can publish a post immediately, so review each post before you approve it.",
+  "marketplace.plugin.trypost.app":
+    "Channels, posts, queue, ideas and analytics, over TryPost's MCP server with browser sign-in.",
+  "marketplace.plugin.trypost.prompt.week": "Which posts are scheduled for this week?",
+  "marketplace.plugin.trypost.prompt.draft": "Draft a LinkedIn post about our new release, but do not schedule it.",
+  "marketplace.plugin.trypost.prompt.analytics": "Which of my posts from last month had the most engagement?",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub and 1,000+ more apps",
   "marketplace.plugin.composio.description":
     "Composio connects your agents to Gmail, Slack, GitHub and more than 1,000 other apps through one MCP server. Sign in with your Composio account. When an agent needs an app, it asks you to connect that app.",

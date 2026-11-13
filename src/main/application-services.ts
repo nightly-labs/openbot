@@ -19,6 +19,7 @@ import { RoutineFlowStore } from "../backend/routine-flows/routine-flow-store";
 import { createRoutineFlows, type RoutineFlowsHandle } from "../backend/routine-flows/routine-flows";
 import { RoutineResultStore } from "../backend/routine-results/routine-result-store";
 import { createRoutineResults, type RoutineResultsHandle } from "../backend/routine-results/routine-results";
+import { clearFlatBackground } from "../backend/workflows/flat-background";
 import { WorkflowGitHubStore } from "../backend/workflows/workflow-github-store";
 import { WorkflowRunStore } from "../backend/workflows/workflow-run-store";
 import { WorkflowStore } from "../backend/workflows/workflow-store";
@@ -27,6 +28,7 @@ import { createWorkflows, type WorkflowNotice, type WorkflowsHandle } from "../b
 import { type AcpRegistry, createAcpRegistry } from "./acp-registry";
 import { type AgentAdminSettingsService, createAgentAdminSettings } from "./agent-admin-settings";
 import { spawnAgentDatabaseHost } from "./agent-database-host-process";
+import { type AgentDefaultsSettingsService, createAgentDefaultsSettings } from "./agent-defaults-settings";
 import { agentDisplayEnvironment, hasSeparateAgentDisplay } from "./agent-display";
 import { type AgentFolders, createAgentFolders } from "./agent-folders";
 import { type AgentHostSettingsService, createAgentHostSettings } from "./agent-host-settings";
@@ -155,6 +157,7 @@ import { SidebarLayoutStore } from "../backend/sidebar-layout-store";
 import { StorageUsageScanner, StorageUsageService } from "../backend/storage-usage";
 import { TeamChatStore } from "../backend/team-chat-store";
 import { UserBrowsingLog } from "../backend/user-browsing-log";
+import { UserFilesBytes } from "../backend/user-files-bytes";
 import { AGENT_ACCESS_FILE, AgentAccessStore } from "./agent-access-store";
 import {
   type AgentDefaultsPreferenceStore,
@@ -257,6 +260,7 @@ import { HermesInstaller } from "./hermes-installer";
 import { HostEventsRuntime } from "./host-events-runtime";
 import { agentWebhookRoutineWriter, HostEventsService, type WebhookDeliveryReport } from "./host-events-service";
 import { HostService } from "./host-service";
+import { HostTurnLimitsPreferenceStore } from "./host-turn-limits-preference-store";
 import { HostUpdateCoordinator } from "./host-update-coordinator";
 import { CLIENT_USE_WINDOW_MS, HostedServerActivity } from "./hosted-server-activity";
 import {
@@ -316,7 +320,7 @@ import { MCP_ACCESS_FILE, type McpAccessControl, McpAccessStore, sameMcpAgents }
 import { McpHostSignIns } from "./mcp-host-sign-ins";
 import { McpOAuthProxySettingsFile } from "./mcp-oauth-proxy-store";
 import {
-  MCP_OAUTH_REDIRECT_PATH,
+  MCP_OAUTH_REDIRECT_PATHS,
   MCP_OAUTH_REDIRECT_PORT,
   startMcpOAuthRedirectServer,
 } from "./mcp-oauth-redirect-server";
@@ -468,6 +472,7 @@ const USER_BROWSING_FILE = "openbot-browsing-steps-v1.json";
 const AGENT_NOTIFICATION_LEVELS_FILE = "openbot-agent-notification-levels-v1.json";
 const SIDEBAR_PINS_FILE = "openbot-sidebar-pins-v1.json";
 const SERVER_TIMEZONE_PREFERENCE_FILE = "openbot-server-timezone-v1.json";
+const HOST_TURN_LIMITS_PREFERENCE_FILE = "openbot-host-turn-limits-v1.json";
 const SERVER_PERSONALITY_PREFERENCE_FILE = "openbot-server-personality-v1.json";
 const PROMPT_CACHE_TTL_PREFERENCE_FILE = "openbot-prompt-cache-ttl-v1.json";
 const CLAUDE_USER_SETUP_PREFERENCE_FILE = "openbot-claude-user-setup-v1.json";
@@ -704,6 +709,7 @@ export interface ApplicationServices {
   approvalAutomation: ApprovalAutomation;
   agentAdminSettings: AgentAdminSettingsService;
   agentHostSettings: AgentHostSettingsService;
+  agentDefaultsSettings: AgentDefaultsSettingsService;
   /** The folders each agent can change besides its workspace, for the desktop settings and `agent-folders-v1`. */
   agentFolders: AgentFolders;
   /** The instruction file of each agent, for the desktop page and `agent-instructions-v1`. */
@@ -726,6 +732,7 @@ export interface ApplicationServices {
   mcpAccess: McpAccessControl;
   serverAudit: ServerAuditStore;
   serverTimezone: ServerTimezonePreferenceStore;
+  hostTurnLimits: HostTurnLimitsPreferenceStore;
   serverPersonality: ServerPersonalityPreferenceStore;
   promptCacheTtl: PromptCacheTtlPreferenceStore;
   claudeUserSetup: ClaudeUserSetupControl;
@@ -1376,12 +1383,13 @@ export async function createApplicationServices({
       : null;
   // Every provider process on a server gets the marker of leftover agent processes and the CPU limit
   // module for Node. The module must exist: Node does not start when a `--require` file is missing.
-  // On the desktop it gets the marker only, so Settings › Agents can list what agents left running.
+  // On the desktop it gets the marker only, so Server Settings › Storage can list what agents left running.
   const cpuLimitModule = app.isPackaged
     ? join(process.resourcesPath, "agent-runtime", "cpu-limit.cjs")
     : resolve(__dirname, "../../resources/agent-runtime/cpu-limit.cjs");
   // Every provider process also gets the system roots that this process trusts, so a Python agent CLI
-  // reaches an MCP server behind a TLS-inspecting network as OpenBot's test does (#6616).
+  // reaches an MCP server behind a TLS-inspecting network as OpenBot's test does (#6616). Codex reads
+  // the system roots itself, so its driver leaves the file out (#8112).
   const certificateEnvironment = await Effect.runPromise(
     agentCertificateEnvironment(join(app.getPath("userData"), AGENT_CERTIFICATES_FILE)).pipe(
       Effect.catch((error) =>
@@ -1521,6 +1529,10 @@ export async function createApplicationServices({
   const serverTimezone = new ServerTimezonePreferenceStore(
     join(app.getPath("userData"), SERVER_TIMEZONE_PREFERENCE_FILE),
   );
+  const hostTurnLimits = new HostTurnLimitsPreferenceStore(
+    join(app.getPath("userData"), HOST_TURN_LIMITS_PREFERENCE_FILE),
+    () => hostMemory?.turnLimit() ?? null,
+  );
   const serverPersonality = new ServerPersonalityPreferenceStore(
     join(app.getPath("userData"), SERVER_PERSONALITY_PREFERENCE_FILE),
   );
@@ -1570,6 +1582,7 @@ export async function createApplicationServices({
       serverAudit.load(),
       mcpServerOwners.load(),
       serverTimezone.load(),
+      hostTurnLimits.load(),
       serverPersonality.load(),
       promptCacheTtl.load(),
       claudeUserSetup.load(),
@@ -1794,7 +1807,7 @@ export async function createApplicationServices({
     language,
     ownListener: () =>
       mcpOAuthRedirect
-        ? { port: Number(new URL(mcpOAuthRedirect.redirectUrl).port), path: MCP_OAUTH_REDIRECT_PATH }
+        ? { port: Number(new URL(mcpOAuthRedirect.redirectUrl).port), paths: MCP_OAUTH_REDIRECT_PATHS }
         : null,
   });
   performance.mark("openbot:services.mcp-sign-in-file");
@@ -2100,10 +2113,11 @@ export async function createApplicationServices({
   const providerTempDirectory = join(app.getPath("userData"), "provider-temp");
   performance.mark("openbot:services.computer-use");
   if (process.platform === "win32") await Effect.runPromise(sweepProviderTemp(providerTempDirectory));
-  // Outside every workspace. Each saved key is masked in the logs before the first agent starts. The
-  // Vault's keys are written only when an agent lists its keys; a file left from the last run that the
-  // Vault no longer holds is removed here.
-  const agentApiKeys = new AgentApiKeys(join(app.getPath("userData"), "agent-api-keys"), () => vault.items.apiKeys());
+  // Outside every workspace. Each saved key is masked in the logs before the first agent starts. A key
+  // file of one agent from a build before agent scope moves into the Vault here. The Vault's keys are
+  // written only when an agent lists its keys; a file left from the last run that the agent can no
+  // longer use is removed here.
+  const agentApiKeys = new AgentApiKeys(join(app.getPath("userData"), "agent-api-keys"), vault.items);
   await Effect.runPromise(agentApiKeys.registerSaved());
   await Effect.runPromise(agentApiKeys.syncVault().pipe(Effect.ignore));
   // The schedule triggers of workflows share the routine timer; built after the workflows below.
@@ -2131,6 +2145,15 @@ export async function createApplicationServices({
     mailbox,
     browser,
     visualPreview: new ChatVisualPreviewer(),
+    clearPictureBackground: (bytes) => {
+      // Skia decodes the PNG or JPEG; its bitmap is premultiplied, as `clearFlatBackground` writes it.
+      const picture = nativeImage.createFromBuffer(Buffer.from(bytes));
+      if (picture.isEmpty()) return null;
+      const size = picture.getSize();
+      const pixels = picture.toBitmap();
+      if (!clearFlatBackground(pixels, size.width, size.height)) return null;
+      return nativeImage.createFromBitmap(pixels, size).toPNG();
+    },
     videoReader: new VideoReader({
       runtimeDirectory: join(app.getPath("userData"), "runtimes", "yt-dlp"),
       target: runtimeTarget(process.platform, process.arch),
@@ -2188,6 +2211,7 @@ export async function createApplicationServices({
           getSources: (options) => desktopCapturer.getSources(options),
         }),
     hostMemory,
+    hostTurnLimits,
     hostedStorageGb: () => hostedStorageGb,
     agentCursorDrawn: drawsComputerUseHighlight,
     requestTimeoutMs: 30_000,
@@ -2198,6 +2222,17 @@ export async function createApplicationServices({
         Effect.tap(() => providerRuntimes.providerUseChanged()),
         Effect.mapError((error) => new AgentLifecycleFailed({ operation: "saveProviderUse", cause: error.cause })),
       ),
+    installedCliProviders: providerUse.installed(),
+    saveInstalledCliChoice: (provider, installed) =>
+      isManagedRuntimeProvider(provider)
+        ? providerUse
+            .setInstalled(provider, installed)
+            .pipe(
+              Effect.mapError(
+                (error) => new AgentLifecycleFailed({ operation: "saveInstalledCliChoice", cause: error.cause }),
+              ),
+            )
+        : Effect.void,
     preferredProvider: setupState.preferredProvider ?? "codex",
     bundledExecutables: providerRuntimes.bundledExecutables(),
     prepareAgentWorkspace: (agent) =>
@@ -2316,6 +2351,7 @@ export async function createApplicationServices({
   teardown.push(TEARDOWN_ORDER.service, "the agent service", () => runCauseEffect(service.stop()));
   // The next turn of each agent uses the instructions of the new personality.
   serverPersonality.onChange(() => service.responseStyleChanged());
+  hostTurnLimits.onChange(() => service.turnLimitsChanged());
   // The skill revision line is in the instructions only when skill learning is Automatic.
   let skillRevision = skillLearning.get().mode === "automatic";
   skillLearning.onChange(({ mode }) => {
@@ -2422,6 +2458,16 @@ export async function createApplicationServices({
             message: failure.cause instanceof Error ? failure.cause.message : sourceText("error.workflow.modelFailed"),
           })),
         ),
+      generateMedia: (request) =>
+        service.generateWorkflowMedia(request).pipe(
+          Effect.mapError((failure) => ({
+            message: failure.cause instanceof Error ? failure.cause.message : sourceText("error.workflow.mediaFailed"),
+          })),
+        ),
+      mediaProviders: () => service.workflowMediaProviders(),
+      mediaCredits: () => service.workflowMediaCredits(),
+      keepPicture: (draftId, types) =>
+        mailbox.keepDraft(draftId, types).pipe(Effect.map((kept) => (typeof kept === "string" ? kept : kept.id))),
       notify: forwardWorkflowNotice,
       connectionOn: (connectionId) => service.messaging.store.connection(connectionId)?.enabled === true,
       post: (connectionId, placeId, markdown) => service.messaging.deliver(connectionId, placeId, markdown),
@@ -2621,6 +2667,8 @@ export async function createApplicationServices({
   // reconciling against the agents alone would read every channel as gone and drop where it sits.
   performance.mark("openbot:services.messaging");
   await runCauseEffect(sidebarLayout.reconcileAgents(service.sidebarChatIds()));
+  // Each saved folder change, from any source, reaches the Library of this window and of joined clients.
+  libraryFolders.onChanged(() => service.notifyLibraryFoldersChanged());
   await runCauseEffect(libraryFolders.reconcileAgents(new Set(service.listAgents().map((agent) => agent.id))));
   await runCauseEffect(
     libraryFolders.reconcileFiles(new Set(mailbox.listStoredFiles().map((stored) => stored.attachment.id))),
@@ -2719,6 +2767,9 @@ export async function createApplicationServices({
             })),
           )
         : null,
+    // Only a hosted server counts its plan storage from the user's files. A computer or a server of
+    // the user shows its own disk, and a scan of its home folder would read files that are not OpenBot's.
+    ...(hostedServer ? { userFiles: new UserFilesBytes(userData, homedir()) } : {}),
   };
   const storageUsage = new StorageUsageService(new StorageUsageScanner(storageSources), storageSources);
   teardown.push(TEARDOWN_ORDER.storageUsage, "storage scans", () => Effect.runPromise(storageUsage.dispose()));
@@ -2910,6 +2961,7 @@ export async function createApplicationServices({
   );
   const agentAdminSettings = createAgentAdminSettings({ agents: service, approvalAutomation });
   const agentHostSettings = createAgentHostSettings({ agents: service, busyMessageMode, agentDefaults });
+  const agentDefaultsSettings = createAgentDefaultsSettings({ agents: service, agentDefaults, busyMessageMode });
   const agentFolders = createAgentFolders({ service, userDataPath: app.getPath("userData") });
   const agentInstructions = createAgentInstructionsFiles(service);
   const browserProfiles = createBrowserProfileService({
@@ -3121,6 +3173,14 @@ export async function createApplicationServices({
         get: () => modelVisibility.hiddenModels(),
         set: (models) => modelVisibility.replaceHidden(models),
       },
+      // `onChange` of the store starts the turns that a higher limit lets start.
+      turnLimits: {
+        get: () => {
+          const { turnLimit, agentTaskLimit } = hostTurnLimits.get();
+          return { turnLimit, agentTaskLimit };
+        },
+        set: (limits) => hostTurnLimits.set(limits),
+      },
     },
     appVersion: app.getVersion(),
     uploadDirectory: join(app.getPath("userData"), "instance-transfer-uploads"),
@@ -3274,7 +3334,7 @@ export async function createApplicationServices({
     // Present, so the host advertises `machine-resources-v1`. The routes are admin-only.
     machine: machineAlerts,
     // Present, so the host advertises `background-processes-v1`. The routes are admin-only. A Windows
-    // host answers a null list, as Settings > Agents does there.
+    // host answers a null list, as this computer does there.
     backgroundProcesses: {
       list: () => listBackgroundProcesses(process.platform, service.listAgents()),
       stop: (id) => stopBackgroundProcess(process.platform, id),
@@ -3332,6 +3392,7 @@ export async function createApplicationServices({
     admin: {
       agents: agentAdminSettings,
       agentHost: agentHostSettings,
+      agentDefaults: agentDefaultsSettings,
       folders: agentFolders,
       instructions: agentInstructions,
       sessionSettings: service,
@@ -3358,6 +3419,21 @@ export async function createApplicationServices({
         changeSettings: (change) => scheduledUpdate().changeSettings(change),
       },
       timezone: serverTimezone,
+      turnLimits: hostTurnLimits,
+      // A self-hosted server only: systemd (or the Docker restart policy) starts it again after the quit.
+      // A desktop app has nothing that starts it again, and a hosted server restarts through the account
+      // service. `app.relaunch` is not used: it would start the app outside the virtual display.
+      ...(serverModeEnvironment
+        ? {
+            restart: {
+              request: (memberId) => {
+                logger.info(`Member ${memberId} asked this server to restart.`);
+                // The answer leaves before the quit closes the connections.
+                setImmediate(() => app.quit());
+              },
+            },
+          }
+        : {}),
       personality: serverPersonality,
       memoryLimit: agentMemoryLimitSetting,
       memoryReview,
@@ -4331,7 +4407,12 @@ export async function createApplicationServices({
         version: app.getVersion(),
         centralAuth,
         host,
-        memory: hostMemory,
+        // `status` shows the limit that runs: the one an owner or admin chose, else the memory's.
+        memory: hostMemory && {
+          level: () => hostMemory.level(),
+          sample: () => hostMemory.sample(),
+          turnLimit: () => hostTurnLimits.turnLimit() ?? hostMemory.turnLimit(),
+        },
         onError: (message, error) => logger.warn(message, toLogValue(error)),
       })
     : null;
@@ -4401,6 +4482,7 @@ export async function createApplicationServices({
     approvalAutomation,
     agentAdminSettings,
     agentHostSettings,
+    agentDefaultsSettings,
     agentFolders,
     agentInstructions,
     browserProfiles,
@@ -4421,6 +4503,7 @@ export async function createApplicationServices({
     mcpAccess,
     serverAudit,
     serverTimezone,
+    hostTurnLimits,
     serverPersonality,
     promptCacheTtl,
     claudeUserSetup: claudeUserSetupSetting,

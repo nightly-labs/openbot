@@ -369,8 +369,6 @@ export interface ConversationProps {
   agentAutoApproves?: boolean | undefined;
   /** Whether a joined server's host answered with the agent's backup models: owners and admins only. */
   remoteBackupModelsLoaded?: boolean | undefined;
-  /** Whether a joined server's host answered with the agent's task limit: owners and admins only. */
-  remoteTaskLimitLoaded?: boolean | undefined;
   /** Whether a joined server's host answered with the agent's plan card setting: owners and admins only. */
   remotePlanCardLoaded?: boolean | undefined;
   /** Whether a joined server's host answered with the agent's Computer Use setting: owners and admins only. */

@@ -235,6 +235,13 @@ export const messages = {
   "marketplace.plugin.higgsfield.prompt.credits": "我还有多少 Higgsfield 积分？",
   "marketplace.plugin.higgsfield.prompt.productShot": "用 Higgsfield 生成一张陶瓷马克杯放在木桌上的产品照。",
   "marketplace.plugin.higgsfield.prompt.clip": "用 Higgsfield 生成一段 5 秒的日落海浪视频。",
+  "marketplace.plugin.sunra.tagline": "AI 图片、视频、音频和 3D",
+  "marketplace.plugin.sunra.description":
+    "Sunra 让助手使用 GPT Image、Nano Banana、Seedream、FLUX、Seedance、Kling 和 Veo 等模型生成图片、视频、音频和 3D 模型，查看积分余额，并获取结果。结果保存到用户 Sunra 账户中的一个项目里。每个用户在浏览器中登录自己的 Sunra 账户。Sunra 会先报出每次生成的费用，确认后才消耗该账户的积分。",
+  "marketplace.plugin.sunra.app": "通过 Sunra 的 MCP 服务器生成图片、视频、音频和 3D，查看积分和结果，在浏览器中登录。",
+  "marketplace.plugin.sunra.prompt.balance": "我还有多少 Sunra 积分？",
+  "marketplace.plugin.sunra.prompt.poster": "用 Sunra 生成一张雨中夜市的竖版海报。",
+  "marketplace.plugin.sunra.prompt.clip": "用 Sunra 生成一段 5 秒的纸船在河上漂流的视频。先告诉我费用。",
   "marketplace.plugin.elevenlabs.tagline": "语音、声音和语音智能体",
   "marketplace.plugin.elevenlabs.description":
     "ElevenLabs 让智能体把文本转成语音、使用各种声音，并创建、测试和查看 ElevenLabs 语音智能体及其对话。生成的音频以短时有效的下载链接返回。每位用户在浏览器中登录自己的 ElevenLabs 账号，每次生成都会使用该账号的额度。",
@@ -371,6 +378,13 @@ export const messages = {
   "marketplace.plugin.postiz.prompt.channels": "哪些社交媒体频道已连接到 Postiz？",
   "marketplace.plugin.postiz.prompt.week": "下周排程了哪些帖子？",
   "marketplace.plugin.postiz.prompt.draft": "起草一篇关于我们新版本的 LinkedIn 帖子，但不要排程。",
+  "marketplace.plugin.trypost.tagline": "社交媒体排程",
+  "marketplace.plugin.trypost.description":
+    "TryPost 让智能体列出你已连接的频道，并在 X、LinkedIn、Instagram、Facebook、TikTok、YouTube、Threads、Bluesky、Mastodon、Pinterest 等平台起草、排程、加入队列和发布帖子。智能体还可以查看分析数据、管理想法和审批，并设置发布时间。在浏览器中登录你的 TryPost 账户并选择一个工作区。智能体可以立即发布帖子，因此请在批准前检查每篇帖子。",
+  "marketplace.plugin.trypost.app": "通过 TryPost 的 MCP 服务器和浏览器登录，管理频道、帖子、队列、想法和分析。",
+  "marketplace.plugin.trypost.prompt.week": "本周排程了哪些帖子？",
+  "marketplace.plugin.trypost.prompt.draft": "起草一篇关于我们新版本的 LinkedIn 帖子，但不要排程。",
+  "marketplace.plugin.trypost.prompt.analytics": "上个月我的哪些帖子互动最多？",
   "marketplace.plugin.composio.tagline": "Gmail、Slack、GitHub 等 1000 多款应用",
   "marketplace.plugin.composio.description":
     "Composio 通过一个 MCP 服务器把你的助手连接到 Gmail、Slack、GitHub 等 1000 多款应用。使用 Composio 账号登录。助手需要某个应用时，会请你连接该应用。",

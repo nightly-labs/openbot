@@ -128,6 +128,10 @@ const SIGNAL_READY_DEADLINE_MS = 30_000;
 // gives the same TURN credentials again for 5 minutes, so a probe makes new ones at most every 8
 // minutes. A socket with traffic is not probed and keeps the 45-minute refresh.
 const SIGNAL_PROBE_INTERVAL_MS = 4 * 60_000;
+// A host handles the relayed frames of all devices one after the other. A WebRTC call that did not
+// settle held all later frames, so no device got an answer while the host showed "online" (#7620).
+// A frame of one device that takes longer than this ends only that device's connection.
+const RELAYED_FRAME_DEADLINE_MS = 30_000;
 
 const peers = new Map<string, PeerState>();
 // Main can replace a peer after an initial connection error. Keep the rate wait across that replacement.
@@ -366,6 +370,8 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
   }
   const socket = prepared ?? new WebSocket(state.signalUrl);
   state.socket = socket;
+  // The frames of the old socket are skipped. A new host socket does not wait for them.
+  if (state.role === "host") state.signalChain = Promise.resolve();
   const sendHello = () => {
     const hello: SignalClientMessage = {
       type: "hello",
@@ -390,8 +396,6 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
   socket.addEventListener("message", (event) => {
     if (!isString(event.data)) return;
     refusal = signalErrorCode(event.data) ?? refusal;
-    // Any frame shows that the socket works, also while earlier frames wait in the chain.
-    if (state.socket === socket) probeSignalLater(state);
     state.signalChain = state.signalChain
       .then(async () => {
         if (state.closed || state.socket !== socket) return;
@@ -406,7 +410,12 @@ function connectSignal(state: PeerState, prepared: WebSocket | null = null): voi
       })
       // Only what handling a frame this peer did read can throw -- an ICE or SDP operation the
       // browser refused. That is a connection failing, which a reconnect can still fix.
-      .catch(() => failPeer(state));
+      .catch(() => failPeer(state))
+      // A handled frame shows that the socket and the chain work. A frame that only arrived does not:
+      // a held chain also receives frames, and the probe then never opened a new socket (#7620).
+      .then(() => {
+        if (state.socket === socket) probeSignalLater(state);
+      });
   });
   socket.addEventListener("close", (event) => {
     if (state.socket !== socket) return;
@@ -597,11 +606,19 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
   if (state.role === "host" && !state.signalHost && message.connectionId) {
     const client = [...state.clients.values()].find((peer) => peer.connectionId === message.connectionId);
     if (client) {
+      let deadline = 0;
       try {
-        await handleSignal(client, message);
+        await Promise.race([
+          handleSignal(client, message),
+          new Promise<never>((_, reject) => {
+            deadline = window.setTimeout(() => reject(new Error("Relayed frame timed out")), RELAYED_FRAME_DEADLINE_MS);
+          }),
+        ]);
       } catch {
         failPeer(client);
         disconnect(client.id);
+      } finally {
+        clearTimeout(deadline);
       }
     }
     return;
@@ -645,6 +662,8 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
     });
     const answer = await connection.createAnswer();
     await connection.setLocalDescription(answer);
+    // A connection that its deadline ended sends no late answer.
+    if (state.closed) return;
     sendSignal(state, {
       type: "answer",
       version: SIGNAL_PROTOCOL_VERSION,

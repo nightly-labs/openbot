@@ -176,7 +176,8 @@ Sourcepoint) are not handled. `bun run test:browser --scenario=cookie-banner` co
 Each snapshot also looks for a bot check (`browser-challenge.ts`). It reads the DOM of the main frame
 in an isolated world: vendor markers of the interstitial page (Cloudflare, DataDome, PerimeterX,
 Imperva, Akamai, AWS WAF) and, only on a short page, captcha frames and phrases such as "verify you
-are human". A long page that only mentions a captcha does not count. A check that passes by itself
+are human". A long page that only mentions a captcha does not count. Akamai markers also count only
+on a short page, because Akamai can leave them, hidden, on the normal page after its check passed. A check that passes by itself
 (`non-interactive`) makes the tab read wait: it reads the page again every second for up to 15
 seconds, and stops at once when the tab closes, a person takes control, or the tab holds a secret.
 All reads of one document share the 15 seconds: a read with a shorter timeout, such as `navigate`,
@@ -494,6 +495,10 @@ whose profile no longer exists fails with `browserProfileMissing`; it never fall
 `#configureSession` applies the same user agent, headers, permissions and download policy to every
 partition. Shutdown and `flushPersistentStorage` flush every persistent partition.
 
+A reload, by the person or by an agent, uses `reloadIgnoringCache`: it gets the files of the page
+from the site again. A site can send a bad file that the browser keeps for hours, and a normal
+reload used that file again (#7772). Opening an address keeps the saved files.
+
 `src/main/browser-profile-service.ts` owns the operations: list, create (name of 1 to 60
 characters, unique, at most 100 profiles), update (name or color), clear data, delete, and assign.
 Clear and delete close the tabs in the partition before they clear its storage and cache. Delete also
@@ -698,7 +703,8 @@ resolves fields before consent and checks the document and origin again before e
 stops recording, suppresses page diagnostics, blocks inspection and capture, rejects remote input,
 and invalidates existing live-view streams. Capture protection remains after same-document navigation
 or an uncertain submission. After a completed submit action without document replacement, the host
-waits up to five seconds, then empties the filled fields. When every field is empty and an automation-world scan finds the
+waits up to five seconds, then empties the filled fields and their `value` attributes, which React
+keeps in step with the value. When every field is empty and an automation-world scan finds the
 value in no title, URL, text node, value, or attribute, including open shadow roots, it keeps the
 document so a single-page sign-in can show its next step, and blocks evaluation and recording in the
 opener group until a main-frame navigation, which also clears history. Otherwise it loads the current

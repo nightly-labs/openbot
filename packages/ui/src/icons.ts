@@ -180,6 +180,8 @@ export { default as UserRound } from "lucide-solid/icons/user-round";
 export { default as UserRoundPen } from "lucide-solid/icons/user-round-pen";
 export { default as UserRoundPlus } from "lucide-solid/icons/user-round-plus";
 export { default as UsersRound } from "lucide-solid/icons/users-round";
+export { default as Volume2 } from "lucide-solid/icons/volume-2";
+export { default as VolumeX } from "lucide-solid/icons/volume-x";
 export { default as Waypoints } from "lucide-solid/icons/waypoints";
 export { default as Webhook } from "lucide-solid/icons/webhook";
 export { default as WifiOff } from "lucide-solid/icons/wifi-off";

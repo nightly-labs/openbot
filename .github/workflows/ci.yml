@@ -481,6 +481,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:codex-usage-reset
 
+      - name: Run the Codex model capacity retry E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:codex-capacity-retry
+
       - name: Run the Codex warning banner E2E test
         if: ${{ !cancelled() }}
         run: bun run test:codex-warning-banner
@@ -740,6 +744,7 @@ jobs:
             .openbot-build/codex-idle-thread-release-e2e/
             .openbot-build/codex-usage-metering-e2e/
             .openbot-build/codex-usage-reset-e2e/
+            .openbot-build/codex-capacity-retry-e2e/
             .openbot-build/usage-read-pacing-e2e/
             .openbot-build/routine-fresh-session-e2e/
             .openbot-build/routine-report-failure-e2e/
@@ -850,6 +855,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:acp-mcp-names
 
+      - name: Run the Copilot MCP relay E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:copilot-mcp-relay
+
       - name: Run the ACP turn stall E2E test
         if: ${{ !cancelled() }}
         run: bun run test:acp-turn-stall
@@ -946,6 +955,7 @@ jobs:
             .openbot-build/acp-additional-directories-e2e/
             .openbot-build/acp-flavor-e2e/
             .openbot-build/acp-mcp-server-names-e2e/
+            .openbot-build/copilot-mcp-relay-e2e/
             .openbot-build/acp-turn-stall-e2e/
             .openbot-build/agent-database-host-start-e2e/
             .openbot-build/acp-instructions-once-e2e/

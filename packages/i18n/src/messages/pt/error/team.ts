@@ -77,6 +77,8 @@ export const messages = {
   "error.team.routinesOnceUnsupported": "Esta conexão não pode salvar rotinas que são executadas uma vez.",
   "error.team.routineRunCommandUnsupported": "Esta conexão não pode fornecer o comando de execução de uma rotina.",
   "error.team.threadQueueUnsupported": "Esta conexão não pode mostrar a fila de uma thread paralela.",
+  "error.team.hostTurnLimitsUnsupported":
+    "Esta conexão não pode mostrar nem alterar os limites de tópicos do servidor.",
   "error.team.usageLimitUnsupported": "Esta conexão não pode mostrar nem alterar os limites de uso dos agentes.",
   "error.team.hermesImportUnsupported": "Esta conexão não pode importar perfis do Hermes do servidor.",
   "error.team.providerDetectionUnsupported":
@@ -116,6 +118,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "Esta conexão não oferece suporte a alterações na identidade do servidor.",
   "error.team.hostUpdateUnsupported": "Esta conexão não oferece suporte a atualizações do computador anfitrião.",
   "error.team.hostTimezoneUnsupported": "Esta conexão não oferece suporte ao fuso horário do servidor.",
+  "error.team.hostRestartUnsupported": "Esta conexão não oferece suporte à reinicialização do servidor.",
   "error.team.hostKeyRotationUnsupported": "Esta conexão não oferece suporte à alteração da chave do servidor.",
   "error.team.localServersUnsupported": "Esta conexão não oferece suporte a servidores neste computador.",
   "error.team.routineResultsUnsupported": "Esta conexão não oferece suporte a destinos de rotinas.",

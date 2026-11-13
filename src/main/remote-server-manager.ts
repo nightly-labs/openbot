@@ -507,7 +507,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         })
       : null;
     this.#webrtcTransport?.on("connected", (serverId) => {
-      this.#events.clearReconnectBackoff(serverId);
+      this.#events.transportConnected(serverId);
       this.#events.markSeenOnline(serverId);
       this.#hostRestartAway.delete(serverId);
       const hostedStartAt = this.#hostedStartAt.get(serverId);
@@ -560,8 +560,11 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       if (!this.#events.isReconnectSuspended(serverId)) this.#connections.setState(serverId, "offline");
       this.#presence.markOffline(serverId);
       this.#emitChanged();
+      const firstDrop = this.#events.transportDisconnected(serverId);
       this.#events.scheduleReconnect(serverId);
-      if (wasOnline) this.emit("directoryInvalidated");
+      // Each read of the host list is a request to the account service. A connection that drops again
+      // after a few seconds already read it after its first drop.
+      if (wasOnline && firstDrop) this.emit("directoryInvalidated");
     });
     // A failed attempt can end with no error event, such as a timeout. The server then stayed offline
     // with no issue, and the full-window loading screen waits for an issue to end (#5273).

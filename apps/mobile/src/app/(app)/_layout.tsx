@@ -528,6 +528,19 @@ function AuthenticatedStack() {
         }}
       />
       <Stack.Screen
+        name="library-folders"
+        // The header comes from the route's `_layout.tsx`. The name page has a field to focus.
+        listeners={refocusNameField}
+        options={{
+          contentStyle: { backgroundColor: sheetBackground },
+          headerShown: false,
+          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.85],
+          sheetGrabberVisible: true,
+        }}
+      />
+      <Stack.Screen
         name="thread-rename"
         // The header comes from the route's `_layout.tsx`, as for the section form.
         listeners={refocusNameField}

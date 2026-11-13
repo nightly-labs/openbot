@@ -83,6 +83,7 @@ export const messages = {
   "agent.error.settingsFailed": "에이전트 설정을 저장하지 못했어요",
   "agent.error.adminOnly": "에이전트 설정은 서버 관리자만 변경할 수 있어요.",
   "agent.error.continueFailed": "에이전트가 계속 진행하지 못했어요. 다시 시도해 주세요.",
+  "agent.error.copyDetails": "세부 정보 복사",
   "agent.error.mcpNotStarted": "MCP 서버가 시작되지 않았어요",
   "agent.error.openMcpSettings": "MCP 설정 열기",
   "agent.error.provider": "제공자 오류",

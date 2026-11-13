@@ -10,22 +10,39 @@ import {
 import { isQueueDelivery, type QueueDelivery } from "./ipc-queue";
 import { isDynamicRecord, isOneOf } from "./runtime-values";
 
-/** The most tasks of one agent that run a turn at the same time, next to the agent's own chat. */
+/**
+ * The most tasks of one agent that run a turn at the same time by the agent's own limit, next to its
+ * own chat. Frozen by `agent-task-limit-v1`, `agent-tasks-v1` and the instance archive.
+ */
 export const AGENT_TASK_LIMIT_MAX = 4;
-/** The task limit of an agent that has no limit of its own. */
+/**
+ * The most that an owner or admin can set as the host default for agents with no limit of their own
+ * (`HostTurnLimits.agentTaskLimit`, `host-turn-limits-v1`).
+ */
+export const HOST_AGENT_TASK_LIMIT_MAX = 64;
+/** The built-in task limit of an agent that has no limit of its own, when the host sets no default. */
 export const AGENT_TASK_LIMIT_DEFAULT = 4;
 
 export function isAgentTaskLimit(value: unknown): value is number {
   return integerInRange(value, 1, AGENT_TASK_LIMIT_MAX);
 }
 
+/** A host default task limit, or a limit that follows it. */
+export function isHostAgentTaskLimit(value: unknown): value is number {
+  return integerInRange(value, 1, HOST_AGENT_TASK_LIMIT_MAX);
+}
+
 /**
  * How many tasks of the agent run a turn at the same time. A provider that runs one turn at a time
- * runs one task, and the agent's own chat waits for it.
+ * runs one task, and the agent's own chat waits for it. `hostDefault` is the limit of an agent that
+ * has no limit of its own.
  */
-export function agentTaskLimit(agent: { provider: AgentProviderId; taskLimit?: number }): number {
+export function agentTaskLimit(
+  agent: { provider: AgentProviderId; taskLimit?: number },
+  hostDefault: number = AGENT_TASK_LIMIT_DEFAULT,
+): number {
   if (!agentProviderDescriptor(agent.provider).concurrentTurns) return 1;
-  return agent.taskLimit ?? AGENT_TASK_LIMIT_DEFAULT;
+  return agent.taskLimit ?? hostDefault;
 }
 
 export const AGENT_TASK_STATES = ["running", "queued", "idle", "closed"] as const;
@@ -280,6 +297,6 @@ export function isAgentTasksSnapshot(value: unknown): value is AgentTasksSnapsho
     Array.isArray(value.tasks) &&
     value.tasks.length <= INPUT_LIMITS.agentTasks &&
     value.tasks.every(isAgentTask) &&
-    isAgentTaskLimit(value.limit)
+    isHostAgentTaskLimit(value.limit)
   );
 }

@@ -47,6 +47,7 @@ import {
   CardValueScrub,
   collectBoundedSnapshot,
   collectFocus,
+  controlIdentity,
   cssObjectMatch,
   describeTargetCandidates,
   fallbackRole,
@@ -101,6 +102,13 @@ const DOCUMENT_ID_PROPERTY = "__openbot_browser_document_id__";
 const MAX_SNAPSHOT_FRAMES = 12;
 const DOM_QUIET_MS = 250;
 const CHOOSER_WAIT_MS = 5_000;
+/**
+ * Many page editors find the drop position in an animation frame that `dragover` requests. A drop
+ * before that frame finds no position and adds nothing, so a drag lets one frame render first. A
+ * tab can draw only one frame each second, and a tab that draws no frames waits only this limit.
+ */
+const DROP_FRAME_WAIT_MS = 1_500;
+const DROP_FRAME_SCRIPT = "new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)))";
 
 type ActionDispatch = () => void;
 
@@ -350,6 +358,8 @@ export class BrowserCdpEngine {
     this: BrowserCdpEngine,
     targets: BrowserTarget[],
     origin: string,
+    /** A password goes whole into each field, such as a sign-up form's password and its confirmation. */
+    wholeSecretInEachField: boolean,
     submission: "on_input" | "enter" | "click",
     submitTarget?: BrowserTarget,
   ): Effect.fn.Return<
@@ -361,10 +371,14 @@ export class BrowserCdpEngine {
        * field is a password field, or every field asks for a one-time code. A text field that the page
        * masks with `-webkit-text-security` is a password field. A code field has
        * `autocomplete="one-time-code"`, or is a text, tel or number input with a strong code word such as
-       * otp, 2fa or verification code in its id, name or aria-label, as older Keycloak sign-in pages have.
-       * A name that also has backup, recovery, mail, phone, sms, name or label is not one: it is another
-       * code or not a code. The fingerprint check of `enter` keeps
-       * this true until the fill; the mask is read here only, because a page can change it as it fills.
+       * otp, totp, authentication code or verification code in its id, name, aria-label, placeholder,
+       * title or label, as older Keycloak, Squarespace and Kite ("External TOTP") sign-in pages have.
+       * A field named only "code" or "passcode", as Okta's `credentials.passcode`, is one when the visible
+       * text of its form names an authenticator app and no email or SMS. A name that also has backup,
+       * recovery, mail, phone, sms, name, label, or a promo, address or card word is not one: it is
+       * another code or not a code. The fingerprint
+       * check of `enter` keeps the field, its form, and its id, name and autocomplete until the fill;
+       * the mask and the label text are read here only, because a page can change them as it fills.
        */
       fields: { password: boolean; oneTimeCode: boolean };
       /**
@@ -444,8 +458,14 @@ export class BrowserCdpEngine {
             send,
             node.backendNodeId,
             `function() {
-              const named = [this.id, this.name, this.getAttribute('aria-label') ?? ''].join(' ').replace(/([a-z])([A-Z0-9])/g, '$1 $2').toLowerCase().replace(/[^a-z0-9]+/g, ' ');
-              const oneTimeCode = (this.getAttribute('autocomplete') ?? '').toLowerCase().split(/\\s+/).includes('one-time-code') || (['text', 'tel', 'number'].includes(this.type) && /totp|\\b(?:otp|2fa|mfa)+(?:code|token|pin)?\\b|\\bauthenticator\\b|\\bone ?time ?(?:code|password|passcode|pin)\\b|\\bverification ?code\\b|\\btwo ?factor\\b/.test(named) && !/backup|recovery|mail|phone|sms|name|label/.test(named));
+              const words = (text) => text.replace(/([a-z])([A-Z0-9])/g, '$1 $2').toLowerCase().replace(/[^a-z0-9]+/g, ' ');
+              const labelledBy = (this.getAttribute('aria-labelledby') ?? '').split(/\\s+/).map((id) => (id && this.getRootNode().getElementById?.(id)?.textContent) || '');
+              const named = words([this.id, this.name, this.getAttribute('aria-label') ?? '', this.getAttribute('placeholder') ?? '', this.title, ...[...(this.labels ?? [])].map((label) => label.textContent ?? ''), ...labelledBy].join(' '));
+              const codeWord = /totp|\\b(?:otp|2fa|mfa)+(?:code|token|pin)?\\b|\\bauthenticator\\b|\\bauthentication ?(?:app|code)\\b|\\bone ?time ?(?:code|password|passcode|pin)\\b|\\bverification ?code\\b|\\btwo ?(?:factor|step)\\b|\\bmulti ?factor\\b/;
+              // Okta names its email, SMS and app code fields the same, so a plain code or passcode
+              // field counts only in a form whose visible text names an app and no email or SMS.
+              const authenticatorForm = () => { const text = words(this.form?.innerText ?? ''); return /\\bauthenticator\\b|\\bauthentication ?app\\b|\\btotp\\b/.test(text) && !/\\be ?mail(?:ed)?\\b|\\bsms\\b|\\btext (?:message|messaged)\\b|\\btexted\\b/.test(text); };
+              const oneTimeCode = (this.getAttribute('autocomplete') ?? '').toLowerCase().split(/\\s+/).includes('one-time-code') || (['text', 'tel', 'number'].includes(this.type) && (codeWord.test(named) || (/\\b(?:pass)?code\\b/.test(named) && authenticatorForm())) && !/backup|recovery|mail|phone|sms|name|label|promo|coupon|voucher|discount|gift|invite|referral|zip|postal|country|card|cvc|cvv|csc/.test(named));
               return { password: this.type === 'password' || (this.type === 'text' && !['', 'none'].includes(getComputedStyle(this).getPropertyValue('-webkit-text-security'))), oneTimeCode, network: ${LOADED_FROM_NETWORK} };
             }`,
             [],
@@ -454,6 +474,9 @@ export class BrowserCdpEngine {
           fields.oneTimeCode &&= isDynamicRecord(kind) && kind.oneTimeCode === true;
           servedByWorker ||= !isDynamicRecord(kind) || kind.network !== true;
         }
+        // A second copy of a password goes only to a password field, so no field shows the value.
+        if (wholeSecretInEachField && inputs.length > 1 && !fields.password)
+          return yield* browserFailure(new Error("A password and its confirmation must both be password fields."));
         return { inputs, button, fingerprints, fields, servedByWorker };
       }),
     );
@@ -494,7 +517,9 @@ export class BrowserCdpEngine {
                   return yield* browserFailure(new Error("Authentication page changed."));
                 // Native entry emits trusted input events across shadow roots, as regular browser typing
                 // does. Synthetic value setters can leave component forms unaware of the filled field.
-                yield* send("Input.insertText", { text: nodes.inputs.length === 1 ? secret : secret[index] });
+                yield* send("Input.insertText", {
+                  text: wholeSecretInEachField || nodes.inputs.length === 1 ? secret : secret[index],
+                });
               }
               if (submission === "on_input" || generation !== this.#navigationGeneration) return;
               if (submission === "click" && nodes.button) {
@@ -556,7 +581,8 @@ export class BrowserCdpEngine {
             const cleared = yield* this.#callOnNode(
               send,
               node.backendNodeId,
-              `function() { this.value = ''; return this.value === ''; }`,
+              // React and similar libraries copy a field's value into its value attribute.
+              `function() { this.value = ''; this.defaultValue = ''; return this.value === ''; }`,
               [],
             ).pipe(Effect.catch(() => Effect.succeed(false)));
             if (cleared !== true) return false;
@@ -576,8 +602,8 @@ export class BrowserCdpEngine {
 
   /**
    * Types a saved card into the fields that the agent named, in the main page or in an HTTPS payment
-   * frame that runs in its own process. Each field is checked before any value goes in: attached, in
-   * an HTTPS frame that `checkOrigin` allows, enabled, of a kind that takes the value, and for the
+   * frame. Each field is checked in the automation world of its own frame before any value goes in:
+   * attached, in an HTTPS frame that `checkOrigin` allows, enabled, of a kind that takes the value, and for the
    * number and the code, not in a form that sends its fields in the page address. When `allowFill`
    * then refuses, nothing is typed and the result is empty; when it allows, it can prepare the tab
    * first. Each field is then filled with native input after its identity is checked again. Snapshots
@@ -604,6 +630,7 @@ export class BrowserCdpEngine {
           field: BrowserCardField;
           backendNodeId: number;
           sessionId?: string | undefined;
+          contextId: number;
           description: BrowserCardFieldDescription;
           text: string;
           fingerprint: string;
@@ -616,8 +643,19 @@ export class BrowserCdpEngine {
           const key = `${node.sessionId ?? "main"}:${node.backendNodeId}`;
           if (seen.has(key)) return yield* browserFailure(new Error("Each card field needs its own target."));
           seen.add(key);
+          // A frame of another origin in the same process cannot read the field, so checks run in its frame.
+          const contextId = yield* this.#nodeFrameContextId(send, node.backendNodeId, node.sessionId);
+          if (contextId === undefined)
+            return yield* unavailable(field, "is unavailable here. Take a fresh snapshot, or use request_takeover.");
           const description = parseCardFieldDescription(
-            yield* this.#callOnNode(send, node.backendNodeId, CARD_FIELD_DESCRIPTION_FUNCTION, [], node.sessionId),
+            yield* this.#callOnNode(
+              send,
+              node.backendNodeId,
+              CARD_FIELD_DESCRIPTION_FUNCTION,
+              [],
+              node.sessionId,
+              contextId,
+            ),
           );
           if (!description?.connected)
             return yield* unavailable(field, "is unavailable here. Take a fresh snapshot, or use request_takeover.");
@@ -642,9 +680,10 @@ export class BrowserCdpEngine {
             CARD_FIELD_FINGERPRINT_FUNCTION,
             [],
             node.sessionId,
+            contextId,
           );
           if (!isString(fingerprint)) return yield* unavailable(field, "is unavailable. Take a fresh snapshot.");
-          fields.push({ field, ...node, description, text, fingerprint });
+          fields.push({ field, ...node, contextId, description, text, fingerprint });
         }
         if (!(yield* policy.allowFill())) return { filled: [], unconfirmed: [] };
         yield* browserSync(() => assertBeforeDeadline(deadline));
@@ -666,6 +705,7 @@ export class BrowserCdpEngine {
                 CARD_SELECT_OPTION_FUNCTION,
                 [entry.field === "expYear" ? "year" : "month", card.expMonth, card.expYear, entry.fingerprint],
                 entry.sessionId,
+                entry.contextId,
               );
               filled.push(entry.field);
               continue;
@@ -677,6 +717,7 @@ export class BrowserCdpEngine {
               CARD_FIELD_SELECT_FUNCTION,
               [entry.fingerprint],
               entry.sessionId,
+              entry.contextId,
             );
             // Native entry sends trusted input events, so payment frames and masked fields take the value.
             yield* send("Input.insertText", { text: entry.text }, entry.sessionId);
@@ -687,6 +728,7 @@ export class BrowserCdpEngine {
               CARD_FIELD_CHECK_FUNCTION,
               [entry.text, entry.field !== "nameOnCard"],
               entry.sessionId,
+              entry.contextId,
             ).pipe(Effect.catch(() => Effect.succeed(false)));
             if (holds !== true) unconfirmed.push(entry.field);
           }
@@ -824,7 +866,8 @@ export class BrowserCdpEngine {
         const emptyWait =
           settle !== null &&
           !settle.busy &&
-          parsed.elements.length === 0 &&
+          // A fallback result can be a page that fades in from opacity 0: it waits as an empty page did.
+          (parsed.elements.length === 0 || parsed.fallback) &&
           settle.emptyWaitMs > 0 &&
           settle.document !== this.#emptyWaitedDocument;
         // The second collect needs time before the read's deadline.
@@ -867,7 +910,10 @@ export class BrowserCdpEngine {
         const retainedRefs = new Set(snapshot.elements.map((element) => element.ref));
         this.#targets = new Map([...parsed.targets].filter(([ref]) => retainedRefs.has(ref)));
         this.#lastSnapshot = snapshot;
-        const lowCoverage = parsed.elements.length < 3 && parsed.text.length > 200;
+        // An empty snapshot of a web page also needs the image: the page draws nothing that the snapshot can read.
+        const emptyPage =
+          parsed.elements.length === 0 && !parsed.text && !snapshot.loading && /^https?:/u.test(snapshot.url);
+        const lowCoverage = (parsed.elements.length < 3 && parsed.text.length > 200) || emptyPage;
         const recommendImage = parsed.hasVisualSurface || parsed.hasFrame || lowCoverage;
         const imageReason = parsed.hasVisualSurface
           ? "canvas-or-video"
@@ -1699,6 +1745,21 @@ export class BrowserCdpEngine {
           if (!dragData) return yield* browserFailure(new Error("The source did not start a native drag operation."));
           yield* send("Input.dispatchDragEvent", { type: "dragEnter", x: to.x, y: to.y, data: dragData }, sessionId);
           yield* send("Input.dispatchDragEvent", { type: "dragOver", x: to.x, y: to.y, data: dragData }, sessionId);
+          // The wait only helps the page. The drop still goes, before the deadline, when no frame comes.
+          const frameWaitMs =
+            deadline === undefined
+              ? DROP_FRAME_WAIT_MS
+              : Math.min(DROP_FRAME_WAIT_MS, deadline - Date.now() - SETTLE_RESERVE_MS);
+          if (frameWaitMs > 0) {
+            yield* Effect.gen(function* () {
+              const contextId = yield* automationContextId(send, sessionId);
+              yield* send(
+                "Runtime.evaluate",
+                { expression: DROP_FRAME_SCRIPT, contextId, awaitPromise: true },
+                sessionId,
+              );
+            }).pipe(Effect.timeoutOrElse({ duration: frameWaitMs, orElse: () => Effect.void }), Effect.ignore);
+          }
           yield* send("Input.dispatchDragEvent", { type: "drop", x: to.x, y: to.y, data: dragData }, sessionId);
           yield* send(
             "Input.dispatchMouseEvent",
@@ -2528,6 +2589,47 @@ export class BrowserCdpEngine {
   });
 
   /**
+   * The frame of the session that holds the node, and its automation world. A frame in the same
+   * process can have another origin, and the world of another frame cannot reach the node.
+   */
+  readonly #nodeFrameWorld = Effect.fn("BrowserCdp.nodeFrameWorld")(function* (
+    this: BrowserCdpEngine,
+    send: SendCommand,
+    backendNodeId: number,
+    sessionId: string | undefined,
+    frames: string[],
+  ) {
+    for (const frameId of frames) {
+      // A frame that detached since the tree was read, or that has no world, is not the target's.
+      const contextId = yield* frameAutomationContextId(send, frameId, sessionId).pipe(
+        Effect.catch(() => Effect.succeed(undefined)),
+      );
+      if (contextId === undefined) continue;
+      const own = yield* this.#callOnNode(
+        send,
+        backendNodeId,
+        "function() { return this.ownerDocument === document; }",
+        [],
+        sessionId,
+        contextId,
+      ).pipe(Effect.catch(() => Effect.succeed(false)));
+      if (own === true) return { frameId, contextId };
+    }
+    return undefined;
+  });
+
+  /** The automation world of the frame that holds the node, or undefined when no frame holds it. */
+  readonly #nodeFrameContextId = Effect.fn("BrowserCdp.nodeFrameContextId")(function* (
+    this: BrowserCdpEngine,
+    send: SendCommand,
+    backendNodeId: number,
+    sessionId: string | undefined,
+  ) {
+    const frames = frameIds(yield* send("Page.getFrameTree", {}, sessionId));
+    return (yield* this.#nodeFrameWorld(send, backendNodeId, sessionId, frames))?.contextId;
+  });
+
+  /**
    * The node, then each frame element that holds its document, up to the page. The node keeps focus
    * only while each of them holds focus in its own document. CDP names a frame's owner even inside a
    * closed shadow root, and the parent of a frame in another process is in another session.
@@ -2542,27 +2644,10 @@ export class BrowserCdpEngine {
     let node = { backendNodeId, sessionId };
     for (let depth = 0; depth <= MAX_FOCUSED_FRAME_DEPTH; depth += 1) {
       const frames = frameIds(yield* send("Page.getFrameTree", {}, node.sessionId));
-      let frameId: string | undefined;
-      for (const id of frames) {
-        // A frame that detached since the tree was read, or that has no world, is not the target's.
-        const contextId = yield* frameAutomationContextId(send, id, node.sessionId).pipe(
-          Effect.catch(() => Effect.succeed(undefined)),
-        );
-        if (contextId === undefined) continue;
-        const own = yield* this.#callOnNode(
-          send,
-          node.backendNodeId,
-          "function() { return this.ownerDocument === document; }",
-          [],
-          node.sessionId,
-          contextId,
-        ).pipe(Effect.catch(() => Effect.succeed(false)));
-        if (own !== true) continue;
-        frameId = id;
-        chain.push({ ...node, contextId });
-        break;
-      }
-      if (!frameId) break;
+      const world = yield* this.#nodeFrameWorld(send, node.backendNodeId, node.sessionId, frames);
+      if (!world) break;
+      const { frameId } = world;
+      chain.push({ ...node, contextId: world.contextId });
       // The page's own frame has no owner. The root frame of another session is owned in its parent.
       if (frameId === frames[0] && node.sessionId === undefined) return chain;
       const owners =
@@ -2912,7 +2997,7 @@ export class BrowserCdpEngine {
       const sessionId = record.targetId ? this.#targetSessions.get(record.targetId)?.sessionId : undefined;
       if (deadline !== undefined) {
         yield* browserSync(() => assertBeforeDeadline(deadline));
-        const current = yield* this.#targetFingerprint(send, record.backendNodeId, sessionId).pipe(
+        const current = yield* this.#targetFingerprint(send, record.backendNodeId, sessionId, record.drawnOnly).pipe(
           Effect.catch(() => Effect.succeed(null)),
         );
         yield* browserSync(() => assertBeforeDeadline(deadline));
@@ -3159,6 +3244,7 @@ export class BrowserCdpEngine {
     send: SendCommand,
     backendNodeId: number,
     sessionId?: string,
+    drawnOnly = false,
   ): Effect.fn.Return<
     { role: string; name: string; tag: string; visibleText: string; visible: boolean },
     BrowserOperationError
@@ -3170,13 +3256,14 @@ export class BrowserCdpEngine {
         this.#callOnNode(
           send,
           backendNodeId,
-          String.raw`function() {
+          // A ref of the fallback snapshot pass is in an aria-hidden or opacity 0 container that the page draws.
+          String.raw`function(drawnOnly) {
           if (this.nodeType !== 1 || !this.isConnected || this.getClientRects().length === 0) return null;
           let element = this;
           while (element) {
-            if (Element.prototype.hasAttribute.call(element, 'hidden') || Element.prototype.hasAttribute.call(element, 'inert') || String(element.getAttribute('aria-hidden')).toLowerCase() === 'true') return null;
+            if (Element.prototype.hasAttribute.call(element, 'hidden') || Element.prototype.hasAttribute.call(element, 'inert') || (!drawnOnly && String(element.getAttribute('aria-hidden')).toLowerCase() === 'true')) return null;
             const style = getComputedStyle(element);
-            if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || style.opacity === '0') return null;
+            if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || (!drawnOnly && style.opacity === '0')) return null;
             const parent = element.parentElement;
             if (parent) element = parent;
             else {
@@ -3186,7 +3273,7 @@ export class BrowserCdpEngine {
           }
           return { visibleText: String(this.innerText ?? this.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 500) };
         }`,
-          [],
+          [drawnOnly],
           sessionId,
         ),
       ],
@@ -3196,11 +3283,17 @@ export class BrowserCdpEngine {
     const axNodes = Array.isArray(partialAxTree.nodes) ? partialAxTree.nodes.filter(isRecord) : [];
     const ax = axNodes.find((candidate) => numberValue(candidate.backendDOMNodeId) === backendNodeId) ?? axNodes[0];
     const state = recordValue(pageState);
+    const visibleText = stringValue(state?.visibleText);
+    const identity = drawnOnly
+      ? controlIdentity(node ?? {}, ax, visibleText)
+      : {
+          role: ax ? axValue(ax.role).toLowerCase() || fallbackRole(node ?? {}) : fallbackRole(node ?? {}),
+          name: ax ? axValue(ax.name).slice(0, 500) : "",
+        };
     return {
-      role: ax ? axValue(ax.role).toLowerCase() || fallbackRole(node ?? {}) : fallbackRole(node ?? {}),
-      name: ax ? axValue(ax.name).slice(0, 500) : "",
+      ...identity,
       tag: (stringValue(node?.localName) || stringValue(node?.nodeName)).toLowerCase(),
-      visibleText: stringValue(state?.visibleText),
+      visibleText,
       visible: state !== undefined,
     };
   });

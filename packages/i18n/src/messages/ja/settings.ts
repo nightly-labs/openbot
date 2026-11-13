@@ -147,6 +147,7 @@ export const messages = {
   "settings.planStart.set": "設定",
   "settings.automationLimit.sectionTitle": "上限",
   "settings.automationLimit.sectionDescription": "このコンピューターのすべてのエージェントに適用されます。",
+  "settings.automationLimit.sectionDescriptionServer": "このサーバーのすべてのエージェントに適用されます。",
   "settings.automationLimit.title": "1時間あたりのリクエスト",
   "settings.automationLimit.option": "1時間あたり{limit}件",
   "settings.automationLimit.note":
@@ -268,6 +269,9 @@ export const messages = {
     "ドックが隠れた場所に細い帯が残ります。ポインタを近づけるとドックが表示されます。エージェントから質問があると、帯に色の波が流れます。",
   "settings.agentDock.results.title": "完了した作業を表示",
   "settings.agentDock.results.description": "エージェントの結果がドックの横に短い時間表示されます。",
+  "settings.agentDock.activeSeats.title": "新着のあるエージェントを表示",
+  "settings.agentDock.activeSeats.description":
+    "ドックにないエージェントやチャンネルも、新しいメッセージがある間や返答を待っている間はドックに表示されます。",
   "settings.agentDock.agents.title": "ドックのエージェント",
   "settings.agentDock.agents.description": "{server} のエージェントです。サーバーごとに専用のドックがあります。",
   "settings.agentDock.agents.empty": "このサーバーにはまだエージェントがいません。",

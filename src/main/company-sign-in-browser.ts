@@ -43,7 +43,7 @@ export const awaitCompanySignIn = Effect.fn("CompanySignIn.awaitBrowser")(functi
     Effect.tryPromise({
       try: () =>
         startLoopbackCallbackServer({
-          path: COMPANY_SIGN_IN_PATH,
+          paths: [COMPANY_SIGN_IN_PATH],
           port: {},
           language: {
             get locale() {

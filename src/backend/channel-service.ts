@@ -1708,10 +1708,11 @@ export class ChannelService {
             this.#wakeAgain.add(channelId);
             continue;
           }
-          // Idle stays silent: the lead judged that nothing needs doing, so there is no dispatch. A
-          // message that names a member is never idle: "Thanks @Ana" or "hi @Ana" gets Ana's answer, as
-          // a person who is named in a group chat answers. An agent writes a name as text, not as a tag,
-          // so a typed "@Name" anywhere counts too; idle completed such a request with no answer (#5964).
+          // Idle is silent for the request of a routine or an agent: the lead judged that nothing needs
+          // doing, so there is no dispatch. A message that names a member is never idle: "Thanks @Ana"
+          // or "hi @Ana" gets Ana's answer, as a person who is named in a group chat answers. An agent
+          // writes a name as text, not as a tag, so a typed "@Name" anywhere counts too; idle completed
+          // such a request with no answer (#5964).
           // An "@" in a link or in a tag, such as a quote, names no one.
           const eligible = this.eligibleMembers(channel);
           const tags = chatTagReferences(task.instruction);
@@ -1726,7 +1727,14 @@ export class ChannelService {
                 .flatMap((match) => this.#typedAddress(eligible, task.instruction.slice(match.index))),
             ]),
           ];
-          if ("idle" in decision && !named.length) {
+          // A person's request is never idle: the lead takes it, as an unclear request, and can ask
+          // what they mean. Idle completed it with no owner and no reply, so the person saw only
+          // silence (#7908).
+          const unnamedIdle = "idle" in decision && !named.length;
+          if (
+            unnamedIdle &&
+            channelResult(yield* Effect.result(channelSync(() => this.#requester(channelId, task, [task])))) === null
+          ) {
             channelResult(
               yield* Effect.result(
                 channelSync(() => this.store.update(channel, { tasks: [{ ...task, state: "completed" }] })),
@@ -1737,13 +1745,15 @@ export class ChannelService {
           }
           const picked = [
             ...new Set(
-              "idle" in decision
-                ? named
-                : "question" in decision
-                  ? [lead.id]
-                  : "agentId" in decision
-                    ? [decision.agentId]
-                    : decision.agentIds,
+              unnamedIdle
+                ? [lead.id]
+                : "idle" in decision
+                  ? named
+                  : "question" in decision
+                    ? [lead.id]
+                    : "agentId" in decision
+                      ? [decision.agentId]
+                      : decision.agentIds,
             ),
           ];
           // A member the model named that cannot take work is left out; with none left, the first
@@ -2933,6 +2943,14 @@ export class ChannelService {
                   // that waits for its subtasks keeps the reason until its last turn (#6667).
                   (deliveryError ?? task.error),
         });
+        // A failed reply did not hold its caller (`settled`), so nothing waits for it when the run
+        // ends. It ends with the run, or its stopped-task card stayed with nothing to continue (#6417).
+        if (nextState === "completed" && task.rootTaskId === task.id)
+          updated.push(
+            ...tasks
+              .filter((item) => item.rootTaskId === task.id && item.state === "failed" && isReplyTask(item))
+              .map((item): ChannelTask => ({ ...item, state: "cancelled", error: null, revision: item.revision + 1 })),
+          );
       }
       updated.push(...releasedParent(tasks, task, state));
       yield* channelSync(() =>
@@ -3129,7 +3147,9 @@ export class ChannelService {
           return;
         }
         const root = tasks.find((item) => item.id === selected.rootTaskId);
-        if (!root || terminal(root)) {
+        // A run that ended can still hold a failed reply that an earlier version left (#6417).
+        const cancelled = root ? descendants(tasks, root.id) : [];
+        if (!root || !cancelled.length) {
           result = refuse("That run has already ended.", "run ended");
           return;
         }
@@ -3147,7 +3167,6 @@ export class ChannelService {
           );
           return;
         }
-        const cancelled = descendants(tasks, root.id);
         const ids = new Set(cancelled.map((item) => item.id));
         if (
           tasks.some(
@@ -3271,6 +3290,28 @@ export class ChannelService {
   });
 
   /**
+   * Whether this computer's user started the agent's running task in this turn with a request whose
+   * text holds `value` as a whole token (`holdsKeyToken`). Only then can the task save that value to
+   * the Vault (#6369): the agent also reads the lead's and other members' words, which must not
+   * choose the key of every agent.
+   */
+  readonly localRequestHolds = Effect.fn("ChannelService.localRequestHolds")(function* (
+    this: ChannelService,
+    channelId: string,
+    agentId: string,
+    turnId: string,
+    value: string,
+  ) {
+    const { task, tasks } = yield* this.#runningTask(channelId, agentId, turnId);
+    const person = this.#requester(channelId, task, tasks);
+    if (person === null || (this.hooks.remotePerson?.(person.id) ?? false)) return false;
+    const root = tasks.find((item) => item.id === task.rootTaskId);
+    if (!root) return false;
+    const request = yield* channelSync(() => this.store.message(channelId, root.requestMessageId));
+    return request ? holdsKeyToken(request.message.text, value) : false;
+  });
+
+  /**
    * The part of a routine run that the agent's running task in this turn has. `owner` is a main task
    * of the routine's request, also one that the lead routed to a member: its failure call ends the
    * run failed. `member` is a task that an owner assigned under it, which reports to that owner.
@@ -3389,16 +3430,23 @@ export class ChannelService {
       if (!isString(args.text) || !args.text.trim() || args.text.length > 100_000)
         return yield* channelFailure(new Error("Provide a task result."));
       // A result before the answer to a reply is the bug that the wait fixes: the caller answered
-      // the person before the other member answered it.
+      // the person before the other member answered it. An assigned task is the same. A subtask from
+      // this turn also runs the task again when the turn ends, also when it settled during the turn,
+      // so a result posted now showed again after each subtask (#7788).
       const unanswered = tasks.find(
         (item) =>
-          task.dependencies.includes(item.id) && isReplyTask(item) && !settled(item) && item.state !== "cancelled",
+          task.dependencies.includes(item.id) &&
+          item.state !== "cancelled" &&
+          (!settled(item) || !assignment.awaitedTaskIds.includes(item.id)),
       );
-      if (unanswered)
+      if (unanswered) {
+        const name = this.memberName(unanswered.ownerAgentId ?? "");
+        const answer = isReplyTask(unanswered) ? "answer" : "result";
         return {
           accepted: false,
-          reason: `${this.memberName(unanswered.ownerAgentId ?? "")} has not answered your reply. End your turn now with no text: you continue this task with its answer. Do not mention this refusal.`,
+          reason: `${settled(unanswered) ? `You continue this task in a new turn with the ${answer} of ${name}.` : isReplyTask(unanswered) ? `${name} has not answered your reply.` : `${name} has not returned the result of your task.`} End your turn now with no text: you continue this task with its ${answer}. Do not mention this refusal.`,
         };
+      }
       const name = this.hooks.agents().find((item) => item.id === agentId)?.name ?? agentId;
       const message = this.message(
         channelId,
@@ -4090,6 +4138,31 @@ function withoutOwnNameLabel(text: string, name: string, streaming = false): str
   const rest = text.slice(match[0].length);
   if (rest.trim()) return rest;
   return streaming ? "" : text;
+}
+
+/** The shortest key that a channel request can give to the Vault, as for log redaction. */
+const CHANNEL_KEY_MIN_LENGTH = 8;
+/**
+ * A character that continues a key, so it cannot stand next to the key in the request. Not `=`: a
+ * pasted `NAME=value` line gives the key after it.
+ */
+const KEY_CHARACTER = /[\p{L}\p{N}_\-+/~.]/u;
+
+/**
+ * Whether `text` holds `value` as a whole token: a key that the person wrote, not a word or a part
+ * of a longer key, which another member's words could pick to replace a Vault key (#6369). A full
+ * stop after the key ends a sentence, so it counts as a boundary.
+ */
+function holdsKeyToken(text: string, value: string): boolean {
+  if (value.length < CHANNEL_KEY_MIN_LENGTH) return false;
+  for (let at = text.indexOf(value); at !== -1; at = text.indexOf(value, at + 1)) {
+    const before = text[at - 1];
+    const end = at + value.length;
+    const after = text[end] === "." ? text[end + 1] : text[end];
+    if ((before === undefined || !KEY_CHARACTER.test(before)) && (after === undefined || !KEY_CHARACTER.test(after)))
+      return true;
+  }
+  return false;
 }
 
 /** The id of the result that one assignment publishes with `channel_result`. */

@@ -5,6 +5,13 @@ export const messages = {
   "vault.items.title": "已保存的项目",
   "vault.items.description":
     "该服务器上的所有助手都可以使用这些项目。OpenBot 会把密码、卡号和安全码直接填入页面，助手不会看到它们。",
+  "vault.items.scopedDescription":
+    "每个项目只供你选择的助手使用。OpenBot 会把密码、卡号和安全码直接填入页面，助手不会看到它们。",
+  "vault.agents.label": "助手",
+  "vault.agents.all": "所有助手",
+  "vault.agents.some": "{chosen}/{total}",
+  "vault.agents.choose": "为 {name} 选择助手：{agents}",
+  "vault.agents.list": "可以使用 {name} 的助手",
   "vault.newItem": "新建项目",
   "vault.kind.login": "登录信息",
   "vault.kind.card": "银行卡",
@@ -97,6 +104,8 @@ export const messages = {
   "vault.request.addLogin": "添加登录信息",
   "vault.request.addCard": "添加银行卡",
   "vault.request.addContact": "添加地址",
+  "vault.request.addApiKey": "添加 API 密钥",
+  "vault.request.apiKeyPrivate": "将保存到你的保险库，不会进入聊天。",
   "vault.request.saved": "已保存到保险库",
   "vault.twoStep.title": "两步验证码",
   "vault.twoStep.on": "已开启",

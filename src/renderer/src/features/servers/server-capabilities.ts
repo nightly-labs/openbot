@@ -64,6 +64,7 @@ export function serverSupportsCapability(
       capability === "agent-backup-models-v1" ||
       capability === "agent-task-limit-v1" ||
       capability === "agent-plan-card-v1" ||
+      capability === "agent-defaults-v1" ||
       capability === "browser-profiles-v1" ||
       capability === "provider-usage-reset-v1" ||
       capability === "skills-admin-v1" ||
@@ -84,6 +85,8 @@ export function serverSupportsCapability(
       capability === "host-member-update-v1" ||
       capability === "host-release-v1" ||
       capability === "host-timezone-v1" ||
+      capability === "host-turn-limits-v1" ||
+      capability === "host-restart-v1" ||
       capability === "agent-memory-limit-v1" ||
       capability === "memory-review-v1" ||
       capability === "skill-learning-v1" ||
@@ -139,6 +142,7 @@ export function serverSupportsCapability(
       capability === "routine-results-v1" ||
       capability === "workflows-chats-v1" ||
       capability === "workflows-channels-v1" ||
+      capability === "workflows-media-v1" ||
       capability === "vault-import-v1" ||
       capability === "agent-waits-v1" ||
       capability === "agent-queue-task-v1" ||
@@ -310,6 +314,14 @@ export function remoteAdminServer(
  */
 export function activeServerHasProviderSettings(server: ServerSummary): boolean {
   return server.kind === "local" || remoteAdminServer(server, "providers-v1") !== undefined;
+}
+
+/**
+ * Server Settings > Agents shows: this computer, or an online joined server that this account
+ * administers and whose host serves `agent-defaults-v1`.
+ */
+export function serverHasAgentDefaults(server: ServerSummary): boolean {
+  return serverCanAdminister(server, "agent-defaults-v1") && (server.kind === "local" || server.state === "online");
 }
 
 /**

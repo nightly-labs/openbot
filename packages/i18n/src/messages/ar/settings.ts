@@ -145,6 +145,7 @@ export const messages = {
   "settings.planStart.set": "تعيين",
   "settings.automationLimit.sectionTitle": "الحد",
   "settings.automationLimit.sectionDescription": "ينطبق على كل الوكلاء على هذا الحاسوب.",
+  "settings.automationLimit.sectionDescriptionServer": "ينطبق على كل الوكلاء على هذا الخادم.",
   "settings.automationLimit.title": "الطلبات في الساعة",
   "settings.automationLimit.option": "{limit} في الساعة",
   "settings.automationLimit.note":
@@ -271,6 +272,9 @@ export const messages = {
     "يبقى شريط رفيع حيث يختفي الشريط. قرّب المؤشر منه لإظهار الشريط. تمر موجة ألوان على الشريط عندما يسألك وكيل عن شيء.",
   "settings.agentDock.results.title": "عرض العمل المنجز",
   "settings.agentDock.results.description": "تظهر نتائج الوكلاء لوقت قصير بجانب الشريط.",
+  "settings.agentDock.activeSeats.title": "عرض الوكلاء الذين لديهم جديد",
+  "settings.agentDock.activeSeats.description":
+    "يظهر الوكيل أو القناة غير الموجودة على الشريط عليه ما دامت لديه رسالة جديدة أو ينتظرك.",
   "settings.agentDock.agents.title": "الوكلاء على الشريط",
   "settings.agentDock.agents.description": "وكلاء {server}. لكل خادم شريطه الخاص.",
   "settings.agentDock.agents.empty": "لا يوجد وكلاء على هذا الخادم بعد.",

@@ -149,6 +149,7 @@ export const messages = {
   "settings.planStart.set": "Aplicar",
   "settings.automationLimit.sectionTitle": "Límite",
   "settings.automationLimit.sectionDescription": "Se aplica a todos los agentes de este ordenador.",
+  "settings.automationLimit.sectionDescriptionServer": "Se aplica a todos los agentes de este servidor.",
   "settings.automationLimit.title": "Solicitudes por hora",
   "settings.automationLimit.option": "{limit} por hora",
   "settings.automationLimit.note":
@@ -274,6 +275,9 @@ export const messages = {
     "Una franja fina queda donde se oculta el dock. Acerca el puntero para mostrar el dock. Una ola de color sube por la franja cuando un agente te pregunta algo.",
   "settings.agentDock.results.title": "Mostrar trabajo terminado",
   "settings.agentDock.results.description": "Los resultados de los agentes aparecen un momento junto al dock.",
+  "settings.agentDock.activeSeats.title": "Mostrar agentes con novedades",
+  "settings.agentDock.activeSeats.description":
+    "Un agente o canal que no está en el dock aparece en él mientras tiene un mensaje nuevo o te espera.",
   "settings.agentDock.agents.title": "Agentes en el dock",
   "settings.agentDock.agents.description": "Los agentes de {server}. Cada servidor tiene su propio dock.",
   "settings.agentDock.agents.empty": "Este servidor aún no tiene agentes.",

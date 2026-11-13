@@ -1,5 +1,45 @@
 [
   {
+    "version": "0.69.0",
+    "date": "2026-11-12",
+    "notices": [
+      "Ausgeblendete Agenten arbeiten jetzt weiter. OpenBot hat die Routinen der Agenten ausgeschaltet, die du vor dieser Version ausgeblendet hast. Schalte die Routinen ein, die du willst."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Heft eine Nachricht in einem Agenten-Chat an: Klicke mit der rechten Maustaste darauf und wähle Anheften. Die Schaltfläche für angeheftete Nachrichten in der Kopfzeile des Chats zeigt die Anheftungen aller Chats des Agenten.",
+          "Die Bibliothek hat Ordner und drei Ansichten. Ein Agent kann außerdem die Dateien, die er anhängt, in einem Ordner speichern, den du benennst.",
+          "Aufgabe beibringen: Wähle im +-Menü Aufgabe beibringen und erledige die Aufgabe dann im Browser des Agenten. Der Agent speichert die Schritte als Fähigkeit.",
+          "Bündle die Konten eines Anbieters in den Einstellungen. Agenten nutzen ein Konto, bis es fast sein Nutzungslimit erreicht, und dann das nächste.",
+          "Füge Fähigkeiten von GitHub hinzu: Füge den Link eines öffentlichen Repositorys in die Suche nach Fähigkeiten im Marktplatz ein.",
+          "Servereinstellungen → Übertragung kann eine vollständige Kopie eines Servers exportieren und Agenten mit einem Schritt auf einen anderen Server kopieren.",
+          "Schalte einen Agenten über sein Menü in der Seitenleiste stumm. Ein stummgeschalteter Agent sendet keine Mitteilungen und spielt keinen Ton ab."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Eine Nachricht, die du während der Arbeit an einen Agenten sendest, steuert jetzt den laufenden Durchlauf. Um sie wie bisher einzureihen, schalte Agenten während der Arbeit steuern unter Einstellungen → Agenten aus.",
+          "Ein ausgeblendeter Agent arbeitet weiter. Er führt seine Routinen aus und erscheint unter Braucht dich, wenn er auf deine Antwort wartet.",
+          "Der geöffnete Server erscheint als Logo unten in der Fensterleiste. Die Schaltfläche Neu steht am Ende des Suchfelds der Seitenleiste.",
+          "OpenBot nutzt Electron 45.3.0 mit Chromium 156, und mehr Seiten mit einer Bot-Prüfung laden im Agenten-Browser."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot startet schneller, vor allem unter Windows, und ein langsamer Computer bleibt nach dem Start nutzbar.",
+          "OpenBot bleibt nach einem Neustart reaktionsschnell, wenn du viele Aufgaben oder Threads hast.",
+          "Unter Linux und Windows beendet OpenBot sich vollständig, wenn du das Hauptfenster schließt.",
+          "Routinen laufen pünktlich, nachdem die Uhrzeit des Computers korrigiert wurde.",
+          "Text, den du aus einem Chat kopierst, hat am Anfang und am Ende keine leeren Zeilen mehr."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.68.0",
     "date": "2026-11-11",
     "notices": [],

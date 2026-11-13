@@ -159,6 +159,8 @@ export const messages = {
   "provider.geminiKey.title": "Gemini-API-sleutel",
   "provider.geminiKey.description":
     "Sla een Gemini-API-sleutel op deze computer op. Een opgeslagen sleutel wordt gebruikt in plaats van je Google-account. Om met Google in te loggen, verwijder je de sleutel en kies je Verbinden in de rij van Gemini.",
+  "provider.geminiKey.descriptionHost":
+    "Sla een Gemini-API-sleutel op de host op. Een opgeslagen sleutel wordt gebruikt in plaats van je Google-account. Om met Google in te loggen, verwijder je de sleutel en kies je Verbinden in de rij van Gemini.",
   "provider.geminiKey.label": "Gemini-API-sleutel",
   "provider.claudeKey.title": "Anthropic-API-sleutel",
   "provider.claudeKey.description":
@@ -167,14 +169,20 @@ export const messages = {
   "provider.inceptionKey.title": "Inception-API-sleutel",
   "provider.inceptionKey.description":
     "Sla een Inception-API-sleutel op deze computer op om de Mercury-modellen te gebruiken. OpenBot draait ze in de Pi CLI die het downloadt.",
+  "provider.inceptionKey.descriptionHost":
+    "Sla een Inception-API-sleutel op de host op om de Mercury-modellen te gebruiken. OpenBot draait ze in de Pi CLI die het downloadt.",
   "provider.inceptionKey.label": "Inception-API-sleutel",
   "provider.deepseekKey.title": "DeepSeek-API-sleutel",
   "provider.deepseekKey.description":
     "Sla een DeepSeek-API-sleutel op deze computer op om de DeepSeek-modellen te gebruiken. OpenBot draait ze in de Pi CLI die het downloadt.",
+  "provider.deepseekKey.descriptionHost":
+    "Sla een DeepSeek-API-sleutel op de host op om de DeepSeek-modellen te gebruiken. OpenBot draait ze in de Pi CLI die het downloadt.",
   "provider.deepseekKey.label": "DeepSeek-API-sleutel",
   "provider.openrouterKey.title": "OpenRouter-API-sleutel",
   "provider.openrouterKey.description":
     "Sla een OpenRouter-API-sleutel op deze computer op om de modellen van OpenRouter te gebruiken. OpenBot draait ze in de Pi CLI die het downloadt.",
+  "provider.openrouterKey.descriptionHost":
+    "Sla een OpenRouter-API-sleutel op de host op om de modellen van OpenRouter te gebruiken. OpenBot draait ze in de Pi CLI die het downloadt.",
   "provider.openrouterKey.label": "OpenRouter-API-sleutel",
   "provider.openCodeKey.title": "Inloggen bij OpenCode Go",
   "provider.openCodeKey.description":
@@ -281,6 +289,10 @@ export const messages = {
   "provider.settings.versionAvailable": "{installed} · {available} is beschikbaar",
   "provider.settings.versionInstalledByUser": "{version} · door jou geïnstalleerd",
   "provider.settings.versionDownloaded": "{version} · gedownload door OpenBot",
+  "provider.settings.otherVersionInstalledByUser": "Niet in gebruik: {version} · door jou geïnstalleerd",
+  "provider.settings.otherVersionDownloaded": "Niet in gebruik: {version} · gedownload door OpenBot",
+  "provider.settings.useInstalledVersion": "Geïnstalleerde gebruiken",
+  "provider.settings.useDownloadedVersion": "Versie van OpenBot gebruiken",
   "provider.settings.update": "Updaten",
   "provider.settings.downloadLabel": "Download van {name}",
   "provider.settings.diagnostics": "Diagnose",
