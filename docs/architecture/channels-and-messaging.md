@@ -749,7 +749,8 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   owner's own message (`WhatsAppConnect.postsAsOwner`). There a request that fails or stops keeps
   its reaction and posts no "could not finish" or "Stopped." text, also when a restart ends the
   request. The status post is deleted, and the failure shows in OpenBot. When the answer cannot be
-  sent there, OpenBot stops and changes nothing: the status post can hold the first part of it.
+  sent there, the status post is deleted too. But when a later part fails, the WhatsApp adapter
+  reports `WhatsAppAnswerPartlySent`: the status post holds the first part, so OpenBot leaves it.
   The owner's "Message yourself" chat, a number only for OpenBot, Slack, Telegram and Discord still
   get the text.
 - **Order.** The one-turn-per-agent rule is unchanged, so Slack requests wait behind the agent's own

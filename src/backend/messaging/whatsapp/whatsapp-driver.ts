@@ -28,6 +28,7 @@ import {
   type MessagingDriver,
   type MessagingPlace,
   type StatusReaction,
+  WhatsAppAnswerPartlySent,
 } from "../messaging-types";
 import {
   userJid,
@@ -244,7 +245,15 @@ class WhatsAppAdapter implements MessagingAdapter {
       // when the post fails, the status post stays for the next attempt.
       if (replaceMessageId) yield* this.remove(target, replaceMessageId).pipe(Effect.catch(() => Effect.void));
     }
-    for (const chunk of rest) yield* this.#send(target, { text: chunk, ...this.#mentions(chunk) });
+    // Only a later part fails after a part is in the chat: the host then must not touch the status post.
+    for (const chunk of rest)
+      yield* this.#send(target, { text: chunk, ...this.#mentions(chunk) }).pipe(
+        Effect.mapError((failure) =>
+          replaceMessageId
+            ? new MessagingAdapterError({ cause: new WhatsAppAnswerPartlySent(failure.cause) })
+            : failure,
+        ),
+      );
     return firstId;
   });
 
