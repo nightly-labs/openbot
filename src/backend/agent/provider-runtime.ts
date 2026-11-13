@@ -2869,7 +2869,21 @@ export class ProviderRuntime implements ProviderPort {
       startTimeoutMs: this.#longStartWaitMs(provider),
       ...(own.confinement ? { confinement: own.confinement } : {}),
       ...(accountEnvironment ? { accountEnvironment } : {}),
-    });
+    }).pipe(
+      // The account's row still says "Connected" from its last check. Only the answer "no account"
+      // changes it: a timeout or a stopped process says nothing about the login (#8277).
+      Effect.mapError((failure) => {
+        const cause = failure.cause;
+        if (
+          !own.account ||
+          !(cause instanceof ProviderSignInError) ||
+          cause.message !== this.#noAccountMessage(provider)
+        )
+          return failure;
+        const message = this.#providerAccounts?.foundSignedOut(own.account);
+        return message ? new ProviderOperationFailed({ cause: new ProviderSignInError({ message }) }) : failure;
+      }),
+    );
     if (disposals !== this.#disposals || this.#hooks.isStopping()) {
       yield* client.stop().pipe(Effect.catch(() => Effect.void));
       return yield* new ProviderOperationFailed({
