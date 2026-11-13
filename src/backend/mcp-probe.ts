@@ -227,7 +227,8 @@ function describeProbeFailure(
   signInPlace: McpSignInPlace | null,
 ): string {
   if (signIn?.cancelled()) return sourceText("error.backend.mcpSignInCancelled");
-  if (signIn && isRegistrationRefusal(error, signIn)) return REGISTRATION_REFUSED;
+  if (signIn && isRegistrationRefusal(error, signIn))
+    return signIn.registrationUnsupported() ? REGISTRATION_UNAVAILABLE : REGISTRATION_REFUSED;
   const status = httpStatus(error);
   if (signIn && status === 401) return sourceText("error.backend.mcpSignInNotAccepted");
   // The token endpoint refused the grant. Its status says nothing about the address the user typed.
@@ -599,6 +600,12 @@ function isProtocolMismatch(error: Error, code: string | null): boolean {
  * registers only the MCP clients it approved. "Try again" and the API key cannot change it.
  */
 const REGISTRATION_REFUSED = sourceText("error.backend.mcpRegistrationRefused");
+
+/**
+ * The sign-in server has no registration at all, as Google's has (#8398). A sign-in app is then the
+ * only client it can accept, so the sentence names it: a local MCP server is not the way forward.
+ */
+const REGISTRATION_UNAVAILABLE = sourceText("error.backend.mcpRegistrationUnavailable");
 
 function isAccessRefusal(status: number | null): boolean {
   return status === 401 || status === 403;

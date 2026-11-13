@@ -252,6 +252,8 @@ export const messages = {
   "error.backend.mcpCommandNotFound": "コマンドが見つかりません: {command}",
   "error.backend.mcpRegistrationRefused":
     "サインインサーバーはまだ OpenBot をアプリとして受け付けていません。原因はお使いのアカウントではありません。ローカル MCP サーバーなど、別の方法で接続してください。",
+  "error.backend.mcpRegistrationUnavailable":
+    "サインインサーバーは OpenBot をアプリとして登録できません。原因はお使いのアカウントではありません。接続するには、「サーバーの設定」>「MCP」でこのサーバーを開き、サインインアプリを追加してください。",
   "error.backend.mcpSignInAbandonedGeneric": "サインインは中止されました。",
   "error.backend.mcpSignInForgotten": "MCP のサインインは実行中に破棄されました。",
   "error.backend.mcpSignInAbandoned": "MCP のサインインは中止されました。",

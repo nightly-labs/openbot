@@ -250,6 +250,8 @@ export const messages = {
   "error.backend.mcpCommandNotFound": "Comando non trovato: {command}",
   "error.backend.mcpRegistrationRefused":
     "Il server di accesso non accetta ancora OpenBot come app. La causa non è il tuo account. Usa un altro modo per connetterti, ad esempio un server MCP locale.",
+  "error.backend.mcpRegistrationUnavailable":
+    "Il server di accesso non può registrare OpenBot come app. La causa non è il tuo account. Per connetterti, apri questo server in Impostazioni server > MCP e aggiungi un’app di accesso.",
   "error.backend.mcpSignInAbandonedGeneric": "L'accesso è stato abbandonato.",
   "error.backend.mcpSignInForgotten": "L'accesso MCP è stato dimenticato mentre era in corso.",
   "error.backend.mcpSignInAbandoned": "L'accesso MCP è stato abbandonato.",
