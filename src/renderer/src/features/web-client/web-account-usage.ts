@@ -17,6 +17,8 @@ export function createWebAccountUsage(options: {
   let usageGeneration = 0;
   /** Counts the resets, so a read that ends after one adds nothing to the next host's reading. */
   let usageResets = 0;
+  /** Counts the reads only, so an older read does not write its credit flag over a newer read's. */
+  let usageReads = 0;
   /** The host that the reading is for, while it is online. */
   const usageHostId = createMemo(() => {
     const hostId = workspace.state.host?.hostId;
@@ -96,11 +98,12 @@ export function createWebAccountUsage(options: {
     if (!readUsage || workspace.state.status !== "online") throw new Error(options.t("webClient.error.usageOffline"));
     const generation = ++usageGeneration;
     const resets = usageResets;
+    const read = ++usageReads;
     const usage = await readUsage();
     if (generation === usageGeneration) setAccountUsage(usage);
     // An event during the read is newer, but it does not say whether an account works on credits: the
     // flag its rows have is only the one they kept from an older reading.
-    else if (resets === usageResets)
+    else if (resets === usageResets && read === usageReads)
       setAccountUsage((current) =>
         current
           ? {

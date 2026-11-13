@@ -239,7 +239,7 @@ export function decodeAccountUsageFromHost(value: unknown): AccountUsage {
 }
 
 /** The `usage-credits-v1` list: an unknown provider is left out. */
-export function decodeUsageCreditsFromHost(value: unknown): UsageCredits[] {
+export function decodeUsageCreditsList(value: unknown): UsageCredits[] {
   if (!isDynamicRecord(value)) throw new Error("Invalid usage credits.");
   return decodeUsageCredits(value.accounts);
 }

@@ -149,7 +149,7 @@ import {
   decodeRemoteTaskReadStates,
   decodeSidebarLayoutSnapshot,
   decodeSidebarPinsFromHost,
-  decodeUsageCreditsFromHost,
+  decodeUsageCreditsList,
 } from "../remote-agent-decoding";
 import { decodeConversationReadState } from "../remote-conversation-decoding";
 import { acceptEmpty, decodeVoid, type ResponseDecoder } from "../remote-host-decoding";
@@ -380,7 +380,7 @@ export function agentIpcHandlers({
           // does, and it is optional: when its read fails, the reading shows as from a host without it.
           if (!remoteServers.supportsCapability(serverId, USAGE_CREDITS_CAPABILITY)) return runCauseEffect(usage);
           const credits = remoteServers
-            .request(serverId, USAGE_CREDITS_ROUTES.list, decodeUsageCreditsFromHost, { method: "POST", body: {} })
+            .request(serverId, USAGE_CREDITS_ROUTES.list, decodeUsageCreditsList, { method: "POST", body: {} })
             .pipe(Effect.orElseSucceed(() => []));
           return runCauseEffect(
             Effect.all([usage, credits], { concurrency: "unbounded" }).pipe(
