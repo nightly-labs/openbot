@@ -321,6 +321,7 @@ export class ChannelService {
     id: string;
     name: string;
     title: string;
+    instructions: string;
     leadAgentId: string | null;
     members: Array<{ agentId: string; name: string }>;
   }> {
@@ -334,6 +335,7 @@ export class ChannelService {
         id: channel.id,
         name: channel.name,
         title: channel.title,
+        instructions: channel.instructions,
         leadAgentId: channel.leadAgentId,
         members: this.eligibleMembers(channel).map((agentId) => ({ agentId, name: names.get(agentId) ?? agentId })),
       }));
