@@ -392,6 +392,7 @@
     "test:team-legacy-clients": "bun scripts/team-api-legacy-clients-e2e.ts",
     "test:team-session-revoke": "bun scripts/team-session-revoke-e2e.ts",
     "test:server-mute": "bun scripts/server-mute-e2e.ts",
+    "test:remote-agent-account-update": "bun scripts/remote-agent-account-update-e2e.ts",
     "test:desktop-notifications": "bun scripts/desktop-notifications-e2e.ts",
     "test:push-notification-away": "bun scripts/push-notification-away-e2e.ts",
     "test:computer-activity": "bun scripts/computer-activity-e2e.ts",

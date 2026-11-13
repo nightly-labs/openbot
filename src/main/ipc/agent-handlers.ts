@@ -66,6 +66,7 @@ import {
   type SetSidebarPinsInput,
   type SidebarLayoutAction,
   type SidebarLayoutSnapshot,
+  type UpdateAgentInput,
   withFastServiceTiers,
   withModelListings,
   withUsageCredits,
@@ -297,6 +298,146 @@ function logRejectedModels<T>(models: T, source: "local" | "remote"): T {
     });
   }
   return models;
+}
+
+/** The server methods that a profile change of an agent on a joined server uses. */
+type RemoteAgentUpdateServers = Pick<
+  RemoteServerManager,
+  "supportsCapability" | "request" | "setAgentChatColor" | "setAgentColor" | "readAgentColors" | "agentWithColor"
+>;
+
+/** Changes the profile, colours and account of an agent on a joined server. */
+export async function updateRemoteAgent(
+  remoteServers: RemoteAgentUpdateServers,
+  serverId: string,
+  input: UpdateAgentInput,
+): Promise<ClientAgentSummary> {
+  // The Team API does not carry access, and a team member must not be able to widen it.
+  if (input.access !== undefined) {
+    throw new Error(sourceText("error.agent.accessLocalOnly"));
+  }
+  if (input.computerUse !== undefined) {
+    throw new Error(sourceText("error.agent.computerUseLocalOnly"));
+  }
+  if (input.allowAutomation !== undefined) {
+    throw new Error(sourceText("error.agent.automationLocalOnly"));
+  }
+  if (input.allowNewChat !== undefined) {
+    throw new Error(sourceText("error.agent.newChatLocalOnly"));
+  }
+  // The released agent route does not carry it; the renderer sends it on `agent-plan-card-v1`.
+  if (input.quickAcknowledgement !== undefined) {
+    throw new Error(sourceText("error.agent.quickAcknowledgementLocalOnly"));
+  }
+  if (input.fastMode !== undefined || input.ultrafast !== undefined) {
+    throw new Error(sourceText("error.agent.settingsLocalOnly"));
+  }
+  if (input.busyMessageMode !== undefined) {
+    throw new Error(sourceText("error.agent.busyMessageModeLocalOnly"));
+  }
+  // The released agent route does not carry the task limit; mobile sets it on `agent-task-limit-v1`.
+  if (input.taskLimit !== undefined) {
+    throw new Error(sourceText("error.agent.taskLimitLocalOnly"));
+  }
+  // The released agent route does not carry backup models; the renderer sends them on
+  // `agent-backup-models-v1`.
+  if (input.backupModels !== undefined) {
+    throw new Error(sourceText("error.agent.backupModelsLocalOnly"));
+  }
+  // A move at a usage limit also sends the held message, so it goes on `agent-usage-limit-v1`. The
+  // move carries only the model fields.
+  if (input.leaveUsageLimit !== undefined) {
+    const { agentId, provider, model, reasoningEffort, providerAccountId } = input;
+    if (
+      input.leaveUsageLimit !== true ||
+      provider === undefined ||
+      model === undefined ||
+      reasoningEffort === undefined ||
+      !remoteServers.supportsCapability(serverId, AGENT_USAGE_LIMIT_CAPABILITY) ||
+      Object.entries(input).some(([key, value]) => value !== undefined && !USAGE_LIMIT_MOVE_FIELDS.has(key))
+    )
+      throw new Error(sourceText("error.team.usageLimitUnsupported"));
+    await runCauseEffect(
+      remoteServers.request(serverId, AGENT_USAGE_LIMIT_ROUTES.switch, acceptEmpty, {
+        method: "POST",
+        body: {
+          agentId,
+          provider,
+          model,
+          reasoningEffort,
+          ...(providerAccountId ? { providerAccountId } : {}),
+        },
+      }),
+    );
+    const moved = (
+      await runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries))
+    ).find((agent) => agent.id === agentId);
+    if (!moved) throw new Error(sourceText("error.team.agentNotFound"));
+    const agent = remoteServers.agentWithColor(serverId, moved);
+    return providerAccountId && providerAccountId !== DEFAULT_PROVIDER_ACCOUNT_ID
+      ? { ...agent, providerAccountId }
+      : agent;
+  }
+  // The released agent route does not carry the account, so it changes on its own route after
+  // the rest: a provider change on the host returns the agent to the new provider's own sign-in.
+  const { providerAccountId, avatarColor, chatColor, ...fields } = input;
+  if (providerAccountId !== undefined && !remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNTS_CAPABILITY))
+    throw new Error(sourceText("error.team.providersUnsupported"));
+  // The released agent route does not carry the chat colour, so it goes on `chat-colors-v1` first.
+  // Without the capability, a change of only the chat colour fails. With other fields, they change
+  // and the chat colour stays.
+  const chatColors = remoteServers.supportsCapability(serverId, CHAT_COLORS_CAPABILITY);
+  if (
+    chatColor !== undefined &&
+    !chatColors &&
+    Object.entries(input).every(([key, value]) => key === "agentId" || key === "chatColor" || value === undefined)
+  )
+    throw new Error(sourceText("error.team.chatColorsUnsupported"));
+  if (chatColors && chatColor !== undefined)
+    await runCauseEffect(remoteServers.setAgentChatColor(serverId, { agentId: input.agentId, color: chatColor }));
+  // The released agent route does not carry the exact colour. With `agent-colors-v1` it goes on
+  // its own route first. That route also sets the nearest hue, so the profile change then leaves
+  // the hue out: on the released route a hue removes the colour. A removed colour keeps the hue,
+  // which then sets the colour that the user chose. The released route removes the colour only
+  // when the hue changes, so a removed colour always goes on the colour route. Without the
+  // capability, only the hue goes.
+  const colors = remoteServers.supportsCapability(serverId, AGENT_COLORS_CAPABILITY);
+  const { avatarHue, ...rest } = fields;
+  const update = colors && avatarColor ? rest : fields;
+  if (colors && avatarColor !== undefined)
+    await runCauseEffect(remoteServers.setAgentColor(serverId, { agentId: input.agentId, color: avatarColor }));
+  // The released agent route refuses a change without a profile field. When a colour went on its
+  // own route above, or the account goes on its own route below, and nothing else changed, the agent
+  // is read again instead (#5708).
+  const colourRouted = (chatColors && chatColor !== undefined) || (colors && avatarColor !== undefined);
+  const ownRouted = colourRouted || providerAccountId !== undefined;
+  const profileChanged =
+    !ownRouted || Object.entries(update).some(([key, value]) => key !== "agentId" && value !== undefined);
+  const patched = profileChanged
+    ? await runCauseEffect(
+        remoteServers.request(serverId, TEAM_API_ROUTES.agent.one(input.agentId), decodeAgentSummary, {
+          method: "PATCH",
+          body: update,
+        }),
+      )
+    : (await runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries))).find(
+        (agent) => agent.id === input.agentId,
+      );
+  if (!patched) throw new Error(sourceText("error.team.agentNotFound"));
+  // A hue alone removes the colour on the host. Read the colours again, so the answer has none.
+  if (colors && avatarColor === undefined && avatarHue !== undefined)
+    await runCauseEffect(remoteServers.readAgentColors(serverId).pipe(Effect.catch(() => Effect.void)));
+  const agent = remoteServers.agentWithColor(serverId, patched);
+  if (providerAccountId === undefined) return agent;
+  await runCauseEffect(
+    remoteServers.request(serverId, PROVIDER_ACCOUNTS_ROUTES.agent, acceptEmpty, {
+      method: "POST",
+      body: { agentId: input.agentId, accountId: providerAccountId },
+    }),
+  );
+  return providerAccountId === null || providerAccountId === DEFAULT_PROVIDER_ACCOUNT_ID
+    ? agent
+    : { ...agent, providerAccountId };
 }
 
 export interface AgentIpcDependencies {
@@ -855,139 +996,7 @@ export function agentIpcHandlers({
       }),
       updateAgent: scopedHandler(parseUpdateAgent, {
         local: (input) => runCauseEffect(service.updateAgent(input)),
-        remote: async (input, serverId) => {
-          // The Team API does not carry access, and a team member must not be able to widen it.
-          if (input.access !== undefined) {
-            throw new Error(sourceText("error.agent.accessLocalOnly"));
-          }
-          if (input.computerUse !== undefined) {
-            throw new Error(sourceText("error.agent.computerUseLocalOnly"));
-          }
-          if (input.allowAutomation !== undefined) {
-            throw new Error(sourceText("error.agent.automationLocalOnly"));
-          }
-          if (input.allowNewChat !== undefined) {
-            throw new Error(sourceText("error.agent.newChatLocalOnly"));
-          }
-          // The released agent route does not carry it; the renderer sends it on `agent-plan-card-v1`.
-          if (input.quickAcknowledgement !== undefined) {
-            throw new Error(sourceText("error.agent.quickAcknowledgementLocalOnly"));
-          }
-          if (input.fastMode !== undefined || input.ultrafast !== undefined) {
-            throw new Error(sourceText("error.agent.settingsLocalOnly"));
-          }
-          if (input.busyMessageMode !== undefined) {
-            throw new Error(sourceText("error.agent.busyMessageModeLocalOnly"));
-          }
-          // The released agent route does not carry the task limit; mobile sets it on `agent-task-limit-v1`.
-          if (input.taskLimit !== undefined) {
-            throw new Error(sourceText("error.agent.taskLimitLocalOnly"));
-          }
-          // The released agent route does not carry backup models; the renderer sends them on
-          // `agent-backup-models-v1`.
-          if (input.backupModels !== undefined) {
-            throw new Error(sourceText("error.agent.backupModelsLocalOnly"));
-          }
-          // A move at a usage limit also sends the held message, so it goes on `agent-usage-limit-v1`. The
-          // move carries only the model fields.
-          if (input.leaveUsageLimit !== undefined) {
-            const { agentId, provider, model, reasoningEffort, providerAccountId } = input;
-            if (
-              input.leaveUsageLimit !== true ||
-              provider === undefined ||
-              model === undefined ||
-              reasoningEffort === undefined ||
-              !remoteServers.supportsCapability(serverId, AGENT_USAGE_LIMIT_CAPABILITY) ||
-              Object.entries(input).some(([key, value]) => value !== undefined && !USAGE_LIMIT_MOVE_FIELDS.has(key))
-            )
-              throw new Error(sourceText("error.team.usageLimitUnsupported"));
-            await runCauseEffect(
-              remoteServers.request(serverId, AGENT_USAGE_LIMIT_ROUTES.switch, acceptEmpty, {
-                method: "POST",
-                body: {
-                  agentId,
-                  provider,
-                  model,
-                  reasoningEffort,
-                  ...(providerAccountId ? { providerAccountId } : {}),
-                },
-              }),
-            );
-            const moved = (
-              await runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries))
-            ).find((agent) => agent.id === agentId);
-            if (!moved) throw new Error(sourceText("error.team.agentNotFound"));
-            const agent = remoteServers.agentWithColor(serverId, moved);
-            return providerAccountId && providerAccountId !== DEFAULT_PROVIDER_ACCOUNT_ID
-              ? { ...agent, providerAccountId }
-              : agent;
-          }
-          // The released agent route does not carry the account, so it changes on its own route after
-          // the rest: a provider change on the host returns the agent to the new provider's own sign-in.
-          const { providerAccountId, avatarColor, chatColor, ...fields } = input;
-          if (
-            providerAccountId !== undefined &&
-            !remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNTS_CAPABILITY)
-          )
-            throw new Error(sourceText("error.team.providersUnsupported"));
-          // The released agent route does not carry the chat colour, so it goes on `chat-colors-v1` first.
-          // Without the capability, a change of only the chat colour fails. With other fields, they change
-          // and the chat colour stays.
-          const chatColors = remoteServers.supportsCapability(serverId, CHAT_COLORS_CAPABILITY);
-          if (
-            chatColor !== undefined &&
-            !chatColors &&
-            Object.entries(input).every(
-              ([key, value]) => key === "agentId" || key === "chatColor" || value === undefined,
-            )
-          )
-            throw new Error(sourceText("error.team.chatColorsUnsupported"));
-          if (chatColors && chatColor !== undefined)
-            await runCauseEffect(
-              remoteServers.setAgentChatColor(serverId, { agentId: input.agentId, color: chatColor }),
-            );
-          // The released agent route does not carry the exact colour. With `agent-colors-v1` it goes on
-          // its own route first. That route also sets the nearest hue, so the profile change then leaves
-          // the hue out: on the released route a hue removes the colour. A removed colour keeps the hue,
-          // which then sets the colour that the user chose. The released route removes the colour only
-          // when the hue changes, so a removed colour always goes on the colour route. Without the
-          // capability, only the hue goes.
-          const colors = remoteServers.supportsCapability(serverId, AGENT_COLORS_CAPABILITY);
-          const { avatarHue, ...rest } = fields;
-          const update = colors && avatarColor ? rest : fields;
-          if (colors && avatarColor !== undefined)
-            await runCauseEffect(remoteServers.setAgentColor(serverId, { agentId: input.agentId, color: avatarColor }));
-          // The released agent route refuses a change without a profile field. When a colour went on its
-          // own route above and nothing else changed, the agent is read again instead (#5708).
-          const colourRouted = (chatColors && chatColor !== undefined) || (colors && avatarColor !== undefined);
-          const profileChanged =
-            !colourRouted || Object.entries(update).some(([key, value]) => key !== "agentId" && value !== undefined);
-          const patched = profileChanged
-            ? await runCauseEffect(
-                remoteServers.request(serverId, TEAM_API_ROUTES.agent.one(input.agentId), decodeAgentSummary, {
-                  method: "PATCH",
-                  body: update,
-                }),
-              )
-            : (
-                await runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries))
-              ).find((agent) => agent.id === input.agentId);
-          if (!patched) throw new Error(sourceText("error.team.agentNotFound"));
-          // A hue alone removes the colour on the host. Read the colours again, so the answer has none.
-          if (colors && avatarColor === undefined && avatarHue !== undefined)
-            await runCauseEffect(remoteServers.readAgentColors(serverId).pipe(Effect.catch(() => Effect.void)));
-          const agent = remoteServers.agentWithColor(serverId, patched);
-          if (providerAccountId === undefined) return agent;
-          await runCauseEffect(
-            remoteServers.request(serverId, PROVIDER_ACCOUNTS_ROUTES.agent, acceptEmpty, {
-              method: "POST",
-              body: { agentId: input.agentId, accountId: providerAccountId },
-            }),
-          );
-          return providerAccountId === null || providerAccountId === DEFAULT_PROVIDER_ACCOUNT_ID
-            ? agent
-            : { ...agent, providerAccountId };
-        },
+        remote: (input, serverId) => updateRemoteAgent(remoteServers, serverId, input),
       }),
       setAvatar: scopedHandler(parseSetAgentAvatar, {
         local: (parsed) => runCauseEffect(service.setAvatar(parsed.agentId, parsed.image)),

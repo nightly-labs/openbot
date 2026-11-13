@@ -1836,9 +1836,11 @@ export function createWebWorkspaceRuntime(
           ),
         );
       // The released agent route refuses a change without a profile field. When a colour went on its
-      // own route above and nothing else changed, there is nothing to send (#5708).
+      // own route above, or the account goes on its own route below, and nothing else changed, there is
+      // nothing to send (#5708).
       const colourRouted = (chatColors && chatColor !== undefined) || (colors && avatarColor !== undefined);
-      if (!colourRouted || Object.entries(profile).some(([key, value]) => key !== "agentId" && value !== undefined))
+      const ownRouted = colourRouted || providerAccountId !== undefined;
+      if (!ownRouted || Object.entries(profile).some(([key, value]) => key !== "agentId" && value !== undefined))
         await request("PATCH", TEAM_API_ROUTES.agent.one(input.agentId), { ...profile });
       if (providerAccountId === undefined) return;
       await runTeamEffect(
