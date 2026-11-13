@@ -210,10 +210,15 @@ async function createSdkClient(token: string, appVersion: string): Promise<OnePa
 function tokenConnectErrorText(error: unknown): string {
   if (error instanceof OnePasswordConnectError) return error.message;
   const message = error instanceof Error ? error.message : String(error);
-  if (/rate limit exceeded/i.test(message)) return sourceText("error.connector.onePasswordRateLimited");
-  if (/request library compatibility issue|request timeout/i.test(message))
+  // The SDK is imported only when a client starts, so its error class is known here by name.
+  if (
+    (error instanceof Error && error.constructor.name === "RateLimitExceededError") ||
+    /rate limit exceeded/i.test(message)
+  )
+    return sourceText("error.connector.onePasswordRateLimited");
+  if (/error sending request|request timeout/i.test(message))
     return sourceText("error.connector.onePasswordUnreachable");
-  if (/invalid service account token|bad service account token|you are not authenticated/i.test(message))
+  if (/(invalid|bad) service account token|create another token|you are not authenticated/i.test(message))
     return sourceText("error.connector.onePasswordTokenRejected");
   return sourceText("error.connector.onePasswordUnexpected", { detail: redactText(message) });
 }
