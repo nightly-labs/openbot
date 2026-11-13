@@ -2,8 +2,10 @@
  * background, and sets `data-openbot-window-glass` on the root. The frame, the content card and the
  * pages that fill the card are clear tints. In the window, the surface tokens are translucent too,
  * so the bubbles, tables, code blocks, cards, controls and the composer show the blur. Dialogs, menus,
- * tooltips and toasts open outside `.app-window`, or in a popper inside it, and stay solid. A browser
- * tab, an iframe or a canvas stays opaque: CSS cannot make a native view clear. */
+ * tooltips and toasts open outside `.app-window`, or in a popper inside it, and stay solid. The full
+ * browser view also opens outside it and stays solid: it covers the app, whose top row would show
+ * through a clear frame. A browser tab, an iframe or a canvas stays opaque: CSS cannot make a native
+ * view clear. */
 :root[data-openbot-window-glass] {
   --window-glass-frame: color-mix(in srgb, var(--openbot-bg-frame) 20%, transparent);
   --window-glass-card: color-mix(in srgb, var(--openbot-bg-canvas) 30%, transparent);
@@ -268,11 +270,6 @@
 :root[data-openbot-window-glass][data-openbot-color-scheme="light"] .app-window .wfn-stage {
   --wfn-card: var(--window-solid-surface);
   --wfn-field: var(--window-solid-control-hover);
-}
-
-/* The full-bleed browser covers the window with its own frame and card. */
-:root[data-openbot-window-glass] .browser-full-view {
-  background: var(--window-glass-frame);
 }
 
 /* The surfaces in a bubble with a chat colour are clear here, so the tint of the bubble shows through them
