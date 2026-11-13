@@ -3750,7 +3750,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           : previous?.usageLimitReturn?.cause === "provider-error"
             ? "provider-error-ended"
             : "usage-limit-ended",
-        leaving && spentBalance ? previousChoice : undefined,
+        previousChoice,
+        leaving && spentBalance,
       );
     const profileChanged = standingProfileChanged(previous, agent, this.#store.agentDefaults());
     const activeSession = this.#store.activeProviderSession(agent.id);
@@ -4201,19 +4202,42 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   /**
    * A note in the agent's chat that it left its model for a usage limit or a provider error, or went back to it. Each
-   * channel whose work waits for the agent gets the same note. `spent` is the model that the agent left because its
+   * channel whose work waits for the agent gets the same note. `spent` says that the agent left `left` because its
    * balance is spent: the agent does not go back to it by itself, so the note names it and says what to do (#7965).
+   * A move to the same model on another account names the account too, as the chat header does: the model name alone
+   * reads as no change (#8227). A channel has readers who do not see the provider's accounts, so its note names an
+   * account only by the name the user gave it, not by its email.
    */
-  #appendModelSwitchMarker(agent: AgentSummary, reason: ModelSwitchReason, spent?: AgentModelChoice): void {
-    const modelName = (choice: AgentModelChoice) =>
-      this.#agentModels(choice).find((option) => option.provider === choice.provider && option.id === choice.model)
-        ?.name ?? choice.model;
-    const model = modelName(agent);
-    const text = spent
-      ? sourceText("status.agent.modelSwitchedForSpentBalance", { previous: modelName(spent), model })
-      : sourceText(MODEL_SWITCH_TEXT[reason], { model });
+  #appendModelSwitchMarker(
+    agent: AgentSummary,
+    reason: ModelSwitchReason,
+    left: AgentModelChoice | undefined,
+    spent: boolean,
+  ): void {
+    const joined = agentModelChoice(agent);
+    const accountOnly = left !== undefined && left.provider === joined.provider && left.model === joined.model;
+    const name = (choice: AgentModelChoice, email: boolean) => {
+      const model =
+        this.#agentModels(choice).find((option) => option.provider === choice.provider && option.id === choice.model)
+          ?.name ?? choice.model;
+      if (!accountOnly) return model;
+      const id = choice.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
+      const account = this.getStatus()
+        .providers?.find((status) => status.id === choice.provider)
+        ?.accounts?.find((candidate) => candidate.id === id);
+      const accountName = account?.label || (email ? account?.email : null);
+      return accountName ? `${accountName} · ${model}` : model;
+    };
+    const note = (email: boolean) =>
+      spent && left
+        ? sourceText("status.agent.modelSwitchedForSpentBalance", {
+            previous: name(left, email),
+            model: name(joined, email),
+          })
+        : sourceText(MODEL_SWITCH_TEXT[reason], { model: name(joined, email) });
+    const text = note(true);
     try {
-      this.channels.noteModelSwitch(agent.id, text, MODEL_SWITCH_ITEM_TYPES[reason]);
+      this.channels.noteModelSwitch(agent.id, note(false), MODEL_SWITCH_ITEM_TYPES[reason]);
     } catch (error) {
       this.#emitError("model_switch_marker_failed", error, agent.id);
     }
