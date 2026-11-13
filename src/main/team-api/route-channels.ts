@@ -110,14 +110,17 @@ export async function routeChannels(
     // The codec drops the field for a peer without the capability, so the frame budget leaves it out too.
     const seenSubtasks = capabilities.has(CHANNEL_SEEN_SUBTASKS_CAPABILITY);
     const taskWaits = capabilities.has(CHANNEL_TASK_WAITS_CAPABILITY) && input.beforeSequence === undefined;
+    // The tasks of a page do not change with its message limit, so the waits are read once.
+    let pageWaits: ChannelTaskWait[] | undefined;
     // Long messages, such as a member's thinking, make a page of fewer messages, so it fits one WebRTC
     // frame. The client reads the rest as older pages. A page larger than the frame cannot reach a
     // remote client.
     for (let limit = 100; ; limit = Math.floor(limit / 2)) {
       const page = channels.store.page(input.channelId, input.beforeSequence, limit);
-      const waits = taskWaits
+      pageWaits ??= taskWaits
         ? visibleWaits(channels, channels.taskWaits(input.channelId, page.tasks), hiddenAgentIds, channelHiddenAgentIds)
         : [];
+      const waits = pageWaits;
       const base = {
         ...page,
         tasks:

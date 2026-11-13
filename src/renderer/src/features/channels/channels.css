@@ -453,12 +453,9 @@
   flex-shrink: 0;
   margin: 0;
   padding: 0 var(--openbot-space-4) var(--openbot-space-2);
-  overflow: hidden;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .channel-wait-note + .channel-paused-tasks {
   margin-top: 0;

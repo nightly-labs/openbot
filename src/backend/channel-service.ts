@@ -2163,17 +2163,30 @@ export class ChannelService {
   /**
    * Why each queued task of `tasks` that has an owner does not start. The pump skips such a task and
    * keeps no reason, so the channel showed a request that did not start and nothing more (#6067).
-   * Work of the owner in this channel is not a reason here: the channel shows it.
+   * Work of the owner in this channel is not a reason here: the channel shows it. A task that waits
+   * for its dependencies or for a usage limit has no reason here either: the pump would not start it
+   * when the busy work ends, and the channel shows a usage limit itself.
    */
   taskWaits(channelId: string, tasks: readonly ChannelTask[]): ChannelTaskWait[] {
     const assignments = this.store.assignments(channelId).filter(activeAssignment);
     const byId = new Map(tasks.map((task) => [task.id, task]));
+    // A remote page can leave a dependency out, so the stored tasks are read once when one is missing.
+    let stored: Map<string, ChannelTask> | undefined;
+    const dependencySettled = (id: string): boolean => {
+      let dependency = byId.get(id);
+      if (!dependency) {
+        stored ??= new Map(this.store.tasks(channelId).map((task) => [task.id, task]));
+        dependency = stored.get(id);
+      }
+      return Boolean(dependency && settled(dependency));
+    };
     return tasks.flatMap((task): ChannelTaskWait[] => {
       const agentId = task.ownerAgentId;
-      if (task.state !== "queued" || !agentId) return [];
+      if (task.state !== "queued" || !agentId || this.hooks.usageLimited?.(agentId)) return [];
       const root = byId.get(task.rootTaskId);
       if (root && (root.state === "paused" || root.state === "failed" || root.state === "cancelled")) return [];
       if (assignments.some((assignment) => assignment.agentId === agentId || assignment.taskId === task.id)) return [];
+      if (task.dependencies.some((id) => !dependencySettled(id))) return [];
       const elsewhere = this.store.agentAssignment(agentId, ACTIVE_ASSIGNMENT_STATES);
       if (elsewhere)
         return [
@@ -4115,15 +4128,25 @@ export class ChannelService {
       .map((assignment) => `${assignment.id}:${assignment.agentId}`)
       .join(",");
     // A channel with no assignment has nothing to report, so an unseen channel counts as empty.
-    if ((this.#activeAssignments.get(channelId) ?? "") === active) return;
+    const previous = this.#activeAssignments.get(channelId) ?? "";
+    if (previous === active) return;
     this.#activeAssignments.set(channelId, active);
     this.hooks.queueHoldChanged?.();
-    // A queued task of another channel can name the work that started or ended here, and its own
-    // channel did not change, so its page is read again only after this.
+    // A queued task of another channel can name the work of an agent that started or ended here, and
+    // its own channel did not change, so its page is read again only after this.
+    const agents = new Set(
+      [previous, active].flatMap((value) =>
+        value ? value.split(",").map((entry) => entry.slice(entry.indexOf(":") + 1)) : [],
+      ),
+    );
     for (const id of this.store.ids()) {
-      if (id === channelId || !this.store.tasks(id).some((task) => task.state === "queued" && task.ownerAgentId))
-        continue;
-      this.hooks.changed(id, this.store.get(id).revision);
+      if (
+        id !== channelId &&
+        this.store
+          .tasks(id)
+          .some((task) => task.state === "queued" && task.ownerAgentId && agents.has(task.ownerAgentId))
+      )
+        this.hooks.changed(id, this.store.get(id).revision);
     }
   }
 
