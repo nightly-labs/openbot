@@ -505,7 +505,7 @@ export class ProviderRuntime implements ProviderPort {
    */
   readonly #lastErrors = new Map<AgentProvider, { message: string; at: number; serial: number }>();
   #errorSerial = 0;
-  /** The providers whose model list is read again after it timed out or failed. */
+  /** The providers whose model list is read again after it timed out. */
   readonly #relisting = new Set<AgentProvider>();
   /** The clients whose failed model list was read again. Each client gets these reads one time. */
   readonly #relistedAfterFailure = new WeakSet<AgentClient>();
@@ -4545,8 +4545,9 @@ export class ProviderRuntime implements ProviderPort {
     // (#8321). Each client gets these reads one time, so a CLI that always fails starts no loop.
     for (const provider of failed) {
       const client = this.#clients.get(provider);
-      if (!client || this.#relisting.has(provider) || this.#relistedAfterFailure.has(client)) continue;
-      this.#relisting.add(provider);
+      // The guard is the client, not the provider: the client that replaces this one during the
+      // waits must get its own reads when its list also fails.
+      if (!client || this.#relistedAfterFailure.has(client)) continue;
       this.#relistedAfterFailure.add(client);
       yield* Effect.gen({ self: this }, function* () {
         for (const delayMs of FAILED_MODEL_LIST_RETRY_DELAYS_MS) {
@@ -4555,7 +4556,7 @@ export class ProviderRuntime implements ProviderPort {
           if (this.#clients.get(provider) !== client) return;
           if (yield* this.#relistModels(provider)) return;
         }
-      }).pipe(Effect.ensuring(Effect.sync(() => this.#relisting.delete(provider))), Effect.forkIn(this.#scope));
+      }).pipe(Effect.forkIn(this.#scope));
     }
     return fresh;
   });
