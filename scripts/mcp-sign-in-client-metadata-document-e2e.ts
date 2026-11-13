@@ -370,7 +370,8 @@ async function main(): Promise<void> {
     const refused = await runCase("registration-refused", true, true);
     check(refused, refused.attempts[0]?.error === null, `the sign-in failed: ${refused.attempts[0]?.error}`);
     check(refused, refused.attempts[0]?.toolCount === 1, "the tools were not listed after the sign-in");
-    check(refused, refused.registrations === 1, `the sign-in registered ${refused.registrations} times`);
+    // The refused `/mcp-auth` registration and its refused `/callback` retry (#8025).
+    check(refused, refused.registrations === 2, `the sign-in registered ${refused.registrations} times`);
     check(
       refused,
       refused.pageClientIds.join() === CLIENT_METADATA_URL,
