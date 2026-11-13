@@ -86,6 +86,13 @@ const PI_TURN_STALL_MS = 10 * 60_000;
  */
 const PI_THREAD_IDLE_RELEASE_MS = 5 * 60_000;
 
+/**
+ * How long the first request to a new `pi` process may take. It includes the start of Pi, the load
+ * of its extensions and the read of the session file, which took more than the 30 seconds of a
+ * usual request on a busy computer (#8273). A Pi that exits fails the request immediately.
+ */
+const PI_START_TIMEOUT_MS = 120_000;
+
 /** How many idle threads keep their `pi` process before the timeout. The longest idle goes first. */
 const PI_IDLE_THREAD_LIMIT = 1;
 
@@ -711,11 +718,12 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       const environment = { ...extension?.environment, ...keyExtension?.environment };
       yield* providerSync(() => this.#spawn(rpc, cwd, args, environment));
       if (resume && requestedId) {
-        const loaded = yield* rpc.request({ type: "switch_session", sessionPath: requestedId });
+        const loaded = yield* rpc.request({ type: "switch_session", sessionPath: requestedId }, PI_START_TIMEOUT_MS);
         if (loaded.cancelled === true)
           return yield* providerFailure(new Error(sourceText("error.provider.piResumeCancelled")));
       }
-      const state = yield* rpc.request({ type: "get_state" });
+      // After a resume, Pi has started and answered, so the usual limit applies.
+      const state = yield* rpc.request({ type: "get_state" }, resume && requestedId ? undefined : PI_START_TIMEOUT_MS);
       const id = getString(state, "sessionFile");
       if (!id || (resume && id !== requestedId))
         return yield* providerFailure(new Error(sourceText("error.provider.piSessionIdentity")));
