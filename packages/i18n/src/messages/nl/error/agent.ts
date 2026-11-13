@@ -94,6 +94,8 @@ export const messages = {
     "Het endpoint dat deze agent gebruikte, is verwijderd. Kies een ander model voor de agent.",
   "error.agent.turnStalled":
     "{provider} reageerde niet meer, dus OpenBot heeft deze beurt beëindigd. Stuur het bericht opnieuw, of kies een ander model.",
+  "error.agent.toolLoopStopped":
+    "{provider} herhaalde een mislukte stap vele keren, dus OpenBot heeft deze beurt gestopt. Stuur het bericht opnieuw of kies een ander model.",
   "error.agent.compactionConnectionLost":
     "De verbinding viel weg terwijl de agent zijn context comprimeerde, dus de taak is gestopt. Controleer je internetverbinding en stuur dan een bericht om verder te gaan.",
   "error.agent.selectedGone": "De gekozen agent bestaat niet meer.",
