@@ -166,6 +166,12 @@ export const messages = {
   "provider.claudeKey.description":
     "Sla een Anthropic-API-sleutel op de host op. Anthropic brengt elk verzoek in rekening op het API-tegoed van de sleutel, niet op je Claude-abonnement. Om hem voor een agent te gebruiken, kies je het API-sleutelaccount in het modelmenu van de agent. Als Claude niet is ingelogd, gebruiken alle agents de sleutel.",
   "provider.claudeKey.label": "Anthropic-API-sleutel",
+  "provider.cursorKey.title": "Cursor-API-sleutel",
+  "provider.cursorKey.description":
+    "Elk Cursor-account na het eerste gebruikt een API-sleutel. Maak een sleutel in het Cursor-dashboard, onder Integrations, en plak die hier. De sleutel wordt op deze computer opgeslagen.",
+  "provider.cursorKey.descriptionHost":
+    "Elk Cursor-account na het eerste gebruikt een API-sleutel. Maak een sleutel in het Cursor-dashboard, onder Integrations, en plak die hier. De sleutel wordt op de host opgeslagen.",
+  "provider.cursorKey.label": "Cursor-API-sleutel",
   "provider.inceptionKey.title": "Inception-API-sleutel",
   "provider.inceptionKey.description":
     "Sla een Inception-API-sleutel op deze computer op om de Mercury-modellen te gebruiken. OpenBot draait ze in de Pi CLI die het downloadt.",

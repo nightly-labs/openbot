@@ -13,6 +13,7 @@ import {
 import {
   type AgentProviderId,
   type ConnectProviderAccountInput,
+  type ConnectProviderAccountKeyInput,
   isProviderAccountId,
   MAX_PROVIDER_ACCOUNTS,
   PROVIDER_ACCOUNT_LABEL_MAX_LENGTH,
@@ -145,6 +146,9 @@ export function providerIpcHandlers({
           }),
         ),
       ),
+      connectProviderAccountKey: payloadHandler(parseConnectProviderAccountKeyInput, ({ provider, accountId, key }) =>
+        runCauseEffect(service.connectProviderAccountKey(provider, accountId, key)),
+      ),
       cancelProviderAccountSignIn: payloadHandler(parseRemoveProviderAccountInput, ({ provider, accountId }) =>
         runCauseEffect(service.cancelProviderAccountSignIn(provider, accountId)),
       ),
@@ -246,6 +250,10 @@ export function parseConnectProviderAccountInput(value: unknown): ConnectProvide
     provider: parseProviderId(value.provider),
     accountId: value.accountId === null ? null : requireString(value.accountId, "accountId"),
   };
+}
+
+export function parseConnectProviderAccountKeyInput(value: unknown): ConnectProviderAccountKeyInput {
+  return { ...parseConnectProviderAccountInput(value), key: parseProviderApiKeyInput(value).key };
 }
 
 export function parseRemoveProviderAccountInput(value: unknown): RemoveProviderAccountInput {

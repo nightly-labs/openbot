@@ -81,7 +81,7 @@ export function accountUsageProviderRows(
       ? accounts.flatMap((account) =>
           account.id === DEFAULT_PROVIDER_ACCOUNT_ID
             ? [null]
-            : account.state === "connected" && !isApiKeyAccount(account.id)
+            : account.state === "connected" && !isApiKeyAccount(account.id, provider.id)
               ? [account.id]
               : [],
         )

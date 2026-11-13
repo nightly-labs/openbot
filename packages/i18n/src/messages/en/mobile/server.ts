@@ -1349,6 +1349,14 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.providers.accountNameHint":
     "Only for you and the admins of this server. Leave it empty to show the email.",
   "mobile.server.providers.accountSignInAgain": "Sign in again",
+  // An account that is an API key of the provider (`provider-account-keys-v1`), such as a Cursor account after the first.
+  "mobile.server.providers.accountsKeyHint":
+    "Each agent uses one account. Choose it in the agent's settings. A new account needs an API key of that account.",
+  "mobile.server.providers.accountChangeKey": "Change key",
+  "mobile.server.providers.accountKeyHint":
+    "Paste an API key of the {provider} account. The key goes to the server. This phone does not keep it.",
+  "mobile.server.providers.accountKeyChecking": "Checking the key…",
+  "mobile.server.providers.accountKeyAddFailed": "Could not add the account. Try again.",
   "mobile.server.providers.removeAccount": "Remove account",
   "mobile.server.providers.removeAccountTitle": "Remove {name}?",
   "mobile.server.providers.removeAccountBody": "The server removes this account and its sign-in.",

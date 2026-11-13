@@ -196,6 +196,12 @@ export const messages = {
   "provider.codexKey.descriptionHost":
     "يحفظ Codex المفتاح على المضيف. تحتسب OpenAI كل طلب على المفتاح، لا على خطة ChatGPT. لاستخدام الخطة مرة أخرى، افصل الحساب ووصّل ChatGPT.",
   "provider.codexKey.label": "مفتاح OpenAI API",
+  "provider.cursorKey.title": "مفتاح Cursor API",
+  "provider.cursorKey.description":
+    "كل حساب Cursor بعد الأول يستخدم مفتاح API. أنشئ مفتاحًا في لوحة تحكم Cursor ضمن Integrations، ثم الصقه هنا. يُحفظ المفتاح على هذا الحاسوب.",
+  "provider.cursorKey.descriptionHost":
+    "كل حساب Cursor بعد الأول يستخدم مفتاح API. أنشئ مفتاحًا في لوحة تحكم Cursor ضمن Integrations، ثم الصقه هنا. يُحفظ المفتاح على المضيف.",
+  "provider.cursorKey.label": "مفتاح Cursor API",
   "provider.inceptionKey.title": "مفتاح Inception API",
   "provider.inceptionKey.description":
     "احفظ مفتاح Inception API على هذا الحاسوب لاستخدام نماذج Mercury. يشغّلها OpenBot في Pi CLI الذي ينزّله.",
