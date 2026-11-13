@@ -2063,17 +2063,19 @@ export class MessagingService {
           // WhatsApp refuses each new attempt too, and each one counts against the number: give up.
           if (failure instanceof MessagingOperationFailed && failure.cause instanceof WhatsAppRefusedError)
             return yield* this.#forgetPost(key, post);
+          // In a quiet chat, the status post can already hold the first part of the answer, and a
+          // notice would show as the owner's message: the chat keeps what reached it.
+          if (final.answer && this.#quietEnd(live.record.connectionId, post.target))
+            return yield* this.#forgetPost(key, post);
           const failures = (this.#finalFailures.get(key) ?? 0) + 1;
           this.#finalFailures.set(key, failures);
           // An answer goes out in parts, and some of them can be on the platform already, so it is
-          // not sent again. The conversation gets the fixed notice, or in a quiet chat only loses the
-          // status post; the host keeps the answer.
+          // not sent again. The conversation gets the fixed notice; the host keeps the answer.
           let current = post;
           if (final.answer) {
-            const quiet = this.#quietEnd(live.record.connectionId, post.target);
             current = {
               ...post,
-              final: { answer: false, text: quiet ? "" : sourceText("status.messaging.failed"), reaction: null },
+              final: { answer: false, text: sourceText("status.messaging.failed"), reaction: null },
             };
             this.#posts.set(key, current);
             yield* this.#status.save();
