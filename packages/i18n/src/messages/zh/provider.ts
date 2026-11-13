@@ -180,6 +180,12 @@ export const messages = {
   "provider.geminiKey.descriptionHost":
     "在主机上保存 Gemini API 密钥。保存后会替代 Google 账号登录。若要用 Google 登录，请先移除密钥，再在 Gemini 行上选择“连接”。",
   "provider.geminiKey.label": "Gemini API 密钥",
+  "provider.cursorKey.title": "Cursor API 密钥",
+  "provider.cursorKey.description":
+    "第一个之后的每个 Cursor 账号都使用 API 密钥。在 Cursor 控制台的 Integrations 中创建密钥，然后粘贴到这里。密钥保存在这台电脑上。",
+  "provider.cursorKey.descriptionHost":
+    "第一个之后的每个 Cursor 账号都使用 API 密钥。在 Cursor 控制台的 Integrations 中创建密钥，然后粘贴到这里。密钥保存在主机上。",
+  "provider.cursorKey.label": "Cursor API 密钥",
   "provider.inceptionKey.title": "Inception API 密钥",
   "provider.inceptionKey.description":
     "在这台电脑上保存 Inception API 密钥，即可使用 Mercury 模型。OpenBot 会在它下载的 Pi CLI 中运行这些模型。",

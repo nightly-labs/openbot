@@ -205,6 +205,12 @@ export type AgentEvent =
       threadId: string;
       turnId: string;
       questions: AgentPromptQuestion[];
+      /**
+       * No turn waits for this question: the provider could not wait longer, so the card stays after
+       * its turn ends, and the answer starts a new turn. A client sees it in the runtime snapshot's
+       * `pendingPrompts`. Local only: the released Team API adapters do not carry it.
+       */
+      detached?: true;
     }
   | {
       type: "agent-input-resolved";
@@ -411,7 +417,8 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
         isString(value.turnId) &&
         Array.isArray(value.questions) &&
         value.questions.length <= INPUT_LIMITS.promptQuestions &&
-        value.questions.every(isAgentPromptQuestion)
+        value.questions.every(isAgentPromptQuestion) &&
+        (value.detached === undefined || value.detached === true)
       );
     case "agent-input-resolved":
       return (

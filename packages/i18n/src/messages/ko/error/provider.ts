@@ -397,6 +397,14 @@ export const messages = {
   "error.provider.accountDefault": "첫 번째 {provider} 계정은 제거할 수 없어요.",
   "error.provider.accountUsesKey":
     "이 {provider} 계정은 저장된 API 키를 사용하므로 로그인이 없어요. 키는 서버 설정 → 제공자에서 변경하세요.",
+  "error.provider.accountNeedsKey":
+    "새 {provider} 계정에는 API 키가 필요해요. 이 기기의 OpenBot을 업데이트한 후 계정을 다시 추가하세요.",
+  "error.provider.accountKeyRefused":
+    "{provider}에서 이 API 키를 받아들이지 않았어요. 키를 확인한 후 다시 시도해 주세요.",
+  "error.provider.accountKeyUnreachable":
+    "API 키를 확인하려 했지만 OpenBot이 {provider}에 연결하지 못했어요. 인터넷 연결을 확인한 후 다시 시도해 주세요.",
+  "error.provider.accountKeySignedOut":
+    "{provider}에서 이 계정의 API 키를 더 이상 받아들이지 않아요. 계정에 새 키를 입력하세요.",
   "error.provider.accountInUse": "이 계정을 사용하는 에이전트가 작업 중이에요. 에이전트가 멈춘 후 다시 시도해 주세요.",
   "error.provider.accountsReadOnly": "저장된 제공자 계정을 읽을 수 없어요. 변경하기 전에 OpenBot을 업데이트하세요.",
   "error.provider.accountSignedOut": "이 {provider} 계정은 로그아웃되었어요. 다시 로그인하세요.",

@@ -685,12 +685,16 @@ the provider's serialized connection command. It refuses a provider that is runn
 deliveries while it writes, and reports success only after a new process runs with the new key.
 
 OpenCode reports OpenCode Zen and OpenCode Go as a single catalog, on the separate endpoints
-`opencode.ai/zen/v1` and `opencode.ai/zen/go/v1`, and OpenBot supports only Go. So `isOpencodeModelUnusableWithStoredKey` in `src/backend/agent/provider-models.ts`
-drops the paid Zen models from `ModelCatalog.refresh` (through the OpenCode driver's
-`catalog.usableWithStoredKey`) while OpenBot is the one supplying the key;
-with no key stored those models can only come from the user's own OpenCode sign-in, which does
-buy them. Neither `/models` endpoint authenticates, so entitlement cannot be read back and the
-split is a product rule rather than a check.
+`opencode.ai/zen/v1` and `opencode.ai/zen/go/v1`, and OpenBot supports only Go. The saved key goes
+only to the `opencode-go` provider, so OpenCode lists a paid Zen model only when the user signed in
+to Zen in OpenCode itself (`opencode auth login`). That sign-in buys the model, so the catalog shows
+each model that OpenCode lists. Checked in OpenCode 2.2.5 and 2.3.0: a key on `opencode-go` lists
+the Go models and no paid Zen model (#6185).
+
+OpenCode first lists the models of a cached or built-in catalog and fetches the new catalog in the
+background, about 3 s later. A first start of OpenCode 2.2.5 listed 80 of 88 models. The OpenCode
+driver thus sets `catalog.relistAfterStart`: the list is read again 5 s after each start, and agents
+do not leave a model that only the first list lacks.
 
 The CLI reports no Go quota over ACP. `readOpenCodeGoUsage` (`src/backend/opencode-usage.ts`)
 sends `opencode.ai/zen/go/v1/usage` the key the CLI uses. A saved key is the only key: the CLI
@@ -979,6 +983,21 @@ user's permissions. `cursorStatePaths` lets it write `~/.cursor` and protects th
 hooks, rules, MCP and permission files there and in the CLI config folder, and the
 `.workspace-trusted` and `mcp-approvals.json` files in each folder in `projects`. Migration 24 adds
 `cursor` to `projection_provider_sessions`.
+
+The CLI holds one sign-in for each computer user: `auth.json` in a fixed folder, or the login
+Keychain on macOS, and `CURSOR_CONFIG_DIR` moves only its settings. So a Cursor account after the
+first is not a home folder but one Cursor API key (`ProviderKeyAccountSupport` in
+`provider-drivers.ts`, `accountSignIn: "key"` in the descriptor). `ProviderCredentialStore` keeps the
+key encrypted under `cursor:<account id>`. `ProviderAccounts.connectKey` first asks Cursor whether it
+accepts the key (`checkCursorApiKey`, the CLI's own `POST /auth/exchange_user_api_key`), because the
+CLI answers a refused key and a failed connection with the same internal error. A process of the
+account gets `CURSOR_API_KEY`, an empty `CURSOR_AUTH_TOKEN` and `AGENT_CLI_CREDENTIAL_STORE=memory`.
+With the memory store the CLI (checked on 2026.10.01) does not read the sign-in of the computer user
+and does not replace it with the tokens of the key; without it, the key's tokens overwrite that
+sign-in. The variable is not in Cursor's documentation. So a CLI before 2026.10.01 offers no account
+after the first (`supports` of the driver). A key account has no browser sign-in, no CLI
+sign-out and no usage reading, and it is not in an account pool. A joined server adds one through
+`provider-account-keys-v1`; the released sign-in routes of `provider-accounts-v1` refuse it.
 
 The CLI reports no usage over ACP. The driver's `readRateLimits` (`src/backend/cursor-usage.ts`)
 sends the request that the CLI sends itself, `aiserver.v1.DashboardService/GetCurrentPeriodUsage`

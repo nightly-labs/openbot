@@ -78,7 +78,13 @@ import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Show } from "solid-js";
 import { ProviderAccountRenameField } from "../../components/ProviderAccountList";
 import type { ProviderPickerOption } from "../../components/ProviderPicker";
-import { isApiKeyAccount, type ProviderPickerAccount, providerAccountName } from "../../components/provider-accounts";
+import {
+  hasKeyAccounts,
+  isApiKeyAccount,
+  isProviderKeyAccount,
+  type ProviderPickerAccount,
+  providerAccountName,
+} from "../../components/provider-accounts";
 import {
   createProviderRow,
   PROVIDER_ACTION_LABEL,
@@ -96,6 +102,7 @@ import { AccountUsageWindowList } from "../account/AccountUsageDetails";
 import type { AccountUsageProviderRow, AccountUsageWindowRow } from "../account/account-usage-view";
 import { providerUpdateAvailable, providerVersionLabel } from "../provider-updates/provider-update";
 import { DangerZone, DetailHeader, type IntegrationStatus } from "./IntegrationLayout";
+import { type KeyDialogText, OpenCodeKeyDialog, type ProviderKeyApi } from "./OpenCodeKeyDialog";
 
 /** The provider page on screen. The settings window puts "Providers ›" before its title. */
 export interface ProviderSettingsDetail {
@@ -721,9 +728,39 @@ function disconnectDescription(
     .join(" ");
 }
 
+/** The key dialog text of each provider whose accounts after the first are API keys. */
+const ACCOUNT_KEY_TEXT: Partial<Record<AgentProviderId, KeyDialogText>> = {
+  cursor: {
+    name: "Cursor",
+    title: "provider.cursorKey.title",
+    description: "provider.cursorKey.description",
+    descriptionHost: "provider.cursorKey.descriptionHost",
+    label: "provider.cursorKey.label",
+  },
+};
+
 function AccountsSection(props: SectionProps) {
   const { t, format, errorMessage, sourceText } = useText();
   const accounts = () => props.option.accounts ?? [];
+  /** The text of the key dialog, where each account after the first is an API key. */
+  const keyText = () => (hasKeyAccounts(props.option.id) ? ACCOUNT_KEY_TEXT[props.option.id] : undefined);
+  /** The key dialog is offered where the computer that runs the providers takes such a key. */
+  const keyOffered = () => Boolean(keyText() && props.accountActions?.connectKey);
+  /** The account whose key the dialog asks for: null adds an account. Undefined while the dialog is closed. */
+  const [keyTarget, setKeyTarget] = createSignal<string | null | undefined>(undefined);
+  /**
+   * The key dialog saves through the account action. The key is new each time and no call reads it
+   * back, so the dialog has no saved state and no Remove: the account's menu removes it.
+   */
+  const keyApi = (accountId: string | null): ProviderKeyApi => ({
+    onHost: !props.accountActions?.local,
+    getProviderApiKeyState: async () => ({ provider: props.option.id, status: "missing" }),
+    setProviderApiKey: async ({ key }) => {
+      await props.accountActions?.connectKey?.(props.option.id, accountId, key);
+    },
+    clearProviderApiKey: async () => undefined,
+    openExternal: async () => undefined,
+  });
   const [removing, setRemoving] = createSignal<ProviderPickerAccount | null>(null);
   const [resetting, setResetting] = createSignal<ProviderPickerAccount | null>(null);
   const [disconnecting, setDisconnecting] = createSignal<ProviderPickerAccount | null>(null);
@@ -788,7 +825,7 @@ function AccountsSection(props: SectionProps) {
   const pool = () => (props.accountActions?.setPool ? props.option.accountPool : undefined);
   /** The pool switch shows where the host has a pool and the provider has a second account to use. */
   /** A saved key has no plan limit, so it is not a pool member. */
-  const planAccounts = () => accounts().filter((account) => !isApiKeyAccount(account.id));
+  const planAccounts = () => accounts().filter((account) => !isApiKeyAccount(account.id, props.option.id));
   const poolOffered = () => Boolean(props.accountActions?.setPool) && (planAccounts().length > 1 || Boolean(pool()));
   const poolLabelId = `provider-settings-${props.option.id}-pool-label`;
   const setPool = (enabled: boolean, leftOut: readonly string[]) =>
@@ -812,19 +849,22 @@ function AccountsSection(props: SectionProps) {
         max: MAX_PROVIDER_ACCOUNTS,
       })}
       actions={
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          aria-label={t("provider.account.addLabel", { name: props.option.name })}
-          disabled={
-            props.disabled || !props.row.accountsOffered() || accounts().length >= MAX_PROVIDER_ACCOUNTS || adding()
-          }
-          onClick={props.row.addAccount}
-        >
-          <UserRoundPlus aria-hidden="true" />
-          {t("provider.account.add")}
-        </Button>
+        // A host that takes no key cannot add an account that is a key, so it offers none.
+        <Show when={!hasKeyAccounts(props.option.id) || keyOffered()}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            aria-label={t("provider.account.addLabel", { name: props.option.name })}
+            disabled={
+              props.disabled || !props.row.accountsOffered() || accounts().length >= MAX_PROVIDER_ACCOUNTS || adding()
+            }
+            onClick={() => (keyOffered() ? setKeyTarget(null) : props.row.addAccount())}
+          >
+            <UserRoundPlus aria-hidden="true" />
+            {t("provider.account.add")}
+          </Button>
+        </Show>
       }
     >
       <ItemGroup class="settings-modal-card" aria-label={t("provider.account.listLabel", { name: props.option.name })}>
@@ -871,6 +911,7 @@ function AccountsSection(props: SectionProps) {
               }
               resetsLeft={props.accountActions?.resetUsage ? resetsLeft(account().id) : 0}
               onResetUsage={() => setResetting({ ...account() })}
+              onChangeKey={keyOffered() ? () => setKeyTarget(account().id) : undefined}
             />
           )}
         </For>
@@ -892,6 +933,11 @@ function AccountsSection(props: SectionProps) {
           <ItemDescription class="provider-settings-error" role="alert">
             {message()}
           </ItemDescription>
+        )}
+      </Show>
+      <Show when={keyTarget() !== undefined ? keyText() : undefined}>
+        {(text) => (
+          <OpenCodeKeyDialog api={keyApi(keyTarget() ?? null)} text={text()} onClose={() => setKeyTarget(undefined)} />
         )}
       </Show>
       <ConfirmDialog
@@ -1002,14 +1048,18 @@ function AccountRow(
     pool: ProviderAccountPool | undefined;
     /** Leaves the account out of the pool, or puts it back. */
     onTogglePool: () => void;
+    /** Opens the key dialog for an account that is an API key. Absent where the host takes no key. */
+    onChangeKey: (() => void) | undefined;
   },
 ) {
-  const { t, format } = useText();
+  const { t, format, sourceText } = useText();
   const [renaming, setRenaming] = createSignal(false);
   const name = () => providerAccountName(t, props.accounts, props.account.id);
   const own = () => props.account.id === DEFAULT_PROVIDER_ACCOUNT_ID;
   /** The saved key's account: the key dialog changes or removes it, and it has no sign-in or plan usage. */
   const apiKey = () => isApiKeyAccount(props.account.id);
+  /** One API key of a provider whose accounts after the first are keys: it has no sign-in, no plan usage and no pool. */
+  const keyAccount = () => isProviderKeyAccount(props.option.id, props.account.id);
   /**
    * A saved Gemini key serves the turns in place of the own Google sign-in, with the key's models. A
    * Reconnect or a Disconnect of the Google sign-in then changes nothing that the user sees (#7913).
@@ -1020,13 +1070,15 @@ function AccountRow(
     Object.hasOwn(ACCOUNT_STATE_TEXT, props.account.state) ? props.account.state : "error";
   const needsSignIn = () => state() === "signed-out" || state() === "error";
   /** The own account signs in again with the provider's Reconnect, so only the others have their own. */
-  const signInAgain = () => !own() && !apiKey() && needsSignIn();
-  const connecting = () => !own() && !apiKey() && state() === "connecting";
+  const signInAgain = () => !own() && !apiKey() && !keyAccount() && needsSignIn();
+  /** A key that the provider no longer accepts is replaced, where a browser account signs in again. */
+  const changeKey = () => (keyAccount() ? props.onChangeKey : undefined);
+  const connecting = () => !own() && !apiKey() && !keyAccount() && state() === "connecting";
   /** A Reconnect of the provider waits for the browser. */
   const ownSigningIn = () => own() && props.row.signingIn();
   const agents = () => props.account.usedBy ?? [];
   /** A pool member: a saved key is never one. */
-  const poolMember = () => Boolean(props.pool) && !apiKey();
+  const poolMember = () => Boolean(props.pool) && !apiKey() && !keyAccount();
   const inPool = () => poolMember() && !props.pool?.leftOut.includes(props.account.id);
   const detail = () =>
     [
@@ -1074,7 +1126,7 @@ function AccountRow(
         </Show>
         <Show when={state() !== "connected"}>
           <ItemDescription class={{ "provider-settings-warning": needsSignIn() }}>
-            {props.account.message ?? t(ACCOUNT_STATE_TEXT[state()])}
+            {props.account.message ? sourceText(props.account.message) : t(ACCOUNT_STATE_TEXT[state()])}
             <Show when={needsSignIn() && agents().length > 0}>
               {` ${t("provider.settings.accountBlocked", { agents: format.list(agents()) })}`}
             </Show>
@@ -1099,6 +1151,14 @@ function AccountRow(
             <LogIn aria-hidden="true" />
             {t("provider.account.signInAgain")}
           </Button>
+        </Show>
+        <Show when={needsSignIn() ? changeKey() : undefined}>
+          {(open) => (
+            <Button type="button" size="sm" disabled={props.disabled} onClick={() => open()()}>
+              <KeyRound aria-hidden="true" />
+              {t("provider.settings.changeKey")}
+            </Button>
+          )}
         </Show>
         <Show when={connecting()}>
           <Button
@@ -1147,7 +1207,7 @@ function AccountRow(
                   </Show>
                 </DropdownMenu.Item>
               </Show>
-              <Show when={state() === "connected" && !apiKey() && props.resetsLeft > 0}>
+              <Show when={state() === "connected" && !apiKey() && !keyAccount() && props.resetsLeft > 0}>
                 <DropdownMenu.Item onSelect={() => props.onResetUsage()}>
                   <Gauge aria-hidden="true" />
                   {t("provider.account.resetUsage")}
@@ -1169,6 +1229,14 @@ function AccountRow(
                   <KeyRound aria-hidden="true" />
                   {t("provider.settings.changeKey")}
                 </DropdownMenu.Item>
+              </Show>
+              <Show when={changeKey()}>
+                {(open) => (
+                  <DropdownMenu.Item onSelect={() => open()()}>
+                    <KeyRound aria-hidden="true" />
+                    {t("provider.settings.changeKey")}
+                  </DropdownMenu.Item>
+                )}
               </Show>
               <Show when={!own() && !apiKey()}>
                 <DropdownMenu.Separator />

@@ -1,5 +1,45 @@
 [
   {
+    "version": "0.70.0",
+    "date": "2026-11-13",
+    "notices": [
+      "Mettez aussi à jour chaque serveur joint vers cette version. Redémarrer le serveur, les valeurs par défaut des agents, les limites de fils et les nouvelles étapes de Workflows ne fonctionnent sur un serveur que s’il a cette version."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Redémarrez depuis l’app un serveur que vous hébergez vous-même : en tant que propriétaire ou administrateur, sélectionnez Redémarrer le serveur dans le menu du serveur.",
+          "Choisissez quels agents peuvent utiliser chaque identifiant, carte, contact et clé d’API dans Réglages du serveur > Vault. Un agent voit et remplit uniquement les éléments qu’il peut utiliser.",
+          "Les workflows ont des étapes Image et Vidéo. Créez des images et de courtes vidéos avec les modèles GPT Image, Grok Imagine ou Sunra, et associez des images comme références.",
+          "Connectez Sunra et TryPost depuis le Marketplace, dans Apps. Les agents peuvent alors créer des médias avec vos crédits Sunra, rédiger et publier des publications sur les réseaux sociaux.",
+          "Les propriétaires et les administrateurs peuvent définir le nombre de fils qui s’exécutent en même temps, sur le serveur et pour chaque agent, dans Réglages du serveur > Général.",
+          "Affichez les agents qui ont de nouveaux messages dans le dock : activez l’option dans Réglages > Dock des agents. Faites un clic droit sur un tel agent et sélectionnez Ajouter au dock pour le garder dans le dock.",
+          "Ajoutez plusieurs comptes Cursor. Chaque agent peut utiliser un compte différent."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Une clé d’API que vous enregistrez pour un seul agent est désormais conservée dans le Vault chiffré. Les clés que lisent les agents ont un nouveau chemin : un script qui utilise l’ancien chemin doit utiliser le nouveau.",
+          "Les réglages des agents, comme Orienter les agents pendant leur travail, se trouvent maintenant dans Réglages du serveur > Agents, pour chaque serveur, y compris pour cet ordinateur.",
+          "Dans la vue complète du navigateur, la zone de message se trouve de nouveau en bas au centre de la page.",
+          "L’en-tête de la discussion affiche le titre de l’agent après son nom, par exemple « Brock · Responsable de magasin »."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot s’ouvre plus vite lorsque vos discussions sont longues.",
+          "Sous Windows et Linux, OpenBot vous demande confirmation avant de quitter pendant que des agents travaillent. Sélectionnez Continuer pour masquer la fenêtre et laisser les agents terminer.",
+          "Les appareils se reconnectent à un serveur lorsque la connexion d’un appareil s’interrompt pendant la configuration. La vue en direct du navigateur d’un agent sur un serveur joint reste aussi ouverte sur une connexion lente.",
+          "Lorsque vous demandez à un agent une capture d’écran d’une page web, il joint désormais l’image à sa réponse.",
+          "Les modèles gratuits d’OpenCode répondent de nouveau lorsqu’une clé OpenCode Go est enregistrée."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.69.0",
     "date": "2026-11-12",
     "notices": [

@@ -1,5 +1,45 @@
 [
   {
+    "version": "0.70.0",
+    "date": "2026-11-13",
+    "notices": [
+      "Zaktualizuj też każdy serwer, do którego jesteś dołączony, do tej wersji. Ponowne uruchomienie serwera, domyślne ustawienia agentów, limity wątków i nowe kroki Przepływów pracy działają na serwerze tylko wtedy, gdy ma on tę wersję."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Uruchom ponownie serwer, który hostujesz sam, z aplikacji: jako właściciel lub administrator wybierz Uruchom ponownie serwer w menu serwera.",
+          "Wybierz, którzy agenci mogą używać każdego loginu, karty, danych kontaktowych i klucza API w Ustawieniach serwera → Sejf. Agent widzi i wypełnia tylko te pozycje, których może używać.",
+          "Przepływy pracy mają kroki Obraz i Wideo. Twórz obrazy i krótkie filmy modelami GPT Image, Grok Imagine lub Sunra i podłączaj obrazy jako referencje.",
+          "Połącz Sunra i TryPost z zakładki Aplikacje w Marketplace. Agenci mogą wtedy tworzyć media z twoimi kredytami Sunra oraz przygotowywać i publikować posty w mediach społecznościowych.",
+          "Właściciele i administratorzy mogą ustawić, ile wątków działa jednocześnie, na serwerze i dla każdego agenta, w Ustawienia serwera → Ogólne.",
+          "Pokazuj agentów z nowymi wiadomościami w doku: włącz to w Ustawienia → Dok agentów. Kliknij prawym przyciskiem myszy takiego agenta i wybierz Dodaj do doku, aby zostawał tam na stałe.",
+          "Dodaj więcej niż jedno konto Cursor. Każdy agent może używać innego konta."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Klucz API, który zapisujesz tylko dla jednego agenta, jest teraz przechowywany w zaszyfrowanym Sejfie. Klucze, które czytają agenci, mają nową ścieżkę, więc skrypt ze starą ścieżką musi użyć nowej.",
+          "Ustawienia agentów, na przykład Kieruj agentami podczas pracy, są teraz w Ustawienia serwera → Agenci dla każdego serwera, także dla tego komputera.",
+          "W pełnym widoku przeglądarki pole wiadomości znów jest na dole, na środku strony.",
+          "Nagłówek czatu pokazuje tytuł agenta po jego nazwie, na przykład „Brock · Kierownik sklepu”."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "OpenBot otwiera się szybciej, gdy twoje czaty są długie.",
+          "W systemach Windows i Linux OpenBot pyta przed zamknięciem, gdy agenci pracują. Wybierz Nie zamykaj, aby ukryć okno i pozwolić agentom skończyć.",
+          "Urządzenia ponownie łączą się z serwerem, gdy połączenie jednego urządzenia zostanie przerwane podczas konfiguracji. Podgląd na żywo przeglądarki agenta na dołączonym serwerze również pozostaje otwarty przy wolnym połączeniu.",
+          "Gdy poprosisz agenta o zrzut ekranu strony internetowej, dołącza teraz obraz do swojej odpowiedzi.",
+          "Darmowe modele OpenCode znów odpowiadają, gdy zapisany jest klucz OpenCode Go."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.69.0",
     "date": "2026-11-12",
     "notices": [

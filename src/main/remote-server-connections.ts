@@ -36,6 +36,7 @@ interface MutableStatus {
   compatibility: ServerCompatibility | null;
   issue: ServerConnectionIssue | null;
   connectionSequence: number;
+  capabilitiesPending: boolean;
   hostRestart: ServerSummary["hostRestart"];
   hostedSleep: HostedSleep;
   hostedIssue: ServerSummary["hostedIssue"];
@@ -65,6 +66,7 @@ export class RemoteServerConnections {
       compatibility: status?.compatibility ?? checkingCompatibility(this.#appVersion),
       issue: status?.issue ?? null,
       connectionSequence: status?.connectionSequence ?? 0,
+      capabilitiesPending: status?.capabilitiesPending ?? false,
       hostRestart: status?.hostRestart ?? null,
       hostedSleep: status?.hostedSleep ?? null,
       hostedIssue: status?.hostedIssue ?? null,
@@ -170,6 +172,22 @@ export class RemoteServerConnections {
     status.hostedIssue = null;
     status.hostedStart = null;
     status.connectionSequence += 1;
+    status.capabilitiesPending = false;
+  }
+
+  // The capability read of a new connection starts. The renderer waits for its end before it loads
+  // the workspace, so that one load reads all the data the host can give. Returns the connection
+  // that the read belongs to.
+  startCapabilityRead(serverId: string): number {
+    const status = this.#mutable(serverId);
+    status.capabilitiesPending = true;
+    return status.connectionSequence;
+  }
+
+  // Silent, as the plain setters are. A read of an older connection must not end the wait of a newer one.
+  endCapabilityRead(serverId: string, connectionSequence: number): void {
+    const status = this.#mutable(serverId);
+    if (status.connectionSequence === connectionSequence) status.capabilitiesPending = false;
   }
 
   // `fallbackState` is what to show when the error is one this app has no specific word for -- the
@@ -245,6 +263,7 @@ export class RemoteServerConnections {
       compatibility: null,
       issue: null,
       connectionSequence: 0,
+      capabilitiesPending: false,
       hostRestart: null,
       hostedSleep: null,
       hostedIssue: null,

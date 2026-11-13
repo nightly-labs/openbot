@@ -1377,6 +1377,13 @@ export const messages = {
   "mobile.server.providers.accountName": "الاسم",
   "mobile.server.providers.accountNameHint": "لك ولمسؤولي هذا الخادم فقط. اتركه فارغًا لعرض البريد الإلكتروني.",
   "mobile.server.providers.accountSignInAgain": "تسجيل الدخول مجددًا",
+  "mobile.server.providers.accountsKeyHint":
+    "يستخدم كل وكيل حسابًا واحدًا. اختره في إعدادات الوكيل. يحتاج الحساب الجديد إلى مفتاح API خاص به.",
+  "mobile.server.providers.accountChangeKey": "تغيير المفتاح",
+  "mobile.server.providers.accountKeyHint":
+    "الصق مفتاح API لحساب {provider}. يُرسل المفتاح إلى الخادم. لا يحتفظ به هذا الهاتف.",
+  "mobile.server.providers.accountKeyChecking": "جارٍ التحقق من المفتاح…",
+  "mobile.server.providers.accountKeyAddFailed": "تعذّرت إضافة الحساب. أعد المحاولة.",
   "mobile.server.providers.removeAccount": "إزالة الحساب",
   "mobile.server.providers.removeAccountTitle": "هل تريد إزالة {name}؟",
   "mobile.server.providers.removeAccountBody": "يزيل الخادم هذا الحساب وتسجيل الدخول الخاص به.",

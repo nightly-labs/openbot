@@ -613,7 +613,7 @@ export class TurnLifecycle {
         else if (compactionFailure) this.#showFailoverError(turn.agentId, turn.threadId, compactionFailure);
         continue;
       }
-      this.#attention.clearForTurn(turn.threadId, turnId);
+      this.#attention.clearForTurn(turn.threadId, turnId, false);
       if (this.#observedCompactions.get(turn.threadId) === turnId) {
         this.#observedCompactions.delete(turn.threadId);
         this.#clearCompactionDeadline(turn.threadId);
@@ -1093,7 +1093,7 @@ export class TurnLifecycle {
             causeCode: classifyFailure(getRecord(turn, "error")),
           });
         }
-        this.#attention.clearForTurn(threadId, turnId);
+        this.#attention.clearForTurn(threadId, turnId, status === "completed");
         if (this.#observedCompactions.get(threadId) === turnId) {
           this.#observedCompactions.delete(threadId);
           this.#clearCompactionDeadline(threadId);

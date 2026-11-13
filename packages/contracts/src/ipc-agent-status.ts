@@ -359,6 +359,14 @@ export interface ConnectProviderAccountInput {
   accountId: string | null;
 }
 
+/**
+ * Gives a provider account its API key: a new account when `accountId` is null, or a new key for one
+ * that exists. For a provider whose accounts are keys (`accountSignIn: "key"`).
+ */
+export interface ConnectProviderAccountKeyInput extends ConnectProviderAccountInput {
+  key: string;
+}
+
 /** A null label returns the account to its email. */
 export interface RenameProviderAccountInput {
   provider: AgentProviderId;

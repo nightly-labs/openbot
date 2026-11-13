@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { ChatChannelWorkRow } from "@/features/channels/components/chat-channel-work-row";
-import { useChannels } from "@/features/channels/components/use-channels";
+import { useChannelList } from "@/features/channels/components/use-channels";
 import { useAgentViewOnly } from "@/features/servers/model/use-server-roles";
 import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
 import { useAgentFirstUnreadMessageId, useApprovalRequests } from "@/features/workspace/components/use-live-workspace";
@@ -37,6 +37,14 @@ import { useMessageDelete } from "./use-message-delete";
 import { useMessagePins } from "./use-message-pins";
 import { useOpenAgentTasks } from "./use-open-agent-tasks";
 import { useQuestionPrompt } from "./use-question-prompt";
+
+const NO_MESSAGE_IDS: ReadonlySet<string> = new Set();
+
+/** `previous` when it holds exactly `ids`, else a new set of them. */
+function keptIdSet(previous: ReadonlySet<string> | null, ids: readonly string[]): ReadonlySet<string> {
+  if (previous && previous.size === ids.length && ids.every((id) => previous.has(id))) return previous;
+  return new Set(ids);
+}
 
 /** `focusMessageId` opens the chat at a message from search instead of at the latest message. */
 export function MobileChatView({
@@ -117,7 +125,7 @@ export function MobileChatView({
   // A turn on another thread, such as channel work, is not this chat's work, as on desktop. A host
   // with channel-attention-v1 names the channel of the thread, and a row below opens it.
   const otherThread = Boolean(liveActivity?.threadId && threadId && liveActivity.threadId !== threadId);
-  const channels = useChannels(agent.serverId).channels;
+  const channels = useChannelList(agent.serverId);
   const workChannel = otherThread
     ? channels.find(
         (channel) => !channel.archived && channel.threads?.some((thread) => thread.threadId === liveActivity?.threadId),
@@ -324,22 +332,30 @@ export function MobileChatView({
     [agent.id, agent.serverId, markAgentUnreadFrom],
   );
   // As on desktop, Mark unread is on the messages that the host counts as unread.
-  const markUnreadMessageIds = useMemo(
-    () =>
-      new Set(
-        (conversation?.messages ?? [])
-          .filter((message) => message.author !== "user" && itemTypeCountsAsUnread(message.itemType))
-          .map((message) => message.id),
-      ),
-    [conversation?.messages],
-  );
+  // The conversation is a new array on each streamed chunk, with the same messages. Each set stays
+  // the same object while its ids stay, as the list asks.
+  const lastMarkUnreadIds = useRef<ReadonlySet<string>>(NO_MESSAGE_IDS);
+  const markUnreadMessageIds = useMemo(() => {
+    const ids = (conversation?.messages ?? [])
+      .filter((message) => message.author !== "user" && itemTypeCountsAsUnread(message.itemType))
+      .map((message) => message.id);
+    lastMarkUnreadIds.current = keptIdSet(lastMarkUnreadIds.current, ids);
+    return lastMarkUnreadIds.current;
+  }, [conversation?.messages]);
   const unreadLineMessageId = unreadLine?.agentId === agent.id ? unreadLine.messageId : null;
   // The line shows above the first of these messages that has a row.
+  const lastUnreadLineIds = useRef<ReadonlySet<string> | null>(null);
   const unreadLineMessageIds = useMemo(() => {
-    if (!unreadLineMessageId) return null;
     const all = conversation?.messages ?? [];
-    const start = all.findIndex((message) => message.id === unreadLineMessageId);
-    return start < 0 ? null : new Set(all.slice(start).map((message) => message.id));
+    const start = unreadLineMessageId ? all.findIndex((message) => message.id === unreadLineMessageId) : -1;
+    lastUnreadLineIds.current =
+      start < 0
+        ? null
+        : keptIdSet(
+            lastUnreadLineIds.current,
+            all.slice(start).map((message) => message.id),
+          );
+    return lastUnreadLineIds.current;
   }, [unreadLineMessageId, conversation?.messages]);
   const activePrompt = messages.findLast(
     (message) =>
@@ -352,8 +368,12 @@ export function MobileChatView({
   const messageDelete = useMessageDelete(agent.serverId, { kind: "agent", agentId: agent.id });
   // As on desktop, the text of a message can start work in an open channel. The channel opens with
   // the text in its composer. The list changes on each channel event, so it is kept by its contents.
-  const channelKey = JSON.stringify(
-    channels.filter((channel) => !channel.archived).map((channel) => ({ id: channel.id, name: channel.name })),
+  const channelKey = useMemo(
+    () =>
+      JSON.stringify(
+        channels.filter((channel) => !channel.archived).map((channel) => ({ id: channel.id, name: channel.name })),
+      ),
+    [channels],
   );
   const sendToChannel = useMemo(() => {
     const open: { id: string; name: string }[] = JSON.parse(channelKey);

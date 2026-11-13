@@ -351,6 +351,11 @@ export const messages = {
   "error.provider.accountDefault": "第一个 {provider} 账号无法移除。",
   "error.provider.accountUsesKey":
     "此 {provider} 账号使用已保存的 API 密钥，没有登录。请在服务器设置 → 服务商中更改密钥。",
+  "error.provider.accountNeedsKey":
+    "新的 {provider} 账号需要 API 密钥。请更新这台设备上的 OpenBot，然后重新添加该账号。",
+  "error.provider.accountKeyRefused": "{provider} 未接受该 API 密钥。请检查密钥后重试。",
+  "error.provider.accountKeyUnreachable": "OpenBot 无法连接 {provider} 来检查 API 密钥。请检查网络连接后重试。",
+  "error.provider.accountKeySignedOut": "{provider} 不再接受该账号的 API 密钥。请为该账号提供新密钥。",
   "error.provider.accountInUse": "该账号上仍有助手在工作。请等该助手停止后重试。",
   "error.provider.accountsReadOnly": "无法读取已保存的服务商账号。请先更新 OpenBot 再修改。",
   "error.provider.accountSignedOut": "该 {provider} 账号已退出登录，请重新登录。",

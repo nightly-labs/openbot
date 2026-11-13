@@ -315,6 +315,36 @@ export function dynamicPromptResult(answers: Record<string, string[]>): DynamicT
   };
 }
 
+/**
+ * The answer for a question that the provider cannot wait for: its call would time out (#6230). The
+ * card stays open, and the user's answer reaches the agent as a new message. Only the model reads it.
+ */
+export function detachedPromptResult(): DynamicToolResult {
+  const value = {
+    status: "waiting",
+    next: "The user has not answered yet. The question stays open in the chat, and the answer arrives as the user's next message, which quotes the question. Do not ask it again. End your turn unless other work does not need the answer.",
+  };
+  return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
+}
+
+/**
+ * The message that carries the answer to a detached question: each answered question as a quote, with
+ * its answer below. It holds no words of its own, so it reads the same in each language.
+ */
+export function lateAnswerText(questions: AgentPromptQuestion[], answers: Record<string, string[]>): string {
+  return questions
+    .flatMap((question) => {
+      const values = answers[question.id] ?? [];
+      if (values.length === 0) return [];
+      const quote = question.question
+        .split("\n")
+        .map((line) => `> ${line}`)
+        .join("\n");
+      return [`${quote}\n\n${values.join(", ")}`];
+    })
+    .join("\n\n");
+}
+
 /** The answer for a question that expired before the user answered it. Only the model reads it. */
 export function expiredPromptResult(
   responseKind: "dynamic-tool" | "mcp-elicitation" | "user-input" | "ui-block",
