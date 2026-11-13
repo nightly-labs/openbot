@@ -39,6 +39,8 @@
 
 .backup-models-list {
   display: flex;
+  /* The list is a grid item of the card: without this, a long name makes it wider than the pane. */
+  min-width: 0;
   flex-direction: column;
   margin: 0;
   padding: 0;
