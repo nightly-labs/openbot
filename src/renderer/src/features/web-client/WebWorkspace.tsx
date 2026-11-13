@@ -3895,7 +3895,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   onManageBrowserProfiles={browserProfiles() ? openBrowserProfileSettings : undefined}
                   onOpenNotificationSettings={(serverId) => openNotificationSettings(serverId)}
                   onOpenMcpSignIn={openMcpSignInFromChat()}
-                  mcpSignedIn={(mcpServerId) => serverSettings.state.mcpSignIns[mcpServerId]?.signedIn === true}
+                  mcpSignedIn={(mcpServerId, url) =>
+                    serverSettings.state.mcpSignIns[mcpServerId]?.signedIn === true &&
+                    serverSettings.state.mcp.some((row) => row.id === mcpServerId && row.url === url)
+                  }
                   onOpenUsage={(trigger) => {
                     const id = server()?.id;
                     if (id) void openHostPage(id, "usage", trigger);

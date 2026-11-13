@@ -87,8 +87,14 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const connectors = useConnectors();
   const { servers, serversLoaded, activeServer, activeServerSupportsCapability, joinServerOpen } = useServers();
   const { select: selectServer } = useServerActions();
-  const { serverSettingsOpen, openServerSettings, openMcpSignIn, serverSettingsTargetId, serverSettingsMcpSignIns } =
-    useServerSettings();
+  const {
+    serverSettingsOpen,
+    openServerSettings,
+    openMcpSignIn,
+    serverSettingsTargetId,
+    serverSettingsMcp,
+    serverSettingsMcpSignIns,
+  } = useServerSettings();
   const {
     appSettingsOpen,
     skillsMarketplaceOpen,
@@ -542,8 +548,11 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
           if (!server || (server.kind === "remote" && !remoteMcpSignIn(server))) return undefined;
           return (mcpServerId: string, trigger: HTMLElement | null) => openMcpSignIn(server.id, mcpServerId, trigger);
         })()}
-        mcpSignedIn={(mcpServerId) =>
-          serverSettingsTargetId() === activeServer()?.id && serverSettingsMcpSignIns()[mcpServerId]?.signedIn === true
+        // The sign-ins and the rows are read together, so the row says which address a sign-in is for.
+        mcpSignedIn={(mcpServerId, url) =>
+          serverSettingsTargetId() === activeServer()?.id &&
+          serverSettingsMcpSignIns()[mcpServerId]?.signedIn === true &&
+          serverSettingsMcp().some((row) => row.id === mcpServerId && row.url === url)
         }
         serverInstall={{
           get servers() {
