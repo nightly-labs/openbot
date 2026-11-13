@@ -136,7 +136,7 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
 
   const waiting = createMemo(() => {
     const current = page();
-    return current ? waitingChannelPrompt(current, env.prompts()) : null;
+    return current ? waitingChannelPrompt(current, threads(), env.prompts()) : null;
   });
   const prompt = createMemo((): Extract<AgentEvent, { type: "prompt" }> | undefined => {
     const found = waiting();
