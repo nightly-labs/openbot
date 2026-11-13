@@ -1137,6 +1137,11 @@ export class SunshineMoonlightRuntime {
   // After a start, nothing waits on these processes. One that exits on its own would leave a runtime
   // that still reports itself started, and every new session would wait for a stream that never comes.
   #watchExit(child: ChildProcess, source: "sunshine" | "moonlight"): void {
+    // A file that is not there gives `error` and no `exit`. With no listener, Node throws it as an
+    // uncaught exception. The child then counts as ended, so the readiness wait of the start fails.
+    child.on("error", (error) => {
+      this.#options.onDiagnostic?.(source, `OpenBot: ${source} had a process error (${error.message}).\n`);
+    });
     child.once("exit", (code, signal) => {
       // A stop clears the field before it waits. A start in progress fails its own readiness wait.
       if ((source === "sunshine" ? this.#sunshine : this.#moonlight) !== child || !this.#state) return;
