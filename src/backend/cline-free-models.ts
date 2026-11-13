@@ -38,15 +38,34 @@ const CLINE_FREE_MODEL_FALLBACKS = [
 ];
 
 /**
+ * The ClinePass models on 2026-11-13. Without them, a saved ClinePass model would run on the session's
+ * own `cline` provider, on Cline Credits, when Cline's list cannot be read.
+ */
+const CLINE_PASS_MODEL_FALLBACKS = [
+  "cline-pass/deepseek-v4.1-flash-1017",
+  "cline-pass/deepseek-v4-pro",
+  "cline-pass/glm-5.3",
+  "cline-pass/glm-5.3-flash",
+  "cline-pass/kimi-k3.1-pro",
+  "cline-pass/muse-spark-1.3-contributor",
+  "cline-pass/kimi-k3",
+  "cline-pass/qwen3.8-max",
+  "cline-pass/minimax-m3.1-flash",
+].map((id) => ({ id }));
+
+/**
  * Reads Cline's free and ClinePass models, which `cline --acp` does not list: its ACP agent lists the
  * models of the session's provider, and only the CLI's own picker reads the other tiers from Cline.
  * The agent takes a model it did not list, so OpenBot lists them and the agent runs them. Without
  * the ClinePass models, a session signed in with `cline` stays on Cline Credits (#8587).
  *
- * Never fails. A list that cannot be read gives the last one that could, then the bundled free tier.
+ * Never fails. A list that cannot be read gives the last one that could, then the bundled one.
  */
 export function clineFreeModels(): () => Effect.Effect<AcpModel[]> {
-  let last: AcpModel[] = CLINE_FREE_MODEL_FALLBACKS.map(freeModel);
+  let last: AcpModel[] = [
+    ...CLINE_PASS_MODEL_FALLBACKS.map(clinePassModel),
+    ...CLINE_FREE_MODEL_FALLBACKS.map(freeModel),
+  ];
   return Effect.fn("ClineFreeModels.read")(
     function* () {
       // One deadline for the headers and the body: a body that stalls must not hold the model list.

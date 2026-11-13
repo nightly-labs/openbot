@@ -6,7 +6,7 @@
 // name, that a listed, a free and a ClinePass model each reach the session through the `model`
 // option, that a free model moves the session to the `cline` provider and a ClinePass model to the
 // `cline-pass` provider (#8587), that a list that cannot be read gives the last good one, then the
-// bundled one, and that an empty free tier is kept.
+// bundled one (in which a ClinePass model still runs), and that an empty free tier is kept.
 // `bun scripts/cline-free-models-e2e.ts`. Writes .openbot-build/cline-free-models-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -164,10 +164,20 @@ try {
   );
   report.lastGood = lastGood;
 
-  // 4. With no good read yet, the bundled free tier is listed.
-  const bundled = (await listModels(open(cli)))
-    .map((model) => model.model ?? "")
-    .filter((id) => id.startsWith("cline-free/"));
+  // 4. With no good read yet, the bundled ClinePass models and free tier are listed, and a saved
+  // ClinePass model still reaches the session.
+  const fresh = open(cli);
+  const bundledIds = (await listModels(fresh)).map((model) => model.model ?? "");
+  assert.ok(bundledIds.includes("cline-pass/glm-5.3"), "With no good read, the bundled ClinePass models are listed.");
+  await rm(log, { force: true });
+  const freshThread = await startThread(fresh, { model: "cline-pass/glm-5.3", cwd: workspace });
+  assert.equal((await runTurn(fresh, freshThread, { model: "cline-pass/glm-5.3" })).error, null);
+  const freshPrompt = (await readJsonl<LogEntry>(log))
+    .filter((entry) => entry.sessionId === freshThread && entry.event === "prompt")
+    .at(-1);
+  assert.equal(freshPrompt?.model, "cline-pass/glm-5.3", "A bundled ClinePass model runs with no good read.");
+  assert.equal(freshPrompt?.provider, "cline-pass", "A bundled ClinePass model runs on the cline-pass provider.");
+  const bundled = bundledIds.filter((id) => id.startsWith("cline-free/"));
   assert.deepEqual(
     bundled,
     [
