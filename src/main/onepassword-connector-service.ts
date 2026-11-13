@@ -204,6 +204,21 @@ async function createSdkClient(token: string, appVersion: string): Promise<OnePa
 }
 
 /**
+ * The text for a token that did not connect. The SDK names most failures only in their message. A
+ * failure that no pattern matches shows its detail, not a cause that can be wrong.
+ */
+function tokenConnectErrorText(error: unknown): string {
+  if (error instanceof OnePasswordConnectError) return error.message;
+  const message = error instanceof Error ? error.message : String(error);
+  if (/rate limit exceeded/i.test(message)) return sourceText("error.connector.onePasswordRateLimited");
+  if (/request library compatibility issue|request timeout/i.test(message))
+    return sourceText("error.connector.onePasswordUnreachable");
+  if (/invalid service account token|bad service account token|you are not authenticated/i.test(message))
+    return sourceText("error.connector.onePasswordTokenRejected");
+  return sourceText("error.connector.onePasswordUnexpected", { detail: redactText(message) });
+}
+
+/**
  * Owns the 1Password connection: Connect through the CLI, a pasted token, the stored token, and the
  * list of logins it reads. It never imports the agent service, which reads it as a `PasswordVault`.
  *
@@ -396,10 +411,7 @@ export class OnePasswordConnectorService implements PasswordVault {
         Effect.sync(() => {
           if (this.#connecting !== controller || controller.signal.aborted) return;
           logger.warn("Unable to connect 1Password with a token", { cause: toLogValue(error) });
-          this.#error =
-            error instanceof OnePasswordConnectError
-              ? error.message
-              : sourceText("error.connector.onePasswordTokenRejected");
+          this.#error = tokenConnectErrorText(error);
         }),
       ),
       Effect.ensuring(this.#finishConnecting(controller)),

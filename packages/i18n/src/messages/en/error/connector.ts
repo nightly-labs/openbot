@@ -31,6 +31,9 @@ export const messages = defineMessages("error.connector", {
   "error.connector.onePasswordCliFailed": "The 1Password CLI failed: {detail}",
   "error.connector.onePasswordUnexpected": "1Password sent an unexpected answer: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password did not accept the service account token.",
+  "error.connector.onePasswordUnreachable":
+    "OpenBot cannot reach 1Password. Check the internet connection, then try again.",
+  "error.connector.onePasswordRateLimited": "1Password received too many requests. Wait a few minutes, then try again.",
   "error.connector.onePasswordNoVault":
     "The service account cannot read a vault. Give it access to a vault, then try again.",
   "error.connector.onePasswordFileUnreadable": "The 1Password connection file is unreadable.",

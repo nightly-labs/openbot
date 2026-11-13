@@ -21,6 +21,10 @@ export const messages = {
   "error.connector.onePasswordCliFailed": "1Password CLI が失敗しました: {detail}",
   "error.connector.onePasswordUnexpected": "1Password から予期しない応答がありました: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password はサービスアカウントのトークンを受け付けませんでした。",
+  "error.connector.onePasswordUnreachable":
+    "OpenBot は 1Password に接続できませんでした。インターネット接続を確認してから、もう一度お試しください。",
+  "error.connector.onePasswordRateLimited":
+    "1Password へのリクエストが多すぎます。数分待ってから、もう一度お試しください。",
   "error.connector.onePasswordNoVault":
     "サービスアカウントは保管庫を読み取れません。保管庫へのアクセス権を付与してから、もう一度お試しください。",
   "error.connector.onePasswordFileUnreadable": "1Password の接続ファイルを読み取れません。",
