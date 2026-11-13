@@ -218,6 +218,10 @@ export const messages = {
     "Wystąpił błąd po stronie dostawcy modelu. Twoje połączenie nie jest przyczyną. Spróbuj ponownie później lub wybierz inny model.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "Odpowiedź modelu została przerwana lub była nieprawidłowa. Wyślij wiadomość ponownie lub wybierz inny model.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "Odpowiedź modelu trzy razy przekroczyła jego limit wyjścia, więc tura została zatrzymana. Wybierz mniejszy wysiłek lub inny model, a potem wyślij wiadomość ponownie.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "Odpowiedź modelu trzy razy przekroczyła jego limit wyjścia, więc tura została zatrzymana. W Ustawieniach otwórz Własny dostawca, kliknij Edytuj przy tym punkcie końcowym i ustaw większe Maks. wyjście dla tego modelu. Możesz też wybrać mniejszy wysiłek lub inny model.",
   "error.provider.opencodeNetwork":
     "OpenCode nie połączył się z dostawcą modelu. Sprawdź połączenie sieciowe komputera, na którym działa OpenBot, a potem spróbuj ponownie.\n{detail}",
   "error.provider.codexStateBusy":

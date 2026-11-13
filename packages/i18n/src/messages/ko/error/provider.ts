@@ -221,6 +221,10 @@ export const messages = {
     "모델 제공자 쪽에서 오류가 났어요. 회원님의 연결 문제가 아니에요. 나중에 다시 시도하거나 다른 모델을 선택하세요.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "모델의 응답이 중간에 끊겼거나 올바르지 않았어요. 메시지를 다시 보내거나 다른 모델을 선택하세요.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "모델의 응답이 출력 한도를 세 번 넘어서 턴이 중지되었습니다. 더 낮은 강도나 다른 모델을 선택한 다음 메시지를 다시 보내세요.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "모델의 응답이 출력 한도를 세 번 넘어서 턴이 중지되었습니다. 설정에서 사용자 지정 제공자를 열고 이 엔드포인트의 편집을 클릭한 다음 이 모델의 최대 출력을 더 크게 설정하세요. 또는 더 낮은 강도나 다른 모델을 선택하세요.",
   "error.provider.opencodeNetwork":
     "OpenCode가 모델 제공자에 연결할 수 없었어요. OpenBot을 실행하는 컴퓨터의 네트워크 연결을 확인한 후 다시 시도해 주세요.\n{detail}",
   "error.provider.codexStateBusy":

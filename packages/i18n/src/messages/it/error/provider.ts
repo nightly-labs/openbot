@@ -225,6 +225,10 @@ export const messages = {
     "Il provider del modello è andato in errore dal suo lato. La tua connessione non c'entra. Riprova più tardi o scegli un altro modello.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "La risposta del modello si è interrotta o non era valida. Invia di nuovo il messaggio o scegli un altro modello.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "La risposta del modello ha superato il suo limite di output tre volte, quindi il turno si è fermato. Scegli un impegno più basso o un altro modello, poi invia di nuovo il messaggio.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "La risposta del modello ha superato il suo limite di output tre volte, quindi il turno si è fermato. In Impostazioni, apri Provider personalizzato, fai clic su Modifica per questo endpoint e imposta un Output massimo più alto per questo modello. Oppure scegli un impegno più basso o un altro modello.",
   "error.provider.opencodeNetwork":
     "OpenCode non è riuscito a connettersi al provider del modello. Controlla la connessione di rete del computer che esegue OpenBot, poi riprova.\n{detail}",
   "error.provider.codexStateBusy":

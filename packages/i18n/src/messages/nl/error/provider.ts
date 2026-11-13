@@ -223,6 +223,10 @@ export const messages = {
     "De modelaanbieder had een storing aan zijn kant. Het ligt niet aan je verbinding. Probeer het later opnieuw of kies een ander model.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "Het antwoord van het model werd afgebroken of was ongeldig. Stuur je bericht opnieuw of kies een ander model.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "Het antwoord van het model was drie keer langer dan de outputlimiet, dus de beurt is gestopt. Kies een lager denkniveau of een ander model en stuur je bericht opnieuw.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "Het antwoord van het model was drie keer langer dan de outputlimiet, dus de beurt is gestopt. Open in Instellingen Eigen aanbieder, klik bij dit endpoint op Bewerken en stel een grotere Max. output in voor dit model. Of kies een lager denkniveau of een ander model.",
   "error.provider.opencodeNetwork":
     "OpenCode kon geen verbinding maken met de modelaanbieder. Controleer de netwerkverbinding van de computer waarop OpenBot draait en probeer het opnieuw.\n{detail}",
   "error.provider.codexStateBusy":

@@ -232,6 +232,10 @@ export const messages = {
     "Beim Modellanbieter ist ein Fehler aufgetreten. Deine Verbindung ist nicht die Ursache. Versuche es später erneut oder wähle ein anderes Modell.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "Die Antwort des Modells wurde abgebrochen oder war ungültig. Sende deine Nachricht erneut oder wähle ein anderes Modell.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "Die Antwort des Modells war dreimal länger als sein Ausgabelimit, darum wurde der Durchgang beendet. Wähle einen geringeren Aufwand oder ein anderes Modell und sende deine Nachricht erneut.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "Die Antwort des Modells war dreimal länger als sein Ausgabelimit, darum wurde der Durchgang beendet. Öffne in den Einstellungen Eigener Anbieter, klicke bei diesem Endpunkt auf Bearbeiten und lege für dieses Modell eine größere Max. Ausgabe fest. Oder wähle einen geringeren Aufwand oder ein anderes Modell.",
   "error.provider.opencodeNetwork":
     "OpenCode konnte keine Verbindung zum Modellanbieter herstellen. Prüfe die Netzwerkverbindung des Computers, auf dem OpenBot läuft, und versuche es erneut.\n{detail}",
   "error.provider.codexStateBusy":

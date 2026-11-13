@@ -226,6 +226,10 @@ export const messages = {
     "Ocorreu uma falha no provedor do modelo. Sua conexão não é a causa. Tente novamente mais tarde ou escolha outro modelo.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "A resposta do modelo foi interrompida ou não era válida. Envie sua mensagem de novo ou escolha outro modelo.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "A resposta do modelo passou do limite de saída três vezes, então o turno parou. Escolha um esforço menor ou outro modelo e envie sua mensagem de novo.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "A resposta do modelo passou do limite de saída três vezes, então o turno parou. Em Configurações, abra Provedor personalizado, clique em Editar neste endpoint e defina uma Saída máxima maior para este modelo. Ou escolha um esforço menor ou outro modelo.",
   "error.provider.opencodeNetwork":
     "O OpenCode não conseguiu se conectar ao provedor do modelo. Verifique a conexão de rede do computador que executa o OpenBot e tente novamente.\n{detail}",
   "error.provider.codexStateBusy":
