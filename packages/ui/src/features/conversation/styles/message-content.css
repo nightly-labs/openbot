@@ -806,6 +806,12 @@
   font: inherit;
 }
 
+/* An agent reply with code has no bubble, and the sidebar colour is the chat canvas colour, so the code
+   would sit on the chat. It takes the surface of the block, as the text of a reply takes its bubble. */
+.message-entry-agent .ui-bubble-variant-ghost .message-code-scroll {
+  background: transparent;
+}
+
 .message-code-line {
   min-height: 19px;
   display: flex;
