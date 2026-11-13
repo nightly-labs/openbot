@@ -293,7 +293,7 @@ try {
     cardsInParent &&
     declineNotices === 2;
   if (!report.passed)
-    report.error = `Expected cards ${JSON.stringify(expected)}, consents ${JSON.stringify(expectedConsents)}, two consent cards in the parent chat and turn, and two decline notices.`;
+    report.error ??= `Expected cards ${JSON.stringify(expected)}, consents ${JSON.stringify(expectedConsents)}, two consent cards in the parent chat and turn, and two decline notices.`;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);
 } finally {

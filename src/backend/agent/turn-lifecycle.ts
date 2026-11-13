@@ -47,7 +47,7 @@ import {
 } from "../protocol";
 import type { AgentMemories } from "./agent-memories";
 import { answerFilePaths } from "./answer-file-paths";
-import type { AttentionBrowserHost, AttentionRegistry } from "./attention-registry";
+import type { AttentionBrowserHost, AttentionRegistry, CodexSubagentParent } from "./attention-registry";
 import type { BrowserUploadTarget } from "./browser-uploads";
 import { type ContextCompaction, compactsOnRequest } from "./context-compaction";
 import type { ConversationRuntime } from "./conversation-runtime";
@@ -438,7 +438,7 @@ export class TurnLifecycle {
    * The running Codex subagents, under their own thread id, with the turn whose list shows them.
    * Codex sends the items of these threads too, and OpenBot knows no agent for them.
    */
-  readonly #codexChildren = new Map<string, { agentId: string; threadId: string; turnId: string }>();
+  readonly #codexChildren = new Map<string, CodexSubagentParent>();
   /**
    * The turns of each agent whose subagents still run. A background subagent keeps its turn here after
    * the turn ended. Boot recovery stops every subagent, so nothing here outlives the process.
@@ -2470,12 +2470,14 @@ export class TurnLifecycle {
     const childThreadId = getString(item, "agentThreadId");
     if (!childThreadId) return;
     const kind = getString(item, "kind");
-    if (kind === "completed" || kind === "interrupted") this.#codexChildren.delete(childThreadId);
-    else this.#codexChildren.set(childThreadId, { agentId, threadId, turnId });
+    // Only a subagent that starts or takes new input works on; any other kind ends the link.
+    if (kind === "started" || kind === "interacted")
+      this.#codexChildren.set(childThreadId, { agentId, threadId, turnId });
+    else this.#codexChildren.delete(childThreadId);
   }
 
   /** The agent, thread and turn of a running Codex subagent, by the subagent's own thread. */
-  codexSubagentParent(childThreadId: string): { agentId: string; threadId: string; turnId: string } | undefined {
+  codexSubagentParent(childThreadId: string): CodexSubagentParent | undefined {
     return this.#codexChildren.get(childThreadId);
   }
 
