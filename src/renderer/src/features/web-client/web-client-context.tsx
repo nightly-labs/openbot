@@ -30,7 +30,7 @@ import type {
   TeamPresenceSnapshot,
   TeamRealtimeEvent,
 } from "@openbot/contracts/ipc";
-import { canAdministerServer } from "@openbot/contracts/ipc";
+import { canAdministerServer, openExchangesOutside } from "@openbot/contracts/ipc";
 import {
   AGENT_COLORS_CAPABILITY,
   AGENT_HIDDEN_CAPABILITY,
@@ -1669,6 +1669,9 @@ export function createWebWorkspace(
         item.error = null;
         item.olderError = null;
       });
+      if (!older)
+        for (const messageId of openExchangesOutside(state.conversations[id]?.page?.messages ?? [], page.messages))
+          refreshOpenExchange(id, messageId);
     } catch (error) {
       if (!disposed && current === generation && !blockAccess(error))
         setState((draft) => {
@@ -1884,6 +1887,41 @@ export function createWebWorkspace(
     }
   }
   // Coalesce event bursts; an event during a read schedules one further authoritative read.
+  /** The reads of loaded open requests that a latest page left out. A change during a read reads it again. */
+  const openExchangeReads = new Map<string, { again: boolean }>();
+  /** Puts the host's current copy of one loaded request in place. The rest of the chat stays as it is. */
+  function refreshOpenExchange(id: string, messageId: string) {
+    const readAround = runtime.conversationAround;
+    // A host without pages sends the whole chat in each read, so its copy is never left behind.
+    if (!readAround || !state.capabilities.includes("conversation-pagination")) return;
+    const key = `${id}\0${messageId}`;
+    const running = openExchangeReads.get(key);
+    if (running) {
+      running.again = true;
+      return;
+    }
+    const read = { again: true };
+    openExchangeReads.set(key, read);
+    const current = generation;
+    void (async () => {
+      while (read.again && !disposed && current === generation) {
+        read.again = false;
+        // The page around the request holds its whole turn at least, with the request as the host has it.
+        const page = await readAround(id, messageId, 1);
+        const message = page.messages.find((candidate) => candidate.id === messageId);
+        if (disposed || current !== generation || !message) return;
+        setState((draft) => {
+          const loaded = draft.conversations[id]?.page;
+          if (!loaded || loaded.threadId !== page.threadId || page.revision < loaded.revision) return;
+          const index = loaded.messages.findIndex((candidate) => candidate.id === messageId);
+          if (index >= 0) loaded.messages[index] = message;
+        });
+      }
+    })()
+      // The next latest page reads it again.
+      .catch(() => undefined)
+      .finally(() => openExchangeReads.delete(key));
+  }
   async function refresh() {
     pendingReload = true;
     if (reloadPromise) return reloadPromise;
