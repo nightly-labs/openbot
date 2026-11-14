@@ -394,6 +394,7 @@ import { SERVER_AUDIT_FILE, ServerAuditStore, serverAuditNames } from "./server-
 import { AGENT_PROCESS_VARIABLE, agentProcessEnvironment, ServerMemory } from "./server-memory";
 import { ServerMode, type ServerModeEnvironment } from "./server-mode";
 import { ServerPersonalityPreferenceStore } from "./server-personality-preference-store";
+import { ServerSetupPage } from "./server-setup-page";
 import { ServerTimezonePreferenceStore } from "./server-timezone-preference-store";
 import {
   configureApplicationProtocol,
@@ -4491,8 +4492,30 @@ export async function createApplicationServices({
       onError: (message, error) => logger.warn(message, toLogValue(error)),
     });
     serverStartRetry.start();
+    // The setup page of a container (docs/umbrel.md). Only a container starts it: on a computer, its
+    // port would be reachable from the network of that computer.
+    const setupPagePort = serverModeEnvironment?.setupPagePort ?? null;
+    let setupPage: ServerSetupPage | null = null;
+    if (setupPagePort !== null && installationMode !== "container") {
+      logger.warn("OPENBOT_SETUP_PAGE_PORT works only in the OpenBot container. The setup page did not start.");
+    } else if (setupPagePort !== null) {
+      const page = new ServerSetupPage({
+        port: setupPagePort,
+        address: "0.0.0.0",
+        rendererRoot: resolve(__dirname, "../renderer"),
+        request: serverMode.setupRequest,
+        onError: (message, error) => logger.warn(message, toLogValue(error)),
+      });
+      await runCauseEffect(page.listen()).then(
+        () => {
+          setupPage = page;
+        },
+        (error) => logger.error("The server setup page did not start:", toLogValue(error)),
+      );
+    }
     teardown.push(TEARDOWN_ORDER.serverMode, "the server control socket", async () => {
       await Effect.runPromise(serverStartRetry.stop());
+      if (setupPage) await Effect.runPromise(setupPage.close());
       await Effect.runPromise(serverMode.close());
     });
   }
