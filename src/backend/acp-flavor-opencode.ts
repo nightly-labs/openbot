@@ -105,7 +105,7 @@ const OPENCODE_REQUEST_FAILURES = [
   ["error.provider.opencodeInvalidUpload", /\binvalid upload request\b/iu],
   [
     "error.provider.opencodeProviderFailed",
-    /\binternal server error\b|\bservice unavailable\b|\bendpoint is unavailable\b|\bbad gateway\b|\bgateway time-?out\b|\boverloaded\b|\bupstream request failed\b|\bDEGRADED function cannot be invoked\b/iu,
+    /\binternal server error\b|\bservice unavailable\b|\bendpoint is unavailable\b|\bbad gateway\b|\bgateway time-?out\b|\boverloaded\b|\bupstream request failed\b/iu,
   ],
   [
     "error.provider.opencodeNetwork",
@@ -162,6 +162,8 @@ function openCodeRequestFailure(
     log(`The model provider does not serve this model to the account: ${reason}`);
     return sourceText("error.provider.opencodeModelNotServed");
   }
+  if (NVIDIA_MODEL_DEGRADED.test(reason))
+    return sourceText("error.provider.opencodeProviderFailed", { detail: shownFailureDetail(redact(reason)) });
   const key = OPENCODE_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
   if (!key) return detail;
   return sourceText(key, { detail: shownFailureDetail(redact(reason)) });
