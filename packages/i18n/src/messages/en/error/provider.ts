@@ -425,6 +425,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.piSessionMissing": "The Pi session file is not available on this computer.",
   "error.provider.piResumeCancelled": "Pi cancelled the session resume. Try again.",
   "error.provider.piSessionIdentity": "Pi returned a different session. The saved session was not replaced.",
+  "error.provider.piExtensionFailed":
+    "Pi stopped because it could not load an extension. Remove or update this extension, then try again. {detail}",
   "error.provider.piModelInvalid": "Select a Pi model that includes its provider.",
   "error.provider.piToolInvalid": "The tool returned an invalid result.",
   "error.provider.piSignIn": "Use /login in Pi on the host computer. Close Pi when sign-in is complete.",

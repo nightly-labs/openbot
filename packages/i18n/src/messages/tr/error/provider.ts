@@ -444,6 +444,8 @@ export const messages = {
   "error.provider.piSessionMissing": "Pi oturum dosyası bu bilgisayarda yok.",
   "error.provider.piResumeCancelled": "Pi oturumu sürdürmeyi iptal etti. Tekrar deneyin.",
   "error.provider.piSessionIdentity": "Pi farklı bir oturum döndürdü. Kayıtlı oturum değiştirilmedi.",
+  "error.provider.piExtensionFailed":
+    "Pi bir uzantıyı yükleyemediği için durdu. Bu uzantıyı kaldırın veya güncelleyin, ardından tekrar deneyin. {detail}",
   "error.provider.piModelInvalid": "Sağlayıcısını içeren bir Pi modeli seçin.",
   "error.provider.piToolInvalid": "Araç geçersiz bir sonuç döndürdü.",
   "error.provider.piSignIn": "Ana makinede Pi içinde /login komutunu kullanın. Oturum açma tamamlanınca Pi'yi kapatın.",

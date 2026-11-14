@@ -435,6 +435,8 @@ export const messages = {
   "error.provider.piSessionMissing": "Файл сессии Pi недоступен на этом компьютере.",
   "error.provider.piResumeCancelled": "Pi отменил возобновление сессии. Повторите попытку.",
   "error.provider.piSessionIdentity": "Pi вернул другую сессию. Сохранённая сессия не заменена.",
+  "error.provider.piExtensionFailed":
+    "Pi остановился, потому что не смог загрузить расширение. Удалите или обновите это расширение и повторите попытку. {detail}",
   "error.provider.piModelInvalid": "Выберите модель Pi с указанием её провайдера.",
   "error.provider.piToolInvalid": "Инструмент вернул некорректный результат.",
   "error.provider.piSignIn": "Выполните /login в Pi на компьютере-хосте. Закройте Pi, когда вход завершится.",
