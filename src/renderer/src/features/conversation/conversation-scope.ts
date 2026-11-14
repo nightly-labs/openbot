@@ -990,6 +990,8 @@ export function createConversationViewScope(props: ConversationProps) {
   const messagePins = createMessagePinsStore({ props });
   /** Moves the open thread's caret to the end of the dictated text. */
   const [threadFocusRequest, setThreadFocusRequest] = createSignal(0);
+  /** Moves the focus to the open thread's message box, as text from a page does in the agent's chat. */
+  const requestThreadFocus = () => setThreadFocusRequest((current) => current + 1);
   const voice = createVoiceStore({
     props,
     resources,
@@ -2517,6 +2519,7 @@ export function createConversationViewScope(props: ConversationProps) {
     threadComposer,
     threadQueue,
     threadFocusRequest,
+    requestThreadFocus,
     branchThread,
     threadVoiceLiveText,
     threadVoiceOwned,

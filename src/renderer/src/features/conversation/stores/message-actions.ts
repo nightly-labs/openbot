@@ -41,6 +41,25 @@ export interface MessageActionsDeps {
   setComposerFocusRequest: (update: (current: number) => number) => void;
 }
 
+/** The draft with the text that a visual reply's page wrote at its end. */
+export function draftWithPageText(draft: string, text: string): string {
+  const current = draft.trimEnd();
+  return current ? `${current}\n${text}` : text;
+}
+
+/**
+ * The draft with the page state as a quote of the page at its start. The latest state replaces the one
+ * before it, and empty text removes it. Undefined when the draft does not change.
+ */
+export function draftWithPageContext(draft: string, messageId: string, text: string): string | undefined {
+  const quote = text.trim() ? serializeChatTagReference("quote", limitedQuoteText(text), messageId) : "";
+  const shown = chatTagReferences(draft).find((reference) => reference.kind === "quote" && reference.id === messageId);
+  if (!shown && !quote) return undefined;
+  // A removed quote takes the space that the editor put after it.
+  const end = shown && !quote && draft[shown.end] === " " ? shown.end + 1 : shown?.end;
+  return shown ? `${draft.slice(0, shown.start)}${quote}${draft.slice(end)}` : `${quote} ${draft}`;
+}
+
 export function createMessageActions(deps: MessageActionsDeps) {
   function replyToMessage(message: AgentMessage) {
     deps.updateCurrentDraft({ replyToMessageId: message.id });
@@ -54,8 +73,7 @@ export function createMessageActions(deps: MessageActionsDeps) {
    * sends it, so a page never sends a message itself.
    */
   function addPageText(text: string) {
-    const draft = deps.currentDraft().text.trimEnd();
-    deps.updateCurrentDraft({ text: draft ? `${draft}\n${text}` : text });
+    deps.updateCurrentDraft({ text: draftWithPageText(deps.currentDraft().text, text) });
     deps.setComposerFocusRequest((value) => value + 1);
   }
 
@@ -65,15 +83,8 @@ export function createMessageActions(deps: MessageActionsDeps) {
    * it, and empty text removes it.
    */
   function setPageContext(message: AgentMessage, text: string) {
-    const draft = deps.currentDraft().text;
-    const quote = text.trim() ? serializeChatTagReference("quote", limitedQuoteText(text), message.id) : "";
-    const shown = chatTagReferences(draft).find(
-      (reference) => reference.kind === "quote" && reference.id === message.id,
-    );
-    // A removed quote takes the space that the editor put after it.
-    const end = shown && !quote && draft[shown.end] === " " ? shown.end + 1 : shown?.end;
-    const next = shown ? `${draft.slice(0, shown.start)}${quote}${draft.slice(end)}` : quote && `${quote} ${draft}`;
-    if (shown || quote) deps.updateCurrentDraft({ text: next });
+    const next = draftWithPageContext(deps.currentDraft().text, message.id, text);
+    if (next !== undefined) deps.updateCurrentDraft({ text: next });
   }
 
   async function reactToMessage(message: AgentMessage, emoji: MessageReaction | null) {
