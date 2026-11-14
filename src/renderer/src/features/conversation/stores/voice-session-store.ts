@@ -70,11 +70,9 @@ export function createVoiceSessions() {
       session = next;
       return next.conversation;
     },
-    /** Ends the conversation of this kind, and turns it off. Before it opens, it only turns it off. */
+    /** Ends the conversation of this kind. It stays on, so it starts again when its chat opens again. */
     end(kind: VoiceConversationKind): void {
-      if (session ? session.kind !== kind : activeAgentId() === null) return;
-      setActiveAgentId(null);
-      end();
+      if (session?.kind === kind) end();
     },
   };
 }

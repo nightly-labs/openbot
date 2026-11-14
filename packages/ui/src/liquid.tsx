@@ -1,7 +1,7 @@
 /**
  * Liquid shapes, as the agent dock and the voice conversation have them: shapes that flow out of an
- * edge of the window frame and back into it. The shapes are one liquid under an SVG "goo" filter, a
- * tab profile gives the dock its shape at rest, and a small spring engine moves them.
+ * edge of the window frame and back into it. The shapes are one liquid under an SVG "goo" filter, and
+ * a small spring engine moves them.
  */
 
 import { prefersReducedMotion } from "./utils";
@@ -25,93 +25,6 @@ export function GooFilter(props: { id: string; class?: string }) {
       </filter>
     </svg>
   );
-}
-
-/* ---------- The tab profile ---------- */
-
-/**
- * The profile of each end of a tab, as points [width from the frame, distance from the end of the
- * tab's straight part]. Width 84.8 is the full tab. A round shoulder turns until the edge is
- * perpendicular to the frame at the bend; then a concave tail runs into the frame along it, so the
- * tab seems to grow out of the frame. Each segment is a cubic curve: two control points and its end.
- */
-const PROFILE_WIDTH = 84.8;
-export type ProfilePoint = readonly [width: number, distance: number];
-const PROFILE_START: ProfilePoint = [PROFILE_WIDTH, 0];
-const PROFILE: readonly (readonly [ProfilePoint, ProfilePoint, ProfilePoint])[] = [
-  // The shoulder.
-  [
-    [84.8, 15],
-    [70, 30],
-    [54, 30],
-  ],
-  // The tail: it leaves the bend flat, then bends down and meets the frame almost along it.
-  [
-    [36, 30],
-    [24, 34.5],
-    [19, 38],
-  ],
-  [
-    [11, 43.5],
-    [2, 54],
-    [0, 64],
-  ],
-];
-const BEND = 30;
-
-/**
- * A tab on a frame edge. `frame` and `side` are on the axis across the edge: the frame line and the
- * far side of the tab. `start` and `end` are on the axis along the edge: the band that the tab holds.
- */
-interface EdgeTab {
-  frame: number;
-  side: number;
-  start: number;
-  end: number;
-}
-
-/** The scale and the placement of the profile. The shoulder sits inside the band and the tail outside it. */
-export function edgeTabFrame(tab: EdgeTab) {
-  const scale = (tab.frame - tab.side) / PROFILE_WIDTH;
-  const size = Math.abs(scale);
-  const across = (width: number) => tab.frame - width * scale;
-  // The shoulder sits inside the band and the tail outside it, so the bend is on the band edge.
-  const up = (distance: number) => tab.start + (BEND - distance) * size;
-  const down = (distance: number) => tab.end - (BEND - distance) * size;
-  return { scale: size, across, up, down };
-}
-
-/**
- * The tab: each end of its side has a round shoulder and then a concave tail that runs into the frame,
- * so the tab seems to grow out of the frame. The path closes at `outside`, past the frame line.
- * `point` writes an (across, along) pair in the coordinates of the caller.
- */
-export function edgeTabPath(tab: EdgeTab, outside: number, point: (across: number, along: number) => string) {
-  const { across, up, down } = edgeTabFrame(tab);
-  const at = (place: (distance: number) => number, [width, distance]: ProfilePoint) =>
-    point(across(width), place(distance));
-  // The start end runs from the tip to the side, so it takes each segment backwards.
-  const startEnd: string[] = [];
-  const endEnd: string[] = [];
-  let from = PROFILE_START;
-  for (const [first, second, end] of PROFILE) {
-    endEnd.push(`C ${at(down, first)} ${at(down, second)} ${at(down, end)}`);
-    startEnd.unshift(`C ${at(up, second)} ${at(up, first)} ${at(up, from)}`);
-    from = end;
-  }
-  const tipStart = up(from[1]);
-  const tipEnd = down(from[1]);
-  return [
-    `M ${point(outside, tipStart - 20)}`,
-    `L ${point(tab.frame, tipStart - 20)}`,
-    `L ${point(tab.frame, tipStart)}`,
-    ...startEnd,
-    `L ${at(down, PROFILE_START)}`,
-    ...endEnd,
-    `L ${point(tab.frame, tipEnd + 20)}`,
-    `L ${point(outside, tipEnd + 20)}`,
-    "Z",
-  ].join(" ");
 }
 
 /* ---------- The open curve ---------- */

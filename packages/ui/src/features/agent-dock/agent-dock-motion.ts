@@ -1,10 +1,10 @@
 /**
  * The shape and the motion of the agent dock. The dock, the chat panel, the neck between them and
  * the drop that carries an agent in or out are one liquid under an SVG "goo" filter. These functions
- * give their geometry, in px. The tab profile and the spring engine are in `liquid.tsx`.
+ * give their geometry, in px. The goo filter and the spring engine are in `liquid.tsx`.
  */
 
-import { edgeTabFrame, edgeTabPath, LIQUID_PAD, type ProfilePoint, type SpringConfig } from "../../liquid";
+import { LIQUID_PAD, type SpringConfig } from "../../liquid";
 
 export const SEAT = 44;
 const SEAT_GAP = 10;
@@ -20,6 +20,35 @@ export const DOCK_LEFT = STAGE_WIDTH - DOCK_WIDTH;
 export const SEAT_CENTER_X = DOCK_LEFT + DOCK_WIDTH / 2;
 /** The strip of window frame on the right edge. The dock grows out of its inner edge. */
 const FRAME_EDGE = 5;
+/**
+ * The profile of each dock end, as points [width from the frame, distance from the end of the dock
+ * side's straight part]. Width 84.8 is the full dock. A round shoulder turns until the edge is
+ * perpendicular to the frame at the bend; then a concave tail runs into the frame along it, so the
+ * dock seems to grow out of the frame. Each segment is a cubic curve: two control points and its end.
+ */
+const PROFILE_WIDTH = 84.8;
+type ProfilePoint = readonly [width: number, distance: number];
+const PROFILE_START: ProfilePoint = [PROFILE_WIDTH, 0];
+const PROFILE: readonly (readonly [ProfilePoint, ProfilePoint, ProfilePoint])[] = [
+  // The shoulder.
+  [
+    [84.8, 15],
+    [70, 30],
+    [54, 30],
+  ],
+  // The tail: it leaves the bend flat, then bends down and meets the frame almost along it.
+  [
+    [36, 30],
+    [24, 34.5],
+    [19, 38],
+  ],
+  [
+    [11, 43.5],
+    [2, 54],
+    [0, 64],
+  ],
+];
+const BEND = 30;
 /**
  * The handle below the dock: a quarter circle beside the bottom tail, from its top end above the
  * centre to its bottom end right of the centre. Profile units.
@@ -81,10 +110,17 @@ export function dockBand(height: number, stretch = 0) {
   return { top: top - Math.max(0, stretch), bottom: top + height + Math.max(0, -stretch) };
 }
 
-/** The dock on the frame edge, before and after the stretch of a drag. Liquid-layer coordinates. */
-function dockTab(height: number, stretch: number) {
+/** The scale and the placement of the dock-end profile. Liquid-layer coordinates. */
+function profileFrame(height: number, stretch: number) {
   const { top, bottom } = dockBand(height, stretch);
-  return { frame: LIQUID_PAD + STAGE_WIDTH - FRAME_EDGE, side: LIQUID_PAD + DOCK_LEFT, start: top, end: bottom };
+  const side = LIQUID_PAD + DOCK_LEFT;
+  const frame = LIQUID_PAD + STAGE_WIDTH - FRAME_EDGE;
+  const scale = (frame - side) / PROFILE_WIDTH;
+  const x = (width: number) => frame - width * scale;
+  // The shoulder sits inside the band and the tail outside it, so the bend is on the band edge.
+  const up = (distance: number) => top + (BEND - distance) * scale;
+  const down = (distance: number) => bottom - (BEND - distance) * scale;
+  return { frame, scale, x, up, down };
 }
 
 /**
@@ -92,12 +128,37 @@ function dockTab(height: number, stretch: number) {
  * window frame, so the dock seems to grow out of the frame. Liquid-layer coordinates.
  */
 export function dockPath(height: number, stretch = 0) {
-  return edgeTabPath(dockTab(height, stretch), LIQUID_WIDTH, (across, along) => `${across} ${along}`);
+  const { frame, x, up, down } = profileFrame(height, stretch);
+  const right = LIQUID_WIDTH;
+  const point = (place: (distance: number) => number, [width, distance]: ProfilePoint) =>
+    `${x(width)} ${place(distance)}`;
+  // The top end runs from the tip to the side, so it takes each segment backwards.
+  const topEnd: string[] = [];
+  const bottomEnd: string[] = [];
+  let from = PROFILE_START;
+  for (const [first, second, end] of PROFILE) {
+    bottomEnd.push(`C ${point(down, first)} ${point(down, second)} ${point(down, end)}`);
+    topEnd.unshift(`C ${point(up, second)} ${point(up, first)} ${point(up, from)}`);
+    from = end;
+  }
+  const tipTop = up(from[1]);
+  const tipBottom = down(from[1]);
+  return [
+    `M ${right} ${tipTop - 20}`,
+    `L ${frame} ${tipTop - 20}`,
+    `L ${frame} ${tipTop}`,
+    ...topEnd,
+    `L ${point(down, PROFILE_START)}`,
+    ...bottomEnd,
+    `L ${frame} ${tipBottom + 20}`,
+    `L ${right} ${tipBottom + 20}`,
+    "Z",
+  ].join(" ");
 }
 
 /** The handle below the dock: an arc beside the bottom tail. Liquid-layer coordinates. */
 export function dockHandlePath(height: number, stretch = 0) {
-  const { scale, across: x, down } = edgeTabFrame(dockTab(height, stretch));
+  const { scale, x, down } = profileFrame(height, stretch);
   const [width, distance] = HANDLE_CENTER;
   const radius = HANDLE_RADIUS * scale;
   const startX = x(width);

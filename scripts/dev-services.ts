@@ -13,7 +13,6 @@ import {
   readDevelopmentInstanceId,
 } from "../src/main/development-profile";
 import { developmentRemoteConnectionPath } from "../src/main/development-runtime-directory";
-import { VOICE_RUNTIME_ADDON } from "../src/main/voice-model-service";
 import {
   type DevInstanceRecord,
   removeDevInstanceRecord,
@@ -296,8 +295,7 @@ async function readHostingDeveloperKey(): Promise<string> {
  * starts after the time limit, without local voice.
  */
 function prepareVoiceRuntime(): void {
-  if (existsSync(join(projectRoot, ".openbot-build/voice/runtime", VOICE_RUNTIME_ADDON))) return;
-  logger.info("Preparing the local voice runtime.");
+  // The script checks the version and every runtime file itself, so a partial or old runtime is repaired.
   try {
     execFileSync(process.execPath, ["run", "voice:prepare-runtime"], {
       cwd: projectRoot,
