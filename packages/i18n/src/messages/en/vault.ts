@@ -88,6 +88,7 @@ export const messages = defineMessages("vault", {
   "vault.placeholder.variableName": "OPENAI_API_KEY",
   "vault.placeholder.expiry": "MM/YY",
   "vault.placeholder.saved": "Saved. Type to replace it.",
+  "vault.expiryInvalid": "Enter the month and year as MM/YY.",
   "vault.billingNone": "None",
   "vault.chooseCountry": "Choose a country",
   "vault.showPassword": "Show password",

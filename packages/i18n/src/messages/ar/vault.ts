@@ -87,6 +87,7 @@ export const messages = {
   "vault.placeholder.variableName": "OPENAI_API_KEY",
   "vault.placeholder.expiry": "MM/YY",
   "vault.placeholder.saved": "محفوظ. اكتب لاستبداله.",
+  "vault.expiryInvalid": "أدخل الشهر والسنة بالشكل MM/YY.",
   "vault.billingNone": "بلا",
   "vault.chooseCountry": "اختر بلدًا",
   "vault.showPassword": "إظهار كلمة المرور",
