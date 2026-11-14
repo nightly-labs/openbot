@@ -220,6 +220,39 @@
   height: var(--openbot-icon-md);
 }
 
+.workflow-page-loading {
+  box-sizing: border-box;
+  display: grid;
+  align-content: start;
+  gap: var(--openbot-space-4);
+  min-height: 100%;
+  padding: var(--openbot-space-8);
+  background: var(--openbot-bg-frame);
+}
+
+.workflow-page-loading-content {
+  display: grid;
+  gap: var(--openbot-space-3);
+  width: min(100%, 36rem);
+  margin-inline: auto;
+  padding-top: var(--openbot-space-8);
+}
+
+.workflow-page-loading-title {
+  width: 45%;
+  height: 1.75rem;
+  margin-bottom: var(--openbot-space-3);
+}
+
+.workflow-page-loading-line {
+  width: 100%;
+  height: 2.5rem;
+}
+
+.workflow-page-loading-line-short {
+  width: 72%;
+}
+
 /* The workflow switcher: the name and a small chevron in one button. The name has the type of the other page titles. */
 .wfn-stage .wfn-hud-title .wfn-hud-switcher {
   gap: var(--openbot-space-1-5);

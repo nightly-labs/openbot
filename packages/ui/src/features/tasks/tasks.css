@@ -27,6 +27,27 @@
   padding: var(--openbot-space-6) var(--openbot-space-2) var(--openbot-space-3);
 }
 
+.tasks-page-loading {
+  display: grid;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-4) var(--openbot-space-2);
+}
+
+.tasks-page-loading-heading {
+  width: 8rem;
+  height: 1rem;
+  margin-bottom: var(--openbot-space-1);
+}
+
+.tasks-page-loading-row {
+  width: 100%;
+  height: 3.25rem;
+}
+
+.tasks-page-loading-row-short {
+  width: 76%;
+}
+
 .tasks-page-avatar.agent-avatar {
   --agent-avatar-optical-offset: -2px;
 
