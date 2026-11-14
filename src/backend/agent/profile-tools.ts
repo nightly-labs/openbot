@@ -48,7 +48,7 @@ const profileFields = {
     .refine(isAvatarHue, "Invalid avatar hue.")
     .nullable()
     .describe(
-      `The color of the generated avatar face: ${AVATAR_HUES.map((hue) => `${hue} ${AVATAR_HUE_NAMES[hue]}`).join(", ")}, or null for an automatic color. Use it when the user asks for a color.`,
+      `The color of the generated avatar face. Only one of ${AVATAR_HUES.map((hue) => `${hue} ${AVATAR_HUE_NAMES[hue]}`).join(", ")}, or null for an automatic color. For a color that is not in the list, use the nearest one.`,
     ),
 };
 
