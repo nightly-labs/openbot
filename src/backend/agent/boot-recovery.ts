@@ -1,5 +1,5 @@
 import { Cause, Effect, Schema } from "effect";
-import type { AgentProvider } from "../agent-client";
+import { type AgentProvider, MissingPiSessionError } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import { mergeConversationSnapshots } from "../conversation-snapshots";
 import { causeHelpers, reportOriginalFailure } from "../effect-boundary";
@@ -394,8 +394,9 @@ export class BootRecovery {
               } catch (refreshFailure) {
                 this.#hooks.emitError("provider_history_backfill_pending", refreshFailure, agent.id);
               }
-              // No rollout, or none saved yet, means no history to import, so it is not an error to show.
-              if (!containsCause(failure, (cause) => isCodexMissingRollout(cause) || isCodexRolloutPending(cause)))
+              // No rollout or Pi session file, or none saved yet, means no history to import, so it is
+              // not an error to show. Without this, each start showed it again in the chat (#7315).
+              if (!containsCause(failure, (cause) => missingHistory(cause) || isCodexRolloutPending(cause)))
                 this.#hooks.emitError("provider_history_backfill_pending", failure.cause, agent.id);
             }),
           ),
@@ -430,7 +431,12 @@ class BootRecoveryFailed extends Schema.TaggedError<BootRecoveryFailed>()("BootR
 const { sync: recoveryStep, rewrap: toBootRecoveryFailed } = causeHelpers(BootRecoveryFailed);
 
 function unreadableHistory(failure: unknown): boolean {
-  return containsCause(failure, (cause) => cause instanceof LineTooLongError || isCodexMissingRollout(cause));
+  return containsCause(failure, (cause) => cause instanceof LineTooLongError || missingHistory(cause));
+}
+
+/** The provider has no saved history for the session: its file was moved or deleted. */
+function missingHistory(cause: unknown): boolean {
+  return isCodexMissingRollout(cause) || cause instanceof MissingPiSessionError;
 }
 
 function containsCause(value: unknown, matches: (cause: unknown) => boolean): boolean {
