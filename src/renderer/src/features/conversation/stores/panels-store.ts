@@ -542,11 +542,18 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
 
   /**
    * Opens a file of the folder view, so that the panel can go back to the folder, or a link of the
-   * shown file. Both are in the workspace of the agent the panel shows.
+   * shown file. Both are in the workspace of the agent the panel shows. A relative link of a shared
+   * file names a file beside it (#7358). When nothing is there, as for a workspace path in a code
+   * span, the workspace opens it as before.
    */
   function openWorkspaceFolderEntry(path: string) {
     const file = deps.sidebarFilePreview();
-    openWorkspaceFile(path, file?.directory?.path, previewWorkspaceAgentId(), "here");
+    const folder = file?.directory?.path;
+    const agentId = previewWorkspaceAgentId();
+    const openInWorkspace = () => openWorkspaceFile(path, folder, agentId, "here");
+    const sibling = file?.source.kind === "shared" ? sharedSiblingPath(file.source.path, path) : null;
+    if (sibling) openSharedFile(sibling, "here", openInWorkspace);
+    else openInWorkspace();
   }
 
   /**
@@ -773,6 +780,25 @@ function filePreviewError(error: unknown, path: string): string {
     return t("attachment.error.fileNotFound", { name });
   }
   return errorMessage(error, t("attachment.error.previewFile", { name }));
+}
+
+/**
+ * The shared path of a relative link in the shared file at `documentPath`, from the folder of that
+ * file. Null for a path that names its own root, such as `/…`, `~/…`, `C:\…` or `Shared/…`. The host
+ * resolves the `..` parts, and refuses a path that leaves the shared folder. The link is decoded as the
+ * workspace resolver decodes it.
+ */
+function sharedSiblingPath(documentPath: string, link: string): string | null {
+  if (/^(?:[/\\~]|[A-Za-z]:)/u.test(link) || SHARED_FOLDER_PATH.test(link)) return null;
+  const end = Math.max(documentPath.lastIndexOf("/"), documentPath.lastIndexOf("\\"));
+  if (end < 0) return null;
+  let decoded = link;
+  try {
+    decoded = decodeURIComponent(link);
+  } catch {
+    // A literal percent sign can be part of a file name.
+  }
+  return `${documentPath.slice(0, end + 1)}${decoded}`;
 }
 
 /** The same file content, so a read again need not replace the shown one. */
