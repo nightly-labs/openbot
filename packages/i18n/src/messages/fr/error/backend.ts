@@ -89,6 +89,10 @@ export const messages = {
     "Attendez la fin du travail dans ce canal, puis supprimez son historique.",
   "error.backend.channelCompactUnavailable":
     "Aucun membre de ce canal ne peut compacter son contexte maintenant. Un membre doit d’abord répondre dans le canal, et son fournisseur doit prendre en charge la compaction.",
+  "error.backend.channelCompactNoSession":
+    "Les membres de ce canal n’ont pas encore de conversation à compacter. Compactez-le après la réponse d’un membre dans le canal.",
+  "error.backend.channelCompactNotSupported":
+    "Aucun membre de ce canal ne peut compacter à la demande. Les membres qui le prennent en charge compactent leur contexte automatiquement quand il est presque plein.",
   "error.backend.channelArchived": "Restaurez ce canal avant d’envoyer des messages ou de modifier des tâches.",
   "error.backend.channelReferenceUnavailable": "Le message de canal référencé est indisponible.",
   "error.backend.channelTaskNotFound": "Tâche de canal introuvable.",
@@ -125,6 +129,7 @@ export const messages = {
   "error.backend.memoryOperationFailed": "L’opération sur le souvenir a échoué. Réessayez.",
   "error.backend.memoryGone": "Ce souvenir n’existe plus.",
   "error.backend.routineGone": "Cette routine n’existe plus.",
+  "error.backend.routineRunGone": "Cette exécution de la routine n’existe plus.",
   "error.backend.turnNotStarted": "Le fournisseur n’a pas démarré ce tour.",
   "error.backend.routineResultConnectionOff":
     "Cette connexion de messagerie est désactivée ou supprimée. Choisissez un autre emplacement.",
@@ -211,6 +216,8 @@ export const messages = {
   "error.backend.interruptSelf": "Un agent ne peut pas s’interrompre lui-même.",
   "error.backend.interruptOtherWork":
     "Cet agent travaille sur une tâche que votre message n’a pas lancée. Seul l’utilisateur ou l’expéditeur de cette tâche peut l’arrêter.",
+  "error.backend.interruptSharedWork":
+    "Le tour de cet agent traite votre message et aussi un message de l’utilisateur ou d’un autre agent. Seul l’utilisateur peut l’arrêter, avec Arrêter l’agent dans le chat de cet agent.",
   "error.backend.interruptStarting": "Cet agent démarre encore un tour. Réessayez après le début du tour.",
   "error.backend.interruptNoSession":
     "OpenBot ne peut pas interrompre cet agent, car sa session de fournisseur est indisponible.",

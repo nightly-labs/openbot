@@ -10,6 +10,8 @@ gnome-keyring
 libsecret-1-0
 openssl
 x11-utils
+# xsetroot: an arrow pointer on the agent display, in place of the default "×".
+x11-xserver-utils
 xauth
 xvfb
 # The Codex sandbox. Without it on PATH, Codex uses its bundled copy and reports an error.

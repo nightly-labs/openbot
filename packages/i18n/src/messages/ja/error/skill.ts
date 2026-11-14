@@ -55,6 +55,8 @@ export const messages = {
   "error.skill.localRevisionNotFound":
     "このローカルスキルにはリビジョン {revision} がありません。最新のリビジョンは {latest} です。",
   "error.skill.localNameTaken": "この名前のローカルスキルはすでに存在します。代わりにそのスキルを改訂してください。",
+  "error.skill.localNameClash":
+    "この名前とローカルスキル「{name}」は、どちらも「{slug}」になります。そのスキルを変更するには、改訂してください。新しいスキルを追加するには、この名前の英字または数字を変更してください。",
   "error.skill.localKeepName": "スキルを改訂するときは、スキル名を変更しないでください。",
   "error.skill.localRelativeFolder":
     "現在のエージェントのワークスペース内にある、相対パスのスキルフォルダーを使用してください。",

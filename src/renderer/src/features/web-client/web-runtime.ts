@@ -97,6 +97,11 @@ import {
   AGENT_FAST_MODE_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
+import {
+  AGENT_PENDING_RUNTIME_CAPABILITY,
+  AGENT_PENDING_RUNTIME_ROUTES,
+  pendingRuntimeUpdateBody,
+} from "@openbot/contracts/team-protocol/agent-pending-runtime-v1";
 import { AGENT_SPEED_CAPABILITY, AGENT_SPEED_ROUTES } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import {
   AGENT_USAGE_LIMIT_CAPABILITY,
@@ -165,6 +170,10 @@ import {
   PENDING_APPROVAL_ROUTES,
 } from "@openbot/contracts/team-protocol/pending-approval-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
+import {
+  ROUTINE_FLOW_STOP_CAPABILITY,
+  ROUTINE_FLOW_STOP_ROUTES,
+} from "@openbot/contracts/team-protocol/routine-flow-stop-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
 import {
@@ -1026,6 +1035,8 @@ export function createWebWorkspaceRuntime(
   ): Promise<T> {
     if (!capabilities.includes(ROUTINE_FLOWS_CAPABILITY))
       throw new Error(currentText().t("error.team.routineFlowsUnsupported"));
+    if (path === ROUTINE_FLOW_STOP_ROUTES.stopRun && !capabilities.includes(ROUTINE_FLOW_STOP_CAPABILITY))
+      throw new Error(currentText().t("error.team.routineFlowStopUnsupported"));
     return teamApi(method, path, decode, body);
   }
   const routineFlows = teamRoutineFlowsApi(routineFlowsRequest);
@@ -1789,6 +1800,16 @@ export function createWebWorkspaceRuntime(
           reasoningEffort,
           ...(providerAccountId ? { providerAccountId } : {}),
         });
+        return;
+      }
+      // While the agent works, the released agent route refuses a provider change. A change of the runtime
+      // alone goes on `agent-pending-runtime-v1`, which keeps it for the next turn, with the account in the
+      // same change.
+      const runtimeChange = capabilities.includes(AGENT_PENDING_RUNTIME_CAPABILITY)
+        ? pendingRuntimeUpdateBody(input)
+        : null;
+      if (runtimeChange) {
+        await request("POST", AGENT_PENDING_RUNTIME_ROUTES.update, runtimeChange);
         return;
       }
       // The released agent route ignores the account, so it goes on `provider-accounts-v1` after the

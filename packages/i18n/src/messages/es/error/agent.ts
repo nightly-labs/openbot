@@ -91,6 +91,8 @@ export const messages = {
   "error.agent.endpointRemoved": "Se eliminó el endpoint que usaba este agente. Elige otro modelo para él.",
   "error.agent.turnStalled":
     "{provider} dejó de responder, así que OpenBot terminó este turno. Envía el mensaje de nuevo o elige otro modelo.",
+  "error.agent.toolLoopStopped":
+    "{provider} repitió muchas veces un paso fallido, así que OpenBot detuvo este turno. Envía el mensaje de nuevo o elige otro modelo.",
   "error.agent.compactionConnectionLost":
     "La conexión se detuvo mientras el agente compactaba su contexto, así que la tarea se detuvo. Comprueba tu conexión a internet y envía un mensaje para continuar.",
   "error.agent.selectedGone": "El agente seleccionado ya no existe.",

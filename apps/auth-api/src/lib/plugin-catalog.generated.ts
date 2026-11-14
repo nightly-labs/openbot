@@ -1033,12 +1033,6 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "d2aece992ac04b73ed82f7ad8bf318a30b4ff1829d835987dce81af836f6ec6f",
     },
     {
-      slug: "mongodb",
-      version: "1.0.0",
-      featured: false,
-      detailSha256: "cc895db953c8ace5f3fd438a5d4b7ff9365c142ef84ce2621d6b37afc3670587",
-    },
-    {
       slug: "moomoo",
       version: "1.0.0",
       featured: false,
@@ -7649,40 +7643,6 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://monday.com",
     privacyPolicyUrl: "https://monday.com/l/privacy/privacy-policy/",
     termsUrl: "https://monday.com/l/legal/tos/",
-    skills: [],
-  },
-  mongodb: {
-    slug: "mongodb",
-    name: "MongoDB Atlas",
-    tagline: "Atlas clusters and databases",
-    description:
-      "MongoDB Atlas lets agents list projects and clusters, inspect databases and collections, and run queries, in read-only or read-write mode as the organization owner allows. Each user signs in to their own MongoDB Atlas account through the browser.",
-    category: "coding",
-    creatorName: "MongoDB",
-    iconUrl: "https://avatars.githubusercontent.com/u/45120?s=256&v=4",
-    version: "1.0.0",
-    prompts: [
-      { id: "prompt-clusters", text: "List the clusters in my Atlas projects and their status." },
-      { id: "prompt-schema", text: "Describe the schema of the orders collection." },
-      { id: "prompt-query", text: "Find the ten most recent orders with a status of pending." },
-    ],
-    apps: [
-      {
-        id: "app-mongodb-mcp",
-        name: "MongoDB Atlas",
-        description: "Cluster, database, and collection access, over MongoDB's MCP server with browser sign-in.",
-        iconUrl: "https://avatars.githubusercontent.com/u/45120?s=256&v=4",
-        server: {
-          name: "mongodb",
-          transport: "http",
-          url: "https://mcp.mongodb.com",
-          auth: [{ id: "mongodb-oauth", kind: "link", label: "Sign in" }],
-        },
-      },
-    ],
-    websiteUrl: "https://www.mongodb.com",
-    privacyPolicyUrl: "https://www.mongodb.com/legal/privacy/privacy-policy",
-    termsUrl: "https://www.mongodb.com/legal/terms-of-use",
     skills: [],
   },
   moomoo: {

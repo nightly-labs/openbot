@@ -89,6 +89,7 @@ export const messages = {
   "error.team.hermesImportUnsupported": "Questa connessione non può importare profili Hermes dal server.",
   "error.team.providerDetectionUnsupported":
     "Questa connessione non può trovare i server di modelli e gli agenti del server.",
+  "error.team.routineFlowStopUnsupported": "Questa connessione non può fermare l’esecuzione di una routine.",
   "error.team.sidebarFoldersUnsupported": "Le cartelle nelle cartelle non sono supportate da questa connessione.",
   "error.team.libraryFoldersUnsupported": "Le cartelle della Libreria non sono supportate da questa connessione.",
   "error.team.agentNotificationLevelsUnsupported":

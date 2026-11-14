@@ -465,7 +465,9 @@ environment of OpenBot, so they can read these values.
 - **Not root.** The image runs as UID 1000. Root owns the release, so agents cannot change it. The
   release has no SUID file. `no-new-privileges` keeps it that way.
 - **Agents have full access in the container.** They run commands, change all of `/data` and use the
-  network. The container is the boundary. Do not mount the Docker socket, your home folder or another
+  network. The container is the boundary. All agents run as UID 1000, so an agent can read the files
+  and processes of the other agents, also the API key files of a Vault key that is for other agents.
+  Put agents that must not share keys in different containers. Do not mount the Docker socket, your home folder or another
   host folder that agents must not change.
 - **Check the image.** Each release image has a build provenance attestation:
 

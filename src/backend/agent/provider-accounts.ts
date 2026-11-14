@@ -32,7 +32,7 @@ import type { ProviderTempOptions } from "./../provider-temp";
 import { shortenDiagnostic } from "./../stderr-diagnostics";
 import { stopProcessTree } from "../windows-process-tree";
 import { usageWindowResetSince } from "./account-usage";
-import { captureBrowser } from "./browser-capture";
+import { captureBrowser, signInPageByOpenBot } from "./browser-capture";
 import type { ProviderAccountStore, StoredProviderAccount } from "./provider-account-store";
 import { ProviderProcessFailed, waitForSuccessfulProcess } from "./provider-status";
 import { providerLabel } from "./thread-items";
@@ -293,7 +293,7 @@ export class ProviderAccounts {
           });
           return yield* login.done;
         }
-        const browser = onHost ? yield* captureBrowser(openExternal) : {};
+        const browser = signInPageByOpenBot(onHost, command) ? yield* captureBrowser(openExternal) : {};
         const target = cliSpawnTarget(cli.executable, command.argv);
         const child = yield* Effect.acquireRelease(
           Effect.sync(() =>

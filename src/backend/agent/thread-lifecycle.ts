@@ -625,7 +625,7 @@ export class ThreadLifecycle {
   ): "idle" | "held" | "gone" {
     if (this.#conversation.loadedClientFor(externalThreadId) !== client) return "gone";
     const agentId = this.#conversation.agentForThread(externalThreadId);
-    // A routine session is ephemeral: no rollout is kept to resume it from.
+    // A routine session ends with its run, and nothing resumes it.
     if (!agentId || this.#conversation.isRoutineSession(externalThreadId)) return "gone";
     const publicThreadId = this.#conversation.publicThreadId(agentId, externalThreadId);
     const session = this.#store.database.activeProviderSession(publicThreadId, client.provider);
@@ -661,6 +661,9 @@ export class ThreadLifecycle {
    * read a whole session again. Its items go to `routineThreadId`, the routine's own side thread, or
    * with no such thread to the agent's chat. Its first turn reads the newest messages of the chat
    * and of the routine's thread.
+   *
+   * Codex still saves the session: a subagent that forks the run's context reads it from the saved
+   * history, and an ephemeral session fails that with `no rollout found` (#8743).
    */
   readonly startRoutineThread = Effect.fn("ThreadLifecycle.startRoutineThread")(function* (
     this: ThreadLifecycle,
@@ -680,7 +683,7 @@ export class ThreadLifecycle {
     });
     const { params } = yield* this.#startParams(owner, client, publicThreadId);
     const response = yield* client
-      .request("thread/start", { ...params, ephemeral: true, persistSession: false }, decodeThreadResponse)
+      .request("thread/start", { ...params, ephemeral: false, persistSession: false }, decodeThreadResponse)
       .pipe(toThreadOperationFailed);
     const externalThreadId = response.thread.id;
     this.#conversation.bindThread(externalThreadId, owner.id, publicThreadId);
@@ -691,14 +694,21 @@ export class ThreadLifecycle {
     return externalThreadId;
   }, Effect.uninterruptible).bind(this);
 
-  /** Ends the provider session of a routine run. A second call does nothing. */
+  /**
+   * Ends the provider session of a routine run. A second call does nothing. `archive`: no subagent of
+   * the run still works, so the saved session also leaves the provider's own thread list, as a
+   * replaced session does. An archive would stop a subagent that still works.
+   */
   readonly closeRoutineThread = Effect.fn("ThreadLifecycle.closeRoutineThread")(function* (
     this: ThreadLifecycle,
     externalThreadId: string,
+    archive = false,
   ) {
     if (!this.#conversation.isRoutineSession(externalThreadId)) return;
     this.#conversation.forgetRoutineSession(externalThreadId);
-    yield* this.#releaseProviderSession(externalThreadId);
+    const client = this.#conversation.openClientFor(externalThreadId);
+    yield* this.#releaseProviderSession(externalThreadId, client);
+    if (archive && client) yield* this.#archiveSession(client, externalThreadId);
     this.#conversation.unbindThread(externalThreadId);
     this.#conversation.unloadThread(externalThreadId);
     this.#givenTurnContext.delete(externalThreadId);

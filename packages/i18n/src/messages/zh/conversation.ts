@@ -60,6 +60,7 @@ export const messages = {
   "conversation.sidePanel.closePane": "关闭 {name}",
   "conversation.sidePanel.openPane": "打开 {name}",
   "conversation.sidePanel.launcher": "打开一个分栏",
+  "conversation.sidePanel.resize": "调整右侧面板宽度",
   "conversation.sidePanel.pane.browser": "浏览器",
   "conversation.sidePanel.pane.files": "文件",
   "conversation.threads.new": "新话题",

@@ -8,6 +8,7 @@ import {
   type ChannelCommand,
   type ChannelMessage,
   type ChannelTask,
+  type ChannelTaskWait,
   canAdministerServer,
   isReleasedRoutineSchedule,
   parseChannelCommand,
@@ -19,7 +20,10 @@ import {
   CHANNEL_PICTURE_ROUTES,
 } from "@openbot/contracts/team-protocol/channel-picture-v1";
 import { CHANNEL_ROUTES, channelRequest, isChannelSettingsRoute } from "@openbot/contracts/team-protocol/channels-v1";
-import { CHANNEL_SEEN_SUBTASKS_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import {
+  CHANNEL_SEEN_SUBTASKS_CAPABILITY,
+  CHANNEL_TASK_WAITS_CAPABILITY,
+} from "@openbot/contracts/team-protocol/current";
 import { sourceText } from "@openbot/i18n/source";
 import type { ChannelService } from "../../backend/channel-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -105,12 +109,19 @@ export async function routeChannels(
     requireVisibleChannel(channels, input.channelId, channelHiddenAgentIds);
     // The codec drops the field for a peer without the capability, so the frame budget leaves it out too.
     const seenSubtasks = capabilities.has(CHANNEL_SEEN_SUBTASKS_CAPABILITY);
+    const taskWaits = capabilities.has(CHANNEL_TASK_WAITS_CAPABILITY) && input.beforeSequence === undefined;
+    // The tasks of a page do not change with its message limit, so the waits are read once.
+    let pageWaits: ChannelTaskWait[] | undefined;
     // Long messages, such as a member's thinking, make a page of fewer messages, so it fits one WebRTC
     // frame. The client reads the rest as older pages. A page larger than the frame cannot reach a
     // remote client.
     for (let limit = 100; ; limit = Math.floor(limit / 2)) {
       const page = channels.store.page(input.channelId, input.beforeSequence, limit);
-      let body = {
+      pageWaits ??= taskWaits
+        ? visibleWaits(channels, channels.taskWaits(input.channelId, page.tasks), hiddenAgentIds, channelHiddenAgentIds)
+        : [];
+      const waits = pageWaits;
+      const base = {
         ...page,
         tasks:
           seenSubtasks && input.beforeSequence === undefined
@@ -119,9 +130,15 @@ export async function routeChannels(
         channel: peerChannel(page.channel),
         messages: page.messages.filter((item) => !hiddenAuthor(item, hiddenAgentIds)),
       };
+      // channel-task-waits-v1 names only tasks of the page.
+      const withWaits = (value: typeof base): typeof base & { waits?: ChannelTaskWait[] } => {
+        const kept = waits.filter((wait) => value.tasks.some((task) => task.id === wait.taskId));
+        return kept.length ? { ...value, waits: kept } : value;
+      };
+      let body = withWaits(base);
       let bytes = Buffer.byteLength(JSON.stringify(body));
       if (bytes > WEBRTC_FRAME_BODY_BUDGET) {
-        body = { ...body, tasks: pageTasks(body.tasks, body.messages) };
+        body = withWaits({ ...base, tasks: pageTasks(base.tasks, base.messages) });
         bytes = Buffer.byteLength(JSON.stringify(body));
       }
       if (bytes <= WEBRTC_FRAME_BODY_BUDGET) return json(200, body);
@@ -175,6 +192,23 @@ export async function routeChannels(
  */
 function seesChannel(members: readonly { agentId: string }[], hiddenAgentIds: ReadonlySet<string>): boolean {
   return members.length === 0 || members.some((item) => !hiddenAgentIds.has(item.agentId));
+}
+
+/**
+ * The waits that this peer can read: none for an agent it cannot see, and none that names a channel
+ * that its list leaves out.
+ */
+function visibleWaits(
+  channels: Pick<ChannelService, "store">,
+  waits: readonly ChannelTaskWait[],
+  hiddenAgentIds: ReadonlySet<string>,
+  channelHiddenAgentIds: ReadonlySet<string>,
+): ChannelTaskWait[] {
+  return waits.filter(
+    (wait) =>
+      !hiddenAgentIds.has(wait.agentId) &&
+      (wait.reason !== "agent-busy" || seesChannel(channels.store.get(wait.channelId).members, channelHiddenAgentIds)),
+  );
 }
 
 /** A channel that the list leaves out answers as a channel that does not exist. */

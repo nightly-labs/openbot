@@ -84,6 +84,10 @@ export const messages = defineMessages("error.backend", {
   "error.backend.channelWaitBeforeDeleteHistory": "Wait until the work in this channel stops, then delete its history.",
   "error.backend.channelCompactUnavailable":
     "No member of this channel can compact its context now. A member must answer in the channel first, and its provider must support compaction.",
+  "error.backend.channelCompactNoSession":
+    "The members of this channel have no conversation to compact yet. Compact it after a member answers in the channel.",
+  "error.backend.channelCompactNotSupported":
+    "No member of this channel can compact on request. Members that support it compact their context automatically when it is almost full.",
   "error.backend.channelArchived": "Restore this channel before sending messages or changing tasks.",
   "error.backend.channelReferenceUnavailable": "The referenced channel message is unavailable.",
   "error.backend.channelTaskNotFound": "Channel task not found.",
@@ -115,6 +119,7 @@ export const messages = defineMessages("error.backend", {
   "error.backend.memoryOperationFailed": "The memory operation failed. Try again.",
   "error.backend.memoryGone": "This memory no longer exists.",
   "error.backend.routineGone": "This routine no longer exists.",
+  "error.backend.routineRunGone": "This routine run no longer exists.",
   "error.backend.turnNotStarted": "The provider did not start this turn.",
   "error.backend.routineResultConnectionOff": "This messaging connection is off or removed. Choose another place.",
   "error.backend.routineResultNoDelivery": "This run has no answer to send again.",
@@ -195,6 +200,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.interruptSelf": "An agent cannot interrupt itself.",
   "error.backend.interruptOtherWork":
     "This agent works on a task that your message did not start. Only the user or the sender of that task can stop it.",
+  "error.backend.interruptSharedWork":
+    "This agent's turn works on your message and also on a message from the user or another agent. Only the user can stop it, with Stop agent in that agent's chat.",
   "error.backend.interruptStarting": "This agent is still starting a turn. Try again after the turn starts.",
   "error.backend.interruptNoSession":
     "OpenBot cannot interrupt this agent because its provider session is unavailable.",
@@ -262,6 +269,14 @@ export const messages = defineMessages("error.backend", {
     "{provider} could not use the MCP server {name}, because the server asks for a sign-in. Open the MCP settings and choose Sign in.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} could not start the MCP server {name}. Open the MCP settings and choose Test connection to see the cause.",
+  "error.backend.mcpAppReconnect":
+    "{name} on ChatGPT asks you to sign in again. Reconnect {name} on ChatGPT, then ask the agent again.",
+  "error.backend.mcpServerSignInPage":
+    "The MCP server {name} asked you to sign in on a web page. OpenBot does not open this page for a server, so it declined. Open the MCP settings and sign in to {name}, then ask the agent again.",
+  "error.backend.mcpServerRequestDeclined":
+    "The MCP server {name} asked for something that OpenBot cannot show, so OpenBot declined it.",
+  "error.backend.mcpRequestDeclined":
+    "An MCP server asked for something that OpenBot cannot show, so OpenBot declined it.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot could not start its local sign-in connection for this server. Restart OpenBot, then try again.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -381,6 +396,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserViewProtected": "Browser view is protected during authentication.",
   "error.backend.browserPreviewPageChanged": "The browser page changed during the preview. Try again.",
   "error.backend.browserInputProtected": "Browser input is protected during authentication.",
+  "error.backend.browserClickMoved":
+    "Nothing was clicked. The page moved the target when the pointer came near, and the press went to {element}. Take a fresh snapshot.",
   "error.backend.browserTypingFocusMoved":
     "The page moved focus away from the target before typing. Nothing was typed. Take a fresh snapshot.",
   "error.backend.browserTypingFocusMovedWhileTyping":

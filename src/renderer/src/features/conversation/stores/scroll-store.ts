@@ -131,13 +131,32 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   /** The agents that write in the channel now. Their text that still arrives waits until it is complete. */
   const channelWriters = createMemo(() => new Set(deps.props.channel?.workers().map((worker) => worker.id) ?? []));
   /*
+   * An agent chat can keep an answer "streaming" after its turn ends, as when a joined server misses
+   * a refresh (#5847). The chat shows that text when the agent has had no turn for a short time. A
+   * joined server sends the final copy after the turn ends, so the final copy usually comes first.
+   */
+  const [turnSettled, setTurnSettled] = createSignal(untrack(() => !deps.props.activeTurnId));
+  createEffect(
+    () => Boolean(deps.props.activeTurnId),
+    (turnActive) => {
+      if (turnActive) {
+        setTurnSettled(false);
+        return;
+      }
+      const timer = setTimeout(() => setTurnSettled(true), STALE_STREAM_MS);
+      return () => clearTimeout(timer);
+    },
+  );
+  /*
    * Only the text of a member that works waits. A view keeps the copy of an older message that it
    * loaded, so a copy loaded while it streamed can stay "streaming" after its task ends (#4846), and
    * it must not stay hidden.
    */
   const held = (message: AgentMessage): boolean =>
     heldWhileWritten(message) &&
-    (!deps.props.channel || (message.senderAgentId !== undefined && channelWriters().has(message.senderAgentId)));
+    (deps.props.channel
+      ? message.senderAgentId !== undefined && channelWriters().has(message.senderAgentId)
+      : Boolean(deps.props.activeTurnId) || !turnSettled());
   /* The quiet answers of a teammate update show under its marker, so they have no row of their own. */
   const updateAnswers = createMemo(() => teammateUpdateAnswers(deps.props.messages));
   const foldedAnswerIds = createMemo(
@@ -456,6 +475,9 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     jumpToLatestMessage,
   };
 }
+
+/** How long an agent chat waits after a turn ends before it shows text that is still marked "streaming". */
+const STALE_STREAM_MS = 3_000;
 
 /** Agent text that the host still writes. A plan, the subagents, a card and an image show while they run. */
 function heldWhileWritten(message: AgentMessage): boolean {

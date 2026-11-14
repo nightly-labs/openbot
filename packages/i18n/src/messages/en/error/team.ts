@@ -79,6 +79,7 @@ export const messages = defineMessages("error.team", {
   "error.team.usageLimitUnsupported": "This connection cannot show or change the usage limits of agents.",
   "error.team.hermesImportUnsupported": "This connection cannot import Hermes profiles from the server.",
   "error.team.providerDetectionUnsupported": "This connection cannot find the model servers and agents of the server.",
+  "error.team.routineFlowStopUnsupported": "This connection cannot stop a routine run.",
   "error.team.sidebarFoldersUnsupported": "Folders in folders are not supported by this connection.",
   "error.team.libraryFoldersUnsupported": "Library folders are not supported by this connection.",
   "error.team.agentNotificationLevelsUnsupported":

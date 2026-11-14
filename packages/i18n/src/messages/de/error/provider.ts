@@ -225,7 +225,7 @@ export const messages = {
   "error.provider.opencodeInvalidUpload":
     "Der Modellanbieter von OpenCode hat eine ungültige Upload-Anfrage gemeldet. Wähle ein anderes Modell und fahre fort. Prüfe gespeicherte Routinen, bevor du sie erneut erstellst.\n{detail}",
   "error.provider.opencodeUnreadableContent":
-    "Dieses Modell kann eine Datei oder ein Bild in diesem Chat nicht lesen. Wähle ein Modell, das Dateien lesen kann, und sende deine Nachricht dann erneut.",
+    "Dieses Modell kann eine Datei oder ein Bild in diesem Chat nicht lesen. OpenBot hat eine neue OpenCode-Sitzung mit dem Chatverlauf gestartet. Sende deine Nachricht ohne die Datei erneut oder wähle ein Modell, das Dateien lesen kann. Wenn du dieses Modell zu einem eigenen Anbieter hinzugefügt hast, entferne in seinen Einstellungen bei „Akzeptiert“ die Auswahl „Bilder“.",
   "error.provider.opencodeContextTooSmall":
     "Dieser Chat passt nicht in das Kontextfenster des Modells. Lade das Modell in Ollama oder LM Studio mit einer größeren Kontextlänge und trage dasselbe Fenster in OpenBot in den Einstellungen seines Anbieters ein. Oder wähle ein größeres Modell.",
   "error.provider.opencodeFreeLimit":
@@ -234,6 +234,8 @@ export const messages = {
     "Beim Modellanbieter ist ein Fehler aufgetreten. Deine Verbindung ist nicht die Ursache. Versuche es später erneut oder wähle ein anderes Modell.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "Die Antwort des Modells wurde abgebrochen oder war ungültig. Sende deine Nachricht erneut oder wähle ein anderes Modell.\n{detail}",
+  "error.provider.opencodeReasoningOverlap":
+    "OpenCode konnte das Denken dieses Modells bei diesem Aufwand nicht lesen. Wähle einen geringeren Aufwand oder ein anderes Modell und sende deine Nachricht dann erneut.",
   "error.provider.opencodeNetwork":
     "OpenCode konnte keine Verbindung zum Modellanbieter herstellen. Prüfe die Netzwerkverbindung des Computers, auf dem OpenBot läuft, und versuche es erneut.\n{detail}",
   "error.provider.codexStateBusy":
@@ -272,6 +274,8 @@ export const messages = {
     "Der Gemini-Server in OPENBOT_ANTIGRAVITY_PATH fehlt oder ist nicht ausführbar. Korrigiere den Pfad oder entferne die Variable und starte OpenBot dann neu.",
   "error.provider.antigravityVersionUnreadable": "Die Version des Gemini-Servers konnte nicht gelesen werden.",
   "error.provider.antigravitySignIn": "Melde dich mit Google an, um Gemini zu verwenden.",
+  "error.provider.antigravityModelAtCapacity":
+    "Google hat für dieses Gemini-Modell gerade keine freie Kapazität. Das Kontingent deines Tarifs ist nicht die Ursache. Versuche es in ein paar Minuten erneut oder wähle ein anderes Modell.\n{detail}",
   "error.provider.antigravityRateLimited":
     "Gemini hat die Anfrage abgelehnt, weil ein Ratenlimit oder das Kontingent des Tarifs erreicht ist. Warte ein paar Minuten oder wähle ein anderes Modell und versuche es dann erneut.\n{detail}",
   "error.provider.antigravityQuotaReached":
@@ -339,6 +343,8 @@ export const messages = {
     "Das Modell hat diesen Chat nicht akzeptiert, weil er zu viele Bilder enthält. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.opencodeSessionRejected":
     "OpenCode hat die Anfrage abgelehnt und keinen Grund genannt. Das kann in einem langen Chat oder nach einem Modellwechsel passieren. OpenBot hat eine neue OpenCode-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut. Wenn der Fehler bleibt, wähle ein anderes Modell oder einen niedrigeren Aufwand.",
+  "error.provider.opencodeCompactionFailed":
+    "Das Modell konnte diesen langen Chat nicht zusammenfassen, um Platz im Kontextfenster zu schaffen. OpenBot hat eine neue OpenCode-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut. Wenn der Fehler bleibt, wähle ein stärkeres Modell.",
   "error.provider.museMcpStartupFault":
     "Muse konnte einen MCP-Server nicht starten und hat MCP in dieser Sitzung gesperrt. OpenBot hat eine neue Muse-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut. Wenn der Fehler bleibt, schalte Computersteuerung oder den fehlerhaften MCP-Server für diesen Agenten aus.",
   "error.provider.claudeSessionMissing":
@@ -369,6 +375,8 @@ export const messages = {
     "{provider} hat den gespeicherten API-Schlüssel abgelehnt. Ersetze oder entferne den Schlüssel in den Einstellungen und versuche es dann erneut.",
   "error.provider.keyProviderNoBalance":
     "Das {provider}-Konto des gespeicherten API-Schlüssels hat kein Guthaben. Lade Guthaben auf das Konto und versuche es dann erneut.",
+  "error.provider.keyProviderLowCredit":
+    "Das {provider}-Konto des gespeicherten API-Schlüssels hat nicht genug Guthaben für eine Antwort dieses Modells. Lade Guthaben auf das Konto oder wähle ein anderes Modell und versuche es dann erneut.",
   "error.provider.modelServiceRefused":
     "Der Modelldienst hat die Anfrage abgelehnt. Wähle ein anderes Modell oder prüfe deinen Zugriff auf dieses Modell beim Dienst.",
   "error.provider.modelServiceRefusedReason":

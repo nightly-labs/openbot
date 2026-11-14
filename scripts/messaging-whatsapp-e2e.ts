@@ -937,15 +937,14 @@ try {
         adapter.edit({ platformChannelId: OWNER_JID, replyThreadId: null }, "UNKNOWN-POST", { text: "Updated" }),
       );
       await until(() => phone.textsTo(OWNER_JID).length === before + 1, "the edit as a new post");
-      // In the owner's own chat, a last blank line makes the bubble wide, so the answer starts at the left.
-      const spacer = /\n\u2800{20,}$/u;
-      assert.match(phone.textsTo(OWNER_JID).at(-1) ?? "", spacer, "A post in the owner's own chat has no spacer line.");
+      // A post in the owner's own chat ends at its last line of text (#8802).
+      assert.equal(phone.textsTo(OWNER_JID).at(-1), "Updated", "A post in the owner's own chat has extra text.");
       const contactJid = `${STRANGER}@s.whatsapp.net`;
       await runCauseEffect(
         adapter.post({ platformChannelId: contactJid, replyThreadId: null }, { text: "To a contact" }),
       );
       await until(() => phone.textsTo(contactJid).includes("To a contact"), "the post to an allowed contact, as it is");
-      return { refused: true, spacer: true };
+      return { refused: true, ownChatAsIs: true };
     });
 
     await step("adapter: a post that the server refuses in its ack fails, and is not reported as sent", async () => {

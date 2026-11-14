@@ -60,6 +60,7 @@ export const messages = {
   "conversation.sidePanel.closePane": "Закрыть: {name}",
   "conversation.sidePanel.openPane": "Открыть: {name}",
   "conversation.sidePanel.launcher": "Открыть вкладку",
+  "conversation.sidePanel.resize": "Изменить размер правой панели",
   "conversation.sidePanel.pane.browser": "Браузер",
   "conversation.sidePanel.pane.files": "Файлы",
   "conversation.threads.new": "Новая ветка",

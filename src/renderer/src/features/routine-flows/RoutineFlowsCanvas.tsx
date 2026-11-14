@@ -404,6 +404,21 @@ export function RoutineFlowsCanvas(props: RoutineFlowsCanvasProps) {
                 } else started = host().routines.test({ agentId: routine.agentId, routineId: routine.id });
                 started.then(() => load(canvasAgentId)).catch(failed(t("diagram.flows.runFailed")));
               }}
+              onStopRun={
+                host().stopRun
+                  ? (nodeId, runId) => {
+                      const routineId = routineIdOfNode(nodeId);
+                      const stop = host().stopRun;
+                      if (!routineId || !stop) return Promise.resolve();
+                      return stop({ routineId, runId })
+                        .then(() => load(canvasAgentId))
+                        .catch((error: unknown) => {
+                          failed(t("diagram.flows.stopFailed"))(error);
+                          throw error;
+                        });
+                    }
+                  : undefined
+              }
               webhooks={
                 host().webhooks
                   ? {

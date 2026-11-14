@@ -82,6 +82,7 @@ import { MCP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-sig
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
+import { ROUTINE_FLOW_STOP_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flow-stop-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RUN_PLACE_CAPABILITY } from "@openbot/contracts/team-protocol/routine-run-place-v1";
@@ -2075,8 +2076,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       },
     ];
   });
-  const routineFlowsHost = webRoutineFlowsHost(workspace.runtime, workspace.onHostEvent, () =>
-    eventsEnabled() ? webhookRoutines : undefined,
+  const routineFlowsHost = webRoutineFlowsHost(
+    workspace.runtime,
+    workspace.onHostEvent,
+    () => (eventsEnabled() ? webhookRoutines : undefined),
+    () => workspace.state.capabilities.includes(ROUTINE_FLOW_STOP_CAPABILITY),
   );
   /** The host's Providers settings, which an owner or admin of the host can open. */
   const openProviderSettings = (trigger: HTMLElement) => {

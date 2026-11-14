@@ -24,6 +24,7 @@ import type {
   BrowserVisibilityInput,
 } from "@openbot/contracts/ipc";
 import { isNumber, isString } from "@openbot/contracts/runtime-values";
+import type { BrowserSignInStorage } from "@openbot/contracts/team-protocol/browser-sign-in-storage-v1";
 import {
   type BrowserSignInCookie,
   browserSignInCookieFitsHost,
@@ -188,6 +189,7 @@ import {
   jsonStringFit,
   type ModelTextCut,
 } from "./model-text-limit";
+import { allowPinchZoom, blockPinchZoom } from "./pinch-zoom";
 import type { DynamicToolCallParams, DynamicToolResult } from "./protocol";
 import { isRecord } from "./protocol";
 import { stepPlace, stepText, type UserBrowsingStep } from "./user-browsing-log";
@@ -249,6 +251,8 @@ const VIEW_CONTEXT_MENU_MS = 1_500;
 const DIALOG_ACTION_WAIT_MS = 10_000;
 /** How long `open` waits for the load of a redirect before its second read. */
 const OPEN_REDIRECT_WAIT_MS = 5_000;
+/** A page dialog holds a script. The sign-in then loads the page again with the cookies only. */
+const SIGN_IN_STORAGE_WRITE_TIMEOUT_MS = 5_000;
 /** A site can redirect more than one time before its page stays. */
 const OPEN_REDIRECT_READS = 2;
 /**
@@ -314,6 +318,12 @@ const IDLE_TAB_SWEEP_MS = 60_000;
  */
 const MAX_IDLE_AWAKE_TABS = 3;
 const AWAKE_TAB_GRACE_MS = 2 * 60_000;
+/**
+ * What the agent reads on its next tool call on a tab that the idle unload closed. The tab kept its
+ * address and title, so without it the agent reads a missing script or value as a bug of the page.
+ */
+const IDLE_UNLOAD_NOTE =
+  "Note: this tab was not used for some time, so its page was unloaded to free memory and loaded again from its address. Scripts that you injected, page variables, form input and the tab history from before are gone. Set them up again if you need them. An idle tab unloads sooner when several other tabs are open: close the tabs that you no longer need.";
 /**
  * The page load errors that say the proxy of the tab did not answer or refused it, and why, with
  * their Chromium codes. A failed load can give only the code, with no name.
@@ -394,9 +404,8 @@ const BROWSER_WEB_PREFERENCES = {
   allowRunningInsecureContent: false,
   // An agent works in tabs that the panel does not show. A throttled tab waits up to a few seconds
   // for each pointer move, because Chromium sends the move with the next frame, and it tells the
-  // page that it is hidden. The cost is that a hidden page keeps its full timer and frame rate
-  // until the idle sweep puts the tab to sleep (`IDLE_TAB_SLEEP_MS`, sooner past `MAX_IDLE_AWAKE_TABS`
-  // idle tabs or when memory is low).
+  // page that it is hidden. A hidden tab that nobody uses is throttled at the next idle sweep
+  // (`#throttleHiddenTabs`), so its videos and animations do not run without end.
   backgroundThrottling: false,
 };
 
@@ -585,6 +594,13 @@ export interface BrowserMainPage {
   zoomFactor: number;
 }
 
+/** True while a turn of an agent acts on the tab, or waits between two of its browser calls. */
+function drivenByAgent(state: BrowserControlState, tab: BrowserHostTab): boolean {
+  return state.sessions.some(
+    (session) => session.tabId === tab.id || (session.tabId === null && session.threadId === tab.ownerThreadId),
+  );
+}
+
 export class BrowserHost {
   static readonly CONTROL_IDLE_GRACE_MS = BrowserControlSessions.IDLE_GRACE_MS;
   readonly #window: BrowserWindow;
@@ -761,6 +777,7 @@ export class BrowserHost {
     // Service workers read the process fallback instead of the session, so it changes too.
     app.userAgentFallback = sessionBrowserUserAgent(app.userAgentFallback);
     this.#configureSession(this.#session);
+    this.#controls.onChanged((state) => this.#syncAgentPinchZoom(state));
     this.#idleTabSweep = setInterval(() => {
       void runCauseEffect(this.#sleepIdleTabs()).catch((error) =>
         logger.warn("Unable to sleep browser tabs", { error: toLogValue(error) }),
@@ -837,6 +854,7 @@ export class BrowserHost {
   });
 
   readonly #sleepIdleTabs = Effect.fn("BrowserHost.sleepIdleTabs")(function* (this: BrowserHost) {
+    this.#throttleHiddenTabs();
     const now = Date.now();
     const idleMs = this.#memoryLow() ? LOW_MEMORY_TAB_SLEEP_MS : IDLE_TAB_SLEEP_MS;
     const awake: BrowserHostTab[] = [];
@@ -851,6 +869,37 @@ export class BrowserHost {
       if (now - tab.lastUsedAt >= this.#awakeTabGraceMs) yield* this.#sleep(tab);
     }
   });
+
+  /**
+   * A tab that the panel does not show and that nobody uses is throttled, as Chrome throttles a
+   * background tab: the page is told that it is hidden, so its videos pause and its timers slow
+   * down. The next use or show turns the throttling off again (`#unthrottle`). Emulated focus keeps
+   * a page visible, so it goes off too (`BrowserCdpEngine.setIdleFocus`).
+   */
+  #throttleHiddenTabs(): void {
+    for (const tab of this.#tabs.values()) {
+      if (tab.closing || tab.contents.isDestroyed() || tab.contents.getBackgroundThrottling()) continue;
+      if (this.#viewShown(tab.view)) continue;
+      if (this.#tabBusy(tab)) continue;
+      tab.contents.setBackgroundThrottling(true);
+      this.#setIdleFocus(tab, false);
+    }
+  }
+
+  /** See `BROWSER_WEB_PREFERENCES` for why a tab that is shown or used is not throttled. */
+  #unthrottle(tab: BrowserHostTab): void {
+    if (tab.contents.isDestroyed() || !tab.contents.getBackgroundThrottling()) return;
+    tab.contents.setBackgroundThrottling(false);
+    this.#setIdleFocus(tab, true);
+  }
+
+  /** Not awaited: a page that does not answer must not stop the idle sweep. */
+  #setIdleFocus(tab: BrowserHostTab, enabled: boolean): void {
+    if (tab.closing) return;
+    Effect.runFork(
+      tab.engine.setIdleFocus(enabled).pipe(Effect.ignore, Effect.forkIn(tab.scope, { startImmediately: true })),
+    );
+  }
 
   /**
    * Only an agent's own tab sleeps. A popup and its opener keep a live link between their pages, and
@@ -870,8 +919,12 @@ export class BrowserHost {
 
   /** A reload loses what the page holds, so a tab that a person or a task still has open stays loaded. */
   #tabInUse(tab: BrowserHostTab): boolean {
+    return this.#activeTabId === tab.id || this.#tabBusy(tab);
+  }
+
+  /** A task, a recording, a live view or a person uses the tab now, also when the panel does not show it. */
+  #tabBusy(tab: BrowserHostTab): boolean {
     return (
-      this.#activeTabId === tab.id ||
       // A preview capture is not a use. An unload that starts during one waits behind it on the queue.
       tab.pendingOperations > (tab.previewCapture ? 1 : 0) ||
       tab.viewInvalidations.size > 0 ||
@@ -907,6 +960,7 @@ export class BrowserHost {
               (capture ? yield* Deferred.await(capture.frame).pipe(Effect.catch(() => Effect.succeed(null))) : null);
             if (tab.sleeping !== sleeping || tab.closing || tab.contents.isDestroyed()) return;
             unloaded = true;
+            tab.idleUnloadNoted = new Set();
             yield* this.#closeRenderer(tab);
           }),
         true,
@@ -1277,16 +1331,19 @@ export class BrowserHost {
   /**
    * Sets the cookies of a sign-in that a member made on their own device, then loads the page again.
    * Only the cookies of the site that the tab shows go in: its host, its parent domains, and its
-   * subdomains. Chromium refuses a public suffix domain. The answer is the count that Chromium set.
+   * subdomains. Chromium refuses a public suffix domain. Some sites keep the sign-in in the page
+   * storage, so its pairs go in too, but only when the tab shows the same origin. The answer is the
+   * count of cookies and pairs that were set.
    */
   readonly importSignIn = Effect.fn("BrowserHost.importSignIn")(function* (
     this: BrowserHost,
     tabId: string,
     cookies: readonly BrowserSignInCookie[],
-  ): Effect.fn.Return<number, BrowserOperationError> {
+    storage: BrowserSignInStorage | null = null,
+  ): Effect.fn.Return<{ cookies: number; storage: number }, BrowserOperationError> {
     const tab = yield* this.#requireTab(tabId);
     const page = URL.canParse(tab.contents.getURL()) ? new URL(tab.contents.getURL()) : null;
-    if (!page || (page.protocol !== "https:" && page.protocol !== "http:")) return 0;
+    if (!page || (page.protocol !== "https:" && page.protocol !== "http:")) return { cookies: 0, storage: 0 };
     const target = this.#tabSession(tab);
     const results = yield* Effect.forEach(
       cookies.filter((cookie) => browserSignInCookieFitsHost(cookie.domain, page.hostname)),
@@ -1307,11 +1364,27 @@ export class BrowserHost {
         ).pipe(Effect.match({ onSuccess: () => 1, onFailure: () => 0 })),
     );
     const count = results.reduce((total, set) => total + set, 0);
-    if (count === 0) return 0;
-    yield* browserCall(() => target.cookies.flushStore());
-    // The cookies are set. A page that does not load again shows its own error in the tab.
+    if (count > 0) yield* browserCall(() => target.cookies.flushStore());
+    // The page itself writes the pairs, so they go to the storage of the origin that it shows. The
+    // tab can move while the cookies are set, so the script checks the origin again. A dialog of the
+    // page holds the script, so the write has a deadline.
+    const stored =
+      storage && storage.entries.length > 0 && storage.origin === page.origin
+        ? yield* browserCall(() =>
+            tab.contents.executeJavaScript(
+              `((origin, entries) => { if (location.origin !== origin) return 0; let set = 0; for (const [name, value] of entries) { try { localStorage.setItem(name, value); set += 1; } catch {} } return set; })(${JSON.stringify(storage.origin)}, ${JSON.stringify(storage.entries.map((entry) => [entry.name, entry.value]))})`,
+              true,
+            ),
+          ).pipe(
+            Effect.timeoutOption(SIGN_IN_STORAGE_WRITE_TIMEOUT_MS),
+            Effect.map((set) => (Option.isSome(set) && isNumber(set.value) ? set.value : 0)),
+            Effect.catch(() => Effect.succeed(0)),
+          )
+        : 0;
+    if (count === 0 && stored === 0) return { cookies: 0, storage: 0 };
+    // The sign-in is set. A page that does not load again shows its own error in the tab.
     yield* this.reload(tabId).pipe(Effect.ignore);
-    return count;
+    return { cookies: count, storage: stored };
   }).bind(this);
 
   /**
@@ -2701,8 +2774,10 @@ export class BrowserHost {
     params: DynamicToolCallParams,
     hooks: BrowserDynamicToolHooks = {},
   ): Effect.fn.Return<DynamicToolResult, BrowserOperationError> {
+    let calledTabId: string | undefined;
     const outcome = yield* Effect.gen({ self: this }, function* () {
       const call = yield* browserSync(() => parseBrowserToolCall(params.tool, params.arguments));
+      if ("tabId" in call.args) calledTabId = call.args.tabId;
       yield* browserSync(() => this.#controls.begin(params, call));
       return { result: yield* runBrowserTool(this.#toolHandlers, call.tool, call, params, hooks) };
     })
@@ -2734,7 +2809,7 @@ export class BrowserHost {
           }),
         ),
       );
-    if ("result" in outcome) return outcome.result;
+    if ("result" in outcome) return this.#withIdleUnloadNote(params, calledTabId, outcome.result);
     // The agent's control of the tab ended above, so the wait does not show the agent at work.
     if (hooks.onUserControl) return yield* hooks.onUserControl(outcome.heldTabId);
     return {
@@ -2742,6 +2817,26 @@ export class BrowserHost {
       contentItems: [{ type: "inputText", text: new BrowserUserControlHeld(outcome.heldTabId).message }],
     };
   }).bind(this);
+
+  /**
+   * Adds `IDLE_UNLOAD_NOTE` after the result of a thread's next tool on a tab that the idle unload
+   * closed (#8833). It comes last, so a reader of the first text still gets the tool's own result.
+   * Only a thread that can use the tab gets it, once. A tool that failed before it woke the tab did not
+   * load the page again, so the note waits for the next call.
+   */
+  #withIdleUnloadNote(
+    params: DynamicToolCallParams,
+    tabId: string | undefined,
+    result: DynamicToolResult,
+  ): DynamicToolResult {
+    const tab = tabId === undefined ? undefined : this.#tabs.get(tabId);
+    const noted = tab?.idleUnloadNoted;
+    if (!tab || !noted || tab.pendingRestore || noted.has(params.threadId)) return result;
+    const listed = this.listTabs().find((candidate) => candidate.id === tab.id);
+    if (!listed || !this.#canUseToolTab(params, listed)) return result;
+    noted.add(params.threadId);
+    return { ...result, contentItems: [...result.contentItems, { type: "inputText", text: IDLE_UNLOAD_NOTE }] };
+  }
 
   #toolTabs(params: DynamicToolCallParams): { tabs: BrowserTab[]; activeTabId: string | null } {
     // A page can put a typed card value in its title or address, so they go through the tab's scrub.
@@ -3477,6 +3572,7 @@ export class BrowserHost {
     });
     view.webContents.setAudioMuted(true);
     view.setBackgroundColor("#0b0b0b");
+    allowPinchZoom(view.webContents);
     return view;
   }
 
@@ -4049,6 +4145,21 @@ export class BrowserHost {
     };
   }
 
+  /** The tab is placed from page coordinates, which a pinch of the app page does not change. */
+  #blockMainPinchZoom(blocked: boolean): void {
+    if (!this.#window.isDestroyed()) blockPinchZoom(this.#window.webContents, blocked);
+  }
+
+  /**
+   * An agent clicks and clips a tab in page coordinates, which a pinch zoom moves. A tab that an agent
+   * acts on goes back to no zoom, and the person can pinch it again when the agent stops.
+   */
+  #syncAgentPinchZoom(state: BrowserControlState): void {
+    for (const tab of this.#tabs.values()) {
+      if (!tab.contents.isDestroyed()) blockPinchZoom(tab.contents, drivenByAgent(state, tab));
+    }
+  }
+
   #syncAttachedView(): void {
     const tab = this.#activeTabId ? this.#tabs.get(this.#activeTabId) : null;
     const targetWindow = this.#target === "picture-in-picture" ? this.#pictureInPictureWindow : this.#window;
@@ -4064,6 +4175,7 @@ export class BrowserHost {
     ) {
       this.#hideAttachedView();
       this.#mainPageListener?.(null);
+      this.#blockMainPinchZoom(false);
       return;
     }
 
@@ -4087,11 +4199,13 @@ export class BrowserHost {
       height: this.#bounds.height * zoomFactor,
     });
     tab.view.setBounds(bounds);
+    this.#unthrottle(tab);
     tab.view.setVisible(true);
     this.#attachedViewShown = true;
     tab.contents.invalidate();
     this.#raisePictureInPictureOverlay();
     this.#mainPageListener?.(this.#target === "main" ? { tabId: tab.id, bounds, zoomFactor } : null);
+    this.#blockMainPinchZoom(this.#target === "main");
     if (tab.focusOnVisible && !this.#inBackgroundWindow(tab.view)) {
       tab.focusOnVisible = false;
       tab.contents.focus();
@@ -4308,6 +4422,7 @@ export class BrowserHost {
     if (!tab) return yield* browserFailure(new Error(`Unknown browser tab: ${tabId}`));
     yield* this.#wake(tab);
     tab.lastUsedAt = Date.now();
+    this.#unthrottle(tab);
     return tab;
   });
 
@@ -4516,11 +4631,7 @@ export class BrowserHost {
     }
     if (!hostname || tab.visitedHost === hostname) return;
     tab.visitedHost = hostname;
-    const driven = this.#controls
-      .state()
-      .sessions.some(
-        (session) => session.tabId === tab.id || (session.tabId === null && session.threadId === tab.ownerThreadId),
-      );
+    const driven = drivenByAgent(this.#controls.state(), tab);
     const visit: BrowserSiteVisit = {
       tabId: tab.id,
       hostname,
