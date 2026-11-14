@@ -96,9 +96,14 @@ export interface AcpFlavor {
   emptyAnswerError?: RegExp;
   /**
    * What to do when `session/load` or `session/resume` fails: wait once for a process that still
-   * starts, or list the sessions to find out whether this one exists. `null` reports the failure.
+   * starts, or list the sessions to find out whether this one exists. `list-sessions` tries a listed
+   * session once more; `confirm-missing` reports the failure of a listed session as it is. `null`
+   * reports the failure.
    */
-  restoreFailure?(error: unknown, method: "load" | "resume"): "wait-for-start" | "list-sessions" | null;
+  restoreFailure?(
+    error: unknown,
+    method: "load" | "resume",
+  ): "wait-for-start" | "list-sessions" | "confirm-missing" | null;
   /**
    * A turn that the agent lost, after which it refuses each request of the session until the turn is
    * discarded. `refusal` matches the text of that refusal, and `unsent` the refusal of a prompt that
@@ -373,6 +378,14 @@ export const GROK_ACP_FLAVOR: AcpFlavor = {
   // The chat then showed no answer and no error (#6529).
   emptyAnswerFailure: noAnswerUnlessPlanOrCompaction,
   mcpServerFailure: grokMcpServerFailure,
+  // Grok CLI 1.0.77 keeps a session in a folder named by its working directory. A resume of a session
+  // that is not in the folder of the workspace, such as after the workspace moved, fails with "Path
+  // not found." and `data.code` `FS_NOT_FOUND`, which Grok also sends for any other missing file. The
+  // agent then failed each message (#8936). Only a `session/list` without the session replaces it.
+  restoreFailure: (error) =>
+    isRecord(error) && error.code === -32603 && isRecord(error.data) && error.data.code === "FS_NOT_FOUND"
+      ? "confirm-missing"
+      : null,
   // Grok CLI 1.0.77 reads the reply of `ask_user_question` as an enum with the tag `outcome`, and
   // fails the tool on a reply without it. `accepted` has the answers by question text, each a text
   // or a list of texts, and `annotations`. `cancelled` tells the model that the user did not answer.
