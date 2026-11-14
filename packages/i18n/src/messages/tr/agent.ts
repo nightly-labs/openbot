@@ -54,6 +54,8 @@ export const messages = {
   "agent.dock.add": "Yuvaya ekle",
   "agent.dock.allAdded": "Tüm ajanlarınız ve kanallarınız yuvada",
   "agent.dock.more": "Daha fazla",
+  "agent.dock.keepOpen": "Açık tut",
+  "agent.dock.closeOnLeave": "Dışarı tıklayınca kapat",
   "agent.dock.openInMain": "Ana pencerede aç",
   "agent.dock.openWindow": "Yeni pencerede aç",
   "agent.dock.remove": "Yuvadan kaldır",

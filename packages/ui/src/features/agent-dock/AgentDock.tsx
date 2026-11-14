@@ -236,8 +236,14 @@ export interface AgentDockProps {
    * drags a seat to a new place. When the promise fails, the seats go back to the order of `seats`.
    */
   onMove?: ((seat: AgentDockSeatRef, before: AgentDockSeatRef | null) => Promise<void> | void) | undefined;
-  /** A change closes the chat, for example when the dock window loses the focus. */
+  /** A change closes the chat, for example when the dock on another display opens a chat. */
   closeRequest?: number | undefined;
+  /**
+   * A change closes the chat when the user did not pin it, for example when the dock window loses the
+   * focus. When it is set, the chat header shows "Keep open", so a clipboard overlay or another window
+   * on top does not close the chat.
+   */
+  blurRequest?: number | undefined;
   /** The window edge that holds the dock. The dock and the panel are mirrored on the left edge. */
   side?: "left" | "right" | undefined;
   /** The dock slides into the window edge. */
@@ -269,6 +275,11 @@ interface DockState {
   sending: Record<string, boolean>;
   /** Raised by one to put the caret in the composer. */
   focus: number;
+  /**
+   * The user keeps the panel open when the dock window loses the focus. The pin belongs to the panel, so
+   * it stays when the user opens the chat of another seat; a close clears it.
+   */
+  pinned: boolean;
 }
 
 let pendingKey = 0;
@@ -304,6 +315,7 @@ export function AgentDock(props: AgentDockProps) {
     errors: {},
     sending: {},
     focus: 0,
+    pinned: false,
   });
   /* The last props of each seat, so a seat that leaves keeps its face while it shrinks away. */
   const seatProps = createMemo((previous?: Map<string, AgentDockSeat>) => {
@@ -819,6 +831,7 @@ export function AgentDock(props: AgentDockProps) {
     motion.kick();
     setState((draft) => {
       draft.open = null;
+      draft.pinned = false;
     });
     props.onOpenChange?.(null);
     if (returnFocus) seatElements.get(id)?.querySelector("button")?.focus({ preventScroll: true });
@@ -1109,6 +1122,14 @@ export function AgentDock(props: AgentDockProps) {
     () => props.closeRequest,
     (request, previous) => {
       if (request !== previous && previous !== undefined) untrack(() => closeChat(false));
+    },
+  );
+
+  createEffect(
+    () => props.blurRequest,
+    (request, previous) => {
+      if (request !== previous && previous !== undefined && !untrack(() => state.pinned))
+        untrack(() => closeChat(false));
     },
   );
 
@@ -1491,6 +1512,15 @@ export function AgentDock(props: AgentDockProps) {
                     }
                     onSend={() => void send()}
                     onClose={() => closeChat()}
+                    pinned={state.pinned}
+                    onPinChange={
+                      props.blurRequest === undefined
+                        ? undefined
+                        : (pinned) =>
+                            setState((draft) => {
+                              draft.pinned = pinned;
+                            })
+                    }
                     onRemove={() => props.onRemove(refOfKey(id))}
                     onAdd={() => props.onAdd(refOfKey(id))}
                     onOpenInMain={() => {
