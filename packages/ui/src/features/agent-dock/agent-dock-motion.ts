@@ -200,10 +200,6 @@ export function dockHandlePath(height: number, stretch = 0) {
   return `M ${startX} ${startY} A ${radius} ${radius} 0 0 1 ${endX} ${endY}`;
 }
 
-/**
- * The neck between the panel and the dock: an hourglass whose ends flare into both sides along
- * S-curves. `size` 0 is no neck and 1 is the full neck. Liquid-layer coordinates.
- */
 /** How far the neck reaches above and below its centre at a size. */
 function neckReach(size: number) {
   return 30 * size;
@@ -222,6 +218,10 @@ export function neckCenterInBand(centerY: number, size: number, height: number, 
   return Math.min(bottom, Math.max(top, centerY));
 }
 
+/**
+ * The neck between the panel and the dock: an hourglass whose ends flare into both sides along
+ * S-curves. `size` 0 is no neck and 1 is the full neck. Liquid-layer coordinates.
+ */
 export function neckPath(centerY: number, size: number) {
   if (size <= 0) return "";
   const y = LIQUID_PAD + centerY;
