@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdirSync, renameSync, rmSync } from "node:fs";
+import { mkdirSync, renameSync, rmSync, statSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import { ATTACHMENT_LIMITS } from "@openbot/contracts/input-limits";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -14,7 +14,7 @@ const logger = createOpenBotLogger("whatsapp");
 /** A saved message, and the copy of its file, go this long after they arrived. */
 export const WHATSAPP_HISTORY_KEEP_MS = 90 * 24 * 60 * 60_000;
 /** The copies of one number's files stay under this size: the oldest go first. */
-export const WHATSAPP_FILES_MAX_BYTES = 2 * 1024 ** 3;
+const WHATSAPP_FILES_MAX_BYTES = 2 * 1024 ** 3;
 /** A download that takes longer stops, so that the files after it are saved too. */
 const DOWNLOAD_DEADLINE_MS = 10 * 60_000;
 
@@ -58,9 +58,9 @@ export class WhatsAppArchive {
   }
 
   /** Saves a message. A new message with a file and its stored WhatsApp message gets the file downloaded. */
-  save(chatJid: string, threadKey: string, entry: ContextEntry, media: WAMessage | null): void {
+  save(chatJid: string, threadKey: string, authorId: string, entry: ContextEntry, media: WAMessage | null): void {
     const saved = this.#write(() =>
-      this.#store.save(this.connectionId, chatJid, threadKey, entry, new Date(this.#now()).toISOString()),
+      this.#store.save(this.connectionId, chatJid, threadKey, authorId, entry, new Date(this.#now()).toISOString()),
     );
     if (!saved || !media) return;
     for (const file of entry.files ?? [])
@@ -89,14 +89,14 @@ export class WhatsAppArchive {
   }
 
   /** A message that its author deleted for everyone goes, with its files. */
-  forget(chatJid: string, messageId: string): void {
-    for (const path of this.#write(() => this.#store.forgetMessage(this.connectionId, chatJid, messageId)) ?? [])
-      this.#delete(path);
+  forget(chatJid: string, messageId: string, authorId: string): void {
+    const paths = this.#write(() => this.#store.forgetMessage(this.connectionId, chatJid, messageId, authorId));
+    for (const path of paths ?? []) this.#delete(path);
   }
 
   /** A message that its author changed keeps the new text. */
-  edit(chatJid: string, messageId: string, text: string): void {
-    this.#write(() => this.#store.editMessage(this.connectionId, chatJid, messageId, text));
+  edit(chatJid: string, messageId: string, authorId: string, text: string): void {
+    this.#write(() => this.#store.editMessage(this.connectionId, chatJid, messageId, authorId, text));
   }
 
   /** Stops the downloads, also the one that runs. A disconnect deletes the folder after this. */
@@ -119,11 +119,14 @@ export class WhatsAppArchive {
     if (this.#closed.signal.aborted) return;
     const path = join(this.#folder, savedName(file));
     const part = `${path}.part`;
+    let size: number;
     try {
       mkdirSync(this.#folder, { recursive: true, mode: 0o700 });
       const signal = AbortSignal.any([this.#closed.signal, AbortSignal.timeout(DOWNLOAD_DEADLINE_MS)]);
       await downloadWhatsAppMedia(this.#session, media, part, ATTACHMENT_LIMITS.fileBytes, signal);
       renameSync(part, path);
+      // The size that the sender declares can be wrong; the limit counts the bytes on disk.
+      size = statSync(path).size;
     } catch (cause) {
       rmSync(part, { force: true });
       // Only the name: a WhatsApp error can hold the file's link.
@@ -133,7 +136,7 @@ export class WhatsAppArchive {
       return;
     }
     // The message went while the file downloaded (a revoke, a prune or a disconnect): the copy goes too.
-    if (!this.#write(() => this.#store.saveFilePath(this.connectionId, chatJid, messageId, file.id, path))) {
+    if (!this.#write(() => this.#store.saveFilePath(this.connectionId, chatJid, messageId, file.id, path, size))) {
       this.#delete(path);
       return;
     }

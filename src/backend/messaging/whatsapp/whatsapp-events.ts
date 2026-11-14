@@ -110,14 +110,14 @@ export async function whatsAppInbound(
     fromMe: Boolean(key.fromMe),
   });
   if (decision.type === "ignore") return null;
+  const authorId = authorNumber ?? userOf(authorJid) ?? context.me.number;
   if (protocol) {
-    applyChange(protocol, chatJid, context.chats);
+    applyChange(protocol, chatJid, authorId, context.chats);
     return null;
   }
   const name = message.pushName?.trim() || authorNumber || "WhatsApp";
   if (decision.type === "pair") return authorNumber ? { type: "pairing", chatJid, senderId: authorNumber, name } : null;
 
-  const authorId = authorNumber ?? userOf(authorJid) ?? context.me.number;
   context.chats.rememberName(authorId, key.fromMe ? null : message.pushName);
   const contextInfo = contextOf(content);
   const quotedId = contextInfo?.stanzaId ?? null;
@@ -168,6 +168,7 @@ export async function whatsAppInbound(
     id,
     chatJid,
     threadKey,
+    authorId,
     authorName: name,
     text: text || files.map((file) => file.name).join(", "),
     sentAt: isoTime(message),
@@ -220,16 +221,22 @@ function savedChange(protocol: proto.Message.IProtocolMessage): boolean {
   );
 }
 
-function applyChange(protocol: proto.Message.IProtocolMessage, chatJid: string, chats: WhatsAppChatState): void {
+/** Only the author's own edit or delete counts. A group admin's delete of another person's message is not followed. */
+function applyChange(
+  protocol: proto.Message.IProtocolMessage,
+  chatJid: string,
+  authorId: string,
+  chats: WhatsAppChatState,
+): void {
   const messageId = protocol.key?.id;
   if (!messageId) return;
   if (protocol.type === proto.Message.ProtocolMessage.Type.REVOKE) {
-    chats.forgetMessage(chatJid, messageId);
+    chats.forgetMessage(chatJid, messageId, authorId);
     return;
   }
   const edited = normalizeMessageContent(protocol.editedMessage);
   const text = edited ? textOf(edited) : "";
-  if (text) chats.editMessage(chatJid, messageId, text);
+  if (text) chats.editMessage(chatJid, messageId, authorId, text);
 }
 
 function contextOf(content: proto.IMessage): proto.IContextInfo | null {

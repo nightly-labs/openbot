@@ -20,19 +20,24 @@ export class MessagingHistoryStore {
     this.#database = database;
   }
 
-  /** Saves one message. False when the message was saved before. */
+  /**
+   * Saves one message. `authorId` is the platform's id of its author, which an edit or a delete must
+   * match. False when the message was saved before.
+   */
   save(
     connectionId: string,
     platformChannelId: string,
     threadKey: string,
+    authorId: string,
     entry: ContextEntry,
     savedAt: string,
   ): boolean {
     const result = this.#database.connection
       .prepare(
         `INSERT INTO projection_messaging_history
-           (connection_id, platform_channel_id, message_id, thread_key, author_name, text, sent_at, files_json, saved_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+           (connection_id, platform_channel_id, message_id, thread_key, author_id, author_name, text, sent_at,
+            files_json, saved_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(connection_id, platform_channel_id, message_id) DO NOTHING`,
       )
       .run(
@@ -40,6 +45,7 @@ export class MessagingHistoryStore {
         platformChannelId,
         entry.id,
         threadKey,
+        authorId,
         entry.authorName,
         entry.text,
         entry.sentAt,
@@ -128,13 +134,17 @@ export class MessagingHistoryStore {
     return found.reverse();
   }
 
-  /** Records where the copy of a message's file is. False when the message or its file is gone. */
+  /**
+   * Records where the copy of a message's file is, and its real size, which the size limit counts.
+   * False when the message or its file is gone.
+   */
   saveFilePath(
     connectionId: string,
     platformChannelId: string,
     messageId: string,
     fileId: string,
     path: string,
+    size: number,
   ): boolean {
     const files = this.#files(connectionId, platformChannelId, messageId);
     if (!files?.some((file) => file.id === fileId)) return false;
@@ -144,7 +154,7 @@ export class MessagingHistoryStore {
          WHERE connection_id = ? AND platform_channel_id = ? AND message_id = ?`,
       )
       .run(
-        JSON.stringify(files.map((file) => (file.id === fileId ? { ...file, path } : file))),
+        JSON.stringify(files.map((file) => (file.id === fileId ? { ...file, path, size } : file))),
         connectionId,
         platformChannelId,
         messageId,
@@ -166,26 +176,36 @@ export class MessagingHistoryStore {
     );
   }
 
-  /** Deletes one message that its author deleted for everyone. Returns the paths of its files. */
-  forgetMessage(connectionId: string, platformChannelId: string, messageId: string): string[] {
+  /**
+   * Deletes one message that its author deleted for everyone. A delete from a different author changes
+   * nothing: the sender chooses the id of the message. Returns the paths of its files.
+   */
+  forgetMessage(connectionId: string, platformChannelId: string, messageId: string, authorId: string): string[] {
     return filePaths(
       this.#database.connection
         .prepare(
           `DELETE FROM projection_messaging_history
-           WHERE connection_id = ? AND platform_channel_id = ? AND message_id = ? RETURNING files_json`,
+           WHERE connection_id = ? AND platform_channel_id = ? AND message_id = ? AND author_id = ?
+           RETURNING files_json`,
         )
-        .all(connectionId, platformChannelId, messageId),
+        .all(connectionId, platformChannelId, messageId, authorId),
     );
   }
 
-  /** Replaces the text of a message that its author changed. */
-  editMessage(connectionId: string, platformChannelId: string, messageId: string, text: string): void {
+  /** Replaces the text of a message that its author changed. A change from a different author does nothing. */
+  editMessage(
+    connectionId: string,
+    platformChannelId: string,
+    messageId: string,
+    authorId: string,
+    text: string,
+  ): void {
     this.#database.connection
       .prepare(
         `UPDATE projection_messaging_history SET text = ?
-         WHERE connection_id = ? AND platform_channel_id = ? AND message_id = ?`,
+         WHERE connection_id = ? AND platform_channel_id = ? AND message_id = ? AND author_id = ?`,
       )
-      .run(text, connectionId, platformChannelId, messageId);
+      .run(text, connectionId, platformChannelId, messageId, authorId);
   }
 
   /**

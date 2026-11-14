@@ -13,6 +13,8 @@ const MESSAGE_ENTRIES = 500;
 interface RecentMessage extends ContextEntry {
   chatJid: string;
   threadKey: string;
+  /** The author's number, which an edit or a delete for everyone must match. */
+  authorId: string;
 }
 
 /** What a reaction or a quote needs of a message: who wrote it. */
@@ -77,7 +79,13 @@ export class WhatsAppChatState {
 
   rememberMessage(message: RecentMessage): void {
     const file = message.files?.[0];
-    this.#archive?.save(message.chatJid, message.threadKey, contextEntry(message), file ? this.media(file.id) : null);
+    this.#archive?.save(
+      message.chatJid,
+      message.threadKey,
+      message.authorId,
+      contextEntry(message),
+      file ? this.media(file.id) : null,
+    );
     if (this.#recent.some((entry) => entry.id === message.id && entry.chatJid === message.chatJid)) return;
     this.#recent.push(message);
     if (this.#recent.length > RECENT_MESSAGES) this.#recent.shift();
@@ -129,17 +137,22 @@ export class WhatsAppChatState {
   }
 
   /** A message that its author deleted for everyone goes from the context and the archive. */
-  forgetMessage(chatJid: string, messageId: string): void {
-    const index = this.#recent.findIndex((entry) => entry.id === messageId && entry.chatJid === chatJid);
+  forgetMessage(chatJid: string, messageId: string, authorId: string): void {
+    const index = this.#recent.findIndex((entry) => this.#isMessage(entry, chatJid, messageId, authorId));
     if (index !== -1) this.#recent.splice(index, 1);
-    this.#archive?.forget(chatJid, messageId);
+    this.#archive?.forget(chatJid, messageId, authorId);
   }
 
   /** A message that its author changed keeps the new text. */
-  editMessage(chatJid: string, messageId: string, text: string): void {
-    const entry = this.#recent.find((candidate) => candidate.id === messageId && candidate.chatJid === chatJid);
+  editMessage(chatJid: string, messageId: string, authorId: string, text: string): void {
+    const entry = this.#recent.find((candidate) => this.#isMessage(candidate, chatJid, messageId, authorId));
     if (entry) entry.text = text;
-    this.#archive?.edit(chatJid, messageId, text);
+    this.#archive?.edit(chatJid, messageId, authorId, text);
+  }
+
+  /** The sender of an edit or a delete chooses the message id, so the author must match too. */
+  #isMessage(entry: RecentMessage, chatJid: string, messageId: string, authorId: string): boolean {
+    return entry.id === messageId && entry.chatJid === chatJid && entry.authorId === authorId;
   }
 
   rememberMenu(messageId: string, menu: MenuPost): void {
@@ -178,6 +191,11 @@ function remember<V>(map: Map<string, V>, key: string, value: V): void {
   }
 }
 
-function contextEntry({ chatJid: _chat, threadKey: _thread, ...entry }: RecentMessage): ContextEntry {
+function contextEntry({
+  chatJid: _chat,
+  threadKey: _thread,
+  authorId: _author,
+  ...entry
+}: RecentMessage): ContextEntry {
   return entry;
 }

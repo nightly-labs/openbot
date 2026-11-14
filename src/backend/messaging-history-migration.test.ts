@@ -71,8 +71,9 @@ function expectHealthy(db: DatabaseSync): void {
 
 function insertMessage(db: DatabaseSync, connectionId: string, messageId: string, text: string): void {
   db.prepare(`INSERT INTO projection_messaging_history
-    (connection_id, platform_channel_id, message_id, thread_key, author_name, text, sent_at, files_json, saved_at)
-    VALUES (?, '120363000000000000@g.us', ?, 'direct', 'Ana 界', ?, '2026-01-03T10:00:00.000Z', '[]',
+    (connection_id, platform_channel_id, message_id, thread_key, author_id, author_name, text, sent_at, files_json,
+      saved_at)
+    VALUES (?, '120363000000000000@g.us', ?, 'direct', '48600100200', 'Ana 界', ?, '2026-01-03T10:00:00.000Z', '[]',
       '2026-01-03T10:00:01.000Z')
     ON CONFLICT(connection_id, platform_channel_id, message_id) DO NOTHING`).run(connectionId, messageId, text);
 }

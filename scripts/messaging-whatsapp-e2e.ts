@@ -833,12 +833,17 @@ try {
           messageTimestamp: Math.floor(Date.now() / 1_000),
           pushName: "Ewa",
         });
-        const change = (messageId: string, protocolMessage: proto.Message.IProtocolMessage): WAMessage => ({
-          key: { remoteJid: GROUP, fromMe: false, id: messageId, participant: author },
+        const change = (
+          messageId: string,
+          protocolMessage: proto.Message.IProtocolMessage,
+          participant = author,
+        ): WAMessage => ({
+          key: { remoteJid: GROUP, fromMe: false, id: messageId, participant },
           message: { protocolMessage },
           messageTimestamp: Math.floor(Date.now() / 1_000),
           pushName: "Ewa",
         });
+        const other = `${STRANGER}@s.whatsapp.net`;
         const savedText = (messageId: string) =>
           agents.messaging.history.recent(id, GROUP, null, 200).find((entry) => entry.id === messageId)?.text;
         phone.current().receive([fileMessage("IN-KEEP-1", "first.txt"), fileMessage("IN-KEEP-2", "second.txt")]);
@@ -850,8 +855,8 @@ try {
         const second = join(folder, "copy-second.txt");
         writeFileSync(first, "first");
         writeFileSync(second, "secnd");
-        assert.ok(agents.messaging.history.saveFilePath(id, GROUP, "IN-KEEP-1", `${GROUP}|IN-KEEP-1`, first));
-        assert.ok(agents.messaging.history.saveFilePath(id, GROUP, "IN-KEEP-2", `${GROUP}|IN-KEEP-2`, second));
+        assert.ok(agents.messaging.history.saveFilePath(id, GROUP, "IN-KEEP-1", `${GROUP}|IN-KEEP-1`, first, 5));
+        assert.ok(agents.messaging.history.saveFilePath(id, GROUP, "IN-KEEP-2", `${GROUP}|IN-KEEP-2`, second, 5));
         assert.deepEqual(agents.messaging.history.trimFiles(id, 10), [], "Copies under the limit went.");
         assert.deepEqual(agents.messaging.history.trimFiles(id, 9), [first], "The oldest copy did not go first.");
         rmSync(first);
@@ -864,6 +869,24 @@ try {
             key: { remoteJid: GROUP, id: "IN-KEEP-1", participant: author },
             editedMessage: { conversation: "the first file, renamed" },
           }),
+          // Another member names Ewa's message: the sender chooses the id, so neither change counts.
+          change(
+            "EDIT-FORGED",
+            {
+              type: proto.Message.ProtocolMessage.Type.MESSAGE_EDIT,
+              key: { remoteJid: GROUP, id: "IN-KEEP-1", participant: author },
+              editedMessage: { conversation: "forged" },
+            },
+            other,
+          ),
+          change(
+            "REVOKE-FORGED",
+            {
+              type: proto.Message.ProtocolMessage.Type.REVOKE,
+              key: { remoteJid: GROUP, id: "IN-KEEP-1", participant: author },
+            },
+            other,
+          ),
           change("REVOKE-1", {
             type: proto.Message.ProtocolMessage.Type.REVOKE,
             key: { remoteJid: GROUP, id: "IN-KEEP-2", participant: author },
@@ -871,6 +894,7 @@ try {
         ]);
         await until(() => savedText("IN-KEEP-1") === "the first file, renamed", "the edited text");
         await until(() => savedText("IN-KEEP-2") === undefined && !existsSync(second), "the deleted message");
+        assert.equal(savedText("IN-KEEP-1"), "the first file, renamed", "Another member changed or deleted a message.");
         assert.equal(received(agents, GROUP, "EDIT-1"), false, "An edit started work.");
         assert.equal(received(agents, GROUP, "REVOKE-1"), false, "A delete for everyone started work.");
         return { trimmed: 1, edited: true, revoked: true };
@@ -916,7 +940,7 @@ try {
         mkdirSync(folder, { recursive: true });
         const copy = join(folder, "copy-plan.pdf");
         writeFileSync(copy, "plan");
-        assert.ok(agents.messaging.history.saveFilePath(id, GROUP, "IN-FILE", `${GROUP}|IN-FILE`, copy));
+        assert.ok(agents.messaging.history.saveFilePath(id, GROUP, "IN-FILE", `${GROUP}|IN-FILE`, copy, 4));
         const withPath = await readHistory(agents, { place: GROUP, query: "plan" });
         assert.deepEqual(withPath.messages[0]?.files, [{ name: "plan.pdf", path: copy }]);
         const values = credentials.get(id);
@@ -946,6 +970,7 @@ try {
           id,
           GROUP,
           OLD_ID,
+          FRIEND,
           {
             id: OLD_ID,
             authorName: "Ewa",

@@ -136,6 +136,7 @@ export const MESSAGING_HISTORY_SCHEMA_SQL = `
     platform_channel_id TEXT NOT NULL,
     message_id TEXT NOT NULL,
     thread_key TEXT NOT NULL,
+    author_id TEXT NOT NULL,
     author_name TEXT NOT NULL,
     text TEXT NOT NULL,
     sent_at TEXT NOT NULL,

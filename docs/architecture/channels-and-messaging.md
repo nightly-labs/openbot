@@ -881,8 +881,9 @@ is one linked number (`workspace_id` is the number in digits).
   a conversation, `messaging_history` and its `query` and `before` filter read the table, and a turn's
   download copies the saved file, and waits for the download at arrival when it did not finish. A
   download stops after 10 minutes or when the connection closes. The copies of one connection stay
-  under 2 GB (`trimFiles`, the oldest first). A delete for everyone deletes the row and its copy, and an
-  edit changes the text. `MessagingService` deletes the rows and copies older than 90 days at start and
+  under 2 GB (`trimFiles`, the oldest first, by the size on disk). A delete for everyone deletes the row
+  and its copy, and an edit changes the text, only when the sender is the saved `author_id`: the sender
+  chooses the message id. A group admin's delete of another person's message is not followed. `MessagingService` deletes the rows and copies older than 90 days at start and
   each hour, also those of a number that is off; a disconnect deletes all of them for the connection.
 - **Not on joined servers.** `connectors-v1` and `routine-results-v1` stay as released: a host leaves
   WhatsApp out of both, and the desktop IPC endpoints `messaging:*-whatsapp-*` are local only.

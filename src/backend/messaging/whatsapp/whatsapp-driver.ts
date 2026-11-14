@@ -443,6 +443,8 @@ class WhatsAppAdapter implements MessagingAdapter {
       id: postId,
       chatJid: target.platformChannelId,
       threadKey: this.#threadKey(target, postId),
+      // The linked number sent it: an edit or a delete from the owner's phone matches.
+      authorId: whatsAppIdentity(this.#handle)?.number ?? "",
       authorName: "OpenBot",
       text,
       sentAt: new Date().toISOString(),
