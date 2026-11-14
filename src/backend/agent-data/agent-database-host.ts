@@ -8,8 +8,8 @@
 // Runtime imports are limited to node:* and Effect. Repository shapes remain type-only, so this
 // process cannot load Electron or the openbot.db facade. Effect does not replace process deadlines.
 
-import { existsSync } from "node:fs";
-import { basename } from "node:path";
+import { accessSync, chmodSync, existsSync, constants as fileAccess, statSync } from "node:fs";
+import { basename, dirname } from "node:path";
 import { createInterface } from "node:readline";
 import { constants, DatabaseSync, type StatementSync } from "node:sqlite";
 import { Context, Effect, Layer, ManagedRuntime, Result, Schema } from "effect";
@@ -49,6 +49,12 @@ const SQLITE_BUSY = 5;
 const SQLITE_FULL = 13;
 /** `SQLITE_READONLY_ROLLBACK`: the file has a hot journal that a read-only connection cannot roll back. */
 const SQLITE_READONLY_ROLLBACK = 776;
+/**
+ * `SQLITE_READONLY`, the primary code in the low byte of the extended codes this host meets on a
+ * write: the file is read-only (8), its folder is read-only so no journal can be made (1544), or the
+ * file was replaced while a connection held the old one (1032).
+ */
+const SQLITE_READONLY = 8;
 
 /** Functions SQLite can compile in that read, write, or load code from the filesystem. */
 const DENIED_FUNCTIONS = new Set(["load_extension", "readfile", "writefile", "edit", "fts3_tokenizer"]);
@@ -280,6 +286,14 @@ function toFailure(error: unknown, databasePath: string): AgentDatabaseFailure {
       sqliteCode: code,
     };
   }
+  if (code !== undefined && (code & 0xff) === SQLITE_READONLY && code !== SQLITE_READONLY_ROLLBACK) {
+    return {
+      kind: "sqlite",
+      message:
+        "Nothing was saved: OpenBot cannot change the shared database file, because it or its folder (OpenBot/Shared/Data) is read-only or belongs to another user account. Reading still works. Tell the user that their user account needs permission to change that folder and the files in it.",
+      sqliteCode: code,
+    };
+  }
   if (code === SQLITE_BUSY) {
     return {
       kind: "busy",
@@ -325,6 +339,36 @@ function rollBackHotJournal(request: AgentDatabaseStatement): Effect.Effect<void
   });
 }
 
+/**
+ * A write connection that SQLite opened read-only stays read-only, and one that holds a replaced
+ * file never sees the new one, so every later write fails until the app restarts (#9225). Both
+ * connections of the file are closed, the owner gets back read and write access to the folder, the
+ * file, and its journal, and the caller runs the write once more on a new connection. SQLite refused
+ * the write before it changed anything, so the second run cannot save it twice. Bits are only added,
+ * and `chmod` cannot change a file another account owns; that case keeps failing with its sentence.
+ */
+function reopenWritable(request: AgentDatabaseStatement): Effect.Effect<void> {
+  return Effect.sync(() => {
+    closePath(request.databasePath);
+    const folder = dirname(request.databasePath);
+    for (const [path, ownerBits] of [
+      [folder, 0o700],
+      [request.databasePath, 0o600],
+      [`${request.databasePath}-journal`, 0o600],
+    ] as const) {
+      try {
+        accessSync(path, fileAccess.R_OK | fileAccess.W_OK);
+      } catch {
+        try {
+          chmodSync(path, statSync(path).mode | ownerBits);
+        } catch {
+          // Missing, or owned by another account: the second run reports it.
+        }
+      }
+    }
+  });
+}
+
 class AgentDatabaseHost extends Context.Service<
   AgentDatabaseHost,
   { execute(request: AgentDatabaseRequest): Effect.Effect<AgentDatabaseRows, HostFailure> }
@@ -358,6 +402,13 @@ class AgentDatabaseHost extends Context.Service<
               Effect.catchIf(
                 (failure) => request.mode === "read" && failure.sqliteCode === SQLITE_READONLY_ROLLBACK,
                 () => rollBackHotJournal(request).pipe(Effect.andThen(run)),
+              ),
+              Effect.catchIf(
+                (failure) =>
+                  request.mode === "write" &&
+                  failure.sqliteCode !== undefined &&
+                  (failure.sqliteCode & 0xff) === SQLITE_READONLY,
+                () => reopenWritable(request).pipe(Effect.andThen(run)),
               ),
             );
           },
