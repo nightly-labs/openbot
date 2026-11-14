@@ -675,6 +675,13 @@ export class VaultService {
         if (item.agents?.includes(agentId)) keys.set(item.name, { value: item.key, own: onlyFor(item, agentId) });
       return [...keys].map(([name, { value, own }]) => ({ name, value, own }));
     },
+    sharedApiKeys: () =>
+      this.#status === "ready"
+        ? this.#store
+            .read()
+            .apiKeys.filter((item) => item.agents === undefined)
+            .map((item) => ({ name: item.name, value: item.key }))
+        : [],
     hasCards: (agentId) =>
       this.#status === "ready" && this.#store.read().cards.some((item) => vaultItemAllows(item, agentId)),
     hasContacts: (agentId) =>
