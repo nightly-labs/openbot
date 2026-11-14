@@ -389,6 +389,8 @@ export class TurnLifecycle {
       compacted: boolean;
       /** The tool steps that started and did not end yet. While one is open, the turn works, it does not wait. */
       openTools: Set<string>;
+      /** The time of the last provider notification that names this turn. */
+      lastEventAt: number;
     }
   >();
   /** The drain's start of each starting delivery, until its turn starts. */
@@ -606,6 +608,9 @@ export class TurnLifecycle {
       this.#capacityNotices.delete(turnId);
       const compactionFailure = this.#compactionFailures.get(turnId);
       this.#compactionFailures.delete(turnId);
+      // A quiet turn that OpenBot stopped after its no-update call completed, also when its process ended.
+      const quietStop = this.#quietStops.has(turnId) && !this.#turnErrors.has(turnId);
+      this.#clearQuietEnd(turnId);
       // A routine run's own session saves no history, so its turn ends now and closes the session.
       if (
         options.keepRecoverable &&
@@ -635,7 +640,7 @@ export class TurnLifecycle {
       this.#compaction.abandonCompaction(turn.threadId);
       // The running entry is gone already, so `#completeTurn` cannot keep the timing.
       this.#keepTurnTiming(turnId, turn);
-      yield* this.#completeTurn(turn.agentId, turn.threadId, turnId, "interrupted").pipe(
+      yield* this.#completeTurn(turn.agentId, turn.threadId, turnId, quietStop ? "completed" : "interrupted").pipe(
         Effect.catchCause((cause) =>
           reportOriginalFailure(cause, (failure) =>
             this.#hooks.emitError("turn_completion_failed", failure, turn.agentId),
@@ -859,6 +864,8 @@ export class TurnLifecycle {
     const threadId = getString(params, "threadId");
     const agentId = threadId ? this.#conversation.agentForThread(threadId) : undefined;
     if (agentId) this.#lastEventAt.set(agentId, Date.now());
+    const eventTurn = this.#runningTurns.get(getString(params, "turnId") ?? "");
+    if (eventTurn) eventTurn.lastEventAt = Date.now();
 
     if (
       threadId &&
@@ -909,6 +916,7 @@ export class TurnLifecycle {
           acted: false,
           compacted: false,
           openTools: new Set(),
+          lastEventAt: Date.now(),
         });
         this.#traces.begin(turnId, new Date().toISOString());
         const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
@@ -1465,8 +1473,8 @@ export class TurnLifecycle {
 
   /**
    * Stops a quiet turn that sends nothing for `QUIET_END_MS` after its no-update call, and its end
-   * completes it. An open tool step or a provider event, such as thinking, keeps the turn. A Stop of
-   * the user and a reported failure keep their own end.
+   * completes it. An open tool step, an open approval or question, or a provider event of the turn,
+   * such as thinking, keeps the turn. A Stop of the user and a reported failure keep their own end.
    */
   #armQuietEnd(agentId: string, turnId: string): void {
     if (this.#quietEndTimers.has(turnId)) return;
@@ -1481,8 +1489,8 @@ export class TurnLifecycle {
         this.#hooks.turnStopped(agentId, this.#taskForThread(agentId, threadId), turnId)
       )
         return;
-      const silentFor = Date.now() - Math.max(calledAt, this.#lastEventAt.get(agentId) ?? 0);
-      if (running.openTools.size > 0 || silentFor < QUIET_END_MS) {
+      const silentFor = Date.now() - Math.max(calledAt, running.lastEventAt);
+      if (running.openTools.size > 0 || this.#attention.hasAttentionFor(agentId) || silentFor < QUIET_END_MS) {
         wait(Math.max(QUIET_END_MS - silentFor, 1_000));
         return;
       }
