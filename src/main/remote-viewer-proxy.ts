@@ -29,6 +29,19 @@ const requireModule = createRequire(import.meta.url);
 const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("ws/package.json")), "index.js"));
 const MAX_REQUEST_BYTES = 2 * 1024 * 1024;
 const MAX_PENDING_SIGNAL_BYTES = 1024 * 1024;
+// The Moonlight viewer's own files are the same for each session of a host's runtime, but their paths
+// hold the session, so the browser never reuses them. Without a copy here, each open loaded them all
+// again through the server connection, one round trip each (#9397). `config.js` holds the session's
+// path and the host writes the paste script, so they are not kept; nor is a page or a query.
+const VIEWER_FILE_PATH = new RegExp(
+  `^${TEAM_API_ROUTES.remoteScreen.sessions}/[A-Za-z0-9-]+/moonlight(/[A-Za-z0-9_./-]+\\.(?:js|mjs|css|wasm|png|svg|ico|woff2?))$`,
+  "u",
+);
+const HOST_WRITTEN_VIEWER_FILES = new Set(["/config.js", "/openbot-paste.js"]);
+// The viewer's files are about 1.2 MB. A host that sends more than this gets no more copies.
+const MAX_KEPT_VIEWER_BYTES = 32 * 1024 * 1024;
+const VIEWER_PAGE_POLICY =
+  "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; media-src 'self' blob:; worker-src 'self' blob:";
 
 interface RemoteViewerTransport {
   sendDesktop(serverId: string, data: string | ArrayBuffer): Effect.Effect<void, RemoteWorkflowError>;
@@ -53,12 +66,19 @@ interface ViewerStream {
   forwarding: Semaphore.Semaphore;
 }
 
+interface KeptViewerFiles {
+  files: Map<string, { contentType: string; bytes: Uint8Array }>;
+  bytes: number;
+}
+
 export class RemoteViewerProxy {
   readonly #options: RemoteViewerProxyOptions;
   readonly #operations = new Set<Deferred.Deferred<void>>();
   readonly #token = crypto.randomUUID().replaceAll("-", "");
   readonly #webSockets = new webSockets.WebSocketServer({ noServer: true });
   readonly #streams = new Map<string, ViewerStream>();
+  // By server. A host gets a new runtime only when it restarts, and a restart ends its connection.
+  readonly #viewerFiles = new Map<string, KeptViewerFiles>();
   #server: Server | null = null;
   #port: number | null = null;
   readonly #lifecycle = new LifecycleGate<number, RemoteWorkflowError>();
@@ -87,6 +107,7 @@ export class RemoteViewerProxy {
     this.#options.transport.off("disconnected", this.#onDisconnected);
     for (const stream of this.#streams.values()) stream.socket.close(1001, "Remote viewer stopped");
     this.#streams.clear();
+    this.#viewerFiles.clear();
     while (this.#operations.size)
       yield* Effect.forEach([...this.#operations], Deferred.await, { concurrency: "unbounded" });
     this.#webSockets.close();
@@ -153,6 +174,11 @@ export class RemoteViewerProxy {
   ): Effect.fn.Return<void, RemoteWorkflowError> {
     const route = this.#route(request.url ?? "/");
     if (!route) return sendText(response, 404, "Not found");
+    const viewerFile =
+      request.method === "GET" || request.method === "HEAD" ? viewerFilePath(route.upstreamPath) : null;
+    const kept = viewerFile === null ? undefined : this.#keptViewerFiles(route.serverId);
+    const keptFile = viewerFile === null ? undefined : kept?.files.get(viewerFile);
+    if (keptFile) return sendViewerFile(response, request.method, 200, keptFile.contentType, keptFile.bytes);
     return yield* Effect.gen({ self: this }, function* () {
       const body =
         request.method === "GET" || request.method === "HEAD" ? undefined : yield* remoteCall(() => readBody(request));
@@ -182,18 +208,18 @@ export class RemoteViewerProxy {
           .replaceAll(namespace, `${prefix}${namespace}`);
         bytes = new TextEncoder().encode(text);
       }
-      const responseHeaders: OutgoingHttpHeaders = {
-        "Content-Type": contentType,
-        "Content-Length": String(bytes.byteLength),
-        "Cache-Control": "no-store",
-        "X-Content-Type-Options": "nosniff",
-      };
-      if (contentType.includes("text/html")) {
-        responseHeaders["Content-Security-Policy"] =
-          "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; media-src 'self' blob:; worker-src 'self' blob:";
+      // A connection lost during the request may have ended at a host that now runs another runtime.
+      if (
+        viewerFile !== null &&
+        kept !== undefined &&
+        upstream.status === 200 &&
+        this.#viewerFiles.get(route.serverId) === kept &&
+        kept.bytes + bytes.byteLength <= MAX_KEPT_VIEWER_BYTES
+      ) {
+        kept.files.set(viewerFile, { contentType, bytes });
+        kept.bytes += bytes.byteLength;
       }
-      response.writeHead(upstream.status, responseHeaders);
-      response.end(request.method === "HEAD" ? undefined : Buffer.from(bytes));
+      sendViewerFile(response, request.method, upstream.status, contentType, bytes);
     }).pipe(
       Effect.catch(() =>
         Effect.sync(() => {
@@ -308,7 +334,17 @@ export class RemoteViewerProxy {
     ).catch(() => undefined);
   }
 
+  #keptViewerFiles(serverId: string): KeptViewerFiles {
+    let kept = this.#viewerFiles.get(serverId);
+    if (!kept) {
+      kept = { files: new Map(), bytes: 0 };
+      this.#viewerFiles.set(serverId, kept);
+    }
+    return kept;
+  }
+
   readonly #onDisconnected = (serverId: string): void => {
+    this.#viewerFiles.delete(serverId);
     for (const [streamId, stream] of this.#streams) {
       if (stream.serverId !== serverId) continue;
       this.#streams.delete(streamId);
@@ -368,6 +404,29 @@ async function readBody(request: IncomingMessage): Promise<Buffer> {
   const body = await readBodyWithin(request, MAX_REQUEST_BYTES);
   if (body === null) throw new Error("Remote viewer request is too large.");
   return body;
+}
+
+function viewerFilePath(upstreamPath: string): string | null {
+  const path = VIEWER_FILE_PATH.exec(upstreamPath)?.[1];
+  return path === undefined || path.includes("..") || HOST_WRITTEN_VIEWER_FILES.has(path) ? null : path;
+}
+
+function sendViewerFile(
+  response: ServerResponse,
+  method: string | undefined,
+  status: number,
+  contentType: string,
+  bytes: Uint8Array,
+): void {
+  const headers: OutgoingHttpHeaders = {
+    "Content-Type": contentType,
+    "Content-Length": String(bytes.byteLength),
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
+  };
+  if (contentType.includes("text/html")) headers["Content-Security-Policy"] = VIEWER_PAGE_POLICY;
+  response.writeHead(status, headers);
+  response.end(method === "HEAD" ? undefined : Buffer.from(bytes));
 }
 
 function sendText(response: ServerResponse, status: number, body: string): void {
