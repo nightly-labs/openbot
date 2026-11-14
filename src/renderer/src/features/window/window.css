@@ -930,6 +930,8 @@
 
 /* The settings page: the nav at the width of the sidebar, and the path to an open detail page above the panel. */
 .settings-page {
+  /* The widest line of the panel and of the path above it. */
+  --settings-page-column-width: 960px;
   display: grid;
   width: 100%;
   height: 100%;
@@ -939,14 +941,15 @@
 }
 
 .settings-page-path-row {
+  /* The room of the Close button. */
+  --settings-page-close-room: calc(var(--openbot-space-8) + var(--openbot-space-4));
   display: flex;
   min-width: 0;
   grid-column: 2;
   grid-row: 1;
   align-items: center;
   padding-block: var(--openbot-space-4) 0;
-  /* The room of the Close button. */
-  padding-inline: 0 calc(var(--openbot-space-8) + var(--openbot-space-4));
+  padding-inline: 0 var(--settings-page-close-room);
 }
 
 .settings-page-path-row:empty {
@@ -964,11 +967,14 @@
   margin-inline-end: var(--openbot-space-3);
 }
 
-/* Below the top row, the path takes the column and the inline padding of the panel, so both start on one edge. */
+/*
+ * Below the top row, the path takes the column and the inline padding of the panel, so both start on one edge.
+ * The row ends before the Close button, so the start margin adds that room back to center on the panel column.
+ */
 .settings-page-path-row > .settings-page-path {
   width: 100%;
-  max-width: 960px;
-  margin-inline: 0;
+  max-width: var(--settings-page-column-width);
+  margin-inline: max(0px, calc((100% + var(--settings-page-close-room) - var(--settings-page-column-width)) / 2)) 0;
   padding-inline: var(--openbot-space-6);
 }
 
@@ -1283,11 +1289,11 @@
   background: transparent;
 }
 
-/* The content starts near the section list and uses the width of the window, up to a readable line. */
+/* The content uses the width of the window, up to a readable line, and is in the center of the panel. */
 .settings-page-content > .settings-modal-page .settings-modal-content {
   width: 100%;
-  max-width: 960px;
-  margin-inline: 0;
+  max-width: var(--settings-page-column-width);
+  margin-inline: auto;
   padding-inline: var(--openbot-space-6);
 }
 

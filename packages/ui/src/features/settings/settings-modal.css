@@ -483,12 +483,13 @@
   font-variant-numeric: tabular-nums;
 }
 
-.app-settings-modal-shell .settings-modal-select {
+/* Every select of a settings row has one width, in your settings and in server settings. */
+:is(.app-settings-modal-shell, .server-settings-modal-shell) .settings-modal-select {
   width: 168px;
 }
 
-/* "Open external links in": browser names are longer than the other choices. */
-.app-settings-modal-shell .settings-modal-link-select {
+/* Long choices, such as browser names, voice models and timezones. */
+:is(.app-settings-modal-shell, .server-settings-modal-shell) .settings-modal-link-select {
   width: 220px;
 }
 
@@ -507,13 +508,23 @@
   gap: var(--openbot-space-2);
 }
 
-.app-settings-modal-shell .settings-modal-select .ui-select-trigger {
+/* Every select in settings, with or without `settings-modal-select`, has the same fill. */
+:is(.app-settings-modal-shell, .server-settings-modal-shell) .settings-modal-content .ui-select-trigger {
   background: var(--openbot-bg-surface-raised);
   color: var(--openbot-text-secondary);
 }
 
-.app-settings-modal-shell .settings-modal-update-track-select {
-  width: 112px;
+/* The fill above has a higher specificity than the hover and open fill of the primitive, so it sets them again. */
+:is(.app-settings-modal-shell, .server-settings-modal-shell) .settings-modal-content .ui-select-trigger[data-expanded] {
+  background: var(--openbot-hover);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :is(.app-settings-modal-shell, .server-settings-modal-shell)
+    .settings-modal-content
+    .ui-select-trigger:hover:not([data-disabled]) {
+    background: var(--openbot-hover);
+  }
 }
 
 .app-settings-modal-shell .settings-modal-update-actions {
@@ -787,12 +798,17 @@
   }
 
   .app-settings-modal-shell .settings-modal-row .ui-item-actions,
-  .app-settings-modal-shell :is(.settings-modal-select, .settings-modal-update-track-select) {
+  .app-settings-modal-shell .settings-modal-select {
     width: 100%;
   }
 
   .app-settings-modal-shell .settings-modal-update-actions {
     justify-content: flex-end;
+  }
+
+  /* Server settings rows do not stack, so their selects keep the width of their value. */
+  .server-settings-modal-shell .settings-modal-select {
+    width: auto;
   }
 }
 

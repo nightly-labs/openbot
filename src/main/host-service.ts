@@ -50,6 +50,7 @@ import {
   SIGNED_OUT_CHANNEL_MEMBER_ID,
 } from "@openbot/contracts/ipc";
 import type { LiveActivityRelayPush } from "@openbot/contracts/live-activity-relay";
+import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import type { HostRestartState } from "@openbot/contracts/team-protocol/host-update-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
@@ -298,6 +299,11 @@ interface HostServiceOptions {
     image: AvatarImageInput | null,
     version?: string | null,
   ) => Effect.Effect<string | null, RemoteWorkflowError>;
+  /** Copies the shape and colour of the server to the account service, as `updateRemoteHostLogo` does the logo. */
+  updateRemoteHostAppearance?: (
+    hostId: string,
+    appearance: ServerAppearance | null,
+  ) => Effect.Effect<void, RemoteWorkflowError>;
 }
 
 class HostApiRuntime extends Context.Service<
@@ -875,6 +881,7 @@ export class HostService extends EventEmitter<HostEvents> {
         configured: true,
         serverName: identity.serverName,
         logoUrl: identity.logoVersion ? serverLogoUrl(identity.logoVersion) : null,
+        appearance: identity.appearance,
         enabledOnLaunch: identity.enabledOnLaunch,
       });
     } else {
@@ -884,6 +891,7 @@ export class HostService extends EventEmitter<HostEvents> {
     if (identity) {
       this.#api.refreshPresence();
       this.#api.refreshIdentity();
+      this.#api.refreshAppearance();
     }
   }
 
@@ -929,6 +937,7 @@ export class HostService extends EventEmitter<HostEvents> {
         serverId: identity.serverId,
         serverName: identity.serverName,
         logoUrl: identity.logoVersion ? serverLogoUrl(identity.logoVersion) : null,
+        appearance: identity.appearance,
         enabledOnLaunch: false,
         message: null,
       });
@@ -970,6 +979,7 @@ export class HostService extends EventEmitter<HostEvents> {
     function* (this: HostService, input: UpdateHostIdentityInput): Effect.fn.Return<HostStatus, RemoteWorkflowError> {
       const optionalRegisterRemoteHost = this.#options.registerRemoteHost;
       const optionalUpdateRemoteHostLogo = this.#options.updateRemoteHostLogo;
+      const optionalUpdateRemoteHostAppearance = this.#options.updateRemoteHostAppearance;
       // A server on this computer has no account session (#5092). Only the desktop app knows its
       // owner password, and the Team API route already required an admin.
       const passwordOwner = this.#options.passwordOwner === true;
@@ -982,9 +992,11 @@ export class HostService extends EventEmitter<HostEvents> {
       this.#setStatus({
         serverName: identity.serverName,
         logoUrl: identity.logoVersion ? serverLogoUrl(identity.logoVersion) : null,
+        appearance: identity.appearance,
         message: sourceText("status.host.identityUpdated"),
       });
       this.#api.refreshIdentity();
+      if (input.appearance !== undefined) this.#api.refreshAppearance();
       // The desktop app registers it for the account at each start, with the name of that start.
       if (passwordOwner) return this.getStatus();
       const ownerMembershipId = yield* remoteDecode(() => this.#requiredOwnerMemberId());
@@ -992,6 +1004,9 @@ export class HostService extends EventEmitter<HostEvents> {
       if (input.logo !== undefined && this.#isActiveHost(identity.serverId)) {
         yield* optionalUpdateRemoteHostLogo?.(identity.serverId, input.logo ?? null, identity.logoVersion) ??
           Effect.succeed(undefined);
+      }
+      if (input.appearance !== undefined && this.#isActiveHost(identity.serverId)) {
+        yield* optionalUpdateRemoteHostAppearance?.(identity.serverId, identity.appearance) ?? Effect.void;
       }
       return this.getStatus();
     },
@@ -2288,6 +2303,7 @@ function initialHostStatus(identity: TeamIdentity | null, unattended: boolean): 
     serverId: identity?.serverId ?? null,
     serverName: identity?.serverName ?? null,
     logoUrl: identity?.logoVersion ? serverLogoUrl(identity.logoVersion) : null,
+    appearance: identity?.appearance ?? null,
     apiUrl: null,
     apiOnline: false,
     remoteDesktopReady: false,

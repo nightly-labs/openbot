@@ -2900,6 +2900,14 @@ textarea {
   height: 30px;
 }
 
+/* The server plush has no thinking dots, so it needs no optical offset. It is an image, so the
+   button padding would make it narrower than the agent faces without `max-width: none`. */
+.avatar-face-choice .server-appearance-choice {
+  --server-plush-logo-size: 30px;
+
+  max-width: none;
+}
+
 /* The eyes are the only change in this grid, so its faces are larger. */
 .avatar-eyes-grid .avatar-face-choice {
   height: 46px;

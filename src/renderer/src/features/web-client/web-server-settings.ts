@@ -7,6 +7,7 @@ import type {
   McpSignInState,
   McpTestResult,
   SaveMcpSignInAppInput,
+  ServerAppearance,
   ServerSummary,
   TeamInviteSummary,
   TeamPresenceMember,
@@ -25,6 +26,7 @@ import {
   rotateHostKey as rotateHostKeyRequest,
   saveMcpServer as saveMcpServerRequest,
   saveMcpSignInApp as saveMcpSignInAppRequest,
+  setHostAppearance,
   setMcpServerEnabled as setMcpServerEnabledRequest,
   signOutMcpServer as signOutMcpServerRequest,
   startMcpSignIn,
@@ -70,6 +72,8 @@ export function createWebServerSettings(options: {
   admin: () => WebAdminRuntime | undefined;
   presence: () => TeamPresenceSnapshot | null;
   refreshHosts: () => Promise<void>;
+  /** Shows a plush look on the server before the host confirms it. */
+  setAppearance: (hostId: string, appearance: ServerAppearance | null) => void;
   /** Whether the host relays sign-ins (`sign-in-relay-v1`), so the page opens in this browser. */
   relaySupported: () => boolean;
 }) {
@@ -201,6 +205,24 @@ export function createWebServerSettings(options: {
   }
 
   /**
+   * Sets the plush look through `host-appearance-v1`. The look shows at the click, and a failure
+   * puts the previous one back; the host's `host-appearance` event then confirms it.
+   */
+  async function saveAppearance(appearance: ServerAppearance | null): Promise<void> {
+    const { server, admin } = requireAdmin();
+    if (!serverCanAdminister(server, "host-appearance-v1"))
+      throw new Error(currentText().t("error.team.hostIdentityUnsupported"));
+    const previous = server.appearance ?? null;
+    options.setAppearance(server.id, appearance);
+    try {
+      await runTeamEffect(setHostAppearance(admin.request, appearance).pipe(Effect.mapError((error) => error.cause)));
+    } catch (error) {
+      options.setAppearance(server.id, previous);
+      throw error;
+    }
+  }
+
+  /**
    * Changes the server key through `host-key-rotation-v1`, which only the owner may use. As on the
    * desktop, the server list is read again, because only its signed handover makes the new key trusted.
    */
@@ -318,6 +340,7 @@ export function createWebServerSettings(options: {
     setOpen,
     refresh,
     saveIdentity,
+    saveAppearance,
     rotateHostKey,
     createInvite: (input: { role: "admin" | "member"; email?: string; permanent?: boolean }): Promise<InviteSummary> =>
       mutateTeam((admin) => admin.team.createInvite(input)),

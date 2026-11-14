@@ -37,6 +37,7 @@ import {
   CHAT_COLORS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_CAPABILITY } from "@openbot/contracts/team-protocol/focus-use-v1";
+import { HOST_APPEARANCE_CAPABILITY, type ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
@@ -579,6 +580,8 @@ export function createWebWorkspace(
           setState((draft) => {
             draft.hostRestart = event.state === "none" ? null : { state: event.state, version: event.version };
           });
+        // The host sends it at connect and after each change (`host-appearance-v1`).
+        if (event.type === "host-appearance") setHostAppearance(id, event.appearance);
         if (event.type === "status") hooks.onStatus?.(event.status);
         if (event.type === "runtime-snapshot") {
           const { attentionComplete } = event.snapshot;
@@ -1026,6 +1029,14 @@ export function createWebWorkspace(
       };
     });
   }
+  /** Shows the plush look of a host in the server list and on the connected host. */
+  function setHostAppearance(id: string, appearance: ServerAppearance | null): void {
+    setState((draft) => {
+      if (draft.host?.hostId === id) draft.host.appearance = appearance;
+      const listed = draft.hosts.find((host) => host.hostId === id);
+      if (listed) listed.appearance = appearance;
+    });
+  }
   function refreshHosts(): Promise<void> {
     if (hostsRefreshPromise) return hostsRefreshPromise;
     const refreshGeneration = generation;
@@ -1101,6 +1112,10 @@ export function createWebWorkspace(
           if (connected && draft.host?.hostId === connected.hostId) {
             draft.host.name = connected.name;
             draft.host.logoKey = connected.logoKey;
+            // A host with `host-appearance-v1` sends its look itself; the account copy can be older.
+            // An account server from before `host-appearance-v1` lists none.
+            if (connected.appearance !== undefined && !draft.capabilities.includes(HOST_APPEARANCE_CAPABILITY))
+              draft.host.appearance = connected.appearance;
           }
           draft.hosts = hosts;
           draft.hostsLoaded = true;
@@ -2100,6 +2115,7 @@ export function createWebWorkspace(
     },
     run,
     refreshHosts,
+    setHostAppearance,
     leaveHost,
     removeOwnedHost,
     retryHosts,

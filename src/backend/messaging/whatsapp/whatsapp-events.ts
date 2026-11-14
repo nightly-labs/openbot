@@ -82,7 +82,9 @@ export async function whatsAppInbound(
   if (key.fromMe && context.isOwnPost(id)) return null;
   if (context.now - sentAt(message) > MESSAGE_MAX_AGE_MS) return null;
   const content = normalizeMessageContent(message.message);
-  if (!content || content.protocolMessage || content.reactionMessage) return null;
+  if (!content || content.reactionMessage) return null;
+  const protocol = content.protocolMessage;
+  if (protocol && !savedChange(protocol)) return null;
 
   const rawChatJid = jidNormalizedUser(rawChat);
   const isGroup = Boolean(isJidGroup(rawChatJid));
@@ -108,10 +110,14 @@ export async function whatsAppInbound(
     fromMe: Boolean(key.fromMe),
   });
   if (decision.type === "ignore") return null;
+  const authorId = authorNumber ?? userOf(authorJid) ?? context.me.number;
+  if (protocol) {
+    applyChange(protocol, chatJid, authorId, context.chats);
+    return null;
+  }
   const name = message.pushName?.trim() || authorNumber || "WhatsApp";
   if (decision.type === "pair") return authorNumber ? { type: "pairing", chatJid, senderId: authorNumber, name } : null;
 
-  const authorId = authorNumber ?? userOf(authorJid) ?? context.me.number;
   context.chats.rememberName(authorId, key.fromMe ? null : message.pushName);
   const contextInfo = contextOf(content);
   const quotedId = contextInfo?.stanzaId ?? null;
@@ -157,8 +163,19 @@ export async function whatsAppInbound(
 
   // In a group, only a mention, or a message of a conversation that an agent answers, counts.
   const addressed = !isGroup || namesMe;
+  // Saved with its file, which an agent can read later with `messaging_history`.
+  const remembered = {
+    id,
+    chatJid,
+    threadKey,
+    authorId,
+    authorName: name,
+    text: text || files.map((file) => file.name).join(", "),
+    sentAt: isoTime(message),
+    ...(files.length ? { files } : {}),
+  };
   if (isGroup && !addressed && !quotedThread) {
-    context.chats.rememberMessage({ id, chatJid, threadKey, authorName: name, text, sentAt: isoTime(message) });
+    context.chats.rememberMessage(remembered);
     return null;
   }
   const replyTo =
@@ -179,15 +196,7 @@ export async function whatsAppInbound(
     files,
     ...(replyTo ? { replyTo } : {}),
   };
-  context.chats.rememberMessage({
-    id,
-    chatJid,
-    threadKey,
-    authorName: name,
-    text: text || files.map((file) => file.name).join(", "),
-    sentAt: isoTime(message),
-    ...(files.length ? { files } : {}),
-  });
+  context.chats.rememberMessage(remembered);
   return { type: "message", message: inbound, chatJid, isGroup };
 }
 
@@ -202,6 +211,32 @@ export function whatsAppQuoteId(target: MessageTarget): string | null {
   const [threadKey = "", replyTo = ""] = target.replyThreadId.split(":");
   if (replyTo) return replyTo;
   return threadKey && threadKey !== WHATSAPP_DIRECT_THREAD ? threadKey : null;
+}
+
+/** A delete for everyone or a change of text, which the saved copy of the message follows. */
+function savedChange(protocol: proto.Message.IProtocolMessage): boolean {
+  return (
+    protocol.type === proto.Message.ProtocolMessage.Type.REVOKE ||
+    protocol.type === proto.Message.ProtocolMessage.Type.MESSAGE_EDIT
+  );
+}
+
+/** Only the author's own edit or delete counts. A group admin's delete of another person's message is not followed. */
+function applyChange(
+  protocol: proto.Message.IProtocolMessage,
+  chatJid: string,
+  authorId: string,
+  chats: WhatsAppChatState,
+): void {
+  const messageId = protocol.key?.id;
+  if (!messageId) return;
+  if (protocol.type === proto.Message.ProtocolMessage.Type.REVOKE) {
+    chats.forgetMessage(chatJid, messageId, authorId);
+    return;
+  }
+  const edited = normalizeMessageContent(protocol.editedMessage);
+  const text = edited ? textOf(edited) : "";
+  if (text) chats.editMessage(chatJid, messageId, authorId, text);
 }
 
 function contextOf(content: proto.IMessage): proto.IContextInfo | null {

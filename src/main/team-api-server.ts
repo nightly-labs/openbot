@@ -185,6 +185,11 @@ import { CUSTOM_PROVIDER_HARNESS_CAPABILITY } from "@openbot/contracts/team-prot
 import { FOCUS_USE_INTERVAL_MS } from "@openbot/contracts/team-protocol/focus-use-v1";
 import { GITHUB_SKILLS_CAPABILITY } from "@openbot/contracts/team-protocol/github-skills-v1";
 import { HERMES_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/hermes-import-v1";
+import {
+  HOST_APPEARANCE_CAPABILITY,
+  HOST_APPEARANCE_EVENT,
+  type HostAppearanceEvent,
+} from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
 import {
   HOST_RESTART_EVENT,
@@ -356,6 +361,7 @@ import { routeFocusUse } from "./team-api/route-focus-use";
 import { routeGithubSkills } from "./team-api/route-github-skills";
 import { routeHermesImport } from "./team-api/route-hermes-import";
 import { routeHostAdmin } from "./team-api/route-host-admin";
+import { routeHostAppearance } from "./team-api/route-host-appearance";
 import { routeHostKeyRotation } from "./team-api/route-host-key-rotation";
 import { routeHostPersonality } from "./team-api/route-host-personality";
 import { routeHostRestart } from "./team-api/route-host-restart";
@@ -812,6 +818,26 @@ export class TeamApiServer {
   announceHostRestart(state: HostRestartState, version: string | null): void {
     this.#hostRestart = { type: HOST_RESTART_EVENT, state, version };
     for (const [client, connection] of this.#eventClients) this.#sendHostRestart(client, connection);
+  }
+
+  /**
+   * Tells every member with `host-appearance-v1` the shape and colour of this server. It is outside
+   * the frozen event vocabulary, so it bypasses the encoders like `host-restart` does.
+   */
+  refreshAppearance(): void {
+    for (const [client, connection] of this.#eventClients) this.#sendHostAppearance(client, connection);
+  }
+
+  #sendHostAppearance(client: Ws.WebSocket, connection: EventClientState): void {
+    if (!connection.capabilities.has(HOST_APPEARANCE_CAPABILITY)) return;
+    const identity = this.#options.store.getIdentity();
+    if (!identity || client.readyState !== webSockets.WebSocket.OPEN) return;
+    const event: HostAppearanceEvent = {
+      type: HOST_APPEARANCE_EVENT,
+      serverId: identity.serverId,
+      appearance: identity.appearance,
+    };
+    client.send(JSON.stringify(event));
   }
 
   #sendHostRestart(client: Ws.WebSocket, connection: EventClientState): void {
@@ -1277,6 +1303,7 @@ export class TeamApiServer {
       if ((await routeProviders(context, this.#options.admin)) === "handled") return;
       if ((await routeProviderUse(context, this.#options.admin)) === "handled") return;
       if ((await routeHostAdmin(context, this.#options.admin)) === "handled") return;
+      if ((await routeHostAppearance(context, this.#options.admin)) === "handled") return;
       if ((await routeHostUpdate(context, this.#options.admin)) === "handled") return;
       if ((await routeHostTimezone(context, this.#options.admin)) === "handled") return;
       if ((await routeHostTurnLimits(context, this.#options.admin)) === "handled") return;
@@ -2016,6 +2043,7 @@ export class TeamApiServer {
             const machineAlertsWereSent = connection.capabilities.has(MACHINE_RESOURCES_CAPABILITY);
             const colorsWereSent = connection.capabilities.has(AGENT_COLORS_CAPABILITY);
             const chatColorsWereSent = connection.capabilities.has(CHAT_COLORS_CAPABILITY);
+            const appearanceWasSent = connection.capabilities.has(HOST_APPEARANCE_CAPABILITY);
             connection.capabilities = new Set(event.capabilities.filter(isTeamCurrentCapability));
             if (connection.capabilities.has("agent-runtime-snapshots") && !snapshotsWereEnabled) {
               this.#sendRuntimeSnapshot(client, connection, false);
@@ -2034,6 +2062,8 @@ export class TeamApiServer {
               this.#sendChatColors(client, connection, this.#chatColors(), true);
             // An alert that came while the member had no device online.
             if (!machineAlertsWereSent) this.#sendPendingMachineAlerts(client, connection);
+            // The shape and colour can change while a client has no event connection.
+            if (!appearanceWasSent) this.#sendHostAppearance(client, connection);
           }
           connection.includeConversationEvents = event.includeConversations;
           return;
@@ -2664,6 +2694,7 @@ export class TeamApiServer {
           if (capability === PROVIDERS_SIGN_IN_V3_CAPABILITY)
             return this.#options.admin?.providers?.pasteSignIn === true;
           if (capability === HOST_ADMIN_CAPABILITY) return this.#options.admin?.identity !== undefined;
+          if (capability === HOST_APPEARANCE_CAPABILITY) return this.#options.admin?.identity !== undefined;
           if (capability === HOST_RELEASE_CAPABILITY) return this.#options.admin?.release !== undefined;
           if (capability === HOST_TIMEZONE_CAPABILITY) return this.#options.admin?.timezone !== undefined;
           if (capability === HOST_TURN_LIMITS_CAPABILITY) return this.#options.admin?.turnLimits !== undefined;

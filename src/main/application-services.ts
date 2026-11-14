@@ -3616,6 +3616,8 @@ export async function createApplicationServices({
       centralAuth.removeRemoteMember(hostId, membershipId).pipe(toRemoteWorkflowError),
     updateRemoteHostLogo: (hostId, image, version) =>
       centralAuth.updateRemoteHostLogo(hostId, image, version).pipe(toRemoteWorkflowError),
+    updateRemoteHostAppearance: (hostId, appearance) =>
+      centralAuth.updateRemoteHostAppearance(hostId, appearance).pipe(toRemoteWorkflowError),
     localDevelopmentHost: developmentRemoteRole === "host",
     passwordOwner: localServerChild !== null,
     logDirectory: join(app.getPath("userData"), "logs", "remote"),
