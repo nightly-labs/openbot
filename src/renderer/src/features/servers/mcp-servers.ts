@@ -97,6 +97,20 @@ export function mcpSignInRecord(states: readonly McpSignInState[]): Record<strin
   return Object.fromEntries(states.map((state) => [state.mcpServerId, state]));
 }
 
+/**
+ * Whether the sign-ins hold one for the row at `url`. The host keeps a sign-in by address, and an
+ * agent can change a row's address after the sign-ins were read: a sign-in counts only when the rows
+ * read with it name the same address (#8194).
+ */
+export function mcpRowSignedIn(
+  signIns: Readonly<Record<string, McpSignInState>>,
+  rows: readonly McpServerConfig[],
+  mcpServerId: string,
+  url: string,
+): boolean {
+  return signIns[mcpServerId]?.signedIn === true && rows.some((row) => row.id === mcpServerId && row.url === url);
+}
+
 /** The whole sentence a test produced, for the form. The row shows the short badge instead. */
 export function mcpTestMessage(test: McpTestState, t: AppTranslate, hostName?: string | undefined): string {
   if (test.status === "testing") return t("common.connecting");

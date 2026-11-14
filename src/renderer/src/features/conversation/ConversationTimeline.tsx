@@ -1164,7 +1164,7 @@ export function ConversationTimeline() {
                                             {(config) => (
                                               <McpSignInChatCard
                                                 config={config()}
-                                                signedIn={props.mcpSignedIn?.(config().id) ?? false}
+                                                signedIn={props.mcpSignedIn?.(config().id, config().url) ?? false}
                                                 onSignIn={
                                                   props.onOpenMcpSignIn
                                                     ? (trigger) => props.onOpenMcpSignIn?.(config().id, trigger)

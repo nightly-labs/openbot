@@ -73,7 +73,7 @@ export function useThreadMcpSignInCard(onContinue: (body: string) => Promise<boo
         {(row) => (
           <McpSignInChatCard
             config={row()}
-            signedIn={props.mcpSignedIn?.(row().id) ?? false}
+            signedIn={props.mcpSignedIn?.(row().id, row().url) ?? false}
             onSignIn={props.onOpenMcpSignIn ? (trigger) => props.onOpenMcpSignIn?.(row().id, trigger) : undefined}
             onContinue={onContinue}
           />

@@ -163,8 +163,11 @@ export interface ConversationProps {
    * where this client cannot sign in for the server on screen; the card then says where to sign in.
    */
   onOpenMcpSignIn?: ((mcpServerId: string, trigger: HTMLElement | null) => void) | undefined;
-  /** Whether the server on screen holds a sign-in for an MCP row, as Server settings last read it. */
-  mcpSignedIn?: ((mcpServerId: string) => boolean) | undefined;
+  /**
+   * Whether the server on screen holds a sign-in for an MCP row at `url`, as Server settings last read
+   * it. A sign-in read for another address of the row is not one: the host keeps sign-ins by address.
+   */
+  mcpSignedIn?: ((mcpServerId: string, url: string) => boolean) | undefined;
   /**
    * The server list that an install command card watches until its new server is online. Absent where
    * this client cannot open a server; the card then stays a marker.
