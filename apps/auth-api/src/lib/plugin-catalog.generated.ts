@@ -1516,7 +1516,7 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       slug: "specstream",
       version: "1.0.0",
       featured: false,
-      detailSha256: "86f7c7f272865ed7105d8106383155c50211d00081aa91fa328564d8634b8491",
+      detailSha256: "61cf7118ac7ba651e20a91e3d1393444acd06203c8db6fd5d6d1ec4e0af8d020",
     },
   ],
 };
