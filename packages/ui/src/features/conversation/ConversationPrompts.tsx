@@ -292,9 +292,21 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
   const { t } = useText();
   const [submitting, setSubmitting] = createSignal<"complete" | "cancel" | null>(null);
   // The page does not open by itself, so opening it is the main action until the user has done it.
-  const [opened, setOpened] = createSignal(false);
+  // The card can stay mounted for the request of another agent, so it keeps the request it opened.
+  const [openedRequest, setOpenedRequest] = createSignal<BrowserTakeoverRequest>();
+  const opened = () => {
+    const done = openedRequest();
+    const request = props.request;
+    return (
+      done !== undefined &&
+      request !== undefined &&
+      done.requestId === request.requestId &&
+      done.agentId === request.agentId &&
+      done.threadId === request.threadId
+    );
+  };
   const openPage = () => {
-    setOpened(true);
+    setOpenedRequest(props.request);
     props.onOpen?.();
   };
   const pageDetails = createMemo(() => browserPageDetails(props.tab, t));
