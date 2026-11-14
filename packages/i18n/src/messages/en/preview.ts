@@ -25,4 +25,6 @@ export const messages = defineMessages("preview", {
   "preview.diff.added": { one: "{count} line added", other: "{count} lines added" },
   "preview.diff.removed": { one: "{count} line removed", other: "{count} lines removed" },
   "preview.diff.noChanges": "No changes.",
+  "preview.diff.instructionsButton": "Changes",
+  "preview.diff.instructionsTitle": "Instruction changes",
 });

@@ -26,4 +26,6 @@ export const messages = {
   "preview.diff.added": { other: "{count}줄 추가됨" },
   "preview.diff.removed": { other: "{count}줄 삭제됨" },
   "preview.diff.noChanges": "변경 사항이 없습니다.",
+  "preview.diff.instructionsButton": "변경 사항",
+  "preview.diff.instructionsTitle": "지침 변경 사항",
 } as const satisfies PartialTranslation<typeof source>;

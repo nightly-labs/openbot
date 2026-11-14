@@ -40,4 +40,6 @@ export const messages = {
     other: "حُذف {count} سطر",
   },
   "preview.diff.noChanges": "لا توجد تغييرات.",
+  "preview.diff.instructionsButton": "التغييرات",
+  "preview.diff.instructionsTitle": "تغييرات التعليمات",
 } as const satisfies PartialTranslation<typeof source>;

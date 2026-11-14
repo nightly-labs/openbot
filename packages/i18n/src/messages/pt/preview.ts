@@ -26,4 +26,6 @@ export const messages = {
   "preview.diff.added": { one: "{count} linha adicionada", other: "{count} linhas adicionadas" },
   "preview.diff.removed": { one: "{count} linha removida", other: "{count} linhas removidas" },
   "preview.diff.noChanges": "Nenhuma alteração.",
+  "preview.diff.instructionsButton": "Alterações",
+  "preview.diff.instructionsTitle": "Alterações nas instruções",
 } as const satisfies PartialTranslation<typeof source>;

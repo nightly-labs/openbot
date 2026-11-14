@@ -26,4 +26,6 @@ export const messages = {
   "preview.diff.added": { other: "新增 {count} 行" },
   "preview.diff.removed": { other: "删除 {count} 行" },
   "preview.diff.noChanges": "没有更改。",
+  "preview.diff.instructionsButton": "更改",
+  "preview.diff.instructionsTitle": "指令更改",
 } as const satisfies PartialTranslation<typeof source>;

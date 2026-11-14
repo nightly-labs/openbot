@@ -26,4 +26,6 @@ export const messages = {
   "preview.diff.added": { one: "{count} regel toegevoegd", other: "{count} regels toegevoegd" },
   "preview.diff.removed": { one: "{count} regel verwijderd", other: "{count} regels verwijderd" },
   "preview.diff.noChanges": "Geen wijzigingen.",
+  "preview.diff.instructionsButton": "Wijzigingen",
+  "preview.diff.instructionsTitle": "Wijzigingen in instructies",
 } as const satisfies PartialTranslation<typeof source>;

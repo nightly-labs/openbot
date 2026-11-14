@@ -26,4 +26,6 @@ export const messages = {
   "preview.diff.added": { one: "שורה אחת נוספה", two: "שתי שורות נוספו", other: "{count} שורות נוספו" },
   "preview.diff.removed": { one: "שורה אחת הוסרה", two: "שתי שורות הוסרו", other: "{count} שורות הוסרו" },
   "preview.diff.noChanges": "אין שינויים.",
+  "preview.diff.instructionsButton": "שינויים",
+  "preview.diff.instructionsTitle": "שינויים בהוראות",
 } as const satisfies PartialTranslation<typeof source>;

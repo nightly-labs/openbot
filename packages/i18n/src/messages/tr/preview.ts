@@ -26,4 +26,6 @@ export const messages = {
   "preview.diff.added": { one: "{count} satır eklendi", other: "{count} satır eklendi" },
   "preview.diff.removed": { one: "{count} satır silindi", other: "{count} satır silindi" },
   "preview.diff.noChanges": "Değişiklik yok.",
+  "preview.diff.instructionsButton": "Değişiklikler",
+  "preview.diff.instructionsTitle": "Talimat değişiklikleri",
 } as const satisfies PartialTranslation<typeof source>;

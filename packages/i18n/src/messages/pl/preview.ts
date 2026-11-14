@@ -36,4 +36,6 @@ export const messages = {
     other: "Usunięto {count} wiersza",
   },
   "preview.diff.noChanges": "Brak zmian.",
+  "preview.diff.instructionsButton": "Zmiany",
+  "preview.diff.instructionsTitle": "Zmiany w instrukcjach",
 } as const satisfies PartialTranslation<typeof source>;

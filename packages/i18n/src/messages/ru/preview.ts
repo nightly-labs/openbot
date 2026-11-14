@@ -36,4 +36,6 @@ export const messages = {
     other: "Удалено {count} строки",
   },
   "preview.diff.noChanges": "Изменений нет.",
+  "preview.diff.instructionsButton": "Изменения",
+  "preview.diff.instructionsTitle": "Изменения инструкций",
 } as const satisfies PartialTranslation<typeof source>;
