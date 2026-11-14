@@ -994,7 +994,8 @@ export function chooseInstalledFirst<Cli extends AgentCliInfo, E>(
   const copy = resolve(bundledExecutable === undefined ? {} : { bundledExecutable });
   const installedCli = resolve({ bundledExecutable: null }).pipe(Effect.orElseSucceed(() => null));
   const choose = (resolved: Cli, installed: Cli | null): InstalledFirstChoice<Cli> => {
-    if (resolved.source !== "managed" || installed?.source !== "system" || installed.incomplete) {
+    // An incomplete CLI of the user's runs over the copy only when the user chose it.
+    if (resolved.source !== "managed" || installed?.source !== "system" || (installed.incomplete && !installedChosen)) {
       return { cli: resolved, passedOver: null };
     }
     const asNew = installed.version === resolved.version || olderVersion(resolved.version, installed.version);
