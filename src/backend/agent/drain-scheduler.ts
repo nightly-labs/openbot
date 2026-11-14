@@ -30,6 +30,7 @@ import {
   type TagReferenceSource,
 } from "./delivery-content";
 import type { DuplicationGate } from "./duplication-gate";
+import type { LiveVoiceRelayed } from "./live-voice";
 import type { MailboxSync } from "./mailbox-sync";
 import type { MemoryHold } from "./memory-hold";
 import type { PlanContinuation } from "./plan-continuation";
@@ -80,6 +81,8 @@ export interface DrainHooks {
   /** The tabs and threads of this agent, as the tags of a delivered message name them. */
   /** `threadId` is the public thread that gets the prompt. */
   tagReferences(agentId: string, threadId: string | null): TagReferenceSource;
+  /** How live voice relayed this delivery, or null for a message that the user wrote. */
+  liveVoiceRelayed(deliveryId: string): LiveVoiceRelayed | null;
   /**
    * Gives a channel task back to its channel after a spent plan refused it; false when it cannot go
    * back. `continueWork` keeps the assignment for a ready backup instead.
@@ -917,6 +920,7 @@ export class DrainScheduler {
               wokenWaits: item.delivery.sender.kind === "routine" ? this.#routines.wokenWaits(item.delivery.id) : [],
               answeredRoutine: this.answeredRoutine(item.delivery),
               tags,
+              liveVoice: this.#hooks.liveVoiceRelayed(item.delivery.id),
               ...(executionText === undefined ? {} : { executionText }),
             });
           }),

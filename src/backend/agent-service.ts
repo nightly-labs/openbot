@@ -201,7 +201,7 @@ import {
 } from "./agent/image-generation";
 import { InstructionsChanges } from "./agent/instructions-changes";
 import type { AgentLibraryFolders } from "./agent/library-folder-tools";
-import { LiveVoice, type LiveVoiceOwner, type LiveVoiceReply } from "./agent/live-voice";
+import { LiveVoice, type LiveVoiceOwner, type LiveVoiceRelayed, type LiveVoiceReply } from "./agent/live-voice";
 import { MailboxSync } from "./agent/mailbox-sync";
 import { type GitHubConnectorSource, McpGateway, type TestMcpServerOptions } from "./agent/mcp-gateway";
 import { type MarketplaceAppServer, mcpServersFromGateway } from "./agent/mcp-tools";
@@ -550,6 +550,8 @@ export interface AgentServiceOptions {
 
 /** How long a user send's `clientMessageId` answers a retry. A retry follows a lost reply, not a day. */
 const USER_SEND_RETRY_WINDOW_MS = 24 * 60 * 60 * 1000;
+/** The newest live voice requests that keep their call context. A call has few requests open, so all of them fit. */
+const LIVE_VOICE_RELAYED_LIMIT = 50;
 /** The `send_message` recipient limit, so one message can reach every section-mate the prompt names. */
 const MAX_SECTION_TEAMMATES = 32;
 /** How long an archive waits for the provider to end the turn that it stopped. After it, the archive is refused. */
@@ -628,6 +630,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #drain: DrainScheduler;
   readonly #sessionSettings: SessionSettings;
   readonly #liveVoice: LiveVoice;
+  /**
+   * How live voice relayed its recent requests, by delivery id, for their prompts. Kept in memory:
+   * after a restart, a request that still waits gives only the user's words.
+   */
+  readonly #liveVoiceRelayed = new Map<string, LiveVoiceRelayed>();
   readonly #queue: QueueControls;
   readonly #attachments: AttachmentGateway;
   readonly #browserUploads: BrowserUploads;
@@ -1700,6 +1707,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
         redactMcp: (text) => this.#mcp.redact(text),
         tagReferences: (agentId, threadId) => this.#tagReferences(agentId, threadId),
+        liveVoiceRelayed: (deliveryId) => this.#liveVoiceRelayed.get(deliveryId) ?? null,
         isStopping: () => this.#stopping,
         isDeleting: (agentId) => this.#removal.deleting().has(agentId),
         servesModel: (model, provider) => this.#endpoints.serves(model, provider),
@@ -1765,8 +1773,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         return agent;
       },
       relay: (agent) => this.#liveVoiceRelay(agent),
-      send: (agentId, text, sender) =>
-        this.sendMessage({ agentId, text }, sender).pipe(
+      send: (agentId, relayed, sender) =>
+        this.#sendUserMessage({ agentId, text: relayed.shown }, sender, undefined, undefined, false, relayed).pipe(
           Effect.flatMap((receipt) => {
             const deliveryId = receipt.deliveries[0]?.id;
             return deliveryId
@@ -1798,6 +1806,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           return this.#tasks.threadForDelivery(deliveryId);
         },
         tagReferences: (agentId, threadId) => this.#tagReferences(agentId, threadId),
+        liveVoiceRelayed: (deliveryId) => this.#liveVoiceRelayed.get(deliveryId) ?? null,
       },
     });
     this.#turn = new TurnLifecycle({
@@ -6320,6 +6329,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     timezone: string | undefined,
     idempotencyKey?: string,
     welcome = false,
+    relayed?: LiveVoiceRelayed,
   ) {
     const validateRecipient = yield* lifecycleStep("prepare message delivery", () =>
       this.#mailbox.prepareDelivery([input.agentId]),
@@ -6373,6 +6383,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         operation: "send message",
         cause: new Error(sourceText("error.agent.queuedMessageCreateFailed")),
       });
+    // Before the steer below, which writes the prompt. Only the newest requests stay.
+    if (relayed) {
+      this.#liveVoiceRelayed.set(delivery.delivery.id, relayed);
+      for (const deliveryId of this.#liveVoiceRelayed.keys()) {
+        if (this.#liveVoiceRelayed.size <= LIVE_VOICE_RELAYED_LIMIT) break;
+        this.#liveVoiceRelayed.delete(deliveryId);
+      }
+    }
     // The task can close while the message is stored, and a closed task shows no queue to cancel it.
     if (task && this.#tasks.threadId(task.taskId) === null) {
       yield* this.cancelQueuedMessage(agent.id, delivery.delivery.id);
