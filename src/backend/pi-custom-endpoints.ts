@@ -62,6 +62,11 @@ function thinkingLevelMap(efforts: readonly CustomProviderReasoningEffort[]): Pi
 // or a header value as an environment reference, and a leading `!` as a shell command, so both are
 // escaped to stay literal. Pi lists a model only when its provider has a key, so a keyless endpoint
 // gets a placeholder key, as Pi's own Ollama example does; a local server ignores it.
+// For a reasoning model at an address that Pi does not know, Pi sends the instructions in the
+// `developer` role, and many OpenAI-compatible servers refuse that with a 400 (#7434). OpenCode sends
+// `system` to the same endpoints, so each model's `compat` turns the `developer` role off. A `compat`
+// on the provider has no effect here (`getCompat`, Pi 1.1.0:
+// https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/ai/src/api/openai-completions.ts#L1702).
 const SOURCE = `export default function (pi) {
   const slot = Symbol.for("openbot.pi.customEndpoints");
   globalThis[slot] ??= process.env.${VARIABLE};
@@ -86,6 +91,7 @@ const SOURCE = `export default function (pi) {
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
         contextWindow: model.contextWindow,
         maxTokens: model.maxTokens,
+        compat: { supportsDeveloperRole: false },
       })),
     });
   }
