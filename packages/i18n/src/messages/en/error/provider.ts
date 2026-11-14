@@ -265,6 +265,8 @@ export const messages = defineMessages("error.provider", {
     "Gemini refused this request. Choose another model, then send your message again. If it fails again, start a new chat.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini lost the connection to its agent and stopped. Send a message to continue.",
+  "error.provider.antigravityTurnStopped":
+    "Gemini stopped because of an error. Send your message again. If it stops again, choose another model or provider.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "On a Windows host, Gemini opens the Google page on the host itself. Connect Gemini on the host computer.",
   "error.provider.cursorArchivePath": "The Cursor archive has an unexpected file.",

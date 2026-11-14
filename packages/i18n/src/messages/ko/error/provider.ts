@@ -271,6 +271,8 @@ export const messages = {
     "Gemini가 이 요청을 거부했어요. 다른 모델을 선택한 후 메시지를 다시 보내 주세요. 다시 실패하면 새 채팅을 시작해 주세요.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini가 에이전트와의 연결이 끊겨 중지됐어요. 계속하려면 메시지를 보내 주세요.",
+  "error.provider.antigravityTurnStopped":
+    "Gemini가 오류로 중지됐어요. 메시지를 다시 보내 주세요. 다시 중지되면 다른 모델이나 제공자를 선택해 주세요.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "Windows 호스트에서는 Gemini가 Google 페이지를 호스트에서 직접 엽니다. 호스트 컴퓨터에서 Gemini를 연결하세요.",
   "error.provider.cursorArchivePath": "Cursor 아카이브에 예상하지 못한 파일이 있어요.",

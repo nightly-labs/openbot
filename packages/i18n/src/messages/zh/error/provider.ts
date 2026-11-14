@@ -241,6 +241,8 @@ export const messages = {
   "error.provider.antigravityRequestRejected":
     "Gemini 拒绝了此请求。请改用其他模型，然后重新发送消息。如果仍然失败，请开始新对话。\n{detail}",
   "error.provider.antigravityConnectionLost": "Gemini 与其代理的连接已断开，已停止。请发送一条消息以继续。",
+  "error.provider.antigravityTurnStopped":
+    "Gemini 因出错而停止。请重新发送你的消息。如果再次停止，请选择其他模型或提供商。",
   "error.provider.antigravityRemoteWindowsSignIn":
     "在 Windows 主机上，Gemini 会在主机本身打开 Google 页面。请在主机电脑上连接 Gemini。",
   "error.provider.cursorArchivePath": "Cursor 压缩包中包含异常文件。",

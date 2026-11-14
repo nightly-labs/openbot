@@ -288,6 +288,8 @@ export const messages = {
     "Gemini hat diese Anfrage abgelehnt. Wähle ein anderes Modell und sende deine Nachricht erneut. Wenn es wieder fehlschlägt, starte einen neuen Chat.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini hat die Verbindung zu seinem Agenten verloren und wurde beendet. Sende eine Nachricht, um fortzufahren.",
+  "error.provider.antigravityTurnStopped":
+    "Gemini wurde wegen eines Fehlers beendet. Sende deine Nachricht erneut. Wenn es wieder stoppt, wähle ein anderes Modell oder einen anderen Anbieter.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "Auf einem Windows-Host öffnet Gemini die Google-Seite auf dem Host selbst. Verbinde Gemini auf dem Host-Computer.",
   "error.provider.cursorArchivePath": "Das Cursor-Archiv enthält eine unerwartete Datei.",

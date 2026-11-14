@@ -169,6 +169,11 @@ export interface AcpFlavor {
      * agent's own log, for a failure text that names no cause. Each name is `mcp_<server>_<tool>`.
      */
     refusedMcpTools?(text: string, argv: readonly string[], sessionId: string): string[];
+    /**
+     * The agent's own record of the failure in the session's last prompt, from its log, for a failure
+     * text that names no cause, or `null`. The turn's message and failure kind come from it.
+     */
+    loggedFailure?(text: string, argv: readonly string[], sessionId: string): string | null;
     /** A failure text after which the agent no longer has the session, so the next prompt opens it again. */
     sessionLost?: RegExp;
   };

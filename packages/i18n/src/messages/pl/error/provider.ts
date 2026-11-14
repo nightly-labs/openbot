@@ -269,6 +269,8 @@ export const messages = {
     "Gemini odrzucił to żądanie. Wybierz inny model i wyślij wiadomość ponownie. Jeśli znów się nie uda, rozpocznij nowy czat.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini utracił połączenie ze swoim agentem i się zatrzymał. Wyślij wiadomość, aby kontynuować.",
+  "error.provider.antigravityTurnStopped":
+    "Gemini zatrzymał się z powodu błędu. Wyślij wiadomość ponownie. Jeśli znowu się zatrzyma, wybierz inny model lub innego dostawcę.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "Na hoście z Windows Gemini otwiera stronę Google na samym hoście. Połącz Gemini na komputerze hosta.",
   "error.provider.cursorArchivePath": "Archiwum Cursor zawiera nieoczekiwany plik.",

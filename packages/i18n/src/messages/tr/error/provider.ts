@@ -277,6 +277,8 @@ export const messages = {
     "Gemini bu isteği reddetti. Başka bir model seçin, sonra mesajınızı yeniden gönderin. Yine başarısız olursa yeni bir sohbet başlatın.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini, aracısıyla bağlantısını kaybetti ve durdu. Devam etmek için bir mesaj gönderin.",
+  "error.provider.antigravityTurnStopped":
+    "Gemini bir hata nedeniyle durdu. Mesajınızı yeniden gönderin. Yine durursa başka bir model veya sağlayıcı seçin.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "Windows ana bilgisayarında Gemini, Google sayfasını ana bilgisayarın kendisinde açar. Gemini'yi ana bilgisayarda bağlayın.",
   "error.provider.cursorArchivePath": "Cursor arşivi beklenmeyen bir dosya içeriyor.",

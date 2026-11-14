@@ -277,6 +277,8 @@ export const messages = {
     "Gemini ha rifiutato questa richiesta. Scegli un altro modello, poi invia di nuovo il messaggio. Se non funziona ancora, inizia una nuova chat.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini ha perso la connessione con il suo agente e si è fermato. Invia un messaggio per continuare.",
+  "error.provider.antigravityTurnStopped":
+    "Gemini si è fermato a causa di un errore. Invia di nuovo il messaggio. Se si ferma ancora, scegli un altro modello o un altro provider.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "Su un host Windows, Gemini apre la pagina di Google sull’host stesso. Connetti Gemini sul computer host.",
   "error.provider.cursorArchivePath": "L'archivio di Cursor contiene un file inatteso.",
