@@ -214,16 +214,21 @@ export class McpGateway {
     this: McpGateway,
     configs: readonly McpServerConfig[],
   ): Effect.fn.Return<string | null, McpGatewayFailed> {
-    const proxied = configs
-      .filter((config) => config.enabled && this.#proxied(config))
-      .map((config) => config.id)
-      .sort();
+    const proxied = this.proxiedServerIds(configs);
     if (proxied.length === 0) return null;
     const identity = yield* this.#proxy.identity().pipe(Effect.result);
     // The hand-off leaves these rows out in this case, and the manifest records that.
     if (Result.isFailure(identity)) return JSON.stringify([null, proxied]);
     return JSON.stringify([identity.success, proxied]);
   });
+
+  /** The sorted ids of the enabled rows in `configs` that go through the proxy: the rows with a sign-in. */
+  proxiedServerIds(configs: readonly McpServerConfig[]): string[] {
+    return configs
+      .filter((config) => config.enabled && this.#proxied(config))
+      .map((config) => config.id)
+      .sort();
+  }
 
   /** Stops the OAuth proxy. Called once, after every provider process has stopped. */
   readonly close = Effect.fnUntraced(function* (this: McpGateway) {

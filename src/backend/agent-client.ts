@@ -40,6 +40,12 @@ export interface AgentClient {
    * because the other providers declare the MCP tools or load them on their own.
    */
   readonly deferredMcpTools?: (externalThreadId: string) => boolean;
+  /**
+   * True when the provider keeps the MCP tools of this session's first turn (`AcpFlavor`
+   * `mcpToolsFixedAtStart`). A changed MCP set then needs a new session, not a resume. Optional,
+   * because the other providers take the current servers on resume.
+   */
+  readonly mcpToolsFixedAtStart?: (externalThreadId: string) => boolean;
   /** False when stopping this client would lose a live provider session with no recovery path. */
   readonly canReleaseProcess?: () => boolean;
   start(): void;
