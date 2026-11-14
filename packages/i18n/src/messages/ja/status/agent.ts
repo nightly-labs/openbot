@@ -89,4 +89,6 @@ export const messages = {
   "status.agent.compactionContinues":
     "エージェントがコンテキストを圧縮している間に接続が切れました。エージェントは続行します。",
   "status.agent.branchTitle": "分岐したチャット",
+  "status.agent.routineSkippedLimit": "スキップ: 使用量の上限に達しました",
+  "status.agent.routineSkippedBusy": "スキップ: 前回の実行が終わっていませんでした",
 } as const satisfies PartialTranslation<typeof source>;

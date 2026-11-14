@@ -94,4 +94,6 @@ export const messages = {
   "status.agent.compactionContinues":
     "Die Verbindung brach ab, während der Agent seinen Kontext komprimierte. Der Agent macht weiter.",
   "status.agent.branchTitle": "Abgezweigter Chat",
+  "status.agent.routineSkippedLimit": "Übersprungen: Nutzungslimit erreicht",
+  "status.agent.routineSkippedBusy": "Übersprungen: Der letzte Lauf war noch nicht beendet",
 } as const satisfies PartialTranslation<typeof source>;

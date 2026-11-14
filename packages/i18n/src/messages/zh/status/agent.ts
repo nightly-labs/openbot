@@ -117,4 +117,6 @@ export const messages = {
   "status.agent.planContinues": "计划还有未完成的步骤。助手继续工作（{current}/{limit}）。",
   "status.agent.compactionContinues": "助手压缩上下文时连接中断。助手将继续工作。",
   "status.agent.branchTitle": "分支聊天",
+  "status.agent.routineSkippedLimit": "已跳过：已达到用量上限",
+  "status.agent.routineSkippedBusy": "已跳过：上一次运行尚未结束",
 } as const satisfies PartialTranslation<typeof source>;

@@ -91,4 +91,6 @@ export const messages = {
   "status.agent.compactionContinues":
     "La connexion s’est interrompue pendant que l’agent compactait son contexte. L’agent continue.",
   "status.agent.branchTitle": "Chat dérivé",
+  "status.agent.routineSkippedLimit": "Non exécutée : limite d’utilisation atteinte",
+  "status.agent.routineSkippedBusy": "Non exécutée : l’exécution précédente n’était pas terminée",
 } as const satisfies PartialTranslation<typeof source>;

@@ -128,4 +128,6 @@ export const messages = {
   "status.agent.planContinues": "في الخطة خطوات مفتوحة. سيتابع الوكيل ({current} من {limit}).",
   "status.agent.compactionContinues": "توقف الاتصال أثناء ضغط الوكيل لسياقه. يتابع الوكيل.",
   "status.agent.branchTitle": "دردشة متفرعة",
+  "status.agent.routineSkippedLimit": "تم التخطي: تم بلوغ حد الاستخدام",
+  "status.agent.routineSkippedBusy": "تم التخطي: لم ينتهِ التشغيل السابق",
 } as const satisfies PartialTranslation<typeof source>;

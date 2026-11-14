@@ -96,4 +96,6 @@ export const messages = {
   "status.agent.planContinues": "계획에 남은 단계가 있어요. 에이전트가 계속해요 ({current}/{limit}).",
   "status.agent.compactionContinues": "에이전트가 컨텍스트를 압축하는 동안 연결이 끊겼어요. 에이전트가 계속해요.",
   "status.agent.branchTitle": "분기된 채팅",
+  "status.agent.routineSkippedLimit": "건너뜀: 사용 한도에 도달함",
+  "status.agent.routineSkippedBusy": "건너뜀: 이전 실행이 끝나지 않았음",
 } as const satisfies PartialTranslation<typeof source>;

@@ -10,6 +10,7 @@ import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { Routine, RoutineSchedule } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
 import { Deferred, Effect } from "effect";
 import { ConversationRuntime } from "../src/backend/agent/conversation-runtime";
@@ -212,6 +213,20 @@ function runCount(fixture: Fixture, routine: Routine): number {
   return fixture.runs.listRuns(fixture.agentId, routine.id, 50, true).length;
 }
 
+/** The history shows an occurrence that the scheduler did not start, with its reason (#8028). */
+function assertSkipRecord(
+  fixture: Fixture,
+  routine: Routine,
+  reason: "status.agent.routineSkippedLimit" | "status.agent.routineSkippedBusy",
+  count = 1,
+): void {
+  const records = fixture.runs
+    .listRuns(fixture.agentId, routine.id, 50, true)
+    .filter((run) => run.missed && run.error === sourceText(reason));
+  assert.equal(records.length, 1, `The history records the skipped occurrence: ${reason}.`);
+  assert.equal(records[0]?.missed?.count, count, "Consecutive skips for one reason share one history row.");
+}
+
 async function raceCase(fixture: Fixture, kind: ScheduleKind, mutation: Mutation): Promise<void> {
   const saved = seed(fixture, kind, mutation);
   const entered = Deferred.makeUnsafe<void>();
@@ -291,9 +306,17 @@ async function raceCase(fixture: Fixture, kind: ScheduleKind, mutation: Mutation
   assert.equal(deliveryCount(fixture, saved.changed), skipped ? 0 : 1, "The pass honors the current routine.");
   assert.equal(
     runCount(fixture, saved.changed),
-    skipped ? 0 : 1,
+    skipped && mutation !== "skip" ? 0 : 1,
     "The current occurrence creates exactly the expected run rows.",
   );
+  if (mutation === "skip") {
+    assertSkipRecord(fixture, saved.changed, "status.agent.routineSkippedLimit");
+    assert.equal(
+      fixture.runs.listRuns(fixture.agentId, saved.changed.id).length,
+      0,
+      "Only the history reads the skip record.",
+    );
+  }
   if (mutation === "edit") {
     const [run] = fixture.runs.listRuns(fixture.agentId, saved.changed.id);
     assert.equal(run?.instruction, "Current instruction");
@@ -359,6 +382,11 @@ async function raceCase(fixture: Fixture, kind: ScheduleKind, mutation: Mutation
     assert.ok(current);
     await runCauseEffect(fixture.scheduler.processDue(new Date(current.trigger.nextRunAt)));
     assert.equal(deliveryCount(fixture, saved.changed), before, "An unfinished run prevents a second queued run.");
+    assertSkipRecord(fixture, saved.changed, "status.agent.routineSkippedBusy");
+    const later = fixture.runs.get(fixture.agentId, saved.changed.id);
+    assert.ok(later);
+    await runCauseEffect(fixture.scheduler.processDue(new Date(later.trigger.nextRunAt)));
+    assertSkipRecord(fixture, saved.changed, "status.agent.routineSkippedBusy", 2);
   }
   assert.deepEqual(fixture.errors, []);
 }

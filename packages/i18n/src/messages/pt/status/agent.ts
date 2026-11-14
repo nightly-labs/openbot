@@ -90,4 +90,6 @@ export const messages = {
   "status.agent.planContinues": "O plano tem etapas abertas. O agente continua ({current} de {limit}).",
   "status.agent.compactionContinues": "A conexão parou enquanto o agente compactava o contexto. O agente continua.",
   "status.agent.branchTitle": "Chat ramificado",
+  "status.agent.routineSkippedLimit": "Pulada: limite de uso atingido",
+  "status.agent.routineSkippedBusy": "Pulada: a execução anterior não tinha terminado",
 } as const satisfies PartialTranslation<typeof source>;

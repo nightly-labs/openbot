@@ -852,14 +852,38 @@ export class RoutineStore {
   }
 
   /**
+   * Records one occurrence that the scheduler did not start, with the reason that the history shows,
+   * and moves the trigger to `nextRunAt` (#8028). When the newest run of the trigger is a skip for the
+   * same reason, that row counts this occurrence too, so a long block does not push the real runs out
+   * of the history.
+   */
+  protected recordSkippedRow(routine: OwnedRoutine, at: Date, nextRunAt: Date, reason: string): void {
+    const newest = this.database.connection
+      .prepare(
+        `SELECT run_id, error, missed_count FROM ${this.tables.runTable}
+         WHERE trigger_id = ? ORDER BY scheduled_for DESC, created_at DESC LIMIT 1`,
+      )
+      .get(routine.trigger.id);
+    const extend =
+      isDynamicRecord(newest) && newest.missed_count !== null && newest.error === reason && isString(newest.run_id)
+        ? newest.run_id
+        : null;
+    this.#recordMissed(routine, { first: at, until: at, count: 1 }, nextRunAt, reason, extend);
+  }
+
+  /**
    * Records the skipped occurrences on one cancelled run and moves the trigger in one transaction, so
    * a crash cannot record them twice. The run is never queued: it only fills the history. A null
-   * `nextRunAt` is a one-time trigger, which keeps its time and pauses the routine instead.
+   * `nextRunAt` is a one-time trigger, which keeps its time and pauses the routine instead. A null
+   * `reason` means that OpenBot was closed at that time. `extendRunId` adds the occurrences to that
+   * skipped-run record instead of a new one.
    */
   #recordMissed(
     routine: OwnedRoutine,
     skipped: { first: Date; until: Date; count: number },
     nextRunAt: Date | null,
+    reason: string | null = null,
+    extendRunId: string | null = null,
   ): void {
     const {
       commandPrefix,
@@ -872,18 +896,18 @@ export class RoutineStore {
       ownerColumn,
     } = this.tables;
     const triggerId = routine.trigger.id;
-    const runId = randomUUID();
+    const runId = extendRunId ?? randomUUID();
     const scheduledFor = skipped.first.toISOString();
     const until = skipped.count > 1 ? skipped.until.toISOString() : null;
     const next = nextRunAt?.toISOString() ?? null;
     this.database.dispatch(
-      `${commandPrefix}-trigger:missed:${triggerId}:${scheduledFor}`,
+      `${commandPrefix}-trigger:${reason === null ? "missed" : "skipped"}:${triggerId}:${scheduledFor}`,
       [
         {
           aggregateType: runAggregate,
           aggregateId: routine.id,
           eventType: `${eventPrefix}.run-missed`,
-          payload: { runId, triggerId, scheduledFor, until, count: skipped.count },
+          payload: { runId, triggerId, scheduledFor, until, count: skipped.count, reason },
         },
         next
           ? {
@@ -901,25 +925,32 @@ export class RoutineStore {
       ],
       (db, sequences) => {
         const timestamp = new Date().toISOString();
-        db.prepare(
-          `INSERT INTO ${runTable} (
+        if (extendRunId)
+          db.prepare(
+            `UPDATE ${runTable} SET missed_count = missed_count + ?, missed_until = ?, updated_at = ?,
+             last_event_sequence = ? WHERE run_id = ?`,
+          ).run(skipped.count, skipped.until.toISOString(), timestamp, sequences[0] ?? 0, extendRunId);
+        else
+          db.prepare(
+            `INSERT INTO ${runTable} (
              run_id, routine_id, ${ownerColumn}, trigger_id, run_kind, scheduled_for, routine_name, instruction,
              status, error, missed_count, missed_until, created_at, updated_at, last_event_sequence
-           ) VALUES (?, ?, ?, ?, 'scheduled', ?, ?, ?, 'cancelled', NULL, ?, ?, ?, ?, ?)`,
-        ).run(
-          runId,
-          routine.id,
-          routine.ownerId,
-          triggerId,
-          scheduledFor,
-          routine.name,
-          routine.instruction,
-          skipped.count,
-          until,
-          timestamp,
-          timestamp,
-          sequences[0] ?? 0,
-        );
+           ) VALUES (?, ?, ?, ?, 'scheduled', ?, ?, ?, 'cancelled', ?, ?, ?, ?, ?, ?)`,
+          ).run(
+            runId,
+            routine.id,
+            routine.ownerId,
+            triggerId,
+            scheduledFor,
+            routine.name,
+            routine.instruction,
+            reason,
+            skipped.count,
+            until,
+            timestamp,
+            timestamp,
+            sequences[0] ?? 0,
+          );
         if (next) {
           db.prepare(
             `UPDATE ${triggerTable} SET next_run_at = ?, updated_at = ?, last_event_sequence = ?
