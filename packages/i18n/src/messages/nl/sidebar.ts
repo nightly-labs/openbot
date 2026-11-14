@@ -49,6 +49,8 @@ export const messages = {
   "sidebar.section.nameUnique": "Mapnamen moeten uniek zijn.",
   "sidebar.section.saveFailed": "Kan deze map niet opslaan. Probeer het opnieuw.",
   "sidebar.section.unassigned": "Niet toegewezen",
+  "sidebar.section.chatCount": { one: "{count} chat", other: "{count} chats" },
+  "sidebar.section.count": { one: "({count})", other: "({count})" },
   "sidebar.section.people": "Personen",
   "sidebar.section.fallback": "Map",
   "sidebar.folder.newInside": "Nieuwe submap",

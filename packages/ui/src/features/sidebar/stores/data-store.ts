@@ -383,6 +383,15 @@ export function createSidebarDataStore(deps: {
     ];
   }
 
+  /**
+   * The chats that a closed section hides, for the count on its header: its own and those of the
+   * folders in it. Pinned chats and the chats in "Needs you" or "Unread" show elsewhere, so they do
+   * not count. Without it, an agent that another agent creates in a closed section shows nowhere (#7982).
+   */
+  function sectionChatCount(sectionId: string): number {
+    return sectionChatIdsDeep(sectionId).length;
+  }
+
   /** The unread messages in a folder and in the folders in it, for the badge on a closed folder. */
   function sectionUnreadCount(sectionId: string): number {
     let count = 0;
@@ -469,6 +478,7 @@ export function createSidebarDataStore(deps: {
     resolvedPinnedItems,
     sectionAcceptsChat,
     sectionCanNest,
+    sectionChatCount,
     sectionChildren,
     sectionIsCollapsed,
     sectionIsInside,
