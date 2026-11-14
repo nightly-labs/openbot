@@ -711,6 +711,13 @@ try {
     (entry) => entry.method === "turn/start" && entry.turnId === quietFailedRun.delivery.turnId,
   )?.text;
   pass("The script-run prompt names the tool", scriptPrompt?.includes("call the routine_report_failure tool") === true);
+  pass(
+    "A script run may pause only its own routine, and a Test run may not change routines (#8963)",
+    scriptPrompt?.includes(`routineId "${quietFailed.id}" and active false`) === true &&
+      !scriptPrompt.includes("Do not create, update, delete, or test routines") &&
+      healthPrompt?.includes(`routineId "${health.id}"`) === false,
+    scriptPrompt,
+  );
 
   // Flows: a failed owner step skips the next agent.
   const healthSteps = await steps("Health check", healthRun.run.id, 2);
