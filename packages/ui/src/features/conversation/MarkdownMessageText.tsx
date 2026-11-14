@@ -730,7 +730,7 @@ function MarkdownInline(props: {
               return <RichText body={item.semanticTag} content={props.content} streamingTailAfter={after()} />;
             }
             const url = safeBrowserUrl(token.href);
-            const { shared: sharedPath, workspace: workspacePath } = linkFileTargets(token.href);
+            const { shared: sharedPath, workspace: workspacePath } = linkFileTargets(writtenLinkTarget(token));
             return url ? (
               <MessageLink
                 url={url}
@@ -1323,13 +1323,43 @@ export function messageImageFiles(blocks: readonly string[]): MessageImageFile[]
       const file = tokenIs(token, "codespan")
         ? mentionedFileTarget(token.text, directory)
         : tokenIs(token, "link")
-          ? linkFileTarget(token.href)
+          ? linkFileTarget(writtenLinkTarget(token))
           : null;
       if (file && IMAGE_FILE_PATTERN.test(fileReferenceName(file.path)))
         files.set(`${file.kind}:${file.path}`, { path: file.path, kind: file.kind });
     });
   }
   return [...files.values()].slice(0, IMAGE_FILE_LIMIT);
+}
+
+/** A character that a backslash escapes in CommonMark. */
+const MARKDOWN_ESCAPABLE = /[!-/:-@[-`{-~]/u;
+const WINDOWS_ABSOLUTE_PATH = /^(?:[A-Za-z]:[/\\]|\\\\)/u;
+
+/**
+ * The target of a link as the agent wrote it, when that is a Windows path. CommonMark reads the `\.`
+ * in `C:\me\.logs\x` as an escape, but each backslash of a Windows path is a separator (#9010). A
+ * path written with escaped separators, such as `C:\\me\\.logs`, keeps the parsed text.
+ */
+function writtenLinkTarget(token: { raw: string; href: string }): string {
+  const { raw, href } = token;
+  for (const match of raw.matchAll(/\]\(\s*<?/gu)) {
+    const start = match.index + match[0].length;
+    let index = start;
+    let parsed = 0;
+    // Walk the written text and the parsed target together; a backslash before punctuation is an escape.
+    while (parsed < href.length && index < raw.length) {
+      const escaped = raw[index] === "\\" && MARKDOWN_ESCAPABLE.test(raw[index + 1] ?? "");
+      if ((escaped ? raw[index + 1] : raw[index]) !== href[parsed]) break;
+      index += escaped ? 2 : 1;
+      parsed += 1;
+    }
+    const written = raw.slice(start, index);
+    // Only a network path starts with two backslashes; a pair after that start is an escaped separator.
+    if (parsed !== href.length || !WINDOWS_ABSOLUTE_PATH.test(written)) continue;
+    return written.slice(2).includes("\\\\") ? href : written;
+  }
+  return href;
 }
 
 /** The shared and workspace paths that a link target can open as a chip. */
