@@ -1020,17 +1020,26 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                   return list.find((model) => model.id === railDefaultModel(provider)) ?? list[0];
                 });
                 const effortOption = () => (ownsSelection() ? selectedModel() : pickerModelOption(effortModel()));
-                const effortOptions = createMemo(() => {
-                  const variants = effortModel()?.variants ?? [];
-                  if (variants.length) return variants;
-                  const option = effortOption();
-                  return showsReasoningEffort() && option && option.reasoningEffortConfigurable !== false
-                    ? option.supportedReasoningEfforts.map((effort) => ({
-                        id: effort,
-                        name: reasoningLabel(effort, t),
-                      }))
-                    : [];
-                });
+                // A model list refresh gives new objects for the same efforts. The list keeps its array
+                // then: a new array makes the open Effort list close.
+                const effortOptions = createMemo<{ id: string; name: string }[]>(
+                  () => {
+                    const variants = effortModel()?.variants ?? [];
+                    if (variants.length) return variants;
+                    const option = effortOption();
+                    return showsReasoningEffort() && option && option.reasoningEffortConfigurable !== false
+                      ? option.supportedReasoningEfforts.map((effort) => ({
+                          id: effort,
+                          name: reasoningLabel(effort, t),
+                        }))
+                      : [];
+                  },
+                  {
+                    equals: (previous, next) =>
+                      previous.length === next.length &&
+                      previous.every((option, i) => option.id === next[i]?.id && option.name === next[i]?.name),
+                  },
+                );
                 const effortValue = () => {
                   const model = effortModel();
                   const queued = queuedEffort();
