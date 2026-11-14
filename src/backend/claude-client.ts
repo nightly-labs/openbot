@@ -1979,7 +1979,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           turn.usageLimit = null;
           turn.balanceSpent = true;
         } else if (turn.usageLimit || refusal || isPlanLimitDiagnostic(text)) {
-          turn.usageLimit = { resetsAt: turn.usageLimit?.resetsAt ?? refusal?.resetsAt ?? null, text: text || null };
+          turn.usageLimit = { resetsAt: refusal?.resetsAt ?? turn.usageLimit?.resetsAt ?? null, text: text || null };
           return;
         }
       }
