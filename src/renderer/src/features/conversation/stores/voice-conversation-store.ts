@@ -781,9 +781,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   return {
     phase,
     muted: () => state.muted,
-    heard: () => state.heard,
     error: () => state.error,
-    said: () => reading()?.part ?? "",
     levels: () => (phase() === "speaking" ? (reading()?.levels ?? state.levels) : state.levels),
     toggleMute,
     interrupt,
