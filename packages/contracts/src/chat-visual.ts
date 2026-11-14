@@ -328,16 +328,26 @@ function webUrl(value: string): string | null {
 /**
  * The base styles. The page has a transparent canvas in the dark scheme, so the chat shows
  * through it, and the theme variables have values even before the app sends the theme.
+ *
+ * A page with its own colours does not get the dark scheme or the theme text colour. Its canvas and
+ * its text then have the colours that a browser gives them, so its text is not light on its own
+ * light background.
  */
-const BASE_STYLE = [
-  ":root{color-scheme:dark;--background:transparent;--foreground:CanvasText;--muted-foreground:GrayText;",
-  "--border:rgba(127,127,127,.3);--card:rgba(127,127,127,.12);--radius:12px;",
-  "--font-sans:system-ui,sans-serif;--font-mono:ui-monospace,monospace;scrollbar-width:none}",
-  "::-webkit-scrollbar{display:none}",
-  "body{margin:0;color:var(--foreground);font:14px/1.5 var(--font-sans)}",
-  // A click on an image outside a link or a button shows it large.
-  "img:not(a img,button img,label img){cursor:zoom-in}",
-].join("");
+function baseStyle(themed: boolean): string {
+  return [
+    `:root{${themed ? "color-scheme:dark;" : ""}--background:transparent;--foreground:CanvasText;--muted-foreground:GrayText;`,
+    "--border:rgba(127,127,127,.3);--card:rgba(127,127,127,.12);--radius:12px;",
+    "--font-sans:system-ui,sans-serif;--font-mono:ui-monospace,monospace;scrollbar-width:none}",
+    "::-webkit-scrollbar{display:none}",
+    `body{margin:0;${themed ? "color:var(--foreground);" : ""}font:14px/1.5 var(--font-sans)}`,
+    // A click on an image outside a link or a button shows it large.
+    "img:not(a img,button img,label img){cursor:zoom-in}",
+  ].join("");
+}
+
+/** A use of a theme colour variable, such as `var(--foreground)`. */
+const THEME_COLOR_USE =
+  /var\(\s*--(?:background|foreground|muted-foreground|muted|card-foreground|card|border|accent|destructive|success|chart-\d)(?![\w-])/u;
 
 /**
  * The script that runs first in the page. It applies the theme, reports the page height, scrolls
@@ -475,6 +485,11 @@ export interface ChatVisualDocumentOptions {
   bootstrap?: boolean;
   /** More elements for the start of `<head>`, after the base style and before the page's own. */
   head?: string;
+  /**
+   * True for a local HTML file that the file preview shows, not a reply page. When the file uses no
+   * theme colour variable, it has its own colours and keeps them.
+   */
+  localFile?: boolean;
 }
 
 /** The theme as CSS. A value that could end the rule or the style element is left out. */
@@ -486,11 +501,11 @@ function themeStyle({ theme = {}, appearance }: ChatVisualDocumentOptions): stri
   return declarations.length ? `:root{${declarations.join("")}}` : "";
 }
 
-function preamble(options: ChatVisualDocumentOptions): string {
+function preamble(options: ChatVisualDocumentOptions, themed: boolean): string {
   return [
     '<meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
-    `<style id="openbot-visual-base">${BASE_STYLE}${themeStyle(options)}</style>`,
+    `<style id="openbot-visual-base">${baseStyle(themed)}${themeStyle(options)}</style>`,
     options.head ?? "",
     options.bootstrap === false ? "" : `<script id="openbot-visual-bootstrap">${BOOTSTRAP}</script>`,
   ].join("");
@@ -504,7 +519,7 @@ function preamble(options: ChatVisualDocumentOptions): string {
  * fills the frame, so the page cannot report its own height.
  */
 export function chatVisualDocument(html: string, options: ChatVisualDocumentOptions = {}): string {
-  const head = preamble(options);
+  const head = preamble(options, options.localFile !== true || THEME_COLOR_USE.test(html));
   const opening = /<(?:!--|script\b|style\b|template\b|textarea\b|title\b)/iu.exec(html)?.index ?? html.length;
   const doctype = /<!doctype\b[^>]*>/iu.exec(html);
   const standards = doctype && doctype.index < opening ? "" : "<!doctype html>";
