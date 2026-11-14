@@ -90,6 +90,7 @@ import { TeamApiServer } from "./team-api-server";
 import type { RemoteDirectoryMember, TeamIdentity, TeamStore } from "./team-store";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcHostGateway } from "./team-webrtc-host-gateway";
+import { windowsSessionDisconnected } from "./windows-session-state";
 
 export const DEVELOPMENT_REMOTE_CLIENT_USERNAME = "openbot-dev-client";
 
@@ -369,6 +370,7 @@ export class HostService extends EventEmitter<HostEvents> {
         (() => Effect.succeed({ username: "openbot", password: "development-runtime-not-for-release" })),
       ...(options.getRemoteDesktopDisplays ? { getDisplays: options.getRemoteDesktopDisplays } : {}),
       getDisplayScreenOrigin: options.getRemoteDesktopDisplayScreenOrigin,
+      sessionDisconnected: windowsSessionDisconnected,
       getIceServers:
         options.getRemoteDesktopIceServers ??
         (() => Effect.fail(new RemoteWorkflowError({ cause: new Error(sourceText("error.host.iceServersMissing")) }))),
