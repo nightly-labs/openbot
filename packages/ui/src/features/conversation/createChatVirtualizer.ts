@@ -6,7 +6,7 @@ import {
   type VirtualItem,
   Virtualizer,
 } from "@tanstack/virtual-core";
-import { createEffect, createMemo, createSignal, createStore, onSettled, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, onCleanup, onSettled, untrack } from "solid-js";
 
 interface ChatVirtualizerOptions<TScrollElement extends Element, TItemElement extends Element> {
   count: () => number;
@@ -50,6 +50,11 @@ const STATIC_CHAT_LIMIT = 100;
  */
 const STATIC_CHAT_RETURN = 10;
 const SCROLL_END_THRESHOLD = 80;
+/**
+ * The frames to wait after the scroll of a smooth jump ends. The virtualizer ends the jump when its
+ * target stays in place for up to 3 frames, and filters the row sizes until then.
+ */
+const SMOOTH_JUMP_SETTLE_FRAMES = 4;
 
 export function createChatVirtualizer<TScrollElement extends Element, TItemElement extends Element>(
   options: ChatVirtualizerOptions<TScrollElement, TItemElement>,
@@ -116,6 +121,42 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
     return previous ? count > STATIC_CHAT_LIMIT - STATIC_CHAT_RETURN : count > STATIC_CHAT_LIMIT;
   });
   let refreshQueued = false;
+  // A smooth jump measures only the rows near its target, until a few frames after its scroll ends.
+  // A row far from the target that mounts or grows during the jump keeps its old size, and the rows
+  // after it cover it. The browser reports a size only when it changes, so the rendered rows of a
+  // virtual chat are measured again once the jump is over. A static chat has no positioned rows.
+  let smoothJumpPending = false;
+  let wasScrolling = false;
+  let settleFrame: number | undefined;
+  const measureRenderedRows = (): void => {
+    syncScrollEndThreshold(virtualizer);
+    // All reads come before the first write, so the page is laid out once.
+    const sizes = [...virtualizer.elementsCache.values()]
+      .filter((element) => element.isConnected)
+      .map((element) => [virtualizer.indexFromElement(element), element.getBoundingClientRect().height] as const);
+    for (const [index, size] of sizes) virtualizer.resizeItem(index, Math.round(size));
+  };
+  const settleSmoothJump = (frames: number): void => {
+    settleFrame = requestAnimationFrame(() => {
+      settleFrame = undefined;
+      // A scroll that starts again, such as the last part of the jump, waits for its own end.
+      if (virtualizer.isScrolling) return;
+      if (frames > 1) {
+        settleSmoothJump(frames - 1);
+        return;
+      }
+      smoothJumpPending = false;
+      if (untrack(virtualized)) measureRenderedRows();
+    });
+  };
+  const measureRowsAfterSmoothJump = (): void => {
+    const ended = wasScrolling && !virtualizer.isScrolling;
+    wasScrolling = virtualizer.isScrolling;
+    if (smoothJumpPending && ended && settleFrame === undefined) settleSmoothJump(SMOOTH_JUMP_SETTLE_FRAMES);
+  };
+  onCleanup(() => {
+    if (settleFrame !== undefined) cancelAnimationFrame(settleFrame);
+  });
 
   const refresh = (): void => {
     const measured = [...virtualizer.getVirtualItems()];
@@ -180,6 +221,7 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
           getItemKey: options.getItemKey,
           scrollMargin,
           onChange: (instance) => {
+            measureRowsAfterSmoothJump();
             scheduleRefresh();
             untrack(() => options.onChange?.(instance));
           },
@@ -215,8 +257,10 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
     },
     scrollMargin: options.scrollMargin,
     itemStart: (index) => virtualizer.measurementsCache[index]?.start,
-    scrollToIndex: (index, scroll) =>
-      virtualizer.scrollToIndex(index, { align: "start", behavior: scroll?.smooth ? "smooth" : "auto" }),
+    scrollToIndex: (index, scroll) => {
+      if (scroll?.smooth) smoothJumpPending = true;
+      virtualizer.scrollToIndex(index, { align: "start", behavior: scroll?.smooth ? "smooth" : "auto" });
+    },
     scrollToOffset: (offset) => virtualizer.scrollToOffset(offset, { align: "start", behavior: "auto" }),
   };
 }
