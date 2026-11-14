@@ -43,7 +43,7 @@
 //  21. "automatic" revises a local skill from its current text, at its current revision.
 //  22. When the writer answer is not JSON or the save fails, the review asks the user instead.
 //      It also asks when the revision drops much of the current text or writes its letters in
-//      ASCII (ş as s), and when the skill is too long to write again: then no writer runs.
+//      ASCII (ş as s), and when the skill leaves no room for the lesson: then no writer runs.
 //  23. "off": the review prompt asks for no skill, and a skill in the answer shows nothing.
 //  24. When the review looks for skills, a turn in which the agent saved a memory stays in the next
 //      review: the memory does not hold how the agent did the task.
@@ -1219,41 +1219,51 @@ try {
   await check(
     "automatic: a revision that drops text or letters, or a skill too long to rewrite, asks the user",
     async () => {
-      const keeper = await createAgent("Keeper");
+      const keeper = await createAgent("Guarded");
       const saves = learned.length;
       const turkish =
-        "Kullanıcının düzeltmelerini uygula. Sürüm notlarını kısa bir liste olarak yaz. Önce etiketi oluştur.";
+        "Kullanıcının düzeltmelerini uygula. Sürüm notlarını kısa bir liste olarak yaz. Önce etiketi oluştur.\n".repeat(
+          10,
+        );
       localSkillInstructions = turkish;
-      const ask = async (index: number, label: string) => {
-        const count = reviews().length;
-        control({
-          operations: [],
-          skill: { action: "update", skillId: LOCAL_SKILL_ID, name: "Notes", message: `Change the notes (${label})?` },
-        });
-        await chat(keeper.id, index, `Keeper ${label}`);
-        await reviewed(count + 1);
-        return waitFor(`the question after ${label}`, () => suggestionLines(keeper.id)[index - 2]);
-      };
-      const ascii = turkish
-        .replace(/ı/gu, "i")
-        .replace(/ü/gu, "u")
-        .replace(/ş/gu, "s")
-        .replace(/ğ/gu, "g")
-        .replace(/ö/gu, "o")
-        .replace(/Ö/gu, "O");
-      writer({ description: "How the user wants release notes.", instructions: `${ascii}\nEtiketi kontrol et.` });
-      await ask(2, "ASCII letters");
-      writer({ description: "How the user wants release notes.", instructions: "Kısa liste yaz." });
-      await ask(3, "a summary");
-      localSkillInstructions = "Write release notes as a short list.\n".repeat(400);
-      const writes = writers().length;
-      await ask(4, "a long skill");
-      assert.equal(writers().length, writes, "No writer runs for a skill that is too long to rewrite.");
-      localSkillInstructions = "Write release notes as a short list.";
-      assert.equal(learnedLines(keeper.id).length, 0, "No saved skill shows.");
-      assert.equal(learned.length, saves, "Nothing was saved.");
-      control({ operations: [] });
-      return { questions: suggestionLines(keeper.id).length };
+      try {
+        const ask = async (index: number, label: string) => {
+          const count = reviews().length;
+          control({
+            operations: [],
+            skill: {
+              action: "update",
+              skillId: LOCAL_SKILL_ID,
+              name: "Notes",
+              message: `Change the notes (${label})?`,
+            },
+          });
+          await chat(keeper.id, index, `Guarded ${label}`);
+          await reviewed(count + 1);
+          return waitFor(`the question after ${label}`, () => suggestionLines(keeper.id)[index - 2]);
+        };
+        const ascii = turkish
+          .replace(/ı/gu, "i")
+          .replace(/ü/gu, "u")
+          .replace(/ş/gu, "s")
+          .replace(/ğ/gu, "g")
+          .replace(/ö/gu, "o")
+          .replace(/Ö/gu, "O");
+        writer({ description: "How the user wants release notes.", instructions: `${ascii}\nEtiketi kontrol et.` });
+        await ask(2, "ASCII letters");
+        writer({ description: "How the user wants release notes.", instructions: "Kısa liste yaz." });
+        await ask(3, "a summary");
+        localSkillInstructions = "Write release notes as a short list.\n".repeat(400);
+        const writes = writers().length;
+        await ask(4, "a long skill");
+        assert.equal(writers().length, writes, "No writer runs for a skill that is too long to rewrite.");
+        assert.equal(learnedLines(keeper.id).length, 0, "No saved skill shows.");
+        assert.equal(learned.length, saves, "Nothing was saved.");
+        return { questions: suggestionLines(keeper.id).length };
+      } finally {
+        localSkillInstructions = "Write release notes as a short list.";
+        control({ operations: [] });
+      }
     },
   );
 
