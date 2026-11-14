@@ -1,10 +1,10 @@
 {
-  "version": "0.70.0",
+  "version": "0.71.0",
   "highlights": [
-    "Update your joined servers to this version too: you can then restart a self-hosted server from the app and set its agent defaults and thread limits.",
-    "Choose which agents can use each Vault item. An API key saved for one agent now stays in the encrypted Vault.",
-    "Make pictures and short videos in Workflows with GPT Image, Grok Imagine and Sunra models.",
-    "Connect Sunra and TryPost from the Apps marketplace.",
-    "OpenBot opens faster when chats are long, and on Windows and Linux it asks before it quits while agents work."
+    "Update your joined servers to this version too, so that routine Stop, files with no text in outside chats and API keys at their old path work there.",
+    "Stop a routine run from the Routines canvas, and pinch on a touchpad to zoom in the app.",
+    "Scripts and tools that read Vault API keys from their files work again after the 0.70.0 update.",
+    "A Claude agent keeps the model in its profile, and moves to its backup model at the monthly spend limit.",
+    "Buy a Starter hosted server again: €30 a month with 25 GB of storage."
   ]
 }

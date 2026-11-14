@@ -1,5 +1,43 @@
 [
   {
+    "version": "0.71.0",
+    "date": "2026-11-14",
+    "notices": [
+      "Atualize também para esta versão cada servidor em que você entrou. Em um servidor, Parar para execuções de rotinas, arquivos que os agentes enviam sem texto e chaves de API no caminho antigo só funcionam quando o servidor tem esta versão."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Use um gesto de pinça no trackpad ou na tela de toque para ampliar a área sob o ponteiro. Diagramas, canvas e o visualizador de imagens mantêm o próprio zoom.",
+          "Pare uma execução de rotina no canvas de Rotinas: selecione Parar na barra superior ou nos detalhes da rotina. A execução termina como Cancelada.",
+          "Os agentes podem enviar um arquivo ou uma imagem sem texto para um chat do WhatsApp, Telegram, Slack ou Discord.",
+          "Compre de novo um servidor hospedado Starter. Ele tem 25 GB de armazenamento.",
+          "Use uma assinatura ClinePass com os agentes Cline. O menu de modelos mostra os modelos ClinePass."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "No Canvas, arraste uma nota, um texto livre, uma forma ou uma etapa pelo texto. Um clique no texto coloca o cursor onde você clicou.",
+          "Uma mensagem que você envia enquanto um agente Antigravity trabalha entra no turno em andamento. Isso exige o Antigravity CLI 1.5.0 ou posterior.",
+          "Uma rotina cuja tarefa manda parar quando o trabalho termina agora se pausa sozinha. Ative-a de novo na sua lista de rotinas.",
+          "O Vault agora informa que todo agente pode ler os arquivos de chave de API dos outros agentes, porque todos os agentes rodam com o mesmo usuário do sistema."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Scripts, servidores MCP e configurações de provedores que leem chaves de API do Vault pelos seus arquivos voltam a funcionar após a atualização para 0.70.0.",
+          "Um agente Claude mantém o modelo no seu perfil quando o Claude Code muda o modelo padrão.",
+          "Quando o Claude para um turno no limite mensal de gastos, um agente com modelos de reserva continua no próximo modelo.",
+          "Os agentes recebem a transcrição completa de um vídeo com legendas, como um vídeo do YouTube.",
+          "O OpenBot usa menos CPU: abas do navegador que você não vê ficam mais lentas, e a luz em movimento na linha de atividade de um agente ficou mais leve."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.70.0",
     "date": "2026-11-13",
     "notices": [

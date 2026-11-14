@@ -1,5 +1,43 @@
 [
   {
+    "version": "0.71.0",
+    "date": "2026-11-14",
+    "notices": [
+      "Update ook elke server waarbij je bent aangesloten naar deze versie. Op een server werken Stoppen voor routine-runs, bestanden die agents zonder tekst sturen en API-sleutels op hun oude pad alleen als de server deze versie heeft."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Knijp op een touchpad of touchscreen om in te zoomen op het gebied onder de aanwijzer. Diagrammen, canvassen en de afbeeldingsviewer behouden hun eigen zoom.",
+          "Stop een routine-run vanaf het Routines-canvas: kies Stoppen in de bovenbalk of in de routinedetails. De run eindigt als Geannuleerd.",
+          "Agents kunnen een bestand of een afbeelding zonder tekst sturen naar een WhatsApp-, Telegram-, Slack- of Discord-chat.",
+          "Koop weer een gehoste Starter-server. Die heeft 25 GB opslag.",
+          "Gebruik een ClinePass-abonnement met Cline-agents. Het modelmenu toont de ClinePass-modellen."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Op het Canvas sleep je een notitie, vrije tekst, een vorm of een stap via de tekst. Een klik op de tekst zet de tekstcursor waar je klikte.",
+          "Een bericht dat je stuurt terwijl een Antigravity-agent werkt, gaat naar de lopende beurt. Dit vereist Antigravity CLI 1.5.0 of later.",
+          "Een routine waarvan de taak zegt te stoppen als het werk klaar is, pauzeert nu zelf. Zet hem weer aan vanuit je lijst met routines.",
+          "De Kluis zegt nu dat elke agent de API-sleutelbestanden van de andere agents kan lezen, omdat alle agents als dezelfde systeemgebruiker draaien."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Scripts, MCP-servers en aanbiedersinstellingen die API-sleutels uit de Kluis uit hun bestanden lezen, werken weer na de update naar 0.70.0.",
+          "Een Claude-agent houdt het model in zijn profiel als Claude Code zijn standaardmodel wijzigt.",
+          "Als Claude een beurt stopt bij de maandelijkse uitgavenlimiet, gaat een agent met reservemodellen verder op zijn volgende model.",
+          "Agents krijgen het volledige transcript van een video met ondertitels, zoals een YouTube-video.",
+          "OpenBot gebruikt minder CPU: browsertabbladen die je niet ziet, vertragen, en het bewegende licht op de activiteitsregel van een agent is lichter."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.70.0",
     "date": "2026-11-13",
     "notices": [

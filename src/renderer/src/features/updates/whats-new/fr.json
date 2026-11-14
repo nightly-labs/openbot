@@ -1,5 +1,43 @@
 [
   {
+    "version": "0.71.0",
+    "date": "2026-11-14",
+    "notices": [
+      "Mettez aussi à jour vers cette version chaque serveur que vous avez rejoint. Sur un serveur, Arrêter pour les exécutions de routines, les fichiers que les agents envoient sans texte et les clés d’API à leur ancien chemin ne fonctionnent que si le serveur a cette version."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Écartez deux doigts sur un pavé tactile ou un écran tactile pour zoomer sur la zone sous le pointeur. Les diagrammes, les canevas et la visionneuse d’images gardent leur propre zoom.",
+          "Arrêtez une exécution de routine depuis le Canevas des routines : sélectionnez Arrêter dans la barre supérieure ou dans les détails de la routine. L’exécution se termine avec le statut Annulée.",
+          "Les agents peuvent envoyer un fichier ou une image sans texte vers une discussion WhatsApp, Telegram, Slack ou Discord.",
+          "Achetez de nouveau un serveur hébergé Starter. Il dispose de 25 Go de stockage.",
+          "Utilisez un abonnement ClinePass avec les agents Cline. Le menu des modèles affiche les modèles ClinePass."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Sur le Canevas, faites glisser une note, un texte libre, une forme ou une étape par son texte. Un clic sur le texte place le point d’insertion à l’endroit cliqué.",
+          "Un message que vous envoyez pendant qu’un agent Antigravity travaille rejoint l’exécution en cours. Cela nécessite Antigravity CLI 1.5.0 ou une version ultérieure.",
+          "Une routine dont la tâche indique de s’arrêter une fois le travail terminé se met maintenant en pause d’elle-même. Réactivez-la depuis votre liste de routines.",
+          "Le Vault indique désormais que chaque agent peut lire les fichiers de clés d’API des autres agents, car tous les agents s’exécutent sous le même utilisateur système."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Les scripts, les serveurs MCP et les réglages de fournisseurs qui lisent les clés d’API du Vault depuis leurs fichiers fonctionnent de nouveau après la mise à jour vers 0.70.0.",
+          "Un agent Claude conserve le modèle de son profil lorsque Claude Code change son modèle par défaut.",
+          "Lorsque Claude arrête une exécution à la limite de dépenses mensuelle, un agent doté de modèles de secours poursuit avec son modèle suivant.",
+          "Les agents obtiennent la transcription complète d’une vidéo sous-titrée, comme une vidéo YouTube.",
+          "OpenBot consomme moins de CPU : les onglets du navigateur que vous ne voyez pas ralentissent, et la lumière animée de la ligne d’activité d’un agent est plus légère."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.70.0",
     "date": "2026-11-13",
     "notices": [
