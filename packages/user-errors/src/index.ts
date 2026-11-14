@@ -103,7 +103,6 @@ export function classifyUserError(error: unknown): UserErrorKind {
   const message = normalizeMessage(error);
   const code = errnoCode(message);
 
-  if (INTERRUPTED_ANSWER.test(message) && !CONTENT_FILTER_STOP.test(message)) return "interrupted";
   if (NETWORK_MESSAGE.test(message) || NETWORK_CODES.includes(code ?? "")) return "network";
   if (
     code === "ETIMEDOUT" ||
@@ -124,6 +123,8 @@ export function classifyUserError(error: unknown): UserErrorKind {
   if (RATE_LIMIT_SIGNALS.test(message)) return "rate-limit";
   // Unanchored, and last: a 429 body that happens to mention a token is still a rate limit.
   if (AUTH_SIGNALS.test(message)) return "auth";
+  // Last: a dropped stream that quotes a 401 or a 429 keeps the kind that its recovery needs.
+  if (INTERRUPTED_ANSWER.test(message) && !CONTENT_FILTER_STOP.test(message)) return "interrupted";
   return "unknown";
 }
 
