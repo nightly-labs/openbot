@@ -36,7 +36,7 @@ import { TELEGRAM_ORCHESTRATOR_AVATAR } from "@openbot/contracts/telegram-app";
 import { WHATSAPP_ORCHESTRATOR_AVATAR } from "@openbot/contracts/whatsapp-app";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
-import { Deferred, Effect, Exit, Result, Schema, Scope } from "effect";
+import { Deferred, Effect, Exit, Result, Schedule, Schema, Scope } from "effect";
 import type { AgentLifecycleFailed } from "../agent-service";
 import { causeHelpers } from "../effect-boundary";
 import type { MessagingOrigin } from "../mailbox-store";
@@ -87,6 +87,7 @@ import { SlackApiError, SlackWebApi } from "./slack/slack-web-api";
 import { type TelegramAppPort, telegramLinkUrl } from "./telegram/telegram-connect";
 import { telegramOrchestratorMemories, telegramOrchestratorProfile } from "./telegram/telegram-orchestrator";
 import { parseTelegramUpdate, telegramLink, telegramRemoval } from "./telegram/telegram-updates";
+import { WHATSAPP_HISTORY_KEEP_MS } from "./whatsapp/whatsapp-archive";
 import { WhatsAppConnect } from "./whatsapp/whatsapp-connect";
 import { whatsAppOrchestratorMemories, whatsAppOrchestratorProfile } from "./whatsapp/whatsapp-orchestrator";
 import type { WhatsAppRuntime } from "./whatsapp/whatsapp-runtime";
@@ -189,6 +190,8 @@ const LIVE_STATES = new Set<MessagingConnectionState>(["connecting", "connected"
 /** The states in which a connection can still get a transport that takes deliveries. */
 const STARTING_STATES = new Set<MessagingConnectionState>(["connecting", "reconnecting", "rate_limited"]);
 const RECENT_MESSAGES = 2_000;
+/** How often the saved WhatsApp messages older than 90 days go. */
+const HISTORY_PRUNE_INTERVAL = "1 hour";
 /** How long a delivery that Signal kept waits for its connection to start. */
 const QUEUED_TRANSPORT_WAIT_MS = 60_000;
 /** How long a Telegram link waits for the Signal socket. */
@@ -297,6 +300,13 @@ export class MessagingService {
     if (this.#started) return;
     this.#started = true;
     this.#scope = Scope.makeUnsafe();
+    // The saved WhatsApp messages and their files go 90 days after they arrived, also those of a number
+    // that is off.
+    yield* Effect.forkIn(
+      Effect.sync(() => this.#pruneHistory()).pipe(Effect.repeat(Schedule.spaced(HISTORY_PRUNE_INTERVAL))),
+      this.#scope,
+      { startImmediately: true },
+    );
     // Before the connections start, which settle the posts they find when they are connected. It does
     // not wait: an activity that comes before the listener below is there would be lost.
     this.#status.load(new Set(this.#threads.store.connections().map((record) => record.connectionId)));
@@ -2471,6 +2481,17 @@ export class MessagingService {
   #requireDiscordConnect(): DiscordConnect {
     if (!this.#discordConnect) throw new Error(sourceText("error.messaging.discordUnsupported"));
     return this.#discordConnect;
+  }
+
+  #pruneHistory(): void {
+    try {
+      const cutoff = Date.now() - WHATSAPP_HISTORY_KEEP_MS;
+      const paths = this.#threads.history.prune(new Date(cutoff).toISOString());
+      this.#whatsappRuntime?.deleteSavedFiles(paths);
+      this.#whatsappRuntime?.pruneFiles(cutoff);
+    } catch (cause) {
+      this.#warn(cause);
+    }
   }
 
   #warn(error: unknown): void {

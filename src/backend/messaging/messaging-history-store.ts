@@ -1,4 +1,4 @@
-import { isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { databaseRow, databaseRows, requiredNumberColumn, requiredStringColumn } from "../database/database-rows";
 import type { OpenBotDatabase } from "../openbot-database";
 import type { ContextEntry, HistoryFilter, InboundFile } from "./messaging-types";
@@ -86,8 +86,10 @@ export class MessagingHistoryStore {
   }
 
   /**
-   * The newest messages of one conversation, or of the whole chat for null, oldest first. A filter
-   * keeps only the messages sent before its time whose text or author has each of its words.
+   * The newest messages of one conversation, or of the whole chat for null, by the time they were
+   * sent, oldest first. A filter keeps only the messages sent before its time whose text or author has
+   * each of its words. A read does not stop inside one second: a message sent in the same second as the
+   * oldest one it gives comes too, so a next read with `before` = that time misses none of them.
    */
   recent(
     connectionId: string,
@@ -97,7 +99,7 @@ export class MessagingHistoryStore {
     filter: HistoryFilter = {},
   ): ContextEntry[] {
     const conditions = ["connection_id = ?", "platform_channel_id = ?"];
-    const values: Array<string | number> = [connectionId, platformChannelId];
+    const values: string[] = [connectionId, platformChannelId];
     if (threadKey !== null) {
       conditions.push("thread_key = ?");
       values.push(threadKey);
@@ -106,19 +108,24 @@ export class MessagingHistoryStore {
       conditions.push("sent_at < ?");
       values.push(filter.before);
     }
-    for (const word of queryWords(filter.query)) {
-      conditions.push("(text LIKE ? ESCAPE '\\' OR author_name LIKE ? ESCAPE '\\')");
-      const pattern = `%${word.replace(/[\\%_]/gu, (character) => `\\${character}`)}%`;
-      values.push(pattern, pattern);
+    // The words are compared in JavaScript, as the chat state does: SQLite's LIKE ignores the case of
+    // ASCII letters only, and "Łódź" must find "łódź".
+    const rows = this.#database.connection
+      .prepare(
+        `SELECT message_id, author_name, text, sent_at, files_json FROM projection_messaging_history
+         WHERE ${conditions.join(" AND ")} ORDER BY sent_at DESC, seq DESC`,
+      )
+      .iterate(...values);
+    const found: ContextEntry[] = [];
+    for (const raw of rows) {
+      const row = databaseRow(raw);
+      if (!row) continue;
+      const message = entry(row);
+      const last = found.at(-1);
+      if (found.length >= limit && last && message.sentAt !== last.sentAt) break;
+      if (matchesHistoryFilter(message, filter)) found.push(message);
     }
-    return entries(
-      this.#database.connection
-        .prepare(
-          `SELECT message_id, author_name, text, sent_at, files_json FROM projection_messaging_history
-           WHERE ${conditions.join(" AND ")} ORDER BY seq DESC LIMIT ?`,
-        )
-        .all(...values, limit),
-    );
+    return found.reverse();
   }
 
   /** Records where the copy of a message's file is. False when the message or its file is gone. */
@@ -150,16 +157,73 @@ export class MessagingHistoryStore {
     return this.#files(connectionId, platformChannelId, messageId)?.find((file) => file.id === fileId)?.path ?? null;
   }
 
-  /** Deletes the messages of a connection that arrived before `savedBefore`. Returns the paths of their files. */
-  prune(connectionId: string, savedBefore: string): string[] {
+  /** Deletes the messages of every connection that arrived before `savedBefore`. Returns the paths of their files. */
+  prune(savedBefore: string): string[] {
+    return filePaths(
+      this.#database.connection
+        .prepare("DELETE FROM projection_messaging_history WHERE saved_at < ? RETURNING files_json")
+        .all(savedBefore),
+    );
+  }
+
+  /** Deletes one message that its author deleted for everyone. Returns the paths of its files. */
+  forgetMessage(connectionId: string, platformChannelId: string, messageId: string): string[] {
     return filePaths(
       this.#database.connection
         .prepare(
-          `DELETE FROM projection_messaging_history WHERE connection_id = ? AND saved_at < ?
-           RETURNING files_json`,
+          `DELETE FROM projection_messaging_history
+           WHERE connection_id = ? AND platform_channel_id = ? AND message_id = ? RETURNING files_json`,
         )
-        .all(connectionId, savedBefore),
+        .all(connectionId, platformChannelId, messageId),
     );
+  }
+
+  /** Replaces the text of a message that its author changed. */
+  editMessage(connectionId: string, platformChannelId: string, messageId: string, text: string): void {
+    this.#database.connection
+      .prepare(
+        `UPDATE projection_messaging_history SET text = ?
+         WHERE connection_id = ? AND platform_channel_id = ? AND message_id = ?`,
+      )
+      .run(text, connectionId, platformChannelId, messageId);
+  }
+
+  /**
+   * Keeps the saved copies of a connection's files under `maxBytes`: the copies of the oldest
+   * messages go first, and their messages keep only the names of the files. Returns the paths that go.
+   */
+  trimFiles(connectionId: string, maxBytes: number): string[] {
+    const db = this.#database.connection;
+    const ownsTransaction = !db.isTransaction;
+    if (ownsTransaction) db.exec("BEGIN IMMEDIATE");
+    try {
+      const rows = databaseRows(
+        db
+          .prepare(
+            `SELECT seq, files_json FROM projection_messaging_history
+             WHERE connection_id = ? AND files_json LIKE '%"path":%' ORDER BY seq`,
+          )
+          .all(connectionId),
+      ).map((row) => ({
+        seq: requiredNumberColumn(row, "seq"),
+        files: decodeFiles(requiredStringColumn(row, "files_json")),
+      }));
+      let total = rows.reduce((sum, row) => sum + savedBytes(row.files), 0);
+      const removed: string[] = [];
+      const update = db.prepare("UPDATE projection_messaging_history SET files_json = ? WHERE seq = ?");
+      for (const row of rows) {
+        if (total <= maxBytes) break;
+        total -= savedBytes(row.files);
+        removed.push(...row.files.flatMap((file) => (file.path ? [file.path] : [])));
+        update.run(JSON.stringify(row.files.map(({ path: _path, ...file }) => file)), row.seq);
+      }
+      if (ownsTransaction) db.exec("COMMIT");
+      return removed;
+    } catch (error) {
+      // SQLite may have rolled back already, and a second ROLLBACK would replace the error that did it.
+      if (ownsTransaction && db.isTransaction) db.exec("ROLLBACK");
+      throw error;
+    }
   }
 
   /** Deletes every message of a connection. Returns the paths of their files. */
@@ -197,18 +261,23 @@ function queryWords(query: string | undefined): string[] {
 
 /** Rows read newest first, as entries oldest first. */
 function entries(rows: unknown): ContextEntry[] {
-  return databaseRows(rows)
-    .map((row) => {
-      const files = decodeFiles(requiredStringColumn(row, "files_json"));
-      return {
-        id: requiredStringColumn(row, "message_id"),
-        authorName: requiredStringColumn(row, "author_name"),
-        text: requiredStringColumn(row, "text"),
-        sentAt: requiredStringColumn(row, "sent_at"),
-        ...(files.length ? { files } : {}),
-      };
-    })
-    .reverse();
+  return databaseRows(rows).map(entry).reverse();
+}
+
+function entry(row: DynamicRecord): ContextEntry {
+  const files = decodeFiles(requiredStringColumn(row, "files_json"));
+  return {
+    id: requiredStringColumn(row, "message_id"),
+    authorName: requiredStringColumn(row, "author_name"),
+    text: requiredStringColumn(row, "text"),
+    sentAt: requiredStringColumn(row, "sent_at"),
+    ...(files.length ? { files } : {}),
+  };
+}
+
+/** The bytes of the saved copies of a message's files. */
+function savedBytes(files: readonly InboundFile[]): number {
+  return files.reduce((sum, file) => sum + (file.path ? file.size : 0), 0);
 }
 
 function filePaths(rows: unknown): string[] {

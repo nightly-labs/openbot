@@ -13,6 +13,10 @@ const logger = createOpenBotLogger("whatsapp");
 
 /** A saved message, and the copy of its file, go this long after they arrived. */
 export const WHATSAPP_HISTORY_KEEP_MS = 90 * 24 * 60 * 60_000;
+/** The copies of one number's files stay under this size: the oldest go first. */
+export const WHATSAPP_FILES_MAX_BYTES = 2 * 1024 ** 3;
+/** A download that takes longer stops, so that the files after it are saved too. */
+const DOWNLOAD_DEADLINE_MS = 10 * 60_000;
 
 /** Where the messages of one linked number are saved. */
 export interface WhatsAppHistory {
@@ -31,7 +35,8 @@ export interface WhatsAppArchiveOptions extends WhatsAppHistory {
  * The saved messages of one linked number. WhatsApp sends no history to a new device, so the messages
  * of the allowed chats that it sees are saved in the database for 90 days, also those that do not
  * address an agent. The file of each message is downloaded when it arrives, one at a time, as WhatsApp
- * deletes old files from its servers. It never logs message text, names or numbers.
+ * deletes old files from its servers; the copies of one number stay under 2 GB. The messaging service
+ * deletes what is older than 90 days. It never logs message text, names or numbers.
  */
 export class WhatsAppArchive {
   readonly connectionId: string;
@@ -39,8 +44,10 @@ export class WhatsAppArchive {
   readonly #folder: string;
   readonly #session: WhatsAppSession;
   readonly #now: () => number;
-  #downloads: Promise<void> = Promise.resolve();
-  #closed = false;
+  readonly #closed = new AbortController();
+  /** The downloads that did not finish, by file id. A call starts one now, or waits for it. */
+  readonly #pending = new Map<string, () => Promise<void>>();
+  #queue: Promise<void> = Promise.resolve();
 
   constructor(options: WhatsAppArchiveOptions) {
     this.connectionId = options.connectionId;
@@ -57,7 +64,7 @@ export class WhatsAppArchive {
     );
     if (!saved || !media) return;
     for (const file of entry.files ?? [])
-      if (file.size <= ATTACHMENT_LIMITS.fileBytes) this.#download(chatJid, entry.id, file, media);
+      if (file.size <= ATTACHMENT_LIMITS.fileBytes) this.#enqueue(chatJid, entry.id, file, media);
   }
 
   between(chatJid: string, threadKey: string, afterId: string | null, beforeId: string): ContextEntry[] {
@@ -68,49 +75,73 @@ export class WhatsAppArchive {
     return this.#store.recent(this.connectionId, chatJid, threadKey, limit, filter);
   }
 
-  /** The copy of a file, or null when it was not saved. The file id is `<chat JID>|<message id>`. */
-  savedFile(file: InboundFile): string | null {
+  /**
+   * The copy of a file, or null when it was not saved. A download that waits in the queue starts now,
+   * and a running one is awaited, so that an agent's turn does not download the same file again.
+   * The file id is `<chat JID>|<message id>`.
+   */
+  async savedFile(file: InboundFile): Promise<string | null> {
+    await this.#pending.get(file.id)?.();
     const [chatJid, messageId] = file.id.split("|");
     if (!chatJid || !messageId) return null;
-    const path = this.#store.savedFile(this.connectionId, chatJid, messageId, file.id);
+    const path = this.#write(() => this.#store.savedFile(this.connectionId, chatJid, messageId, file.id));
     return path && this.#owns(path) ? path : null;
   }
 
-  /** Deletes the messages and files that arrived more than 90 days ago. */
-  prune(): void {
-    const cutoff = new Date(this.#now() - WHATSAPP_HISTORY_KEEP_MS).toISOString();
-    for (const path of this.#write(() => this.#store.prune(this.connectionId, cutoff)) ?? []) this.#delete(path);
+  /** A message that its author deleted for everyone goes, with its files. */
+  forget(chatJid: string, messageId: string): void {
+    for (const path of this.#write(() => this.#store.forgetMessage(this.connectionId, chatJid, messageId)) ?? [])
+      this.#delete(path);
   }
 
-  /** Stops the downloads that did not start. A disconnect deletes the folder after this. */
+  /** A message that its author changed keeps the new text. */
+  edit(chatJid: string, messageId: string, text: string): void {
+    this.#write(() => this.#store.editMessage(this.connectionId, chatJid, messageId, text));
+  }
+
+  /** Stops the downloads, also the one that runs. A disconnect deletes the folder after this. */
   close(): void {
-    this.#closed = true;
+    this.#closed.abort();
   }
 
-  #download(chatJid: string, messageId: string, file: InboundFile, media: WAMessage): void {
-    this.#downloads = this.#downloads.then(async () => {
-      if (this.#closed) return;
-      const path = join(this.#folder, savedName(file));
-      const part = `${path}.part`;
-      try {
-        mkdirSync(this.#folder, { recursive: true, mode: 0o700 });
-        await downloadWhatsAppMedia(this.#session, media, part, ATTACHMENT_LIMITS.fileBytes);
-        renameSync(part, path);
-      } catch (cause) {
-        rmSync(part, { force: true });
-        // Only the name: a WhatsApp error can hold the file's link.
-        const reason =
-          cause instanceof Error ? (cause.message === "file_too_large" ? cause.message : cause.name) : "unknown";
-        logger.warn("A WhatsApp file could not be saved.", { cause: reason });
-        return;
-      }
-      // The message went while the file downloaded (a prune or a disconnect): the copy goes too.
-      if (!this.#write(() => this.#store.saveFilePath(this.connectionId, chatJid, messageId, file.id, path)))
-        this.#delete(path);
-    });
+  #enqueue(chatJid: string, messageId: string, file: InboundFile, media: WAMessage): void {
+    let running: Promise<void> | null = null;
+    const start = () => {
+      running ??= this.#download(chatJid, messageId, file, media).finally(() => this.#pending.delete(file.id));
+      return running;
+    };
+    this.#pending.set(file.id, start);
+    this.#queue = this.#queue.then(start);
   }
 
-  /** A database write that must not stop the read of a message. */
+  /** Never fails: a file that could not be saved keeps only its name. */
+  async #download(chatJid: string, messageId: string, file: InboundFile, media: WAMessage): Promise<void> {
+    if (this.#closed.signal.aborted) return;
+    const path = join(this.#folder, savedName(file));
+    const part = `${path}.part`;
+    try {
+      mkdirSync(this.#folder, { recursive: true, mode: 0o700 });
+      const signal = AbortSignal.any([this.#closed.signal, AbortSignal.timeout(DOWNLOAD_DEADLINE_MS)]);
+      await downloadWhatsAppMedia(this.#session, media, part, ATTACHMENT_LIMITS.fileBytes, signal);
+      renameSync(part, path);
+    } catch (cause) {
+      rmSync(part, { force: true });
+      // Only the name: a WhatsApp error can hold the file's link.
+      const reason =
+        cause instanceof Error ? (cause.message === "file_too_large" ? cause.message : cause.name) : "unknown";
+      logger.warn("A WhatsApp file could not be saved.", { cause: reason });
+      return;
+    }
+    // The message went while the file downloaded (a revoke, a prune or a disconnect): the copy goes too.
+    if (!this.#write(() => this.#store.saveFilePath(this.connectionId, chatJid, messageId, file.id, path))) {
+      this.#delete(path);
+      return;
+    }
+    for (const old of this.#write(() => this.#store.trimFiles(this.connectionId, WHATSAPP_FILES_MAX_BYTES)) ?? [])
+      this.#delete(old);
+  }
+
+  /** A database call that must not stop the read of a message. */
   #write<T>(write: () => T): T | null {
     try {
       return write();

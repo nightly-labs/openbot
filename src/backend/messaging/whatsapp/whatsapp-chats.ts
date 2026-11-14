@@ -124,13 +124,22 @@ export class WhatsAppChatState {
   }
 
   /** The copy of a file that the archive saved when it arrived, or null. */
-  savedFile(file: InboundFile): string | null {
-    return this.#archive?.savedFile(file) ?? null;
+  async savedFile(file: InboundFile): Promise<string | null> {
+    return (await this.#archive?.savedFile(file)) ?? null;
   }
 
-  /** Deletes the saved messages and files that are older than the archive keeps. */
-  prune(): void {
-    this.#archive?.prune();
+  /** A message that its author deleted for everyone goes from the context and the archive. */
+  forgetMessage(chatJid: string, messageId: string): void {
+    const index = this.#recent.findIndex((entry) => entry.id === messageId && entry.chatJid === chatJid);
+    if (index !== -1) this.#recent.splice(index, 1);
+    this.#archive?.forget(chatJid, messageId);
+  }
+
+  /** A message that its author changed keeps the new text. */
+  editMessage(chatJid: string, messageId: string, text: string): void {
+    const entry = this.#recent.find((candidate) => candidate.id === messageId && candidate.chatJid === chatJid);
+    if (entry) entry.text = text;
+    this.#archive?.edit(chatJid, messageId, text);
   }
 
   rememberMenu(messageId: string, menu: MenuPost): void {

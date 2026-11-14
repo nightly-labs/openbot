@@ -321,7 +321,8 @@ class WhatsAppAdapter implements MessagingAdapter {
     maxBytes: number,
   ) {
     if (file.size > maxBytes) return yield* new MessagingAdapterError({ cause: new Error("file_too_large") });
-    const saved = this.#handle.chats.savedFile(file);
+    const chats = this.#handle.chats;
+    const saved = yield* Effect.promise(() => chats.savedFile(file));
     if (saved) {
       const copied = yield* Effect.tryPromise(() => copySaved(saved, destination, maxBytes)).pipe(
         Effect.orElseSucceed(() => false),

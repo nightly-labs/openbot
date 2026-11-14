@@ -82,7 +82,9 @@ export async function whatsAppInbound(
   if (key.fromMe && context.isOwnPost(id)) return null;
   if (context.now - sentAt(message) > MESSAGE_MAX_AGE_MS) return null;
   const content = normalizeMessageContent(message.message);
-  if (!content || content.protocolMessage || content.reactionMessage) return null;
+  if (!content || content.reactionMessage) return null;
+  const protocol = content.protocolMessage;
+  if (protocol && !savedChange(protocol)) return null;
 
   const rawChatJid = jidNormalizedUser(rawChat);
   const isGroup = Boolean(isJidGroup(rawChatJid));
@@ -108,6 +110,10 @@ export async function whatsAppInbound(
     fromMe: Boolean(key.fromMe),
   });
   if (decision.type === "ignore") return null;
+  if (protocol) {
+    applyChange(protocol, chatJid, context.chats);
+    return null;
+  }
   const name = message.pushName?.trim() || authorNumber || "WhatsApp";
   if (decision.type === "pair") return authorNumber ? { type: "pairing", chatJid, senderId: authorNumber, name } : null;
 
@@ -204,6 +210,26 @@ export function whatsAppQuoteId(target: MessageTarget): string | null {
   const [threadKey = "", replyTo = ""] = target.replyThreadId.split(":");
   if (replyTo) return replyTo;
   return threadKey && threadKey !== WHATSAPP_DIRECT_THREAD ? threadKey : null;
+}
+
+/** A delete for everyone or a change of text, which the saved copy of the message follows. */
+function savedChange(protocol: proto.Message.IProtocolMessage): boolean {
+  return (
+    protocol.type === proto.Message.ProtocolMessage.Type.REVOKE ||
+    protocol.type === proto.Message.ProtocolMessage.Type.MESSAGE_EDIT
+  );
+}
+
+function applyChange(protocol: proto.Message.IProtocolMessage, chatJid: string, chats: WhatsAppChatState): void {
+  const messageId = protocol.key?.id;
+  if (!messageId) return;
+  if (protocol.type === proto.Message.ProtocolMessage.Type.REVOKE) {
+    chats.forgetMessage(chatJid, messageId);
+    return;
+  }
+  const edited = normalizeMessageContent(protocol.editedMessage);
+  const text = edited ? textOf(edited) : "";
+  if (text) chats.editMessage(chatJid, messageId, text);
 }
 
 function contextOf(content: proto.IMessage): proto.IContextInfo | null {

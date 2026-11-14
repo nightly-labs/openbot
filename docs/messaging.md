@@ -284,7 +284,9 @@ then fails at once, and the agent can try again. Discord gives the text only of 
 mention OpenBot, and of bot posts. Discord messages name their files. Telegram gives what this
 computer saw since it started. WhatsApp keeps the messages of the allowed chats for 90 days, also
 after a restart and also those that do not mention the number. It downloads their files when they
-arrive, and the agent gets the path of each copy. `query` keeps the messages whose text or author has
+arrive, and the agent gets the path of each copy. The copies of one number use at most 2 GB: the
+oldest go first, and their messages keep only the file names. A message that its author deletes for
+everyone goes, and a changed message keeps the new text. `query` keeps the messages whose text or author has
 each of its words, and `before` (an ISO time) reads earlier messages. WhatsApp searches all its saved
 messages; the other platforms search only the newest messages that they give.
 

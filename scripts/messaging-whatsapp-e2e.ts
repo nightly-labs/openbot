@@ -8,7 +8,7 @@
 // Writes .openbot-build/messaging-whatsapp-e2e/report.json.
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -819,6 +819,61 @@ try {
           "A group that is not allowed started work.",
         );
         return { threadKey: link.threadKey };
+      },
+    );
+
+    await step(
+      "saved history: the oldest copies go over the size limit, a delete for everyone deletes, an edit changes",
+      async () => {
+        const id = connectionId(agents);
+        const author = `${FRIEND}@s.whatsapp.net`;
+        const fileMessage = (messageId: string, fileName: string): WAMessage => ({
+          key: { remoteJid: GROUP, fromMe: false, id: messageId, participant: author },
+          message: { documentMessage: { fileName, mimetype: "text/plain", fileLength: 5, caption: messageId } },
+          messageTimestamp: Math.floor(Date.now() / 1_000),
+          pushName: "Ewa",
+        });
+        const change = (messageId: string, protocolMessage: proto.Message.IProtocolMessage): WAMessage => ({
+          key: { remoteJid: GROUP, fromMe: false, id: messageId, participant: author },
+          message: { protocolMessage },
+          messageTimestamp: Math.floor(Date.now() / 1_000),
+          pushName: "Ewa",
+        });
+        const savedText = (messageId: string) =>
+          agents.messaging.history.recent(id, GROUP, null, 200).find((entry) => entry.id === messageId)?.text;
+        phone.current().receive([fileMessage("IN-KEEP-1", "first.txt"), fileMessage("IN-KEEP-2", "second.txt")]);
+        await until(() => savedText("IN-KEEP-2"), "the two saved file messages");
+        // The fake messages have no media key, so the downloads at arrival fail; copies stand in for them.
+        const folder = runtime.filesPath(id);
+        mkdirSync(folder, { recursive: true });
+        const first = join(folder, "copy-first.txt");
+        const second = join(folder, "copy-second.txt");
+        writeFileSync(first, "first");
+        writeFileSync(second, "secnd");
+        assert.ok(agents.messaging.history.saveFilePath(id, GROUP, "IN-KEEP-1", `${GROUP}|IN-KEEP-1`, first));
+        assert.ok(agents.messaging.history.saveFilePath(id, GROUP, "IN-KEEP-2", `${GROUP}|IN-KEEP-2`, second));
+        assert.deepEqual(agents.messaging.history.trimFiles(id, 10), [], "Copies under the limit went.");
+        assert.deepEqual(agents.messaging.history.trimFiles(id, 9), [first], "The oldest copy did not go first.");
+        rmSync(first);
+        const trimmed = await readHistory(agents, { place: GROUP, query: "IN-KEEP-1" });
+        assert.deepEqual(trimmed.messages[0]?.files, [{ name: "first.txt" }], "A trimmed message kept its path.");
+
+        phone.current().receive([
+          change("EDIT-1", {
+            type: proto.Message.ProtocolMessage.Type.MESSAGE_EDIT,
+            key: { remoteJid: GROUP, id: "IN-KEEP-1", participant: author },
+            editedMessage: { conversation: "the first file, renamed" },
+          }),
+          change("REVOKE-1", {
+            type: proto.Message.ProtocolMessage.Type.REVOKE,
+            key: { remoteJid: GROUP, id: "IN-KEEP-2", participant: author },
+          }),
+        ]);
+        await until(() => savedText("IN-KEEP-1") === "the first file, renamed", "the edited text");
+        await until(() => savedText("IN-KEEP-2") === undefined && !existsSync(second), "the deleted message");
+        assert.equal(received(agents, GROUP, "EDIT-1"), false, "An edit started work.");
+        assert.equal(received(agents, GROUP, "REVOKE-1"), false, "A delete for everyone started work.");
+        return { trimmed: 1, edited: true, revoked: true };
       },
     );
 

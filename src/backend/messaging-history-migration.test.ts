@@ -109,6 +109,7 @@ describe("messaging history migration", () => {
     expect(historyObjects(db)).toEqual([
       { type: "index", name: "idx_projection_messaging_history_place" },
       { type: "index", name: "idx_projection_messaging_history_saved" },
+      { type: "index", name: "idx_projection_messaging_history_sent" },
       { type: "table", name: "projection_messaging_history" },
       { type: "index", name: "sqlite_autoindex_projection_messaging_history_1" },
     ]);

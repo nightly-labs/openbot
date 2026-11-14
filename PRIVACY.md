@@ -1556,7 +1556,9 @@ restrict or block a number that it sees as automated.
   mention the number, are kept in the database for 90 days after they arrive, so that an agent can
   read and search them. The files of these messages are downloaded when they arrive, up to 100 MB
   each, to `<userData>/whatsapp/files/`, readable only by the user, and are deleted with their
-  message. Names are kept in memory until OpenBot quits. Pairing requests are kept in memory for at
+  message. The copies of one number use at most 2 GB: when they use more, the copies of the oldest
+  messages are deleted first, and those messages keep only the names of their files. A message that
+  its author deletes for everyone is deleted with its files, and a changed message keeps the new text. Names are kept in memory until OpenBot quits. Pairing requests are kept in memory for at
   most an hour. Disconnect logs the device out (when OpenBot is connected), deletes its keys, the saved
   messages and their files, and keeps the conversations, the workspace memories and the allowed
   senders.

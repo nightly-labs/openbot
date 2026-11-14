@@ -879,8 +879,11 @@ is one linked number (`workspace_id` is the number in digits).
   `projection_messaging_history` (migration 62, `MessagingHistoryStore`), and downloads its file one at
   a time to `<userData>/whatsapp/files/<connection id>/`. `seq` keeps the arrival order. The context of
   a conversation, `messaging_history` and its `query` and `before` filter read the table, and a turn's
-  download copies the saved file. The transport deletes rows and files older than 90 days at start and
-  each hour; a disconnect deletes all of them for the connection.
+  download copies the saved file, and waits for the download at arrival when it did not finish. A
+  download stops after 10 minutes or when the connection closes. The copies of one connection stay
+  under 2 GB (`trimFiles`, the oldest first). A delete for everyone deletes the row and its copy, and an
+  edit changes the text. `MessagingService` deletes the rows and copies older than 90 days at start and
+  each hour, also those of a number that is off; a disconnect deletes all of them for the connection.
 - **Not on joined servers.** `connectors-v1` and `routine-results-v1` stay as released: a host leaves
   WhatsApp out of both, and the desktop IPC endpoints `messaging:*-whatsapp-*` are local only.
 
