@@ -153,7 +153,7 @@ export const MESSAGING_TOOL_DEFINITIONS: readonly { name: string; description: s
   },
   {
     name: "messaging_post",
-    description: `Post markdown as OpenBot to a place of a connected Slack workspace, Discord server, Telegram or WhatsApp chat, such as a report from a routine. Get connection and place ids from messaging_list_places. files: local files from your workspace or the OpenBot shared directory, sent after the text, or alone without text. replyTo puts the post in a thread: a Slack thread ts, a Discord or Telegram message id, or t<topic id> for a Telegram forum topic. embeds: Discord only, up to ${DISCORD_EMBEDS_LIMIT} Discord embed objects; text is then optional. Everyone in the place sees the post. A Slack or Discord <@user id>, Telegram @username, or Telegram or WhatsApp @<user id> pings that person. Your final answer still goes only to the conversation you answer. Works in any turn.`,
+    description: `Post markdown as OpenBot to a place of a connected Slack workspace, Discord server, Telegram or WhatsApp chat, such as a report from a routine. Get connection and place ids from messaging_list_places. files: local files from your workspace or the OpenBot shared directory, sent after any text. replyTo puts the post in a thread: a Slack thread ts, a Discord or Telegram message id, or t<topic id> for a Telegram forum topic. embeds: Discord only, up to ${DISCORD_EMBEDS_LIMIT} Discord embed objects; text is then optional. Everyone in the place sees the post. A Slack or Discord <@user id>, Telegram @username, or Telegram or WhatsApp @<user id> pings that person. Your final answer still goes only to the conversation you answer. Works in any turn.`,
     shape: postShape,
   },
 ];
