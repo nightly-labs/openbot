@@ -14,6 +14,7 @@ import { VoicePanel } from "@openbot/ui/features/conversation/VoicePanel";
 import { McpSignInRelayDialog } from "@openbot/ui/features/settings/McpSignInPage";
 import { useText } from "@openbot/ui/text";
 import { actionToast } from "../../action-toast";
+import { useChatBubbleStyle } from "../../chat-bubble-style-preference";
 import { deviceQuoteShortcut } from "../../send-shortcut-preference";
 import { type AgentTemplatePublishCalls, agentTemplatesPort } from "../agent-templates/agent-templates-port";
 import { createPublishAgent } from "../agent-templates/PublishAgent";
@@ -137,6 +138,7 @@ function VoiceConversation(paneProps: { kind: VoiceConversationKind; port?: Code
 /** @internal Stable HMR boundary for conversation panels. */
 export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLButtonElement) => void) | undefined }) {
   const controller = useConversationController();
+  const bubbleStyle = useChatBubbleStyle();
   const {
     agentReady,
     activateBrowserTab,
@@ -656,6 +658,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
         {(agent) => (
           <SideQuestionPanel
             agent={agent()}
+            bubbleStyle={bubbleStyle()}
             agents={props.agents}
             exchanges={sideQuestion().exchanges}
             skills={installedSkills()}

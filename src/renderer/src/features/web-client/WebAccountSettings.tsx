@@ -20,6 +20,7 @@ import {
 } from "@openbot/ui";
 import { AppearanceSelect } from "@openbot/ui/features/settings/AppearanceSelect";
 import { ACTION_SOUND_CHOICES, TASK_SOUND_CHOICES } from "@openbot/ui/features/settings/app-settings";
+import { ChatBubbleStyleSelect } from "@openbot/ui/features/settings/ChatBubbleStyleSelect";
 import { OwnChatColorTrigger } from "@openbot/ui/features/settings/ChatColorSetting";
 import { LanguageSelect } from "@openbot/ui/features/settings/LanguageSelect";
 import { NotificationMatrix, NotificationScopeTitle } from "@openbot/ui/features/settings/NotificationMatrix";
@@ -33,6 +34,7 @@ import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, onCleanup } from "solid-js";
 import { readActionSoundChoice, setActionSoundChoice } from "../../action-sounds";
 import { setShowAgentSteps, useShowAgentSteps } from "../../agent-steps-preference";
+import { setChatBubbleStyle, useChatBubbleStyle } from "../../chat-bubble-style-preference";
 import { setCompactMessageActions, useCompactMessageActions } from "../../compact-message-actions-preference";
 import { playSoundChoice, readTaskSound, setTaskSound } from "../../completion-sound";
 import { webReportsEnabled } from "../../error-reports";
@@ -100,6 +102,7 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
   const layout = useLayout();
   const showAgentSteps = useShowAgentSteps();
   const compactMessageActions = useCompactMessageActions();
+  const bubbleStyle = useChatBubbleStyle();
   const webLiveVoice = useWebLiveVoice();
   // Playback reads the stored value on each event, so the menus follow a change from another tab.
   const [soundChoice, setSoundChoice] = createSignal(readActionSoundChoice());
@@ -277,6 +280,19 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
                 </ItemContent>
                 <ItemActions>
                   <OwnChatColorTrigger value={props.account.chatColor ?? null} onChange={saveChatColor} />
+                </ItemActions>
+              </Item>
+              <Item class="settings-modal-row">
+                <ItemContent>
+                  <ItemTitle>{t("settings.bubbleStyle.title")}</ItemTitle>
+                  <ItemDescription>{t("settings.bubbleStyle.description")}</ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <ChatBubbleStyleSelect
+                    value={bubbleStyle()}
+                    onChange={setChatBubbleStyle}
+                    {...(modalElement ? { mount: modalElement } : {})}
+                  />
                 </ItemActions>
               </Item>
             </ItemGroup>
