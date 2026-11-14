@@ -4111,13 +4111,12 @@ export async function createApplicationServices({
     },
   });
   teardown.push(TEARDOWN_ORDER.remoteDesktop, "remote desktop", () => Effect.runPromise(remoteDesktop.stop()));
-  // Until the user chooses a model, dictation follows the app language they chose, or else the first
-  // language of the computer.
+  // Until the user chooses a model, dictation follows the app language they chose, or else the language
+  // of the computer, as `LanguageService` reads it. A language with no app translation, such as Thai,
+  // still counts here.
   const voicePreferences = new VoicePreferenceStore(join(app.getPath("userData"), "voice-preference.json"), () => {
     const chosen = language.preference.language;
-    return defaultVoiceSettings(
-      chosen === DEFAULT_APP_LANGUAGE ? (app.getPreferredSystemLanguages()[0] ?? app.getLocale()) : chosen,
-    );
+    return defaultVoiceSettings(chosen === DEFAULT_APP_LANGUAGE ? app.getLocale() : chosen);
   });
   await runCauseEffect(voicePreferences.load());
   const voiceApiKeys = new VoiceApiKeyStore({
