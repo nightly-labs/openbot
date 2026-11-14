@@ -6,6 +6,10 @@
 //   bun scripts/hosting/leaseweb-pool.ts status
 //       Read only. The machines of each location and product, how many are free and how many are ready
 //       for a new server, each free machine that is not ready, and the work that `sync` does.
+//   bun scripts/hosting/leaseweb-pool.ts boat
+//       Read only. Each server that is still on boat and has a paid plan that does not end: `move` it.
+//       Also the number of servers on boat whose plan ends, is past due, or ended. A customer who takes
+//       back a cancel, or pays a past-due plan, comes back on this list.
 //   bun scripts/hosting/leaseweb-pool.ts free
 //       Read only. Each VPS with no reference on the four Leaseweb accounts, such as a VPS just bought.
 //   bun scripts/hosting/leaseweb-pool.ts add <VPS ID>... [--apply]
@@ -485,6 +489,34 @@ class Pool {
   /** SQL: the machine `p` has a token and asked the account service a short time ago. */
   #readySql() {
     return `(p.assign_token_hash IS NOT NULL AND COALESCE(p.seen_at, 0) > ${literal(Date.now() - POOL_SEEN_WITHIN_MS)})`;
+  }
+
+  boat() {
+    const onBoat = `h.operator_host IS NULL AND h.provider_sandbox_id IS NOT NULL AND h.deleted_at IS NULL
+      AND h.desired_state != 'deleted'`;
+    const subscription = (condition: string) =>
+      `EXISTS(SELECT 1 FROM billing_subscriptions b WHERE b.server_id = h.server_id AND ${condition})`;
+    const paid = subscription("b.status IN ('active', 'trialing') AND b.cancel_at_period_end = 0");
+    const toMove = this.#rows(
+      `SELECT h.server_id, h.plan, h.currency, h.observed_state FROM hosted_servers h WHERE ${onBoat} AND ${paid}
+       ORDER BY h.created_at`,
+      z.object({ server_id: z.string(), plan: z.string(), currency: z.string(), observed_state: z.string() }),
+    );
+    for (const row of toMove) {
+      logger.info(`Move ${row.server_id}: ${row.plan}, ${row.currency}, ${row.observed_state} on boat.`);
+    }
+    if (toMove.length === 0) logger.info("No server with a paid plan is on boat.");
+    const [others] = this.#rows(
+      `SELECT
+         SUM(${subscription("b.status IN ('active', 'trialing') AND b.cancel_at_period_end = 1")}) AS ending,
+         SUM(${subscription("b.status IN ('past_due', 'unpaid')")}) AS past_due,
+         SUM(NOT ${subscription("b.status IN ('active', 'trialing', 'past_due', 'unpaid')")}) AS ended
+       FROM hosted_servers h WHERE ${onBoat} AND NOT ${paid}`,
+      z.object({ ending: z.number().nullable(), past_due: z.number().nullable(), ended: z.number().nullable() }),
+    );
+    logger.info(
+      `Also on boat: ${others?.ending ?? 0} whose plan ends, ${others?.past_due ?? 0} past due, ${others?.ended ?? 0} with no plan.`,
+    );
   }
 
   status() {
@@ -1845,7 +1877,7 @@ systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/ru
 }
 
 const USAGE =
-  "Usage: leaseweb-pool.ts status | free | add <VPS ID>... | remove <VPS ID>... | sync | prepare <VPS ID>... --keys=<file> [--reinstall] | move <server ID> <VPS ID | auto> [--keys=<file>] [--units=<unit>,...] [--docker] [--folders=<folder>,...] | custom <VPS ID> --owner=<email> --customer=<word> --name=<server name> --keys=<file> [--apply] [--env=test]";
+  "Usage: leaseweb-pool.ts status | boat | free | add <VPS ID>... | remove <VPS ID>... | sync | prepare <VPS ID>... --keys=<file> [--reinstall] | move <server ID> <VPS ID | auto> [--keys=<file>] [--units=<unit>,...] [--docker] [--folders=<folder>,...] | custom <VPS ID> --owner=<email> --customer=<word> --name=<server name> --keys=<file> [--apply] [--env=test]";
 
 async function main(args: string[]) {
   const [command, ...operands] = args.filter((arg) => !arg.startsWith("--"));
@@ -1853,6 +1885,7 @@ async function main(args: string[]) {
   const keys = option("keys");
   const pool = new Pool(args.includes("--apply"), args.includes("--env=test"), process.env, keys);
   if (command === "status") pool.status();
+  else if (command === "boat") pool.boat();
   else if (command === "free") await pool.free();
   else if (command === "add" && operands.length > 0) await pool.add(operands);
   else if (command === "remove" && operands.length > 0) pool.remove(operands);
