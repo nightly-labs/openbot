@@ -33,7 +33,7 @@ import { useAgentTasks } from "../agent-tasks/agent-tasks-context";
 import { useAgentThreads } from "../agent-threads/agent-threads-context";
 import { conversationThreads } from "../agent-threads/conversation-threads";
 import { attentionKey } from "../agents/agent-runtime-snapshot";
-import { agentThreadAttention } from "../agents/agent-thread-attention";
+import { agentTakeoverTabIds, agentThreadAttention } from "../agents/agent-thread-attention";
 import { useAgents } from "../agents/agents-context";
 import { agentsPort } from "../agents/agents-port";
 import { withHostAccountUsage } from "../agents/host-provider-accounts";
@@ -227,6 +227,14 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
       ...agentThreadAttention({ agents: agentList(), pendingPrompts: pendingPrompts(), approvals: approvals() }),
       usageLimits: usageLimits(),
     }),
+  );
+  const agentTakeoverTabs = createMemo(() =>
+    agentTakeoverTabIds(
+      agentList(),
+      Object.values(pendingPrompts()).flatMap((event) =>
+        event?.type === "browser-takeover-requested" ? [event.request] : [],
+      ),
+    ),
   );
 
   const activeApproval = createMemo(() => {
@@ -643,6 +651,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         messageFocusRequest={messageFocusRequest()}
         onSelectAgent={selectAgent}
         agentWaits={agentWaits()}
+        agentTakeoverTabIds={agentTakeoverTabs()}
         onUpdateAgent={updateConversationAgent}
         onSetAgentAvatar={setAgentAvatar}
         onSendMessage={sendMessage}

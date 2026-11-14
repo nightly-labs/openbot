@@ -69,6 +69,7 @@ export function ConversationComposer() {
     retryUpload,
     awaitingReplies,
     dismissAwaitingReplies,
+    openWaitingAgent,
     composerFocusRequest,
     composerHasContent,
     currentChatConversationKey,
@@ -515,7 +516,7 @@ export function ConversationComposer() {
                 items={items()}
                 title={channel ? t("chat.awaiting.subtasks") : undefined}
                 onDismiss={dismissAwaitingReplies}
-                onOpenAgent={props.onSelectAgent}
+                onOpenAgent={openWaitingAgent}
                 // A channel's rows are its sub-tasks, not queued replies.
                 onSteer={props.activeTurnId && !channel && steers() ? props.onSteerQueuedMessage : undefined}
                 onStop={channel && !channel.readOnly() ? channel.stopAwaitingReply : undefined}
