@@ -512,7 +512,7 @@ export function developerInstructions(
               // command with a curly quote or an en or em dash before it runs, as `invalid-structure`;
               // the agent sent the same text again and again (#9211).
               process.platform === "win32"
-                ? " In execute, write Windows paths with forward slashes, such as C:/Users/…: JavaScript drops a single backslash. In shell commands, use only straight quotes and plain hyphens: OpenCode refuses a command with a curly quote or an en or em dash (invalid-structure). Write such a character as [char]0x2013, or read the text from a file."
+                ? " In execute, write Windows paths with forward slashes, such as C:/Users/…: JavaScript drops a single backslash. In shell commands, use only straight quotes and plain hyphens: OpenCode refuses a command with a curly quote or an en or em dash (invalid-structure). Write such a character as $([char]0x2013) inside double quotes, or read the text from a file."
                 : ""
             }`
           : // Grok CLI 1.0.77 gives MCP tools to the model only through its `search_tool` and
