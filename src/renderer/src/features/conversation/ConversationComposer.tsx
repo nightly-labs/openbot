@@ -245,6 +245,11 @@ export function ConversationComposer() {
       : undefined;
   const newChat = () =>
     props.agent && props.onClearAgentContext ? { agent: props.agent, start: props.onClearAgentContext } : undefined;
+  /** The "+" menu item: it shows also before the provider reports usage, when the ring has no New chat. */
+  const newChatMenuItem = () => {
+    const action = newChat();
+    return action && { ...action, disabled: context()?.compaction?.status === "running" };
+  };
   const compaction = () => {
     const value = context()?.compaction;
     return value && value.id !== dismissedCompactions()[currentChatConversationKey() ?? ""] ? value : null;
@@ -815,6 +820,7 @@ export function ConversationComposer() {
               onTeach={teachTask()}
               onSideQuestion={askSideQuestion()}
               onVoice={openVoiceConversation()}
+              newChat={newChatMenuItem()}
             />
             <div class="composer-primary-actions">
               <Show when={contextUsageView(context())}>
