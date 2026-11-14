@@ -1,6 +1,6 @@
 import type { AttachmentSummary, ImageGenerationAspectRatio } from "@openbot/contracts/ipc";
 import { Button, Download, Maximize2 } from "@openbot/ui";
-import { createEffect, createSignal, Show } from "solid-js";
+import { createEffect, createSignal, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import {
   FAILED_MEDIA_RATIO,
@@ -10,6 +10,7 @@ import {
   type MediaGenerationStatus,
   mediaRatioValue,
 } from "./media-generation-frame";
+import { rememberedMediaSize, rememberMediaSize } from "./media-size-memory";
 import { createSteadyImageUrl } from "./steady-image-url";
 
 export type ImageGenerationStatus = MediaGenerationStatus;
@@ -35,13 +36,18 @@ export function ImageGeneration(props: ImageGenerationProps) {
   const { t, errorMessage } = useText();
   const [previewError, setPreviewError] = createSignal(false);
   // The ratio stays when the URL changes: a sent image gets the URL of its stored copy, and the
-  // image keeps its size and pixels until that copy loads.
-  const [imageSize, setImageSize] = createSignal<{ width: number; height: number } | null>(null);
+  // image keeps its size and pixels until that copy loads. An image that loaded before in this window
+  // has its shape before it loads again.
+  const [imageSize, setImageSize] = createSignal(untrack(() => rememberedMediaSize(props.attachment?.id)));
   const imageUrl = createSteadyImageUrl(() => props.attachment?.previewUrl);
   let image: HTMLImageElement | undefined;
   const readRatio = (element: HTMLImageElement) => {
     const { naturalHeight, naturalWidth } = element;
-    if (naturalWidth > 0 && naturalHeight > 0) setImageSize({ width: naturalWidth, height: naturalHeight });
+    if (naturalWidth <= 0 || naturalHeight <= 0) return;
+    const size = { width: naturalWidth, height: naturalHeight };
+    setImageSize(size);
+    const id = props.attachment?.id;
+    if (id) rememberMediaSize(id, size);
   };
   // Keyed by the drawn URL: a URL that failed is not tried again while the new one loads.
   createEffect(

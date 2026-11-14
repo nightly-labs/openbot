@@ -1,6 +1,6 @@
 import type { AttachmentSummary, ImageGenerationAspectRatio } from "@openbot/contracts/ipc";
 import { Button, Download, Maximize2 } from "@openbot/ui";
-import { createEffect, createStore, Show } from "solid-js";
+import { createEffect, createStore, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import type { AttachmentMediaSource } from "./AttachmentCards";
 import {
@@ -11,6 +11,7 @@ import {
   type MediaGenerationStatus,
   mediaRatioValue,
 } from "./media-generation-frame";
+import { rememberedMediaSize, rememberMediaSize } from "./media-size-memory";
 import { VideoPlayer } from "./VideoPlayer";
 
 export interface VideoGenerationProps {
@@ -42,10 +43,12 @@ interface VideoPlayerState {
 /** A video that an agent made: the frame while it is made, then a player with its own controls. */
 export function VideoGeneration(props: VideoGenerationProps) {
   const { t, errorMessage } = useText();
+  // A video that loaded before in this window has its shape before its metadata loads again.
+  const remembered = untrack(() => rememberedMediaSize(props.attachment?.id));
   const [player, setPlayer] = createStore<VideoPlayerState>({
     duration: 0,
-    width: 0,
-    height: 0,
+    width: remembered?.width ?? 0,
+    height: remembered?.height ?? 0,
     loading: false,
     playOnLoad: false,
     failed: false,
@@ -156,6 +159,8 @@ export function VideoGeneration(props: VideoGenerationProps) {
                 state.width = videoWidth;
                 state.height = videoHeight;
               });
+              const id = props.attachment?.id;
+              if (id) rememberMediaSize(id, { width: videoWidth, height: videoHeight });
             }}
             onError={() =>
               setPlayer((state) => {

@@ -316,7 +316,14 @@ export function createScrollStore(deps: ScrollStoreDeps) {
       !deps.props.loadingOlder &&
       !deps.props.olderError,
     (needsOlderPage) => {
-      if (needsOlderPage) deps.props.onLoadOlder?.();
+      if (!needsOlderPage) return;
+      // Rows that just arrived, as when a chat opens, have not measured the boundary again: it still
+      // holds the value of the chat before them. Measure before asking for a page.
+      if (untrack(() => timelineMessages().length) > 0) {
+        updateHistoryBoundary();
+        if (!untrack(atHistoryBoundary)) return;
+      }
+      deps.props.onLoadOlder?.();
     },
   );
 
@@ -349,7 +356,22 @@ export function createScrollStore(deps: ScrollStoreDeps) {
 
   /* One writer for the boundary: the row the virtualizer renders first, read where the reader is. */
   function updateHistoryBoundary(element = deps.elements.scrollElement()): void {
-    setAtHistoryBoundary(chatHistoryBoundaryReached(element, firstRenderedIndex));
+    const followsLatest = deps.sticky.getStickToLatest();
+    setAtHistoryBoundary(
+      chatHistoryBoundaryReached(element, firstRenderedIndex, followsLatest) &&
+        (!followsLatest || latestRowRendered(element)),
+    );
+  }
+
+  /**
+   * Rows that arrive lay out a frame or more after the messages change. Until then the transcript
+   * shows the rows from before, such as the empty chat that is opening, and its height says nothing
+   * about the new rows. A chat that follows its latest message always renders that row.
+   */
+  function latestRowRendered(element: HTMLElement | undefined): boolean {
+    const latest = untrack(() => timelineMessages().at(-1));
+    if (!element || !latest) return true;
+    return element.querySelector(`[data-chat-search-message="${CSS.escape(latest.id)}"]`) !== null;
   }
 
   function updateScrollFade(element = deps.elements.scrollElement()) {
