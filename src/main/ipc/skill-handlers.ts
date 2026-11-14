@@ -34,7 +34,7 @@ export function skillIpcHandlers({
 }: SkillIpcDependencies): Pick<IpcGroupHandlers, "skills"> {
   return {
     skills: {
-      localList: handler(() => runCauseEffect(localSkillTools(skills).list())),
+      localList: handler(async () => (await runCauseEffect(localSkillTools(skills).list())).skills),
       localGet: payloadHandler(parseReadLocalSkill, (input) => runCauseEffect(localSkillTools(skills).get(input))),
       localCreate: payloadHandler(parseCreateLocalSkill, (input) =>
         runCauseEffect(localSkillTools(skills).create(input)),

@@ -3153,8 +3153,11 @@ export async function createApplicationServices({
       return {
         list: () =>
           library.pipe(
-            Effect.flatMap((local) => local.list()),
-            Effect.map((list) => list.map(({ id, slug, name, version }) => ({ id, slug, name, version }))),
+            Effect.flatMap((local) => local.listWithUnreadable()),
+            Effect.map(({ skills, unreadable }) => ({
+              skills: skills.map(({ id, slug, name, version }) => ({ id, slug, name, version })),
+              unreadable: unreadable.map(({ skillId }) => skillId),
+            })),
           ),
         assigned: (agentIds: readonly string[]) =>
           Effect.forEach(agentIds, (agentId) =>
