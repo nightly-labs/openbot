@@ -13,6 +13,7 @@ import {
   keepUsageCredits,
   type UsageCredits,
   usageQuotaForModel,
+  usageWindowsForModel,
   withUsageCredits,
 } from "@openbot/contracts/ipc";
 import { decodeRecord } from "@openbot/contracts/ipc-decoding";
@@ -259,7 +260,7 @@ export function spentUsageWindow(
     // When two windows are spent, the model can run only after both reset: keep the one that resets
     // last. A window with no reset time never gives the quota back.
     let spent: SpentUsageWindow | null = null;
-    for (const slot of ["primary", "secondary"] as const) {
+    for (const slot of usageWindowsForModel(provider, model, quota)) {
       const window = quota[slot];
       if (!window || window.usedPercent < 100) continue;
       if (window.resetsAt !== null && window.resetsAt * 1_000 <= nowMs) continue;
