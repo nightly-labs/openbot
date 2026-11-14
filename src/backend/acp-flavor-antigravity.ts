@@ -318,6 +318,9 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   streamAnswerBeforePromptReturns: true,
   // A silent prompt can be a background task that still runs, so the turn is not ended as stalled.
   promptOpenForBackgroundTasks: true,
+  // 1.5.x ends the prompt when its model waits for a command over 10 s, and sends nothing for the
+  // wake-up. The idle release then stopped the process 5 minutes later (#8660).
+  wakesAfterPromptEnds: true,
   // Antigravity 1.3.0 sends `usage_update` but has no ACP method or command that compacts.
   contextCompaction: "handoff",
   // Antigravity 1.4.4 starts a `localharness_external` of about 100 MB for each session and keeps it
