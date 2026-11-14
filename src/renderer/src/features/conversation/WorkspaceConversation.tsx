@@ -228,14 +228,13 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
       usageLimits: usageLimits(),
     }),
   );
-  const agentTakeoverTabs = createMemo(() =>
-    agentTakeoverTabIds(
-      agentList(),
-      Object.values(pendingPrompts()).flatMap((event) =>
-        event?.type === "browser-takeover-requested" ? [event.request] : [],
-      ),
+  /** The browser takeovers that wait on the server. */
+  const pendingTakeovers = createMemo(() =>
+    Object.values(pendingPrompts()).flatMap((event) =>
+      event?.type === "browser-takeover-requested" ? [event.request] : [],
     ),
   );
+  const agentTakeoverTabs = createMemo(() => agentTakeoverTabIds(agentList(), pendingTakeovers()));
 
   const activeApproval = createMemo(() => {
     const agent = activeAgent();
@@ -455,9 +454,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
       tabs: agentThreads,
       approvals: approvals(),
       prompts: Object.values(pendingPrompts()).filter((event) => event?.type === "prompt"),
-      takeovers: Object.values(pendingPrompts()).flatMap((event) =>
-        event?.type === "browser-takeover-requested" ? [event.request] : [],
-      ),
+      takeovers: pendingTakeovers(),
       newThreadTitle: t("conversation.threads.new"),
       onRespondApproval: (approval, decision, options) =>
         respondToApprovalRequest(approval.agentId, approval.requestId, decision, options),
