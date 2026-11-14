@@ -1967,10 +1967,11 @@ export class TurnLifecycle {
       const failure = refusedFailure ?? reportedError;
       if (refused) {
         yield* this.#hooks.dropRefusedSession(agentId, threadId);
-        const taskId = taskTurn ? this.#taskForThread(agentId, threadId) : null;
-        if (taskId !== null && failure !== undefined) {
+        // The task was read before the drop, which unbinds the provider thread. Read after it, the
+        // thread showed its failure with no reason, and the reason went to the agent's own chat (#9219).
+        if (laneTaskId !== null && failure !== undefined) {
           this.#hooks.emitFailure?.({ code: "agent_error", agentId, causeCode: classifyFailure(failure) });
-          this.#hooks.taskFailed(taskId, failure);
+          this.#hooks.taskFailed(laneTaskId, failure);
         } else this.#hooks.emitError("agent_error", failure, agentId);
       }
       if (deliveries.some((delivery) => delivery.delivery.sender.kind === "agent")) {
