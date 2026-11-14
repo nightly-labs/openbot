@@ -435,6 +435,8 @@ export const messages = {
   "error.provider.piSessionMissing": "이 컴퓨터에서 Pi 세션 파일을 사용할 수 없어요.",
   "error.provider.piResumeCancelled": "Pi가 세션 재개를 취소했어요. 다시 시도해 주세요.",
   "error.provider.piSessionIdentity": "Pi가 다른 세션을 반환했어요. 저장된 세션은 교체되지 않았어요.",
+  "error.provider.piExtensionFailed":
+    "확장 프로그램을 불러올 수 없어 Pi가 중지되었습니다. 이 확장 프로그램을 제거하거나 업데이트한 후 다시 시도하세요. {detail}",
   "error.provider.piModelInvalid": "제공자가 포함된 Pi 모델을 선택하세요.",
   "error.provider.piToolInvalid": "도구가 올바르지 않은 결과를 반환했어요.",
   "error.provider.piSignIn": "호스트 컴퓨터의 Pi에서 /login을 사용하세요. 로그인이 끝나면 Pi를 닫으세요.",

@@ -445,6 +445,8 @@ export const messages = {
   "error.provider.piResumeCancelled": "Pi ha annullato la ripresa della sessione. Riprova.",
   "error.provider.piSessionIdentity":
     "Pi ha restituito una sessione diversa. La sessione salvata non è stata sostituita.",
+  "error.provider.piExtensionFailed":
+    "Pi si è fermato perché non è riuscito a caricare un'estensione. Rimuovi o aggiorna questa estensione, poi riprova. {detail}",
   "error.provider.piModelInvalid": "Seleziona un modello di Pi che includa il suo provider.",
   "error.provider.piToolInvalid": "Il tool ha restituito un risultato non valido.",
   "error.provider.piSignIn": "Usa /login in Pi sul computer host. Chiudi Pi quando l'accesso è completato.",

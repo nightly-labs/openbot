@@ -462,6 +462,8 @@ export const messages = {
   "error.provider.piSessionMissing": "Le fichier de session Pi n’est pas disponible sur cet ordinateur.",
   "error.provider.piResumeCancelled": "Pi a annulé la reprise de la session. Réessayez.",
   "error.provider.piSessionIdentity": "Pi a renvoyé une autre session. La session enregistrée n’a pas été remplacée.",
+  "error.provider.piExtensionFailed":
+    "Pi s’est arrêté, car il n’a pas pu charger une extension. Supprimez ou mettez à jour cette extension, puis réessayez. {detail}",
   "error.provider.piModelInvalid": "Sélectionnez un modèle Pi qui inclut son fournisseur.",
   "error.provider.piToolInvalid": "L’outil a renvoyé un résultat non valide.",
   "error.provider.piSignIn": "Utilisez /login dans Pi sur l’ordinateur hôte. Fermez Pi une fois la connexion terminée.",
