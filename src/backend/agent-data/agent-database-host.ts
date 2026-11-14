@@ -271,10 +271,11 @@ function runStatement(statement: StatementSync, parameters: readonly AgentDataba
 /**
  * SQLite's own sentence is usually the best one a model can get -- "no such table: users" and
  * "UNIQUE constraint failed: users.email" are exactly what it needs to fix its next call. Only the
- * three that would mislead are rewritten, and the absolute path is removed from every one of them
+ * four that would mislead are rewritten, and the absolute path is removed from every one of them
  * because these sentences are logged and shown.
  */
-function toFailure(error: unknown, databasePath: string): AgentDatabaseFailure {
+function toFailure(error: unknown, request: AgentDatabaseStatement): AgentDatabaseFailure {
+  const { databasePath } = request;
   if (error instanceof HostFailure) return redactFailure(error.failure, databasePath);
   const code = typeof error === "object" && error !== null && "errcode" in error ? Number(error.errcode) : undefined;
   const message = error instanceof Error ? error.message : String(error);
@@ -286,7 +287,8 @@ function toFailure(error: unknown, databasePath: string): AgentDatabaseFailure {
       sqliteCode: code,
     };
   }
-  if (code !== undefined && (code & 0xff) === SQLITE_READONLY && code !== SQLITE_READONLY_ROLLBACK) {
+  // Only a write: on the read-only connection the same code means the statement tried to write.
+  if (request.mode === "write" && code !== undefined && (code & 0xff) === SQLITE_READONLY) {
     return {
       kind: "sqlite",
       message:
@@ -320,7 +322,7 @@ function databaseCall<A>(request: AgentDatabaseStatement, operation: () => A): E
   return Effect.try({
     try: operation,
     catch: (error) => {
-      const failure = toFailure(error, request.databasePath);
+      const failure = toFailure(error, request);
       return new HostFailure(failure.kind, failure.message, failure.sqliteCode);
     },
   });
