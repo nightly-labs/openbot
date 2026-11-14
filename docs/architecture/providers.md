@@ -187,7 +187,7 @@ memory. `ThreadLifecycle` reads `memoryReview()` at each start and resume of a s
 measured the correction turn at about 20,000 input tokens in one request, against about 63,000 in
 five requests when the agent saved the memory itself.
 
-The number of turns is a setting of the server that runs the agents: Server settings > General >
+The number of turns is a setting of the server that runs the agents: Server settings > Memory >
 Memory review, with 10, 20 (the default) or 40 turns, or Off. An owner or admin of a joined server sets
 it through `memory-review-v1` (see [servers.md](servers.md)). Main owns
 `openbot-memory-review-v1.json` (`MemoryReviewPreferenceStore`) and passes
@@ -236,7 +236,7 @@ a new skill has a class-level name, and environment failures, claims that a tool
 errors that went away, tasks done once and attempts that never worked are not skills. The review
 suggests at most one skill, and only when a signal fired.
 
-Skill learning is a setting of the server that runs the agents: Server settings > General > Agents >
+Skill learning is a setting of the server that runs the agents: Server settings > Memory >
 Skill learning, with Automatic (the default), Ask first, or Off. An owner or admin of a joined server
 sets it through `skill-learning-v1` (see [servers.md](servers.md)). Main owns
 `openbot-skill-learning-v1.json` (`SkillLearningPreferenceStore`) and passes `skillLearning()` to

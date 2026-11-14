@@ -19,6 +19,7 @@ export const messages = {
   "settings.interfaceFont.title": "インターフェイスのフォント",
   "settings.interfaceFont.description": "メニュー、チャット、設定のフォントです。",
   "settings.interfaceFont.default": "デフォルト (Inter)",
+  "settings.interfaceFont.defaultSystem": "システムフォント",
   "settings.codeFont.title": "コードのフォント",
   "settings.codeFont.description": "コード、ターミナル、ファイルパスのフォントです。",
   "settings.codeFont.default": "デフォルト",
@@ -281,7 +282,7 @@ export const messages = {
   "settings.analytics.webDescription":
     "オン: 利用状況と安定性のメタデータを、アカウント ID とメールアドレスとともに OpenBot の自社運用の分析基盤に送信します。オフ: 同じメタデータをランダムなインストール ID のみとともに送信します。チャット、ファイル、プロンプトは送信しません。この設定はこのブラウザーに適用されます。",
   "settings.tab.general.title": "一般",
-  "settings.tab.general.description": "このコンピューターでの OpenBot の動作を設定します。",
+  "settings.tab.general.description": "チャットの動作と OpenBot が共有する内容を設定します。",
   "settings.tab.agents.title": "エージェント",
   "settings.tab.agents.description":
     "エージェントごとに設定しないときに、このコンピューターのエージェントができることを選びます。",
@@ -308,6 +309,14 @@ export const messages = {
   "settings.tab.hostedServers.title": "ホスト型サーバー",
   "settings.tab.hostedServers.description":
     "このコンピューターの電源が切れているときも動作する OpenBot サーバーを作成します。",
+  "settings.tab.appearance.description": "テーマ、色、言語、フォントを設定します。",
+  "settings.tab.appBehavior.description": "このコンピューターでの OpenBot の起動と実行を設定します。",
+  "settings.appearance.colorsTitle": "色",
+  "settings.appearance.textTitle": "言語とテキスト",
+  "settings.appBehavior.startTitle": "起動と終了",
+  "settings.appBehavior.backgroundTitle": "バックグラウンド",
+  "settings.sections.group.account": "アカウント",
+  "settings.sections.group.thisComputer": "このコンピューター",
   "settings.sections.label": "設定のセクション",
   "settings.panel.resize": "右パネルのサイズを変更",
   "settings.preferences.loadFailed": "設定を読み込めませんでした。",

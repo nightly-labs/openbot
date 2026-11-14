@@ -72,8 +72,9 @@ async function openSettings(page: Page) {
   if (!(await settingsTitle(page).isVisible()))
     await page.keyboard.press(process.platform === "darwin" ? "Meta+Comma" : "Control+Comma");
   await settingsTitle(page).waitFor();
-  const general = page.getByRole("tab", { name: en["settings.tab.general.title"], exact: true });
-  if (await general.isVisible()) await general.click();
+  // Theme is in the Appearance section.
+  const appearance = page.getByRole("tab", { name: en["settings.appearance.title"], exact: true });
+  if (await appearance.isVisible()) await appearance.click();
   await themeButton(page).waitFor();
 }
 
