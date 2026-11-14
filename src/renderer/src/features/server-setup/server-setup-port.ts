@@ -42,14 +42,15 @@ export function number(answer: SetupAnswer, key: string): number | null {
 }
 
 async function call(method: "GET" | "POST", path: string, fields?: Record<string, string>): Promise<SetupAnswer> {
+  const init: RequestInit = { method, credentials: "same-origin", cache: "no-store" };
   const headers: Record<string, string> = { [SERVER_SETUP_HEADER]: "1" };
-  let body: string | undefined;
   if (fields) {
     headers["content-type"] = "application/x-www-form-urlencoded";
-    body = new URLSearchParams(fields).toString();
+    init.body = new URLSearchParams(fields).toString();
   }
+  init.headers = headers;
   try {
-    const response = await fetch(path, { method, headers, body, credentials: "same-origin", cache: "no-store" });
+    const response = await fetch(path, init);
     return { ok: response.ok, values: answerValues(await response.json()) };
   } catch {
     return { ok: false, values: { error: NO_ANSWER } };
