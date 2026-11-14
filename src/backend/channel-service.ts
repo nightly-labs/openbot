@@ -1516,11 +1516,12 @@ export class ChannelService {
    * place when people keep writing.
    */
   #dispatchOrder(channelId: string, tasks: readonly ChannelTask[]): readonly ChannelTask[] {
-    // The task that a person's message belongs to: its new task, the task it continues, or the task
-    // that routing gave it. A subtask only inherits the id of the message.
+    // A task that answers a person's message: a root task of that message (one for each member it
+    // names), the task it continues, or the task that routing gave it. A subtask only inherits the id
+    // of the message.
     const answersPerson = (task: ChannelTask) => {
       const request = this.store.message(channelId, task.requestMessageId);
-      return request?.taskId === task.id && requestPerson(request) !== null;
+      return (task.parentTaskId === null || request?.taskId === task.id) && requestPerson(request) !== null;
     };
     const running = new Set(
       this.store
