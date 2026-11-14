@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The openbox configuration of the agent display. openbot-desktop explains the desktop. -->
+<openbox_config xmlns="http://openbox.org/3.4/rc">
+  <resistance>
+    <strength>10</strength>
+    <screen_edge_strength>20</screen_edge_strength>
+  </resistance>
+  <focus>
+    <focusNew>yes</focusNew>
+    <followMouse>no</followMouse>
+  </focus>
+  <placement>
+    <policy>Smart</policy>
+    <center>yes</center>
+  </placement>
+  <theme>
+    <name>OpenBot</name>
+    <!-- No iconify button: with no panel, a person cannot find a minimized window again. -->
+    <titleLayout>LMC</titleLayout>
+    <keepBorder>yes</keepBorder>
+    <animateIconify>no</animateIconify>
+    <font place="ActiveWindow"><name>DejaVu Sans</name><size>9</size><weight>bold</weight></font>
+    <font place="InactiveWindow"><name>DejaVu Sans</name><size>9</size><weight>bold</weight></font>
+    <font place="MenuHeader"><name>DejaVu Sans</name><size>9</size><weight>bold</weight></font>
+    <font place="MenuItem"><name>DejaVu Sans</name><size>9</size><weight>normal</weight></font>
+    <font place="ActiveOnScreenDisplay"><name>DejaVu Sans</name><size>9</size><weight>bold</weight></font>
+    <font place="InactiveOnScreenDisplay"><name>DejaVu Sans</name><size>9</size><weight>bold</weight></font>
+  </theme>
+  <!-- One desktop, so that no key or click moves the windows of an agent out of view. -->
+  <desktops>
+    <number>1</number>
+    <firstdesk>1</firstdesk>
+    <popupTime>0</popupTime>
+  </desktops>
+  <resize>
+    <drawContents>yes</drawContents>
+    <popupShow>Never</popupShow>
+  </resize>
+  <margins><top>0</top><bottom>0</bottom><left>0</left><right>0</right></margins>
+  <dock><noStrut>yes</noStrut></dock>
+  <!-- Only the keys that each desktop has. All other keys go to the window. -->
+  <keyboard>
+    <keybind key="A-Tab">
+      <action name="NextWindow"><allDesktops>no</allDesktops><finalactions><action name="Focus" /><action name="Raise" /><action name="Unshade" /></finalactions></action>
+    </keybind>
+    <keybind key="A-S-Tab">
+      <action name="PreviousWindow"><allDesktops>no</allDesktops><finalactions><action name="Focus" /><action name="Raise" /><action name="Unshade" /></finalactions></action>
+    </keybind>
+    <keybind key="A-F4"><action name="Close" /></keybind>
+  </keyboard>
+  <!-- No Alt+drag and no scroll actions: those go to the window too. A "Frame" binding with no
+       modifier would take each press in the window, and then the title bar does not move. -->
+  <mouse>
+    <dragThreshold>3</dragThreshold>
+    <doubleClickTime>400</doubleClickTime>
+    <context name="Client">
+      <mousebind button="Left" action="Press"><action name="Focus" /><action name="Raise" /></mousebind>
+      <mousebind button="Middle" action="Press"><action name="Focus" /><action name="Raise" /></mousebind>
+      <mousebind button="Right" action="Press"><action name="Focus" /><action name="Raise" /></mousebind>
+    </context>
+    <!-- A right-click on a title bar opens the main menu, as on the empty screen, so the menu opens
+         while a window is maximized. -->
+    <context name="Titlebar">
+      <mousebind button="Left" action="Press"><action name="Focus" /><action name="Raise" /></mousebind>
+      <mousebind button="Left" action="Drag"><action name="Move" /></mousebind>
+      <mousebind button="Left" action="DoubleClick"><action name="ToggleMaximize" /></mousebind>
+      <mousebind button="Right" action="Press"><action name="Focus" /><action name="Raise" /><action name="ShowMenu"><menu>root-menu</menu></action></mousebind>
+    </context>
+    <context name="Top">
+      <mousebind button="Left" action="Drag"><action name="Resize"><edge>top</edge></action></mousebind>
+    </context>
+    <context name="Left">
+      <mousebind button="Left" action="Drag"><action name="Resize"><edge>left</edge></action></mousebind>
+    </context>
+    <context name="Right">
+      <mousebind button="Left" action="Drag"><action name="Resize"><edge>right</edge></action></mousebind>
+    </context>
+    <context name="Bottom">
+      <mousebind button="Left" action="Drag"><action name="Resize"><edge>bottom</edge></action></mousebind>
+    </context>
+    <context name="TRCorner BRCorner TLCorner BLCorner">
+      <mousebind button="Left" action="Press"><action name="Focus" /><action name="Raise" /></mousebind>
+      <mousebind button="Left" action="Drag"><action name="Resize" /></mousebind>
+    </context>
+    <context name="Maximize">
+      <mousebind button="Left" action="Press"><action name="Focus" /><action name="Raise" /></mousebind>
+      <mousebind button="Left" action="Click"><action name="ToggleMaximize" /></mousebind>
+    </context>
+    <context name="Close">
+      <mousebind button="Left" action="Press"><action name="Focus" /><action name="Raise" /></mousebind>
+      <mousebind button="Left" action="Click"><action name="Close" /></mousebind>
+    </context>
+    <context name="Root">
+      <mousebind button="Right" action="Press"><action name="ShowMenu"><menu>root-menu</menu></action></mousebind>
+    </context>
+  </mouse>
+  <menu>
+    <file>openbot-menu.xml</file>
+    <hideDelay>200</hideDelay>
+    <middle>no</middle>
+    <submenuShowDelay>100</submenuShowDelay>
+    <showIcons>no</showIcons>
+  </menu>
+</openbox_config>
