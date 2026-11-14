@@ -553,9 +553,18 @@ export function PageRail(props: PageRailProps) {
         RAIL_MIN_FREE;
       setRingSlots(Math.max(1, Math.min(MAX_RING_PLACES, Math.floor(free / slot))));
     };
-    const observer = new ResizeObserver(measure);
+    /* A new ring count changes the size of the end group, which this observer watches. The measure
+     * waits for the next frame, so the change does not come back in the same observer loop. */
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(measure);
+    });
     for (const element of [nav, pagesBox, endBox]) observer.observe(element);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+    };
   });
   /** The pages that this server has, in rail order. */
   const pages = createMemo((): RailPage[] => {
