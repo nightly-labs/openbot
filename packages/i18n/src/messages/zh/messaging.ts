@@ -7,6 +7,7 @@ export const messages = {
   "messaging.help.secret_storage_unavailable": "OpenBot 无法在这台电脑上读取已保存的令牌。请断开该工作区后重新连接。",
   "messaging.help.relay_unavailable":
     "OpenBot 无法在这台电脑上接收 Slack 事件。请登录，在服务器设置中为这台电脑命名，并保持 OpenBot 开着。",
+  "messaging.help.not_linked": "此工作区未关联到此服务器。选择“重新连接”进行关联。",
   // The same help for a Discord server connection.
   "messaging.discordHelp.invalid_token":
     "Discord 已不再接受该 Discord 服务器中的 OpenBot，可能已被移除。请重新连接该 Discord 服务器。",

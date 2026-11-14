@@ -66,6 +66,8 @@ function connectionHelp(
         return t("mobile.server.connectors.telegram.helpRemoved");
       case "relay_unavailable":
         return t("mobile.server.connectors.telegram.helpRelay", { host });
+      case "not_linked":
+        return t("mobile.server.connectors.telegram.helpNotLinked", { host });
       case "invalid_token":
       case "secret_storage_unavailable":
       case "error":
@@ -90,6 +92,9 @@ function connectionHelp(
       return t(slack ? "mobile.server.connectors.slack.helpRelay" : "mobile.server.connectors.discord.helpRelay", {
         host,
       });
+    // Only Slack reports it: Discord learns its guilds from Signal and reports `invalid_token`.
+    case "not_linked":
+      return slack ? t("mobile.server.connectors.slack.helpNotLinked", { host }) : null;
     default:
       return null;
   }

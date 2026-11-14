@@ -36,6 +36,9 @@ export class TelegramTransport implements MessagingTransport {
   #sink: TransportSink | null = null;
   #release: (() => void) | null = null;
   #unsubscribe: (() => void) | null = null;
+  #unsubscribeRoutes: (() => void) | null = null;
+  /** False when the socket's route ticket does not name this chat: Signal sends its events elsewhere. */
+  #linked = true;
 
   constructor(options: TelegramTransportOptions) {
     this.#identity = options.identity;
@@ -46,6 +49,10 @@ export class TelegramTransport implements MessagingTransport {
 
   start(sink: TransportSink): void {
     this.#sink = sink;
+    this.#unsubscribeRoutes ??= this.#ingress.onLinkedRoutes("telegram", (ids) => {
+      this.#linked = ids === null || ids.has(this.#chatId);
+      this.#report(this.#ingress.state());
+    });
     this.#release ??= this.#ingress.acquire("telegram");
     this.#unsubscribe ??= this.#ingress.onState((state) => this.#report(state));
     this.#report(this.#ingress.state());
@@ -59,6 +66,9 @@ export class TelegramTransport implements MessagingTransport {
       this.#sink = null;
       this.#unsubscribe?.();
       this.#unsubscribe = null;
+      this.#unsubscribeRoutes?.();
+      this.#unsubscribeRoutes = null;
+      this.#linked = true;
       this.#release?.();
       this.#release = null;
     }),
@@ -91,7 +101,9 @@ export class TelegramTransport implements MessagingTransport {
   #report(state: IngressState): void {
     this.#sink?.state(
       state === "online" && this.#ingress.telegram.available()
-        ? "connected"
+        ? this.#linked
+          ? "connected"
+          : "not_linked"
         : state === "connecting"
           ? "connecting"
           : "relay_unavailable",

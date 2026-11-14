@@ -735,6 +735,8 @@ export const messages = {
     "OpenBot이 {host}에 저장된 토큰을 읽을 수 없어요. 워크스페이스 연결을 해제한 다음 다시 연결해 주세요.",
   "mobile.server.connectors.slack.helpRelay":
     "{host}의 OpenBot이 Slack 이벤트를 받을 수 없어요. {host}에서 로그인하고, 서버 설정에서 서버 이름을 지정한 다음 OpenBot을 계속 실행해 두세요.",
+  "mobile.server.connectors.slack.helpNotLinked":
+    "이 워크스페이스는 {host}에 연결되어 있지 않습니다. 연결하려면 다시 연결을 누르세요.",
   "mobile.server.connectors.slack.orchestratorTitle": "Slack Orchestrator",
   "mobile.server.connectors.slack.orchestratorDescription":
     "이 에이전트가 Slack의 모든 요청을 받아요. 짧은 요청은 직접 답변하고, 다른 작업은 알맞은 에이전트에게 맡긴 다음 스레드에 답변을 게시해요.",
@@ -809,6 +811,8 @@ export const messages = {
     "{host}의 OpenBot이 Telegram 메시지를 받을 수 없어요. {host}에서 로그인하고, 서버 설정에서 서버 이름을 지정한 다음 OpenBot을 계속 실행해 두세요.",
   "mobile.server.connectors.telegram.helpError":
     "OpenBot이 이 채팅에 접근할 수 없어요. 다시 연결하거나 채팅 연결을 해제하세요.",
+  "mobile.server.connectors.telegram.helpNotLinked":
+    "이 채팅은 {host}에 연결되어 있지 않습니다. 연결하려면 다시 연결을 누르세요.",
   "mobile.server.connectors.telegram.retryAt": "Telegram이 OpenBot에 대기를 요청했어요. {time}에 다시 시도해요.",
   "mobile.server.connectors.telegram.linkTitle": "채팅 연결",
   "mobile.server.connectors.telegram.linkAnother": "다른 채팅 연결",

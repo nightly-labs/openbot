@@ -1049,6 +1049,7 @@ export const messages = {
     "لا يستطيع OpenBot قراءة الرموز المميزة المحفوظة على {host}. اقطع اتصال مساحة العمل، ثم اربطها مجددًا.",
   "mobile.server.connectors.slack.helpRelay":
     "لا يستطيع OpenBot على {host} تلقي أحداث Slack. على {host}، سجّل الدخول، وامنح الخادم اسمًا في إعدادات الخادم، وأبقِ OpenBot مفتوحًا.",
+  "mobile.server.connectors.slack.helpNotLinked": 'مساحة العمل هذه غير مرتبطة بـ {host}. اضغط "إعادة الاتصال" لربطها.',
   "mobile.server.connectors.slack.orchestratorTitle": "Slack Orchestrator",
   "mobile.server.connectors.slack.orchestratorDescription":
     "يتلقى هذا الوكيل كل طلب من Slack. يرد على الطلبات القصيرة بنفسه، ويعطي العمل الآخر للوكيل المناسب، وينشر الإجابة في السلسلة.",
@@ -1135,6 +1136,7 @@ export const messages = {
     "لا يستطيع OpenBot على {host} تلقي رسائل Telegram. على {host}، سجّل الدخول، وامنح الخادم اسمًا في إعدادات الخادم، وأبقِ OpenBot مفتوحًا.",
   "mobile.server.connectors.telegram.helpError":
     "لا يستطيع OpenBot الوصول إلى هذه الدردشة. أعد الاتصال، أو اقطع اتصال الدردشة.",
+  "mobile.server.connectors.telegram.helpNotLinked": 'هذه الدردشة غير مرتبطة بـ {host}. اضغط "إعادة الاتصال" لربطها.',
   "mobile.server.connectors.telegram.retryAt": "طلب Telegram من OpenBot الانتظار. سيعيد المحاولة في {time}.",
   "mobile.server.connectors.telegram.linkTitle": "ربط دردشة",
   "mobile.server.connectors.telegram.linkAnother": "ربط دردشة أخرى",

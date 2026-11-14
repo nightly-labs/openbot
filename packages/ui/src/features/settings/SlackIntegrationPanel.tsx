@@ -106,6 +106,7 @@ const STATE_HELP: Record<WorkspacePlatform, Partial<Record<MessagingConnection["
     invalid_token: "messaging.help.invalid_token",
     secret_storage_unavailable: "messaging.help.secret_storage_unavailable",
     relay_unavailable: "messaging.help.relay_unavailable",
+    not_linked: "messaging.help.not_linked",
   },
   discord: {
     invalid_token: "messaging.discordHelp.invalid_token",

@@ -776,6 +776,8 @@ export const messages = {
     "OpenBot ne peut pas lire les jetons enregistrés sur {host}. Déconnectez l’espace de travail, puis connectez-le à nouveau.",
   "mobile.server.connectors.slack.helpRelay":
     "OpenBot sur {host} ne peut pas recevoir les événements Slack. Sur {host}, connectez-vous, donnez un nom au serveur dans les Réglages du serveur et gardez OpenBot ouvert.",
+  "mobile.server.connectors.slack.helpNotLinked":
+    "Cet espace de travail n’est pas lié à {host}. Touchez Reconnecter pour le lier.",
   "mobile.server.connectors.slack.orchestratorTitle": "Slack Orchestrator",
   "mobile.server.connectors.slack.orchestratorDescription":
     "Cet agent reçoit chaque demande venant de Slack. Il répond lui-même aux demandes courtes, confie les autres tâches au bon agent et publie la réponse dans le fil.",
@@ -858,6 +860,8 @@ export const messages = {
     "OpenBot sur {host} ne peut pas recevoir de messages Telegram. Sur {host}, connectez-vous, donnez un nom au serveur dans les Réglages du serveur et gardez OpenBot ouvert.",
   "mobile.server.connectors.telegram.helpError":
     "OpenBot ne peut pas joindre cette discussion. Reconnectez-la ou déconnectez-la.",
+  "mobile.server.connectors.telegram.helpNotLinked":
+    "Cette discussion n’est pas liée à {host}. Touchez Reconnecter pour la lier.",
   "mobile.server.connectors.telegram.retryAt": "Telegram a demandé à OpenBot de patienter. Nouvel essai à {time}.",
   "mobile.server.connectors.telegram.linkTitle": "Associer une discussion",
   "mobile.server.connectors.telegram.linkAnother": "Associer une autre discussion",
