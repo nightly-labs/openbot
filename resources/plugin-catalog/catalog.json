@@ -1507,6 +1507,12 @@
       "version": "1.0.0",
       "featured": false,
       "detailSha256": "165a596c50c0bfcdfb4e79ddbb7a85ae01ab1149e7397c2422384244927c5510"
+    },
+    {
+      "slug": "specstream",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "61cf7118ac7ba651e20a91e3d1393444acd06203c8db6fd5d6d1ec4e0af8d020"
     }
   ]
 }
