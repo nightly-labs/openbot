@@ -837,6 +837,9 @@ export class ThreadLifecycle {
     const givenContext = yield* this.#turnContextKey(owner, client);
     const { agent, mcpServers, toolRuntimes, own, environment, proxy, instructionsFile, params } =
       yield* this.#startParams(owner, client, publicThreadId);
+    // Before the request, with the same reading, as the Codex manifest: a sign-in or a download that
+    // finishes while the provider answers is not what this session was given.
+    const mcpSet = this.#mcpSetFingerprint(mcpServers, toolRuntimes);
     const response = yield* client
       .request("thread/start", { ...params, ephemeral: false }, decodeThreadResponse)
       .pipe(toThreadOperationFailed);
@@ -867,7 +870,7 @@ export class ThreadLifecycle {
             approvals,
           );
         } else if (client.mcpToolsFixedAtStart?.(externalThreadId)) {
-          yield* this.#writeToolManifest(externalThreadId, this.#mcpSetFingerprint(mcpServers), []);
+          yield* this.#writeToolManifest(externalThreadId, mcpSet, []);
         }
         // The handoff reads the store synchronously. A failure there must also clean up this session.
         const handoff = yield* this.buildProviderHandoff(agent.id, publicThreadId).pipe(
@@ -1353,7 +1356,9 @@ export class ThreadLifecycle {
     if (client.provider === "codex") return yield* this.hasCurrentToolsEffect(agent, client, sessionId);
     if (!client.mcpToolsFixedAtStart?.(sessionId) || this.#conversation.loadedClientFor(sessionId) === client)
       return true;
-    const fingerprint = yield* threadStep(() => this.#mcpSetFingerprint(this.#agentMcpServers(agent)));
+    const fingerprint = yield* threadStep(() =>
+      this.#mcpSetFingerprint(this.#agentMcpServers(agent), this.#toolRuntimes()),
+    );
     const stored = yield* Effect.result(threadIo(() => readFile(this.toolManifestPath(sessionId), "utf8")));
     if (Result.isSuccess(stored)) return stored.success.split("\n", 1)[0] === fingerprint;
     if (!missingSessionFile(stored.failure.cause)) return yield* stored.failure;
@@ -1369,11 +1374,11 @@ export class ThreadLifecycle {
    * these change at each start of OpenBot (a new port, a driver that is not ready yet), and a resume
    * gets the new values while the tools keep their names.
    */
-  #mcpSetFingerprint(configs: readonly McpServerConfig[]): string {
+  #mcpSetFingerprint(configs: readonly McpServerConfig[], toolRuntimes: McpToolRuntimes): string {
     const rows = configs.filter(
       (config) => config.id !== COMPUTER_USE_MCP_SERVER_ID && config.id !== GITHUB_CONNECTOR_MCP_SERVER_ID,
     );
-    const { binDirectories, commandAliases } = this.#toolRuntimes();
+    const { binDirectories, commandAliases } = toolRuntimes;
     return createHash("sha256")
       .update(
         JSON.stringify([mcpFingerprintValues(rows), this.#mcpProxiedServerIds(rows), [binDirectories, commandAliases]]),
