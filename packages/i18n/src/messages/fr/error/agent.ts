@@ -173,6 +173,8 @@ export const messages = {
     "La zone n’est pas entièrement dans un seul écran. Utilisez des points du bureau situés dans les limites d’un écran renvoyées par list_capture_sources.",
   "error.agent.screenCapturePermissionMissing":
     "OpenBot n’a pas l’autorisation « Enregistrement de l’écran ». Demandez à l’utilisateur d’ouvrir Réglages Système > Confidentialité et sécurité > Enregistrement de l’écran et de l’audio du système, d’activer OpenBot, puis de quitter et de rouvrir OpenBot.",
+  "error.agent.screenCaptureListPermission":
+    "OpenBot n’a pas encore l’autorisation « Enregistrement de l’écran » et ne peut donc pas lister les fenêtres. Pour capturer un écran, appelez capture_screen avec target screen. L’utilisateur approuve d’abord la capture, puis macOS peut lui demander l’autorisation.",
   "error.agent.screenCaptureEmptyWindows":
     "Windows a renvoyé une image vide. Demandez à l’utilisateur de déverrouiller l’ordinateur et de fermer le contenu protégé. Une stratégie de l’organisation peut aussi bloquer la capture d’écran.",
   "error.agent.screenCaptureFailed": "La capture d’écran a échoué. Réessayez.",

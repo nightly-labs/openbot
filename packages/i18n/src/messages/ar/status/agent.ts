@@ -22,6 +22,7 @@ export const messages = {
   "status.agent.screenCaptureScreen": "التقاط الشاشة الرئيسية وإرسال الصورة إلى نموذج الوكيل.",
   "status.agent.screenCaptureChannel":
     "تظهر الصورة في القناة {channel}، ويمكن لكل عضو في هذا الخادم يقرأ القناة رؤيتها.",
+  "status.agent.screenCapturePermissionNext": "قد يطلب منك macOS بعد ذلك السماح لـ OpenBot بـ «تسجيل الشاشة».",
   "status.agent.screenCaptureDisplay": "التقاط الشاشة {name} وإرسال الصورة إلى نموذج الوكيل.",
   "status.agent.screenCaptureWindow": "التقاط النافذة {name} وإرسال الصورة إلى نموذج الوكيل.",
   "status.agent.screenCaptureRegion":

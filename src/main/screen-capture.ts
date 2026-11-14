@@ -139,26 +139,45 @@ export class ScreenCapturer implements ScreenCaptureHost {
   readonly listSources = Effect.fn("ScreenCapturer.listSources")(function* (
     this: ScreenCapturer,
   ): Effect.fn.Return<ScreenCaptureSources, ScreenCaptureFailed> {
-    yield* this.#requirePermission();
-    const primary = this.#options.primaryDisplayId();
+    yield* this.#requirePermission(false);
+    const displays = yield* this.listDisplays();
     const windows = yield* this.#sources(["window"], { width: 0, height: 0 });
     return {
-      displays: this.#options.displays().map((display) => ({
+      displays,
+      windows: windows.slice(0, MAX_LISTED_WINDOWS).map((window) => ({ id: window.id, name: window.name })),
+    };
+  });
+
+  listDisplays(): Effect.Effect<ScreenCaptureSources["displays"]> {
+    return Effect.sync(() => {
+      const primary = this.#options.primaryDisplayId();
+      return this.#options.displays().map((display) => ({
         id: String(display.id),
         name: display.label,
         bounds: { ...display.bounds },
         scaleFactor: display.scaleFactor,
         primary: display.id === primary,
-      })),
-      windows: windows.slice(0, MAX_LISTED_WINDOWS).map((window) => ({ id: window.id, name: window.name })),
-    };
-  });
+      }));
+    });
+  }
+
+  /** True on macOS without the grant, until the first capture of this process asked for it. */
+  promptsForPermission(): Effect.Effect<boolean> {
+    return Effect.sync(() => {
+      if (this.#options.platform !== "darwin" || this.#askedForPermission) return false;
+      try {
+        return this.#options.screenAccess() !== "granted";
+      } catch {
+        return false;
+      }
+    });
+  }
 
   readonly capture = Effect.fn("ScreenCapturer.capture")(function* (
     this: ScreenCapturer,
     request: ScreenCaptureRequest,
   ): Effect.fn.Return<ScreenCaptureImage, ScreenCaptureFailed> {
-    yield* this.#requirePermission();
+    yield* this.#requirePermission(true);
     const displays = this.#options.displays();
     if (request.target === "window") {
       const source = (yield* this.#sources(["window"], WINDOW_THUMBNAIL_SIZE)).find(
@@ -206,14 +225,21 @@ export class ScreenCapturer implements ScreenCaptureHost {
    * wallpaper until the user grants it. Chromium reads the grant as granted or denied only, so a
    * grant that was never asked for also reads as denied. The first refusal in this process makes one
    * capture whose result is thrown away, which shows the macOS prompt when the user was never asked.
+   * Only a capture that the user approved does this: a list of the sources never asks (#9092).
    */
-  readonly #requirePermission = Effect.fn("ScreenCapturer.requirePermission")(function* (this: ScreenCapturer) {
+  readonly #requirePermission = Effect.fn("ScreenCapturer.requirePermission")(function* (
+    this: ScreenCapturer,
+    ask: boolean,
+  ) {
     if (this.#options.platform !== "darwin") return;
     const status = yield* Effect.try({
       try: () => this.#options.screenAccess(),
       catch: () => failure(sourceText("error.agent.screenCapturePermissionMissing")),
     });
     if (status === "granted") return;
+    if (!ask && !this.#askedForPermission) {
+      return yield* failure(sourceText("error.agent.screenCaptureListPermission"));
+    }
     if (!this.#askedForPermission) {
       this.#askedForPermission = true;
       yield* this.#sources(["screen"], { width: 1, height: 1 }).pipe(Effect.ignore);

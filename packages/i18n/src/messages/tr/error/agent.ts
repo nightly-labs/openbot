@@ -159,6 +159,8 @@ export const messages = {
     "Bölge tek bir ekranın içinde değil. list_capture_sources sonucundaki tek bir ekranın sınırları içinde kalan masaüstü noktaları kullanın.",
   "error.agent.screenCapturePermissionMissing":
     "OpenBot'un Ekran Kaydı izni yok. Kullanıcıdan Sistem Ayarları > Gizlilik ve Güvenlik > Ekran ve Sistem Sesi Kaydı bölümünü açmasını, OpenBot'u etkinleştirmesini, sonra OpenBot'tan çıkıp yeniden açmasını isteyin.",
+  "error.agent.screenCaptureListPermission":
+    "OpenBot'un henüz Ekran Kaydı izni yok, bu yüzden pencereleri listeleyemez. Bir ekranı yakalamak için capture_screen'i target screen ile çağırın. Kullanıcı önce yakalamayı onaylar, sonra macOS kullanıcıdan izin isteyebilir.",
   "error.agent.screenCaptureEmptyWindows":
     "Windows boş bir görüntü verdi. Kullanıcıdan bilgisayarın kilidini açmasını ve korumalı içeriği kapatmasını isteyin. Bir kuruluş ilkesi de ekran yakalamayı engelleyebilir.",
   "error.agent.screenCaptureFailed": "Ekran yakalama başarısız oldu. Tekrar deneyin.",

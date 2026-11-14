@@ -142,6 +142,8 @@ export const messages = {
     "该区域不在任何单个显示器内，请使用某个显示器范围内的桌面坐标（来自 list_capture_sources）。",
   "error.agent.screenCapturePermissionMissing":
     "OpenBot 没有屏幕录制权限。请让用户打开“系统设置 > 隐私与安全性 > 屏幕与系统音频录制”，允许 OpenBot，然后退出并重新打开 OpenBot。",
+  "error.agent.screenCaptureListPermission":
+    "OpenBot 还没有屏幕录制权限，因此无法列出窗口。要截取显示器，请以 target screen 调用 capture_screen。用户先批准截取，然后 macOS 可能会向用户请求该权限。",
   "error.agent.screenCaptureEmptyWindows":
     "Windows 返回了空图像。请让用户解锁电脑并关闭受保护的内容；组织策略也可能阻止截屏。",
   "error.agent.screenCaptureFailed": "截屏失败，请重试。",
