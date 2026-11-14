@@ -381,20 +381,25 @@ export function expiredPromptResult(
   };
 }
 
+const USER_MESSAGE_NOTE =
+  "The user wrote a new message in this chat instead of answering. Follow that message. If it is not in your input, end your turn: it starts next. Ask again only if you still need the answer.";
+
 /**
  * The answer for a question or block that the user did not answer because they wrote a new message
  * in the chat. Only the model reads it. The message reaches the agent as a steer or as the next turn.
+ * `userInputNote`: the client gives the `note` of a `user-input` result to the model (`AgentClient`).
  */
 export function userMessagePromptResult(
   responseKind: "dynamic-tool" | "user-input" | "ui-block",
   blockId: string | undefined,
-): DynamicToolResult | { answers: Record<string, never> } {
-  // `request_user_input` has no field for a note: empty answers are what a skip gives.
-  if (responseKind === "user-input") return { answers: {} };
+  userInputNote = false,
+): DynamicToolResult | { answers: Record<string, never>; note?: string } {
+  // Codex's `request_user_input` has no field for a note: empty answers are what a skip gives.
+  if (responseKind === "user-input") return userInputNote ? { answers: {}, note: USER_MESSAGE_NOTE } : { answers: {} };
   const value = {
     status: "skipped",
     ...(blockId ? { blockId } : {}),
-    next: "The user wrote a new message in this chat instead of answering. Follow that message. If it is not in your input, end your turn: it starts next. Ask again only if you still need the answer.",
+    next: USER_MESSAGE_NOTE,
   };
   return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }

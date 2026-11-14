@@ -2045,7 +2045,7 @@ export class AttentionRegistry {
       this.#closePrompt(
         requestId,
         pending,
-        userMessagePromptResult(pending.responseKind, pending.uiBlock?.blockId),
+        userMessagePromptResult(pending.responseKind, pending.uiBlock?.blockId, pending.client.userInputNote),
         { status: "cancelled" },
         pending.uiBlock ? answeredUiBlockState(pending.uiBlock.spec, null, undefined, undefined) : undefined,
       );
