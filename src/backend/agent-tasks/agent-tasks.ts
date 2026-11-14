@@ -790,6 +790,9 @@ function publicHold(reason: string | null): AgentTaskHold | null {
     case "task-limit":
       return "task-limit";
     case "agent-client-changing":
+    // The provider starts or replaces its CLI, so the agent's process starts again on it (#8915).
+    case "providers-not-ready":
+    case "provider-cli-replaced":
       return "agent-restarting";
     case "usage-limit":
       return "usage-limit";
