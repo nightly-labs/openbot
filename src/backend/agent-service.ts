@@ -544,6 +544,8 @@ export interface AgentServiceOptions {
   hostedStorageGb?: () => number | null;
   /** OpenBot draws the Computer Use agent cursor, because the agents share the display of its windows. */
   agentCursorDrawn?: boolean;
+  /** The Computer Use driver drives a native Wayland desktop, where video can have no route (#9127). */
+  computerUseOnWayland?: boolean;
   /** When an idle Codex session is unloaded, and how many idle sessions one app server keeps. Tests make it short. */
   codexIdleSessions?: { releaseAfterMs: number; idleLimit: number };
 }
@@ -1351,6 +1353,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       serverHost: hostMemory !== null,
       ...(options.hostedStorageGb ? { hostedStorageGb: options.hostedStorageGb } : {}),
       ...(options.agentCursorDrawn ? { agentCursorDrawn: true } : {}),
+      ...(options.computerUseOnWayland ? { computerUseOnWayland: true } : {}),
       ...(options.responseStyle ? { responseStyle: options.responseStyle } : {}),
       memoryReview: () => this.#memoryReview.running(),
       skillRevision: () => options.skillLearning?.() === "automatic",

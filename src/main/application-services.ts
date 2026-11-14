@@ -231,7 +231,12 @@ import {
 } from "./computer-use-target-window";
 import { isSupportedCuaDriverTarget, resolveCuaDriver } from "./cua-driver-artifact";
 import { CuaDriverDaemonClient } from "./cua-driver-daemon-client";
-import { CuaDriverRuntime, cuaDriverCommandAlias, resolveCuaDriverEndpoint } from "./cua-driver-runtime";
+import {
+  CuaDriverRuntime,
+  cuaDriverCommandAlias,
+  cuaDriverDrivesWayland,
+  resolveCuaDriverEndpoint,
+} from "./cua-driver-runtime";
 import { type CustomAgentChanges, createCustomAgentChanges } from "./custom-agent-changes";
 import { CUSTOM_AGENTS_FILE, CustomAgentStore } from "./custom-agent-store";
 import { type CustomProviderChanges, createCustomProviderChanges } from "./custom-provider-changes";
@@ -2233,6 +2238,8 @@ export async function createApplicationServices({
     hostTurnLimits,
     hostedStorageGb: () => hostedStorageGb,
     agentCursorDrawn: drawsComputerUseHighlight,
+    // An agent display of its own is X11, where the driver records video.
+    computerUseOnWayland: drawsComputerUseHighlight && cuaDriverDrivesWayland(process.platform),
     requestTimeoutMs: 30_000,
     offProviders: providerUse.off(),
     providerAccounts,
