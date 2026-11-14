@@ -995,6 +995,8 @@ export const messages = {
     "WhatsApp удалил этот сервер из связанных устройств. Привяжите номер заново.",
   "mobile.server.connectors.whatsapp.helpError":
     "OpenBot не может связаться с WhatsApp на этом номере. Переподключите или отключите номер.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "OpenBot не может прочитать сохранённые ключи этого номера. Привяжите номер заново.",
   "mobile.server.connectors.whatsapp.retryAt": "WhatsApp попросил OpenBot подождать. Следующая попытка в {time}.",
   "mobile.server.connectors.whatsapp.linkAgain": "Привязать заново",
   "mobile.server.connectors.whatsapp.ownNumber": "Личный номер",

@@ -1189,6 +1189,8 @@ export const messages = {
     "WhatsApp הסיר את השרת הזה ממכשירים מקושרים. יש לקשר את המספר שוב.",
   "mobile.server.connectors.whatsapp.helpError":
     "OpenBot לא מצליח להגיע ל-WhatsApp במספר הזה. אפשר לחבר מחדש, או לנתק את המספר.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "OpenBot לא מצליח לקרוא את המפתחות השמורים של המספר הזה. יש לקשר את המספר שוב.",
   "mobile.server.connectors.whatsapp.retryAt": "WhatsApp ביקש מ-OpenBot להמתין. הוא ינסה שוב בשעה {time}.",
   "mobile.server.connectors.whatsapp.linkAgain": "קישור מחדש",
   "mobile.server.connectors.whatsapp.ownNumber": "מספר אישי",

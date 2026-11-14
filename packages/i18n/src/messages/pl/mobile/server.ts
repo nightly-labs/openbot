@@ -1001,6 +1001,8 @@ export const messages = {
     "WhatsApp usunął ten serwer z połączonych urządzeń. Połącz numer ponownie.",
   "mobile.server.connectors.whatsapp.helpError":
     "OpenBot nie może połączyć się z WhatsApp na tym numerze. Połącz ponownie lub odłącz numer.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "OpenBot nie może odczytać zapisanych kluczy tego numeru. Połącz numer ponownie.",
   "mobile.server.connectors.whatsapp.retryAt": "WhatsApp poprosił OpenBot o czekanie. Kolejna próba o {time}.",
   "mobile.server.connectors.whatsapp.linkAgain": "Połącz od nowa",
   "mobile.server.connectors.whatsapp.ownNumber": "Numer prywatny",

@@ -827,6 +827,7 @@ export const messages = {
     "你允许的人可以联系 OpenBot。其他人会收到一个代码，需要把它交给你。",
   "mobile.server.connectors.whatsapp.helpLoggedOut": "WhatsApp 已把这台服务器从已关联的设备中移除。请重新关联该号码。",
   "mobile.server.connectors.whatsapp.helpError": "OpenBot 无法通过该号码连接 WhatsApp。请重新连接，或断开该号码。",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable": "OpenBot 无法读取该号码已保存的密钥。请重新关联该号码。",
   "mobile.server.connectors.whatsapp.retryAt": "WhatsApp 要求 OpenBot 等待，将于 {time} 重试。",
   "mobile.server.connectors.whatsapp.linkAgain": "重新关联",
   "mobile.server.connectors.whatsapp.ownNumber": "个人号码",
