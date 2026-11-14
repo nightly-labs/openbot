@@ -419,6 +419,7 @@
     "test:central-auth-startup": "bun scripts/central-auth-startup-stall-e2e.ts",
     "test:exit-records": "bun scripts/exit-records-e2e.ts",
     "test:exit-watchdog": "bun scripts/exit-watchdog-e2e.ts",
+    "test:team-webrtc-bridge-loss": "bun scripts/team-webrtc-bridge-loss-e2e.ts",
     "test:zero-filled-settings": "bun scripts/zero-filled-settings-e2e.ts",
     "test:hosted-start-wait": "bun apps/auth-api/scripts/hosted-start-wait-e2e.ts",
     "test:hosted-start-time": "bun apps/auth-api/scripts/hosted-start-time-e2e.ts",
