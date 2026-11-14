@@ -17,8 +17,14 @@ import { type SenderDecision, senderDecision, type WhatsAppSenderRules } from ".
 
 /** The conversation of a direct chat: the whole chat. */
 export const WHATSAPP_DIRECT_THREAD = "dm";
-/** An `append` message older than the connect time minus this is history, not a new message. */
+/** On a new link, an `append` message older than the connect time minus this is history, not a new message. */
 const APPEND_GRACE_MS = 60_000;
+/**
+ * WhatsApp sends the messages that it held while this device was away (asleep, closed, a dead socket)
+ * as `append` after the connect. Only the first socket after a link gets history, so on a later socket
+ * an `append` message this recent is a held message that still gets an answer.
+ */
+const HELD_MAX_AGE_MS = 20 * 60_000;
 /** A message older than this is not answered: its asker has moved on. */
 const MESSAGE_MAX_AGE_MS = 24 * 60 * 60_000;
 const APPROVE_TEXT = /^(1|approve|yes)$/iu;
@@ -52,10 +58,24 @@ export type WhatsAppEvent =
   /** An unknown person wrote to a dedicated number. */
   | { type: "pairing"; chatJid: string; senderId: string; name: string };
 
+/** The socket facts that tell a held message from history. */
+export interface WhatsAppUpsertWindow {
+  /** When the socket opened, in milliseconds. */
+  openedAt: number;
+  /** WhatsApp sent the number its history before this socket opened, so an `append` is not history. */
+  synced: boolean;
+  now: number;
+}
+
 /** True for an upsert that can carry a new message: live ones, and recent `append` ones. */
-export function freshUpsert(type: string, message: WAMessage, openedAt: number): boolean {
+export function freshUpsert(type: string, message: WAMessage, upsertWindow: WhatsAppUpsertWindow): boolean {
   if (type === "notify") return true;
-  return type === "append" && sentAt(message) >= openedAt - APPEND_GRACE_MS;
+  if (type !== "append") return false;
+  const sent = sentAt(message);
+  return (
+    sent >= upsertWindow.openedAt - APPEND_GRACE_MS ||
+    (upsertWindow.synced && sent >= upsertWindow.now - HELD_MAX_AGE_MS)
+  );
 }
 
 /** The dedup key of a message, stable across redeliveries. */

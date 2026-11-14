@@ -1,10 +1,10 @@
 // Checks the WhatsApp connector end to end against a fake WhatsApp: the link by QR code and by pairing
 // code, the encrypted store and its lock, the sender rules (the owner's own chat, personal chats left
 // alone, pairing codes on a dedicated number, the group mention gate, LID authors), the echo guard,
-// numbered approval answers, the journal replay after a restart, each close code, the send queue while
-// the socket is down, and the disconnect. Runs the real agent service, messaging service, WhatsApp
-// driver, runtime, session and store on a temporary profile. Only the Baileys socket is fake: no
-// message leaves this computer. `bun scripts/messaging-whatsapp-e2e.ts`.
+// numbered approval answers, held messages after a wake, the journal replay after a restart, each
+// close code, the send queue while the socket is down, and the disconnect. Runs the real agent
+// service, messaging service, WhatsApp driver, runtime, session and store on a temporary profile.
+// Only the Baileys socket is fake: no message leaves this computer. `bun scripts/messaging-whatsapp-e2e.ts`.
 // Writes .openbot-build/messaging-whatsapp-e2e/report.json.
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
@@ -631,6 +631,46 @@ try {
       assert.equal(received(agents, OWNER_JID, own.id), false, "An own post was read as a request.");
       return { echoId: own.id };
     });
+
+    await step(
+      "held messages: after a wake, a synced number answers what WhatsApp held; a new link does not",
+      async () => {
+        const handle = runtime.get(credentials.get(connectionId(agents))?.storeId ?? "");
+        assert.ok(handle, "No open store.");
+        // The transport journals each message that it hands on, in the order that WhatsApp gives them.
+        const journaled = (id: string | null | undefined) =>
+          handle.store.unhandled().some((entry) => entry.dedupKey === `${OWNER_JID}:${id}`);
+        // WhatsApp sends the messages that it held for the device as `append`, with their send time.
+        const held = (text: string, minutesAgo: number) => {
+          const sent = message({ chat: OWNER_JID, fromMe: true, text });
+          sent.messageTimestamp = Math.floor((Date.now() - minutesAgo * 60_000) / 1_000);
+          return sent;
+        };
+        const readUpTo = async (label: string) => {
+          const marker = message({ chat: OWNER_JID, fromMe: true, text: label });
+          phone.current().receive([marker]);
+          await until(() => journaled(marker.key.id), label);
+        };
+
+        // The first socket after the link gets the number's history: an old `append` is not a new request.
+        const history = held("from before the link", 5);
+        phone.current().receive([history], "append");
+        await readUpTo("a live message on the new link");
+        assert.equal(journaled(history.key.id), false, "A new link answered a message from its history.");
+
+        // The computer sleeps and wakes. The next socket of the number gets no history, only held messages.
+        const sockets = phone.sockets.length;
+        messaging.resume();
+        await until(() => phone.sockets.length > sockets && connection(messaging)?.state === "connected", "the wake");
+        const recent = held("written while the computer slept", 5);
+        const old = held("written long before the wake", 30);
+        phone.current().receive([old, recent], "append");
+        await readUpTo("a live message after the wake");
+        assert.equal(journaled(recent.key.id), true, "A message that WhatsApp held during the sleep was dropped.");
+        assert.equal(journaled(old.key.id), false, "A message older than the held-message window was answered.");
+        return { history: false, recent: true, old: false };
+      },
+    );
 
     await step("status post: a number with the setting off gets no “Working on it…” post", async () => {
       const link = agents.messaging.store.linkByKey(connectionId(agents), OWNER_JID, "dm");
