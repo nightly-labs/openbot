@@ -833,6 +833,46 @@ try {
     await assert.rejects(stat(join(root, "private-api-keys", ".vault", "agent-4", "PRIVATE_TOKEN")));
   });
 
+  // A client that shows the form as questions, such as the iPhone app, sends each answer as text (#7302).
+  await step("a typed key that the form cannot read keeps the form open, and saves nothing", async () => {
+    const { keys, registry: unreadRegistry } = await vaultRegistry("unread");
+    const spec = apiKeyFormSpec({ name: "UNREAD_TOKEN", title: "Unread token", vault: true });
+    assert.ok(spec);
+    const id = nextRequest++;
+    unreadRegistry.surfaceUiBlock(
+      client,
+      { id, method: "item/tool/call", params: { threadId: THREAD, turnId: "turn-unread" } },
+      { blockId: `block-${id}`, spec, apiKey: { name: "UNREAD_TOKEN", vault: true } },
+    );
+    const respond = (answers: Record<string, string[]>, responder?: PromptResponder) =>
+      runCauseEffect(unreadRegistry.respondToPrompt({ requestId: id, answers }, responder));
+    const unreadable = /OpenBot could not read the API key/;
+    // A member cannot enter a key at all, so they are not asked to correct one first.
+    await assert.rejects(
+      respond({ [API_KEY_FIELD_ID]: [KEY], [API_KEY_SCOPE_FIELD_ID]: ["Todos os agentes"] }, MEMBER),
+      /Only the server owner or an admin can enter an API key/,
+    );
+    await assert.rejects(
+      respond({ [API_KEY_FIELD_ID]: [KEY], [API_KEY_SCOPE_FIELD_ID]: ["Todos os agentes"] }),
+      unreadable,
+    );
+    await assert.rejects(
+      respond({ [API_KEY_FIELD_ID]: ["k".repeat(8_001)], [API_KEY_SCOPE_FIELD_ID]: ["All agents (Vault)"] }),
+      unreadable,
+    );
+    assert.equal(client.answers.has(id), false, "the agent got an answer for a refused form");
+    assert.deepEqual(await Effect.runPromise(keys.list(AGENT)), []);
+    const message = snapshot.messages.find((candidate) => candidate.uiBlock?.blockId === `block-${id}`);
+    assert.equal(message?.uiBlock?.state.status, "pending");
+    // The same form still takes an answer that it can read.
+    await respond({ [API_KEY_FIELD_ID]: [KEY], [API_KEY_SCOPE_FIELD_ID]: ["All agents (Vault)"] });
+    assert.equal(agentAnswer(client.answers.get(id)).status, "saved");
+    assert.deepEqual(
+      (await Effect.runPromise(keys.list(AGENT))).map((key) => key.name),
+      ["UNREAD_TOKEN"],
+    );
+  });
+
   await writeFile(join(OUT, "report.json"), `${JSON.stringify({ passed: true, steps }, null, 2)}\n`);
   process.stdout.write(`agent-api-keys-e2e: ${steps.length} steps passed\n`);
 } catch (error) {

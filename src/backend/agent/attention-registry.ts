@@ -822,11 +822,16 @@ export class AttentionRegistry {
       const answered = values?.[API_KEY_FIELD_ID];
       // A pasted key often brings a space or a line break, which the service would refuse.
       const value = typeof answered === "string" ? answered.trim() : "";
+      // A key that the read lost, such as one over the field limit or with a "Save for" answer that
+      // is no option, was still typed: it must not close the form as a skip.
+      const typed = value !== "" || input.answers[API_KEY_FIELD_ID]?.some((answer) => answer.trim() !== "");
       // A skip saves nothing, so a member may give it: the turn must not wait for an owner.
-      if (value === "") return null;
+      if (!typed) return null;
       // The key goes to an agent of this server that every member may run.
       if (responder && !responder.privileged)
         throw new ForbiddenAttentionAnswer(sourceText("error.backend.apiKeyNotAllowed"));
+      // The form stays open, so the user can correct the answer.
+      if (value === "") throw new Error(sourceText("error.backend.apiKeyAnswerUnreadable"));
       if (!this.#apiKeys) throw new Error(sourceText("error.backend.apiKeySaveFailed"));
       // The form selects the Vault when it opens; only the agent option keeps the key private.
       const toVault = apiKey.vault === true && values?.[API_KEY_SCOPE_FIELD_ID] !== API_KEY_SCOPE_AGENT;

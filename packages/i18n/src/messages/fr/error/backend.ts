@@ -362,6 +362,8 @@ export const messages = {
   "error.backend.apiKeySaveFailed": "OpenBot n’a pas pu enregistrer la clé d’API. Réessayez.",
   "error.backend.apiKeyNotAllowed": "Seul le propriétaire du serveur ou un administrateur peut saisir une clé d’API.",
   "error.backend.apiKeySaving": "La clé d’API est déjà en cours d’enregistrement.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot n’a pas pu lire la clé d’API. Saisissez une clé de 8 000 caractères au plus, puis choisissez qui peut l’utiliser.",
   "error.backend.authRequestInactive": "Cette demande d’authentification sécurisée n’est plus active.",
   "error.backend.secureAuthUnavailable": "L’authentification sécurisée est indisponible.",
   "error.backend.browserUrlRequired": "Une URL de navigateur est requise.",

@@ -322,6 +322,8 @@ export const messages = {
   "error.backend.apiKeySaveFailed": "OpenBot לא הצליח לשמור את מפתח ה-API. יש לנסות שוב.",
   "error.backend.apiKeyNotAllowed": "רק בעל השרת או מנהל יכולים להזין מפתח API.",
   "error.backend.apiKeySaving": "מפתח ה-API כבר נשמר.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot לא הצליח לקרוא את מפתח ה-API. יש להזין מפתח של עד 8,000 תווים ולבחור מי יכול להשתמש בו.",
   "error.backend.vaultItemNotAllowed": "רק בעל השרת או מנהל יכולים להוסיף פריט לכספת.",
   "error.backend.vaultItemSaving": "פריט הכספת כבר נשמר.",
   "error.backend.authRequestInactive": "בקשת האימות המאובטח הזו אינה פעילה עוד.",

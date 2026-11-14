@@ -353,6 +353,8 @@ export const messages = {
   "error.backend.apiKeySaveFailed": "OpenBot kon de API-sleutel niet opslaan. Probeer het opnieuw.",
   "error.backend.apiKeyNotAllowed": "Alleen de eigenaar van de server of een beheerder kan een API-sleutel invoeren.",
   "error.backend.apiKeySaving": "De API-sleutel wordt al opgeslagen.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot kon de API-sleutel niet lezen. Voer een sleutel van maximaal 8.000 tekens in en kies wie hem mag gebruiken.",
   "error.backend.vaultItemNotAllowed":
     "Alleen de eigenaar van de server of een beheerder kan een item aan de Kluis toevoegen.",
   "error.backend.vaultItemSaving": "Het Kluis-item wordt al opgeslagen.",

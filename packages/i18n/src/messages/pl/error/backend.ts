@@ -344,6 +344,8 @@ export const messages = {
   "error.backend.apiKeySaveFailed": "OpenBot nie mógł zapisać klucza API. Spróbuj ponownie.",
   "error.backend.apiKeyNotAllowed": "Klucz API może wpisać tylko właściciel serwera lub administrator.",
   "error.backend.apiKeySaving": "Klucz API jest już zapisywany.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot nie mógł odczytać klucza API. Wpisz klucz o długości do 8000 znaków i wybierz, kto może go używać.",
   "error.backend.authRequestInactive": "To żądanie bezpiecznego uwierzytelnienia nie jest już aktywne.",
   "error.backend.secureAuthUnavailable": "Bezpieczne uwierzytelnianie jest niedostępne.",
   "error.backend.browserUrlRequired": "Adres URL przeglądarki jest wymagany.",
