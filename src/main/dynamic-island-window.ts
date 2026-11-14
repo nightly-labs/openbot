@@ -71,8 +71,6 @@ export interface DynamicIslandWindowControllerOptions {
   ensureMainWindow?: () => Promise<BrowserWindow>;
   presentMainWindow: (window: BrowserWindow) => void;
   performHaptic: () => void;
-  /** Called when the presentation changes, with the one before. A renderer outside these windows follows it. */
-  onPresentation?: (previous: DynamicIslandPresentation, next: DynamicIslandPresentation) => void;
   /** Called with each shape that an island page reports, before the window takes it. */
   onInputRegion?: (rendererId: number, rects: AgentDockInputRect[]) => void;
   performCriticalAction: (action: CriticalAction) => Effect.Effect<void, DynamicIslandFailed>;
@@ -180,9 +178,7 @@ export class DynamicIslandWindowController {
 
   publish(presentation: DynamicIslandPresentation): void {
     if (isDeepStrictEqual(this.#presentation, presentation)) return;
-    const previous = this.#presentation;
     this.#presentation = presentation;
-    this.#options.onPresentation?.(previous, presentation);
     for (const window of this.#windows.values()) {
       sendToRenderer(window, IPC_ENDPOINTS.dynamicIsland.presentation, presentation);
     }

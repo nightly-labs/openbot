@@ -1154,8 +1154,7 @@ export async function createApplicationServices({
     ensureMainWindow: windows.ensureMainWindow,
     presentMainWindow: showMainWindow,
     performHaptic: () => macHapticFeedback.performAlignment(),
-    onPresentation: (previous, next) => layerOverlay?.islandPresentationChanged(previous, next),
-    onInputRegion: (rendererId, rects) => layerOverlay?.inputRegionChanged("island", rendererId, rects),
+    onInputRegion: (rendererId, rects) => layerOverlay?.inputRegionChanged(rendererId, rects),
     showContextMenu: (window) =>
       Menu.buildFromTemplate([
         {
@@ -1194,7 +1193,7 @@ export async function createApplicationServices({
     windowKind,
     createWindow: layerOverlay ? layerOverlay.createDockWindow : createAgentDockWindow,
     onPresentation: (presentation) => layerOverlay?.dockPresentationChanged(presentation),
-    onInputRegion: (rendererId, rects) => layerOverlay?.inputRegionChanged("dock", rendererId, rects),
+    onInputRegion: (rendererId, rects) => layerOverlay?.inputRegionChanged(rendererId, rects),
     loadWindow: loadAgentDockRenderer,
     screen,
     dragPointer: layerOverlay ? () => layerOverlay.dragPointer() : undefined,

@@ -59,7 +59,7 @@ export interface AgentDockWindowControllerOptions {
   sendMessage: (action: AgentDockSendAction) => Effect.Effect<void, AgentDockFailed>;
   /** The pointer for a drag, where the screen cannot see it (a dock shown as a Wayland layer). Null: the screen's. */
   dragPointer?: (() => { x: number; y: number } | null) | undefined;
-  /** Called when the presentation changes. A renderer outside these windows follows it. */
+  /** Called when the presentation changes. The Wayland layers of the dock follow its edge. */
   onPresentation?: (presentation: AgentDockPresentation | null) => void;
   /** Called with each shape that a dock page reports, before the window takes it. */
   onInputRegion?: (rendererId: number, rects: AgentDockInputRect[]) => void;

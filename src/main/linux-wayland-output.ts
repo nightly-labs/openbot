@@ -27,6 +27,7 @@ import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Effect, Option, Schema } from "effect";
 import { app } from "electron";
 import { relaunchApp } from "./linux-appimage-relaunch";
+import { layerOverlayAvailable } from "./linux-layer-overlay";
 
 const logger = createOpenBotLogger("main");
 
@@ -217,10 +218,12 @@ export function aboveAppsWindowKind(server: boolean): "panel" | "tool" | "x11" |
 
 /**
  * Whether the agent dock and the Dynamic Island can show above other apps. Missing: they can. On Wayland, only after a restart on
- * XWayland, which needs a packaged app and an X11 display. A development build only quits on a restart.
+ * XWayland, which needs a packaged app and an X11 display. A development build only quits on a restart. On Hyprland with
+ * Quickshell they show as Wayland layers, with no restart (`linux-layer-overlay.ts`).
  */
 export function aboveAppsScreenSupport(): AboveAppsSupport | undefined {
   if (process.platform !== "linux" || usesX11Windows()) return undefined;
+  if (layerOverlayAvailable(process.env, process.resourcesPath)) return undefined;
   // An explicit `--ozone-platform=wayland` stays on each start, so a restart would come back to Wayland.
   return app.isPackaged && process.env.DISPLAY && chromiumChoosesWayland() ? "restart" : "unsupported";
 }

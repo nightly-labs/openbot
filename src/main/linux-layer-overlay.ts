@@ -3,35 +3,26 @@
 // On Linux the island and the dock are X11 windows above other apps (`linux-wayland-output.ts`).
 // Hyprland ignores the X11 "above" and "sticky" hints and X11 window shapes, so there they are
 // ordinary windows: under other apps and panels, on one workspace, black outside their shape, and
-// caught by window rules and by programs that act on windows (such as snow that settles on them).
+// caught by window rules and by programs that act on windows.
 //
 // Where Quickshell is installed, OpenBot renders the same island and dock pages offscreen (Electron
 // offscreen rendering) and a small Quickshell instance shows their frames as layers on the Overlay
 // layer (`resources/linux-layer-overlay/shell.qml`): above every window and panel, on every workspace,
 // and never a window. Quickshell sends the pointer and the keys back, and OpenBot gives them to the
-// page as input events. The pages, their look and their behaviour are the ones of the windows.
+// page as input events.
 //
-// Two additions only here, where the island is not a window the user can glance at under the menu
-// bar: the island opens for a moment by itself when an agent starts a task or needs the user (a reply,
-// a question, an approval, a failure), as if the pointer were on it; and the click area follows the
-// page's own shape while the island is open, so the empty part of its surface lets clicks through.
+// The window controllers stay the owners of the behaviour: they choose the displays, the places, the
+// shapes and the presentations, as on X11. Each window they make has its own layer on the output of its
+// display, so the island and the dock behave as on the other platforms.
 
 import { type ChildProcess, spawn } from "node:child_process";
 import { accessSync, chmodSync, constants, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type Server, type Socket } from "node:net";
 import { delimiter, join } from "node:path";
-import {
-  type AgentDockEdge,
-  type AgentDockInputRect,
-  type AgentDockPresentation,
-  type DynamicIslandPresentation,
-  IPC_ENDPOINTS,
-  isAgentDockPresentation,
-} from "@openbot/contracts/ipc";
+import type { AgentDockInputRect, AgentDockPresentation } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { BrowserWindow, type Rectangle, screen } from "electron";
-import { sendToRenderer } from "./renderer-ipc";
 import { isTrustedRendererUrl } from "./trusted-renderer";
 
 const logger = createOpenBotLogger("main");
@@ -43,11 +34,7 @@ const MAX_RESTARTS = 5;
 /** Frames per second while nobody looks at a surface, and while the pointer is on it. */
 const IDLE_FPS = 30;
 const HOVER_FPS = 60;
-/** How long the island stays open by itself: a new task, and what needs the user. */
-const PEEK_TASK_MS = 3_500;
-const PEEK_ATTENTION_MS = 6_000;
-/** The page needs a moment to show the new presentation before the pointer comes. */
-const PEEK_DELAY_MS = 350;
+const SURFACE_ID = /^(island|dock)-\d{1,9}$/;
 // The environment of an AppImage or a development shell, which Quickshell must not inherit.
 const NOT_FOR_QUICKSHELL = [
   "LD_LIBRARY_PATH",
@@ -67,21 +54,32 @@ export interface LayerOverlayLocation {
   shellQml: string;
 }
 
-/** A line from Quickshell, checked. Anything else is ignored. */
-export type LayerOverlayInput =
-  /** `screenY`: the pointer's height on the output, for the dock's drag. */
-  | { type: "input"; surface: SurfaceKind; event: InputEvent; screenY: number | null }
-  | { type: "placement"; movedAway: boolean; dockEdge: "left" | "right" | null };
+/** The display of a window, for Quickshell to find the output with the same name or place. */
+interface LayerOutput {
+  name: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** A line from Quickshell, checked. Anything else is ignored. `screenY`: the pointer's height on the output. */
+export interface LayerOverlayInput {
+  surface: string;
+  event: InputEvent;
+  screenY: number | null;
+}
 
 /** A line from OpenBot to Quickshell. */
 type LayerOverlayMessage =
-  | { type: "frame"; surface: SurfaceKind; file: string; seq: number; width: number; height: number }
-  | { type: "mask"; surface: SurfaceKind; rects: AgentDockInputRect[] }
-  | { type: "cursor"; surface: SurfaceKind; shape: string }
-  | { type: "hide"; surface: SurfaceKind }
-  | { type: "edge"; surface: "dock"; edge: "left" | "right" }
+  | { type: "surface"; surface: string; kind: SurfaceKind; output: LayerOutput }
+  | { type: "frame"; surface: string; file: string; seq: number; width: number; height: number }
+  | { type: "mask"; surface: string; rects: AgentDockInputRect[] }
+  | { type: "cursor"; surface: string; shape: string }
+  | { type: "remove"; surface: string }
+  | { type: "edge"; edge: "left" | "right" }
   /** Where the dock sits on its output, from its top, as the dock controller places it. */
-  | { type: "place"; surface: "dock"; y: number };
+  | { type: "place"; surface: string; y: number };
 
 function findQuickshell(env: NodeJS.ProcessEnv): string | null {
   const directories = [
@@ -181,73 +179,36 @@ function inputEvent(value: DynamicRecord): InputEvent | null {
 }
 
 /** Checks a line from Quickshell. The input events are the ones of `webContents.sendInputEvent`. */
-export function parseLayerOverlayInput(line: string): LayerOverlayInput | null {
+function parseLayerOverlayInput(line: string): LayerOverlayInput | null {
   let message: unknown;
   try {
     message = JSON.parse(line);
   } catch {
     return null;
   }
-  if (typeof message !== "object" || message === null || !("type" in message)) return null;
-  if (message.type === "placement") {
-    const movedAway = "movedAway" in message && message.movedAway === true;
-    const edge = "dockEdge" in message ? message.dockEdge : null;
-    return { type: "placement", movedAway, dockEdge: edge === "left" || edge === "right" ? edge : null };
-  }
-  if (message.type !== "input" || !("surface" in message) || !("event" in message)) return null;
-  const surface = message.surface;
-  const event = message.event;
-  if (surface !== "island" && surface !== "dock") return null;
-  if (!isDynamicRecord(event)) return null;
+  if (!isDynamicRecord(message) || message.type !== "input") return null;
+  const surface = "surface" in message ? message.surface : undefined;
+  const event = "event" in message ? message.event : undefined;
+  if (typeof surface !== "string" || !SURFACE_ID.test(surface) || !isDynamicRecord(event)) return null;
   const input = inputEvent(event);
   if (!input) return null;
   const screenY = "screenY" in message && isFiniteNumber(message.screenY) ? Math.round(message.screenY) : null;
-  return { type: "input", surface, event: input, screenY };
+  return { surface, event: input, screenY };
 }
 
-/** The part of a presentation that, when it changes, makes the island open for a moment. */
-function peekKey(presentation: DynamicIslandPresentation): string {
-  switch (presentation.mode) {
-    case "idle":
-      return "idle";
-    case "working":
-      return `working:${presentation.working.map((item) => `${item.agent.id}/${item.task}`).join("|")}`;
-    case "message":
-      return `message:${presentation.message.messageId}`;
-    case "failed":
-      return `failed:${presentation.item.turnId}`;
-    default:
-      return `${presentation.mode}:${String(presentation.item.requestId)}`;
-  }
-}
-
-/** Whether the island opens for a moment: a new task, or a new item that needs the user. */
-export function shouldPeek(previous: DynamicIslandPresentation, next: DynamicIslandPresentation): boolean {
-  if (next.mode === "idle" || peekKey(next) === peekKey(previous)) return false;
-  if (next.mode !== "working" || previous.mode !== "working") return true;
-  // Working: only a task that was not there before.
-  return next.working.some(
-    (item) => !previous.working.some((old) => old.agent.id === item.agent.id && old.task === item.task),
-  );
-}
-
-/** A dock presentation on its way to the page, at the edge of the output where the layer is. Null keeps the user's edge. */
-export function dockPresentationAtEdge(
-  presentation: AgentDockPresentation,
-  edge: AgentDockEdge | null,
-): AgentDockPresentation {
-  return !edge || presentation.edge === edge ? presentation : { ...presentation, edge };
-}
-
-interface SurfaceState {
-  windows: BrowserWindow[];
+interface Surface {
+  id: string;
+  kind: SurfaceKind;
+  window: BrowserWindow;
+  output: LayerOutput;
   seq: number;
   last: Extract<LayerOverlayMessage, { type: "frame" }> | null;
   rects: AgentDockInputRect[];
   /** The shape that the page reports, also while the controller opens the whole window to the pointer. */
   pageRects: AgentDockInputRect[] | null;
   cursor: string;
-  pointerInside: boolean;
+  /** The dock's height on its output. */
+  place: number | null;
 }
 
 export class LinuxLayerOverlay {
@@ -255,21 +216,15 @@ export class LinuxLayerOverlay {
   readonly #socketPath: string;
   readonly #frameDir: string;
   readonly #server: Server;
-  readonly #surfaces: Record<SurfaceKind, SurfaceState> = {
-    island: { windows: [], seq: 0, last: null, rects: [], pageRects: null, cursor: "default", pointerInside: false },
-    dock: { windows: [], seq: 0, last: null, rects: [], pageRects: null, cursor: "default", pointerInside: false },
-  };
+  readonly #surfaces = new Map<string, Surface>();
+  #nextId = 1;
   #client: Socket | null = null;
   #child: ChildProcess | null = null;
   #restarts = 0;
   #stopped = false;
-  #placement: { movedAway: boolean; dockEdge: "left" | "right" | null } = { movedAway: false, dockEdge: null };
-  #dockPresentation: AgentDockPresentation | null = null;
-  #peekTimer: ReturnType<typeof setTimeout> | null = null;
-  /** The pointer's height on the dock's output, from the last pointer event on a surface. */
-  #pointerY: number | null = null;
-  #dockPlace: number | null = null;
-  #peeking = false;
+  #dockEdge: "left" | "right" | null = null;
+  /** The pointer's height on the output of the surface that had the last pointer event. */
+  #pointer: { surface: string; y: number } | null = null;
 
   constructor(location: LayerOverlayLocation, runtimeDirectory: string) {
     this.#location = location;
@@ -296,7 +251,6 @@ export class LinuxLayerOverlay {
 
   stop(): void {
     this.#stopped = true;
-    if (this.#peekTimer) clearTimeout(this.#peekTimer);
     this.#child?.kill();
     this.#client?.destroy();
     this.#server.close();
@@ -306,43 +260,35 @@ export class LinuxLayerOverlay {
 
   /**
    * The pointer for the dock's drag, or null to read it from the screen. Over a layer, X11 does not see
-   * the pointer, so the drag takes its height from the pointer events of the layer.
+   * the pointer, so the drag takes its height from the pointer events of the dock's layer.
    */
   dragPointer(): Electron.Point | null {
-    const dock = this.#active("dock");
-    if (this.#pointerY === null || !dock) return null;
-    const display = screen.getDisplayMatching(dock.getBounds());
-    return { x: display.bounds.x, y: display.bounds.y + this.#pointerY };
+    const pointer = this.#pointer;
+    const surface = pointer ? this.#surfaces.get(pointer.surface) : undefined;
+    if (!pointer || surface?.kind !== "dock" || surface.window.isDestroyed()) return null;
+    const display = screen.getDisplayMatching(surface.window.getBounds());
+    return { x: display.bounds.x, y: display.bounds.y + pointer.y };
   }
 
-  /** The island window: the same page as `createDynamicIslandWindow`, rendered offscreen. */
+  /** An island window: the same page as `createDynamicIslandWindow`, rendered offscreen. */
   readonly createIslandWindow = (bounds: Rectangle): BrowserWindow => this.#offscreenWindow("island", bounds);
-  /** The dock window: the same page as `createAgentDockWindow`, rendered offscreen. */
+  /** A dock window: the same page as `createAgentDockWindow`, rendered offscreen. */
   readonly createDockWindow = (bounds: Rectangle): BrowserWindow => this.#offscreenWindow("dock", bounds);
 
-  /** The island's presentation changed: it opens for a moment for a new task or an item that needs the user. */
-  islandPresentationChanged(previous: DynamicIslandPresentation, next: DynamicIslandPresentation): void {
-    if (shouldPeek(previous, next)) this.#peek(next.mode === "working" ? PEEK_TASK_MS : PEEK_ATTENTION_MS);
-  }
-
-  /**
-   * The dock's presentation changed: its edge goes to Quickshell. The controller sends it to the page
-   * itself, through `#adopt`'s send, which gives a dock on another output that output's far edge.
-   */
+  /** The dock's presentation changed: its edge goes to Quickshell. */
   dockPresentationChanged(presentation: AgentDockPresentation | null): void {
-    this.#dockPresentation = presentation;
-    if (presentation) this.#write({ type: "edge", surface: "dock", edge: presentation.edge });
+    if (!presentation) return;
+    this.#dockEdge = presentation.edge;
+    this.#write({ type: "edge", edge: presentation.edge });
   }
 
   /** The page's own shape, which the click area follows while the controller opens the whole window. */
-  inputRegionChanged(kind: SurfaceKind, rendererId: number, rects: AgentDockInputRect[]): void {
-    const window = this.#active(kind);
-    if (window && window.webContents.id === rendererId)
-      this.#surfaces[kind].pageRects = rects.map((rect) => ({ ...rect }));
-  }
-
-  #active(kind: SurfaceKind): BrowserWindow | null {
-    return this.#surfaces[kind].windows.find((window) => !window.isDestroyed()) ?? null;
+  inputRegionChanged(rendererId: number, rects: AgentDockInputRect[]): void {
+    for (const surface of this.#surfaces.values()) {
+      if (!surface.window.isDestroyed() && surface.window.webContents.id === rendererId) {
+        surface.pageRects = rects.map((rect) => ({ ...rect }));
+      }
+    }
   }
 
   #offscreenWindow(kind: SurfaceKind, bounds: Rectangle): BrowserWindow {
@@ -370,63 +316,83 @@ export class LinuxLayerOverlay {
     window.webContents.on("will-navigate", (event, targetUrl) => {
       if (!isTrustedRendererUrl(targetUrl)) event.preventDefault();
     });
-    this.#adopt(kind, window);
+    this.#adopt(kind, window, bounds);
     return window;
   }
 
-  #adopt(kind: SurfaceKind, window: BrowserWindow): void {
-    const surface = this.#surfaces[kind];
-    const shown = () => this.#active(kind) === window;
-    surface.windows.push(window);
-    // One island and one dock show: another display's window does not paint.
-    if (!shown()) {
-      window.webContents.once("did-finish-load", () => {
-        if (!shown()) window.webContents.stopPainting();
-      });
-    }
+  #outputOf(bounds: Rectangle): LayerOutput {
+    const display = screen.getDisplayMatching(bounds);
+    return { name: display.label, ...display.bounds };
+  }
+
+  #announce(surface: Surface): void {
+    this.#write({ type: "surface", surface: surface.id, kind: surface.kind, output: surface.output });
+  }
+
+  #adopt(kind: SurfaceKind, window: BrowserWindow, bounds: Rectangle): void {
+    const surface: Surface = {
+      id: `${kind}-${this.#nextId++}`,
+      kind,
+      window,
+      output: this.#outputOf(bounds),
+      seq: 0,
+      last: null,
+      rects: [],
+      pageRects: null,
+      cursor: "default",
+      place: null,
+    };
+    this.#surfaces.set(surface.id, surface);
+    this.#announce(surface);
     window.webContents.setFrameRate(IDLE_FPS);
     window.webContents.on("paint", (_event, _dirty, image) => {
-      if (!shown() || image.isEmpty()) return;
+      if (image.isEmpty()) return;
       const size = image.getSize();
-      const file = join(this.#frameDir, `${kind}-${surface.seq % 3}.png`);
+      const file = join(this.#frameDir, `${surface.id}-${surface.seq % 3}.png`);
       try {
         writeFileSync(file, image.toPNG());
       } catch {
         return;
       }
-      surface.last = { type: "frame", surface: kind, file, seq: surface.seq++, width: size.width, height: size.height };
+      surface.last = {
+        type: "frame",
+        surface: surface.id,
+        file,
+        seq: surface.seq++,
+        width: size.width,
+        height: size.height,
+      };
       this.#write(surface.last);
     });
     window.webContents.on("cursor-changed", (_event, type) => {
-      if (!shown()) return;
       surface.cursor = type;
-      this.#write({ type: "cursor", surface: kind, shape: type });
+      this.#write({ type: "cursor", surface: surface.id, shape: type });
     });
-    // The window controllers place and shape the window as on X11. Here the shape is the click area,
-    // only the size counts, and nothing shows a window.
+    // The window controllers place and shape the window as on X11. Here the shape is the click area of
+    // the layer. While the controller opens the whole window to the pointer, the page's own shape counts.
     window.setShape = (rects: Rectangle[]) => {
-      if (!shown()) return;
       const [width = 0, height = 0] = window.getSize();
+      const first = rects[0];
       const whole =
-        rects.length === 1 &&
-        rects[0]?.x === 0 &&
-        rects[0]?.y === 0 &&
-        (rects[0]?.width ?? 0) >= width &&
-        (rects[0]?.height ?? 0) >= height;
+        rects.length === 1 && first?.x === 0 && first.y === 0 && first.width >= width && first.height >= height;
       surface.rects = whole && surface.pageRects ? surface.pageRects : rects.map((rect) => ({ ...rect }));
-      this.#write({ type: "mask", surface: kind, rects: surface.rects });
+      this.#write({ type: "mask", surface: surface.id, rects: surface.rects });
     };
-    const setSize = window.setSize.bind(window);
-    const getBounds = window.getBounds.bind(window);
-    window.setBounds = (bounds: Partial<Rectangle>) => {
-      if (kind === "dock" && bounds.y !== undefined) this.#placeDock({ ...getBounds(), ...bounds });
-      if (!bounds.width || !bounds.height) return;
-      const [width, height] = window.getSize();
-      if (width !== bounds.width || height !== bounds.height) setSize(bounds.width, bounds.height, false);
+    // The offscreen window is never on screen, so it can move: its bounds stay the ones that the
+    // controller set, and the layer follows them.
+    const setBounds = window.setBounds.bind(window);
+    window.setBounds = (next: Partial<Rectangle>) => {
+      setBounds(next, false);
+      this.#follow(surface);
     };
-    if (kind === "dock") this.#placeDock(getBounds());
+    const setPosition = window.setPosition.bind(window);
+    window.setPosition = (x: number, y: number) => {
+      setPosition(x, y, false);
+      this.#follow(surface);
+    };
+    this.#follow(surface);
+    // A layer shows itself, above every window and on every workspace: nothing here shows a window.
     const nothing = () => undefined;
-    window.setPosition = nothing;
     window.show = nothing;
     window.showInactive = nothing;
     window.setIgnoreMouseEvents = nothing;
@@ -434,85 +400,32 @@ export class LinuxLayerOverlay {
     window.setAlwaysOnTop = nothing;
     window.moveTop = nothing;
     window.on("closed", () => {
-      const wasShown = surface.windows[0] === window;
-      surface.windows = surface.windows.filter((other) => other !== window);
-      if (!wasShown) return;
-      const next = this.#active(kind);
-      if (!next) {
-        surface.last = null;
-        this.#write({ type: "hide", surface: kind });
-        return;
-      }
-      next.webContents.startPainting();
-      next.webContents.invalidate();
+      this.#surfaces.delete(surface.id);
+      if (this.#pointer?.surface === surface.id) this.#pointer = null;
+      this.#write({ type: "remove", surface: surface.id });
     });
-    if (kind === "dock") {
-      // Every presentation that reaches the page, from the controller or from here, takes the edge of
-      // the output where the layer is. The controller sends after its hook runs, so a copy sent from
-      // the hook alone would be replaced at once by the presentation for the primary output's edge.
-      const contents = window.webContents;
-      const send = contents.send.bind(contents);
-      contents.send = (channel: string, ...args: unknown[]) => {
-        if (channel !== IPC_ENDPOINTS.agentDock.presentation.channel) {
-          send(channel, ...args);
-          return;
-        }
-        const edge = this.#placement.movedAway ? this.#placement.dockEdge : null;
-        send(
-          channel,
-          ...args.map((value) => (isAgentDockPresentation(value) ? dockPresentationAtEdge(value, edge) : value)),
-        );
-      };
-      window.webContents.on("did-finish-load", () => setTimeout(() => this.#sendDockPresentation(), 50));
+  }
+
+  /** The window moved: the layer goes to the output of its display, and the dock to its height there. */
+  #follow(surface: Surface): void {
+    if (surface.window.isDestroyed()) return;
+    const bounds = surface.window.getBounds();
+    const output = this.#outputOf(bounds);
+    if (
+      output.name !== surface.output.name ||
+      output.x !== surface.output.x ||
+      output.y !== surface.output.y ||
+      output.width !== surface.output.width ||
+      output.height !== surface.output.height
+    ) {
+      surface.output = output;
+      this.#announce(surface);
     }
-  }
-
-  /** The dock controller placed the dock: the layer takes the same height on its output. */
-  #placeDock(bounds: Rectangle): void {
-    const display = screen.getDisplayMatching(bounds);
-    this.#dockPlace = Math.max(0, Math.round(bounds.y - display.bounds.y));
-    this.#write({ type: "place", surface: "dock", y: this.#dockPlace });
-  }
-
-  /** Sends the dock's presentation again, when the layers move to another output or back. */
-  #sendDockPresentation(): void {
-    const presentation = this.#dockPresentation;
-    const window = this.#active("dock");
-    if (!presentation || !window) return;
-    sendToRenderer(window, IPC_ENDPOINTS.agentDock.presentation, presentation);
-  }
-
-  #peek(durationMs: number): void {
-    const surface = this.#surfaces.island;
-    if (surface.pointerInside) return;
-    const window = this.#active("island");
-    if (!window) return;
-    const [width = 0] = window.getSize();
-    const rect = surface.pageRects?.[0] ?? { x: Math.round(width / 2) - 100, y: 0, width: 200, height: 40 };
-    const x = Math.round(rect.x + rect.width / 2);
-    const y = Math.round(rect.y + Math.min(rect.height, 44) / 2);
-    if (this.#peekTimer) clearTimeout(this.#peekTimer);
-    this.#peekTimer = setTimeout(() => {
-      if (surface.pointerInside || window.isDestroyed()) return;
-      this.#peeking = true;
-      window.webContents.setFrameRate(HOVER_FPS);
-      window.webContents.sendInputEvent({ type: "mouseEnter", x, y });
-      window.webContents.sendInputEvent({ type: "mouseMove", x, y });
-      this.#peekTimer = setTimeout(() => this.#endPeek(true), durationMs);
-    }, PEEK_DELAY_MS);
-  }
-
-  #endPeek(leave: boolean): void {
-    if (this.#peekTimer) clearTimeout(this.#peekTimer);
-    this.#peekTimer = null;
-    if (!this.#peeking) return;
-    this.#peeking = false;
-    const window = this.#active("island");
-    if (!leave || !window || this.#surfaces.island.pointerInside) return;
-    const [, height = 1] = window.getSize();
-    window.webContents.sendInputEvent({ type: "mouseMove", x: 1, y: height - 1 });
-    window.webContents.sendInputEvent({ type: "mouseLeave", x: 1, y: height - 1 });
-    window.webContents.setFrameRate(IDLE_FPS);
+    if (surface.kind !== "dock") return;
+    const place = Math.max(0, Math.round(bounds.y - output.y));
+    if (place === surface.place) return;
+    surface.place = place;
+    this.#write({ type: "place", surface: surface.id, y: place });
   }
 
   #spawn(): void {
@@ -556,40 +469,28 @@ export class LinuxLayerOverlay {
       if (this.#client === socket) this.#client = null;
     });
     socket.on("error", () => socket.destroy());
-    for (const kind of ["island", "dock"] as const) {
-      const surface = this.#surfaces[kind];
+    if (this.#dockEdge) this.#write({ type: "edge", edge: this.#dockEdge });
+    for (const surface of this.#surfaces.values()) {
+      this.#announce(surface);
       if (surface.last) this.#write(surface.last);
-      this.#write({ type: "mask", surface: kind, rects: surface.rects });
-      this.#write({ type: "cursor", surface: kind, shape: surface.cursor });
+      this.#write({ type: "mask", surface: surface.id, rects: surface.rects });
+      this.#write({ type: "cursor", surface: surface.id, shape: surface.cursor });
+      if (surface.place !== null) this.#write({ type: "place", surface: surface.id, y: surface.place });
     }
-    if (this.#dockPresentation) this.#write({ type: "edge", surface: "dock", edge: this.#dockPresentation.edge });
-    if (this.#dockPlace !== null) this.#write({ type: "place", surface: "dock", y: this.#dockPlace });
   }
 
   #read(line: string): void {
     const message = parseLayerOverlayInput(line);
     if (!message) return;
-    if (message.type === "placement") {
-      this.#placement = { movedAway: message.movedAway, dockEdge: message.dockEdge };
-      this.#sendDockPresentation();
-      return;
-    }
-    const window = this.#active(message.surface);
-    if (!window) return;
-    if (message.screenY !== null) this.#pointerY = message.screenY;
-    const surface = this.#surfaces[message.surface];
-    if (message.event.type === "mouseEnter") {
-      surface.pointerInside = true;
-      window.webContents.setFrameRate(HOVER_FPS);
-      if (message.surface === "island") this.#endPeek(false);
-    } else if (message.event.type === "mouseLeave") {
-      surface.pointerInside = false;
-      window.webContents.setFrameRate(IDLE_FPS);
-    } else if (message.event.type === "mouseDown") {
-      window.webContents.focus();
-    }
+    const surface = this.#surfaces.get(message.surface);
+    if (!surface || surface.window.isDestroyed()) return;
+    const contents = surface.window.webContents;
+    if (message.screenY !== null) this.#pointer = { surface: surface.id, y: message.screenY };
+    if (message.event.type === "mouseEnter") contents.setFrameRate(HOVER_FPS);
+    else if (message.event.type === "mouseLeave") contents.setFrameRate(IDLE_FPS);
+    else if (message.event.type === "mouseDown") contents.focus();
     try {
-      window.webContents.sendInputEvent(message.event);
+      contents.sendInputEvent(message.event);
     } catch (error) {
       logger.warn("An input event did not reach the layer overlay page:", toLogValue(error));
     }
