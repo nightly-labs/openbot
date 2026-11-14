@@ -28,7 +28,7 @@
 //       (docs/hosted-servers.md#a-new-server-on-a-pool-machine). A free machine that has the data of a
 //       server (a first start that failed, or a move that went back) is not changed; with
 //       `--reinstall`, the script erases its disk first.
-//   bun scripts/hosting/leaseweb-pool.ts move <server ID> <VPS ID | auto> [--keys=<file>] [--units=<unit>,...] [--docker] [--apply]
+//   bun scripts/hosting/leaseweb-pool.ts move <server ID> <VPS ID | auto> [--keys=<file>] [--units=<unit>,...] [--docker] [--folders=<folder>,...] [--apply]
 //       Moves one server from its boat sandbox to a free machine of the pool, as
 //       docs/hosted-servers.md#move-a-server-from-boat says. The machine takes no new server from then
 //       on. `auto` selects the machine when the move starts: a free machine of the plan, in the order of the
@@ -37,7 +37,9 @@
 //       that an operator moves by hand, and the move then continues. It refuses a sandbox whose stop at
 //       boat is failing, and stops before the downtime when the sandbox has Docker containers. `--docker`
 //       says that an operator moves the containers by hand (stopped before the move, so the boat stop can
-//       save the sandbox), and the move then continues.
+//       save the sandbox), and the move then continues. It also stops when files of the customer are in
+//       folders outside the home that the move does not copy, such as `/srv/vaults`. `--folders` names
+//       the folders that an operator copies by hand, and the move then continues.
 //   bun scripts/hosting/leaseweb-pool.ts custom <VPS ID> --owner=<email> --customer=<word> \
 //       --name=<server name> --keys=<file> [--apply]
 //       Sets up a VPS with no reference as the server of one customer, not in the pool
@@ -1435,7 +1437,13 @@ exit "$status"`;
     throw new Error(`The pool has no free ${product} for this server. Add a machine first.`);
   }
 
-  async move(serverId: string, vpsArg: string, unitsMovedByHand: readonly string[] = [], dockerMovedByHand = false) {
+  async move(
+    serverId: string,
+    vpsArg: string,
+    unitsMovedByHand: readonly string[] = [],
+    dockerMovedByHand = false,
+    foldersMovedByHand: readonly string[] = [],
+  ) {
     if (!SERVER_ID_PATTERN.test(serverId)) throw new Error(`Not a server ID: ${serverId}`);
     if (vpsArg !== "auto" && !VPS_ID_PATTERN.test(vpsArg)) throw new Error(`Not a VPS ID: ${vpsArg}`);
     const started = Date.now();
@@ -1605,6 +1613,17 @@ bash "$d/move-from-boat.sh" packages`,
       if (units.length > 0) {
         throw new Error(
           `The sandbox has systemd units of the customer that the move does not copy: ${units.join(", ")}.`,
+        );
+      }
+      // The move copies only the home and the directories that `added_trees` finds. A server with files of
+      // the customer in other folders, such as vaults in /srv, stays on boat unless `--folders` names each.
+      const folders = output
+        .split("\n")
+        .flatMap((line) => /^folder=(\/\S.*)$/u.exec(line)?.[1] ?? [])
+        .filter((folder) => !foldersMovedByHand.includes(folder));
+      if (folders.length > 0) {
+        throw new Error(
+          `The sandbox has files of the customer in folders that the move does not copy: ${folders.join(", ")}.`,
         );
       }
       // The VPS has no Docker, and the move does not copy containers or images. A container that restarts
@@ -1794,7 +1813,7 @@ systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/ru
 }
 
 const USAGE =
-  "Usage: leaseweb-pool.ts status | free | add <VPS ID>... | remove <VPS ID>... | sync | prepare <VPS ID>... --keys=<file> [--reinstall] | move <server ID> <VPS ID | auto> [--keys=<file>] [--units=<unit>,...] [--docker] | custom <VPS ID> --owner=<email> --customer=<word> --name=<server name> --keys=<file> [--apply] [--env=test]";
+  "Usage: leaseweb-pool.ts status | free | add <VPS ID>... | remove <VPS ID>... | sync | prepare <VPS ID>... --keys=<file> [--reinstall] | move <server ID> <VPS ID | auto> [--keys=<file>] [--units=<unit>,...] [--docker] [--folders=<folder>,...] | custom <VPS ID> --owner=<email> --customer=<word> --name=<server name> --keys=<file> [--apply] [--env=test]";
 
 async function main(args: string[]) {
   const [command, ...operands] = args.filter((arg) => !arg.startsWith("--"));
@@ -1808,7 +1827,13 @@ async function main(args: string[]) {
   else if (command === "sync") await pool.sync();
   else if (command === "prepare" && operands.length > 0) await pool.prepare(operands, args.includes("--reinstall"));
   else if (command === "move" && operands.length === 2 && operands[0] && operands[1])
-    await pool.move(operands[0], operands[1], option("units")?.split(",").filter(Boolean), args.includes("--docker"));
+    await pool.move(
+      operands[0],
+      operands[1],
+      option("units")?.split(",").filter(Boolean),
+      args.includes("--docker"),
+      option("folders")?.split(",").filter(Boolean),
+    );
   else if (command === "custom" && operands.length === 1 && operands[0])
     await pool.custom(operands[0], {
       owner: option("owner") ?? "",

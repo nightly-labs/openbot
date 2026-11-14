@@ -24,7 +24,8 @@
 #
 #   move-from-boat.sh packages
 #       On the sandbox, while the customer still uses it. Prints the apt packages that the customer
-#       installed, for `install-packages`. It does not stop OpenBot.
+#       installed, for `install-packages`, and the systemd units and the folders with files of the
+#       customer that the move does not copy. It does not stop OpenBot.
 #
 #   move-from-boat.sh install-packages
 #       On the prepared VPS, before the export. Installs the apt packages that `packages` printed, from
@@ -430,8 +431,25 @@ customer_units() {
   return 0
 }
 
+# The folders outside the archive that have files of the service user, one level below the top, such
+# as `/srv/vaults`. The move does not copy them. Issue #8871: Obsidian vaults that were outside the home
+# were missing after a move. The service user owns /opt and /usr/local, and `added_trees` covers them.
+# A file that the customer made as root is not found.
+customer_folders() {
+  local uid
+  uid=$(id -u "$SERVICE_USER")
+  # A file that goes away during the search makes find fail. The folders that it found stay valid.
+  {
+    find / -xdev \( -path /proc -o -path /sys -o -path /dev -o -path /run -o -path /tmp -o -path /var/tmp \
+      -o -path /home -o -path "$KEYRING_HOME" -o -path /opt -o -path /usr -o -path /var/spool/cron \
+      -o -path /var/lib/docker -o -path /var/cache -o -path /var/crash -o -path /var/log \) -prune \
+      -o ! -type d -uid "$uid" -print 2>/dev/null || true
+  } | awk -F/ '{ print "/" $2 (NF > 2 ? "/" $3 : "") }' | sort -u
+}
+
 # What the move does not copy, for the report of the import.
 not_moved() {
+  customer_folders | sed 's/$/: files of the customer outside the home/'
   local count
   if command -v docker >/dev/null; then
     count=$(timeout 20 docker ps --all --quiet 2>/dev/null | wc -l) || count=0
@@ -580,6 +598,7 @@ packages() {
   [ -s "$USER_HOME/.base-apt-packages.txt" ] || echo "The image has no list of its apt packages. The move installs no apt package." >&2
   added_packages | sed 's/^/apt=/'
   customer_units | sort -u | sed 's/^/unit=/'
+  customer_folders | sed 's/^/folder=/'
 }
 
 install_packages() {
