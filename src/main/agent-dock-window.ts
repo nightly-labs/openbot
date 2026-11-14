@@ -19,6 +19,7 @@ import { createOpenBotLogger, type Logger, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Schema, Semaphore } from "effect";
 import type { BrowserWindow, Display, Rectangle, Screen } from "electron";
 import { causeHelpers } from "../backend/effect-boundary";
+import { forceActivateX11Window } from "./linux-x11-activation";
 import { letPointerThrough, type PointerForwardingGate } from "./pointer-forwarding-gate";
 import { sendToRenderer } from "./renderer-ipc";
 
@@ -202,7 +203,11 @@ export class AgentDockWindowController {
       letPointerThrough(this.#options.pointerForwarding, window, !input.interactive);
     const keyboard = input.keyboard === true;
     window.setFocusable(keyboard);
-    if (keyboard && !window.isFocused()) window.focus();
+    if (keyboard && !window.isFocused()) {
+      window.focus();
+      // KWin of Plasma 6.3 and older does not focus a dock window for `focus()` or a click (#7415).
+      if (this.#options.windowKind === "x11") forceActivateX11Window(window);
+    }
   }
 
   /**
