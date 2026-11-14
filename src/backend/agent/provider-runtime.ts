@@ -1813,24 +1813,23 @@ export class ProviderRuntime implements ProviderPort {
     onHost: boolean,
     region: SignInRegion = "global",
   ) {
-    // A check of the providers cancels each sign-in that has not finished (`#refreshProviders`), so a
-    // Connect during a check waits for its end. Before, the Connect ended with no sign-in and no
-    // message (#9384). A Connect of a provider that the check found connected has nothing to do.
     const state = () => this.#status.providers?.find((row) => row.id === provider)?.state;
     const before = state();
+    this.#startFailures.delete(provider);
+    const start = this.#providerStarts.get(provider);
+    if (start) yield* Deferred.await(start);
+    if (start && this.#clients.has(provider) && this.#accounts.has(provider)) return this.status();
+    // A check of the providers cancels each sign-in that has not finished (`#refreshProviders`), so a
+    // Connect during a check waits for its end. Before, the Connect ended with no sign-in and no
+    // message (#9384). When the check finds a signed-out provider connected, the Connect has nothing
+    // to do. A row that showed the check gives no such state, so its Connect signs in.
     let waited = false;
     while (this.#providerRefresh) {
       waited = true;
       yield* Deferred.await(this.#providerRefresh).pipe(Effect.ignore);
     }
-    if (waited && before !== "available" && state() === "available") return this.status();
-    this.#startFailures.delete(provider);
-    const start = this.#providerStarts.get(provider);
-    if (start) yield* Deferred.await(start);
-    if (start && this.#clients.has(provider) && this.#accounts.has(provider)) return this.status();
-    if (this.#providerRefresh || (!start && ["starting", "restarting"].includes(this.#status.phase))) {
-      return this.status();
-    }
+    if (waited && before !== "available" && before !== "checking" && state() === "available") return this.status();
+    if (!start && ["starting", "restarting"].includes(this.#status.phase)) return this.status();
     const signIn = requireProviderDriver(provider).signIn;
     return yield* this.#runProviderConnectionCommand(provider, () =>
       this.#signIn(provider, signIn, openExternal, onHost, region),
