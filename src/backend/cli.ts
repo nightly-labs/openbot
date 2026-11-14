@@ -1,6 +1,6 @@
 import { execFile, spawn } from "node:child_process";
 import { constants } from "node:fs";
-import { access, stat } from "node:fs/promises";
+import { access, open, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, delimiter, dirname, extname, isAbsolute, join, posix, resolve, win32 } from "node:path";
 import { promisify, stripVTControlCharacters } from "node:util";
@@ -33,6 +33,11 @@ interface ResolvedCli {
    * too, when the resolver runs the CLI. Absent on Windows, which has no login shell.
    */
   launchPath?: string;
+  /**
+   * The user's CLI starts, but a part that some models need is missing, such as the code-mode host of
+   * a bare `codex` program (#9139). OpenBot's own copy wins over it.
+   */
+  incomplete?: true;
 }
 
 export interface CodexCliInfo extends ResolvedCli {
@@ -118,6 +123,10 @@ export const resolveCodexCli: (input?: {
     const failures: CodexCliError[] = [];
     // The copy that OpenBot tried first. The message for it tells the user which copy to repair.
     let firstFailedSource: "system" | "managed" | undefined;
+    // A Codex of the user's without its code-mode host runs only when no complete one starts. A path
+    // that the user set stays under their control.
+    const configured = input.systemCandidates === undefined ? configuredCliPath("codex") : null;
+    let incomplete: CodexCliInfo | undefined;
 
     for (const candidate of candidates) {
       if (!(yield* isExecutable(candidate.executable))) continue;
@@ -133,10 +142,20 @@ export const resolveCodexCli: (input?: {
           return { executable: candidate.executable, version, source: candidate.source, ...launch };
         }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
       );
-      if (Result.isSuccess(attempt)) return attempt.success;
+      if (Result.isSuccess(attempt)) {
+        const cli = attempt.success;
+        if (cli.source === "managed" || cli.executable === configured || (yield* hasCodeModeHost(cli.executable))) {
+          return cli;
+        }
+        incomplete ??= { ...cli, incomplete: true };
+        continue;
+      }
       const error = attempt.failure.cause;
 
-      if (isCliTimeout(error)) throw error;
+      if (isCliTimeout(error)) {
+        if (incomplete) return incomplete;
+        throw error;
+      }
       firstFailedSource ??= candidate.source;
       failures.push(
         error instanceof CodexCliError
@@ -145,6 +164,7 @@ export const resolveCodexCli: (input?: {
       );
     }
 
+    if (incomplete) return incomplete;
     const outdated = failures.find((failure) => failure.code === "outdated");
     if (outdated) throw outdated;
     if (failures.length > 0) {
@@ -170,6 +190,44 @@ function bundledCodexExecutable(
 ): string | null {
   return bundledProviderExecutable("codex", platform, architecture, resourcesPath);
 }
+
+/** Version-manager shims that start a full Codex package, by the name of their real program. */
+const CODEX_LAUNCHER = /^(?:volta-shim|mise|aqua-proxy)(?:\.exe)?$/iu;
+
+/**
+ * Whether Codex can start `codex-code-mode-host`, which code-mode models such as GPT-6 need for MCP
+ * tools. Codex looks beside its real program and in `codex-resources` of its package
+ * (`code_mode_host_program` in codex-rs). A bare `codex` copied alone has neither (#9139). A launcher,
+ * such as npm's `codex.js`, a version-manager shim or a bun or Scoop shim on Windows, starts a full
+ * package. A file that cannot be read counts as complete.
+ */
+const hasCodeModeHost = Effect.fn("Cli.hasCodeModeHost")((executable: string) =>
+  providerCall(async () => {
+    const program = await realpath(executable);
+    if (CODEX_LAUNCHER.test(basename(program))) return true;
+    const isFile = (path: string) =>
+      stat(path).then(
+        (info) => info.isFile(),
+        () => false,
+      );
+    if (process.platform === "win32") {
+      if (extname(program).toLowerCase() !== ".exe") return true;
+      const stem = program.slice(0, -".exe".length);
+      if ((await isFile(`${stem}.bunx`)) || (await isFile(`${stem}.shim`))) return true;
+    } else {
+      const file = await open(program, "r");
+      try {
+        const { buffer, bytesRead } = await file.read(Buffer.alloc(2), 0, 2, 0);
+        if (bytesRead === 2 && buffer.toString("latin1") === "#!") return true;
+      } finally {
+        await file.close();
+      }
+    }
+    const host = process.platform === "win32" ? "codex-code-mode-host.exe" : "codex-code-mode-host";
+    const folder = dirname(program);
+    return (await isFile(join(folder, host))) || (await isFile(join(folder, "..", "codex-resources", host)));
+  }).pipe(Effect.orElseSucceed(() => true)),
+);
 
 export const resolveClaudeCli: (input?: {
   systemCandidates?: string[];
@@ -936,7 +994,9 @@ export function chooseInstalledFirst<Cli extends AgentCliInfo, E>(
   const copy = resolve(bundledExecutable === undefined ? {} : { bundledExecutable });
   const installedCli = resolve({ bundledExecutable: null }).pipe(Effect.orElseSucceed(() => null));
   const choose = (resolved: Cli, installed: Cli | null): InstalledFirstChoice<Cli> => {
-    if (resolved.source !== "managed" || installed?.source !== "system") return { cli: resolved, passedOver: null };
+    if (resolved.source !== "managed" || installed?.source !== "system" || installed.incomplete) {
+      return { cli: resolved, passedOver: null };
+    }
     const asNew = installed.version === resolved.version || olderVersion(resolved.version, installed.version);
     if (preferInstalled && (asNew || installedChosen)) {
       const copyNewer = olderVersion(installed.version, resolved.version);
