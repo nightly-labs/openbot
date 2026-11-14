@@ -97,6 +97,8 @@ export const messages = {
   "app.socialFollow.redditTitle": "我如何使用 OpenBot",
   "app.rail.usageRings": "{name} 用量：{windows}。打开用量",
   "app.rail.customAgentUsage": "{name} 用量。打开用量",
+  "app.rail.moreUsage": { one: "另外 {count} 个账号。打开用量", other: "另外 {count} 个账号。打开用量" },
+  "app.rail.moreUsageCount": "+{count}",
   "app.rail.mediaCredits": "{name}：剩余 {credits} 积分。打开 {name}",
   "app.rail.mediaCreditsQuota": "{name}：团队积分 {quota} 中剩余 {credits}。打开 {name}",
   "app.rail.mediaCreditsMeta": "积分",
