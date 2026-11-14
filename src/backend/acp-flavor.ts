@@ -1,5 +1,10 @@
 import { win32 } from "node:path";
-import type { LoadSessionResponse, NewSessionRequest, PromptResponse, RequestError } from "@agentclientprotocol/sdk";
+import {
+  type LoadSessionResponse,
+  type NewSessionRequest,
+  type PromptResponse,
+  RequestError,
+} from "@agentclientprotocol/sdk";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import type { CauseCode } from "@openbot/telemetry";
@@ -383,7 +388,7 @@ export const GROK_ACP_FLAVOR: AcpFlavor = {
   // not found." and `data.code` `FS_NOT_FOUND`, which Grok also sends for any other missing file. The
   // agent then failed each message (#8936). Only a `session/list` without the session replaces it.
   restoreFailure: (error) =>
-    isRecord(error) && error.code === -32603 && isRecord(error.data) && error.data.code === "FS_NOT_FOUND"
+    error instanceof RequestError && error.code === -32603 && isRecord(error.data) && error.data.code === "FS_NOT_FOUND"
       ? "confirm-missing"
       : null,
   // Grok CLI 1.0.77 reads the reply of `ask_user_question` as an enum with the tag `outcome`, and
