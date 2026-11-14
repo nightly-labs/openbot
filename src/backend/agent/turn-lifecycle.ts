@@ -124,6 +124,8 @@ const ENDED_TURN_LIMIT = 256;
  * with no update, until the stall watch fails the finished run (#8629).
  */
 const QUIET_END_MS = 30_000;
+/** How often OpenBot checks again for the end of a quiet turn that called the no-update tool again. */
+const QUIET_REPEAT_POLL_MS = 1_000;
 /** How long before a turn's start its usage records can be, as in host analytics. */
 const TURN_USAGE_MARGIN_MS = 60 * 60 * 1_000;
 /**
@@ -441,6 +443,8 @@ export class TurnLifecycle {
   readonly #quietEndTimers = new Map<string, NodeJS.Timeout>();
   /** Quiet turns that OpenBot stopped after their no-update call. Their `interrupted` end completes them. */
   readonly #quietStops = new Set<string>();
+  /** Quiet turns that called the no-update tool again after it told them to end (#9375). */
+  readonly #quietRepeats = new Set<string>();
   /** Running turns whose agent reported that its routine run failed, with the reason. The completion takes it. */
   readonly #reportedFailures = new Map<string, string>();
   /**
@@ -585,6 +589,7 @@ export class TurnLifecycle {
     for (const timer of this.#quietEndTimers.values()) clearTimeout(timer);
     this.#quietEndTimers.clear();
     this.#quietStops.clear();
+    this.#quietRepeats.clear();
     this.#reportedFailures.clear();
     this.#endedTurns.clear();
     this.#refusedRetries.clear();
@@ -1581,9 +1586,19 @@ export class TurnLifecycle {
    * Stops a quiet turn that sends nothing for `QUIET_END_MS` after its no-update call, and its end
    * completes it. An open tool step, an open approval or question, or a provider event of the turn,
    * such as thinking, keeps the turn. A Stop of the user and a reported failure keep their own end.
+   * A second no-update call shows that the model does not end its turn: Kimi called the tool again
+   * every 2 s for an hour, and each call reset the silence (#9375). OpenBot then ends the turn when no
+   * tool step, approval or question is open, without the silence.
    */
   #armQuietEnd(agentId: string, turnId: string): void {
-    if (this.#quietEndTimers.has(turnId)) return;
+    const armed = this.#quietEndTimers.get(turnId);
+    if (armed) {
+      if (this.#quietRepeats.has(turnId)) return;
+      this.#quietRepeats.add(turnId);
+      clearTimeout(armed);
+    }
+    const repeated = armed !== undefined;
+    const quietFor = repeated ? 0 : QUIET_END_MS;
     const calledAt = Date.now();
     const check = () => {
       this.#quietEndTimers.delete(turnId);
@@ -1597,19 +1612,20 @@ export class TurnLifecycle {
         return;
       const silentFor = Date.now() - Math.max(calledAt, running.lastEventAt);
       if (running.openTools.size > 0 || this.#attention.hasAttentionForTurn(threadId, turnId)) {
-        wait(QUIET_END_MS);
+        wait(repeated ? QUIET_REPEAT_POLL_MS : QUIET_END_MS);
         return;
       }
-      if (silentFor < QUIET_END_MS) {
-        wait(QUIET_END_MS - silentFor);
+      if (silentFor < quietFor) {
+        wait(quietFor - silentFor);
         return;
       }
       this.#quietStops.add(turnId);
-      logger.info("A quiet turn sent nothing after its no-update call; OpenBot ends it.", {
-        agentId,
-        turnId,
-        provider: client.provider,
-      });
+      logger.info(
+        repeated
+          ? "A quiet turn called the no-update tool again; OpenBot ends it."
+          : "A quiet turn sent nothing after its no-update call; OpenBot ends it.",
+        { agentId, turnId, provider: client.provider },
+      );
       Effect.runFork(client.request("turn/interrupt", { threadId, turnId }, decodeRecordResponse).pipe(Effect.ignore));
     };
     const wait = (ms: number) => {
@@ -1617,7 +1633,7 @@ export class TurnLifecycle {
       timer.unref?.();
       this.#quietEndTimers.set(turnId, timer);
     };
-    wait(QUIET_END_MS);
+    wait(quietFor);
   }
 
   #clearQuietEnd(turnId: string): void {
@@ -1625,6 +1641,7 @@ export class TurnLifecycle {
     if (timer) clearTimeout(timer);
     this.#quietEndTimers.delete(turnId);
     this.#quietStops.delete(turnId);
+    this.#quietRepeats.delete(turnId);
   }
 
   /** Whether the channel shows the answers of this running channel routine turn as steps (#7166). */
