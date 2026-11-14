@@ -240,6 +240,15 @@ export function unsentHandoff(current: string, sent: string | undefined): string
   return unsent.length > 0 ? handoffPacket(HANDOFF_START, unsent) : undefined;
 }
 
+/**
+ * Whether a handoff holds the conversation history: the first turn of a new session sends it. A
+ * handoff with only routine digests goes to a session that already had turns.
+ */
+export function handoffHasHistory(handoff: string): boolean {
+  const { packet, history } = handoffParts(handoff);
+  return packet && history !== HANDOFF_START;
+}
+
 const HANDOFF_PACKET_END = `\n${HANDOFF_END}`;
 
 function handoffParts(handoff: string | undefined): { packet: boolean; history: string; digests: string[] } {
