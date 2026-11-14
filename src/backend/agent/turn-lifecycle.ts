@@ -1490,8 +1490,12 @@ export class TurnLifecycle {
       )
         return;
       const silentFor = Date.now() - Math.max(calledAt, running.lastEventAt);
-      if (running.openTools.size > 0 || this.#attention.hasAttentionFor(agentId) || silentFor < QUIET_END_MS) {
-        wait(Math.max(QUIET_END_MS - silentFor, 1_000));
+      if (running.openTools.size > 0 || this.#attention.hasAttentionForTurn(threadId, turnId)) {
+        wait(QUIET_END_MS);
+        return;
+      }
+      if (silentFor < QUIET_END_MS) {
+        wait(QUIET_END_MS - silentFor);
         return;
       }
       this.#quietStops.add(turnId);

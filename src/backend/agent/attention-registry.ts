@@ -622,6 +622,24 @@ export class AttentionRegistry {
     );
   }
 
+  /** Whether a question, an approval or a browser takeover of this turn waits, matched as `clearForTurn` does. */
+  hasAttentionForTurn(threadId: string, turnId: string): boolean {
+    return (
+      [...this.#prompts.values()].some(
+        (pending) =>
+          getString(pending.params, "threadId") === threadId && getString(pending.params, "turnId") === turnId,
+      ) ||
+      [...this.#approvals.values()].some(
+        (pending) =>
+          (getString(pending.params, "threadId") ?? getString(pending.params, "conversationId")) === threadId &&
+          (getString(pending.params, "turnId") ?? turnId) === turnId,
+      ) ||
+      [...this.#takeovers.values()].some(
+        (pending) => pending.params.threadId === threadId && pending.params.turnId === turnId,
+      )
+    );
+  }
+
   /** Full details for one agent; the UI snapshot has a separate size budget. */
   localAttention(agentId: string) {
     return {
