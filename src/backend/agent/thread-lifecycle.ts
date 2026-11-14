@@ -147,6 +147,16 @@ const CODEX_TOOLS_CONFIG = { update_plan: { enabled: true } } as const;
 export const CODEX_FEATURES_CONFIG = { "features.goals": false } as const;
 
 /**
+ * Codex loads its own Computer Use plugins by default, and they control the screen with no OpenBot
+ * cursor (#7386). A session without Computer Use turns them off. A thread value wins over the user's
+ * own Codex file, so the OpenBot setting decides. Codex 0.160 does not read `features.computer_use`.
+ */
+const CODEX_COMPUTER_USE_PLUGINS_OFF = {
+  "plugins.computer-use@openai-bundled.enabled": false,
+  "plugins.unified-computer-use@openai-bundled.enabled": false,
+} as const;
+
+/**
  * Codex gives each MCP server that is not `required` 1 second to start before a turn's first step,
  * then leaves it out of that step with only a trace log (#4410). A cold `npx` server takes longer,
  * mostly on Windows. A server that starts in time adds no wait.
@@ -1026,6 +1036,7 @@ export class ThreadLifecycle {
         "features.code_mode.direct_only_tool_namespaces": string[];
         [variable: `shell_environment_policy.set.${string}`]: string;
       } & CodexPromptSettings &
+        Partial<typeof CODEX_COMPUTER_USE_PLUGINS_OFF> &
         ReturnType<typeof codexSandboxConfig>;
     },
     ThreadOperationFailed
@@ -1043,6 +1054,7 @@ export class ThreadLifecycle {
         tools: CODEX_TOOLS_CONFIG,
         ...CODEX_FEATURES_CONFIG,
         ...codexPromptSettings(own.read),
+        ...(agentComputerUseEnabled(agent) ? {} : CODEX_COMPUTER_USE_PLUGINS_OFF),
         // Codex reads 32 KiB of `AGENTS.md` by default. A file that the editor saves in a non-Latin
         // script can be longer, and Codex would drop its end.
         project_doc_max_bytes: AGENT_INSTRUCTIONS_FILE_BYTES,
@@ -1194,6 +1206,11 @@ export class ThreadLifecycle {
           // A Marketplace app that starts on the managed Bun: a session from before that start has the
           // `npx` command, and Codex keeps it on resume. Only an agent with such an app adds a value.
           ...(catalogCommands.length > 0 ? [["catalog-commands", ...catalogCommands]] : []),
+          // A loaded session keeps the Codex plugins of its start: a session from before Codex's own
+          // Computer Use was turned off goes on controlling the screen. Only a session without
+          // Computer Use adds a value: an agent with the setting off, or a task or channel thread
+          // beside the agent's own chat. Such a session is replaced once, and when the setting changes.
+          ...(agentComputerUseEnabled(agent) ? [] : ["codex-computer-use-off"]),
         ]),
       )
       .digest("hex");
