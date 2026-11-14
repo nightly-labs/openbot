@@ -63,6 +63,12 @@ export const messages = {
   "settings.chatColor.red": "Rot",
   "settings.chatColor.green": "Grün",
   "settings.chatColor.blue": "Blau",
+  "settings.bubbleStyle.title": "Deine Blasen",
+  "settings.bubbleStyle.description":
+    "Im Chat mit einem Agenten haben deine Blasen die Farbe des Agenten. Nur du siehst das.",
+  "settings.bubbleStyle.solid": "Voll",
+  "settings.bubbleStyle.tint": "Getönt",
+  "settings.bubbleStyle.classic": "Klassisch",
   "settings.appBehavior.title": "App-Verhalten",
   "settings.conversations.title": "Unterhaltungen",
   "settings.launchAtLogin.title": "OpenBot bei der Anmeldung starten",

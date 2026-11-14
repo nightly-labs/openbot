@@ -1,6 +1,7 @@
 import type { AvatarColor } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
+import { CHAT_BUBBLE_STYLES, ownMessageAuthor } from "@openbot/ui/features/conversation/own-bubble";
 import { CHAT_COLOR_PRESETS } from "@openbot/ui/features/settings/ChatColorPicker";
 import { For } from "solid-js";
 import { fn } from "storybook/test";
@@ -112,6 +113,39 @@ export const Presets: Story = {
             agents={STORY_AGENTS}
             {...callbacks}
           />
+        )}
+      </For>
+    </main>
+  ),
+};
+
+/**
+ * The reader's bubbles in a chat with each story agent, in each bubble style of Settings › Appearance ›
+ * Your bubbles. Solid fills the bubble with the agent's face color, with dark text on a light color.
+ */
+export const BubbleStyles: Story = {
+  render: () => (
+    <main class="foundation-story" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 24px">
+      <For each={CHAT_BUBBLE_STYLES}>
+        {(style) => (
+          <div>
+            <For each={STORY_AGENTS}>
+              {(agent) => (
+                <ChatMessageRow
+                  message={{
+                    id: `bubble-style-${style}-${agent.id}`,
+                    author: "you",
+                    body: `${style} with ${agent.name}: \`code\` and **bold**`,
+                    time: "10:03",
+                    kind: "text",
+                  }}
+                  author={ownMessageAuthor({ name: "You", style, agent, chatColor: undefined })}
+                  agents={STORY_AGENTS}
+                  {...callbacks}
+                />
+              )}
+            </For>
+          </div>
         )}
       </For>
     </main>

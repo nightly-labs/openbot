@@ -95,6 +95,7 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
       },
       { titleKey: "settings.logoColor.title", descriptionKey: "settings.logoColor.description" },
       { titleKey: "settings.chatColor.title", descriptionKey: "settings.chatColor.description" },
+      { titleKey: "settings.bubbleStyle.title", descriptionKey: "settings.bubbleStyle.description" },
       { titleKey: "settings.chatBackground.title", descriptionKey: "settings.chatBackground.description" },
       { titleKey: "settings.language.title", descriptionKey: "settings.language.description" },
       { titleKey: "settings.interfaceSize.title", descriptionKey: "settings.interfaceSize.description" },

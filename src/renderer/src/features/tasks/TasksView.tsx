@@ -39,6 +39,7 @@ import {
 import { actionToast } from "../../action-toast";
 import { useShowAgentSteps } from "../../agent-steps-preference";
 import { toAgentMessages } from "../../app-message-projection";
+import { useChatBubbleStyle } from "../../chat-bubble-style-preference";
 import { readPanelWidth, savePanelWidth } from "../../components/panel-width-storage";
 import { usePlatform } from "../../platform";
 import { appendVoiceTranscript } from "../../voice-recording";
@@ -194,6 +195,7 @@ export function TasksView(props: TasksViewProps) {
   });
   const { appFocused, appInfo } = usePlatform();
   const showAgentSteps = useShowAgentSteps();
+  const bubbleStyle = useChatBubbleStyle();
   let pending: PendingStart | null = null;
   let generation = 0;
   const listRequests = new Map<string, number>();
@@ -862,6 +864,7 @@ export function TasksView(props: TasksViewProps) {
               task={hosted()}
               limit={state.snapshots[task()?.agentId ?? ""]?.limit ?? 1}
               agent={agent()}
+              bubbleStyle={bubbleStyle()}
               agents={props.agents}
               messages={messages}
               draft={state.drafts[taskId] ?? ""}

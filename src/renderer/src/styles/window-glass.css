@@ -322,3 +322,12 @@
     transparent
   );
 }
+
+/* A solid bubble is the agent's color, so it stays opaque on the glass as it is on a solid window. */
+:root[data-openbot-window-glass]
+  .app-window
+  .message-entry-user
+  .ui-bubble.message-bubble-colored.message-bubble-solid
+  > .ui-bubble-content {
+  background: var(--message-chat-color);
+}

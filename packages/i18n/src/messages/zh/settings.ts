@@ -61,6 +61,11 @@ export const messages = {
   "settings.chatColor.red": "红",
   "settings.chatColor.green": "绿",
   "settings.chatColor.blue": "蓝",
+  "settings.bubbleStyle.title": "你的气泡",
+  "settings.bubbleStyle.description": "在与助手的聊天中，你的气泡使用助手的颜色。只有你能看到。",
+  "settings.bubbleStyle.solid": "纯色",
+  "settings.bubbleStyle.tint": "淡色",
+  "settings.bubbleStyle.classic": "经典",
   // The Settings window, General tab.
   "settings.appBehavior.title": "应用行为",
   "settings.conversations.title": "对话",

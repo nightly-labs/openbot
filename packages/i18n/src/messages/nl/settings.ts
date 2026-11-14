@@ -61,6 +61,12 @@ export const messages = {
   "settings.chatColor.red": "Rood",
   "settings.chatColor.green": "Groen",
   "settings.chatColor.blue": "Blauw",
+  "settings.bubbleStyle.title": "Jouw ballonnen",
+  "settings.bubbleStyle.description":
+    "In een chat met een agent krijgen je ballonnen de kleur van de agent. Alleen jij ziet dit.",
+  "settings.bubbleStyle.solid": "Vol",
+  "settings.bubbleStyle.tint": "Tint",
+  "settings.bubbleStyle.classic": "Klassiek",
   "settings.appBehavior.title": "Gedrag van de app",
   "settings.conversations.title": "Gesprekken",
   "settings.launchAtLogin.title": "Open OpenBot bij inloggen",

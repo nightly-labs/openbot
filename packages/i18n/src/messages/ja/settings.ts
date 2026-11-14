@@ -61,6 +61,12 @@ export const messages = {
   "settings.chatColor.red": "赤",
   "settings.chatColor.green": "緑",
   "settings.chatColor.blue": "青",
+  "settings.bubbleStyle.title": "自分の吹き出し",
+  "settings.bubbleStyle.description":
+    "エージェントとのチャットでは、自分の吹き出しがエージェントの色になります。表示されるのは自分だけです。",
+  "settings.bubbleStyle.solid": "塗りつぶし",
+  "settings.bubbleStyle.tint": "淡色",
+  "settings.bubbleStyle.classic": "クラシック",
   "settings.appBehavior.title": "アプリの動作",
   "settings.conversations.title": "会話",
   "settings.launchAtLogin.title": "ログイン時に OpenBot を開く",

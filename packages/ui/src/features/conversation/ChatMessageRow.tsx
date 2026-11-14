@@ -18,6 +18,7 @@ import { AgentAvatar } from "../agents/AgentAvatar";
 import type { AttachmentDownloads, AttachmentMediaSource } from "./AttachmentCards";
 import type { MessageImageFile } from "./MarkdownMessageText";
 import { conversationBubbleVariant, MessageBody } from "./MessageRendering";
+import { solidBubbleTakesDarkText } from "./own-bubble";
 
 /**
  * Who wrote a message, as much as a row needs to draw it.
@@ -39,6 +40,11 @@ export interface ChatMessageAuthor {
    * reader's and an agent's bubbles stay grey, and another person's bubble takes their name colour.
    */
   chatColor?: AvatarColor | undefined;
+  /**
+   * The reader's own bubble in an agent chat fills with `chatColor` instead of a tint of it, as the
+   * Solid bubble style draws it. See `ownMessageAuthor`.
+   */
+  solidBubble?: boolean | undefined;
 }
 
 export interface ChatMessageRowProps {
@@ -145,10 +151,19 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
     ].filter((style) => style !== undefined);
     return styles.length > 0 ? styles.join("; ") : undefined;
   };
-  const bubbleClass = () => ({
-    "message-bubble-member": member(),
-    "message-bubble-colored": chatColor() !== undefined,
-  });
+  const solidColor = () => {
+    const tint = chatColor();
+    return own() && props.author.solidBubble === true ? tint : undefined;
+  };
+  const bubbleClass = () => {
+    const solid = solidColor();
+    return {
+      "message-bubble-member": member(),
+      "message-bubble-colored": chatColor() !== undefined,
+      "message-bubble-solid": solid !== undefined,
+      "message-bubble-solid-dark-text": solid !== undefined && solidBubbleTakesDarkText(solid),
+    };
+  };
   const rowClass = () => [
     "message-entry",
     {
