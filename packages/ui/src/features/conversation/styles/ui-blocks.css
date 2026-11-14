@@ -314,9 +314,10 @@
 }
 
 /* Confirm */
+/* The value column keeps a minimum width: a long label wraps, and a select still shows its option. */
 .ui-block-fields {
   display: grid;
-  grid-template-columns: minmax(64px, max-content) minmax(0, 1fr);
+  grid-template-columns: minmax(64px, max-content) minmax(min(192px, 50%), 1fr);
   align-items: center;
   gap: var(--openbot-space-2) var(--openbot-space-3);
   margin: 0;
@@ -325,6 +326,7 @@
 
 .ui-block-fields dt {
   color: var(--openbot-text-muted);
+  overflow-wrap: anywhere;
 }
 
 .ui-block-fields dd {
