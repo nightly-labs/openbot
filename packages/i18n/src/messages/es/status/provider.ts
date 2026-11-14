@@ -12,6 +12,7 @@ export const messages = {
   "status.provider.retryServerError":
     "El servidor de {provider} está ocupado o tiene un error. Reintento {attempt} de {maxAttempts}.",
   "status.provider.retryRecovered": "{provider} vuelve a recibir respuestas de su servidor.",
+  "status.provider.retryNoLimit": "El servidor de {provider} está ocupado o tiene un error. Reintento {attempt}.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude respondió a la velocidad estándar. Con una suscripción de Claude, el modo rápido usa créditos de uso. Actívalos en tu cuenta de Claude.",
   "status.provider.claudeFastModeNotOnPlan":

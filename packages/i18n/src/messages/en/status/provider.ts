@@ -12,6 +12,9 @@ export const messages = defineMessages("status.provider", {
   "status.provider.retryServerError":
     "The {provider} server is busy or has an error. Retry {attempt} of {maxAttempts}.",
   "status.provider.retryRecovered": "{provider} gets answers from its server again.",
+  // A provider that gives no limit for its retries.
+  "status.provider.retryNoLimit":
+    "The {provider} server is busy or has an error. {provider} tries again (attempt {attempt}).",
   // Claude Code ran a fast mode turn at the standard speed, with the reason.
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude answered at the standard speed. Fast mode with a Claude subscription uses usage credits. Turn them on in your Claude account.",

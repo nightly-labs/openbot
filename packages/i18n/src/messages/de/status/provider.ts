@@ -12,6 +12,7 @@ export const messages = {
   "status.provider.retryServerError":
     "Der {provider}-Server ist ausgelastet oder hat einen Fehler. Versuch {attempt} von {maxAttempts}.",
   "status.provider.retryRecovered": "{provider} erhält wieder Antworten von seinem Server.",
+  "status.provider.retryNoLimit": "Der {provider}-Server ist ausgelastet oder hat einen Fehler. Versuch {attempt}.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude hat mit normaler Geschwindigkeit geantwortet. Der Schnellmodus nutzt mit einem Claude-Abo Nutzungsguthaben. Schalte es in deinem Claude-Konto ein.",
   "status.provider.claudeFastModeNotOnPlan":

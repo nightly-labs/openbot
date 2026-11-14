@@ -43,6 +43,13 @@ const GEMINI_ACCOUNT_LINK = /https:\/\/accounts\.google\.com\/signin\/[^\s<>"'`)
  * ends the turn as a success. A model's warning sign comes with the emoji selector (U+FE0F).
  */
 const GEMINI_WARNING_ANSWER = /^\n\u26A0 /u;
+/**
+ * The Antigravity CLI 1.5.8 tries a failed model request again, 8 times in about 2 minutes. Before
+ * each try it sends "\n⚠ API error (attempt 1): Error 503, Message: ..., Status: UNAVAILABLE,
+ * Details: []\n" as answer text. When no try works, "⚠ Agent execution terminated due to error."
+ * follows; when one works, the answer of the model follows (#8238).
+ */
+const GEMINI_RETRY_NOTICE = /^\n?⚠ API error \(attempt (\d+)\): /u;
 /** The answers that are the server's failure text, not a reply of the model. */
 const GEMINI_FAILURE_ANSWER = new RegExp(
   `${GEMINI_EXECUTION_ERROR_ANSWER.source}|${GEMINI_CONNECTION_LOST_ANSWER.source}|${GEMINI_VERIFICATION_ANSWER.source}|${GEMINI_WARNING_ANSWER.source}`,
@@ -288,6 +295,10 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   sdkHarness: {
     failedSession: (stderrLine) => GEMINI_SDK_FAILURE.exec(stderrLine)?.[1],
     answerIsFailure: GEMINI_FAILURE_ANSWER,
+    retryNotice: (text) => {
+      const attempt = GEMINI_RETRY_NOTICE.exec(text)?.[1];
+      return attempt ? Number(attempt) : null;
+    },
     emptyOutputFailure: GEMINI_EMPTY_OUTPUT_FAILURE,
     turnFailure: geminiTurnFailure,
     accountLink: geminiAccountLink,

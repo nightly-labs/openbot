@@ -11,6 +11,7 @@ export const messages = {
   "status.provider.retryServerError":
     "{provider} のサーバーが混雑しているか、エラーが発生しています。再試行 {attempt}/{maxAttempts}。",
   "status.provider.retryRecovered": "{provider} がサーバーから再び応答を受け取っています。",
+  "status.provider.retryNoLimit": "{provider} のサーバーが混雑しているか、エラーが発生しています。再試行 {attempt}。",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude は標準の速度で応答しました。Claude サブスクリプションでは、高速モードは使用クレジットを使います。Claude アカウントでオンにしてください。",
   "status.provider.claudeFastModeNotOnPlan":

@@ -12,6 +12,7 @@ export const messages = {
   "status.provider.retryServerError":
     "Serwer {provider} jest zajęty lub zwrócił błąd. Ponowienie {attempt} z {maxAttempts}.",
   "status.provider.retryRecovered": "{provider} znów otrzymuje odpowiedzi ze swojego serwera.",
+  "status.provider.retryNoLimit": "Serwer {provider} jest zajęty lub zwrócił błąd. Ponowienie {attempt}.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude odpowiedział ze standardową szybkością. Z subskrypcją Claude tryb szybki korzysta ze środków na użycie. Włącz je na koncie Claude.",
   "status.provider.claudeFastModeNotOnPlan":

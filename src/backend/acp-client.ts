@@ -250,6 +250,11 @@ interface AcpTurn {
    * server then sends the failure as answer text and ends the turn as a success.
    */
   sdkFailureAt: number | null;
+  /**
+   * The chunks that report a failed model request which the agent tries again
+   * (`AcpFlavor.sdkHarness.retryNotice`), until the answer or the failure text comes.
+   */
+  retryNotices: string;
   /** The prompt told the model not to answer, so an empty turn is a success. */
   answerOptional: boolean;
   messages: ThreadItem[];
@@ -2463,6 +2468,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       accountLink: null,
       sessionLost: false,
       sdkFailureAt: null,
+      retryNotices: "",
       answerOptional,
       messages: [],
       toolNames: new Map(),
@@ -2599,6 +2605,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (sdkHarness && !turn.providerError && !turn.stopped && response.stopReason === "end_turn") {
         // The server's SDK failed the prompt and sent its message as the answer (1.3.0). The text
         // before the failure is the partial answer; the rest is the message.
+        // Retry notices with nothing after them are the failure text, as they were before #8238.
+        if (turn.retryNotices) {
+          turn.sdkFailureAt ??= turn.text.length;
+          turn.text += turn.retryNotices;
+          turn.retryNotices = "";
+        }
         const failureAt = turn.sdkFailureAt ?? (sdkHarness.answerIsFailure.test(turn.text) ? 0 : null);
         const failure = failureAt === null ? "" : turn.text.slice(failureAt).trim();
         if (failureAt !== null) {
@@ -3065,6 +3077,41 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   /** Applies one output update of the agent to a turn: a live one, or one that a background replay found. */
   #applyTurnUpdate(thread: AcpThread, turn: AcpTurn, update: SessionUpdate): void {
     if (!SESSION_STATE_UPDATES.has(update.sessionUpdate)) turn.answered = true;
+    const text =
+      update.sessionUpdate === "agent_message_chunk" && update.content.type === "text" ? update.content.text : null;
+    // The agent tries a failed model request again, for minutes. With no line for it the chat stayed
+    // empty, and an answer that came after a retry was reported as the failure (#8238).
+    const attempt = text === null ? null : (this.#flavor.sdkHarness?.retryNotice?.(text) ?? null);
+    if (text !== null && attempt !== null) {
+      turn.retryNotices += text;
+      this.emit("notification", {
+        method: "openbot/turn-progress",
+        params: {
+          threadId: thread.id,
+          turnId: turn.id,
+          detail: sourceText("status.provider.retryNoLimit", { provider: this.#label, attempt: String(attempt) }),
+        },
+      });
+      return;
+    }
+    if (turn.retryNotices && !SESSION_STATE_UPDATES.has(update.sessionUpdate)) {
+      const notices = turn.retryNotices;
+      turn.retryNotices = "";
+      // No try worked: the notices are the start of the failure text, which names the cause. The
+      // failure text counts with one line break before it or with none, as the notices do.
+      if (text !== null && this.#flavor.sdkHarness?.answerIsFailure.test(`\n${text.replace(/^\n+/u, "")}`)) {
+        turn.sdkFailureAt ??= turn.text.length;
+        turn.text += notices;
+      } else
+        this.emit("notification", {
+          method: "openbot/turn-progress",
+          params: {
+            threadId: thread.id,
+            turnId: turn.id,
+            detail: sourceText("status.provider.retryRecovered", { provider: this.#label }),
+          },
+        });
+    }
     if (this.#flavor.unsentBackgroundTurns) {
       const id = shownEntryId(update);
       if (id) thread.shownIds.add(id);
