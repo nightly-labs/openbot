@@ -8,6 +8,8 @@ export const messages = {
   "status.agent.instructionsChanged": "Talimatlarını güncelledi",
   "status.agent.modelSwitchedForLimit": "Kullanım sınırına ulaşıldı. {model} modeline geçildi.",
   "status.agent.modelReturnedAfterLimit": "Kullanım sınırı bitti. {model} modeline geri dönüldü.",
+  "status.agent.routineSkippedRunOpen": "Atlandı: son çalıştırma henüz bitmemişti",
+  "status.agent.routineSkippedUsageLimit": "Atlandı: kullanım sınırına ulaşıldı",
   "status.agent.modelSwitchedForError": "Sağlayıcı hatası. {model} modeline geçildi.",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} için kredi kalmadı. {model} modeline geçildi. Yeniden kullanmak için kredi ekleyin ve sonra seçin.",

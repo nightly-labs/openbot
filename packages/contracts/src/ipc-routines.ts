@@ -225,6 +225,7 @@ export const ROUTINE_MISSED_COUNT_LIMIT = 999;
 /**
  * The occurrences that one `cancelled` run stands for: they came due while OpenBot was closed, and
  * none of them ran. `until` is the last of them, or null for one occurrence at `scheduledFor`.
+ * When the scheduler skipped them for another reason, the run's `error` holds that reason.
  */
 export interface RoutineMissedRuns {
   count: number;

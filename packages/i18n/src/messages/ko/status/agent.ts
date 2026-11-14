@@ -7,6 +7,8 @@ export const messages = {
   "status.agent.instructionsChanged": "지침을 업데이트했어요",
   "status.agent.modelSwitchedForLimit": "사용 한도에 도달했어요. {model}(으)로 전환했어요.",
   "status.agent.modelReturnedAfterLimit": "사용 한도가 끝났어요. {model}(으)로 다시 전환했어요.",
+  "status.agent.routineSkippedRunOpen": "건너뜀: 이전 실행이 아직 끝나지 않았음",
+  "status.agent.routineSkippedUsageLimit": "건너뜀: 사용 한도에 도달함",
   "status.agent.modelSwitchedForError": "제공자 오류가 발생했어요. {model}(으)로 전환했어요.",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous}의 크레딧이 모두 소진되었습니다. {model}(으)로 전환했습니다. 다시 사용하려면 크레딧을 추가한 후 선택하세요.",

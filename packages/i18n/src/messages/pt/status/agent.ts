@@ -8,6 +8,8 @@ export const messages = {
   "status.agent.instructionsChanged": "Atualizou suas instruções",
   "status.agent.modelSwitchedForLimit": "Limite de uso atingido. O modelo mudou para {model}.",
   "status.agent.modelReturnedAfterLimit": "O limite de uso terminou. O modelo voltou para {model}.",
+  "status.agent.routineSkippedRunOpen": "Pulada: a última execução ainda não tinha terminado",
+  "status.agent.routineSkippedUsageLimit": "Pulada: o limite de uso foi atingido",
   "status.agent.modelSwitchedForError": "Erro do provedor. O modelo mudou para {model}.",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} ficou sem créditos. Trocado para {model}. Para usá-lo de novo, adicione créditos e depois selecione-o.",

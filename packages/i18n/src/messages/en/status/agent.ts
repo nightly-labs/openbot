@@ -7,6 +7,8 @@ export const messages = defineMessages("status.agent", {
   "status.agent.instructionsChanged": "Updated its instructions",
   "status.agent.modelSwitchedForLimit": "Usage limit reached. Switched to {model}.",
   "status.agent.modelReturnedAfterLimit": "Usage limit ended. Switched back to {model}.",
+  "status.agent.routineSkippedRunOpen": "Skipped: the last run had not finished",
+  "status.agent.routineSkippedUsageLimit": "Skipped: usage limit reached",
   "status.agent.modelSwitchedForError": "Provider error. Switched to {model}.",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} has no credits left. Switched to {model}. To use it again, add credits and then select it.",
