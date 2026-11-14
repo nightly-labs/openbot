@@ -17,6 +17,7 @@ import { deviceQuoteShortcut } from "../../send-shortcut-preference";
 import { latestVisibleAgentMessageId } from "./conversation-read-state";
 import { useConversationViewScope } from "./conversation-scope";
 import type { SideThread } from "./conversation-types";
+import { useThreadMarketplaceSuggestionCard } from "./MarketplaceSuggestionChatCard";
 import { useThreadMcpSignInCard } from "./McpSignInChatCard";
 import { createTurnSteps } from "./turn-steps";
 
@@ -115,6 +116,8 @@ export function ConversationSideThread(props: { threadId: string }) {
     ) : undefined;
   /** Continue on a sign-in card goes to this thread, as the person's next message there. */
   const mcpSignInCard = useThreadMcpSignInCard((body) => thread()?.onSend(body, [], null) ?? Promise.resolve(false));
+  const marketplaceCard = useThreadMarketplaceSuggestionCard();
+  const messageCard = (message: AgentMessage) => mcpSignInCard(message) ?? marketplaceCard(message);
   /** Branches this thread through an answer. The branch opens as a chat tab. */
   const branch = () => {
     if (!view.threads?.onBranch) return undefined;
@@ -211,7 +214,7 @@ export function ConversationSideThread(props: { threadId: string }) {
             onCompactContext={current().thread.onCompactContext}
             waitsForAnswer={waitsForAnswer()}
             attention={answerCard()}
-            messageCard={mcpSignInCard}
+            messageCard={messageCard}
             olderMessages={current().thread.olderMessages}
             newerMessages={current().thread.newerMessages}
             focusMessage={current().thread.focusMessage}
