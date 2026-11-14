@@ -3230,6 +3230,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     turn.messages.push(item);
     this.emit("notification", { method: "item/completed", params: { threadId: thread.id, turnId: turn.id, item } });
     turn.text = "";
+    // An SDK failure ends the turn, so text that a later step follows was not one. A model's or the
+    // CLI's warning line ("\n⚠ ...") made the next step's answer the error (#7479).
+    turn.sdkFailureAt = null;
     turn.textMessageId = null;
     turn.textMessageStart = 0;
     turn.messageChunks = 0;
