@@ -178,20 +178,21 @@ function anthropicBaseUrl(baseUrl: string): string | null {
 
 /**
  * Azure OpenAI and Foundry refuse function tools with `reasoning_effort` on `/chat/completions`, and
- * every agent turn sends both, so each turn failed with a 400 (#3460). Their v1 API serves
- * `/responses` at the same base URL and takes the key as a bearer token, so the OpenAI adapter works
- * unchanged. `@ai-sdk/azure` is no fix: it builds `/deployments/<model>/responses`, which a v1
- * resource answers with 404.
+ * every agent turn sends both, so each turn failed with a 400 (#3460). OpenAI does the same for newer
+ * models such as `gpt-6-astra` (#7476). Both v1 APIs serve `/responses` at the same base URL and take
+ * the key as a bearer token, so the OpenAI adapter works unchanged. `@ai-sdk/azure` is no fix: it
+ * builds `/deployments/<model>/responses`, which a v1 resource answers with 404.
  *
- * Only with a key: without `apiKey`, the OpenAI adapter reads `OPENAI_API_KEY` from the environment
- * that OpenCode inherits, and would send the user's OpenAI key to Azure. A keyless endpoint, such as
- * one with an Entra ID `Authorization` header, keeps the OpenAI-compatible adapter.
+ * Only with a key, on both hosts: without `apiKey`, the OpenAI adapter reads `OPENAI_API_KEY` from the
+ * environment that OpenCode inherits, and would send a key that the user did not give this endpoint,
+ * to Azure or to OpenAI. A keyless endpoint, such as one with an Entra ID or a gateway
+ * `Authorization` header, keeps the OpenAI-compatible adapter.
  */
-function isAzureOpenAiV1(provider: CustomProviderConfig): boolean {
+function usesResponsesApi(provider: CustomProviderConfig): boolean {
   const url = URL.parse(provider.baseUrl);
+  if (!provider.apiKey || url?.protocol !== "https:") return false;
+  if (url.hostname === "api.openai.com") return url.pathname === "/v1" || url.pathname === "/v1/";
   return (
-    Boolean(provider.apiKey) &&
-    url?.protocol === "https:" &&
     (url.hostname.endsWith(".openai.azure.com") || url.hostname.endsWith(".services.ai.azure.com")) &&
     (url.pathname === "/openai/v1" || url.pathname === "/openai/v1/")
   );
@@ -200,7 +201,11 @@ function isAzureOpenAiV1(provider: CustomProviderConfig): boolean {
 function providerEntry(provider: CustomProviderConfig): OpenCodeProviderEntry {
   const anthropic = anthropicBaseUrl(provider.baseUrl);
   return {
-    npm: anthropic ? OPENCODE_ANTHROPIC_NPM : isAzureOpenAiV1(provider) ? OPENCODE_OPENAI_NPM : OPENCODE_COMPATIBLE_NPM,
+    npm: anthropic
+      ? OPENCODE_ANTHROPIC_NPM
+      : usesResponsesApi(provider)
+        ? OPENCODE_OPENAI_NPM
+        : OPENCODE_COMPATIBLE_NPM,
     name: provider.name,
     options: {
       baseURL: anthropic ?? provider.baseUrl,
