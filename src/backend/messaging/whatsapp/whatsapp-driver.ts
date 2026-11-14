@@ -48,12 +48,6 @@ const WHATSAPP_FILE_BYTES_LIMIT = 64 * 1024 * 1024;
 /** WhatsApp clients show an edit only within 15 minutes; a later edit is lost without an error. */
 const EDIT_WINDOW_MS = 14 * 60_000;
 const PLACE_NAME_TIMEOUT_MS = 5_000;
-/**
- * In "Message yourself", WhatsApp shows OpenBot's posts on the right, as the owner's own. A last line of
- * blank braille characters (U+2800, which WhatsApp does not trim) makes the bubble as wide as the chat
- * allows, so the answer starts at the left, as a reply does. The time stays on that line.
- */
-const SELF_CHAT_SPACER = `\n${"\u2800".repeat(36)}`;
 
 /** The reaction on the person's message: arrived, then done, failed or stopped. */
 const REACTIONS: Record<StatusReaction, string> = {
@@ -161,7 +155,7 @@ class WhatsAppAdapter implements MessagingAdapter {
 
   readonly post = Effect.fnUntraced(function* (this: WhatsAppAdapter, target: MessageTarget, body: MessageBody) {
     const sent = yield* this.#send(target, {
-      text: this.#layout(target, this.#statusText(body)),
+      text: this.#statusText(body),
       ...this.#mentions(body.text),
     });
     if (body.buttons?.length)
@@ -187,7 +181,7 @@ class WhatsAppAdapter implements MessagingAdapter {
       return;
     }
     yield* this.#session().send(target.platformChannelId, {
-      text: this.#layout(target, this.#statusText(body)),
+      text: this.#statusText(body),
       edit: this.#ownKey(target, messageId),
     });
   });
@@ -228,7 +222,7 @@ class WhatsAppAdapter implements MessagingAdapter {
     replaceMessageId: string | null,
   ) {
     yield* this.#checkPlace(target.platformChannelId);
-    const [first = "", ...rest] = whatsAppChunks(markdown).map((chunk) => this.#layout(target, chunk));
+    const [first = "", ...rest] = whatsAppChunks(markdown);
     const firstMentions = this.#mentions(first);
     let firstId: string | null = null;
     const sentAt = replaceMessageId ? this.#sentAt.get(replaceMessageId) : undefined;
@@ -488,13 +482,6 @@ class WhatsAppAdapter implements MessagingAdapter {
   }
 
   /** Status text from the host, in WhatsApp's formatting, with its buttons as a numbered menu. */
-  /** The text with the spacer line in the owner's own chat, and as it is in every other chat. */
-  #layout(target: MessageTarget, text: string): string {
-    const identity = whatsAppIdentity(this.#handle);
-    const ownChat = identity !== null && userPart(target.platformChannelId) === identity.number;
-    return ownChat ? `${text}${SELF_CHAT_SPACER}` : text;
-  }
-
   #statusText(body: MessageBody): string {
     const actions = new Set(body.buttons?.map((button) => button.action));
     const menu = [
