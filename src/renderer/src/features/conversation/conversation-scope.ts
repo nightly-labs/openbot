@@ -34,6 +34,7 @@ import {
 } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { createScopeGuard } from "../../scope-lifetime";
+import { currentDevicePlatform } from "../../send-shortcut-preference";
 import { appendVoiceTranscript } from "../../voice-recording";
 import { serverSupportsCapability } from "../servers/server-capabilities";
 import { codexLiveAccess } from "../speech/codex-live-access";
@@ -920,6 +921,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setChatSearchMessageIds,
     setChatSearchTotal,
     setActiveChatSearchIndex,
+    shortcutPlatform: () => (currentDevicePlatform() === "darwin" ? "mac" : "pc"),
   });
   const { closeChatSearch, moveChatSearch, setChatSearchInputElement } = search;
   // The open side thread has its own search. It finds text only in the thread rows on the page, because
@@ -950,6 +952,7 @@ export function createConversationViewScope(props: ConversationProps) {
     setChatSearchMessageIds: setThreadSearchMessageIds,
     setChatSearchTotal: () => undefined,
     setActiveChatSearchIndex: setActiveThreadSearchIndex,
+    shortcutPlatform: () => (currentDevicePlatform() === "darwin" ? "mac" : "pc"),
   });
   // Another thread, or the agent's own chat, has other messages, so the search of the thread closes.
   // A new thread has no task (`null`), and the agent's own chat has no thread (`undefined`).
