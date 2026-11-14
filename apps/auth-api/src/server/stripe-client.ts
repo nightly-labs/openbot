@@ -641,7 +641,7 @@ export function subscriptionLicenseItem(subscription: StripeSubscription): Strip
 }
 
 /** True for a Price of the storage add-on of a hosted server. */
-export function isStoragePrice(price: { lookup_key: string | null; metadata: Readonly<Record<string, string>> }) {
+function isStoragePrice(price: { lookup_key: string | null; metadata: Readonly<Record<string, string>> }) {
   return parseStorageTierPrice(price) !== null;
 }
 

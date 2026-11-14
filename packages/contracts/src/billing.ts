@@ -376,8 +376,7 @@ export function parseBillingStorageRequest(value: unknown): BillingStorageReques
   return { subscriptionId: value.subscriptionId, tier: value.tier };
 }
 
-function parseStorageUpgrades(value: unknown): BillingStorageUpgrade[] {
-  if (!Array.isArray(value)) return [];
+function parseStorageUpgrades(value: readonly unknown[]): BillingStorageUpgrade[] {
   const upgrades: BillingStorageUpgrade[] = [];
   for (const item of value) {
     if (
@@ -421,7 +420,8 @@ function parseBillingServerPlan(value: unknown): BillingServerPlan | null {
     cancelAtPeriodEnd: value.cancelAtPeriodEnd,
     // A value that this app cannot read is left out, so the plan still shows with the storage of its table.
     ...(isStorageGb(value.storageGb) ? { storageGb: value.storageGb } : {}),
-    storageUpgrades: parseStorageUpgrades(value.storageUpgrades),
+    // An older account server sends no upgrades; the plan then has none.
+    ...(Array.isArray(value.storageUpgrades) ? { storageUpgrades: parseStorageUpgrades(value.storageUpgrades) } : {}),
   };
 }
 
