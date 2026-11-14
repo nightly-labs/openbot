@@ -68,6 +68,7 @@ import {
   LIQUID_PAD,
   LIQUID_WIDTH,
   MAX_STRETCH,
+  neckCenterInBand,
   neckPath,
   PANEL_CLOSE,
   PANEL_GAP,
@@ -514,7 +515,8 @@ export function AgentDock(props: AgentDockProps) {
     panelContent.style.transform = `scale(${0.96 + 0.04 * reveal})`;
 
     // While the blob is over the dock, it joins the dock itself; the neck grows once it is clear.
-    neck.setAttribute("d", neckPath(neckY.value, Math.max(0, Math.min(neckSize.value, free))));
+    const neckOpen = Math.max(0, Math.min(neckSize.value, free));
+    neck.setAttribute("d", neckPath(neckCenterInBand(neckY.value, neckOpen, height, pull), neckOpen));
 
     const r = Math.max(0, dropR.value);
     drop.style.transform = `translate(${dropX.value}px, ${dropY.value}px) translate(-50%, -50%) scale(${r / (SEAT / 2)})`;

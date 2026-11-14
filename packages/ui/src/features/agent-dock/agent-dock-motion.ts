@@ -200,6 +200,24 @@ export function dockHandlePath(height: number, stretch = 0) {
   return `M ${startX} ${startY} A ${radius} ${radius} 0 0 1 ${endX} ${endY}`;
 }
 
+/** How far the neck reaches above and below its centre at a size. */
+function neckReach(size: number) {
+  return 30 * size;
+}
+
+/**
+ * The neck's centre, kept inside the dock's band. Beside the dock the liquid shows only in the band, so a
+ * neck that springs past the top or the bottom seat (a wobble on the way to the first seat) would be cut flat.
+ */
+export function neckCenterInBand(centerY: number, size: number, height: number, stretch = 0) {
+  const band = dockBand(height, stretch);
+  const reach = neckReach(Math.max(0, size));
+  const top = band.top - LIQUID_PAD + reach;
+  const bottom = band.bottom - LIQUID_PAD - reach;
+  if (top > bottom) return (top + bottom) / 2;
+  return Math.min(bottom, Math.max(top, centerY));
+}
+
 /**
  * The neck between the panel and the dock: an hourglass whose ends flare into both sides along
  * S-curves. `size` 0 is no neck and 1 is the full neck. Liquid-layer coordinates.
@@ -211,7 +229,7 @@ export function neckPath(centerY: number, size: number) {
   const dock = LIQUID_PAD + DOCK_LEFT;
   const middle = (panel + dock) / 2;
   const waist = 10 * size;
-  const reach = waist + 20 * size;
+  const reach = neckReach(size);
   const bend = PANEL_GAP * 0.3;
   const half = (sign: 1 | -1) => {
     const edge = y + sign * reach;
