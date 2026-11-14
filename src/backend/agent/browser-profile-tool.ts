@@ -3,6 +3,7 @@ import {
   type AgentBrowserProfile,
   type AgentSummary,
   agentBrowserProfile,
+  BROWSER_PROFILE_LIMIT,
   BROWSER_PROFILE_NAME_MAX,
   sameAgentBrowserProfile,
   type UpdateAgentBrowserProfileInput,
@@ -39,13 +40,17 @@ export const setBrowserProfileToolSchema = z.strictObject({
     .refine((ids) => new Set(ids).size === ids.length, "Pass each agent id once.")
     .describe("Stable ids from list_agents. Include your own id to move yourself."),
   profile: z
+    .enum(["shared", "own", "named"])
+    .describe(
+      '"shared": the profile of all agents that have no other. "own": a profile of each agent only. "named": the named profile in name.',
+    ),
+  name: z
     .string()
     .trim()
     .min(1)
     .max(BROWSER_PROFILE_NAME_MAX)
-    .describe(
-      '"shared" for the profile of all agents that have no other, "own" for a profile of each agent only, or the name of a named profile. A name that no profile has makes a new profile.',
-    ),
+    .optional()
+    .describe("Only with profile named. A name that no profile has makes a new profile."),
 });
 
 /** The browser profile of an agent as `read_agent` shows it. A profile name is user data. */
@@ -70,11 +75,9 @@ type Target =
   | { kind: "named"; profileId: string; name: string }
   | { kind: "new"; name: string };
 
-function requestedTarget(profile: string, profiles: readonly { id: string; name: string }[]): Target {
-  if (sameName(profile, "shared")) return { kind: "shared" };
-  if (sameName(profile, "own")) return { kind: "own" };
-  const named = profiles.find((candidate) => sameName(candidate.name, profile));
-  return named ? { kind: "named", profileId: named.id, name: named.name } : { kind: "new", name: profile };
+function namedTarget(name: string, profiles: readonly { id: string; name: string }[]): Target {
+  const named = profiles.find((candidate) => sameName(candidate.name, name));
+  return named ? { kind: "named", profileId: named.id, name: named.name } : { kind: "new", name };
 }
 
 function approvalReason(target: Target, agents: string): string {
@@ -111,7 +114,9 @@ export const handleSetBrowserProfileTool = Effect.fn("SetBrowserProfileTool.hand
     params: DynamicToolCallParams,
     options: SetBrowserProfileToolOptions,
   ): Effect.fn.Return<OpenBotToolResponse, ToolOperationFailed> {
-    const { agentIds, profile } = setBrowserProfileToolSchema.parse(params.arguments, { reportInput: true });
+    const { agentIds, profile, name } = setBrowserProfileToolSchema.parse(params.arguments, { reportInput: true });
+    if ((profile === "named") !== (name !== undefined))
+      return openBotToolFailure("Pass name with profile named, and only then.");
     const profiles = options.profiles;
     if (!profiles) return openBotToolFailure("This OpenBot has no browser profiles.");
     // A routine, a channel task, an external chat, another agent or a web page must not move an agent
@@ -126,7 +131,12 @@ export const handleSetBrowserProfileTool = Effect.fn("SetBrowserProfileTool.hand
       if (!agent) throw new Error(sourceText("error.agent.unknown", { id: agentId }));
       return agent;
     });
-    const target = requestedTarget(profile, profiles.list().profiles);
+    const named = profiles.list().profiles;
+    const target: Target =
+      name === undefined ? { kind: profile === "own" ? "own" : "shared" } : namedTarget(name, named);
+    // Before the card, so that the owner does not approve a change that cannot happen.
+    if (target.kind === "new" && named.length >= BROWSER_PROFILE_LIMIT)
+      return openBotToolFailure(sourceText("error.backend.browserProfileLimit", { limit: BROWSER_PROFILE_LIMIT }));
     const wanted = (agent: AgentSummary): boolean => {
       const current = agentBrowserProfile(agent);
       if (target.kind === "new") return true;
@@ -137,7 +147,10 @@ export const handleSetBrowserProfileTool = Effect.fn("SetBrowserProfileTool.hand
       return !sameAgentBrowserProfile(current, next);
     };
     const moving = targets.filter(wanted);
-    if (moving.length === 0) return openBotToolResult({ status: "unchanged", profile });
+    const unchanged = targets
+      .filter((agent) => !moving.includes(agent))
+      .map((agent) => ({ agentId: agent.id, ok: true as const, unchanged: true as const }));
+    if (moving.length === 0) return openBotToolResult({ status: "unchanged", results: unchanged });
 
     const decision = yield* options.approve(approvalReason(target, moving.map((agent) => agent.name).join(", ")));
     if (decision === "cancel")
@@ -177,7 +190,7 @@ export const handleSetBrowserProfileTool = Effect.fn("SetBrowserProfileTool.hand
       ...(target.kind === "new" ? { created: true } : {}),
       moved,
       failed: results.length - moved,
-      results,
+      results: [...results, ...unchanged],
       next: "The moved agents start with no open tabs. A new profile has no sign-ins: the user signs in once in it, and request_takeover can hand them the page.",
     });
   },

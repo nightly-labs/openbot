@@ -457,7 +457,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "set_browser_profile",
     description:
-      'Move local OpenBot agents to one browser profile, from the user\'s request. A browser profile holds sign-ins, cookies and site data; agents on the same profile share them. profile is "shared" (the profile of all agents without another one), "own" (a profile of each agent only) or the name of a named profile; read_agent lists the names. A name that no profile has makes a new, empty profile. The owner approves each change on a card, and only a person\'s message in your chat or a thread they opened can start it. The open tabs of each moved agent close. The result has, for each agent id, ok or the error.',
+      'Move local OpenBot agents to one browser profile, from the user\'s request. A browser profile holds sign-ins, cookies and site data; agents on the same profile share them. profile is "shared" (the profile of all agents without another one), "own" (a profile of each agent only) or "named" with the name of a named profile; read_agent lists the names. A name that no profile has makes a new, empty profile. The owner approves each change on a card, and only a person\'s message in your chat or a thread they opened can start it. The open tabs of each moved agent close. The result has, for each agent id, ok (with unchanged when it was already there) or the error.',
     shape: setBrowserProfileToolSchema.shape,
   },
   {

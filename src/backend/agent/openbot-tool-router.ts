@@ -916,8 +916,7 @@ export class OpenBotToolRouter {
               tool === "send_message" ||
               tool === "messaging_post" ||
               tool === "web_search" ||
-              tool === "create_server_install_command" ||
-              tool === "set_browser_profile";
+              tool === "create_server_install_command";
             // A workflow tool reports its own correctable failures; only bad arguments reach this point.
             const correctable = (cause: unknown) =>
               correctableTool || (WORKFLOW_TOOL_NAMES.has(tool) && cause instanceof z.ZodError);

@@ -152,7 +152,7 @@ try {
   };
 
   await step("A turn that no person started cannot change a profile, and shows no card", async () => {
-    const { success, value } = await call({ agentIds: [sales.id], profile: "Client A" }, false);
+    const { success, value } = await call({ agentIds: [sales.id], profile: "named", name: "Client A" }, false);
     assert.equal(success, false);
     assert.equal(cards.length, 0);
     assert.equal(profiles.list().profiles.length, 0, "No profile is made.");
@@ -162,7 +162,7 @@ try {
 
   await step("A declined card changes nothing", async () => {
     answer = "decline";
-    const { success, value } = await call({ agentIds: [sales.id], profile: "Client A" });
+    const { success, value } = await call({ agentIds: [sales.id], profile: "named", name: "Client A" });
     answer = "accept";
     assert.equal(success, true);
     assert.equal(value.status, "declined");
@@ -173,7 +173,7 @@ try {
   });
 
   await step("One call makes a named profile and moves two agents to it", async () => {
-    const { success, value } = await call({ agentIds: [sales.id, support.id], profile: "Client A" });
+    const { success, value } = await call({ agentIds: [sales.id, support.id], profile: "named", name: "Client A" });
     assert.equal(success, true);
     assert.equal(value.status, "changed");
     assert.equal(value.created, true);
@@ -193,13 +193,18 @@ try {
 
   await step("A name in another case reuses the profile; agents already on it need no card", async () => {
     const before = cards.length;
-    const unchanged = await call({ agentIds: [sales.id], profile: "client a" });
+    const unchanged = await call({ agentIds: [sales.id], profile: "named", name: "client a" });
     assert.equal(unchanged.value.status, "unchanged");
+    assert.deepEqual(unchanged.value.results, [{ agentId: sales.id, ok: true, unchanged: true }]);
     assert.equal(cards.length, before, "No card for no change.");
-    const moved = await call({ agentIds: [coordinator.id, sales.id], profile: "CLIENT A" });
+    const moved = await call({ agentIds: [coordinator.id, sales.id], profile: "named", name: "CLIENT A" });
     assert.equal(moved.value.status, "changed");
     assert.equal(moved.value.created, undefined);
     assert.equal(moved.value.moved, 1, "Only the agent that changes moves.");
+    assert.deepEqual(moved.value.results, [
+      { agentId: coordinator.id, ok: true },
+      { agentId: sales.id, ok: true, unchanged: true },
+    ]);
     assert.equal(
       cards.at(-1),
       sourceText("status.agent.browserProfileNamed", { agents: "Coordinator", profile: "Client A" }),
@@ -209,7 +214,7 @@ try {
   });
 
   await step("shared and own move agents out of the named profile", async () => {
-    const shared = await call({ agentIds: [coordinator.id], profile: "Shared" });
+    const shared = await call({ agentIds: [coordinator.id], profile: "shared" });
     assert.equal(shared.value.moved, 1);
     assert.equal(cards.at(-1), sourceText("status.agent.browserProfileShared", { agents: "Coordinator" }));
     assert.deepEqual(view(coordinator.id), { kind: "shared" });
@@ -221,19 +226,43 @@ try {
     return { shared: shared.value, own: own.value };
   });
 
+  await step("A named profile called Shared is not the shared profile", async () => {
+    const named = await call({ agentIds: [coordinator.id], profile: "named", name: "Shared" });
+    assert.equal(named.value.created, true);
+    assert.equal(
+      cards.at(-1),
+      sourceText("status.agent.browserProfileNew", { agents: "Coordinator", profile: "Shared" }),
+    );
+    assert.deepEqual(view(coordinator.id), { kind: "named", name: "Shared" });
+    const back = await call({ agentIds: [coordinator.id], profile: "shared" });
+    assert.equal(back.value.moved, 1);
+    assert.deepEqual(view(coordinator.id), { kind: "shared" });
+    return back.value;
+  });
+
   await step("An unknown agent id fails the call before a card", async () => {
     const before = cards.length;
-    const { success, value } = await call({ agentIds: [sales.id, "missing-agent"], profile: "Client B" });
+    const { success, value } = await call({
+      agentIds: [sales.id, "missing-agent"],
+      profile: "named",
+      name: "Client B",
+    });
     assert.equal(success, false);
     assert.equal(cards.length, before);
-    assert.equal(profiles.list().profiles.length, 1, "No profile is made.");
+    assert.equal(profiles.list().profiles.length, 2, "No profile is made.");
     return value;
   });
 
-  await step("A repeated agent id is a correctable argument error", async () => {
-    const { success, value } = await call({ agentIds: [sales.id, sales.id], profile: "shared" });
-    assert.equal(success, false);
-    return value;
+  await step("A repeated agent id and a missing name are correctable argument errors", async () => {
+    const repeated = await call({ agentIds: [sales.id, sales.id], profile: "shared" });
+    assert.equal(repeated.success, false);
+    const before = cards.length;
+    const noName = await call({ agentIds: [sales.id], profile: "named" });
+    assert.equal(noName.success, false);
+    const extraName = await call({ agentIds: [sales.id], profile: "own", name: "Client A" });
+    assert.equal(extraName.success, false);
+    assert.equal(cards.length, before);
+    return { repeated: repeated.value, noName: noName.value, extraName: extraName.value };
   });
   report.passed = true;
 } catch (error) {
