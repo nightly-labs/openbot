@@ -319,7 +319,7 @@ export const messages = {
   "error.provider.claudeApiKeyNoCredit":
     "De Anthropic-API-sleutel heeft geen API-tegoed. Een Claude-abonnement betaalt geen verzoeken met een API-sleutel. Voeg tegoed toe in de Anthropic Console, of log bij Instellingen in bij Claude en kies het Claude-account in het modelmenu van de agent.",
   "error.provider.claudeServiceBlocked":
-    "De Claude-dienst heeft dit verzoek geblokkeerd. Meestal is dit een kort probleem bij Claude, geen probleem met je aanmelding. Stuur het bericht over een paar minuten opnieuw.",
+    "De Claude-dienst heeft dit verzoek geblokkeerd. Meestal is dit een kort probleem bij Claude, geen probleem met je account. Stuur het bericht over een paar minuten opnieuw.",
   "error.provider.foreignReasoning":
     "{provider} heeft het eerdere redeneren in deze chat niet geaccepteerd, omdat een ander account of een andere API-sleutel het heeft ontvangen. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.imageTooSmall":

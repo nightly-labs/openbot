@@ -316,7 +316,7 @@ export const messages = {
   "error.provider.claudeApiKeyNoCredit":
     "Anthropic API 키에 API 크레딧이 없어요. Claude 플랜은 API 키로 보낸 요청에 사용되지 않아요. Anthropic Console에서 크레딧을 추가하거나, 설정에서 Claude에 로그인한 다음 에이전트의 모델 메뉴에서 Claude 계정을 선택하세요.",
   "error.provider.claudeServiceBlocked":
-    "Claude 서비스가 이 요청을 차단했어요. 보통 Claude 쪽의 일시적인 문제이며, 로그인 문제가 아니에요. 몇 분 후에 메시지를 다시 보내세요.",
+    "Claude 서비스가 이 요청을 차단했어요. 보통 Claude 쪽의 일시적인 문제이며, 계정 문제가 아니에요. 몇 분 후에 메시지를 다시 보내세요.",
   "error.provider.foreignReasoning":
     "다른 계정이나 API 키가 받은 추론이라서 {provider}이(가) 이 채팅의 이전 추론을 수락하지 않았어요. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했어요. 다시 시도해 주세요.",
   "error.provider.imageTooSmall":

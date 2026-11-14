@@ -339,7 +339,7 @@ export const messages = {
   "error.provider.claudeApiKeyNoCredit":
     "La clé API Anthropic n'a pas de crédit API. Un forfait Claude ne paie pas les requêtes faites avec une clé API. Ajoutez du crédit dans l'Anthropic Console, ou connectez-vous à Claude dans les réglages et sélectionnez le compte Claude dans le menu des modèles de l'agent.",
   "error.provider.claudeServiceBlocked":
-    "Le service de Claude a bloqué cette requête. C'est en général un problème passager chez Claude, pas un problème de connexion. Renvoyez le message dans quelques minutes.",
+    "Le service de Claude a bloqué cette requête. C'est en général un problème passager chez Claude, pas un problème avec votre compte. Renvoyez le message dans quelques minutes.",
   "error.provider.foreignReasoning":
     "{provider} n’a pas accepté le raisonnement précédent de cette conversation, car un autre compte ou une autre clé API l’a reçu. OpenBot a ouvert une nouvelle session {provider} avec l’historique de la conversation. Réessayez.",
   "error.provider.imageTooSmall":
