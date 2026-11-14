@@ -129,10 +129,15 @@ export function SettingsRow({
   onAccessibilityAction?: (event: AccessibilityActionEvent) => void;
 }>) {
   const muted = String(useCSSVariable("--openbot-text-grouped-secondary"));
+  // A fixed width, as in `TrailingValue`, so the chevrons of all rows have the same position.
   const chevron =
-    onPress && disclosure ? <ChevronRight size={18} color={muted} strokeWidth={1.5} style={MIRROR_IN_RTL} /> : null;
+    onPress && disclosure ? (
+      <View className="w-[18px] shrink-0 items-center">
+        <ChevronRight size={18} color={muted} strokeWidth={1.5} style={MIRROR_IN_RTL} />
+      </View>
+    ) : null;
   const trailing = value ? (
-    <View className="flex-row items-center gap-2">
+    <View className="flex-row items-center justify-end gap-2">
       <Typography.Paragraph className="text-grouped-secondary">{value}</Typography.Paragraph>
       {chevron}
     </View>
