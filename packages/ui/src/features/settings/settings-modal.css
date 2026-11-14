@@ -508,19 +508,23 @@
   gap: var(--openbot-space-2);
 }
 
-/*
- * Every select in settings has the same fill. `Select` puts the class on its root, and `SearchSelect` (the
- * font and timezone rows) puts it on the trigger. Selects without the class, such as the filters above a
- * list, are in the content.
- */
-:is(.app-settings-modal-shell, .server-settings-modal-shell)
-:is(
-  .settings-modal-select .ui-select-trigger,
-  .ui-select-trigger.settings-modal-select,
-  .settings-modal-content .ui-select-trigger
-) {
+/* Every select in settings, with or without `settings-modal-select`, has the same fill. */
+:is(.app-settings-modal-shell, .server-settings-modal-shell) .settings-modal-content .ui-select-trigger {
   background: var(--openbot-bg-surface-raised);
   color: var(--openbot-text-secondary);
+}
+
+/* The fill above has a higher specificity than the hover and open fill of the primitive, so it sets them again. */
+:is(.app-settings-modal-shell, .server-settings-modal-shell) .settings-modal-content .ui-select-trigger[data-expanded] {
+  background: var(--openbot-hover);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :is(.app-settings-modal-shell, .server-settings-modal-shell)
+    .settings-modal-content
+    .ui-select-trigger:hover:not([data-disabled]) {
+    background: var(--openbot-hover);
+  }
 }
 
 .app-settings-modal-shell .settings-modal-update-actions {
@@ -800,6 +804,11 @@
 
   .app-settings-modal-shell .settings-modal-update-actions {
     justify-content: flex-end;
+  }
+
+  /* Server settings rows do not stack, so their selects keep the width of their value. */
+  .server-settings-modal-shell .settings-modal-select {
+    width: auto;
   }
 }
 
