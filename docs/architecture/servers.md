@@ -373,6 +373,11 @@ only to a connection with the capability and never for a hidden agent. Webhook c
 rotation and webhook test runs stay on `events-v1`. A client without the capability shows a notice
 in the Routines view; the web client shows the view switch only when the host serves it.
 
+`routine-flow-stop-v1` adds `POST /v1/routine-flows/runs/stop { routineId, runId }`, which stops a run
+that has not ended and answers `{}`. The member needs manage access to each agent of the routine and
+of the run's steps, and every one of them must be visible. A client without the capability shows no
+Stop.
+
 ### Workflows
 
 `workflows-v1` serves the workflow canvas (see [Workflows](agents.md#workflows)) to a joined desktop,
@@ -681,6 +686,17 @@ steps; otherwise it stays open and waits for the next cookie. Done sends without
 The desktop discards the window's session after a send that set cookies, on Cancel, and at shutdown.
 A failed send keeps it, so Done can try again. The web client has no menu item: a web page cannot
 read the cookies of another site.
+
+`browser-sign-in-storage-v1` (protocol 9 only) adds `POST /v1/browser/sign-in/storage` with
+`{ tabId, cookies, storage }` and answers with `{ cookies, storage }`, the counts that the host set.
+Some sites keep the sign-in in the page storage (localStorage), not in a cookie (#8686). `storage` is
+null, or the origin of the window's page and its pairs, at most 1000 pairs and 262,144 characters in
+all. The window reads the page storage in its isolated world when the page is on the tab's host,
+at each check and at Done, and keeps the last copy, so a closed window still sends it. The host sets
+the cookies as `browser-sign-in` does. It writes the pairs only when the tab shows the same origin,
+keeps the other pairs of that origin, and loads the tab again when it set a cookie or a pair. A
+desktop uses this route when the server advertises the capability, and `browser-sign-in` with
+cookies only for an older server. The host never sends the values back or records them.
 
 ### Skill events
 

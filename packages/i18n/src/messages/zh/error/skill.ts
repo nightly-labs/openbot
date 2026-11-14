@@ -49,6 +49,8 @@ export const messages = {
   "error.skill.localNotFound": "此本地技能不存在。请在本地技能列表中核对其 ID。",
   "error.skill.localRevisionNotFound": "此本地技能没有修订版本 {revision}。最新的修订版本是 {latest}。",
   "error.skill.localNameTaken": "已存在同名本地技能，请改为修订它。",
+  "error.skill.localNameClash":
+    "此名称与本地技能“{name}”都会变成“{slug}”。要更改该技能，请修订它。要添加新技能，请更改此名称中的拉丁字母或数字。",
   "error.skill.localKeepName": "修订技能时请保持技能名称不变。",
   "error.skill.localRelativeFolder": "请使用当前助手工作区内的相对技能文件夹。",
   "error.skill.localSourceOutside": "技能源必须位于助手工作区内。",

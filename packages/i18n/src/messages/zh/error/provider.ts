@@ -191,7 +191,7 @@ export const messages = {
   "error.provider.opencodeInvalidUpload":
     "OpenCode 的模型服务商报告上传请求无效。请改用其他模型继续；重新创建自动化任务前请先检查已保存的自动化任务。\n{detail}",
   "error.provider.opencodeUnreadableContent":
-    "该模型无法读取该对话中的文件或图片。请选择能读取文件的模型，然后重新发送消息。",
+    "该模型无法读取该对话中的文件或图片。OpenBot 已使用聊天记录开始新的 OpenCode 会话。请去掉文件后重新发送消息，或选择能读取文件的模型。如果你将此模型添加到了自定义服务商，请在其设置的“接受”中取消勾选“图片”。",
   "error.provider.opencodeContextTooSmall":
     "此聊天超出了模型的上下文窗口。请在 Ollama 或 LM Studio 中以更大的上下文长度加载模型，并在 OpenBot 中该模型提供方的设置里填写相同的窗口。或者选择更大的模型。",
   "error.provider.opencodeFreeLimit":
@@ -199,6 +199,8 @@ export const messages = {
   "error.provider.opencodeProviderFailed":
     "模型服务商一侧发生故障，不是你的网络问题。请稍后重试或改用其他模型。\n{detail}",
   "error.provider.opencodeIncompleteReply": "模型的回复中断了或无效。请重新发送消息，或改用其他模型。\n{detail}",
+  "error.provider.opencodeReasoningOverlap":
+    "OpenCode 无法在此推理强度下读取该模型的推理内容。请选择更低的推理强度或其他模型，然后重新发送消息。",
   "error.provider.opencodeNetwork":
     "OpenCode 无法连接模型服务商。请检查运行 OpenBot 的电脑的网络连接后重试。\n{detail}",
   "error.provider.codexStateBusy": "ChatGPT 仍在为上一次启动准备本地历史记录。请等几分钟，然后重试。",
@@ -228,6 +230,8 @@ export const messages = {
     "OPENBOT_ANTIGRAVITY_PATH 中的 Gemini 服务器不存在或不可执行。请更正路径或删除该变量，然后重启 OpenBot。",
   "error.provider.antigravityVersionUnreadable": "无法读取 Gemini 服务器版本。",
   "error.provider.antigravitySignIn": "请使用 Google 账号登录以使用 Gemini。",
+  "error.provider.antigravityModelAtCapacity":
+    "Google 目前没有此 Gemini 模型的空闲容量。原因不是你的套餐配额。请几分钟后重试，或改用其他模型。\n{detail}",
   "error.provider.antigravityRateLimited":
     "由于触发速率限制或套餐配额用尽，Gemini 拒绝了该请求。请等待几分钟或改用其他模型后重试。\n{detail}",
   "error.provider.antigravityQuotaReached":
@@ -289,6 +293,8 @@ export const messages = {
     "此聊天中的图片太多，模型未接受此聊天。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
   "error.provider.opencodeSessionRejected":
     "OpenCode 拒绝了这次请求，但没有给出原因。长对话或更换模型之后可能出现这种情况。OpenBot 已带着聊天记录开启新的 OpenCode 会话，请重试。如果仍然报错，请换一个模型或调低推理强度。",
+  "error.provider.opencodeCompactionFailed":
+    "模型无法总结这段长对话，因此无法在上下文窗口中腾出空间。OpenBot 已带着聊天记录开启新的 OpenCode 会话，请重试。如果仍然报错，请选择更强的模型。",
   "error.provider.museMcpStartupFault":
     "Muse 无法启动某个 MCP 服务器，并在本次会话中停用了 MCP。OpenBot 已带着聊天记录开启新的 Muse 会话，请重试。如果仍然报错，请关闭 Computer Use，或对该助手关闭启动失败的 MCP 服务器。",
   "error.provider.claudeSessionMissing":
@@ -314,6 +320,8 @@ export const messages = {
     "Gemini 回答前，Google 需要验证你的账号。在浏览器中验证你的 Google 账号，然后重新发送消息。",
   "error.provider.keyProviderRefused": "{provider} 拒绝了已保存的 API 密钥。请在设置中更换或移除该密钥，然后重试。",
   "error.provider.keyProviderNoBalance": "已保存 API 密钥的 {provider} 账户没有余额。请为账户充值，然后重试。",
+  "error.provider.keyProviderLowCredit":
+    "已保存 API 密钥的 {provider} 账户余额不足以支付该模型的回复。请为账户充值，或选择其他模型，然后重试。",
   "error.provider.modelServiceRefused": "模型服务拒绝了该请求。请选择其他模型，或在该服务中检查你对此模型的访问权限。",
   "error.provider.modelServiceRefusedReason":
     "模型服务拒绝了该请求：{reason}。请选择其他模型，或在该服务中检查你对此模型的访问权限。",

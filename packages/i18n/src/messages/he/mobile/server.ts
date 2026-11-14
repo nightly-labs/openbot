@@ -735,7 +735,7 @@ export const messages = {
   "mobile.server.vault.contacts": "פרטי קשר",
   "mobile.server.vault.apiKeys": "מפתחות API",
   "mobile.server.vault.apiKeysFooter":
-    "סוכנים ב-{host} קוראים כל מפתח מקובץ פרטי לפי שם המשתנה שלו. המפתחות נשארים ב-{host}. הטלפון הזה לא יכול להציג אותם.",
+    "סוכנים ב-{host} קוראים כל מפתח מקובץ לפי שם המשתנה שלו. כל הסוכנים פועלים כאותו משתמש מערכת, ולכן סוכן יכול לקרוא גם קובץ מפתח שמיועד לסוכנים אחרים. המפתחות נשארים ב-{host}. הטלפון הזה לא יכול להציג אותם.",
   "mobile.server.vault.empty": "אין פריטים",
   "mobile.server.vault.addLogin": "הוספת התחברות",
   "mobile.server.vault.addCard": "הוספת כרטיס",

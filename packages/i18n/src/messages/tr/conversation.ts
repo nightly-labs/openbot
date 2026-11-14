@@ -60,6 +60,7 @@ export const messages = {
   "conversation.sidePanel.closePane": "{name} kapat",
   "conversation.sidePanel.openPane": "{name} aç",
   "conversation.sidePanel.launcher": "Bir bölme aç",
+  "conversation.sidePanel.resize": "Sağ paneli yeniden boyutlandır",
   "conversation.sidePanel.pane.browser": "Tarayıcı",
   "conversation.sidePanel.pane.files": "Dosyalar",
   "conversation.threads.new": "Yeni mesaj dizisi",

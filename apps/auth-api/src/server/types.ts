@@ -117,6 +117,8 @@ export interface WorkerBindings {
   HOSTED_SERVER_TEMPLATE?: string;
   BOAT_API_KEY?: string;
   BOAT_WEBHOOK_SECRET?: string;
+  /** A Discord webhook for operator messages about the server pool. Without it there are no pool alerts. */
+  HOSTED_POOL_ALERT_WEBHOOK_URL?: string;
   /** An OpenPanel server client and its write-only secret, for account events. Set only in production. */
   OPENPANEL_CLIENT_ID?: string;
   OPENPANEL_CLIENT_SECRET?: string;

@@ -221,12 +221,16 @@ export function restrictionInput(
 /**
  * Describe a failed profile tool call. Schema failures omit submitted instructions and unknown field
  * names. A schema parsed with `reportInput` gives the checked value, so a trimmed field reports its
- * trimmed length.
+ * trimmed length. `unsupportedFields` gives the text for an object at `path` that has fields the tool
+ * does not take.
  */
-export function profileToolErrorMessage(error: unknown): string {
+export function profileToolErrorMessage(
+  error: unknown,
+  unsupportedFields: (path: readonly PropertyKey[]) => string = () => "Remove unsupported profile fields.",
+): string {
   if (!(error instanceof z.ZodError)) return error instanceof Error ? error.message : String(error);
   const details = error.issues.map((issue) => {
-    if (issue.code === "unrecognized_keys") return "Remove unsupported profile fields.";
+    if (issue.code === "unrecognized_keys") return unsupportedFields(issue.path);
     const field = issue.path.join(".") || "arguments";
     if (issue.code === "too_big" && issue.origin === "string" && typeof issue.input === "string") {
       return `${field} must have at most ${issue.maximum} characters; received ${issue.input.length}. Shorten it and retry.`;

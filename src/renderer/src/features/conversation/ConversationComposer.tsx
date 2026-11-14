@@ -339,7 +339,7 @@ export function ConversationComposer() {
     const duration = format.number(minutes, { style: "unit", unit: "minute", unitDisplay: "long" });
     return { title: undefined, body: t("composer.providerWait.silent", { provider, duration }) };
   });
-  /** A file the model cannot read is fixed by a model change, not by waiting, so it is not shown as a failure. */
+  /** A file the model cannot read is fixed by a send without it or a model change, not by waiting, so it is not shown as a failure. */
   const unreadableContent = () =>
     props.agent?.provider === "opencode" &&
     currentChatError() === localizeSourceText(sourceText("error.provider.opencodeUnreadableContent"));

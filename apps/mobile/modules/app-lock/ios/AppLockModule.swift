@@ -32,7 +32,7 @@ final class AppLockMonitor {
   }
 
   func takeAway() -> AwayState {
-    var state = AwayState()
+    let state = AwayState()
     if let awaySince {
       state.awayMs = Double(clock_gettime_nsec_np(CLOCK_MONOTONIC) &- awaySince) / 1_000_000
     }
@@ -82,7 +82,7 @@ final class AppLockMonitor {
   }
 }
 
-final class PinHashException: Exception {
+final class PinHashException: Exception, @unchecked Sendable {
   override var reason: String {
     "The PIN hash could not be made"
   }

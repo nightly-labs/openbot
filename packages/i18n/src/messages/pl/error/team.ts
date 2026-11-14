@@ -79,6 +79,7 @@ export const messages = {
   "error.team.usageLimitUnsupported": "To połączenie nie może pokazać ani zmienić limitów użycia agentów.",
   "error.team.hermesImportUnsupported": "To połączenie nie może zaimportować profili Hermes z serwera.",
   "error.team.providerDetectionUnsupported": "To połączenie nie może znaleźć serwerów modeli i agentów serwera.",
+  "error.team.routineFlowStopUnsupported": "To połączenie nie może zatrzymać uruchomienia rutyny.",
   "error.team.sidebarFoldersUnsupported": "To połączenie nie obsługuje folderów w folderach.",
   "error.team.libraryFoldersUnsupported": "To połączenie nie obsługuje folderów Biblioteki.",
   "error.team.agentNotificationLevelsUnsupported":

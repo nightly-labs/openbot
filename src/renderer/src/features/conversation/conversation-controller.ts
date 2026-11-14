@@ -45,7 +45,7 @@ import type { SideQuestionState } from "./stores/side-question-store";
 import { createVoiceSessions } from "./stores/voice-session-store";
 import type { VoiceCloudStream } from "./stores/voice-store";
 
-const BROWSER_PANEL_DEFAULT = 380;
+export const BROWSER_PANEL_DEFAULT = 380;
 const BROWSER_PIP_STORAGE_KEY = "openbot:browser-pip-native-bounds";
 
 function readBrowserPipBounds(): BrowserBounds | null {

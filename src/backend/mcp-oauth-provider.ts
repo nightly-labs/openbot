@@ -209,6 +209,12 @@ const TOKEN_REFRESH_MARGIN_MS = 60_000;
  */
 const MCP_REVOCATION_TIMEOUT_MS = 5_000;
 
+/**
+ * What Sign in would do for a server that answered without one: nothing, open a page, or end at
+ * once because the authorization server cannot take OpenBot as a client.
+ */
+export type McpSignInOffer = "none" | "offered" | "refused";
+
 /** One sign-in, from the browser leaving to the token set being stored. */
 export interface McpSignIn {
   /** Given to the SDK transport, which drives the whole exchange through it. */
@@ -254,6 +260,11 @@ export interface McpSignIn {
    * sentence. Only a fetch passed through `watchRegistration` sees the status.
    */
   registrationStatus: () => number | null;
+  /**
+   * Whether the authorization server refused each redirect address of this attempt's registration
+   * with `invalid_redirect_uri`. YNAB registers only the MCP clients it approved (#8417).
+   */
+  registrationRedirectRefused: () => boolean;
   /** `fetch` for an exchange that can register, keeping the status of the registration answer. */
   watchRegistration: (fetch: FetchLike) => FetchLike;
   /**
@@ -291,8 +302,8 @@ export interface McpOAuthAuthority {
   needsSignIn: (url: string) => boolean;
   /** Whether this computer keeps a sign-in for this URL: current, expired, or ended by the server. */
   hasSignIn: (url: string) => boolean;
-  /** Whether Sign in would open a page for a server that answered without one. See `McpOAuth.offersSignIn`. */
-  offersSignIn: (url: string) => Effect.Effect<boolean>;
+  /** What Sign in would do for a server that answered without one. See `McpOAuth.signInOffer`. */
+  signInOffer: (url: string) => Effect.Effect<McpSignInOffer>;
   /** Drops the tokens and keeps the sign-in app, so the next sign-in uses the same app. */
   signOut: (url: string) => Effect.Effect<void, McpOperationError>;
   /** Drops everything kept for this URL, the sign-in app included. Used when the row is removed. */
@@ -585,6 +596,7 @@ export class McpOAuth implements McpOAuthAuthority {
       registrationFailed: () => provider.registrationPending,
       registrationUnsupported: () => provider.registrationUnsupported,
       registrationStatus: () => provider.registrationStatus,
+      registrationRedirectRefused: () => provider.redirectRefused,
       watchRegistration: (fetch) => provider.watchRegistration(fetch),
       cancelled: () => cancelled,
       exchangeFailed: () => exchangeFailed,
@@ -638,23 +650,32 @@ export class McpOAuth implements McpOAuthAuthority {
   }
 
   /**
-   * Whether Sign in would open a page for a server that answered without one: no token is on file,
+   * What Sign in would do for a server that answered without one. `offered`: no token is on file,
    * and its metadata names an authorization server. Some servers list their tools to anyone and want
-   * a token only to run one. Public documents only; a read that fails is a no, because nobody
-   * pressed Sign in to see its error.
+   * a token only to run one. `refused`: that authorization server cannot take OpenBot as a new client,
+   * so Sign in would end at once with the refused-registration sentence (#8827). Public documents
+   * only; a read that fails is `none`, because nobody pressed Sign in to see its error.
    */
-  readonly offersSignIn = Effect.fn("McpOAuth.offersSignIn")(function* (this: McpOAuth, url: string) {
+  readonly signInOffer = Effect.fn("McpOAuth.signInOffer")(function* (this: McpOAuth, url: string) {
     const key = mcpOAuthAccountKey(url);
-    if (!key || this.#options.storage.read(key)?.tokens) return false;
+    const record = key === null ? undefined : this.#options.storage.read(key);
+    if (!key || record?.tokens) return "none";
     const controller = new AbortController();
-    return yield* namesAuthorizationServer(mcpOAuthServerUrl(key), this.#fetch(key, controller.signal)).pipe(
-      Effect.timeoutOrElse({
-        duration: this.#options.refreshTimeoutMs ?? MCP_TOKEN_TIMEOUT_MS,
-        orElse: () => Effect.succeed(false),
-      }),
-      Effect.catch(() => Effect.succeed(false)),
-      Effect.ensuring(Effect.sync(() => controller.abort())),
-    );
+    const fetchFn = this.#fetch(key, controller.signal);
+    const timeoutMs = this.#options.refreshTimeoutMs ?? MCP_TOKEN_TIMEOUT_MS;
+    return yield* Effect.gen(function* () {
+      const issuer = yield* namesAuthorizationServer(mcpOAuthServerUrl(key), fetchFn).pipe(
+        Effect.timeoutOrElse({ duration: timeoutMs, orElse: () => Effect.succeed(null) }),
+        Effect.catch(() => Effect.succeed(null)),
+      );
+      if (!issuer) return "none";
+      // A sign-in app, or a registration with this issuer, is the client: nothing has to register.
+      // The SDK drops a registration bound to another issuer and registers again.
+      const client = record?.client;
+      if (record?.app || (client && (typeof client.issuer !== "string" || issuersMatch(client.issuer, issuer))))
+        return "offered";
+      return (yield* acceptsNewClient(issuer, fetchFn, timeoutMs)) ? "offered" : "refused";
+    }).pipe(Effect.ensuring(Effect.sync(() => controller.abort())));
   });
 
   get redirectUrl(): string {
@@ -918,6 +939,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   #registrationPending = false;
   /** The status the authorization server answered the pending registration with. */
   #registrationStatus: number | null = null;
+  /** Whether that answer was `invalid_redirect_uri`, with no client metadata document to use instead. */
+  #redirectRefused = false;
 
   constructor(options: ClientProviderOptions) {
     this.#options = options;
@@ -1122,6 +1145,11 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     return this.#registrationStatus;
   }
 
+  /** Whether the last registration answer refused each redirect address that this attempt sent. */
+  get redirectRefused(): boolean {
+    return this.#redirectRefused;
+  }
+
   /**
    * Matched by address, not by `#registrationPending`: the SDK also registers when it drops a
    * client bound to another issuer, which this provider never hears about.
@@ -1139,6 +1167,10 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    * form of the address it refused, which the listener also answers. Dropbox accepts only the paths
    * of the MCP clients it knows (#8025). A server that refuses OpenBot itself refuses that one too,
    * and the first refusal is kept.
+   *
+   * A server that refuses each address with `invalid_redirect_uri` registers only the MCP clients it
+   * approved: YNAB answers "Redirect URI is not an allowed MCP client" (#8417). The client metadata
+   * document then takes the place of the registration, as for a 401 or a 403.
    */
   watchRegistration(fetch: FetchLike): FetchLike {
     return async (input, init) => {
@@ -1157,7 +1189,10 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       const retried = callback ? await fetch(input, callback) : null;
       if (retried?.ok) response = retried;
       this.#registrationStatus = response.status;
-      if (!this.#documentReplacesRefusal(response.status)) return response;
+      const redirectRefused = (await registrationErrorCode(response)) === "invalid_redirect_uri";
+      this.#redirectRefused = redirectRefused;
+      if (!this.#documentReplacesRefusal(response.status, redirectRefused)) return response;
+      this.#redirectRefused = false;
       await response.body?.cancel();
       return Response.json(
         {
@@ -1187,8 +1222,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    * registers OpenBot keeps that registration: only a refusal changes the client. The document has
    * no secret, so the server must list `none`.
    */
-  #documentReplacesRefusal(status: number): boolean {
-    if (status !== 401 && status !== 403) return false;
+  #documentReplacesRefusal(status: number, redirectRefused: boolean): boolean {
+    if (status !== 401 && status !== 403 && !redirectRefused) return false;
     const metadata = this.#discoveryState?.authorizationServerMetadata;
     return (
       metadata?.client_id_metadata_document_supported === true &&
@@ -1250,6 +1285,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       Effect.gen({ self: this }, function* () {
         this.#registrationPending = false;
         this.#registrationStatus = null;
+        this.#redirectRefused = false;
         this.recordSecret(information.client_secret);
         // The SDK binds an unstamped client to its issuer after an exchange. For a sign-in app that
         // binding is all that is written: the app is not a registration.
@@ -1598,8 +1634,8 @@ function mcpOAuthServerUrl(key: string): string {
 }
 
 /**
- * Whether the server publishes protected-resource metadata that names an authorization server, which
- * is what a sign-in needs to open a page. Any answer below 500 that is not such metadata says no: a
+ * The first authorization server that the server's protected-resource metadata names, or `null`. A
+ * sign-in needs one to open a page. Any answer below 500 that is not such metadata says no: a
  * 404, a refusal, or a page that is not metadata. No answer, a server error, or a busy server (408,
  * 429) says nothing about the server, so it fails: a sign-in must not end as if the server asked for
  * none, which left the row showing the result of the earlier test, with no page and no words.
@@ -1621,7 +1657,23 @@ const namesAuthorizationServer = Effect.fnUntraced(function* (resource: string, 
       return Effect.fail(new Error(sourceText("error.backend.mcpSignInMetadataUnreadable")));
     }),
   );
-  return Boolean(metadata?.authorization_servers?.length);
+  return metadata?.authorization_servers?.[0] ?? null;
+});
+
+/**
+ * Whether an authorization server can take a client that OpenBot does not have yet, as the SDK
+ * decides it: a registration endpoint, or the client metadata document. Google's has neither, so
+ * Sign in to Gmail or Drive always ends in the refused-registration sentence (#8827). Metadata that
+ * cannot be read is a yes: the SDK then registers at `/register`, and Sign in says what went wrong.
+ */
+const acceptsNewClient = Effect.fnUntraced(function* (issuer: string, fetchFn: FetchLike, timeoutMs: number) {
+  const metadata = yield* mcpCall(() => discoverAuthorizationServerMetadata(issuer, { fetchFn })).pipe(
+    Effect.timeoutOrElse({ duration: timeoutMs, orElse: () => Effect.succeed(undefined) }),
+    Effect.catch(() => Effect.succeed(undefined)),
+  );
+  return (
+    !metadata || Boolean(metadata.registration_endpoint) || metadata.client_id_metadata_document_supported === true
+  );
 });
 
 /** A legacy binding is useful only when it names an endpoint this client would send credentials to. */
@@ -1736,14 +1788,20 @@ const registrationErrorSchema = z.looseObject({ error: z.string() });
  * the SDK still reads the answer that is kept. The secure fetch has already limited the body.
  */
 async function refusesRedirectAddress(response: Response): Promise<boolean> {
-  if (response.status !== 400) return false;
+  const error = await registrationErrorCode(response);
+  return error === "invalid_redirect_uri" || error === "invalid_client_metadata";
+}
+
+/** The OAuth `error` of a 400 registration answer, or `null`. A copy is read, as above. */
+async function registrationErrorCode(response: Response): Promise<string | null> {
+  if (response.status !== 400) return null;
   const body = registrationErrorSchema.safeParse(
     await response
       .clone()
       .json()
       .catch(() => null),
   );
-  return body.success && (body.data.error === "invalid_redirect_uri" || body.data.error === "invalid_client_metadata");
+  return body.success ? body.data.error : null;
 }
 
 /** The `localhost` form of a `127.0.0.1` loopback address, or `null` for any other address. */
@@ -1941,7 +1999,9 @@ const secureOAuthRequest = Effect.fn("McpOAuth.secureFetch")(function* (
     if (hop >= MAX_OAUTH_REDIRECTS)
       return yield* mcpFailure(new Error(sourceText("error.backend.oauthTooManyRedirects")));
     const next = yield* mcpSync(() => new URL(location, url));
-    if (next.origin !== url.origin && carriesCredential(request))
+    // Only a sign-in request may move to its own `www.` host: MCP traffic keeps its origin rule.
+    const ownWwwHost = !mcpTraffic && movesToOwnWwwHost(url, next, response.status);
+    if (next.origin !== url.origin && carriesCredential(request) && !ownWwwHost)
       return yield* mcpFailure(new Error(sourceText("error.backend.oauthRedirectOrigin", { origin: next.origin })));
     url = next;
     request = redirected(request, response.status);
@@ -2033,6 +2093,20 @@ function withoutHash(url: URL): string {
 function carriesCredential(request: RequestInit): boolean {
   if (request.body !== undefined && request.body !== null) return true;
   return new Headers(request.headers).has("authorization");
+}
+
+/**
+ * Whether a redirect only moves the same https request between a host and its own `www.` host.
+ * Lunch Flow's metadata names `lunchflow.app`, which answers each request with a 308 to the same
+ * path on `www.lunchflow.app` (#8436). The server that redirects already has the request, and a
+ * 307 or 308 keeps the method and the body. Any other origin change still refuses a credential.
+ */
+function movesToOwnWwwHost(from: URL, to: URL, status: number): boolean {
+  if (status !== 307 && status !== 308) return false;
+  if (from.protocol !== "https:" || to.protocol !== "https:" || from.port !== to.port) return false;
+  if (from.pathname !== to.pathname || from.search !== to.search) return false;
+  const ownWww = (bare: string, www: string) => www === `www.${bare}` && !bare.startsWith("www.");
+  return ownWww(from.hostname, to.hostname) || ownWww(to.hostname, from.hostname);
 }
 
 /** Where a credential may be sent: an https endpoint, or one on the user's own machine. */

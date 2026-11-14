@@ -11,6 +11,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
+import { PASSWORD_MANAGER_BRANDS } from "../../backend/password-vault";
 import type { PasswordVaultSource } from "../../backend/password-vault-router";
 import { type PasswordManagerDriver, type PasswordManagerError, passwordManagerFailure } from "./driver";
 
@@ -94,7 +95,11 @@ export class PasswordManagersService {
 
   /** The login sources of the browser, one for each manager. */
   routes(): PasswordVaultSource[] {
-    return [...this.#drivers.values()].map(({ prefix, vault }) => ({ prefix, vault }));
+    return [...this.#drivers.values()].map(({ id, prefix, vault }) => ({
+      prefix,
+      name: PASSWORD_MANAGER_BRANDS[id],
+      vault,
+    }));
   }
 
   #driver(manager: PasswordManagerId): PasswordManagerDriver {

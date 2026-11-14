@@ -4,9 +4,9 @@ import type { messages as source } from "../en/vault";
 export const messages = {
   "vault.items.title": "已保存的项目",
   "vault.items.description":
-    "该服务器上的所有助手都可以使用这些项目。OpenBot 会把密码、卡号和安全码直接填入页面，助手不会看到它们。",
+    "该服务器上的所有助手都可以使用这些项目。OpenBot 会把密码、卡号和安全码直接填入页面，助手不会看到它们。助手从文件中读取 API 密钥，而不是从聊天中读取。",
   "vault.items.scopedDescription":
-    "每个项目只供你选择的助手使用。OpenBot 会把密码、卡号和安全码直接填入页面，助手不会看到它们。",
+    "每个项目只供你选择的助手使用。OpenBot 会把密码、卡号和安全码直接填入页面，助手不会看到它们。助手从文件中读取 API 密钥，而不是从聊天中读取。所有助手都以同一个系统用户运行，因此助手也能读取为其他助手保存的 API 密钥文件。",
   "vault.agents.label": "助手",
   "vault.agents.all": "所有助手",
   "vault.agents.some": "{chosen}/{total}",

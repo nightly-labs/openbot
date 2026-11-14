@@ -313,6 +313,14 @@ export class WhatsAppRefusedError extends Error {
   }
 }
 
+/** An answer that failed after its first part replaced the status post: that post now holds the part. */
+export class WhatsAppAnswerPartlySent extends Error {
+  constructor(cause: unknown) {
+    super("A part of the WhatsApp answer was sent.", { cause });
+    this.name = "WhatsAppAnswerPartlySent";
+  }
+}
+
 /**
  * The relay that brings a platform's HTTP requests to this host: Signal's `ingress` socket, which
  * the main process owns. It is open while anything holds it.

@@ -216,7 +216,7 @@ export const messages = {
   "error.provider.opencodeInvalidUpload":
     "De modelaanbieder van OpenCode meldde een ongeldig uploadverzoek. Kies een ander model en ga verder. Controleer opgeslagen routines voordat je ze opnieuw maakt.\n{detail}",
   "error.provider.opencodeUnreadableContent":
-    "Dit model kan een bestand of afbeelding in deze chat niet lezen. Kies een model dat bestanden kan lezen en stuur je bericht opnieuw.",
+    "Dit model kan een bestand of afbeelding in deze chat niet lezen. OpenBot heeft een nieuwe OpenCode-sessie gestart met de chatgeschiedenis. Stuur je bericht opnieuw zonder het bestand, of kies een model dat bestanden kan lezen. Heb je dit model aan een eigen aanbieder toegevoegd, schakel dan in de instellingen bij ‘Accepteert’ ‘Afbeeldingen’ uit.",
   "error.provider.opencodeContextTooSmall":
     "Deze chat past niet in het contextvenster van het model. Laad het model in Ollama of LM Studio met een grotere contextlengte, en vul hetzelfde venster in bij de providerinstellingen in OpenBot. Of kies een groter model.",
   "error.provider.opencodeFreeLimit":
@@ -225,6 +225,8 @@ export const messages = {
     "De modelaanbieder had een storing aan zijn kant. Het ligt niet aan je verbinding. Probeer het later opnieuw of kies een ander model.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "Het antwoord van het model werd afgebroken of was ongeldig. Stuur je bericht opnieuw of kies een ander model.\n{detail}",
+  "error.provider.opencodeReasoningOverlap":
+    "OpenCode kon de redenering van dit model bij dit denkniveau niet lezen. Kies een lager denkniveau of een ander model en stuur je bericht dan opnieuw.",
   "error.provider.opencodeNetwork":
     "OpenCode kon geen verbinding maken met de modelaanbieder. Controleer de netwerkverbinding van de computer waarop OpenBot draait en probeer het opnieuw.\n{detail}",
   "error.provider.codexStateBusy":
@@ -259,6 +261,8 @@ export const messages = {
     "De Gemini-server in OPENBOT_ANTIGRAVITY_PATH ontbreekt of is niet uitvoerbaar. Corrigeer het pad of verwijder de variabele en start OpenBot daarna opnieuw.",
   "error.provider.antigravityVersionUnreadable": "Kan de versie van de Gemini-server niet lezen.",
   "error.provider.antigravitySignIn": "Log in met Google om Gemini te gebruiken.",
+  "error.provider.antigravityModelAtCapacity":
+    "Google heeft nu geen vrije capaciteit voor dit Gemini-model. Het quotum van je abonnement is niet de oorzaak. Probeer het over een paar minuten opnieuw, of kies een ander model.\n{detail}",
   "error.provider.antigravityRateLimited":
     "Gemini heeft het verzoek geweigerd, omdat een limiet op het aantal verzoeken of het quotum van het abonnement is bereikt. Wacht een paar minuten of kies een ander model, en probeer het opnieuw.\n{detail}",
   "error.provider.antigravityQuotaReached":
@@ -324,6 +328,8 @@ export const messages = {
     "Het model accepteerde deze chat niet, omdat de chat te veel afbeeldingen bevat. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.opencodeSessionRejected":
     "OpenCode heeft het verzoek geweigerd zonder de oorzaak te geven. Dit kan gebeuren in een lange chat of na een modelwijziging. OpenBot heeft een nieuwe OpenCode-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Blijft de fout, kies dan een ander model of een lager niveau.",
+  "error.provider.opencodeCompactionFailed":
+    "Het model kon deze lange chat niet samenvatten om ruimte te maken in het contextvenster. OpenBot heeft een nieuwe OpenCode-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Blijft de fout, kies dan een sterker model.",
   "error.provider.museMcpStartupFault":
     "Muse kon een MCP-server niet starten en heeft MCP in deze sessie geblokkeerd. OpenBot heeft een nieuwe Muse-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Blijft de fout, zet dan Computerbesturing of de mislukte MCP-server uit voor deze agent.",
   "error.provider.claudeSessionMissing":
@@ -354,6 +360,8 @@ export const messages = {
     "{provider} heeft de opgeslagen API-sleutel geweigerd. Vervang of verwijder de sleutel in Instellingen en probeer het opnieuw.",
   "error.provider.keyProviderNoBalance":
     "Het {provider}-account van de opgeslagen API-sleutel heeft geen saldo. Voeg tegoed toe aan het account en probeer het opnieuw.",
+  "error.provider.keyProviderLowCredit":
+    "Het {provider}-account van de opgeslagen API-sleutel heeft niet genoeg tegoed voor een antwoord van dit model. Voeg tegoed toe aan het account of kies een ander model en probeer het opnieuw.",
   "error.provider.modelServiceRefused":
     "De modeldienst heeft het verzoek geweigerd. Kies een ander model of controleer je toegang tot dit model bij de dienst.",
   "error.provider.modelServiceRefusedReason":

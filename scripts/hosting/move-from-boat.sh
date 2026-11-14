@@ -24,13 +24,14 @@
 #
 #   move-from-boat.sh packages
 #       On the sandbox, while the customer still uses it. Prints the apt packages that the customer
-#       installed, for `install-packages`. It does not stop OpenBot.
+#       installed, for `install-packages`, and the systemd units and the folders with files of the
+#       customer that the move does not copy. It does not stop OpenBot.
 #
 #   move-from-boat.sh install-packages
 #       On the prepared VPS, before the export. Installs the apt packages that `packages` printed, from
 #       standard input, so that the import does not install them during the downtime.
 #
-#   move-from-boat.sh export <archive | ->
+#   move-from-boat.sh export <archive | -> [<folder>...]
 #       On the sandbox. Stops OpenBot and keeps it stopped, then archives the home of the service user,
 #       the server keyring, and what the customer installed outside the home: directories in /opt and
 #       /usr/local, npm packages for all users, programs in /usr/local/bin, the crontab, and the names
@@ -39,12 +40,15 @@
 #       provider sign-in and each key of the customer: move it only over SSH, and delete each copy
 #       after the import. With `-`, the archive goes to standard output and the messages to standard
 #       error: send it to the VPS through SSH, so that the sandbox needs no disk space for a copy.
+#       It also archives each <folder> of the customer that `packages` named and that the operator gives
+#       (see `movable_folder`).
 #
-#   move-from-boat.sh import <archive>
+#   move-from-boat.sh import <archive> [<folder>...]
 #       On the prepared VPS. Restores the archive as the service user and compares the checksums. Puts
 #       the moved commands in ~/.local/bin, installs the crontab and the apt packages, and names each
-#       command that cannot start here and each item that the move did not copy. It does not start
-#       OpenBot.
+#       command that cannot start here and each item that the move did not copy. It also restores each
+#       <folder> that the operator gave to the export, as a new folder of the service user. It does not
+#       start OpenBot.
 #
 #   move-from-boat.sh start
 #       On the VPS, after a complete import, when the row of the server names this machine and the
@@ -430,6 +434,38 @@ customer_units() {
   return 0
 }
 
+# The folders outside the archive that have files of the service user, one level below the top (two in
+# /var), such as `/srv/vaults` or `/var/lib/syncthing`. The move does not copy them. Issue #8871: Obsidian
+# vaults that were outside the home were missing after a move. The search skips /opt and /usr: the
+# service user owns /opt and /usr/local, and `added_trees` finds what the customer added there. A file
+# that the customer made as root is not found. The search goes into other mounts, because a folder of
+# the customer can be one. When it fails, it fails `packages`, so that a move never continues on a part
+# of the search.
+customer_folders() {
+  local uid
+  uid=$(id -u "$SERVICE_USER")
+  find / \( -path /proc -o -path /sys -o -path /dev -o -path /run -o -path /tmp -o -path /var/tmp \
+    -o -path /home -o -path "$KEYRING_HOME" -o -path /opt -o -path /usr -o -path /snap -o -path /var/spool/cron \
+    -o -path /var/lib/docker -o -path /var/cache -o -path /var/crash -o -path /var/log \) -prune \
+    -o ! -type d -uid "$uid" -print |
+    awk -F/ '{ n = $2 == "var" ? 4 : 3; if (n > NF - 1) n = NF - 1; f = ""
+      for (i = 2; i <= n; i++) f = f "/" $i; print f == "" ? $0 : f }' | sort -u
+}
+
+# True for a folder that the move can copy when the operator names it: `/srv/<name>`, `/mnt/<name>`,
+# `/media/<name>`, or a new top-level folder that no system program reads. The import makes it as a new
+# folder of the service user, and the service user restores it. The operator gives the list, not the
+# manifest: an agent of the customer can get root in the sandbox and write the manifest.
+movable_folder() {
+  [[ $1 =~ ^/(srv/|mnt/|media/)?[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*$ ]] || return 1
+  [ "$1" != "$KEYRING_HOME" ] || return 1
+  case $1 in
+    /bin | /boot | /cdrom | /dev | /etc | /gnu | /home | /initrd* | /lib* | /lost+found | /media | /mnt | /nix | \
+      /opt | /proc | /root | /run | /sbin | /snap | /srv | /swap* | /sys | /tmp | /usr | /var) return 1 ;;
+  esac
+  return 0
+}
+
 # What the move does not copy, for the report of the import.
 not_moved() {
   local count
@@ -580,6 +616,7 @@ packages() {
   [ -s "$USER_HOME/.base-apt-packages.txt" ] || echo "The image has no list of its apt packages. The move installs no apt package." >&2
   added_packages | sed 's/^/apt=/'
   customer_units | sort -u | sed 's/^/unit=/'
+  customer_folders | sed 's/^/folder=/'
 }
 
 install_packages() {
@@ -589,8 +626,13 @@ install_packages() {
 }
 
 export_data() {
-  [ "$#" -eq 1 ] || fail "usage: $0 export <archive | ->"
-  local archive=$1 copy=$1 version
+  [ "$#" -ge 1 ] || fail "usage: $0 export <archive | -> [<folder>...]"
+  local archive=$1 copy=$1 version folder
+  shift
+  for folder in "$@"; do
+    movable_folder "$folder" || fail "The move cannot copy $folder, so this server stays on boat. Nothing was archived."
+    [ -d "$folder" ] && [ ! -L "$folder" ] || fail "$folder is not a folder in this sandbox. Nothing was archived."
+  done
   if [ "$archive" = - ]; then
     [ ! -t 1 ] || fail "Send the archive through SSH to the VPS, not to the terminal."
     copy="the copy of the archive"
@@ -636,6 +678,7 @@ export_data() {
       notes+="$tree: programs of root read it"$'\n'
     fi
   done < <(added_trees | sort -u)
+  for folder in "$@"; do members+=("./${folder#/}"); done
   commands=$(added_commands "$trees")
   commands+=$'\n'$(package_commands "$trees" "$commands")
   notes+=$(not_moved)
@@ -922,8 +965,8 @@ report_commands() {
 }
 
 import_data() {
-  [ "$#" -eq 1 ] && [ -f "$1" ] || fail "usage: $0 import <archive>"
-  local archive=$1 manifest version installed sums clis groups missing line trees present members group
+  [ "$#" -ge 1 ] && [ -f "$1" ] || fail "usage: $0 import <archive> [<folder>...]"
+  local archive=$1 folder manifest version installed sums clis groups missing line trees present members group
   # First: a machine that gets the data of a moved server must not also take a new one.
   stop_offer
   is_hosted_install || fail "This machine is not prepared. Run \"$0 prepare\" first."
@@ -932,6 +975,11 @@ import_data() {
     fail "An import did not get to its start on this machine. Run \"$0 discard $(hostname)\", then run the import again."
   [ ! -e "$USER_HOME/.config/OpenBot" ] && [ ! -e "$KEYRING_HOME/keyrings" ] ||
     fail "This machine has the data of a server."
+  shift
+  for folder in "$@"; do
+    movable_folder "$folder" || fail "The import cannot restore $folder. Nothing was restored."
+    [ ! -e "$folder" ] && [ ! -L "$folder" ] || fail "$folder is on this machine already. Nothing was restored."
+  done
 
   # Only the manifest, to standard output: no file of the archive is on the disk yet.
   manifest=$(tar --extract --file "$archive" --to-stdout --occurrence=1 "./${MANIFEST#/}") || fail "The archive has no manifest."
@@ -962,6 +1010,7 @@ import_data() {
   {
     echo importing
     printf '%s' "$trees" | sed 's/^/tree=/'
+    for folder in "$@"; do echo "folder=$folder"; done
   } >"$IMPORT_STATE"
   # Each added directory is new and belongs to the service user. Its parents belong to root.
   while read -r line; do
@@ -970,6 +1019,12 @@ import_data() {
     install -d -o "$SERVICE_USER" -g "$group" -m 0755 "$line"
     members+=("./${line#/}")
   done <<<"$trees"
+  # The folders that the operator named, new and of the service user, as the directories above.
+  for folder in "$@"; do
+    (umask 022 && mkdir -p "${folder%/*}")
+    install -d -o "$SERVICE_USER" -g "$group" -m 0755 "$folder"
+    members+=("./${folder#/}")
+  done
   # The archive is from a machine where an agent of the customer can get root, and the service user
   # has no root here. So the service user restores it, and only its two directories and the new
   # directories above: the kernel then refuses a file outside them, an owner that is not the service
@@ -992,6 +1047,7 @@ import_data() {
     echo imported
     printf 'database=%s\n' "$(sha256sum "$DATABASE" | cut -d' ' -f1)"
     printf '%s' "$trees" | sed 's/^/tree=/'
+    for folder in "$@"; do echo "folder=$folder"; done
   } >"$IMPORT_STATE"
   echo "Restored the server of OpenBot $version. This machine has OpenBot $installed, and it does not run."
   echo "Next: when the row of the server names this machine and the sandbox is stopped, run: $0 start"
@@ -1063,6 +1119,9 @@ discard() {
   # import is not in the state.
   sed -n 's/^tree=//p' "$IMPORT_STATE" | while read -r tree; do
     if [ -n "$tree" ] && movable_tree "$tree"; then rm -rf --one-file-system -- "$tree"; fi
+  done
+  sed -n 's/^folder=//p' "$IMPORT_STATE" | while read -r folder; do
+    if [ -n "$folder" ] && movable_folder "$folder"; then rm -rf --one-file-system -- "$folder"; fi
   done
   if command -v crontab >/dev/null; then crontab -u "$SERVICE_USER" -r 2>/dev/null || true; fi
   # The copy also gives the home the mode of /etc/skel, so set the mode of a new home again.

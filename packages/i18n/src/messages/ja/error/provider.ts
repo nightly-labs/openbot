@@ -221,7 +221,7 @@ export const messages = {
   "error.provider.opencodeInvalidUpload":
     "OpenCode のモデルプロバイダーが無効なアップロードリクエストを報告しました。別のモデルを選択して続行してください。ルーティンをもう一度作成する前に、保存済みのルーティンを確認してください。\n{detail}",
   "error.provider.opencodeUnreadableContent":
-    "このモデルは、このチャット内のファイルまたは画像を読み取れません。ファイルを読み取れるモデルを選択してから、メッセージをもう一度送信してください。",
+    "このモデルは、このチャット内のファイルまたは画像を読み取れません。OpenBot はチャット履歴を引き継いだ新しい OpenCode セッションを開始しました。ファイルを外してメッセージをもう一度送信するか、ファイルを読み取れるモデルを選択してください。このモデルをカスタムプロバイダーに追加した場合は、その設定の「入力」で「画像」をオフにしてください。",
   "error.provider.opencodeContextTooSmall":
     "このチャットはモデルのコンテキストウィンドウに収まりません。Ollama または LM Studio で、より大きいコンテキスト長でモデルを読み込み、OpenBot のプロバイダー設定に同じウィンドウを入力してください。または、より大きいモデルを選んでください。",
   "error.provider.opencodeFreeLimit":
@@ -230,6 +230,8 @@ export const messages = {
     "モデルプロバイダー側で障害が発生しました。お使いの接続は原因ではありません。後でもう一度試すか、別のモデルを選んでください。\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "モデルの応答が途中で切れたか、無効でした。メッセージをもう一度送信するか、別のモデルを選んでください。\n{detail}",
+  "error.provider.opencodeReasoningOverlap":
+    "OpenCode はこの推論の強さでこのモデルの推論を読み取れませんでした。推論の強さを下げるか別のモデルを選んでから、メッセージをもう一度送信してください。",
   "error.provider.opencodeNetwork":
     "OpenCode がモデルプロバイダーに接続できませんでした。OpenBot を実行しているコンピューターのネットワーク接続を確認してから、もう一度お試しください。\n{detail}",
   "error.provider.codexStateBusy":
@@ -265,6 +267,8 @@ export const messages = {
     "OPENBOT_ANTIGRAVITY_PATH の Gemini サーバーが見つからないか、実行できません。パスを修正するか変数を削除してから、OpenBot を再起動してください。",
   "error.provider.antigravityVersionUnreadable": "Gemini サーバーのバージョンを読み取れません。",
   "error.provider.antigravitySignIn": "Gemini を使うには Google でサインインしてください。",
+  "error.provider.antigravityModelAtCapacity":
+    "現在、Google にはこの Gemini モデルの空き容量がありません。プランの割り当てが原因ではありません。数分後にもう一度お試しいただくか、別のモデルを選んでください。\n{detail}",
   "error.provider.antigravityRateLimited":
     "レート制限またはプランの割り当てに達したため、Gemini がリクエストを拒否しました。数分待つか別のモデルを選んでから、もう一度お試しください。\n{detail}",
   "error.provider.antigravityQuotaReached":
@@ -335,6 +339,8 @@ export const messages = {
     "画像が多すぎるため、モデルはこのチャットを受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.opencodeSessionRejected":
     "OpenCode がリクエストを拒否しましたが、原因は示されていません。長いチャットやモデルの変更後に起こることがあります。OpenBot はチャット履歴を引き継いだ新しい OpenCode セッションを開始しました。もう一度お試しください。エラーが続く場合は、別のモデルを選ぶか推論レベルを下げてください。",
+  "error.provider.opencodeCompactionFailed":
+    "モデルがこの長いチャットを要約できず、コンテキストウィンドウに空きを作れませんでした。OpenBot はチャット履歴を引き継いだ新しい OpenCode セッションを開始しました。もう一度お試しください。エラーが続く場合は、より高性能なモデルを選んでください。",
   "error.provider.museMcpStartupFault":
     "Muse が MCP サーバーを起動できず、このセッションで MCP をブロックしました。OpenBot はチャット履歴を引き継いだ新しい Muse セッションを開始しました。もう一度お試しください。エラーが続く場合は、このエージェントの Computer Use または失敗した MCP サーバーをオフにしてください。",
   "error.provider.claudeSessionMissing":
@@ -365,6 +371,8 @@ export const messages = {
     "{provider} は保存された API キーを拒否しました。設定でキーを置き換えるか削除してから、もう一度お試しください。",
   "error.provider.keyProviderNoBalance":
     "保存された API キーの {provider} アカウントに残高がありません。アカウントにクレジットを追加してから、もう一度お試しください。",
+  "error.provider.keyProviderLowCredit":
+    "保存された API キーの {provider} アカウントには、このモデルの応答に必要なクレジットが足りません。アカウントにクレジットを追加するか、別のモデルを選択してから、もう一度お試しください。",
   "error.provider.modelServiceRefused":
     "モデルサービスがリクエストを拒否しました。別のモデルを選択するか、サービスでこのモデルへのアクセス権を確認してください。",
   "error.provider.modelServiceRefusedReason":

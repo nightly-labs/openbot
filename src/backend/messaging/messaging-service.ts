@@ -74,6 +74,7 @@ import {
   type MessagingIngress,
   type MessagingTransport,
   TelegramCallError,
+  WhatsAppAnswerPartlySent,
   WhatsAppRefusedError,
 } from "./messaging-types";
 import { type SlackAppPort, SlackConnect, type SlackConnectFailed } from "./slack/slack-connect";
@@ -524,6 +525,15 @@ export class MessagingService {
   /** True for a WhatsApp number whose owner turned off the "Waiting" and "Working on it…" posts. */
   #withoutStatusPost(live: LiveConnection): boolean {
     return live.record.platform === "whatsapp" && this.#whatsapp?.workingMessage(live.record.connectionId) === false;
+  }
+
+  /**
+   * True for a chat where a post shows as the owner's own message: another person's chat on the
+   * owner's personal WhatsApp number. A request that fails or stops there leaves only its reaction,
+   * and the owner sees the failure in OpenBot. The owner did not write a notice to that person.
+   */
+  #quietEnd(connectionId: string, target: MessageTarget): boolean {
+    return this.#whatsapp?.postsAsOwner(connectionId, target.platformChannelId) === true;
   }
 
   #requireWhatsApp(): WhatsAppConnect {
@@ -1970,7 +1980,11 @@ export class MessagingService {
       return;
     }
     this.#targets.delete(key);
-    const final = finalPost(activity, this.#threads.awaitsTeammate(activity.link.linkId));
+    const final = finalPost(
+      activity,
+      this.#threads.awaitsTeammate(activity.link.linkId),
+      this.#quietEnd(activity.link.connectionId, target),
+    );
     // In a thread that a ping opened, a person that the answer pings can reply without a mention too.
     if (final.answer && live?.record.platform === "slack") {
       const botUserId = live.identity?.botUserId;
@@ -2047,18 +2061,24 @@ export class MessagingService {
     }).pipe(
       Effect.tapError((failure) =>
         Effect.gen({ self: this }, function* () {
+          const cause = failure instanceof MessagingOperationFailed ? failure.cause : null;
+          const partlySent = cause instanceof WhatsAppAnswerPartlySent;
           // WhatsApp refuses each new attempt too, and each one counts against the number: give up.
-          if (failure instanceof MessagingOperationFailed && failure.cause instanceof WhatsAppRefusedError)
+          if ((partlySent ? cause.cause : cause) instanceof WhatsAppRefusedError)
             return yield* this.#forgetPost(key, post);
+          const quiet = final.answer && this.#quietEnd(live.record.connectionId, post.target);
+          // In a quiet chat, the status post holds the first part of the answer: the chat keeps it.
+          if (quiet && partlySent) return yield* this.#forgetPost(key, post);
           const failures = (this.#finalFailures.get(key) ?? 0) + 1;
           this.#finalFailures.set(key, failures);
           // An answer goes out in parts, and some of them can be on the platform already, so it is
-          // not sent again. The conversation gets the fixed notice; the host keeps the answer.
+          // not sent again. The conversation gets the fixed notice, or in a quiet chat, where no part
+          // was sent, only loses the status post; the host keeps the answer.
           let current = post;
           if (final.answer) {
             current = {
               ...post,
-              final: { answer: false, text: sourceText("status.messaging.failed"), reaction: null },
+              final: { answer: false, text: quiet ? "" : sourceText("status.messaging.failed"), reaction: null },
             };
             this.#posts.set(key, current);
             yield* this.#status.save();
@@ -2104,7 +2124,8 @@ export class MessagingService {
         if (!this.#status.restored.has(key)) continue;
         if (this.#threads.isPending(linkId, key.slice(linkId.length + 1))) continue;
         this.#status.restored.delete(key);
-        post = { ...post, final: { answer: false, text: sourceText("status.messaging.stopped"), reaction: "stopped" } };
+        const text = this.#quietEnd(connectionId, post.target) ? "" : sourceText("status.messaging.stopped");
+        post = { ...post, final: { answer: false, text, reaction: "stopped" } };
         this.#posts.set(key, post);
       }
       this.#dispatch(this.#serial(linkId, this.#deliverFinal(live, key, post)));
@@ -2493,18 +2514,30 @@ function token(): string {
   return randomBytes(16).toString("hex");
 }
 
-/** The last post of a request and the reaction on the person's message, from how its turn ended. */
+/**
+ * The last post of a request and the reaction on the person's message, from how its turn ended. In a
+ * quiet chat, a failed or stopped request posts no text: an empty text takes back the status post.
+ */
 function finalPost(
   activity: Exclude<MessagingActivity, { type: "started" | "progress" }>,
   awaitsTeammate: boolean,
+  quiet: boolean,
 ): PendingFinal {
   // A follow-up turn answers a teammate's reply: the person's message already shows how its own turn ended.
   const reacts = activity.type === "cancelled" || !activity.followUp;
   if (activity.type === "cancelled" || activity.status === "interrupted")
-    return { answer: false, text: sourceText("status.messaging.stopped"), reaction: reacts ? "stopped" : null };
+    return {
+      answer: false,
+      text: quiet ? "" : sourceText("status.messaging.stopped"),
+      reaction: reacts ? "stopped" : null,
+    };
   // The provider's error can hold local paths or MCP values, so the platform gets a fixed sentence.
   if (activity.status === "failed")
-    return { answer: false, text: sourceText("status.messaging.failed"), reaction: reacts ? "failed" : null };
+    return {
+      answer: false,
+      text: quiet ? "" : sourceText("status.messaging.failed"),
+      reaction: reacts ? "failed" : null,
+    };
   const reaction = reacts ? "done" : null;
   // A quiet answer posts nothing: an empty text takes back the status post.
   if (activity.answer && isQuietAnswer(activity.answer)) return { answer: false, text: "", reaction };

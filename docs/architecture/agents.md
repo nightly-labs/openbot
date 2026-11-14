@@ -78,6 +78,11 @@ of only quiet routine runs and teammate updates settles as above, also on the em
 path and in the history import. The desktop chat shows its quiet answers under the marker of the
 last update of the turn, which starts closed (`teammateUpdateAnswers`).
 
+A teammate's answer to a request that a quiet routine run sent continues that run, so nobody waits
+for its turn either (`answeredRequestId`, #8364). Such a turn ends quiet only after a call to
+`routine_no_update`: without the call its answer is a result and shows. The answer to a Test run's
+request always shows.
+
 `quiet` reaches remote clients too, through the optional `quiet-turn-v1` capability
 (`packages/contracts/src/team-protocol/quiet-turn-v1.ts`). The host sends a client with the
 capability a `quiet-turn-completed` event in place of `turn-completed`. The client transport changes
@@ -225,6 +230,12 @@ on a joined host.
   same routine and run, but `reconcileDelivery` finds a run only by its own delivery, so the run status
   does not change. A `routine_report_failure` call in a handoff turn fails only that step, through its
   completed delivery's error, and the agents after it are skipped.
+- Stop (`RoutineFlows.stopRun`) ends a run that has not ended. `RoutineScheduler.stopRun` first records
+  the run as cancelled, so the end of its turn cannot change that, then cancels its queued delivery
+  and interrupts its turn, also in the routine's side thread. A turn that cannot be stopped does not
+  keep the run open. Then each running handoff step ends as cancelled and its turn stops, and each
+  agent that has not started is skipped. The canvas shows Stop in place of Run now while the run of the
+  routine in focus works; a joined host needs `routine-flow-stop-v1`.
 - A canvas shows routines of every trigger kind (`routine-flow-routines.ts`). A webhook routine
   carries its endpoint, event type and filters; the details panel saves them, rotates the secret and
   runs a test through the events API, as the routine settings do. On a joined host only an owner or
@@ -676,12 +687,14 @@ a queued message waits is stored on the agent as `pendingRuntime`. The running w
 sessions. When the drain is about to start the next message and no work has started,
 `AgentService` applies the queued runtime first (the `next-turn` move), then retires the provider
 sessions of the chat and of each task thread, so each one gets a handoff on the new provider. A
-queued change that fails on an idle agent, such as for a provider that is now off, is removed. An
-update that also changes other fields, a move to a backup model, a Team API request (its released
-protocol has no `pendingRuntime`), and the automatic usage-limit, provider-error and endpoint moves
-still wait for idle work (`error.agent.waitForTasksBeforeProviderChange` /
-`error.agent.waitBeforeProviderChange`). A Team API model or effort change keeps the queued
-change, because the remote client cannot see it. The channel threads of the agent
+queued change that fails on an idle agent, such as for a provider that is now off, is removed. A
+joined server's client queues the same change on `agent-pending-runtime-v1` (see
+[team-api.md](team-api.md)). An update that also changes other fields, a move to a backup model, a
+request on the released agent route (its released protocol has no `pendingRuntime`), and the
+automatic usage-limit, provider-error and endpoint moves still wait for idle work
+(`error.agent.waitForTasksBeforeProviderChange` / `error.agent.waitBeforeProviderChange`). A model or
+effort change on the released agent route keeps the queued change, because an older remote client
+cannot see it. The channel threads of the agent
 (`ChannelStore.contextThreadsForAgent`) are retired too, and their work steps are saved. A channel
 turn also carries its own self-contained context packet. The instance transfer file keeps `taskLimit`, and its server
 preferences keep the host turn limits.
@@ -784,9 +797,22 @@ with the `empty_answer` cause, as an ACP turn with no answer fails, unless the t
 (a quiet teammate update or routine run), compacted, showed a plan, continues a plan, or was stopped
 by the user. The error waits for the end
 of the turn, also with no backup model. A backup model then runs the turn again, as for a provider
-error. With no backup, a turn that only teammate results started runs once more on the same model;
-the turn did no step, so it repeats nothing. A second empty run, or an empty turn from the person,
-shows the error. `scripts/codex-empty-lead-turn-e2e.ts` checks these paths.
+error. With no backup, a turn that only teammate results started runs once more on the same model.
+A thread turn never moves to a backup, so it always runs once more on the same model (#8503). So
+does the turn of an external chat conversation, such as WhatsApp (#8573); a channel task does not.
+`MessagingThreads` keeps the conversation's status post while the turn's messages wait in the queue,
+so the conversation gets no "Stopped." before the answer. The turn did no step, so it repeats
+nothing. A second empty run, or an empty turn from the person, shows the error.
+
+Codex can also write its last words as narration (a `msg_` commentary item) and then send an empty
+answer (#8837). Codex takes that narration as the turn's result, so `TurnLifecycle` makes the
+narration after the turn's last tool step the answer, and removes the empty rows. Outside a channel,
+this applies whether the turn did a step or not. A turn that did a step and wrote no such narration
+ends as before: its output can be a file or an image, or teammates or subagents still work for it. A
+teammate's such turn sends the note of its work (#8214). A channel turn keeps the rule above, since
+text after `channel_result` is a step there. Voice on the desktop does not read the answer again when
+it read that narration as a progress update.
+`scripts/codex-empty-lead-turn-e2e.ts` checks these paths.
 
 A message to an agent that runs a turn follows the busy-message mode: "steer" takes it into the
 running turn, "queue" starts it after the turn. The default is "steer" (`DEFAULT_BUSY_MESSAGE_MODE`).

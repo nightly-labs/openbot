@@ -85,6 +85,10 @@ export const messages = {
   "error.backend.channelWaitBeforeDeleteHistory": "Bu kanaldaki iş bitene kadar bekleyin, sonra geçmişini silin.",
   "error.backend.channelCompactUnavailable":
     "Bu kanalın hiçbir üyesi şu anda bağlamını sıkıştıramıyor. Önce bir üyenin kanalda yanıt vermesi ve sağlayıcısının sıkıştırmayı desteklemesi gerekir.",
+  "error.backend.channelCompactNoSession":
+    "Bu kanalın üyelerinin henüz sıkıştırılacak bir konuşması yok. Bir üye kanalda yanıt verdikten sonra sıkıştırın.",
+  "error.backend.channelCompactNotSupported":
+    "Bu kanalın hiçbir üyesi istek üzerine sıkıştıramaz. Bunu destekleyen üyeler, bağlamları neredeyse dolduğunda otomatik olarak sıkıştırır.",
   "error.backend.channelArchived": "Mesaj göndermeden veya görevleri değiştirmeden önce bu kanalı geri yükleyin.",
   "error.backend.channelReferenceUnavailable": "Referans verilen kanal mesajı kullanılamıyor.",
   "error.backend.channelTaskNotFound": "Kanal görevi bulunamadı.",
@@ -117,6 +121,7 @@ export const messages = {
   "error.backend.memoryOperationFailed": "Bellek işlemi başarısız oldu. Tekrar deneyin.",
   "error.backend.memoryGone": "Bu bellek artık mevcut değil.",
   "error.backend.routineGone": "Bu rutin artık mevcut değil.",
+  "error.backend.routineRunGone": "Bu rutin çalıştırması artık mevcut değil.",
   "error.backend.turnNotStarted": "Sağlayıcı bu turu başlatmadı.",
   "error.backend.routineResultConnectionOff": "Bu mesajlaşma bağlantısı kapalı veya kaldırılmış. Başka bir yer seçin.",
   "error.backend.routineResultNoDelivery": "Bu çalıştırmanın yeniden gönderilecek bir yanıtı yok.",
@@ -195,6 +200,8 @@ export const messages = {
   "error.backend.interruptSelf": "Bir ajan kendi kendini kesintiye uğratamaz.",
   "error.backend.interruptOtherWork":
     "Bu ajan mesajınızın başlatmadığı bir görev üzerinde çalışıyor. Yalnızca kullanıcı veya o görevin göndereni görevi durdurabilir.",
+  "error.backend.interruptSharedWork":
+    "Bu ajanın turu mesajınız ve ayrıca kullanıcıdan ya da başka bir ajandan gelen bir mesaj üzerinde çalışıyor. Onu yalnızca kullanıcı, o ajanın sohbetindeki Ajanı durdur ile durdurabilir.",
   "error.backend.interruptStarting": "Bu ajan hâlâ bir tur başlatıyor. Tur başladıktan sonra tekrar deneyin.",
   "error.backend.interruptNoSession": "OpenBot sağlayıcı oturumu kullanılamadığı için bu ajanı kesintiye uğratamıyor.",
   "error.backend.memoryTextRequired": "Bellek metni gereklidir.",
