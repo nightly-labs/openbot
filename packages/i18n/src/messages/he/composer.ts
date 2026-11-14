@@ -44,6 +44,7 @@ export const messages = {
   "composer.picker.noSkills": "אין לסוכן הזה מיומנויות.",
   "composer.picker.noSkillMatch": "אין מיומנות שמתאימה ל-״{query}״.",
   "composer.picker.skillsLoadFailed": "המיומנויות לא נטענו.",
+  "composer.picker.skillProblem": "{name} לא זמינה. {problem} בקשו מהסוכן לתקן אותה.",
   "composer.token.attachment": "פתיחת הקובץ המצורף {name}",
   "composer.token.agent": "סוכן {name}",
   "composer.token.skill": "מיומנות {name}",

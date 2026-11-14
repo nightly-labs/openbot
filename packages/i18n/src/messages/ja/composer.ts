@@ -46,6 +46,7 @@ export const messages = {
   "composer.picker.noSkills": "このエージェントにはスキルがありません。",
   "composer.picker.noSkillMatch": "「{query}」に一致するスキルはありません。",
   "composer.picker.skillsLoadFailed": "スキルを読み込めませんでした。",
+  "composer.picker.skillProblem": "{name} は使用できません。{problem} エージェントに修正を依頼してください。",
   "composer.token.attachment": "添付ファイル {name} を開く",
   "composer.token.agent": "エージェント {name}",
   "composer.token.skill": "スキル {name}",

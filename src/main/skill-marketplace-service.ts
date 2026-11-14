@@ -266,7 +266,14 @@ export class SkillMarketplaceService {
       : Cache.get(this.#catalogVersions, skillId);
   }
 
-  listInstalledForChatTags(agentId: string): Effect.Effect<InstalledSkill[], SkillMarketplaceFailure> {
+  /**
+   * `problems` also lists the skill folders that have a problem, with the reason, so that the `$`
+   * picker can say why the agent cannot use them. A reader without it does not get them.
+   */
+  listInstalledForChatTags(
+    agentId: string,
+    options: { problems?: boolean } = {},
+  ): Effect.Effect<InstalledSkill[], SkillMarketplaceFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<InstalledSkill[], SkillMarketplaceFailure> {
       const agent = yield* skillSync(() => this.requireAgent(agentId));
       const lock = yield* readLock(agent.workspacePath);
@@ -274,7 +281,7 @@ export class SkillMarketplaceService {
       // The skills of a pack are folders of their own, so the folder scan lists them for `$<name>`.
       const parents = new Set(Object.values(lock.skills).map((entry) => entry.slug));
       for (const skill of yield* listFolderSkills(agent, parents).pipe(toSkillMarketplaceFailure))
-        if (!skill.problem) installed.push(skill);
+        if (!skill.problem || options.problems) installed.push(skill);
       for (const entry of Object.values(lock.skills)) {
         if (entry.enabled === false) continue;
         installed.push(
@@ -286,8 +293,13 @@ export class SkillMarketplaceService {
           ),
         );
       }
-      installed.push(...(yield* listHomeFolderSkills(new Set(installed.map((skill) => skill.slug)))));
-      return installed.sort((a, b) => a.name.localeCompare(b.name));
+      // A usable skill in `~/.agents/skills` stays when a workspace folder of the same name has a problem.
+      const usableSlugs = new Set(installed.flatMap((skill) => (skill.problem ? [] : [skill.slug])));
+      const home = yield* listHomeFolderSkills(usableSlugs);
+      const homeSlugs = new Set(home.map((skill) => skill.slug));
+      return [...installed.filter((skill) => !(skill.problem && homeSlugs.has(skill.slug))), ...home].sort((a, b) =>
+        a.name.localeCompare(b.name),
+      );
     });
   }
 

@@ -277,7 +277,11 @@ export function BrowserDockAdapter(adapterProps: { tab: BrowserTab | undefined; 
     return snapshot({
       agent: dockAgent(agent),
       agents: props.agents.map(dockAgent),
-      skills: installedSkills().slice(0, BROWSER_DOCK_LIMITS.skills).map(dockSkill),
+      // The dock has no place for the reason a skill cannot be used, so it offers usable skills only.
+      skills: installedSkills()
+        .filter((skill) => skill.problem === undefined)
+        .slice(0, BROWSER_DOCK_LIMITS.skills)
+        .map(dockSkill),
       mcpServers: mcpServers().map(dockMcpServer),
       draft: { text, revision: draftRevision },
       focusRequest: composerFocusRequest(),

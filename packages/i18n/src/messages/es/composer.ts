@@ -44,6 +44,7 @@ export const messages = {
   "composer.picker.noSkills": "Este agente no tiene habilidades.",
   "composer.picker.noSkillMatch": "Ninguna habilidad coincide con «{query}».",
   "composer.picker.skillsLoadFailed": "No se cargaron las habilidades.",
+  "composer.picker.skillProblem": "{name} no está disponible. {problem} Pide al agente que lo corrija.",
   "composer.token.attachment": "Abrir archivo adjunto {name}",
   "composer.token.agent": "Agente {name}",
   "composer.token.skill": "Habilidad {name}",

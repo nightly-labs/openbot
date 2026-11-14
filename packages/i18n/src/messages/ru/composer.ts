@@ -45,6 +45,7 @@ export const messages = {
   "composer.picker.noSkills": "У этого агента нет навыков.",
   "composer.picker.noSkillMatch": "Нет навыков по запросу «{query}».",
   "composer.picker.skillsLoadFailed": "Не удалось загрузить навыки.",
+  "composer.picker.skillProblem": "Навык {name} недоступен. {problem} Попросите агента исправить его.",
   "composer.token.attachment": "Открыть прикреплённый файл {name}",
   "composer.token.agent": "Агент {name}",
   "composer.token.skill": "Навык {name}",

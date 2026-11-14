@@ -348,7 +348,7 @@ export type ComposerAgent = Pick<
 /** The skill fields that the composer, the queue and rich text read. */
 export type ComposerSkill = Pick<
   InstalledSkill,
-  "skillId" | "slug" | "name" | "state" | "enabled" | "origin" | "description"
+  "skillId" | "slug" | "name" | "state" | "enabled" | "origin" | "description" | "problem"
 >;
 
 /** The MCP server fields that the composer reads. It never reads the environment or the headers. */

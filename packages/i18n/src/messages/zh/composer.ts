@@ -43,6 +43,7 @@ export const messages = {
   "composer.picker.noSkills": "该助手没有技能。",
   "composer.picker.noSkillMatch": "没有技能匹配“{query}”。",
   "composer.picker.skillsLoadFailed": "技能加载失败。",
+  "composer.picker.skillProblem": "{name} 无法使用。{problem} 请让智能体修复它。",
   "composer.token.attachment": "打开附件 {name}",
   "composer.token.agent": "助手 {name}",
   "composer.token.skill": "技能 {name}",
