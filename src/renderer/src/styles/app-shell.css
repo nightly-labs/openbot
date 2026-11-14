@@ -3307,7 +3307,7 @@ textarea {
   line-height: var(--openbot-leading-sm);
 }
 
-/* A named quota group with more than one window: its full name on one row above its windows. */
+/* A named quota group: its full name on one row above its windows. */
 .account-usage-window-group {
   grid-column: 1 / -1;
   min-width: 0;
