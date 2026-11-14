@@ -154,6 +154,7 @@ import { telegramDriver } from "../backend/messaging/telegram/telegram-driver";
 import { whatsAppDriver } from "../backend/messaging/whatsapp/whatsapp-driver";
 import { WhatsAppRuntime } from "../backend/messaging/whatsapp/whatsapp-runtime";
 import { OpenBotDatabase } from "../backend/openbot-database";
+import { PASSWORD_MANAGER_BRANDS } from "../backend/password-vault";
 import { passwordVaultRouter } from "../backend/password-vault-router";
 import { sweepProviderTemp } from "../backend/provider-temp";
 import { SidebarLayoutStore } from "../backend/sidebar-layout-store";
@@ -2319,10 +2320,10 @@ export async function createApplicationServices({
       mcpAuthorization: () => githubConnector.mcpAuthorization().pipe(toMcpGatewayFailed),
     },
     passwordVault: passwordVaultRouter([
-      { prefix: "", vault: onePasswordConnector },
-      { prefix: "bitwarden:", vault: bitwardenConnector },
+      { prefix: "", name: PASSWORD_MANAGER_BRANDS.onepassword, vault: onePasswordConnector },
+      { prefix: "bitwarden:", name: PASSWORD_MANAGER_BRANDS.bitwarden, vault: bitwardenConnector },
       ...passwordManagers.routes(),
-      { prefix: "openbot:", vault: vault.logins },
+      { prefix: "openbot:", name: "the OpenBot Vault", vault: vault.logins },
     ]),
     vaultItems: vault.items,
     linkWallet: linkAccount,

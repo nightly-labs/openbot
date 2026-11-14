@@ -57,9 +57,10 @@ export async function runBitwardenBrowserSmoke(browser: BrowserHost): Promise<vo
   const vault = passwordVaultRouter([
     {
       prefix: "",
+      name: "1Password",
       vault: { connected: () => false, loginsFor: () => Effect.succeed(null), secretFor: () => Effect.succeed(null) },
     },
-    { prefix: "bitwarden:", vault: connector },
+    { prefix: "bitwarden:", name: "Bitwarden", vault: connector },
   ]);
   const checks: string[] = [];
   try {

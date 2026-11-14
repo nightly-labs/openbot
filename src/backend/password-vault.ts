@@ -38,9 +38,13 @@ export interface VaultLogin {
   hasOneTimePassword: boolean;
 }
 
-/** Keeps the original vault failure private; callers log it and give the agent a fixed message. */
+/**
+ * Keeps the original vault failure private; callers log it and give the agent a fixed message.
+ * `sources` names the login sources that could not be read, when the router knows them.
+ */
 export class PasswordVaultError extends Schema.TaggedError<PasswordVaultError>()("PasswordVaultError", {
   cause: Schema.Defect(),
+  sources: Schema.optionalKey(Schema.Array(Schema.String)),
 }) {}
 
 export interface PasswordVault {

@@ -1688,7 +1688,12 @@ export class AttentionRegistry {
     );
     if (Result.isFailure(listed)) {
       logger.warn("Unable to list the shared logins", { error: toLogValue(listed.failure.cause) });
-      return browserTakeoverError("The shared password vault could not be read. Use submit_secret without loginId.");
+      const sources = listed.failure.sources?.join(", ");
+      return browserTakeoverError(
+        sources
+          ? `OpenBot could not read the saved logins of ${sources}. Use submit_secret without loginId, and tell the user that ${sources} could not be read and that its page in Marketplace shows what to do.`
+          : "The shared password vault could not be read. Use submit_secret without loginId.",
+      );
     }
     const logins = listed.success;
     const answer =
