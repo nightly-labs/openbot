@@ -1289,9 +1289,14 @@ still uses the sandbox. The downtime is the export, the copy, the import and the
    (`/srv/vaults`) or two in `/var` (`/var/lib/syncthing`), that has a file of `user` outside the paths
    above, `/usr`, `/tmp`, `/var/log`, `/var/cache` and `/var/crash`, also on another mount.
    `leaseweb-pool.ts move` then stops before the downtime, and the server stays on boat. It also stops
-   when the search fails. With `--folders=<folder>,...`, an operator copies these folders by hand (as
-   root, to the same paths, before `start`) and the move continues. A file that the customer made as
-   root is not found.
+   when the search fails. With `--folders=<folder>,...`, the move copies these folders too: `export`
+   archives them, and `import` makes each one as a new folder of `user` and restores it as `user`, as it
+   does for the directories in `/opt`. Only `/srv/<name>`, `/mnt/<name>`, `/media/<name>` and a new
+   top-level folder (not a system folder such as `/var` or `/snap`) are possible, and the VPS must not
+   have the folder; the move checks this before the downtime. The operator gives this list, not the
+   archive, because an agent of the customer can get root in the sandbox. `discard` removes these
+   folders. Copy another folder by hand: then do not start OpenBot in the sandbox again, as step 7 says.
+   A file that the customer made as root is not found.
 
    The move also stops before the downtime when the sandbox has a Docker container (a directory in
    `/var/lib/docker/containers`): the VPS has no Docker, and the archive has no containers or images.

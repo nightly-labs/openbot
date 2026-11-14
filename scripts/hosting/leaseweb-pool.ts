@@ -39,7 +39,8 @@
 //       says that an operator moves the containers by hand (stopped before the move, so the boat stop can
 //       save the sandbox), and the move then continues. It also stops when files of the customer are in
 //       folders outside the home that the move does not copy, such as `/srv/vaults`. `--folders` names
-//       the folders that an operator copies by hand, and the move then continues.
+//       the folders that the move then copies too: `/srv/<name>`, `/mnt/<name>`, `/media/<name>` or a
+//       new top-level folder, which the machine must not have. An operator copies other folders by hand.
 //   bun scripts/hosting/leaseweb-pool.ts custom <VPS ID> --owner=<email> --customer=<word> \
 //       --name=<server name> --keys=<file> [--apply]
 //       Sets up a VPS with no reference as the server of one customer, not in the pool
@@ -306,10 +307,21 @@ const SANDBOX_SSH = `ssh -i "$d/key" -o IdentitiesOnly=yes -o BatchMode=yes -o S
   -o UserKnownHostsFile="$d/known-hosts" -o ConnectTimeout=20 -o ServerAliveInterval=15`;
 
 /** Runs in the sandbox as root. Sends the archive to the machine; the key of the move can only write it there. */
+/** True for a folder that `--folders` can name: the same rule as `movable_folder` of move-from-boat.sh. */
+function movableFolder(folder: string) {
+  return (
+    /^\/(?:srv\/|mnt\/|media\/)?[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*$/u.test(folder) &&
+    folder !== "/srv/openbot-hosted" &&
+    !/^\/(?:bin|boot|cdrom|dev|etc|gnu|home|initrd.*|lib.*|lost\+found|media|mnt|nix|opt|proc|root|run|sbin|snap|srv|swap.*|sys|tmp|usr|var)$/u.test(
+      folder,
+    )
+  );
+}
+
 const RUN_EXPORT = `#!/bin/bash
 set -o pipefail
 d=${SANDBOX_MOVE}
-bash "$d/move-from-boat.sh" export - 2>"$d/export.log" | ${SANDBOX_SSH} "root@$1"
+bash "$d/move-from-boat.sh" export - "\${@:2}" 2>"$d/export.log" | ${SANDBOX_SSH} "root@$1"
 echo "$?" >"$d/status"
 `;
 
@@ -1442,9 +1454,14 @@ exit "$status"`;
     vpsArg: string,
     unitsMovedByHand: readonly string[] = [],
     dockerMovedByHand = false,
-    foldersMovedByHand: readonly string[] = [],
+    foldersToCopy: readonly string[] = [],
   ) {
     if (!SERVER_ID_PATTERN.test(serverId)) throw new Error(`Not a server ID: ${serverId}`);
+    // The same check as `movable_folder` of move-from-boat.sh. The names also go into shell commands.
+    for (const folder of foldersToCopy) {
+      if (!movableFolder(folder)) throw new Error(`The move cannot copy ${folder}. Copy it by hand.`);
+    }
+    const folderArgs = foldersToCopy.map((folder) => `'${folder}'`).join(" ");
     if (vpsArg !== "auto" && !VPS_ID_PATTERN.test(vpsArg)) throw new Error(`Not a VPS ID: ${vpsArg}`);
     const started = Date.now();
     let last = started;
@@ -1618,15 +1635,27 @@ bash "$d/move-from-boat.sh" packages`,
         );
       }
       // The move copies only the home and the directories that `added_trees` finds. A server with files of
-      // the customer in other folders, such as vaults in /srv, stays on boat unless `--folders` names each.
+      // the customer in other folders, such as vaults in /srv, stays on boat unless `--folders` names each:
+      // the move then copies them.
       const folders = output
         .split("\n")
         .flatMap((line) => /^folder=(\/\S.*)$/u.exec(line)?.[1] ?? [])
-        .filter((folder) => !foldersMovedByHand.includes(folder));
+        .filter((folder) => !foldersToCopy.includes(folder));
       if (folders.length > 0) {
         throw new Error(
-          `The sandbox has files of the customer in folders that the move does not copy: ${folders.join(", ")}.`,
+          `The sandbox has files of the customer in folders that the move does not copy: ${folders.join(", ")}. ` +
+            "Name each with --folders so that the move copies it, or copy it by hand.",
         );
+      }
+      if (foldersToCopy.length > 0) {
+        // The import makes each folder new. Check the machine before the downtime, not during it.
+        const present = this.#remote(
+          machine,
+          `for f in ${folderArgs}; do if [ -e "$f" ] || [ -L "$f" ]; then echo "$f"; fi; done`,
+          { capture: true },
+        ).trim();
+        if (present !== "")
+          throw new Error(`The machine has these folders already: ${present.split("\n").join(", ")}.`);
       }
       // The VPS has no Docker, and the move does not copy containers or images. A container that restarts
       // also makes the stop at boat fail. So a server with a container stays on boat.
@@ -1693,7 +1722,7 @@ bash "$d/move-from-boat.sh" packages`,
       await this.#sandboxRun(
         sandbox,
         `systemctl reset-failed openbot-move-export.service 2>/dev/null || true
-systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/run-export.sh ${machine.address}`,
+systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/run-export.sh ${machine.address} ${folderArgs}`,
       );
       const deadline = Date.now() + EXPORT_WAIT_MS;
       let status = "";
@@ -1743,7 +1772,7 @@ systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/ru
       // the sandbox. `archiving` is not enough: boat can cancel the stop after it, and the sandbox then runs
       // and starts OpenBot again.
       await this.#boat("POST", `/sandboxes/${sandbox}/stop`, {});
-      this.#remote(machine, `bash ${MACHINE_HOSTING}/move-from-boat.sh import ${MACHINE_ARCHIVE}`);
+      this.#remote(machine, `bash ${MACHINE_HOSTING}/move-from-boat.sh import ${MACHINE_ARCHIVE} ${folderArgs}`);
       lap("Import");
       const stopped = await this.#waitForSandbox(
         sandbox,
