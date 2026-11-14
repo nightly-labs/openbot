@@ -89,17 +89,19 @@ export function createBillingStore(calls: () => BillingCalls | undefined, isActi
   }
 
   /**
-   * Buys a storage tier and takes the state that the account server returns. A failure goes to the
-   * caller, which shows it in the storage dialog.
+   * Buys a storage tier and takes the state that the account server returns. A load that started before
+   * the purchase can end after it, so a load runs again after it. A failure goes to the caller, which
+   * shows it in the storage dialog.
    */
   async function buyStorage(request: BillingStorageRequest): Promise<void> {
     const api = calls();
-    if (!api) return;
+    if (!api) throw new TypeError("The billing calls are not available.");
     try {
       const billing = await api.buyStorage(request);
       setState((draft) => {
         draft.billing = billing;
       });
+      void load();
     } catch (error) {
       // A lost response can follow a completed charge. Read the actual state.
       void load();

@@ -107,10 +107,11 @@ const CATALOG_TTL_MS = 5 * 60_000;
 const catalogCache = new Map<string, { expiresAt: number; prices: ReadonlyMap<string, StripePrice> }>();
 const NO_PRICES: ReadonlyMap<string, StripePrice> = new Map();
 /**
- * A repeated storage purchase in this time uses the same Stripe idempotency key, so a double click is one
- * change. Stripe keeps a refused payment for its key, so the key also has the payment method of the
- * subscription: a retry with a new payment method gets a new key at once, and any retry gets one in the
- * next window.
+ * A storage purchase in this time from the same storage item uses the same Stripe idempotency key, so a
+ * double click is one change, and two purchases at the same time cannot each add a storage item. The key
+ * does not have the tier: Stripe refuses the second purchase, as `idempotency_error`. Stripe keeps a
+ * refused payment for its key, so the key also has the payment method of the subscription: a retry with a
+ * new payment method gets a new key at once, and any retry gets one in the next window.
  */
 const STORAGE_PURCHASE_WINDOW_MS = 60_000;
 
@@ -847,7 +848,7 @@ export class BillingService {
             `SELECT s.server_id FROM billing_subscriptions s
          JOIN hosted_servers hs ON hs.server_id = s.server_id AND hs.owner_user_id = s.user_id
          WHERE s.stripe_subscription_id = ? AND s.user_id = ? AND s.stripe_customer_id = ?
-           AND s.status IN ('active', 'trialing') AND s.cancel_at_period_end = 0
+           AND s.status = 'active' AND s.cancel_at_period_end = 0
            AND hs.operator_host IS NOT NULL AND hs.desired_state <> 'deleted' AND COALESCE(hs.storage_tier, 0) < ?`,
           )
           .bind(request.subscriptionId, userId, customerId, request.tier)
@@ -862,7 +863,7 @@ export class BillingService {
       if (
         !key ||
         !isBillingCurrency(currency) ||
-        (current.status !== "active" && current.status !== "trialing") ||
+        current.status !== "active" ||
         current.cancel_at_period_end ||
         typeof current.cancel_at === "number" ||
         subscriptionCustomerId(current) !== customerId ||
@@ -876,7 +877,7 @@ export class BillingService {
       const storageItem = subscriptionStorageItem(current);
       const window = Math.floor(dependencies.now() / STORAGE_PURCHASE_WINDOW_MS);
       const paymentMethod = subscriptionPaymentMethodId(current) ?? "default";
-      const idempotencyKey = `openbot-storage-${current.id}-${storageItem?.price.id ?? "none"}-${price.id}-${paymentMethod}-${window}`;
+      const idempotencyKey = `openbot-storage-${current.id}-${storageItem?.price.id ?? "none"}-${paymentMethod}-${window}`;
       yield* stripeRequest(() =>
         dependencies.stripe.setStorageItem(
           { subscriptionId: current.id, itemId: storageItem?.id ?? null, priceId: price.id },
@@ -892,6 +893,9 @@ export class BillingService {
                 Effect.mapError(stripeFailure),
               );
               if (subscriptionStorageItem(after)?.price.id === price.id) return after;
+            }
+            if (error instanceof StripeRequestError && error.type === "idempotency_error") {
+              return yield* storageUnavailable();
             }
             return yield* Effect.fail(
               error instanceof StripeRequestError && error.status === 402
@@ -1394,13 +1398,12 @@ function planLookupKey(price: {
   );
 }
 
-/** A server on a VPS of the operator whose plan renews. Only such a server can buy a storage tier. */
+/**
+ * A server on a VPS of the operator whose paid plan renews. Only such a server can buy a storage tier: a
+ * trial invoices 0 for the change, so the disk would grow before a payment.
+ */
 function canBuyStorage(row: ServerPlanRow): boolean {
-  return (
-    row.on_operator_host === 1 &&
-    (row.status === "active" || row.status === "trialing") &&
-    row.cancel_at_period_end !== 1
-  );
+  return row.on_operator_host === 1 && row.status === "active" && row.cancel_at_period_end !== 1;
 }
 
 function serverPlan(row: ServerPlanRow, prices: ReadonlyMap<string, StripePrice>): BillingServerPlan | null {

@@ -5,7 +5,7 @@ import type {
   BillingStorageUpgradeTier,
 } from "@openbot/contracts/billing";
 import { Badge, Button, Dialog, Progress, RadioGroup } from "@openbot/ui";
-import { createSignal, For, Show, untrack } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import { useText } from "../../text";
 import { formatMinorMoney } from "./money";
 import "./billing-server-lifecycle-preview.css";
@@ -64,9 +64,16 @@ export function StorageTierDialog(props: StorageTierDialogProps) {
   const { t, format } = useText();
   let primary: HTMLButtonElement | undefined;
   const best = () => bestValueTier(props.upgrades);
-  // The best value is chosen first, else the only tier.
-  const [selected, setSelected] = createSignal(untrack(() => String(best() ?? props.upgrades.at(-1)?.tier ?? "")));
-  const chosen = () => props.upgrades.find((upgrade) => String(upgrade.tier) === selected()) ?? props.upgrades[0];
+  const [picked, setSelected] = createSignal<string | null>(null);
+  // The best value is chosen first, else the largest tier. A choice that the tiers no longer have (a load
+  // while the dialog is open) goes back to it.
+  const selected = () => {
+    const value = picked();
+    return value !== null && props.upgrades.some((upgrade) => String(upgrade.tier) === value)
+      ? value
+      : String(best() ?? props.upgrades.at(-1)?.tier ?? "");
+  };
+  const chosen = () => props.upgrades.find((upgrade) => String(upgrade.tier) === selected());
   const gigabytes = (size: number) => t("format.fileSize.gigabytes", { size: format.number(size) });
   const price = (amount: number | null) =>
     amount === null

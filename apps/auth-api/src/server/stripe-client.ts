@@ -286,16 +286,22 @@ export class StripeClient {
     this: StripeClient,
     lookupKeys: readonly string[],
   ): Effect.fn.Return<StripePrice[], StripeRequestError | StripeTransportError> {
-    const prices: StripePrice[] = [];
+    const chunks: (readonly string[])[] = [];
     for (let start = 0; start < lookupKeys.length; start += PRICE_LOOKUP_KEYS_PER_REQUEST) {
-      const query = new URLSearchParams({ active: "true", limit: "100" });
-      for (const key of lookupKeys.slice(start, start + PRICE_LOOKUP_KEYS_PER_REQUEST)) {
-        query.append("lookup_keys[]", key);
-      }
-      query.append("expand[]", "data.currency_options");
-      prices.push(...(yield* this.#requestEffect("GET", `/v1/prices?${query}`, null, priceListSchema)).data);
+      chunks.push(lookupKeys.slice(start, start + PRICE_LOOKUP_KEYS_PER_REQUEST));
     }
-    return prices;
+    // The requests run at the same time, so a cold catalog waits for one Stripe call, not one per chunk.
+    const pages = yield* Effect.forEach(
+      chunks,
+      (keys) => {
+        const query = new URLSearchParams({ active: "true", limit: "100" });
+        for (const key of keys) query.append("lookup_keys[]", key);
+        query.append("expand[]", "data.currency_options");
+        return this.#requestEffect("GET", `/v1/prices?${query}`, null, priceListSchema);
+      },
+      { concurrency: "unbounded" },
+    );
+    return pages.flatMap((page) => page.data);
   }).bind(this);
 
   /** The same idempotency key gives the same customer, so two requests at once make one customer. */
