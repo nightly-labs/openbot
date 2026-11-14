@@ -510,15 +510,32 @@ export function ImageLightbox(props: {
       if (zoomed()) move(FIT, true);
       else move(zoomAround(camera, stagePoint(event), DOUBLE_CLICK_ZOOM), true);
     };
-    const onResize = new ResizeObserver(() => {
-      // A new fitted size keeps the zoom level, the percent of the natural size.
+    // A new fitted size keeps the zoom level, the percent of the natural size.
+    const keepZoom = () => {
       const image = zoomImage();
       move(
         image && zoomed()
           ? { ...camera, scale: (zoom() * image.naturalWidth) / (image.offsetWidth * screenPixelRatio()) }
           : camera,
       );
-    });
+    };
+    const onResize = new ResizeObserver(keepZoom);
+    // A page zoom, or a window moved to a screen with another scale, changes the screen pixel size.
+    let resolution: MediaQueryList | undefined;
+    const onResolution = () => {
+      for (const entry of images()) {
+        const image = imageElements.get(entry.id);
+        if (image?.isConnected && image.naturalWidth) fitScreenPixels(image, entry.mimeType);
+      }
+      keepZoom();
+      watchResolution();
+    };
+    const watchResolution = () => {
+      resolution?.removeEventListener("change", onResolution);
+      resolution = matchMedia(`(resolution: ${screenPixelRatio()}dppx)`);
+      resolution.addEventListener("change", onResolution);
+    };
+    watchResolution();
     area.addEventListener("wheel", onWheel, { passive: false });
     area.addEventListener("pointerdown", onDown);
     area.addEventListener("pointermove", onMove);
@@ -534,6 +551,7 @@ export function ImageLightbox(props: {
       area.removeEventListener("pointercancel", onUp);
       area.removeEventListener("dblclick", onDoubleClick);
       onResize.disconnect();
+      resolution?.removeEventListener("change", onResolution);
     };
   });
 
