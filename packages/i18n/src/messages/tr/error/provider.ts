@@ -218,7 +218,7 @@ export const messages = {
   "error.provider.opencodeInvalidUpload":
     "OpenCode'un model sağlayıcısı geçersiz bir yükleme isteği bildirdi. Başka bir model seçin ve devam edin. Kayıtlı rutinleri yeniden oluşturmadan önce denetleyin.\n{detail}",
   "error.provider.opencodeUnreadableContent":
-    "Bu model, bu sohbetteki bir dosyayı veya görseli okuyamıyor. Dosya okuyabilen bir model seçin, ardından mesajınızı yeniden gönderin.",
+    "Bu model, bu sohbetteki bir dosyayı veya görseli okuyamıyor. OpenBot, sohbet geçmişiyle yeni bir OpenCode oturumu başlattı. Mesajınızı dosya olmadan yeniden gönderin veya dosya okuyabilen bir model seçin. Bu modeli özel bir sağlayıcıya eklediyseniz, ayarlarında “Kabul eder” altındaki “Görseller” seçeneğini kaldırın.",
   "error.provider.opencodeContextTooSmall":
     "Bu sohbet modelin bağlam penceresine sığmıyor. Ollama veya LM Studio'da modeli daha büyük bir bağlam uzunluğuyla yükleyin ve OpenBot'taki sağlayıcı ayarlarına aynı pencereyi girin. Ya da daha büyük bir model seçin.",
   "error.provider.opencodeFreeLimit":
@@ -227,6 +227,8 @@ export const messages = {
     "Model sağlayıcısı kendi tarafında başarısız oldu. Bağlantınız bunun nedeni değildir. Daha sonra tekrar deneyin veya başka bir model seçin.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "Modelin yanıtı yarıda kesildi veya geçerli değildi. Mesajınızı tekrar gönderin veya başka bir model seçin.\n{detail}",
+  "error.provider.opencodeReasoningOverlap":
+    "OpenCode bu efor düzeyinde bu modelin akıl yürütmesini okuyamadı. Daha düşük bir efor ya da başka bir model seçin, sonra mesajınızı yeniden gönderin.",
   "error.provider.opencodeNetwork":
     "OpenCode model sağlayıcısına bağlanamadı. OpenBot'u çalıştıran bilgisayarın ağ bağlantısını kontrol edin, ardından tekrar deneyin.\n{detail}",
   "error.provider.codexStateBusy":
@@ -261,6 +263,8 @@ export const messages = {
     "OPENBOT_ANTIGRAVITY_PATH içindeki Gemini sunucusu yok veya çalıştırılabilir değil. Yolu düzeltin ya da değişkeni kaldırın, ardından OpenBot'u yeniden başlatın.",
   "error.provider.antigravityVersionUnreadable": "Gemini sunucu sürümü okunamıyor.",
   "error.provider.antigravitySignIn": "Gemini'yi kullanmak için Google ile oturum açın.",
+  "error.provider.antigravityModelAtCapacity":
+    "Google'ın şu anda bu Gemini modeli için boş kapasitesi yok. Sebep planınızın kotası değil. Birkaç dakika sonra yeniden deneyin ya da başka bir model seçin.\n{detail}",
   "error.provider.antigravityRateLimited":
     "Bir hız sınırına veya planın kotasına ulaşıldığı için Gemini isteği reddetti. Birkaç dakika bekleyin ya da başka bir model seçin, sonra yeniden deneyin.\n{detail}",
   "error.provider.antigravityQuotaReached":
@@ -329,6 +333,8 @@ export const messages = {
     "Sohbette çok fazla görsel olduğu için model bu sohbeti kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
   "error.provider.opencodeSessionRejected":
     "OpenCode isteği reddetti ve nedenini belirtmedi. Bu, uzun bir sohbette veya model değişikliğinden sonra olabilir. OpenBot, sohbet geçmişiyle yeni bir OpenCode oturumu başlattı. Yeniden deneyin. Hata sürerse başka bir model veya daha düşük bir efor seçin.",
+  "error.provider.opencodeCompactionFailed":
+    "Model, bağlam penceresinde yer açmak için bu uzun sohbeti özetleyemedi. OpenBot, sohbet geçmişiyle yeni bir OpenCode oturumu başlattı. Yeniden deneyin. Hata sürerse daha güçlü bir model seçin.",
   "error.provider.museMcpStartupFault":
     "Muse bir MCP sunucusunu başlatamadı ve bu oturumda MCP’yi engelledi. OpenBot, sohbet geçmişiyle yeni bir Muse oturumu başlattı. Tekrar deneyin. Hata devam ederse bu ajan için Bilgisayar Kullanımı’nı veya başarısız olan MCP sunucusunu kapatın.",
   "error.provider.claudeSessionMissing":
@@ -359,6 +365,8 @@ export const messages = {
     "{provider} kayıtlı API anahtarını reddetti. Ayarlar'da anahtarı değiştirin veya kaldırın, ardından yeniden deneyin.",
   "error.provider.keyProviderNoBalance":
     "Kayıtlı API anahtarının {provider} hesabında bakiye yok. Hesaba kredi ekleyin, ardından yeniden deneyin.",
+  "error.provider.keyProviderLowCredit":
+    "Kayıtlı API anahtarının {provider} hesabında bu modelin yanıtı için yeterli kredi yok. Hesaba kredi ekleyin veya başka bir model seçin, ardından yeniden deneyin.",
   "error.provider.modelServiceRefused":
     "Model hizmeti isteği reddetti. Başka bir model seçin veya hizmette bu modele erişiminizi kontrol edin.",
   "error.provider.modelServiceRefusedReason":

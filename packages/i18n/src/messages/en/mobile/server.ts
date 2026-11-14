@@ -713,7 +713,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.vault.contacts": "Contact info",
   "mobile.server.vault.apiKeys": "API keys",
   "mobile.server.vault.apiKeysFooter":
-    "Agents on {host} read each key from a private file by its variable name. The keys stay on {host}. This phone cannot show them.",
+    "Agents on {host} read each key from a file by its variable name. All agents run as the same system user, so an agent can also read a key file that is for other agents. The keys stay on {host}. This phone cannot show them.",
   "mobile.server.vault.empty": "No items",
   "mobile.server.vault.addLogin": "Add login",
   "mobile.server.vault.addCard": "Add card",

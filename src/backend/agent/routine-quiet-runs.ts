@@ -74,6 +74,21 @@ export function quietTeammateDelivery(delivery: QueueDelivery): boolean {
   );
 }
 
+/**
+ * The message that a teammate's answer replies to, when the answer wants no answer itself; null for
+ * any other delivery. When a quiet routine run of this agent sent that message, the turn continues
+ * the run, and nobody waits for it, as nobody waited for the run. Such a turn can end quiet, but
+ * only after a call to the no-update tool: without the call, its answer is a result (#8364).
+ */
+export function answeredRequestId(delivery: QueueDelivery): string | null {
+  return delivery.sender.kind === "agent" &&
+    delivery.sender.agentId !== delivery.recipientAgentId &&
+    delivery.expectsReply === false &&
+    delivery.replyToMessageId
+    ? delivery.replyToMessageId
+    : null;
+}
+
 /** Only the marker, with white space around it. The marker inside a longer text is a report. */
 export function isNoUpdateAnswer(text: string): boolean {
   const answer = text.trim();

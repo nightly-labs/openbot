@@ -214,7 +214,7 @@ export const messages = {
   "error.provider.opencodeInvalidUpload":
     "OpenCode의 모델 제공자가 올바르지 않은 업로드 요청이라고 알렸어요. 다른 모델을 선택해 계속하세요. 저장된 루틴을 다시 만들기 전에 확인하세요.\n{detail}",
   "error.provider.opencodeUnreadableContent":
-    "이 모델은 이 채팅의 파일이나 이미지를 읽을 수 없어요. 파일을 읽을 수 있는 모델을 선택한 후 메시지를 다시 보내세요.",
+    "이 모델은 이 채팅의 파일이나 이미지를 읽을 수 없어요. OpenBot이 채팅 기록으로 새 OpenCode 세션을 시작했어요. 파일 없이 메시지를 다시 보내거나, 파일을 읽을 수 있는 모델을 선택하세요. 이 모델을 사용자 지정 제공자에 추가했다면 설정의 '입력'에서 '이미지'를 해제하세요.",
   "error.provider.opencodeContextTooSmall":
     "이 채팅이 모델의 컨텍스트 창에 맞지 않습니다. Ollama 또는 LM Studio에서 더 큰 컨텍스트 길이로 모델을 불러오고, OpenBot의 제공자 설정에 같은 창을 입력하세요. 또는 더 큰 모델을 선택하세요.",
   "error.provider.opencodeFreeLimit":
@@ -223,6 +223,8 @@ export const messages = {
     "모델 제공자 쪽에서 오류가 났어요. 회원님의 연결 문제가 아니에요. 나중에 다시 시도하거나 다른 모델을 선택하세요.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "모델의 응답이 중간에 끊겼거나 올바르지 않았어요. 메시지를 다시 보내거나 다른 모델을 선택하세요.\n{detail}",
+  "error.provider.opencodeReasoningOverlap":
+    "OpenCode가 이 강도에서 이 모델의 추론을 읽지 못했습니다. 더 낮은 강도나 다른 모델을 선택한 다음 메시지를 다시 보내세요.",
   "error.provider.opencodeNetwork":
     "OpenCode가 모델 제공자에 연결할 수 없었어요. OpenBot을 실행하는 컴퓨터의 네트워크 연결을 확인한 후 다시 시도해 주세요.\n{detail}",
   "error.provider.codexStateBusy":
@@ -255,6 +257,8 @@ export const messages = {
     "OPENBOT_ANTIGRAVITY_PATH의 Gemini 서버가 없거나 실행할 수 없어요. 경로를 고치거나 변수를 삭제한 다음 OpenBot을 다시 시작하세요.",
   "error.provider.antigravityVersionUnreadable": "Gemini 서버 버전을 읽을 수 없어요.",
   "error.provider.antigravitySignIn": "Gemini를 사용하려면 Google로 로그인하세요.",
+  "error.provider.antigravityModelAtCapacity":
+    "지금 Google에 이 Gemini 모델의 여유 용량이 없어요. 요금제 할당량 때문은 아니에요. 몇 분 후 다시 시도하거나 다른 모델을 선택해 주세요.\n{detail}",
   "error.provider.antigravityRateLimited":
     "속도 제한 또는 요금제 할당량에 도달해서 Gemini가 요청을 거부했어요. 몇 분 기다리거나 다른 모델을 선택한 후 다시 시도해 주세요.\n{detail}",
   "error.provider.antigravityQuotaReached":
@@ -321,6 +325,8 @@ export const messages = {
     "이미지가 너무 많아서 모델이 이 채팅을 받지 않았습니다. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했습니다. 다시 시도하세요.",
   "error.provider.opencodeSessionRejected":
     "OpenCode가 원인을 알리지 않고 요청을 거부했어요. 긴 채팅이나 모델 변경 후에 발생할 수 있어요. OpenBot이 채팅 기록으로 새 OpenCode 세션을 시작했어요. 다시 시도해 주세요. 오류가 계속되면 다른 모델이나 낮은 강도를 선택하세요.",
+  "error.provider.opencodeCompactionFailed":
+    "모델이 이 긴 채팅을 요약하지 못해 컨텍스트 창에 공간을 만들지 못했어요. OpenBot이 채팅 기록으로 새 OpenCode 세션을 시작했어요. 다시 시도해 주세요. 오류가 계속되면 더 강력한 모델을 선택하세요.",
   "error.provider.museMcpStartupFault":
     "Muse가 MCP 서버를 시작하지 못해서 이 세션에서 MCP를 차단했어요. OpenBot이 채팅 기록으로 새 Muse 세션을 시작했어요. 다시 시도해 주세요. 오류가 계속되면 이 에이전트의 컴퓨터 제어 또는 실패한 MCP 서버를 끄세요.",
   "error.provider.claudeSessionMissing":
@@ -351,6 +357,8 @@ export const messages = {
     "{provider}가 저장된 API 키를 거부했어요. 설정에서 키를 교체하거나 제거한 후 다시 시도하세요.",
   "error.provider.keyProviderNoBalance":
     "저장된 API 키의 {provider} 계정에 잔액이 없어요. 계정에 크레딧을 추가한 후 다시 시도하세요.",
+  "error.provider.keyProviderLowCredit":
+    "저장된 API 키의 {provider} 계정에 이 모델의 응답에 필요한 크레딧이 부족해요. 계정에 크레딧을 추가하거나 다른 모델을 선택한 후 다시 시도하세요.",
   "error.provider.modelServiceRefused":
     "모델 서비스가 요청을 거부했어요. 다른 모델을 선택하거나 서비스에서 이 모델에 대한 접근 권한을 확인하세요.",
   "error.provider.modelServiceRefusedReason":

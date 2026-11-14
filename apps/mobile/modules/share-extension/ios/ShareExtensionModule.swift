@@ -11,7 +11,7 @@ struct ShareTargetRecord: Record {
   @Field var avatarUri: String? = nil
 }
 
-final class ShareKeychainException: GenericException<OSStatus> {
+final class ShareKeychainException: GenericException<OSStatus>, @unchecked Sendable {
   override var reason: String {
     "The share session could not be saved (\(param))"
   }

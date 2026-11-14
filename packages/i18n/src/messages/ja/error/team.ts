@@ -79,6 +79,7 @@ export const messages = {
   "error.team.usageLimitUnsupported": "この接続ではエージェントの使用量の上限を表示または変更できません。",
   "error.team.hermesImportUnsupported": "この接続ではサーバーから Hermes のプロファイルを取り込めません。",
   "error.team.providerDetectionUnsupported": "この接続ではサーバーのモデルサーバーとエージェントを検出できません。",
+  "error.team.routineFlowStopUnsupported": "この接続ではルーティンの実行を停止できません。",
   "error.team.sidebarFoldersUnsupported": "この接続ではフォルダー内のフォルダーを使用できません。",
   "error.team.libraryFoldersUnsupported": "この接続ではライブラリのフォルダーを使用できません。",
   "error.team.agentNotificationLevelsUnsupported":

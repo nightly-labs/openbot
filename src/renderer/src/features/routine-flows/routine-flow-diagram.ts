@@ -48,8 +48,10 @@ function runStatus(status: RoutineRunStatus, steps: readonly RoutineFlowStep[]):
   if (status === "queued" || status === "running" || status === "needs-attention") return "running";
   if (steps.some((step) => step.status === "running")) return "running";
   if (status === "cancelled") return "cancelled";
-  if (status === "succeeded") return steps.some((step) => step.status === "failed") ? "failed" : "succeeded";
-  return "failed";
+  if (status !== "succeeded") return "failed";
+  if (steps.some((step) => step.status === "failed")) return "failed";
+  // The routine's own agent answered, and the user stopped the flow after it.
+  return steps.some((step) => step.status === "cancelled") ? "cancelled" : "succeeded";
 }
 
 function routineRun(run: RoutineRun): DiagramRoutineRun {

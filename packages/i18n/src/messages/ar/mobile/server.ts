@@ -724,7 +724,7 @@ export const messages = {
   "mobile.server.vault.contacts": "معلومات الاتصال",
   "mobile.server.vault.apiKeys": "مفاتيح API",
   "mobile.server.vault.apiKeysFooter":
-    "يقرأ الوكلاء على {host} كل مفتاح من ملف خاص باسم متغيره. تبقى المفاتيح على {host}. لا يستطيع هذا الهاتف عرضها.",
+    "يقرأ الوكلاء على {host} كل مفتاح من ملف باسم متغيره. يعمل كل الوكلاء كمستخدم النظام نفسه، لذا يمكن للوكيل أيضًا قراءة ملف مفتاح مخصص لوكلاء آخرين. تبقى المفاتيح على {host}. لا يستطيع هذا الهاتف عرضها.",
   "mobile.server.vault.empty": "لا عناصر",
   "mobile.server.vault.addLogin": "إضافة بيانات تسجيل دخول",
   "mobile.server.vault.addCard": "إضافة بطاقة",

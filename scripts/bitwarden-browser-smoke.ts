@@ -1,9 +1,10 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { Effect } from "effect";
+import { Effect, Result } from "effect";
 import { webContents } from "electron";
 import type { BrowserHost } from "../src/backend/browser-host";
 import { runCauseEffect } from "../src/backend/effect-boundary";
+import type { VaultLogin } from "../src/backend/password-vault";
 import { passwordVaultRouter } from "../src/backend/password-vault-router";
 import { BitwardenConnectorService } from "../src/main/bitwarden-connector-service";
 import { waitForPresentedFrame } from "./browser-smoke-frames";
@@ -27,9 +28,14 @@ export function bitwardenLoginFixture(kind: "password" | "authenticator"): Respo
 
 /** Real browser and vault router; the injected CLI contains only synthetic credentials. */
 export async function runBitwardenBrowserSmoke(browser: BrowserHost): Promise<void> {
+  /** While true, each `bw` call fails, as with a session key that no longer works (#8777). */
+  let cliFails = false;
+  /** The logins of the OpenBot Vault fixture for `ORIGIN`. */
+  let vaultLogins: VaultLogin[] = [];
   const connector = new BitwardenConnectorService({
     findCli: async () => "/fixture/bw",
     runCli: async (_executable, args) => {
+      if (cliFails) throw new Error("Fixture bw failure.");
       if (args[0] === "sync") return "Sync complete.";
       if (args[1] === "folders")
         return JSON.stringify([
@@ -57,9 +63,19 @@ export async function runBitwardenBrowserSmoke(browser: BrowserHost): Promise<vo
   const vault = passwordVaultRouter([
     {
       prefix: "",
+      name: "1Password",
       vault: { connected: () => false, loginsFor: () => Effect.succeed(null), secretFor: () => Effect.succeed(null) },
     },
-    { prefix: "bitwarden:", vault: connector },
+    { prefix: "bitwarden:", name: "Bitwarden", vault: connector },
+    {
+      prefix: "openbot:",
+      name: "the OpenBot Vault",
+      vault: {
+        connected: () => true,
+        loginsFor: () => Effect.succeed(vaultLogins),
+        secretFor: () => Effect.succeed(null),
+      },
+    },
   ]);
   const checks: string[] = [];
   try {
@@ -107,6 +123,24 @@ export async function runBitwardenBrowserSmoke(browser: BrowserHost): Promise<vo
         await runCauseEffect(browser.close(tab.id));
       }
     }
+    cliFails = true;
+    vaultLogins = [
+      { id: "vault-login", title: "Vault fixture", username: "vault@example.test", hasOneTimePassword: false },
+    ];
+    const failed = await Effect.runPromise(Effect.result(vault.loginsFor(ORIGIN)));
+    const failedStatus = connector.status();
+    if (!Result.isFailure(failed) || failed.failure.sources?.join() !== "Bitwarden")
+      throw new Error("The failed login list did not name Bitwarden.");
+    if (failed.failure.logins?.map(({ id }) => id).join() !== "openbot:vault-login")
+      throw new Error("A Bitwarden failure hid the OpenBot Vault login.");
+    if (!failedStatus.connected || !failedStatus.error)
+      throw new Error("The Bitwarden status did not show the failed read.");
+    checks.push("a Bitwarden read failure names Bitwarden, keeps the other logins, and shows the error in its status");
+    vaultLogins = [];
+    cliFails = false;
+    if ((await runCauseEffect(vault.loginsFor(ORIGIN)))?.[0]?.id !== login.id || connector.status().error !== null)
+      throw new Error("A working Bitwarden read did not clear the error.");
+    checks.push("the next working read lists the Bitwarden login and clears the error");
     await runCauseEffect(connector.disconnect());
     if (await runCauseEffect(vault.secretFor(login.id, ORIGIN, "password")))
       throw new Error("Disconnected vault returned a password.");

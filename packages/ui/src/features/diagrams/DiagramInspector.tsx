@@ -5,7 +5,7 @@
  * selected routine shows what it asks for, which agents it starts, when it fires and how it went.
  */
 
-import { Badge, Button, ChevronLeft, CopyButton, Textarea } from "@openbot/ui";
+import { Badge, Button, ChevronLeft, CopyButton, Square, Textarea } from "@openbot/ui";
 import { createEffect, createMemo, createSignal, For, flush, Show } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
@@ -45,6 +45,24 @@ export interface DiagramInspectorProps {
   onEditTask?: ((nodeId: string, routineId: string, task: string) => void) | undefined;
   /** Sets the webhook of a routine that a webhook starts. Without it, the webhook is not shown. */
   webhooks?: DiagramWebhookActions | undefined;
+  /** The Stop of the focused routine's run while it works. */
+  runStop?: DiagramRunStop | undefined;
+}
+
+/** The Stop of a run that works: pressed once, it waits as "Stopping…" until the run ends. */
+export interface DiagramRunStop {
+  stopping: boolean;
+  onStop: () => void;
+}
+
+export function DiagramStopButton(props: { stop: DiagramRunStop }) {
+  const { t } = useText();
+  return (
+    <Button type="button" variant="secondary" size="xs" disabled={props.stop.stopping} onClick={props.stop.onStop}>
+      <Square aria-hidden="true" />
+      {props.stop.stopping ? t("diagram.run.stopping") : t("diagram.run.stop")}
+    </Button>
+  );
 }
 
 export function DiagramInspector(props: DiagramInspectorProps) {
@@ -112,6 +130,7 @@ export function DiagramInspector(props: DiagramInspectorProps) {
             </>
           )}
         </Show>
+        <Show when={props.runStop}>{(stop) => <DiagramStopButton stop={stop()} />}</Show>
       </header>
 
       <div class="diagram-inspector-body">

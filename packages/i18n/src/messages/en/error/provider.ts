@@ -208,7 +208,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.opencodeInvalidUpload":
     "OpenCode's model provider reported an invalid upload request. Choose another model and continue. Check saved routines before you create them again.\n{detail}",
   "error.provider.opencodeUnreadableContent":
-    "This model cannot read a file or image in this chat. Choose a model that can read files, then send your message again.",
+    "This model cannot read a file or image in this chat. OpenBot started a new OpenCode session with the chat history. Send your message again without the file, or choose a model that can read files. If you added this model to a custom provider, clear Images at Accepts in its settings.",
   "error.provider.opencodeContextTooSmall":
     "This chat does not fit in the model's context window. In Ollama or LM Studio, load the model with a larger context length, and enter the same window in its OpenBot provider settings. Or choose a larger model.",
   "error.provider.opencodeFreeLimit":
@@ -217,6 +217,8 @@ export const messages = defineMessages("error.provider", {
     "The model provider failed on its side. Your connection is not the cause. Try again later or choose another model.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "The model's reply was cut off or was not valid. Send your message again, or choose another model.\n{detail}",
+  "error.provider.opencodeReasoningOverlap":
+    "OpenCode could not read the reasoning of this model at this effort. Select a lower effort or another model, then send your message again.",
   "error.provider.opencodeNetwork":
     "OpenCode could not connect to the model provider. Check the network connection of the computer that runs OpenBot, then try again.\n{detail}",
   "error.provider.codexStateBusy":
@@ -249,6 +251,8 @@ export const messages = defineMessages("error.provider", {
     "The Gemini server in OPENBOT_ANTIGRAVITY_PATH is missing or is not executable. Correct the path or remove the variable, then restart OpenBot.",
   "error.provider.antigravityVersionUnreadable": "Unable to read the Gemini server version.",
   "error.provider.antigravitySignIn": "Sign in with Google to use Gemini.",
+  "error.provider.antigravityModelAtCapacity":
+    "Google has no free capacity for this Gemini model now. Your plan's quota is not the cause. Try again in a few minutes, or choose another model.\n{detail}",
   "error.provider.antigravityRateLimited":
     "Gemini refused the request because a rate limit or the plan's quota is reached. Wait a few minutes or choose another model, then try again.\n{detail}",
   "error.provider.antigravityQuotaReached":
@@ -313,6 +317,8 @@ export const messages = defineMessages("error.provider", {
     "The model did not accept this chat because the chat has too many images. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.opencodeSessionRejected":
     "OpenCode refused the request and did not give the cause. This can occur in a long chat or after a model change. OpenBot started a new OpenCode session with the chat history. Try again. If the error continues, select a different model or a lower effort.",
+  "error.provider.opencodeCompactionFailed":
+    "The model could not summarize this long chat to make room in its context window. OpenBot started a new OpenCode session with the chat history. Try again. If the error continues, select a stronger model.",
   "error.provider.museMcpStartupFault":
     "Muse could not start an MCP server and blocked MCP in this session. OpenBot started a new Muse session with the chat history. Try again. If the error continues, turn off Computer Use or the failed MCP server for this agent.",
   "error.provider.claudeSessionMissing":
@@ -343,6 +349,8 @@ export const messages = defineMessages("error.provider", {
     "{provider} refused the saved API key. Replace or remove the key in Settings, then try again.",
   "error.provider.keyProviderNoBalance":
     "The {provider} account of the saved API key has no balance. Add credit to the account, then try again.",
+  "error.provider.keyProviderLowCredit":
+    "The {provider} account of the saved API key does not have enough credit for a reply from this model. Add credit to the account, or select a different model, then try again.",
   "error.provider.modelServiceRefused":
     "The model service refused the request. Select a different model, or check your access to this model at the service.",
   "error.provider.modelServiceRefusedReason":

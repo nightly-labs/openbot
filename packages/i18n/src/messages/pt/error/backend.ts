@@ -92,6 +92,10 @@ export const messages = {
     "Aguarde o trabalho neste canal terminar e depois exclua o histórico.",
   "error.backend.channelCompactUnavailable":
     "Nenhum membro deste canal pode compactar o contexto agora. Um membro precisa responder no canal primeiro, e o provedor dele precisa suportar compactação.",
+  "error.backend.channelCompactNoSession":
+    "Os membros deste canal ainda não têm uma conversa para compactar. Compacte depois que um membro responder no canal.",
+  "error.backend.channelCompactNotSupported":
+    "Nenhum membro deste canal pode compactar sob demanda. Os membros que suportam isso compactam o contexto automaticamente quando ele está quase cheio.",
   "error.backend.channelArchived": "Restaure este canal antes de enviar mensagens ou alterar tarefas.",
   "error.backend.channelReferenceUnavailable": "A mensagem do canal usada como referência está indisponível.",
   "error.backend.channelTaskNotFound": "Tarefa do canal não encontrada.",
@@ -125,6 +129,7 @@ export const messages = {
   "error.backend.memoryOperationFailed": "A operação de memória falhou. Tente de novo.",
   "error.backend.memoryGone": "Esta memória não existe mais.",
   "error.backend.routineGone": "Esta rotina não existe mais.",
+  "error.backend.routineRunGone": "Esta execução da rotina não existe mais.",
   "error.backend.turnNotStarted": "O provedor não iniciou este turno.",
   "error.backend.routineResultConnectionOff":
     "Esta conexão de mensagens está desativada ou foi removida. Escolha outro lugar.",
@@ -207,6 +212,8 @@ export const messages = {
   "error.backend.interruptSelf": "Um agente não pode interromper a si mesmo.",
   "error.backend.interruptOtherWork":
     "Este agente trabalha em uma tarefa que sua mensagem não iniciou. Somente o usuário ou quem enviou a tarefa pode interrompê-lo.",
+  "error.backend.interruptSharedWork":
+    "O turno deste agente trabalha na sua mensagem e também numa mensagem do usuário ou de outro agente. Só o usuário pode pará-lo, com Parar agente no chat desse agente.",
   "error.backend.interruptStarting":
     "Este agente ainda está iniciando um turno. Tente novamente após o início do turno.",
   "error.backend.interruptNoSession":
@@ -278,6 +285,14 @@ export const messages = {
     "{provider} não conseguiu usar o servidor MCP {name} porque o servidor pede que você entre. Abra as configurações de MCP e escolha Entrar.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} não conseguiu iniciar o servidor MCP {name}. Abra as configurações de MCP e escolha Testar conexão para ver a causa.",
+  "error.backend.mcpAppReconnect":
+    "{name} no ChatGPT pede que você entre de novo. Reconecte {name} no ChatGPT e peça de novo ao agente.",
+  "error.backend.mcpServerSignInPage":
+    "O servidor MCP {name} pediu que você entre em uma página da web. O OpenBot não abre essa página para um servidor, então recusou o pedido. Abra as configurações de MCP, entre em {name} e peça de novo ao agente.",
+  "error.backend.mcpServerRequestDeclined":
+    "O servidor MCP {name} pediu algo que o OpenBot não consegue mostrar, então o OpenBot recusou o pedido.",
+  "error.backend.mcpRequestDeclined":
+    "Um servidor MCP pediu algo que o OpenBot não consegue mostrar, então o OpenBot recusou o pedido.",
   "error.backend.mcpOAuthProxyUnavailable":
     "O OpenBot não conseguiu iniciar a conexão local de login para este servidor. Reinicie o OpenBot e tente novamente.",
   "error.backend.mcpOAuthSignInNeeded":

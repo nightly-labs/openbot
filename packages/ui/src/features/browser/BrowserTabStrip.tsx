@@ -343,8 +343,9 @@ export function BrowserTabStrip(props: {
       event.preventDefault();
       event.stopPropagation();
     };
-    // A vertical wheel scrolls the row, as in other browsers.
+    // A vertical wheel scrolls the row, as in other browsers. A pinch (Ctrl+wheel) zooms the page.
     const onWheel = (event: WheelEvent) => {
+      if (event.ctrlKey) return;
       if (Math.abs(event.deltaY) <= Math.abs(event.deltaX) || element.scrollWidth <= element.clientWidth) return;
       event.preventDefault();
       element.scrollLeft += event.deltaY;

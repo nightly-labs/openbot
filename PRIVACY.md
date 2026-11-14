@@ -944,9 +944,12 @@ no review reads are deleted after 30 days. Turning the setting off deletes all r
   its site) and the name, expiry and billing address of a card, and delete items, with no approval: the
   chat shows each change, and an item that an agent adds keeps the agent's name. Agents cannot see,
   add, change or delete a Vault API key as an item. When an agent lists its API keys, OpenBot writes
-  each Vault key, readable only by the user, to
-  `~/Library/Application Support/OpenBot/agent-api-keys/.vault/<NAME>`, outside every workspace, and
-  gives the agent the path; every agent on the server can read these files in its commands. A changed
+  each Vault key that the agent can use, readable only by the user, to
+  `~/Library/Application Support/OpenBot/agent-api-keys/.vault/<agentId>/<NAME>`, outside every
+  workspace, and gives the agent the path. All agents run as the same system user, so every agent on
+  the server can read these files in its commands, also the files of a key that is for other agents
+  or for "Only this agent". The choice of agents controls which agents OpenBot gives a key to; it does
+  not keep a key from the other agents. A changed
   key is written again, and a deleted key or a Vault that cannot be read removes its file, also at
   start. API keys are redacted from logs, exports and diagnostics. A password that the
   user types into the secure sign-in card goes to the Vault only while Save to Vault is checked. On a

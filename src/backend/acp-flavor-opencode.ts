@@ -7,6 +7,7 @@ import {
   isImageCountDiagnostic,
   isImageTooLargeDiagnostic,
   isImageTooSmallDiagnostic,
+  isUnreadableContentDiagnostic,
   isUsageLimitDiagnostic,
 } from "./agent/provider-diagnostics";
 import { isRecord } from "./protocol";
@@ -71,15 +72,6 @@ function openCodeAuthRequired(error: unknown, model: string | null, endpoint: Ac
 }
 
 /**
- * A request that the model refused for a file, image or audio part in the chat. OpenCode 2.1.1
- * sends a part when the model catalog lists its kind, or when the part has a kind it does not know,
- * such as an MCP resource. Each gateway words the refusal differently; OpenCode itself refuses a
- * kind that the protocol cannot carry.
- */
-const OPENCODE_UNREADABLE_CONTENT =
-  /\[unsupported_content_type\]|\bcontent part type "[^"]*" is not supported\b|\bsupports text-only requests\b|\bdoes not support media type\b/iu;
-
-/**
  * A request that is larger than the model's context window, also after OpenCode 2.2.6 compacted the
  * chat. OpenCode names its own failure `compaction.failed` ("cannot be reduced further") or
  * `compaction.unavailable` ("Nothing to compact yet", when only the first exchange is there); a model
@@ -137,16 +129,21 @@ function openCodeRequestFailure(
   // A gateway wraps it as an upstream failure; the turn reads the provider's text to start a new session.
   if (isImageTooSmallDiagnostic(reason) || isImageTooLargeDiagnostic(reason) || isImageCountDiagnostic(reason))
     return redact(reason);
-  // The part stays in the session, so each turn on this model fails until the user picks another.
-  // The provider's text says nothing more to the user; it goes to the log.
-  if (OPENCODE_UNREADABLE_CONTENT.test(reason)) {
+  // The part stays in the session, so the turn reads the provider's text to start a new session.
+  if (isUnreadableContentDiagnostic(reason)) {
     log(`OpenCode model refused the chat content: ${reason}`);
-    return sourceText("error.provider.opencodeUnreadableContent");
+    return redact(reason);
   }
   // OpenCode 2.2.7 names a model reply that ended with no finish reason, or that it could not read.
   // OpenCode retries a cut-off reply by itself, and a weak connection can also cut it off (#6872).
   if (isRecord(error.data) && error.data.errorName === "provider.invalid-output")
     return sourceText("error.provider.opencodeIncompleteReply", { detail: shownFailureDetail(redact(reason)) });
+  // OpenCode 2.2.7 stops the turn when a model starts a second reasoning block before the first ends.
+  // A route such as Vercel AI Gateway's does this at a higher effort; a send again fails the same way (#8621).
+  if (/\breasoning start before end\b/u.test(reason)) {
+    log(`OpenCode could not read the model's reasoning stream: ${reason}`);
+    return sourceText("error.provider.opencodeReasoningOverlap");
+  }
   // Before the list: a gateway reports an overflow as `Upstream request failed: <reason>` too.
   if (OPENCODE_CONTEXT_TOO_SMALL.test(reason)) {
     log(`OpenCode request does not fit the model's context window: ${reason}`);

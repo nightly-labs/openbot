@@ -375,6 +375,8 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
         onWheel={(event) => {
           const at = point(event);
           if (!at) return;
+          // A pinch (Ctrl+wheel) goes to the remote page only, not to the app page around it.
+          if (event.ctrlKey) event.preventDefault();
           send({
             type: "pointer",
             action: "wheel",
