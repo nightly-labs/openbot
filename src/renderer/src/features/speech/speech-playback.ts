@@ -22,7 +22,7 @@ export interface SpeechSource {
   messageId: string | null;
 }
 
-/** What is read aloud now, for the speaking bar, the voice pane and the message that plays. */
+/** What is read aloud now, for the speaking bar, the voice pill and the message that plays. */
 export interface SpeechReading {
   /** Null for a text of no agent, such as the voice sample in Settings. */
   serverId: string | null;
@@ -387,7 +387,7 @@ export async function readAloud(
 
 /**
  * Plays the user's own recording of a spoken message from a position, in seconds, with the same
- * waveform as a reading. It has no agent, so the speaking bar and the voice pane do not show it.
+ * waveform as a reading. It has no agent, so the speaking bar and the voice pill do not show it.
  */
 export async function playRecording(messageId: string, url: string, from = 0): Promise<void> {
   stopSpeech();

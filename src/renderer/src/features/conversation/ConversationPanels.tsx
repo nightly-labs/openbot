@@ -9,7 +9,7 @@ import { BROWSER_NEW_TAB_URL } from "@openbot/ui/features/browser/browser-sugges
 import { SidePanelHeader, SidePanelLauncher, type SidePanelPane } from "@openbot/ui/features/conversation/SidePanel";
 import { SideQuestionPanel } from "@openbot/ui/features/conversation/SideQuestionPanel";
 import { SubagentPanel } from "@openbot/ui/features/conversation/Subagents";
-import { VoicePanel } from "@openbot/ui/features/conversation/VoicePanel";
+import { VoicePill } from "@openbot/ui/features/conversation/VoicePill";
 import { McpSignInRelayDialog } from "@openbot/ui/features/settings/McpSignInPage";
 import { useText } from "@openbot/ui/text";
 import { actionToast } from "../../action-toast";
@@ -55,20 +55,20 @@ import {
 import { conversationPort } from "./conversation-port";
 
 /**
- * The voice conversation with the agent that is open when the pane opens. An agent on this computer,
+ * The voice conversation with the chat's agent, in a pill at the top of the chat. An agent on this computer,
  * or on a joined server with `live-voice-v1`, uses Codex live voice when the user turned it on in
  * Settings → Voice, whatever the agent's provider: the voice sends each request to the agent. A failed read of that setting keeps the conversation that
- * transcribes on this computer. A conversation that still runs from an earlier visit to the pane shows again.
+ * transcribes on this computer. A conversation that still runs from an earlier visit to the chat shows again.
  * The browser client has only Codex live voice: its runtime gives the port only when the user turned it on.
  */
-function VoiceConversationPane() {
+function VoiceConversationPane(pill: VoicePillPresence) {
   const controller = useConversationController();
   const { props } = useConversationViewScope();
   const running = untrack(() => (props.agent ? controller.voiceSessions.running(props.agent.id) : null));
   const runtimeLive = untrack(() => props.runtime?.liveVoice);
   if (runtimeLive) {
     const liveKind: VoiceConversationKind = running ?? "codex-live";
-    return <VoiceConversation kind={liveKind} port={runtimeLive} />;
+    return <VoiceConversation kind={liveKind} port={runtimeLive} open={pill.open} onClosed={pill.onClosed} />;
   }
   // Live voice runs in the Codex App Server of the agent's server. An older joined server cannot start
   // it, so its agents transcribe. Without a ChatGPT sign-in of that server's Codex, the voice transcribes.
@@ -87,20 +87,26 @@ function VoiceConversationPane() {
       );
   return (
     <Show when={kind()} keyed>
-      {(next) => <VoiceConversation kind={next} />}
+      {(next) => <VoiceConversation kind={next} open={pill.open} onClosed={pill.onClosed} />}
     </Show>
   );
 }
 
-function VoiceConversation(paneProps: { kind: VoiceConversationKind; port?: CodexLivePort }) {
+/** The pill is open, or goes back into the top edge and then calls `onClosed`. */
+interface VoicePillPresence {
+  open: boolean;
+  onClosed: () => void;
+}
+
+function VoiceConversation(paneProps: VoicePillPresence & { kind: VoiceConversationKind; port?: CodexLivePort }) {
   const controller = useConversationController();
-  const { props, startVoiceConversation, closeSidePanelPane } = useConversationViewScope();
+  const { props, startVoiceConversation, endVoiceConversation } = useConversationViewScope();
   const agentId = untrack(() => props.agent?.id);
   if (!agentId) return null;
   const serverId = untrack(() => props.server?.id ?? LOCAL_SERVER_ID);
   const kind = untrack(() => paneProps.kind);
   const port = untrack(() => paneProps.port);
-  // The conversation outlives this pane: another tab or chat keeps it, and closing the Voice tab ends it.
+  // The conversation outlives this pill: another chat keeps it, and End stops it.
   const conversation = controller.voiceSessions.open(agentId, kind, () =>
     kind === "codex-live"
       ? createCodexLiveConversation({ agentId, serverId, ...(port ? { port } : {}) })
@@ -113,19 +119,19 @@ function VoiceConversation(paneProps: { kind: VoiceConversationKind; port?: Code
   return (
     <Show when={props.agent}>
       {(agent) => (
-        <VoicePanel
+        <VoicePill
           agent={agent()}
           phase={conversation.phase()}
           muted={conversation.muted()}
-          heard={conversation.heard()}
-          said={conversation.said()}
           levels={conversation.levels()}
           error={conversation.error()}
           onToggleMute={conversation.toggleMute}
           onInterrupt={conversation.interrupt}
-          onEnd={() => closeSidePanelPane("voice")}
+          onEnd={endVoiceConversation}
           speed={replySpeed()}
           onCycleSpeed={cycleSpeed}
+          open={paneProps.open}
+          onClosed={paneProps.onClosed}
         />
       )}
     </Show>
@@ -204,6 +210,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     installedSkillsLoadFailed,
     mcpServers,
     voiceConversationAvailable,
+    voiceConversationOpen,
     panelSubagentId,
     shownPanelThreadId,
     openPanelThread,
@@ -213,6 +220,27 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     replyJump,
   } = useConversationViewScope();
   const { t, errorMessage } = useText();
+  const chatAgentKey = () => (props.agent ? `${props.server?.id ?? "local"}:${props.agent.id}` : null);
+  const voiceKey = () => (voiceConversationOpen() && voiceConversationAvailable() && chatAgentKey()) || null;
+  // When the conversation ends, the pill stays in the page while it goes back into the top edge. A
+  // conversation that starts again in that time gets a new pill. Another chat does not show the pill
+  // of this one on its way out.
+  const [voicePill, setVoicePill] = createSignal<{ key: string } | null>(null);
+  const [voicePillClosing, setVoicePillClosing] = createSignal(false);
+  createEffect(
+    () => ({ key: voiceKey(), chat: chatAgentKey() }),
+    ({ key, chat }) => {
+      const shown = untrack(voicePill);
+      if (key) {
+        if (shown?.key !== key || untrack(voicePillClosing)) setVoicePill({ key });
+        setVoicePillClosing(false);
+      } else if (shown && shown.key === chat) setVoicePillClosing(true);
+      else {
+        setVoicePill(null);
+        setVoicePillClosing(false);
+      }
+    },
+  );
   /** The web client asks the host. Desktop asks main, which asks a joined server's host. */
   const publishCalls = (): AgentTemplatePublishCalls => {
     if (props.runtime?.admin) return props.runtime.admin.agentTemplates;
@@ -415,7 +443,6 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     ...(props.browserEnabled !== false && channelBrowserPane() ? (["browser"] as const) : []),
     ...(filesServer() && filesSource() ? (["files"] as const) : []),
     ...(props.agent || channel ? (["settings"] as const) : []),
-    ...(props.agent && voiceConversationAvailable() ? (["voice"] as const) : []),
   ]);
   /** The subagent in the Subagent pane, from the newest turn that has it. */
   const panelSubagent = createMemo(() => {
@@ -653,17 +680,18 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
         )}
       </Show>
 
-      {/* Keyed, so another agent or server gets its own conversation; closing the Voice tab ends it. */}
-      <Show
-        when={
-          activeRightPanel() === "voice" &&
-          voiceConversationAvailable() &&
-          props.agent &&
-          `${props.server?.id ?? "local"}:${props.agent.id}`
-        }
-        keyed
-      >
-        <VoiceConversationPane />
+      {/* Keyed, so another agent or server gets its own conversation; End in the pill ends it. */}
+      <Show when={voicePill()} keyed>
+        {(shown) => (
+          <VoiceConversationPane
+            open={!voicePillClosing()}
+            onClosed={() => {
+              if (voicePill() !== shown) return;
+              setVoicePill(null);
+              setVoicePillClosing(false);
+            }}
+          />
+        )}
       </Show>
 
       {/* Keyed, so each side thread gets its own messages and read state. */}

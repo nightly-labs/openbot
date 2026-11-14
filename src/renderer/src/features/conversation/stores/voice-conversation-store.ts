@@ -5,7 +5,7 @@ import {
   VOICE_MODELS,
   VOICE_STREAM_LIMITS,
 } from "@openbot/contracts/ipc";
-import type { VoicePanelPhase } from "@openbot/ui/features/conversation/VoicePanel";
+import type { VoicePhase } from "@openbot/ui/features/conversation/VoicePill";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore, onCleanup } from "solid-js";
 import { desktopAnalytics } from "../../../analytics";
@@ -769,7 +769,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     const current = speechReading();
     return current?.serverId === deps.serverId && current.agentId === deps.agentId ? current : null;
   };
-  function phase(): VoicePanelPhase {
+  function phase(): VoicePhase {
     if (state.offline) return "offline";
     if (state.phase === "starting" || state.phase === "listening") return state.phase;
     if (state.phase === "waiting" && reading()) return "speaking";

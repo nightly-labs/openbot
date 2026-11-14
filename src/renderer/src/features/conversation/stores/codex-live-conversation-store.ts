@@ -1,5 +1,5 @@
 import type { OpenBotDesktopApi, VoiceLiveEvent } from "@openbot/contracts/ipc";
-import type { VoicePanelPhase } from "@openbot/ui/features/conversation/VoicePanel";
+import type { VoicePhase } from "@openbot/ui/features/conversation/VoicePill";
 import { currentText } from "@openbot/ui/text";
 import { createStore, onCleanup } from "solid-js";
 import { SPEECH_LEVEL_COUNT } from "../../speech/speech-playback";
@@ -309,7 +309,7 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
 
   void start();
 
-  const phase = (): VoicePanelPhase => state.step;
+  const phase = (): VoicePhase => state.step;
   return {
     phase,
     muted: () => state.muted,
