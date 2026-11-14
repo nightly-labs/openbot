@@ -17,8 +17,10 @@ import {
   type ChannelDraft,
   type ChannelMemory,
   type ChannelMessage,
+  type ChannelPage,
   type ChannelRoutingConversationEventAction,
   type ChannelTask,
+  type ChannelTaskWait,
   CONTEXT_RESET_ITEM_TYPE,
   type ConversationSnapshot,
   type CreateChannelMemoryInput,
@@ -60,6 +62,7 @@ import {
   isChannelRoutineTool,
   PERSON_CANCEL_REQUIRED,
   PERSON_REQUEST_REQUIRED,
+  requestPerson,
 } from "./channel-management";
 import { ChannelMemoryStore } from "./channel-memory-store";
 import { CHANNEL_REPLY_ID_PREFIX, channelReplyExpectedResult, checkChannelReply, isReplyTask } from "./channel-replies";
@@ -319,6 +322,7 @@ export class ChannelService {
     id: string;
     name: string;
     title: string;
+    instructions: string;
     leadAgentId: string | null;
     members: Array<{ agentId: string; name: string }>;
   }> {
@@ -332,6 +336,7 @@ export class ChannelService {
         id: channel.id,
         name: channel.name,
         title: channel.title,
+        instructions: channel.instructions,
         leadAgentId: channel.leadAgentId,
         members: this.eligibleMembers(channel).map((agentId) => ({ agentId, name: names.get(agentId) ?? agentId })),
       }));
@@ -530,14 +535,17 @@ export class ChannelService {
    * "Delete history": every message of the channel leaves the view and the stored history, with its
    * files, and the members forget the channel as after "New conversation". The members,
    * instructions, memories, routines and tasks stay. Work that still runs or waits refuses it, and
-   * `members.busy` and `members.end` work as for `clearContext`.
+   * `members.busy` works as for `clearContext`. `members.forget` deletes the messages of each
+   * member's channel thread and ends its session; a failure leaves the rest for a second request.
    */
   readonly deleteHistory = Effect.fn("ChannelService.deleteHistory")(function* (
     this: ChannelService,
     channelId: string,
     members: {
       busy: (contexts: ReadonlyArray<{ agentId: string; threadId: string }>) => boolean;
-      end: (threadIds: readonly string[]) => Effect.Effect<void>;
+      forget: (
+        contexts: ReadonlyArray<{ agentId: string; threadId: string }>,
+      ) => Effect.Effect<void, ChannelOperationError>;
     },
   ) {
     yield* this.#serialize(
@@ -554,7 +562,7 @@ export class ChannelService {
         yield* channelSync(() => this.store.deleteHistory(channel));
         // A failure here leaves copies that no message shows; a second request removes them.
         yield* this.mailbox.deleteChannelMessageCopies(channelId, "all").pipe(Effect.mapError(channelFailure));
-        yield* members.end(contexts.map((context) => context.threadId));
+        yield* members.forget(contexts);
       }).pipe(Effect.uninterruptible),
     );
     this.publish(channelId);
@@ -1499,11 +1507,43 @@ export class ChannelService {
     );
   }
 
+  /**
+   * The order in which the pump tries the tasks of a channel: a person's queued message first, then
+   * the rest in the order they were made. A channel runs `CHANNEL_PARALLEL_LIMIT` tasks at once, so a
+   * question to a lead that waited for its subtasks waited behind every queued subtask, and the
+   * person saw no answer (#8761). The request of a routine or an agent keeps its place. While a
+   * person's message already runs here, the order stays as made, so delegated work still gets a
+   * place when people keep writing.
+   */
+  #dispatchOrder(channelId: string, tasks: readonly ChannelTask[]): readonly ChannelTask[] {
+    // A task that answers a person's message: a root task of that message (one for each member it
+    // names), the task it continues, or the task that routing gave it. A subtask only inherits the id
+    // of the message.
+    const answersPerson = (task: ChannelTask) => {
+      const request = this.store.message(channelId, task.requestMessageId);
+      return (task.parentTaskId === null || request?.taskId === task.id) && requestPerson(request) !== null;
+    };
+    const running = new Set(
+      this.store
+        .assignments(channelId)
+        .filter(activeAssignment)
+        .map((assignment) => assignment.taskId),
+    );
+    const first: ChannelTask[] = [];
+    const rest: ChannelTask[] = [];
+    for (const task of tasks) {
+      if (running.has(task.id) && answersPerson(task)) return tasks;
+      (task.state === "queued" && answersPerson(task) ? first : rest).push(task);
+    }
+    return [...first, ...rest];
+  }
+
   private readonly pump = Effect.fn("ChannelService.pump")(function* (
     this: ChannelService,
     channelId: string,
   ): Effect.fn.Return<void, ChannelOperationError> {
-    for (const candidate of yield* channelSync(() => this.store.tasks(channelId))) {
+    const listed = yield* channelSync(() => this.store.tasks(channelId));
+    for (const candidate of yield* channelSync(() => this.#dispatchOrder(channelId, listed))) {
       if (this.#stopped || this.#deletedChannels.has(channelId)) return;
       // One row each, not every task of the channel again: a long channel holds thousands of
       // finished tasks, and the whole list for each of them blocked the main process for minutes.
@@ -2144,6 +2184,60 @@ export class ChannelService {
       channelName: reserving.channel.title.trim() || reserving.channel.name,
       agentId: reserving.assignment.agentId,
     };
+  }
+
+  /**
+   * A page for this computer's reader, with the reason that each queued task waits. An older page adds
+   * only messages: the view keeps the tasks of the first page.
+   */
+  page(channelId: string, before?: number): ChannelPage {
+    const stored = this.store.page(channelId, before);
+    if (before !== undefined) return stored;
+    const page = { ...stored, tasks: this.store.withSeenDependencies(channelId, stored.tasks) };
+    const waits = this.taskWaits(channelId, page.tasks);
+    return waits.length ? { ...page, waits } : page;
+  }
+
+  /**
+   * Why each queued task of `tasks` that has an owner does not start. The pump skips such a task and
+   * keeps no reason, so the channel showed a request that did not start and nothing more (#6067).
+   * Work of the owner in this channel is not a reason here: the channel shows it. A task that waits
+   * for its dependencies or for a usage limit has no reason here either: the pump would not start it
+   * when the busy work ends, and the channel shows a usage limit itself.
+   */
+  taskWaits(channelId: string, tasks: readonly ChannelTask[]): ChannelTaskWait[] {
+    const assignments = this.store.assignments(channelId).filter(activeAssignment);
+    const byId = new Map(tasks.map((task) => [task.id, task]));
+    // A remote page can leave a dependency out, so the stored tasks are read once when one is missing.
+    let stored: Map<string, ChannelTask> | undefined;
+    const dependencySettled = (id: string): boolean => {
+      let dependency = byId.get(id);
+      if (!dependency) {
+        stored ??= new Map(this.store.tasks(channelId).map((task) => [task.id, task]));
+        dependency = stored.get(id);
+      }
+      return Boolean(dependency && settled(dependency));
+    };
+    return tasks.flatMap((task): ChannelTaskWait[] => {
+      const agentId = task.ownerAgentId;
+      if (task.state !== "queued" || !agentId || this.hooks.usageLimited?.(agentId)) return [];
+      const root = byId.get(task.rootTaskId);
+      if (root && (root.state === "paused" || root.state === "failed" || root.state === "cancelled")) return [];
+      if (assignments.some((assignment) => assignment.agentId === agentId || assignment.taskId === task.id)) return [];
+      if (task.dependencies.some((id) => !dependencySettled(id))) return [];
+      const elsewhere = this.store.agentAssignment(agentId, ACTIVE_ASSIGNMENT_STATES);
+      if (elsewhere)
+        return [
+          {
+            taskId: task.id,
+            agentId,
+            reason: "agent-busy",
+            channelId: elsewhere.channel.id,
+            channelName: elsewhere.channel.name,
+          },
+        ];
+      return assignments.length >= CHANNEL_PARALLEL_LIMIT ? [{ taskId: task.id, agentId, reason: "channel-full" }] : [];
+    });
   }
 
   deliveryFailed(deliveryId: string, reason: string): Effect.Effect<void, ChannelOperationError> {
@@ -4072,9 +4166,26 @@ export class ChannelService {
       .map((assignment) => `${assignment.id}:${assignment.agentId}`)
       .join(",");
     // A channel with no assignment has nothing to report, so an unseen channel counts as empty.
-    if ((this.#activeAssignments.get(channelId) ?? "") === active) return;
+    const previous = this.#activeAssignments.get(channelId) ?? "";
+    if (previous === active) return;
     this.#activeAssignments.set(channelId, active);
     this.hooks.queueHoldChanged?.();
+    // A queued task of another channel can name the work of an agent that started or ended here, and
+    // its own channel did not change, so its page is read again only after this.
+    const agents = new Set(
+      [previous, active].flatMap((value) =>
+        value ? value.split(",").map((entry) => entry.slice(entry.indexOf(":") + 1)) : [],
+      ),
+    );
+    for (const id of this.store.ids()) {
+      if (
+        id !== channelId &&
+        this.store
+          .tasks(id)
+          .some((task) => task.state === "queued" && task.ownerAgentId && agents.has(task.ownerAgentId))
+      )
+        this.hooks.changed(id, this.store.get(id).revision);
+    }
   }
 
   readonly stop = Effect.fn("ChannelService.stop")(function* (

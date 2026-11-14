@@ -390,7 +390,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "list_channels",
     description:
-      "List the open channels with their id, name, lead, and members. A sidebar section (folder) is not a channel.",
+      "List open channels: id, name, lead, members, instructions (first 300 characters). Folders are not channels.",
     shape: listChannelsToolSchema.shape,
   },
   {
@@ -432,7 +432,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "read_agent",
     description:
-      "Read the setup of one local OpenBot agent, or your own when you omit agentId: profile, provider, model, reasoning effort, account, backup models, the model it returns to after a usage limit or a provider error, access, Computer Use, notifications, auto-approve, installed skills, routines, and the MCP servers it gets. Read-only. Call it before you change another agent.",
+      "Read the setup of one local OpenBot agent, or your own when you omit agentId: profile, provider, model, reasoning effort, account, backup models, the model it returns to after a usage limit or a provider error, access, permissions, Computer Use, notifications, installed skills, routines, and the MCP servers it gets. Read-only. Call it before you change another agent.",
     shape: readAgentToolSchema.shape,
   },
   {

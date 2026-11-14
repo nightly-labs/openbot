@@ -60,6 +60,7 @@ export const messages = {
   "conversation.sidePanel.closePane": "{name} 닫기",
   "conversation.sidePanel.openPane": "{name} 열기",
   "conversation.sidePanel.launcher": "패널 열기",
+  "conversation.sidePanel.resize": "오른쪽 패널 크기 조절",
   "conversation.sidePanel.pane.browser": "브라우저",
   "conversation.sidePanel.pane.files": "파일",
   "conversation.threads.new": "새 스레드",

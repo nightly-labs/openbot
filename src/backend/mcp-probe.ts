@@ -691,6 +691,8 @@ function isRegistrationRefusal(error: unknown, signIn: McpSignIn): boolean {
   if (signIn.registrationUnsupported()) return true;
   const status = signIn.registrationStatus();
   if (isAccessRefusal(status)) return true;
+  // YNAB answers each address it did not approve with 400 `invalid_redirect_uri` (#8417).
+  if (signIn.registrationRedirectRefused()) return true;
   // The SDK also registers when it drops a client bound to another issuer. `registrationFailed`
   // misses that registration, and the watched status shows it.
   if (!signIn.registrationFailed() && status === null) return false;

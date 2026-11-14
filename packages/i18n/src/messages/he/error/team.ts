@@ -78,6 +78,7 @@ export const messages = {
   "error.team.usageLimitUnsupported": "החיבור הזה אינו יכול להציג או לשנות את מגבלות השימוש של סוכנים.",
   "error.team.hermesImportUnsupported": "החיבור הזה אינו יכול לייבא פרופילי Hermes מהשרת.",
   "error.team.providerDetectionUnsupported": "החיבור הזה אינו יכול למצוא את שרתי המודלים והסוכנים של השרת.",
+  "error.team.routineFlowStopUnsupported": "החיבור הזה לא יכול לעצור הרצה של שגרה.",
   "error.team.sidebarFoldersUnsupported": "תיקיות בתוך תיקיות אינן נתמכות בחיבור הזה.",
   "error.team.libraryFoldersUnsupported": "תיקיות הספרייה אינן נתמכות בחיבור הזה.",
   "error.team.agentNotificationLevelsUnsupported":

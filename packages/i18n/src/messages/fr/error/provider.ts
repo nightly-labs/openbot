@@ -231,7 +231,7 @@ export const messages = {
   "error.provider.opencodeInvalidUpload":
     "Le fournisseur de modèles d’OpenCode a signalé une demande d’envoi non valide. Choisissez un autre modèle et continuez. Vérifiez les routines enregistrées avant de les créer à nouveau.\n{detail}",
   "error.provider.opencodeUnreadableContent":
-    "Ce modèle ne peut pas lire un fichier ou une image de cette conversation. Choisissez un modèle qui sait lire les fichiers, puis envoyez à nouveau votre message.",
+    "Ce modèle ne peut pas lire un fichier ou une image de cette conversation. OpenBot a démarré une nouvelle session OpenCode avec l’historique de la conversation. Envoyez à nouveau votre message sans le fichier, ou choisissez un modèle qui sait lire les fichiers. Si vous avez ajouté ce modèle à un fournisseur personnalisé, décochez « Images » dans « Accepte » dans ses réglages.",
   "error.provider.opencodeContextTooSmall":
     "Cette conversation ne tient pas dans la fenêtre de contexte du modèle. Dans Ollama ou LM Studio, chargez le modèle avec un contexte plus long, puis saisissez la même fenêtre dans les réglages de son fournisseur dans OpenBot. Ou choisissez un modèle plus grand.",
   "error.provider.opencodeFreeLimit":
@@ -240,6 +240,8 @@ export const messages = {
     "Le fournisseur du modèle a échoué de son côté. Votre connexion n’en est pas la cause. Réessayez plus tard ou choisissez un autre modèle.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "La réponse du modèle a été coupée ou n’était pas valide. Renvoyez votre message ou choisissez un autre modèle.\n{detail}",
+  "error.provider.opencodeReasoningOverlap":
+    "OpenCode n'a pas pu lire le raisonnement de ce modèle avec cet effort. Sélectionnez un effort plus faible ou un autre modèle, puis renvoyez votre message.",
   "error.provider.opencodeNetwork":
     "OpenCode n’a pas pu se connecter au fournisseur du modèle. Vérifiez la connexion réseau de l’ordinateur qui exécute OpenBot, puis réessayez.\n{detail}",
   "error.provider.codexStateBusy":
@@ -275,6 +277,8 @@ export const messages = {
     "Le serveur Gemini de OPENBOT_ANTIGRAVITY_PATH est introuvable ou n’est pas exécutable. Corrigez le chemin ou supprimez la variable, puis redémarrez OpenBot.",
   "error.provider.antigravityVersionUnreadable": "Impossible de lire la version du serveur Gemini.",
   "error.provider.antigravitySignIn": "Connectez-vous avec Google pour utiliser Gemini.",
+  "error.provider.antigravityModelAtCapacity":
+    "Google n’a pas de capacité libre pour ce modèle Gemini en ce moment. Le quota de votre abonnement n’est pas en cause. Réessayez dans quelques minutes ou choisissez un autre modèle.\n{detail}",
   "error.provider.antigravityRateLimited":
     "Gemini a refusé la requête, car une limite de débit ou le quota de l’abonnement est atteint. Attendez quelques minutes ou choisissez un autre modèle, puis réessayez.\n{detail}",
   "error.provider.antigravityQuotaReached":
@@ -344,6 +348,8 @@ export const messages = {
     "Le modèle n'a pas accepté ce chat, car il contient trop d'images. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez.",
   "error.provider.opencodeSessionRejected":
     "OpenCode a refusé la requête sans en donner la cause. Cela peut arriver dans une longue conversation ou après un changement de modèle. OpenBot a démarré une nouvelle session OpenCode avec l’historique de la conversation. Réessayez. Si l’erreur continue, choisissez un autre modèle ou un effort plus faible.",
+  "error.provider.opencodeCompactionFailed":
+    "Le modèle n’a pas pu résumer cette longue conversation pour libérer de la place dans sa fenêtre de contexte. OpenBot a démarré une nouvelle session OpenCode avec l’historique. Réessayez. Si l’erreur continue, choisissez un modèle plus puissant.",
   "error.provider.museMcpStartupFault":
     "Muse n’a pas pu démarrer un serveur MCP et a bloqué MCP dans cette session. OpenBot a démarré une nouvelle session Muse avec l’historique de la conversation. Réessayez. Si l’erreur persiste, désactivez Computer Use ou le serveur MCP en échec pour cet agent.",
   "error.provider.claudeSessionMissing":
@@ -374,6 +380,8 @@ export const messages = {
     "{provider} a refusé la clé d’API enregistrée. Remplacez ou supprimez la clé dans les Réglages, puis réessayez.",
   "error.provider.keyProviderNoBalance":
     "Le compte {provider} de la clé d’API enregistrée n’a pas de solde. Ajoutez du crédit au compte, puis réessayez.",
+  "error.provider.keyProviderLowCredit":
+    "Le compte {provider} de la clé d’API enregistrée n’a pas assez de crédit pour une réponse de ce modèle. Ajoutez du crédit au compte ou sélectionnez un autre modèle, puis réessayez.",
   "error.provider.modelServiceRefused":
     "Le service du modèle a refusé la requête. Choisissez un autre modèle ou vérifiez votre accès à ce modèle auprès du service.",
   "error.provider.modelServiceRefusedReason":

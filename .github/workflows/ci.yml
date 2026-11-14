@@ -880,6 +880,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:acp-audio-input
 
+      - name: Run the Antigravity steer E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:antigravity-steer
+
       - name: Run the Grok steer E2E test
         if: ${{ !cancelled() }}
         run: bun run test:grok-steer
@@ -965,6 +969,7 @@ jobs:
             .openbot-build/agent-database-host-start-e2e/
             .openbot-build/acp-instructions-once-e2e/
             .openbot-build/acp-audio-input-e2e/
+            .openbot-build/antigravity-steer-e2e/
             .openbot-build/grok-steer-e2e/
             .openbot-build/grok-question-e2e/
             .openbot-build/grok-partial-model-list-e2e/

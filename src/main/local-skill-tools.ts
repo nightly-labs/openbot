@@ -1,7 +1,8 @@
-import { join } from "node:path";
+import { join, posix } from "node:path";
 import { Effect } from "effect";
 import type { LocalSkillTools } from "../backend/agent/skill-tools";
 import { ToolOperationFailed, toToolOperationFailed } from "../backend/agent/tool-operation";
+import { MANAGED_SKILL_FOLDERS } from "./managed-skill-service";
 import type { SkillMarketplaceService } from "./skill-marketplace-service";
 
 export function localSkillTools(skills: SkillMarketplaceService): LocalSkillTools {
@@ -40,12 +41,16 @@ export function localSkillTools(skills: SkillMarketplaceService): LocalSkillTool
     create: (input) =>
       Effect.gen(function* () {
         const skill = yield* library.create(input.agentId, input.sourcePath).pipe(toToolOperationFailed);
+        // The source is the agent's own skill folder, which the agent already uses: an install would
+        // find that folder at its target and refuse to replace it (#8569). The agent keeps its folder.
+        const source = posix.normalize(input.sourcePath);
+        if (MANAGED_SKILL_FOLDERS.some((folder) => source === `${folder}/${skill.slug}`)) return skill;
         yield* skills.installLocal({ agentId: input.agentId, skillId: skill.id, revision: skill.version }).pipe(
           Effect.mapError(
-            () =>
+            (failure) =>
               new ToolOperationFailed({
                 cause: new Error(
-                  `Skill ${skill.id} was saved as revision ${skill.version}, but installation failed. Read it and retry install_local_skill; do not create it again.`,
+                  `Skill ${skill.id} was saved as revision ${skill.version}, but installation failed${failure.cause instanceof Error ? `: ${failure.cause.message}` : "."} Read it and retry install_local_skill; do not create it again.`,
                 ),
               }),
           ),

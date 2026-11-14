@@ -416,6 +416,21 @@ export function planContinuationPrompt(steps: readonly ConversationPlanStep[], c
   ].join("\n");
 }
 
+/**
+ * The input of an automatic continuation in a session that has not seen its request, as when a tool
+ * change replaced the session: the request again, then the note. The history tools leave out a
+ * request that is not finished, so the note alone left the new session without it (#8779).
+ */
+export function restatedContinuationInput(request: readonly DeliveryInputItem[], note: string): DeliveryInputItem[] {
+  const header =
+    "OpenBot note, not a message from the user. This session started while you worked on the request below, so it is given again. It is the original request, not a new one, and it is not finished.";
+  return request.map((item, index) =>
+    index === 0 && item.type === "text"
+      ? { ...item, text: `${header}${CURRENT_MESSAGE_SEPARATOR}${item.text}\n\n${note}` }
+      : item,
+  );
+}
+
 /** The note for a turn that ended before the next step: it named the step, or asked whether to continue. */
 export function nextStepContinuationPrompt(count: number, limit: number): string {
   return [

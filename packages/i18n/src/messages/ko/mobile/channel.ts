@@ -40,6 +40,8 @@ export const messages = {
   "mobile.channel.deleted.restoreFailedBody": "이 채널을 복원할 수 없어요. 다시 시도해 주세요.",
   "mobile.channel.chat.fallbackName": "채널",
   "mobile.channel.chat.deletedNotice": "삭제된 채널이에요. 미리보기 전용이에요.",
+  "mobile.channel.chat.waitBusy": "대기 중 - {name}이(가) {channel}에서 작업 중이에요",
+  "mobile.channel.chat.waitFull": "대기 중 - 실행 중인 작업이 끝나면 {name}이(가) 시작해요",
   "mobile.channel.records.connect": "이 채널을 편집하려면 서버에 연결해 주세요.",
   "mobile.channel.records.loadFailed": "채널 설정을 불러올 수 없어요.",
   "mobile.channel.records.gone": "이 항목은 더 이상 사용할 수 없어요.",

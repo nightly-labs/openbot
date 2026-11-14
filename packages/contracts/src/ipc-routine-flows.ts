@@ -99,6 +99,12 @@ export interface UpdateRoutineFlowLinkInput {
   instruction: string;
 }
 
+/** A run of a routine to stop. The routine names the agents a joined member must see and manage. */
+export interface StopRoutineFlowRunInput {
+  routineId: string;
+  runId: string;
+}
+
 /** The largest coordinate a node may take; far beyond any canvas a person would build. */
 export const ROUTINE_FLOW_MAX_COORDINATE = 1_000_000;
 
@@ -225,6 +231,10 @@ export function isConnectRoutineFlowInput(value: unknown): value is ConnectRouti
 
 export function isDisconnectRoutineFlowInput(value: unknown): value is DisconnectRoutineFlowInput {
   return isDynamicRecord(value) && isIdentifier(value.linkId);
+}
+
+export function isStopRoutineFlowRunInput(value: unknown): value is StopRoutineFlowRunInput {
+  return isDynamicRecord(value) && isIdentifier(value.routineId) && isIdentifier(value.runId);
 }
 
 export function isUpdateRoutineFlowLinkInput(value: unknown): value is UpdateRoutineFlowLinkInput {

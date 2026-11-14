@@ -60,6 +60,7 @@ export const messages = {
   "conversation.sidePanel.closePane": "{name} を閉じる",
   "conversation.sidePanel.openPane": "{name} を開く",
   "conversation.sidePanel.launcher": "ペインを開く",
+  "conversation.sidePanel.resize": "右パネルのサイズを変更",
   "conversation.sidePanel.pane.browser": "ブラウザ",
   "conversation.sidePanel.pane.files": "ファイル",
   "conversation.threads.new": "新しいスレッド",

@@ -179,7 +179,7 @@ import { BootRecovery } from "./agent/boot-recovery";
 import { BrowserUploads } from "./agent/browser-uploads";
 import type { ChatVisualPreviewHost } from "./agent/chat-visual-preview";
 import { CodexIdleSessions } from "./agent/codex-idle-sessions";
-import { ContextCompaction } from "./agent/context-compaction";
+import { ContextCompaction, compactsOnRequest } from "./agent/context-compaction";
 import { ConversationReader } from "./agent/conversation-reader";
 import { ConversationRuntime } from "./agent/conversation-runtime";
 import { CustomEndpoints, toEndpointChangeFailed } from "./agent/custom-endpoints";
@@ -284,7 +284,7 @@ import { type AgentThreadRecord, AgentThreadStore } from "./agent-threads/agent-
 import { AgentWaitStore } from "./agent-waits/agent-wait-store";
 import { AgentWaits } from "./agent-waits/agent-waits";
 import { automationRunCommand } from "./automation-command";
-import { toChannelOperationError } from "./channel-effects";
+import { channelSync, toChannelOperationError } from "./channel-effects";
 import { type ChannelImageFile, ChannelImages } from "./channel-images";
 import { ChannelRoutineScheduler } from "./channel-routine-scheduler";
 import { ChannelService } from "./channel-service";
@@ -1398,6 +1398,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           const run = this.#routines.runForDelivery(deliveryId);
           return run === null || quietRoutineRun(run);
         },
+        quietRunDelivery: (deliveryId) => this.#routines.quietRunForDelivery(deliveryId),
         isRoutineThread: (threadId) => this.#tasks.isRoutineThreadId(threadId),
         executionThreads: () => [...this.channels.store.executionThreads(), ...this.messaging.store.executionThreads()],
         taskThreads: () => this.#tasks.executionThreads(),
@@ -1832,7 +1833,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         mayContinueOnBackup: (agentId) => this.#mayContinueStoppedWork(agentId),
         requeueChannelDelivery: (deliveryId, continueWork) => this.#requeueChannelDelivery(deliveryId, continueWork),
         quietRoutineDelivery: (deliveryId) => this.#routines.quietRunForDelivery(deliveryId),
-        closeRoutineSession: (externalThreadId) => this.#threads.closeRoutineThread(externalThreadId),
+        closeRoutineSession: (externalThreadId, archive) => this.#threads.closeRoutineThread(externalThreadId, archive),
         conversationTurnEnded: (agentId, sideThreadId, counts, memoryCommitted) =>
           this.#memoryReview.turnEnded(agentId, sideThreadId, counts, memoryCommitted),
         turnStopped: (agentId, taskId, turnId) =>
@@ -1953,6 +1954,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       serverClaims: options.serverClaims ?? null,
       apiKeys: options.agentApiKeys ?? null,
       vaultItems: options.vaultItems ?? null,
+      codexSubagentParent: (childThreadId) => this.#turn.codexSubagentParent(childThreadId),
       hooks: {
         listAgents: () => this.listAgents(),
         listModels: () => this.listModels(),
@@ -2360,6 +2362,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#routines
       .test(input)
       .pipe(Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "testRoutine", cause: failure.cause })));
+  }
+
+  /** The user's Stop for one routine run that has not ended; see `RoutineScheduler.stopRun`. */
+  stopRoutineRun(input: {
+    agentId: string;
+    routineId: string;
+    runId: string;
+  }): Effect.Effect<void, AgentLifecycleFailed> {
+    return this.#routines
+      .stopRun(input)
+      .pipe(
+        Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "stopRoutineRun", cause: failure.cause })),
+      );
   }
 
   /** Hands a routine run's work on to the next agent of its flow; answers the delivery id. */
@@ -4499,7 +4514,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     });
   }, Effect.uninterruptible).bind(this);
 
-  /** "Delete history" of a channel. The members forget it, as for `clearChannelContext`. */
+  /**
+   * "Delete history" of a channel. Each member's channel thread holds the channel text that its turns
+   * read and wrote, so its messages go as for `deleteAgentHistory`; the thread itself stays. The
+   * members forget the channel, as for `clearChannelContext`.
+   */
   readonly deleteChannelHistory = Effect.fn("AgentService.deleteChannelHistory")(function* (
     this: AgentService,
     channelId: string,
@@ -4509,18 +4528,35 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         const agents = new Map(this.#store.list().map((agent) => [agent.id, agent]));
         return contexts.some(({ agentId, threadId }) => this.#channelSessionBusy(agents.get(agentId), threadId));
       },
-      end: (threadIds) =>
+      forget: (contexts) =>
         Effect.forEach(
-          threadIds,
-          (threadId) => {
-            // The messages are gone, so the files that their turns used open from no other link.
-            this.#turn.fileHistory.forgetThread(threadId);
-            return this.#threads.endThreadContext(threadId);
-          },
+          contexts,
+          ({ agentId, threadId }) =>
+            Effect.gen({ self: this }, function* () {
+              // Also for a deleted agent: the channel keeps its thread until the channel goes.
+              yield* channelSync(() => this.#deleteChannelThreadHistory(agentId, threadId));
+              // The messages are gone, so the files that their turns used open from no other link.
+              this.#turn.fileHistory.forgetThread(threadId);
+              yield* this.#threads.endThreadContext(threadId);
+            }),
           { discard: true },
         ),
     });
   }, Effect.uninterruptible).bind(this);
+
+  /**
+   * Deletes the messages of one member's channel thread. A loaded copy in memory loses them too,
+   * so no reader shows them again.
+   */
+  #deleteChannelThreadHistory(agentId: string, threadId: string): void {
+    const revision = this.#store.database.deleteThreadHistory({ agentId, threadId });
+    this.#conversation.forgetDeletedHistory(threadId);
+    const loaded = this.#conversation.loadedExecutionSnapshot(threadId);
+    if (!loaded) return;
+    const snapshot = { ...loaded, messages: [], revision };
+    this.#conversation.setSnapshot(agentId, snapshot);
+    this.#conversation.publishConversation(snapshot);
+  }
 
   /** Whether a member's channel session runs a turn, or a compaction or a refused start holds it. */
   #channelSessionBusy(agent: AgentSummary | undefined, threadId: string): boolean {
@@ -4544,19 +4580,39 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     channelId: string,
   ) {
     const contexts = yield* this.channels.compactTargets(channelId);
+    // A provider process stops after some minutes with no turn, and only its process compacts a session.
+    // It starts again as for a turn; a process that a turn would replace is not touched. A busy channel
+    // refuses first, and a provider whose last process could not compact on request does not start.
+    const { agents: members, candidates: found } = yield* lifecycleStep("find channel compact members", () =>
+      this.#channelCompactCandidates(contexts),
+    );
+    const stoppedMembers = [...new Set(found.map(({ agentId }) => members.get(agentId)))].filter(
+      (agent): agent is AgentSummary =>
+        agent !== undefined &&
+        this.#mayCompactOnRequest(agent) &&
+        !this.#providers.agentClientRunning(agent) &&
+        this.#providers.agentClientCurrent(agent),
+    );
+    yield* Effect.forEach(
+      stoppedMembers,
+      (agent) =>
+        this.#providers.ensureAgentClient(agent).pipe(
+          Effect.asVoid,
+          Effect.catch(() =>
+            Effect.sync(() =>
+              logger.warn("A channel member's provider did not start to compact.", { agentId: agent.id }),
+            ),
+          ),
+        ),
+      { discard: true },
+    );
     const sessions = yield* lifecycleStep("compact channel context", () => {
-      const agents = new Map(this.#store.list().map((agent) => [agent.id, agent]));
-      const candidates = contexts.flatMap(({ agentId, threadId }) => {
-        const agent = agents.get(agentId);
-        const session = agent ? this.#store.database.activeProviderSession(threadId, agent.provider) : null;
-        return agent && session ? [{ agentId, threadId, externalSessionId: session.externalSessionId }] : [];
-      });
-      if (candidates.some(({ agentId, threadId }) => this.#channelSessionBusy(agents.get(agentId), threadId)))
-        throw new ContextCompactRefusedError(sourceText("error.backend.channelWaitBeforeCompact"));
+      // Again: a turn can start while a process starts.
+      const { agents, candidates } = this.#channelCompactCandidates(contexts);
       const reserved = candidates.filter(({ agentId, externalSessionId }) =>
         this.#compaction.reserve(agentId, externalSessionId, true),
       );
-      if (!reserved.length) throw new ContextCompactRefusedError(sourceText("error.backend.channelCompactUnavailable"));
+      if (!reserved.length) throw new ContextCompactRefusedError(this.#channelCompactRefusal(candidates, agents));
       return reserved;
     });
     yield* Effect.forEach(
@@ -4566,6 +4622,47 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       { discard: true, concurrency: "unbounded" },
     );
   }, Effect.uninterruptible).bind(this);
+
+  /** The members' channel sessions that can compact. Throws while one of them is busy. */
+  #channelCompactCandidates(contexts: ReadonlyArray<{ agentId: string; threadId: string }>): {
+    agents: Map<string, AgentSummary>;
+    candidates: Array<{ agentId: string; threadId: string; externalSessionId: string }>;
+  } {
+    const agents = new Map(this.#store.list().map((agent) => [agent.id, agent]));
+    const candidates = contexts.flatMap(({ agentId, threadId }) => {
+      const agent = agents.get(agentId);
+      const session = agent ? this.#store.database.activeProviderSession(threadId, agent.provider) : null;
+      return agent && session ? [{ agentId, threadId, externalSessionId: session.externalSessionId }] : [];
+    });
+    if (candidates.some(({ agentId, threadId }) => this.#channelSessionBusy(agents.get(agentId), threadId)))
+      throw new ContextCompactRefusedError(sourceText("error.backend.channelWaitBeforeCompact"));
+    return { agents, candidates };
+  }
+
+  /**
+   * Why no member of a channel compacts. A member with no session has nothing to compact yet. A member
+   * whose provider compacts by itself, or not at all, cannot compact on request. A provider that
+   * never started can, so it gets the general refusal.
+   */
+  #channelCompactRefusal(
+    candidates: ReadonlyArray<{ agentId: string }>,
+    agents: ReadonlyMap<string, AgentSummary>,
+  ): string {
+    if (!candidates.length) return sourceText("error.backend.channelCompactNoSession");
+    const onRequest = candidates.some(({ agentId }) => {
+      const agent = agents.get(agentId);
+      return agent !== undefined && this.#mayCompactOnRequest(agent);
+    });
+    return sourceText(
+      onRequest ? "error.backend.channelCompactUnavailable" : "error.backend.channelCompactNotSupported",
+    );
+  }
+
+  /** False when the last process of the agent's provider could not compact on request. */
+  #mayCompactOnRequest(agent: AgentSummary): boolean {
+    const mode = this.#providers.lastCompactionMode(agent);
+    return mode === undefined || compactsOnRequest(mode);
+  }
 
   /**
    * The new chat that the agent asked for with `start_new_chat`. The drain calls it when the agent's

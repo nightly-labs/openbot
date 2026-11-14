@@ -11,8 +11,11 @@ import {
   SUPERTONIC_MODEL_FILES,
 } from "@openbot/contracts/speech-models";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Exit, Fiber, Result, Schema, Scope, Stream } from "effect";
 import { causeHelpers } from "../backend/effect-boundary";
+
+const logger = createOpenBotLogger("voice-model-service");
 
 /** The N-API addon of sherpa-onnx. Its libraries are in the same directory. */
 export const VOICE_RUNTIME_ADDON = "sherpa-onnx.node";
@@ -294,6 +297,7 @@ export class VoiceModelService<Id extends DownloadedModelId> extends EventEmitte
         } else if (Result.isFailure(downloaded)) {
           const cause = downloaded.failure.cause;
           const stopped = cause instanceof Error && cause.name === "AbortError";
+          if (!stopped) logger.warn(`Could not download the ${this.modelId} model.`, downloadFailureReason(cause));
           this.#setStatus({
             phase: "error",
             progress: null,
@@ -487,6 +491,27 @@ export class VoiceOperationError extends Schema.TaggedError<VoiceOperationError>
 }) {}
 
 const { io: voiceIO } = causeHelpers(VoiceOperationError);
+
+/**
+ * A short reason for the log, never a URL or a path: a code of this file (`download-status-404`),
+ * a Chromium network error (`net::ERR_PROXY_CONNECTION_FAILED`) or a Node error code (`ECONNRESET`).
+ */
+function downloadFailureReason(cause: unknown): string {
+  if (!(cause instanceof Error)) return "unknown";
+  if (/^download-[a-z0-9-]+$/.test(cause.message)) return cause.message;
+  const network = /net::ERR_[A-Z_]+/.exec(cause.message);
+  if (network) return network[0];
+  for (const error of [cause, cause.cause]) {
+    if (
+      error instanceof Error &&
+      "code" in error &&
+      typeof error.code === "string" &&
+      /^[A-Z][A-Z0-9_]+$/.test(error.code)
+    )
+      return error.code;
+  }
+  return "unknown";
+}
 
 /**
  * Deletes the Whisper model cache that earlier versions downloaded (`<userData>/runtimes/whisper`).

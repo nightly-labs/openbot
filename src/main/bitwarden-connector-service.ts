@@ -323,12 +323,17 @@ export class BitwardenConnectorService implements PasswordVault {
   ): Effect.fn.Return<VaultLogin[] | null, PasswordVaultError> {
     const session = yield* this.#ready();
     if (!session) return null;
-    yield* this.#call(session, ["sync"]);
-    const output = yield* this.#call(session, ["list", "items", "--folderid", session.folderId]);
-    const items = yield* Effect.try({
-      try: () => Schema.decodeUnknownSync(Schema.Array(itemSchema))(JSON.parse(output)),
-      catch: failure,
-    });
+    const items = yield* this.#reported(
+      session,
+      Effect.gen({ self: this }, function* () {
+        yield* this.#call(session, ["sync"]);
+        const output = yield* this.#call(session, ["list", "items", "--folderid", session.folderId]);
+        return yield* Effect.try({
+          try: () => Schema.decodeUnknownSync(Schema.Array(itemSchema))(JSON.parse(output)),
+          catch: failure,
+        });
+      }),
+    );
     return items
       .filter((item) => matches(item, session.folderId, origin))
       .map((item) => ({
@@ -348,19 +353,20 @@ export class BitwardenConnectorService implements PasswordVault {
     if (!/^[a-f0-9-]{36}$/iu.test(id)) return null;
     const session = yield* this.#ready();
     if (!session) return null;
-    yield* this.#call(session, ["sync"]);
-    const output = yield* this.#call(session, ["get", "item", id]);
-    const item = yield* Effect.try({
-      try: () => Schema.decodeUnknownSync(itemSchema)(JSON.parse(output)),
-      catch: failure,
-    });
-    if (item.id !== id || !matches(item, session.folderId, origin)) return null;
-    const value =
-      kind === "password"
-        ? item.login?.password
-        : item.login?.totp
-          ? (yield* this.#call(session, ["get", "totp", id])).trim()
-          : null;
+    const value = yield* this.#reported(
+      session,
+      Effect.gen({ self: this }, function* () {
+        yield* this.#call(session, ["sync"]);
+        const output = yield* this.#call(session, ["get", "item", id]);
+        const item = yield* Effect.try({
+          try: () => Schema.decodeUnknownSync(itemSchema)(JSON.parse(output)),
+          catch: failure,
+        });
+        if (item.id !== id || !matches(item, session.folderId, origin)) return null;
+        if (kind === "password") return item.login?.password ?? null;
+        return item.login?.totp ? (yield* this.#call(session, ["get", "totp", id])).trim() : null;
+      }),
+    );
     if (!value) return null;
     registerSecretValue(value, { allowShort: true });
     return value;
@@ -466,6 +472,32 @@ export class BitwardenConnectorService implements PasswordVault {
     this.#touch();
     this.#emit();
   }).bind(this);
+
+  /**
+   * Runs a read of the open session. While its reads fail, the status shows the error, so the page
+   * does not show a working connection; the next read that works removes the error. A stored host
+   * connection also ends the session, so the next read unlocks again.
+   */
+  #reported<A>(session: Session, read: Effect.Effect<A, PasswordVaultError>): Effect.Effect<A, PasswordVaultError> {
+    return read.pipe(
+      // The caller logs the failure.
+      Effect.tapError(({ cause }) =>
+        Effect.suspend(() => {
+          if (this.#session !== session) return Effect.void;
+          const host = Boolean(this.#host?.store.read());
+          this.#error = host ? hostError(cause) : sourceText("error.connector.bitwardenFailed");
+          return host ? this.#dropSession() : Effect.sync(() => this.#emit());
+        }),
+      ),
+      Effect.tap(() =>
+        Effect.sync(() => {
+          if (this.#error === null || this.#session !== session) return;
+          this.#error = null;
+          this.#emit();
+        }),
+      ),
+    );
+  }
 
   /** Ends the session and the host sign-in in memory. The stored connection stays. */
   #stop(): Effect.Effect<void> {

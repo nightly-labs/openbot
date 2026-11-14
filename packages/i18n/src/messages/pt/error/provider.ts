@@ -219,7 +219,7 @@ export const messages = {
   "error.provider.opencodeInvalidUpload":
     "O provedor de modelos do OpenCode reportou uma requisição de upload inválida. Escolha outro modelo e continue. Verifique as rotinas salvas antes de recriá-las.\n{detail}",
   "error.provider.opencodeUnreadableContent":
-    "Este modelo não consegue ler um arquivo ou uma imagem neste chat. Escolha um modelo que leia arquivos e envie sua mensagem de novo.",
+    "Este modelo não consegue ler um arquivo ou uma imagem neste chat. O OpenBot iniciou uma nova sessão do OpenCode com o histórico do chat. Envie sua mensagem de novo sem o arquivo ou escolha um modelo que leia arquivos. Se você adicionou este modelo a um provedor personalizado, desmarque “Imagens” em “Aceita” nas configurações dele.",
   "error.provider.opencodeContextTooSmall":
     "Esta conversa não cabe na janela de contexto do modelo. No Ollama ou no LM Studio, carregue o modelo com um contexto maior e informe a mesma janela nas configurações do provedor no OpenBot. Ou escolha um modelo maior.",
   "error.provider.opencodeFreeLimit":
@@ -228,6 +228,8 @@ export const messages = {
     "Ocorreu uma falha no provedor do modelo. Sua conexão não é a causa. Tente novamente mais tarde ou escolha outro modelo.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "A resposta do modelo foi interrompida ou não era válida. Envie sua mensagem de novo ou escolha outro modelo.\n{detail}",
+  "error.provider.opencodeReasoningOverlap":
+    "O OpenCode não conseguiu ler o raciocínio deste modelo com este esforço. Selecione um esforço menor ou outro modelo e envie sua mensagem de novo.",
   "error.provider.opencodeNetwork":
     "O OpenCode não conseguiu se conectar ao provedor do modelo. Verifique a conexão de rede do computador que executa o OpenBot e tente novamente.\n{detail}",
   "error.provider.codexStateBusy":
@@ -262,6 +264,8 @@ export const messages = {
     "O servidor do Gemini em OPENBOT_ANTIGRAVITY_PATH não existe ou não é executável. Corrija o caminho ou remova a variável e reinicie o OpenBot.",
   "error.provider.antigravityVersionUnreadable": "Não foi possível ler a versão do servidor do Gemini.",
   "error.provider.antigravitySignIn": "Entre com o Google para usar o Gemini.",
+  "error.provider.antigravityModelAtCapacity":
+    "O Google não tem capacidade livre para este modelo do Gemini agora. A cota do seu plano não é a causa. Tente novamente em alguns minutos ou escolha outro modelo.\n{detail}",
   "error.provider.antigravityRateLimited":
     "O Gemini recusou a solicitação porque um limite de requisições ou a cota do plano foi atingido. Aguarde alguns minutos ou escolha outro modelo e tente novamente.\n{detail}",
   "error.provider.antigravityQuotaReached":
@@ -327,6 +331,8 @@ export const messages = {
     "O modelo não aceitou este chat porque ele tem imagens demais. O OpenBot iniciou uma nova sessão do {provider} com o histórico do chat. Tente novamente.",
   "error.provider.opencodeSessionRejected":
     "O OpenCode recusou a solicitação e não informou a causa. Isso pode acontecer em um chat longo ou depois de trocar de modelo. O OpenBot iniciou uma nova sessão do OpenCode com o histórico do chat. Tente novamente. Se o erro continuar, escolha outro modelo ou um esforço menor.",
+  "error.provider.opencodeCompactionFailed":
+    "O modelo não conseguiu resumir este chat longo para liberar espaço na janela de contexto. O OpenBot iniciou uma nova sessão do OpenCode com o histórico do chat. Tente novamente. Se o erro continuar, escolha um modelo mais potente.",
   "error.provider.museMcpStartupFault":
     "O Muse não conseguiu iniciar um servidor MCP e bloqueou o MCP nesta sessão. O OpenBot iniciou uma nova sessão do Muse com o histórico do chat. Tente novamente. Se o erro continuar, desative o Uso do computador ou o servidor MCP que falhou para este agente.",
   "error.provider.claudeSessionMissing":
@@ -357,6 +363,8 @@ export const messages = {
     "O {provider} recusou a chave de API salva. Substitua ou remova a chave nas Configurações e tente novamente.",
   "error.provider.keyProviderNoBalance":
     "A conta do {provider} da chave de API salva não tem saldo. Adicione crédito à conta e tente novamente.",
+  "error.provider.keyProviderLowCredit":
+    "A conta do {provider} da chave de API salva não tem crédito suficiente para uma resposta deste modelo. Adicione crédito à conta ou selecione outro modelo e tente novamente.",
   "error.provider.modelServiceRefused":
     "O serviço do modelo recusou a solicitação. Escolha outro modelo ou verifique seu acesso a este modelo no serviço.",
   "error.provider.modelServiceRefusedReason":

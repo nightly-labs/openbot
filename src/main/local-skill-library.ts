@@ -178,8 +178,16 @@ export class LocalSkillLibrary {
         return yield* new LocalSkillFailure({
           cause: new Error(sourceText("error.skill.managedSlug", { slug: info.slug })),
         });
-      if ((yield* this.list()).some((skill) => skill.slug === info.slug))
-        return yield* new LocalSkillFailure({ cause: new Error(sourceText("error.skill.localNameTaken")) });
+      const taken = (yield* this.list()).find((skill) => skill.slug === info.slug);
+      // A different name can give the same slug, as two names that differ only in Chinese text do (#8693).
+      if (taken)
+        return yield* new LocalSkillFailure({
+          cause: new Error(
+            taken.name === info.name
+              ? sourceText("error.skill.localNameTaken")
+              : sourceText("error.skill.localNameClash", { name: taken.name, slug: info.slug }),
+          ),
+        });
       const id = `local-skill-${randomUUID()}`;
       yield* this.publishEffect(id, 1, bytes);
       return yield* this.get(id, 1);

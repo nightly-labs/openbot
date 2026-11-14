@@ -155,10 +155,12 @@ private enum ComposerPaste {
       let original = unsafeBitCast(method_getImplementation(method), to: KeyCommandsFunction.self)
       let replacement: @convention(block) (UITextView) -> NSArray? = { view in
         let commands = original(view, keyCommands)
-        return MainActor.assumeIsolated {
-          guard view.composerPasteTarget != nil else { return commands }
-          return ((commands as? [UIKeyCommand]) ?? []) + submitCommands() as NSArray
+        // `NSArray` is not Sendable, so only the added commands leave the main actor block.
+        let added: [UIKeyCommand]? = MainActor.assumeIsolated {
+          view.composerPasteTarget == nil ? nil : submitCommands()
         }
+        guard let added else { return commands }
+        return ((commands as? [UIKeyCommand]) ?? []) + added as NSArray
       }
       method_setImplementation(method, imp_implementationWithBlock(replacement))
     }
