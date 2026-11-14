@@ -205,6 +205,8 @@ export const messages = {
     "OpenCode ha rifiutato questo modello gratuito. Alcuni modelli gratuiti non sono disponibili in tutti i paesi. Scegli un altro modello con l'etichetta Gratuito, oppure incolla una chiave OpenCode Go nelle impostazioni di OpenCode e scegli un modello OpenCode Go.",
   "error.provider.customEndpointKeyRefused":
     'L\'endpoint "{provider}" ha rifiutato la sua chiave API o le sue intestazioni. Inseriscile di nuovo in Impostazioni server → Provider, poi riprova.',
+  "error.provider.customEndpointAccessRefused":
+    'L\'endpoint "{provider}" ha rifiutato la richiesta. La sua chiave API o le sue intestazioni potrebbero essere errate, oppure il suo account non può usare questo modello. Controllale in Impostazioni server → Provider o scegli un altro modello. Poi riprova.',
   "error.provider.customEndpointKeyMissing":
     'L\'endpoint "{provider}" ha bisogno di una chiave API. Aggiungi la chiave in Impostazioni server → Provider, poi riprova.',
   "error.provider.opencodeKeyExpired":

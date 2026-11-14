@@ -178,6 +178,8 @@ export const messages = {
     "OpenCode 拒绝了这个免费模型。部分免费模型并非在所有国家/地区都可用。请选择其他带“免费”标签的模型，或在 OpenCode 设置中粘贴 OpenCode Go 密钥并选择 OpenCode Go 模型。",
   "error.provider.customEndpointKeyRefused":
     "端点“{provider}”拒绝了它的 API 密钥或请求头。请在“服务器设置 → 服务商”中重新输入，然后重试。",
+  "error.provider.customEndpointAccessRefused":
+    "端点“{provider}”拒绝了请求。它的 API 密钥或请求头可能有误，或者它的账户无法使用此模型。请在“服务器设置 → 服务商”中检查，或选择其他模型，然后重试。",
   "error.provider.customEndpointKeyMissing":
     "端点“{provider}”需要 API 密钥。请在“服务器设置 → 服务商”中添加密钥，然后重试。",
   "error.provider.opencodeKeyExpired":

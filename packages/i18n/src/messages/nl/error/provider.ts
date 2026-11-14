@@ -203,6 +203,8 @@ export const messages = {
     "OpenCode heeft dit gratis model geweigerd. Sommige gratis modellen zijn niet in elk land beschikbaar. Kies een ander model met het label Gratis, of plak een OpenCode Go-sleutel in de OpenCode-instellingen en kies een OpenCode Go-model.",
   "error.provider.customEndpointKeyRefused":
     "Het endpoint “{provider}” heeft zijn API-sleutel of headers geweigerd. Voer ze opnieuw in bij Serverinstellingen → Aanbieders en probeer het daarna opnieuw.",
+  "error.provider.customEndpointAccessRefused":
+    "Het endpoint “{provider}” heeft het verzoek geweigerd. Zijn API-sleutel of headers kunnen onjuist zijn, of zijn account mag dit model niet gebruiken. Controleer ze bij Serverinstellingen → Aanbieders of kies een ander model. Probeer het daarna opnieuw.",
   "error.provider.customEndpointKeyMissing":
     "Het endpoint “{provider}” heeft een API-sleutel nodig. Voeg de sleutel toe bij Serverinstellingen → Aanbieders en probeer het daarna opnieuw.",
   "error.provider.opencodeKeyExpired":

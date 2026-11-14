@@ -187,6 +187,8 @@ export const messages = {
     "OpenCode דחה את המודל החינמי הזה. חלק מהמודלים החינמיים אינם זמינים בכל מדינה. יש לבחור מודל אחר עם התווית Free, או להדביק מפתח OpenCode Go בהגדרות OpenCode ולבחור מודל של OpenCode Go.",
   "error.provider.customEndpointKeyRefused":
     "נקודת הקצה ״{provider}״ דחתה את מפתח ה-API או את הכותרות שלה. יש להזין אותם שוב בהגדרות שרת ← ספקים, ואז לנסות שוב.",
+  "error.provider.customEndpointAccessRefused":
+    "נקודת הקצה ״{provider}״ דחתה את הבקשה. ייתכן שמפתח ה-API או הכותרות שלה שגויים, או שהחשבון שלה לא יכול להשתמש במודל הזה. יש לבדוק אותם בהגדרות שרת ← ספקים, או לבחור מודל אחר. ואז לנסות שוב.",
   "error.provider.customEndpointKeyMissing":
     "נקודת הקצה ״{provider}״ דורשת מפתח API. יש להוסיף את המפתח בהגדרות שרת ← ספקים, ואז לנסות שוב.",
   "error.provider.opencodeKeyExpired":

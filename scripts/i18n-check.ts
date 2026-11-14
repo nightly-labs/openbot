@@ -51,6 +51,8 @@ const RELEASED_SOURCE_KEYS = new Set([
   "error.backend.channelRoutingUnreadable",
   // A host without `agent-hidden-work` refuses a message to a hidden agent with this text.
   "error.backend.recipientHidden",
+  // A host from v0.57.0 to v0.69.0 sends this when a custom endpoint refuses a turn.
+  "error.provider.customEndpointKeyRefused",
 ]);
 
 const logger = createOpenBotLogger("i18n-check");
