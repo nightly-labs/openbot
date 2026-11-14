@@ -104,6 +104,11 @@ function loginTitle(website: string): string {
   return websiteUrl(website)?.hostname ?? website;
 }
 
+/** The host and port of a saved website. `www.example.com` is the same host as `example.com`. */
+function loginHost(website: string): string | undefined {
+  return websiteUrl(website)?.host.replace(/^www\./u, "");
+}
+
 /** The agent that added an item, kept when the user or another agent changes it. */
 function origin(existing: { addedBy?: string } | undefined, addedBy: string | undefined): { addedBy?: string } {
   const name = existing ? existing.addedBy : addedBy;
@@ -547,9 +552,15 @@ export class VaultService {
     yield* this.#change((record) => {
       const matches = (item: StoredLogin) =>
         item.username === username && websiteMatchesOrigin({ url: item.website, autofill: "anywhere" }, website);
-      const existing = record.logins.find((item) => vaultItemAllows(item, agent.id) && matches(item));
+      const usable = record.logins.filter((item) => vaultItemAllows(item, agent.id) && matches(item));
+      // Only a login for this host gets the new password. A login for another host of the site, such as
+      // status.example.com for billing.example.com, can be another account: it stays, and this login
+      // is added. When that login has this password, it already fills here, and nothing is added.
+      const existing =
+        usable.find((item) => loginHost(item.website) === loginHost(website)) ??
+        usable.find((item) => item.password === login.password);
       // The user keeps this login from this agent, so the agent's copy is for this agent only.
-      const hidden = !existing && record.logins.some(matches);
+      const hidden = usable.length === 0 && record.logins.some(matches);
       if (existing?.password === login.password) {
         outcome.saved = {
           id: existing.id,

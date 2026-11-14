@@ -6,7 +6,8 @@
 // rewrites or removes the files, and that a key file of one agent from a build before agent scope moves
 // into the Vault. With a Vault, the form saves the key there for every agent by default, and "Only this
 // agent" saves it there for the agent only. Logins, cards and contacts for chosen agents are hidden
-// from the other agents.
+// from the other agents. A login that an agent saves for one subdomain never changes the password of a
+// login for another subdomain.
 // No provider or account is used.
 // `bun scripts/agent-api-keys-e2e.ts`. Writes .openbot-build/agent-api-keys-e2e/report.json.
 import assert from "node:assert/strict";
@@ -575,6 +576,50 @@ try {
       ((await Effect.runPromise(restarted.logins.loginsFor(site, AGENT))) ?? []).map((login) => login.username).sort(),
       ["chosen@example.com", "shared@example.com"],
     );
+  });
+
+  await step("a new password for another subdomain adds a login and keeps the saved one", async () => {
+    const vault = new VaultService({
+      store: new VaultStore(join(root, "openbot-vault-subdomains.json"), REVERSING_CIPHER),
+      canPersist: () => true,
+    });
+    await Effect.runPromise(vault.load());
+    const coder = { id: AGENT, name: "Coder" };
+    const userLogin = async (website: string, username: string, password: string) => {
+      const state = await Effect.runPromise(
+        vault.save({ kind: "login", id: null, website, username, password, notes: "" }),
+      );
+      const saved = state.items.find((item) => item.kind === "login" && item.website === website);
+      assert.ok(saved);
+      return saved;
+    };
+    const typeLogin = (origin: string, username: string, password: string) =>
+      Effect.runPromise(vault.items.saveLogin({ origin, username, password }, coder));
+    const password = (id: string, origin: string) =>
+      Effect.runPromise(vault.logins.secretFor(id, origin, "password", AGENT));
+    const status = await userLogin("status.example.com", "blake", "e2e-status-password");
+
+    const billing = await typeLogin("https://billing.example.com", "blake", "e2e-billing-password");
+    assert.deepEqual([billing.created, billing.changed, billing.name], [true, true, "billing.example.com"]);
+    assert.notEqual(billing.id, status.id);
+    assert.equal(await password(status.id, "https://status.example.com"), "e2e-status-password");
+    assert.equal(await password(billing.id, "https://billing.example.com"), "e2e-billing-password");
+
+    // The password of a login for another subdomain already fills there, so nothing is added.
+    const shop = await typeLogin("https://shop.example.com", "blake", "e2e-status-password");
+    assert.deepEqual([shop.id, shop.created, shop.changed], [status.id, false, false]);
+
+    // A new password for the same host changes that login.
+    const changed = await typeLogin("https://status.example.com", "blake", "e2e-status-new-password");
+    assert.deepEqual([changed.id, changed.created, changed.changed], [status.id, false, true]);
+    assert.equal(await password(status.id, "https://status.example.com"), "e2e-status-new-password");
+    assert.equal(await password(billing.id, "https://billing.example.com"), "e2e-billing-password");
+
+    // www.example.com is the same host as example.com.
+    const apex = await userLogin("example.com", "ada", "e2e-apex-password");
+    const www = await typeLogin("https://www.example.com", "ada", "e2e-www-password");
+    assert.deepEqual([www.id, www.created, www.changed], [apex.id, false, true]);
+    assert.equal(vault.state().items.filter((item) => item.kind === "login").length, 3);
   });
 
   await step(
