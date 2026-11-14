@@ -27,9 +27,9 @@ export type AccountUsageTone = PlanLimitTone;
 export interface AccountUsageWindowRow {
   label: string;
   /**
-   * The named quota group of a window whose group has more than one window. The list shows the
-   * group name once, on a line of its own, and only the short window name on each row, so a cut
-   * label does not hide which window a row is.
+   * The named quota group of the window, for a provider that names groups. The list shows the group
+   * name once, on a line of its own, and only the short window name on each row, so a cut label does
+   * not hide which group or window a row is.
    */
   group?: { name: string; window: string };
   remainingPercent: number;
@@ -160,12 +160,12 @@ function usageRow(
       ? groups.flatMap((group) => {
           const groupWindows = reportedUsageWindows(group);
           return groupWindows.map((window) => {
-            if (groupWindows.length === 1) return windowRow(window, group.name);
             const windowName = usageWindowLabel(window.windowDurationMins, text);
-            return {
-              ...windowRow(window, text.t("account.usage.window.group", { group: group.name, window: windowName })),
-              group: { name: group.name, window: windowName },
-            };
+            const label =
+              groupWindows.length > 1
+                ? text.t("account.usage.window.group", { group: group.name, window: windowName })
+                : group.name;
+            return { ...windowRow(window, label), group: { name: group.name, window: windowName } };
           });
         })
       : ownWindows;
