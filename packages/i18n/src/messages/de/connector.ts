@@ -285,6 +285,8 @@ export const messages = {
   "connector.telegram.helpRelayUnavailableHost":
     "OpenBot auf {host} kann keine Telegram-Nachrichten empfangen. Melde dich auf {host} an, gib dem Server in den Servereinstellungen einen Namen und lass OpenBot geöffnet.",
   "connector.telegram.helpError": "OpenBot kann diesen Chat nicht erreichen. Verbinde ihn erneut oder trenne den Chat.",
+  "connector.telegram.helpNotLinked":
+    "OpenBot empfängt hier keine Nachrichten aus diesem Chat. Er ist mit einem anderen Server verknüpft. Wähle „Neu verbinden“, um ihn hier zu verknüpfen.",
   "connector.telegram.retryAt": "Telegram hat OpenBot gebeten zu warten. Neuer Versuch um {time}.",
   "connector.telegram.pause": "Pausieren",
   "connector.telegram.resume": "Fortsetzen",

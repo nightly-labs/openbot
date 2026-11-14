@@ -758,6 +758,8 @@ export const messages = {
     "OpenBot は {host} に保存されたトークンを読み取れません。ワークスペースを切断してから、もう一度接続してください。",
   "mobile.server.connectors.slack.helpRelay":
     "{host} の OpenBot は Slack のイベントを受信できません。{host} でサインインし、サーバー設定でサーバーに名前を付けて、OpenBot を開いたままにしてください。",
+  "mobile.server.connectors.slack.helpNotLinked":
+    "{host} の OpenBot はこのワークスペースのメッセージを受信していません。別のサーバーにリンクされています。{host} にリンクするには「再接続」をタップしてください。",
   "mobile.server.connectors.slack.orchestratorTitle": "Slack Orchestrator",
   "mobile.server.connectors.slack.orchestratorDescription":
     "このエージェントは Slack からのすべてのリクエストを受け取ります。短いものには自分で回答し、その他の作業は適切なエージェントに任せて、回答をスレッドに投稿します。",
@@ -827,6 +829,8 @@ export const messages = {
     "{host} の OpenBot は Telegram のメッセージを受信できません。{host} でサインインし、サーバー設定でサーバーに名前を付けて、OpenBot を開いたままにしてください。",
   "mobile.server.connectors.telegram.helpError":
     "OpenBot はこのチャットに接続できません。再接続するか、チャットを切断してください。",
+  "mobile.server.connectors.telegram.helpNotLinked":
+    "{host} の OpenBot はこのチャットのメッセージを受信していません。別のサーバーにリンクされています。{host} にリンクするには「再接続」をタップしてください。",
   "mobile.server.connectors.telegram.retryAt": "Telegram から待機するよう求められました。{time} に再試行します。",
   "mobile.server.connectors.telegram.linkTitle": "チャットをリンク",
   "mobile.server.connectors.telegram.linkAnother": "別のチャットをリンク",

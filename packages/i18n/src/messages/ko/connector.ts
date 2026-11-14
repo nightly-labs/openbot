@@ -241,6 +241,8 @@ export const messages = {
   "connector.telegram.helpRelayUnavailableHost":
     "{host}의 OpenBot이 Telegram 메시지를 받을 수 없어요. {host}에서 로그인하고, 서버 설정에서 서버에 이름을 지정한 뒤 OpenBot을 열어 두세요.",
   "connector.telegram.helpError": "OpenBot이 이 채팅에 접근할 수 없어요. 다시 연결하거나 채팅 연결을 해제해 주세요.",
+  "connector.telegram.helpNotLinked":
+    "OpenBot이 여기에서 이 채팅의 메시지를 받지 않습니다. 다른 서버에 연결되어 있습니다. 여기에 연결하려면 다시 연결을 선택하세요.",
   "connector.telegram.retryAt": "Telegram이 OpenBot에 기다리라고 요청했어요. {time}에 다시 시도해요.",
   "connector.telegram.pause": "일시 정지",
   "connector.telegram.resume": "재개",

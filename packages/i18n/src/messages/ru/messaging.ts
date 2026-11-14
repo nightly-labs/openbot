@@ -8,6 +8,8 @@ export const messages = {
     "OpenBot не может прочитать сохранённые токены на этом компьютере. Отключите рабочее пространство и подключите его снова.",
   "messaging.help.relay_unavailable":
     "OpenBot не может получать события Slack на этом компьютере. Войдите в аккаунт, задайте компьютеру имя в настройках сервера и не закрывайте OpenBot.",
+  "messaging.help.not_linked":
+    "OpenBot не получает здесь сообщения из этого рабочего пространства. Оно связано с другим сервером. Выберите «Переподключить», чтобы связать его здесь.",
   "messaging.discordHelp.invalid_token":
     "Discord больше не принимает OpenBot на этом сервере Discord. Возможно, приложение удалили. Подключите сервер Discord заново.",
   "messaging.discordHelp.secret_storage_unavailable":

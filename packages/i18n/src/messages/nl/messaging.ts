@@ -8,6 +8,8 @@ export const messages = {
     "OpenBot kan de opgeslagen tokens op deze computer niet lezen. Verbreek de verbinding met de werkruimte en verbind hem daarna opnieuw.",
   "messaging.help.relay_unavailable":
     "OpenBot kan geen Slack-events ontvangen op deze computer. Log in, geef deze computer een naam in de serverinstellingen en houd OpenBot open.",
+  "messaging.help.not_linked":
+    "OpenBot ontvangt hier geen berichten uit deze werkruimte. Die is gekoppeld aan een andere server. Kies Opnieuw verbinden om hem hier te koppelen.",
   "messaging.discordHelp.invalid_token":
     "Discord accepteert OpenBot niet meer in deze Discord-server. De app is misschien verwijderd. Verbind de Discord-server opnieuw.",
   "messaging.discordHelp.secret_storage_unavailable":

@@ -8,6 +8,8 @@ export const messages = {
     "يتعذّر على OpenBot قراءة الرموز المحفوظة على هذا الحاسوب. افصل مساحة العمل، ثم اربطها مرة أخرى.",
   "messaging.help.relay_unavailable":
     "يتعذّر على OpenBot تلقي أحداث Slack على هذا الحاسوب. سجّل الدخول، وامنح هذا الحاسوب اسمًا في إعدادات الخادم، وأبقِ OpenBot مفتوحًا.",
+  "messaging.help.not_linked":
+    'لا يستقبل OpenBot هنا رسائل مساحة العمل هذه. إنها مرتبطة بخادم آخر. اختر "إعادة الربط" لربطها هنا.',
   "messaging.discordHelp.invalid_token":
     "لم يعد Discord يقبل OpenBot في خادم Discord هذا. ربما أُزيل. اربط خادم Discord مرة أخرى.",
   "messaging.discordHelp.secret_storage_unavailable":

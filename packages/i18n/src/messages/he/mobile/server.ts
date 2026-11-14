@@ -1060,6 +1060,8 @@ export const messages = {
     "OpenBot לא יכול לקרוא את האסימונים השמורים ב-{host}. יש לנתק את סביבת העבודה ולחבר אותה שוב.",
   "mobile.server.connectors.slack.helpRelay":
     "OpenBot ב-{host} לא יכול לקבל אירועים מ-Slack. ב-{host} יש להתחבר, לתת לשרת שם בהגדרות השרת, ולהשאיר את OpenBot פתוח.",
+  "mobile.server.connectors.slack.helpNotLinked":
+    'OpenBot ב-{host} לא מקבל הודעות מסביבת העבודה הזו. היא מקושרת לשרת אחר. הקישו "חיבור מחדש" כדי לקשר אותה ל-{host}.',
   "mobile.server.connectors.slack.orchestratorTitle": "Slack Orchestrator",
   "mobile.server.connectors.slack.orchestratorDescription":
     "הסוכן הזה מקבל כל בקשה מ-Slack. הוא עונה בעצמו על בקשות קצרות, מעביר עבודה אחרת לסוכן המתאים, ומפרסם את התשובה בשרשור.",
@@ -1143,6 +1145,8 @@ export const messages = {
   "mobile.server.connectors.telegram.helpRelay":
     "OpenBot ב-{host} לא יכול לקבל הודעות מ-Telegram. ב-{host} יש להתחבר, לתת לשרת שם בהגדרות השרת, ולהשאיר את OpenBot פתוח.",
   "mobile.server.connectors.telegram.helpError": "OpenBot לא מצליח להגיע לצ'אט הזה. אפשר לחבר מחדש, או לנתק את הצ'אט.",
+  "mobile.server.connectors.telegram.helpNotLinked":
+    'OpenBot ב-{host} לא מקבל הודעות מהצ\'אט הזה. הוא מקושר לשרת אחר. הקישו "חיבור מחדש" כדי לקשר אותו ל-{host}.',
   // {time} is a time, such as 14:30.
   "mobile.server.connectors.telegram.retryAt": "Telegram ביקש מ-OpenBot להמתין. הוא ינסה שוב בשעה {time}.",
   "mobile.server.connectors.telegram.linkTitle": "קישור צ'אט",

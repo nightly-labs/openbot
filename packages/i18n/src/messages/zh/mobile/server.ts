@@ -723,6 +723,8 @@ export const messages = {
     "OpenBot 无法读取 {host} 上已保存的令牌。请断开该工作区后重新连接。",
   "mobile.server.connectors.slack.helpRelay":
     "{host} 上的 OpenBot 无法接收 Slack 事件。请在 {host} 上登录，在“服务器设置”中为服务器命名，并保持 OpenBot 打开。",
+  "mobile.server.connectors.slack.helpNotLinked":
+    "{host} 上的 OpenBot 收不到此工作区的消息。它已关联到另一台服务器。轻点“重新连接”可将其关联到 {host}。",
   "mobile.server.connectors.slack.orchestratorTitle": "Slack 调度助手",
   "mobile.server.connectors.slack.orchestratorDescription":
     "该助手接收来自 Slack 的所有请求。简单的问题它自己回答，其余的交给合适的助手处理，并把答案发在话题中。",
@@ -791,6 +793,8 @@ export const messages = {
   "mobile.server.connectors.telegram.helpRelay":
     "{host} 上的 OpenBot 无法接收 Telegram 消息。请在 {host} 上登录，在“服务器设置”中为服务器命名，并保持 OpenBot 打开。",
   "mobile.server.connectors.telegram.helpError": "OpenBot 无法连接到该聊天。请重新连接，或断开该聊天。",
+  "mobile.server.connectors.telegram.helpNotLinked":
+    "{host} 上的 OpenBot 收不到此聊天的消息。它已关联到另一台服务器。轻点“重新连接”可将其关联到 {host}。",
   // {time} is a time, such as 14:30.
   "mobile.server.connectors.telegram.retryAt": "Telegram 要求 OpenBot 等待，将于 {time} 重试。",
   "mobile.server.connectors.telegram.linkTitle": "关联聊天",

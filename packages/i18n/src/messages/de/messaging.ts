@@ -8,6 +8,8 @@ export const messages = {
     "OpenBot kann die gespeicherten Tokens auf diesem Computer nicht lesen. Trenne den Arbeitsbereich und verbinde ihn erneut.",
   "messaging.help.relay_unavailable":
     "OpenBot kann auf diesem Computer keine Slack-Ereignisse empfangen. Melde dich an, gib diesem Computer in den Servereinstellungen einen Namen und lass OpenBot geöffnet.",
+  "messaging.help.not_linked":
+    "OpenBot empfängt hier keine Nachrichten aus diesem Workspace. Er ist mit einem anderen Server verknüpft. Wähle „Neu verbinden“, um ihn hier zu verknüpfen.",
   "messaging.discordHelp.invalid_token":
     "Discord akzeptiert OpenBot auf diesem Discord-Server nicht mehr. Es wurde möglicherweise entfernt. Verbinde den Discord-Server erneut.",
   "messaging.discordHelp.secret_storage_unavailable":

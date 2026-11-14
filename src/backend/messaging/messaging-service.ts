@@ -561,6 +561,12 @@ export class MessagingService {
     // A guild that removed the bot has no bot to reconnect to and no link: it must install it again.
     if (platform === "discord" && record.lastErrorCode === "invalid_token")
       return yield* this.connectDiscordGuild(opensPage);
+    // Signal sends a workspace or chat that is linked to another host there: only a new link brings it here.
+    if (this.#live.get(record.connectionId)?.state === "not_linked") {
+      if (platform === "slack") return yield* this.connectSlackWorkspace(opensPage);
+      if (platform === "telegram")
+        return yield* this.connectTelegramChat(workspaceId.startsWith("-") ? "group" : "direct", opensPage);
+    }
     yield* this.#stopConnection(record.connectionId);
     this.#threads.store.updateConnection(record.connectionId, { enabled: true, lastErrorCode: null });
     const updated = this.#threads.store.connection(record.connectionId);

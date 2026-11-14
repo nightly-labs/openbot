@@ -306,6 +306,8 @@ export const messages = {
   "connector.telegram.helpRelayUnavailableHost":
     "{host} üzerindeki OpenBot Telegram mesajlarını alamıyor. {host} üzerinde oturum açın, Sunucu ayarlarında sunucuya bir ad verin ve OpenBot'u açık tutun.",
   "connector.telegram.helpError": "OpenBot bu sohbete ulaşamıyor. Yeniden bağlanın veya sohbetin bağlantısını kesin.",
+  "connector.telegram.helpNotLinked":
+    "OpenBot bu sohbetin mesajlarını burada almıyor. Başka bir sunucuya bağlı. Buraya bağlamak için Yeniden bağlan'ı seçin.",
   "connector.telegram.retryAt": "Telegram OpenBot'tan beklemesini istedi. {time} saatinde tekrar deneyecek.",
   "connector.telegram.pause": "Duraklat",
   "connector.telegram.resume": "Sürdür",

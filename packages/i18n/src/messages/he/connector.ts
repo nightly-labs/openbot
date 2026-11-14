@@ -312,6 +312,8 @@ export const messages = {
   "connector.telegram.helpRelayUnavailableHost":
     "OpenBot ב-{host} לא יכול לקבל הודעות Telegram. ב-{host} יש להתחבר, לתת לשרת שם בהגדרות השרת ולהשאיר את OpenBot פתוח.",
   "connector.telegram.helpError": "OpenBot לא מצליח להגיע לצ'אט הזה. יש לחבר מחדש או לנתק את הצ'אט.",
+  "connector.telegram.helpNotLinked":
+    'OpenBot לא מקבל כאן הודעות מהצ\'אט הזה. הוא מקושר לשרת אחר. בחרו "חיבור מחדש" כדי לקשר אותו לכאן.',
   "connector.telegram.retryAt": "Telegram ביקש מ-OpenBot להמתין. הוא ינסה שוב ב-{time}.",
   "connector.telegram.pause": "השהיה",
   "connector.telegram.resume": "המשך",

@@ -356,7 +356,17 @@ export interface MessagingIngress {
    * sends a session. A guild of this host that is not in it was unlinked, or the bot left it.
    */
   onDiscordRoutes(listener: (guildIds: ReadonlySet<string>) => void): () => void;
+  /**
+   * Calls `listener` with the Slack workspaces or the Telegram chats in the route ticket of the socket,
+   * when Signal accepts the socket. Only a listener added before the socket asked for the ticket gets
+   * it, so a workspace or chat linked after that request is not judged by it. A workspace or chat of
+   * this host that is not in it is linked to another host, or to none.
+   */
+  onLinkedRoutes(platform: LinkedRoutePlatform, listener: (ids: ReadonlySet<string>) => void): () => void;
 }
+
+/** The platforms whose route ticket the host reads: Discord gets its guilds from Signal's session. */
+export type LinkedRoutePlatform = "slack" | "telegram";
 
 /** The bytes of one `upload` call. */
 export interface DiscordUploadFile {
