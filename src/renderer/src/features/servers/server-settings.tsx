@@ -575,9 +575,10 @@ const ServerSettings = createSimpleContext({
       let waiting = true;
       const signIn = serversPort().agent.signInMcpServer({ config }, server.id);
       if (server.kind === "remote") {
+        // A relayed sign-in moves to a host tab when its page is only on the host, so both are read.
         if (serverSupportsCapability(server, "sign-in-relay-v1"))
           void followMcpSignInRelay(server.id, config.url, () => waiting);
-        else void followMcpSignInPage(server.id, config.url, () => waiting);
+        void followMcpSignInPage(server.id, config.url, () => waiting);
       }
       const result = await signIn.finally(() => {
         waiting = false;

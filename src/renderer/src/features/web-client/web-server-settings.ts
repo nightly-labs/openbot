@@ -13,6 +13,7 @@ import type {
   TeamPresenceSnapshot,
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { runTeamEffect } from "@openbot/team-client";
 import {
   cancelMcpSignIn as cancelMcpSignInRequest,
@@ -72,6 +73,10 @@ export function createWebServerSettings(options: {
   refreshHosts: () => Promise<void>;
   /** Whether the host relays sign-ins (`sign-in-relay-v1`), so the page opens in this browser. */
   relaySupported: () => boolean;
+  /** Whether the host opens a sign-in page in its own browser for the live view (`mcp-sign-in-v1`). */
+  hostTabSupported: () => boolean;
+  /** Whether this user administers the host. The host shows its private tabs only to an administrator. */
+  administers: () => boolean;
 }) {
   const [state, setState] = createStore<WebServerSettingsState>({
     open: false,
@@ -255,16 +260,20 @@ export function createWebServerSettings(options: {
     });
   }
 
+  async function signInMcpServer(config: McpServerConfig): Promise<McpTestResult> {
+    const { admin } = requireAdmin();
+    if (options.relaySupported()) return signInRelayed(admin, config);
+    return signInInHostTab(admin, config);
+  }
+
   /**
    * The host runs the sign-in and opens the page in its own browser. One request cannot wait for a
    * person to sign in, so the status is read until the sign-in ends; the page shows meanwhile.
    */
-  async function signInMcpServer(config: McpServerConfig): Promise<McpTestResult> {
-    const { admin } = requireAdmin();
+  async function signInInHostTab(admin: WebAdminRuntime, config: McpServerConfig): Promise<McpTestResult> {
     const url = config.url;
     const run = <T>(effect: Effect.Effect<T, { cause: unknown }>) =>
       runTeamEffect(effect.pipe(Effect.mapError((error) => error.cause)));
-    if (options.relaySupported()) return signInRelayed(admin, config);
     await run(startMcpSignIn(admin.request, { config }));
     try {
       while (true) {
@@ -283,13 +292,23 @@ export function createWebServerSettings(options: {
     }
   }
 
-  /** A relayed sign-in waits in this browser: see `webMcpRelay`. */
+  /**
+   * A relayed sign-in waits in this browser: see `webMcpRelay`. A page that only the host can reach
+   * opens in the host's tab, and the live view shows it here. A member cannot watch that tab, so a
+   * member is told to ask an administrator.
+   */
   async function signInRelayed(admin: WebAdminRuntime, config: McpServerConfig): Promise<McpTestResult> {
     try {
-      return await relay.signIn(admin.request, config);
+      return await relay.signIn(admin.request, config, hostOnlyPage(admin, config));
     } finally {
       void refreshMcpSignIns().catch(() => undefined);
     }
+  }
+
+  function hostOnlyPage(admin: WebAdminRuntime, config: McpServerConfig) {
+    if (!options.administers())
+      return async (): Promise<McpTestResult> => ({ toolCount: 0, error: sourceText("error.mcp.signInPageOnServer") });
+    return options.hostTabSupported() ? () => signInInHostTab(admin, config) : undefined;
   }
 
   /** The host answers each change with the whole list. A read still in flight has the old list. */

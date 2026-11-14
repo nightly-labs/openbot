@@ -18,5 +18,7 @@ export const messages = {
   "error.mcp.relayEnded": "Bu oturum açma sona erdi. Yeniden başlatın.",
   "error.mcp.relayNoState":
     "Sunucunun oturum açma sayfası dönüş adresini korumuyor, bu yüzden OpenBot onu bu bilgisayarda açmaz.",
+  "error.mcp.signInPageOnServer":
+    "Bu oturum açma sayfası yalnızca sunucuda. Sunucunun sahibinden veya bir yöneticisinden oturum açmasını isteyin.",
   "error.mcp.relayAddressInvalid": "Bu, bu oturum açmanın sonundaki adres değil. Tarayıcıdan tam adresi kopyalayın.",
 } as const satisfies PartialTranslation<typeof source>;

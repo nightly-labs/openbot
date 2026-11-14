@@ -17,5 +17,7 @@ export const messages = {
   "error.mcp.relayEnded": "Este login terminou. Inicie-o novamente.",
   "error.mcp.relayNoState":
     "A página de login do servidor não protege o endereço de retorno, então o OpenBot não a abre neste computador.",
+  "error.mcp.signInPageOnServer":
+    "Esta página de login está só no servidor. Peça a um proprietário ou administrador do servidor para entrar.",
   "error.mcp.relayAddressInvalid": "Este não é o endereço do fim deste login. Copie o endereço completo do navegador.",
 } as const satisfies PartialTranslation<typeof source>;

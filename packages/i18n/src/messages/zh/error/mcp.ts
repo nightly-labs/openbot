@@ -16,5 +16,6 @@ export const messages = {
   "error.mcp.redirectRelayed": "OpenBot 已将登录结果发送到服务器，你可以关闭该窗口。",
   "error.mcp.relayEnded": "本次登录已结束，请重新开始。",
   "error.mcp.relayNoState": "该服务器的登录页面未保护其返回地址，因此 OpenBot 不会在这台电脑上打开它。",
+  "error.mcp.signInPageOnServer": "此登录页面仅在服务器上。请让服务器的所有者或管理员登录。",
   "error.mcp.relayAddressInvalid": "这不是本次登录流程末尾的地址，请从浏览器复制完整地址。",
 } as const satisfies PartialTranslation<typeof source>;

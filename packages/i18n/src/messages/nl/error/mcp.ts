@@ -16,6 +16,8 @@ export const messages = {
   "error.mcp.relayEnded": "Deze inlog is afgelopen. Start opnieuw.",
   "error.mcp.relayNoState":
     "De inlogpagina van de server beschermt het terugkeeradres niet, dus OpenBot opent hem niet op deze computer.",
+  "error.mcp.signInPageOnServer":
+    "Deze aanmeldpagina staat alleen op de server. Vraag een eigenaar of beheerder van de server om zich aan te melden.",
   "error.mcp.relayAddressInvalid":
     "Dit is niet het adres aan het einde van deze inlog. Kopieer het volledige adres uit de browser.",
 } as const satisfies PartialTranslation<typeof source>;

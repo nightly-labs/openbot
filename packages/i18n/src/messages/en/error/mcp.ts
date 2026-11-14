@@ -16,6 +16,8 @@ export const messages = defineMessages("error.mcp", {
   "error.mcp.relayEnded": "This sign-in ended. Start it again.",
   "error.mcp.relayNoState":
     "The server's sign-in page does not protect its return address, so OpenBot does not open it on this computer.",
+  "error.mcp.signInPageOnServer":
+    "This sign-in page is only on the server. Ask an owner or admin of the server to sign in.",
   "error.mcp.relayAddressInvalid":
     "This is not the address at the end of this sign-in. Copy the full address from the browser.",
 });
