@@ -71,7 +71,7 @@ import { attachmentCall, attachmentFailure } from "../attachment-effects";
 import { OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
 import type { ChannelService } from "../channel-service";
 import type { ProviderSession } from "../database/provider-sessions";
-import type { MailboxStore } from "../mailbox-store";
+import { amendedExpectsReply, type MailboxStore } from "../mailbox-store";
 import { agentMcpServers, codexDeferredMcpServers, openCodeMcpServers } from "../mcp-provider-shapes";
 import type { MessagingThreads } from "../messaging/messaging-threads";
 import { isMessagingOutboundCall } from "../messaging/messaging-tools";
@@ -3053,6 +3053,14 @@ export class OpenBotToolRouter {
       // The same rule for a request from a Slack thread or another external conversation (#5517).
       const messaging = this.#mailbox.answerReturn(answeredRequestIds, recipientValues);
       const text = params.arguments.text;
+      // A message that only corrects a request still running at the recipient amends it: the first
+      // request's result still comes back, so asking for a second one would queue a turn for nothing.
+      // An explicit expectsReply, or a reply, keeps the caller's intent.
+      const amendsRunningRequest =
+        expectsReply === undefined &&
+        replyTo === null &&
+        this.#mailbox.amendsRunningRequest(senderAgentId, recipientValues);
+      const effectiveExpectsReply = amendedExpectsReply(expectsReply, replyTo !== null, amendsRunningRequest);
       const receipt = yield* this.#mailbox
         .enqueue({
           sender: { kind: "agent", agentId: senderAgentId },
@@ -3060,7 +3068,7 @@ export class OpenBotToolRouter {
           text,
           sourcePaths: paths,
           replyToMessageId: replyTo,
-          ...(expectsReply === undefined ? {} : { expectsReply }),
+          ...(effectiveExpectsReply === undefined ? {} : { expectsReply: effectiveExpectsReply }),
           ...(messaging ? { messaging } : {}),
           ...(messagingReturn ? { messagingReturn } : {}),
           ...(senderTaskId ? { senderTaskId } : {}),
@@ -3077,7 +3085,8 @@ export class OpenBotToolRouter {
             Effect.map((steer) => {
               this.#mailboxSync.emitQueue(delivery.recipientAgentId);
               this.#drain.scheduleDrain(delivery.recipientAgentId);
-              return sentDelivery(delivery, steer);
+              const sent = sentDelivery(delivery, steer);
+              return amendsRunningRequest ? { ...sent, note: amendmentNote(steer, sent.note) } : sent;
             }),
           ),
         { concurrency: "unbounded" },
@@ -3114,6 +3123,21 @@ const RECIPIENT_QUEUES_NOTE =
  * steered message shows as running. A queued one says why it waits while the recipient works. The
  * result explains itself, so the tool description stays in the context budget.
  */
+/** Says that this message corrects the request already running, so no second result is expected. */
+function amendmentNote(steer: AgentMessageSteer, existing: string | undefined): string {
+  const head =
+    steer === "steered"
+      ? "This message amended the request already running at the recipient."
+      : "This message amended your request; it waits for the recipient's next turn (in Steer mode it joins the running turn).";
+  return [
+    head,
+    "The result of your earlier request still comes back; this amendment gets no answer of its own.",
+    existing,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 function sentDelivery(delivery: QueuedMessageReceipt["deliveries"][number], steer: AgentMessageSteer): SentDelivery {
   if (steer === "steered") return { ...delivery, status: "running", position: null, outcome: "steered" };
   if (delivery.status !== "queued") return delivery;
