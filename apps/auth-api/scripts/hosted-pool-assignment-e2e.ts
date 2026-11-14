@@ -478,12 +478,14 @@ async function purchaseStartsOnThePoolOrOnBoat() {
     { failed: events("setup_failed"), provisioned: events("provisioned", "boat") },
   );
   check(
-    "each lost pool start alerts once with its machine, and its start on boat sends no second alert",
-    alerts.length === alertsBefore + unsigned.length &&
-      unsigned.every((serverId) =>
-        alertsAbout(`(${serverId.slice(0, 8)}) did not start on pool machine`).some((alert) =>
-          alert.endsWith("and starts on boat. Prepare the machine again."),
-        ),
+    "each lost pool start alerts once with its machine, and once more when its boat start is stored",
+    alerts.length === alertsBefore + 2 * unsigned.length &&
+      unsigned.every(
+        (serverId) =>
+          alertsAbout(`(${serverId.slice(0, 8)}) did not start on pool machine`).length === 1 &&
+          alerts
+            .slice(alertsBefore)
+            .filter((alert) => alert.includes(`${serverId.slice(0, 8)}) starts on boat: pool machine`)).length === 1,
       ),
     alerts.slice(alertsBefore),
   );

@@ -1890,12 +1890,14 @@ export class HostedServerService {
 
   /**
    * Starts a paid server: on a free prepared machine of the pool, or else in a new boat sandbox. Only one
-   * caller wins the change from `awaiting_payment`. Without `pool`, only boat is used.
+   * caller wins the change from `awaiting_payment`. Without `pool`, only boat is used. `boatReason` tells
+   * the operator why a server that the pool did not take starts on boat.
    */
   readonly #provision = Effect.fn("HostedServerService.provision")(function* (
     this: HostedServerService,
     row: HostedServerRow,
     pool = true,
+    boatReason: string | null = null,
   ): Effect.fn.Return<void, HostedFailure, HostedServerDependencies> {
     const dependencies = yield* HostedServerDependencies;
     // A server on a machine outside boat never gets a sandbox: a new one would be empty.
@@ -1906,15 +1908,17 @@ export class HostedServerService {
     if (pool && secret) {
       const assigned = yield* this.#assignPoolMachine(row, secret).pipe(
         Effect.catch((error) =>
-          Effect.sync(() =>
+          Effect.sync(() => {
             console.warn("Hosted server pool assignment failed.", {
               serverId: row.server_id,
               error: safeErrorCode(error),
-            }),
-          ).pipe(Effect.andThen(this.#alertBoatStart(row, "the pool query failed")), Effect.as(false)),
+            });
+            return "the pool query failed";
+          }),
         ),
       );
-      if (assigned) return;
+      if (assigned === true) return;
+      boatReason = assigned;
     }
     const boat = dependencies.boat;
     const template = this.#template;
@@ -1945,6 +1949,8 @@ export class HostedServerService {
         .run(),
     );
     if (claimed.meta.changes !== 1) return;
+    // Only the caller that changed the row alerts, so a lost race or a retry before this point sends nothing.
+    if (boatReason) yield* this.#alertBoatStart(row, boatReason);
     const request = createRequest(row, from, claim);
     return yield* Effect.gen({ self: this }, function* () {
       // The same idempotency key and request body make a retry safe: boat returns the sandbox that it made.
@@ -2018,17 +2024,18 @@ export class HostedServerService {
   /**
    * Gives a new paid server a free prepared machine of the pool. The machine asks for its server
    * (`poolAssignment`), starts OpenBot with the claim, and the sign-in of OpenBot sets the row to `running`
-   * (`redeemClaim`). One statement takes the machine, so two purchases never get the same one. Returns
-   * false when the pool has no such machine: the caller then uses boat.
+   * (`redeemClaim`). One statement takes the machine, so two purchases never get the same one. When the
+   * pool has no such machine, returns the reason for the operator, or null for a server that stays on boat.
+   * The caller then uses boat.
    */
   readonly #assignPoolMachine = Effect.fn("HostedServerService.assignPoolMachine")(function* (
     this: HostedServerService,
     row: HostedServerRow,
     secret: string,
-  ): Effect.fn.Return<boolean, HostedFailure, HostedServerDependencies> {
+  ): Effect.fn.Return<true | string | null, HostedFailure, HostedServerDependencies> {
     const dependencies = yield* HostedServerDependencies;
     // After a boat attempt, boat can still make the sandbox of that attempt. Such a server stays on boat.
-    if (row.provider_template || row.provider_sandbox_id) return false;
+    if (row.provider_template || row.provider_sandbox_id) return null;
     const now = dependencies.now();
     const seenAfter = now - POOL_SEEN_WITHIN_MS;
     const locations = poolLocations(row.currency);
@@ -2075,8 +2082,7 @@ export class HostedServerService {
       yield* this.#alertLowPool(POOL_PRODUCT_OF_PLAN[row.plan], location, seenAfter);
       return true;
     }
-    yield* this.#alertBoatStart(row, `no ready ${POOL_PRODUCT_OF_PLAN[row.plan]} in ${locations.join(", ")}`);
-    return false;
+    return `no ready ${POOL_PRODUCT_OF_PLAN[row.plan]} in ${locations.join(", ")}`;
   });
 
   /** A server on boat must move to a pool machine by hand later (docs/hosted-servers.md#move-a-server-from-boat). */
@@ -2171,12 +2177,11 @@ export class HostedServerService {
       machine: "pool",
     });
     const current = yield* this.#requireRow(row.server_id);
-    const toBoat = current.observed_state === "awaiting_payment";
     yield* this.#alertPool(
-      `A ${row.plan} server (${row.server_id.slice(0, 8)}) did not start on pool machine ${hostId}${toBoat ? " and starts on boat" : ""}. Prepare the machine again.`,
+      `A ${row.plan} server (${row.server_id.slice(0, 8)}) did not start on pool machine ${hostId}. Prepare the machine again.`,
     );
-    if (!toBoat) return false;
-    yield* this.#provision(current, false);
+    if (current.observed_state !== "awaiting_payment") return false;
+    yield* this.#provision(current, false, `pool machine ${hostId} did not start it`);
     return true;
   });
 

@@ -1666,12 +1666,14 @@ sends the operator one message:
 | Event | Message | Action |
 | --- | --- | --- |
 | A purchase takes a machine and leaves 0 or 1 free machines of that product in that location | `Pool <location> <product>: <n> free machines left.` | Buy and `prepare` machines. |
-| A purchase starts on boat: no ready machine, or the pool query failed | `A <plan> server (<currency>, <server ID prefix>) starts on boat: <reason>.` | `move` it when a machine is ready. `leaseweb-pool.ts boat` lists it. |
-| A pool start is lost (no sign-in in 4 minutes) | `A <plan> server (<server ID prefix>) did not start on pool machine <host ID> ...` | `prepare --reinstall` the machine, then `move` the server. |
+| A server starts on boat: no ready machine, the pool query failed, or its pool machine did not start it | `A <plan> server (<currency>, <server ID prefix>) starts on boat: <reason>.` | `move` it when a machine is ready. `leaseweb-pool.ts boat` lists it. |
+| A pool start is lost (no sign-in in 4 minutes) | `A <plan> server (<server ID prefix>) did not start on pool machine <host ID>. Prepare the machine again.` | `prepare --reinstall` the machine. |
 
-A message has no account, email or name. A retry of a boat attempt does not ask the pool and sends
-no message. A failed send logs one line and is not sent again. Without the secret there are no
-messages. Set it one time; a deploy keeps it:
+A message has no account, email or name. The boat message goes out only after the Worker stores the
+boat start, so a lost race, a retry of a boat attempt, or a pool change whose answer was lost sends
+nothing. A failed send logs one line and is not sent again. Without the secret there are no messages.
+The encrypted `apps/auth-api/.env.production` holds the URL, and `bun run api:deploy` sets it. The CI
+deploy keeps the value that the Worker has. To set only the secret:
 
 ```sh
 cd apps/auth-api && bunx wrangler secret put HOSTED_POOL_ALERT_WEBHOOK_URL

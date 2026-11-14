@@ -2,6 +2,8 @@ import { Effect } from "effect";
 import type { BoatFetch } from "./boat-client";
 
 const SEND_TIMEOUT_MS = 10_000;
+/** Each request makes the service again, so a bad URL warns once for each Worker isolate. */
+let warnedBadUrl = false;
 
 /** Sends one operator message about the server pool. The caller keeps it free of accounts and emails. */
 export type HostedPoolAlert = (text: string) => Effect.Effect<void>;
@@ -14,15 +16,10 @@ export type HostedPoolAlert = (text: string) => Effect.Effect<void>;
 export function createHostedPoolAlert(webhookUrl: string | undefined, fetch: BoatFetch): HostedPoolAlert | null {
   const value = webhookUrl?.trim();
   if (!value) return null;
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    console.warn("HOSTED_POOL_ALERT_WEBHOOK_URL is not a URL. Pool alerts are off.");
-    return null;
-  }
-  if (url.protocol !== "https:") {
-    console.warn("HOSTED_POOL_ALERT_WEBHOOK_URL must use HTTPS. Pool alerts are off.");
+  const url = URL.parse(value);
+  if (url?.protocol !== "https:") {
+    if (!warnedBadUrl) console.warn("HOSTED_POOL_ALERT_WEBHOOK_URL is not an HTTPS URL. Pool alerts are off.");
+    warnedBadUrl = true;
     return null;
   }
   const target = url.href;
