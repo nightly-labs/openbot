@@ -397,6 +397,8 @@ export const messages = {
   "connector.whatsapp.helpLoggedOutHost": "WhatsApp bu sunucuyu bağlı cihazlardan kaldırdı. Numarayı yeniden bağlayın.",
   "connector.whatsapp.helpError":
     "OpenBot bu numarada WhatsApp'a ulaşamıyor. Yeniden bağlanın veya numaranın bağlantısını kesin.",
+  "connector.whatsapp.helpKeysUnreadable":
+    "OpenBot bu numaranın kayıtlı anahtarlarını okuyamıyor. Numarayı yeniden bağlayın.",
   "connector.whatsapp.retryAt": "WhatsApp OpenBot'tan beklemesini istedi. {time} saatinde tekrar deneyecek.",
   "connector.whatsapp.pause": "Duraklat",
   "connector.whatsapp.resume": "Sürdür",

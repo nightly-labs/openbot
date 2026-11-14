@@ -61,6 +61,12 @@ export const messages = {
   "settings.chatColor.red": "Kırmızı",
   "settings.chatColor.green": "Yeşil",
   "settings.chatColor.blue": "Mavi",
+  "settings.bubbleStyle.title": "Balonlarınız",
+  "settings.bubbleStyle.description":
+    "Bir ajanla sohbette balonlarınız ajanın rengini alır. Bunu yalnızca siz görürsünüz.",
+  "settings.bubbleStyle.solid": "Dolu",
+  "settings.bubbleStyle.tint": "Ton",
+  "settings.bubbleStyle.classic": "Klasik",
   "settings.appBehavior.title": "Uygulama davranışı",
   "settings.conversations.title": "Konuşmalar",
   "settings.launchAtLogin.title": "Oturum açıldığında OpenBot'u başlat",

@@ -181,7 +181,7 @@ completed or was cancelled, for a plan, a license or the billing portal. The con
 name and email are not sent to analytics.
 The production desktop app records application, sign-in, onboarding, agent, message, turn, prompt,
 approval, queue, routine, workflow, team, browser, search, Remote Desktop, update, marketplace, memory,
-provider, voice transcription, Voice pane, spoken reply, voice model download, spoken reply setting,
+provider, voice transcription, voice conversation, spoken reply, voice model download, spoken reply setting,
 reaction, Hosted Site, hosted server offer, hosted server plans, plan and member limits, license,
 contact sales, provider usage limit, agent template, phone connection, connector, Computer Use
 permission, help link, channel, server export and import, Usage view, and confirmed
@@ -1110,20 +1110,20 @@ Network traffic can also occur when:
   pins from `cache.agilebits.com`, checks its SHA-256, and keeps it in
   `~/Library/Application Support/OpenBot/provider-state/1password-cli`. The request carries no user
   data;
-- the user dictates or opens the Voice pane for the first time, or presses Download in **Settings →
+- the user dictates or starts a voice conversation for the first time, or presses Download in **Settings →
   Voice**. OpenBot downloads the speech model that it pins, Parakeet TDT, Parakeet Unified EN,
   Underdog Bark 3.0 Plus, Whisper turbo or Cohere Transcribe, from `huggingface.co`, checks its size and SHA-256, and keeps it in `runtimes` in
   the application data folder. The request carries no user data. Dictation audio from these models
   stays on the computer, and the chosen model and language are saved in `voice-preference.json` in
   the same folder;
 - the user selects ElevenLabs Scribe v2 Realtime in **Settings → Voice** and dictates or talks in
-  the Voice pane. While the microphone records, or when a Voice pane turn ends, OpenBot streams the
+  a voice conversation. While the microphone records, or when a voice conversation turn ends, OpenBot streams the
   audio and the chosen language to `api.elevenlabs.io` with the user's own API key, and receives the
   text. Nothing else is sent: no conversation, file or agent instruction. ElevenLabs handles the
   audio and the text under its own policy and the user's ElevenLabs plan. The local models send
   nothing;
 - the user selects Groq Whisper large-v3 turbo or Groq Whisper large-v3 in **Settings → Voice** and
-  dictates or talks in the Voice pane. When the recording stops, or when a Voice pane turn ends,
+  dictates or talks in a voice conversation. When the recording stops, or when a voice conversation turn ends,
   OpenBot sends the recorded audio, the chosen model and, when the user set one, the language to
   `api.groq.com` with the user's own API key, and receives the text. Nothing else is sent: no
   conversation, file or agent instruction. Groq handles the audio and the text under its own policy
@@ -1141,7 +1141,7 @@ Network traffic can also occur when:
   the recording in memory, writes it as a WAV file to the app's cache folder only while the request
   runs, and deletes it after. The address and the choices are saved in the phone's keychain, and the
   API key in a separate keychain entry. **Remove voice server** deletes both;
-- the user turns on Read replies aloud, opens the Voice pane for the first time, or presses Download
+- the user turns on Read replies aloud, starts a voice conversation for the first time, or presses Download
   in the Spoken replies section of **Settings → Voice**. OpenBot downloads the Supertonic 3 voice
   model that it pins from `huggingface.co`, checks its size and SHA-256, and keeps it in `runtimes`
   in the application data folder. The request carries no user data. When Supertonic reads a reply
@@ -1152,7 +1152,7 @@ Network traffic can also occur when:
   `api.elevenlabs.io` or `api.x.ai` with the user's own API key, and receives the audio. Listen
   sends a short sample text. Nothing else is sent: no conversation, file or agent instruction. The
   provider handles the text and the audio under its own policy and the user's plan.
-  In the Voice pane, the spoken reply runs on this
+  In a voice conversation, the spoken reply runs on this
   computer, also for an agent on a remote server. Speech recognition uses the model chosen in
   **Settings → Voice**: a local model runs on this computer, and ElevenLabs or Groq gets the audio as
   described above. A message that the user speaks to an agent on this computer keeps its recording,
@@ -1161,7 +1161,7 @@ Network traffic can also occur when:
   text, as for a typed message, and no recording is kept. Recordings show in the Storage tab of
   **Server Settings**, where the user can delete them, and are part of a data export. A recording is
   deleted with the agent's or channel's data;
-- the user turns on Codex live voice in **Settings → Voice** and opens the Voice pane of an agent on
+- the user turns on Codex live voice in **Settings → Voice** and starts a voice conversation with an agent on
   this computer, with any provider. OpenBot starts a separate Codex App Server process for the
   session. The app window sends a WebRTC offer to it, and it opens a realtime voice session with
   OpenAI through the user's own Codex sign-in: the agent's own Codex account for an agent on Codex,

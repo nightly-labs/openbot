@@ -39,6 +39,19 @@ import type { AvatarMood } from "../../bloub-avatar";
 import { createMenuSearch } from "../../components/createMenuSearch";
 import { createScrollFades } from "../../components/createScrollFades";
 import type { ComposerAgent } from "../../data";
+import {
+  createMotion,
+  GooFilter,
+  LIQUID_CLOSE,
+  LIQUID_OPEN,
+  LIQUID_PAD,
+  SLIDE_END,
+  SNAPPY,
+  SOFT,
+  type Spring,
+  stagedCurve,
+  WOBBLY,
+} from "../../liquid";
 import { useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
 import { AgentAvatar } from "../agents/AgentAvatar";
@@ -55,7 +68,6 @@ import {
 import { AgentDockShelf, type AgentDockShelfResult } from "./AgentDockShelf";
 import {
   addCenterY,
-  createMotion,
   DOCK_LEFT,
   DOCK_PAD,
   DOCK_WIDTH,
@@ -65,25 +77,18 @@ import {
   dockPath,
   HANDLE_STROKE,
   LIQUID_HEIGHT,
-  LIQUID_PAD,
   LIQUID_WIDTH,
   MAX_STRETCH,
   neckCenterInBand,
   neckPath,
-  PANEL_CLOSE,
   PANEL_GAP,
   PANEL_HEIGHT,
-  PANEL_OPEN,
   PANEL_RADIUS,
   PANEL_WIDTH,
   SEAT,
   SEAT_CENTER_X,
   SEAT_PITCH,
   SEAT_VIEW_INSET,
-  SLIDE_END,
-  SNAPPY,
-  SOFT,
-  type Spring,
   STAGE_WIDTH,
   STRETCH_FOLLOW,
   STRETCH_PER_SPEED,
@@ -91,10 +96,8 @@ import {
   seatsHeight,
   seatView,
   seatViewTop,
-  stagedCurve,
   TUCK,
   TUCK_DISTANCE,
-  WOBBLY,
 } from "./agent-dock-motion";
 
 export type { AgentDockChatModel } from "./AgentDockChat";
@@ -359,7 +362,7 @@ export function AgentDock(props: AgentDockProps) {
    */
   const listH = motion.spring(SEAT_VIEW_INSET + seatsHeight(initialCount), SOFT);
   /** Open progress: 0 is the seat, 1 is the full panel. Width leads height for a liquid stretch. */
-  const panelOpen = motion.spring(0, PANEL_OPEN);
+  const panelOpen = motion.spring(0, LIQUID_OPEN);
   // 0 while the panel opens, 1 while it closes: a close goes back as a drop, not as a tall bar.
   const closing = motion.spring(0, SOFT);
   const neckY = motion.spring(PANEL_HEIGHT / 2, WOBBLY);
@@ -734,7 +737,7 @@ export function AgentDock(props: AgentDockProps) {
       // From rest the path changes at once; during a close it blends, so the shape does not jump.
       if (panelOpen.value < 0.02) closing.jump(0);
       else closing.to(0);
-      panelOpen.to(1, undefined, PANEL_OPEN);
+      panelOpen.to(1, undefined, LIQUID_OPEN);
     }
     motion.kick();
   }
@@ -817,7 +820,7 @@ export function AgentDock(props: AgentDockProps) {
     if (panelOpen.value > 0.98) closing.jump(1);
     else closing.to(1);
     // The neck holds the blob until it is back in the dock, so no gap opens on the way in.
-    panelOpen.to(0, () => neckSize.jump(0), PANEL_CLOSE);
+    panelOpen.to(0, () => neckSize.jump(0), LIQUID_CLOSE);
     motion.kick();
     setState((draft) => {
       draft.open = null;
@@ -1158,12 +1161,7 @@ export function AgentDock(props: AgentDockProps) {
       }}
     >
       <AmbientMotion when={ambientMotion()}>
-        <svg class="agent-dock-filter" aria-hidden="true" width="0" height="0">
-          <filter id={filterId} x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="9" result="blur" />
-            <feColorMatrix in="blur" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -11" />
-          </filter>
-        </svg>
+        <GooFilter id={filterId} class="agent-dock-filter" />
 
         {/* The liquid: the dock, the neck, the panel and the drop under the goo filter. */}
         <div

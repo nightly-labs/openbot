@@ -2515,6 +2515,18 @@ export function createConversationViewScope(props: ConversationProps) {
     !channel &&
     (!props.runtime ||
       (props.runtime.liveVoice !== undefined && codexLiveAccess(props.agentStatus.providers) !== "signIn"));
+  /** True while the voice conversation with this chat's agent is on. Its pill shows at the top of the chat. */
+  const voiceConversationOpen = () => Boolean(props.agent && controller.voiceSessions.active(props.agent.id));
+  /** Starts the voice conversation with this chat's agent, or ends it. Another one ends first. */
+  function toggleVoiceConversation() {
+    const agentId = props.agent?.id;
+    if (!agentId) return;
+    if (controller.voiceSessions.active(agentId)) controller.voiceSessions.stop(agentId);
+    else if (voiceConversationAvailable()) controller.voiceSessions.start(agentId);
+  }
+  function endVoiceConversation() {
+    if (props.agent) controller.voiceSessions.stop(props.agent.id);
+  }
   // A transcribed conversation sends its turns through this view, so it ends with the view.
   onCleanup(() => controller.voiceSessions.end("transcribed"));
   /** Starts a voice conversation with an agent. It ends with the owner that calls this. */
@@ -2548,6 +2560,9 @@ export function createConversationViewScope(props: ConversationProps) {
     replyJump,
     messagePins,
     voiceConversationAvailable,
+    voiceConversationOpen,
+    toggleVoiceConversation,
+    endVoiceConversation,
     startVoiceConversation,
     sideQuestionAvailable,
     sideQuestion,
