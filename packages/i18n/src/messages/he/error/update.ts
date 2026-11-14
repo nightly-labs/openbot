@@ -22,6 +22,7 @@ export const messages = {
   "error.update.siblingCheckFailed": "לא ניתן לאמת סשנים אחרים של OpenBot. יש לנסות שוב לפני ההתקנה.",
   "error.update.readOnlyLocation":
     "OpenBot לא יכול להתקין עדכונים מהמיקום הזה. צא מ-OpenBot. ב-Finder, גרור את OpenBot לתיקייה 'יישומים' (אם הוא כבר שם, גרור אותו החוצה ובחזרה פנימה). לאחר מכן פתח את OpenBot והתקן את העדכון שוב.",
+  "error.update.notApplied": "העדכון לא הותקן. יש להפעיל מחדש כדי לנסות שוב.",
   "error.update.remoteDisabled": "עדכונים ממנהלי שרת כבויים במחשב הזה.",
   "error.update.restartStarted": "OpenBot כבר מופעל מחדש כדי להתקין את העדכון.",
   "error.update.alreadyRestarting": "OpenBot כבר מופעל מחדש.",

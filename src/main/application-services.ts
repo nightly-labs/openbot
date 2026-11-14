@@ -4289,6 +4289,7 @@ export async function createApplicationServices({
         }
       : {}),
     updaterCacheDirectory,
+    installRecordPath: join(app.getPath("userData"), "update-install.json"),
   });
   teardown.push(TEARDOWN_ORDER.updater, "the update service", () => Effect.runPromise(updater.stop()));
   const agentInitialization = new AgentInitializationGate((rosterLoaded) =>

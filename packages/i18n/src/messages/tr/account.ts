@@ -56,6 +56,7 @@ export const messages = {
   "account.update.downloadLabel": "Güncellemeyi indir. Yeni güncelleme mevcut.",
   "account.update.available": "Yeni güncelleme mevcut",
   "account.update.ready": "Güncelleme hazır",
+  "account.update.notInstalled": "Güncelleme yüklenmedi",
   "account.update.progress": "Güncelleme indirme ilerlemesi",
   "account.login.connectingTitle": "OpenBot'a bağlanılıyor",
   "account.login.unavailableTitle": "Hizmet kullanılamıyor",

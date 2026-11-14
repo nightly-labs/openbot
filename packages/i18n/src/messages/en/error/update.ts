@@ -25,6 +25,7 @@ export const messages = defineMessages("error.update", {
   "error.update.siblingCheckFailed": "Could not verify other OpenBot sessions. Try again before installing.",
   "error.update.readOnlyLocation":
     "OpenBot cannot install updates from this location. Quit OpenBot. In Finder, drag OpenBot into the Applications folder (if it is already there, drag it out and back in). Then open OpenBot and install the update again.",
+  "error.update.notApplied": "The update did not install. Restart to try again.",
   // A joined server's admin reads these from the host.
   "error.update.remoteDisabled": "Updates from server admins are turned off on this computer.",
   "error.update.restartStarted": "OpenBot is already restarting to install the update.",

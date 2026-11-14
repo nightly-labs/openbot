@@ -76,6 +76,14 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
   // Host-managed tenants watch the status but never act on it.
   const managed = createMemo(() => props.updateStatus.managedByHost === true);
   const ready = createMemo(() => !failed() && (phase() === "ready" || phase() === "installing"));
+  // A "ready" status with a message: the last restart did not install this update. The island has room
+  // for a short label only, so the full sentence is the tooltip.
+  const notInstalled = createMemo(
+    () => phase() === "ready" && !managed() && Boolean(props.updateStatus.message?.trim()),
+  );
+  const readyText = () => (notInstalled() ? t("account.update.notInstalled") : t("account.update.ready"));
+  const readyTitle = () =>
+    notInstalled() ? formatErrorMessage(props.updateStatus.message, t("account.update.notInstalled")) : undefined;
   const progress = createMemo(() => {
     const value = props.updateStatus.progress;
     return value === null ? null : Math.min(100, Math.max(0, Math.round(value)));
@@ -160,8 +168,8 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
           <strong data-text="available" aria-hidden={ready() || failed() ? "true" : undefined}>
             {t("account.update.available")}
           </strong>
-          <strong data-text="ready" aria-hidden={ready() && !failed() ? undefined : "true"}>
-            {t("account.update.ready")}
+          <strong data-text="ready" aria-hidden={ready() && !failed() ? undefined : "true"} title={readyTitle()}>
+            {readyText()}
           </strong>
           <strong data-text="error" aria-hidden={failed() ? undefined : "true"} title={errorMessage()}>
             {errorMessage()}

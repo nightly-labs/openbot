@@ -17,6 +17,7 @@ import { Cause, Deferred, Effect, Result, Schema, Scope, Semaphore } from "effec
 import type { ProgressInfo, UpdateInfo } from "electron-updater";
 import type { HostUpdateState } from "../../packages/contracts/src/host-manager";
 import { causeHelpers } from "../backend/effect-boundary";
+import { readNotAppliedUpdate, writeUpdateInstallRecord } from "./update-install-record";
 import type { OpenBotSiblingInstance, SiblingScanFailed } from "./update-sibling-instances";
 
 const logger = createOpenBotLogger("update");
@@ -137,6 +138,8 @@ interface UpdateServiceOptions {
   shipItDirectory?: string | undefined;
   /** electron-updater's cache directory, named by `updaterCacheDirName` in `app-update.yml`. */
   updaterCacheDirectory?: string | undefined;
+  /** The file that tells the next start which version an update restart tried to install. */
+  installRecordPath?: string | undefined;
   initialCheckDelayMs?: number;
   checkIntervalMs?: number;
   checkTimeoutMs?: number;
@@ -224,6 +227,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       | "beforeInstall"
       | "checkSiblingInstances"
       | "currentUid"
+      | "installRecordPath"
       | "logDirectory"
       | "shipItDirectory"
       | "updaterCacheDirectory"
@@ -266,6 +270,8 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #rolloutMiss: string | null = null;
   /** A newer release in its staged rollout that the last check did not offer to this install. */
   #stagedVersion: string | null = null;
+  /** The version that the last update restart did not install. Its "ready" status says so. */
+  readonly #notAppliedVersion: string | null;
 
   constructor(updater: UpdateAdapter, options: UpdateServiceOptions) {
     super();
@@ -282,6 +288,9 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
         installing: options.installTimeoutMs ?? DEFAULT_PHASE_TIMEOUTS.installing,
       },
     };
+    this.#notAppliedVersion = options.installRecordPath
+      ? readNotAppliedUpdate(options.installRecordPath, options.currentVersion)
+      : null;
     this.#status = {
       phase: options.enabled ? "idle" : "unsupported",
       currentVersion: options.currentVersion,
@@ -671,6 +680,9 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
           if (this.#checkRequest) yield* Deferred.await(this.#checkRequest).pipe(Effect.catch(() => Effect.void));
           if (this.#installGeneration !== generation) return;
           this.#installHandedOver = true;
+          const recordPath = this.#options.installRecordPath;
+          if (recordPath && this.#downloadedVersion)
+            writeUpdateInstallRecord(recordPath, this.#options.currentVersion, this.#downloadedVersion);
           // Silent, so the assisted Windows installer shows no page and opens the app again: it ignores
           // the force-run flag in a visible run. Other updaters only relaunch, now from `true` and not
           // from `autoRunAppAfterInstall`, which is also `true`.
@@ -817,7 +829,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       phase: "ready",
       availableVersion: version,
       progress: 100,
-      message: null,
+      message: version !== null && version === this.#notAppliedVersion ? NOT_APPLIED_MESSAGE : null,
       errorCode: null,
     });
   }
@@ -933,6 +945,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
 
 const INSTALL_FAILED_MESSAGE = sourceText("error.update.installFailed");
 const MANAGED_HOST_MESSAGE = sourceText("error.update.managedByHost");
+const NOT_APPLIED_MESSAGE = sourceText("error.update.notApplied");
 const SIBLING_SESSION_MESSAGE = sourceText("error.update.siblingSession");
 const CHECK_STALLED_MESSAGE = sourceText("error.update.checkStalled");
 const CHECK_OFFLINE_MESSAGE = sourceText("error.update.checkOffline");

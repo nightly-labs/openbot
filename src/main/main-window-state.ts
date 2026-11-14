@@ -53,6 +53,8 @@ export interface SecondLaunchState {
   hasMainWindow: boolean;
   /** Startup has built the services, so a closed main window can be built again. */
   started: boolean;
+  /** macOS: the quit hands the app to the installer, which opens the new version when it is done. */
+  installingUpdate: boolean;
 }
 
 /**
@@ -60,13 +62,14 @@ export interface SecondLaunchState {
  * - `reopen`: build the main window again. Outside macOS, closing it destroys it.
  * - `relaunch`: start a new instance once this one exits. The launch that asked has already exited
  *   because this process holds the single-instance lock, so without this nothing would open.
- * - `ignore`: startup is still building the window and will show it.
+ * - `ignore`: startup is still building the window and will show it, or an update installs. A relaunch
+ *   would start the old version while the installer works, and the installer then cancels (#8099).
  */
 export type SecondLaunchResponse = "present" | "reopen" | "relaunch" | "ignore";
 
 export function secondLaunchResponse(state: SecondLaunchState): SecondLaunchResponse {
   if (state.sessionEnding) return "ignore";
-  if (state.quitting) return "relaunch";
+  if (state.quitting) return state.installingUpdate ? "ignore" : "relaunch";
   if (state.hasMainWindow) return "present";
   return state.started ? "reopen" : "ignore";
 }

@@ -470,6 +470,8 @@ let shutdownDone = false;
 let systemSessionEnding = false;
 let systemSessionEndFlushStarted = false;
 let relaunchRequested = false;
+/** An update install started its quit. The newer-database recovery has its own updater, so no status is read. */
+let updateInstallStarted = false;
 /**
  * Set by a quit signal, by `before-quit` and by a Windows `session-end`, and never cleared. Not
  * `isQuitting`: a Windows session end that another app cancels also sets that, and then OpenBot
@@ -1451,6 +1453,7 @@ if (!hasSingleInstanceLock) {
       quitting: isQuitting,
       hasMainWindow,
       started: services !== null,
+      installingUpdate: process.platform === "darwin" && updateInstallStarted,
     });
     if (response === "present" && window) showMainWindow(window);
     else if (response === "reopen") reopenMainWindow();
@@ -2065,6 +2068,7 @@ function forceExitAfterShutdownDeadline(deadlineMs: number): void {
  * so Squirrel gets that time less the teardown.
  */
 async function prepareForUpdateInstall(deadlineMs = UPDATE_INSTALL_TIMEOUT_MS): Promise<void> {
+  updateInstallStarted = true;
   recordExit("update");
   if (services) await runCauseEffect(services.browser.flushPersistentStorage());
   await prepareForShutdown(deadlineMs);

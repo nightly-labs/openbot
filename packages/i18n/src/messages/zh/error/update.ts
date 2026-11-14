@@ -22,6 +22,7 @@ export const messages = {
   "error.update.siblingCheckFailed": "无法确认其他 OpenBot 会话，请在安装前重试。",
   "error.update.readOnlyLocation":
     "OpenBot 无法从此位置安装更新。请退出 OpenBot。在“访达”中，将 OpenBot 拖到“应用程序”文件夹（如果它已经在那里，请先拖出来再拖回去）。然后打开 OpenBot，再次安装更新。",
+  "error.update.notApplied": "更新未能安装。请重启以再试一次。",
   // A joined server's admin reads these from the host.
   "error.update.remoteDisabled": "这台电脑已关闭“允许服务器成员触发更新”。",
   "error.update.restartStarted": "OpenBot 已在重启以安装更新。",
