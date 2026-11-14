@@ -1,6 +1,12 @@
 import { fileReferenceName, isFileReference } from "@openbot/brand/file-reference";
 import { attachmentReferenceAt } from "@openbot/contracts/attachment-references";
-import { blockChatMath, chatMathBlockStart, chatMathStart, inlineChatMath } from "@openbot/contracts/chat-math";
+import {
+  blockChatMath,
+  chatMathBlockInterrupts,
+  chatMathBlockStart,
+  chatMathStart,
+  inlineChatMath,
+} from "@openbot/contracts/chat-math";
 import { chatPreviewKind } from "@openbot/contracts/chat-preview";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { Button, Checkbox } from "@openbot/ui";
@@ -84,6 +90,14 @@ interface MathToken extends Tokens.Generic {
 const markdown = new Marked({
   gfm: true,
   breaks: true,
+  tokenizer: {
+    // Marked tries a heading underlined by `=` or `-` before it ends a paragraph at a math block, so
+    // a formula with such a line became a heading. Return `undefined` to read a paragraph instead.
+    lheading(source) {
+      const heading = this.rules.block.lheading.exec(source);
+      return heading && chatMathBlockInterrupts(source, heading[0].length) ? undefined : false;
+    },
+  },
   extensions: [
     {
       name: "blockMath",
