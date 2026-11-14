@@ -559,6 +559,16 @@ function customRefusal(error: unknown, detail: string, label: string): string {
   return error === "refusal" ? sourceText("error.provider.acpRefusedNoReason", { provider: label }) : detail;
 }
 
+const customTurnFailure: NonNullable<AcpFlavor["turnFailure"]> = (
+  error,
+  detail,
+  _redact,
+  _log,
+  _model,
+  _endpoint,
+  label,
+) => customRefusal(error, detail, label);
+
 function customFailureCause(error: unknown): CauseCode | null {
   return error === "refusal" ? "unknown" : null;
 }
@@ -567,7 +577,7 @@ function customFailureCause(error: unknown): CauseCode | null {
 const OMP_ACP_FLAVOR: AcpFlavor = {
   sessionNotFound: ompSessionNotFound,
   emptyAnswerFailure: customEmptyAnswerFailure,
-  turnFailure: (error, detail, _redact, _log, _model, _endpoint, label) => customRefusal(error, detail, label),
+  turnFailure: customTurnFailure,
   failureCause: customFailureCause,
 };
 
@@ -578,7 +588,7 @@ const OMP_ACP_FLAVOR: AcpFlavor = {
 const CUSTOM_ACP_FLAVOR: AcpFlavor = {
   sessionNotFound: ompSessionNotFound,
   emptyAnswerFailure: customEmptyAnswerFailure,
-  turnFailure: OMP_ACP_FLAVOR.turnFailure,
+  turnFailure: customTurnFailure,
   failureCause: customFailureCause,
 };
 
