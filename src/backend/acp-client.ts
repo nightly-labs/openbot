@@ -2527,7 +2527,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       while (providerResult(yield* Effect.result(this.#leaveOutFailedMcpServer(thread, turn, response, params))))
         response = providerResult(yield* send());
       if (thread.activeTurn !== turn || turn.completing) return;
-      let idleWakes = 0;
+      // A wake prompt left the same commands running: the wait ends.
+      let staleWake = false;
       for (;;) {
         // A steer by prompt ends the prompt before it with `end_turn`, and the work goes on under the
         // steer's prompt. The turn ends with the reply to the last one.
@@ -2538,9 +2539,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         }
         // A command still runs in the background (`AcpFlavor.wakesAfterPromptEnds`). The turn stays
         // open until the session changes, and a prompt then connects the agent's wake-up to it.
-        // A wake-up after which the same commands still run is idle; the second one ends the wait,
-        // so a session that changes for another cause does not cost a model step every poll.
-        const running = response.stopReason === "end_turn" && idleWakes < 2 ? this.#backgroundCommands(turn) : "";
+        // The agent can finish a command while no prompt is open and never report it, so a wake-up
+        // after which the same commands still show as running ends the wait. One wake prompt is the
+        // most that a session that changes for another cause costs.
+        const running: string = response.stopReason === "end_turn" && !staleWake ? this.#backgroundCommands(turn) : "";
         if (!running) break;
         const wake = yield* this.#awaitSessionChange(thread, turn);
         if (thread.activeTurn !== turn || turn.completing) return;
@@ -2553,7 +2555,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         );
         if (thread.activeTurn !== turn || turn.completing) return;
         turn.lastActivityAt = Date.now();
-        if (this.#backgroundCommands(turn) === running) idleWakes += 1;
+        staleWake = this.#backgroundCommands(turn) === running;
       }
       this.#reportPromptUsage(thread, turn, response);
       // A flavor can fail a turn that ended with no answer (OpenCode, custom agents). A turn told not
