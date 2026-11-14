@@ -2304,9 +2304,16 @@ export class AttentionRegistry {
               (login) => kind === "password" || login.hasOneTimePassword,
             );
         const chosen = loginId ?? (candidates.length === 1 ? candidates[0]?.id : undefined);
-        return chosen
-          ? { loginId: chosen, secret: yield* vault.secretFor(chosen, request.origin, kind, agentId) }
-          : null;
+        if (!chosen) return null;
+        const secret = yield* vault.secretFor(chosen, request.origin, kind, agentId);
+        // With no value, an id that list_logins does not give for this site is a wrong id, not a login
+        // with no password. When the list cannot be read, the reason stays as before.
+        const listed = secret || !loginId ? null : yield* Effect.result(vault.loginsFor(request.origin, agentId));
+        const unknown =
+          listed !== null &&
+          Result.isSuccess(listed) &&
+          !(listed.success ?? []).some((candidate) => candidate.id === loginId);
+        return { loginId: chosen, secret, unknown };
       }),
     );
     if (Result.isFailure(found)) {
@@ -2320,6 +2327,12 @@ export class AttentionRegistry {
       return skip(
         "no-login",
         "no saved login matches this site, or several match and the call has no loginId from list_logins.",
+      );
+    if (login.unknown)
+      return skip(
+        "unknown-login",
+        `no saved login for this site has the id ${login.loginId}. Call list_logins and give the id of a login exactly as list_logins shows it, with its prefix, for example openbot:.`,
+        login.loginId,
       );
     if (!login.secret)
       return skip(
