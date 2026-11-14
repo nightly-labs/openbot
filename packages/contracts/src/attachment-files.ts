@@ -275,6 +275,10 @@ export function attachmentMimeTypeForName(name: string) {
     case "md":
     case "markdown":
       return "text/markdown";
+    // The file preview shows an HTML attachment as a page only for this type (`isChatVisualMimeType`).
+    case "html":
+    case "htm":
+      return "text/html";
     case "json":
     case "jsonl":
     case "ipynb":
