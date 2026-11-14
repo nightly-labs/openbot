@@ -240,6 +240,16 @@ export class RoutineScheduler implements RoutineDueSource {
     return this.#routines.runForDelivery(deliveryId);
   }
 
+  /**
+   * The zone whose clock a routine delivery's run time is given in: its routine's. A flow handoff has
+   * no run of its own, so it gets the server timezone. Without it, the agent reads only the UTC time
+   * and takes the wrong date for a run near midnight (#9276).
+   */
+  timezoneForDelivery(deliveryId: string): string {
+    const run = this.#routines.runForDelivery(deliveryId);
+    return (run && this.#routines.get(run.agentId, run.routineId)?.timezone) || this.#timezone();
+  }
+
   /** The open waits that the run of this delivery continues. */
   wokenWaits(deliveryId: string): AgentWait[] {
     return this.#waits.wokenBy(deliveryId);
