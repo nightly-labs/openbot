@@ -1,7 +1,7 @@
 import { ProviderLogo } from "@openbot/brand";
 import { Button, Gauge, RefreshCw } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createSignal, For, onCleanup, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
 import { useText } from "../../text";
 import {
@@ -33,6 +33,10 @@ export function AccountUsageDetails(props: {
   /* A card with a height limit scrolls the list, and the header stays. The fades show where more rows are. */
   const fades = createScrollFades();
   onCleanup(() => fades.stop());
+  createEffect(
+    () => props.rows.length,
+    () => fades.remeasure(),
+  );
   return (
     <>
       <header class="account-usage-popover-header">

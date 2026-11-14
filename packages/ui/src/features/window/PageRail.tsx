@@ -61,6 +61,22 @@ function RailButton(props: {
   );
 }
 
+/** The hover card of a usage ring: the limits of its readings, with no refresh. */
+function UsageCard(props: { rows: AccountUsageProviderRow[] }) {
+  const { t } = useText();
+  return (
+    <AccountUsageDetails
+      rows={props.rows}
+      loading={false}
+      error={null}
+      refreshActive={false}
+      refreshDisabled
+      onRefresh={() => undefined}
+      title={<h2 class="account-usage-popover-title">{t("account.usage.title")}</h2>}
+    />
+  );
+}
+
 /** Two tracks in a 34px box, with 4.5px between their centers. */
 const RING = { size: 34, stroke: 2.25, spacing: 4.5 };
 
@@ -93,17 +109,7 @@ function UsageRings(props: {
   return (
     <RailButton
       label={label()}
-      card={() => (
-        <AccountUsageDetails
-          rows={rows()}
-          loading={false}
-          error={null}
-          refreshActive={false}
-          refreshDisabled
-          onRefresh={() => undefined}
-          title={<h2 class="account-usage-popover-title">{t("account.usage.title")}</h2>}
-        />
-      )}
+      card={() => <UsageCard rows={rows()} />}
       class="window-rail-usage"
       onClick={props.onOpen}
     >
@@ -161,17 +167,7 @@ function MoreUsageRings(props: { rings: readonly UsageRing[]; onOpen: (button: H
   return (
     <RailButton
       label={t("app.rail.moreUsage", { count: props.rings.length })}
-      card={() => (
-        <AccountUsageDetails
-          rows={rows()}
-          loading={false}
-          error={null}
-          refreshActive={false}
-          refreshDisabled
-          onRefresh={() => undefined}
-          title={<h2 class="account-usage-popover-title">{t("account.usage.title")}</h2>}
-        />
-      )}
+      card={() => <UsageCard rows={rows()} />}
       class="window-rail-usage window-rail-usage-more"
       onClick={props.onOpen}
     >
@@ -193,7 +189,8 @@ function MoreUsageRings(props: { rings: readonly UsageRing[]; onOpen: (button: H
 
 /**
  * The most ring places in the rail, also in a tall window: four rings and the "+N" ring, or five
- * rings. A "+N" ring never takes the place of one ring.
+ * rings. A "+N" ring never takes the place of one ring. When the window has space for one place
+ * only, the "+N" ring shows all the readings.
  */
 const MAX_RING_PLACES = 5;
 /** The space in pixels that stays between the pages and the end of the rail. */
