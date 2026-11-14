@@ -22,6 +22,7 @@ import type { AgentProfileDraft } from "@openbot/contracts/ipc";
 import {
   AGENT_FOLDER_LIMIT,
   AGENT_PROVIDERS,
+  AGENT_STORED_EMPTY_PREVIEW,
   type AgentAccess,
   type AgentBackupModels,
   type AgentDefaults,
@@ -157,7 +158,7 @@ const LEGACY_AVATAR_COLORS = [
   "gray",
 ] as const;
 
-const NEW_AGENT_PREVIEW = "No messages yet";
+const NEW_AGENT_PREVIEW = AGENT_STORED_EMPTY_PREVIEW;
 /** The longest agent preview the store keeps; a longer text is cut to it. */
 const AGENT_PREVIEW_MAX_LENGTH = 180;
 const DEFAULT_AGENT_MODEL: AgentModelId = "gpt-6-luna";

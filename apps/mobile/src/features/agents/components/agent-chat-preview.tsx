@@ -1,3 +1,4 @@
+import { isAgentStoredEmptyPreview } from "@openbot/contracts/ipc";
 import { Link } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -9,6 +10,7 @@ import { type MobileAgent, useMobileWorkspaceSelector } from "@/features/workspa
 import { useColumnWidth } from "@/shared/components/adaptive-split";
 import { useFontScale } from "@/shared/lib/font-scale";
 import { isIOS } from "@/shared/lib/platform";
+import { useText } from "@/shared/lib/text";
 
 const HEADER_HEIGHT = 64;
 const SIDE_INSET = 16;
@@ -52,6 +54,7 @@ function PreviewBubble({ text, onHeight }: { text: string; onHeight?: (height: n
  * that opens the chat does not also parse the latest message.
  */
 export function useAgentChatPreview(agent: MobileAgent) {
+  const { t } = useText();
   const fontScale = useFontScale();
   // In the chat list pane, the preview has the width of the pane, not of the whole window.
   const screenWidth = useColumnWidth();
@@ -59,7 +62,7 @@ export function useAgentChatPreview(agent: MobileAgent) {
   const [bubbleHeight, setBubbleHeight] = useState<number | null>(null);
   const width = screenWidth - 2 * SIDE_INSET;
   const bubbleWidth = width - 2 * SIDE_INSET;
-  const text = previewText(agent.preview);
+  const text = isAgentStoredEmptyPreview(agent.preview) ? t("mobile.agent.noMessages") : previewText(agent.preview);
 
   const fallbackLines = Math.ceil((text.length * FALLBACK_CHARACTER_WIDTH * fontScale) / (bubbleWidth - 32));
   const estimatedBubbleHeight = bubbleHeight ?? 24 + Math.max(1, fallbackLines) * FALLBACK_LINE_HEIGHT * fontScale;

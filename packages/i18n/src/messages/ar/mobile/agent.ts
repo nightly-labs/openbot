@@ -563,6 +563,7 @@ export const messages = {
   "mobile.agent.section.unassigned": "الوكلاء",
   "mobile.agent.section.moveFailed": "تعذّر نقل الدردشة",
   "mobile.agent.section.moveTo": "نقل إلى مجلد",
+  "mobile.agent.noMessages": "لا رسائل بعد",
   "mobile.agent.section.newInside": "مجلد جديد بداخله",
   "mobile.agent.section.moveFolder": "نقل إلى",
   "mobile.agent.section.topLevel": "المستوى الأعلى",

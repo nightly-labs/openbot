@@ -521,6 +521,7 @@ export const messages = {
   "mobile.agent.section.unassigned": "Agenti",
   "mobile.agent.section.moveFailed": "Impossibile spostare la chat",
   "mobile.agent.section.moveTo": "Sposta nella cartella",
+  "mobile.agent.noMessages": "Ancora nessun messaggio",
   "mobile.agent.section.newInside": "Nuova sottocartella",
   "mobile.agent.section.moveFolder": "Sposta in",
   "mobile.agent.section.topLevel": "Livello principale",

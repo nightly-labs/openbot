@@ -533,6 +533,7 @@ export const messages = {
   "mobile.agent.section.unassigned": "Ajanlar",
   "mobile.agent.section.moveFailed": "Sohbet taşınamadı",
   "mobile.agent.section.moveTo": "Klasöre taşı",
+  "mobile.agent.noMessages": "Henüz mesaj yok",
   "mobile.agent.section.newInside": "Yeni alt klasör",
   "mobile.agent.section.moveFolder": "Şuraya taşı",
   "mobile.agent.section.topLevel": "En üst düzey",

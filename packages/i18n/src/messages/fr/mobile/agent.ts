@@ -534,6 +534,7 @@ export const messages = {
   "mobile.agent.section.unassigned": "Agents",
   "mobile.agent.section.moveFailed": "Impossible de déplacer la discussion",
   "mobile.agent.section.moveTo": "Déplacer vers un dossier",
+  "mobile.agent.noMessages": "Aucun message pour l’instant",
   "mobile.agent.section.newInside": "Nouveau sous-dossier",
   "mobile.agent.section.moveFolder": "Déplacer vers",
   "mobile.agent.section.topLevel": "Niveau supérieur",

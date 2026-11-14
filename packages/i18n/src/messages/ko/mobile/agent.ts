@@ -515,6 +515,7 @@ export const messages = {
   "mobile.agent.section.unassigned": "에이전트",
   "mobile.agent.section.moveFailed": "채팅을 이동할 수 없어요",
   "mobile.agent.section.moveTo": "폴더로 이동",
+  "mobile.agent.noMessages": "아직 메시지가 없어요",
   "mobile.agent.section.newInside": "새 하위 폴더",
   "mobile.agent.section.moveFolder": "이동",
   "mobile.agent.section.topLevel": "최상위",

@@ -558,6 +558,7 @@ export const messages = {
   "mobile.agent.section.unassigned": "Agenci",
   "mobile.agent.section.moveFailed": "Nie udało się przenieść czatu",
   "mobile.agent.section.moveTo": "Przenieś do folderu",
+  "mobile.agent.noMessages": "Brak wiadomości",
   "mobile.agent.section.newInside": "Nowy podfolder",
   "mobile.agent.section.moveFolder": "Przenieś do",
   "mobile.agent.section.topLevel": "Najwyższy poziom",

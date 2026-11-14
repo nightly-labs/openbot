@@ -559,6 +559,7 @@ export const messages = {
   "mobile.agent.section.unassigned": "Агенты",
   "mobile.agent.section.moveFailed": "Не удалось переместить чат",
   "mobile.agent.section.moveTo": "Переместить в папку",
+  "mobile.agent.noMessages": "Сообщений пока нет",
   "mobile.agent.section.newInside": "Новая вложенная папка",
   "mobile.agent.section.moveFolder": "Переместить в",
   "mobile.agent.section.topLevel": "Верхний уровень",
