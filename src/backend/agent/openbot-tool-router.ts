@@ -1961,7 +1961,7 @@ export class OpenBotToolRouter {
       !this.#requestedByPerson(senderAgentId, params.turnId, executionThreadId)
     )
       return openBotToolFailure(
-        "Only a person's message, in your OpenBot chat or a thread they opened, can change, delete or run a workflow. Ask the user to request it there.",
+        "Only a person's message, in your OpenBot chat or a thread they opened, can change, delete or run a workflow. This turn did not start with one, and an answer to ask_user or ask_ui does not change that. Do not retry in this turn: ask the user to send the request there as a new message.",
       );
     // A read gives every workflow, its webhook URLs and its run outputs. The Team API hides these
     // from a member by agent access and admin rights, so a member's message does not get them here.
