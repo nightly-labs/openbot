@@ -292,7 +292,7 @@ function toFailure(error: unknown, request: AgentDatabaseStatement): AgentDataba
     return {
       kind: "sqlite",
       message:
-        "Nothing was saved: OpenBot cannot change the shared database file, because it or its folder (OpenBot/Shared/Data) is read-only or belongs to another user account. Reading still works. Tell the user that their user account needs permission to change that folder and the files in it.",
+        "Nothing was saved, because OpenBot does not have permission to change the shared tables file or its Data folder. The user account that runs OpenBot needs permission to change that folder and the files in it.",
       sqliteCode: code,
     };
   }
@@ -345,9 +345,10 @@ function rollBackHotJournal(request: AgentDatabaseStatement): Effect.Effect<void
  * A write connection that SQLite opened read-only stays read-only, and one that holds a replaced
  * file never sees the new one, so every later write fails until the app restarts (#9225). Both
  * connections of the file are closed, the owner gets back read and write access to the folder, the
- * file, and its journal, and the caller runs the write once more on a new connection. SQLite refused
- * the write before it changed anything, so the second run cannot save it twice. Bits are only added,
- * and `chmod` cannot change a file another account owns; that case keeps failing with its sentence.
+ * file, and its journal or WAL files, and the caller runs the write once more on a new connection.
+ * SQLite refused the write before it changed anything, so the second run cannot save it twice. Bits
+ * are only added, and `chmod` cannot change a file another account owns; that case keeps failing
+ * with its sentence.
  */
 function reopenWritable(request: AgentDatabaseStatement): Effect.Effect<void> {
   return Effect.sync(() => {
@@ -357,6 +358,8 @@ function reopenWritable(request: AgentDatabaseStatement): Effect.Effect<void> {
       [folder, 0o700],
       [request.databasePath, 0o600],
       [`${request.databasePath}-journal`, 0o600],
+      [`${request.databasePath}-wal`, 0o600],
+      [`${request.databasePath}-shm`, 0o600],
     ] as const) {
       try {
         accessSync(path, fileAccess.R_OK | fileAccess.W_OK);
