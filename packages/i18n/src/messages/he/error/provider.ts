@@ -211,6 +211,8 @@ export const messages = {
     "התשובה של המודל נקטעה או שלא הייתה תקינה. יש לשלוח את ההודעה שוב או לבחור מודל אחר.\n{detail}",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode לא הצליח לקרוא את החשיבה של המודל הזה ברמת המאמץ הזו. יש לבחור רמת מאמץ נמוכה יותר או מודל אחר, ואז לשלוח את ההודעה שוב.",
+  "error.provider.opencodeModelNotServed":
+    "ספק המודל לא מציע כרגע את המודל הזה לחשבון שלך. בחר מודל אחר ושלח את ההודעה שוב.",
   "error.provider.opencodeNetwork":
     "OpenCode לא הצליח להתחבר לספק המודלים. יש לבדוק את חיבור הרשת של המחשב שמריץ את OpenBot ואז לנסות שוב.\n{detail}",
   "error.provider.codexStateBusy":

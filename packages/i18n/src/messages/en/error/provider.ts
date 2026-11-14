@@ -219,6 +219,8 @@ export const messages = defineMessages("error.provider", {
     "The model's reply was cut off or was not valid. Send your message again, or choose another model.\n{detail}",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode could not read the reasoning of this model at this effort. Select a lower effort or another model, then send your message again.",
+  "error.provider.opencodeModelNotServed":
+    "The model provider does not offer this model to your account now. Choose another model, then send your message again.",
   "error.provider.opencodeNetwork":
     "OpenCode could not connect to the model provider. Check the network connection of the computer that runs OpenBot, then try again.\n{detail}",
   "error.provider.codexStateBusy":

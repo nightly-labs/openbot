@@ -234,6 +234,8 @@ export const messages = {
     "La respuesta del modelo se cortó o no era válida. Envía tu mensaje de nuevo o elige otro modelo.\n{detail}",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode no pudo leer el razonamiento de este modelo con este esfuerzo. Selecciona un esfuerzo menor u otro modelo y vuelve a enviar tu mensaje.",
+  "error.provider.opencodeModelNotServed":
+    "El proveedor del modelo no ofrece este modelo a tu cuenta ahora. Elige otro modelo y envía tu mensaje de nuevo.",
   "error.provider.opencodeNetwork":
     "OpenCode no pudo conectarse al proveedor del modelo. Comprueba la conexión de red del equipo que ejecuta OpenBot e inténtalo de nuevo.\n{detail}",
   "error.provider.codexStateBusy":
