@@ -99,11 +99,17 @@ function isOwn(message: AgentMessage): boolean {
 /**
  * True when the host's copy of a pending message has arrived. An earlier message with the same text is
  * not the copy. When the mark is no longer in the list, all the messages are later.
+ *
+ * The list holds only the newest messages, so the host's copy leaves it again as new messages come. A
+ * message that the host stored and whose mark left the list is delivered: its copy is newer than the
+ * mark, so it was in the list or left it with the mark. Without this, the pending row came back below
+ * the newest messages (#6773). An empty list is not loaded yet, so it tells nothing.
  */
-function delivered(pending: AgentDockPendingMessage, messages: readonly AgentMessage[]): boolean {
+export function pendingMessageDelivered(pending: AgentDockPendingMessage, messages: readonly AgentMessage[]): boolean {
   if (pending.messageId !== null && messages.some((message) => message.id === pending.messageId)) return true;
-  const start = pending.after === null ? 0 : messages.findIndex((message) => message.id === pending.after) + 1;
-  return messages.slice(start).some((message) => isOwn(message) && message.body.trim() === pending.text);
+  const mark = pending.after === null ? -1 : messages.findIndex((message) => message.id === pending.after);
+  if (pending.messageId !== null && pending.after !== null && mark < 0 && messages.length > 0) return true;
+  return messages.slice(mark + 1).some((message) => isOwn(message) && message.body.trim() === pending.text);
 }
 
 export function AgentDockChat(props: {
@@ -136,7 +142,9 @@ export function AgentDockChat(props: {
   const fades = createScrollFades();
   onCleanup(() => fades.stop());
   const messages = createMemo(() => props.chat.messages.filter(isDockMessage).slice(-VISIBLE_MESSAGES));
-  const pending = createMemo(() => props.pending.filter((message) => !delivered(message, props.chat.messages)));
+  const pending = createMemo(() =>
+    props.pending.filter((message) => !pendingMessageDelivered(message, props.chat.messages)),
+  );
   const agentSeat = () => (props.seat.kind === "agent" ? props.seat : undefined);
   const channel = () => (props.seat.kind === "channel" ? props.seat.channel : undefined);
   const name = () => (props.seat.kind === "agent" ? props.seat.agent.name : props.seat.channel.name);
@@ -379,7 +387,15 @@ export function AgentDockChat(props: {
                 {(message) => (
                   <Bubble align="end" variant="secondary" class="agent-dock-bubble" data-pending="">
                     <BubbleContent>
-                      <p class="agent-dock-text">{message.text}</p>
+                      {/* The same Markdown as the sent message, so a mention shows as its chip and not as markup. */}
+                      <div class="agent-dock-markdown message-markdown">
+                        <MarkdownMessageText
+                          body={message.text}
+                          agents={props.agents}
+                          onSelectAgent={(agentId) => props.onSelectAgent?.(agentId)}
+                          onOpenLink={(url) => props.onOpenLink?.(url)}
+                        />
+                      </div>
                     </BubbleContent>
                   </Bubble>
                 )}

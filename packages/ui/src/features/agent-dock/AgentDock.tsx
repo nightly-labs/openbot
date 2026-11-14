@@ -51,6 +51,7 @@ import {
   type AgentDockChatModel,
   type AgentDockChatVoice,
   type AgentDockPendingMessage,
+  pendingMessageDelivered,
 } from "./AgentDockChat";
 import { AgentDockShelf, type AgentDockShelfResult } from "./AgentDockShelf";
 import {
@@ -1109,6 +1110,27 @@ export function AgentDock(props: AgentDockProps) {
     () => props.closeRequest,
     (request, previous) => {
       if (request !== previous && previous !== undefined) untrack(() => closeChat(false));
+    },
+  );
+
+  /* A pending message leaves the state when its copy is delivered. The chat keeps only the newest
+     messages, so a pending message that stayed came back below them when its copy left (#6773). */
+  createEffect(
+    () => {
+      const id = state.shown;
+      const pending = id ? state.pending[id] : undefined;
+      if (!id || !pending?.length) return null;
+      const messages = props.chat(refOfKey(id)).messages;
+      const delivered = pending.filter((message) => pendingMessageDelivered(message, messages));
+      return delivered.length > 0 ? { id, keys: delivered.map((message) => message.key) } : null;
+    },
+    (found) => {
+      if (!found) return;
+      setState((draft) => {
+        draft.pending[found.id] = (draft.pending[found.id] ?? []).filter(
+          (message) => !found.keys.includes(message.key),
+        );
+      });
     },
   );
 
