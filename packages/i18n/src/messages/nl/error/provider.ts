@@ -207,6 +207,8 @@ export const messages = {
     "Het endpoint “{provider}” heeft een API-sleutel nodig. Voeg de sleutel toe bij Serverinstellingen → Aanbieders en probeer het daarna opnieuw.",
   "error.provider.opencodeKeyExpired":
     "Je OpenCode-API-sleutel is verlopen. Maak een nieuwe sleutel in OpenCode Console, plak hem in de OpenCode-instellingen en probeer het opnieuw.",
+  "error.provider.opencodeKeyRefused":
+    "OpenCode Go heeft je opgeslagen API-sleutel geweigerd. De sleutel is misschien verlopen. Maak een nieuwe sleutel in OpenCode Console, plak hem in de OpenCode-instellingen en probeer het opnieuw.",
   "error.provider.opencodeServiceFailure":
     "OpenCode kon deze beurt niet voltooien, omdat de lokale service is mislukt. Probeer het opnieuw. Blijft de fout, verbind OpenCode dan opnieuw in Instellingen.",
   "error.provider.opencodeRateLimited":

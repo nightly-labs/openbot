@@ -214,6 +214,8 @@ export const messages = {
     "El endpoint «{provider}» necesita una clave de API. Añade la clave en Ajustes del servidor → Proveedores y luego inténtalo de nuevo.",
   "error.provider.opencodeKeyExpired":
     "Tu clave de API de OpenCode caducó. Crea una clave nueva en OpenCode Console, pégala en los ajustes de OpenCode y luego inténtalo de nuevo.",
+  "error.provider.opencodeKeyRefused":
+    "OpenCode Go rechazó tu clave de API guardada. Puede que la clave haya caducado. Crea una clave nueva en OpenCode Console, pégala en los ajustes de OpenCode y luego inténtalo de nuevo.",
   "error.provider.opencodeServiceFailure":
     "OpenCode no pudo completar este turno porque falló su servicio local. Inténtalo de nuevo. Si el error continúa, vuelve a conectar OpenCode en Ajustes.",
   "error.provider.opencodeRateLimited":

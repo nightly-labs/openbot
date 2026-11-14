@@ -738,6 +738,11 @@ A keyless OpenCode still lists models whose provider has no sign-in. OpenCode 2.
 one with `-32000` "provider authentication required" and no provider ID. `OPENCODE_ACP_FLAVOR`
 maps that code to `error.provider.opencodeAuthRequired`, which names the provider from the model ID
 before its first `/` and lists the fixes: a Free model, a Go key, or `opencode auth login`.
+OpenCode 2.2.5 sends the same error, with no reason, when OpenCode Go refuses a key, such as an
+expired one (#9095). OpenBot sends its saved key only to OpenCode Go, so with a saved key and an
+`opencode-go/` model the client's `savedKey` option makes the flavor show
+`error.provider.opencodeKeyRefused`. With no saved key, a refused key and a missing key look the
+same, and the text stays `error.provider.opencodeAuthRequired`.
 
 #### Turns of a background subagent or shell command
 

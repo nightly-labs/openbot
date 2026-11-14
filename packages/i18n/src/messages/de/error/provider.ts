@@ -216,6 +216,8 @@ export const messages = {
     "Der Endpunkt „{provider}“ braucht einen API-Schlüssel. Füge den Schlüssel in Servereinstellungen → Anbieter hinzu und versuche es dann erneut.",
   "error.provider.opencodeKeyExpired":
     "Dein OpenCode-API-Schlüssel ist abgelaufen. Erstelle in der OpenCode Console einen neuen Schlüssel, füge ihn in den OpenCode-Einstellungen ein und versuche es dann erneut.",
+  "error.provider.opencodeKeyRefused":
+    "OpenCode Go hat deinen gespeicherten API-Schlüssel abgelehnt. Der Schlüssel ist vielleicht abgelaufen. Erstelle in der OpenCode Console einen neuen Schlüssel, füge ihn in den OpenCode-Einstellungen ein und versuche es dann erneut.",
   "error.provider.opencodeServiceFailure":
     "OpenCode konnte diesen Durchlauf nicht abschließen, da sein lokaler Dienst fehlgeschlagen ist. Versuche es erneut. Falls der Fehler weiter auftritt, verbinde OpenCode in den Einstellungen erneut.",
   "error.provider.opencodeRateLimited":

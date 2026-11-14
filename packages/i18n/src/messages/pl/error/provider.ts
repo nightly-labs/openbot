@@ -202,6 +202,8 @@ export const messages = {
     "Endpoint „{provider}” wymaga klucza API. Dodaj klucz w Ustawieniach serwera → Dostawcy, a potem spróbuj ponownie.",
   "error.provider.opencodeKeyExpired":
     "Twój klucz API OpenCode wygasł. Utwórz nowy klucz w OpenCode Console, wklej go w ustawieniach OpenCode, potem spróbuj ponownie.",
+  "error.provider.opencodeKeyRefused":
+    "OpenCode Go odrzucił Twój zapisany klucz API. Klucz mógł wygasnąć. Utwórz nowy klucz w OpenCode Console, wklej go w ustawieniach OpenCode, potem spróbuj ponownie.",
   "error.provider.opencodeServiceFailure":
     "OpenCode nie ukończył tej tury, ponieważ jego lokalna usługa uległa awarii. Spróbuj ponownie. Jeśli błąd się powtarza, połącz ponownie OpenCode w Ustawieniach.",
   "error.provider.opencodeRateLimited":

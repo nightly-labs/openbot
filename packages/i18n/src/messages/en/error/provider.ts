@@ -199,6 +199,8 @@ export const messages = defineMessages("error.provider", {
     'The endpoint "{provider}" needs an API key. Add the key in Server settings → Providers, then try again.',
   "error.provider.opencodeKeyExpired":
     "Your OpenCode API key expired. Create a new key in OpenCode Console, paste it in the OpenCode settings, then try again.",
+  "error.provider.opencodeKeyRefused":
+    "OpenCode Go refused your saved API key. The key may have expired. Create a new key in OpenCode Console, paste it in the OpenCode settings, then try again.",
   "error.provider.opencodeServiceFailure":
     "OpenCode could not complete this turn because its local service failed. Try again. If the error continues, reconnect OpenCode in Settings.",
   "error.provider.opencodeRateLimited":

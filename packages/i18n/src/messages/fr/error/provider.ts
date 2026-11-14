@@ -222,6 +222,8 @@ export const messages = {
     "Le point de terminaison « {provider} » a besoin d’une clé d’API. Ajoutez la clé dans Réglages du serveur → Fournisseurs, puis réessayez.",
   "error.provider.opencodeKeyExpired":
     "Votre clé d’API OpenCode a expiré. Créez une nouvelle clé dans OpenCode Console, collez-la dans les réglages d’OpenCode, puis réessayez.",
+  "error.provider.opencodeKeyRefused":
+    "OpenCode Go a refusé votre clé d’API enregistrée. La clé a peut-être expiré. Créez une nouvelle clé dans OpenCode Console, collez-la dans les réglages d’OpenCode, puis réessayez.",
   "error.provider.opencodeServiceFailure":
     "OpenCode n’a pas pu terminer ce tour, car son service local a échoué. Réessayez. Si l’erreur continue, reconnectez OpenCode dans les réglages.",
   "error.provider.opencodeRateLimited":

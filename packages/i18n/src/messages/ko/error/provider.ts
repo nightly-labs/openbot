@@ -205,6 +205,8 @@ export const messages = {
     '엔드포인트 "{provider}"에는 API 키가 필요해요. 서버 설정 → 제공자에서 키를 추가한 다음 다시 시도해 주세요.',
   "error.provider.opencodeKeyExpired":
     "OpenCode API 키가 만료되었어요. OpenCode Console에서 새 키를 만들어 OpenCode 설정에 붙여넣은 후 다시 시도해 주세요.",
+  "error.provider.opencodeKeyRefused":
+    "OpenCode Go가 저장된 API 키를 거부했어요. 키가 만료되었을 수 있어요. OpenCode Console에서 새 키를 만들어 OpenCode 설정에 붙여넣은 후 다시 시도해 주세요.",
   "error.provider.opencodeServiceFailure":
     "로컬 서비스 오류로 OpenCode가 이 턴을 완료하지 못했어요. 다시 시도해 주세요. 오류가 계속되면 설정에서 OpenCode를 다시 연결하세요.",
   "error.provider.opencodeRateLimited":
