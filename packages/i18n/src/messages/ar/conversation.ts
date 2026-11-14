@@ -133,7 +133,6 @@ export const messages = {
   "conversation.voice.phase.thinking": "يفكّر",
   "conversation.voice.phase.speaking": "يتحدث",
   "conversation.voice.phase.offline": "غير متصل",
-  "conversation.voice.speakNow": "تحدّث الآن",
   "conversation.voice.mute": "كتم الميكروفون",
   "conversation.voice.interrupt": "مقاطعة",
   "conversation.voice.start": "بدء محادثة صوتية",

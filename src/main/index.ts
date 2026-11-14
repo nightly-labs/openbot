@@ -6,7 +6,6 @@ import {
   type AgentSummary,
   type AppLogoColor,
   type CentralAuthState,
-  DEFAULT_APP_LOGO_COLOR,
   DEFAULT_QUIT_GUARD,
   type HostStatus,
   IPC_ENDPOINTS,
@@ -52,12 +51,14 @@ import { requestNotificationPermission, showRetainedNotification } from "./deskt
 import { guardDevelopmentOutput } from "./development-output";
 import {
   developmentUserDataName,
+  developmentWorktreeColor,
   readAnalyticsCaptureUrl,
   readDevelopmentInstanceId,
   readDevelopmentProfile,
   readDevelopmentRemoteDebuggingPort,
   shouldAutoStartHost,
 } from "./development-profile";
+import { tintDevelopmentIcon } from "./development-worktree-icon";
 import { stopStuckExitAfterLimit } from "./exit-watchdog";
 import { filePreviewPages } from "./file-preview-pages";
 import { hostAllowsTenantLaunch } from "./host-update-coordinator";
@@ -631,22 +632,27 @@ let appIconColorImage: NativeImage | undefined;
 /**
  * A packaged release on macOS shows the icon of its bundle in the Dock. On macOS 26 that icon comes
  * from the Icon Composer catalog, with glass and with dark, clear and tinted versions; `dock.setIcon`
- * would replace it with one flat image until the app quits.
+ * would replace it with one flat image until the app quits. So the Dock keeps it only until the user
+ * chooses a logo color: a chosen color, the default one included, must not turn dark with the system.
  */
 const dockShowsBundleIcon = process.platform === "darwin" && app.isPackaged && appVariant === "production";
-/** Electron cannot give the Dock back to the bundle icon, so after one change each change sets an image. */
-let dockIconChanged = false;
 let backgroundTray: BackgroundTray | null = null;
 
 /**
  * Shows the chosen logo color on the Dock icon, or on each window icon where there is no Dock. A dev
- * or preview build keeps the icon of its build, so it is not mistaken for the release. macOS has no
+ * or preview build keeps the icon of its build, so it is not mistaken for the release; a dev build
+ * from source shows that icon in the color of its worktree. macOS has no
  * alternate app icon API, so when the app is closed the Dock shows the icon inside the app bundle:
  * changing that file would break the code signature.
  */
-function applyAppIconColor(color: AppLogoColor): void {
+function applyAppIconColor(color: AppLogoColor, chosen: boolean): void {
+  const worktreeIcon = developmentWorktreeIcon();
+  if (worktreeIcon) {
+    showAppIcon(worktreeIcon);
+    return;
+  }
   if (appVariant !== "production") return;
-  if (dockShowsBundleIcon && color === DEFAULT_APP_LOGO_COLOR && !dockIconChanged) return;
+  if (dockShowsBundleIcon && !chosen) return;
   const icon = nativeImage.createFromPath(
     resolveLogoColorIconPath({
       color,
@@ -657,8 +663,24 @@ function applyAppIconColor(color: AppLogoColor): void {
     }),
   );
   if (icon.isEmpty()) return;
+  showAppIcon(icon);
+}
+
+let developmentIcon: NativeImage | null | undefined;
+/**
+ * A dev build from source shows the dev icon in the color of its worktree, so the apps of two
+ * worktrees that are open at the same time are easy to tell apart in the Dock and the app switcher.
+ */
+function developmentWorktreeIcon(): NativeImage | null {
+  if (developmentIcon !== undefined) return developmentIcon;
+  const icon = appVariant === "dev" && !app.isPackaged ? nativeImage.createFromPath(appIconPath) : null;
+  developmentIcon =
+    icon && !icon.isEmpty() ? tintDevelopmentIcon(icon, developmentWorktreeColor(resolve(__dirname, "../.."))) : null;
+  return developmentIcon;
+}
+
+function showAppIcon(icon: NativeImage): void {
   if (process.platform === "darwin") {
-    dockIconChanged = true;
     app.dock?.setIcon(icon);
     return;
   }
@@ -1478,7 +1500,8 @@ if (!hasSingleInstanceLock) {
       });
       // Set the Dock icon before `dock.show()` below. A development build runs the stock Electron.app,
       // so until this call its Dock tile shows the Electron logo.
-      if (process.platform === "darwin" && !localServerChild && !dockShowsBundleIcon) app.dock?.setIcon(appIconPath);
+      if (process.platform === "darwin" && !localServerChild && !dockShowsBundleIcon)
+        app.dock?.setIcon(developmentWorktreeIcon() ?? appIconPath);
       if (!(await runCauseEffect(hostAllowsTenantLaunch()))) {
         app.quit();
         return;
@@ -1810,9 +1833,9 @@ if (!hasSingleInstanceLock) {
         }
         placeWindowButtons(BrowserWindow.getAllWindows());
       });
-      applyAppIconColor(logoColor.preference.color);
+      applyAppIconColor(logoColor.preference.color, logoColor.chosen);
       logoColor.subscribe((preference) => {
-        applyAppIconColor(preference.color);
+        applyAppIconColor(preference.color, logoColor.chosen);
         for (const window of BrowserWindow.getAllWindows()) {
           sendToRenderer(window, IPC_ENDPOINTS.app.appLogoColorPreference, preference);
         }

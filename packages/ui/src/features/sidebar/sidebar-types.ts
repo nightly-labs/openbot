@@ -92,6 +92,8 @@ export interface SidebarProps {
   chatHistory?: SidebarChatHistory | undefined;
   /** A new OpenBot version of the server. The header shows a button that opens its update. */
   serverUpdate?: { version: string; running: boolean; onOpen: () => void } | undefined;
+  /** Content at the end of the top bar, after its buttons. The desktop dev build puts the worktree branch here. */
+  topbarDetail?: JSX.Element | undefined;
   agents: AgentProfile[];
   activeAgentId: string;
   showPeople?: boolean | undefined;

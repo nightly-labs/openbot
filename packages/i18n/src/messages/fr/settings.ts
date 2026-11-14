@@ -22,6 +22,7 @@ export const messages = {
   "settings.interfaceFont.title": "Police de l’interface",
   "settings.interfaceFont.description": "La police des menus, des discussions et des réglages.",
   "settings.interfaceFont.default": "Par défaut (Inter)",
+  "settings.interfaceFont.defaultSystem": "Police système",
   "settings.codeFont.title": "Police du code",
   "settings.codeFont.description": "La police du code, des terminaux et des chemins de fichier.",
   "settings.codeFont.default": "Par défaut",
@@ -64,6 +65,12 @@ export const messages = {
   "settings.chatColor.red": "Rouge",
   "settings.chatColor.green": "Vert",
   "settings.chatColor.blue": "Bleu",
+  "settings.bubbleStyle.title": "Vos bulles",
+  "settings.bubbleStyle.description":
+    "Dans une discussion avec un agent, vos bulles prennent la couleur de l'agent. Vous seul la voyez.",
+  "settings.bubbleStyle.solid": "Plein",
+  "settings.bubbleStyle.tint": "Teinte",
+  "settings.bubbleStyle.classic": "Classique",
   // The Settings window, General tab.
   "settings.appBehavior.title": "Comportement de l’application",
   "settings.conversations.title": "Conversations",
@@ -296,7 +303,7 @@ export const messages = {
     "Activé : les métadonnées d’utilisation et de fiabilité sont envoyées aux services analytiques auto-hébergés d’OpenBot avec l’identifiant et l’e-mail de votre compte. Désactivé : les mêmes métadonnées sont envoyées avec un identifiant d’installation aléatoire uniquement. Les conversations, fichiers et prompts ne sont jamais envoyés. Ce réglage s’applique à ce navigateur.",
   // The Settings window shell: its tab list, headers and save bar.
   "settings.tab.general.title": "Général",
-  "settings.tab.general.description": "Contrôler le comportement d’OpenBot sur cet ordinateur.",
+  "settings.tab.general.description": "Choisir le fonctionnement des discussions et ce qu’OpenBot partage.",
   "settings.tab.agents.title": "Agents",
   "settings.tab.agents.description":
     "Choisir ce que les agents de cet ordinateur peuvent faire quand vous ne le réglez pas pour un agent.",
@@ -323,6 +330,14 @@ export const messages = {
   "settings.tab.hostedServers.title": "Serveurs hébergés",
   "settings.tab.hostedServers.description":
     "Créer des serveurs OpenBot qui fonctionnent quand cet ordinateur est éteint.",
+  "settings.tab.appearance.description": "Choisir le thème, les couleurs, la langue et les polices.",
+  "settings.tab.appBehavior.description": "Choisir comment OpenBot démarre et fonctionne sur cet ordinateur.",
+  "settings.appearance.colorsTitle": "Couleurs",
+  "settings.appearance.textTitle": "Langue et texte",
+  "settings.appBehavior.startTitle": "Démarrage et sortie",
+  "settings.appBehavior.backgroundTitle": "Arrière-plan",
+  "settings.sections.group.account": "Compte",
+  "settings.sections.group.thisComputer": "Cet ordinateur",
   "settings.sections.label": "Sections des réglages",
   "settings.panel.resize": "Redimensionner le panneau de droite",
   "settings.preferences.loadFailed": "Impossible de charger vos réglages.",
