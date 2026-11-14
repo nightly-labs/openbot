@@ -268,9 +268,11 @@ const READY_SEARCH_RESULTS = 3;
 /**
  * A search that names a workflow makes every workflow tool ready, and only them: an agent that builds
  * a workflow also edits, runs, reads and deletes it. A routine is not a workflow step, so a query
- * such as "create workflow routine" does not also load the routine schemas and guidance.
+ * such as "create workflow routine" does not also load the routine schemas and guidance. The app and
+ * the release notes call the Workflows board the Canvas, so users ask for a canvas; without these words
+ * a search found no workflow tool and the agent said that it could not make one (#9367).
  */
-const WORKFLOW_WORDS = new Set(["workflow", "workflows"]);
+const WORKFLOW_WORDS = new Set(["workflow", "workflows", "canvas", "canvases"]);
 const WORKFLOW_TOOLS = BUILTIN_TOOL_CATALOG.filter(
   (entry) =>
     entry.namespace === OPENBOT_DYNAMIC_TOOLS.name && words(entry.tool).some((word) => WORKFLOW_WORDS.has(word)),

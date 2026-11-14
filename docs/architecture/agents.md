@@ -314,8 +314,8 @@ changed, on this computer and on a joined host.
 - Agents use workflows with six `openbot` tools (`workflow-tools.ts`): `list_workflows`,
   `read_workflow`, `edit_workflow`, `delete_workflow`, `run_workflow` and `read_workflow_runs`. They
   are not in the visible set, so before `tool_search` finds them they cost only their names. A search
-  word `workflow` or `workflows` gives the schemas of all six, and no other schema or guidance, so one
-  search covers a build, a run and a delete. A read gives only the runtime fields of each node and no
+  word `workflow`, `workflows`, `canvas` or `canvases` gives the schemas of all six, and no other schema or
+  guidance, so one search covers a build, a run and a delete. Users call the Workflows board the Canvas. A read gives only the runtime fields of each node and no
   positions, unless the agent asks for the layout; then each node has its position and card size. A run read gives each step's kind and a short label
   (the agent id, prompt, rule or question), so the agent does not read the workflow again.
   `edit_workflow` takes a list of operations (add, update, move, remove, connect, disconnect) and saves

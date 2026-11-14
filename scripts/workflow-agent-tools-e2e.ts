@@ -203,6 +203,13 @@ try {
       !(search.guidance ?? []).some((text) => text.includes("Manage scheduled work")),
     { ready, guidance: search.guidance },
   );
+  // Users call the Workflows board the Canvas. A canvas search found no workflow tool (#9367).
+  const canvas = discoverTools(params("tool_search", { query: "create a canvas" }), "claude");
+  check(
+    "a canvas search gives all 6 workflow tools with schemas",
+    canvas.tools.filter((tool) => tool.name.includes("workflow") && "inputSchema" in tool).length === 6,
+    canvas.tools.map((tool) => tool.name),
+  );
   const mixed = discoverTools(params("tool_search", { queries: ["workflow", "openbot_browser.snapshot"] }), "codex");
   check(
     "a workflow search keeps the schema of a tool that another query names exactly",
