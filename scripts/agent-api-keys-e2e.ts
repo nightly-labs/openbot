@@ -615,6 +615,27 @@ try {
     assert.equal(await password(status.id, "https://status.example.com"), "e2e-status-new-password");
     assert.equal(await password(billing.id, "https://billing.example.com"), "e2e-billing-password");
 
+    // A login that the user keeps from this agent still makes the agent's new login for this agent only.
+    const kept = await Effect.runPromise(
+      vault.save({
+        kind: "login",
+        id: null,
+        website: "admin.example.com",
+        username: "blake",
+        password: "e2e-admin-password",
+        notes: "",
+        agents: ["agent-3"],
+      }),
+    );
+    const keptId = kept.items.find((item) => item.kind === "login" && item.website === "admin.example.com")?.id;
+    const admin = await typeLogin("https://admin.example.com", "blake", "e2e-admin-agent-password");
+    assert.deepEqual([admin.created, admin.changed], [true, true]);
+    assert.notEqual(admin.id, keptId);
+    assert.deepEqual(vault.state().items.find((item) => item.id === admin.id)?.agents, [AGENT]);
+    assert.equal(await password(status.id, "https://status.example.com"), "e2e-status-new-password");
+    assert.ok(await Effect.runPromise(vault.items.delete(admin.id, AGENT)));
+    assert.ok(keptId && (await Effect.runPromise(vault.delete(keptId))));
+
     // www.example.com is the same host as example.com.
     const apex = await userLogin("example.com", "ada", "e2e-apex-password");
     const www = await typeLogin("https://www.example.com", "ada", "e2e-www-password");

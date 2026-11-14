@@ -560,7 +560,7 @@ export class VaultService {
         usable.find((item) => loginHost(item.website) === loginHost(website)) ??
         usable.find((item) => item.password === login.password);
       // The user keeps this login from this agent, so the agent's copy is for this agent only.
-      const hidden = usable.length === 0 && record.logins.some(matches);
+      const hidden = !existing && record.logins.some((item) => !vaultItemAllows(item, agent.id) && matches(item));
       if (existing?.password === login.password) {
         outcome.saved = {
           id: existing.id,
