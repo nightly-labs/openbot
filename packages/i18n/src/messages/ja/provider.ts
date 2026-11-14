@@ -120,6 +120,8 @@ export const messages = {
   "provider.picker.download": "{name} のダウンロード",
   "provider.picker.search": "モデルを検索",
   "provider.picker.noMatches": "検索に一致するモデルはありません。",
+  "provider.picker.openrouterNoMatches":
+    "検索に一致するモデルはありません。openrouter.ai のプライバシー、プロバイダー、ガードレールの設定によって、このリストのモデルが非表示になることがあります。",
   "provider.picker.olderModels": "以前のモデル",
   "provider.picker.olderModelsList": "{name} の以前のモデル",
   "provider.picker.noModels": "{name} で利用できるモデルはありません。",

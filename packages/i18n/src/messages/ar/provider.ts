@@ -136,6 +136,8 @@ export const messages = {
   "provider.picker.download": "تنزيل {name}",
   "provider.picker.search": "البحث في النماذج",
   "provider.picker.noMatches": "لا توجد نماذج تطابق بحثك.",
+  "provider.picker.openrouterNoMatches":
+    "لا توجد نماذج تطابق بحثك. يمكن أن تخفي إعدادات الخصوصية والمزوّدين والحواجز الوقائية في openrouter.ai بعض النماذج من هذه القائمة.",
   "provider.picker.olderModels": "نماذج أقدم",
   "provider.picker.olderModelsList": "نماذج {name} الأقدم",
   "provider.picker.noModels": "لا تتوفر نماذج من {name}.",

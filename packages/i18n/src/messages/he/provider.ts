@@ -116,6 +116,8 @@ export const messages = {
   "provider.picker.download": "הורדת {name}",
   "provider.picker.search": "חיפוש מודלים",
   "provider.picker.noMatches": "אין מודלים שתואמים לחיפוש.",
+  "provider.picker.openrouterNoMatches":
+    "אין מודלים שתואמים לחיפוש. הגדרות הפרטיות, הספקים ומגבלות ההגנה שלך ב-openrouter.ai יכולות להסתיר מודלים מהרשימה הזו.",
   "provider.picker.olderModels": "מודלים ישנים",
   "provider.picker.olderModelsList": "מודלים ישנים של {name}",
   "provider.picker.noModels": "אין מודלים זמינים מ-{name}.",

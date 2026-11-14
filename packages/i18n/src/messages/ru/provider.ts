@@ -134,6 +134,8 @@ export const messages = {
   "provider.picker.download": "Загрузка {name}",
   "provider.picker.search": "Поиск моделей",
   "provider.picker.noMatches": "Моделей по вашему запросу не найдено.",
+  "provider.picker.openrouterNoMatches":
+    "Моделей по вашему запросу не найдено. Настройки конфиденциальности, провайдеров и ограничений (guardrails) на openrouter.ai могут скрывать модели из этого списка.",
   "provider.picker.olderModels": "Старые модели",
   "provider.picker.olderModelsList": "Старые модели {name}",
   "provider.picker.noModels": "У {name} нет доступных моделей.",
