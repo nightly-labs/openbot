@@ -11,7 +11,7 @@ import { ChannelAvatar } from "@openbot/ui/features/channels/ChannelAvatar";
 import { ChannelStoppedTasks } from "@openbot/ui/features/channels/ChannelStoppedTasks";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createStore, For, Show } from "solid-js";
-import { createSidePanelWidth, saveSidePanelWidth } from "../../components/side-panel-width";
+import { createSidePanelWidth, readSidePanelWidth, saveSidePanelWidth } from "../../components/side-panel-width";
 import { AgentMemoriesSettings } from "../conversation/AgentMemoriesSettings";
 import { AgentRoutinesSettings } from "../conversation/AgentRoutinesSettings";
 import type { ConversationChannelSettingsPaneProps } from "../conversation/conversation-types";
@@ -264,6 +264,7 @@ export function ChannelSettingsPane(
   return (
     <SettingsPanel
       onResizeEnd={saveSidePanelWidth}
+      preferredWidth={readSidePanelWidth}
       id="channel-side-panel"
       label={t("channel.panel.label")}
       width={panelWidth()}

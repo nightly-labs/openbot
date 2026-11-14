@@ -32,7 +32,6 @@ import { MediaFilePreview } from "./MediaFilePreview";
 
 /** The side panel has one width for all its panes, so this pane has the smallest width of the settings pane. */
 const PANEL_MIN = SETTINGS_PANEL_DEFAULT;
-const PANEL_MAX = 1600;
 const TEXT_LIMIT = 1_000_000;
 /** Longer text shows as plain text, so the panel stays responsive. */
 const HIGHLIGHT_LIMIT = 200_000;
@@ -45,7 +44,8 @@ const HIGHLIGHT_LINE_LIMIT = 5_000;
 const BLOB_PREVIEW_KINDS = new Set<FilePreview["previewKind"]>(["image", "pdf", "audio", "video"]);
 
 interface FilePreviewPanelProps {
-  readWidth: (fallback: number, min: number, max: number) => number;
+  /** The shared width of the side panel: the width from the last drag, or the default. */
+  readWidth: () => number;
   onResizeEnd: (width: number) => void;
   onResetWidth: () => void;
   readWrapLines: () => boolean;
@@ -60,7 +60,6 @@ interface FilePreviewPanelProps {
   /** A workspace folder. The panel lists it instead of a file. */
   directory?: WorkspaceDirectory | null;
   agents: AgentProfile[];
-  defaultWidth: () => number;
   maxWidth: () => number;
   onWidthChange: (width: number) => void;
   onOpenLink: (url: string) => void;
@@ -105,8 +104,7 @@ interface FilePreviewPanelProps {
 
 export default function FilePreviewPanel(props: FilePreviewPanelProps) {
   const { t, format } = useText();
-  const defaultPanelWidth = () => Math.round(Math.min(PANEL_MAX, Math.max(PANEL_MIN, props.defaultWidth())));
-  const [panelWidth, setPanelWidth] = createSignal(props.readWidth(defaultPanelWidth(), PANEL_MIN, PANEL_MAX));
+  const [panelWidth, setPanelWidth] = createSignal(props.readWidth());
   const [previewUrl, setPreviewUrl] = createSignal<string | null>(null);
   // The panel mounts when a file opens, so it has to paint its closed state
   // first. Two frames guarantee that paint before the open state applies.
@@ -213,8 +211,7 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
 
   // When the chat gets wider again, the panel goes back to the width from the last drag.
   const resizeDefaultPanel = () => {
-    const preferredWidth = props.readWidth(defaultPanelWidth(), PANEL_MIN, PANEL_MAX);
-    setPanelWidth(Math.round(Math.min(props.maxWidth(), Math.max(PANEL_MIN, preferredWidth))));
+    setPanelWidth(Math.round(Math.min(props.maxWidth(), Math.max(PANEL_MIN, props.readWidth()))));
   };
 
   return (
@@ -231,7 +228,7 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
         controls="file-preview-panel"
         direction="right"
         value={panelWidth()}
-        defaultValue={defaultPanelWidth()}
+        defaultValue={PANEL_MIN}
         min={PANEL_MIN}
         max={props.maxWidth}
         onResize={setPanelWidth}
@@ -239,7 +236,7 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
         onParentResize={resizeDefaultPanel}
         onReset={() => {
           props.onResetWidth();
-          setPanelWidth(defaultPanelWidth());
+          setPanelWidth(props.readWidth());
         }}
       />
       <header class="file-preview-header">

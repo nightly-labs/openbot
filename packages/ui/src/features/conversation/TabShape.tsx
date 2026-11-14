@@ -82,8 +82,12 @@ export function TabShape(props: {
     const place = () => {
       cancelAnimationFrame(frame);
       frame = 0;
-      // Where the row is not on the card, the shape does not show and nothing is measured.
-      if (getComputedStyle(element).display === "none") return;
+      // Where the row is not on the card, the shape does not show and nothing is measured. When it shows
+      // again, it starts on its tab and does not slide from an old place.
+      if (getComputedStyle(element).display === "none") {
+        hide();
+        return;
+      }
       watchList();
       // New tabs need an observer too. A removed tab is not observed again, so the observer does not keep it.
       for (const part of observed) {
@@ -160,6 +164,9 @@ export function TabShape(props: {
     const observed = new Set<Element>();
     const changes = new MutationObserver(changed);
     changes.observe(row, { subtree: true, childList: true, attributes: true, attributeFilter: WATCHED_ATTRIBUTES });
+    // The transparent window hides the shape (`window.css`), and no change in the row tells when it ends.
+    const appearance = new MutationObserver(schedule);
+    appearance.observe(document.documentElement, { attributes: true, attributeFilter: ["data-openbot-window-glass"] });
     sizes.observe(row);
     // A tab that opens, closes or moves animates. Its place is final at the end.
     row.addEventListener("transitionend", schedule);
@@ -168,6 +175,7 @@ export function TabShape(props: {
     return () => {
       cancelAnimationFrame(frame);
       changes.disconnect();
+      appearance.disconnect();
       sizes.disconnect();
       list?.removeEventListener("scroll", place);
       row.removeEventListener("transitionend", schedule);

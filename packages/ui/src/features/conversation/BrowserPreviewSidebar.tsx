@@ -8,7 +8,6 @@ import { createEffect, createMemo, createSignal, createStore, For, onSettled, Sh
 
 /** The side panel has one width for all its panes, so this pane has the smallest width of the settings pane. */
 const BROWSER_PANEL_MIN = SETTINGS_PANEL_DEFAULT;
-const BROWSER_PANEL_MAX = 1600;
 /** How often the preview of a tab that loads, or that an agent acts in, shows the page again. */
 const BUSY_CAPTURE_INTERVAL = 3000;
 /** How often the preview of another tab shows the page again. */
@@ -16,7 +15,8 @@ const IDLE_CAPTURE_INTERVAL = 20_000;
 
 interface BrowserPreviewSidebarProps {
   capturePreview?: ((tabId: string) => Promise<BrowserPreview>) | undefined;
-  readWidth: (fallback: number, min: number, max: number) => number;
+  /** The shared width of the side panel: the width from the last drag, or the default. */
+  readWidth: () => number;
   saveWidth: (width: number) => void;
   resetWidth: () => void;
   tabs: BrowserTab[];
@@ -25,7 +25,6 @@ interface BrowserPreviewSidebarProps {
   hidden: boolean;
   suspended: boolean;
   contextKey: string;
-  defaultWidth: () => number;
   maxWidth: () => number;
   onWidthChange: (width: number) => void;
   onOpenTab: (tabId: string, trigger: HTMLButtonElement) => void;
@@ -41,11 +40,7 @@ export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps)
     const conversation = panel.closest(".conversation-panel");
     return conversation ? holdFlag(conversation, "browser-side-panel") : undefined;
   });
-  const defaultPanelWidth = () =>
-    Math.round(Math.min(BROWSER_PANEL_MAX, Math.max(BROWSER_PANEL_MIN, props.defaultWidth())));
-  const [panelWidth, setPanelWidth] = createSignal(
-    props.readWidth(defaultPanelWidth(), BROWSER_PANEL_MIN, BROWSER_PANEL_MAX),
-  );
+  const [panelWidth, setPanelWidth] = createSignal(props.readWidth());
   createEffect(
     () => panelWidth(),
     (width) => {
@@ -59,13 +54,12 @@ export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps)
 
   // When the chat gets wider again, the panel goes back to the shared width, which another pane can set.
   const resizeDefaultPanel = () => {
-    const preferredWidth = props.readWidth(defaultPanelWidth(), BROWSER_PANEL_MIN, BROWSER_PANEL_MAX);
-    setPanelWidth(Math.round(Math.min(props.maxWidth(), Math.max(BROWSER_PANEL_MIN, preferredWidth))));
+    setPanelWidth(Math.round(Math.min(props.maxWidth(), Math.max(BROWSER_PANEL_MIN, props.readWidth()))));
   };
 
   const resetPanelWidth = () => {
     props.resetWidth();
-    setPanelWidth(defaultPanelWidth());
+    setPanelWidth(props.readWidth());
   };
 
   return (
@@ -82,7 +76,7 @@ export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps)
         controls="browser-side-panel"
         direction="right"
         value={panelWidth()}
-        defaultValue={defaultPanelWidth()}
+        defaultValue={BROWSER_PANEL_MIN}
         min={BROWSER_PANEL_MIN}
         max={props.maxWidth}
         onResize={resizePanel}

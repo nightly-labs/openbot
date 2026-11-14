@@ -33,7 +33,7 @@ import { agentFilesLinkValue } from "@openbot/ui/features/files/AgentFilesView";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, createStore, Show, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
-import { createSidePanelWidth, saveSidePanelWidth } from "../../components/side-panel-width";
+import { createSidePanelWidth, readSidePanelWidth, saveSidePanelWidth } from "../../components/side-panel-width";
 import type { SkillCatalogCalls } from "../../skills-port";
 import { agentSkillCalls, skillsPort } from "../../skills-port";
 import type { BrowserProfileCalls } from "../browser/browser-profiles-port";
@@ -508,6 +508,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       width={panelWidth()}
       onResize={setPanelWidth}
       onResizeEnd={saveSidePanelWidth}
+      preferredWidth={readSidePanelWidth}
       onUnshownSaveError={(message) =>
         actionToast.error(message, {
           id: "agent-settings-save-failed",

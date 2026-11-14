@@ -614,7 +614,6 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                 preview={file().preview}
                 directory={file().directory ?? null}
                 agents={props.agents}
-                defaultWidth={() => SIDE_PANEL_DEFAULT}
                 maxWidth={sidePanelMaxWidth}
                 onWidthChange={setSidePanelWidth}
                 onOpenLink={(url) => void openExternalMessageUrl(url)}
@@ -729,7 +728,6 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
           hidden={browserExpandedOpen()}
           suspended={props.browserVisibilitySuspended || props.globalOverlayOpen || props.remoteDesktopVisible}
           contextKey={`${props.server?.id ?? "local"}:${props.agent?.id ?? ""}`}
-          defaultWidth={() => SIDE_PANEL_DEFAULT}
           maxWidth={sidePanelMaxWidth}
           onWidthChange={setSidePanelWidth}
           capturePreview={props.runtime?.browser.capturePreview}
