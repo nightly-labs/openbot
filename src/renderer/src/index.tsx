@@ -7,6 +7,7 @@ import "./selection-copy";
 import { App } from "./App";
 import { startActionSounds } from "./action-sounds";
 import { syncAppearance } from "./appearance-choice";
+import { watchDevWorktree } from "./dev-worktree";
 import { readChatWindowTarget } from "./features/window/chat-window";
 import { syncLogoColor } from "./logo-color";
 import { startRendererTiming } from "./renderer-timing";
@@ -23,6 +24,7 @@ performance.mark("openbot:renderer-start");
 installPointerFocusGuard();
 syncAppearance({ windowGlass: true });
 syncLogoColor();
+watchDevWorktree();
 startActionSounds();
 startRendererTiming();
 

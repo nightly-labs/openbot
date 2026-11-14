@@ -1,6 +1,7 @@
 import { installPointerFocusGuard } from "@openbot/ui/pointer-focus";
 import { render } from "@solidjs/web";
 import { syncAppearance } from "./appearance-choice";
+import { watchDevWorktree } from "./dev-worktree";
 import { AgentDockSurface } from "./features/agent-dock/AgentDockSurface";
 import { BrowserDockSurface } from "./features/browser/BrowserDockSurface";
 import { ComputerUseHighlightSurface } from "./features/computer-use/ComputerUseHighlightSurface";
@@ -30,6 +31,7 @@ if (surface) document.documentElement.dataset.surface = surface;
 // helper windows change the theme at once, with no sweep.
 if (surface !== "dynamic-island") syncAppearance({ sweep: false });
 syncLogoColor();
+watchDevWorktree();
 // The helper windows are not inside `App`, so each gets the language setting of its own. They use
 // the same preload and the same trusted-origin IPC gate as the main window, and main already sends
 // every language change to every window.
