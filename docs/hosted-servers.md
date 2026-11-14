@@ -1453,18 +1453,24 @@ below, but with `desired_state` and `observed_state` of before the move. On 2026
 24 GB took 9 minutes; a restart timer of boat started OpenBot during it, and tar stopped the export.
 The export now stops that timer.
 
+`move` sets `size` to `HOSTED_PLAN_SIZE` (`small` for Starter), so the statement writes the boat type of
+the sandbox again: the `type` that boat shows for the sandbox (`default` for a Starter sandbox from
+2026-11-14 or later, `small` before). Without it, a Starter row on a `default` sandbox shows 12 GB of
+storage and an almost full disk.
+
 ```sql
 UPDATE hosted_servers SET provider_sandbox_id = retired_sandbox_id, retired_sandbox_id = NULL,
-  operator_host = NULL, desired_state = CASE WHEN desired_state = 'running' THEN 'idle' ELSE desired_state END,
+  operator_host = NULL, size = '<boat type of the sandbox>',
+  desired_state = CASE WHEN desired_state = 'running' THEN 'idle' ELSE desired_state END,
   observed_state = 'stopped', updated_at = <now in ms>
 WHERE server_id = '<server ID>' AND operator_host IS NOT NULL AND retired_sandbox_id IS NOT NULL
   AND desired_state != 'deleted';
 ```
 
 A server whose plan ended on the VPS keeps `stopped`, so the rollback does not start it. When the
-plan changed while the server ran on the VPS, the sandbox still has the machine of the old plan and
-the row has the `size` of the new plan. In that case also write `pending_size = size` in the
-statement, so that the resume changes the machine, as it does after a plan change on boat. Not
+plan changed while the server ran on the VPS, the sandbox still has the machine of the old plan. In
+that case also write `pending_size = '<HOSTED_BOAT_PLAN_SIZE of the new plan>'` in the statement when it
+is not the boat type of the sandbox, so that the resume changes the machine, as it does after a plan change on boat. Not
 tested: a rollback after a plan change.
 
 A moved server that lost its session cannot get a new claim from a client request. The operator
