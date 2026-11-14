@@ -230,6 +230,21 @@ function zoomKeyframes(from: DOMRect, to: DOMRect, fromRadius: number, toRadius:
   ];
 }
 
+/** Screen pixels for each CSS pixel. A display scale above 100% and a page zoom raise it. */
+const screenPixelRatio = () => window.devicePixelRatio || 1;
+
+/**
+ * Limits an image to one image pixel for each screen pixel, as an image app shows it at 100%. At its
+ * natural CSS size, a display scale above 100% spreads each image pixel over more screen pixels and
+ * blurs a screenshot. A vector image scales without loss, so it keeps its natural CSS size.
+ */
+function fitScreenPixels(image: HTMLImageElement, mimeType: string): void {
+  if (mimeType === "image/svg+xml") return;
+  const ratio = screenPixelRatio();
+  image.style.setProperty("--image-lightbox-screen-width", `${image.naturalWidth / ratio}px`);
+  image.style.setProperty("--image-lightbox-screen-height", `${image.naturalHeight / ratio}px`);
+}
+
 /** A web client on plain HTTP has no clipboard that takes images. */
 const canCopyImages = () => typeof ClipboardItem !== "undefined" && typeof navigator.clipboard?.write === "function";
 
@@ -377,7 +392,8 @@ export function ImageLightbox(props: {
       return;
     }
     // Layout sizes, not `getBoundingClientRect`: the zoom and the animations transform the image.
-    setZoom((camera.scale * image.offsetWidth) / image.naturalWidth);
+    // The level counts screen pixels, so 100% shows each image pixel on one screen pixel.
+    setZoom((camera.scale * image.offsetWidth * screenPixelRatio()) / image.naturalWidth);
     const glide = animate && motion;
     image.toggleAttribute("data-settling", glide);
     // A glide back to fit keeps the clip and the sharp drawing until the image is fitted.
@@ -497,7 +513,11 @@ export function ImageLightbox(props: {
     const onResize = new ResizeObserver(() => {
       // A new fitted size keeps the zoom level, the percent of the natural size.
       const image = zoomImage();
-      move(image && zoomed() ? { ...camera, scale: (zoom() * image.naturalWidth) / image.offsetWidth } : camera);
+      move(
+        image && zoomed()
+          ? { ...camera, scale: (zoom() * image.naturalWidth) / (image.offsetWidth * screenPixelRatio()) }
+          : camera,
+      );
     });
     area.addEventListener("wheel", onWheel, { passive: false });
     area.addEventListener("pointerdown", onDown);
@@ -788,7 +808,10 @@ export function ImageLightbox(props: {
                             alt={entry.name}
                             referrerpolicy="no-referrer"
                             draggable={false}
-                            onLoad={(event) => reveal(entry, event.currentTarget)}
+                            onLoad={(event) => {
+                              fitScreenPixels(event.currentTarget, entry.mimeType);
+                              reveal(entry, event.currentTarget);
+                            }}
                             onError={() => {
                               if (entry.id === current()?.id) opened = true;
                               setFailed((state) => {
