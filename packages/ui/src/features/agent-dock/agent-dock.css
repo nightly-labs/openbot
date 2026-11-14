@@ -776,14 +776,10 @@
   scale: -1 1;
 }
 
-/* The dock is above the other apps. Its loops run only while the user uses the dock. A stopped spinner
-   looks frozen, so the spinner turns in steps, which compose the screen again less often. */
+/* The dock is above the other apps. Its loops run only while the user uses the dock. The spinner
+   always turns: a stopped spinner looks as if the agent stopped. */
 .agent-dock[data-ambient-motion="paused"] .agent-row-thinking-dots i {
   animation-play-state: paused;
-}
-
-.agent-dock[data-ambient-motion="paused"] .ui-spinner {
-  animation-timing-function: steps(12);
 }
 
 @media (prefers-reduced-motion: reduce) {
