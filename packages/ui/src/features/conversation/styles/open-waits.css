@@ -49,10 +49,6 @@
   text-overflow: ellipsis;
 }
 
-[data-wait-state="woken"] .open-waits-row-state {
-  color: var(--openbot-warning-text);
-}
-
 [data-wait-state="resuming"] .open-waits-row-state {
   color: var(--openbot-text-primary);
   animation: task-list-pulse 1.6s ease-in-out infinite;

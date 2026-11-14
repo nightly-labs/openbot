@@ -31,10 +31,11 @@ export interface OpenWaitsProps {
   now?: Date;
 }
 
+/** A woken wait still waits: the next routine run wakes it again, so it is not a failure. */
 const MARK_STATE: Record<OpenWaitState, TaskMarkState> = {
   waiting: "pending",
   resuming: "active",
-  woken: "failed",
+  woken: "pending",
 };
 
 const STATE_LABEL = {
