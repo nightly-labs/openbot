@@ -16,6 +16,9 @@ xauth
 xvfb
 # The Codex sandbox. Without it on PATH, Codex uses its bundled copy and reports an error.
 bubblewrap
+# The Claude sandbox needs bubblewrap and socat. Without socat, each turn of a Claude agent with
+# "Workspace only" fails before it starts.
+socat
 # The Hermes Agent installer clones Hermes with git, and the Node.js that it downloads needs
 # libatomic1. Without them, the install stops, and the service user cannot install them: that user
 # has no sudo.
