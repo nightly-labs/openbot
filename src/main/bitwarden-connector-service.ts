@@ -80,6 +80,9 @@ export interface BitwardenHostOptions {
 function failure(): PasswordVaultError {
   return new PasswordVaultError({ cause: new Error(sourceText("error.connector.bitwardenFailed")) });
 }
+function cliMissing(): PasswordVaultError {
+  return new PasswordVaultError({ cause: new Error(sourceText("error.connector.bitwardenCliMissing")) });
+}
 
 /** No shell, inherited credentials, or command output in an error. */
 const runBitwardenCli: BitwardenCliRunner = (executable, args, extra, signal) => {
@@ -112,9 +115,7 @@ const runBitwardenCli: BitwardenCliRunner = (executable, args, extra, signal) =>
   });
 };
 
-async function findCli(): Promise<string> {
-  const name = process.platform === "win32" ? "bw.exe" : "bw";
-  const directories = [...(process.env.PATH ?? "").split(delimiter), "/opt/homebrew/bin", "/usr/local/bin"];
+async function firstCli(name: string, directories: string[]): Promise<string | null> {
   for (const directory of new Set(directories.filter(isAbsolute))) {
     try {
       const path = await realpath(join(directory, name));
@@ -124,7 +125,49 @@ async function findCli(): Promise<string> {
       /* Try the next installation directory. */
     }
   }
-  throw new Error(sourceText("error.connector.bitwardenFailed"));
+  return null;
+}
+
+/** Where Windows keeps the user and the system `Path` that a new process gets. */
+const WINDOWS_PATH_KEYS = [
+  "HKCU\\Environment",
+  "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment",
+];
+
+/**
+ * The folders of the Windows `Path` as it is now, and the folders where winget links its tools.
+ * OpenBot's own `PATH` is the one it got at start, so a CLI installed after that is not on it.
+ * A key that cannot be read adds no folders.
+ */
+async function currentWindowsPathFolders(): Promise<string[]> {
+  const reg = join(process.env.SystemRoot ?? "C:\\Windows", "System32", "reg.exe");
+  const values = await Promise.all(
+    WINDOWS_PATH_KEYS.map(
+      (key) =>
+        new Promise<string>((resolve) => {
+          execFile(reg, ["query", key, "/v", "Path"], { timeout: 5_000, windowsHide: true }, (error, stdout) => {
+            resolve(error ? "" : (/^\s*Path\s+REG_(?:EXPAND_)?SZ\s+(.*)$/imu.exec(stdout)?.[1] ?? ""));
+          });
+        }),
+    ),
+  );
+  const folders = values
+    .flatMap((value) => value.split(";"))
+    .map((folder) => folder.trim().replace(/%([^%]+)%/gu, (text, name: string) => process.env[name] ?? text));
+  const { LOCALAPPDATA, ProgramFiles } = process.env;
+  if (LOCALAPPDATA) folders.push(join(LOCALAPPDATA, "Microsoft", "WinGet", "Links"));
+  if (ProgramFiles) folders.push(join(ProgramFiles, "WinGet", "Links"));
+  return folders;
+}
+
+async function findCli(): Promise<string> {
+  const name = process.platform === "win32" ? "bw.exe" : "bw";
+  const directories = [...(process.env.PATH ?? "").split(delimiter), "/opt/homebrew/bin", "/usr/local/bin"];
+  const found =
+    (await firstCli(name, directories)) ??
+    (process.platform === "win32" ? await firstCli(name, await currentWindowsPathFolders()) : null);
+  if (found) return found;
+  throw new Error(sourceText("error.connector.bitwardenCliMissing"));
 }
 
 /** An `https:` server address without a trailing slash, or null. `bw status` reports it as it was set. */
@@ -221,7 +264,7 @@ export class BitwardenConnectorService implements PasswordVault {
     yield* this.disconnect();
     const attempt = this.#attempt;
     registerSecretValue(key);
-    const executable = yield* Effect.tryPromise({ try: this.#find, catch: failure });
+    const executable = yield* Effect.tryPromise({ try: this.#find, catch: cliMissing });
     const session: Session = { executable, env: { BW_SESSION: key }, folderId: "", abort: new AbortController() };
     // Keep the pending session so disconnect can cancel the CLI while connect is waiting.
     if (attempt !== this.#attempt) return this.status();
@@ -466,7 +509,8 @@ export class BitwardenConnectorService implements PasswordVault {
       catch: failure,
     });
     const shared = folders.filter((folder) => folder.name === "Shared with OpenBot");
-    if (shared.length !== 1 || !shared[0]?.id) return yield* failure();
+    if (shared.length !== 1 || !shared[0]?.id)
+      return yield* new PasswordVaultError({ cause: new Error(sourceText("error.connector.bitwardenFolderMissing")) });
     session.folderId = shared[0].id;
     this.#error = null;
     this.#touch();

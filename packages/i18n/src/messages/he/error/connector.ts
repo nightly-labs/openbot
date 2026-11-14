@@ -35,6 +35,10 @@ export const messages = {
   "error.connector.onePasswordFileTooLarge": "קובץ החיבור ל-1Password גדול מדי.",
   "error.connector.bitwardenFailed":
     "לא ניתן לקרוא את Bitwarden. יש להתקין את ה-CLI bw, להתחבר, לבטל את הנעילה וליצור תיקייה אחת בשם Shared with OpenBot. יש להתחבר עם מפתח סשן חדש.",
+  "error.connector.bitwardenCliMissing":
+    "OpenBot לא מוצא את ה-CLI של Bitwarden. התקינו את bw, ודאו שהוא פועל בטרמינל חדש ואז התחברו שוב.",
+  "error.connector.bitwardenFolderMissing":
+    "ב-Bitwarden צריכה להיות בדיוק תיקייה אחת בשם Shared with OpenBot. צרו אותה או מחקו את התיקייה העודפת, ואז התחברו שוב.",
   "error.connector.bitwardenHostInput":
     "יש להזין כתובת שרת HTTPS, את client_id ו-client_secret של מפתח ה-API ואת הסיסמה הראשית.",
   "error.connector.bitwardenHostFailed":
