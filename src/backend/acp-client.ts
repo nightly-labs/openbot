@@ -49,7 +49,7 @@ import {
   OPENCODE_CHILD_UPDATE_METHOD,
   type OpenCodeLaunches,
 } from "./agent/acp-subagent-updates";
-import { isTurnContextBlock, withoutTurnContext } from "./agent/developer-instructions";
+import { BACKGROUND_WAKE_NOTE, isTurnContextBlock, withoutTurnContext } from "./agent/developer-instructions";
 import type { GeneratedMediaKind } from "./agent/image-generation";
 import { acpPlanSteps, PLAN_UPDATED_METHOD } from "./agent/plan-updates";
 import { elicitationFieldQuestions, elicitationValue } from "./agent/prompts";
@@ -200,15 +200,6 @@ const ACP_BACKGROUND_WATCH_MS = 30 * 60_000;
  * can also stay unchanged while the model writes a long step.
  */
 const ACP_BACKGROUND_TURN_QUIET_MS = 15_000;
-
-/**
- * The prompt that connects an agent's wake-up for a finished background command to the open turn
- * (`AcpFlavor.wakesAfterPromptEnds`). The model reads it; the chat does not show it.
- */
-const BACKGROUND_WAKE_PROMPT: ContentBlock = {
-  type: "text",
-  text: "<openbot-background-wake>\nThe session changed while a command that you moved to the background ran. If the command finished, read its result and continue the task. If it still runs, end your turn.\n</openbot-background-wake>",
-};
 
 /**
  * How long the agent's store can still get the rest of a turn that did not complete, such as one
@@ -2556,10 +2547,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         if (wake === "steered") continue;
         if (wake === "none") break;
         this.#reportPromptUsage(thread, turn, response);
+        // As the first prompt, a wake prompt that gets no update is sent again once, and then fails.
         response = providerResult(
-          yield* providerCall(() =>
-            this.#sessionConnection(thread).prompt({ sessionId: thread.id, prompt: [BACKGROUND_WAKE_PROMPT] }),
-          ).pipe(Effect.result),
+          yield* this.#sendPrompt(thread, turn, [{ type: "text", text: BACKGROUND_WAKE_NOTE }], params),
         );
         if (thread.activeTurn !== turn || turn.completing) return;
         turn.lastActivityAt = Date.now();
@@ -2671,11 +2661,22 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
    * The IDs of the turn's `execute` tool calls that still run, joined, for an agent that can end a
    * prompt while they run (`AcpFlavor.wakesAfterPromptEnds`). Empty when none runs. A stopped turn
    * and one that failed do not wait for them, and a daemon, such as a dev server, runs on by intent.
+   * The wait needs a CLI that joins a second prompt to its work (`#steersByPrompt`): the wake prompt
+   * and the user's messages during the wait both do so.
    */
   #backgroundCommands(turn: AcpTurn): string {
-    if (!this.#flavor.wakesAfterPromptEnds || turn.stopped || turn.providerError) return "";
+    const failed =
+      turn.providerError !== null ||
+      turn.sdkFailureAt !== null ||
+      this.#flavor.sdkHarness?.answerIsFailure.test(turn.text) === true;
+    if (!this.#flavor.wakesAfterPromptEnds || !this.#steersByPrompt || turn.stopped || failed) return "";
     return [...turn.toolItems.values()]
-      .filter((item) => item.toolKind === "execute" && !(isRecord(item.arguments) && item.arguments.IsDaemon === true))
+      .filter(
+        (item) =>
+          item.toolKind === "execute" &&
+          item.status === "in_progress" &&
+          !(isRecord(item.arguments) && item.arguments.IsDaemon === true),
+      )
       .map((item) => item.id)
       .join("\n");
   }
@@ -2684,7 +2685,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
    * Waits until `session/list` shows that the session changed after its prompt ended: the agent woke
    * its model for a finished command. "steered" when the user sent a message into the turn, which
    * connects the work again by itself. "none" when the agent reports no change time, or after
-   * `ACP_BACKGROUND_WATCH_MS` with no change: the turn then ends as before.
+   * `ACP_BACKGROUND_WATCH_MS` with no change: the turn then ends as before. A `session/list` that
+   * fails, such as one that times out on a busy process, skips that poll only.
    */
   readonly #awaitSessionChange = Effect.fn("AcpAgentClient.awaitSessionChange")(function* (
     this: AcpAgentClient,
@@ -2699,10 +2701,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       yield* Effect.sleep(ACP_BACKGROUND_POLL_MS);
       if (thread.activeTurn !== turn || turn.completing || turn.stopped) return "none";
       if (turn.steerReplies.length > 0) return "steered";
-      const updatedAt = yield* this.#sessionUpdatedAt(thread).pipe(Effect.orElseSucceed(() => null));
-      if (updatedAt === null) return "none";
-      if (before !== undefined && updatedAt !== before) return "changed";
-      before = updatedAt;
+      const read = yield* Effect.result(this.#sessionUpdatedAt(thread));
+      if (Result.isFailure(read)) continue;
+      if (read.success === null) return "none";
+      if (before !== undefined && read.success !== before) return "changed";
+      before = read.success;
     }
     return "none";
   });

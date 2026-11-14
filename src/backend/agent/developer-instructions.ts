@@ -408,9 +408,22 @@ export function steerNote(sender: "user" | "teammate"): string {
   ].join("\n");
 }
 
+const BACKGROUND_WAKE_START = "<openbot_background_wake>";
+
+/**
+ * The prompt that connects an agent's wake-up for a finished background command to its open turn
+ * (`AcpFlavor.wakesAfterPromptEnds`). The model reads it; the chat does not show it.
+ */
+export const BACKGROUND_WAKE_NOTE = [
+  BACKGROUND_WAKE_START,
+  "The session changed while a command that you moved to the background ran. If the command finished, read its result and continue the task. If it still runs, end your turn.",
+  "</openbot_background_wake>",
+].join("\n");
+
 /**
  * Whether a user text block is one that `memoryContextUpdate`, `sectionTeammatesUpdate`,
- * `instructionsFileUpdate`, the turn style reminder or `steerNote` wrote, not text that a person wrote.
+ * `instructionsFileUpdate`, the turn style reminder, `steerNote` or `BACKGROUND_WAKE_NOTE` wrote,
+ * not text that a person wrote.
  */
 export function isTurnContextBlock(text: string): boolean {
   return [
@@ -421,6 +434,7 @@ export function isTurnContextBlock(text: string): boolean {
     SAVED_LOGINS_BLOCK_START,
     TURN_STYLE_START,
     STEER_NOTE_START,
+    BACKGROUND_WAKE_START,
   ].some((start) => text.startsWith(`${start}\n`));
 }
 
@@ -432,7 +446,7 @@ export function isTurnContextBlock(text: string): boolean {
  */
 export function withoutTurnContext(text: string): string {
   return text.replace(
-    /^(?:<(openbot_saved_memories|openbot_saved_memories_update|openbot_section_teammates|openbot_agent_instructions|openbot_saved_logins|openbot_turn_style|openbot_steer)>\n[\s\S]*?\n<\/\1>\n*)+/u,
+    /^(?:<(openbot_saved_memories|openbot_saved_memories_update|openbot_section_teammates|openbot_agent_instructions|openbot_saved_logins|openbot_turn_style|openbot_steer|openbot_background_wake)>\n[\s\S]*?\n<\/\1>\n*)+/u,
     "",
   );
 }
