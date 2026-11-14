@@ -86,6 +86,11 @@ export interface OpenBotDynamicIslandProps {
   /** The user-chosen compact height, as a percent of the default. */
   heightPercent?: number;
   extendedHoverArea?: boolean;
+  /**
+   * Beside a physical notch, the idle island stays inside the notch until the pointer is on it. The
+   * idle ears then do not cover the menu bar items beside the notch. A preview keeps the ears.
+   */
+  idleInsideNotch?: boolean;
   suppressInitialHover?: boolean;
   onStateChange: (state: DynamicIslandViewState, reason: DynamicIslandStateChangeReason) => void;
   /** Resolves `false` when the action failed, so a reply field keeps its draft. */
@@ -490,9 +495,16 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
       },
     };
   });
+  const idleFoldedIntoNotch = () =>
+    props.idleInsideNotch === true &&
+    props.displayMode !== "island" &&
+    props.notchSize !== undefined &&
+    compactLayoutPresentation().mode === "idle" &&
+    !hovered();
   const compactWidth = () => {
     const geometry = compactGeometry();
     if (geometry) return props.displayMode === "island" ? geometry.island.width : geometry.notch.width;
+    if (idleFoldedIntoNotch()) return props.notchSize?.width;
     return openBotIdleCompactWidth(props.displayMode, props.notchSize, widthPercent());
   };
   const compactHeight = () => {
@@ -662,6 +674,7 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
             "openbot-dynamic-island",
             `dynamic-island-${visiblePresentation().mode === "message" ? "message-first" : visiblePresentation().mode}`,
             config().badge ? "dynamic-island-status" : undefined,
+            idleFoldedIntoNotch() ? "dynamic-island-idle-in-notch" : undefined,
             visiblePresentation().mode !== "idle" && visiblePresentation().mode !== "working"
               ? "dynamic-island-panel-wide"
               : undefined,
