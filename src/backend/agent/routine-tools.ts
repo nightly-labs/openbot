@@ -149,6 +149,6 @@ export function openBotToolResult(value: unknown): OpenBotToolResponse {
 export function openBotToolFailure(message: string, details?: Readonly<Record<string, number>>): OpenBotToolResponse {
   return {
     success: false,
-    contentItems: [{ type: "inputText", text: JSON.stringify({ error: message, ...details }) }],
+    contentItems: [{ type: "inputText", text: JSON.stringify({ ...details, error: message }) }],
   };
 }
