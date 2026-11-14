@@ -12,8 +12,13 @@ export interface MessagingPromptInput {
   platform: MessagingPlatform;
   workspaceName: string | null;
   isDirect: boolean;
-  /** The OpenBot user wrote it in the linked WhatsApp number's own "Message yourself" chat. */
+  /** The OpenBot user's own account wrote it, in any chat of the linked WhatsApp number. */
   fromOwner: boolean;
+  /**
+   * Only the OpenBot user and the agent can read this conversation: their own direct chat with the
+   * number. A group or a chat with someone else is not private even when the owner writes in it.
+   */
+  isPrivate: boolean;
   /** The conversation name that people see, such as `#general`. */
   place: string;
   authorName: string;
@@ -55,18 +60,23 @@ const CONTEXT_CHARACTERS = 12_000;
 export const REPLY_CHARACTERS = 4_000;
 
 /**
- * The prompt of one external message. The author is not the OpenBot user, so the text is framed as
- * untrusted input, the same way a teammate message is framed as collaborator input. The one exception
- * is the OpenBot user's own WhatsApp "Message yourself" chat: only the owner can write and read there.
+ * The prompt of one messaging message. In the untrusted branch the author is not the OpenBot user,
+ * so the text is framed as external input, the same way a teammate message is framed as
+ * collaborator input. When the OpenBot user's own account wrote it, the text says so, and says who
+ * else can read the answer. Only the owner's own direct chat with the number is private.
  */
 export function messagingPromptText(input: MessagingPromptInput): string {
   const words = PLATFORM_WORDS[input.platform];
   const platform = words.name;
   const lines = input.fromOwner
     ? [
-        `Message from the OpenBot user, in the "Message yourself" chat of their own ${words.workspace}.`,
+        input.isPrivate
+          ? `Message from the OpenBot user, in the "Message yourself" chat of their own ${words.workspace}.`
+          : `Message from the OpenBot user, in a ${words.workspace} chat where other people are present.`,
         input.workspaceName ? `${words.workspace}: ${input.workspaceName}` : null,
-        `Place: the OpenBot user's own "Message yourself" chat. Only the OpenBot user writes and reads it, so you can answer with their own data, as in the app.`,
+        input.isPrivate
+          ? `Place: the OpenBot user's own "Message yourself" chat. Only the OpenBot user writes and reads it, so you can answer with their own data, as in the app.`
+          : `Place: ${input.place}, ${words.conversation} Other people can read what you post here, so answer only what the OpenBot user, not everyone here, may see.`,
         "Your final answer is posted to this chat.",
       ]
     : [
