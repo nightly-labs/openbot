@@ -19,6 +19,8 @@ export const messages = {
   "error.connector.onePasswordCliSignedOut":
     "В CLI 1Password не выполнен вход. Включите его интеграцию в приложении 1Password и подключитесь снова.",
   "error.connector.onePasswordCliFailed": "CLI 1Password завершился с ошибкой: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "Ваш аккаунт 1Password не позволяет вам создать общее хранилище или сервисный аккаунт. Попросите владельца или администратора аккаунта дать это разрешение или выдать токен сервисного аккаунта, затем нажмите «Использовать токен».",
   "error.connector.onePasswordUnexpected": "1Password прислал неожиданный ответ: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password не принял токен сервисного аккаунта.",
   "error.connector.onePasswordNoVault":

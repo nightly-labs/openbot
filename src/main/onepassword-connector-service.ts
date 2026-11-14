@@ -137,6 +137,29 @@ function connectFailure(message: string): OnePasswordOperationError {
   return new OnePasswordOperationError({ cause: new OnePasswordConnectError(message) });
 }
 
+/** A failed `op` run. `forbidden` is set when 1Password refused the request with a 403. */
+class OnePasswordCliError extends OnePasswordConnectError {
+  readonly forbidden: boolean;
+
+  constructor(message: string, forbidden: boolean) {
+    super(message);
+    this.forbidden = forbidden;
+  }
+}
+
+/**
+ * 1Password refuses `vault create` and `service-account create` with a 403 when the account does not
+ * let this person create vaults or service accounts. The user sees what to do; the log keeps the CLI line.
+ */
+const explainRefusedCreate = Effect.fn("OnePasswordConnector.explainRefusedCreate")(function* (
+  error: OnePasswordOperationError,
+) {
+  const cause = error.cause;
+  if (!(cause instanceof OnePasswordCliError) || !cause.forbidden) return yield* error;
+  logger.warn("1Password refused to create the shared vault or the service account", { detail: cause.message });
+  return yield* connectFailure(sourceText("error.connector.onePasswordCliForbidden"));
+});
+
 /** Parses the JSON that the CLI writes to its standard output. */
 function cliJson<T>(schema: z.ZodType<T>) {
   return (output: string) => onePasswordDecode(() => schema.parse(JSON.parse(output)));
@@ -185,7 +208,8 @@ const runOnePasswordCli: OnePasswordCliRunner = async (executable, args, signal)
           return;
         }
         const detail = redactText(String(stderr).trim().split("\n").at(-1) || error.message);
-        reject(new OnePasswordConnectError(sourceText("error.connector.onePasswordCliFailed", { detail })));
+        const forbidden = /\(403\)|\bforbidden\b/i.test(String(stderr));
+        reject(new OnePasswordCliError(sourceText("error.connector.onePasswordCliFailed", { detail }), forbidden));
       },
     );
   });
@@ -635,7 +659,7 @@ export class OnePasswordConnectorService implements PasswordVault {
           "json",
         ],
         signal,
-      ).pipe(Effect.flatMap(cliJson(vaultSchema)))).id;
+      ).pipe(Effect.catch(explainRefusedCreate), Effect.flatMap(cliJson(vaultSchema)))).id;
     const token = (yield* this.#cli(
       [
         "service-account",
@@ -647,7 +671,7 @@ export class OnePasswordConnectorService implements PasswordVault {
         "--raw",
       ],
       signal,
-    )).trim();
+    ).pipe(Effect.catch(explainRefusedCreate))).trim();
     if (!token) return yield* connectFailure(sourceText("error.connector.onePasswordTokenRejected"));
     registerSecretValue(token);
     return token;

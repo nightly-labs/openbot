@@ -28,6 +28,8 @@ export const messages = {
   "error.connector.onePasswordCliSignedOut":
     "لم يتم تسجيل الدخول إلى 1Password CLI. فعّل تكامله في تطبيق 1Password، ثم اتصل مرة أخرى.",
   "error.connector.onePasswordCliFailed": "فشل 1Password CLI: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "لا يسمح لك حساب 1Password بإنشاء الخزنة المشتركة أو حساب خدمة. اطلب هذا الإذن من مالك الحساب أو مسؤوله، أو اطلب منه رمز حساب خدمة وانقر «استخدام رمز».",
   "error.connector.onePasswordUnexpected": "أرسل 1Password إجابة غير متوقعة: {detail}",
   "error.connector.onePasswordTokenRejected": "لم يقبل 1Password رمز حساب الخدمة.",
   "error.connector.onePasswordNoVault": "لا يمكن لحساب الخدمة قراءة أي خزنة. امنحه الوصول إلى خزنة، ثم حاول مرة أخرى.",

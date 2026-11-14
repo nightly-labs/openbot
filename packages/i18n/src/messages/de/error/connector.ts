@@ -19,6 +19,8 @@ export const messages = {
   "error.connector.onePasswordCliSignedOut":
     "Die 1Password CLI ist nicht angemeldet. Aktiviere ihre Integration in der 1Password-App und verbinde sie erneut.",
   "error.connector.onePasswordCliFailed": "Die 1Password CLI ist fehlgeschlagen: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "Dein 1Password-Konto erlaubt dir nicht, den geteilten Tresor oder ein Dienstkonto zu erstellen. Bitte einen Inhaber oder Administrator des Kontos um diese Berechtigung, oder bitte ihn um ein Dienstkonto-Token und klicke auf „Token verwenden“.",
   "error.connector.onePasswordUnexpected": "1Password hat eine unerwartete Antwort gesendet: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password hat das Dienstkonto-Token nicht akzeptiert.",
   "error.connector.onePasswordNoVault":

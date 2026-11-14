@@ -19,6 +19,8 @@ export const messages = {
   "error.connector.onePasswordCliSignedOut":
     "La CLI di 1Password non ha effettuato l'accesso. Attiva la sua integrazione nell'app 1Password, poi connetti di nuovo.",
   "error.connector.onePasswordCliFailed": "La CLI di 1Password è fallita: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "Il tuo account 1Password non ti permette di creare il vault condiviso o un service account. Chiedi questo permesso a un proprietario o a un amministratore dell'account, oppure chiedigli un token del service account e fai clic su «Usa token».",
   "error.connector.onePasswordUnexpected": "1Password ha inviato una risposta inattesa: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password non ha accettato il token del service account.",
   "error.connector.onePasswordNoVault":

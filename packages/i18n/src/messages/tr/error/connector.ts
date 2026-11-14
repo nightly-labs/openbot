@@ -20,6 +20,8 @@ export const messages = {
   "error.connector.onePasswordCliSignedOut":
     "1Password CLI'de oturum açılmamış. 1Password uygulamasında entegrasyonunu açın, ardından yeniden bağlanın.",
   "error.connector.onePasswordCliFailed": "1Password CLI başarısız oldu: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "1Password hesabınız paylaşılan kasayı veya bir hizmet hesabı oluşturmanıza izin vermiyor. Hesabın sahibinden veya yöneticisinden bu izni isteyin ya da bir hizmet hesabı belirteci isteyip “Belirteç kullan” düğmesine tıklayın.",
   "error.connector.onePasswordUnexpected": "1Password beklenmeyen bir yanıt gönderdi: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password hizmet hesabı belirtecini kabul etmedi.",
   "error.connector.onePasswordNoVault":

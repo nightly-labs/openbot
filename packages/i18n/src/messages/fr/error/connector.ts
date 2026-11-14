@@ -19,6 +19,8 @@ export const messages = {
   "error.connector.onePasswordCliSignedOut":
     "La CLI 1Password n’est pas connectée. Activez son intégration dans l’application 1Password, puis connectez-vous à nouveau.",
   "error.connector.onePasswordCliFailed": "La CLI 1Password a échoué : {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "Votre compte 1Password ne vous permet pas de créer le coffre partagé ni un compte de service. Demandez cette autorisation à un propriétaire ou à un administrateur du compte, ou demandez-lui un jeton de compte de service, puis cliquez sur « Utiliser un jeton ».",
   "error.connector.onePasswordUnexpected": "1Password a envoyé une réponse inattendue : {detail}",
   "error.connector.onePasswordTokenRejected": "1Password n’a pas accepté le jeton du compte de service.",
   "error.connector.onePasswordNoVault":
