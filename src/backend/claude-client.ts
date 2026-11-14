@@ -2486,7 +2486,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       // A sign-in failure moves the turn to a backup model, as an invalid key does, and so do spent
       // usage credits and a billing refusal. The shared classifier does not find these causes in
       // all CLI texts, such as "Credit balance is too low", so the client names them.
-      const signInFailed = turn.authenticationFailed || CLAUDE_NOT_LOGGED_IN.test(String(error));
+      // Cloudflare's block page in front of the Claude API arrives as `authentication_failed`, but the
+      // request never reached Claude, so the sign-in is not the cause (#8811).
+      const blocked = CLAUDE_CLOUDFLARE_BLOCK.test(String(error));
+      if (blocked) queryLogger.warn("Cloudflare blocked a Claude request.", { error: redactText(String(error)) });
+      const signInFailed = !blocked && (turn.authenticationFailed || CLAUDE_NOT_LOGGED_IN.test(String(error)));
       const billing = turn.billingFailed || (turn.balanceSpent && isBalanceDiagnostic(String(error)));
       this.emit("notification", {
         method: "error",
@@ -2494,7 +2498,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           threadId: runtime.id,
           turnId: turn.id,
           message: claudeTurnError(error, this.#usesApiKey()),
-          ...(signInFailed ? { causeCode: "authentication" } : billing ? { causeCode: "billing" } : {}),
+          ...(blocked
+            ? { causeCode: "provider_unavailable" }
+            : signInFailed
+              ? { causeCode: "authentication" }
+              : billing
+                ? { causeCode: "billing" }
+                : {}),
         },
       });
     }
@@ -2943,6 +2953,14 @@ const CLAUDE_API_CREDIT_EMPTY = /\bcredit balance (?:is )?too low\b/iu;
 const CLAUDE_NOT_LOGGED_IN = /\bnot logged in\b\s*·\s*please run \/login\b/iu;
 
 /**
+ * A 403 that Cloudflare, not Claude, sent: "Failed to authenticate. API Error: 403 Attention
+ * Required! | Cloudflare" (Claude Code 2.1.323, #8811). Only a 403 with a block marker matches, so
+ * any other 403 stays a sign-in failure.
+ */
+const CLAUDE_CLOUDFLARE_BLOCK =
+  /\b403\b[\s\S]*(?:attention required!? \| cloudflare|sorry, you have been blocked|cf-browser-verification|__cf_chl|cdn-cgi\/challenge-platform)/iu;
+
+/**
  * The chat text for a fast mode turn that Claude Code ran at the standard speed. `pending` and
  * `sdk_opt_in_required` are states of the client itself, so only the log keeps them.
  */
@@ -2970,6 +2988,7 @@ function claudeFastModeWarning(reason: string): string | null {
 function claudeTurnError(error: unknown, apiKey: boolean): string {
   const text = String(error);
   if (apiKey && CLAUDE_API_CREDIT_EMPTY.test(text)) return sourceText("error.provider.claudeApiKeyNoCredit");
+  if (CLAUDE_CLOUDFLARE_BLOCK.test(text)) return sourceText("error.provider.claudeServiceBlocked");
   // With an API key there is no sign-in to renew, so the key turn keeps the CLI text.
   if (!apiKey && CLAUDE_NOT_LOGGED_IN.test(text))
     return sourceText("error.provider.signInExpired", { provider: agentProviderName("claude") });

@@ -312,6 +312,8 @@ export const messages = {
     "Ten czat stał się za długi dla Claude. OpenBot rozpoczął nową sesję Claude Code z historią czatu. Spróbuj ponownie.",
   "error.provider.claudeApiKeyNoCredit":
     "Klucz API Anthropic nie ma środków API. Plan Claude nie płaci za zapytania z kluczem API. Doładuj środki w Anthropic Console albo zaloguj się do Claude w Ustawieniach i wybierz konto Claude w menu modeli agenta.",
+  "error.provider.claudeServiceBlocked":
+    "Usługa Claude zablokowała to zapytanie. Zwykle to krótki problem po stronie Claude, a nie problem z Twoim kontem. Wyślij wiadomość ponownie za kilka minut.",
   "error.provider.foreignReasoning":
     "Dostawca {provider} nie przyjął wcześniejszego rozumowania z tego czatu, ponieważ otrzymało je inne konto lub inny klucz API. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie.",
   "error.provider.imageTooSmall":
