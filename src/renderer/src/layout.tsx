@@ -6,7 +6,7 @@ import {
   type SidebarView,
 } from "@openbot/ui/features/sidebar/sidebar-types";
 import { PAGE_RAIL_PINNABLE_PAGES, type PageRailPinnablePage } from "@openbot/ui/features/window/PageRail";
-import { createEffect, createMemo, createSignal, onSettled } from "solid-js";
+import { createMemo, createSignal, onSettled } from "solid-js";
 import { z } from "zod";
 import { readPanelWidth } from "./components/panel-width-storage";
 import {
@@ -29,27 +29,28 @@ import { usePlatform } from "./platform";
 import { createSimpleContext } from "./simple-context";
 
 /**
- * Whether the conversation still has room beside a sidebar of this width. The
- * server rail is part of the arithmetic rather than a style detail, and its
- * width depends on the platform: macOS reserves space for the traffic lights,
- * while the two platforms that draw a standard OS frame narrow the rail on a
- * small window. A width of `0` means the rail is not drawn: main has not reported
- * the platform yet, or the user chose the server menu.
+ * The width of the server rail beside the sidebar. macOS reserves space for the traffic lights, and the
+ * two platforms that draw a standard OS frame narrow the rail on a small window. A width of `0` means
+ * the rail is not drawn: main has not reported the platform yet, or the user chose the server menu.
  */
-function shouldAutoCompactSidebar(
+function serverRailWidthFor(platform: AppInfo["platform"] | undefined, serverView: ServerView, windowWidth: number) {
+  if (platform === undefined || serverView === "menu") return 0;
+  if (platform === "darwin") return MAC_SERVER_RAIL_WIDTH;
+  return windowWidth <= 800 ? NARROW_SERVER_RAIL_WIDTH : SERVER_RAIL_WIDTH;
+}
+
+/**
+ * The room the sidebar can take while the chat keeps `CONVERSATION_MIN_WIDTH`. The open right panel
+ * takes its width first, and it is fixed, so the sidebar gives way before the chat header is squeezed.
+ * A value below `LEFT_PANEL_MIN` means even the smallest sidebar does not fit, so it is compact.
+ */
+function sidebarRoomWidth(
   platform: AppInfo["platform"] | undefined,
-  panelWidth: number,
   serverView: ServerView,
-): boolean {
-  const serverRailWidth =
-    platform === undefined || serverView === "menu"
-      ? 0
-      : platform === "darwin"
-        ? MAC_SERVER_RAIL_WIDTH
-        : window.innerWidth <= 800
-          ? NARROW_SERVER_RAIL_WIDTH
-          : SERVER_RAIL_WIDTH;
-  return window.innerWidth - serverRailWidth - panelWidth < CONVERSATION_MIN_WIDTH;
+  windowWidth: number,
+  rightPanelWidth: number,
+): number {
+  return windowWidth - serverRailWidthFor(platform, serverView, windowWidth) - rightPanelWidth - CONVERSATION_MIN_WIDTH;
 }
 
 /** The pages in the rail until the user chooses. The others start in the More menu. */
@@ -134,7 +135,25 @@ const Layout = createSimpleContext({
       const choices = railPinChoices();
       return PAGE_RAIL_PINNABLE_PAGES.filter((page) => choices[page] ?? RAIL_PINNED_BY_DEFAULT.has(page));
     });
-    const [leftPanelAutoCompact, setLeftPanelAutoCompact] = createSignal(false);
+    // The width the open right panel takes beside the chat, or 0 when it is closed. The conversation sets it.
+    const [rightPanelWidth, setRightPanelWidthSignal] = createSignal(0);
+    // The user asked for the sidebar while there is no room. It opens at the smallest width until the
+    // right panel changes, so the toggle always works (for example, to switch servers).
+    const [leftPanelForcedOpen, setLeftPanelForcedOpen] = createSignal(false);
+    function setRightPanelWidth(width: number): void {
+      setLeftPanelForcedOpen(false);
+      setRightPanelWidthSignal(width);
+    }
+    const [windowWidth, setWindowWidth] = createSignal(window.innerWidth);
+    const sidebarRoom = createMemo(() =>
+      sidebarRoomWidth(platform.appInfo()?.platform, serverView(), windowWidth(), rightPanelWidth()),
+    );
+    /** The width the sidebar is drawn at: the width the user chose, but never wider than the room left. */
+    const leftPanelShownWidth = createMemo(() => Math.max(LEFT_PANEL_MIN, Math.min(leftPanelWidth(), sidebarRoom())));
+    /** The widest the user can drag the sidebar now. It shrinks when the right panel opens. */
+    const leftPanelMaxWidth = createMemo(() => Math.max(LEFT_PANEL_MIN, Math.min(LEFT_PANEL_MAX, sidebarRoom())));
+    /** Even the smallest sidebar does not fit beside the chat, so the sidebar is compact unless the user opened it. */
+    const leftPanelAutoCompact = createMemo(() => sidebarRoom() < LEFT_PANEL_MIN && !leftPanelForcedOpen());
     // A closed sidebar shows no agent list. A window with no page rail has no room to close it, so
     // there the styles show it compact; that is why closed is also compact.
     const [sidebarClosed, setSidebarClosedSignal] = createSignal(
@@ -153,20 +172,11 @@ const Layout = createSimpleContext({
       () => platform.appInfo() !== null && platform.chatWindow === null && serverView() === "rail",
     );
 
-    function updateResponsiveSidebar(): void {
-      setLeftPanelAutoCompact(shouldAutoCompactSidebar(platform.appInfo()?.platform, leftPanelWidth(), serverView()));
-    }
-
-    createEffect(
-      () => ({ osPlatform: platform.appInfo()?.platform, panelWidth: leftPanelWidth(), view: serverView() }),
-      ({ osPlatform, panelWidth, view }) => {
-        setLeftPanelAutoCompact(shouldAutoCompactSidebar(osPlatform, panelWidth, view));
-      },
-    );
-
+    // The window width is a signal, so the sidebar room and the compact state follow a resize.
     onSettled(() => {
-      window.addEventListener("resize", updateResponsiveSidebar);
-      return () => window.removeEventListener("resize", updateResponsiveSidebar);
+      const updateWindowWidth = () => setWindowWidth(window.innerWidth);
+      window.addEventListener("resize", updateWindowWidth);
+      return () => window.removeEventListener("resize", updateWindowWidth);
     });
 
     // Another window or browser tab can change the pins or the chat order.
@@ -224,14 +234,17 @@ const Layout = createSimpleContext({
     function expandSidebar(): void {
       setSidebarClosed(false);
       setSidebarCollapsed(false);
-      setLeftPanelAutoCompact(false);
+      setLeftPanelForcedOpen(true);
     }
 
     return {
       leftPanelWidth,
+      leftPanelShownWidth,
+      leftPanelMaxWidth,
       setLeftPanelWidth,
       leftPanelCompact,
       leftPanelNarrow,
+      setRightPanelWidth,
       setSidebarCollapsed,
       sidebarClosed,
       setSidebarClosed,
