@@ -191,6 +191,8 @@ export const messages = {
   "error.backend.interruptSelf": "لا يمكن للوكيل مقاطعة نفسه.",
   "error.backend.interruptOtherWork":
     "يعمل هذا الوكيل على مهمة لم تبدأها رسالتك. يمكن للمستخدم أو لمرسل تلك المهمة فقط إيقافها.",
+  "error.backend.interruptSharedWork":
+    "يعمل دور هذا الوكيل على رسالتك وأيضًا على رسالة من المستخدم أو من وكيل آخر. المستخدم وحده يمكنه إيقافه، باستخدام إيقاف الوكيل في محادثة ذلك الوكيل.",
   "error.backend.interruptStarting": "لا يزال هذا الوكيل يبدأ دورًا. حاول مرة أخرى بعد بدء الدور.",
   "error.backend.interruptNoSession": "لا يمكن لـ OpenBot مقاطعة هذا الوكيل لأن جلسة المزوّد غير متاحة.",
   "error.backend.memoryTextRequired": "يلزم نص الذكرى.",

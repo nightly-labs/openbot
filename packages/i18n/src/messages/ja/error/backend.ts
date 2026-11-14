@@ -211,6 +211,8 @@ export const messages = {
   "error.backend.interruptSelf": "エージェントは自分自身を中断できません。",
   "error.backend.interruptOtherWork":
     "このエージェントは、あなたのメッセージで開始されていないタスクを実行中です。そのタスクを停止できるのは、ユーザーまたはそのタスクの送信者だけです。",
+  "error.backend.interruptSharedWork":
+    "このエージェントのターンは、あなたのメッセージに加えて、ユーザーまたは別のエージェントからのメッセージも処理しています。停止できるのはユーザーだけで、そのエージェントのチャットの「エージェントを停止」を使います。",
   "error.backend.interruptStarting":
     "このエージェントはまだターンを開始中です。ターンが始まってからもう一度お試しください。",
   "error.backend.interruptNoSession":

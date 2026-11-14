@@ -209,6 +209,8 @@ export const messages = {
   "error.backend.interruptSelf": "Un agente non può interrompere se stesso.",
   "error.backend.interruptOtherWork":
     "Questo agente sta lavorando a un'attività che il tuo messaggio non ha avviato. Solo l'utente o chi ha inviato quell'attività può fermarla.",
+  "error.backend.interruptSharedWork":
+    "Il turno di questo agente lavora sul tuo messaggio e anche su un messaggio dell'utente o di un altro agente. Solo l'utente può fermarlo, con Ferma l'agente nella chat di quell'agente.",
   "error.backend.interruptStarting": "Questo agente sta ancora avviando un turno. Riprova dopo l'avvio del turno.",
   "error.backend.interruptNoSession":
     "OpenBot non può interrompere questo agente perché la sua sessione del provider non è disponibile.",

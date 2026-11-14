@@ -218,6 +218,8 @@ export const messages = {
   "error.backend.interruptSelf": "Ein Agent kann sich nicht selbst unterbrechen.",
   "error.backend.interruptOtherWork":
     "Dieser Agent arbeitet an einer Aufgabe, die nicht durch deine Nachricht gestartet wurde. Nur der Benutzer oder der Absender dieser Aufgabe kann ihn stoppen.",
+  "error.backend.interruptSharedWork":
+    "Der Durchgang dieses Agenten bearbeitet deine Nachricht und auch eine Nachricht des Benutzers oder eines anderen Agenten. Nur der Benutzer kann ihn stoppen, mit Agenten stoppen im Chat dieses Agenten.",
   "error.backend.interruptStarting":
     "Dieser Agent startet noch einen Durchlauf. Versuche es erneut, sobald der Durchlauf beginnt.",
   "error.backend.interruptNoSession":
