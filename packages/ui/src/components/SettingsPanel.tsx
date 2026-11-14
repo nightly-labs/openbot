@@ -51,6 +51,11 @@ export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
         max={props.maxWidth}
         onResize={props.onResize}
         onResizeEnd={props.onResizeEnd}
+        // A narrower chat makes the panel narrower only for now: the width from the last drag stays saved.
+        onParentResize={() => {
+          const max = typeof props.maxWidth === "function" ? props.maxWidth() : props.maxWidth;
+          if (props.width > max) props.onResize(max);
+        }}
       />
       {props.children}
     </aside>

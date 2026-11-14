@@ -85,8 +85,18 @@ export function TabShape(props: {
       // Where the row is not on the card, the shape does not show and nothing is measured.
       if (getComputedStyle(element).display === "none") return;
       watchList();
-      // Observing a part again has no effect, and new tabs need an observer too.
-      for (const part of row.querySelectorAll(sized)) sizes.observe(part);
+      // New tabs need an observer too. A removed tab is not observed again, so the observer does not keep it.
+      for (const part of observed) {
+        if (!part.isConnected) {
+          sizes.unobserve(part);
+          observed.delete(part);
+        }
+      }
+      for (const part of row.querySelectorAll(sized)) {
+        if (observed.has(part)) continue;
+        sizes.observe(part);
+        observed.add(part);
+      }
       const tab = row.querySelector<HTMLElement>(selected);
       const parent = element.offsetParent;
       if (!tab || !(parent instanceof HTMLElement) || !tab.checkVisibility({ visibilityProperty: true })) {
@@ -147,6 +157,7 @@ export function TabShape(props: {
     };
     // A size change comes after layout and before paint, so the shape moves in the frame that the tab moves.
     const sizes = new ResizeObserver(place);
+    const observed = new Set<Element>();
     const changes = new MutationObserver(changed);
     changes.observe(row, { subtree: true, childList: true, attributes: true, attributeFilter: WATCHED_ATTRIBUTES });
     sizes.observe(row);

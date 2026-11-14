@@ -17,7 +17,6 @@ const IDLE_CAPTURE_INTERVAL = 20_000;
 interface BrowserPreviewSidebarProps {
   capturePreview?: ((tabId: string) => Promise<BrowserPreview>) | undefined;
   readWidth: (fallback: number, min: number, max: number) => number;
-  readCustomWidth: () => number;
   saveWidth: (width: number) => void;
   resetWidth: () => void;
   tabs: BrowserTab[];
@@ -44,9 +43,6 @@ export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps)
   });
   const defaultPanelWidth = () =>
     Math.round(Math.min(BROWSER_PANEL_MAX, Math.max(BROWSER_PANEL_MIN, props.defaultWidth())));
-  const storedPanelWidth = props.readCustomWidth();
-  let customPanelWidth = Number.isFinite(storedPanelWidth);
-  let savedCustomPanelWidth = customPanelWidth ? storedPanelWidth : null;
   const [panelWidth, setPanelWidth] = createSignal(
     props.readWidth(defaultPanelWidth(), BROWSER_PANEL_MIN, BROWSER_PANEL_MAX),
   );
@@ -61,22 +57,14 @@ export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps)
     setPanelWidth(width);
   };
 
-  const saveCustomPanelWidth = (width: number) => {
-    customPanelWidth = true;
-    savedCustomPanelWidth = width;
-    props.saveWidth(width);
-  };
-
+  // When the chat gets wider again, the panel goes back to the shared width, which another pane can set.
   const resizeDefaultPanel = () => {
-    const preferredWidth =
-      customPanelWidth && savedCustomPanelWidth !== null ? savedCustomPanelWidth : defaultPanelWidth();
+    const preferredWidth = props.readWidth(defaultPanelWidth(), BROWSER_PANEL_MIN, BROWSER_PANEL_MAX);
     setPanelWidth(Math.round(Math.min(props.maxWidth(), Math.max(BROWSER_PANEL_MIN, preferredWidth))));
   };
 
   const resetPanelWidth = () => {
     props.resetWidth();
-    customPanelWidth = false;
-    savedCustomPanelWidth = null;
     setPanelWidth(defaultPanelWidth());
   };
 
@@ -98,7 +86,7 @@ export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps)
         min={BROWSER_PANEL_MIN}
         max={props.maxWidth}
         onResize={resizePanel}
-        onResizeEnd={saveCustomPanelWidth}
+        onResizeEnd={props.saveWidth}
         onParentResize={resizeDefaultPanel}
         onReset={resetPanelWidth}
       />

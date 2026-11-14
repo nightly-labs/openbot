@@ -12,16 +12,13 @@ const SIDE_PANEL_STORAGE_KEY = "openbot:side-panel-width";
 /** Before the panes shared one width, Agent settings kept its own. A user who set it keeps that width. */
 const SETTINGS_PANEL_STORAGE_KEY = "openbot:settings-panel-width";
 
-/** The width from the last drag, or NaN when the panel has the default width. */
-export function readCustomSidePanelWidth(): number {
-  const stored =
-    window.localStorage.getItem(SIDE_PANEL_STORAGE_KEY) ?? window.localStorage.getItem(SETTINGS_PANEL_STORAGE_KEY);
-  return Number.parseFloat(stored ?? "");
-}
-
 /** The width from the last drag, or the default. */
 export function readSidePanelWidth(): number {
-  const stored = readCustomSidePanelWidth();
+  const stored = Number.parseFloat(
+    window.localStorage.getItem(SIDE_PANEL_STORAGE_KEY) ??
+      window.localStorage.getItem(SETTINGS_PANEL_STORAGE_KEY) ??
+      "",
+  );
   return Number.isFinite(stored)
     ? Math.min(SETTINGS_PANEL_MAX, Math.max(SIDE_PANEL_DEFAULT, stored))
     : SIDE_PANEL_DEFAULT;

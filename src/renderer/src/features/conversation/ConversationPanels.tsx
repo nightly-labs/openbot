@@ -14,7 +14,12 @@ import { VoicePanel } from "@openbot/ui/features/conversation/VoicePanel";
 import { McpSignInRelayDialog } from "@openbot/ui/features/settings/McpSignInPage";
 import { useText } from "@openbot/ui/text";
 import { actionToast } from "../../action-toast";
-import { resetSidePanelWidth, SIDE_PANEL_DEFAULT, saveSidePanelWidth } from "../../components/side-panel-width";
+import {
+  readSidePanelWidth,
+  resetSidePanelWidth,
+  SIDE_PANEL_DEFAULT,
+  saveSidePanelWidth,
+} from "../../components/side-panel-width";
 import { deviceQuoteShortcut } from "../../send-shortcut-preference";
 import { type AgentTemplatePublishCalls, agentTemplatesPort } from "../agent-templates/agent-templates-port";
 import { createPublishAgent } from "../agent-templates/PublishAgent";
@@ -549,6 +554,9 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
             max={sidePanelMaxWidth}
             onResize={setSidePanelWidth}
             onResizeEnd={saveSidePanelWidth}
+            // A narrower chat makes the panel narrower only for now. When the chat gets wider, the panel goes
+            // back to the width from the last drag.
+            onParentResize={() => setSidePanelWidth(Math.round(Math.min(sidePanelMaxWidth(), readSidePanelWidth())))}
             onReset={() => {
               resetSidePanelWidth();
               setSidePanelWidth(SIDE_PANEL_DEFAULT);
