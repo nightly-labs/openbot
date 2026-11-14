@@ -2897,15 +2897,16 @@ export class ChannelService {
       // part of its reply. After a restart, the Claude history import wrote old turns again with new
       // ids, and each such row showed as a new reply under a completed task.
       // A row of a turn that continues the task after a background job is part of its reply while the
-      // task is not reopened. It gets its row when it completes: the turn can end before its last
-      // update, and a row left at streaming stopped the channel's history (#3673).
+      // task is not reopened and the channel is open. It gets its row when it completes: a turn that
+      // fails or stops leaves its row at streaming, and such a row stopped the channel's history (#3673).
       if (!original && !activeAssignment(assignment)) {
         const task = tasks.get(assignment.taskId);
         if (
           !late ||
           message.status === "streaming" ||
           task?.state !== "completed" ||
-          task.revision !== assignment.taskRevision
+          task.revision !== assignment.taskRevision ||
+          this.store.get(channelId).archived
         )
           continue;
       }
