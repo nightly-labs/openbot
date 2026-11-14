@@ -9,6 +9,7 @@ import {
   GooFilter,
   LIQUID_CLOSE,
   LIQUID_OPEN,
+  LIQUID_PAD,
   SLIDE_END,
   SNAPPY,
   SOFT,
@@ -32,8 +33,6 @@ const PHASE_LABELS: Record<VoicePhase, AppTextKey> = {
 
 /** The pill shows the newest readings only, so the waveform stays short. */
 const PILL_LEVELS = 12;
-/** The liquid layer starts this far above the frame edge, so the goo joins the drop to the frame. */
-const LIQUID_PAD = 40;
 /** The frame part of the liquid stops this far above the edge: the goo spreads it a little. */
 const FRAME_GAP = 2;
 /** The neck starts this far above the edge, in the frame. */
@@ -177,6 +176,8 @@ export function VoicePill(props: VoicePillProps) {
       motion.kick();
     });
     observer.observe(face);
+    // A new chat width moves the centre: the pill must be placed again.
+    observer.observe(dock);
     return () => {
       observer.disconnect();
       motion.stop();
@@ -227,7 +228,7 @@ export function VoicePill(props: VoicePillProps) {
           workingFaces
           class="voice-pill-avatar"
         />
-        <span class="voice-pill-phase sr-only">
+        <span class="voice-pill-phase sr-only" aria-live="polite">
           {t(props.muted && props.phase === "listening" ? "conversation.voice.phase.muted" : PHASE_LABELS[props.phase])}
         </span>
         <VoiceWaveform

@@ -30,8 +30,6 @@ export function contentIn(element: HTMLElement, delay = 0, motion = (rest: numbe
 
 export interface MorphPillProps extends Omit<JSX.HTMLAttributes<HTMLElement>, "class" | "children" | "ref"> {
   open: boolean;
-  /** The edge of the frame that the pill grows out of. */
-  edge: "top" | "bottom";
   /** The class of the shell. The shell must clip its content, so the content does not show past the spring. */
   class: string;
   /** The class of the face, the content that keeps its own width. */
@@ -40,18 +38,16 @@ export interface MorphPillProps extends Omit<JSX.HTMLAttributes<HTMLElement>, "c
   face?: string | undefined;
   /** Content of the shell behind the face, such as a progress fill. */
   backdrop?: JSX.Element;
-  /** The pill went back into its capsule and left the page. */
-  onClosed?: (() => void) | undefined;
   children: JSX.Element;
 }
 
 /**
- * A pill that is in the page while it is open or closing. It grows out of a small capsule beyond the
- * edge of its frame (the offset parent) and goes back into it. The width follows the content on a
- * spring. Other attributes, such as `aria-label` and `data-*`, go on the shell.
+ * A pill that is in the page while it is open or closing. It grows out of a small capsule below the
+ * bottom edge of its frame (the offset parent) and goes back into it. The width follows the content
+ * on a spring. Other attributes, such as `aria-label` and `data-*`, go on the shell.
  */
 export function MorphPill(props: MorphPillProps) {
-  const shellProps = omit(props, "open", "edge", "class", "faceClass", "face", "backdrop", "onClosed", "children");
+  const shellProps = omit(props, "open", "class", "faceClass", "face", "backdrop", "children");
   const [present, setPresent] = createSignal(false);
   let shell: HTMLElement | undefined;
   let face: HTMLElement | undefined;
@@ -65,20 +61,17 @@ export function MorphPill(props: MorphPillProps) {
   });
   onCleanup(() => {
     observer.disconnect();
-    // A pill that leaves the page in another way does not call `onClosed` later.
     for (const animation of closing) animation.cancel();
     closing = [];
   });
 
   // The face has its own width; 2 px are the border of the shell.
   const contentWidth = () => (face ? face.offsetWidth + 2 : 0);
-  /** From the pill to past the edge of its frame, so the capsule starts out of view. Up is negative. */
+  /** From the pill to past the bottom edge of its frame, so the capsule starts out of view. */
   const travel = () => {
-    const top = untrack(() => props.edge) === "top";
-    if (!shell?.offsetParent) return top ? -48 : 48;
+    if (!shell?.offsetParent) return 48;
     const parent = shell.offsetParent.getBoundingClientRect();
-    const own = shell.getBoundingClientRect();
-    return top ? -(own.top - parent.top + BUD.height) : parent.bottom - own.bottom + BUD.height;
+    return parent.bottom - shell.getBoundingClientRect().bottom + BUD.height;
   };
 
   function resizeTo(next: number) {
@@ -160,7 +153,6 @@ export function MorphPill(props: MorphPillProps) {
 
   function close() {
     setPresent(false);
-    untrack(() => props.onClosed)?.();
   }
 
   function reopen() {

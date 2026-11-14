@@ -292,13 +292,18 @@ async function readHostingDeveloperKey(): Promise<string> {
 /**
  * Dictation and voice conversations load the sherpa-onnx runtime from `.openbot-build/voice` in
  * development. A new worktree does not have it, so the first start downloads it (the models download
- * in the app when they are first used). Without the network the app still starts, without local voice.
+ * in the app when they are first used). Without the network, or when the download stops, the app still
+ * starts after the time limit, without local voice.
  */
 function prepareVoiceRuntime(): void {
   if (existsSync(join(projectRoot, ".openbot-build/voice/runtime", VOICE_RUNTIME_ADDON))) return;
   logger.info("Preparing the local voice runtime.");
   try {
-    execFileSync(process.execPath, ["run", "voice:prepare-runtime"], { cwd: projectRoot, stdio: "inherit" });
+    execFileSync(process.execPath, ["run", "voice:prepare-runtime"], {
+      cwd: projectRoot,
+      stdio: "inherit",
+      timeout: 300_000,
+    });
   } catch (error) {
     logger.warn(
       "Could not prepare the local voice runtime. Local voice is off until `bun run voice:prepare-runtime` completes.",

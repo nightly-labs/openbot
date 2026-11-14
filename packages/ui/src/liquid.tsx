@@ -7,6 +7,12 @@
 import { prefersReducedMotion } from "./utils";
 
 /**
+ * A liquid layer starts this far before the frame edge, so the goo joins a shape to the frame
+ * that is drawn in this band.
+ */
+export const LIQUID_PAD = 40;
+
+/**
  * Blurs the shapes under it and then cuts the blur at about half its alpha, so shapes that touch
  * flow into one. A shape that uses it sets `filter: url(#id)`.
  */

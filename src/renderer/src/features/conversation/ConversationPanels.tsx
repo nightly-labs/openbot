@@ -209,7 +209,6 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     installedSkills,
     installedSkillsLoadFailed,
     mcpServers,
-    voiceConversationAvailable,
     voiceConversationOpen,
     panelSubagentId,
     shownPanelThreadId,
@@ -221,7 +220,9 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
   } = useConversationViewScope();
   const { t, errorMessage } = useText();
   const chatAgentKey = () => (props.agent ? `${props.server?.id ?? "local"}:${props.agent.id}` : null);
-  const voiceKey = () => (voiceConversationOpen() && voiceConversationAvailable() && chatAgentKey()) || null;
+  // A channel cannot send the turns of a conversation. Elsewhere the pill stays while the conversation
+  // is on, also when its access ends, so End stays in view.
+  const voiceKey = () => (voiceConversationOpen() && !channel && chatAgentKey()) || null;
   // When the conversation ends, the pill stays in the page while it goes back into the top edge. A
   // conversation that starts again in that time gets a new pill. Another chat does not show the pill
   // of this one on its way out.

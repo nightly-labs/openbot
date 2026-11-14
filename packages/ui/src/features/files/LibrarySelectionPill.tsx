@@ -61,7 +61,6 @@ export function LibrarySelectionPill(props: LibrarySelectionPillProps) {
   return (
     <MorphPill
       open={props.open}
-      edge="bottom"
       class="library-pill"
       faceClass="library-pill-face"
       face={face()}

@@ -1,4 +1,4 @@
-import { createRoot, createSignal, getOwner, runWithOwner } from "solid-js";
+import { createEffect, createRoot, createSignal, getOwner, runWithOwner } from "solid-js";
 import type { createCodexLiveConversation } from "./codex-live-conversation-store";
 import type { createVoiceConversation } from "./voice-conversation-store";
 
@@ -55,14 +55,24 @@ export function createVoiceSessions() {
       if (session?.agentId === agentId && session.kind === kind) return session.conversation;
       end();
       const next = runWithOwner(owner, () =>
-        createRoot((dispose): VoiceSession => ({ agentId, kind, conversation: create(), dispose })),
+        createRoot((dispose): VoiceSession => {
+          const opened: VoiceSession = { agentId, kind, conversation: create(), dispose };
+          // A conversation that is turned off, also one that opened after End, must not keep the microphone.
+          createEffect(
+            () => activeAgentId() === agentId,
+            (on) => {
+              if (!on) queueMicrotask(() => end(opened));
+            },
+          );
+          return opened;
+        }),
       );
       session = next;
       return next.conversation;
     },
-    /** Ends the conversation of this kind, and turns it off. */
+    /** Ends the conversation of this kind, and turns it off. Before it opens, it only turns it off. */
     end(kind: VoiceConversationKind): void {
-      if (session?.kind !== kind) return;
+      if (session ? session.kind !== kind : activeAgentId() === null) return;
       setActiveAgentId(null);
       end();
     },

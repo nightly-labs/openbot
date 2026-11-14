@@ -4,7 +4,7 @@
  * give their geometry, in px. The tab profile and the spring engine are in `liquid.tsx`.
  */
 
-import { edgeTabFrame, edgeTabPath, type ProfilePoint, type SpringConfig } from "../../liquid";
+import { edgeTabFrame, edgeTabPath, LIQUID_PAD, type ProfilePoint, type SpringConfig } from "../../liquid";
 
 export const SEAT = 44;
 const SEAT_GAP = 10;
@@ -29,8 +29,7 @@ const HANDLE_RADIUS = 34.3;
 /** The width of the handle stroke, in px. */
 export const HANDLE_STROKE = 4;
 
-/** The liquid layer starts 40px before the stage and runs 60px past the window edge. */
-export const LIQUID_PAD = 40;
+/** The liquid layer starts LIQUID_PAD before the stage and runs 60px past the window edge. */
 export const LIQUID_WIDTH = STAGE_WIDTH + LIQUID_PAD + 60;
 export const LIQUID_HEIGHT = PANEL_HEIGHT + LIQUID_PAD * 2;
 
