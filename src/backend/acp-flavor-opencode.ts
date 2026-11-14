@@ -55,8 +55,17 @@ export function isOpenCodeInternalFailure(error: unknown): boolean {
  * user's country: `opencode run` shows "This model is not available in your country". A free model
  * needs no sign-in, so the text told the user to choose a free model while one was chosen. The ID
  * stands in for the display name: a free ID ends in `-free`, as the name ends in "Free".
+ *
+ * OpenCode 2.2.5 also answers this way for an OpenCode Go key that the service refuses, such as an
+ * expired key. Only OpenCode's log has the reason, so a user with a saved key was told to add a key
+ * (#9095). OpenBot sends its saved key only to OpenCode Go.
  */
-function openCodeAuthRequired(error: unknown, model: string | null, endpoint: AcpCustomEndpoint | null): string | null {
+function openCodeAuthRequired(
+  error: unknown,
+  model: string | null,
+  endpoint: AcpCustomEndpoint | null,
+  savedKey: boolean,
+): string | null {
   if (!(error instanceof RequestError) || error.code !== -32000) return null;
   if (endpoint)
     return sourceText(
@@ -65,6 +74,7 @@ function openCodeAuthRequired(error: unknown, model: string | null, endpoint: Ac
     );
   if (model?.toLowerCase().startsWith("opencode/") && isFreeOpencodeModel(model, model))
     return sourceText("error.provider.opencodeFreeModelRefused");
+  if (savedKey) return sourceText("error.provider.opencodeKeyRefused");
   const provider = model?.includes("/") ? model.slice(0, model.indexOf("/")) : "";
   return provider
     ? sourceText("error.provider.opencodeAuthRequired", { provider })
@@ -200,8 +210,8 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
           (typeof error.data.cwd === "string" &&
             error.message === `Invalid params: session ${sessionId} does not belong to cwd: ${error.data.cwd}`))
       : null,
-  turnFailure: (error, detail, redact, log, model, endpoint) => {
-    const authRequired = openCodeAuthRequired(error, model, endpoint);
+  turnFailure: (error, detail, redact, log, model, endpoint, savedKey) => {
+    const authRequired = openCodeAuthRequired(error, model, endpoint, savedKey);
     if (authRequired) return authRequired;
     // Google answers "API key not valid" (#1388).
     if (/invalid api key|api key not valid|unauthori[sz]ed|token refresh failed|authentication failed/i.test(detail))

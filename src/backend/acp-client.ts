@@ -494,6 +494,8 @@ export interface AcpProviderOptions {
   modelName?: (id: string, name: string) => string;
   /** The custom endpoint that serves a model, when the provider is not this agent's own. */
   customEndpoint?: (modelId: string | null) => AcpCustomEndpoint | null;
+  /** Whether OpenBot sends a saved API key for the provider of a model. Never the key itself. */
+  savedKey?: (modelId: string | null) => boolean;
   /**
    * Values to mask in every diagnostic and error this client emits, read at each use: the custom
    * agent's environment values, which have no secret name that `redactText` could know them by.
@@ -3819,6 +3821,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           (text) => this.emit("diagnostic", this.#redact(text)),
           thread.currentModelId,
           this.options.customEndpoint?.(thread.currentModelId) ?? null,
+          this.options.savedKey?.(thread.currentModelId) ?? false,
         ) ?? detail;
       // A fixed code, so analytics and failover need not read the cause again from the sentence.
       const causeCode = turn.failureCause ?? acpFailureCause(error, this.#flavor, message);
