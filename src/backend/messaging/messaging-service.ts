@@ -1560,8 +1560,7 @@ export class MessagingService {
               .toReversed()
               .flatMap((entry) =>
                 (entry.files ?? []).map((file) => ({ file, label: `${entry.authorName}: ${file.name}` })),
-              )
-              .filter((item) => !quoted.some((candidate) => candidate.file.id === item.file.id)),
+              ),
           ];
           const { paths, skipped } = yield* this.#download(
             adapter,
