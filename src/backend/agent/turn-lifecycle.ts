@@ -1,3 +1,4 @@
+import { isNarrationItemId } from "@openbot/contracts/conversation-narration";
 import {
   type AgentEvent,
   type AgentStepActivity,
@@ -390,6 +391,8 @@ export class TurnLifecycle {
       acted: boolean;
       /** A compaction ran in the turn. Codex can end such a turn with no answer. */
       compacted: boolean;
+      /** The id of the narration that Codex wrote after the turn's last tool step, if any. */
+      narration: string | null;
       /** The tool steps that started and did not end yet. While one is open, the turn works, it does not wait. */
       openTools: Set<string>;
       /** The time of the last provider notification that names this turn. */
@@ -780,17 +783,21 @@ export class TurnLifecycle {
   }
 
   /**
-   * Codex ends a turn with no answer and no step as completed. A lead that got its teammates' results
-   * and ended that way stopped the whole team, with no error (#7225). Such a turn fails as an ACP turn
-   * with no answer does, and its end runs it again or shows the error. A turn that wants no answer, a
-   * turn that compacted, a plan and a turn that the user stopped can end empty.
+   * Codex ends a turn with no answer as completed. A lead that got its teammates' results and ended
+   * that way stopped the whole team, with no error (#7225). Such a turn fails as an ACP turn with no
+   * answer does, and its end runs it again or shows the error. A turn that wants no answer, a turn
+   * that compacted, a plan and a turn that the user stopped can end empty.
+   *
+   * Codex can also write its last words as narration and then send an empty answer. Codex itself
+   * takes that narration as the turn's result, so the narration after the last tool step becomes the
+   * answer (#8837). A turn that did a step and wrote no such narration ends as before: its output can
+   * be a file or an image, or teammates or subagents still work for it.
    */
   #holdCodexNoAnswer(agentId: string, threadId: string, turnId: string, source: AgentClient): boolean {
     const running = this.#runningTurns.get(turnId);
     if (
       source.provider !== "codex" ||
       running === undefined ||
-      running.acted ||
       running.compacted ||
       this.#turnErrors.has(turnId) ||
       this.#failoverTurns.has(turnId) ||
@@ -808,13 +815,24 @@ export class TurnLifecycle {
       this.#quietRoutineTurn(agentId, threadId, deliveries, this.#noUpdateTurns.has(turnId))
     )
       return false;
-    const messages = this.#conversation.ensureSnapshot(agentId, threadId).messages;
+    const snapshot = this.#conversation.ensureSnapshot(agentId, threadId);
+    const { messages } = snapshot;
     if (
       messages.some(
         (message) => message.turnId === turnId && (message.id === `${turnId}:plan` || isAgentAnswer(message)),
       )
     )
       return false;
+    // A channel turn keeps its own rules: text after `channel_result` is a step there, not an answer.
+    if (
+      this.#conversation.channelForThread(snapshot.threadId) === null &&
+      deliveries.every(({ channelId }) => channelId === undefined) &&
+      this.#answerWithNarration(messages, turnId, running.narration)
+    ) {
+      logger.info("A turn's last narration became its answer.", { agentId, turnId, provider: source.provider });
+      return false;
+    }
+    if (running.acted) return false;
     const message = sourceText("error.provider.acpNoAnswer", {
       provider: agentProviderDescriptor(source.provider).displayName,
     });
@@ -829,6 +847,23 @@ export class TurnLifecycle {
     // The failed delivery keeps this reason.
     this.#turnErrors.set(turnId, message);
     this.#failoverTurns.set(turnId, { message, context });
+    return true;
+  }
+
+  /**
+   * Makes the narration that Codex wrote after the turn's last tool step the turn's answer. The
+   * turn's empty rows hold nothing, so they go: the turn-completion write deletes their stored rows.
+   */
+  #answerWithNarration(messages: ConversationMessage[], turnId: string, narrationId: string | null): boolean {
+    const narration = messages.find((message) => message.id === narrationId && message.turnId === turnId);
+    if (narration?.itemType !== "commentary" || !narration.text.trim()) return false;
+    narration.itemType = "final_answer";
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+      // Codex names its answer rows `final_answer`.
+      const row = message?.itemType === "final_answer" ? { ...message, itemType: "agentMessage" } : message;
+      if (isEmptyAttemptText(row, turnId)) messages.splice(index, 1);
+    }
     return true;
   }
 
@@ -923,6 +958,7 @@ export class TurnLifecycle {
           produced: false,
           acted: false,
           compacted: false,
+          narration: null,
           openTools: new Set(),
           lastEventAt: Date.now(),
         });
@@ -979,8 +1015,18 @@ export class TurnLifecycle {
         const itemId = getString(item, "id");
         if (itemId) this.#itemTurns.set(itemId, turnId);
         this.#markProduced(turnId, isRepeatedWork(item));
+        const running = this.#runningTurns.get(turnId);
+        if (running && item.type === "agentMessage" && item.phase === "commentary") {
+          if (
+            notification.method === "item/completed" &&
+            itemId !== null &&
+            isNarrationItemId(itemId, source.provider) &&
+            isString(item.text) &&
+            item.text.trim()
+          )
+            running.narration = itemId;
+        } else if (running && isRepeatedWork(item)) running.narration = null;
         if (item.type === "contextCompaction") {
-          const running = this.#runningTurns.get(turnId);
           if (running) running.compacted = true;
           // A memory change can mark the session for reload while its current client compacts it.
           if (this.#conversation.openClientFor(threadId) !== source) return;
