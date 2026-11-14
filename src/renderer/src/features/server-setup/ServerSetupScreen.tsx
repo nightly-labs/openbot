@@ -10,6 +10,7 @@ import {
   type SetupAnswer,
   setupLoginStart,
   setupLoginVerify,
+  setupRetry,
   setupStatus,
   text,
 } from "./server-setup-port";
@@ -74,6 +75,12 @@ export function ServerSetupScreen() {
     const message = text(answer, "message") ?? fallbackMessage(code);
     const retryAfterSeconds = number(answer, "retry_after");
     return retryAfterSeconds ? { code, message, retryAfterSeconds } : { code, message };
+  }
+
+  /** The server refused because of its account state: the page shows that state. */
+  function refusedByAccount(answer: SetupAnswer): boolean {
+    const code = text(answer, "error");
+    return code === "signed_in" || (code?.startsWith("account_") ?? false);
   }
 
   function poll(delay = STATUS_POLL_MS): void {
@@ -147,7 +154,7 @@ export function ServerSetupScreen() {
       });
       return;
     }
-    if (text(answer, "error") === "signed_in") {
+    if (refusedByAccount(answer)) {
       await refresh();
       return;
     }
@@ -167,7 +174,7 @@ export function ServerSetupScreen() {
       showStatus(answer);
       return;
     }
-    if (text(answer, "error") === "signed_in") {
+    if (refusedByAccount(answer)) {
       await refresh();
       return;
     }
@@ -184,7 +191,7 @@ export function ServerSetupScreen() {
         <AccountLogin
           variant={variant}
           state={state.login}
-          onRetry={refresh}
+          onRetry={async () => showStatus(await setupRetry())}
           onRequestEmailCode={requestEmailCode}
           onVerifyEmailCode={verifyEmailCode}
           onReset={async () => {

@@ -7,7 +7,8 @@
  * The page listens on a TCP port of the container, which publishes no port. Only the network of the
  * container reaches it: on Umbrel, the app proxy, which asks for the Umbrel login first. Other programs
  * on that network can reach the port too, so the page answers only the requests of
- * `ServerSetupAction`: status and the email-code sign-in, which a signed-in server refuses. It has no
+ * `ServerSetupAction`: status, the retry of the account and the email-code sign-in, which a server
+ * with a session refuses. It has no
  * sign-out, claim, rename or Mobile Connect code. It never sends the session token, the code or the
  * challenge of another request back. It serves only its page and the files in `assets/`.
  *
@@ -36,6 +37,7 @@ const API_ROUTES: Record<string, ServerSetupAction> = {
   [`GET ${SERVER_SETUP_ROUTES.status}`]: "status",
   [`POST ${SERVER_SETUP_ROUTES.loginStart}`]: "login_start",
   [`POST ${SERVER_SETUP_ROUTES.loginVerify}`]: "login_verify",
+  [`POST ${SERVER_SETUP_ROUTES.retry}`]: "retry",
 };
 
 const SECURITY_HEADERS = {

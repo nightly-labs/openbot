@@ -41,6 +41,8 @@ const SERVER_NAME = "OpenBot";
 
 // The fake account service. It accepts one code, as the account service does.
 let account: CentralAuthState = { status: "signed_out" };
+/** The stored session. It stays when the account service cannot confirm it, as in the real manager. */
+let session = false;
 const sentCodes: string[] = [];
 /** Each code that reached the account service. A refused request must not reach it. */
 const verifiedCodes: string[] = [];
@@ -67,8 +69,20 @@ const centralAuth: ServerModeOptions["centralAuth"] = {
         return structuredClone(account);
       }
       account = { status: "signed_in", user: { id: "user-e2e", email: account.email, name: null, avatarUrl: null } };
+      session = true;
       // The entry point publishes the host when the account changes.
       setTimeout(() => void runCauseEffect(serverMode.publish()), 0);
+      return structuredClone(account);
+    }),
+  hasSession: () => session,
+  // The account service answers again: a stored session is confirmed.
+  retry: () =>
+    Effect.sync(() => {
+      if (account.status === "error" && session) {
+        account = { status: "signed_in", user: { id: "user-e2e", email: EMAIL, name: null, avatarUrl: null } };
+      } else if (account.status === "error") {
+        account = { status: "signed_out" };
+      }
       return structuredClone(account);
     }),
   cancelCompanySignIn: () => Effect.sync(() => structuredClone(account)),
@@ -77,6 +91,7 @@ const centralAuth: ServerModeOptions["centralAuth"] = {
   logout: () =>
     Effect.sync(() => {
       account = { status: "signed_out" };
+      session = false;
       return structuredClone(account);
     }),
   createMobileConnect: () => Effect.die(new Error("The setup page must not make a Mobile Connect code.")),
@@ -158,6 +173,7 @@ interface Checks {
   signedInRefusesSignIn?: number;
   oldChallengeRefused?: number;
   signedInRefusesCode?: number;
+  unconfirmedSessionRefuses?: { start: number; verify: number; retry: string | number | undefined };
 }
 const checks: Checks = {};
 rmSync(OUT, { recursive: true, force: true });
@@ -299,6 +315,27 @@ try {
   assert.deepEqual(verifiedCodes, codesBefore);
   assert.equal(account.status, "signed_in");
   checks.signedInRefusesCode = code.status;
+
+  // The account service did not confirm the stored session at the start. The session is still the
+  // owner's: no sign-in and no code, only the retry, which confirms it.
+  const signedIn = account;
+  account = { status: "error", issue: { code: "auth_api_unavailable", message: "The account service is down." } };
+  const unconfirmedStart = await postForm("/api/login/start", { email: "other@example.com" });
+  assert.deepEqual(await unconfirmedStart.json(), { error: "account_error" });
+  const unconfirmedVerify = await postForm("/api/login/verify", { challenge: CHALLENGE, code: CODE });
+  assert.deepEqual(await unconfirmedVerify.json(), { error: "account_error" });
+  assert.deepEqual(sentCodes, [EMAIL]);
+  assert.deepEqual(verifiedCodes, codesBefore);
+  assert.equal(session, true);
+  const retried = await postForm("/api/retry", {});
+  const retriedValues = await retried.json();
+  assert.equal(retriedValues.account, "signed_in");
+  assert.deepEqual(account, signedIn);
+  checks.unconfirmedSessionRefuses = {
+    start: unconfirmedStart.status,
+    verify: unconfirmedVerify.status,
+    retry: retriedValues.account,
+  };
 
   const report = {
     ok: true,

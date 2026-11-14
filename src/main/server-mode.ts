@@ -50,7 +50,7 @@ export interface ServerModeEnvironment {
 }
 
 /** The requests of the setup page: status and the email-code sign-in. Nothing else. */
-export type ServerSetupAction = "status" | "login_start" | "login_verify";
+export type ServerSetupAction = "status" | "login_start" | "login_verify" | "retry";
 
 /** Returns null unless this process is a self-hosted server that systemd started. */
 export function takeServerModeEnvironment(
@@ -86,6 +86,8 @@ export interface ServerModeOptions {
     | "requestEmailCode"
     | "cancelCompanySignIn"
     | "verifyEmailCode"
+    | "hasSession"
+    | "retry"
     | "canPersistSession"
     | "redeemServerClaim"
     | "logout"
@@ -221,23 +223,54 @@ export class ServerMode {
       case "status":
         return Effect.sync(() => this.#status());
       case "login_start":
-        return this.#startLogin(body.get("email") ?? "", null);
+        return Effect.suspend(
+          () => this.#setupRefusal(["signed_out", "code_sent"]) ?? this.#startLogin(body.get("email") ?? "", null),
+        );
       case "login_verify":
-        return this.#verifySetupLogin(body.get("challenge") ?? "", body.get("code") ?? "");
+        return Effect.suspend(
+          () =>
+            this.#setupRefusal(["code_sent"]) ??
+            this.#verifySetupLogin(body.get("challenge") ?? "", body.get("code") ?? ""),
+        );
+      case "retry":
+        return this.#retrySetup();
     }
   };
+
+  /**
+   * A sign-in of the setup page starts only on a server with no session. A session that the account
+   * service could not confirm at the start (state `error` or `loading`) is still the owner's session:
+   * a code of another account would replace it, and a wrong code would remove it.
+   */
+  #setupRefusal(allowed: readonly CentralAuthState["status"][]): Effect.Effect<Answer> | null {
+    const { centralAuth } = this.#options;
+    const status = centralAuth.getState().status;
+    if (status === "signed_in") return Effect.succeed(failure(409, "signed_in"));
+    if (centralAuth.hasSession() || !allowed.includes(status)) return Effect.succeed(failure(409, `account_${status}`));
+    return null;
+  }
 
   /**
    * The page signs in only with the challenge of the current sign-in. Another program on the network
    * cannot complete an older challenge of its own after the owner asked for a code.
    */
   #verifySetupLogin(challenge: string, code: string): Effect.Effect<Answer, RemoteWorkflowError> {
+    const state = this.#options.centralAuth.getState();
+    if (state.status === "code_sent" && state.challengeId !== challenge.trim()) {
+      return Effect.succeed(failure(409, "challenge_replaced", sourceText("error.auth.codeNotVerified")));
+    }
+    return this.#verifyLogin(challenge, code, null);
+  }
+
+  /** The retry of the account screen: it starts the account again, as the app does. Only after an error. */
+  #retrySetup(): Effect.Effect<Answer, RemoteWorkflowError> {
     return Effect.suspend(() => {
-      const state = this.#options.centralAuth.getState();
-      if (state.status === "code_sent" && state.challengeId !== challenge.trim()) {
-        return Effect.succeed(failure(409, "challenge_replaced", sourceText("error.auth.codeNotVerified")));
-      }
-      return this.#verifyLogin(challenge, code, null);
+      const { centralAuth } = this.#options;
+      if (centralAuth.getState().status !== "error") return Effect.sync(() => this.#status());
+      return centralAuth.retry().pipe(
+        Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause })),
+        Effect.map(() => this.#status()),
+      );
     });
   }
 

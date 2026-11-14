@@ -35,10 +35,10 @@ Umbrel's `app_proxy` asks for the Umbrel password before it sends a request to t
 listens on all addresses of the container, so other apps on the Docker network of Umbrel can reach it
 without that password. For this reason the page:
 
-- has only three requests: the status, send a code, and sign in with the code. It has no sign-out,
-  server claim, rename or Mobile Connect code.
-- refuses a sign-in and a code when the server is signed in. Another app cannot move the server to
-  its own account or remove its session.
+- has only four requests: the status, send a code, sign in with the code, and retry after an account
+  error. It has no sign-out, server claim, rename or Mobile Connect code.
+- refuses a sign-in and a code when the server has a session, also a session that the account service
+  has not confirmed yet. Another app cannot move the server to its own account or remove its session.
 - accepts a code only for the current sign-in. Another app cannot complete an older sign-in of its own
   after you ask for a code.
 - accepts a request only with its own `x-openbot-setup` header, as a form, and from its own origin

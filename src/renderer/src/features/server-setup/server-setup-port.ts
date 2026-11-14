@@ -26,6 +26,11 @@ export function setupLoginVerify(challenge: string, code: string): Promise<Setup
   return call("POST", SERVER_SETUP_ROUTES.loginVerify, { challenge, code });
 }
 
+/** Starts the account of the server again after an error, as the Retry button of the app does. */
+export function setupRetry(): Promise<SetupAnswer> {
+  return call("POST", SERVER_SETUP_ROUTES.retry, {});
+}
+
 export function text(answer: SetupAnswer, key: string): string | null {
   const value = answer.values[key];
   return isString(value) && value ? value : null;
