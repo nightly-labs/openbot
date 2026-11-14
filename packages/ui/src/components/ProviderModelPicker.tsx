@@ -611,9 +611,9 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     const effort = props.reasoningEffort;
     if (props.foreignProvider !== undefined || selectedHasVariants()) return;
     // The effort that the model value fixes is part of the model, also where the effort is not a setting.
-    const fixed = selectedFixed()?.effort;
-    if (fixed) return reasoningLabel(fixed, t);
-    if (!showsReasoningEffort() || !effort) return;
+    const fixed = selectedFixed();
+    if (fixed?.effort) return reasoningLabel(fixed.effort, t);
+    if (fixed || !showsReasoningEffort() || !effort) return;
     const model = selectedModel();
     if (!model?.supportedReasoningEfforts.includes(effort) || model.reasoningEffortConfigurable === false) return;
     return reasoningLabel(effort, t);
@@ -1024,7 +1024,10 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                   const variants = effortModel()?.variants ?? [];
                   if (variants.length) return variants;
                   const option = effortOption();
-                  return showsReasoningEffort() && option && option.reasoningEffortConfigurable !== false
+                  return showsReasoningEffort() &&
+                    option &&
+                    option.reasoningEffortConfigurable !== false &&
+                    !fixedModelSettings(option)
                     ? option.supportedReasoningEfforts.map((effort) => ({
                         id: effort,
                         name: reasoningLabel(effort, t),
@@ -1423,14 +1426,16 @@ function displayModelName(name: string | undefined, fallback: string): string {
 
 interface FixedModelSettings {
   context: string | null;
-  /** Only when the model has no effort setting of its own. */
   effort: AgentReasoningEffort | null;
   fast: boolean;
 }
 
 /**
- * The settings that a Cursor model value fixes, as in `grok-4.7[context=256k,reasoning=high,fast=true]`.
- * Cursor ACP lists one value for each model and refuses the others, so these are not choices (#4411).
+ * The settings that a Cursor model value fixes, as in `grok-4.7[context=256k,reasoning_effort=high,fast=true]`.
+ * Cursor ACP lists one value for each model and refuses the others, so these are not choices (#4411),
+ * and such a model has no effort setting. The value says so also where the model option does not:
+ * a joined server does not send `reasoningEffortConfigurable` (#7737). Cursor names the effort
+ * `reasoning`, `effort` or `reasoning_effort`, which differs between models.
  */
 function fixedModelSettings(model: ClientAgentModelOption | undefined): FixedModelSettings | null {
   if (model?.provider !== "cursor") return null;
@@ -1440,11 +1445,7 @@ function fixedModelSettings(model: ClientAgentModelOption | undefined): FixedMod
   for (const pair of params.split(",")) {
     const [key, value = ""] = pair.split("=");
     if (key === "context" && /^\d+(?:\.\d+)?[km]$/iu.test(value)) settings.context = value;
-    else if (
-      (key === "reasoning" || key === "effort") &&
-      model.reasoningEffortConfigurable === false &&
-      isReasoningEffort(value)
-    )
+    else if ((key === "reasoning" || key === "effort" || key === "reasoning_effort") && isReasoningEffort(value))
       settings.effort = value;
     else if (key === "fast") settings.fast = value === "true";
   }
