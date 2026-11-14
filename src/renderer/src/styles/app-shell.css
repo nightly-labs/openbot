@@ -3307,6 +3307,16 @@ textarea {
   line-height: var(--openbot-leading-sm);
 }
 
+/* A named quota group: its full name on one row above its windows. */
+.account-usage-window-group {
+  grid-column: 1 / -1;
+  min-width: 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  overflow-wrap: anywhere;
+}
+
 .account-usage-window[data-usage-tone="warning"] {
   --account-usage-window-tone: var(--openbot-warning);
 }
