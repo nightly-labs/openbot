@@ -25,8 +25,11 @@ import { MediaFilePreview } from "./MediaFilePreview";
 export interface AttachmentMediaSource {
   /** The loaded URL of an attachment. Reactive. */
   url(attachmentId: string): string | undefined;
-  /** Loads the file for inline display. Resolves false when it cannot show inline. */
-  load(attachment: AttachmentSummary): Promise<boolean>;
+  /**
+   * Loads the file for inline display. Resolves false when it cannot show inline. An image loads up to
+   * `thumbnailLimit`, or up to `mediaLimit` with `"media"`: the image that the user asked an agent to make.
+   */
+  load(attachment: AttachmentSummary, limit?: "thumbnail" | "media"): Promise<boolean>;
   /** An image up to this size loads when its card shows. */
   thumbnailLimit: number;
   /** Audio or video up to this size loads on a click. Above it, the card offers only the download. */

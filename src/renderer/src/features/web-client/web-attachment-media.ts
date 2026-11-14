@@ -139,7 +139,7 @@ export function createWebAttachmentMedia(
     thumbnailLimit: WEB_THUMBNAIL_BYTES,
     mediaLimit: WEB_MEDIA_BYTES,
     url: (id) => (disposed ? undefined : shown().get(`${hostId()}:${id}`)),
-    load(attachment) {
+    load(attachment, size = "thumbnail") {
       const host = currentHost();
       const key = `${host}:${attachment.id}`;
       const entry = entries.get(key);
@@ -152,7 +152,7 @@ export function createWebAttachmentMedia(
       if (running) return running;
       const type = mediaType(attachment);
       if (!type) return Promise.resolve(false);
-      const limit = playableMediaKind(type) ? WEB_MEDIA_BYTES : WEB_THUMBNAIL_BYTES;
+      const limit = playableMediaKind(type) || size === "media" ? WEB_MEDIA_BYTES : WEB_THUMBNAIL_BYTES;
       if (attachment.size > limit) return Promise.resolve(false);
       const job = download(attachment, type, limit, key).finally(() => {
         if (loading.get(key) === job) loading.delete(key);
