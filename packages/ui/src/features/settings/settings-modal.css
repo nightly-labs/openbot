@@ -483,12 +483,13 @@
   font-variant-numeric: tabular-nums;
 }
 
-.app-settings-modal-shell .settings-modal-select {
+/* Every select of a settings row has one width, in your settings and in server settings. */
+:is(.app-settings-modal-shell, .server-settings-modal-shell) .settings-modal-select {
   width: 168px;
 }
 
-/* "Open external links in": browser names are longer than the other choices. */
-.app-settings-modal-shell .settings-modal-link-select {
+/* Long choices, such as browser names, voice models and timezones. */
+:is(.app-settings-modal-shell, .server-settings-modal-shell) .settings-modal-link-select {
   width: 220px;
 }
 
@@ -507,13 +508,19 @@
   gap: var(--openbot-space-2);
 }
 
-.app-settings-modal-shell .settings-modal-select .ui-select-trigger {
+/*
+ * Every select in settings has the same fill. `Select` puts the class on its root, and `SearchSelect` (the
+ * font and timezone rows) puts it on the trigger. Selects without the class, such as the filters above a
+ * list, are in the content.
+ */
+:is(.app-settings-modal-shell, .server-settings-modal-shell)
+:is(
+  .settings-modal-select .ui-select-trigger,
+  .ui-select-trigger.settings-modal-select,
+  .settings-modal-content .ui-select-trigger
+) {
   background: var(--openbot-bg-surface-raised);
   color: var(--openbot-text-secondary);
-}
-
-.app-settings-modal-shell .settings-modal-update-track-select {
-  width: 112px;
 }
 
 .app-settings-modal-shell .settings-modal-update-actions {
@@ -787,7 +794,7 @@
   }
 
   .app-settings-modal-shell .settings-modal-row .ui-item-actions,
-  .app-settings-modal-shell :is(.settings-modal-select, .settings-modal-update-track-select) {
+  .app-settings-modal-shell .settings-modal-select {
     width: 100%;
   }
 
