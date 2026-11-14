@@ -3809,6 +3809,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           (text) => this.emit("diagnostic", this.#redact(text)),
           thread.currentModelId,
           this.options.customEndpoint?.(thread.currentModelId) ?? null,
+          this.#label,
         ) ?? detail;
       // A fixed code, so analytics and failover need not read the cause again from the sentence.
       const causeCode = turn.failureCause ?? acpFailureCause(error, this.#flavor, message);

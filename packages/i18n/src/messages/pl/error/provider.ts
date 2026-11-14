@@ -239,6 +239,8 @@ export const messages = {
     "Model OpenCode zakończył turę po rozumowaniu, bez odpowiedzi. Spróbuj ponownie albo wybierz inny model.",
   "error.provider.acpNoAnswer":
     "{provider} zakończył turę bez odpowiedzi. Wyślij wiadomość ponownie albo rozpocznij nowy czat.",
+  "error.provider.acpRefusedNoReason":
+    "{provider} zatrzymał się bez odpowiedzi i nie podał powodu. Jeśli wymaga logowania, zaloguj się, a potem wyślij wiadomość ponownie.",
   "error.provider.chatgptPageFailed": "Nie udało się otworzyć strony połączenia ChatGPT.",
   "error.provider.noneReady": "Żaden dostawca agentów nie jest gotowy.",
   "error.provider.claudeTurnActive": "Zaczekaj na zakończenie aktywnej tury Claude, zanim odświeżysz jego kontekst.",

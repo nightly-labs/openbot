@@ -65,7 +65,7 @@ export interface AcpFlavor {
   /**
    * The message of a failed turn, from the redacted failure text. `redact` masks more text, `log`
    * writes a diagnostic that it redacts first, and `model` is the session's model. `endpoint` is the
-   * custom endpoint that serves that model, or null.
+   * custom endpoint that serves that model, or null. `label` is the agent's name for the user.
    */
   turnFailure?(
     error: unknown,
@@ -74,6 +74,7 @@ export interface AcpFlavor {
     log: (text: string) => void,
     model: string | null,
     endpoint: AcpCustomEndpoint | null,
+    label: string,
   ): string;
   /**
    * The cause of a turn's failure that the agent names in a structured field, such as an error name
@@ -549,8 +550,36 @@ function customEmptyAnswerFailure({ answered }: { answered: boolean }, label: st
   return answered ? null : sourceText("error.provider.acpNoAnswer", { provider: label });
 }
 
+/**
+ * A custom agent's `refusal` stop reason names no cause, and agents use it for other things than
+ * blocked content: WorkBuddy sends it when its sign-in is missing (#8876). The chat showed only the
+ * word "refusal", and analytics counted blocked content.
+ */
+function customRefusal(error: unknown, detail: string, label: string): string {
+  return error === "refusal" ? sourceText("error.provider.acpRefusedNoReason", { provider: label }) : detail;
+}
+
+const customTurnFailure: NonNullable<AcpFlavor["turnFailure"]> = (
+  error,
+  detail,
+  _redact,
+  _log,
+  _model,
+  _endpoint,
+  label,
+) => customRefusal(error, detail, label);
+
+function customFailureCause(error: unknown): CauseCode | null {
+  return error === "refusal" ? "unknown" : null;
+}
+
 /** Oh My Pi (`omp acp`). Its rules are here when they do not apply to every custom agent. */
-const OMP_ACP_FLAVOR: AcpFlavor = { sessionNotFound: ompSessionNotFound, emptyAnswerFailure: customEmptyAnswerFailure };
+const OMP_ACP_FLAVOR: AcpFlavor = {
+  sessionNotFound: ompSessionNotFound,
+  emptyAnswerFailure: customEmptyAnswerFailure,
+  turnFailure: customTurnFailure,
+  failureCause: customFailureCause,
+};
 
 /**
  * A custom agent without a flavor of its own. It keeps omp's rule: the rule needs the exact session
@@ -559,6 +588,8 @@ const OMP_ACP_FLAVOR: AcpFlavor = { sessionNotFound: ompSessionNotFound, emptyAn
 const CUSTOM_ACP_FLAVOR: AcpFlavor = {
   sessionNotFound: ompSessionNotFound,
   emptyAnswerFailure: customEmptyAnswerFailure,
+  turnFailure: customTurnFailure,
+  failureCause: customFailureCause,
 };
 
 const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
@@ -571,7 +602,8 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
     sessionNotFound: (error, sessionId) => hermesSessionNotFound(error) ?? ompSessionNotFound(error, sessionId),
     lostTurns: HERMES_LOST_TURNS,
     resendsAnswer: true,
-    turnFailure: hermesTurnFailure,
+    turnFailure: (error, detail, _redact, _log, _model, _endpoint, label) =>
+      customRefusal(error, hermesTurnFailure(error, detail), label),
   },
 };
 

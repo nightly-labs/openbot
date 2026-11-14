@@ -239,6 +239,8 @@ export const messages = {
     "Модель OpenCode завершила ход после рассуждения, без ответа. Повторите попытку или выберите другую модель.",
   "error.provider.acpNoAnswer":
     "{provider} завершил ход без ответа. Отправьте сообщение ещё раз или начните новый чат.",
+  "error.provider.acpRefusedNoReason":
+    "{provider} остановился без ответа и не назвал причину. Если нужен вход, войдите в него, затем отправьте сообщение ещё раз.",
   "error.provider.chatgptPageFailed": "OpenBot не смог открыть страницу подключения ChatGPT.",
   "error.provider.noneReady": "Ни один провайдер агентов не готов.",
   "error.provider.claudeTurnActive": "Дождитесь завершения текущего хода Claude, прежде чем обновлять его контекст.",

@@ -260,6 +260,8 @@ export const messages = {
     "Le modèle OpenCode a terminé le tour après son raisonnement, sans réponse. Réessayez ou choisissez un autre modèle.",
   "error.provider.acpNoAnswer":
     "{provider} a terminé le tour sans réponse. Renvoyez le message ou démarrez une nouvelle discussion.",
+  "error.provider.acpRefusedNoReason":
+    "{provider} s’est arrêté sans réponse et sans donner de raison. S’il demande une connexion, connectez-vous, puis renvoyez le message.",
   "error.provider.chatgptPageFailed": "OpenBot n’a pas pu ouvrir la page de connexion ChatGPT.",
   "error.provider.noneReady": "Aucun fournisseur d’agent n’est prêt.",
   "error.provider.claudeTurnActive": "Attendez la fin du tour Claude actif avant d’actualiser son contexte.",
