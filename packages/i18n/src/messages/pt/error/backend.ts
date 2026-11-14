@@ -17,6 +17,7 @@ export const messages = {
   "error.backend.browserViewLimit": "Há visualizações do navegador demais abertas neste computador anfitrião.",
   "error.backend.browserViewEnded": "A visualização ao vivo desta página terminou.",
   "error.backend.browserViewFailed": "A visualização ao vivo desta página falhou.",
+  "error.backend.browserViewNoFrame": "A página no servidor não apareceu. Feche esta visualização e abra-a novamente.",
   "error.backend.windowTemporarilyUnavailable": "A janela do OpenBot está temporariamente indisponível.",
   "error.backend.windowUnavailable": "A janela do OpenBot está indisponível.",
   "error.backend.sunshineApiHttp": "A API do Sunshine falhou com HTTP {status}.",
