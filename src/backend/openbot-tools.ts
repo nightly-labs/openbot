@@ -433,7 +433,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "read_agent",
     description:
-      "Read the setup of one local OpenBot agent, or your own when you omit agentId: profile, provider, model, reasoning effort, account, backup models, the model it returns to after a usage limit or a provider error, access, permissions, Computer Use, notifications, browser profile with the names of all browser profiles, installed skills, routines, and the MCP servers it gets. Read-only. Call it before you change another agent.",
+      "Read the setup of one local OpenBot agent, or your own when you omit agentId: profile, provider, model, reasoning effort, account, backup models, the model it returns to after a usage limit or a provider error, access, permissions, Computer Use, notifications, browser profile, installed skills, routines, and the MCP servers it gets. Read-only. Call it before you change another agent.",
     shape: readAgentToolSchema.shape,
   },
   {
@@ -457,7 +457,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "set_browser_profile",
     description:
-      'Move local OpenBot agents to one browser profile, from the user\'s request. A browser profile holds sign-ins, cookies and site data; agents on the same profile share them. profile is "shared" (the profile of all agents without another one), "own" (a profile of each agent only) or "named" with the name of a named profile; read_agent lists the names. A name that no profile has makes a new, empty profile. The owner approves each change on a card, and only a person\'s message in your chat or a thread they opened can start it. The open tabs of each moved agent close. The result has, for each agent id, ok (with unchanged when it was already there) or the error.',
+      "Move local agents to one browser profile when the user asks. A profile holds sign-ins and cookies, which its agents share. The owner approves each change on a card. Moved agents lose their open tabs.",
     shape: setBrowserProfileToolSchema.shape,
   },
   {

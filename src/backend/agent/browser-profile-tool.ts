@@ -38,19 +38,17 @@ export const setBrowserProfileToolSchema = z.strictObject({
     .min(1)
     .max(SET_BROWSER_PROFILE_AGENTS_LIMIT)
     .refine((ids) => new Set(ids).size === ids.length, "Pass each agent id once.")
-    .describe("Stable ids from list_agents. Include your own id to move yourself."),
+    .describe("Ids from list_agents. Include yours to move yourself."),
   profile: z
     .enum(["shared", "own", "named"])
-    .describe(
-      '"shared": the profile of all agents that have no other. "own": a profile of each agent only. "named": the named profile in name.',
-    ),
+    .describe('"shared": of all agents with no other. "own": one for each agent. "named": the one in name.'),
   name: z
     .string()
     .trim()
     .min(1)
     .max(BROWSER_PROFILE_NAME_MAX)
     .optional()
-    .describe("Only with profile named. A name that no profile has makes a new profile."),
+    .describe("Only with named. A new name makes an empty profile."),
 });
 
 /** The browser profile of an agent as `read_agent` shows it. A profile name is user data. */
