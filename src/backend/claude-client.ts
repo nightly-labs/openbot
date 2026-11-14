@@ -2315,6 +2315,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           typeof input.file_path === "string"
             ? [input.file_path]
             : undefined,
+        // The folder that a finished search worked in, so a chip that names a file from its result finds it.
+        folderPaths:
+          completed && failure === null && ["Glob", "Grep", "LS"].includes(name) && isRecord(input)
+            ? [input.path].filter((path) => typeof path === "string")
+            : undefined,
         item: {
           id,
           type: "toolCall",
