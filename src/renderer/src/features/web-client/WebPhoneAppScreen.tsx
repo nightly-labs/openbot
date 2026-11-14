@@ -9,8 +9,11 @@ import { For } from "solid-js";
 
 const PRODUCT_NAME = "OpenBot";
 const STORAGE_KEY = "openbot.web.phoneBrowser";
-/** A phone: a narrow screen with a touch pointer. A narrow desktop window has a mouse, so it keeps the web client. */
-const PHONE_QUERY = "(max-width: 720px) and (pointer: coarse)";
+/**
+ * A phone: a touch pointer and a narrow screen, or a short screen when the phone is in landscape. A
+ * narrow desktop window has a mouse, and a tablet is wider and taller, so both keep the web client.
+ */
+const PHONE_QUERY = "(pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px)";
 
 interface StoreLink {
   platform: MobilePlatformLogoVariant;

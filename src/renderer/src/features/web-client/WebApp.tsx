@@ -226,6 +226,20 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
     (initialHostingReturn ? { outcome: initialHostingReturn.paid ? "completed" : "cancelled", kind: "plan" } : null);
   /** Shown after the first session check, because its 401 resets the login state. */
   let companySignInReturnError = takeCompanySignInError();
+  /**
+   * A link or a return in the address opens the web client directly. The address no longer holds
+   * it, so a phone screen in front of it would lose an invitation, and a return comes back from a
+   * flow that the user started in the browser.
+   */
+  const addressHadLink =
+    agentTemplateId() !== null ||
+    inviteUrl() !== null ||
+    pluginSlug() !== null ||
+    marketplaceListing() !== null ||
+    startLink() !== null ||
+    initialBillingReturn !== null ||
+    initialHostingReturn !== null ||
+    companySignInReturnError !== null;
   const [workspace, setWorkspace] = createSignal<typeof WebWorkspace>();
   /** Sets the account when the workspace code is ready to show it. */
   async function showAccount(account: CentralAuthUser) {
@@ -521,9 +535,8 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
   const appearancePreference = createWebAppearancePreference();
   // The sign-in starts in the browser language; its language button opens the wheel to change it.
   const [languageWheelOpen, setLanguageWheelOpen] = createSignal(false);
-  // On a phone the web client first points to the phone app. Links in the address wait until the
-  // user continues in the browser.
-  const [phoneAppShown, setPhoneAppShown] = createSignal(phoneAppScreenWanted());
+  // On a phone the web client first points to the phone app, unless the address opened a link.
+  const [phoneAppShown, setPhoneAppShown] = createSignal(!addressHadLink && phoneAppScreenWanted());
   return (
     <StaticI18nProvider
       locale={resolveLocale(languagePreference.language(), navigator.language)}
