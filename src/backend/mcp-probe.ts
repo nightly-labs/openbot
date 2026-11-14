@@ -1,4 +1,8 @@
 import { basename } from "node:path";
+import {
+  Client as ModernClient,
+  StreamableHTTPClientTransport as ModernHttpTransport,
+} from "@modelcontextprotocol/client";
 import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -205,6 +209,15 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
       ...unexplained,
       bearer: yield* advertisesOAuth(config.url, timeoutMs - (Date.now() - startedAt)),
     };
+  // A server of revision 2026-07-28 alone answers the 2025 handshake with 400, while the agents,
+  // which speak that revision, use its tools (#9234). Only then is that revision tried, in the time
+  // the first connection left; a server that passed before keeps the same single connection. When
+  // the second answer fails too, the first one is what the user reads.
+  const remainingMs = timeoutMs - (Date.now() - startedAt);
+  if (!signIn && config.transport === "http" && httpStatus(first.failure.cause) === 400 && remainingMs > 0) {
+    const modern = yield* Effect.result(connectAndCountModernEffect(server, remainingMs));
+    if (Result.isSuccess(modern)) return found(modern.success);
+  }
   if (!signIn || !(first.failure.cause instanceof UnauthorizedError)) return failure(first.failure.cause);
   return yield* afterSignIn(signIn);
 });
@@ -306,17 +319,55 @@ const connectAndCountEffect = Effect.fnUntraced(function* (
   signIn: McpSignIn | null,
   onChallenge: (challenge: McpChallenge) => void,
 ) {
+  return yield* countOverEffect(timeoutMs, () => {
+    const client = new Client({ name: "openbot-probe", version: "1" }, { capabilities: {} });
+    const transport = createTransport(server, signIn, onChallenge);
+    return { client, transport, connect: (signal) => client.connect(transport, { signal }) };
+  });
+});
+
+/**
+ * `connectAndCountEffect` in MCP revision 2026-07-28, which the 2025 client cannot speak: the SDK v2
+ * client sends the `Mcp-Method` and `Mcp-Name` headers that revision requires. Same headers and
+ * stored token as the first connection, and no sign-in.
+ */
+const connectAndCountModernEffect = Effect.fnUntraced(function* (server: ResolvedMcpServer, timeoutMs: number) {
+  return yield* countOverEffect(timeoutMs, () => {
+    const client = new ModernClient(
+      { name: "openbot-probe", version: "1" },
+      { capabilities: {}, versionNegotiation: { mode: { pin: MODERN_PROTOCOL_VERSION } } },
+    );
+    const transport = new ModernHttpTransport(new URL(server.config.url), {
+      requestInit: { headers: mcpHandoffHeaders(server) },
+    });
+    return { client, transport, connect: (signal) => client.connect(transport, { signal }) };
+  });
+});
+
+const MODERN_PROTOCOL_VERSION = "2026-07-28";
+
+/** What the probe uses of an SDK v1 or v2 client. */
+interface ProbeClient {
+  listTools(
+    params: { cursor: string } | undefined,
+    options: { signal: AbortSignal },
+  ): Promise<{ tools: ReadonlyArray<{ name: string }>; nextCursor?: string | undefined }>;
+  close(): Promise<void>;
+}
+
+interface ProbeConnection {
+  client: ProbeClient;
+  transport: Pick<Transport, "close">;
+  connect: (signal: AbortSignal) => Promise<void>;
+}
+
+/** Opens the connection, counts its tools within the deadline, and closes it whatever it answered. */
+const countOverEffect = Effect.fnUntraced(function* (timeoutMs: number, open: () => ProbeConnection) {
   return yield* Effect.acquireUseRelease(
-    Effect.try({
-      try: () => ({
-        client: new Client({ name: "openbot-probe", version: "1" }, { capabilities: {} }),
-        transport: createTransport(server, signIn, onChallenge),
-      }),
-      catch: (cause) => new McpProbeFailure({ cause }),
-    }),
-    ({ client, transport }) =>
+    Effect.try({ try: open, catch: (cause) => new McpProbeFailure({ cause }) }),
+    ({ client, connect }) =>
       Effect.gen(function* () {
-        yield* probeIo((signal) => client.connect(transport, { signal }));
+        yield* probeIo(connect);
         return yield* countToolsEffect(client);
       }).pipe(
         Effect.timeoutOrElse({
@@ -335,7 +386,7 @@ interface ListedTools {
 }
 
 /** Count all pages within the connection deadline, without repeating a cursor. */
-const countToolsEffect = Effect.fnUntraced(function* (client: Client) {
+const countToolsEffect = Effect.fnUntraced(function* (client: ProbeClient) {
   const seen = new Set<string>();
   const names: string[] = [];
   let count = 0;
@@ -463,7 +514,7 @@ const advertisesOAuth = Effect.fnUntraced(function* (url: string, remainingMs: n
 });
 
 /** Close both SDK resources and kill a stdio child if it survives transport close. */
-const closeQuietlyEffect = Effect.fnUntraced(function* (client: Client, transport: Transport) {
+const closeQuietlyEffect = Effect.fnUntraced(function* (client: ProbeClient, transport: Pick<Transport, "close">) {
   yield* probeIo(() => client.close()).pipe(Effect.catch(() => Effect.void));
   yield* probeIo(() => transport.close()).pipe(Effect.catch(() => Effect.void));
   const pid = transport instanceof StdioClientTransport ? transport.pid : null;
