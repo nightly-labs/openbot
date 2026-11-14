@@ -357,6 +357,11 @@ export function createTurnSteps(deps: {
       const failedSubagents = turn.ran.filter(({ subagent }) => subagent.status === "failed").length;
       return { durationMs: turn.turnEnd - turn.turnStart, failed: failedSteps + failedSubagents };
     },
+    /** The steps of the turn of an answer that its stored trace did not keep, because the turn had too many. */
+    omittedStepsAbove(messageId: string | undefined): number {
+      const turnId = messageId === undefined ? undefined : turnOfAnswer().get(messageId);
+      return (turnId === undefined ? undefined : sources().traces.get(turnId)?.omittedSteps) ?? 0;
+    },
     /**
      * The trace of the turn of an answer: the turn, then each of its steps, and each subagent. The
      * host stores the times of each step and the usage of a turn that ends. A turn from before that

@@ -123,6 +123,14 @@
   white-space: nowrap;
 }
 
+/* The turn had more steps than the trace keeps. */
+.trace-omitted {
+  margin: 0;
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  border-bottom: 1px solid var(--openbot-border);
+  color: var(--openbot-text-muted);
+}
+
 /* The same roll as the task list: the digits that change lift in and sharpen. */
 .trace-total-value {
   --digit-dur: var(--openbot-duration-overlay);

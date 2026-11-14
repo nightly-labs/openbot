@@ -35,6 +35,8 @@ export interface ConversationTurnTrace {
   endedAt: string | null;
   /** The first `CONVERSATION_TRACE_STEP_LIMIT` steps of the turn, in start order. */
   steps: ConversationTraceStep[];
+  /** The steps after the first `CONVERSATION_TRACE_STEP_LIMIT` that the host did not keep. Absent when it kept all. */
+  omittedSteps?: number | undefined;
   /** All the tokens that the provider reported for the turn: input, cached input, cache writes and output. */
   tokens?: number | undefined;
   /** The cost in US dollars. Null when one record of the turn has no cost; absent when no record has one. */
@@ -53,6 +55,7 @@ export function isConversationTurnTrace(value: unknown): value is ConversationTu
     Array.isArray(value.steps) &&
     value.steps.length <= CONVERSATION_TRACE_STEP_LIMIT &&
     value.steps.every(isConversationTraceStep) &&
+    (value.omittedSteps === undefined || isCount(value.omittedSteps)) &&
     (value.tokens === undefined || isCount(value.tokens)) &&
     (value.costUsd === undefined || value.costUsd === null || isCost(value.costUsd))
   );

@@ -74,6 +74,8 @@ export type TraceKeyboard = "mac" | "pc";
 
 export interface TraceWaterfallProps {
   spans: readonly TraceSpan[];
+  /** The steps of the turn that the host did not keep, because the turn had too many. The spans and totals leave them out. */
+  omittedSteps?: number | undefined;
   /** The time now, in epoch milliseconds. The caller moves it while a span runs. */
   now: number;
   keyboard: TraceKeyboard;
@@ -815,6 +817,9 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
         <TraceTotal label={t("chat.trace.toolCalls")} value={totals().toolCalls} format={format.number} />
         <TraceTotal label={t("chat.trace.errors")} value={totals().errors} format={format.number} />
       </dl>
+      <Show when={props.omittedSteps}>
+        {(count) => <p class="trace-omitted">{t("chat.trace.omitted", { count: count() })}</p>}
+      </Show>
 
       <div class={["trace-body", fades.classes()]} style={stackStyle()} ref={bindBody} onScroll={measureScroll}>
         <div
@@ -1256,6 +1261,7 @@ export function TraceWaterfallDialog(props: TraceWaterfallDialogProps) {
           >
             <TraceWaterfall
               spans={props.spans}
+              omittedSteps={props.omittedSteps}
               now={props.now}
               keyboard={props.keyboard}
               defaultQuery={props.defaultQuery}

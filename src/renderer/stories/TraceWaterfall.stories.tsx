@@ -256,6 +256,15 @@ export const Live: Story = {
   },
 };
 
+/** A turn with more steps than the trace keeps. The trace says how many later steps it does not show. */
+export const Partial: Story = {
+  render: () => (
+    <div style={{ width: "1000px", height: "640px", display: "flex" }}>
+      <TraceWaterfall spans={FINISHED} now={FINISHED_NOW} keyboard="mac" omittedSteps={742} />
+    </div>
+  ),
+};
+
 /** A search that matches nothing. */
 export const NoMatches: Story = {
   render: () => (
