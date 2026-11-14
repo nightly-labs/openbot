@@ -237,7 +237,9 @@ export class ScreenCapturer implements ScreenCaptureHost {
       catch: () => failure(sourceText("error.agent.screenCapturePermissionMissing")),
     });
     if (status === "granted") return;
-    if (!ask) return yield* failure(sourceText("error.agent.screenCaptureListPermission"));
+    if (!ask && !this.#askedForPermission) {
+      return yield* failure(sourceText("error.agent.screenCaptureListPermission"));
+    }
     if (!this.#askedForPermission) {
       this.#askedForPermission = true;
       yield* this.#sources(["screen"], { width: 1, height: 1 }).pipe(Effect.ignore);
