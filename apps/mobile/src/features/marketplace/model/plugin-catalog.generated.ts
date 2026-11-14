@@ -757,6 +757,39 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
+    slug: "appsignal",
+    name: "AppSignal",
+    tagline: "Errors, performance and logs",
+    description:
+      "AppSignal lets agents search error incidents and stack traces, find slow actions and traces, read logs, metrics, check-ins and uptime monitors, and build dashboards. Each user signs in to their own AppSignal account through the browser. The sign-in gives all read and write tools, so agents can also change the state, severity and assignee of an incident and add notes.",
+    category: "coding",
+    creatorName: "AppSignal",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-new-errors", text: "Which new errors did my production app get since the last deploy?" },
+      { id: "prompt-slow-actions", text: "Which actions were the slowest this week, and why?" },
+      { id: "prompt-uptime", text: "Did any uptime monitor or check-in fail in the last 24 hours?" },
+    ],
+    websiteUrl: "https://www.appsignal.com",
+    privacyPolicyUrl: "https://www.appsignal.com/privacy-policy",
+    termsUrl: "https://www.appsignal.com/terms",
+    featured: false,
+    apps: [
+      {
+        id: "app-appsignal-mcp",
+        name: "AppSignal",
+        description:
+          "Error incidents, performance, logs, metrics and dashboards, over AppSignal's MCP server with browser sign-in.",
+        server: {
+          name: "appsignal",
+          transport: "http",
+          url: "https://appsignal.com/api/mcp",
+          auth: [{ id: "appsignal-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+  },
+  {
     slug: "gitlab",
     name: "GitLab",
     tagline: "Issues, merge requests and pipelines",
@@ -1064,6 +1097,39 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
               docsLabel: "Create a key",
             },
           ],
+        },
+      },
+    ],
+  },
+  {
+    slug: "cloud66",
+    name: "Cloud 66",
+    tagline: "Applications, deploys and servers",
+    description:
+      "Cloud 66 lets agents list accounts, applications, servers and clouds, read deployments and their logs, start deployments, manage deployment profiles, and create Deploy v3 clusters. Each user signs in to their own Cloud 66 account through the browser and selects the permissions on the consent page. Agents cannot do more than the user's Cloud 66 role permits. Deploying and creating servers can cost money. To delete an application or a deployment profile, or to add a cloud, the user confirms each request on a Cloud 66 page in the browser.",
+    category: "coding",
+    creatorName: "Cloud 66",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-applications", text: "Which applications are in my Cloud 66 accounts?" },
+      { id: "prompt-failed-deploy", text: "Why did the last deployment of my app fail? Read its logs." },
+      { id: "prompt-deploy", text: "Deploy my staging application and tell me when it is done." },
+    ],
+    websiteUrl: "https://www.cloud66.com",
+    privacyPolicyUrl: "https://www.cloud66.com/privacy",
+    termsUrl: "https://www.cloud66.com/terms",
+    featured: false,
+    apps: [
+      {
+        id: "app-cloud66-mcp",
+        name: "Cloud 66",
+        description:
+          "Applications, deployments, servers, clouds and clusters, over Cloud 66's MCP server with browser sign-in.",
+        server: {
+          name: "cloud66",
+          transport: "http",
+          url: "https://app.cloud66.com/mcp",
+          auth: [{ id: "cloud66-oauth", kind: "link", label: "Sign in" }],
         },
       },
     ],

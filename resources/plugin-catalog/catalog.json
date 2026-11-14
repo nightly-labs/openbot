@@ -117,6 +117,12 @@
       "detailSha256": "414a33dd79f7318638bc68e56ecaeb81c77762666a9bd6f11a0e228c0323fcf1"
     },
     {
+      "slug": "appsignal",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "06ac0cae59af375996995d2ba631b0cae72c22031e74ba20f6e1d1d393e27a1f"
+    },
+    {
       "slug": "gitlab",
       "version": "1.0.0",
       "featured": false,
@@ -169,6 +175,12 @@
       "version": "1.0.0",
       "featured": false,
       "detailSha256": "6f49588f09b44f27f82958b558efd0d8521a5784e35f55c755337ed4b07e4b42"
+    },
+    {
+      "slug": "cloud66",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "bd0fd2c4bf0742c92f2ff2fc11dbeaea94304a8ca96ed2892251ee07c07429ce"
     },
     {
       "slug": "context7",

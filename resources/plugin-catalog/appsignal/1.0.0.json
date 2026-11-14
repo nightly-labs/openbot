@@ -1,0 +1,33 @@
+{
+  "slug": "appsignal",
+  "name": "AppSignal",
+  "tagline": "Errors, performance and logs",
+  "description": "AppSignal lets agents search error incidents and stack traces, find slow actions and traces, read logs, metrics, check-ins and uptime monitors, and build dashboards. Each user signs in to their own AppSignal account through the browser. The sign-in gives all read and write tools, so agents can also change the state, severity and assignee of an incident and add notes.",
+  "category": "coding",
+  "creatorName": "AppSignal",
+  "iconUrl": "https://www.appsignal.com/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-new-errors", "text": "Which new errors did my production app get since the last deploy?" },
+    { "id": "prompt-slow-actions", "text": "Which actions were the slowest this week, and why?" },
+    { "id": "prompt-uptime", "text": "Did any uptime monitor or check-in fail in the last 24 hours?" }
+  ],
+  "apps": [
+    {
+      "id": "app-appsignal-mcp",
+      "name": "AppSignal",
+      "description": "Error incidents, performance, logs, metrics and dashboards, over AppSignal's MCP server with browser sign-in.",
+      "iconUrl": "https://www.appsignal.com/favicon.ico",
+      "server": {
+        "name": "appsignal",
+        "transport": "http",
+        "url": "https://appsignal.com/api/mcp",
+        "auth": [{ "id": "appsignal-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.appsignal.com",
+  "privacyPolicyUrl": "https://www.appsignal.com/privacy-policy",
+  "termsUrl": "https://www.appsignal.com/terms",
+  "skills": []
+}
