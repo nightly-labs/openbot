@@ -81,8 +81,6 @@ function withOlderMessages(held: ConversationSnapshot, snapshot: ConversationSna
 export interface AgentTasksOptions {
   /** Read on each call: tests and stories replace the port per case. */
   port: () => AgentTasksPort;
-  /** The server on screen, where the state spans a server switch. */
-  serverId?: () => string;
   activeAgentId: () => string | undefined;
   /** The server moves a queued message to a new thread: this computer, or the `agent-queue-task-v1` route. */
   queuedMessageMovable: () => boolean;
@@ -422,10 +420,9 @@ export function createAgentTasks(options: AgentTasksOptions) {
 
   /**
    * Reads the newest messages of a thread that shows a part around an old message, in the place of
-   * that part. The thread then follows its latest message again. A `serverId` reads that server, also
-   * after a server switch.
+   * that part. The thread then follows its latest message again.
    */
-  async function loadLatest(agentId: string, taskId: string, serverId?: string): Promise<void> {
+  async function loadLatest(agentId: string, taskId: string): Promise<void> {
     const history = state.history[taskId];
     if (!history?.hasNewer || history.loadingLatest) return;
     const request = (readRequests.get(taskId) ?? 0) + 1;
@@ -435,7 +432,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
       if (entry) entry.loadingLatest = true;
     });
     try {
-      const snapshot = await port().readTask({ agentId, taskId }, serverId);
+      const snapshot = await port().readTask({ agentId, taskId });
       if (!scopeIsCurrent() || readRequests.get(taskId) !== request) return;
       rememberNewest(taskId, snapshot);
       setState((current) => {
@@ -653,32 +650,23 @@ export function createAgentTasks(options: AgentTasksOptions) {
     }
   }
 
-  /**
-   * Sends `attachmentDraftIds` only when there are files, so a server with text-only threads gets no new key.
-   * A `serverId` starts the thread on that server, also after a server switch; the list of the server
-   * on screen then does not take it.
-   */
+  /** Sends `attachmentDraftIds` only when there are files, so a server with text-only threads gets no new key. */
   async function startTask(
     agentId: string,
     text: string,
     attachmentDraftIds: string[] = [],
-    serverId?: string,
   ): Promise<AgentTask | null> {
     const task = await runAction(
       () =>
-        port().startTask(
-          {
-            agentId,
-            text,
-            ...(attachmentDraftIds.length ? { attachmentDraftIds } : {}),
-            clientMessageId: crypto.randomUUID(),
-          },
-          serverId,
-        ),
+        port().startTask({
+          agentId,
+          text,
+          ...(attachmentDraftIds.length ? { attachmentDraftIds } : {}),
+          clientMessageId: crypto.randomUUID(),
+        }),
       "conversation.threads.error.start",
     );
-    const onScreen = serverId === undefined || options.serverId === undefined || serverId === options.serverId();
-    if (task && scopeIsCurrent() && onScreen) rememberTask(task);
+    if (task && scopeIsCurrent()) rememberTask(task);
     return task;
   }
 
@@ -714,34 +702,27 @@ export function createAgentTasks(options: AgentTasksOptions) {
     return task;
   }
 
-  /**
-   * Steers the task's running turn, or queues the message in the task. A `serverId` sends to that
-   * server, also after a server switch.
-   */
+  /** Steers the task's running turn, or queues the message in the task. */
   async function sendToTask(
     agentId: string,
     taskId: string,
     text: string,
     attachmentDraftIds: string[] = [],
     replyToMessageId: string | null = null,
-    serverId?: string,
   ): Promise<boolean> {
     // The sent message and the answer come after the part around an old message, so the thread shows
     // its latest messages again.
-    void loadLatest(agentId, taskId, serverId);
+    void loadLatest(agentId, taskId);
     const receipt = await runAction(
       () =>
-        port().sendToTask(
-          {
-            agentId,
-            taskId,
-            text,
-            ...(attachmentDraftIds.length ? { attachmentDraftIds } : {}),
-            ...(replyToMessageId ? { replyToMessageId } : {}),
-            clientMessageId: crypto.randomUUID(),
-          },
-          serverId,
-        ),
+        port().sendToTask({
+          agentId,
+          taskId,
+          text,
+          ...(attachmentDraftIds.length ? { attachmentDraftIds } : {}),
+          ...(replyToMessageId ? { replyToMessageId } : {}),
+          clientMessageId: crypto.randomUUID(),
+        }),
       "conversation.threads.error.send",
     );
     return receipt !== null;
