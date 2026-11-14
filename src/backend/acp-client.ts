@@ -202,6 +202,15 @@ const ACP_BACKGROUND_WATCH_MS = 30 * 60_000;
 const ACP_BACKGROUND_TURN_QUIET_MS = 15_000;
 
 /**
+ * The prompt that connects an agent's wake-up for a finished background command to the open turn
+ * (`AcpFlavor.wakesAfterPromptEnds`). The model reads it; the chat does not show it.
+ */
+const BACKGROUND_WAKE_PROMPT: ContentBlock = {
+  type: "text",
+  text: "<openbot-background-wake>\nThe session changed while a command that you moved to the background ran. If the command finished, read its result and continue the task. If it still runs, end your turn.\n</openbot-background-wake>",
+};
+
+/**
  * How long the agent's store can still get the rest of a turn that did not complete, such as one
  * that OpenCode went on with after a stop (#2858). A background replay does not show that rest.
  */
@@ -2527,12 +2536,34 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       while (providerResult(yield* Effect.result(this.#leaveOutFailedMcpServer(thread, turn, response, params))))
         response = providerResult(yield* send());
       if (thread.activeTurn !== turn || turn.completing) return;
-      // A steer by prompt ends the prompt before it with `end_turn`, and the work goes on under the
-      // steer's prompt. The turn ends with the reply to the last one.
-      for (let steer = turn.steerReplies.shift(); steer; steer = turn.steerReplies.shift()) {
-        this.#reportPromptUsage(thread, turn, response);
-        response = providerResult(yield* Deferred.await(steer));
+      let idleWakes = 0;
+      for (;;) {
+        // A steer by prompt ends the prompt before it with `end_turn`, and the work goes on under the
+        // steer's prompt. The turn ends with the reply to the last one.
+        for (let steer = turn.steerReplies.shift(); steer; steer = turn.steerReplies.shift()) {
+          this.#reportPromptUsage(thread, turn, response);
+          response = providerResult(yield* Deferred.await(steer));
+          if (thread.activeTurn !== turn || turn.completing) return;
+        }
+        // A command still runs in the background (`AcpFlavor.wakesAfterPromptEnds`). The turn stays
+        // open until the session changes, and a prompt then connects the agent's wake-up to it.
+        // A wake-up after which the same commands still run is idle; the second one ends the wait,
+        // so a session that changes for another cause does not cost a model step every poll.
+        const running = response.stopReason === "end_turn" && idleWakes < 2 ? this.#backgroundCommands(turn) : "";
+        if (!running) break;
+        const wake = yield* this.#awaitSessionChange(thread, turn);
         if (thread.activeTurn !== turn || turn.completing) return;
+        if (wake === "steered") continue;
+        if (wake === "none") break;
+        this.#reportPromptUsage(thread, turn, response);
+        response = providerResult(
+          yield* providerCall(() =>
+            this.#sessionConnection(thread).prompt({ sessionId: thread.id, prompt: [BACKGROUND_WAKE_PROMPT] }),
+          ).pipe(Effect.result),
+        );
+        if (thread.activeTurn !== turn || turn.completing) return;
+        turn.lastActivityAt = Date.now();
+        if (this.#backgroundCommands(turn) === running) idleWakes += 1;
       }
       this.#reportPromptUsage(thread, turn, response);
       // A flavor can fail a turn that ended with no answer (OpenCode, custom agents). A turn told not
@@ -2635,6 +2666,46 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       },
     });
   }
+
+  /**
+   * The IDs of the turn's `execute` tool calls that still run, joined, for an agent that can end a
+   * prompt while they run (`AcpFlavor.wakesAfterPromptEnds`). Empty when none runs. A stopped turn
+   * and one that failed do not wait for them, and a daemon, such as a dev server, runs on by intent.
+   */
+  #backgroundCommands(turn: AcpTurn): string {
+    if (!this.#flavor.wakesAfterPromptEnds || turn.stopped || turn.providerError) return "";
+    return [...turn.toolItems.values()]
+      .filter((item) => item.toolKind === "execute" && !(isRecord(item.arguments) && item.arguments.IsDaemon === true))
+      .map((item) => item.id)
+      .join("\n");
+  }
+
+  /**
+   * Waits until `session/list` shows that the session changed after its prompt ended: the agent woke
+   * its model for a finished command. "steered" when the user sent a message into the turn, which
+   * connects the work again by itself. "none" when the agent reports no change time, or after
+   * `ACP_BACKGROUND_WATCH_MS` with no change: the turn then ends as before.
+   */
+  readonly #awaitSessionChange = Effect.fn("AcpAgentClient.awaitSessionChange")(function* (
+    this: AcpAgentClient,
+    thread: AcpThread,
+    turn: AcpTurn,
+  ) {
+    const until = Date.now() + ACP_BACKGROUND_WATCH_MS;
+    // The first reading comes one poll after the prompt ended, so the agent's own write of that end
+    // is not taken as a wake-up.
+    let before: string | undefined;
+    while (Date.now() < until) {
+      yield* Effect.sleep(ACP_BACKGROUND_POLL_MS);
+      if (thread.activeTurn !== turn || turn.completing || turn.stopped) return "none";
+      if (turn.steerReplies.length > 0) return "steered";
+      const updatedAt = yield* this.#sessionUpdatedAt(thread).pipe(Effect.orElseSucceed(() => null));
+      if (updatedAt === null) return "none";
+      if (before !== undefined && updatedAt !== before) return "changed";
+      before = updatedAt;
+    }
+    return "none";
+  });
 
   /**
    * Sends a message into the running turn as a second `session/prompt` (`AcpFlavor.steerByPromptSince`).

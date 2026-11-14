@@ -192,6 +192,14 @@ export interface AcpFlavor {
    * shell command that runs in the background.
    */
   unsentBackgroundTurns?: true;
+  /**
+   * The agent can end a prompt with `end_turn` while a command (`execute` tool call) that it moved to
+   * the background still runs, and then wakes its model by itself when the command ends. With no
+   * prompt open, it sends no update and no permission request for that work. OpenBot keeps the turn
+   * open, and when `session/list` shows that the session changed, a second prompt connects the work
+   * again. A command with `rawInput.IsDaemon` runs on by intent and does not keep the turn open.
+   */
+  wakesAfterPromptEnds?: true;
   /** Each answer message has its own `messageId`, so text of a new ID is a new message, not more text. */
   messagePerId?: true;
   /**
