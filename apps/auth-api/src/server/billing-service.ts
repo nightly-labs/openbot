@@ -16,13 +16,14 @@ import {
   isBillingAmount,
   isOpenBillingStatus,
   parseBillingLookupKey,
-  planStorageGb,
 } from "@openbot/contracts/billing";
-import type {
-  HostedServerCatalog,
-  HostedServerCatalogPlan,
-  HostedServerEntryPoint,
-  HostedServerPlanPrices,
+import {
+  type HostedServerCatalog,
+  type HostedServerCatalogPlan,
+  type HostedServerEntryPoint,
+  type HostedServerPlanPrices,
+  type HostedServerSize,
+  hostedServerStorageGb,
 } from "@openbot/contracts/hosted-servers";
 import {
   LICENSE_METADATA,
@@ -114,6 +115,8 @@ interface ServerPlanRow {
   cancel_at_period_end: number;
   /** 1 for a hosted server on a machine of the operator. */
   on_operator_host: number;
+  /** The machine of the hosted server after a resize that waits, or null when the subscription has no server row. */
+  server_size: HostedServerSize | null;
 }
 
 /** A subscription that the webhook stored, for a server that its metadata names. */
@@ -727,7 +730,8 @@ export class BillingService {
               .prepare(
                 `SELECT s.stripe_subscription_id, s.server_id, h.name AS server_name, s.plan, s.interval, s.currency,
                   s.amount, s.status, s.current_period_end, s.cancel_at_period_end,
-                  hs.operator_host IS NOT NULL AS on_operator_host
+                  hs.operator_host IS NOT NULL AS on_operator_host,
+                  CASE WHEN hs.provider_template IS NULL THEN NULL ELSE COALESCE(hs.pending_size, hs.size) END AS server_size
            FROM billing_subscriptions s
            LEFT JOIN remote_hosts h ON h.host_id = s.server_id AND h.owner_user_id = s.user_id
            LEFT JOIN hosted_servers hs ON hs.server_id = s.server_id AND hs.owner_user_id = s.user_id
@@ -1284,7 +1288,7 @@ function serverPlan(row: ServerPlanRow): BillingServerPlan | null {
     status: row.status,
     currentPeriodEnd: row.current_period_end,
     cancelAtPeriodEnd: row.cancel_at_period_end === 1,
-    storageGb: planStorageGb(row.plan, row.on_operator_host === 1),
+    storageGb: hostedServerStorageGb(row.plan, row.on_operator_host === 1, row.server_size),
   };
 }
 

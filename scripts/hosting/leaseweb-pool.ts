@@ -68,6 +68,9 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { BILLING_PLAN_IDS, type BillingPlanId } from "@openbot/contracts/billing";
+import { HOSTED_PLAN_SIZE, HOSTED_SERVER_SIZE_NAMES } from "@openbot/contracts/hosted-servers";
+import { isOneOf } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { z } from "zod";
 
@@ -105,7 +108,7 @@ const SANDBOX_PATTERN = /^bx_[a-z0-9]{4,40}$/u;
 const STATE_PATTERN = /^[a-z_]{1,32}$/u;
 const VERSION_PATTERN = /^\d+\.\d+\.\d+$/u;
 /** The machine of each plan that moves. */
-const PRODUCT_OF_PLAN: Record<string, string> = { starter: "VPS01", standard: "VPS02", pro: "VPS03" };
+const PRODUCT_OF_PLAN: Record<BillingPlanId, string> = { starter: "VPS01", standard: "VPS02", pro: "VPS03" };
 const AUTH_API_URL = {
   production: "https://api.openbot.run",
   test: "https://openbot-auth-api-test.internal9671.workers.dev",
@@ -197,6 +200,7 @@ type WorkRow = z.infer<typeof workRowSchema>;
 
 const moveRowSchema = z.object({
   plan: z.string(),
+  size: z.enum(HOSTED_SERVER_SIZE_NAMES),
   desired_state: z.string(),
   observed_state: z.string().regex(STATE_PATTERN),
   observed_error: z.string().nullable(),
@@ -1503,14 +1507,17 @@ exit "$status"`;
       last = now;
     };
     const [row] = this.#rows(
-      `SELECT h.plan, h.desired_state, h.observed_state, h.observed_error, h.provider_sandbox_id, h.operator_host,
+      `SELECT h.plan, h.size, h.desired_state, h.observed_state, h.observed_error, h.provider_sandbox_id, h.operator_host,
          h.currency, u.email FROM hosted_servers h JOIN users u ON u.id = h.owner_user_id
        WHERE h.server_id = ${literal(serverId, SERVER_ID_PATTERN)}`,
       moveRowSchema,
     );
     if (!row) throw new Error(`There is no server ${serverId}.`);
+    if (!isOneOf(BILLING_PLAN_IDS, row.plan)) {
+      throw new Error(`Server ${serverId} has the plan ${row.plan}. No machine is set for this plan.`);
+    }
     const product = PRODUCT_OF_PLAN[row.plan];
-    if (!product) throw new Error(`Server ${serverId} has the plan ${row.plan}. No machine is set for this plan.`);
+    const planSize = HOSTED_PLAN_SIZE[row.plan];
     if (row.desired_state !== "running" && row.desired_state !== "idle") {
       throw new Error(`Server ${serverId} is ${row.desired_state}. Move only a server that is running or idle.`);
     }
@@ -1580,11 +1587,13 @@ exit "$status"`;
     const machineState = state;
     lap("Machine prepared");
 
-    // 2. The row. From here the Worker sends no call to boat for the server.
+    // 2. The row. From here the Worker sends no call to boat for the server. The size becomes the plan's
+    // machine: a Starter sandbox is `default` (HOSTED_BOAT_PLAN_SIZE), and its VPS 1 is `small`.
     const host = literal(`leaseweb:${vpsId}`, HOST_ID_PATTERN);
     const server = literal(serverId, SERVER_ID_PATTERN);
     const changes = this.#write(
       `UPDATE hosted_servers SET operator_host = ${host}, retired_sandbox_id = provider_sandbox_id,
+         size = ${literal(planSize, STATE_PATTERN)},
          provider_sandbox_id = NULL, desired_state = 'running', observed_state = 'running', observed_error = NULL,
          updated_at = ${literal(Date.now())}
        WHERE server_id = ${server} AND provider_sandbox_id = ${literal(sandbox, SANDBOX_PATTERN)} AND operator_host IS NULL
@@ -1863,6 +1872,7 @@ systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/ru
       row.observed_error !== null && STATE_PATTERN.test(row.observed_error) ? `'${row.observed_error}'` : "NULL";
     const changes = this.#write(
       `UPDATE hosted_servers SET provider_sandbox_id = retired_sandbox_id, retired_sandbox_id = NULL, operator_host = NULL,
+         size = ${literal(row.size, STATE_PATTERN)},
          desired_state = ${literal(row.desired_state, STATE_PATTERN)}, observed_state = ${literal(row.observed_state, STATE_PATTERN)},
          observed_error = ${error}, updated_at = ${literal(Date.now())}
        WHERE server_id = ${literal(serverId, SERVER_ID_PATTERN)} AND operator_host = ${literal(`leaseweb:${vpsId}`, HOST_ID_PATTERN)}

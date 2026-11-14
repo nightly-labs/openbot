@@ -238,13 +238,14 @@ export function AddServerDialog(props: AddServerDialogProps) {
     work()
       ? hostedWorkYearlyDiscountPercent(props.plans, currency())
       : hostedYearlyDiscountPercent(props.plans, currency());
-  // Characters over the 10 that fit in a column at 760 px. The pricing step gets wider for each one.
-  // With a license, the longest old and new prices share the line.
+  // Characters over the 10 that fit in a column at 760 px, with 2 for the space between the old and the
+  // new price. The pricing step gets wider for each one. With a license, the longest old and new prices
+  // share the line.
   const extraPriceChars = () => {
     const longest = longestPrice();
     const length = longest
       ? longest.was.length + longest.now.length + 2
-      : hostedPriceLength(props.plans, currency(), format);
+      : hostedPriceLength(props.plans, currency(), format) + 2;
     return Math.max(0, length - 10);
   };
   let stepHeading: HTMLElement | undefined;

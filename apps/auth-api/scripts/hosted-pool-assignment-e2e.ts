@@ -71,7 +71,7 @@ async function purchaseStartsOnThePoolOrOnBoat() {
     .prepare("INSERT INTO users(id, identity_key, email, created_at, updated_at) VALUES (?, ?, ?, 1, 1)")
     .run(OWNER.id, `email:${OWNER.email}`, OWNER.email);
 
-  const created: { serverId: string; from: string; claim: string }[] = [];
+  const created: { serverId: string; from: string; claim: string; type: string }[] = [];
   const alerts: string[] = [];
   const boatFetch = async (input: string, init: RequestInit) => {
     if (input === ALERT_URL) {
@@ -83,7 +83,12 @@ async function purchaseStartsOnThePoolOrOnBoat() {
     if (method === "POST" && path === "/sandboxes") {
       const body = JSON.parse(String(init.body));
       const serverId = String(body.env.OPENBOT_HOSTED_HOST_ID);
-      created.push({ serverId, from: String(body.from), claim: String(body.env.OPENBOT_HOSTED_CLAIM) });
+      created.push({
+        serverId,
+        from: String(body.from),
+        claim: String(body.env.OPENBOT_HOSTED_CLAIM),
+        type: String(body.type),
+      });
       return Response.json({ ok: true, sandbox: { id: `bx_${serverId}`, state: "provisioning" } });
     }
     if (path.endsWith("/commands"))
@@ -96,7 +101,7 @@ async function purchaseStartsOnThePoolOrOnBoat() {
   };
   const sandboxOf = (serverId: string) => created.filter((entry) => entry.serverId === serverId);
   /** For the report: the sandboxes with no claim. */
-  const sandboxes = () => created.map((entry) => ({ serverId: entry.serverId, from: entry.from }));
+  const sandboxes = () => created.map((entry) => ({ serverId: entry.serverId, from: entry.from, type: entry.type }));
 
   const tracked: Action[] = [];
   const work: Promise<void>[] = [];
@@ -340,6 +345,44 @@ async function purchaseStartsOnThePoolOrOnBoat() {
     onStarter === 1 && sandboxOf("starter-1").length + sandboxOf("starter-2").length === 1,
     { machine: serversOn(starter), sandboxes: sandboxes() },
   );
+  // A boat `small` sandbox has less disk than the Starter storage. Its VPS 1 keeps the plan size.
+  const starterOnBoat = [...sandboxOf("starter-1"), ...sandboxOf("starter-2")][0];
+  const starters = (await Effect.runPromise(service.list(OWNER))).servers.filter((server) =>
+    server.serverId.startsWith("starter-"),
+  );
+  check(
+    "a Starter on boat gets a `default` sandbox, a Starter on its VPS 1 stays `small`, and both have 25 GB",
+    starterOnBoat?.type === "default" &&
+      starters.length === 2 &&
+      starters.every(
+        (server) =>
+          server.size === (server.serverId === starterOnBoat.serverId ? "default" : "small") && server.storageGb === 25,
+      ),
+    {
+      sandboxes: sandboxes(),
+      starters: starters.map(({ serverId, size, storageGb }) => ({ serverId, size, storageGb })),
+    },
+  );
+
+  // A Starter that waits for its payment has no machine yet. Its `small` row size is not a boat disk.
+  insertServer.run(
+    "starter-unpaid",
+    OWNER.id,
+    "Server starter-unpaid",
+    null,
+    null,
+    HOSTED_PLAN_SIZE.starter,
+    "starter",
+    "eur",
+    "awaiting_payment",
+    "key-starter-unpaid",
+    clock.now,
+    clock.now,
+  );
+  const unpaid = (await Effect.runPromise(service.list(OWNER))).servers.find(
+    (server) => server.serverId === "starter-unpaid",
+  );
+  check("a Starter with no machine yet shows the plan storage of 25 GB", unpaid?.storageGb === 25, { unpaid });
 
   // 5. A server with an earlier boat attempt stays on boat: boat can still make the sandbox of that attempt.
   const spare = await machine(1010, "VPS02", "AMS-01");

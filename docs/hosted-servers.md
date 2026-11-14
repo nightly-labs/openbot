@@ -30,8 +30,13 @@ leaves the page for Stripe). The old page closes first; when the user paid on it
 that server with no page. The server list sends the limit as
 `maxServers`. When the paid servers reach it, the add server dialog disables the plans and opens the
 server list (Settings on desktop, Billing on the web) to delete a server. Each server
-has its own Stripe plan. Its machine comes from the plan
-(`HOSTED_PLAN_SIZE`): Starter is boat `small`, Standard is `default`, and Pro is `large`.
+has its own Stripe plan. Its machine comes from the plan: a pool machine of the plan (Starter VPS 1,
+Standard VPS 2, Pro VPS 3), or when none is free, a boat sandbox (`HOSTED_BOAT_PLAN_SIZE`): Starter and
+Standard are `default`, and Pro is `large`. Starter sandboxes from before 2026-11-14 are `small` and keep
+12 GB of storage until a change of plan or billing interval moves them to the new Starter price and to
+`default`. Before the boat claim the row has no machine (`provider_template` is NULL), so the storage that
+the server list and Billing show is the plan storage, not the disk of `size`. `leaseweb-pool.ts move` puts a Starter sandbox on a VPS 1 and sets the row to
+`HOSTED_PLAN_SIZE`.
 
 ## Parts
 
@@ -1431,8 +1436,8 @@ The VPS is not the same machine as the sandbox:
   until the operator moves it to a VPS 3. Nothing tells the operator about the plan change: look for
   `plan = 'pro'` rows whose machine is a VPS 2. A change up from Starter on a VPS 1 is worse: a
   Standard server shows 75 GB on a 100 GB disk. Move it to a VPS 2 soon.
-- The clients show the vCPU and the memory of the boat size of the plan (2 and 4 GB, 4 and 8 GB, 8
-  and 16 GB) also for a moved server. A VPS has more: the VPS 2 in FRA-01 showed 6 vCPU and 16 GiB.
+- Settings shows the vCPU and the memory of the row `size`, and the upgrade dialog shows the memory of the
+  boat size of the plan (`HOSTED_BOAT_PLAN_SIZE`), also for a moved server. A VPS has more: the VPS 2 in FRA-01 showed 6 vCPU and 16 GiB.
 - After the owner deletes the server, OpenBot still runs on the VPS with a session that is ended. It
   cannot connect, and it has the data until the operator reinstalls the machine.
 
@@ -1448,18 +1453,24 @@ below, but with `desired_state` and `observed_state` of before the move. On 2026
 24 GB took 9 minutes; a restart timer of boat started OpenBot during it, and tar stopped the export.
 The export now stops that timer.
 
+`move` sets `size` to `HOSTED_PLAN_SIZE` (`small` for Starter), so the statement writes the boat type of
+the sandbox again: the `type` that boat shows for the sandbox (`default` for a Starter sandbox from
+2026-11-14 or later, `small` before). Without it, a Starter row on a `default` sandbox shows 12 GB of
+storage and an almost full disk.
+
 ```sql
 UPDATE hosted_servers SET provider_sandbox_id = retired_sandbox_id, retired_sandbox_id = NULL,
-  operator_host = NULL, desired_state = CASE WHEN desired_state = 'running' THEN 'idle' ELSE desired_state END,
+  operator_host = NULL, size = '<boat type of the sandbox>',
+  desired_state = CASE WHEN desired_state = 'running' THEN 'idle' ELSE desired_state END,
   observed_state = 'stopped', updated_at = <now in ms>
 WHERE server_id = '<server ID>' AND operator_host IS NOT NULL AND retired_sandbox_id IS NOT NULL
   AND desired_state != 'deleted';
 ```
 
 A server whose plan ended on the VPS keeps `stopped`, so the rollback does not start it. When the
-plan changed while the server ran on the VPS, the sandbox still has the machine of the old plan and
-the row has the `size` of the new plan. In that case also write `pending_size = size` in the
-statement, so that the resume changes the machine, as it does after a plan change on boat. Not
+plan changed while the server ran on the VPS, the sandbox still has the machine of the old plan. In
+that case also write `pending_size = '<HOSTED_BOAT_PLAN_SIZE of the new plan>'` in the statement when it
+is not the boat type of the sandbox, so that the resume changes the machine, as it does after a plan change on boat. Not
 tested: a rollback after a plan change.
 
 A moved server that lost its session cannot get a new claim from a client request. The operator
