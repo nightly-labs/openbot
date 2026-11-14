@@ -302,18 +302,23 @@ function vttTracks(value: unknown): string[] {
 
 /**
  * The caption track to read: captions that people wrote in the language of the video, then the
- * site's automatic captions of the spoken language, then other written captions. Automatic
- * captions in other languages are machine translations and are not used.
+ * site's automatic captions of the spoken language, then the only written track or an English one.
+ * Automatic captions in other languages are machine translations and are not used. With no track,
+ * the sound is transcribed.
  */
 function captionTrack(info: Info): { key: string; automatic: boolean } | null {
-  const language = text(info.language);
+  const language = text(info.language)?.toLowerCase() ?? null;
+  const inLanguage = (key: string, code: string | null) =>
+    code !== null && (key.toLowerCase() === code || key.toLowerCase().startsWith(`${code}-`));
   const written = vttTracks(info.subtitles);
   const automatic = vttTracks(info.automatic_captions);
-  const writtenKey = written.find((key) => language !== null && (key === language || key.startsWith(`${language}-`)));
+  const writtenKey = written.find((key) => inLanguage(key, language));
   if (writtenKey) return { key: writtenKey, automatic: false };
-  const automaticKey = automatic.find((key) => key.endsWith("-orig")) ?? automatic.find((key) => key === language);
+  const automaticKey =
+    automatic.find((key) => key.endsWith("-orig")) ?? automatic.find((key) => key.toLowerCase() === language);
   if (automaticKey) return { key: automaticKey, automatic: true };
-  return written[0] ? { key: written[0], automatic: false } : null;
+  const otherKey = written.length === 1 ? written[0] : written.find((key) => inLanguage(key, "en"));
+  return otherKey ? { key: otherKey, automatic: false } : null;
 }
 
 const CUE_TIME = /^(?:(\d+):)?(\d{2}):(\d{2})[.,]\d{3}\s+-->/u;
