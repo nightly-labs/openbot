@@ -1828,9 +1828,16 @@ export async function createApplicationServices({
   let mcpOAuthAuthority: McpOAuth | null = null;
   // A joined server's sign-in can send its callback to this same port: the host's own listener
   // uses the same port number. A `state` that no local sign-in started goes to the relay.
+  // A development build on macOS or Windows, and a Linux desktop that refused the scheme, do not
+  // open `openbot://` in this app (`presentApplication`), so their sign-ins keep the loopback names.
+  const mcpOAuthDeepLink = () =>
+    (process.platform === "linux" || app.isPackaged) && app.isDefaultProtocolClient("openbot")
+      ? MCP_OAUTH_REDIRECT_URL
+      : undefined;
   const signInRelayClient = new SignInRelayClient({
     openExternal: openLink,
     language,
+    deepLinkRedirectUrl: mcpOAuthDeepLink,
     ownListener: () =>
       mcpOAuthRedirect
         ? { port: Number(new URL(mcpOAuthRedirect.redirectUrl).port), paths: MCP_OAUTH_REDIRECT_PATHS }
@@ -1866,12 +1873,7 @@ export async function createApplicationServices({
     storage: mcpOAuthStore,
     openExternal: openLink,
     redirectUrl: mcpOAuthRedirect?.redirectUrl ?? MCP_OAUTH_REDIRECT_URL,
-    // A development build on macOS or Windows, and a Linux desktop that refused the scheme, do not
-    // open `openbot://` in this app (`presentApplication`), so their sign-ins keep the loopback names.
-    deepLinkRedirectUrl: () =>
-      (process.platform === "linux" || app.isPackaged) && app.isDefaultProtocolClient("openbot")
-        ? MCP_OAUTH_REDIRECT_URL
-        : undefined,
+    deepLinkRedirectUrl: mcpOAuthDeepLink,
     logger: createOpenBotLogger("mcp-oauth"),
   });
   mcpOAuthAuthority = mcpOAuth;

@@ -145,6 +145,7 @@ import {
   ROUTINE_RUN_PLACE_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
   SIGN_IN_RELAY_CAPABILITY,
+  SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
   SKILL_LEARNING_CAPABILITY,
   SKILLS_ADMIN_CAPABILITY,
   SKILLS_EVENTS_CAPABILITY,
@@ -2558,7 +2559,7 @@ export class TeamApiServer {
             return this.#options.mcpServers !== undefined && this.#options.mcpAccess !== undefined;
           if (capability === MCP_SIGN_IN_APP_CAPABILITY)
             return this.#options.mcpServers !== undefined && this.#options.mcpSignIns !== undefined;
-          if (capability === SIGN_IN_RELAY_CAPABILITY)
+          if (capability === SIGN_IN_RELAY_CAPABILITY || capability === SIGN_IN_RELAY_DEEP_LINK_CAPABILITY)
             return this.#options.mcpServers !== undefined && this.#options.signInRelay !== undefined;
           if (capability === PROVIDER_ACCOUNT_RELAY_CAPABILITY || capability === PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY)
             return (

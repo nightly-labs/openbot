@@ -2568,9 +2568,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   signInMcpServer(
     input: TestMcpServerInput,
     open?: McpSignInOpener,
+    deepLinkRedirectUrl?: string,
   ): Effect.Effect<McpTestResult, AgentLifecycleFailed> {
     return this.#mcp
-      .signIn(input, open)
+      .signIn(input, open, deepLinkRedirectUrl)
       .pipe(
         Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "signInMcpServer", cause: failure.cause })),
       );

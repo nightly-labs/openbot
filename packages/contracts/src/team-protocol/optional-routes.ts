@@ -129,6 +129,7 @@ import { SHARED_TABLES_CODECS } from "./shared-tables-v1";
 import { SIDE_QUESTION_CODECS } from "./side-question-v1";
 import { SIDEBAR_FOLDERS_CODECS } from "./sidebar-folders-v1";
 import { SIDEBAR_PINS_CODECS } from "./sidebar-pins-v1";
+import { SIGN_IN_RELAY_DEEP_LINK_CODECS } from "./sign-in-relay-deep-link-v1";
 import { SIGN_IN_RELAY_CODECS } from "./sign-in-relay-v1";
 import { SKILL_LEARNING_CODECS } from "./skill-learning-v1";
 import { SKILLS_ADMIN_CODECS } from "./skills-admin-v1";
@@ -216,6 +217,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...PROVIDER_HOST_SIGN_IN_CODECS,
   ...MCP_SIGN_IN_APP_CODECS,
   ...SIGN_IN_RELAY_CODECS,
+  ...SIGN_IN_RELAY_DEEP_LINK_CODECS,
   ...FOCUS_USE_CODECS,
   ...COMPUTER_ACTIVITY_CODECS,
   ...CONNECTORS_CODECS,
