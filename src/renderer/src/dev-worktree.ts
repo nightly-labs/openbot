@@ -1,7 +1,7 @@
 import { createSignal } from "solid-js";
 
 /** What `scripts/dev-worktree-vite-plugin.ts` sends. */
-export interface DevWorktree {
+interface DevWorktree {
   readonly branch: string | null;
   readonly color: string;
   readonly path: string;
