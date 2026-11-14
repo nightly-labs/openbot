@@ -1072,22 +1072,26 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         const isCurrent = () =>
           generation === loadGeneration.current && Boolean(serverId) && !removedServers.current.has(serverId ?? "");
         void (async () => {
-          while (read.again && isCurrent()) {
-            read.again = false;
-            // The page around the request holds its whole turn at least, with the request as the host has it.
-            const page = await request(
-              "GET",
-              `${TEAM_API_ROUTES.agent.conversationPage(agentId)}?limit=1&around=${encodeURIComponent(messageId)}`,
-              decodeConversationPage,
-              undefined,
-              serverId,
-            );
-            if (isCurrent() && page.agentId === agentId) conversationStore.replaceMessage(page, messageId);
+          try {
+            while (read.again && isCurrent()) {
+              read.again = false;
+              // The page around the request holds its whole turn at least, with the request as the host has it.
+              const page = await request(
+                "GET",
+                `${TEAM_API_ROUTES.agent.conversationPage(agentId)}?limit=1&around=${encodeURIComponent(messageId)}`,
+                decodeConversationPage,
+                undefined,
+                serverId,
+              );
+              if (isCurrent() && page.agentId === agentId) conversationStore.replaceMessage(page, messageId);
+            }
+          } finally {
+            // In the same step as the last check, so a later page starts a new read and is not lost.
+            openExchangeReads.current.delete(key);
           }
         })()
           // The next latest page reads it again.
-          .catch(() => undefined)
-          .finally(() => openExchangeReads.current.delete(key));
+          .catch(() => undefined);
       }
     },
     [request, conversationStore],

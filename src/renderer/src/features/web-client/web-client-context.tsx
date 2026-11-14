@@ -1886,7 +1886,6 @@ export function createWebWorkspace(
       if (current === generation) report(error);
     }
   }
-  // Coalesce event bursts; an event during a read schedules one further authoritative read.
   /** The reads of loaded open requests that a latest page left out. A change during a read reads it again. */
   const openExchangeReads = new Map<string, { again: boolean }>();
   /** Puts the host's current copy of one loaded request in place. The rest of the chat stays as it is. */
@@ -1904,24 +1903,29 @@ export function createWebWorkspace(
     openExchangeReads.set(key, read);
     const current = generation;
     void (async () => {
-      while (read.again && !disposed && current === generation) {
-        read.again = false;
-        // The page around the request holds its whole turn at least, with the request as the host has it.
-        const page = await readAround(id, messageId, 1);
-        const message = page.messages.find((candidate) => candidate.id === messageId);
-        if (disposed || current !== generation || !message) return;
-        setState((draft) => {
-          const loaded = draft.conversations[id]?.page;
-          if (!loaded || loaded.threadId !== page.threadId || page.revision < loaded.revision) return;
-          const index = loaded.messages.findIndex((candidate) => candidate.id === messageId);
-          if (index >= 0) loaded.messages[index] = message;
-        });
+      try {
+        while (read.again && !disposed && current === generation) {
+          read.again = false;
+          // The page around the request holds its whole turn at least, with the request as the host has it.
+          const page = await readAround(id, messageId, 1);
+          const message = page.messages.find((candidate) => candidate.id === messageId);
+          if (disposed || current !== generation || !message) return;
+          setState((draft) => {
+            const loaded = draft.conversations[id]?.page;
+            if (!loaded || loaded.threadId !== page.threadId || page.revision < loaded.revision) return;
+            const index = loaded.messages.findIndex((candidate) => candidate.id === messageId);
+            if (index >= 0) loaded.messages[index] = message;
+          });
+        }
+      } finally {
+        // In the same step as the last check, so a later page starts a new read and is not lost.
+        openExchangeReads.delete(key);
       }
     })()
       // The next latest page reads it again.
-      .catch(() => undefined)
-      .finally(() => openExchangeReads.delete(key));
+      .catch(() => undefined);
   }
+  // Coalesce event bursts; an event during a read schedules one further authoritative read.
   async function refresh() {
     pendingReload = true;
     if (reloadPromise) return reloadPromise;

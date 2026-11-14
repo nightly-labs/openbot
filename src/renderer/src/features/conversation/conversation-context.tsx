@@ -822,27 +822,31 @@ const Conversation = createSimpleContext({
       const read = { again: true };
       openExchangeReads.set(key, read);
       void (async () => {
-        while (read.again && scopeIsCurrent()) {
-          read.again = false;
-          // The page around the request holds its whole turn at least, with the request as the host has it.
-          const page = await conversationPort().agent.readConversationPage({
-            agentId,
-            anchor: { type: "around", messageId },
-            limit: 1,
-          });
-          const message = page.messages.find((candidate) => candidate.id === messageId);
-          if (!scopeIsCurrent() || !message) return;
-          const fresh = toAgentMessage(message, agentId);
-          updateConversation(agentId, (conversation) => {
-            const stored = conversation.messages.find((candidate) => candidate.id === messageId);
-            if (stored && page.revision >= (conversation.revision ?? -1) && !agentMessagesEqual(stored, fresh))
-              updateStored(stored, stored.animate === undefined ? fresh : { ...fresh, animate: stored.animate });
-          });
+        try {
+          while (read.again && scopeIsCurrent()) {
+            read.again = false;
+            // The page around the request holds its whole turn at least, with the request as the host has it.
+            const page = await conversationPort().agent.readConversationPage({
+              agentId,
+              anchor: { type: "around", messageId },
+              limit: 1,
+            });
+            const message = page.messages.find((candidate) => candidate.id === messageId);
+            if (!scopeIsCurrent() || !message) return;
+            const fresh = toAgentMessage(message, agentId);
+            updateConversation(agentId, (conversation) => {
+              const stored = conversation.messages.find((candidate) => candidate.id === messageId);
+              if (stored && page.revision >= (conversation.revision ?? -1) && !agentMessagesEqual(stored, fresh))
+                updateStored(stored, stored.animate === undefined ? fresh : { ...fresh, animate: stored.animate });
+            });
+          }
+        } finally {
+          // In the same step as the last check, so a later page starts a new read and is not lost.
+          openExchangeReads.delete(key);
         }
       })()
         // The next latest page reads it again.
-        .catch(() => undefined)
-        .finally(() => openExchangeReads.delete(key));
+        .catch(() => undefined);
     }
 
     async function loadOlderAgentMessages(agentId = activeAgent()?.id): Promise<void> {
