@@ -270,7 +270,8 @@ class DiscordAdapter implements MessagingAdapter {
       );
       if (Result.isFailure(attempt) || !attempt.success) skipped.push(file.name);
     }
-    return skipped;
+    // The Signal upload answer does not give the message id.
+    return { skipped, firstId: null };
   });
 
   /**

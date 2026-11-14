@@ -130,6 +130,8 @@ export interface MessagingOutbound {
         /** The people that a Slack post pinged, and its redacted text. */
         ping?: { userIds: string[]; text: string };
       }
+    /** A post of files alone. Slack and Discord do not give the id of an upload. */
+    | { posted: true; messageId?: string; skippedFiles?: string[]; ping?: undefined }
     | { error: string; failure: Exclude<MessagingPostFailure, "gone"> }
   >;
   /** A Discord output of a workflow: a reply, a post or a reaction. */
@@ -536,7 +538,7 @@ export class MessagingThreads {
             call.embeds,
           );
     if ("error" in answer) return openBotToolFailure(answer.error);
-    if (!("ping" in answer)) return openBotToolResult(answer);
+    if (!("posted" in answer) || !answer.ping) return openBotToolResult(answer);
     const { ping, ...result } = answer;
     if (ping && call.tool === "messaging_post")
       yield* this.recordPings({

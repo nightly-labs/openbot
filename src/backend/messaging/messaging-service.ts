@@ -1790,6 +1790,30 @@ export class MessagingService {
     const botUserId = live.identity.botUserId;
     const pinged =
       live.record.platform === "slack" ? slackPingedUsers(text).filter((userId) => userId !== botUserId) : [];
+    // Files without text or embeds are the post: an empty text post before them would fail.
+    if (!text.trim() && !embeds.length && files.length) {
+      const uploaded = yield* live.adapter.upload(target, files).pipe(
+        Effect.catch((failure) =>
+          Effect.sync(() => {
+            this.#warn(failure.cause);
+            return { skipped: files.map((file) => file.name), firstId: null };
+          }),
+        ),
+      );
+      const sentFiles = files.map((file) => file.name).filter((name) => !uploaded.skipped.includes(name));
+      if (!sentFiles.length)
+        return {
+          error:
+            "No file was sent: each file was empty, too large for the platform, or not readable. Check the files and try again.",
+          failure: "unknown" as const,
+        };
+      if (uploaded.firstId) live.adapter.rememberPost?.(target, uploaded.firstId, `Files: ${sentFiles.join(", ")}`);
+      return {
+        posted: true as const,
+        ...(uploaded.firstId ? { messageId: uploaded.firstId } : {}),
+        ...(uploaded.skipped.length ? { skippedFiles: uploaded.skipped } : {}),
+      };
+    }
     const posted = yield* (
       postEmbeds && embeds.length
         ? postEmbeds.call(live.adapter, target, text, embeds.map(redactEmbed))
@@ -1812,6 +1836,7 @@ export class MessagingService {
     // The text is in the place already, so a failed upload names the files and does not fail the post.
     const skippedFiles = files.length
       ? yield* live.adapter.upload(target, files).pipe(
+          Effect.map((uploaded) => uploaded.skipped),
           Effect.catch((failure) =>
             Effect.sync(() => {
               this.#warn(failure.cause);
@@ -2015,7 +2040,7 @@ export class MessagingService {
     yield* this.#deliverFinal(live, key, ended);
     if (activity.type === "finished" && activity.status === "completed" && activity.files.length) {
       const { adapter } = live;
-      const skipped = yield* adapter.upload(target, activity.files).pipe(toMessagingOperationFailed);
+      const { skipped } = yield* adapter.upload(target, activity.files).pipe(toMessagingOperationFailed);
       if (skipped.length)
         yield* adapter
           .post(target, {
