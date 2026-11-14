@@ -975,6 +975,15 @@ export class OpenBotToolRouter {
    */
   #askUi(client: AgentClient, request: AppServerRequest, params: DynamicToolCallParams): void {
     const refuse = (message: string) => client.respond(request.id, openBotToolFailure(message));
+    // Nobody presses a button on Slack, Discord, Telegram or WhatsApp, so the turn would wait forever
+    // and the chat's next messages would get "Too many requests are waiting" (#7347).
+    const agentId = this.#conversation.agentForThread(params.threadId);
+    if (agentId && this.#messaging.store.linkForThread(this.#conversation.publicThreadId(agentId, params.threadId))) {
+      refuse(
+        "This conversation is in an external chat, where nobody can press a card button. Put the draft or the action in your answer and ask the person to confirm it. A reply in this chat that confirms it is the approval; then do it.",
+      );
+      return;
+    }
     const parsed = askUiToolSchema.safeParse(params.arguments);
     if (!parsed.success) {
       refuse(`${z.prettifyError(parsed.error)}\nCorrect the arguments and retry.`);

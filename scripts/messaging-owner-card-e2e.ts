@@ -4,6 +4,8 @@
 // checked the provider's thread id, the Discord thread passed as the agent's own chat, and the turn
 // waited on the owner's card until the provider's tool timeout (100 minutes for Grok), so every later
 // message of that author got "Too many requests are waiting". The person's own chat still gets the card.
+// The same holds for an `openbot.ask_ui` confirm card, such as a draft to approve before a send (#7347):
+// in an external chat it is refused at once, and the agent asks in its answer instead.
 // Runs the real agent service, messaging threads and tool router on a temporary profile with a fake
 // Codex app-server. The fake calls the tool through `tool_call`, as a model does, and logs the result.
 // `bun scripts/messaging-owner-card-e2e.ts`. Writes .openbot-build/messaging-owner-card-e2e/report.json.
@@ -39,6 +41,7 @@ const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 const CALL_MARK = "FEEDBACK-CALL";
 const PERSON = { id: "local", name: "Alex" };
 const REFUSAL = "Only a person's message";
+const ASK_UI_REFUSAL = "nobody can press a card button";
 /** Longer than a fake turn, much shorter than the provider's tool timeout. */
 const TURN_MS = 20_000;
 
@@ -225,6 +228,12 @@ const agents = new AgentService({
   },
 });
 
+/** The question cards (ask_user, ask_ui) that the service shows, in order. */
+const prompts: { requestId: string | number; threadId: string }[] = [];
+agents.on("event", (event) => {
+  if (event.type === "prompt") prompts.push({ requestId: event.requestId, threadId: event.threadId });
+});
+
 /** The approval cards that the service shows, in order. */
 const approvals: { requestId: string | number; threadId: string; reason: string | null }[] = [];
 agents.on("event", (event) => {
@@ -246,6 +255,20 @@ async function logged(name: string, index: number) {
 
 const callText = (title: string) =>
   `${CALL_MARK} <<ARGS${JSON.stringify({ __tool: "send_feedback", kind: "idea", title, text: "Let me pick an agent from the Android share sheet." })}ARGS>>`;
+
+const draftCardText = () =>
+  `${CALL_MARK} <<ARGS${JSON.stringify({
+    __tool: "ask_ui",
+    block: {
+      type: "confirm",
+      title: "Send this message to the group?",
+      preview: "Hi all, the meeting moves to 3 pm.",
+      actions: [
+        { id: "send", label: "Send", style: "primary" },
+        { id: "cancel", label: "Cancel" },
+      ],
+    },
+  })}ARGS>>`;
 
 /** The deliveries of a Discord link that have not ended. */
 const openDeliveries = (linkId: string) => mailbox.unresolvedMessagingDeliveries(linkId);
@@ -306,7 +329,23 @@ try {
   );
   await waitFor("the Discord queue to drain", () => openDeliveries(linkId).length === 0);
 
-  // 3. The person's own chat still gets the card. A decline sends nothing.
+  // 3. A draft card in the external chat is refused at once, and the next message is not busy.
+  const draftIndex = toolLogs().length;
+  const draft = await receive("message-4", draftCardText());
+  assert.ok(draft.status === "queued", `The draft message was not queued: ${draft.status}`);
+  const draftCard = await logged("ask_ui from Discord", draftIndex);
+  pass(
+    "A Discord turn cannot show a draft card, and the router says so at once",
+    !draftCard.success && draftCard.text.includes(ASK_UI_REFUSAL),
+    draftCard.text,
+  );
+  pass("No question card showed for the Discord turn", prompts.length === 0, JSON.stringify(prompts));
+  await waitFor("the draft turn to end", () => openDeliveries(linkId).length === 0);
+  const afterDraft = await receive("message-5", "Did you send it?");
+  pass("The author's next message is queued, not refused as busy", afterDraft.status === "queued", afterDraft.status);
+  await waitFor("the Discord queue to drain", () => openDeliveries(linkId).length === 0);
+
+  // 4. The person's own chat still gets the card. A decline sends nothing.
   const ownIndex = toolLogs().length;
   await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: callText("From the owner") }, PERSON));
   const card = await waitFor("the owner's feedback card", () => approvals[0]);
@@ -314,6 +353,15 @@ try {
   await runCauseEffect(agents.respondToApproval({ requestId: card.requestId, decision: "decline" }));
   const fromOwner = await logged("send_feedback from the own chat", ownIndex);
   pass("A declined card sends nothing", fromOwner.text.includes('"declined"'), fromOwner.text);
+
+  // 5. The person's own chat still shows the draft card.
+  await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: draftCardText() }, PERSON));
+  const ownDraft = await waitFor("the draft card in the own chat", () => prompts[0]);
+  pass(
+    "The person's own chat shows the draft card",
+    ownDraft.threadId !== draft.link.threadId,
+    JSON.stringify(ownDraft),
+  );
 
   report.passed = true;
 } catch (error) {
