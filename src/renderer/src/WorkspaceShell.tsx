@@ -65,6 +65,9 @@ import { WorkspaceOverlays } from "./WorkspaceOverlays";
  * closes the page, as each row calls `showAgents`. The other pages of the rail - schedule, usage or settings - sit outside that
  * group and inert it.
  */
+/** The same wait as the connection toast of the first load, after which the user gets the controls. */
+const FIRST_CONNECTION_COVER_MS = 10_000;
+
 export function WorkspaceShell(props: {
   account: () => CentralAuthUser;
   /**
@@ -237,6 +240,27 @@ export function WorkspaceShell(props: {
       loading: activeServer()?.state === "online",
       hasContent: scope.connection.synced,
     });
+  // Main reports a remote server as offline before its first connection. A server with an issue
+  // already failed, so its Retry connects in the pane.
+  const firstConnection = () =>
+    (activeServer()?.state === "connecting" || activeServer()?.state === "offline") && !activeServer()?.issue;
+  // A server that does not answer fails only after 30 s. The cover ends sooner, so the user can select
+  // another server from the rail (#5755). It does not come back for the same first load.
+  const connectingServerId = createMemo(() =>
+    remote() && serversLoaded() && !scope.connection.synced && firstConnection() ? activeServer()?.id : undefined,
+  );
+  const [coverEndedFor, setCoverEndedFor] = createSignal<string | null>(null);
+  createEffect(connectingServerId, (serverId) => {
+    if (!serverId) return;
+    const timer = setTimeout(() => setCoverEndedFor(serverId), FIRST_CONNECTION_COVER_MS);
+    return () => clearTimeout(timer);
+  });
+  createEffect(
+    () => scope.connection.synced,
+    (synced) => {
+      if (synced) setCoverEndedFor(null);
+    },
+  );
   // The first load covers the whole window. A server that is offline, sleeps, fails or waits shows its
   // screen in the pane only, so the user can select another server from the rail.
   const fullWindowLoading = () =>
@@ -244,10 +268,7 @@ export function WorkspaceShell(props: {
     !scope.connection.synced &&
     (connectionPhase() === "loading" || connectionPhase() === "connecting") &&
     (!serversLoaded() ||
-      activeServer()?.state === "online" ||
-      activeServer()?.state === "connecting" ||
-      // Main reports a remote server as offline before its first connection; only a reported issue ends the cover.
-      (activeServer()?.state === "offline" && !activeServer()?.issue));
+      (coverEndedFor() !== activeServer()?.id && (activeServer()?.state === "online" || firstConnection())));
   // The full-window screen stays after the load ends, so its crew hop out before it goes. A new
   // first load after its exit mounts a new screen.
   const [loadingCover, setLoadingCover] = createSignal(false);
