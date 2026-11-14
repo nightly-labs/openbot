@@ -43,13 +43,35 @@ function ThreadMenuList(props: ThreadHeaderProps) {
 }
 
 /**
+ * Whether a thread that only the menu shows has agent messages that the user has not read. The tabs
+ * show their own marks; a narrow header shows only the open thread. A routine's thread often has no
+ * tab, so without this mark the agent's unread dot in the sidebar leads nowhere in the chat (#9166).
+ */
+function unreadInMenuOnly(props: ThreadHeaderProps & { mode: ThreadRowMode }): boolean {
+  const shown = new Set(props.mode === "tabs" ? props.tabs.map((thread) => thread.id) : [props.activeId]);
+  return props.threads.some((thread) => !shown.has(thread.id) && (thread.unread ?? 0) > 0);
+}
+
+/** The unread dot on the menu button. The button's description says it for a screen reader. */
+function MenuUnreadDot(props: { show: boolean }) {
+  return (
+    <Show when={props.show}>
+      <span class="agent-threads-menu-unread" aria-hidden="true" />
+    </Show>
+  );
+}
+
+/**
  * The menu button: a chevron after the tabs, or in a narrow header the open thread with a chevron. In
- * a header too narrow for a title, only the chevron shows, and the menu marks the open thread.
+ * a header too narrow for a title, only the chevron shows, and the menu marks the open thread. A dot
+ * on the button leads to an unread thread that has no tab.
  */
 function ThreadMenuTrigger(props: ThreadHeaderProps & { mode: ThreadRowMode }) {
   const { t } = useText();
   const active = () => props.tabs.find((thread) => thread.id === props.activeId);
   const switcher = () => (props.mode === "compact" ? active() : undefined);
+  const unread = () => unreadInMenuOnly(props);
+  const unreadDescription = () => (unread() ? t("sidebar.state.unreadThreads") : undefined);
   return (
     <Show
       when={switcher()}
@@ -61,9 +83,11 @@ function ThreadMenuTrigger(props: ThreadHeaderProps & { mode: ThreadRowMode }) {
             class: "agent-threads-icon-button agent-threads-menu-button no-drag",
           })}
           aria-label={t("conversation.threads.all")}
+          aria-description={unreadDescription()}
           title={t("conversation.threads.all")}
         >
           <ChevronDown aria-hidden="true" />
+          <MenuUnreadDot show={unread()} />
         </DropdownMenu.Trigger>
       }
     >
@@ -73,6 +97,7 @@ function ThreadMenuTrigger(props: ThreadHeaderProps & { mode: ThreadRowMode }) {
           data-attention={threadAttention(thread().status)}
           title={thread().title}
           aria-label={t("conversation.threads.current", { title: thread().title })}
+          aria-description={unreadDescription()}
         >
           {/* The open thread as its selected tab shows it: the icon slot, the title, then the chevron. */}
           <span class="agent-threads-switcher-icon" aria-hidden="true">
@@ -81,6 +106,7 @@ function ThreadMenuTrigger(props: ThreadHeaderProps & { mode: ThreadRowMode }) {
           <ThreadTitle class="agent-threads-tab-title" title={thread().title} />
           <ThreadStatusText status={thread().status} />
           <ChevronDown class="agent-threads-switcher-chevron" aria-hidden="true" />
+          <MenuUnreadDot show={unread()} />
         </DropdownMenu.Trigger>
       )}
     </Show>
