@@ -11,6 +11,10 @@ export const messages = {
   "error.mcp.signInFileTooLarge": "Plik logowania MCP jest za duży.",
   "error.mcp.unsupported": "Ten serwer nie obsługuje serwerów MCP.",
   "error.mcp.signInOnHost": "Logowanie do serwera MCP działa tylko w OpenBot na komputerze hosta.",
+  "error.mcp.signInPageOnServer":
+    "Ta strona logowania otwiera się tylko na serwerze. Poproś właściciela lub administratora serwera o zalogowanie się.",
+  "error.mcp.signInPageOnServerSwitch":
+    "Ta strona logowania otwiera się tylko na serwerze. Przełącz się na ten serwer, a potem ponownie wybierz Zaloguj się.",
   "error.mcp.signInAppUnsupported": "Ten serwer nie obsługuje aplikacji logowania. Zaktualizuj OpenBot na hoście.",
   "error.mcp.redirectRelayed": "OpenBot wysłał logowanie do serwera. Możesz zamknąć to okno.",
   "error.mcp.relayEnded": "To logowanie się zakończyło. Rozpocznij je ponownie.",

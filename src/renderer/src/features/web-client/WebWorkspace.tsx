@@ -1203,6 +1203,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     presence: () => workspace.state.presence,
     refreshHosts: () => workspace.refreshHosts(),
     relaySupported: () => workspace.state.capabilities.includes(SIGN_IN_RELAY_CAPABILITY),
+    hostTabSupported: () =>
+      workspace.state.capabilities.includes(MCP_SIGN_IN_CAPABILITY) &&
+      workspace.state.capabilities.includes("browser-view"),
   });
   /** Only the owner of a host with `host-key-rotation-v1` changes its key. A named function, not a ternary prop. */
   function rotateHostKeyAction() {

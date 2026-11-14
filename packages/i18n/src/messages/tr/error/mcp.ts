@@ -12,6 +12,10 @@ export const messages = {
   "error.mcp.signInFileTooLarge": "MCP oturum açma dosyası çok büyük.",
   "error.mcp.unsupported": "MCP sunucuları bu sunucu tarafından desteklenmiyor.",
   "error.mcp.signInOnHost": "Bir MCP sunucusunda oturum açma yalnızca ana makinedeki OpenBot'ta çalışır.",
+  "error.mcp.signInPageOnServer":
+    "Bu oturum açma sayfası yalnızca sunucuda açılır. Sunucunun sahibinden veya yöneticisinden oturum açmasını isteyin.",
+  "error.mcp.signInPageOnServerSwitch":
+    "Bu oturum açma sayfası yalnızca sunucuda açılır. Bu sunucuya geçin, ardından yeniden Oturum aç'ı seçin.",
   "error.mcp.signInAppUnsupported":
     "Bu sunucu oturum açma uygulamalarını desteklemiyor. Ana makinedeki OpenBot'u güncelleyin.",
   "error.mcp.redirectRelayed": "OpenBot oturum açmayı sunucuya gönderdi. Bu pencereyi kapatabilirsiniz.",

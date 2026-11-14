@@ -11,6 +11,10 @@ export const messages = defineMessages("error.mcp", {
   "error.mcp.signInFileTooLarge": "The MCP sign-in file is too large.",
   "error.mcp.unsupported": "MCP servers are not supported by this server.",
   "error.mcp.signInOnHost": "Sign-in to an MCP server works only in OpenBot on the host computer.",
+  "error.mcp.signInPageOnServer":
+    "This sign-in page opens only on the server. Ask an owner or admin of the server to sign in.",
+  "error.mcp.signInPageOnServerSwitch":
+    "This sign-in page opens only on the server. Switch to this server, then choose Sign in again.",
   "error.mcp.signInAppUnsupported": "This server does not support sign-in apps. Update OpenBot on the host.",
   "error.mcp.redirectRelayed": "OpenBot sent the sign-in to the server. You can close this window.",
   "error.mcp.relayEnded": "This sign-in ended. Start it again.",
