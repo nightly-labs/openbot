@@ -69,7 +69,7 @@ export interface DynamicIslandWindowControllerOptions {
   getPrimaryDisplay: () => Display;
   getMainWindow: () => BrowserWindow | null;
   /** The OpenBot window that has the keyboard, if one has it. */
-  getFocusedWindow?: () => BrowserWindow | null;
+  getFocusedWindow: () => BrowserWindow | null;
   ensureMainWindow?: () => Promise<BrowserWindow>;
   presentMainWindow: (window: BrowserWindow) => void;
   performHaptic: () => void;
@@ -205,16 +205,21 @@ export class DynamicIslandWindowController {
     // activating the app, so the main window stays where it is.
     const wantsKeyboard = interactive && keyboard;
     if (wantsKeyboard && this.#options.windowKind === "panel" && !this.#keyboardReturn.has(displayId)) {
-      this.#keyboardReturn.set(displayId, this.#options.getFocusedWindow?.() ?? null);
+      const focused = this.#options.getFocusedWindow();
+      // The island of another display had the keyboard: the window that it got the keyboard from gets it back.
+      const island = [...this.#windows].find(([, candidate]) => candidate === focused);
+      this.#keyboardReturn.set(displayId, island ? (this.#keyboardReturn.get(island[0]) ?? null) : focused);
     }
-    const keyboardReturn = wantsKeyboard ? undefined : this.#keyboardReturn.get(displayId);
-    if (!wantsKeyboard) this.#keyboardReturn.delete(displayId);
+    const keyboardReturn = interactive ? undefined : this.#keyboardReturn.get(displayId);
+    if (!interactive) this.#keyboardReturn.delete(displayId);
     window.setFocusable(wantsKeyboard);
     if (wantsKeyboard && !window.isFocused()) window.focus();
     if (!interactive && bounds) this.#scheduleCollapse(displayId, window);
     // On macOS, a panel that is no longer focusable keeps the keyboard, so typing went nowhere (#9450).
-    // The OpenBot window that had the keyboard gets it back. When another app had it, the panel keeps
-    // it: hiding the panel can bring an OpenBot window to the front (electron/electron#35483, #3497).
+    // When the island closes, the OpenBot window that had the keyboard gets it back. Not before: the
+    // island renderer ends its interaction when its window loses focus, and the pointer can still be on
+    // it. When another app had the keyboard, the panel keeps it: hiding the panel can bring an OpenBot
+    // window to the front (electron/electron#35483, #3497).
     if (
       keyboardReturn &&
       keyboardReturn !== window &&
