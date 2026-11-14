@@ -783,8 +783,8 @@ export class TurnLifecycle {
    * Codex ends a turn with no answer and no step as completed. A lead that got its teammates' results
    * and ended that way stopped the whole team, with no error (#7225). Such a turn fails as an ACP turn
    * with no answer does, and its end runs it again or shows the error. A turn that wants no answer, a
-   * turn that compacted, a plan and a turn that the user stopped can end empty. A turn that did a step
-   * stays completed (`#noteNoAnswerAfterSteps`).
+   * turn that compacted, a plan and a turn that the user stopped can end empty. A turn that did work, a
+   * tool step or answer text, stays completed (`#noteNoAnswerAfterSteps`).
    */
   #holdCodexNoAnswer(agentId: string, threadId: string, turnId: string, source: AgentClient): boolean {
     const running = this.#runningTurns.get(turnId);
