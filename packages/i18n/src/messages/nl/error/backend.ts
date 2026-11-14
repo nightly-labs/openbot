@@ -208,6 +208,8 @@ export const messages = {
   "error.backend.interruptSelf": "Een agent kan zichzelf niet onderbreken.",
   "error.backend.interruptOtherWork":
     "Deze agent werkt aan een taak die jouw bericht niet heeft gestart. Alleen de gebruiker of de afzender van die taak kan deze stoppen.",
+  "error.backend.interruptSharedWork":
+    "De beurt van deze agent werkt aan je bericht en ook aan een bericht van de gebruiker of een andere agent. Alleen de gebruiker kan hem stoppen, met Agent stoppen in de chat van die agent.",
   "error.backend.interruptStarting": "Deze agent start nog een beurt. Probeer het opnieuw als de beurt is gestart.",
   "error.backend.interruptNoSession":
     "OpenBot kan deze agent niet onderbreken, omdat de sessie bij de aanbieder niet beschikbaar is.",

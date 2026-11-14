@@ -212,6 +212,8 @@ export const messages = {
   "error.backend.interruptSelf": "Um agente não pode interromper a si mesmo.",
   "error.backend.interruptOtherWork":
     "Este agente trabalha em uma tarefa que sua mensagem não iniciou. Somente o usuário ou quem enviou a tarefa pode interrompê-lo.",
+  "error.backend.interruptSharedWork":
+    "O turno deste agente trabalha na sua mensagem e também numa mensagem do usuário ou de outro agente. Só o usuário pode pará-lo, com Parar agente no chat desse agente.",
   "error.backend.interruptStarting":
     "Este agente ainda está iniciando um turno. Tente novamente após o início do turno.",
   "error.backend.interruptNoSession":

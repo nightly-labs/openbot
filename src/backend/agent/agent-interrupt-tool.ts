@@ -103,7 +103,15 @@ export class AgentInterruptTool {
         return openBotToolFailure(sourceText("error.backend.useChannelTaskControlsWork"));
       }
       if (!ownedBy(deliveries, callerAgentId)) {
-        return openBotToolFailure(sourceText("error.backend.interruptOtherWork"));
+        // The turn is not the caller's to stop, but its queued requests are still the caller's to
+        // cancel, or they start after the turn that the caller could not stop.
+        const cancelledMessages = yield* toolStep(() => this.#cancelQueuedFrom(agentId, callerAgentId));
+        // The caller's message can start the turn and another sender's message join it later, for
+        // example a message that the user steers in. Then only the user can stop it.
+        const message = deliveries.some((context) => sentBy(context, callerAgentId))
+          ? sourceText("error.backend.interruptSharedWork")
+          : sourceText("error.backend.interruptOtherWork");
+        return openBotToolFailure(message, cancelledMessages > 0 ? { cancelledMessages } : undefined);
       }
       if (!this.#store.activeProviderSession(agentId) && !this.#conversation.hasRoutineSession(agentId)) {
         return openBotToolFailure(sourceText("error.backend.interruptNoSession"));
@@ -224,8 +232,9 @@ export class AgentInterruptTool {
 
 /** Every delivery the turn runs came from the caller, and it runs at least one. */
 function ownedBy(deliveries: readonly DeliveryContext[], callerAgentId: string): boolean {
-  return (
-    deliveries.length > 0 &&
-    deliveries.every(({ delivery }) => delivery.sender.kind === "agent" && delivery.sender.agentId === callerAgentId)
-  );
+  return deliveries.length > 0 && deliveries.every((context) => sentBy(context, callerAgentId));
+}
+
+function sentBy({ delivery }: DeliveryContext, agentId: string): boolean {
+  return delivery.sender.kind === "agent" && delivery.sender.agentId === agentId;
 }

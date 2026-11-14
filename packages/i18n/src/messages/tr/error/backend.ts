@@ -200,6 +200,8 @@ export const messages = {
   "error.backend.interruptSelf": "Bir ajan kendi kendini kesintiye uğratamaz.",
   "error.backend.interruptOtherWork":
     "Bu ajan mesajınızın başlatmadığı bir görev üzerinde çalışıyor. Yalnızca kullanıcı veya o görevin göndereni görevi durdurabilir.",
+  "error.backend.interruptSharedWork":
+    "Bu ajanın turu mesajınız ve ayrıca kullanıcıdan ya da başka bir ajandan gelen bir mesaj üzerinde çalışıyor. Onu yalnızca kullanıcı, o ajanın sohbetindeki Ajanı durdur ile durdurabilir.",
   "error.backend.interruptStarting": "Bu ajan hâlâ bir tur başlatıyor. Tur başladıktan sonra tekrar deneyin.",
   "error.backend.interruptNoSession": "OpenBot sağlayıcı oturumu kullanılamadığı için bu ajanı kesintiye uğratamıyor.",
   "error.backend.memoryTextRequired": "Bellek metni gereklidir.",
