@@ -475,16 +475,18 @@ export class BitwardenConnectorService implements PasswordVault {
 
   /**
    * Runs a read of the open session. While its reads fail, the status shows the error, so the page
-   * does not show a working connection; the next read that works removes the error.
+   * does not show a working connection; the next read that works removes the error. A stored host
+   * connection also ends the session, so the next read unlocks again.
    */
   #reported<A>(session: Session, read: Effect.Effect<A, PasswordVaultError>): Effect.Effect<A, PasswordVaultError> {
     return read.pipe(
       // The caller logs the failure.
       Effect.tapError(({ cause }) =>
-        Effect.sync(() => {
-          if (this.#session !== session) return;
-          this.#error = this.#host?.store.read() ? hostError(cause) : sourceText("error.connector.bitwardenFailed");
-          this.#emit();
+        Effect.suspend(() => {
+          if (this.#session !== session) return Effect.void;
+          const host = Boolean(this.#host?.store.read());
+          this.#error = host ? hostError(cause) : sourceText("error.connector.bitwardenFailed");
+          return host ? this.#dropSession() : Effect.sync(() => this.#emit());
         }),
       ),
       Effect.tap(() =>

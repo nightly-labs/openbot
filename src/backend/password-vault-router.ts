@@ -14,8 +14,8 @@ export interface PasswordVaultSource {
 /**
  * Lists the logins of every source and fills from the one that a login id names. Only new sources get
  * a prefix: existing 1Password item ids keep their meaning, and Bitwarden ids keep `bitwarden:`.
- * A source that cannot be read does not hide the logins of the others. The list fails, with the
- * names of those sources, only when no other source has a login for the site.
+ * When a source cannot be read, the list fails, as a fill must not choose from part of the logins.
+ * The failure names those sources and keeps the logins of the others, so `list_logins` can show them.
  */
 export function passwordVaultRouter(sources: ReadonlyArray<PasswordVaultSource>): PasswordVault {
   // The longest prefix first, so the empty prefix matches only an id that no other source names.
@@ -40,10 +40,11 @@ export function passwordVaultRouter(sources: ReadonlyArray<PasswordVaultSource>)
         any = true;
         found.push(...list.success.map((login) => ({ ...login, id: `${prefix}${login.id}` })));
       }
-      if (unreadable.length > 0 && found.length === 0)
+      if (unreadable.length > 0)
         return yield* new PasswordVaultError({
           cause: new Error(`Unreadable password sources: ${unreadable.join(", ")}.`),
           sources: unreadable,
+          logins: found,
         });
       return any ? found : null;
     }),

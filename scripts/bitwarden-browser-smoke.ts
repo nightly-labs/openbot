@@ -127,18 +127,16 @@ export async function runBitwardenBrowserSmoke(browser: BrowserHost): Promise<vo
     vaultLogins = [
       { id: "vault-login", title: "Vault fixture", username: "vault@example.test", hasOneTimePassword: false },
     ];
-    const kept = await runCauseEffect(vault.loginsFor(ORIGIN));
+    const failed = await Effect.runPromise(Effect.result(vault.loginsFor(ORIGIN)));
     const failedStatus = connector.status();
-    if (kept?.length !== 1 || kept[0]?.id !== "openbot:vault-login")
+    if (!Result.isFailure(failed) || failed.failure.sources?.join() !== "Bitwarden")
+      throw new Error("The failed login list did not name Bitwarden.");
+    if (failed.failure.logins?.map(({ id }) => id).join() !== "openbot:vault-login")
       throw new Error("A Bitwarden failure hid the OpenBot Vault login.");
     if (!failedStatus.connected || !failedStatus.error)
       throw new Error("The Bitwarden status did not show the failed read.");
-    checks.push("a Bitwarden read failure keeps the other logins and shows the error in the Bitwarden status");
+    checks.push("a Bitwarden read failure names Bitwarden, keeps the other logins, and shows the error in its status");
     vaultLogins = [];
-    const failed = await Effect.runPromise(Effect.result(vault.loginsFor(ORIGIN)));
-    if (!Result.isFailure(failed) || failed.failure.sources?.join() !== "Bitwarden")
-      throw new Error("The failed login list did not name Bitwarden.");
-    checks.push("with no other login, the list fails and names Bitwarden");
     cliFails = false;
     if ((await runCauseEffect(vault.loginsFor(ORIGIN)))?.[0]?.id !== login.id || connector.status().error !== null)
       throw new Error("A working Bitwarden read did not clear the error.");
