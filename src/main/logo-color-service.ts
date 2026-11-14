@@ -6,16 +6,16 @@ import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } f
 const DEFAULT_PREFERENCE: AppLogoColorPreference = { color: DEFAULT_APP_LOGO_COLOR };
 
 /**
- * The saved logo color, or the default. A file that is missing, unreadable or names a color this
- * build does not ship reads as the default: a lost color choice must not stop the app from starting.
+ * The saved logo color, or `null` when the user has not chosen one. A file that is missing,
+ * unreadable or names a color this build does not ship reads as no choice: a lost color choice must
+ * not stop the app from starting.
  */
 
 const readLogoColorPreference = Effect.fn("LogoColorPreference.read")((path: string) =>
-  readPreferenceFile(path, (parsed): AppLogoColorPreference => {
-    if (!isDynamicRecord(parsed) || parsed.version !== 1 || !isAppLogoColor(parsed.color))
-      return { ...DEFAULT_PREFERENCE };
+  readPreferenceFile(path, (parsed): AppLogoColorPreference | null => {
+    if (!isDynamicRecord(parsed) || parsed.version !== 1 || !isAppLogoColor(parsed.color)) return null;
     return { color: parsed.color };
-  }).pipe(Effect.catch(() => Effect.succeed({ ...DEFAULT_PREFERENCE }))),
+  }).pipe(Effect.catch(() => Effect.succeed(null))),
 );
 
 const writeLogoColorPreference = Effect.fn("LogoColorPreference.write")(function* (
@@ -34,6 +34,7 @@ export class LogoColorService {
   readonly #path: string;
   readonly #listeners = new Set<(preference: AppLogoColorPreference) => void>();
   #preference: AppLogoColorPreference = { ...DEFAULT_PREFERENCE };
+  #chosen = false;
   #writes = Semaphore.makeUnsafe(1);
 
   constructor(input: { path: string }) {
@@ -44,10 +45,20 @@ export class LogoColorService {
     return { ...this.#preference };
   }
 
+  /**
+   * Whether the user has chosen a color, the default one included. Without a choice the macOS Dock
+   * keeps the bundle icon, which follows the system dark and tinted icon styles.
+   */
+  get chosen(): boolean {
+    return this.#chosen;
+  }
+
   /** Read the saved preference. Called once at startup, before the first window loads. */
   load(): Effect.Effect<AppLogoColorPreference, PreferenceFileFailure> {
     return Effect.gen({ self: this }, function* () {
-      this.#preference = yield* readLogoColorPreference(this.#path);
+      const saved = yield* readLogoColorPreference(this.#path);
+      this.#chosen = saved !== null;
+      this.#preference = saved ?? { ...DEFAULT_PREFERENCE };
       return this.preference;
     });
   }
@@ -63,6 +74,7 @@ export class LogoColorService {
   #write(preference: AppLogoColorPreference): Effect.Effect<AppLogoColorPreference, PreferenceFileFailure> {
     return Effect.gen({ self: this }, function* () {
       this.#preference = yield* writeLogoColorPreference(this.#path, preference);
+      this.#chosen = true;
       for (const listener of this.#listeners) listener(this.preference);
       return this.preference;
     }).pipe(Effect.uninterruptible);

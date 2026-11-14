@@ -6,7 +6,6 @@ import {
   type AgentSummary,
   type AppLogoColor,
   type CentralAuthState,
-  DEFAULT_APP_LOGO_COLOR,
   DEFAULT_QUIT_GUARD,
   type HostStatus,
   IPC_ENDPOINTS,
@@ -631,11 +630,10 @@ let appIconColorImage: NativeImage | undefined;
 /**
  * A packaged release on macOS shows the icon of its bundle in the Dock. On macOS 26 that icon comes
  * from the Icon Composer catalog, with glass and with dark, clear and tinted versions; `dock.setIcon`
- * would replace it with one flat image until the app quits.
+ * would replace it with one flat image until the app quits. So the Dock keeps it only until the user
+ * chooses a logo color: a chosen color, the default one included, must not turn dark with the system.
  */
 const dockShowsBundleIcon = process.platform === "darwin" && app.isPackaged && appVariant === "production";
-/** Electron cannot give the Dock back to the bundle icon, so after one change each change sets an image. */
-let dockIconChanged = false;
 let backgroundTray: BackgroundTray | null = null;
 
 /**
@@ -644,9 +642,9 @@ let backgroundTray: BackgroundTray | null = null;
  * alternate app icon API, so when the app is closed the Dock shows the icon inside the app bundle:
  * changing that file would break the code signature.
  */
-function applyAppIconColor(color: AppLogoColor): void {
+function applyAppIconColor(color: AppLogoColor, chosen: boolean): void {
   if (appVariant !== "production") return;
-  if (dockShowsBundleIcon && color === DEFAULT_APP_LOGO_COLOR && !dockIconChanged) return;
+  if (dockShowsBundleIcon && !chosen) return;
   const icon = nativeImage.createFromPath(
     resolveLogoColorIconPath({
       color,
@@ -658,7 +656,6 @@ function applyAppIconColor(color: AppLogoColor): void {
   );
   if (icon.isEmpty()) return;
   if (process.platform === "darwin") {
-    dockIconChanged = true;
     app.dock?.setIcon(icon);
     return;
   }
@@ -1810,9 +1807,9 @@ if (!hasSingleInstanceLock) {
         }
         placeWindowButtons(BrowserWindow.getAllWindows());
       });
-      applyAppIconColor(logoColor.preference.color);
+      applyAppIconColor(logoColor.preference.color, logoColor.chosen);
       logoColor.subscribe((preference) => {
-        applyAppIconColor(preference.color);
+        applyAppIconColor(preference.color, logoColor.chosen);
         for (const window of BrowserWindow.getAllWindows()) {
           sendToRenderer(window, IPC_ENDPOINTS.app.appLogoColorPreference, preference);
         }
