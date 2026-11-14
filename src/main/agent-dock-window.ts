@@ -57,6 +57,12 @@ export interface AgentDockWindowControllerOptions {
   ensureMainWindow?: () => Promise<BrowserWindow>;
   presentMainWindow: (window: BrowserWindow) => void;
   sendMessage: (action: AgentDockSendAction) => Effect.Effect<void, AgentDockFailed>;
+  /** The pointer for a drag, where the screen cannot see it (a dock shown as a Wayland layer). Null: the screen's. */
+  dragPointer?: (() => { x: number; y: number } | null) | undefined;
+  /** Called when the presentation changes. The Wayland layers of the dock follow its edge. */
+  onPresentation?: (presentation: AgentDockPresentation | null) => void;
+  /** Called with each shape that a dock page reports, before the window takes it. */
+  onInputRegion?: (rendererId: number, rects: AgentDockInputRect[]) => void;
   /** Windows: forwards the pointer moves to a dock window only near the dock. */
   pointerForwarding?: PointerForwardingGate | null;
   logger?: Logger;
@@ -119,6 +125,7 @@ export class AgentDockWindowController {
       if (isDeepStrictEqual(this.#presentation, presentation)) return Effect.void;
       const previous = this.#presentation;
       this.#presentation = presentation;
+      this.#options.onPresentation?.(presentation);
       for (const { window } of this.#liveWindows()) {
         sendToRenderer(window, IPC_ENDPOINTS.agentDock.presentation, presentation);
       }
@@ -210,6 +217,7 @@ export class AgentDockWindowController {
    * go to the window only in these parts.
    */
   setInputRegion(rendererId: number, rects: AgentDockInputRect[]): void {
+    this.#options.onInputRegion?.(rendererId, rects);
     const entry = this.#liveWindows().find((item) => item.rendererId === rendererId);
     if (!entry) return;
     entry.shape = rects;
@@ -231,7 +239,7 @@ export class AgentDockWindowController {
   drag(rendererId: number, phase: AgentDockDragPhase): void {
     const entry = this.#liveWindows().find((item) => item.rendererId === rendererId);
     if (!entry) return;
-    const pointerY = this.#options.screen.getCursorScreenPoint().y;
+    const pointerY = (this.#options.dragPointer?.() ?? this.#options.screen.getCursorScreenPoint()).y;
     if (phase === "start") {
       this.#drag = { rendererId, pointerY, windowY: entry.window.getBounds().y };
       return;
