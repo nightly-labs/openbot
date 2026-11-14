@@ -16,4 +16,6 @@ export const messages = {
     "OpenBot はこのコンピューターに保存されたトークンを読み取れません。Discord サーバーの接続を解除してから、もう一度接続してください。",
   "messaging.discordHelp.relay_unavailable":
     "OpenBot はこのコンピューターで Discord のイベントを受信できません。サインインし、サーバー設定でこのコンピューターに名前を付けて、OpenBot を開いたままにしてください。",
+  "messaging.discordHelp.not_linked":
+    "この Discord サーバーはこの OpenBot サーバーにリンクされていません。リンクするには「再接続」を選択してください。",
 } as const satisfies PartialTranslation<typeof source>;

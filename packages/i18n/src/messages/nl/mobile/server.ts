@@ -791,6 +791,8 @@ export const messages = {
     "OpenBot kan de opgeslagen tokens op {host} niet lezen. Ontkoppel de Discord-server en verbind hem opnieuw.",
   "mobile.server.connectors.discord.helpRelay":
     "OpenBot op {host} kan geen Discord-gebeurtenissen ontvangen. Log op {host} in, geef de server een naam in Serverinstellingen en houd OpenBot open.",
+  "mobile.server.connectors.discord.helpNotLinked":
+    "Deze Discord-server is niet gekoppeld aan {host}. Tik op Opnieuw verbinden om hem te koppelen.",
   "mobile.server.connectors.discord.orchestratorTitle": "Discord Orchestrator",
   "mobile.server.connectors.discord.orchestratorDescription":
     "Deze agent ontvangt elk verzoek uit Discord. Korte verzoeken beantwoordt hij zelf, ander werk geeft hij aan de juiste agent, en hij antwoordt in het kanaal.",

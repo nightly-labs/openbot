@@ -819,6 +819,8 @@ export const messages = {
     "OpenBot {host} üzerindeki kayıtlı belirteçleri okuyamıyor. Discord sunucusu bağlantısını kesin, ardından tekrar bağlayın.",
   "mobile.server.connectors.discord.helpRelay":
     "{host} üzerindeki OpenBot Discord etkinliklerini alamıyor. {host} üzerinde oturum açın, Sunucu ayarlarında sunucuya bir ad verin ve OpenBot'u açık tutun.",
+  "mobile.server.connectors.discord.helpNotLinked":
+    "Bu Discord sunucusu {host} sunucusuna bağlı değil. Bağlamak için Yeniden bağlan'a dokunun.",
   "mobile.server.connectors.discord.orchestratorTitle": "Discord Düzenleyicisi",
   "mobile.server.connectors.discord.orchestratorDescription":
     "Bu ajan Discord'dan gelen her isteği alır. Kısa olanları kendisi yanıtlar, diğer işleri doğru ajana iletir ve yanıtı kanalda verir.",

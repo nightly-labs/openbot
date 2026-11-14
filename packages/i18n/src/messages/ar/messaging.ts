@@ -15,4 +15,5 @@ export const messages = {
     "يتعذّر على OpenBot قراءة الرموز المحفوظة على هذا الحاسوب. افصل خادم Discord، ثم اربطه مرة أخرى.",
   "messaging.discordHelp.relay_unavailable":
     "يتعذّر على OpenBot تلقي أحداث Discord على هذا الحاسوب. سجّل الدخول، وامنح هذا الحاسوب اسمًا في إعدادات الخادم، وأبقِ OpenBot مفتوحًا.",
+  "messaging.discordHelp.not_linked": 'خادم Discord هذا غير مرتبط بخادم OpenBot هذا. اختر "إعادة الربط" لربطه.',
 } as const satisfies PartialTranslation<typeof source>;

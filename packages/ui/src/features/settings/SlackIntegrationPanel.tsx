@@ -112,6 +112,7 @@ const STATE_HELP: Record<WorkspacePlatform, Partial<Record<MessagingConnection["
     invalid_token: "messaging.discordHelp.invalid_token",
     secret_storage_unavailable: "messaging.discordHelp.secret_storage_unavailable",
     relay_unavailable: "messaging.discordHelp.relay_unavailable",
+    not_linked: "messaging.discordHelp.not_linked",
   },
 };
 

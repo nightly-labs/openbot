@@ -1100,6 +1100,7 @@ export const messages = {
     "لا يستطيع OpenBot قراءة الرموز المميزة المحفوظة على {host}. اقطع اتصال خادم Discord، ثم اربطه مجددًا.",
   "mobile.server.connectors.discord.helpRelay":
     "لا يستطيع OpenBot على {host} تلقي أحداث Discord. على {host}، سجّل الدخول، وامنح الخادم اسمًا في إعدادات الخادم، وأبقِ OpenBot مفتوحًا.",
+  "mobile.server.connectors.discord.helpNotLinked": 'خادم Discord هذا غير مرتبط بـ {host}. اضغط "إعادة الاتصال" لربطه.',
   "mobile.server.connectors.discord.orchestratorTitle": "Discord Orchestrator",
   "mobile.server.connectors.discord.orchestratorDescription":
     "يتلقى هذا الوكيل كل طلب من Discord. يرد على الطلبات القصيرة بنفسه، ويعطي العمل الآخر للوكيل المناسب، ويرد بالإجابة في القناة.",

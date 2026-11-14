@@ -763,6 +763,7 @@ export const messages = {
     "OpenBot 无法读取 {host} 上已保存的令牌。请断开该 Discord 服务器后重新连接。",
   "mobile.server.connectors.discord.helpRelay":
     "{host} 上的 OpenBot 无法接收 Discord 事件。请在 {host} 上登录，在“服务器设置”中为服务器命名，并保持 OpenBot 打开。",
+  "mobile.server.connectors.discord.helpNotLinked": "此 Discord 服务器未关联到 {host}。轻点“重新连接”进行关联。",
   "mobile.server.connectors.discord.orchestratorTitle": "Discord 调度助手",
   "mobile.server.connectors.discord.orchestratorDescription":
     "该助手接收来自 Discord 的所有请求。简单的问题它自己回答，其余的交给合适的助手处理，并在频道中回复答案。",

@@ -17,4 +17,6 @@ export const messages = {
     "OpenBot bu bilgisayardaki kayıtlı belirteçleri okuyamıyor. Discord sunucusu bağlantısını kesin, ardından tekrar bağlayın.",
   "messaging.discordHelp.relay_unavailable":
     "OpenBot bu bilgisayarda Discord etkinliklerini alamıyor. Oturum açın, Sunucu ayarlarından bu bilgisayara bir ad verin ve OpenBot'u açık tutun.",
+  "messaging.discordHelp.not_linked":
+    "Bu Discord sunucusu bu OpenBot sunucusuna bağlı değil. Bağlamak için Yeniden bağlan'ı seçin.",
 } as const satisfies PartialTranslation<typeof source>;

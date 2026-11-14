@@ -823,6 +823,8 @@ export const messages = {
     "OpenBot ne peut pas lire les jetons enregistrés sur {host}. Déconnectez le serveur Discord, puis connectez-le à nouveau.",
   "mobile.server.connectors.discord.helpRelay":
     "OpenBot sur {host} ne peut pas recevoir les événements Discord. Sur {host}, connectez-vous, donnez un nom au serveur dans les Réglages du serveur et gardez OpenBot ouvert.",
+  "mobile.server.connectors.discord.helpNotLinked":
+    "Ce serveur Discord n’est pas lié à {host}. Touchez Reconnecter pour le lier.",
   "mobile.server.connectors.discord.orchestratorTitle": "Discord Orchestrator",
   "mobile.server.connectors.discord.orchestratorDescription":
     "Cet agent reçoit chaque demande venant de Discord. Il répond lui-même aux demandes courtes, confie les autres tâches au bon agent et répond dans le canal.",

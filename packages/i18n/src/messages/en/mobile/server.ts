@@ -1077,6 +1077,8 @@ export const messages = defineMessages("mobile.server", {
     "OpenBot cannot read the saved tokens on {host}. Disconnect the Discord server, then connect it again.",
   "mobile.server.connectors.discord.helpRelay":
     "OpenBot on {host} cannot receive Discord events. On {host}, sign in, give the server a name in Server settings, and keep OpenBot open.",
+  "mobile.server.connectors.discord.helpNotLinked":
+    "This Discord server is not linked to {host}. Tap Reconnect to link it.",
   "mobile.server.connectors.discord.orchestratorTitle": "Discord Orchestrator",
   "mobile.server.connectors.discord.orchestratorDescription":
     "This agent receives every request from Discord. It answers short ones itself, gives other work to the right agent, and replies with the answer in the channel.",

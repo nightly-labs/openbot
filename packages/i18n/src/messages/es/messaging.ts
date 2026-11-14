@@ -16,4 +16,6 @@ export const messages = {
     "OpenBot no puede leer los tokens guardados en este equipo. Desconecta el servidor de Discord y vuelve a conectarlo.",
   "messaging.discordHelp.relay_unavailable":
     "OpenBot no puede recibir eventos de Discord en este equipo. Inicia sesión, asigna un nombre a este equipo en los ajustes del servidor y mantén OpenBot abierto.",
+  "messaging.discordHelp.not_linked":
+    "Este servidor de Discord no está vinculado a este servidor de OpenBot. Selecciona Reconectar para vincularlo.",
 } as const satisfies PartialTranslation<typeof source>;
