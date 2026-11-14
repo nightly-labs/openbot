@@ -247,11 +247,11 @@ export class RoutineScheduler implements RoutineDueSource {
    */
   timezoneForDelivery(deliveryId: string): string {
     const run = this.#routines.runForDelivery(deliveryId);
-    if (run) return this.#routines.get(run.agentId, run.routineId)?.timezone || this.#timezone();
+    if (run) return this.#routines.getRecord(run.agentId, run.routineId)?.timezone || this.#timezone();
     const sender = this.#mailbox.getDelivery(deliveryId)?.delivery.sender;
     if (sender?.kind === "routine") {
       for (const agent of this.#hooks.listAgents()) {
-        const routine = this.#routines.get(agent.id, sender.routineId);
+        const routine = this.#routines.getRecord(agent.id, sender.routineId);
         if (routine) return routine.timezone || this.#timezone();
       }
     }
