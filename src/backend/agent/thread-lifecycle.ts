@@ -9,6 +9,7 @@ import {
   agentQuickAcknowledgementEnabled,
   COMPUTER_USE_MCP_SERVER_ID,
   DEFAULT_RESPONSE_STYLE,
+  GITHUB_CONNECTOR_MCP_SERVER_ID,
   type McpServerConfig,
   type ResponseStyle,
   workspaceAccessEnforced,
@@ -1340,7 +1341,8 @@ export class ThreadLifecycle {
    * resumed session (`hasCurrentToolsEffect`). A provider that keeps the MCP tools of a session's first
    * turn gives a server added later only as a note: an agent knew the Tavily tools of a resumed Kimi
    * session and could not call them (#8931). The refresh after an MCP change replaces the sessions,
-   * but it is lost when OpenBot restarts first. The other providers take the current servers on resume.
+   * but it is lost when OpenBot restarts first. A session that this client holds got that refresh,
+   * so only a resume reads the record. The other providers take the current servers on resume.
    */
   readonly #hasCurrentSessionTools = Effect.fn("ThreadLifecycle.hasCurrentSessionTools")(function* (
     this: ThreadLifecycle,
@@ -1349,7 +1351,8 @@ export class ThreadLifecycle {
     sessionId: string,
   ) {
     if (client.provider === "codex") return yield* this.hasCurrentToolsEffect(agent, client, sessionId);
-    if (!client.mcpToolsFixedAtStart?.(sessionId)) return true;
+    if (!client.mcpToolsFixedAtStart?.(sessionId) || this.#conversation.loadedClientFor(sessionId) === client)
+      return true;
     const fingerprint = yield* threadStep(() => this.#mcpSetFingerprint(this.#agentMcpServers(agent)));
     const stored = yield* Effect.result(threadIo(() => readFile(this.toolManifestPath(sessionId), "utf8")));
     if (Result.isSuccess(stored)) return stored.success.split("\n", 1)[0] === fingerprint;
@@ -1360,13 +1363,21 @@ export class ThreadLifecycle {
   });
 
   /**
-   * The MCP set that a session of `mcpToolsFixedAtStart` was given: the servers and which of them have
-   * a sign-in, which moves a row to the proxy. Not the proxy address, which changes at each start of
-   * OpenBot: a resume gets the new address, and the tools keep their names.
+   * The MCP set that a session of `mcpToolsFixedAtStart` was given: the user's servers, which of them
+   * have a sign-in (a row then moves to the proxy), and the managed runtimes, without which an `npx`
+   * server is left out. Not the proxy addresses, and not the built-in Computer Use and GitHub entries:
+   * these change at each start of OpenBot (a new port, a driver that is not ready yet), and a resume
+   * gets the new values while the tools keep their names.
    */
   #mcpSetFingerprint(configs: readonly McpServerConfig[]): string {
+    const rows = configs.filter(
+      (config) => config.id !== COMPUTER_USE_MCP_SERVER_ID && config.id !== GITHUB_CONNECTOR_MCP_SERVER_ID,
+    );
+    const { binDirectories, commandAliases } = this.#toolRuntimes();
     return createHash("sha256")
-      .update(JSON.stringify([mcpFingerprintValues(configs), this.#mcpProxiedServerIds(configs)]))
+      .update(
+        JSON.stringify([mcpFingerprintValues(rows), this.#mcpProxiedServerIds(rows), [binDirectories, commandAliases]]),
+      )
       .digest("hex");
   }
 
