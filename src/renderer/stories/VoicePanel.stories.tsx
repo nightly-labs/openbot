@@ -86,3 +86,5 @@ export const ServerOffline: Story = {
     error: "The server is not connected. The conversation continues when it connects again.",
   },
 };
+
+export const CodexLiveVoice: Story = { args: { voice: "Codex live voice · OpenAI chooses the voice" } };

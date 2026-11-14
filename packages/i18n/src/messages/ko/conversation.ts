@@ -137,6 +137,8 @@ export const messages = {
   "conversation.voice.error": "음성 대화를 시작할 수 없어요.",
   "conversation.voice.notSent": "메시지를 보내지 못했어요. 다시 말씀해 주세요.",
   "conversation.voice.offline": "서버에 연결되지 않았어요. 다시 연결되면 대화를 이어갈게요.",
+  "conversation.voice.liveVoice": "Codex 라이브 음성 · {voice}",
+  "conversation.voice.liveVoiceAutomatic": "Codex 라이브 음성 · OpenAI가 음성을 고릅니다",
   "conversation.speech.label": "{name}이(가) 답변을 소리 내어 읽어요",
   "conversation.speech.stop": "읽기 중지",
   "conversation.panels.openWorkspaceFailed": "워크스페이스 폴더를 열 수 없어요",

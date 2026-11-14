@@ -138,6 +138,8 @@ export const messages = {
   "conversation.voice.error": "Impossibile avviare la conversazione vocale.",
   "conversation.voice.notSent": "Il messaggio non è stato inviato. Parla di nuovo.",
   "conversation.voice.offline": "Il server non è connesso. La conversazione riprende quando si riconnette.",
+  "conversation.voice.liveVoice": "Voce dal vivo di Codex · {voice}",
+  "conversation.voice.liveVoiceAutomatic": "Voce dal vivo di Codex · OpenAI sceglie la voce",
   "conversation.speech.label": "{name} legge la risposta ad alta voce",
   "conversation.speech.stop": "Interrompi lettura",
   "conversation.panels.openWorkspaceFailed": "Impossibile aprire la cartella del workspace",

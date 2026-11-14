@@ -1,4 +1,4 @@
-import type { OpenBotDesktopApi, VoiceLiveEvent } from "@openbot/contracts/ipc";
+import type { CodexLiveVoice, OpenBotDesktopApi, VoiceLiveEvent } from "@openbot/contracts/ipc";
 import type { VoicePanelPhase } from "@openbot/ui/features/conversation/VoicePanel";
 import { currentText } from "@openbot/ui/text";
 import { createStore, onCleanup } from "solid-js";
@@ -29,6 +29,8 @@ interface LiveState {
   said: string;
   error: string | null;
   levels: number[];
+  /** The voice of this conversation: null when OpenAI chooses it, undefined while it is not known. */
+  voice: CodexLiveVoice | null | undefined;
 }
 
 function quietLevels(): number[] {
@@ -60,6 +62,8 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
     said: "",
     error: null,
     levels: quietLevels(),
+    // The browser client sends no voice, so OpenAI chooses it.
+    voice: deps.port ? null : undefined,
   });
   let disposed = false;
   let failed = false;
@@ -195,6 +199,17 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
     silencedTurn = null;
     silenceNextReply = false;
     reply.muted = false;
+    // Main reads the same setting when the call starts, so this is the voice of this conversation.
+    if (!deps.port)
+      void window.openbot.voice.getSpeechSettings().then(
+        (settings) => {
+          if (disposed) return;
+          setState((draft) => {
+            draft.voice = settings.codexLiveVoice;
+          });
+        },
+        () => undefined,
+      );
     try {
       microphone = await navigator.mediaDevices.getUserMedia({
         // The reply plays while the microphone listens: the echo canceller removes it.
@@ -317,6 +332,7 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
     error: () => state.error,
     said: () => state.said,
     levels: () => state.levels,
+    liveVoice: () => state.voice,
     toggleMute,
     interrupt,
   };

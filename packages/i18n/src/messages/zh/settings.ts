@@ -663,6 +663,7 @@ export const messages = {
   "settings.voice.speech.listenFailed": "无法播放示例。",
   "settings.voice.live.section": "实时语音",
   "settings.voice.live.signIn": "请用 ChatGPT 账号登录 Codex 以使用实时语音。",
+  "settings.voice.live.voice.description": "OpenAI 会在语音对话中使用此声音。选择“自动”时由 OpenAI 选择声音。",
   // No value may end with the word "import": the CommonJS shim of electron-vite reads `import"` in the
   // main bundle as an import statement and inserts its code inside the string.
   "settings.transfer.title": "把这台服务器迁移到另一台电脑",

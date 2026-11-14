@@ -138,6 +138,8 @@ export const messages = {
   "conversation.voice.error": "Het spraakgesprek kan niet starten.",
   "conversation.voice.notSent": "Het bericht is niet verstuurd. Spreek opnieuw.",
   "conversation.voice.offline": "De server is niet verbonden. Het gesprek gaat verder zodra hij weer verbonden is.",
+  "conversation.voice.liveVoice": "Codex live spraak · {voice}",
+  "conversation.voice.liveVoiceAutomatic": "Codex live spraak · OpenAI kiest de stem",
   "conversation.speech.label": "{name} leest het antwoord voor",
   "conversation.speech.stop": "Stoppen met voorlezen",
   "conversation.panels.openWorkspaceFailed": "Kan de werkruimtemap niet openen",

@@ -671,6 +671,8 @@ export const messages = {
   "settings.voice.speech.listenFailed": "샘플을 재생할 수 없어요.",
   "settings.voice.live.section": "라이브 음성",
   "settings.voice.live.signIn": "라이브 음성을 사용하려면 ChatGPT 계정으로 Codex에 로그인하세요.",
+  "settings.voice.live.voice.description":
+    "음성 대화에서 OpenAI가 이 음성으로 말합니다. 자동을 선택하면 OpenAI가 음성을 고릅니다.",
   "settings.transfer.title": "이 서버를 다른 컴퓨터로 옮기기",
   "settings.transfer.lede": "에이전트와 스킬, 루틴, 메모리, 파일이 하나의 파일에 담겨요.",
   "settings.transfer.flow.label": "이전 방법",

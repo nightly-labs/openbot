@@ -682,6 +682,8 @@ export const messages = {
   "settings.voice.speech.listenFailed": "Kan het voorbeeld niet afspelen.",
   "settings.voice.live.section": "Live spraak",
   "settings.voice.live.signIn": "Meld je met je ChatGPT-account aan bij Codex om live spraak te gebruiken.",
+  "settings.voice.live.voice.description":
+    "OpenAI spreekt met deze stem in spraakgesprekken. Bij Automatisch kiest OpenAI de stem.",
   "settings.transfer.title": "Verplaats deze server naar een andere computer",
   "settings.transfer.lede": "Je agents, hun vaardigheden, routines, herinneringen en bestanden gaan in één bestand.",
   "settings.transfer.flow.label": "Hoe een overdracht werkt",
