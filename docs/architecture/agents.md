@@ -802,7 +802,17 @@ A thread turn never moves to a backup, so it always runs once more on the same m
 does the turn of an external chat conversation, such as WhatsApp (#8573); a channel task does not.
 `MessagingThreads` keeps the conversation's status post while the turn's messages wait in the queue,
 so the conversation gets no "Stopped." before the answer. The turn did no step, so it repeats
-nothing. A second empty run, or an empty turn from the person, shows the error. `scripts/codex-empty-lead-turn-e2e.ts` checks these paths.
+nothing. A second empty run, or an empty turn from the person, shows the error.
+
+Codex can also write its last words as narration (a `msg_` commentary item) and then send an empty
+answer (#8837). Codex takes that narration as the turn's result, so `TurnLifecycle` makes the
+narration after the turn's last tool step the answer, and removes the empty rows. Outside a channel,
+this applies whether the turn did a step or not. With no such narration, a turn that did a step does
+not run again: it fails with the same error when a person's message started it, and a teammate's
+turn ends as completed, so the agent that asked gets the note of the work (#8214). A channel turn
+keeps the rule above, since text after `channel_result` is a step there. An external chat that
+already got the narration as a progress post does not get it again as the answer.
+`scripts/codex-empty-lead-turn-e2e.ts` checks these paths.
 
 A message to an agent that runs a turn follows the busy-message mode: "steer" takes it into the
 running turn, "queue" starts it after the turn. The default is "steer" (`DEFAULT_BUSY_MESSAGE_MODE`).
