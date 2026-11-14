@@ -1954,6 +1954,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       serverClaims: options.serverClaims ?? null,
       apiKeys: options.agentApiKeys ?? null,
       vaultItems: options.vaultItems ?? null,
+      codexSubagentParent: (childThreadId) => this.#turn.codexSubagentParent(childThreadId),
       hooks: {
         listAgents: () => this.listAgents(),
         listModels: () => this.listModels(),
