@@ -671,6 +671,7 @@ export const messages = {
   "settings.voice.speech.listenFailed": "לא ניתן להשמיע את הדוגמה.",
   "settings.voice.live.section": "קול חי",
   "settings.voice.live.signIn": "יש להתחבר ל-Codex עם חשבון ChatGPT כדי להשתמש בקול חי.",
+  "settings.voice.live.voice.description": "OpenAI מדבר בקול הזה בשיחות קוליות. במצב אוטומטי, OpenAI בוחר את הקול.",
   "settings.voice.server.section": "שרת קול",
   "settings.voice.server.title": "שרת תואם OpenAI",
   "settings.voice.server.notSetUp": "לא הוגדר",

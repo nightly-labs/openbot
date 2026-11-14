@@ -112,6 +112,25 @@ function VoiceConversation(paneProps: { kind: VoiceConversationKind; port?: Code
   const transcribed = kind === "transcribed";
   const replySpeed = () => (transcribed ? speechSpeed() : undefined);
   const cycleSpeed = transcribed ? cycleSpeechSpeed : undefined;
+  // Codex live voice does not use the voice of Spoken replies, so the panel names the voice that speaks.
+  // The browser client sends no voice, so OpenAI chooses it there.
+  const { t } = useText();
+  const [liveVoice, setLiveVoice] = createSignal<string | null | undefined>(port ? null : undefined);
+  if (kind === "codex-live" && !port)
+    void speechPort()
+      .voice.getSpeechSettings()
+      .then(
+        (settings) => setLiveVoice(settings.codexLiveVoice),
+        () => undefined,
+      );
+  const voiceLabel = () => {
+    if (kind !== "codex-live") return undefined;
+    const voice = liveVoice();
+    if (voice === undefined) return undefined;
+    return voice === null
+      ? t("conversation.voice.liveVoiceAutomatic")
+      : t("conversation.voice.liveVoice", { voice: voice.charAt(0).toUpperCase() + voice.slice(1) });
+  };
   return (
     <Show when={props.agent}>
       {(agent) => (
@@ -128,6 +147,7 @@ function VoiceConversation(paneProps: { kind: VoiceConversationKind; port?: Code
           onEnd={() => closeSidePanelPane("voice")}
           speed={replySpeed()}
           onCycleSpeed={cycleSpeed}
+          voice={voiceLabel()}
         />
       )}
     </Show>

@@ -141,6 +141,8 @@ export const messages = {
   "conversation.voice.notSent": "Die Nachricht wurde nicht gesendet. Sprich noch einmal.",
   "conversation.voice.offline":
     "Der Server ist nicht verbunden. Das Gespräch geht weiter, sobald er wieder verbunden ist.",
+  "conversation.voice.liveVoice": "Codex-Live-Sprache · {voice}",
+  "conversation.voice.liveVoiceAutomatic": "Codex-Live-Sprache · OpenAI wählt die Stimme",
   "conversation.speech.label": "{name} liest die Antwort vor",
   "conversation.speech.stop": "Vorlesen stoppen",
   "conversation.panels.openWorkspaceFailed": "Der Arbeitsbereichsordner konnte nicht geöffnet werden",

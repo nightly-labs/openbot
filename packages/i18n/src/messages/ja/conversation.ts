@@ -136,6 +136,8 @@ export const messages = {
   "conversation.voice.error": "音声会話を開始できませんでした。",
   "conversation.voice.notSent": "メッセージを送信できませんでした。もう一度話してください。",
   "conversation.voice.offline": "サーバーに接続していません。再接続すると会話を続けます。",
+  "conversation.voice.liveVoice": "Codex ライブ音声 · {voice}",
+  "conversation.voice.liveVoiceAutomatic": "Codex ライブ音声 · OpenAI が声を選びます",
   "conversation.speech.label": "{name} が返信を読み上げています",
   "conversation.speech.stop": "読み上げを停止",
   "conversation.panels.openWorkspaceFailed": "ワークスペースのフォルダーを開けませんでした",

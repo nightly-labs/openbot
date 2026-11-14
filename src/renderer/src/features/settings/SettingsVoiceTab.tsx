@@ -621,6 +621,7 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
             <Item class="settings-modal-row">
               <ItemContent>
                 <ItemTitle>{t("settings.voice.speech.voice.title")}</ItemTitle>
+                <ItemDescription>{t("settings.voice.live.voice.description")}</ItemDescription>
               </ItemContent>
               <ItemActions>
                 <Select<LiveVoiceChoice>

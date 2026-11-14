@@ -68,7 +68,8 @@
   font-weight: 600;
 }
 
-.voice-panel-phase {
+.voice-panel-phase,
+.voice-panel-voice {
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
 }

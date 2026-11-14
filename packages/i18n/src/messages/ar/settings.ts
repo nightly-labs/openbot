@@ -712,6 +712,8 @@ export const messages = {
   "settings.voice.speech.listenFailed": "تعذّر تشغيل العينة.",
   "settings.voice.live.section": "الصوت المباشر",
   "settings.voice.live.signIn": "سجّل الدخول إلى Codex بحساب ChatGPT لاستخدام الصوت المباشر.",
+  "settings.voice.live.voice.description":
+    "تتحدث OpenAI بهذا الصوت في المحادثات الصوتية. مع «تلقائي» تختار OpenAI الصوت.",
   "settings.voice.server.section": "خادم الصوت",
   "settings.voice.server.title": "خادم متوافق مع OpenAI",
   "settings.voice.server.notSetUp": "غير مُعدّ",

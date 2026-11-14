@@ -715,6 +715,8 @@ export const messages = {
   "settings.voice.speech.listenFailed": "Не удалось воспроизвести образец.",
   "settings.voice.live.section": "Живой голос",
   "settings.voice.live.signIn": "Войдите в Codex с аккаунтом ChatGPT, чтобы использовать живой голос.",
+  "settings.voice.live.voice.description":
+    "OpenAI говорит этим голосом в голосовых разговорах. При выборе «Автоматически» голос выбирает OpenAI.",
   "settings.transfer.title": "Перенос сервера на другой компьютер",
   "settings.transfer.lede": "Ваши агенты, их навыки, регулярные задачи, память и файлы сохраняются в один файл.",
   "settings.transfer.flow.label": "Как проходит перенос",

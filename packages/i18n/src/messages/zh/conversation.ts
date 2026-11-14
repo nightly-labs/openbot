@@ -134,6 +134,8 @@ export const messages = {
   "conversation.voice.error": "无法开始语音对话。",
   "conversation.voice.notSent": "消息未发送。请再说一次。",
   "conversation.voice.offline": "服务器未连接。重新连接后，对话会继续。",
+  "conversation.voice.liveVoice": "Codex 实时语音 · {voice}",
+  "conversation.voice.liveVoiceAutomatic": "Codex 实时语音 · 由 OpenAI 选择声音",
   "conversation.speech.label": "{name} 正在朗读回复",
   "conversation.speech.stop": "停止朗读",
   "conversation.panels.openWorkspaceFailed": "无法打开工作区文件夹",

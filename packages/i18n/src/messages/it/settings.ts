@@ -688,6 +688,8 @@ export const messages = {
   "settings.voice.speech.listenFailed": "Impossibile riprodurre l’esempio.",
   "settings.voice.live.section": "Voce dal vivo",
   "settings.voice.live.signIn": "Accedi a Codex con il tuo account ChatGPT per usare la voce dal vivo.",
+  "settings.voice.live.voice.description":
+    "OpenAI parla con questa voce nelle conversazioni vocali. Con Automatica, OpenAI sceglie la voce.",
   "settings.transfer.title": "Sposta questo server su un altro computer",
   "settings.transfer.lede": "I tuoi agenti, le loro skill, routine, memorie e file vanno in un unico file.",
   "settings.transfer.flow.label": "Come funziona un trasferimento",

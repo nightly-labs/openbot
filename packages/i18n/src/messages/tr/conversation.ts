@@ -139,6 +139,8 @@ export const messages = {
   "conversation.voice.error": "Sesli konuşma başlatılamadı.",
   "conversation.voice.notSent": "Mesaj gönderilmedi. Yeniden konuş.",
   "conversation.voice.offline": "Sunucu bağlı değil. Yeniden bağlandığında konuşma devam eder.",
+  "conversation.voice.liveVoice": "Codex canlı ses · {voice}",
+  "conversation.voice.liveVoiceAutomatic": "Codex canlı ses · sesi OpenAI seçer",
   "conversation.speech.label": "{name} yanıtı sesli okuyor",
   "conversation.speech.stop": "Okumayı durdur",
   "conversation.panels.openWorkspaceFailed": "Çalışma alanı klasörü açılamadı",

@@ -689,6 +689,8 @@ export const messages = {
   "settings.voice.speech.listenFailed": "Örnek oynatılamadı.",
   "settings.voice.live.section": "Canlı ses",
   "settings.voice.live.signIn": "Canlı sesi kullanmak için ChatGPT hesabınızla Codex'e giriş yapın.",
+  "settings.voice.live.voice.description":
+    "OpenAI sesli konuşmalarda bu sesle konuşur. Otomatik seçeneğinde sesi OpenAI seçer.",
   "settings.transfer.title": "Bu sunucuyu başka bir bilgisayara taşıyın",
   "settings.transfer.lede": "Ajanlarınız, becerileri, rutinleri, bellekleri ve dosyaları tek bir dosyada toplanır.",
   "settings.transfer.flow.label": "Aktarım nasıl çalışır",

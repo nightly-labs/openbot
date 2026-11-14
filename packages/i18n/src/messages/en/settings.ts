@@ -726,6 +726,8 @@ export const messages = defineMessages("settings", {
   "settings.voice.speech.listenFailed": "Could not play the sample.",
   "settings.voice.live.section": "Live voice",
   "settings.voice.live.signIn": "Sign in to Codex with your ChatGPT account to use live voice.",
+  "settings.voice.live.voice.description":
+    "OpenAI speaks with this voice in voice conversations. With Automatic, OpenAI chooses the voice.",
   "settings.voice.server.section": "Voice server",
   "settings.voice.server.title": "OpenAI-compatible server",
   "settings.voice.server.notSetUp": "Not set up",

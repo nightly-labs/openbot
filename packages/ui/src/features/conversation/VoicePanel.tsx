@@ -47,6 +47,8 @@ export interface VoicePanelProps {
   speed?: number | undefined;
   /** Changes to the next speed. Without it, the panel has no speed button. */
   onCycleSpeed?: (() => void) | undefined;
+  /** The voice that speaks the replies, when it is not the voice of Spoken replies. */
+  voice?: string | undefined;
 }
 
 /**
@@ -72,6 +74,7 @@ export function VoicePanel(props: VoicePanelProps) {
         <span class="voice-panel-phase">
           {t(props.muted && props.phase === "listening" ? "conversation.voice.phase.muted" : PHASE_LABELS[props.phase])}
         </span>
+        <Show when={props.voice}>{(voice) => <span class="voice-panel-voice">{voice()}</span>}</Show>
       </header>
       <div class="voice-panel-stage">
         <div

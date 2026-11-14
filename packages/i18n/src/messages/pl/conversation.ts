@@ -139,6 +139,8 @@ export const messages = {
   "conversation.voice.error": "Nie udało się rozpocząć rozmowy głosowej.",
   "conversation.voice.notSent": "Wiadomość nie została wysłana. Powiedz to jeszcze raz.",
   "conversation.voice.offline": "Serwer nie jest połączony. Rozmowa będzie kontynuowana po ponownym połączeniu.",
+  "conversation.voice.liveVoice": "Głos na żywo Codex · {voice}",
+  "conversation.voice.liveVoiceAutomatic": "Głos na żywo Codex · OpenAI wybiera głos",
   "conversation.speech.label": "{name} czyta odpowiedź na głos",
   "conversation.speech.stop": "Zatrzymaj czytanie",
   "conversation.panels.openWorkspaceFailed": "Nie udało się otworzyć folderu obszaru roboczego",
