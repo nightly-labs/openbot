@@ -107,6 +107,11 @@ import { type ApprovalAutomationPolicy, NO_APPROVAL_AUTOMATION } from "./approva
 import type { AttachmentGateway } from "./attachment-gateway";
 import type { AttentionRegistry, CodexSubagentParent } from "./attention-registry";
 import { loadAvatarFile } from "./avatar-file";
+import {
+  type AgentBrowserProfiles,
+  agentBrowserProfileView,
+  handleSetBrowserProfileTool,
+} from "./browser-profile-tool";
 import { saveBrowserScreenshot } from "./browser-screenshot-file";
 import type { BrowserUploads } from "./browser-uploads";
 import {
@@ -433,6 +438,8 @@ export interface OpenBotToolRouterOptions {
   feedback?: AgentFeedback | null | undefined;
   /** Makes claims for `create_server_install_command`; null where this process has no account service. */
   serverClaims?: AgentServerClaims | null | undefined;
+  /** The named browser profiles, for `read_agent` and `set_browser_profile`; null where this process has none. */
+  browserProfiles?: (() => AgentBrowserProfiles | null) | undefined;
   /** The API keys that users saved for agents; null where nothing can save them. */
   apiKeys?: AgentApiKeys | null | undefined;
   /** The Vault, where `save_api_key` keeps a key for every agent; null where this server has none. */
@@ -489,6 +496,7 @@ export class OpenBotToolRouter {
   /** The turns whose report already got the similar issues, so the next call sends it. */
   readonly #feedbackSearched = new Set<string>();
   readonly #serverClaims: AgentServerClaims | null;
+  readonly #browserProfiles: () => AgentBrowserProfiles | null;
   readonly #apiKeys: AgentApiKeys | null;
   readonly #vaultItems: VaultItems | null;
   readonly #hooks: OpenBotToolRouterHooks;
@@ -546,6 +554,7 @@ export class OpenBotToolRouter {
     this.#feedbackFacts = options.feedbackFacts ?? null;
     this.#feedback = options.feedback ?? null;
     this.#serverClaims = options.serverClaims ?? null;
+    this.#browserProfiles = options.browserProfiles ?? (() => null);
     this.#apiKeys = options.apiKeys ?? null;
     this.#vaultItems = options.vaultItems ?? null;
     this.#hooks = options.hooks;
@@ -907,7 +916,8 @@ export class OpenBotToolRouter {
               tool === "send_message" ||
               tool === "messaging_post" ||
               tool === "web_search" ||
-              tool === "create_server_install_command";
+              tool === "create_server_install_command" ||
+              tool === "set_browser_profile";
             // A workflow tool reports its own correctable failures; only bad arguments reach this point.
             const correctable = (cause: unknown) =>
               correctableTool || (WORKFLOW_TOOL_NAMES.has(tool) && cause instanceof z.ZodError);
@@ -1516,6 +1526,16 @@ export class OpenBotToolRouter {
     });
   });
 
+  /** The agent's browser profile and the names of all profiles, so a change can reuse a name. */
+  #agentBrowserProfile(agent: AgentSummary) {
+    const profiles = this.#browserProfiles()?.list().profiles;
+    if (!profiles) return {};
+    return {
+      browserProfile: agentBrowserProfileView(agent, profiles),
+      browserProfileNames: profiles.map((profile) => profile.name),
+    };
+  }
+
   #requireAgent(agentId: string): AgentSummary {
     const agent = this.#hooks.listAgents().find((candidate) => candidate.id === agentId);
     if (!agent) throw new Error(sourceText("error.agent.unknown", { id: agentId }));
@@ -1585,6 +1605,7 @@ export class OpenBotToolRouter {
         ? { computerUseReady: mcpServers.some((server) => server.id === COMPUTER_USE_MCP_SERVER_ID) }
         : {}),
       notifications: agent.notifications,
+      ...this.#agentBrowserProfile(agent),
       autoApprove: permissions === "full",
       ...(skills ? { skills } : { skillsError }),
       routines: this.#routines.list(agent.id).map((routine) => ({
@@ -2135,6 +2156,33 @@ export class OpenBotToolRouter {
 
     if (params.tool === "create_server_install_command")
       return yield* this.#serverInstallCommand(client, request, params, senderAgentId);
+
+    if (params.tool === "set_browser_profile")
+      return yield* handleSetBrowserProfileTool(params, {
+        listAgents: () => this.#hooks.listAgents(),
+        profiles: this.#browserProfiles(),
+        requestedByPerson: this.#requestedByPerson(senderAgentId, params.turnId, params.threadId),
+        approve: (reason) =>
+          this.#attention.awaitToolApproval(
+            client,
+            request,
+            {
+              requestId: request.id,
+              agentId: senderAgentId,
+              threadId: this.#conversation.publicThreadId(senderAgentId, params.threadId),
+              turnId: params.turnId,
+              kind: "permissions",
+              command: null,
+              cwd: null,
+              reason,
+              grantRoot: null,
+              permissions: null,
+            },
+            // A profile holds sign-ins of other agents, and Full access does not answer for that.
+            { ownerOnly: true },
+          ),
+        redactMcp: (text) => this.#hooks.redactMcp(text),
+      });
 
     if (params.tool === "react_to_user_message") return yield* this.#react(params, senderAgentId);
 

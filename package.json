@@ -229,6 +229,7 @@
     "test:browser-fingerprint": "bun scripts/browser-fingerprint-e2e.ts",
     "test:browser-ambiguous-targets": "bun scripts/browser-ambiguous-targets-e2e.ts",
     "test:browser-profile-agents": "bun scripts/browser-profile-agents-e2e.ts",
+    "test:agent-browser-profile-tool": "bun scripts/agent-browser-profile-tool-e2e.ts",
     "test:browser:google-live": "bun scripts/browser-smoke.ts --google-live",
     "test:browser:whatsapp-live": "bun scripts/browser-smoke.ts --whatsapp-live",
     "test:browser:canva-live": "bun scripts/browser-smoke.ts --canva-live",

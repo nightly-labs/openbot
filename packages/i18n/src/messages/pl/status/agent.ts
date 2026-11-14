@@ -39,6 +39,14 @@ export const messages = {
   "status.agent.serverInstallCommand":
     "Utwórz jednorazowe polecenie, które instaluje OpenBot na innym komputerze jako serwer {name} i loguje go do Twojego konta. Agent uruchamia je tam.",
   "status.agent.serverInstallCard": "Polecenie instalacji dla serwera {name}",
+  "status.agent.browserProfileNamed":
+    "Przenieś {agents} do profilu przeglądarki {profile}. Otrzymają jego logowania i pliki cookie. Ich otwarte karty zostaną zamknięte.",
+  "status.agent.browserProfileNew":
+    "Utwórz nowy profil przeglądarki {profile} i przenieś do niego {agents}. Nie ma w nim logowań. Ich otwarte karty zostaną zamknięte.",
+  "status.agent.browserProfileShared":
+    "Przenieś {agents} do wspólnego profilu przeglądarki. Otrzymają jego logowania i pliki cookie. Ich otwarte karty zostaną zamknięte.",
+  "status.agent.browserProfileOwn":
+    "Daj każdemu z {agents} własny profil przeglądarki. Ich otwarte karty zostaną zamknięte.",
   "status.agent.feedbackSending": "Wysyłanie opinii do zespołu OpenBot…",
   "status.agent.workflowDelete":
     "Usuń przepływ pracy {title} razem z jego uruchomieniami i wersjami. Jego otwarte kroki zostaną zatrzymane.",
