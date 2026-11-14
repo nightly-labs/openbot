@@ -1295,7 +1295,9 @@ still uses the sandbox. The downtime is the export, the copy, the import and the
    top-level folder (not a system folder such as `/var` or `/snap`) are possible, and the VPS must not
    have the folder; the move checks this before the downtime. The operator gives this list, not the
    archive, because an agent of the customer can get root in the sandbox. `discard` removes these
-   folders. Copy another folder by hand: then do not start OpenBot in the sandbox again, as step 7 says.
+   folders. A server with another such folder, such as `/var/lib/syncthing` or a file directly in `/srv`,
+   stays on boat: a copy by hand cannot work, because `move` starts OpenBot on the VPS right after the
+   sandbox stops.
    A file that the customer made as root is not found.
 
    The move also stops before the downtime when the sandbox has a Docker container (a directory in

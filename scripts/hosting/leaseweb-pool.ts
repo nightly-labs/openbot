@@ -40,7 +40,7 @@
 //       save the sandbox), and the move then continues. It also stops when files of the customer are in
 //       folders outside the home that the move does not copy, such as `/srv/vaults`. `--folders` names
 //       the folders that the move then copies too: `/srv/<name>`, `/mnt/<name>`, `/media/<name>` or a
-//       new top-level folder, which the machine must not have. An operator copies other folders by hand.
+//       new top-level folder, which the machine must not have. A server with another such folder stays on boat.
 //   bun scripts/hosting/leaseweb-pool.ts custom <VPS ID> --owner=<email> --customer=<word> \
 //       --name=<server name> --keys=<file> [--apply]
 //       Sets up a VPS with no reference as the server of one customer, not in the pool
@@ -1459,7 +1459,7 @@ exit "$status"`;
     if (!SERVER_ID_PATTERN.test(serverId)) throw new Error(`Not a server ID: ${serverId}`);
     // The same check as `movable_folder` of move-from-boat.sh. The names also go into shell commands.
     for (const folder of foldersToCopy) {
-      if (!movableFolder(folder)) throw new Error(`The move cannot copy ${folder}. Copy it by hand.`);
+      if (!movableFolder(folder)) throw new Error(`The move cannot copy ${folder}, so this server stays on boat.`);
     }
     const folderArgs = foldersToCopy.map((folder) => `'${folder}'`).join(" ");
     if (vpsArg !== "auto" && !VPS_ID_PATTERN.test(vpsArg)) throw new Error(`Not a VPS ID: ${vpsArg}`);
@@ -1644,7 +1644,8 @@ bash "$d/move-from-boat.sh" packages`,
       if (folders.length > 0) {
         throw new Error(
           `The sandbox has files of the customer in folders that the move does not copy: ${folders.join(", ")}. ` +
-            "Name each with --folders so that the move copies it, or copy it by hand.",
+            "With --folders, the move copies /srv/<name>, /mnt/<name>, /media/<name> and a new top-level folder. " +
+            "A server with another such folder stays on boat.",
         );
       }
       if (foldersToCopy.length > 0) {

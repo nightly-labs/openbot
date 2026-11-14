@@ -630,7 +630,7 @@ export_data() {
   local archive=$1 copy=$1 version folder
   shift
   for folder in "$@"; do
-    movable_folder "$folder" || fail "The move cannot copy $folder. Copy it by hand. Nothing was archived."
+    movable_folder "$folder" || fail "The move cannot copy $folder, so this server stays on boat. Nothing was archived."
     [ -d "$folder" ] && [ ! -L "$folder" ] || fail "$folder is not a folder in this sandbox. Nothing was archived."
   done
   if [ "$archive" = - ]; then
