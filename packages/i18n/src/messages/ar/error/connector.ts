@@ -53,6 +53,8 @@ export const messages = {
   "error.connector.protonPassCliInstallFailed": "تعذّر تثبيت Proton Pass CLI. تحقق من اتصال الشبكة، ثم اتصل مرة أخرى.",
   "error.connector.protonPassPlan":
     "لا تسمح خطة Proton الخاصة بك باستخدام Proton Pass CLI. غيّر الخطة، ثم اتصل مرة أخرى.",
+  "error.connector.protonPassPlanMissing":
+    "لا تتضمن خطة Proton الخاصة بك Proton Pass CLI. تحتاج إلى خطة تتضمن Pass Plus، مثل Pass Plus أو Pass Family أو Proton Unlimited. غيّر الخطة، ثم اتصل مرة أخرى.",
   "error.connector.protonPassExpired": "انتهى الوصول إلى Proton Pass. اتصل مرة أخرى.",
   "error.connector.protonPassKeyInvalid": "أدخل مفتاح وصول Proton Pass يبدأ بـ pst_.",
   "error.connector.protonPassExtraPassword": "كلمة المرور الإضافية غير صحيحة. أدخلها مرة أخرى.",

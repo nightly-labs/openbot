@@ -46,6 +46,8 @@ export const messages = {
     "Nie udało się zainstalować Proton Pass CLI. Sprawdź połączenie sieciowe, a potem połącz ponownie.",
   "error.connector.protonPassPlan":
     "Twój plan Proton nie pozwala na Proton Pass CLI. Zmień plan, a potem połącz ponownie.",
+  "error.connector.protonPassPlanMissing":
+    "Twój plan Proton nie obejmuje Proton Pass CLI. Potrzebny jest plan z Pass Plus, na przykład Pass Plus, Pass Family lub Proton Unlimited. Zmień plan, a potem połącz ponownie.",
   "error.connector.protonPassExpired": "Dostęp do Proton Pass wygasł. Połącz ponownie.",
   "error.connector.protonPassKeyInvalid": "Wpisz klucz dostępu Proton Pass, który zaczyna się od pst_.",
   "error.connector.protonPassExtraPassword": "Dodatkowe hasło jest nieprawidłowe. Wpisz je ponownie.",

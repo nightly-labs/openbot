@@ -635,9 +635,9 @@ export const messages = {
   "connector.protonPass.expiredDescription":
     "Los agentes no pueden iniciar sesión con tus credenciales compartidas hasta que vuelvas a iniciar sesión.",
   "connector.protonPass.reconnect": "Reconectar",
-  "connector.protonPass.planTitle": "Proton Pass necesita un plan de pago",
+  "connector.protonPass.planTitle": "Proton Pass necesita un plan con Pass Plus",
   "connector.protonPass.planDescription":
-    "La CLI de Proton Pass solo funciona con un plan de pago de Proton. Cambia tu plan y vuelve a conectar.",
+    "La CLI de Proton Pass necesita un plan de Proton con Pass Plus, como Pass Plus, Pass Family o Proton Unlimited. Otros planes de pago, como Mail Plus, no la incluyen. Cambia tu plan y vuelve a conectar.",
   "connector.protonPass.vaultTitle": "Bóveda compartida",
   "connector.protonPass.vaultDescription":
     "Los agentes pueden iniciar sesión con las credenciales de esta bóveda. Mueve una credencial a ella para compartirla.",

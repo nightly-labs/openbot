@@ -54,6 +54,8 @@ export const messages = {
     "לא ניתן להתקין את ה-CLI של Proton Pass. יש לבדוק את חיבור הרשת ולהתחבר שוב.",
   "error.connector.protonPassPlan":
     "התוכנית שלך ב-Proton לא כוללת את ה-CLI של Proton Pass. יש לשנות תוכנית ולהתחבר שוב.",
+  "error.connector.protonPassPlanMissing":
+    "התוכנית שלך ב-Proton לא כוללת את ה-CLI של Proton Pass. נדרשת תוכנית עם Pass Plus, כמו Pass Plus, Pass Family או Proton Unlimited. יש לשנות תוכנית ולהתחבר שוב.",
   "error.connector.protonPassExpired": "הגישה אל Proton Pass הסתיימה. יש להתחבר שוב.",
   "error.connector.protonPassKeyInvalid": "יש להזין מפתח גישה של Proton Pass שמתחיל ב-pst_.",
   "error.connector.protonPassExtraPassword": "הסיסמה הנוספת שגויה. יש להזין אותה שוב.",

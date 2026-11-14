@@ -46,6 +46,8 @@ export const messages = {
     "Kan de Proton Pass CLI niet installeren. Controleer de netwerkverbinding en verbind daarna opnieuw.",
   "error.connector.protonPassPlan":
     "Je Proton-abonnement staat de Proton Pass CLI niet toe. Wijzig het abonnement en verbind daarna opnieuw.",
+  "error.connector.protonPassPlanMissing":
+    "Je Proton-abonnement bevat de Proton Pass CLI niet. Daarvoor is een abonnement met Pass Plus nodig, zoals Pass Plus, Pass Family of Proton Unlimited. Wijzig het abonnement en verbind daarna opnieuw.",
   "error.connector.protonPassExpired": "De toegang tot Proton Pass is beëindigd. Verbind opnieuw.",
   "error.connector.protonPassKeyInvalid": "Voer een Proton Pass-toegangssleutel in die met pst_ begint.",
   "error.connector.protonPassExtraPassword": "Het extra wachtwoord is onjuist. Voer het opnieuw in.",

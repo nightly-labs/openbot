@@ -51,6 +51,8 @@ const RELEASED_SOURCE_KEYS = new Set([
   "error.backend.channelRoutingUnreadable",
   // A host without `agent-hidden-work` refuses a message to a hidden agent with this text.
   "error.backend.recipientHidden",
+  // Hosts up to v0.71.0 send this when the Proton plan does not include the Proton Pass CLI.
+  "error.connector.protonPassPlan",
 ]);
 
 const logger = createOpenBotLogger("i18n-check");

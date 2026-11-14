@@ -622,9 +622,9 @@ export const messages = {
   "connector.protonPass.expiredDescription":
     "Os agentes não podem entrar com seus logins compartilhados até você entrar de novo.",
   "connector.protonPass.reconnect": "Reconectar",
-  "connector.protonPass.planTitle": "O Proton Pass precisa de um plano pago",
+  "connector.protonPass.planTitle": "O Proton Pass precisa de um plano com Pass Plus",
   "connector.protonPass.planDescription":
-    "A CLI do Proton Pass só funciona com um plano pago do Proton. Mude seu plano e conecte de novo.",
+    "A CLI do Proton Pass precisa de um plano do Proton com Pass Plus, como Pass Plus, Pass Family ou Proton Unlimited. Outros planos pagos, como o Mail Plus, não a incluem. Mude seu plano e conecte de novo.",
   "connector.protonPass.vaultTitle": "Cofre compartilhado",
   "connector.protonPass.vaultDescription":
     "Os agentes podem entrar com os logins deste cofre. Mova um login para ele para compartilhá-lo.",
