@@ -282,6 +282,13 @@ export const messages = {
   "mobile.server.settings.identityUnsupported":
     "Aggiorna OpenBot su questo server per cambiarne qui il nome e il logo.",
   "mobile.server.settings.identityOffline": "Connettiti a questo server per cambiarne il nome e il logo.",
+  "mobile.server.settings.appearance": "Forma e colore",
+  "mobile.server.settings.appearanceShape": "Forma",
+  "mobile.server.settings.appearanceShapeOption": "Forma {number}",
+  "mobile.server.settings.appearanceColor": "Colore del server",
+  "mobile.server.settings.appearanceAutomatic": "Automatico",
+  "mobile.server.settings.appearanceReset": "Ripristina",
+  "mobile.server.settings.appearanceSaveFailed": "Impossibile salvare la forma e il colore del server. Riprova.",
   "mobile.server.route.cropLogo": "Ritaglia logo",
   "mobile.server.members.remove": "Rimuovi membro",
   "mobile.server.members.invitePeople": "Invita persone",

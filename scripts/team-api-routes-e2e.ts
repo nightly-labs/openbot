@@ -236,6 +236,13 @@ import {
 import { GITHUB_SKILLS_CAPABILITY, GITHUB_SKILLS_ROUTES } from "@openbot/contracts/team-protocol/github-skills-v1";
 import { HERMES_IMPORT_CAPABILITY, HERMES_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/hermes-import-v1";
 import {
+  HOST_APPEARANCE_CAPABILITY,
+  HOST_APPEARANCE_EVENT,
+  HOST_APPEARANCE_ROUTES,
+  type ServerAppearance,
+  serverAppearanceOrNull,
+} from "@openbot/contracts/team-protocol/host-appearance-v1";
+import {
   HOST_KEY_ROTATION_CAPABILITY,
   HOST_KEY_ROTATION_ROUTES,
 } from "@openbot/contracts/team-protocol/host-key-rotation-v1";
@@ -2329,6 +2336,20 @@ try {
       // A stand-in for the server-mode restart, which closes the app under its service manager. This
       // checks the gate and that a refused request never reaches the host.
       restart: { request: (memberId) => record("restartHost", memberId) },
+      // The real team store, as the host service writes it. The host service then sends the new
+      // look to each event socket, so this does the same.
+      identity: {
+        updateIdentity: (input) =>
+          store.updateIdentity(input).pipe(
+            Effect.tap(() =>
+              Effect.sync(() => {
+                record("updateIdentity", input);
+                server?.refreshAppearance();
+              }),
+            ),
+            Effect.asVoid,
+          ),
+      },
       turnLimits: hostTurnLimits,
       // A stand-in for `LocalServers`; `local-servers-e2e.ts` starts real children. This checks the gate
       // and the wire, and that a refused request never reaches the desktop app.
@@ -12092,6 +12113,109 @@ try {
         callsOf("restartHost")[1]?.[0] !== adaId,
       [summary(adminRestart), summary(ownerRestart), callsOf("restartHost")],
     );
+  }
+
+  // ---- Server shape and colour (host-appearance-v1) ----
+  {
+    const capabilities = [HOST_APPEARANCE_CAPABILITY];
+    const identityUpdates = () => callsOf("updateIdentity").length;
+    const storedAppearance = () => store.getIdentity()?.appearance;
+    const set = (token: string, json: Json, use: { capabilities?: string[] } = { capabilities }) =>
+      call("POST", HOST_APPEARANCE_ROUTES.appearance, { ...use, token, json });
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises host-appearance-v1 to a protocol 9 peer and not to a protocol 8 peer",
+      list(field(compatibility.body, "capabilities")).includes(HOST_APPEARANCE_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(HOST_APPEARANCE_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+
+    // A socket that declares the capability gets the look at once, and again after each change.
+    const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
+      TEAM_PROTOCOL_V1_WEBSOCKET,
+      `openbot-token.${bobToken}`,
+    ]);
+    const looks: Array<ServerAppearance | null> = [];
+    const waiters = new Set<() => void>();
+    socket.addEventListener("message", (message) => {
+      const value = JSON.parse(String(message.data));
+      if (!isDynamicRecord(value) || value.type !== HOST_APPEARANCE_EVENT || value.serverId !== serverId) return;
+      looks.push(value.appearance === null ? null : serverAppearanceOrNull(value.appearance));
+      for (const wake of waiters) wake();
+    });
+    await new Promise<void>((resolveOpen, reject) => {
+      socket.addEventListener("open", () => resolveOpen(), { once: true });
+      socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+    });
+    const until = (count: number) =>
+      new Promise<boolean>((resolveReady) => {
+        if (looks.length >= count) return resolveReady(true);
+        const timer = setTimeout(() => {
+          waiters.delete(wake);
+          resolveReady(false);
+        }, 5_000);
+        const wake = () => {
+          if (looks.length < count) return;
+          clearTimeout(timer);
+          waiters.delete(wake);
+          resolveReady(true);
+        };
+        waiters.add(wake);
+      });
+    socket.send(JSON.stringify({ type: "agent-event-scope", includeConversations: false, capabilities }));
+    const atConnect = await until(1);
+    check(
+      "a member's event socket that declares host-appearance-v1 gets the automatic look at once",
+      atConnect && looks.length === 1 && looks[0] === null && storedAppearance() === null,
+      looks,
+    );
+
+    const look: ServerAppearance = { shape: "hexagone", color: "#3b82f6" };
+    // The same look as the request body sends it.
+    const sent: Json = { shape: "hexagone", color: "#3b82f6" };
+    const member = await set(bobToken, { appearance: sent });
+    const noCapability = await set(adaToken, { appearance: sent }, {});
+    const invalid = await set(adaToken, { appearance: { shape: "star", color: "#3b82f6" } });
+    const badColor = await set(adaToken, { appearance: { shape: "hexagone", color: "blue" } });
+    check(
+      "a member gets 403, a client without the capability gets 400, a bad look gets 400, and the look does not change",
+      errorIs(member, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(noCapability, 400, sourceText("error.team.hostIdentityUnsupported")) &&
+        invalid.status === 400 &&
+        badColor.status === 400 &&
+        identityUpdates() === 0 &&
+        storedAppearance() === null,
+      [summary(member), summary(noCapability), summary(invalid), summary(badColor)],
+    );
+
+    const admin = await set(adaToken, { appearance: sent });
+    const changed = await until(2);
+    check(
+      "an admin sets the look: 200, the store keeps it, and the member's socket gets it",
+      admin.status === 200 &&
+        isDeepStrictEqual(admin.body, {}) &&
+        isDeepStrictEqual(storedAppearance(), look) &&
+        changed &&
+        isDeepStrictEqual(looks[1], look),
+      [summary(admin), storedAppearance(), looks],
+    );
+
+    const reset = await set(owner.sessionToken, { appearance: null });
+    const resetSent = await until(3);
+    check(
+      "the owner sends null: the server has the automatic look again, and the socket gets null",
+      reset.status === 200 &&
+        storedAppearance() === null &&
+        resetSent &&
+        looks[2] === null &&
+        isDeepStrictEqual(
+          callsOf("updateIdentity").map(([input]) => input),
+          [{ appearance: look }, { appearance: null }],
+        ),
+      [summary(reset), storedAppearance(), looks, callsOf("updateIdentity")],
+    );
+    socket.close();
   }
 
   // ---- Library folders (library-folders-v1) ----

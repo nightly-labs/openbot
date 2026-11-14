@@ -279,6 +279,13 @@ export const messages = {
   "mobile.server.settings.identityUnsupported":
     "ここで名前とロゴを変更するには、このサーバーの OpenBot をアップデートしてください。",
   "mobile.server.settings.identityOffline": "名前とロゴを変更するには、このサーバーに接続してください。",
+  "mobile.server.settings.appearance": "形と色",
+  "mobile.server.settings.appearanceShape": "形",
+  "mobile.server.settings.appearanceShapeOption": "形 {number}",
+  "mobile.server.settings.appearanceColor": "サーバーの色",
+  "mobile.server.settings.appearanceAutomatic": "自動",
+  "mobile.server.settings.appearanceReset": "リセット",
+  "mobile.server.settings.appearanceSaveFailed": "サーバーの形と色を保存できませんでした。もう一度お試しください。",
   "mobile.server.route.cropLogo": "ロゴを切り抜く",
   "mobile.server.members.remove": "メンバーを削除",
   "mobile.server.members.invitePeople": "ユーザーを招待",

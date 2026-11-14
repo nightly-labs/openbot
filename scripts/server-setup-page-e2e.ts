@@ -106,6 +106,7 @@ let hostStatus: HostStatus = {
   serverName: null,
   apiUrl: null,
   logoUrl: null,
+  appearance: null,
   apiOnline: false,
   remoteDesktopReady: false,
   remoteDesktopScreenRecordingDenied: false,

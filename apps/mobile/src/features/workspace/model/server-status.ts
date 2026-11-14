@@ -102,6 +102,12 @@ export function serverFromHost(
     id: host.hostId,
     name: host.name,
     logoKey: host.logoKey,
+    // An older account server sends no appearance. The server then keeps the one that its host sent.
+    ...(host.appearance !== undefined
+      ? { appearance: host.appearance }
+      : previous?.appearance === undefined
+        ? {}
+        : { appearance: previous.appearance }),
     kind,
     state: previous?.state ?? "unknown",
     initialConnectionPending: previous?.initialConnectionPending ?? true,

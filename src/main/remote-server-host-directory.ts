@@ -225,6 +225,7 @@ export function reconcileWebRtcHosts(input: WebRtcHostReconciliationInput): WebR
         encryptedToken: "",
         remoteDesktopAvailable: false,
         logoVersion: host.logoKey,
+        ...(host.appearance === undefined ? {} : { appearance: host.appearance }),
         role: host.role,
         ...(host.memberLimit === undefined ? {} : { memberLimit: host.memberLimit }),
         ...(host.hosted === undefined ? {} : { hosted: host.hosted }),
@@ -257,6 +258,8 @@ export function reconcileWebRtcHosts(input: WebRtcHostReconciliationInput): WebR
     if (input.isConnected(server.id) && server.publicKey === refreshed.publicKey) {
       refreshed.remoteDesktopAvailable = server.remoteDesktopAvailable;
     }
+    // An account server from before `host-appearance-v1` lists none; the host's own event set it.
+    if (refreshed.appearance === undefined && server.appearance !== undefined) refreshed.appearance = server.appearance;
     return [refreshed];
   });
   for (const server of listed) {

@@ -91,6 +91,7 @@ import { GITHUB_SKILLS_CAPABILITY } from "./github-skills-v1";
 import { HERMES_IMPORT_CAPABILITY } from "./hermes-import-v1";
 import { TEAM_HISTORY_EXTENT_CAPABILITY } from "./history-extent-v1";
 import { HOST_ADMIN_CAPABILITY } from "./host-admin-v1";
+import { HOST_APPEARANCE_CAPABILITY } from "./host-appearance-v1";
 import { HOST_KEY_ROTATION_CAPABILITY } from "./host-key-rotation-v1";
 import { HOST_MEMBER_UPDATE_CAPABILITY } from "./host-member-update-v1";
 import { HOST_PERSONALITY_CAPABILITY } from "./host-personality-v1";
@@ -328,6 +329,7 @@ export {
   EVENTS_CAPABILITY,
   FOCUS_USE_CAPABILITY,
   HOST_ADMIN_CAPABILITY,
+  HOST_APPEARANCE_CAPABILITY,
   HOST_KEY_ROTATION_CAPABILITY,
   HOST_MEMBER_UPDATE_CAPABILITY,
   HOST_RELEASE_CAPABILITY,
@@ -650,6 +652,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   ROUTINE_FLOW_STOP_CAPABILITY,
   AGENT_PENDING_RUNTIME_CAPABILITY,
   BROWSER_SIGN_IN_STORAGE_CAPABILITY,
+  HOST_APPEARANCE_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -883,7 +886,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== CHANNEL_TASK_WAITS_CAPABILITY &&
     capability !== ROUTINE_FLOW_STOP_CAPABILITY &&
     capability !== AGENT_PENDING_RUNTIME_CAPABILITY &&
-    capability !== BROWSER_SIGN_IN_STORAGE_CAPABILITY,
+    capability !== BROWSER_SIGN_IN_STORAGE_CAPABILITY &&
+    capability !== HOST_APPEARANCE_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -993,6 +997,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   ROUTINE_FLOW_STOP_CAPABILITY,
   AGENT_PENDING_RUNTIME_CAPABILITY,
   BROWSER_SIGN_IN_STORAGE_CAPABILITY,
+  HOST_APPEARANCE_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1185,6 +1190,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== CHANNEL_TASK_WAITS_CAPABILITY &&
       capability !== ROUTINE_FLOW_STOP_CAPABILITY &&
       capability !== AGENT_PENDING_RUNTIME_CAPABILITY &&
-      capability !== BROWSER_SIGN_IN_STORAGE_CAPABILITY,
+      capability !== BROWSER_SIGN_IN_STORAGE_CAPABILITY &&
+      capability !== HOST_APPEARANCE_CAPABILITY,
   );
 }

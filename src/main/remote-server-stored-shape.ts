@@ -34,6 +34,7 @@ import {
   isOneOf,
   isString,
 } from "@openbot/contracts/runtime-values";
+import { type ServerAppearance, serverAppearanceOrNull } from "@openbot/contracts/team-protocol/host-appearance-v1";
 
 export interface StoredRemoteServer {
   id: string;
@@ -45,6 +46,8 @@ export interface StoredRemoteServer {
   encryptedToken: string;
   remoteDesktopAvailable: boolean;
   logoVersion?: string | null;
+  /** The shape and colour that the host shows with no logo (`host-appearance-v1`). Null for the automatic look. */
+  appearance?: ServerAppearance | null;
   role: TeamRole;
   transport?: "webrtc-v2";
   /** The active members that the host's plan allows, from the account server's host list. */
@@ -277,7 +280,15 @@ function readStoredRemoteServer(value: unknown): StoredRemoteServer | null {
     ...(isBoolean(value.hosted) ? { hosted: value.hosted } : {}),
     ...(isBoolean(value.restartAvailable) ? { restartAvailable: value.restartAvailable } : {}),
     ...(isPositiveInteger(value.storageGb) ? { storageGb: value.storageGb } : {}),
+    // A bad appearance drops only the appearance: the next host list or event writes it again.
+    ...storedAppearance(value.appearance),
   };
+}
+
+function storedAppearance(value: unknown): { appearance?: ServerAppearance | null } {
+  if (value === null) return { appearance: null };
+  const appearance = serverAppearanceOrNull(value);
+  return appearance ? { appearance } : {};
 }
 
 function isPositiveInteger(value: unknown): value is number {

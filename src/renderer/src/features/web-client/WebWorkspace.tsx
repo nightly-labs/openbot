@@ -633,6 +633,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       const incompatibility =
         active && workspace.state.incompatibility?.hostId === host.hostId ? workspace.state.incompatibility : null;
       const notice = notifications.state(host.hostId);
+      // The connected host has the look from its own event; the list has the account server's copy.
+      const connected = active ? workspace.state.host : null;
+      const appearance = connected?.appearance !== undefined ? connected.appearance : host.appearance;
       return {
         id: host.hostId,
         name: host.name,
@@ -652,6 +655,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         notificationsMutedUntil: notice.mutedUntil,
         notificationLevel: notice.level,
         remoteDesktopAvailable: false,
+        ...(appearance === undefined ? {} : { appearance }),
         ...(host.memberLimit === undefined ? {} : { memberLimit: host.memberLimit }),
         ...(host.hosted === undefined ? {} : { hosted: host.hosted }),
         ...(host.restartAvailable === undefined ? {} : { restartAvailable: host.restartAvailable }),
@@ -1202,6 +1206,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     admin: () => workspace.runtime.admin,
     presence: () => workspace.state.presence,
     refreshHosts: () => workspace.refreshHosts(),
+    setAppearance: (hostId, appearance) => workspace.setHostAppearance(hostId, appearance),
     relaySupported: () => workspace.state.capabilities.includes(SIGN_IN_RELAY_CAPABILITY),
   });
   /** Only the owner of a host with `host-key-rotation-v1` changes its key. A named function, not a ternary prop. */
@@ -3416,6 +3421,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         loadError={serverSettings.state.error}
                         onRetry={serverSettings.refresh}
                         onSaveIdentity={serverSettings.saveIdentity}
+                        onSaveAppearance={serverSettings.saveAppearance}
                         // Publication and screen recording belong to the computer that runs the server.
                         onSetPublished={unavailable}
                         onRotateHostKey={rotateHostKeyAction()}

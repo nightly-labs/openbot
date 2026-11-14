@@ -40,6 +40,7 @@ import {
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { FOCUS_USE_CAPABILITY, FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
 import { HOST_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/host-admin-v1";
+import { HOST_APPEARANCE_CAPABILITY } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { HOST_KEY_ROTATION_CAPABILITY } from "@openbot/contracts/team-protocol/host-key-rotation-v1";
 import { HOST_MEMBER_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-member-update-v1";
 import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
@@ -111,6 +112,7 @@ import {
   readSidebarPins,
   rotateHostKey,
   seedSidebarPins,
+  setHostAppearance,
   setSidebarPins,
   updateHostIdentity,
 } from "@openbot/team-client/team-admin-requests";
@@ -1692,6 +1694,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             server.id === serverId ? { ...server, name: event.serverName, logoKey: event.logoVersion } : server,
           ),
         );
+      } else if (event.type === "host-appearance") {
+        // The host sends its plush when the phone connects and after each change.
+        const { appearance } = event;
+        setServers((current) => current.map((server) => (server.id === serverId ? { ...server, appearance } : server)));
       }
     },
     [
@@ -1961,6 +1967,22 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         // A new generation drops a directory read that started before the save, and the refresh
         // reads again after it. The change is saved, so a failed read must not report a failure.
         await refreshMemberships().catch(() => undefined);
+      },
+      setServerAppearance: async (serverId, appearance) => {
+        const server = serversRef.current.find((candidate) => candidate.id === serverId);
+        if (!server || !canAdministerServer(server.role))
+          throw new Error(currentText().t("mobile.server.settings.identityNotAllowed"));
+        requireCapability(
+          serverCapabilities.current,
+          serverId,
+          HOST_APPEARANCE_CAPABILITY,
+          "mobile.server.settings.identityUnsupported",
+        );
+        await runTeamRequest(setHostAppearance(teamApi(serverId), appearance));
+        // The host also sends `host-appearance`; this shows the choice at once.
+        setServers((current) =>
+          current.map((candidate) => (candidate.id === serverId ? { ...candidate, appearance } : candidate)),
+        );
       },
       rotateServerKey: async (serverId) => {
         const server = serversRef.current.find((candidate) => candidate.id === serverId);
@@ -2468,6 +2490,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       return {
         ...createHostRequestChecks(capabilities),
         canEditServerIdentity: (serverId) => administers(serverId, HOST_ADMIN_CAPABILITY),
+        canEditServerAppearance: (serverId) => administers(serverId, HOST_APPEARANCE_CAPABILITY),
         canRotateServerKey: (serverId) =>
           servers.find((candidate) => candidate.id === serverId)?.role === "owner" &&
           administers(serverId, HOST_KEY_ROTATION_CAPABILITY),

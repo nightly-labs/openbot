@@ -8,6 +8,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
 import { type DynamicRecord, isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { type ServerAppearance, serverAppearanceOrNull } from "@openbot/contracts/team-protocol/host-appearance-v1";
 
 /** The account API's answers, and the decoders that `CentralAuthManager` checks them with. */
 
@@ -23,6 +24,11 @@ export interface RemoteHostSummary {
   hostId: string;
   name: string;
   logoKey: string | null;
+  /**
+   * The shape and colour that the server shows with no logo; null for the automatic look. An older
+   * account server sends none, and a bad value is dropped.
+   */
+  appearance?: ServerAppearance | null;
   devicePublicKey: string | null;
   /** The host's signed key handovers. An account server from before handovers sends none. */
   keyHandovers: HostKeyHandover[];
@@ -170,6 +176,13 @@ export function decodeRegisteredRemoteHost(value: unknown): RegisteredRemoteHost
   };
 }
 
+/** A bad value drops only the appearance, as for the limit, so the host list still loads. */
+function directoryAppearance(value: unknown): { appearance?: ServerAppearance | null } {
+  if (value === null) return { appearance: null };
+  const appearance = serverAppearanceOrNull(value);
+  return appearance ? { appearance } : {};
+}
+
 export function decodeRemoteHosts(value: unknown): RemoteHostSummary[] {
   const record = decodeRecord(value, "remote hosts");
   if (!Array.isArray(record.hosts)) throw new Error("Invalid remote host list.");
@@ -190,6 +203,7 @@ export function decodeRemoteHosts(value: unknown): RemoteHostSummary[] {
       hostId: requiredString(host, "hostId"),
       name: requiredString(host, "name"),
       logoKey: host.logoKey,
+      ...directoryAppearance(host.appearance),
       devicePublicKey: host.devicePublicKey,
       keyHandovers: optionalHostKeyHandovers(host.keyHandovers),
       authEpoch: host.authEpoch,
