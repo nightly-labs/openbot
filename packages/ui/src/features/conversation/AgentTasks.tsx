@@ -23,10 +23,15 @@ function taskMarkState(task: AgentTask): TaskMarkState {
  * The state of a task in a few words: that a running task waits for the person, what it does now,
  * else how its last turn ended.
  */
-export function agentTaskStatus(task: AgentTask, t: TextValue["t"], wait?: AgentTaskWait): string {
+export function agentTaskStatus(
+  task: AgentTask,
+  t: TextValue["t"],
+  sourceText: TextValue["sourceText"],
+  wait?: AgentTaskWait,
+): string {
   if (task.state === "running" && wait === "approval") return t("conversation.tasks.state.waitingApproval");
   if (task.state === "running" && wait === "answer") return t("conversation.tasks.state.waitingAnswer");
-  if (task.state === "running") return task.progress ?? t("conversation.tasks.state.running");
+  if (task.state === "running") return task.progress ? sourceText(task.progress) : t("conversation.tasks.state.running");
   if (task.state === "queued") return t("conversation.tasks.state.queued");
   if (task.outcome === null) return t("conversation.tasks.state.new");
   return t(OUTCOME_TEXT[task.outcome]);
@@ -37,7 +42,7 @@ export function agentTaskStatus(task: AgentTask, t: TextValue["t"], wait?: Agent
  * state is already in the text beside it.
  */
 export function AgentTaskMark(props: { task: AgentTask; decorative?: boolean; wait?: AgentTaskWait }) {
-  const { t } = useText();
+  const { t, sourceText } = useText();
   return (
     <Show
       when={!props.decorative}
@@ -50,8 +55,8 @@ export function AgentTaskMark(props: { task: AgentTask; decorative?: boolean; wa
       <span
         class="agent-tasks-mark"
         role="img"
-        aria-label={agentTaskStatus(props.task, t, props.wait)}
-        title={agentTaskStatus(props.task, t, props.wait)}
+        aria-label={agentTaskStatus(props.task, t, sourceText, props.wait)}
+        title={agentTaskStatus(props.task, t, sourceText, props.wait)}
       >
         <TaskMark state={taskMarkState(props.task)} />
       </span>

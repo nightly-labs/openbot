@@ -14,8 +14,9 @@ import { type TraceKeyboard, type TraceSpan, TraceWaterfallDialog } from "./Trac
 /**
  * One step of an agent's turn: a thought, a progress line of the host, or a memory change that the
  * turn committed. `memory-summary` is the count that a host without the changes sends instead.
- * The text of `progress` and `memory-summary` is the host's English source text. The `error` of a
- * `progress` step is the output of a failed tool step, which the line can open.
+ * The text of `progress` and `memory-summary` is the host's English source text. The step list
+ * resolves those keys with `sourceText`. The `error` of a `progress` step is the output of a failed
+ * tool step, which the line can open.
  */
 export type AgentStep =
   | { id: string; kind: "thinking"; text: string }

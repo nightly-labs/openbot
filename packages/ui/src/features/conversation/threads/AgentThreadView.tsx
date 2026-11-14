@@ -322,7 +322,7 @@ export interface AgentThreadSelectionActions {
  * busy-message mode says.
  */
 export function AgentThreadView(props: AgentThreadViewProps) {
-  const { t } = useText();
+  const { t, sourceText } = useText();
   // Resolved once, so the card is built one time for the check and the row.
   const attention = children(() => props.attention);
   const [sending, setSending] = createSignal(false);
@@ -861,17 +861,20 @@ export function AgentThreadView(props: AgentThreadViewProps) {
             }}
           </For>
           <Show when={running()}>
-            {(task) => (
-              <div class="virtual-chat-row">
-                <AgentActivityIndicator
-                  agent={props.agent}
-                  label={activityLabel}
-                  detail={task().progress}
-                  steps={props.activeSteps}
-                  stepsOpenByDefault={props.stepsOpenByDefault}
-                />
-              </div>
-            )}
+            {(task) => {
+              const progress = task().progress;
+              return (
+                <div class="virtual-chat-row">
+                  <AgentActivityIndicator
+                    agent={props.agent}
+                    label={activityLabel}
+                    detail={progress ? sourceText(progress) : null}
+                    steps={props.activeSteps}
+                    stepsOpenByDefault={props.stepsOpenByDefault}
+                  />
+                </div>
+              );
+            }}
           </Show>
           <Show keyed when={props.approval}>
             {(approval) => (
