@@ -52,6 +52,8 @@ const QUIT_GUARD_LABEL = {
 } as const satisfies Record<QuitGuard, AppTextKey>;
 
 interface SettingsGeneralTabProps {
+  /** The page that shows: General, Appearance or App behavior. The three pages edit the same preferences. */
+  part: "general" | "appearance" | "app-behavior";
   value: GeneralSettingsValue;
   /** The device with the keyboard, naming ⌘ or Ctrl in the shortcut option. */
   platform?: "darwin" | "win32" | "linux" | undefined;
@@ -91,292 +93,307 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
       : ({ title: "settings.keepRunning.title", description: "settings.keepRunning.description" } as const);
   return (
     <>
-      <SettingsSection title={i18n.t("settings.appearance.title")}>
-        <ItemGroup class="settings-modal-card">
-          <Item data-settings-row="settings.appearance.theme.title" class="settings-modal-row">
-            <ItemContent>
-              <ItemTitle>{i18n.t("settings.appearance.theme.title")}</ItemTitle>
-              <ItemDescription>{i18n.t("settings.appearance.theme.description")}</ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <AppearanceSelect
-                value={appearance.theme()}
-                onChange={appearance.changeTheme}
-                palettes={appearance.palettes()}
-                mount={props.selectMount}
+      <Show when={props.part === "appearance"}>
+        <SettingsSection title={i18n.t("settings.appearance.colorsTitle")}>
+          <ItemGroup class="settings-modal-card">
+            <Item data-settings-row="settings.appearance.theme.title" class="settings-modal-row">
+              <ItemContent>
+                <ItemTitle>{i18n.t("settings.appearance.theme.title")}</ItemTitle>
+                <ItemDescription>{i18n.t("settings.appearance.theme.description")}</ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <AppearanceSelect
+                  value={appearance.theme()}
+                  onChange={appearance.changeTheme}
+                  palettes={appearance.palettes()}
+                  mount={props.selectMount}
+                />
+              </ItemActions>
+            </Item>
+            <Show when={props.platform === "darwin"}>
+              <SwitchField
+                data-settings-row="settings.appearance.transparentWindow.title"
+                checked={appearance.transparentWindow()}
+                onChange={appearance.changeTransparentWindow}
+                label={i18n.t("settings.appearance.transparentWindow.title")}
+                description={i18n.t("settings.appearance.transparentWindow.description")}
               />
-            </ItemActions>
-          </Item>
-          <Show when={props.platform === "darwin"}>
-            <SwitchField
-              data-settings-row="settings.appearance.transparentWindow.title"
-              checked={appearance.transparentWindow()}
-              onChange={appearance.changeTransparentWindow}
-              label={i18n.t("settings.appearance.transparentWindow.title")}
-              description={i18n.t("settings.appearance.transparentWindow.description")}
-            />
-          </Show>
-          <Item data-settings-row="settings.language.title" class="settings-modal-row">
-            <ItemContent>
-              <ItemTitle>{i18n.t("settings.language.title")}</ItemTitle>
-              <ItemDescription>{i18n.t("settings.language.description")}</ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <LanguageSelect value={i18n.language()} onChange={i18n.changeLanguage} mount={props.selectMount} />
-            </ItemActions>
-          </Item>
-          <Item data-settings-row="settings.interfaceSize.title" class="settings-modal-row">
-            <ItemContent>
-              <ItemTitle>{i18n.t("settings.interfaceSize.title")}</ItemTitle>
-              <ItemDescription>{i18n.t("settings.interfaceSize.description")}</ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Select<AppInterfaceSize>
-                class="settings-modal-select"
-                options={interfaceSizeOptions}
-                value={interfaceSize.percent()}
-                onChange={(value) => value && interfaceSize.changePercent(value)}
-                placement="bottom-end"
-                itemComponent={(selectProps) => (
-                  <SelectItem item={selectProps.item}>{interfaceSizeLabel(selectProps.item.rawValue)}</SelectItem>
-                )}
-              >
-                <SelectTrigger size="sm" aria-label={i18n.t("settings.interfaceSize.title")}>
-                  <SelectValue<AppInterfaceSize>>{(state) => interfaceSizeLabel(state.selectedOption())}</SelectValue>
-                </SelectTrigger>
-                <SelectContent mount={props.selectMount} />
-              </Select>
-            </ItemActions>
-          </Item>
-          {/* Local only, on a joined server too: the list is the fonts of this computer. */}
-          <Item data-settings-row="settings.interfaceFont.title" class="settings-modal-row">
-            <ItemContent>
-              <ItemTitle id={interfaceFontTitleId}>{i18n.t("settings.interfaceFont.title")}</ItemTitle>
-              <ItemDescription>{i18n.t("settings.interfaceFont.description")}</ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <FontSelect
-                kind="interface"
-                value={appearance.interfaceFont()}
-                onChange={appearance.changeInterfaceFont}
-                fonts={installedFonts()}
-                aria-labelledby={interfaceFontTitleId}
-                mount={props.selectMount}
-              />
-            </ItemActions>
-          </Item>
-          <Item data-settings-row="settings.codeFont.title" class="settings-modal-row">
-            <ItemContent>
-              <ItemTitle id={codeFontTitleId}>{i18n.t("settings.codeFont.title")}</ItemTitle>
-              <ItemDescription>{i18n.t("settings.codeFont.description")}</ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <FontSelect
-                kind="code"
-                value={appearance.codeFont()}
-                onChange={appearance.changeCodeFont}
-                fonts={installedFonts()}
-                aria-labelledby={codeFontTitleId}
-                mount={props.selectMount}
-              />
-            </ItemActions>
-          </Item>
-          <Item data-settings-row="settings.logoColor.title" class="settings-modal-row settings-logo-color-row">
-            <ItemContent>
-              <ItemTitle>{i18n.t("settings.logoColor.title")}</ItemTitle>
-              <ItemDescription>{i18n.t("settings.logoColor.description")}</ItemDescription>
-              <Show when={props.variant !== "production"}>
-                <ItemDescription>{i18n.t("settings.logoColor.buildNote")}</ItemDescription>
-              </Show>
-            </ItemContent>
-            <LogoColorPicker value={logoColor.color()} onChange={logoColor.changeColor} />
-          </Item>
-          <Item data-settings-row="settings.chatColor.title" class="settings-modal-row">
-            <ItemContent>
-              <ItemTitle>{i18n.t("settings.chatColor.title")}</ItemTitle>
-              <ItemDescription>{i18n.t("settings.chatColor.description")}</ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <OwnChatColorTrigger value={props.chatColor} onChange={saveChatColor} />
-            </ItemActions>
-          </Item>
-          <Item data-settings-row="settings.chatBackground.title" class="settings-modal-row">
-            <ItemContent>
-              <ItemTitle>{i18n.t("settings.chatBackground.title")}</ItemTitle>
-              <ItemDescription>{i18n.t("settings.chatBackground.description")}</ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <ChatBackgroundSetting
-                scheme={documentColorScheme()}
-                light={appearance.chatBackgroundLight()}
-                dark={appearance.chatBackgroundDark()}
-                onChange={(scheme, value) =>
-                  scheme === "light"
-                    ? appearance.changeChatBackgroundLight(value)
-                    : appearance.changeChatBackgroundDark(value)
-                }
-              />
-            </ItemActions>
-          </Item>
-        </ItemGroup>
-      </SettingsSection>
+            </Show>
+            <Item data-settings-row="settings.logoColor.title" class="settings-modal-row settings-logo-color-row">
+              <ItemContent>
+                <ItemTitle>{i18n.t("settings.logoColor.title")}</ItemTitle>
+                <ItemDescription>{i18n.t("settings.logoColor.description")}</ItemDescription>
+                <Show when={props.variant !== "production"}>
+                  <ItemDescription>{i18n.t("settings.logoColor.buildNote")}</ItemDescription>
+                </Show>
+              </ItemContent>
+              <LogoColorPicker value={logoColor.color()} onChange={logoColor.changeColor} />
+            </Item>
+            <Item data-settings-row="settings.chatColor.title" class="settings-modal-row">
+              <ItemContent>
+                <ItemTitle>{i18n.t("settings.chatColor.title")}</ItemTitle>
+                <ItemDescription>{i18n.t("settings.chatColor.description")}</ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <OwnChatColorTrigger value={props.chatColor} onChange={saveChatColor} />
+              </ItemActions>
+            </Item>
+            <Item data-settings-row="settings.chatBackground.title" class="settings-modal-row">
+              <ItemContent>
+                <ItemTitle>{i18n.t("settings.chatBackground.title")}</ItemTitle>
+                <ItemDescription>{i18n.t("settings.chatBackground.description")}</ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <ChatBackgroundSetting
+                  scheme={documentColorScheme()}
+                  light={appearance.chatBackgroundLight()}
+                  dark={appearance.chatBackgroundDark()}
+                  onChange={(scheme, value) =>
+                    scheme === "light"
+                      ? appearance.changeChatBackgroundLight(value)
+                      : appearance.changeChatBackgroundDark(value)
+                  }
+                />
+              </ItemActions>
+            </Item>
+          </ItemGroup>
+        </SettingsSection>
+        <SettingsSection title={i18n.t("settings.appearance.textTitle")}>
+          <ItemGroup class="settings-modal-card">
+            <Item data-settings-row="settings.language.title" class="settings-modal-row">
+              <ItemContent>
+                <ItemTitle>{i18n.t("settings.language.title")}</ItemTitle>
+                <ItemDescription>{i18n.t("settings.language.description")}</ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <LanguageSelect value={i18n.language()} onChange={i18n.changeLanguage} mount={props.selectMount} />
+              </ItemActions>
+            </Item>
+            <Item data-settings-row="settings.interfaceSize.title" class="settings-modal-row">
+              <ItemContent>
+                <ItemTitle>{i18n.t("settings.interfaceSize.title")}</ItemTitle>
+                <ItemDescription>{i18n.t("settings.interfaceSize.description")}</ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <Select<AppInterfaceSize>
+                  class="settings-modal-select"
+                  options={interfaceSizeOptions}
+                  value={interfaceSize.percent()}
+                  onChange={(value) => value && interfaceSize.changePercent(value)}
+                  placement="bottom-end"
+                  itemComponent={(selectProps) => (
+                    <SelectItem item={selectProps.item}>{interfaceSizeLabel(selectProps.item.rawValue)}</SelectItem>
+                  )}
+                >
+                  <SelectTrigger size="sm" aria-label={i18n.t("settings.interfaceSize.title")}>
+                    <SelectValue<AppInterfaceSize>>{(state) => interfaceSizeLabel(state.selectedOption())}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent mount={props.selectMount} />
+                </Select>
+              </ItemActions>
+            </Item>
+            {/* Local only, on a joined server too: the list is the fonts of this computer. */}
+            <Item data-settings-row="settings.interfaceFont.title" class="settings-modal-row">
+              <ItemContent>
+                <ItemTitle id={interfaceFontTitleId}>{i18n.t("settings.interfaceFont.title")}</ItemTitle>
+                <ItemDescription>{i18n.t("settings.interfaceFont.description")}</ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <FontSelect
+                  kind="interface"
+                  systemFontDefault={props.platform === "darwin"}
+                  value={appearance.interfaceFont()}
+                  onChange={appearance.changeInterfaceFont}
+                  fonts={installedFonts()}
+                  aria-labelledby={interfaceFontTitleId}
+                  mount={props.selectMount}
+                />
+              </ItemActions>
+            </Item>
+            <Item data-settings-row="settings.codeFont.title" class="settings-modal-row">
+              <ItemContent>
+                <ItemTitle id={codeFontTitleId}>{i18n.t("settings.codeFont.title")}</ItemTitle>
+                <ItemDescription>{i18n.t("settings.codeFont.description")}</ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <FontSelect
+                  kind="code"
+                  value={appearance.codeFont()}
+                  onChange={appearance.changeCodeFont}
+                  fonts={installedFonts()}
+                  aria-labelledby={codeFontTitleId}
+                  mount={props.selectMount}
+                />
+              </ItemActions>
+            </Item>
+          </ItemGroup>
+        </SettingsSection>
+      </Show>
 
-      <SettingsSection title={i18n.t("settings.conversations.title")}>
-        <ItemGroup class="settings-modal-card">
-          <Item data-settings-row="settings.sendShortcut.title" class="settings-modal-row">
-            <ItemContent>
-              <ItemTitle>{i18n.t("settings.sendShortcut.title")}</ItemTitle>
-              <ItemDescription>{i18n.t("settings.sendShortcut.description")}</ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <SendShortcutSelect
-                value={props.value.sendShortcut}
-                onChange={(mode) => props.onUpdateSetting("sendShortcut", mode)}
-                devicePlatform={props.platform ?? "darwin"}
-                mount={props.selectMount}
-              />
-            </ItemActions>
-          </Item>
-          <Item data-settings-row="sidebar.order.title" class="settings-modal-row">
-            <ItemContent>
-              <ItemTitle>{i18n.t("sidebar.order.title")}</ItemTitle>
-              <ItemDescription>{i18n.t("settings.chatOrder.description")}</ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <SidebarChatOrderSelect
-                value={layout.sidebarChatOrder()}
-                onChange={layout.setSidebarChatOrder}
-                mount={props.selectMount}
-              />
-            </ItemActions>
-          </Item>
-          <SwitchField
-            data-settings-row="settings.showAgentSteps.title"
-            checked={props.value.showAgentSteps}
-            onChange={(checked) => props.onUpdateSetting("showAgentSteps", checked)}
-            label={i18n.t("settings.showAgentSteps.title")}
-            description={i18n.t("settings.showAgentSteps.description")}
-          />
-          <SwitchField
-            data-settings-row="settings.compactMessageActions.title"
-            checked={props.value.compactMessageActions}
-            onChange={(checked) => props.onUpdateSetting("compactMessageActions", checked)}
-            label={i18n.t("settings.compactMessageActions.title")}
-            description={i18n.t("settings.compactMessageActions.description")}
-          />
-          <Item data-settings-row="settings.externalLinks.title" class="settings-modal-row">
-            <ItemContent>
-              <ItemTitle>{i18n.t("settings.externalLinks.title")}</ItemTitle>
-              <ItemDescription>{i18n.t("settings.externalLinks.description")}</ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <ExternalLinkSelect
-                target={props.value.externalLinkTarget}
-                platform={props.platform}
-                mount={props.selectMount}
-                onChange={(target) => props.onUpdateSetting("externalLinkTarget", target)}
-              />
-            </ItemActions>
-          </Item>
-        </ItemGroup>
-      </SettingsSection>
+      <Show when={props.part === "general"}>
+        <SettingsSection title={i18n.t("settings.conversations.title")}>
+          <ItemGroup class="settings-modal-card">
+            <Item data-settings-row="settings.sendShortcut.title" class="settings-modal-row">
+              <ItemContent>
+                <ItemTitle>{i18n.t("settings.sendShortcut.title")}</ItemTitle>
+                <ItemDescription>{i18n.t("settings.sendShortcut.description")}</ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <SendShortcutSelect
+                  value={props.value.sendShortcut}
+                  onChange={(mode) => props.onUpdateSetting("sendShortcut", mode)}
+                  devicePlatform={props.platform ?? "darwin"}
+                  mount={props.selectMount}
+                />
+              </ItemActions>
+            </Item>
+            <Item data-settings-row="sidebar.order.title" class="settings-modal-row">
+              <ItemContent>
+                <ItemTitle>{i18n.t("sidebar.order.title")}</ItemTitle>
+                <ItemDescription>{i18n.t("settings.chatOrder.description")}</ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <SidebarChatOrderSelect
+                  value={layout.sidebarChatOrder()}
+                  onChange={layout.setSidebarChatOrder}
+                  mount={props.selectMount}
+                />
+              </ItemActions>
+            </Item>
+            <SwitchField
+              data-settings-row="settings.showAgentSteps.title"
+              checked={props.value.showAgentSteps}
+              onChange={(checked) => props.onUpdateSetting("showAgentSteps", checked)}
+              label={i18n.t("settings.showAgentSteps.title")}
+              description={i18n.t("settings.showAgentSteps.description")}
+            />
+            <SwitchField
+              data-settings-row="settings.compactMessageActions.title"
+              checked={props.value.compactMessageActions}
+              onChange={(checked) => props.onUpdateSetting("compactMessageActions", checked)}
+              label={i18n.t("settings.compactMessageActions.title")}
+              description={i18n.t("settings.compactMessageActions.description")}
+            />
+            <Item data-settings-row="settings.externalLinks.title" class="settings-modal-row">
+              <ItemContent>
+                <ItemTitle>{i18n.t("settings.externalLinks.title")}</ItemTitle>
+                <ItemDescription>{i18n.t("settings.externalLinks.description")}</ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <ExternalLinkSelect
+                  target={props.value.externalLinkTarget}
+                  platform={props.platform}
+                  mount={props.selectMount}
+                  onChange={(target) => props.onUpdateSetting("externalLinkTarget", target)}
+                />
+              </ItemActions>
+            </Item>
+          </ItemGroup>
+        </SettingsSection>
 
-      <SettingsSection title={i18n.t("settings.appBehavior.title")}>
-        <ItemGroup class="settings-modal-card">
-          <Show when={props.value.launchAtLogin !== null}>
+        <SettingsSection title={i18n.t("settings.permissions.title")}>
+          <ItemGroup class="settings-modal-card">
             <SwitchField
-              data-settings-row="settings.launchAtLogin.title"
-              checked={props.value.launchAtLogin === true}
-              onChange={(checked) => props.onUpdateSetting("launchAtLogin", checked)}
-              label={i18n.t("settings.launchAtLogin.title")}
-              description={i18n.t("settings.launchAtLogin.description")}
+              data-settings-row="settings.analytics.title"
+              checked={props.value.productAnalytics}
+              onChange={(checked) => props.onUpdateSetting("productAnalytics", checked)}
+              label={i18n.t("settings.analytics.title")}
+              description={i18n.t("settings.analytics.description")}
             />
-          </Show>
-          <SwitchField
-            data-settings-row="settings.keepRemoteSessions.title"
-            checked={props.value.keepRemoteSessions}
-            onChange={(checked) => props.onUpdateSetting("keepRemoteSessions", checked)}
-            label={i18n.t("settings.keepRemoteSessions.title")}
-            description={i18n.t("settings.keepRemoteSessions.description")}
-          />
-          <Show when={props.value.keepRunningInBackground !== null}>
-            <SwitchField
-              data-settings-row={backgroundRow().title}
-              checked={props.value.keepRunningInBackground === true}
-              onChange={(checked) => props.onUpdateSetting("keepRunningInBackground", checked)}
-              label={i18n.t(backgroundRow().title)}
-              description={i18n.t(backgroundRow().description)}
-            />
-          </Show>
-          <Show when={props.value.keepAwake !== null}>
-            <SwitchField
-              data-settings-row="settings.keepAwake.title"
-              checked={props.value.keepAwake === true}
-              onChange={(checked) => props.onUpdateSetting("keepAwake", checked)}
-              label={i18n.t("settings.keepAwake.title")}
-              description={i18n.t("settings.keepAwake.description")}
-            />
-            <SwitchField
-              data-settings-row="settings.keepAwakeOnBattery.title"
-              checked={props.value.keepAwakeOnBattery === true}
-              disabled={props.value.keepAwake !== true}
-              onChange={(checked) => props.onUpdateSetting("keepAwakeOnBattery", checked)}
-              label={i18n.t("settings.keepAwakeOnBattery.title")}
-              description={i18n.t("settings.keepAwakeOnBattery.description")}
-            />
-          </Show>
-          <SwitchField
-            data-settings-row="settings.restoreWorkspace.title"
-            checked={props.value.restoreLastWorkspace}
-            onChange={(checked) => props.onUpdateSetting("restoreLastWorkspace", checked)}
-            label={i18n.t("settings.restoreWorkspace.title")}
-            description={i18n.t("settings.restoreWorkspace.description")}
-          />
-          <Show when={props.value.quitGuard}>
-            {(quitGuard) => (
-              <Item data-settings-row="settings.quitGuard.title" class="settings-modal-row">
-                <ItemContent>
-                  <ItemTitle>{i18n.t("settings.quitGuard.title")}</ItemTitle>
-                  <ItemDescription>{i18n.t("settings.quitGuard.description")}</ItemDescription>
-                </ItemContent>
-                <ItemActions>
-                  <Select<QuitGuard>
-                    class="settings-modal-select"
-                    options={quitGuardOptions}
-                    value={quitGuard()}
-                    onChange={(value) => value && value !== quitGuard() && props.onUpdateSetting("quitGuard", value)}
-                    placement="bottom-end"
-                    itemComponent={(selectProps) => (
-                      <SelectItem item={selectProps.item}>
-                        {i18n.t(QUIT_GUARD_LABEL[selectProps.item.rawValue])}
-                      </SelectItem>
-                    )}
-                  >
-                    <SelectTrigger size="sm" aria-label={i18n.t("settings.quitGuard.title")}>
-                      <SelectValue<QuitGuard>>
-                        {(state) => i18n.t(QUIT_GUARD_LABEL[state.selectedOption()])}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent mount={props.selectMount} />
-                  </Select>
-                </ItemActions>
-              </Item>
-            )}
-          </Show>
-        </ItemGroup>
-      </SettingsSection>
+          </ItemGroup>
+        </SettingsSection>
+      </Show>
 
-      <SettingsSection title={i18n.t("settings.permissions.title")}>
-        <ItemGroup class="settings-modal-card">
-          <SwitchField
-            data-settings-row="settings.analytics.title"
-            checked={props.value.productAnalytics}
-            onChange={(checked) => props.onUpdateSetting("productAnalytics", checked)}
-            label={i18n.t("settings.analytics.title")}
-            description={i18n.t("settings.analytics.description")}
-          />
-        </ItemGroup>
-      </SettingsSection>
+      <Show when={props.part === "app-behavior"}>
+        <SettingsSection title={i18n.t("settings.appBehavior.startTitle")}>
+          <ItemGroup class="settings-modal-card">
+            <Show when={props.value.launchAtLogin !== null}>
+              <SwitchField
+                data-settings-row="settings.launchAtLogin.title"
+                checked={props.value.launchAtLogin === true}
+                onChange={(checked) => props.onUpdateSetting("launchAtLogin", checked)}
+                label={i18n.t("settings.launchAtLogin.title")}
+                description={i18n.t("settings.launchAtLogin.description")}
+              />
+            </Show>
+            <SwitchField
+              data-settings-row="settings.restoreWorkspace.title"
+              checked={props.value.restoreLastWorkspace}
+              onChange={(checked) => props.onUpdateSetting("restoreLastWorkspace", checked)}
+              label={i18n.t("settings.restoreWorkspace.title")}
+              description={i18n.t("settings.restoreWorkspace.description")}
+            />
+            <SwitchField
+              data-settings-row="settings.keepRemoteSessions.title"
+              checked={props.value.keepRemoteSessions}
+              onChange={(checked) => props.onUpdateSetting("keepRemoteSessions", checked)}
+              label={i18n.t("settings.keepRemoteSessions.title")}
+              description={i18n.t("settings.keepRemoteSessions.description")}
+            />
+            <Show when={props.value.quitGuard}>
+              {(quitGuard) => (
+                <Item data-settings-row="settings.quitGuard.title" class="settings-modal-row">
+                  <ItemContent>
+                    <ItemTitle>{i18n.t("settings.quitGuard.title")}</ItemTitle>
+                    <ItemDescription>{i18n.t("settings.quitGuard.description")}</ItemDescription>
+                  </ItemContent>
+                  <ItemActions>
+                    <Select<QuitGuard>
+                      class="settings-modal-select"
+                      options={quitGuardOptions}
+                      value={quitGuard()}
+                      onChange={(value) => value && value !== quitGuard() && props.onUpdateSetting("quitGuard", value)}
+                      placement="bottom-end"
+                      itemComponent={(selectProps) => (
+                        <SelectItem item={selectProps.item}>
+                          {i18n.t(QUIT_GUARD_LABEL[selectProps.item.rawValue])}
+                        </SelectItem>
+                      )}
+                    >
+                      <SelectTrigger size="sm" aria-label={i18n.t("settings.quitGuard.title")}>
+                        <SelectValue<QuitGuard>>
+                          {(state) => i18n.t(QUIT_GUARD_LABEL[state.selectedOption()])}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent mount={props.selectMount} />
+                    </Select>
+                  </ItemActions>
+                </Item>
+              )}
+            </Show>
+          </ItemGroup>
+        </SettingsSection>
+        <SettingsSection title={i18n.t("settings.appBehavior.backgroundTitle")}>
+          <ItemGroup class="settings-modal-card">
+            <Show when={props.value.keepRunningInBackground !== null}>
+              <SwitchField
+                data-settings-row={backgroundRow().title}
+                checked={props.value.keepRunningInBackground === true}
+                onChange={(checked) => props.onUpdateSetting("keepRunningInBackground", checked)}
+                label={i18n.t(backgroundRow().title)}
+                description={i18n.t(backgroundRow().description)}
+              />
+            </Show>
+            <Show when={props.value.keepAwake !== null}>
+              <SwitchField
+                data-settings-row="settings.keepAwake.title"
+                checked={props.value.keepAwake === true}
+                onChange={(checked) => props.onUpdateSetting("keepAwake", checked)}
+                label={i18n.t("settings.keepAwake.title")}
+                description={i18n.t("settings.keepAwake.description")}
+              />
+              <SwitchField
+                data-settings-row="settings.keepAwakeOnBattery.title"
+                checked={props.value.keepAwakeOnBattery === true}
+                disabled={props.value.keepAwake !== true}
+                onChange={(checked) => props.onUpdateSetting("keepAwakeOnBattery", checked)}
+                label={i18n.t("settings.keepAwakeOnBattery.title")}
+                description={i18n.t("settings.keepAwakeOnBattery.description")}
+              />
+            </Show>
+          </ItemGroup>
+        </SettingsSection>
+      </Show>
     </>
   );
 }

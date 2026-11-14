@@ -34,6 +34,14 @@
   --openbot-font-sans:
     "Inter Variable", "Inter Variable Fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Arabic",
     sans-serif;
+  /* The site keeps the type scale that it was designed for. The app made its three small steps 1px
+   * larger, in @openbot/brand/tokens.css. */
+  --openbot-text-sm: 12px;
+  --openbot-text-md: 13px;
+  --openbot-text-lg: 14px;
+  --openbot-leading-sm: 16px;
+  --openbot-leading-md: 18px;
+  --openbot-leading-lg: 20px;
   --pulse-dur: 1000ms;
   --pulse-count: 1;
   --pulse-min: 0.5;

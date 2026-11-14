@@ -135,6 +135,7 @@ export { default as PinOff } from "lucide-solid/icons/pin-off";
 export { default as Play } from "lucide-solid/icons/play";
 export { default as Plug } from "lucide-solid/icons/plug";
 export { default as Plus } from "lucide-solid/icons/plus";
+export { default as Power } from "lucide-solid/icons/power";
 export { default as Puzzle } from "lucide-solid/icons/puzzle";
 export { default as Redo2 } from "lucide-solid/icons/redo-2";
 export { default as RefreshCw } from "lucide-solid/icons/refresh-cw";

@@ -198,7 +198,7 @@ export function useGlobalSearchSources(open: () => boolean) {
             detail: server.name,
             group: "settings",
             icon: BookMarked,
-            run: () => openServerSettings(server.id, globalSearchOpener(), "general"),
+            run: () => openServerSettings(server.id, globalSearchOpener(), "memory"),
           });
         }
         if (serverCanAdminister(server, "memory-review-v1") && (server.kind === "local" || server.state === "online")) {
@@ -208,7 +208,7 @@ export function useGlobalSearchSources(open: () => boolean) {
             detail: server.name,
             group: "settings",
             icon: BookMarked,
-            run: () => openServerSettings(server.id, globalSearchOpener(), "general"),
+            run: () => openServerSettings(server.id, globalSearchOpener(), "memory"),
           });
         }
         if (
@@ -221,13 +221,13 @@ export function useGlobalSearchSources(open: () => boolean) {
             detail: server.name,
             group: "settings",
             icon: BookMarked,
-            run: () => openServerSettings(server.id, globalSearchOpener(), "general"),
+            run: () => openServerSettings(server.id, globalSearchOpener(), "memory"),
           });
         }
         if (serverHasAgentDefaults(server)) {
           list.push({
             id: "server:agents",
-            label: t("server.settings.agents"),
+            label: t("server.settings.agentDefaultsTitle"),
             detail: server.name,
             group: "settings",
             icon: Bot,

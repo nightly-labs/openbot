@@ -60,9 +60,13 @@ const IMPORT_ROW: ServerRow = {
   descriptionKey: "server.settings.importDescription",
 };
 
-/** Server Settings > Agents, then its rows. */
+/** Server Settings > Agent defaults, then its rows. */
 const AGENTS_ROWS: ReadonlyArray<ServerRow> = [
-  { section: "agents", titleKey: "server.settings.agents", descriptionKey: "server.settings.agentsDescription" },
+  {
+    section: "agents",
+    titleKey: "server.settings.agentDefaultsTitle",
+    descriptionKey: "server.settings.agentsDescription",
+  },
   { section: "agents", titleKey: "agentSettings.automation.title" },
   { section: "agents", titleKey: "agentSettings.agentNewChat.title" },
   { section: "agents", titleKey: "agentSettings.quickAcknowledgement.title" },
@@ -171,9 +175,9 @@ export function SettingsPage(props: { kind: SettingsKind }) {
     for (const marked of content.querySelectorAll("[data-search-match]")) marked.removeAttribute("data-search-match");
     if (!row.anchor) return;
     // A row that the current state does not show has no anchor in the page; then only the tab opens.
-    const anchor = content.querySelector(
-      `.settings-modal-tab-panel[data-tab="${row.tab}"] [data-settings-row="${row.anchor}"]`,
-    );
+    // A plain string: as a template type, each tab and row key pair is one member of a union that is too large.
+    const selector: string = `.settings-modal-tab-panel[data-tab="${row.tab}"] [data-settings-row="${row.anchor}"]`;
+    const anchor = content.querySelector(selector);
     // A switch row puts the anchor on its switch, so the search marks the whole row of the card.
     const target = anchor?.closest(".settings-modal-card > *") ?? anchor;
     if (!(target instanceof HTMLElement)) return;

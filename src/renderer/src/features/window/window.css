@@ -521,6 +521,13 @@
     overflow: hidden;
   }
 
+  /* The chip of a parent in a path starts before its text. The identity clips a long title, so it starts
+     earlier by the same width and does not cut the chip. The text stays where it was. */
+  .app-window > .app-frame-edge .page-header-identity[data-path] {
+    margin-inline-start: calc(-1 * var(--openbot-space-2) - 1px);
+    padding-inline-start: calc(var(--openbot-space-2) + 1px);
+  }
+
   .app-window > .app-frame-edge .page-header-title {
     font-size: var(--openbot-text-md);
     font-weight: var(--openbot-weight-medium);
@@ -693,7 +700,10 @@
     margin-inline-end: 0;
   }
 
+  /* The row stays when it has no path, because a section page shows its title in the panel. It is
+   * the part of the top row that moves the window. */
   .app-frame-edge[data-window-page-kind="settings"] > .window-page > .settings-page > .settings-page-path-row {
+    display: flex;
     padding-block: 0;
     padding-inline-start: 0;
     -webkit-app-region: drag;
@@ -708,9 +718,10 @@
     width: auto;
     flex: 0 1 auto;
     max-width: none;
-    /* The page starts 1px after the start of the frame. */
-    margin-inline: -1px 0;
-    padding-inline: var(--top-row-padding-inline);
+    /* The path starts near the section list. The pill of the section before the open page starts just after
+       the line of the list, so the start padding is the start inset of the pill. */
+    margin-inline: 0;
+    padding-inline: calc(var(--openbot-space-2) + 1px) var(--openbot-space-3);
   }
 
   .app-frame-edge[data-window-page-kind="titled"] > .window-page {
@@ -815,9 +826,9 @@
 /* Below the top row, the path takes the column and the inline padding of the panel, so both start on one edge. */
 .settings-page-path-row > .settings-page-path {
   width: 100%;
-  max-width: 784px;
-  margin-inline: auto;
-  padding-inline: var(--openbot-space-8);
+  max-width: 960px;
+  margin-inline: 0;
+  padding-inline: var(--openbot-space-6);
 }
 
 .settings-page-nav {
@@ -829,7 +840,7 @@
   gap: var(--openbot-space-1);
   overflow: hidden;
   border-inline-end: 1px solid var(--openbot-border);
-  padding: var(--openbot-space-4) var(--openbot-space-3) 0;
+  padding: var(--openbot-space-4) var(--openbot-space-2) 0;
 }
 
 /* The title and the search stay at the top. The list below them scrolls. */
@@ -897,13 +908,14 @@
   }
 }
 
+/* The title starts on the edge of the row icons below it. */
 .settings-page-title {
   margin: 0 0 var(--openbot-space-3);
   padding: 0 var(--openbot-space-2);
   color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-lg);
+  font-size: var(--openbot-text-2xl);
   font-weight: var(--openbot-weight-semibold);
-  line-height: var(--openbot-leading-lg);
+  line-height: var(--openbot-leading-2xl);
 }
 
 /* The heading takes the focus when the page opens, only so a screen reader reads it. */
@@ -915,7 +927,8 @@
 /* The search has more space below it than the gap of the nav, so it does not look like a section row. */
 .settings-page-search {
   flex: none;
-  margin-bottom: var(--openbot-space-2);
+  height: var(--openbot-control-md);
+  margin-bottom: var(--openbot-space-3);
   border-radius: var(--openbot-radius-pill);
   padding: 0 var(--openbot-space-3);
 }
@@ -959,7 +972,7 @@
 /* The row to the other settings page: below the section list, apart from it, at the end of the column. */
 .settings-page-footer {
   flex: none;
-  margin-inline: calc(-1 * var(--openbot-space-3));
+  margin-inline: calc(-1 * var(--openbot-space-2));
   --settings-page-switch-radius: calc(var(--openbot-radius-card) - var(--openbot-space-1));
   border-top: 1px solid var(--openbot-border);
   padding: var(--openbot-space-1);
@@ -1019,14 +1032,23 @@
   transform: scaleX(-1);
 }
 
-.settings-page-nav-group .settings-modal-nav-item {
-  padding-inline: var(--openbot-space-3);
+/* The rows of the list are close together, so a long list shows in one view. */
+.settings-page-nav-group .settings-modal-nav {
+  gap: var(--openbot-space-0-5);
+}
+
+/* The selected row keeps the weight of the other rows, so its name does not get wider when it is selected.
+   Only its background and color change. */
+.settings-page-nav-group .settings-modal-nav-item,
+.settings-page-nav-group .settings-modal-nav-item[aria-current="page"] {
+  min-height: var(--openbot-control-sm);
+  padding-inline: var(--openbot-space-2);
+  font-weight: var(--openbot-weight-regular);
 }
 
 .settings-page-nav-group .settings-modal-nav-item[data-selected] {
   background: var(--openbot-bg-control-hover);
   color: var(--openbot-text-primary);
-  font-weight: var(--openbot-weight-medium);
 }
 
 /* A search result: the section with its icon, and below it the matching row title */
@@ -1080,6 +1102,13 @@
   height: var(--openbot-icon-sm);
 }
 
+/* The icons of the section list have a thin line, so the list looks light. */
+.settings-page-search > svg,
+.settings-page-footer svg,
+.settings-page-nav-group .settings-modal-nav-item svg {
+  stroke-width: var(--openbot-icon-stroke-lg);
+}
+
 .settings-page-result-title {
   overflow: hidden;
   padding-inline-start: calc(var(--openbot-icon-sm) + var(--openbot-space-2));
@@ -1113,10 +1142,12 @@
   background: transparent;
 }
 
+/* The content starts near the section list and uses the width of the window, up to a readable line. */
 .settings-page-content > .settings-modal-page .settings-modal-content {
   width: 100%;
-  max-width: 784px;
-  margin-inline: auto;
+  max-width: 960px;
+  margin-inline: 0;
+  padding-inline: var(--openbot-space-6);
 }
 
 /* The row that a search result opened */
@@ -1155,12 +1186,16 @@
     grid-row: 3;
   }
 
+  .settings-page-content > .settings-modal-page .settings-modal-content {
+    padding-inline: var(--openbot-space-4);
+  }
+
   .settings-page-nav {
     grid-column: 1;
     grid-row: 1;
     border-inline-end: 0;
     border-bottom: 1px solid var(--openbot-border);
-    padding: var(--openbot-space-3) var(--openbot-space-3) 0;
+    padding: var(--openbot-space-3) var(--openbot-space-2) 0;
   }
 
   .settings-page-title {

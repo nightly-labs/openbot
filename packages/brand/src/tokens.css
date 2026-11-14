@@ -308,9 +308,12 @@
   --openbot-hover: rgba(255, 255, 255, 0.06);
   /* The default fonts. The desktop puts a font that the user chooses in Settings before them, in
    * --openbot-font-sans and --openbot-font-mono, so a letter that the chosen font does not have still
-   * shows. Noto Sans Arabic draws Arabic on Linux, where the system fallback is often DejaVu Sans. */
+   * shows. On macOS the system font (SF Pro) comes first: -apple-system and BlinkMacSystemFont exist
+   * only there, and they keep its automatic text and display sizes, which "SF Pro" by name does not.
+   * Other systems use Inter. Noto Sans Arabic draws Arabic on Linux, where the system fallback is
+   * often DejaVu Sans. */
   --openbot-font-sans-default:
-    "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Arabic", sans-serif;
+    -apple-system, BlinkMacSystemFont, "Inter Variable", "Segoe UI", "Noto Sans Arabic", sans-serif;
   --openbot-font-mono-default: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, monospace;
   --openbot-font-sans: var(--openbot-font-sans-default);
   --openbot-font-mono: var(--openbot-font-mono-default);
@@ -318,15 +321,15 @@
    * sixteen sizes and eight line-heights, four of them a single call site, which is how
    * an 11px size ended up paired with a 26px line-height. scripts/ui-foundation-check.ts
    * holds "untokenized font-size" at zero, so a size that is not here has nowhere to go. */
-  --openbot-text-sm: 12px;
-  --openbot-text-md: 13px;
-  --openbot-text-lg: 14px;
+  --openbot-text-sm: 13px;
+  --openbot-text-md: 14px;
+  --openbot-text-lg: 15px;
   --openbot-text-xl: 16px;
   --openbot-text-2xl: 18px;
   --openbot-text-3xl: 24px;
-  --openbot-leading-sm: 16px;
-  --openbot-leading-md: 18px;
-  --openbot-leading-lg: 20px;
+  --openbot-leading-sm: 18px;
+  --openbot-leading-md: 20px;
+  --openbot-leading-lg: 22px;
   --openbot-leading-xl: 22px;
   --openbot-leading-2xl: 24px;
   --openbot-leading-3xl: 30px;

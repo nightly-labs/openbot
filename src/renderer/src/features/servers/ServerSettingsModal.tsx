@@ -21,6 +21,7 @@ import {
   ArrowLeftRight,
   Blocks,
   Bot,
+  Brain,
   Button,
   CalendarClock,
   Download,
@@ -45,6 +46,7 @@ import type { ProviderSettingsDetail } from "@openbot/ui/features/settings/Provi
 import {
   SaveBarDock,
   SettingsDialogShell,
+  SettingsNavGroupLabel,
   type SettingsPagePlacement,
 } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { SettingsHostedSitesTab } from "@openbot/ui/features/settings/SettingsHostedSitesTab";
@@ -85,6 +87,7 @@ import { type McpPanelDetail, type McpPanelSignIn, ServerMcpPanel } from "./Serv
 import { createServerMembersSection } from "./ServerMembersSection";
 import type { ServerMemoryLimitOptions } from "./ServerMemoryLimitSetting";
 import type { ServerMemoryReviewOptions } from "./ServerMemoryReviewSetting";
+import { createServerMemorySection } from "./ServerMemorySection";
 import { type ServerPersonalityOptions, ServerPersonalitySetting } from "./ServerPersonalitySetting";
 import { createServerRolesSection, type ServerAgentAccessOptions } from "./ServerRolesSection";
 import { type ServerRoutineFeedOptions, ServerRoutineFeedPanel } from "./ServerRoutineFeedPanel";
@@ -215,13 +218,13 @@ export interface ServerSettingsModalProps {
    */
   hostUpdate?: ServerUpdateOptions | undefined;
   /**
-   * General shows the server timezone only when a caller supplies this, and only for the local
+   * Agent defaults shows the server timezone only when a caller supplies this, and only for the local
    * server or a remote host with `host-timezone-v1` that this member administers.
    */
   hostTimezone?: ServerTimezoneOptions | undefined;
   /**
-   * General shows the thread limits only when a caller supplies this, and only for the local server
-   * or a remote host with `host-turn-limits-v1` that this member administers.
+   * Agent defaults shows the thread limits only when a caller supplies this, and only for the local
+   * server or a remote host with `host-turn-limits-v1` that this member administers.
    */
   hostTurnLimits?: ServerTurnLimitsOptions | undefined;
   /**
@@ -333,6 +336,7 @@ export type ServerSettingsSection =
   | "general"
   | "personality"
   | "agents"
+  | "memory"
   | "vault"
   | "members"
   | "roles"
@@ -352,7 +356,8 @@ type Section = ServerSettingsSection;
 const sections = {
   general: { title: "server.settings.generalTitle", description: "server.settings.generalDescription" },
   personality: { title: "server.settings.personalityTitle", description: "server.settings.personalityDescription" },
-  agents: { title: "server.settings.agents", description: "server.settings.agentsDescription" },
+  agents: { title: "server.settings.agentDefaultsTitle", description: "server.settings.agentsDescription" },
+  memory: { title: "server.settings.memoryTitle", description: "server.settings.memoryDescription" },
   vault: { title: "server.settings.vaultTitle", description: "server.settings.vaultDescription" },
   members: { title: "server.settings.membersTitle", description: "server.settings.membersDescription" },
   roles: { title: "server.settings.rolesTitle", description: "server.settings.rolesDescription" },
@@ -369,25 +374,63 @@ const sections = {
   "browser-profiles": { title: "browser.profiles.title", description: "browser.profiles.subtitle" },
 } as const satisfies Record<Section, { title: AppTextKey; description: AppTextKey }>;
 
-/** The section list, in its order. A section shows only when the server and the caller support it. */
-const NAV_SECTIONS: ReadonlyArray<{ value: Section; icon: typeof Settings }> = [
+/** The row names of a section, so that the section search also finds a section by one of its rows. */
+const SECTION_ROWS: Partial<Record<Section, readonly AppTextKey[]>> = {
+  general: [
+    "server.settings.name",
+    "server.settings.logo",
+    "server.settings.hostKeyTitle",
+    "server.settings.leaveTitle",
+    "server.settings.removeTitle",
+  ],
+  agents: [
+    "server.settings.timezone",
+    "server.settings.turnLimit",
+    "server.settings.agentTaskLimit",
+    "agentSettings.automation.title",
+    "agentSettings.agentNewChat.title",
+    "agentSettings.quickAcknowledgement.title",
+    "settings.busyMessage.title",
+    "settings.commitCoAuthor.sectionTitle",
+  ],
+  memory: [
+    "server.settings.memoryLimit",
+    "server.settings.memoryReview",
+    "server.settings.skillLearning",
+    "server.settings.browsingMemory",
+  ],
+  members: [
+    "server.settings.publish",
+    "server.companySignIn.title",
+    "server.companySignIn.sso",
+    "server.companySignIn.scim",
+  ],
+  storage: ["settings.backgroundProcesses.title"],
+};
+
+/**
+ * The section list, in its order. The sections that most users need come first, and each group after
+ * them starts with its label. A section shows only when the server and the caller support it.
+ */
+const NAV_SECTIONS: ReadonlyArray<{ value: Section; icon: typeof Settings; group?: AppTextKey }> = [
   { value: "general", icon: Settings },
-  { value: "personality", icon: Smile },
-  { value: "agents", icon: Bot },
-  { value: "vault", icon: KeyRound },
-  { value: "members", icon: UsersRound },
-  { value: "roles", icon: ShieldCheck },
-  { value: "audit", icon: History },
-  { value: "desktop", icon: Monitor },
-  { value: "mcp", icon: Blocks },
-  { value: "storage", icon: HardDrive },
-  { value: "sites", icon: Globe2 },
   { value: "providers", icon: Sparkles },
-  { value: "updates", icon: RefreshCw },
-  { value: "import", icon: Download },
-  { value: "transfer", icon: ArrowLeftRight },
-  { value: "routines", icon: CalendarClock },
-  { value: "browser-profiles", icon: AppWindow },
+  { value: "personality", icon: Smile },
+  { value: "agents", icon: Bot, group: "server.settings.group.agents" },
+  { value: "memory", icon: Brain, group: "server.settings.group.agents" },
+  { value: "mcp", icon: Blocks, group: "server.settings.group.agents" },
+  { value: "vault", icon: KeyRound, group: "server.settings.group.agents" },
+  { value: "browser-profiles", icon: AppWindow, group: "server.settings.group.agents" },
+  { value: "routines", icon: CalendarClock, group: "server.settings.group.agents" },
+  { value: "sites", icon: Globe2, group: "server.settings.group.agents" },
+  { value: "members", icon: UsersRound, group: "server.settings.group.people" },
+  { value: "roles", icon: ShieldCheck, group: "server.settings.group.people" },
+  { value: "audit", icon: History, group: "server.settings.group.people" },
+  { value: "storage", icon: HardDrive, group: "server.settings.group.server" },
+  { value: "updates", icon: RefreshCw, group: "server.settings.group.server" },
+  { value: "desktop", icon: Monitor, group: "server.settings.group.server" },
+  { value: "import", icon: Download, group: "server.settings.group.server" },
+  { value: "transfer", icon: ArrowLeftRight, group: "server.settings.group.server" },
 ];
 
 export function ServerSettingsModal(props: ServerSettingsModalProps) {
@@ -513,6 +556,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   const roles = createServerRolesSection(host, () => section() === "roles" || section() === "members");
   const audit = createServerAuditSection(host, () => section() === "audit");
   const agents = createServerAgentsSection(host, () => section() === "agents");
+  const memory = createServerMemorySection(host);
 
   /** Whether this server and the caller support the section. */
   const sectionSupported = (value: Section): boolean => {
@@ -524,6 +568,8 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         return Boolean(personalityOptions());
       case "agents":
         return agents.available();
+      case "memory":
+        return memory.available();
       case "vault":
         return Boolean(props.vault);
       case "roles":
@@ -557,7 +603,9 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     const needle = props.sectionQuery?.trim().toLocaleLowerCase();
     if (!needle) return true;
     const { title, description } = sections[value];
-    return t(title).toLocaleLowerCase().includes(needle) || t(description).toLocaleLowerCase().includes(needle);
+    return [title, description, ...(SECTION_ROWS[value] ?? [])].some((key) =>
+      t(key).toLocaleLowerCase().includes(needle),
+    );
   };
   /** The sections that the search finds. Without a search, each section that this server supports. */
   const matchingSections = createMemo(() =>
@@ -693,6 +741,14 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     },
   );
 
+  /** The memory settings leave with the access that gives them, as the agent defaults do. */
+  createEffect(
+    () => section() === "memory" && !memory.available(),
+    (gone) => {
+      if (gone) setSection("general");
+    },
+  );
+
   /** A server with no Vault for this account has no Vault section. */
   createEffect(
     () => section() === "vault" && !props.vault,
@@ -739,6 +795,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         value === "general" ||
         value === "personality" ||
         value === "agents" ||
+        value === "memory" ||
         value === "vault" ||
         value === "members" ||
         value === "roles" ||
@@ -889,13 +946,18 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
           <>
             <Tabs.List class="settings-modal-nav" aria-label={t("server.settings.sections")}>
               <For each={navSections()}>
-                {(item) => {
+                {(item, index) => {
                   const Icon = item.icon;
                   return (
-                    <Tabs.Trigger class="settings-modal-nav-item" value={item.value}>
-                      <Icon aria-hidden="true" />
-                      <span>{t(sections[item.value].title)}</span>
-                    </Tabs.Trigger>
+                    <>
+                      <Show when={item.group !== navSections()[index() - 1]?.group && item.group}>
+                        {(group) => <SettingsNavGroupLabel label={t(group())} />}
+                      </Show>
+                      <Tabs.Trigger class="settings-modal-nav-item" value={item.value}>
+                        <Icon aria-hidden="true" />
+                        <span>{t(sections[item.value].title)}</span>
+                      </Tabs.Trigger>
+                    </>
                   );
                 }}
               </For>
@@ -912,6 +974,11 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         <Tabs.Content value="general" class="settings-modal-tab-panel server-settings-panel" data-tab="general">
           <general.Panel />
         </Tabs.Content>
+        <Show when={memory.available()}>
+          <Tabs.Content value="memory" class="settings-modal-tab-panel server-settings-panel" data-tab="memory">
+            <memory.Panel />
+          </Tabs.Content>
+        </Show>
         <Show when={personalityOptions()}>
           {(options) => (
             <Tabs.Content
