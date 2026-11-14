@@ -14,7 +14,7 @@
 // No provider or account is used.
 // `bun scripts/agent-api-keys-e2e.ts`. Writes .openbot-build/agent-api-keys-e2e/report.json.
 import assert from "node:assert/strict";
-import { lstat, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { AgentEvent, ConversationSnapshot } from "@openbot/contracts/ipc";
@@ -384,11 +384,17 @@ try {
         // The next start writes both again.
         await rm(ownPath);
         await rm(join(vaultFolder, "agent-3"), { recursive: true });
+        // The temporary link of a replace that stopped before its rename goes too.
+        const stoppedLink = `${ownPath}.0f8e6a52-3c1d-4b7e-9a20-5d6c7b8e9f10.tmp`;
+        await symlink(join("..", ".vault", "agent-3", "OPENAI_API_KEY"), stoppedLink);
         await Effect.runPromise(keys.syncVault());
         assert.ok((await lstat(ownPath)).isSymbolicLink());
         assert.equal(await readFile(ownPath, "utf8"), NEW_KEY);
-        // A key that the agent saves for itself gets a link too, and a plain file of the agent stays.
+        await assert.rejects(lstat(stoppedLink));
+        // A key that the agent saves for itself gets a link too, also in place of a link that the user
+        // made, and a plain file of the agent stays.
         await writeFile(join(keyRoot, "agent-3", "notes.txt"), "e2e-agent-notes");
+        await symlink("notes.txt", join(keyRoot, "agent-3", "LINEAR_API_KEY"));
         await Effect.runPromise(keys.save({ id: "agent-3", name: undefined }, "LINEAR_API_KEY", VAULT_KEY));
         await synced;
         assert.equal(await readFile(join(keyRoot, "agent-3", "LINEAR_API_KEY"), "utf8"), VAULT_KEY);
