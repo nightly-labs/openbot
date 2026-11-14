@@ -393,6 +393,8 @@ export const messages = {
   "error.backend.mcpServerHttpCredentials": "Сервер ответил {status}. Проверьте API-ключ или другие учётные данные.",
   "error.backend.mcpServerHttpUrl":
     "Сервер ответил {status}. Проверьте URL. Ссылка может быть неверной, устаревшей или удалённой.",
+  "error.backend.mcpServerBearerKey":
+    "Этот сервер использует ключ API, а не вход. В разделе «Заголовки» укажите ключ Authorization, а в значении — Bearer, пробел и ваш ключ API.",
   "error.backend.mcpSignInAppUrl": "Для приложения входа нужен правильный URL сервера.",
   "error.backend.mcpSignInAppClientId": "Введите ID клиента приложения входа.",
   "error.backend.mcpSignInAppIssuerChanged":

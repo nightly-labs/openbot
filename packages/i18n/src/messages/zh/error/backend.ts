@@ -352,6 +352,8 @@ export const messages = {
   "error.backend.browserInputProtected": "验证期间浏览器输入受保护。",
   "error.backend.mcpServerHttpCredentials": "服务器返回 {status}。请检查 API 密钥或其他凭据。",
   "error.backend.mcpServerHttpUrl": "服务器返回 {status}。请检查地址，链接可能错误、过期或已删除。",
+  "error.backend.mcpServerBearerKey":
+    "此服务器使用 API 密钥，而不是登录。在“请求头”中，将键设为 Authorization，将值设为 Bearer、一个空格和你的 API 密钥。",
   "error.backend.mcpSignInAppUrl": "登录应用需要有效的服务器地址。",
   "error.backend.mcpSignInAppClientId": "请输入登录应用的客户端 ID。",
   "error.backend.mcpSignInAppIssuerChanged":

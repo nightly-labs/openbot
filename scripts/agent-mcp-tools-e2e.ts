@@ -50,8 +50,17 @@ async function mcpServer(mode: Mode): Promise<{ url: string; close: () => Promis
     void (async () => {
       const path = new URL(request.url ?? "/", "http://127.0.0.1").pathname;
       if (path !== "/mcp") return json(response, 404, { error: "not found" });
+      // An OAuth server names its metadata. A Bearer challenge without it, from an origin with no
+      // metadata, is a token server such as Coolify, which wants a key (#9176).
       if (mode === "sign-in")
-        return json(response, 401, { error: "unauthorized" }, { "www-authenticate": 'Bearer realm="e2e"' });
+        return json(
+          response,
+          401,
+          { error: "unauthorized" },
+          {
+            "www-authenticate": `Bearer realm="e2e", resource_metadata="http://${request.headers.host}/.well-known/oauth-protected-resource/mcp"`,
+          },
+        );
       if (mode === "key") return json(response, 401, { error: "unauthorized" });
       if (request.method !== "POST") {
         response.writeHead(405).end();

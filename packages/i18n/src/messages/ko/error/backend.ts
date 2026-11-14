@@ -379,6 +379,8 @@ export const messages = {
   "error.backend.mcpServerHttpCredentials": "서버가 {status}(으)로 응답했어요. API 키나 다른 자격 증명을 확인하세요.",
   "error.backend.mcpServerHttpUrl":
     "서버가 {status}(으)로 응답했어요. URL을 확인하세요. 링크가 잘못되었거나 만료되었거나 삭제되었을 수 있어요.",
+  "error.backend.mcpServerBearerKey":
+    "이 서버는 로그인이 아니라 API 키를 사용해요. 헤더에서 키를 Authorization으로, 값을 Bearer, 공백, API 키 순서로 입력하세요.",
   "error.backend.mcpSignInAppUrl": "로그인 앱에는 올바른 서버 URL이 필요해요.",
   "error.backend.mcpSignInAppClientId": "로그인 앱의 클라이언트 ID를 입력하세요.",
   "error.backend.mcpSignInAppIssuerChanged":

@@ -138,6 +138,13 @@ interface McpChallenge {
   status: number;
   /** Whether `WWW-Authenticate` names the Bearer scheme, which is what an OAuth server asks for. */
   bearer: boolean;
+  /** Whether the challenge names `resource_metadata`, the document of an OAuth sign-in. */
+  resourceMetadata: boolean;
+  /**
+   * A Bearer challenge from an origin that publishes no OAuth metadata: the server wants a token
+   * in the `Authorization` header, not a sign-in. Laravel's MCP server with Sanctum answers so (#9176).
+   */
+  keyOnly?: boolean;
   /** Where the request ended up after any redirect. */
   url: string;
 }
@@ -193,6 +200,8 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
   // metadata at the origin is what says a sign-in, not a key, is wanted. Only a refusal the sentence
   // would explain is followed up, and only public documents are read: no credential is sent.
   const unexplained = seen.challenge;
+  // The same Test deadline covers the lookup: it gets only the time the connection left.
+  const remainingMs = () => timeoutMs - (Date.now() - startedAt);
   if (
     !signIn &&
     signInPlace !== null &&
@@ -200,10 +209,24 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
     !unexplained.bearer &&
     !hasCredentialHeader(config)
   )
-    // The same Test deadline covers the lookup: it gets only the time the connection left.
     seen.challenge = {
       ...unexplained,
-      bearer: yield* advertisesOAuth(config.url, timeoutMs - (Date.now() - startedAt)),
+      bearer: (yield* advertisesOAuth(config.url, remainingMs(), ORIGIN_METADATA)) === true,
+    };
+  // A Bearer challenge alone does not say OAuth: a token server answers the same. Without a
+  // `resource_metadata` link, only metadata the origin publishes says a sign-in exists. A lookup
+  // that could not finish keeps the sign-in, as before.
+  else if (
+    !signIn &&
+    signInPlace !== null &&
+    unexplained?.status === 401 &&
+    unexplained.bearer &&
+    !unexplained.resourceMetadata &&
+    !hasCredentialHeader(config)
+  )
+    seen.challenge = {
+      ...unexplained,
+      keyOnly: (yield* advertisesOAuth(config.url, remainingMs(), signInMetadata(config.url))) === false,
     };
   if (!signIn || !(first.failure.cause instanceof UnauthorizedError)) return failure(first.failure.cause);
   return yield* afterSignIn(signIn);
@@ -228,11 +251,17 @@ function describeProbeFailure(
 ): string {
   if (signIn?.cancelled()) return sourceText("error.backend.mcpSignInCancelled");
   if (signIn && isRegistrationRefusal(error, signIn)) return REGISTRATION_REFUSED;
+  // With no metadata, the SDK registers at a guessed address, and a token server answers that with
+  // a status such as Laravel's 419. The sign-in never existed; the key is what the server wants.
+  if (signIn?.signInServerMissing()) return BEARER_KEY;
   const status = httpStatus(error);
   if (signIn && status === 401) return sourceText("error.backend.mcpSignInNotAccepted");
   // The token endpoint refused the grant. Its status says nothing about the address the user typed.
   if (signIn?.exchangeFailed() && status !== null && status >= 400 && status < 500)
     return sourceText("error.backend.mcpSignInNotAccepted");
+  // A Bearer server that takes a token, or an `Authorization` value without its `Bearer` word.
+  if (challenge?.status === 401 && challenge.bearer && (challenge.keyOnly || authorizationWithoutScheme(config)))
+    return BEARER_KEY;
   // A key the user pasted into a header is theirs to fix; the sign-in would not replace it.
   if (challenge?.status === 401 && challenge.bearer && !hasCredentialHeader(config)) {
     const described = describeSignInChallenge(config.url, challenge.url, signInPlace);
@@ -272,7 +301,7 @@ function httpsAddress(finalUrl: string, url: string): string {
  */
 function probeNeed(config: McpServerConfig, challenge: McpChallenge | null): McpProbeNeed | null {
   if (!challenge || !isAccessRefusal(challenge.status)) return null;
-  if (challenge.status !== 401 || !challenge.bearer || hasCredentialHeader(config)) return "key";
+  if (challenge.status !== 401 || !challenge.bearer || challenge.keyOnly || hasCredentialHeader(config)) return "key";
   return normalizeResource(config.url) ? "sign_in" : null;
 }
 
@@ -280,6 +309,15 @@ function probeNeed(config: McpServerConfig, challenge: McpChallenge | null): Mcp
 export function hasCredentialHeader(config: McpServerConfig): boolean {
   return config.headers.some(({ key, value }) => CREDENTIAL_HEADER.test(key) && value.trim().length > 0);
 }
+
+/** An `Authorization` value of one word: the token alone, without the scheme such as `Bearer`. */
+function authorizationWithoutScheme(config: McpServerConfig): boolean {
+  return config.headers.some(
+    ({ key, value }) => key.trim().toLowerCase() === "authorization" && /^\S+$/u.test(value.trim()),
+  );
+}
+
+const BEARER_KEY = sourceText("error.backend.mcpServerBearerKey");
 
 const CREDENTIAL_HEADER = /auth|key|token|secret/i;
 
@@ -431,10 +469,12 @@ function challengeRecordingFetch(onChallenge: (challenge: McpChallenge) => void)
   return async (input, init) => {
     const response = await fetch(input, init);
     if (response.status === 401 || response.status === 403) {
+      const challenge = response.headers.get("www-authenticate") ?? "";
       onChallenge({
         status: response.status,
         // `Headers.get` joins several challenges with commas, so Bearer may follow another scheme.
-        bearer: /(?:^|,)\s*bearer\b/iu.test(response.headers.get("www-authenticate") ?? ""),
+        bearer: /(?:^|,)\s*bearer\b/iu.test(challenge),
+        resourceMetadata: /\bresource_metadata\s*=/iu.test(challenge),
         url: response.url || input.toString(),
       });
     }
@@ -442,24 +482,43 @@ function challengeRecordingFetch(onChallenge: (challenge: McpChallenge) => void)
   };
 }
 
-/** Whether the server's origin publishes OAuth metadata, read without any credential. */
-const advertisesOAuth = Effect.fnUntraced(function* (url: string, remainingMs: number) {
-  if (remainingMs <= 0) return false;
+/** The OAuth metadata documents at the origin root. */
+const ORIGIN_METADATA = ["/.well-known/oauth-protected-resource", "/.well-known/oauth-authorization-server"];
+
+/**
+ * Every place the SDK looks for the metadata of a sign-in, so that "none" is a claim about the
+ * whole server: the RFC 9728 path form of the server's address, and OpenID discovery.
+ */
+function signInMetadata(url: string): string[] {
+  const path = new URL(url).pathname.replace(/\/+$/u, "");
+  const resource = path ? [`/.well-known/oauth-protected-resource${path}`] : [];
+  return [...resource, ...ORIGIN_METADATA, "/.well-known/openid-configuration"];
+}
+
+/**
+ * Whether the server's origin publishes OAuth metadata at one of `paths`, read without any
+ * credential. `null` when a read failed or the time ran out, and no other read found metadata.
+ */
+const advertisesOAuth = Effect.fnUntraced(function* (url: string, remainingMs: number, paths: readonly string[]) {
+  if (remainingMs <= 0) return null;
   const { origin } = new URL(url);
-  const lookups = ["/.well-known/oauth-protected-resource", "/.well-known/oauth-authorization-server"].map((path) =>
+  const lookups = paths.map((path) =>
     Effect.tryPromise({
-      try: async (signal) => {
+      try: async (signal): Promise<boolean | null> => {
         const response = await fetch(`${origin}${path}`, { signal, headers: { accept: "application/json" } });
         await response.body?.cancel();
+        // A server error says nothing about the document.
+        if (response.status >= 500) return null;
         return response.ok && (response.headers.get("content-type") ?? "").includes("json");
       },
       catch: (cause) => new McpProbeFailure({ cause }),
-    }).pipe(Effect.catch(() => Effect.succeed(false))),
+    }).pipe(Effect.catch(() => Effect.succeed(null))),
   );
-  const found = yield* Effect.all(lookups, { concurrency: "unbounded" }).pipe(
-    Effect.timeoutOrElse({ duration: remainingMs, orElse: () => Effect.succeed([false]) }),
+  const found: readonly (boolean | null)[] = yield* Effect.all(lookups, { concurrency: "unbounded" }).pipe(
+    Effect.timeoutOrElse({ duration: remainingMs, orElse: () => Effect.succeed([null]) }),
   );
-  return found.some(Boolean);
+  if (found.includes(true)) return true;
+  return found.includes(null) ? null : false;
 });
 
 /** Close both SDK resources and kill a stdio child if it survives transport close. */

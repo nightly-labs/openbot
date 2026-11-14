@@ -254,6 +254,12 @@ export interface McpSignIn {
    */
   registrationUnsupported: () => boolean;
   /**
+   * Whether this attempt had to register, no registration came back, and discovery found no OAuth
+   * metadata at all. The SDK then registers at a guessed address: a server that takes only a
+   * token, such as Coolify, has no sign-in to find there (#9176).
+   */
+  signInServerMissing: () => boolean;
+  /**
    * The HTTP status of this attempt's last registration answer, or `null`. The SDK keeps the status
    * only when the body is not an OAuth error, and turns a code it does not know into a
    * `ServerError`: Dropbox answers 403 `registration_not_supported`, which arrives as a bare
@@ -595,6 +601,7 @@ export class McpOAuth implements McpOAuthAuthority {
       secrets: () => provider.secrets(),
       registrationFailed: () => provider.registrationPending,
       registrationUnsupported: () => provider.registrationUnsupported,
+      signInServerMissing: () => provider.signInServerMissing,
       registrationStatus: () => provider.registrationStatus,
       registrationRedirectRefused: () => provider.redirectRefused,
       watchRegistration: (fetch) => provider.watchRegistration(fetch),
@@ -1139,6 +1146,17 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   get registrationUnsupported(): boolean {
     const metadata = this.#discoveryState?.authorizationServerMetadata;
     return this.#registrationPending && metadata !== undefined && !metadata.registration_endpoint;
+  }
+
+  /** No client, and discovery found neither resource nor authorization server metadata. */
+  get signInServerMissing(): boolean {
+    const discovery = this.#discoveryState;
+    return (
+      this.#registrationPending &&
+      discovery !== undefined &&
+      !discovery.authorizationServerMetadata &&
+      !discovery.resourceMetadata
+    );
   }
 
   get registrationStatus(): number | null {
