@@ -54,8 +54,8 @@ export function OpenBotHostedServers() {
       <ArticleImage
         src={pricing}
         alt="OpenBot hosted server pricing with Starter, Standard, and Pro plans. The yearly billing option is selected, showing member limits, storage, and speed for each plan."
-        width={1528}
-        height={1232}
+        width={1616}
+        height={1532}
         caption="The hosted server plans differ in team size, storage, and speed. Yearly billing saves 20%."
       />
 

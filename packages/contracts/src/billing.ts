@@ -93,9 +93,16 @@ export function serverStorageGb(server: ServerStorage): number {
   return server.storageGb ?? planStorageGb(server.plan, false);
 }
 
-/** The storage in GB of the same server after a change to `nextPlan`. A plan change keeps the machine. */
+/**
+ * The storage in GB of the same server after a change to `nextPlan`. A plan change keeps the machine.
+ * Starter has the same storage on both machines, so its storage does not show the machine. Then this
+ * gives the smaller storage of `nextPlan`.
+ */
 export function serverStorageGbAfter(server: ServerStorage, nextPlan: BillingPlanId): number {
-  return planStorageGb(nextPlan, server.storageGb === OPERATOR_HOST_STORAGE_GB[server.plan]);
+  const onOperatorHost =
+    server.storageGb === OPERATOR_HOST_STORAGE_GB[server.plan] &&
+    server.storageGb !== planStorageGb(server.plan, false);
+  return planStorageGb(nextPlan, onOperatorHost);
 }
 
 /**
@@ -111,7 +118,7 @@ export const LEGACY_MEMBER_LIMITS: Readonly<Record<BillingPlanId, number>> = {
 /**
  * The monthly list price of each plan, in minor units (cents, grosze, centavos). Each amount divides by 5, so
  * a year (12 months less 20%) is a whole number. BRL is the EUR price times 6. Starter subscriptions from before
-2026-11-14 keep their Stripe Price of €20, $25, 80 zł or R$120. (The BRL Starter license is 30% lower;
+ * 2026-11-14 keep their Stripe Price of €20, $25, 80 zł or R$120. (The BRL Starter license is 30% lower;
  * see license.ts.)
  */
 const BILLING_PLAN_MONTHLY_PRICES: Readonly<Record<BillingPlanId, Readonly<Record<BillingCurrency, number>>>> = {
