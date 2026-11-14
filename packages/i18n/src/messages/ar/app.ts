@@ -10,7 +10,6 @@ export const messages = {
   "app.action.unavailable": "الإجراء غير متاح",
   "app.error.actionFailed": "تعذّر إكمال الإجراء. أعد المحاولة.",
   "app.errorStatus.queueLoad": "تعذّر تحميل الرسائل في قائمة الانتظار",
-  "app.errorStatus.waitsLoad": "تعذّر تحميل الانتظارات المفتوحة",
   "app.errorStatus.answer": "تعذّر إرسال إجابتك",
   "app.errorStatus.approval": "تعذّر إرسال قرارك",
   "app.errorStatus.browserTakeover": "تعذّر إنهاء التحكم في المتصفح",

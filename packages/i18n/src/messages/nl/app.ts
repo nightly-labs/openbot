@@ -10,7 +10,6 @@ export const messages = {
   "app.action.unavailable": "Actie niet beschikbaar",
   "app.error.actionFailed": "De actie kan niet worden voltooid. Probeer het opnieuw.",
   "app.errorStatus.queueLoad": "Kan berichten in de wachtrij niet laden",
-  "app.errorStatus.waitsLoad": "Kan open wachtmomenten niet laden",
   "app.errorStatus.answer": "Kan je antwoord niet versturen",
   "app.errorStatus.approval": "Kan je beslissing niet versturen",
   "app.errorStatus.browserTakeover": "Kan de browserovername niet beëindigen",

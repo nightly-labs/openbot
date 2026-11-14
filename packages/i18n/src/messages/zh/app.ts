@@ -11,7 +11,6 @@ export const messages = {
   "app.action.unavailable": "该操作不可用",
   "app.error.actionFailed": "无法完成该操作，请重试。",
   "app.errorStatus.queueLoad": "无法加载排队的消息",
-  "app.errorStatus.waitsLoad": "无法加载未结等待",
   "app.errorStatus.answer": "无法发送你的回答",
   "app.errorStatus.approval": "无法发送你的决定",
   "app.errorStatus.browserTakeover": "无法结束浏览器接管",

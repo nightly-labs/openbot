@@ -10,7 +10,6 @@ export const messages = {
   "app.action.unavailable": "Akcja niedostępna",
   "app.error.actionFailed": "Nie udało się wykonać akcji. Spróbuj ponownie.",
   "app.errorStatus.queueLoad": "Nie udało się wczytać wiadomości w kolejce",
-  "app.errorStatus.waitsLoad": "Nie udało się wczytać otwartych oczekiwań",
   "app.errorStatus.answer": "Nie udało się wysłać odpowiedzi",
   "app.errorStatus.approval": "Nie udało się wysłać decyzji",
   "app.errorStatus.browserTakeover": "Nie udało się zakończyć przejęcia przeglądarki",

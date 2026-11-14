@@ -11,7 +11,6 @@ export const messages = {
   "app.action.unavailable": "操作を利用できません",
   "app.error.actionFailed": "操作を完了できませんでした。もう一度お試しください。",
   "app.errorStatus.queueLoad": "キュー内のメッセージを読み込めませんでした",
-  "app.errorStatus.waitsLoad": "未完了の待機を読み込めませんでした",
   "app.errorStatus.answer": "回答を送信できませんでした",
   "app.errorStatus.approval": "判断を送信できませんでした",
   "app.errorStatus.browserTakeover": "ブラウザー操作の引き継ぎを終了できませんでした",
