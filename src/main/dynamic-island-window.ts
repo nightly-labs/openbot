@@ -419,7 +419,10 @@ export class DynamicIslandWindowController {
     const window = this.#options.createWindow(this.#windowBounds(display, bounds, false), display);
     this.#windows.set(display.id, window);
     window.setHasShadow(false);
-    window.setAlwaysOnTop(true, "status");
+    // On Windows, Electron puts a "status" window behind the taskbar each time it becomes active. When the
+    // taskbar is not topmost, for example in front of a full-screen app, the window then loses "always on
+    // top" for good (#7452).
+    window.setAlwaysOnTop(true, this.#options.windowKind === "tool" ? "screen-saver" : "status");
     // Electron documents these for macOS (and `setVisibleOnAllWorkspaces` also for Linux). Some are not
     // defined on Windows, so a call there throws.
     if (this.#options.windowKind === "panel") {
