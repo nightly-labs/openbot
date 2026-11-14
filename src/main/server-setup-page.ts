@@ -21,9 +21,10 @@ import type { Socket } from "node:net";
 import { join } from "node:path";
 import { SERVER_SETUP_HEADER, SERVER_SETUP_ROUTES } from "@openbot/contracts/server-setup";
 import { Effect } from "effect";
+import { runCauseEffect } from "../backend/effect-boundary";
 import { applicationContentType } from "./application-content-type";
 import { readBodyWithin } from "./http-body";
-import { remoteCall } from "./remote-service-effects";
+import { type RemoteWorkflowError, remoteCall } from "./remote-service-effects";
 import type { ServerModeAnswer, ServerSetupAction } from "./server-mode";
 
 const MAX_BODY_BYTES = 4096;
@@ -61,7 +62,7 @@ export interface ServerSetupPageOptions {
   address: string;
   /** The renderer build: `server-setup.html` and its `assets/`. */
   rendererRoot: string;
-  request: (action: ServerSetupAction, body: URLSearchParams) => Promise<ServerModeAnswer>;
+  request: (action: ServerSetupAction, body: URLSearchParams) => Effect.Effect<ServerModeAnswer, RemoteWorkflowError>;
   onError: (message: string, error: unknown) => void;
 }
 
@@ -131,7 +132,7 @@ export class ServerSetupPage {
     let answer: ServerModeAnswer;
     try {
       const body = await readBody(request);
-      answer = body === null ? failure(413, "too_large") : await this.#options.request(action, body);
+      answer = body === null ? failure(413, "too_large") : await runCauseEffect(this.#options.request(action, body));
     } catch (error) {
       this.#options.onError("A server setup page request failed.", error);
       // The messages of the account and host services are the ones the app shows. They name no secret.

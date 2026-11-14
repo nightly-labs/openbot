@@ -42,6 +42,8 @@ const SERVER_NAME = "OpenBot";
 // The fake account service. It accepts one code, as the account service does.
 let account: CentralAuthState = { status: "signed_out" };
 const sentCodes: string[] = [];
+/** Each code that reached the account service. A refused request must not reach it. */
+const verifiedCodes: string[] = [];
 const centralAuth: ServerModeOptions["centralAuth"] = {
   getState: () => structuredClone(account),
   requestEmailCode: (email: string) =>
@@ -58,6 +60,7 @@ const centralAuth: ServerModeOptions["centralAuth"] = {
     }),
   verifyEmailCode: (challengeId: string, code: string) =>
     Effect.sync(() => {
+      verifiedCodes.push(code);
       if (account.status !== "code_sent") return structuredClone(account);
       if (challengeId !== CHALLENGE || code !== CODE) {
         account = { ...account, issue: { code: "invalid_sign_in_code", message: "The code is not valid." } };
@@ -153,6 +156,8 @@ interface Checks {
     language: string;
   };
   signedInRefusesSignIn?: number;
+  oldChallengeRefused?: number;
+  signedInRefusesCode?: number;
 }
 const checks: Checks = {};
 rmSync(OUT, { recursive: true, force: true });
@@ -226,6 +231,16 @@ try {
     await tab.getByRole("heading", { name: "Check your inbox" }).waitFor();
     assert.deepEqual(sentCodes, [EMAIL]);
 
+    // Another program cannot complete a challenge that is not the current one.
+    const oldChallenge = await postForm("/api/login/verify", { challenge: "old-challenge", code: CODE });
+    assert.equal(oldChallenge.status, 409);
+    assert.deepEqual(await oldChallenge.json(), {
+      error: "challenge_replaced",
+      message: "The sign-in code could not be verified.",
+    });
+    assert.deepEqual(verifiedCodes, []);
+    checks.oldChallengeRefused = oldChallenge.status;
+
     // The code input sends the code when it is full, as in the app.
     const codeInput = tab.getByLabel("One-time code", { exact: true });
     await codeInput.fill(WRONG_CODE);
@@ -270,16 +285,20 @@ try {
     await browser.close();
   }
 
-  // A signed-in server refuses a new sign-in.
-  const again = await fetch(`${origin}/api/login/start`, {
-    method: "POST",
-    headers: { "x-openbot-setup": "1", "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ email: "other@example.com" }).toString(),
-  });
+  // A signed-in server refuses a new sign-in, and a code: another account or a wrong code would
+  // replace or remove the session.
+  const codesBefore = [...verifiedCodes];
+  const again = await postForm("/api/login/start", { email: "other@example.com" });
   assert.equal(again.status, 409);
   assert.deepEqual(await again.json(), { error: "signed_in" });
   assert.deepEqual(sentCodes, [EMAIL]);
   checks.signedInRefusesSignIn = again.status;
+  const code = await postForm("/api/login/verify", { challenge: "other-challenge", code: WRONG_CODE });
+  assert.equal(code.status, 409);
+  assert.deepEqual(await code.json(), { error: "signed_in" });
+  assert.deepEqual(verifiedCodes, codesBefore);
+  assert.equal(account.status, "signed_in");
+  checks.signedInRefusesCode = code.status;
 
   const report = {
     ok: true,
@@ -296,7 +315,15 @@ try {
   rmSync(runtime, { recursive: true, force: true });
 }
 
-/** A free port on the loopback address. */
+/** A form post of the page script. */
+function postForm(path: string, fields: Record<string, string>): Promise<Response> {
+  return fetch(`${origin}${path}`, {
+    method: "POST",
+    headers: { "x-openbot-setup": "1", "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams(fields).toString(),
+  });
+}
+
 /** A screenshot after the step transitions end. A loop, such as the spinner, does not end, so it is not waited for. */
 async function settledScreenshot(page: Page, path: string): Promise<void> {
   await page.evaluate(() =>
@@ -312,6 +339,7 @@ async function settledScreenshot(page: Page, path: string): Promise<void> {
   await page.screenshot({ path });
 }
 
+/** A free port on the loopback address. */
 function freePort(): Promise<number> {
   return new Promise((resolvePort, reject) => {
     const probe = createServer();

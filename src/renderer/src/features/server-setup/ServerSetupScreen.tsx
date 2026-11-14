@@ -20,6 +20,8 @@ const PRODUCT_NAME = "OpenBot";
 const DEFAULT_SERVER_NAME = "OpenBot";
 /** How often the page asks again while the account loads or the server starts. */
 const STATUS_POLL_MS = 2_000;
+/** How often the page asks again after an error. The server retries the account service by itself. */
+const ERROR_POLL_MS = 10_000;
 
 interface ServerView {
   email: string;
@@ -74,9 +76,9 @@ export function ServerSetupScreen() {
     return retryAfterSeconds ? { code, message, retryAfterSeconds } : { code, message };
   }
 
-  function poll(): void {
+  function poll(delay = STATUS_POLL_MS): void {
     window.clearTimeout(pollTimer);
-    pollTimer = window.setTimeout(() => void refresh(), STATUS_POLL_MS);
+    pollTimer = window.setTimeout(() => void refresh(), delay);
   }
 
   function showStatus(answer: SetupAnswer): void {
@@ -88,6 +90,7 @@ export function ServerSetupScreen() {
         draft.server = null;
         draft.login = { status: "error", issue };
       });
+      poll(ERROR_POLL_MS);
       return;
     }
     const account = text(answer, "account");
@@ -121,6 +124,7 @@ export function ServerSetupScreen() {
       else if (!keepChallenge) draft.login = { status: "signed_out" };
     });
     if (loading) poll();
+    else if (issue) poll(ERROR_POLL_MS);
   }
 
   async function refresh(): Promise<void> {
@@ -161,6 +165,10 @@ export function ServerSetupScreen() {
     const answer = await setupLoginVerify(current.challengeId, code);
     if (answer.ok) {
       showStatus(answer);
+      return;
+    }
+    if (text(answer, "error") === "signed_in") {
+      await refresh();
       return;
     }
     const issue = issueOf(answer);

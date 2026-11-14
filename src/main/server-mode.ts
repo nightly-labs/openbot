@@ -213,16 +213,33 @@ export class ServerMode {
    * program on the network of the container can reach its port, and these change a signed-in server
    * or give access to the account. The server gets its name in Server Settings of the app.
    */
-  readonly setupRequest = async (action: ServerSetupAction, body: URLSearchParams): Promise<ServerModeAnswer> => {
+  readonly setupRequest = (
+    action: ServerSetupAction,
+    body: URLSearchParams,
+  ): Effect.Effect<ServerModeAnswer, RemoteWorkflowError> => {
     switch (action) {
       case "status":
-        return this.#status();
+        return Effect.sync(() => this.#status());
       case "login_start":
-        return runCauseEffect(this.#startLogin(body.get("email") ?? "", null));
+        return this.#startLogin(body.get("email") ?? "", null);
       case "login_verify":
-        return runCauseEffect(this.#verifyLogin(body.get("challenge") ?? "", body.get("code") ?? "", null));
+        return this.#verifySetupLogin(body.get("challenge") ?? "", body.get("code") ?? "");
     }
   };
+
+  /**
+   * The page signs in only with the challenge of the current sign-in. Another program on the network
+   * cannot complete an older challenge of its own after the owner asked for a code.
+   */
+  #verifySetupLogin(challenge: string, code: string): Effect.Effect<Answer, RemoteWorkflowError> {
+    return Effect.suspend(() => {
+      const state = this.#options.centralAuth.getState();
+      if (state.status === "code_sent" && state.challengeId !== challenge.trim()) {
+        return Effect.succeed(failure(409, "challenge_replaced", sourceText("error.auth.codeNotVerified")));
+      }
+      return this.#verifyLogin(challenge, code, null);
+    });
+  }
 
   async #handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
     let answer: Answer;
@@ -330,6 +347,8 @@ export class ServerMode {
     name: string | null,
   ): Effect.fn.Return<Answer, RemoteWorkflowError> {
     if (!challenge.trim() || !code.trim()) return failure(400, "invalid_request");
+    // A code of another account would replace the session. A wrong code would remove the stored session.
+    if (this.#options.centralAuth.getState().status === "signed_in") return failure(409, "signed_in");
     if (name !== null) {
       // The host refuses such a name only when it publishes, after the sign-in.
       const serverName = parseHostedServerName(name);

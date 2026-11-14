@@ -5,7 +5,7 @@
 //   bun scripts/umbrel-app.ts --version <x.y.z> [--out=<folder>]
 //
 // The default folder is .openbot-build/umbrel/openbot. Copy it to an Umbrel app store as `openbot`.
-import { chmodSync, cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Schema } from "effect";
@@ -26,6 +26,11 @@ if (!version || !/^\d+\.\d+\.\d+$/u.test(version)) {
 }
 const out = resolve(ROOT, argument("out") ?? ".openbot-build/umbrel/openbot");
 
+// The folder is replaced. Only an empty folder or an earlier app folder can be replaced, never the repository.
+const notAppFolder = existsSync(out) && readdirSync(out).length > 0 && !existsSync(join(out, "umbrel-app.yml"));
+if (out === TEMPLATE || notAppFolder) {
+  throw new Error(`${out} is not an Umbrel app folder. Give an empty or new folder as --out.`);
+}
 const digest = await indexDigest(version);
 rmSync(out, { recursive: true, force: true });
 mkdirSync(join(out, "hooks"), { recursive: true });

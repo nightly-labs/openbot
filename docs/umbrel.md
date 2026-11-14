@@ -37,13 +37,19 @@ without that password. For this reason the page:
 
 - has only three requests: the status, send a code, and sign in with the code. It has no sign-out,
   server claim, rename or Mobile Connect code.
-- refuses a sign-in when the server is signed in. Another app cannot move the server to its own
-  account.
+- refuses a sign-in and a code when the server is signed in. Another app cannot move the server to
+  its own account or remove its session.
+- accepts a code only for the current sign-in. Another app cannot complete an older sign-in of its own
+  after you ask for a code.
 - accepts a request only with its own `x-openbot-setup` header, as a form, and from its own origin
   when the browser tells the origin. A page of another site cannot send one from your browser.
 - shows no secret. It shows the email of the account and the server name.
 - serves only its page and the files of the build in `assets/`, with the content security policy of
   the app window and no outside source.
+
+Until the server is signed in, another app on that network can sign it in to its own account first.
+Sign in right after you install the app. The page then shows the email of the account that owns the
+server.
 
 The page uses the language and the color scheme of the browser.
 
