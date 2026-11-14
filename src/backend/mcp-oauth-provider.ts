@@ -1148,11 +1148,15 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     return this.#registrationPending && metadata !== undefined && !metadata.registration_endpoint;
   }
 
-  /** No client, and discovery found neither resource nor authorization server metadata. */
+  /**
+   * No client, the server answered the registration, and discovery found neither resource nor
+   * authorization server metadata. A registration that got no answer is a network failure.
+   */
   get signInServerMissing(): boolean {
     const discovery = this.#discoveryState;
     return (
       this.#registrationPending &&
+      this.#registrationStatus !== null &&
       discovery !== undefined &&
       !discovery.authorizationServerMetadata &&
       !discovery.resourceMetadata

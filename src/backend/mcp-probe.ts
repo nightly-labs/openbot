@@ -199,35 +199,25 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
   // A server on the 2025-03 MCP authorization spec answers 401 with no challenge at all; its OAuth
   // metadata at the origin is what says a sign-in, not a key, is wanted. Only a refusal the sentence
   // would explain is followed up, and only public documents are read: no credential is sent.
+  //
+  // A Bearer challenge alone does not say OAuth either: a token server answers the same (#9176).
+  // Without a `resource_metadata` link, only metadata the origin publishes says a sign-in exists.
+  // A lookup that could not finish keeps the sign-in, as before.
   const unexplained = seen.challenge;
-  // The same Test deadline covers the lookup: it gets only the time the connection left.
-  const remainingMs = () => timeoutMs - (Date.now() - startedAt);
-  if (
-    !signIn &&
-    signInPlace !== null &&
-    unexplained?.status === 401 &&
-    !unexplained.bearer &&
-    !hasCredentialHeader(config)
-  )
-    seen.challenge = {
-      ...unexplained,
-      bearer: (yield* advertisesOAuth(config.url, remainingMs(), ORIGIN_METADATA)) === true,
-    };
-  // A Bearer challenge alone does not say OAuth: a token server answers the same. Without a
-  // `resource_metadata` link, only metadata the origin publishes says a sign-in exists. A lookup
-  // that could not finish keeps the sign-in, as before.
-  else if (
-    !signIn &&
-    signInPlace !== null &&
-    unexplained?.status === 401 &&
-    unexplained.bearer &&
-    !unexplained.resourceMetadata &&
-    !hasCredentialHeader(config)
-  )
-    seen.challenge = {
-      ...unexplained,
-      keyOnly: (yield* advertisesOAuth(config.url, remainingMs(), signInMetadata(config.url))) === false,
-    };
+  if (!signIn && signInPlace !== null && unexplained?.status === 401 && !hasCredentialHeader(config)) {
+    // The same Test deadline covers the lookup: it gets only the time the connection left.
+    const remainingMs = timeoutMs - (Date.now() - startedAt);
+    if (!unexplained.bearer)
+      seen.challenge = {
+        ...unexplained,
+        bearer: (yield* advertisesOAuth(config.url, remainingMs, ORIGIN_METADATA)) === true,
+      };
+    else if (!unexplained.resourceMetadata)
+      seen.challenge = {
+        ...unexplained,
+        keyOnly: (yield* advertisesOAuth(config.url, remainingMs, signInMetadata(config.url))) === false,
+      };
+  }
   if (!signIn || !(first.failure.cause instanceof UnauthorizedError)) return failure(first.failure.cause);
   return yield* afterSignIn(signIn);
 });
@@ -240,6 +230,8 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
  * challenge to a probe that could not sign in wants a sign-in, not a key: that is what Granola
  * answers, and the header fields alone gave the user no way forward. A key pasted into a header
  * is the exception: Composio Connect ignores a key in the wrong header and sends the same challenge.
+ * A Bearer challenge from a server that publishes no OAuth metadata (`keyOnly`) wants a key too:
+ * Coolify answers so (#9176).
  */
 function describeProbeFailure(
   error: unknown,
@@ -250,10 +242,10 @@ function describeProbeFailure(
   signInPlace: McpSignInPlace | null,
 ): string {
   if (signIn?.cancelled()) return sourceText("error.backend.mcpSignInCancelled");
-  if (signIn && isRegistrationRefusal(error, signIn)) return REGISTRATION_REFUSED;
   // With no metadata, the SDK registers at a guessed address, and a token server answers that with
-  // a status such as Laravel's 419. The sign-in never existed; the key is what the server wants.
+  // a status such as Laravel's 419, or 401. The sign-in never existed; the key is what it wants.
   if (signIn?.signInServerMissing()) return BEARER_KEY;
+  if (signIn && isRegistrationRefusal(error, signIn)) return REGISTRATION_REFUSED;
   const status = httpStatus(error);
   if (signIn && status === 401) return sourceText("error.backend.mcpSignInNotAccepted");
   // The token endpoint refused the grant. Its status says nothing about the address the user typed.
@@ -296,8 +288,9 @@ function httpsAddress(finalUrl: string, url: string): string {
 
 /**
  * What the refusal asks of the user, decided as `describeProbeFailure` words it: a Bearer challenge
- * to a row with no credential header of its own wants a sign-in, any other refusal a key. A
- * sign-in over plain http needs a new address first, which the error names.
+ * to a row with no credential header of its own wants a sign-in, unless the server publishes no
+ * OAuth metadata (`keyOnly`); any other refusal wants a key. A sign-in over plain http needs a new
+ * address first, which the error names.
  */
 function probeNeed(config: McpServerConfig, challenge: McpChallenge | null): McpProbeNeed | null {
   if (!challenge || !isAccessRefusal(challenge.status)) return null;
@@ -507,9 +500,10 @@ const advertisesOAuth = Effect.fnUntraced(function* (url: string, remainingMs: n
       try: async (signal): Promise<boolean | null> => {
         const response = await fetch(`${origin}${path}`, { signal, headers: { accept: "application/json" } });
         await response.body?.cancel();
-        // A server error says nothing about the document.
-        if (response.status >= 500) return null;
-        return response.ok && (response.headers.get("content-type") ?? "").includes("json");
+        if (response.ok) return (response.headers.get("content-type") ?? "").includes("json");
+        // Only a missing document says "none". A refusal, such as a firewall's 403 or a 429, or a
+        // server error says nothing about the document.
+        return response.status === 404 || response.status === 410 ? false : null;
       },
       catch: (cause) => new McpProbeFailure({ cause }),
     }).pipe(Effect.catch(() => Effect.succeed(null))),
