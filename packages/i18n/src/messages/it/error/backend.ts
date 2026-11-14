@@ -294,6 +294,10 @@ export const messages = {
     "Questo computer ha bloccato la connessione al server. Controlla il firewall o il software di sicurezza, poi riprova.",
   "error.backend.mcpServerIncompatible":
     "A questo indirizzo qualcosa ha risposto, ma non come server MCP via Streamable HTTP. Controlla l'URL e aggiorna l'app che esegue il server.",
+  "error.backend.mcpHtmlLogin":
+    "Questo server ha restituito una pagina di accesso web. Aggiungi un'intestazione Authorization in Impostazioni server, MCP, con il valore Bearer e il tuo token. Non usare la scheda Accedi.",
+  "error.backend.mcpHtmlLoginRejected":
+    "Questo server ha restituito una pagina di accesso web. L'intestazione Authorization non è stata accettata. In Impostazioni server, MCP, imposta il valore su Bearer e il tuo token.",
   "error.backend.mcpRemoteBridge":
     "{reason} Questo comando esegue il bridge mcp-remote. Scegli invece Streamable HTTP con l'URL {url} e OpenBot ti fa accedere.",
   "error.backend.oauthNotHttps":

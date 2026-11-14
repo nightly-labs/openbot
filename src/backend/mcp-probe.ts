@@ -138,6 +138,11 @@ interface McpChallenge {
   status: number;
   /** Whether `WWW-Authenticate` names the Bearer scheme, which is what an OAuth server asks for. */
   bearer: boolean;
+  /**
+   * The final response was a redirect to an HTML page, such as a web login. That is an API token
+   * in `Authorization`, not an OAuth sign-in. A 200 JSON document reached by redirect is not this.
+   */
+  html: boolean;
   /** Where the request ended up after any redirect. */
   url: string;
 }
@@ -217,6 +222,8 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
  * challenge to a probe that could not sign in wants a sign-in, not a key: that is what Granola
  * answers, and the header fields alone gave the user no way forward. A key pasted into a header
  * is the exception: Composio Connect ignores a key in the wrong header and sends the same challenge.
+ * A redirect to an HTML login page is a key too, and it is decided before that sign-in sentence:
+ * the page is not OAuth, and the JSON parser would otherwise quote the HTML.
  */
 function describeProbeFailure(
   error: unknown,
@@ -233,6 +240,12 @@ function describeProbeFailure(
   // The token endpoint refused the grant. Its status says nothing about the address the user typed.
   if (signIn?.exchangeFailed() && status !== null && status >= 400 && status < 500)
     return sourceText("error.backend.mcpSignInNotAccepted");
+  // A redirect to an HTML login page wants a Bearer token in Authorization. It is not the OAuth
+  // card, and a credential header that still lands on that page was not accepted.
+  if (challenge?.html)
+    return hasCredentialHeader(config)
+      ? sourceText("error.backend.mcpHtmlLoginRejected")
+      : sourceText("error.backend.mcpHtmlLogin");
   // A key the user pasted into a header is theirs to fix; the sign-in would not replace it.
   if (challenge?.status === 401 && challenge.bearer && !hasCredentialHeader(config)) {
     const described = describeSignInChallenge(config.url, challenge.url, signInPlace);
@@ -266,11 +279,13 @@ function httpsAddress(finalUrl: string, url: string): string {
 }
 
 /**
- * What the refusal asks of the user, decided as `describeProbeFailure` words it: a Bearer challenge
- * to a row with no credential header of its own wants a sign-in, any other refusal a key. A
- * sign-in over plain http needs a new address first, which the error names.
+ * What the refusal asks of the user, decided as `describeProbeFailure` words it: a redirect to an
+ * HTML login page wants a key, whether or not a credential header is already set. A Bearer
+ * challenge to a row with no credential header of its own wants a sign-in, any other refusal a
+ * key. A sign-in over plain http needs a new address first, which the error names.
  */
 function probeNeed(config: McpServerConfig, challenge: McpChallenge | null): McpProbeNeed | null {
+  if (challenge?.html) return "key";
   if (!challenge || !isAccessRefusal(challenge.status)) return null;
   if (challenge.status !== 401 || !challenge.bearer || hasCredentialHeader(config)) return "key";
   return normalizeResource(config.url) ? "sign_in" : null;
@@ -422,24 +437,77 @@ function createTransport(
   });
 }
 
+/** The media type before any `;`, so `text/html; charset=utf-8` counts. */
+function htmlMediaType(header: string | null): boolean {
+  const media = (header ?? "").split(";", 1)[0]?.trim().toLowerCase() ?? "";
+  return media === "text/html" || media === "application/xhtml+xml";
+}
+
+const REDIRECT_STATUS = new Set([301, 302, 303, 307, 308]);
+
 /**
  * The platform fetch, noting each refusal on the way past. Without a sign-in provider the SDK keeps
  * only the status of a refusal, and the `WWW-Authenticate` header is what tells a server that wants
  * an OAuth sign-in apart from one that wants a key.
+ *
+ * The Streamable HTTP client posts with `redirect: "manual"`, so a 302 to a login page is not
+ * followed and would otherwise be reported as that status. A same-origin hop is read here only to
+ * see whether the page is HTML. The original response is what the client parses. No credential is
+ * sent on that hop, and another origin is not requested.
  */
 function challengeRecordingFetch(onChallenge: (challenge: McpChallenge) => void): FetchLike {
   return async (input, init) => {
     const response = await fetch(input, init);
-    if (response.status === 401 || response.status === 403) {
+    let html = response.redirected && htmlMediaType(response.headers.get("content-type"));
+    let status = response.status;
+    let url = response.url || input.toString();
+    if (!html && REDIRECT_STATUS.has(response.status)) {
+      const login = await loginPage(response, url, init?.signal);
+      if (login) {
+        html = true;
+        status = login.status;
+        url = login.url;
+      }
+    }
+    if (response.status === 401 || response.status === 403 || html) {
       onChallenge({
-        status: response.status,
+        status,
         // `Headers.get` joins several challenges with commas, so Bearer may follow another scheme.
         bearer: /(?:^|,)\s*bearer\b/iu.test(response.headers.get("www-authenticate") ?? ""),
-        url: response.url || input.toString(),
+        html,
+        url,
       });
     }
     return response;
   };
+}
+
+/** The same-origin page a redirect names, when that page is HTML, or null. */
+async function loginPage(
+  response: Response,
+  url: string,
+  signal: AbortSignal | null | undefined,
+): Promise<{ status: number; url: string } | null> {
+  const location = response.headers.get("location");
+  if (!location) return null;
+  let next: URL;
+  try {
+    next = new URL(location, url);
+  } catch {
+    return null;
+  }
+  if (next.origin !== new URL(url).origin) return null;
+  try {
+    // Manual: a later hop could leave this origin. One same-origin HTML page is enough.
+    const followed = await fetch(next, { method: "GET", redirect: "manual", ...(signal ? { signal } : {}) });
+    const stayed = !followed.url || new URL(followed.url).origin === next.origin;
+    const html = stayed && !REDIRECT_STATUS.has(followed.status) && htmlMediaType(followed.headers.get("content-type"));
+    const found = html ? { status: followed.status, url: followed.url || next.toString() } : null;
+    await followed.body?.cancel();
+    return found;
+  } catch {
+    return null;
+  }
 }
 
 /** Whether the server's origin publishes OAuth metadata, read without any credential. */
