@@ -5503,6 +5503,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       concurrency: "unbounded",
       discard: true,
     });
+    // After the clients: a provider that still runs can send one more progress step of a task.
+    this.#tasks.dispose();
     yield* this.#warmGenerations.dispose();
     yield* Fiber.join(channelStop);
     // After the clients: a provider that still runs would see its MCP servers fail.
