@@ -278,7 +278,7 @@ class WhatsAppAdapter implements MessagingAdapter {
                 mimetype: DOCUMENT_TYPES[extname(file.name).toLowerCase()] ?? file.mimeType,
               };
           const messageId = yield* this.#send(target, content);
-          firstId ??= messageId;
+          if (messageId) firstId ??= messageId;
           return true;
         }),
       );

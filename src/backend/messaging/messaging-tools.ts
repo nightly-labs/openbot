@@ -171,7 +171,7 @@ export type MessagingOutboundToolCall =
       connection: string;
       place: string;
       replyTo: string | null;
-      /** Empty when the post has only embeds. */
+      /** Empty when the post has only embeds or only files. */
       text: string;
       files: string[];
       embeds: DiscordEmbed[];

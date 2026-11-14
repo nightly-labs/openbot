@@ -1792,19 +1792,18 @@ export class MessagingService {
       live.record.platform === "slack" ? slackPingedUsers(text).filter((userId) => userId !== botUserId) : [];
     // Files without text or embeds are the post: an empty text post before them would fail.
     if (!text.trim() && !embeds.length && files.length) {
-      const uploaded = yield* live.adapter.upload(target, files).pipe(
-        Effect.catch((failure) =>
-          Effect.sync(() => {
-            this.#warn(failure.cause);
-            return { skipped: files.map((file) => file.name), firstId: null };
-          }),
-        ),
-      );
+      const result = yield* Effect.result(live.adapter.upload(target, files));
+      if (Result.isFailure(result))
+        return {
+          error: `${refusal(result.failure)} A file can be in the place already. Do not post it again only because of this error.`,
+          failure: "unknown" as const,
+        };
+      const uploaded = result.success;
       const sentFiles = files.map((file) => file.name).filter((name) => !uploaded.skipped.includes(name));
       if (!sentFiles.length)
         return {
           error:
-            "No file was sent: each file was empty, too large for the platform, or not readable. Check the files and try again.",
+            "No file was sent: a file can be empty, too large for the platform or not readable, or its send failed on the way. A file can be in the place already. Do not post it again only because of this error.",
           failure: "unknown" as const,
         };
       if (uploaded.firstId) live.adapter.rememberPost?.(target, uploaded.firstId, `Files: ${sentFiles.join(", ")}`);
