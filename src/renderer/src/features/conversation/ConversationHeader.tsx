@@ -178,7 +178,12 @@ export function ConversationHeader() {
       remoteControl={
         props.remoteDesktopEnabled !== false && props.server?.kind === "remote"
           ? {
-              enabled: Boolean(props.remoteDesktopSessionActive || props.server.state === "online"),
+              // A host without the desktop runtime (Linux arm64, no X11) answers `ready: false`; opening
+              // the viewer there only shows an error that no retry fixes.
+              enabled: Boolean(
+                props.remoteDesktopSessionActive ||
+                  (props.server.state === "online" && props.server.remoteDesktopAvailable),
+              ),
               active: Boolean(props.remoteDesktopSessionActive),
               visible: Boolean(props.remoteDesktopVisible),
               onOpen: (trigger) => {

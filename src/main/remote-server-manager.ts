@@ -548,9 +548,9 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
                 ),
                 server
                   ? Effect.gen({ self: this }, function* () {
-                      const remoteDesktopAvailable = yield* this.#client
-                        .probeRemoteDesktop(server)
-                        .pipe(Effect.catch(() => Effect.succeed(false)));
+                      // A probe that fails keeps the previous value: a brief failure must not turn off
+                      // remote control for a working host. A host that says no answers `false`.
+                      const remoteDesktopAvailable = yield* this.#client.probeRemoteDesktop(server);
                       yield* this.#store.update(serverId, { remoteDesktopAvailable });
                       this.#emitChanged();
                     }).pipe(Effect.catch(() => Effect.void))
