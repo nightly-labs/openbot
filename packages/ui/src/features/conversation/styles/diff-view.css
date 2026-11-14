@@ -91,3 +91,44 @@
 .diff-view-row[data-diff="removed"] .diff-view-text::before {
   content: "-";
 }
+
+/* `WordDiff`: the changed words inside one run of text. */
+.diff-word {
+  border-radius: var(--openbot-radius-xs);
+  text-decoration-thickness: 1px;
+}
+
+.diff-word[data-diff="removed"] {
+  background: var(--openbot-danger-soft);
+  color: var(--openbot-text-muted);
+  text-decoration-line: line-through;
+}
+
+.diff-word[data-diff="added"] {
+  background: var(--openbot-success-soft);
+  text-decoration-line: none;
+}
+
+/* The dialog that shows what an agent changed in its instruction file. */
+.instructions-diff-dialog {
+  width: min(760px, 100%);
+  max-height: calc(100dvh - 2 * var(--openbot-space-6));
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-3);
+  overflow: hidden;
+  padding: var(--openbot-space-4);
+  background: var(--openbot-bg-sidebar);
+  color: var(--openbot-text-primary);
+}
+
+.instructions-diff-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-3);
+}
+
+.instructions-diff-dialog .diff-view {
+  min-height: 0;
+}

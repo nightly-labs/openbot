@@ -11,11 +11,19 @@ export interface DiffRow {
   newLine: number | null;
 }
 
-/** A line diff of two texts, by longest common subsequence after the shared start and end are cut off. */
+/** A line diff of two texts. An empty text has no lines, so a new file shows only added lines. */
 export function diffLines(oldText: string, newText: string): DiffRow[] {
-  // An empty text has no lines, so a new file shows only added lines.
-  const before = oldText === "" ? [] : oldText.split("\n");
-  const after = newText === "" ? [] : newText.split("\n");
+  return diffSequence(oldText === "" ? [] : oldText.split("\n"), newText === "" ? [] : newText.split("\n"));
+}
+
+/** A word diff of two texts. The spaces between words are parts too, so the parts join to each text. */
+export function diffWords(oldText: string, newText: string): DiffRow[] {
+  const words = (text: string) => text.split(/(\s+)/u).filter((part) => part !== "");
+  return diffSequence(words(oldText), words(newText));
+}
+
+/** A diff of two lists of parts, by longest common subsequence after the shared start and end are cut off. */
+function diffSequence(before: readonly string[], after: readonly string[]): DiffRow[] {
   let start = 0;
   while (start < before.length && start < after.length && before[start] === after[start]) start++;
   let endBefore = before.length;
@@ -72,6 +80,38 @@ export function diffLines(oldText: string, newText: string): DiffRow[] {
   }
   same(endBefore, before.length, endAfter - endBefore);
   return rows;
+}
+
+/** The changes between two short texts in one run of text: removed words struck, added words marked. */
+export function WordDiff(props: { oldText: string; newText: string; class?: string | undefined }) {
+  // Neighbour parts of one kind join, so a changed phrase is one mark.
+  const parts = createMemo(() =>
+    diffWords(props.oldText, props.newText).reduce<{ kind: DiffRow["kind"]; text: string }[]>((joined, part) => {
+      const last = joined.at(-1);
+      if (last?.kind === part.kind) last.text += part.text;
+      else joined.push({ kind: part.kind, text: part.text });
+      return joined;
+    }, []),
+  );
+  return (
+    <span class={["diff-words", props.class]} dir="auto">
+      <For each={parts()}>
+        {(part) =>
+          part.kind === "removed" ? (
+            <del class="diff-word" data-diff="removed">
+              {part.text}
+            </del>
+          ) : part.kind === "added" ? (
+            <ins class="diff-word" data-diff="added">
+              {part.text}
+            </ins>
+          ) : (
+            part.text
+          )
+        }
+      </For>
+    </span>
+  );
 }
 
 export interface DiffViewProps {
