@@ -312,6 +312,9 @@ function probeSecrets(server: UsableMcpServer, signIn: McpSignIn | null): string
   return [...values, ...(signIn?.secrets() ?? [])];
 }
 
+/** How the probe names itself to a server, in both protocol versions. */
+const PROBE_CLIENT_INFO = { name: "openbot-probe", version: "1" };
+
 /** One connection, from the handshake to the tool count, closed again whatever it answered. */
 const connectAndCountEffect = Effect.fnUntraced(function* (
   server: ResolvedMcpServer,
@@ -320,7 +323,7 @@ const connectAndCountEffect = Effect.fnUntraced(function* (
   onChallenge: (challenge: McpChallenge) => void,
 ) {
   return yield* countOverEffect(timeoutMs, () => {
-    const client = new Client({ name: "openbot-probe", version: "1" }, { capabilities: {} });
+    const client = new Client(PROBE_CLIENT_INFO, { capabilities: {} });
     const transport = createTransport(server, signIn, onChallenge);
     return { client, transport, connect: (signal) => client.connect(transport, { signal }) };
   });
@@ -333,10 +336,10 @@ const connectAndCountEffect = Effect.fnUntraced(function* (
  */
 const connectAndCountModernEffect = Effect.fnUntraced(function* (server: ResolvedMcpServer, timeoutMs: number) {
   return yield* countOverEffect(timeoutMs, () => {
-    const client = new ModernClient(
-      { name: "openbot-probe", version: "1" },
-      { capabilities: {}, versionNegotiation: { mode: { pin: MODERN_PROTOCOL_VERSION } } },
-    );
+    const client = new ModernClient(PROBE_CLIENT_INFO, {
+      capabilities: {},
+      versionNegotiation: { mode: { pin: MODERN_PROTOCOL_VERSION } },
+    });
     const transport = new ModernHttpTransport(new URL(server.config.url), {
       requestInit: { headers: mcpHandoffHeaders(server) },
     });
