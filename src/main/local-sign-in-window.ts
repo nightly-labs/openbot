@@ -317,6 +317,8 @@ export class LocalSignInWindows {
       contextIsolation: true,
       nodeIntegration: false,
       session: pending.session,
+      // A page in fullscreen fills this window only (see `isAllowedBrowserPermission`).
+      disableHtmlFullscreenWindowResize: true,
     };
     const window = new BrowserWindow({
       width: WINDOW_WIDTH,
