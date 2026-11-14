@@ -181,7 +181,9 @@ fi
 # remote desktop shows it before an agent opens a window, and the default black root looks like no
 # video (#3554). Its pointer is an arrow, not the default "×", which looks like an error (#6091).
 # `-noreset` keeps the arrow when the last client disconnects. A server whose update could not
-# install xsetroot starts with the "×".
+# install xsetroot starts with the "×". openbot-desktop then runs a window manager on that display.
+# It comes from the release, not from this folder: an older openbot-hosted-update installs only the
+# scripts that it knows.
 exec xvfb-run -a -s "-screen 0 $(display_size "$requested_size")x24 -nolisten tcp -wr -noreset" \
-  bash -c 'command -v xsetroot >/dev/null && xsetroot -cursor_name left_ptr; export OPENBOT_AGENT_DISPLAY=$DISPLAY; exec xvfb-run -a -f "$XAUTHORITY" -s "-screen 0 1280x800x24 -nolisten tcp" "$@"' \
-  openbot-hosted-server "${openbot[@]}"
+  bash -c 'command -v xsetroot >/dev/null && xsetroot -cursor_name left_ptr; if [ -r "$1" ]; then bash "$1" </dev/null & fi; shift; export OPENBOT_AGENT_DISPLAY=$DISPLAY; exec xvfb-run -a -f "$XAUTHORITY" -s "-screen 0 1280x800x24 -nolisten tcp" "$@"' \
+  openbot-hosted-server /opt/OpenBot/app/resources/hosting/openbot-desktop "${openbot[@]}"
