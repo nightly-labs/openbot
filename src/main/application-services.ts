@@ -1144,6 +1144,7 @@ export async function createApplicationServices({
     getDisplays: () => screen.getAllDisplays(),
     getPrimaryDisplay: () => screen.getPrimaryDisplay(),
     getMainWindow: windows.getMainWindow,
+    getFocusedWindow: () => BrowserWindow.getFocusedWindow(),
     ensureMainWindow: windows.ensureMainWindow,
     presentMainWindow: showMainWindow,
     performHaptic: () => macHapticFeedback.performAlignment(),
