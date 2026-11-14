@@ -8,6 +8,7 @@ import {
   type AgentSummary,
   AVATAR_HUES,
   AVATAR_SEED_PATTERN,
+  type AvatarHue,
   agentComputerUseEnabled,
   isAvatarHue,
   isProviderAccountId,
@@ -15,6 +16,19 @@ import {
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
 import { z } from "zod";
+
+const AVATAR_HUE_NAMES = {
+  0: "red",
+  30: "orange",
+  55: "yellow",
+  100: "lime",
+  150: "green",
+  185: "cyan",
+  215: "blue",
+  245: "indigo",
+  280: "violet",
+  320: "magenta",
+} as const satisfies Record<AvatarHue, string>;
 
 const profileFields = {
   name: z.string().trim().min(1).max(INPUT_LIMITS.agentName),
@@ -33,7 +47,9 @@ const profileFields = {
     .int()
     .refine(isAvatarHue, "Invalid avatar hue.")
     .nullable()
-    .describe(`One of ${AVATAR_HUES.join(", ")}, or null for an automatic hue.`),
+    .describe(
+      `The color of the generated avatar face: ${AVATAR_HUES.map((hue) => `${hue} ${AVATAR_HUE_NAMES[hue]}`).join(", ")}, or null for an automatic color. Use it when the user asks for a color.`,
+    ),
 };
 
 export const createAgentToolSchema = z
@@ -94,7 +110,7 @@ export const updateProfileToolSchema = z
       .min(1)
       .max(INPUT_LIMITS.path)
       .describe(
-        "Local PNG, JPEG, or WebP file, up to 512 KB. Resize or compress a copy with your available tools first if needed. Use an absolute path or a path relative to your workspace. Do not combine with avatarSeed or avatarHue.",
+        "Local PNG, JPEG, or WebP file, up to 512 KB. The image replaces the generated avatar face, so use it only for an image that the user gives or asks for, never to set a color. Resize or compress a copy with your available tools first if needed. Use an absolute path or a path relative to your workspace. Do not combine with avatarSeed or avatarHue.",
       )
       .optional(),
     provider: z
