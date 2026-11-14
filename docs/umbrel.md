@@ -75,11 +75,12 @@ Updates offers no update. Do not go back to an older version: see [Upgrades](doc
 
 ```sh
 bun scripts/umbrel-app.ts --version <x.y.z> [--id <app id>]
+bun scripts/umbrel-app.ts --version <x.y.z> --official [--submission <pull request URL>]
 ```
 
 The script writes `.openbot-build/umbrel/<app id>`: the manifest and the Compose file with the app id,
-the version and the digest of the image index on GHCR, the `pre-start` hook and `seccomp.json`. Copy the
-folder to an app store, with the app id as its name. The app id is `openbot` by default. In a community
+the version and the digest of the image index on GHCR, the empty `data` folder, the `pre-start` hook
+and `seccomp.json`. Copy the folder to an app store, with the app id as its name. The app id is `openbot` by default. In a community
 app store, the app id must start with the id of the store. The release must contain the setup page:
 0.71.0 and older releases do not.
 
@@ -91,10 +92,31 @@ run the workflow from the Actions tab of the store.
 
 | File | Use |
 | --- | --- |
-| `umbrel-app.yml` | The manifest. Umbrel opens the app on port 4180. The icon is `openbot.run/icon-512x512.png`. |
+| `umbrel-app.yml` | The manifest. Umbrel opens the app on port 4180. The icon is `openbot.run/icon-512x512.png`, except with `--official`. |
 | `docker-compose.yml` | The container, with the same options as `docker/compose.yaml`. `app_proxy` sends the requests to the setup page on port 8080. |
+| `data/.gitkeep` | Keeps the source folder of the `/data` bind mount in the app store. Umbrel's linter needs it. |
 | `hooks/pre-start` | Makes the data folder and gives it to UID 1000, the user of the image. |
 | `seccomp.json` | A copy of `docker/seccomp.json`. The container stops without it, see [Security](docker.md#security). |
+
+### The official Umbrel App Store
+
+`--official` writes the app for [getumbrel/umbrel-apps](https://github.com/getumbrel/umbrel-apps):
+the id `openbot` and no `icon` line, because Umbrel keeps the icons and the gallery of that store in
+another repository. Umbrel adds the gallery images. `--submission` writes the URL of the pull request
+to that store in the manifest. Umbrel's linter accepts the package when it has that URL:
+
+```sh
+npm run lint:apps -- openbot --check-images
+```
+
+Write these reasons in the pull request, because Umbrel asks for them:
+
+- `security_opt`: the Electron sandbox in the image makes user namespaces. The default seccomp profile
+  of Docker refuses the calls for it, and the container stops. `seccomp.json` is the default profile
+  with one more rule: `clone` and `unshare` without limits on their flags (see
+  [Security](docker.md#security)). `no-new-privileges` is also set.
+- `restart: unless-stopped`: OpenBot exits with code 0 when an owner restarts the server from Server
+  Settings. With `on-failure`, the app then stays stopped.
 
 `bun run test:server-setup-page` runs the setup page with a fake account service in Chrome and
 writes `.openbot-build/server-setup-page-e2e/report.json`.
