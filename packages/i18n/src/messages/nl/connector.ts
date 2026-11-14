@@ -273,7 +273,7 @@ export const messages = {
     "OpenBot op {host} kan geen Telegram-berichten ontvangen. Log op {host} in, geef de server een naam in Serverinstellingen en houd OpenBot open.",
   "connector.telegram.helpError": "OpenBot kan deze chat niet bereiken. Verbind opnieuw of koppel de chat los.",
   "connector.telegram.helpNotLinked":
-    "OpenBot ontvangt hier geen berichten uit deze chat. Die is gekoppeld aan een andere server. Kies Opnieuw verbinden om hem hier te koppelen.",
+    "Deze chat is niet gekoppeld aan deze server. Kies Opnieuw verbinden om hem te koppelen.",
   "connector.telegram.retryAt": "Telegram vroeg OpenBot te wachten. Het probeert het opnieuw om {time}.",
   "connector.telegram.pause": "Pauzeren",
   "connector.telegram.resume": "Hervatten",

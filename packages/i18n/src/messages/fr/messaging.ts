@@ -9,7 +9,7 @@ export const messages = {
   "messaging.help.relay_unavailable":
     "OpenBot ne peut pas recevoir les événements Slack sur cet ordinateur. Connectez-vous, donnez un nom à cet ordinateur dans les réglages du serveur et gardez OpenBot ouvert.",
   "messaging.help.not_linked":
-    "OpenBot ne reçoit pas ici les messages de cet espace de travail. Il est lié à un autre serveur. Sélectionnez Reconnecter pour le lier ici.",
+    "Cet espace de travail n’est pas lié à ce serveur. Sélectionnez Reconnecter pour le lier.",
   "messaging.discordHelp.invalid_token":
     "Discord n’accepte plus OpenBot sur ce serveur Discord. Il a peut-être été retiré. Connectez à nouveau le serveur Discord.",
   "messaging.discordHelp.secret_storage_unavailable":

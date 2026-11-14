@@ -280,7 +280,7 @@ export const messages = {
     "OpenBot sur {host} ne peut pas recevoir de messages Telegram. Sur {host}, connectez-vous, donnez un nom au serveur dans les Réglages du serveur et gardez OpenBot ouvert.",
   "connector.telegram.helpError": "OpenBot ne peut pas joindre cette discussion. Reconnectez-la ou déconnectez-la.",
   "connector.telegram.helpNotLinked":
-    "OpenBot ne reçoit pas ici les messages de cette discussion. Elle est liée à un autre serveur. Sélectionnez Reconnecter pour la lier ici.",
+    "Cette discussion n’est pas liée à ce serveur. Sélectionnez Reconnecter pour la lier.",
   "connector.telegram.retryAt": "Telegram a demandé à OpenBot de patienter. Nouvel essai à {time}.",
   "connector.telegram.pause": "Mettre en pause",
   "connector.telegram.resume": "Reprendre",

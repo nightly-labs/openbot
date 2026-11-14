@@ -278,7 +278,7 @@ export const messages = {
     "{host} の OpenBot は Telegram のメッセージを受信できません。{host} でサインインし、サーバー設定でサーバーに名前を付けて、OpenBot を開いたままにしてください。",
   "connector.telegram.helpError": "OpenBot はこのチャットに接続できません。再接続するか、チャットを切断してください。",
   "connector.telegram.helpNotLinked":
-    "OpenBot はここでこのチャットのメッセージを受信していません。別のサーバーにリンクされています。ここにリンクするには「再接続」を選択してください。",
+    "このチャットはこのサーバーにリンクされていません。リンクするには「再接続」を選択してください。",
   "connector.telegram.retryAt": "Telegram から待機するよう求められました。{time} に再試行します。",
   "connector.telegram.pause": "一時停止",
   "connector.telegram.resume": "再開",

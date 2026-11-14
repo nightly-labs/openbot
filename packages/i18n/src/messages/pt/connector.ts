@@ -275,7 +275,7 @@ export const messages = {
     "O OpenBot em {host} não consegue receber mensagens do Telegram. Em {host}, entre na sua conta, dê um nome ao servidor nas Configurações do servidor e mantenha o OpenBot aberto.",
   "connector.telegram.helpError": "O OpenBot não consegue acessar este chat. Reconecte ou desconecte o chat.",
   "connector.telegram.helpNotLinked":
-    "O OpenBot não recebe aqui as mensagens deste chat. Ele está vinculado a outro servidor. Selecione Reconectar para vinculá-lo aqui.",
+    "Este chat não está vinculado a este servidor. Selecione Reconectar para vinculá-lo.",
   "connector.telegram.retryAt": "O Telegram pediu para o OpenBot aguardar. Ele tentará novamente às {time}.",
   "connector.telegram.pause": "Pausar",
   "connector.telegram.resume": "Retomar",

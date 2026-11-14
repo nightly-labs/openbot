@@ -745,7 +745,7 @@ export const messages = {
   "mobile.server.connectors.slack.helpRelay":
     "OpenBot op {host} kan geen Slack-gebeurtenissen ontvangen. Log op {host} in, geef de server een naam in Serverinstellingen en houd OpenBot open.",
   "mobile.server.connectors.slack.helpNotLinked":
-    "OpenBot op {host} ontvangt geen berichten uit deze werkruimte. Die is gekoppeld aan een andere server. Tik op Opnieuw verbinden om hem aan {host} te koppelen.",
+    "Deze werkruimte is niet gekoppeld aan {host}. Tik op Opnieuw verbinden om hem te koppelen.",
   "mobile.server.connectors.slack.orchestratorTitle": "Slack Orchestrator",
   "mobile.server.connectors.slack.orchestratorDescription":
     "Deze agent ontvangt elk verzoek uit Slack. Korte verzoeken beantwoordt hij zelf, ander werk geeft hij aan de juiste agent, en hij plaatst het antwoord in de thread.",
@@ -826,7 +826,7 @@ export const messages = {
   "mobile.server.connectors.telegram.helpError":
     "OpenBot kan deze chat niet bereiken. Verbind opnieuw of ontkoppel de chat.",
   "mobile.server.connectors.telegram.helpNotLinked":
-    "OpenBot op {host} ontvangt geen berichten uit deze chat. Die is gekoppeld aan een andere server. Tik op Opnieuw verbinden om hem aan {host} te koppelen.",
+    "Deze chat is niet gekoppeld aan {host}. Tik op Opnieuw verbinden om hem te koppelen.",
   "mobile.server.connectors.telegram.retryAt": "Telegram vroeg OpenBot te wachten. Het probeert het opnieuw om {time}.",
   "mobile.server.connectors.telegram.linkTitle": "Chat koppelen",
   "mobile.server.connectors.telegram.linkAnother": "Nog een chat koppelen",

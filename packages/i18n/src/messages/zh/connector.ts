@@ -277,8 +277,7 @@ export const messages = {
   "connector.telegram.helpRelayUnavailableHost":
     "{host} 上的 OpenBot 无法接收 Telegram 消息。请在 {host} 上登录，在服务器设置中为该服务器命名，并保持 OpenBot 开着。",
   "connector.telegram.helpError": "OpenBot 无法连接到该聊天。请重新连接，或断开该聊天。",
-  "connector.telegram.helpNotLinked":
-    "OpenBot 在这里收不到此聊天的消息。它已关联到另一台服务器。选择“重新连接”可将其关联到这里。",
+  "connector.telegram.helpNotLinked": "此聊天未关联到此服务器。选择“重新连接”进行关联。",
   "connector.telegram.retryAt": "Telegram 要求 OpenBot 等待，将于 {time} 重试。",
   "connector.telegram.pause": "暂停",
   "connector.telegram.resume": "恢复",

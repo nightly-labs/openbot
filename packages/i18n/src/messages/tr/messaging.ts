@@ -9,8 +9,7 @@ export const messages = {
     "OpenBot bu bilgisayardaki kayıtlı belirteçleri okuyamıyor. Çalışma alanı bağlantısını kesin, ardından tekrar bağlayın.",
   "messaging.help.relay_unavailable":
     "OpenBot bu bilgisayarda Slack etkinliklerini alamıyor. Oturum açın, Sunucu ayarlarından bu bilgisayara bir ad verin ve OpenBot'u açık tutun.",
-  "messaging.help.not_linked":
-    "OpenBot bu çalışma alanının mesajlarını burada almıyor. Başka bir sunucuya bağlı. Buraya bağlamak için Yeniden bağlan'ı seçin.",
+  "messaging.help.not_linked": "Bu çalışma alanı bu sunucuya bağlı değil. Bağlamak için Yeniden bağlan'ı seçin.",
   // Bir Discord sunucusu bağlantısı için aynı yardım.
   "messaging.discordHelp.invalid_token":
     "Discord artık bu Discord sunucusunda OpenBot'u kabul etmiyor. Kaldırılmış olabilir. Discord sunucusunu tekrar bağlayın.",

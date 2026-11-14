@@ -774,7 +774,7 @@ export const messages = {
   "mobile.server.connectors.slack.helpRelay":
     "{host} üzerindeki OpenBot Slack etkinliklerini alamıyor. {host} üzerinde oturum açın, Sunucu ayarlarında sunucuya bir ad verin ve OpenBot'u açık tutun.",
   "mobile.server.connectors.slack.helpNotLinked":
-    "{host} üzerindeki OpenBot bu çalışma alanının mesajlarını almıyor. Başka bir sunucuya bağlı. {host} sunucusuna bağlamak için Yeniden bağlan'a dokunun.",
+    "Bu çalışma alanı {host} sunucusuna bağlı değil. Bağlamak için Yeniden bağlan'a dokunun.",
   "mobile.server.connectors.slack.orchestratorTitle": "Slack Düzenleyicisi",
   "mobile.server.connectors.slack.orchestratorDescription":
     "Bu ajan Slack'ten gelen her isteği alır. Kısa olanları kendisi yanıtlar, diğer işleri doğru ajana iletir ve yanıtı ileti dizisinde paylaşır.",
@@ -853,7 +853,7 @@ export const messages = {
   "mobile.server.connectors.telegram.helpError":
     "OpenBot bu sohbete ulaşamıyor. Yeniden bağlanın veya sohbetin bağlantısını kesin.",
   "mobile.server.connectors.telegram.helpNotLinked":
-    "{host} üzerindeki OpenBot bu sohbetin mesajlarını almıyor. Başka bir sunucuya bağlı. {host} sunucusuna bağlamak için Yeniden bağlan'a dokunun.",
+    "Bu sohbet {host} sunucusuna bağlı değil. Bağlamak için Yeniden bağlan'a dokunun.",
   "mobile.server.connectors.telegram.retryAt":
     "Telegram OpenBot'tan beklemesini istedi. {time} saatinde tekrar deneyecek.",
   "mobile.server.connectors.telegram.linkTitle": "Bir sohbet bağla",

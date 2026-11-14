@@ -776,7 +776,7 @@ export const messages = {
   "mobile.server.connectors.slack.helpRelay":
     "O OpenBot em {host} não consegue receber eventos do Slack. Em {host}, entre na sua conta, dê um nome ao servidor nas Configurações do servidor e mantenha o OpenBot aberto.",
   "mobile.server.connectors.slack.helpNotLinked":
-    "O OpenBot em {host} não recebe as mensagens deste workspace. Ele está vinculado a outro servidor. Toque em Reconectar para vinculá-lo a {host}.",
+    "Este workspace não está vinculado a {host}. Toque em Reconectar para vinculá-lo.",
   "mobile.server.connectors.slack.orchestratorTitle": "Orquestrador do Slack",
   "mobile.server.connectors.slack.orchestratorDescription":
     "Este agente recebe todas as solicitações do Slack. Ele mesmo responde às curtas, encaminha o restante do trabalho ao agente certo e publica a resposta na conversa.",
@@ -859,7 +859,7 @@ export const messages = {
   "mobile.server.connectors.telegram.helpError":
     "O OpenBot não consegue acessar este chat. Reconecte ou desconecte o chat.",
   "mobile.server.connectors.telegram.helpNotLinked":
-    "O OpenBot em {host} não recebe as mensagens deste chat. Ele está vinculado a outro servidor. Toque em Reconectar para vinculá-lo a {host}.",
+    "Este chat não está vinculado a {host}. Toque em Reconectar para vinculá-lo.",
   "mobile.server.connectors.telegram.retryAt":
     "O Telegram pediu para o OpenBot aguardar. Ele tentará novamente às {time}.",
   "mobile.server.connectors.telegram.linkTitle": "Vincular um chat",
