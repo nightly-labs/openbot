@@ -28,7 +28,7 @@
 //       (docs/hosted-servers.md#a-new-server-on-a-pool-machine). A free machine that has the data of a
 //       server (a first start that failed, or a move that went back) is not changed; with
 //       `--reinstall`, the script erases its disk first.
-//   bun scripts/hosting/leaseweb-pool.ts move <server ID> <VPS ID | auto> [--keys=<file>] [--units=<unit>,...] [--docker] [--apply]
+//   bun scripts/hosting/leaseweb-pool.ts move <server ID> <VPS ID | auto> [--keys=<file>] [--units=<unit>,...] [--docker] [--folders=<folder>,...] [--apply]
 //       Moves one server from its boat sandbox to a free machine of the pool, as
 //       docs/hosted-servers.md#move-a-server-from-boat says. The machine takes no new server from then
 //       on. `auto` selects the machine when the move starts: a free machine of the plan, in the order of the
@@ -37,7 +37,10 @@
 //       that an operator moves by hand, and the move then continues. It refuses a sandbox whose stop at
 //       boat is failing, and stops before the downtime when the sandbox has Docker containers. `--docker`
 //       says that an operator moves the containers by hand (stopped before the move, so the boat stop can
-//       save the sandbox), and the move then continues.
+//       save the sandbox), and the move then continues. It also stops when files of the customer are in
+//       folders outside the home that the move does not copy, such as `/srv/vaults`. `--folders` names
+//       the folders that the move then copies too: `/srv/<name>`, `/mnt/<name>`, `/media/<name>` or a
+//       new top-level folder, which the machine must not have. A server with another such folder stays on boat.
 //   bun scripts/hosting/leaseweb-pool.ts custom <VPS ID> --owner=<email> --customer=<word> \
 //       --name=<server name> --keys=<file> [--apply]
 //       Sets up a VPS with no reference as the server of one customer, not in the pool
@@ -304,10 +307,21 @@ const SANDBOX_SSH = `ssh -i "$d/key" -o IdentitiesOnly=yes -o BatchMode=yes -o S
   -o UserKnownHostsFile="$d/known-hosts" -o ConnectTimeout=20 -o ServerAliveInterval=15`;
 
 /** Runs in the sandbox as root. Sends the archive to the machine; the key of the move can only write it there. */
+/** True for a folder that `--folders` can name: the same rule as `movable_folder` of move-from-boat.sh. */
+function movableFolder(folder: string) {
+  return (
+    /^\/(?:srv\/|mnt\/|media\/)?[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*$/u.test(folder) &&
+    folder !== "/srv/openbot-hosted" &&
+    !/^\/(?:bin|boot|cdrom|dev|etc|gnu|home|initrd.*|lib.*|lost\+found|media|mnt|nix|opt|proc|root|run|sbin|snap|srv|swap.*|sys|tmp|usr|var)$/u.test(
+      folder,
+    )
+  );
+}
+
 const RUN_EXPORT = `#!/bin/bash
 set -o pipefail
 d=${SANDBOX_MOVE}
-bash "$d/move-from-boat.sh" export - 2>"$d/export.log" | ${SANDBOX_SSH} "root@$1"
+bash "$d/move-from-boat.sh" export - "\${@:2}" 2>"$d/export.log" | ${SANDBOX_SSH} "root@$1"
 echo "$?" >"$d/status"
 `;
 
@@ -1435,8 +1449,19 @@ exit "$status"`;
     throw new Error(`The pool has no free ${product} for this server. Add a machine first.`);
   }
 
-  async move(serverId: string, vpsArg: string, unitsMovedByHand: readonly string[] = [], dockerMovedByHand = false) {
+  async move(
+    serverId: string,
+    vpsArg: string,
+    unitsMovedByHand: readonly string[] = [],
+    dockerMovedByHand = false,
+    foldersToCopy: readonly string[] = [],
+  ) {
     if (!SERVER_ID_PATTERN.test(serverId)) throw new Error(`Not a server ID: ${serverId}`);
+    // The same check as `movable_folder` of move-from-boat.sh. The names also go into shell commands.
+    for (const folder of foldersToCopy) {
+      if (!movableFolder(folder)) throw new Error(`The move cannot copy ${folder}, so this server stays on boat.`);
+    }
+    const folderArgs = foldersToCopy.map((folder) => `'${folder}'`).join(" ");
     if (vpsArg !== "auto" && !VPS_ID_PATTERN.test(vpsArg)) throw new Error(`Not a VPS ID: ${vpsArg}`);
     const started = Date.now();
     let last = started;
@@ -1593,6 +1618,8 @@ if ids=$(docker ps -aq 2>/dev/null); then
   echo "docker_restart=$restart"
 fi
 bash "$d/move-from-boat.sh" packages`,
+        // `packages` searches the disk outside the home for files of the customer.
+        600,
       );
       const values = keyValues(output);
       packages = output.split("\n").filter((line) => /^apt=[a-z0-9][a-z0-9+.-]+$/u.test(line));
@@ -1606,6 +1633,30 @@ bash "$d/move-from-boat.sh" packages`,
         throw new Error(
           `The sandbox has systemd units of the customer that the move does not copy: ${units.join(", ")}.`,
         );
+      }
+      // The move copies only the home and the directories that `added_trees` finds. A server with files of
+      // the customer in other folders, such as vaults in /srv, stays on boat unless `--folders` names each:
+      // the move then copies them.
+      const folders = output
+        .split("\n")
+        .flatMap((line) => /^folder=(\/\S.*)$/u.exec(line)?.[1] ?? [])
+        .filter((folder) => !foldersToCopy.includes(folder));
+      if (folders.length > 0) {
+        throw new Error(
+          `The sandbox has files of the customer in folders that the move does not copy: ${folders.join(", ")}. ` +
+            "With --folders, the move copies /srv/<name>, /mnt/<name>, /media/<name> and a new top-level folder. " +
+            "A server with another such folder stays on boat.",
+        );
+      }
+      if (foldersToCopy.length > 0) {
+        // The import makes each folder new. Check the machine before the downtime, not during it.
+        const present = this.#remote(
+          machine,
+          `for f in ${folderArgs}; do if [ -e "$f" ] || [ -L "$f" ]; then echo "$f"; fi; done`,
+          { capture: true },
+        ).trim();
+        if (present !== "")
+          throw new Error(`The machine has these folders already: ${present.split("\n").join(", ")}.`);
       }
       // The VPS has no Docker, and the move does not copy containers or images. A container that restarts
       // also makes the stop at boat fail. So a server with a container stays on boat.
@@ -1672,7 +1723,7 @@ bash "$d/move-from-boat.sh" packages`,
       await this.#sandboxRun(
         sandbox,
         `systemctl reset-failed openbot-move-export.service 2>/dev/null || true
-systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/run-export.sh ${machine.address}`,
+systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/run-export.sh ${machine.address} ${folderArgs}`,
       );
       const deadline = Date.now() + EXPORT_WAIT_MS;
       let status = "";
@@ -1722,7 +1773,7 @@ systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/ru
       // the sandbox. `archiving` is not enough: boat can cancel the stop after it, and the sandbox then runs
       // and starts OpenBot again.
       await this.#boat("POST", `/sandboxes/${sandbox}/stop`, {});
-      this.#remote(machine, `bash ${MACHINE_HOSTING}/move-from-boat.sh import ${MACHINE_ARCHIVE}`);
+      this.#remote(machine, `bash ${MACHINE_HOSTING}/move-from-boat.sh import ${MACHINE_ARCHIVE} ${folderArgs}`);
       lap("Import");
       const stopped = await this.#waitForSandbox(
         sandbox,
@@ -1794,7 +1845,7 @@ systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/ru
 }
 
 const USAGE =
-  "Usage: leaseweb-pool.ts status | free | add <VPS ID>... | remove <VPS ID>... | sync | prepare <VPS ID>... --keys=<file> [--reinstall] | move <server ID> <VPS ID | auto> [--keys=<file>] [--units=<unit>,...] [--docker] | custom <VPS ID> --owner=<email> --customer=<word> --name=<server name> --keys=<file> [--apply] [--env=test]";
+  "Usage: leaseweb-pool.ts status | free | add <VPS ID>... | remove <VPS ID>... | sync | prepare <VPS ID>... --keys=<file> [--reinstall] | move <server ID> <VPS ID | auto> [--keys=<file>] [--units=<unit>,...] [--docker] [--folders=<folder>,...] | custom <VPS ID> --owner=<email> --customer=<word> --name=<server name> --keys=<file> [--apply] [--env=test]";
 
 async function main(args: string[]) {
   const [command, ...operands] = args.filter((arg) => !arg.startsWith("--"));
@@ -1808,7 +1859,16 @@ async function main(args: string[]) {
   else if (command === "sync") await pool.sync();
   else if (command === "prepare" && operands.length > 0) await pool.prepare(operands, args.includes("--reinstall"));
   else if (command === "move" && operands.length === 2 && operands[0] && operands[1])
-    await pool.move(operands[0], operands[1], option("units")?.split(",").filter(Boolean), args.includes("--docker"));
+    await pool.move(
+      operands[0],
+      operands[1],
+      option("units")?.split(",").filter(Boolean),
+      args.includes("--docker"),
+      option("folders")
+        ?.split(",")
+        .map((folder) => folder.replace(/(?<=.)\/+$/u, ""))
+        .filter(Boolean),
+    );
   else if (command === "custom" && operands.length === 1 && operands[0])
     await pool.custom(operands[0], {
       owner: option("owner") ?? "",
