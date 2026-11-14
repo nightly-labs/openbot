@@ -22,4 +22,10 @@ export const messages = {
   "preview.unsupported.openExternally": "Harici olarak aç",
   "preview.spreadsheet.readFailed": "Bu elektronik tablo okunamadı.",
   "preview.spreadsheet.truncated": "Önizleme ilk {rows} satır ve {columns} sütunla sınırlandırıldı.",
+  "preview.diff.label": "{name} içindeki değişiklikler",
+  "preview.diff.added": { one: "{count} satır eklendi", other: "{count} satır eklendi" },
+  "preview.diff.removed": { one: "{count} satır silindi", other: "{count} satır silindi" },
+  "preview.diff.noChanges": "Değişiklik yok.",
+  "preview.diff.instructionsButton": "Değişiklikler",
+  "preview.diff.instructionsTitle": "Talimat değişiklikleri",
 } as const satisfies PartialTranslation<typeof source>;

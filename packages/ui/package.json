@@ -443,6 +443,7 @@
     "./features/provider-diagnostics/provider-diagnostics": "./src/features/provider-diagnostics/provider-diagnostics.ts",
     "./features/provider-updates/provider-update": "./src/features/provider-updates/provider-update.ts",
     "./features/conversation/FilePreviewPanel": "./src/features/conversation/FilePreviewPanel.tsx",
+    "./features/conversation/DiffView": "./src/features/conversation/DiffView.tsx",
     "./features/conversation/BrowserPreviewSidebar": "./src/features/conversation/BrowserPreviewSidebar.tsx",
     "./styles/sliding-tabs.css": "./src/styles/sliding-tabs.css",
     "./styles/sr-only.css": "./src/styles/sr-only.css",

@@ -22,4 +22,20 @@ export const messages = {
   "preview.unsupported.openExternally": "Открыть в программе",
   "preview.spreadsheet.readFailed": "Не удалось прочитать эту таблицу.",
   "preview.spreadsheet.truncated": "Просмотр ограничен первыми {rows} строками и {columns} столбцами.",
+  "preview.diff.label": "Изменения в {name}",
+  "preview.diff.added": {
+    one: "Добавлена {count} строка",
+    few: "Добавлены {count} строки",
+    many: "Добавлено {count} строк",
+    other: "Добавлено {count} строки",
+  },
+  "preview.diff.removed": {
+    one: "Удалена {count} строка",
+    few: "Удалены {count} строки",
+    many: "Удалено {count} строк",
+    other: "Удалено {count} строки",
+  },
+  "preview.diff.noChanges": "Изменений нет.",
+  "preview.diff.instructionsButton": "Изменения",
+  "preview.diff.instructionsTitle": "Изменения инструкций",
 } as const satisfies PartialTranslation<typeof source>;
