@@ -726,6 +726,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       configSetUnsaved: options.flavor.configSetUnsaved,
       keepProbeSession: () => options.flavor.closeKeepsSession === true && this.#supportsSessionResume,
       probeCloseDelayMs: options.flavor.probeCloseDelayMs,
+      deletesSessions: () => this.#initialization?.agentCapabilities?.sessionCapabilities?.delete != null,
     });
   }
 
