@@ -9,6 +9,7 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { z } from "zod";
+import type { McpSignInOffer } from "../mcp-oauth-provider";
 import type { McpProbeOutcome } from "../mcp-probe";
 import type { McpGateway, McpGatewayFailed } from "./mcp-gateway";
 import { profileToolErrorMessage } from "./profile-tools";
@@ -108,8 +109,8 @@ export interface AgentMcpServers {
    * so a saved server with new tools refreshes the sessions.
    */
   inspect(config: McpServerConfig, tested?: boolean): Effect.Effect<McpProbeOutcome, ToolOperationFailed>;
-  /** Whether an http server that answered without a sign-in offers one. Public documents only. */
-  offersSignIn(config: McpServerConfig): Effect.Effect<boolean>;
+  /** What Sign in would do for an http server that answered without a sign-in. Public documents only. */
+  signInOffer(config: McpServerConfig): Effect.Effect<McpSignInOffer>;
   /** Masks the MCP secret values in a text that goes back to the agent. */
   redact(text: string): string;
 }
@@ -137,7 +138,7 @@ export function mcpServersFromGateway(
         Effect.mapError((cause) => new ToolOperationFailed({ cause })),
         Effect.andThen(gateway.inspect(config, tested).pipe(toToolFailure)),
       ),
-    offersSignIn: (config) => gateway.offersSignIn(config),
+    signInOffer: (config) => gateway.signInOffer(config),
     redact: (text) => gateway.redact(text),
   };
 }
@@ -242,7 +243,18 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
       const outcome = yield* servers.inspect(config, true);
       // A server can list its tools to anyone and want a sign-in only to run one: the test passes
       // and those tools fail. Only a test the agent asks for reads the metadata, not each search.
-      if (outcome.error === null && (yield* servers.offersSignIn(config))) {
+      const offer = outcome.error === null ? yield* servers.signInOffer(config) : "none";
+      // A Sign in card that can only fail would come back after each test (#8827).
+      if (offer === "refused")
+        return openBotToolResult({
+          status: "ready",
+          server: describeServer(config, servers.signIns()),
+          toolCount: outcome.toolCount,
+          tools: outcome.tools,
+          error: sourceText("error.backend.mcpRegistrationRefused"),
+          next: "The tools that need a sign-in fail, and a sign-in cannot fix it. Tell the user what the error says, in plain words. Do not offer a Sign in card or ask the user to sign in.",
+        });
+      if (offer === "offered") {
         yield* call.requestSignIn(config);
         return openBotToolResult({
           status: "ready",
