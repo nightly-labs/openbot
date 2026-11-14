@@ -770,7 +770,9 @@ export class ProviderAccounts {
         Effect.gen({ self: this }, function* () {
           const email = signedIn.email ?? null;
           const organization = signedIn.organization ?? null;
-          if (email && this.#loginTaken(provider, account.id, { email, organization }))
+          // Only a sign-in adds a login. A later check keeps a working account: the provider's own sign-in,
+          // which a terminal CLI shares, can change to the same login, and that stopped its agents (#7344).
+          if (afterSignIn && email && this.#loginTaken(provider, account.id, { email, organization }))
             return yield* accountFailure(
               sourceText("error.provider.accountAlreadyAdded", { provider: providerLabel(provider) }),
             );
