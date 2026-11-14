@@ -60,7 +60,12 @@ export function isNonActionableCodexWarning(message: string): boolean {
     // (`codex-rs/core/src/session/mod.rs`). OpenBot changes the model on purpose: the user picked a
     // new one, or a backup model ran. The turn continues, but the red banner looked like a failure and
     // told the user to switch back (#8135).
-    message.startsWith("This session was recorded with model ")
+    message.startsWith("This session was recorded with model ") ||
+    // Codex sends this on each session start when the user's own or a project's `config.toml` sets
+    // `features.multi_agent` (`codex-rs/config/src/loader/mod.rs`). A session setting from OpenBot
+    // does not stop it, because Codex reads only those two layers. The chat works, but a red banner
+    // asked the user to edit the Codex file (#8763).
+    message.startsWith("`[features].multi_agent` is deprecated.")
   );
 }
 
