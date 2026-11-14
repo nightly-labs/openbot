@@ -18,4 +18,5 @@ export const messages = {
   "error.kind.permission": "Je hebt geen toestemming om deze actie uit te voeren. Vraag de eigenaar om toegang.",
   "error.kind.rateLimit": "Te veel verzoeken. Wacht even en probeer het opnieuw.",
   "error.kind.service": "De service is niet beschikbaar. Wacht even en probeer het opnieuw.",
+  "error.kind.interrupted": "De verbinding werd verbroken voordat het antwoord klaar was. Stuur je bericht opnieuw.",
 } as const satisfies PartialTranslation<typeof source>;

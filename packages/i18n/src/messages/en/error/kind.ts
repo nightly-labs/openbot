@@ -16,4 +16,5 @@ export const messages = defineMessages("error.kind", {
   "error.kind.permission": "You do not have permission to complete this action. Ask the owner for access.",
   "error.kind.rateLimit": "Too many requests. Wait a moment, then try again.",
   "error.kind.service": "The service is unavailable. Wait a moment, then try again.",
+  "error.kind.interrupted": "The connection closed before the answer was finished. Send your message again.",
 });
