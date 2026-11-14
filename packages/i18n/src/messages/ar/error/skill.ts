@@ -29,6 +29,8 @@ export const messages = {
   "error.skill.replaceModified": "توجد تغييرات محلية في هذه المهارة. أكّد الاستبدال للمتابعة.",
   "error.skill.removeModified": "توجد تغييرات محلية في هذه المهارة. أكّد الإزالة لحذفها.",
   "error.skill.notFound": "لم يتم العثور على المهارة.",
+  "error.skill.folderSkillToggle":
+    "لم يثبّت OpenBot هذه المهارة، لذلك لا يمكنه تشغيلها أو إيقافها. عدّلها أو أزلها في {location}.",
   "error.skill.disableModified": "توجد تغييرات محلية في هذه المهارة. احفظ نسختي المزوّدين أو وفّق بينهما قبل تعطيلها.",
   "error.skill.disableNeedsRepair": "تحتاج هذه المهارة إلى إصلاح قبل تعطيلها.",
   "error.skill.enableNeedsRepair": "تحتاج هذه المهارة إلى إصلاح قبل تفعيلها.",

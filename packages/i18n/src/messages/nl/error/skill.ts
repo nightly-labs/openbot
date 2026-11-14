@@ -29,6 +29,8 @@ export const messages = {
   "error.skill.replaceModified": "Deze vaardigheid heeft lokale wijzigingen. Bevestig het vervangen om door te gaan.",
   "error.skill.removeModified": "Deze vaardigheid heeft lokale wijzigingen. Bevestig het verwijderen om ze te wissen.",
   "error.skill.notFound": "Vaardigheid niet gevonden.",
+  "error.skill.folderSkillToggle":
+    "OpenBot heeft deze vaardigheid niet geïnstalleerd en kan hem dus niet aan- of uitzetten. Bewerk of verwijder hem in {location}.",
   "error.skill.disableModified":
     "Deze vaardigheid heeft lokale wijzigingen. Sla beide kopieën bij de aanbieders op of breng ze in overeenstemming voordat je haar uitschakelt.",
   "error.skill.disableNeedsRepair": "Deze vaardigheid moet worden hersteld voordat je haar kunt uitschakelen.",

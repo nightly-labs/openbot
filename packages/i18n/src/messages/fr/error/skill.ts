@@ -33,6 +33,8 @@ export const messages = {
   "error.skill.removeModified":
     "Cette compétence a des modifications locales. Confirmez la suppression pour les effacer.",
   "error.skill.notFound": "Compétence introuvable.",
+  "error.skill.folderSkillToggle":
+    "OpenBot n’a pas installé cette compétence et ne peut donc pas l’activer ni la désactiver. Modifiez-la ou retirez-la dans {location}.",
   "error.skill.disableModified":
     "Cette compétence a des modifications locales. Enregistrez ou harmonisez les deux copies des fournisseurs avant de la désactiver.",
   "error.skill.disableNeedsRepair": "Cette compétence doit être réparée avant de pouvoir être désactivée.",

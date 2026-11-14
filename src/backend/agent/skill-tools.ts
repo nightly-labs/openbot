@@ -1,13 +1,14 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type {
-  CreateLocalSkillInput,
-  InstalledSkill,
-  LocalSkillRevisionInput,
-  MarketplaceSkillDetail,
-  ReviseLocalSkillInput,
-  SetEnabledSkillInput,
-  SkillConversationEvent,
-  UninstallSkillInput,
+import {
+  type CreateLocalSkillInput,
+  type InstalledSkill,
+  isFolderSkill,
+  type LocalSkillRevisionInput,
+  type MarketplaceSkillDetail,
+  type ReviseLocalSkillInput,
+  type SetEnabledSkillInput,
+  type SkillConversationEvent,
+  type UninstallSkillInput,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
@@ -163,7 +164,26 @@ export const runLocalSkillTool = Effect.fn("SkillTools.run")(function* (
     case "set_skill_enabled": {
       const input = yield* toolStep(() => setSkillEnabledSchema.parse(args));
       const target = yield* toolStep(() => targetAgent(input.agentId));
-      return yield* api.setEnabled({ ...input, agentId: target });
+      return yield* api.setEnabled({ ...input, agentId: target }).pipe(
+        // A folder skill is not in the lock file, so the service says that it does not exist. Name its folder instead.
+        Effect.catch((failure) =>
+          api.listInstalled(target).pipe(
+            Effect.orElseSucceed((): InstalledSkill[] => []),
+            Effect.flatMap((skills) => {
+              const location = skills.find(
+                (skill) => skill.skillId === input.skillId && isFolderSkill(skill),
+              )?.location;
+              return Effect.fail(
+                location === undefined
+                  ? failure
+                  : new ToolOperationFailed({
+                      cause: new Error(sourceText("error.skill.folderSkillToggle", { location })),
+                    }),
+              );
+            }),
+          ),
+        ),
+      );
     }
     case "uninstall_skill": {
       const input = yield* toolStep(() => uninstallSkillSchema.parse(args));

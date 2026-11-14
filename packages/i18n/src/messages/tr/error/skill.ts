@@ -30,6 +30,8 @@ export const messages = {
   "error.skill.replaceModified": "Bu beceride yerel değişiklikler var. Devam etmek için değiştirmeyi onaylayın.",
   "error.skill.removeModified": "Bu beceride yerel değişiklikler var. Bunları silmek için kaldırmayı onaylayın.",
   "error.skill.notFound": "Beceri bulunamadı.",
+  "error.skill.folderSkillToggle":
+    "OpenBot bu beceriyi yüklemedi, bu yüzden açıp kapatamaz. {location} içinde düzenleyin veya kaldırın.",
   "error.skill.disableModified":
     "Bu beceride yerel değişiklikler var. Devre dışı bırakmadan önce her iki sağlayıcı kopyasını kaydedin veya eşitleyin.",
   "error.skill.disableNeedsRepair": "Bu beceri devre dışı bırakılmadan önce onarılmalıdır.",

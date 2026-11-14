@@ -29,6 +29,8 @@ export const messages = defineMessages("error.skill", {
   "error.skill.replaceModified": "This skill has local changes. Confirm replacement to continue.",
   "error.skill.removeModified": "This skill has local changes. Confirm removal to delete them.",
   "error.skill.notFound": "Skill not found.",
+  "error.skill.folderSkillToggle":
+    "OpenBot did not install this skill, so it cannot turn it on or off. Edit or remove it in {location}.",
   "error.skill.disableModified":
     "This skill has local changes. Save or reconcile both provider copies before disabling it.",
   "error.skill.disableNeedsRepair": "This skill needs repair before it can be disabled.",

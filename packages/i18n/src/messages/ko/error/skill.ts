@@ -30,6 +30,8 @@ export const messages = {
   "error.skill.replaceModified": "이 스킬에 로컬 변경 사항이 있어요. 계속하려면 교체를 확인해 주세요.",
   "error.skill.removeModified": "이 스킬에 로컬 변경 사항이 있어요. 삭제하려면 제거를 확인해 주세요.",
   "error.skill.notFound": "스킬을 찾을 수 없어요.",
+  "error.skill.folderSkillToggle":
+    "OpenBot이 설치한 스킬이 아니라서 켜거나 끌 수 없어요. {location}에서 편집하거나 제거해 주세요.",
   "error.skill.disableModified":
     "이 스킬에 로컬 변경 사항이 있어요. 비활성화하기 전에 두 제공자 사본을 저장하거나 조정해 주세요.",
   "error.skill.disableNeedsRepair": "이 스킬을 비활성화하려면 먼저 복구해야 해요.",

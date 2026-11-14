@@ -30,6 +30,7 @@ export const messages = {
   "error.skill.replaceModified": "该技能有本地修改，请确认替换以继续。",
   "error.skill.removeModified": "该技能有本地修改，请确认移除以删除它们。",
   "error.skill.notFound": "未找到该技能。",
+  "error.skill.folderSkillToggle": "该技能不是由 OpenBot 安装的，因此无法启用或停用。请在 {location} 中编辑或移除。",
   "error.skill.disableModified": "该技能有本地修改。停用前请先保存或对齐两个服务商的副本。",
   "error.skill.disableNeedsRepair": "该技能需要先修复才能停用。",
   "error.skill.enableNeedsRepair": "该技能需要先修复才能启用。",
