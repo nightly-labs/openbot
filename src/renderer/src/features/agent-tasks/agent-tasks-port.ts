@@ -46,33 +46,35 @@ export interface AgentTasksPort
 }
 
 /**
- * The side threads on desktop: main reaches the active server, or the server that a call names. A
- * delete that waits for its Undo time names its server, so a server switch does not move it.
+ * The side threads on desktop, on one server. The thread state lives as long as its server scope, so
+ * each call names that server: a message that waits for its files, or a reply that comes after a
+ * server switch, stays on the server of the thread (#9123). A delete that waits for its Undo time
+ * names its own server.
  * Read on each call: tests and stories replace `window.openbot` per case.
  */
-export function agentTasksPort(): AgentTasksPort {
+export function agentTasksPort(server: string): AgentTasksPort {
   const { agent } = window.openbot;
   return {
-    listTasks: (agentId) => agent.listTasks(agentId),
-    readTask: (input) => agent.readTask(input),
-    readTaskPage: (input) => agent.readTaskPage(input),
-    readTaskAround: (input) => agent.readTaskAround(input),
-    startTask: (input) => agent.startTask(input),
-    sendToTask: (input) => agent.sendMessage(input),
-    runQueuedMessageAsTask: (input) => agent.runQueuedMessageAsTask(input),
-    branchTask: (input) => agent.branchTask(input),
-    stopTask: (input) => agent.stopTask(input),
-    closeTask: (input, serverId) => agent.closeTask(input, serverId),
-    reopenTask: (input, serverId) => agent.reopenTask(input, serverId),
-    renameTask: (input) => agent.renameTask(input),
-    deleteTask: (input, serverId) => agent.deleteTask(input, serverId),
-    deleteTaskMessage: (input) => agent.deleteConversationMessage(input),
-    listTaskReads: (agentId) => agent.listTaskReads(agentId),
-    markTaskRead: (input) => agent.markTaskRead(input),
+    listTasks: (agentId) => agent.listTasks(agentId, server),
+    readTask: (input) => agent.readTask(input, server),
+    readTaskPage: (input) => agent.readTaskPage(input, server),
+    readTaskAround: (input) => agent.readTaskAround(input, server),
+    startTask: (input) => agent.startTask(input, server),
+    sendToTask: (input) => agent.sendMessage(input, server),
+    runQueuedMessageAsTask: (input) => agent.runQueuedMessageAsTask(input, server),
+    branchTask: (input) => agent.branchTask(input, server),
+    stopTask: (input) => agent.stopTask(input, server),
+    closeTask: (input, serverId) => agent.closeTask(input, serverId ?? server),
+    reopenTask: (input, serverId) => agent.reopenTask(input, serverId ?? server),
+    renameTask: (input) => agent.renameTask(input, server),
+    deleteTask: (input, serverId) => agent.deleteTask(input, serverId ?? server),
+    deleteTaskMessage: (input) => agent.deleteConversationMessage(input, server),
+    listTaskReads: (agentId) => agent.listTaskReads(agentId, server),
+    markTaskRead: (input) => agent.markTaskRead(input, server),
     queue: {
-      cancelQueuedMessage: (input) => agent.cancelQueuedMessage(input),
-      steerQueuedMessage: (input) => agent.steerQueuedMessage(input),
-      reorderQueue: (input) => agent.reorderQueue(input),
+      cancelQueuedMessage: (input) => agent.cancelQueuedMessage(input, server),
+      steerQueuedMessage: (input) => agent.steerQueuedMessage(input, server),
+      reorderQueue: (input) => agent.reorderQueue(input, server),
     },
   };
 }
