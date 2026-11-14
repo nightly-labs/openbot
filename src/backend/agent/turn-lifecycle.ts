@@ -2728,14 +2728,16 @@ export class TurnLifecycle {
   ): ConversationMessage | undefined {
     const message = traceMessage(messages, turnId);
     if (!message) return undefined;
-    let usage: { tokens: number; costUsd: number | null } | null = null;
+    let usage: { tokens: number; cachedInput: number; costUsd: number | null } | null = null;
     try {
       const since = new Date(Date.parse(trace.startedAt) - TURN_USAGE_MARGIN_MS).toISOString();
       usage = this.#store.database.usage.readTurnTotals(agentId, turnId, since);
     } catch (error) {
       logger.warn("The usage of a turn could not be read for its trace.", { error });
     }
-    message.trace = usage ? { ...trace, tokens: usage.tokens, costUsd: usage.costUsd } : trace;
+    message.trace = usage
+      ? { ...trace, tokens: usage.tokens, cachedInput: usage.cachedInput, costUsd: usage.costUsd }
+      : trace;
     return message;
   }
 

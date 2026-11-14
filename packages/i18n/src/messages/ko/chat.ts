@@ -67,6 +67,7 @@ export const messages = {
   "chat.trace.duration": "소요 시간",
   "chat.trace.cost": "비용",
   "chat.trace.tokens": "토큰",
+  "chat.trace.cachedInput": "캐시된 입력",
   "chat.trace.llmCalls": "LLM 호출",
   "chat.trace.toolCalls": "도구 호출",
   "chat.trace.errors": "오류",
