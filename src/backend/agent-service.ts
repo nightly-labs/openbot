@@ -3668,8 +3668,22 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       previous !== undefined &&
       !input.leaveUsageLimit &&
       Object.keys(input).every((key) => RUNTIME_UPDATE_KEYS.has(key));
+    // An account that an agent names stays the agent's while a pool of the provider's accounts runs
+    // (#9116). The app shows the pool as one choice, so a person's change of the model or the account
+    // returns the agent to the pool. Automatic moves and a change of effort keep the pin as it is.
+    const pinnedAccountId =
+      move !== null
+        ? undefined
+        : initiatingAgentId === undefined
+          ? input.provider !== undefined || input.model !== undefined || input.providerAccountId !== undefined
+            ? null
+            : undefined
+          : input.providerAccountId !== undefined
+            ? (requestedAccount ?? DEFAULT_PROVIDER_ACCOUNT_ID)
+            : undefined;
+    const pin = pinnedAccountId === undefined ? {} : { pinnedAccountId };
     const queue = (pendingRuntime: AgentPendingRuntime) =>
-      this.#store.updateAgent({ agentId: input.agentId, pendingRuntime }, initiatingAgentId).pipe(
+      this.#store.updateAgent({ agentId: input.agentId, pendingRuntime, ...pin }, initiatingAgentId).pipe(
         Effect.tap(() =>
           Effect.sync(() => {
             this.#emit({ type: "agents-changed", agents: this.listAgents() });
@@ -3776,6 +3790,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ...(usageLimitReturn !== undefined ? { usageLimitReturn } : {}),
         // A Team API client cannot see the queued change, so only a handover from it ends the change.
         ...(runtimeFields && (queueWhileBusy || handoverNeeded) ? { pendingRuntime: null } : {}),
+        ...pin,
       },
       initiatingAgentId,
     );
@@ -3952,7 +3967,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const current = choice.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
     const pick = this.#poolPick(choice.provider, choice.model, current);
     if (pick !== null) this.#providers.setPoolInUse(choice.provider, pick);
-    if (pick === null || pick === current) return null;
+    if (pick === null || pick === current || this.#keepsPinnedAccount(agent)) return null;
     return {
       provider: choice.provider,
       model: choice.model,
@@ -3968,7 +3983,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (!this.#pooled(choice)) return false;
     const current = choice.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
     const pick = this.#poolPick(choice.provider, choice.model, current);
-    return pick !== null && pick !== current;
+    return pick !== null && pick !== current && !this.#keepsPinnedAccount(agent);
+  }
+
+  /**
+   * Whether the agent stays on the account that an agent chose for it: the agent is on it, and it is
+   * ready for the model. A limit or a sign-out lets the pool move the agent, and the move ends the pin.
+   */
+  #keepsPinnedAccount(agent: AgentSummary): boolean {
+    const choice = agentModelChoice(agent);
+    return (
+      agent.pinnedAccountId === (choice.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID) &&
+      this.#usageLimitReady(choice)
+    );
   }
 
   /**
