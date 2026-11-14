@@ -326,6 +326,7 @@
 
 .ui-block-fields dt {
   color: var(--openbot-text-muted);
+  overflow-wrap: anywhere;
 }
 
 .ui-block-fields dd {
