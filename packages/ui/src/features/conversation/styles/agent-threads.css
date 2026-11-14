@@ -322,6 +322,24 @@
   color: var(--openbot-text-muted);
 }
 
+/* A thread that only the menu shows has unread agent messages: a dot on the menu button, in the
+   color of the thread unread dot, leads to it. */
+.agent-threads-menu-button.ui-button,
+.agent-threads-switcher.ui-button {
+  position: relative;
+}
+
+.agent-threads-menu-unread {
+  position: absolute;
+  inset-block-start: 2px;
+  inset-inline-end: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-unread-surface);
+  pointer-events: none;
+}
+
 /* A narrow header: the open thread as one button, with the shape, fill and type of a selected tab.
    The chevron says that it opens the thread list. */
 .agent-threads-switcher.ui-button {
