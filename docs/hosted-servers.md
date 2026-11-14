@@ -626,7 +626,7 @@ to 2 minutes for that session. OpenBot shows its own windows on a 1280x800 Xvfb 
 `:0`, and lightdm keeps the other keys when it writes the file. The script names `:0` in
 `OPENBOT_AGENT_DISPLAY`, so an agent's screenshot and remote desktop do not show the OpenBot window
 (see [Computer Use and remote desktop](architecture/computer-use.md#agent-display-on-a-server)). With
-no desktop session, the server starts two Xvfb displays, as a
+no desktop session, the server starts two Xvfb displays and Openbox on the agent display, as a
 [self-hosted server](self-hosted-server.md#how-it-works) does. The keyring files are in
 `/srv/openbot-hosted/keyrings`:
 
