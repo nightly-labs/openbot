@@ -657,6 +657,7 @@ export function MarketplaceStory(props: StoryProps) {
           },
         },
     addServer: member ? undefined : fn(),
+    editServer: member ? undefined : fn(),
     runPrompt: fn(),
     copyLink: fn(),
     copyListingLink: fn(),

@@ -1803,6 +1803,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const [serverSettingsSection, setServerSettingsSection] = createSignal<ServerSettingsSection | null>(null);
   /** Set when the Marketplace asked for the form that adds an MCP server, until the MCP section opens it. */
   const [mcpAddRequest, setMcpAddRequest] = createSignal(false);
+  /** The MCP row whose Edit the Marketplace asked for, until the MCP section opens its form. */
+  const [mcpEditRequest, setMcpEditRequest] = createSignal<string | null>(null);
   /** The MCP row that a chat card asked to sign in to. The MCP section starts its sign-in, as its Sign in button does. */
   const [mcpSignInRequest, setMcpSignInRequest] = createSignal<string | null>(null);
   async function openServerSettings(
@@ -1819,6 +1821,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     }
     setServerSettingsSection(section);
     setMcpAddRequest(false);
+    setMcpEditRequest(null);
     setMcpSignInRequest(null);
     setMobilePane("conversation");
     setHostPage(null);
@@ -3027,6 +3030,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                           onAddServer={(serverId) => {
                             void openServerSettings(serverId, null, "mcp").then(() => setMcpAddRequest(true));
                           }}
+                          onEditServer={(serverId, mcpServerId) => {
+                            void openServerSettings(serverId, null, "mcp").then(() => setMcpEditRequest(mcpServerId));
+                          }}
                         />
                       }
                     >
@@ -3443,6 +3449,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         mcpSignInRequest={mcpSignInRequest()}
                         onMcpSignInRequestHandled={() => setMcpSignInRequest(null)}
                         onMcpAddRequestHandled={() => setMcpAddRequest(false)}
+                        mcpEditRequest={mcpEditRequest()}
+                        onMcpEditRequestHandled={() => setMcpEditRequest(null)}
                         onSaveMcpServer={async (config) => {
                           await serverSettings.saveMcpServer(config);
                           // A saved row can name an address the host is already signed in to.

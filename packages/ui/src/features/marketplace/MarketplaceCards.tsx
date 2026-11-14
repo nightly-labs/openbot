@@ -2,7 +2,7 @@ import { Button, Plus, TriangleAlert } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { Show } from "solid-js";
 import { AppLogo, Done } from "./MarketplaceParts";
-import type { MarketplaceApp } from "./marketplace-model";
+import { customServerStatus, type MarketplaceApp } from "./marketplace-model";
 import type { MarketplaceScope } from "./marketplace-view";
 
 /** "1,204 installs", in the reader's number format. */
@@ -83,7 +83,7 @@ export function AppAction(props: {
       when={props.app.status !== "connected"}
       fallback={
         <Show when={list()}>
-          <Done>{t("marketplace.app.connected")}</Done>
+          <Done>{t(props.app.kind === "custom" ? customServerStatus(props.app) : "marketplace.app.connected")}</Done>
         </Show>
       }
     >
