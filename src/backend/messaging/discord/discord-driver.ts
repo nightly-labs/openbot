@@ -596,15 +596,15 @@ function hasContent(message: DiscordHistoryMessage): boolean {
 }
 
 /**
- * Without the Message Content intent, Discord gives no text for a message that does not mention
- * OpenBot. The read then looks empty although the channel has messages.
+ * Why the read left out messages. Without the Message Content intent, Discord gives no text for a
+ * message that does not mention OpenBot, and a system message, such as a member join, has none.
  */
 function leftOutNote(count: number): string {
   const messages =
     count === 1
       ? "1 message of this channel has no text or files that OpenBot can read, so it is left out."
       : `${count} messages of this channel have no text or files that OpenBot can read, so they are left out.`;
-  return `${messages} Discord can give OpenBot the text of a message only when the message mentions OpenBot. A person can mention OpenBot in a message so that OpenBot can read it.`;
+  return `${messages} Possible causes: Discord gives OpenBot the text of a message only when the message mentions OpenBot, or the message is a system message, such as a member join. A person can mention OpenBot in a message so that OpenBot can read it.`;
 }
 
 function compareSnowflakes(left: string, right: string): number {
