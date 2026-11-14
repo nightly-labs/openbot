@@ -2326,17 +2326,31 @@ export class MailboxStore {
     error: string | null = null,
   ): Effect.fn.Return<void, StoredStateFailure> {
     try {
+      // A teammate that already sent its answer to this request did answer it, also when its turn
+      // then failed or stopped. The request ends completed, so the agent that asked does not see it
+      // as failed (#7259). The turn keeps its own failure.
+      const answered = status !== "completed" && this.#answeredRequest(deliveryId);
       // Redacted here, not at the call site: this text is written to the database and read back by
       // the renderer through the queue. A provider CLI quotes what it was given, so a failure against
       // a custom endpoint can carry that endpoint's API key or a header value.
       yield* this.#updateDeliveryEffect(deliveryId, ["starting", "running"], {
-        status,
-        error: error === null ? null : redactText(error),
+        status: answered ? "completed" : status,
+        error: answered || error === null ? null : redactText(error),
       });
     } catch (cause) {
       return yield* new StoredStateFailure({ cause });
     }
   }, Effect.uninterruptible).bind(this);
+
+  /** Whether the delivery is a teammate request outside a channel that its recipient has answered. */
+  #answeredRequest(deliveryId: string): boolean {
+    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    if (!delivery) return false;
+    const request = this.#state.messages.find((message) => message.id === delivery.messageId);
+    return (
+      request?.sender.kind === "agent" && !request.channelId && this.hasReplyFrom(delivery.recipientAgentId, request.id)
+    );
+  }
 
   cancel = Effect.fn("MailboxStore.cancel")(function* (
     this: MailboxStore,
