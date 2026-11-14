@@ -25,6 +25,7 @@ import {
   requestLargeFile,
   useAttachmentDownload,
 } from "../model/large-files";
+import { shareTypeOptions } from "../model/share-file-type";
 import { shareFilesNative } from "../model/share-files-native";
 import { mediaFile, writeMediaFile } from "./use-media-file";
 
@@ -340,7 +341,10 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
       const name = safeFileName(attachment.name);
       file = new File(Paths.cache, `${Date.now()}-${name}`);
       await writeFileData(file, result.data);
-      await Sharing.shareAsync(file.uri, { mimeType: result.data.mimeType, dialogTitle: attachment.name });
+      await Sharing.shareAsync(file.uri, {
+        ...shareTypeOptions(file.uri, result.data.mimeType),
+        dialogTitle: attachment.name,
+      });
     } catch (error) {
       void haptics.notification("error");
       showFailureAlert(
@@ -537,7 +541,10 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
       const data = await load(attachment);
       file = new File(Paths.cache, `${Date.now()}-${safeFileName(attachment.name)}`);
       await writeFileData(file, data);
-      await Sharing.shareAsync(file.uri, { mimeType: data.mimeType, dialogTitle: attachment.name });
+      await Sharing.shareAsync(file.uri, {
+        ...shareTypeOptions(file.uri, data.mimeType),
+        dialogTitle: attachment.name,
+      });
     } catch (error) {
       fail(error, t("mobile.chat.attachment.openFailed"));
     } finally {
@@ -609,7 +616,7 @@ export async function shareLocalAttachment(file: { name: string; mimeType: strin
       temporary.writeSync(file.base64, { encoding: "base64" });
       uri = temporary.uri;
     }
-    await Sharing.shareAsync(uri, { mimeType: file.mimeType, dialogTitle: file.name });
+    await Sharing.shareAsync(uri, { ...shareTypeOptions(uri, file.mimeType), dialogTitle: file.name });
   } catch (error) {
     void haptics.notification("error");
     showFailureAlert(
