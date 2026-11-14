@@ -165,9 +165,6 @@ export const messages = {
   "server.upgrade.title": "你的智能体空间即将用完",
   "server.upgrade.description": "{server} 的可用空间所剩无几。升级后，你的智能体可以不间断地继续工作。",
   "server.upgrade.used": "已使用 {used}，共 {total}",
-  "server.upgrade.current": "{plan}（当前）",
-  "server.upgrade.price": "价格",
-  "server.upgrade.action": "升级到 {plan}",
   "server.hosted.progressTitle": "正在配置 {name}",
   // The setup waits for the first payment on the Stripe page in the browser.
   "server.hosted.paymentTitle": "请在浏览器中完成付款",

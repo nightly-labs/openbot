@@ -149,9 +149,6 @@ export const messages = {
   "server.upgrade.description":
     "{server} ha poco spazio libero. Esegui l’upgrade per far lavorare i tuoi agenti senza interruzioni.",
   "server.upgrade.used": "{used} di {total} usati",
-  "server.upgrade.current": "{plan} (attuale)",
-  "server.upgrade.price": "Prezzo",
-  "server.upgrade.action": "Passa a {plan}",
   "server.hosted.progressTitle": "Configurazione di {name}",
   "server.hosted.paymentTitle": "Completa il pagamento nel browser",
   "server.hosted.paymentDescription": "La configurazione inizia quando Stripe conferma il pagamento.",

@@ -449,6 +449,7 @@ async function run() {
         plan: "pro",
         interval: "month",
         currency: "eur",
+        storageTier: 0,
       }),
     );
   }

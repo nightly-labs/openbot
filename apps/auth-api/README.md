@@ -34,9 +34,13 @@ commands continue to use that file.
 ### Stripe sandbox
 
 `bun run api:stripe:bootstrap` creates the six plan Prices (lookup keys `openbot_{plan}_{month|year}`),
-the license Price (`openbot_license_month`) and the Customer Portal settings in the Stripe account of `STRIPE_SECRET_KEY`. It is safe to run
-again: a changed amount makes a new Price and moves the lookup key to it. In the Portal, an upgrade
-is charged at once, and a downgrade or a shorter interval starts at the next period.
+the twelve storage add-on Prices (`openbot_storage_{plan}_{1|2}_{month|year}`, one Product for each
+plan), the license Prices and the Customer Portal settings in the Stripe account of `STRIPE_SECRET_KEY`.
+It is safe to run again: a changed amount makes a new Price and moves the lookup key to it. The Portal
+has no plan change (`subscription_update` is off); it cancels plans and updates payment methods.
+`POST /v1/me/billing/storage` (and `/api/browser/v1/me/billing/storage`) with
+`{subscriptionId, tier}` buys a storage tier for a server on a VPS of the operator. See
+[Hosted servers](../../docs/hosted-servers.md#storage-tiers).
 
 For a local Worker, forward the webhooks and set the secret that `stripe listen` prints in your
 shell as `STRIPE_WEBHOOK_SECRET`:
@@ -53,7 +57,8 @@ also sets the allow list from `HOSTED_SERVERS_TEST_ALLOW_LIST` and the developer
 
 `scripts/stripe-flows-e2e.ts` checks the plan flows against the sandbox and a local Worker: renewal,
 failed renewal, cancel at the period end, plan change, renew, delete, another account's server, a
-deleted customer, a refund, a dispute, and the welcome email of a first plan. The `license-*`
+deleted customer, a refund, a dispute, the welcome email of a first plan, and the storage tiers
+(`storage-tier`, which needs the storage Prices of the bootstrap). The `license-*`
 scenarios check the license: buy, Checkout, one open Checkout page, change users, the user count,
 renewal, failed renewal, currency, isolation from the server plans, and the user limit at a join. Each scenario uses a Stripe
 test clock and deletes it at the end. Start the Worker
@@ -68,8 +73,8 @@ repository root:
 bun scripts/stripe-flows-e2e.ts --api http://127.0.0.1:<port> [scenario ...]
 ```
 
-The `portal` scenario prints a Customer Portal cancel page and then an update page, and waits until
-you use them. The report goes to `.openbot-build/stripe-flows-e2e.json`.
+The `portal` scenario prints a Customer Portal cancel page and waits until you use it. Then it checks
+that the plan change flow of an old app opens the Portal home, and that the Portal has no plan change. The report goes to `.openbot-build/stripe-flows-e2e.json`.
 
 The `boat` scenario runs only when you name it. It pays for a server, waits until OpenBot in the VM
 signs in and publishes the host, restarts the service to check the stored session, and deletes the

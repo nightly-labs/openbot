@@ -134,6 +134,7 @@ import { Route as V1MarketplaceAgentsAgentIdRouteImport } from './routes/v1/mark
 import { Route as V1MarketplaceAgentsMineRouteImport } from './routes/v1/marketplace/agents/mine'
 import { Route as V1MeBillingIndexRouteImport } from './routes/v1/me/billing/index'
 import { Route as V1MeBillingPortalRouteImport } from './routes/v1/me/billing/portal'
+import { Route as V1MeBillingStorageRouteImport } from './routes/v1/me/billing/storage'
 import { Route as V1MeLicenseIndexRouteImport } from './routes/v1/me/license/index'
 import { Route as V1MeLicenseCheckoutRouteImport } from './routes/v1/me/license/checkout'
 import { Route as V1MeLicensePlanRouteImport } from './routes/v1/me/license/plan'
@@ -848,6 +849,11 @@ const V1MeBillingPortalRoute = V1MeBillingPortalRouteImport.update({
   path: '/billing/portal',
   getParentRoute: () => V1MeRoute,
 } as any)
+const V1MeBillingStorageRoute = V1MeBillingStorageRouteImport.update({
+  id: '/billing/storage',
+  path: '/billing/storage',
+  getParentRoute: () => V1MeRoute,
+} as any)
 const V1MeLicenseIndexRoute = V1MeLicenseIndexRouteImport.update({
   id: '/license/',
   path: '/license/',
@@ -1442,6 +1448,7 @@ export interface FileRoutesByFullPath {
   '/v1/marketplace/agents/$agentId': typeof V1MarketplaceAgentsAgentIdRouteWithChildren
   '/v1/marketplace/agents/mine': typeof V1MarketplaceAgentsMineRoute
   '/v1/me/billing/portal': typeof V1MeBillingPortalRoute
+  '/v1/me/billing/storage': typeof V1MeBillingStorageRoute
   '/v1/me/license/checkout': typeof V1MeLicenseCheckoutRoute
   '/v1/me/license/plan': typeof V1MeLicensePlanRoute
   '/v1/me/license/renewal': typeof V1MeLicenseRenewalRoute
@@ -1648,6 +1655,7 @@ export interface FileRoutesByTo {
   '/v1/marketplace/agents/$agentId': typeof V1MarketplaceAgentsAgentIdRouteWithChildren
   '/v1/marketplace/agents/mine': typeof V1MarketplaceAgentsMineRoute
   '/v1/me/billing/portal': typeof V1MeBillingPortalRoute
+  '/v1/me/billing/storage': typeof V1MeBillingStorageRoute
   '/v1/me/license/checkout': typeof V1MeLicenseCheckoutRoute
   '/v1/me/license/plan': typeof V1MeLicensePlanRoute
   '/v1/me/license/renewal': typeof V1MeLicenseRenewalRoute
@@ -1859,6 +1867,7 @@ export interface FileRoutesById {
   '/v1/marketplace/agents/$agentId': typeof V1MarketplaceAgentsAgentIdRouteWithChildren
   '/v1/marketplace/agents/mine': typeof V1MarketplaceAgentsMineRoute
   '/v1/me/billing/portal': typeof V1MeBillingPortalRoute
+  '/v1/me/billing/storage': typeof V1MeBillingStorageRoute
   '/v1/me/license/checkout': typeof V1MeLicenseCheckoutRoute
   '/v1/me/license/plan': typeof V1MeLicensePlanRoute
   '/v1/me/license/renewal': typeof V1MeLicenseRenewalRoute
@@ -2067,6 +2076,7 @@ export interface FileRouteTypes {
     | '/v1/marketplace/agents/$agentId'
     | '/v1/marketplace/agents/mine'
     | '/v1/me/billing/portal'
+    | '/v1/me/billing/storage'
     | '/v1/me/license/checkout'
     | '/v1/me/license/plan'
     | '/v1/me/license/renewal'
@@ -2273,6 +2283,7 @@ export interface FileRouteTypes {
     | '/v1/marketplace/agents/$agentId'
     | '/v1/marketplace/agents/mine'
     | '/v1/me/billing/portal'
+    | '/v1/me/billing/storage'
     | '/v1/me/license/checkout'
     | '/v1/me/license/plan'
     | '/v1/me/license/renewal'
@@ -2483,6 +2494,7 @@ export interface FileRouteTypes {
     | '/v1/marketplace/agents/$agentId'
     | '/v1/marketplace/agents/mine'
     | '/v1/me/billing/portal'
+    | '/v1/me/billing/storage'
     | '/v1/me/license/checkout'
     | '/v1/me/license/plan'
     | '/v1/me/license/renewal'
@@ -3620,6 +3632,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V1MeBillingPortalRouteImport
       parentRoute: typeof V1MeRoute
     }
+    '/v1/me/billing/storage': {
+      id: '/v1/me/billing/storage'
+      path: '/billing/storage'
+      fullPath: '/v1/me/billing/storage'
+      preLoaderRoute: typeof V1MeBillingStorageRouteImport
+      parentRoute: typeof V1MeRoute
+    }
     '/v1/me/license/': {
       id: '/v1/me/license/'
       path: '/license'
@@ -4280,6 +4299,7 @@ interface V1MeRouteChildren {
   V1MeChatColorRoute: typeof V1MeChatColorRoute
   V1MeProfileRoute: typeof V1MeProfileRoute
   V1MeBillingPortalRoute: typeof V1MeBillingPortalRoute
+  V1MeBillingStorageRoute: typeof V1MeBillingStorageRoute
   V1MeLicenseCheckoutRoute: typeof V1MeLicenseCheckoutRoute
   V1MeLicensePlanRoute: typeof V1MeLicensePlanRoute
   V1MeLicenseRenewalRoute: typeof V1MeLicenseRenewalRoute
@@ -4294,6 +4314,7 @@ const V1MeRouteChildren: V1MeRouteChildren = {
   V1MeChatColorRoute: V1MeChatColorRoute,
   V1MeProfileRoute: V1MeProfileRoute,
   V1MeBillingPortalRoute: V1MeBillingPortalRoute,
+  V1MeBillingStorageRoute: V1MeBillingStorageRoute,
   V1MeLicenseCheckoutRoute: V1MeLicenseCheckoutRoute,
   V1MeLicensePlanRoute: V1MeLicensePlanRoute,
   V1MeLicenseRenewalRoute: V1MeLicenseRenewalRoute,
