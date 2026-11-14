@@ -306,6 +306,12 @@ uninstall_command() {
   if [ -f /etc/apparmor.d/openbot-hosted ] && command -v apparmor_parser >/dev/null &&
     [ -d /sys/kernel/security/apparmor ]; then
     apparmor_parser --remove /etc/apparmor.d/openbot-hosted 2>/dev/null || true
+    # The rule that openbot-hosted-update added for the Claude sandbox.
+    if grep -qs '^# OpenBot: ' /etc/apparmor.d/local/bwrap-userns-restrict; then
+      sed -i -e '/^# OpenBot: /d' -e '/^priority=1 allow pix \/\*\* -> &bwrap,$/d' \
+        /etc/apparmor.d/local/bwrap-userns-restrict
+      apparmor_parser --replace /etc/apparmor.d/bwrap-userns-restrict 2>/dev/null || true
+    fi
   fi
   rm -f /etc/apparmor.d/openbot-hosted /usr/local/bin/openbot
   # The desktop .deb also installs into /opt/OpenBot, so only the entries of a server go.
