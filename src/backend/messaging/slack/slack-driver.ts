@@ -252,7 +252,8 @@ class SlackAdapter implements MessagingAdapter {
         channel_id: target.platformChannelId,
         thread_ts: target.replyThreadId ?? undefined,
       });
-    return skipped;
+    // Slack shares the files in one message, but its upload answer does not give the message ts.
+    return { skipped, firstId: null };
   });
 
   readonly history = Effect.fnUntraced(function* (

@@ -177,8 +177,14 @@ export interface MessagingAdapter {
    * message of its place, for a platform whose history this device cannot read (WhatsApp).
    */
   rememberPost?(target: MessageTarget, postId: string, text: string): void;
-  /** Uploads files to the conversation, and returns the names it did not send. */
-  upload(target: MessageTarget, files: MessagingAnswerFile[]): Effect.Effect<string[], MessagingAdapterError>;
+  /**
+   * Uploads files to the conversation. Returns the names it did not send, and the id of the first
+   * message it sent when the platform gives one (WhatsApp, Telegram).
+   */
+  upload(
+    target: MessageTarget,
+    files: MessagingAnswerFile[],
+  ): Effect.Effect<{ skipped: string[]; firstId: string | null }, MessagingAdapterError>;
   /** Earlier messages of the conversation, oldest first, after `afterId` and before `beforeId`. */
   history(
     platformChannelId: string,

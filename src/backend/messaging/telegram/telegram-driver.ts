@@ -191,6 +191,7 @@ class TelegramAdapter implements MessagingAdapter {
     files: MessagingAnswerFile[],
   ) {
     const skipped: string[] = [];
+    let firstId: string | null = null;
     for (const file of files) {
       const sent = yield* Effect.result(
         Effect.gen({ self: this }, function* () {
@@ -207,12 +208,13 @@ class TelegramAdapter implements MessagingAdapter {
           if (!ticket.uploadToken) return yield* new MessagingAdapterError({ cause: new Error("no_upload_token") });
           const messageId = yield* this.#gateway.upload(ticket.uploadToken, file.path);
           this.#state.rememberThread(messageId, telegramThreadKey(target));
+          firstId ??= String(messageId);
           return true;
         }),
       );
       if (Result.isFailure(sent) || !sent.success) skipped.push(file.name);
     }
-    return skipped;
+    return { skipped, firstId };
   });
 
   history(

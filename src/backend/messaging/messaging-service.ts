@@ -1790,6 +1790,29 @@ export class MessagingService {
     const botUserId = live.identity.botUserId;
     const pinged =
       live.record.platform === "slack" ? slackPingedUsers(text).filter((userId) => userId !== botUserId) : [];
+    // Files without text or embeds are the post: an empty text post before them would fail.
+    if (!text.trim() && !embeds.length && files.length) {
+      const result = yield* Effect.result(live.adapter.upload(target, files));
+      if (Result.isFailure(result))
+        return {
+          error: `${refusal(result.failure)} A file can be in the place already. Do not post it again only because of this error.`,
+          failure: "unknown" as const,
+        };
+      const uploaded = result.success;
+      const sentFiles = files.map((file) => file.name).filter((name) => !uploaded.skipped.includes(name));
+      if (!sentFiles.length)
+        return {
+          error:
+            "No file was sent: a file can be empty, too large for the platform or not readable, or its send failed on the way. A file can be in the place already. Do not post it again only because of this error.",
+          failure: "unknown" as const,
+        };
+      if (uploaded.firstId) live.adapter.rememberPost?.(target, uploaded.firstId, `Files: ${sentFiles.join(", ")}`);
+      return {
+        posted: true as const,
+        ...(uploaded.firstId ? { messageId: uploaded.firstId } : {}),
+        ...(uploaded.skipped.length ? { skippedFiles: uploaded.skipped } : {}),
+      };
+    }
     const posted = yield* (
       postEmbeds && embeds.length
         ? postEmbeds.call(live.adapter, target, text, embeds.map(redactEmbed))
@@ -1812,6 +1835,7 @@ export class MessagingService {
     // The text is in the place already, so a failed upload names the files and does not fail the post.
     const skippedFiles = files.length
       ? yield* live.adapter.upload(target, files).pipe(
+          Effect.map((uploaded) => uploaded.skipped),
           Effect.catch((failure) =>
             Effect.sync(() => {
               this.#warn(failure.cause);
@@ -2015,7 +2039,7 @@ export class MessagingService {
     yield* this.#deliverFinal(live, key, ended);
     if (activity.type === "finished" && activity.status === "completed" && activity.files.length) {
       const { adapter } = live;
-      const skipped = yield* adapter.upload(target, activity.files).pipe(toMessagingOperationFailed);
+      const { skipped } = yield* adapter.upload(target, activity.files).pipe(toMessagingOperationFailed);
       if (skipped.length)
         yield* adapter
           .post(target, {
