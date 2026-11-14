@@ -802,6 +802,19 @@ function waylandEnvironment(platform: NodeJS.Platform): NodeJS.ProcessEnv {
 }
 
 /**
+ * The driver drives a native Wayland desktop: its own test, on the environment the daemon gets.
+ *
+ * There, video depends on the compositor. The shipped build records only through the GNOME helper
+ * extension (GNOME 45 to 49, installed by hand) or a wlroots recorder, so on other GNOME and on KDE
+ * `start_recording` cannot start video (#9127).
+ */
+export function cuaDriverDrivesWayland(platform: NodeJS.Platform): boolean {
+  if (platform !== "linux" || !process.env.WAYLAND_DISPLAY) return false;
+  const flag = (process.env[WAYLAND_ENV] ?? waylandEnvironment(platform)[WAYLAND_ENV] ?? "").trim();
+  return flag !== "" && flag !== "0" && flag.toLowerCase() !== "false";
+}
+
+/**
  * Refuses a socket directory this user does not privately own.
  *
  * `mkdir` succeeds without complaint when the directory is already there, and applies its mode only
