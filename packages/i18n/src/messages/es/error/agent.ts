@@ -12,6 +12,12 @@ export const messages = {
     "La herramienta no se ejecutó. En tool_call, arguments debe ser un objeto JSON, no texto. Envía la llamada de nuevo con arguments como objeto.",
   "error.agent.toolCallDiscoveryTool":
     "La herramienta no se ejecutó. tool_call no puede ejecutar openbot.tool_search ni openbot.tool_describe. Llámalas directamente con los mismos argumentos.",
+  "error.agent.toolCallEnvelopeKeys":
+    "La herramienta no se ejecutó. tool_call solo acepta name y arguments. Pon los argumentos de la herramienta en arguments, como objeto, y vuelve a enviar la llamada.",
+  "error.agent.toolCallUnknownTool":
+    "La herramienta no se ejecutó. tool_call no encontró ninguna herramienta con este nombre. Usa el nombre calificado exacto que da tool_search, como openbot_browser.snapshot.",
+  "error.agent.toolCallUnknownToolSuggest":
+    "La herramienta no se ejecutó. tool_call no encontró ninguna herramienta con este nombre. Es posible que el nombre calificado sea {name}. Si lo es, vuelve a enviar la llamada con ese nombre.",
   "error.agent.routineScheduleArgumentsInvalid":
     "La programación de la rutina no es válida: {detail} Corrige la programación y vuelve a intentarlo. openbot.tool_describe da el esquema.",
   "error.agent.approvalWhileDeleting": "No se puede conceder la aprobación mientras se elimina el agente.",

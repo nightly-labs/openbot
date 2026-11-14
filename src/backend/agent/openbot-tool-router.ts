@@ -642,7 +642,10 @@ export class OpenBotToolRouter {
             if (params.tool === "tool_call") {
               const resolved = resolveDeferredTool(params, client.provider);
               if (!resolved) {
-                client.respond(request.id, openBotToolFailure(deferredCallArgumentsError(params) ?? invalid));
+                client.respond(
+                  request.id,
+                  openBotToolFailure(deferredCallArgumentsError(params, client.provider, deferredMcp) ?? invalid),
+                );
                 return;
               }
               params = resolved;

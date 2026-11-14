@@ -11,6 +11,12 @@ export const messages = {
     "工具未运行。在 tool_call 中，arguments 必须是 JSON 对象，而不是文本。请将 arguments 作为对象，再次发送调用。",
   "error.agent.toolCallDiscoveryTool":
     "工具未运行。tool_call 无法运行 openbot.tool_search 或 openbot.tool_describe。请使用相同的参数直接调用它们。",
+  "error.agent.toolCallEnvelopeKeys":
+    "工具未运行。tool_call 只接受 name 和 arguments。请将工具的参数作为对象放入 arguments，再次发送调用。",
+  "error.agent.toolCallUnknownTool":
+    "工具未运行。tool_call 找不到此名称的工具。请使用 tool_search 给出的准确完整名称，例如 openbot_browser.snapshot。",
+  "error.agent.toolCallUnknownToolSuggest":
+    "工具未运行。tool_call 找不到此名称的工具。完整名称可能是 {name}。如果是，请使用该名称再次发送调用。",
   "error.agent.routineScheduleArgumentsInvalid":
     "自动化任务的时间表无效：{detail} 请更正时间表后重试。openbot.tool_describe 可提供架构。",
   // Agent errors that the main process and the backend send.
