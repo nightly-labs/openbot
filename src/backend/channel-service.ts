@@ -1506,11 +1506,31 @@ export class ChannelService {
     );
   }
 
+  /**
+   * The order in which the pump tries the tasks of a channel: a person's own request first, then
+   * the rest in the order they were made. A channel runs `CHANNEL_PARALLEL_LIMIT` tasks at once, so a
+   * question to a lead that waited for its subtasks waited behind every queued subtask, and the
+   * person saw no answer (#8761). The request of a routine or an agent keeps its place.
+   */
+  #dispatchOrder(channelId: string, tasks: readonly ChannelTask[]): readonly ChannelTask[] {
+    const asked = new Set(
+      tasks
+        .filter(
+          (task) =>
+            task.state === "queued" && task.parentTaskId === null && this.#requester(channelId, task, [task]) !== null,
+        )
+        .map((task) => task.id),
+    );
+    if (!asked.size) return tasks;
+    return [...tasks.filter((task) => asked.has(task.id)), ...tasks.filter((task) => !asked.has(task.id))];
+  }
+
   private readonly pump = Effect.fn("ChannelService.pump")(function* (
     this: ChannelService,
     channelId: string,
   ): Effect.fn.Return<void, ChannelOperationError> {
-    for (const candidate of yield* channelSync(() => this.store.tasks(channelId))) {
+    const listed = yield* channelSync(() => this.store.tasks(channelId));
+    for (const candidate of yield* channelSync(() => this.#dispatchOrder(channelId, listed))) {
       if (this.#stopped || this.#deletedChannels.has(channelId)) return;
       // One row each, not every task of the channel again: a long channel holds thousands of
       // finished tasks, and the whole list for each of them blocked the main process for minutes.
