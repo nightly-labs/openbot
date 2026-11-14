@@ -28,7 +28,7 @@ import { isTrustedRendererUrl } from "./trusted-renderer";
 const logger = createOpenBotLogger("main");
 
 /** Set to "0" to keep the X11 windows on Hyprland. */
-export const LAYER_OVERLAY_SWITCH = "OPENBOT_LAYER_OVERLAY";
+const LAYER_OVERLAY_SWITCH = "OPENBOT_LAYER_OVERLAY";
 const MAX_LINE = 256 * 1024;
 const MAX_RESTARTS = 5;
 /** Frames per second while nobody looks at a surface, and while the pointer is on it. */
@@ -49,7 +49,7 @@ const NOT_FOR_QUICKSHELL = [
 type SurfaceKind = "island" | "dock";
 type InputEvent = Parameters<Electron.WebContents["sendInputEvent"]>[0];
 
-export interface LayerOverlayLocation {
+interface LayerOverlayLocation {
   quickshell: string;
   shellQml: string;
 }
@@ -64,7 +64,7 @@ interface LayerOutput {
 }
 
 /** A line from Quickshell, checked. Anything else is ignored. `screenY`: the pointer's height on the output. */
-export interface LayerOverlayInput {
+interface LayerOverlayInput {
   surface: string;
   event: InputEvent;
   screenY: number | null;
