@@ -407,6 +407,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpServerHttpCredentials": "The server answered {status}. Check the API key or other credentials.",
   "error.backend.mcpServerHttpUrl":
     "The server answered {status}. Check the URL. The link may be wrong, expired, or deleted.",
+  "error.backend.mcpServerBearerKey":
+    "This server takes an API key, not a sign-in. Under Headers, set the key to Authorization and the value to Bearer, a space, and your API key.",
   "error.backend.mcpSignInAppUrl": "The sign-in app needs a valid server URL.",
   "error.backend.mcpSignInAppClientId": "Enter the client ID of the sign-in app.",
   "error.backend.mcpSignInAppIssuerChanged":

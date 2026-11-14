@@ -43,6 +43,7 @@ const FAILURE_KINDS: Partial<Record<string, McpFailureKind>> = {
   "error.mcp.signInOnHost": "sign-in",
   "error.backend.mcpSignInNotAccepted": "refused",
   "error.backend.mcpServerHttpCredentials": "refused",
+  "error.backend.mcpServerBearerKey": "refused",
   "error.backend.mcpRegistrationRefused": "refused",
   "error.backend.mcpSignInNeedsHttps": "url",
   "error.backend.mcpServerHttpUrl": "url",

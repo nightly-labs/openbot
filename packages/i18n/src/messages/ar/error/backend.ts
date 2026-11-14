@@ -378,6 +378,8 @@ export const messages = {
   "error.backend.mcpServerHttpCredentials": "أجاب الخادم بـ {status}. تحقق من مفتاح API أو بيانات الاعتماد الأخرى.",
   "error.backend.mcpServerHttpUrl":
     "أجاب الخادم بـ {status}. تحقق من URL. قد يكون الرابط خاطئًا أو منتهي الصلاحية أو محذوفًا.",
+  "error.backend.mcpServerBearerKey":
+    "يستخدم هذا الخادم مفتاح API، وليس تسجيل الدخول. في الترويسات، اجعل المفتاح Authorization والقيمة Bearer ثم مسافة ثم مفتاح API.",
   "error.backend.mcpSignInAppUrl": "يحتاج تطبيق تسجيل الدخول إلى URL خادم صالح.",
   "error.backend.mcpSignInAppClientId": "أدخل Client ID لتطبيق تسجيل الدخول.",
   "error.backend.mcpSignInAppIssuerChanged":

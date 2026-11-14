@@ -410,6 +410,8 @@ export const messages = {
     "De server antwoordde met {status}. Controleer de API-sleutel of andere inloggegevens.",
   "error.backend.mcpServerHttpUrl":
     "De server antwoordde met {status}. Controleer de URL. De link kan onjuist, verlopen of verwijderd zijn.",
+  "error.backend.mcpServerBearerKey":
+    "Deze server gebruikt een API-sleutel, geen aanmelding. Zet bij Headers de sleutel op Authorization en de waarde op Bearer, een spatie en je API-sleutel.",
   "error.backend.mcpSignInAppUrl": "De inlogapp heeft een geldige server-URL nodig.",
   "error.backend.mcpSignInAppClientId": "Voer de client-ID van de inlogapp in.",
   "error.backend.mcpSignInAppIssuerChanged":

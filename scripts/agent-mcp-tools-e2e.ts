@@ -49,6 +49,17 @@ async function mcpServer(mode: Mode): Promise<{ url: string; close: () => Promis
   const server: Server = createServer((request, response) => {
     void (async () => {
       const path = new URL(request.url ?? "/", "http://127.0.0.1").pathname;
+      // A Bearer challenge without `resource_metadata` wants a sign-in only when the origin publishes
+      // OAuth metadata. Without it, the server takes a key, as Coolify does (#9176).
+      if (mode === "sign-in" && path === "/.well-known/oauth-authorization-server") {
+        const origin = `http://${request.headers.host}`;
+        return json(response, 200, {
+          issuer: origin,
+          authorization_endpoint: `${origin}/authorize`,
+          token_endpoint: `${origin}/token`,
+          response_types_supported: ["code"],
+        });
+      }
       if (path !== "/mcp") return json(response, 404, { error: "not found" });
       if (mode === "sign-in")
         return json(response, 401, { error: "unauthorized" }, { "www-authenticate": 'Bearer realm="e2e"' });

@@ -372,6 +372,8 @@ export const messages = {
     "הטקסט נמצא בשדה, אבל הדף העביר את המוקד, ולכן Enter לא נשלח. אין להקליד את הטקסט שוב. יש לצלם snapshot חדש.",
   "error.backend.mcpServerHttpCredentials": "השרת ענה {status}. יש לבדוק את מפתח ה-API או פרטי גישה אחרים.",
   "error.backend.mcpServerHttpUrl": "השרת ענה {status}. יש לבדוק את ה-URL. ייתכן שהקישור שגוי, פג תוקפו או נמחק.",
+  "error.backend.mcpServerBearerKey":
+    "השרת הזה משתמש במפתח API, לא בהתחברות. בכותרות, הגדר את המפתח ל-Authorization ואת הערך ל-Bearer, רווח, ומפתח ה-API שלך.",
   "error.backend.mcpSignInAppUrl": "אפליקציית ההתחברות דורשת כתובת שרת תקינה.",
   "error.backend.mcpSignInAppClientId": "יש להזין את מזהה הלקוח של אפליקציית ההתחברות.",
   "error.backend.mcpSignInAppIssuerChanged":
