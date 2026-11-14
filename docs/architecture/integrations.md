@@ -556,8 +556,8 @@ posts no line and leaves only its reaction. An error still posts its line (“To
 waiting”, “OpenBot could not finish this request”), so the person knows that it did not succeed.
 A reply of `stop` still stops the request; in a group, the person replies to their own request,
 because there is no status post to reply to. The released `whatsapp-connector-v1` overview cannot
-carry the value, so a client reads this list and merges it (`withWhatsAppWorkingMessages`). A client hides the switch while the host does not have the
-capability. Only protocol 9 peers get it.
+carry the value, so a client reads this list and merges it (`withWhatsAppWorkingMessages`). A client
+hides the switch while the host does not have the capability. Only protocol 9 peers get it.
 
 The phone uses the same routes in Marketplace › Apps › WhatsApp
 (`apps/mobile/src/features/servers/components/whatsapp-connector-page.tsx`). It links only with a

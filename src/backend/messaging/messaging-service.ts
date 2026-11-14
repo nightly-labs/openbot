@@ -528,10 +528,8 @@ export class MessagingService {
    * reaction. An error still posts its line, so the person knows that the request did not succeed.
    */
   #withoutStatusPost(connectionId: string): boolean {
-    return (
-      this.#threads.store.connection(connectionId)?.platform === "whatsapp" &&
-      this.#whatsapp?.workingMessage(connectionId) === false
-    );
+    // Only a WhatsApp number stores this value, so another platform always reads true here.
+    return this.#whatsapp?.workingMessage(connectionId) === false;
   }
 
   /**
