@@ -763,6 +763,8 @@ export class TurnLifecycle {
    */
   #stopCompactionLoop(agentId: string, threadId: string, turnId: string, client: AgentClient): void {
     this.#clearCompactionDeadline(threadId);
+    // Codex can start one more compaction before it handles the first stop.
+    if (this.#compactionFailures.get(turnId)?.loop) return;
     logger.warn("A provider compacted again and again; OpenBot stops its turn.", { provider: client.provider });
     this.#holdCompactionFailure(
       turnId,
@@ -773,7 +775,7 @@ export class TurnLifecycle {
         turnId,
         severity: "error",
       },
-      true,
+      false,
       sourceText("error.agent.compactionLoopStopped", { provider: agentProviderName(client.provider) }),
     );
     Effect.runFork(client.request("turn/interrupt", { threadId, turnId }, decodeRecordResponse).pipe(Effect.ignore));
@@ -797,8 +799,9 @@ export class TurnLifecycle {
     if (held?.loop) return;
     const loop = loopMessage !== undefined;
     const message = loopMessage ?? sourceText("error.agent.compactionConnectionLost");
-    // An error that Codex sends after the deadline stopped the turn keeps the turn stopped by it.
-    const stopped = stalled || held?.stalled === true;
+    // An error that Codex sends after the deadline stopped the turn keeps the turn stopped by it. A
+    // loop stop is always OpenBot's, so its `interrupted` end is a failure too.
+    const stopped = stalled || loop || held?.stalled === true;
     this.#compactionFailures.set(turnId, {
       message,
       context,

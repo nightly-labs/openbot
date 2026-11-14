@@ -115,8 +115,8 @@ const run = (threadId, turnId, kind) => {
         if (!looping.has(turnId)) return;
         write({ method: "item/completed", params: { threadId, turnId, item } });
         // The compaction leaves 60% of the window, which is still above this fake's own limit.
-        const left = { total: { totalTokens: 60000 }, last: { totalTokens: 60000 }, modelContextWindow: 100000 };
-        write({ method: "thread/tokenUsage/updated", params: { threadId, turnId, tokenUsage: left } });
+        const usage = { total: { totalTokens: 60000 }, last: { totalTokens: 60000 }, modelContextWindow: 100000 };
+        write({ method: "thread/tokenUsage/updated", params: { threadId, turnId, tokenUsage: usage } });
         setTimeout(again, 10);
       }, 10);
     };
