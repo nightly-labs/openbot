@@ -783,14 +783,14 @@ export class TurnLifecycle {
    * Codex ends a turn with no answer and no step as completed. A lead that got its teammates' results
    * and ended that way stopped the whole team, with no error (#7225). Such a turn fails as an ACP turn
    * with no answer does, and its end runs it again or shows the error. A turn that wants no answer, a
-   * turn that compacted, a plan and a turn that the user stopped can end empty.
+   * turn that compacted, a plan and a turn that the user stopped can end empty. A turn that did work, a
+   * tool step or answer text, stays completed (`#noteNoAnswerAfterSteps`).
    */
   #holdCodexNoAnswer(agentId: string, threadId: string, turnId: string, source: AgentClient): boolean {
     const running = this.#runningTurns.get(turnId);
     if (
       source.provider !== "codex" ||
       running === undefined ||
-      running.acted ||
       running.compacted ||
       this.#turnErrors.has(turnId) ||
       this.#failoverTurns.has(turnId) ||
@@ -809,6 +809,10 @@ export class TurnLifecycle {
     )
       return false;
     const messages = this.#conversation.ensureSnapshot(agentId, threadId).messages;
+    if (running.acted) {
+      this.#noteNoAnswerAfterSteps(agentId, threadId, turnId, source, deliveries, messages);
+      return false;
+    }
     if (
       messages.some(
         (message) => message.turnId === turnId && (message.id === `${turnId}:plan` || isAgentAnswer(message)),
@@ -830,6 +834,43 @@ export class TurnLifecycle {
     this.#turnErrors.set(turnId, message);
     this.#failoverTurns.set(turnId, { message, context });
     return true;
+  }
+
+  /**
+   * Codex can end a turn after its steps with no answer, or with its text only as thinking. The user
+   * then saw a blank reply (#8810). The turn stays completed, so its memory changes are kept and its
+   * steps do not run again. In the agent's own chat, when the user wrote the turn's messages and the
+   * turn shows nothing, a notice says so. A teammate gets its own note (`noResultNote`).
+   */
+  #noteNoAnswerAfterSteps(
+    agentId: string,
+    threadId: string,
+    turnId: string,
+    source: AgentClient,
+    deliveries: readonly DeliveryContext[],
+    messages: readonly ConversationMessage[],
+  ): void {
+    if (
+      this.#conversation.isExecutionThread(this.#conversation.publicThreadId(agentId, threadId)) ||
+      !deliveries.every(({ delivery, channelId }) => delivery.sender.kind === "user" && channelId === undefined) ||
+      messages.some((message) => message.turnId === turnId && showsOutput(message))
+    )
+      return;
+    logger.info("A turn ended with no answer after its steps.", { agentId, turnId, provider: source.provider });
+    this.#hooks.emitError(
+      "agent_error",
+      sourceText("error.provider.noAnswerAfterSteps", {
+        provider: agentProviderDescriptor(source.provider).displayName,
+      }),
+      agentId,
+      {
+        causeCode: "empty_answer",
+        provider: source.provider,
+        model: this.#hooks.turnModel(agentId, turnId),
+        turnId,
+        severity: "warning",
+      },
+    );
   }
 
   /**
@@ -2823,6 +2864,20 @@ function isRepeatedWork(item: { type?: unknown; phase?: unknown; text?: unknown 
   if (item.type === "userMessage" || item.type === "reasoning" || item.type === "contextCompaction") return false;
   if (item.type !== "agentMessage") return true;
   return item.phase !== "commentary" && isString(item.text) && item.text.trim() !== "";
+}
+
+/** Whether a message shows the user part of a turn: not the user's own message and not thinking. */
+function showsOutput(message: ConversationMessage): boolean {
+  return (
+    message.author !== "user" &&
+    message.itemType !== "commentary" &&
+    (message.text.trim() !== "" ||
+      (message.attachments?.length ?? 0) > 0 ||
+      message.imageGeneration !== undefined ||
+      message.videoGeneration !== undefined ||
+      message.questionPrompt !== undefined ||
+      message.uiBlock !== undefined)
+  );
 }
 
 /** Which subagents a list holds and the state of each, without their steps. */

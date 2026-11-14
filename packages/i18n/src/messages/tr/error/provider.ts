@@ -247,6 +247,8 @@ export const messages = {
     "OpenCode modeli turu akıl yürütmesinden sonra yanıt vermeden bitirdi. Tekrar deneyin veya başka bir model seçin.",
   "error.provider.acpNoAnswer":
     "{provider} turu yanıt vermeden bitirdi. Mesajı yeniden gönderin veya yeni bir sohbet başlatın.",
+  "error.provider.noAnswerAfterSteps":
+    "{provider} bazı adımları uyguladı, sonra turu yanıt vermeden bitirdi. Aynı isteği yeniden göndermeden önce ajana ne yaptığını sorun.",
   "error.provider.chatgptPageFailed": "OpenBot ChatGPT bağlantı sayfasını açamadı.",
   "error.provider.noneReady": "Hiçbir ajan sağlayıcısı hazır değil.",
   "error.provider.claudeTurnActive": "Bağlamını yenilemeden önce etkin Claude turunun bitmesini bekleyin.",
