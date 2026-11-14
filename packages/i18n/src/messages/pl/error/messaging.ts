@@ -15,6 +15,8 @@ export const messages = {
   "error.messaging.telegramUnsupported": "Ten komputer nie może połączyć się z Telegramem.",
   "error.messaging.telegramRelayUnavailable":
     "OpenBot nie może połączyć się z Telegramem na tym komputerze. Zaloguj się, nadaj temu komputerowi nazwę i spróbuj ponownie.",
+  "error.messaging.telegramRelayUnreachable":
+    "OpenBot nie może połączyć się ze swoją usługą z tego komputera. Sprawdź połączenie z internetem, VPN, serwer proxy lub zaporę sieciową i spróbuj ponownie.",
   "error.messaging.telegramServiceUnavailable": "OpenBot nie może teraz połączyć Telegrama. Spróbuj ponownie później.",
   "error.messaging.whatsappNotConnected": "Ten numer WhatsApp nie jest połączony.",
   "error.messaging.whatsappUnsupported": "Ten komputer nie może połączyć się z WhatsApp.",
