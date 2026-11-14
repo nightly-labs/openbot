@@ -2,7 +2,9 @@
 // the real SQLite, the real mailbox and the real channel service, on a temporary profile. No provider,
 // account or network is started. The lead waits for three subtasks: two run, so the channel is full,
 // and one is queued. The person then asks the lead a question. When one subtask ends, the question
-// takes the free place, and the queued subtask waits for the next one.
+// takes the free place, and the queued subtask waits for the next one. While the question runs, the
+// next free place goes in the order the tasks were made: the queued subtask starts before a later
+// routine request and before a later message of a person, so delegated work is not held back for ever.
 //
 // Run: bun scripts/channel-person-first-e2e.ts
 // Writes .openbot-build/channel-person-first-e2e/report.json and exits non-zero on a failure.
@@ -27,6 +29,7 @@ const WAIT_MS = 5_000;
 
 interface Report {
   started: { question: boolean; queuedSubtask: boolean; activeInChannel: number } | null;
+  next?: { queuedSubtask: boolean; routine: boolean; personFollowUp: boolean };
   passed: boolean;
   failure?: string;
 }
@@ -194,6 +197,56 @@ try {
     activeInChannel: service.store.assignments(channelId).filter(active).length,
   };
   assert.deepEqual(report.started, { question: true, queuedSubtask: false, activeInChannel: CHANNEL_PARALLEL_LIMIT });
+
+  // While the question runs, the next place goes in the order the tasks were made: the queued
+  // subtask starts before a routine's request and before another message of a person.
+  const routineMessageId = randomUUID();
+  await runCauseEffect(
+    service.command(
+      {
+        type: "request",
+        operationId: randomUUID(),
+        channelId,
+        text: "Post the daily launch status.",
+        recipientAgentId: workers[1]?.id ?? null,
+        requestMessageId: routineMessageId,
+        origin: { kind: "routine", routineId: "routine-e2e", routineName: "Daily status", runId: randomUUID() },
+      },
+      PERSON,
+    ),
+  );
+  await runCauseEffect(
+    service.command(
+      {
+        type: "send",
+        operationId: randomUUID(),
+        channelId,
+        text: "Can you check the launch date?",
+        recipientAgentId: workers[0]?.id ?? null,
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      },
+      PERSON,
+    ),
+  );
+  const tasks = service.store.tasks(channelId);
+  const routine = tasks.find((task) => task.requestMessageId === routineMessageId);
+  const followUp = tasks.find((task) => task.ownerAgentId === workers[0]?.id && task.state === "queued");
+  const [, running] = work;
+  const [, runningTask] = subtasks;
+  assert.ok(routine && followUp && running && runningTask);
+  service.store.update(service.store.get(channelId), {
+    tasks: [{ ...runningTask, state: "completed" }],
+    assignments: [{ ...running, state: "completed" }],
+  });
+  await runCauseEffect(service.wake(channelId));
+  await until(() => assignmentOf(queuedSubtask.id), "the queued subtask to start");
+  report.next = {
+    queuedSubtask: true,
+    routine: assignmentOf(routine.id) !== undefined,
+    personFollowUp: assignmentOf(followUp.id) !== undefined,
+  };
+  assert.deepEqual(report.next, { queuedSubtask: true, routine: false, personFollowUp: false });
   report.passed = true;
 } catch (error) {
   report.failure = error instanceof Error ? error.message : String(error);

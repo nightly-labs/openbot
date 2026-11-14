@@ -62,6 +62,7 @@ import {
   isChannelRoutineTool,
   PERSON_CANCEL_REQUIRED,
   PERSON_REQUEST_REQUIRED,
+  requestPerson,
 } from "./channel-management";
 import { ChannelMemoryStore } from "./channel-memory-store";
 import { CHANNEL_REPLY_ID_PREFIX, channelReplyExpectedResult, checkChannelReply, isReplyTask } from "./channel-replies";
@@ -1507,22 +1508,33 @@ export class ChannelService {
   }
 
   /**
-   * The order in which the pump tries the tasks of a channel: a person's own request first, then
+   * The order in which the pump tries the tasks of a channel: a person's queued message first, then
    * the rest in the order they were made. A channel runs `CHANNEL_PARALLEL_LIMIT` tasks at once, so a
    * question to a lead that waited for its subtasks waited behind every queued subtask, and the
-   * person saw no answer (#8761). The request of a routine or an agent keeps its place.
+   * person saw no answer (#8761). The request of a routine or an agent keeps its place. While a
+   * person's message already runs here, the order stays as made, so delegated work still gets a
+   * place when people keep writing.
    */
   #dispatchOrder(channelId: string, tasks: readonly ChannelTask[]): readonly ChannelTask[] {
-    const asked = new Set(
-      tasks
-        .filter(
-          (task) =>
-            task.state === "queued" && task.parentTaskId === null && this.#requester(channelId, task, [task]) !== null,
-        )
-        .map((task) => task.id),
+    // The task that a person's message belongs to: its new task, the task it continues, or the task
+    // that routing gave it. A subtask only inherits the id of the message.
+    const answersPerson = (task: ChannelTask) => {
+      const request = this.store.message(channelId, task.requestMessageId);
+      return request?.taskId === task.id && requestPerson(request) !== null;
+    };
+    const running = new Set(
+      this.store
+        .assignments(channelId)
+        .filter(activeAssignment)
+        .map((assignment) => assignment.taskId),
     );
-    if (!asked.size) return tasks;
-    return [...tasks.filter((task) => asked.has(task.id)), ...tasks.filter((task) => !asked.has(task.id))];
+    const first: ChannelTask[] = [];
+    const rest: ChannelTask[] = [];
+    for (const task of tasks) {
+      if (running.has(task.id) && answersPerson(task)) return tasks;
+      (task.state === "queued" && answersPerson(task) ? first : rest).push(task);
+    }
+    return [...first, ...rest];
   }
 
   private readonly pump = Effect.fn("ChannelService.pump")(function* (
