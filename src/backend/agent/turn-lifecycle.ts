@@ -1794,13 +1794,9 @@ export class TurnLifecycle {
       const subagents = snapshot.messages.find((message) => message.id === `${turnId}:subagents`);
       stopRunningSubagents(subagents?.subagents, new Date().toISOString(), { background: false });
       if (this.#trackSubagents(agentId, turnId, subagents?.subagents)) this.#hooks.emitRuntimeSnapshot();
-      let subagentsWork = this.#subagentTurns.get(agentId)?.has(turnId) === true;
+      if (routineSession && !this.#subagentsWork(agentId, turnId)) this.#archivableRoutineSessions.add(threadId);
       for (const [childId, parent] of this.#codexChildren)
-        if (parent.turnId === turnId) {
-          subagentsWork = true;
-          this.#codexChildren.delete(childId);
-        }
-      if (routineSession && !subagentsWork) this.#archivableRoutineSessions.add(threadId);
+        if (parent.turnId === turnId) this.#codexChildren.delete(childId);
       for (const message of snapshot.messages) {
         if (this.#itemTurns.get(message.id) !== turnId || message.status !== "streaming") continue;
         message.status = normalizeCompletionStatus(
@@ -2163,7 +2159,7 @@ export class TurnLifecycle {
     for (const [itemId, itemTurnId] of this.#itemTurns) if (itemTurnId === turnId) this.#itemTurns.delete(itemId);
     // A routine run's own session ends with its turn. A task or channel turn runs in another session.
     if (runningThreadId && this.#conversation.isRoutineSession(runningThreadId))
-      yield* this.#hooks.closeRoutineSession(runningThreadId);
+      yield* this.#hooks.closeRoutineSession(runningThreadId, !this.#subagentsWork(agentId, turnId));
     yield* turnStep(() => this.#mailboxSync.emitQueue(agentId)).pipe(Effect.catchCause(report));
     yield* turnStep(() => {
       for (const { delivery } of deliveries) {
@@ -2577,6 +2573,13 @@ export class TurnLifecycle {
       if (turns.size === 0) this.#subagentTurns.delete(agentId);
     }
     return true;
+  }
+
+  /** Whether a subagent of the turn still works: a linked Codex child, or a background subagent. */
+  #subagentsWork(agentId: string, turnId: string): boolean {
+    if (this.#subagentTurns.get(agentId)?.has(turnId)) return true;
+    for (const parent of this.#codexChildren.values()) if (parent.turnId === turnId) return true;
+    return false;
   }
 
   /** Codex reports its subagents as tool items of the parent thread. */

@@ -4,12 +4,13 @@
 // session: each request sends all of the session's earlier input again, as a model request does, and
 // reports that size as input tokens. The chat gets about 45,000 tokens of history, then a routine
 // runs twice. The check asserts that each run starts a session that Codex saves, so that a subagent
-// can fork it (#8743), and that the run closes it and takes it out of the Codex thread list. It also
-// asserts that the run's request stays small, that both runs use one routine thread and their
-// answers show there and not in the chat, that the chat keeps its session, and that the chat turns
-// read the answers. While the second run is held, a chat message and a run of a second routine must
-// finish: the lanes do not wait for each other. The second routine opens a wait, which a routine
-// thread can do as the chat can.
+// can fork it (#8743), and that the run closes it and takes it out of the Codex thread list, except
+// when a subagent of the run still works: an archive would stop it. It also asserts that the run's
+// request stays small, that both runs use one routine thread and their answers show there and not
+// in the chat, that the chat keeps its session, and that the chat turns read the answers. While the
+// second run is held, a chat message and a run of a second routine must finish: the lanes do not
+// wait for each other. The second routine opens a wait, which a routine thread can do as the chat
+// can.
 // A routine with no run place runs in the chat: its answer shows in the chat, and it gets no thread.
 // It also drives saved password and authenticator fills through the routine tool router, checks
 // the sign-in guidance, and checks that no secret reaches the provider. Each run keeps the agent's
@@ -62,6 +63,8 @@ const HISTORY_CHARACTERS = 45_000;
 const ROUTINE_INPUT_LIMIT = 10_000;
 const ROUTINE_MARK = "ROUTINE-CHECK";
 const SECOND_MARK = "ROUTINE-SECOND";
+/** A routine run whose Codex subagent still works when its turn ends. */
+const SUBAGENT_MARK = "SUBAGENT-RUN";
 const VAULT_ORIGIN = "https://routine.openbot.test";
 const VAULT_LOGIN = "routine-login";
 const PASSWORD = "fixture-routine-password";
@@ -148,9 +151,14 @@ const answer = (message) => {
       const tokenUsage = { total: breakdown(state.input, state.cached, state.output), last: breakdown(prompt, cached, 100), modelContextWindow: 1000000 };
       write({ method: "thread/tokenUsage/updated", params: { threadId: params.threadId, turnId, tokenUsage } });
       const second = text.includes(${JSON.stringify(SECOND_MARK)});
+      const subagent = text.includes(${JSON.stringify(SUBAGENT_MARK)});
       const routine = !second && text.includes(${JSON.stringify(ROUTINE_MARK)});
       const reply = second ? "Second routine report: the docs are current." : routine ? "Routine report " + (++reports) + ": the build is green." : "Done.";
       const answerTurn = () => {
+        if (subagent) {
+          const spawn = { type: "collabAgentToolCall", id: "spawn-" + turnId, tool: "spawnAgent", status: "completed", senderThreadId: params.threadId, receiverThreadIds: ["child-" + turnId], prompt: "Check the logs", model: "gpt-6-luna", agentsStates: { ["child-" + turnId]: { status: "running", message: null } } };
+          write({ method: "item/completed", params: { threadId: params.threadId, turnId, item: spawn } });
+        }
         const item = { type: "agentMessage", id: "message-" + turnId, text: reply, phase: "final_answer" };
         write({ method: "item/completed", params: { threadId: params.threadId, turnId, item } });
         write({ method: "turn/completed", params: { threadId: params.threadId, turn: { id: turnId, status: "completed" } } });
@@ -240,6 +248,7 @@ const report: {
   threadStarts: Omit<LogEntry, "text">[];
   closedThreads: string[];
   archivedThreads: string[];
+  subagentRunArchived?: boolean;
   turns: TurnReport[];
   routineAnswersInChat: string[];
   routineThreads: { routine: string; taskId: string; threadId: string; title: string; answers: string[] }[];
@@ -735,6 +744,27 @@ try {
       report.threadStarts.filter((entry) => entry.persistSession !== false).length === 1,
   );
 
+  // An archive stops the subagents of a Codex thread, so a run whose subagent still works keeps its
+  // session listed. The chat routine below runs after it, so the close has ended before the check.
+  const subagentRoutine = agents.createRoutine({
+    agentId: agent.id,
+    name: "Subagent check",
+    instruction: `${SUBAGENT_MARK}: start a subagent and report.`,
+    active: false,
+    timezone: "UTC",
+    schedule: { kind: "daily", time: "12:00" },
+    runIn: "thread",
+  });
+  const subagentRun = await runCauseEffect(agents.testRoutine({ agentId: agent.id, routineId: subagentRoutine.id }));
+  assert.ok(subagentRun.deliveryId, "subagent routine: no delivery");
+  await settled(subagentRun.deliveryId, "subagent routine run");
+  const subagentTurn = await waitFor("the subagent routine turn", () =>
+    fakeEntries().find((item) => item.method === "turn/start" && item.text?.includes(SUBAGENT_MARK)),
+  );
+  await waitFor("the subagent routine session to close", () =>
+    fakeEntries().some((item) => item.method === "thread/unsubscribe" && item.threadId === subagentTurn.threadId),
+  );
+
   // A routine with no run place runs in the chat, as before 0.61.
   const chatRoutine = agents.createRoutine({
     agentId: agent.id,
@@ -761,6 +791,10 @@ try {
     ).length,
     runStatus: chatRunStatus,
   };
+  report.subagentRunArchived = fakeEntries().some(
+    (item) => item.method === "thread/archive" && item.threadId === subagentTurn.threadId,
+  );
+  pass("A routine session whose subagent still works is not archived", !report.subagentRunArchived);
   pass(
     "A routine with no run place answers in the chat and gets no thread",
     report.chatRoutine.threads === 0 && report.chatRoutine.answersInChat === 1 && chatRunStatus === "succeeded",
