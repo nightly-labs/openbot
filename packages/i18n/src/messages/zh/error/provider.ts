@@ -154,6 +154,7 @@ export const messages = {
   "error.provider.codeLoginNotWaiting": "当前没有等待输入验证码的登录，请重新开始登录。",
   "error.provider.codeLoginBadCode": "请粘贴登录页显示的验证码。",
   "error.provider.codeLoginRefused": "服务商未接受该验证码，请重新开始登录。",
+  "error.provider.signInNetwork": "登录时无法连接服务商。请检查运行 OpenBot 的电脑的网络连接和代理后重试。",
   "error.provider.codeLoginUnsupported": "该服务器不支持用粘贴验证码的方式登录。请在服务器电脑的浏览器中登录。",
   "error.provider.cliBusyRetry": "{provider} CLI 正在处理对话，请等它结束后重试。",
   "error.provider.cliSigningIn": "{provider} CLI 正在登录，请完成或取消登录后再更新。",

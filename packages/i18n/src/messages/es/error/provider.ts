@@ -180,6 +180,8 @@ export const messages = {
   "error.provider.codeLoginNotWaiting": "Ningún inicio de sesión está esperando un código. Inicia sesión de nuevo.",
   "error.provider.codeLoginBadCode": "Pega el código que muestra la página de inicio de sesión.",
   "error.provider.codeLoginRefused": "El proveedor no aceptó el código. Inicia sesión de nuevo.",
+  "error.provider.signInNetwork":
+    "El inicio de sesión no pudo conectarse al proveedor. Comprueba la conexión de red y el proxy del equipo que ejecuta OpenBot e inténtalo de nuevo.",
   "error.provider.codeLoginUnsupported":
     "Este servidor no permite iniciar sesión con un código pegado. Inicia sesión en el navegador del equipo del servidor.",
   "error.provider.cliBusyRetry":

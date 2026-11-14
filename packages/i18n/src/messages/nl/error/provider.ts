@@ -174,6 +174,8 @@ export const messages = {
   "error.provider.codeLoginNotWaiting": "Er wacht geen inlog op een code. Start het inloggen opnieuw.",
   "error.provider.codeLoginBadCode": "Plak de code die de inlogpagina toont.",
   "error.provider.codeLoginRefused": "De aanbieder heeft de code niet geaccepteerd. Start het inloggen opnieuw.",
+  "error.provider.signInNetwork":
+    "Het inloggen kon geen verbinding maken met de aanbieder. Controleer de netwerkverbinding en de proxy van de computer waarop OpenBot draait en probeer het opnieuw.",
   "error.provider.codeLoginUnsupported":
     "Deze server kan niet inloggen met een geplakte code. Log in op de servercomputer, in de browser daar.",
   "error.provider.cliBusyRetry":

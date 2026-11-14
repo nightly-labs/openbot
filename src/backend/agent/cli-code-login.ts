@@ -7,6 +7,7 @@ import { shellQuote } from "../automation-command";
 import { cliSpawnTarget } from "../cli";
 import { stopProcessTree } from "../windows-process-tree";
 import { waitForSuccessfulProcess } from "./provider-status";
+import { readOutputTail, signInNetworkFailure } from "./sign-in-network-failure";
 
 /**
  * What a provider CLI prints for a sign-in the user finishes on another device.
@@ -89,6 +90,14 @@ export const startCliCodeLogin = Effect.fnUntraced(function* (options: {
   );
   child.stdin?.on("error", () => undefined);
   if (options.closeInput && options.flow !== "paste") child.stdin?.end();
+  // A `paste` sign-in runs on a terminal, which writes errors to the standard output.
+  const tails = [readOutputTail(child.stdout), readOutputTail(child.stderr)];
+  const output = () => tails.map((tail) => tail()).join("\n");
+  // A CLI that could not reach its service says so in its output (#7377). Other failures keep their message.
+  const failure = (cause: unknown) =>
+    signInNetworkFailure(child, output).pipe(
+      Effect.flatMap((network) => Effect.fail(new CliCodeLoginFailed({ cause: network ?? cause }))),
+    );
   let submitted = false;
   // Keep the result after the completion task closes the process scope. Joining a prompt fiber
   // in that scope can otherwise replace an early CLI failure with interruption.
@@ -97,23 +106,23 @@ export const startCliCodeLogin = Effect.fnUntraced(function* (options: {
   // signal, so it keeps its own message.
   const done = yield* Effect.forkScoped(
     waitForSuccessfulProcess(child, options.timeoutMs).pipe(
-      Effect.mapError(
-        (failure) =>
-          new CliCodeLoginFailed({
-            cause:
-              submitted && child.exitCode !== null
-                ? new Error(sourceText("error.provider.codeLoginRefused"))
-                : failure.cause,
-          }),
+      Effect.catch((exit) =>
+        submitted && child.exitCode !== null
+          ? Effect.fail(new CliCodeLoginFailed({ cause: new Error(sourceText("error.provider.codeLoginRefused")) }))
+          : failure(exit.cause),
       ),
       Effect.tapError((failure) => Deferred.fail(prompt, failure)),
       Effect.tap(() => Deferred.succeed(prompt, null)),
     ),
     { startImmediately: true },
   );
-  yield* Effect.forkScoped(Deferred.complete(prompt, readCodePrompt(child, options.flow)), {
-    startImmediately: true,
-  });
+  yield* Effect.forkScoped(
+    Deferred.complete(
+      prompt,
+      readCodePrompt(child, options.flow).pipe(Effect.catch((unread) => failure(unread.cause))),
+    ),
+    { startImmediately: true },
+  );
   return {
     child,
     done: Fiber.join(done),

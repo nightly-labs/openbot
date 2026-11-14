@@ -175,6 +175,8 @@ export const messages = {
   "error.provider.codeLoginNotWaiting": "Hiçbir oturum açma işlemi bir kod beklemiyor. Oturum açmayı tekrar başlatın.",
   "error.provider.codeLoginBadCode": "Oturum açma sayfasının gösterdiği kodu yapıştırın.",
   "error.provider.codeLoginRefused": "Sağlayıcı kodu kabul etmedi. Oturum açmayı tekrar başlatın.",
+  "error.provider.signInNetwork":
+    "Oturum açma sağlayıcıya bağlanamadı. OpenBot'u çalıştıran bilgisayarın ağ bağlantısını ve proxy ayarını kontrol edin, ardından tekrar deneyin.",
   "error.provider.codeLoginUnsupported":
     "Bu sunucu yapıştırılan bir kodla oturum açamaz. Sunucu bilgisayarında, onun tarayıcısında oturum açın.",
   "error.provider.cliBusyRetry":

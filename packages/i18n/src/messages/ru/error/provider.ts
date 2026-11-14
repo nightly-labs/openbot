@@ -171,6 +171,8 @@ export const messages = {
   "error.provider.codeLoginNotWaiting": "Нет входа, который ждал бы код. Начните вход заново.",
   "error.provider.codeLoginBadCode": "Вставьте код, который показывает страница входа.",
   "error.provider.codeLoginRefused": "Провайдер не принял код. Начните вход заново.",
+  "error.provider.signInNetwork":
+    "При входе не удалось подключиться к провайдеру. Проверьте сетевое подключение и прокси компьютера, где работает OpenBot, и повторите попытку.",
   "error.provider.codeLoginUnsupported":
     "Этот сервер не поддерживает вход по вставленному коду. Войдите на компьютере сервера в его браузере.",
   "error.provider.cliBusyRetry": "{provider} CLI обрабатывает ход. Дождитесь его завершения и повторите попытку.",

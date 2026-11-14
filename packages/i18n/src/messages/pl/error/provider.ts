@@ -173,6 +173,8 @@ export const messages = {
   "error.provider.codeLoginNotWaiting": "Żadne logowanie nie czeka na kod. Rozpocznij logowanie ponownie.",
   "error.provider.codeLoginBadCode": "Wklej kod, który pokazuje strona logowania.",
   "error.provider.codeLoginRefused": "Dostawca nie przyjął kodu. Rozpocznij logowanie ponownie.",
+  "error.provider.signInNetwork":
+    "Logowanie nie połączyło się z dostawcą. Sprawdź połączenie sieciowe i serwer proxy komputera, na którym działa OpenBot, a potem spróbuj ponownie.",
   "error.provider.codeLoginUnsupported":
     "Ten serwer nie obsługuje logowania wklejonym kodem. Zaloguj się na komputerze serwera, w jego przeglądarce.",
   "error.provider.cliBusyRetry": "{provider} CLI pracuje nad turą. Zaczekaj, aż skończy, i spróbuj ponownie.",

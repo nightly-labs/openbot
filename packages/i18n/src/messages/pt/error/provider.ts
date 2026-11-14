@@ -180,6 +180,8 @@ export const messages = {
   "error.provider.codeLoginNotWaiting": "Nenhum login está aguardando um código. Inicie o login novamente.",
   "error.provider.codeLoginBadCode": "Cole o código mostrado na página de login.",
   "error.provider.codeLoginRefused": "O provedor não aceitou o código. Inicie o login novamente.",
+  "error.provider.signInNetwork":
+    "O login não conseguiu se conectar ao provedor. Verifique a conexão de rede e o proxy do computador que executa o OpenBot e tente novamente.",
   "error.provider.codeLoginUnsupported":
     "Este servidor não permite entrar com um código colado. Entre pelo navegador no computador do servidor.",
   "error.provider.cliBusyRetry": "A CLI de {provider} está executando um turno. Aguarde o término e tente novamente.",

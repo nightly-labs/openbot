@@ -181,6 +181,8 @@ export const messages = {
   "error.provider.codeLoginNotWaiting": "Keine Anmeldung wartet auf einen Code. Starte die Anmeldung erneut.",
   "error.provider.codeLoginBadCode": "Füge den Code ein, den die Anmeldeseite anzeigt.",
   "error.provider.codeLoginRefused": "Der Anbieter hat den Code nicht akzeptiert. Starte die Anmeldung erneut.",
+  "error.provider.signInNetwork":
+    "Die Anmeldung konnte keine Verbindung zum Anbieter herstellen. Prüfe die Netzwerkverbindung und den Proxy des Computers, auf dem OpenBot läuft, und versuche es erneut.",
   "error.provider.codeLoginUnsupported":
     "Dieser Server unterstützt keine Anmeldung mit einem eingefügten Code. Melde dich im Browser auf dem Servercomputer an.",
   "error.provider.cliBusyRetry":
