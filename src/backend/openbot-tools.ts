@@ -781,7 +781,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "send_message",
     description:
-      "Queue an asynchronous message and optional local files for one or more OpenBot agents. On a reply, pass the original message id as replyToMessageId.",
+      "Queue an asynchronous message and optional local files for one or more OpenBot agents. On a reply, pass the original message id as replyToMessageId. For independent work that must not wait in the recipient's busy chat, set newThread.",
     shape: {
       recipientAgentIds: z.array(z.string()).min(1).max(32),
       text: z.string().min(1).max(100_000),
@@ -791,6 +791,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
         .boolean()
         .describe(
           "True, the default, for a request, question or delegated task: OpenBot sends the recipient's result back. False for information that the recipient must not answer, such as a status or your own reply to a task; it ends the exchange.",
+        )
+        .optional(),
+      newThread: z
+        .boolean()
+        .describe(
+          "True starts a new side thread for each recipient and runs this message there as its first work, so it does not wait in the recipient's chat. The result names the task id of each thread; a later replyToMessageId to the result continues that thread. Use it for independent teammate work, not for every message. Not with replyToMessageId: a reply continues an existing thread.",
         )
         .optional(),
     },

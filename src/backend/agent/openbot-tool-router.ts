@@ -172,6 +172,7 @@ import {
 } from "./screen-capture";
 import { type AgentSidebar, handleSidebarTool } from "./sidebar-tools";
 import { LOCAL_SKILL_TOOL_DEFINITIONS, type LocalSkillTools, runLocalSkillTool } from "./skill-tools";
+import { sendMessageToNewThreads } from "./teammate-thread-send";
 import { isDynamicToolCall } from "./thread-items";
 import { toolCallIdempotencyKey } from "./tool-call-idempotency";
 import {
@@ -2993,6 +2994,27 @@ export class OpenBotToolRouter {
       if (expectsReply !== undefined && typeof expectsReply !== "boolean") {
         throw new Error("expectsReply must be a boolean.");
       }
+      const newThread = params.arguments.newThread;
+      if (newThread !== undefined && typeof newThread !== "boolean") {
+        throw new Error("newThread must be a boolean.");
+      }
+      // A reply continues the thread of the message that it answers; a new thread starts one. The two
+      // destinations cannot share one call.
+      if (newThread && replyToMessageId !== undefined && replyToMessageId !== null) {
+        throw new Error(
+          "A reply continues the thread of the message that it answers, so a reply cannot also start a new thread. Send the new thread without replyToMessageId, or the reply without newThread.",
+        );
+      }
+      if (newThread) {
+        return yield* this.#sendMessageToNewThreads(
+          params,
+          senderAgentId,
+          recipientValues,
+          paths,
+          params.arguments.text,
+          expectsReply,
+        );
+      }
 
       const turnDeliveries = this.#mailbox.findDeliveriesByTurn(senderAgentId, params.turnId);
       // A request from a Slack turn: the teammate's answer goes back to that Slack thread.
@@ -3049,7 +3071,16 @@ export class OpenBotToolRouter {
         answeredRequestIds.map((requestId) => this.#mailbox.answerTaskId(senderAgentId, requestId, recipientValues)),
       );
       const [answerTaskId = null] = answerTaskIds.size === 1 ? answerTaskIds : [];
-      const taskId = answerTaskId && this.#tasks.threadId(answerTaskId) !== null ? answerTaskId : undefined;
+      // The thread belongs to the recipient: an answer to a request from its side thread runs in that
+      // thread, and a reply to a thread's result runs in that task (#8134).
+      const onlyRecipient = recipientValues.length === 1 ? recipientValues[0] : undefined;
+      const taskId =
+        answerTaskId &&
+        onlyRecipient !== undefined &&
+        this.#tasks.has(onlyRecipient, answerTaskId) &&
+        this.#tasks.threadId(answerTaskId) !== null
+          ? answerTaskId
+          : undefined;
       // The same rule for a request from a Slack thread or another external conversation (#5517).
       const messaging = this.#mailbox.answerReturn(answeredRequestIds, recipientValues);
       const text = params.arguments.text;
@@ -3093,6 +3124,39 @@ export class OpenBotToolRouter {
     Effect.catchDefect((cause) => Effect.fail(new ToolOperationFailed({ cause }))),
     Effect.uninterruptible,
   );
+
+  /**
+   * Sends one independent teammate message per recipient (#8134): each message starts a new side
+   * thread of its recipient and runs there as its first work, so it does not wait in the recipient's
+   * chat. The result still comes back to the sender. Every thread exists before any message is sent,
+   * so a limit refusal for one recipient sends nothing, and the agent can send the same request
+   * again. A retried call reuses the thread and the message that the first call made.
+   */
+  readonly #sendMessageToNewThreads = Effect.fn("OpenBotToolRouter.sendMessageToNewThreads")(function* (
+    this: OpenBotToolRouter,
+    params: DynamicToolCallParams,
+    senderAgentId: string,
+    recipientValues: readonly string[],
+    paths: string[],
+    text: string,
+    expectsReply: boolean | undefined,
+  ): Effect.fn.Return<OpenBotToolResponse, ToolOperationFailed> {
+    return yield* sendMessageToNewThreads(
+      {
+        mailbox: this.#mailbox,
+        tasks: this.#tasks,
+        mailboxSync: this.#mailboxSync,
+        conversation: this.#conversation,
+        drain: this.#drain,
+      },
+      { threadId: params.threadId, turnId: params.turnId, callId: params.callId },
+      senderAgentId,
+      recipientValues,
+      paths,
+      text,
+      expectsReply,
+    );
+  });
 }
 
 type SentDelivery = QueuedMessageReceipt["deliveries"][number] & {

@@ -536,16 +536,38 @@ export class MailboxStore {
   /**
    * The side thread that an agent's answer goes back to: the one the request was sent from, when the
    * answer goes to the agent that sent the request, and to no one else, and its sender received it.
+   * A reply also continues the task that an independent teammate request started (#8134): the reply
+   * to the requester's own task request continues that task, and the reply to the teammate's
+   * automatic result continues the task that the request it answers ran in. The task of a message
+   * belongs to its recipient, so every task that these routes return belongs to the answer's
+   * recipient. An external conversation keeps its own return instead.
    */
   answerTaskId(senderAgentId: string, replyToMessageId: string, recipientAgentIds: readonly string[]): string | null {
     if (recipientAgentIds.length !== 1) return null;
     const request = this.#state.messages.find((message) => message.id === replyToMessageId);
-    if (!request?.senderTaskId || request.sender.kind !== "agent" || request.sender.agentId !== recipientAgentIds[0])
-      return null;
+    if (request?.sender.kind !== "agent") return null;
+    const peer = recipientAgentIds[0];
+    // The reply answers either a message that the peer sent, or the requester's own task request.
+    const ownRequest = request.sender.agentId === senderAgentId;
+    if (!ownRequest && request.sender.agentId !== peer) return null;
     const received = this.#state.deliveries.some(
-      (delivery) => delivery.messageId === request.id && delivery.recipientAgentId === senderAgentId,
+      (delivery) =>
+        delivery.messageId === request.id && delivery.recipientAgentId === (ownRequest ? peer : senderAgentId),
     );
-    return received ? request.senderTaskId : null;
+    if (!received) return null;
+    if (!ownRequest && request.senderTaskId) return request.senderTaskId;
+    if (request.channelId || request.messaging || request.messagingReturn) return null;
+    if (ownRequest) return request.taskId ?? null;
+    const origin =
+      request.replyToMessageId !== null
+        ? this.#state.messages.find((message) => message.id === request.replyToMessageId)
+        : undefined;
+    if (!origin?.taskId) return null;
+    return this.#state.deliveries.some(
+      (delivery) => delivery.messageId === origin.id && delivery.recipientAgentId === peer,
+    )
+      ? origin.taskId
+      : null;
   }
 
   /**
