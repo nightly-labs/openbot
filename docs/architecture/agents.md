@@ -807,11 +807,11 @@ nothing. A second empty run, or an empty turn from the person, shows the error.
 Codex can also write its last words as narration (a `msg_` commentary item) and then send an empty
 answer (#8837). Codex takes that narration as the turn's result, so `TurnLifecycle` makes the
 narration after the turn's last tool step the answer, and removes the empty rows. Outside a channel,
-this applies whether the turn did a step or not. With no such narration, a turn that did a step does
-not run again: it fails with the same error when a person's message started it, and a teammate's
-turn ends as completed, so the agent that asked gets the note of the work (#8214). A channel turn
-keeps the rule above, since text after `channel_result` is a step there. An external chat that
-already got the narration as a progress post does not get it again as the answer.
+this applies whether the turn did a step or not. A turn that did a step and wrote no such narration
+ends as before: its output can be a file or an image, or teammates or subagents still work for it. A
+teammate's such turn sends the note of its work (#8214). A channel turn keeps the rule above, since
+text after `channel_result` is a step there. Voice on the desktop does not read the answer again when
+it read that narration as a progress update.
 `scripts/codex-empty-lead-turn-e2e.ts` checks these paths.
 
 A message to an agent that runs a turn follows the busy-message mode: "steer" takes it into the

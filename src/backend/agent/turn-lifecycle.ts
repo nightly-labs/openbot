@@ -790,8 +790,8 @@ export class TurnLifecycle {
    *
    * Codex can also write its last words as narration and then send an empty answer. Codex itself
    * takes that narration as the turn's result, so the narration after the last tool step becomes the
-   * answer (#8837). With no such narration, a turn that did a step does not run again. It fails only
-   * when a person waits for it; a teammate gets the note of the work that the turn did (#8214).
+   * answer (#8837). A turn that did a step and wrote no such narration ends as before: its output can
+   * be a file or an image, or teammates or subagents still work for it.
    */
   #holdCodexNoAnswer(agentId: string, threadId: string, turnId: string, source: AgentClient): boolean {
     const running = this.#runningTurns.get(turnId);
@@ -825,14 +825,14 @@ export class TurnLifecycle {
       return false;
     // A channel turn keeps its own rules: text after `channel_result` is a step there, not an answer.
     if (
-      this.#conversation.channelForThread(snapshot.threadId) !== null ||
-      deliveries.some(({ channelId }) => channelId !== undefined)
+      this.#conversation.channelForThread(snapshot.threadId) === null &&
+      deliveries.every(({ channelId }) => channelId === undefined) &&
+      this.#answerWithNarration(messages, turnId, running.narration)
     ) {
-      if (running.acted) return false;
-    } else if (this.#answerWithNarration(messages, turnId, running.narration)) {
       logger.info("A turn's last narration became its answer.", { agentId, turnId, provider: source.provider });
       return false;
-    } else if (running.acted && deliveries.every(({ delivery }) => delivery.sender.kind !== "user")) return false;
+    }
+    if (running.acted) return false;
     const message = sourceText("error.provider.acpNoAnswer", {
       provider: agentProviderDescriptor(source.provider).displayName,
     });

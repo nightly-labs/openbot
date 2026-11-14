@@ -15,8 +15,8 @@
 //      run ends the conversation's request as failed.
 //   8. In a thread, a person's turn that ran a step and wrote its last words as narration, then an
 //      empty answer, shows that narration as its answer (#8837). With narration only before the
-//      step, the thread fails with the error and does not run again. A teammate's such turn still
-//      sends the note of its work to the agent that asked (#8214).
+//      step, the turn ends as before: completed, once, with the narration still a step. A teammate's
+//      such turn still sends the note of its work to the agent that asked (#8214).
 // `bun run test:codex-empty-lead-turn`. Writes .openbot-build/codex-empty-lead-turn-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -651,11 +651,11 @@ try {
     return outcome;
   });
 
-  await check("in a thread, an empty turn with narration only before its step shows the error", async () => {
+  await check("in a thread, an empty turn with narration only before its step ends as before", async () => {
     const outcome = await personInThread("NARRATION-BEFORE-STEP");
     assert.equal(outcome.runs, 1, `A turn that ran a step does not run again: ${JSON.stringify(outcome)}`);
-    assert.equal(outcome.outcome, "failed");
-    assert.equal(outcome.error, NO_ANSWER);
+    assert.equal(outcome.outcome, "completed");
+    assert.equal(outcome.error, null);
     assert.equal(
       outcome.rows.some((row) => row.itemType !== "commentary" && row.text.trim() !== ""),
       false,

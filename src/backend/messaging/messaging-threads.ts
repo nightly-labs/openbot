@@ -912,7 +912,6 @@ export class MessagingThreads {
         if (!link) return false;
         const started = this.#turnOrigins.get(event.turnId) ?? { deliveryIds: [], origin: null, followUp: false };
         this.#turnOrigins.delete(event.turnId);
-        const progress = this.#progress.get(event.turnId);
         this.#progress.delete(event.turnId);
         // A turn whose messages went back to the queue runs again, such as an empty answer to a
         // teammate's result (#8573). The conversation keeps its status post until that run ends.
@@ -934,7 +933,7 @@ export class MessagingThreads {
         }
         this.store.touch(link.linkId);
         Effect.runFork(
-          this.#finished(link, event.turnId, event.status, started.origin, started.followUp, progress).pipe(
+          this.#finished(link, event.turnId, event.status, started.origin, started.followUp).pipe(
             Effect.uninterruptible,
             Effect.forkIn(scope, { startImmediately: true }),
           ),
@@ -1090,12 +1089,9 @@ export class MessagingThreads {
     status: string,
     origin: MessagingOrigin | null,
     followUp: boolean,
-    progress: string | undefined,
   ): Effect.fn.Return<void, MessagingThreadFailed> {
     const messages = yield* threadsStep(() => this.#turnMessages(link, turnId));
-    const last = [...messages].reverse().find(isAnswer);
-    // Narration that became the turn's answer (#8837) is not posted again after its progress post.
-    const answer = last && last.id !== progress ? last.text : null;
+    const answer = [...messages].reverse().find(isAnswer)?.text ?? null;
     const files: MessagingAnswerFile[] = [];
     for (const message of messages) {
       if (message.author === "user") continue;
