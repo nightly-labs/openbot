@@ -43,7 +43,9 @@ account, open a terminal of the app in Umbrel (Settings â€º Advanced settings â€
 `src/renderer/src/features/server-setup/`, shows the shared `AccountLogin` screen of the app. It starts only in the OpenBot image, where `/opt/OpenBot/hosted/mode`
 is `container`. A self-hosted server that systemd runs writes a warning and does not start it.
 
-Umbrel's `app_proxy` asks for the Umbrel password before it sends a request to the page. The page
+Umbrel asks for the Umbrel password before it sends a request to the page. The `app_proxy` service
+of the Compose file does this on older umbrelOS. umbrelOS 2.0 removes that service and its own app
+gateway does it. The page
 listens on all addresses of the container, so other apps on the Docker network of Umbrel can reach it
 without that password. For this reason the page:
 
@@ -93,7 +95,7 @@ run the workflow from the Actions tab of the store.
 | File | Use |
 | --- | --- |
 | `umbrel-app.yml` | The manifest. Umbrel opens the app on port 4180. The icon is `openbot.run/icon-512x512.png`, except with `--official`. |
-| `docker-compose.yml` | The container, with the same options as `docker/compose.yaml`. `app_proxy` sends the requests to the setup page on port 8080. |
+| `docker-compose.yml` | The container, with the same options as `docker/compose.yaml`. Umbrel sends the requests of the app to the setup page on port 8080. |
 | `data/.gitkeep` | Keeps the source folder of the `/data` bind mount in the app store. Umbrel's linter needs it. |
 | `hooks/pre-start` | Makes the data folder and gives it to UID 1000, the user of the image. |
 | `seccomp.json` | A copy of `docker/seccomp.json`. The container stops without it, see [Security](docker.md#security). |
@@ -121,15 +123,30 @@ Write these reasons in the pull request, because Umbrel asks for them:
 `bun run test:server-setup-page` runs the setup page with a fake account service in Chrome and
 writes `.openbot-build/server-setup-page-e2e/report.json`.
 
+## Tests on umbrelOS
+
+The app was tested on umbrelOS 2.0.2 in a container (`ghcr.io/getumbrel/umbrelos`, arm64, Docker
+Desktop on macOS), with the setup page of this branch on the 0.71.0 image:
+
+- umbreld installed `openbot-server` from the community app store. It accepted `seccomp.json`, and the
+  `pre-start` hook gave the data folder to UID 1000 with mode 0700. The Electron sandbox started.
+- Without an Umbrel sign-in, the app port sends the browser to the Umbrel sign-in. After it, the setup
+  page shows the sign-in screen of OpenBot.
+- After a restart of the app in umbreld, the data and `openbot.db` stay.
+- `openbot logout` runs in the app container.
+- Umbrel's linter (`lint:apps`) shows no errors on the `--official` app with a submission URL.
+
 ## Not confirmed
 
-- The app was not installed on umbrelOS. The Compose file uses
-  `security_opt: seccomp=${APP_DATA_DIR}/seccomp.json`. No app in the official Umbrel store sets a
-  seccomp profile, so it is not known if Umbrel accepts it or if its review allows it.
-- umbrelOS was not checked for AppArmor rules that refuse user namespaces. On such a host, the
-  container stops at its start, as on Ubuntu 23.10 or newer (see [Not confirmed](docker.md#not-confirmed)).
-- The terminal of the app in Umbrel was not tested with `openbot logout`.
-- The install steps of the community app store were not done on umbrelOS. They come from Umbrel's
-  [community app store template](https://github.com/getumbrel/umbrel-community-app-store).
+- The app was not installed on an Umbrel Home, a Raspberry Pi or an x86_64 computer. It is not known if
+  Umbrel's review accepts `security_opt: seccomp=${APP_DATA_DIR}/seccomp.json`. No app in the official
+  Umbrel store sets a seccomp profile.
+- AppArmor was not checked. The kernel of the test has no AppArmor. On a host with AppArmor rules that
+  refuse user namespaces, the container stops at its start, as on Ubuntu 23.10 or newer (see
+  [Not confirmed](docker.md#not-confirmed)).
+- The Terminal page of Umbrel was not opened. `openbot logout` was run with `docker exec` in the app
+  container.
+- The store was added with the API of umbreld, not in the App Store page. The store has no app before
+  the first release with the setup page, so the test copied the app into the clone of the store.
 - Umbrel backups of the app data were not tested. A backup must have all of `/data`, see
   [Data](docker.md#data).
