@@ -397,6 +397,20 @@ try {
         assert.equal(await Effect.runPromise(keys.remove("agent-3", "LINEAR_API_KEY")), true);
         await synced;
         await assert.rejects(lstat(join(keyRoot, "agent-3", "LINEAR_API_KEY")));
+        // A key that the user deletes in the Vault, or gives to every agent, leaves no link.
+        const deletedId = await saveKey(null, "SENTRY_TOKEN", VAULT_KEY, ["agent-3"]);
+        await Effect.runPromise(keys.syncVault());
+        assert.ok((await lstat(join(keyRoot, "agent-3", "SENTRY_TOKEN"))).isSymbolicLink());
+        await Effect.runPromise(vault.delete(deletedId));
+        await synced;
+        await assert.rejects(lstat(join(keyRoot, "agent-3", "SENTRY_TOKEN")));
+        const sharedId = await saveKey(null, "LINEAR_API_KEY", VAULT_KEY, ["agent-3"]);
+        await Effect.runPromise(keys.syncVault());
+        assert.ok((await lstat(join(keyRoot, "agent-3", "LINEAR_API_KEY"))).isSymbolicLink());
+        await saveKey(sharedId, "LINEAR_API_KEY", VAULT_KEY, null);
+        await assert.rejects(lstat(join(keyRoot, "agent-3", "LINEAR_API_KEY")));
+        await Effect.runPromise(vault.delete(sharedId));
+        await synced;
         await saveKey(ownId, "OPENAI_API_KEY", KEY, ["agent-3"]);
       }
       if (process.platform !== "win32") {

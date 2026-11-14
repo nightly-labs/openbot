@@ -138,13 +138,13 @@ export class AgentApiKeys {
         for (const agentId of copies.filter((id) => AGENT_ID_PATTERN.test(id)))
           yield* this.#writeAgent(join(vaultFolder, agentId), agentId);
         // The agent folders of 0.69 and earlier: the Vault copy and a link for each key for that agent
-        // only, also when the agent did not list its keys after the update.
+        // only, also when the agent did not list its keys after the update. The link of a key that is
+        // deleted, or now for other agents too, goes.
         for (const agentId of agents.filter((id) => AGENT_ID_PATTERN.test(id))) {
           const own = this.#readyVault()
             ?.apiKeys(agentId)
             .some((key) => key.own);
-          if (!own) continue;
-          if (!copies.includes(agentId)) yield* this.#writeAgent(join(vaultFolder, agentId), agentId);
+          if (own && !copies.includes(agentId)) yield* this.#writeAgent(join(vaultFolder, agentId), agentId);
           yield* this.#linkOwnKeys(agentId);
         }
       }),
