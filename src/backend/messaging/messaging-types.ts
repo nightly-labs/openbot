@@ -357,12 +357,12 @@ export interface MessagingIngress {
    */
   onDiscordRoutes(listener: (guildIds: ReadonlySet<string>) => void): () => void;
   /**
-   * Calls `listener` with the Slack workspaces or the Telegram chats in the route ticket of the socket,
-   * when Signal accepts the socket. Only a listener added before the socket asked for the ticket gets
-   * it, so a workspace or chat linked after that request is not judged by it. A workspace or chat of
-   * this host that is not in it is linked to another host, or to none.
+   * Calls `listener` with the Slack workspaces or the Telegram chats that Signal routes to the socket:
+   * at once when the open socket knows them, and each time Signal accepts a new socket. A workspace or
+   * chat of this host that is not in them is linked to another host, or to none. Null when the socket's
+   * account service named no IDs: then nothing is known.
    */
-  onLinkedRoutes(platform: LinkedRoutePlatform, listener: (ids: ReadonlySet<string>) => void): () => void;
+  onLinkedRoutes(platform: LinkedRoutePlatform, listener: (ids: ReadonlySet<string> | null) => void): () => void;
 }
 
 /** The platforms whose route ticket the host reads: Discord gets its guilds from Signal's session. */

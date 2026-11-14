@@ -731,10 +731,11 @@ export class MessagingService {
       // A workspace connected later is answered by the Slack Orchestrator that exists.
       orchestratorAgentId: this.#orchestrator(record) ?? this.#platformOrchestrator("slack"),
     });
+    // Signal learns the workspaces of this host when the socket connects. Before the start, so that
+    // the open socket's older workspace list does not show the new workspace as not linked.
+    this.#ingress?.reconnect();
     const updated = this.#threads.store.connection(record.connectionId);
     if (updated) yield* this.#startConnection(updated);
-    // Signal learns the workspaces of this host when the socket connects.
-    this.#ingress?.reconnect();
     return true;
   }, Effect.uninterruptible).bind(this);
 

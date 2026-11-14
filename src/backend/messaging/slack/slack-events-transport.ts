@@ -44,9 +44,8 @@ export class SlackEventsTransport implements MessagingTransport {
 
   start(sink: TransportSink): void {
     this.#sink = sink;
-    // Before `acquire`, which can open the socket: only a ticket asked for after this start counts.
     this.#unsubscribeRoutes ??= this.#ingress.onLinkedRoutes("slack", (ids) => {
-      this.#linked = ids.has(this.#identity.workspaceId);
+      this.#linked = ids === null || ids.has(this.#identity.workspaceId);
       this.#report(this.#ingress.state());
     });
     this.#release ??= this.#ingress.acquire("slack");

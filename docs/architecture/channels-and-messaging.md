@@ -639,12 +639,12 @@ the answer. Every answer comes from OpenBot.
   one ticket lifetime after it starts it asks the Worker (`/v2/remote/slack-route/validate`, signed
   like `/v2/remote/resume/validate`) which links of each ticket D1 still has. The host trusts a delivery because Signal checked the signature; no host has the
   signing secret.
-- **Not linked.** The host reads the workspace IDs of its own ticket (`SignalIngress.onLinkedRoutes`).
-  When Signal accepts the socket, a workspace connection that started before the ticket request and
-  is not in it reports `not_linked`, not `connected`: Signal sends its events to another host, such as
-  after the workspace moved or the saved settings were copied to a new server. It is not fatal and
-  unlinks nothing. Reconnect opens the Slack install page, which links the workspace to this host.
-  A workspace linked after the ticket request waits for the next socket.
+- **Not linked.** The account service names the workspace IDs beside the ticket, and the host keeps
+  them for the open socket (`SignalIngress.onLinkedRoutes`). A workspace connection that is not in them
+  reports `not_linked`, not `connected`: Signal sends its events to another host, such as after the
+  workspace moved or the saved settings were copied to a new server. It is not fatal and unlinks
+  nothing. Reconnect opens the Slack install page, which links the workspace to this host. A new
+  workspace opens a new socket before its connection starts, so an older list does not judge it.
 
 Telegram uses the same socket with one difference: one OpenBot bot serves every user, so its token
 must not reach any host. Only Signal has it (`TELEGRAM_BOT_TOKENS`), and the contract is
@@ -664,8 +664,9 @@ must not reach any host. Only Signal has it (`TELEGRAM_BOT_TOKENS`), and the con
   callback query ID, and sends `telegram-delivery` to the socket that holds the chat. It always
   answers 200: Telegram would hold back the bot's other chats behind one offline host. The Telegram
   route ticket (`telegramRoute` in the hello, audience `openbot-telegram-route`, the Slack route key)
-  and `telegram-route-revoked` work as the Slack ones do. A chat that is not in the ticket reports
-  `not_linked` as a Slack workspace does, and Reconnect opens a new link for the chat.
+  and `telegram-route-revoked` work as the Slack ones do. A chat that is not in the ticket's chat list
+  reports `not_linked` as a Slack workspace does, and Reconnect opens a new link for the chat. A chat
+  that Signal links on the open socket joins the socket's list at once.
 - **Calls.** The host sends `telegram-call` only to a Signal whose `ready` names the `telegram`
   capability, because Signal closes a socket on a frame it does not know. Signal accepts only the
   methods and parameters of `TelegramCallParams`, as strict objects, only for a chat routed to that

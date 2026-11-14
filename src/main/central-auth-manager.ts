@@ -128,6 +128,20 @@ type StoredSessionStage = "read" | "decrypt" | "decode" | "encrypt" | "write";
  * The stage, error name and system code only. A decode message can quote the decrypted text, and a
  * file system message names the path.
  */
+
+/**
+ * A Slack or Telegram route ticket, and the workspace or chat IDs that the account service names beside
+ * it. The host reads the IDs to show a connection that Signal does not route here. Null without IDs.
+ */
+function decodeLinkedRoute(
+  value: unknown,
+  label: string,
+  field: "teams" | "chats",
+): { ticket: string; ids: string[] | null } {
+  const record = decodeRecord(value, label);
+  const ids = record[field];
+  return { ticket: requiredString(record, "ticket"), ids: Array.isArray(ids) && ids.every(isString) ? ids : null };
+}
 function storedSessionFailure(stage: StoredSessionStage, error: unknown) {
   const code = isDynamicRecord(error) && isString(error.code) ? error.code : null;
   return { stage, error: error instanceof Error ? error.name : typeof error, code };
@@ -828,12 +842,12 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     function* (
       this: CentralAuthManager,
       hostId: string,
-    ): Effect.fn.Return<string, CentralAuthOperationError, CentralAuthTransport> {
+    ): Effect.fn.Return<{ ticket: string; ids: string[] | null }, CentralAuthOperationError, CentralAuthTransport> {
       const machineToken = yield* this.#hostMachineToken(hostId);
       return yield* this.#requestEffect(
         `/v2/remote/hosts/${encodeURIComponent(hostId)}/slack-route`,
         { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ machineToken }) },
-        (value) => requiredString(decodeRecord(value, "Slack route"), "ticket"),
+        (value) => decodeLinkedRoute(value, "Slack route", "teams"),
       );
     },
     (operation) => this.#owned(operation),
@@ -912,12 +926,12 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     function* (
       this: CentralAuthManager,
       hostId: string,
-    ): Effect.fn.Return<string, CentralAuthOperationError, CentralAuthTransport> {
+    ): Effect.fn.Return<{ ticket: string; ids: string[] | null }, CentralAuthOperationError, CentralAuthTransport> {
       const machineToken = yield* this.#hostMachineToken(hostId);
       return yield* this.#requestEffect(
         `/v2/remote/hosts/${encodeURIComponent(hostId)}/telegram-route`,
         { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ machineToken }) },
-        (value) => requiredString(decodeRecord(value, "Telegram route"), "ticket"),
+        (value) => decodeLinkedRoute(value, "Telegram route", "chats"),
       );
     },
     (operation) => this.#owned(operation),

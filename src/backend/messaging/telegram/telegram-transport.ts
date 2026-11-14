@@ -49,9 +49,8 @@ export class TelegramTransport implements MessagingTransport {
 
   start(sink: TransportSink): void {
     this.#sink = sink;
-    // Before `acquire`, which can open the socket: only a ticket asked for after this start counts.
     this.#unsubscribeRoutes ??= this.#ingress.onLinkedRoutes("telegram", (ids) => {
-      this.#linked = ids.has(this.#chatId);
+      this.#linked = ids === null || ids.has(this.#chatId);
       this.#report(this.#ingress.state());
     });
     this.#release ??= this.#ingress.acquire("telegram");
