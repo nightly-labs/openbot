@@ -1,5 +1,43 @@
 [
   {
+    "version": "0.71.0",
+    "date": "2026-11-14",
+    "notices": [
+      "Actualiza también a esta versión cada servidor al que te has unido. En un servidor, Detener para las ejecuciones de rutinas, los archivos que los agentes envían sin texto y las claves de API en su ruta antigua solo funcionan cuando el servidor tiene esta versión."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Separa dos dedos en un touchpad o en una pantalla táctil para acercar el área bajo el puntero. Los diagramas, el lienzo y el visor de imágenes mantienen su propio zoom.",
+          "Detén una ejecución de rutina desde el lienzo de Rutinas: selecciona Detener en la barra superior o en los detalles de la rutina. La ejecución termina con el estado Cancelada.",
+          "Los agentes pueden enviar un archivo o una imagen sin texto a un chat de WhatsApp, Telegram, Slack o Discord.",
+          "Vuelve a comprar un servidor alojado Starter. Tiene 25 GB de almacenamiento.",
+          "Usa una suscripción de ClinePass con agentes de Cline. El menú de modelos muestra los modelos de ClinePass."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "En el lienzo, arrastra una nota, un texto libre, una forma o un paso por su texto. Un clic en el texto coloca el cursor donde hiciste clic.",
+          "Un mensaje que envías mientras trabaja un agente de Antigravity entra en la ejecución en curso. Esto requiere Antigravity CLI 1.5.0 o una versión posterior.",
+          "Una rutina cuya tarea indica que debe detenerse al terminar el trabajo ahora se pausa sola. Vuelve a activarla desde tu lista de rutinas.",
+          "Vault ahora indica que cada agente puede leer los archivos de claves de API de los demás agentes, porque todos los agentes se ejecutan con el mismo usuario del sistema."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Los scripts, los servidores MCP y los ajustes de proveedores que leen claves de API de Vault desde sus archivos vuelven a funcionar tras la actualización a 0.70.0.",
+          "Un agente de Claude conserva el modelo de su perfil cuando Claude Code cambia su modelo predeterminado.",
+          "Cuando Claude detiene una ejecución en el límite de gasto mensual, un agente con modelos de respaldo continúa con su siguiente modelo.",
+          "Los agentes obtienen la transcripción completa de un video con subtítulos, como un video de YouTube.",
+          "OpenBot usa menos CPU: las pestañas del navegador que no ves se ralentizan, y la luz en movimiento de la línea de actividad de un agente es más ligera."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.70.0",
     "date": "2026-11-13",
     "notices": [
