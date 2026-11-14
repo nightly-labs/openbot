@@ -215,13 +215,14 @@ export class AgentRemoval {
       })),
     );
     let stage = "provider-files";
+    let orchestratorOf: readonly string[] = [];
     yield* Effect.gen({ self: this }, function* () {
       for (const session of providerSessions)
         yield* this.#threads
           .deleteProviderSessionFiles(session.externalSessionId, session.id)
           .pipe(toAgentRemovalFailed);
       stage = "messaging";
-      yield* this.#messaging.deleteForAgent(agent.id).pipe(toAgentRemovalFailed);
+      orchestratorOf = yield* this.#messaging.deleteForAgent(agent.id).pipe(toAgentRemovalFailed);
       stage = "tasks";
       yield* this.#hooks.deleteTasks(agent.id);
       stage = "mailbox";
@@ -238,6 +239,20 @@ export class AgentRemoval {
       stage = "agent-files-and-record";
       yield* this.#store.deleteAgent(agent.id).pipe(toAgentRemovalFailed);
     }).pipe(
+      // The agent stays for a retry, so it stays the orchestrator of its places. Otherwise a place shows
+      // no orchestrator, and adding one makes a second agent beside it (#7437).
+      Effect.tapError(() =>
+        removalStep(() => {
+          if (this.#store.list().some((candidate) => candidate.id === agent.id))
+            this.#messaging.store.restoreOrchestrator(agent.id, orchestratorOf);
+        }).pipe(
+          Effect.catch((failure) =>
+            Effect.sync(() =>
+              this.#logger.warn("Could not restore a deleted agent's orchestrator role.", removalErrorCode(failure)),
+            ),
+          ),
+        ),
+      ),
       Effect.mapError((failure) => {
         // File-system errors can contain private paths. Log only the failed stage and the error code.
         this.#logger.warn("Agent deletion failed.", { stage, ...removalErrorCode(failure) });

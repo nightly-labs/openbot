@@ -403,9 +403,14 @@ export class MessagingStore {
   /**
    * Removes every link of an agent, with the execution threads and their history. A workspace whose
    * orchestrator it was has none until the user adds one again. The caller releases the provider
-   * sessions of `threadIdsForAgent` first.
+   * sessions of `threadIdsForAgent` first. Gives the connections whose orchestrator it was.
    */
-  deleteForAgent(agentId: string): void {
+  deleteForAgent(agentId: string): string[] {
+    const orchestratorOf = databaseRows(
+      this.#database.connection
+        .prepare("SELECT connection_id FROM projection_messaging_connections WHERE orchestrator_agent_id = ?")
+        .all(agentId),
+    ).map((row) => requiredStringColumn(row, "connection_id"));
     const links = databaseRows(
       this.#database.connection
         .prepare("SELECT link_id, thread_id FROM projection_messaging_threads WHERE agent_id = ?")
@@ -459,6 +464,17 @@ export class MessagingStore {
         return null;
       },
     );
+    return orchestratorOf;
+  }
+
+  /**
+   * Makes the agent the orchestrator of `connectionIds` again, after its deletion failed and the
+   * agent stays. A connection that got another orchestrator in the meantime keeps that one.
+   */
+  restoreOrchestrator(agentId: string, connectionIds: readonly string[]): void {
+    for (const connectionId of connectionIds)
+      if (this.connection(connectionId)?.orchestratorAgentId === null)
+        this.updateConnection(connectionId, { orchestratorAgentId: agentId });
   }
 
   threadIdsForAgent(agentId: string): string[] {

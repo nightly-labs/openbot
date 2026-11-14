@@ -1076,10 +1076,10 @@ export class MessagingThreads {
   readonly deleteForAgent = Effect.fn("MessagingThreads.deleteForAgent")(function* (
     this: MessagingThreads,
     agentId: string,
-  ): Effect.fn.Return<void, MessagingThreadFailed> {
+  ): Effect.fn.Return<string[], MessagingThreadFailed> {
     for (const threadId of this.store.threadIdsForAgent(agentId))
       yield* this.#hooks.forgetThread(threadId).pipe(toMessagingThreadFailed);
-    yield* threadsStep(() => this.store.deleteForAgent(agentId));
+    return yield* threadsStep(() => this.store.deleteForAgent(agentId));
   });
 
   readonly #finished = Effect.fn("MessagingThreads.finished")(function* (
