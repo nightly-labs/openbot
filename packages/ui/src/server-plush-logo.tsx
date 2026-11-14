@@ -96,7 +96,7 @@ export interface ServerPlushLogoProps {
   /** The server ID. It chooses the colour when the server has no colour of its own. */
   seed: string;
   /** The shape and colour that an owner or admin chose. Null or absent gives the automatic look. */
-  appearance?: ServerAppearance | null;
+  appearance?: ServerAppearance | null | undefined;
   class?: JSX.HTMLAttributes<HTMLImageElement>["class"];
 }
 

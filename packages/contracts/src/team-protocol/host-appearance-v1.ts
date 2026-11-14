@@ -59,6 +59,16 @@ export function serverAppearanceOrNull(value: unknown): ServerAppearance | null 
   return { shape: value.shape, color: value.color };
 }
 
+/**
+ * The optional `appearance` field of a stored or listed server record. Null is the automatic look.
+ * A bad value drops only the field, so the record still loads; an absent field means an older source.
+ */
+export function optionalServerAppearanceField(value: unknown): { appearance?: ServerAppearance | null } {
+  if (value === null) return { appearance: null };
+  const appearance = serverAppearanceOrNull(value);
+  return appearance ? { appearance } : {};
+}
+
 const color: AdminDecoder = (value) => {
   if (!isServerAppearanceColor(value)) throw new Error("Invalid admin colour.");
   return value;

@@ -62,8 +62,9 @@ function ServerSettingsHome({ server }: { server: MobileServer }) {
   return (
     <SettingsContent>
       {canAdministerServer(server.role) ? <ServerIdentityForm server={server} /> : <ServerHeader server={server} />}
-      {/* Only an owner or admin of a connected host that serves `host-appearance-v1`. */}
-      {canEditServerAppearance(server.id) ? <ServerAppearancePicker server={server} /> : null}
+      {/* Only an owner or admin of a connected host that serves `host-appearance-v1`. A logo hides
+          the plush, so the picker shows only while the server has no logo, as on desktop. */}
+      {canEditServerAppearance(server.id) && !server.logoKey ? <ServerAppearancePicker server={server} /> : null}
       <ServerGeneralSection serverId={server.id} />
       <ServerPeopleSection server={server} />
       <ServerAiSection serverId={server.id} />

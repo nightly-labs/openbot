@@ -12,7 +12,10 @@ import {
 import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
 import { decodeRemoteSession, decodeRemoteSessionTicket } from "@openbot/contracts/remote-control-plane";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
-import { type ServerAppearance, serverAppearanceOrNull } from "@openbot/contracts/team-protocol/host-appearance-v1";
+import {
+  optionalServerAppearanceField,
+  type ServerAppearance,
+} from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { referenceFrom, safeReference } from "@openbot/user-errors/reference";
 import { Deferred, Effect, Schema, Semaphore } from "effect";
@@ -24,13 +27,6 @@ import {
   remoteHostFingerprint,
 } from "./host-key-handover";
 import type { TeamClientFetch } from "./index";
-
-/** The appearance of a directory record. A bad value drops only the appearance, so the server stays in the list. */
-function directoryAppearance(value: unknown): { appearance?: ServerAppearance | null } {
-  if (value === null) return { appearance: null };
-  const appearance = serverAppearanceOrNull(value);
-  return appearance ? { appearance } : {};
-}
 
 export interface RemoteTeamHost {
   hostId: string;
@@ -239,7 +235,7 @@ export class RemoteTeamDirectoryClient {
                 hostId: candidate.hostId,
                 name: candidate.name,
                 logoKey: candidate.logoKey,
-                ...directoryAppearance(candidate.appearance),
+                ...optionalServerAppearanceField(candidate.appearance),
                 devicePublicKey,
                 membershipId: candidate.membershipId,
                 role: candidate.role,

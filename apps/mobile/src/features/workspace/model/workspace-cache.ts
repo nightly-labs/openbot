@@ -10,7 +10,7 @@ import {
   type SidebarLayoutSnapshot,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
-import { serverAppearanceOrNull } from "@openbot/contracts/team-protocol/host-appearance-v1";
+import { optionalServerAppearanceField } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import type { RemoteTeamHost } from "@openbot/team-client";
 import * as Crypto from "expo-crypto";
 import * as FileSystem from "expo-file-system/legacy";
@@ -164,12 +164,6 @@ function decodeCachedServer(value: unknown): CachedServer {
   };
 }
 
-function cachedAppearance(value: unknown): Pick<RemoteTeamHost, "appearance"> {
-  if (value === null) return { appearance: null };
-  const appearance = serverAppearanceOrNull(value);
-  return appearance ? { appearance } : {};
-}
-
 /** A server record as `RemoteTeamDirectoryClient.listHosts` gave it, its key already checked there. */
 function decodeCachedHost(value: unknown): RemoteTeamHost {
   if (!isDynamicRecord(value)) throw new Error("The cached server list is invalid.");
@@ -201,7 +195,7 @@ function decodeCachedHost(value: unknown): RemoteTeamHost {
     ...(isBoolean(restartAvailable) ? { restartAvailable } : {}),
     ...(isStorageGb(storageGb) ? { storageGb } : {}),
     // A file of an older build has no appearance, and a bad one is dropped: the next server list writes it again.
-    ...cachedAppearance(appearance),
+    ...optionalServerAppearanceField(appearance),
     ...(keyChangedAt === undefined ? {} : { keyChangedAt }),
   };
 }

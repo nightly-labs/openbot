@@ -26,7 +26,7 @@ export interface CopyAgentsServer {
   id: string;
   name: string;
   logoUrl: string | null;
-  appearance?: ServerAppearance | null;
+  appearance?: ServerAppearance | null | undefined;
 }
 
 export type CopyAgentsPhase = "idle" | "copying" | "done";

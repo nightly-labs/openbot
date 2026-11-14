@@ -8,7 +8,10 @@ import {
 } from "@openbot/contracts/ipc";
 import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
 import { type DynamicRecord, isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
-import { type ServerAppearance, serverAppearanceOrNull } from "@openbot/contracts/team-protocol/host-appearance-v1";
+import {
+  optionalServerAppearanceField,
+  type ServerAppearance,
+} from "@openbot/contracts/team-protocol/host-appearance-v1";
 
 /** The account API's answers, and the decoders that `CentralAuthManager` checks them with. */
 
@@ -176,13 +179,6 @@ export function decodeRegisteredRemoteHost(value: unknown): RegisteredRemoteHost
   };
 }
 
-/** A bad value drops only the appearance, as for the limit, so the host list still loads. */
-function directoryAppearance(value: unknown): { appearance?: ServerAppearance | null } {
-  if (value === null) return { appearance: null };
-  const appearance = serverAppearanceOrNull(value);
-  return appearance ? { appearance } : {};
-}
-
 export function decodeRemoteHosts(value: unknown): RemoteHostSummary[] {
   const record = decodeRecord(value, "remote hosts");
   if (!Array.isArray(record.hosts)) throw new Error("Invalid remote host list.");
@@ -203,7 +199,7 @@ export function decodeRemoteHosts(value: unknown): RemoteHostSummary[] {
       hostId: requiredString(host, "hostId"),
       name: requiredString(host, "name"),
       logoKey: host.logoKey,
-      ...directoryAppearance(host.appearance),
+      ...optionalServerAppearanceField(host.appearance),
       devicePublicKey: host.devicePublicKey,
       keyHandovers: optionalHostKeyHandovers(host.keyHandovers),
       authEpoch: host.authEpoch,
