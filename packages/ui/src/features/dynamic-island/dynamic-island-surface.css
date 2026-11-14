@@ -415,12 +415,6 @@
   border-top-color: currentColor;
 }
 
-/* The island is above every app all day. Away from the pointer, its spinner turns in steps: a smooth
-   turn makes macOS compose the screen again at each frame, and a stopped one looks frozen. */
-.openbot-dynamic-island-transition-root[data-ambient-motion="paused"] .ui-spinner {
-  animation-timing-function: steps(12);
-}
-
 .dynamic-island[data-layout-state="expanded"] .dynamic-island-surface-compact-name {
   opacity: 0;
 }
