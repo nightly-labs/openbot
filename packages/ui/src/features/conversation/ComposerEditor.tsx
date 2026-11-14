@@ -225,7 +225,7 @@ export function expandComposerMentions(value: string): string {
 }
 
 export function ComposerEditor(props: ComposerEditorProps) {
-  const { t, format } = useText();
+  const { t, format, sourceText } = useText();
   const [mention, setMention] = createSignal<MentionContext | null>(null);
   const [activeOption, setActiveOption] = createSignal(0);
   /* Where the `$` that the add menu wrote starts, so that picker can say why it is empty. */
@@ -264,8 +264,21 @@ export function ComposerEditor(props: ComposerEditorProps) {
     );
   });
   const usableSkills = createMemo(() =>
-    (props.skills ?? []).filter((skill) => skill.state !== "needs-repair" && skill.enabled !== false),
+    (props.skills ?? []).filter(
+      (skill) => skill.state !== "needs-repair" && skill.enabled !== false && skill.problem === undefined,
+    ),
   );
+  /* The skills that `$` names with the reason the agent cannot use them, under the rows it offers. */
+  const skillProblems = createMemo(() => {
+    const context = mention();
+    if (context?.trigger !== "$") return [];
+    const query = context.query.trim().toLocaleLowerCase();
+    return (props.skills ?? []).flatMap(({ problem, ...skill }) =>
+      problem !== undefined && skill.enabled !== false && skillMatchRank(skill, query) !== null
+        ? [{ name: skill.name, problem }]
+        : [],
+    );
+  });
   const matchingSkills = createMemo(() => {
     const query = mention()?.query.trim().toLocaleLowerCase() ?? "";
     const ranked = usableSkills().flatMap((skill) => {
@@ -358,13 +371,15 @@ export function ComposerEditor(props: ComposerEditorProps) {
    */
   const pickerStatus = createMemo(() => {
     const context = mention();
-    if (context?.trigger !== "$" || matchingOptions().length > 0) return null;
+    if (context?.trigger !== "$" || matchingOptions().length > 0 || skillProblems().length > 0) return null;
     if (requestedMentionStart() !== context.start && context.query.trim()) return null;
     if (usableSkills().length === 0)
       return t(props.skillsLoadFailed ? "composer.picker.skillsLoadFailed" : "composer.picker.noSkills");
     return t("composer.picker.noSkillMatch", { query: context.query.trim() });
   });
-  const pickerOpen = createMemo(() => mention() !== null && (matchingOptions().length > 0 || pickerStatus() !== null));
+  const pickerOpen = createMemo(
+    () => mention() !== null && (matchingOptions().length > 0 || pickerStatus() !== null || skillProblems().length > 0),
+  );
   /** The `@` or `$` query, which the rows mark in their names. */
   const pickerQuery = () => mention()?.query.trim() ?? "";
   const pickerOptionElements = new Map<string, HTMLElement>();
@@ -1178,7 +1193,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
                 </p>
               )}
             </Show>
-            <Show when={pickerStatus() === null}>
+            <Show when={pickerStatus() === null && matchingOptions().length > 0}>
               <Listbox.Root<PickerOption, PickerSection>
                 as="div"
                 ref={bindPickerList}
@@ -1294,6 +1309,20 @@ export function ComposerEditor(props: ComposerEditorProps) {
                   );
                 }}
               />
+            </Show>
+            <Show when={skillProblems().length > 0}>
+              <div class="mention-picker-problems">
+                <For each={skillProblems()}>
+                  {(skill) => (
+                    <p class="mention-picker-skill-problem">
+                      {t("composer.picker.skillProblem", {
+                        name: skill.name,
+                        problem: sourceText(skill.problem),
+                      })}
+                    </p>
+                  )}
+                </For>
+              </div>
             </Show>
           </div>
         </Portal>

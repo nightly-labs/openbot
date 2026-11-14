@@ -30,6 +30,7 @@ import {
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SECRET_VAULT_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
+import { SKILL_PROBLEMS_CAPABILITY } from "@openbot/contracts/team-protocol/skill-problems-v1";
 import { V5_AGENT_MODEL } from "@openbot/contracts/team-protocol/v5-adapter";
 import { V6_AGENT_MODEL } from "@openbot/contracts/team-protocol/v6-adapter";
 import { WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-v1";
@@ -256,7 +257,9 @@ export async function routeAgents(
       return json(200, await runCauseEffect(agents.getUsage(agentId)));
     }
     if (method === "GET" && action === "skills") {
-      return json(200, skills ? await runCauseEffect(skills.listInstalledForChatTags(agentId)) : []);
+      // An older client would offer a skill that has a problem as a usable one.
+      const problems = capabilities.has(SKILL_PROBLEMS_CAPABILITY);
+      return json(200, skills ? await runCauseEffect(skills.listInstalledForChatTags(agentId, { problems })) : []);
     }
     if (method === "PATCH" && !action) {
       const input = agentUpdate(await readJson(request), agentId);

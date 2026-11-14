@@ -61,6 +61,7 @@ import {
   decodeHostProviderAccountPools,
   decodeHostWhatsAppLinkState,
   decodeHostWhatsAppOverview,
+  decodeInstalledSkills,
   disconnectedPasswordManager,
   type HermesImportPreview,
   type HiddenAgentsSnapshot,
@@ -338,6 +339,7 @@ import { SIDE_QUESTION_CAPABILITY, SIDE_QUESTION_ROUTES } from "@openbot/contrac
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { SIDEBAR_PINS_CAPABILITY, SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { SKILL_LEARNING_CAPABILITY, SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
+import { SKILL_PROBLEMS_CAPABILITY } from "@openbot/contracts/team-protocol/skill-problems-v1";
 import { SKILLS_ADMIN_CAPABILITY, SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { STORAGE_DISK_CAPABILITY, STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-disk-v1";
 import {
@@ -435,7 +437,7 @@ import { RemoteRequestError } from "../src/main/remote-server-errors";
 import { RemoteWorkflowError } from "../src/main/remote-service-effects";
 import { SidebarPinStore } from "../src/main/sidebar-pin-store";
 import { SkillLearningPreferenceStore } from "../src/main/skill-learning-preference-store";
-import { SkillMarketplaceFailure, type SkillMarketplaceService } from "../src/main/skill-marketplace-service";
+import { SkillMarketplaceFailure, SkillMarketplaceService } from "../src/main/skill-marketplace-service";
 import type {
   TeamApiAgentAccess,
   TeamApiAgents,
@@ -2068,6 +2070,25 @@ const githubSkillsAdmin: Pick<
   setEnabled: () => Effect.die(new Error("Not used.")),
 };
 
+// The real skill reader over Ada's workspace (#9006): one skill folder that the provider reads, and one
+// whose `SKILL.md` starts with the byte order mark that Windows PowerShell 5.1 writes.
+const adaSkills = join(root, "workspaces", "agent-ada", ".claude", "skills");
+mkdirSync(join(adaSkills, "good-skill"), { recursive: true });
+writeFileSync(join(adaSkills, "good-skill", "SKILL.md"), "---\nname: good-skill\ndescription: Works.\n---\n# Good\n");
+mkdirSync(join(adaSkills, "settlement-economy"), { recursive: true });
+writeFileSync(
+  join(adaSkills, "settlement-economy", "SKILL.md"),
+  "\uFEFF---\r\nname: settlement-economy\r\ndescription: Settles.\r\n---\r\n# Settle\r\n",
+);
+const chatSkills = new SkillMarketplaceService(
+  {
+    requestAuthorized: () => Effect.die("Not used."),
+    downloadAuthorized: () => Effect.die("Not used."),
+    resolveApiUrl: () => "",
+  },
+  () => agents,
+);
+
 // The real skill learning store on a temporary file, as the host keeps it.
 const skillLearningFile = join(root, "skill-learning.json");
 const skillLearning = new SkillLearningPreferenceStore(skillLearningFile);
@@ -2216,6 +2237,7 @@ try {
     mailbox,
     browser,
     chat: new TeamChatStore(database),
+    skills: chatSkills,
     // The real host-settings service, over an agent writer that records each change.
     admin: {
       skills: githubSkillsAdmin,
@@ -5857,6 +5879,44 @@ try {
           ],
         ),
       [summary(noSave), summary(saved), summary(discarded)],
+    );
+  }
+
+  // ---- The skills that an agent cannot use, with the reason (skill-problems-v1, #9006) ----
+  {
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises skill-problems-v1 on protocol 9 only",
+      list(field(compatibility.body, "capabilities")).includes(SKILL_PROBLEMS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(SKILL_PROBLEMS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const path = TEAM_API_ROUTES.agent.skills("agent-ada");
+    const plain = await call("GET", path, { token: bobToken, protocol: TEAM_PROTOCOL_V9, capabilities: [] });
+    const withProblems = await call("GET", path, {
+      token: bobToken,
+      protocol: TEAM_PROTOCOL_V9,
+      capabilities: [SKILL_PROBLEMS_CAPABILITY],
+    });
+    // The list also has the host user's own skills in `~/.agents/skills`, which differ on each computer.
+    const named = (reply: Reply) =>
+      decodeInstalledSkills(reply.body)
+        .filter((skill) => skill.skillId.startsWith("workspace:"))
+        .map(({ slug, problem }) => ({ slug, problem }));
+    check(
+      "an older client gets only the usable skill folder, as before",
+      plain.status === 200 && isDeepStrictEqual(named(plain), [{ slug: "good-skill", problem: undefined }]),
+      summary(plain),
+    );
+    check(
+      "a client with skill-problems-v1 also gets the folder whose SKILL.md has a byte order mark, with the reason",
+      withProblems.status === 200 &&
+        isDeepStrictEqual(named(withProblems), [
+          { slug: "good-skill", problem: undefined },
+          { slug: "settlement-economy", problem: sourceText("error.skill.frontmatterMissing") },
+        ]),
+      summary(withProblems),
     );
   }
 

@@ -43,6 +43,7 @@ export const messages = defineMessages("composer", {
   "composer.picker.noSkills": "This agent has no skills.",
   "composer.picker.noSkillMatch": "No skill matches “{query}”.",
   "composer.picker.skillsLoadFailed": "Skills did not load.",
+  "composer.picker.skillProblem": "{name} is not available. {problem} Ask the agent to fix it.",
   "composer.token.attachment": "Open attached file {name}",
   "composer.token.agent": "Agent {name}",
   "composer.token.skill": "Skill {name}",

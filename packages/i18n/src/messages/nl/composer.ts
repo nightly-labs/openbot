@@ -48,6 +48,7 @@ export const messages = {
   "composer.picker.noSkills": "Deze agent heeft geen vaardigheden.",
   "composer.picker.noSkillMatch": "Geen vaardigheid gevonden voor “{query}”.",
   "composer.picker.skillsLoadFailed": "Vaardigheden zijn niet geladen.",
+  "composer.picker.skillProblem": "{name} is niet beschikbaar. {problem} Vraag de agent om het te herstellen.",
   "composer.token.attachment": "Bijgevoegd bestand {name} openen",
   "composer.token.agent": "Agent {name}",
   "composer.token.skill": "Vaardigheid {name}",

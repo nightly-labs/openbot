@@ -1095,6 +1095,25 @@
   line-height: var(--openbot-leading-sm);
 }
 
+/*
+ * The skills that the agent cannot use, under the rows. A reason can wrap, so the notes take their own
+ * height and scroll after four rows.
+ */
+.mention-picker-problems {
+  max-height: calc(4 * var(--mention-picker-row-height));
+  overflow-y: auto;
+  padding: var(--mention-picker-gutter) 0;
+  overscroll-behavior: contain;
+}
+
+.mention-picker-skill-problem {
+  margin: 0;
+  padding: var(--openbot-space-1) calc(var(--mention-picker-gutter) + 8px);
+  color: var(--openbot-queue-action);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
 /* While the user filters, the matched text stands out from the rest, as in the search dialog. */
 .mention-picker-option[data-filtering] {
   --mention-picker-name-color: var(--openbot-queue-action);

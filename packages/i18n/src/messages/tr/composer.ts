@@ -47,6 +47,7 @@ export const messages = {
   "composer.picker.noSkills": "Bu ajanın becerisi yok.",
   "composer.picker.noSkillMatch": "“{query}” ile eşleşen beceri yok.",
   "composer.picker.skillsLoadFailed": "Beceriler yüklenemedi.",
+  "composer.picker.skillProblem": "{name} kullanılamıyor. {problem} Düzeltmesi için ajana sor.",
   "composer.token.attachment": "Ekli dosyayı aç: {name}",
   "composer.token.agent": "Ajan {name}",
   "composer.token.skill": "Beceri {name}",

@@ -44,6 +44,7 @@ export const messages = {
   "composer.picker.noSkills": "ليس لدى هذا الوكيل مهارات.",
   "composer.picker.noSkillMatch": "لا توجد مهارة تطابق «{query}».",
   "composer.picker.skillsLoadFailed": "لم يتم تحميل المهارات.",
+  "composer.picker.skillProblem": "{name} غير متاحة. {problem} اطلب من الوكيل إصلاحها.",
   "composer.token.attachment": "فتح الملف المرفق {name}",
   "composer.token.agent": "الوكيل {name}",
   "composer.token.skill": "المهارة {name}",

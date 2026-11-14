@@ -44,6 +44,7 @@ export const messages = {
   "composer.picker.noSkills": "이 에이전트에는 스킬이 없어요.",
   "composer.picker.noSkillMatch": "“{query}”와(과) 일치하는 스킬이 없어요.",
   "composer.picker.skillsLoadFailed": "스킬을 불러오지 못했어요.",
+  "composer.picker.skillProblem": "{name}을(를) 사용할 수 없어요. {problem} 에이전트에게 고쳐 달라고 요청하세요.",
   "composer.token.attachment": "첨부 파일 {name} 열기",
   "composer.token.agent": "에이전트 {name}",
   "composer.token.skill": "스킬 {name}",

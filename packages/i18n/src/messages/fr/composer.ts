@@ -48,6 +48,7 @@ export const messages = {
   "composer.picker.noSkills": "Cet agent n’a aucune compétence.",
   "composer.picker.noSkillMatch": "Aucune compétence ne correspond à « {query} ».",
   "composer.picker.skillsLoadFailed": "Les compétences n’ont pas pu être chargées.",
+  "composer.picker.skillProblem": "{name} n’est pas disponible. {problem} Demandez à l’agent de le corriger.",
   "composer.token.attachment": "Ouvrir le fichier joint {name}",
   "composer.token.agent": "Agent {name}",
   "composer.token.skill": "Compétence {name}",

@@ -615,7 +615,7 @@ export function agentIpcHandlers({
           ),
       }),
       listInstalledSkills: scopedHandler(parseAgentId, {
-        local: (agentId) => runCauseEffect(skills.listInstalledForChatTags(agentId)),
+        local: (agentId) => runCauseEffect(skills.listInstalledForChatTags(agentId, { problems: true })),
         // A server too old to know the endpoint would answer 404, so ask its advertised capabilities first.
         remote: (agentId, serverId) =>
           remoteServers
