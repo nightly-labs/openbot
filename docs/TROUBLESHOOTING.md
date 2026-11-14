@@ -234,7 +234,7 @@ A routine runs only while the computer is awake and OpenBot is open.
 - After OpenBot was closed, the routine setting "If OpenBot was closed at the scheduled time"
   decides: skip the run, or run it one time when OpenBot opens.
 
-On macOS and Windows, turn on Settings → General → **Keep this computer awake**. While the computer
+On macOS and Windows, turn on Settings → App behavior → **Keep this computer awake**. While the computer
 is connected to power, it then does not sleep when idle. The display can still turn off. A closed
 laptop lid, or a sleep that you select, still sleeps the computer, unless macOS uses an external
 display (closed-display mode). On battery power, the computer sleeps as usual, unless you also turn

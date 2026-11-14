@@ -867,6 +867,8 @@ export const messages = {
     "OpenBot nie może odczytać zapisanych tokenów na serwerze {host}. Odłącz obszar roboczy, a potem połącz go ponownie.",
   "mobile.server.connectors.slack.helpRelay":
     "OpenBot na serwerze {host} nie może odbierać zdarzeń Slack. Na serwerze {host} zaloguj się, nadaj serwerowi nazwę w ustawieniach serwera i nie zamykaj OpenBot.",
+  "mobile.server.connectors.slack.helpNotLinked":
+    "Ten obszar roboczy nie jest połączony z {host}. Stuknij Połącz ponownie, aby go połączyć.",
   "mobile.server.connectors.slack.orchestratorTitle": "Slack Orchestrator",
   "mobile.server.connectors.slack.orchestratorDescription":
     "Ten agent odbiera każdą prośbę ze Slacka. Na krótkie odpowiada sam, inną pracę przekazuje odpowiedniemu agentowi i publikuje odpowiedź w wątku.",
@@ -914,6 +916,8 @@ export const messages = {
     "OpenBot nie może odczytać zapisanych tokenów na serwerze {host}. Odłącz serwer Discord, a potem połącz go ponownie.",
   "mobile.server.connectors.discord.helpRelay":
     "OpenBot na serwerze {host} nie może odbierać zdarzeń Discord. Na serwerze {host} zaloguj się, nadaj serwerowi nazwę w ustawieniach serwera i nie zamykaj OpenBot.",
+  "mobile.server.connectors.discord.helpNotLinked":
+    "Ten serwer Discord nie jest połączony z {host}. Stuknij Połącz ponownie, aby go połączyć.",
   "mobile.server.connectors.discord.orchestratorTitle": "Discord Orchestrator",
   "mobile.server.connectors.discord.orchestratorDescription":
     "Ten agent odbiera każdą prośbę z Discorda. Na krótkie odpowiada sam, inną pracę przekazuje odpowiedniemu agentowi i odpowiada na kanale.",
@@ -951,6 +955,8 @@ export const messages = {
     "OpenBot na serwerze {host} nie może odbierać wiadomości z Telegram. Na serwerze {host} zaloguj się, nadaj serwerowi nazwę w ustawieniach serwera i nie zamykaj OpenBot.",
   "mobile.server.connectors.telegram.helpError":
     "OpenBot nie może połączyć się z tym czatem. Połącz ponownie lub odłącz czat.",
+  "mobile.server.connectors.telegram.helpNotLinked":
+    "Ten czat nie jest połączony z {host}. Stuknij Połącz ponownie, aby go połączyć.",
   "mobile.server.connectors.telegram.retryAt": "Telegram poprosił OpenBot o czekanie. Kolejna próba o {time}.",
   "mobile.server.connectors.telegram.linkTitle": "Połącz czat",
   "mobile.server.connectors.telegram.linkAnother": "Połącz kolejny czat",
@@ -995,6 +1001,8 @@ export const messages = {
     "WhatsApp usunął ten serwer z połączonych urządzeń. Połącz numer ponownie.",
   "mobile.server.connectors.whatsapp.helpError":
     "OpenBot nie może połączyć się z WhatsApp na tym numerze. Połącz ponownie lub odłącz numer.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "OpenBot nie może odczytać zapisanych kluczy tego numeru. Połącz numer ponownie.",
   "mobile.server.connectors.whatsapp.retryAt": "WhatsApp poprosił OpenBot o czekanie. Kolejna próba o {time}.",
   "mobile.server.connectors.whatsapp.linkAgain": "Połącz od nowa",
   "mobile.server.connectors.whatsapp.ownNumber": "Numer prywatny",

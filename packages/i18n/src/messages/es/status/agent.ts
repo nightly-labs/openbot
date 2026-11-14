@@ -8,6 +8,8 @@ export const messages = {
   "status.agent.instructionsChanged": "Actualizó sus instrucciones",
   "status.agent.modelSwitchedForLimit": "Límite de uso alcanzado. Se cambió a {model}.",
   "status.agent.modelReturnedAfterLimit": "El límite de uso terminó. Se volvió a {model}.",
+  "status.agent.routineSkippedRunOpen": "Omitida: la última ejecución no había terminado",
+  "status.agent.routineSkippedUsageLimit": "Omitida: se alcanzó el límite de uso",
   "status.agent.modelSwitchedForError": "Error del proveedor. Se cambió a {model}.",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} no tiene créditos. Se cambió a {model}. Para volver a usarlo, añade créditos y luego selecciónalo.",
@@ -36,6 +38,14 @@ export const messages = {
   "status.agent.serverInstallCommand":
     "Crear un comando de un solo uso que instala OpenBot en otro ordenador como el servidor {name} y lo conecta a tu cuenta. El agente lo ejecuta allí.",
   "status.agent.serverInstallCard": "Comando de instalación para el servidor {name}",
+  "status.agent.browserProfileNamed":
+    "Mover {agents} al perfil del navegador {profile}. Reciben sus inicios de sesión y cookies. Sus pestañas abiertas se cierran.",
+  "status.agent.browserProfileNew":
+    "Crear el nuevo perfil del navegador {profile} y mover {agents} a él. No tiene inicios de sesión. Sus pestañas abiertas se cierran.",
+  "status.agent.browserProfileShared":
+    "Mover {agents} al perfil del navegador compartido. Reciben sus inicios de sesión y cookies. Sus pestañas abiertas se cierran.",
+  "status.agent.browserProfileOwn":
+    "Dar a {agents} un perfil del navegador propio para cada uno. Sus pestañas abiertas se cierran.",
   "status.agent.feedbackSending": "Enviando tus comentarios al equipo de OpenBot…",
   "status.agent.workflowDelete":
     "Eliminar el flujo de trabajo {title} con sus ejecuciones y versiones. Sus pasos abiertos se detienen.",

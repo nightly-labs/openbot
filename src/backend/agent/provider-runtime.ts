@@ -4209,6 +4209,11 @@ export class ProviderRuntime implements ProviderPort {
       }
       // A failed tool call names its server too, but is not a server that did not start. A built-in
       // server is not in the MCP settings, and its failure stays the provider's error, as before.
+      // Codex reports each failed start in `mcpServer/startupStatus/updated` too
+      // (`#reportMcpStartupStatus`). Its stderr line of the same failure can give a different
+      // cause, such as the `rmcp` worker's `AuthRequired(…)` beside a status that read as a failed
+      // start, so the user got two toasts that disagree (#9360). For Codex, the status is the one
+      // report.
       const mcpServer =
         isMcpSubsystemDiagnostic(message) && !isToolCallDiagnostic(message)
           ? this.#configuredMcpServerIn(redacted)
@@ -4216,7 +4221,7 @@ export class ProviderRuntime implements ProviderPort {
       if (mcpServer !== undefined && !mcpServer?.builtIn) {
         const server = mcpServer?.name ?? null;
         stderrLogger.warn("A provider reported an MCP server failure.", { provider: client.provider, server, message });
-        if (server) this.#reportMcpServerFailure(client.provider, server, redacted);
+        if (server && client.provider !== "codex") this.#reportMcpServerFailure(client.provider, server, redacted);
         return;
       }
       if (isTelemetryExportDiagnostic(message)) {

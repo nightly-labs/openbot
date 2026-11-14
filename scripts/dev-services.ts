@@ -288,12 +288,35 @@ async function readHostingDeveloperKey(): Promise<string> {
   return environment.HOSTED_SERVERS_DEVELOPER_KEY ?? "";
 }
 
+/**
+ * Dictation and voice conversations load the sherpa-onnx runtime from `.openbot-build/voice` in
+ * development. A new worktree does not have it, so the first start downloads it (the models download
+ * in the app when they are first used). Without the network, or when the download stops, the app still
+ * starts after the time limit, without local voice.
+ */
+function prepareVoiceRuntime(): void {
+  // The script checks the version and every runtime file itself, so a partial or old runtime is repaired.
+  try {
+    execFileSync(process.execPath, ["run", "voice:prepare-runtime"], {
+      cwd: projectRoot,
+      stdio: "inherit",
+      timeout: 300_000,
+    });
+  } catch (error) {
+    logger.warn(
+      "Could not prepare the local voice runtime. Local voice is off until `bun run voice:prepare-runtime` completes.",
+      toLogValue(error),
+    );
+  }
+}
+
 async function main(): Promise<void> {
   const { target, dryRun, force, shared, hostingTest, slack } = parseDevelopmentTarget(process.argv.slice(2));
   if (!dryRun && prepareDevelopmentEnvironment() === "created") {
     logger.info("Prepared local development state.");
   }
   const services = servicesForTarget(target);
+  if (!dryRun && services.includes("app")) prepareVoiceRuntime();
   const developmentEnvironment = dryRun ? {} : await loadDevelopmentEnvironment(projectRoot);
   const sharedEnvironment = developmentEnvironmentForTarget(target);
   if (hostingTest) {

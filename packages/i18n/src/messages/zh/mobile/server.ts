@@ -723,6 +723,7 @@ export const messages = {
     "OpenBot 无法读取 {host} 上已保存的令牌。请断开该工作区后重新连接。",
   "mobile.server.connectors.slack.helpRelay":
     "{host} 上的 OpenBot 无法接收 Slack 事件。请在 {host} 上登录，在“服务器设置”中为服务器命名，并保持 OpenBot 打开。",
+  "mobile.server.connectors.slack.helpNotLinked": "此工作区未关联到 {host}。轻点“重新连接”进行关联。",
   "mobile.server.connectors.slack.orchestratorTitle": "Slack 调度助手",
   "mobile.server.connectors.slack.orchestratorDescription":
     "该助手接收来自 Slack 的所有请求。简单的问题它自己回答，其余的交给合适的助手处理，并把答案发在话题中。",
@@ -762,6 +763,7 @@ export const messages = {
     "OpenBot 无法读取 {host} 上已保存的令牌。请断开该 Discord 服务器后重新连接。",
   "mobile.server.connectors.discord.helpRelay":
     "{host} 上的 OpenBot 无法接收 Discord 事件。请在 {host} 上登录，在“服务器设置”中为服务器命名，并保持 OpenBot 打开。",
+  "mobile.server.connectors.discord.helpNotLinked": "此 Discord 服务器未关联到 {host}。轻点“重新连接”进行关联。",
   "mobile.server.connectors.discord.orchestratorTitle": "Discord 调度助手",
   "mobile.server.connectors.discord.orchestratorDescription":
     "该助手接收来自 Discord 的所有请求。简单的问题它自己回答，其余的交给合适的助手处理，并在频道中回复答案。",
@@ -791,6 +793,7 @@ export const messages = {
   "mobile.server.connectors.telegram.helpRelay":
     "{host} 上的 OpenBot 无法接收 Telegram 消息。请在 {host} 上登录，在“服务器设置”中为服务器命名，并保持 OpenBot 打开。",
   "mobile.server.connectors.telegram.helpError": "OpenBot 无法连接到该聊天。请重新连接，或断开该聊天。",
+  "mobile.server.connectors.telegram.helpNotLinked": "此聊天未关联到 {host}。轻点“重新连接”进行关联。",
   // {time} is a time, such as 14:30.
   "mobile.server.connectors.telegram.retryAt": "Telegram 要求 OpenBot 等待，将于 {time} 重试。",
   "mobile.server.connectors.telegram.linkTitle": "关联聊天",
@@ -824,6 +827,7 @@ export const messages = {
     "你允许的人可以联系 OpenBot。其他人会收到一个代码，需要把它交给你。",
   "mobile.server.connectors.whatsapp.helpLoggedOut": "WhatsApp 已把这台服务器从已关联的设备中移除。请重新关联该号码。",
   "mobile.server.connectors.whatsapp.helpError": "OpenBot 无法通过该号码连接 WhatsApp。请重新连接，或断开该号码。",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable": "OpenBot 无法读取该号码已保存的密钥。请重新关联该号码。",
   "mobile.server.connectors.whatsapp.retryAt": "WhatsApp 要求 OpenBot 等待，将于 {time} 重试。",
   "mobile.server.connectors.whatsapp.linkAgain": "重新关联",
   "mobile.server.connectors.whatsapp.ownNumber": "个人号码",

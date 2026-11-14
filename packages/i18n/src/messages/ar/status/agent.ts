@@ -7,6 +7,8 @@ export const messages = {
   "status.agent.instructionsChanged": "حدّث تعليماته",
   "status.agent.modelSwitchedForLimit": "تم بلوغ حد الاستخدام. تم التبديل إلى {model}.",
   "status.agent.modelReturnedAfterLimit": "انتهى حد الاستخدام. تمت العودة إلى {model}.",
+  "status.agent.routineSkippedRunOpen": "تشغيل متخطى: لم يكن التشغيل السابق قد انتهى",
+  "status.agent.routineSkippedUsageLimit": "تشغيل متخطى: تم بلوغ حد الاستخدام",
   "status.agent.modelSwitchedForError": "خطأ في المزوّد. تم التبديل إلى {model}.",
   "status.agent.modelSwitchedForSpentBalance":
     "لم يتبق رصيد في {previous}. تم التبديل إلى {model}. لاستخدامه مرة أخرى، أضف رصيدًا ثم اختره.",
@@ -36,6 +38,13 @@ export const messages = {
   "status.agent.serverInstallCommand":
     "إنشاء أمر لمرة واحدة يثبّت OpenBot على كمبيوتر آخر كالخادم {name} ويسجّل دخوله إلى حسابك. يشغّله الوكيل هناك.",
   "status.agent.serverInstallCard": "أمر التثبيت للخادم {name}",
+  "status.agent.browserProfileNamed":
+    "انقل {agents} إلى ملف تعريف المتصفح {profile}. يحصلون على تسجيلات الدخول وملفات تعريف الارتباط الخاصة به. تُغلق علاماتهم المفتوحة.",
+  "status.agent.browserProfileNew":
+    "أنشئ ملف تعريف المتصفح الجديد {profile} وانقل {agents} إليه. لا يحتوي على أي تسجيل دخول. تُغلق علاماتهم المفتوحة.",
+  "status.agent.browserProfileShared":
+    "انقل {agents} إلى ملف تعريف المتصفح المشترك. يحصلون على تسجيلات الدخول وملفات تعريف الارتباط الخاصة به. تُغلق علاماتهم المفتوحة.",
+  "status.agent.browserProfileOwn": "امنح كل واحد من {agents} ملف تعريف متصفح خاصًا به. تُغلق علاماتهم المفتوحة.",
   "status.agent.feedbackSending": "جارٍ إرسال ملاحظاتك إلى فريق OpenBot…",
   "status.agent.workflowDelete": "احذف سير العمل {title} مع عمليات تشغيله وإصداراته. تتوقف خطواته المفتوحة.",
   "status.agent.vaultCardFillFrames": "حقول البطاقة موجودة في إطارات من {origins}.",

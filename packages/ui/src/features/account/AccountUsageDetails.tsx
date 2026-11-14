@@ -1,7 +1,8 @@
 import { ProviderLogo } from "@openbot/brand";
 import { Button, Gauge, RefreshCw } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createSignal, For, onCleanup, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
+import { createScrollFades } from "../../components/createScrollFades";
 import { useText } from "../../text";
 import {
   type AccountUsageProviderRow,
@@ -29,6 +30,13 @@ export function AccountUsageDetails(props: {
   const [now, setNow] = createSignal(Date.now());
   const clock = window.setInterval(() => setNow(Date.now()), RESET_CLOCK_MS);
   onCleanup(() => window.clearInterval(clock));
+  /* A card with a height limit scrolls the list, and the header stays. The fades show where more rows are. */
+  const fades = createScrollFades();
+  onCleanup(() => fades.stop());
+  createEffect(
+    () => props.rows.length,
+    () => fades.remeasure(),
+  );
   return (
     <>
       <header class="account-usage-popover-header">
@@ -66,7 +74,12 @@ export function AccountUsageDetails(props: {
         </p>
       </Show>
       <Show when={props.rows.length > 0}>
-        <ul class="account-usage-providers" aria-label={t("account.usage.providers")}>
+        <ul
+          class={["account-usage-providers", fades.classes()]}
+          aria-label={t("account.usage.providers")}
+          ref={(element) => fades.bind(element)}
+          onScroll={fades.measure}
+        >
           <For each={props.rows} keyed={accountUsageRowKey}>
             {(row) => (
               <li class="account-usage-provider" aria-label={accountUsageRowLabel(row(), text, props.loading)}>

@@ -89,6 +89,8 @@ export const messages = {
     "{provider} wiele razy powtórzył nieudany krok, więc OpenBot zatrzymał tę turę. Wyślij wiadomość ponownie lub wybierz inny model.",
   "error.agent.compactionConnectionLost":
     "Połączenie przerwało się, gdy agent kompaktował kontekst, więc zadanie się zatrzymało. Sprawdź połączenie z internetem, a potem wyślij wiadomość, aby kontynuować.",
+  "error.agent.compactionLoopStopped":
+    "{provider} kompaktował kontekst raz za razem i za każdym razem był on zbyt pełny, aby kontynuować, więc OpenBot zatrzymał tę turę. Wyłącz serwery MCP lub użycie komputera, których ten agent nie potrzebuje, a potem wyślij wiadomość. Jeśli ty lub agent zmieniliście, kiedy {provider} kompaktuje, cofnij tę zmianę.",
   "error.agent.selectedGone": "Wybrany agent już nie istnieje.",
   "error.agent.profileEndpointsChanged": "Własne endpointy zmieniły się w trakcie generowania. Spróbuj ponownie.",
   "error.agent.profileInvalid": "Dostawca zwrócił nieprawidłowy profil. Spróbuj zmienić prompt.",

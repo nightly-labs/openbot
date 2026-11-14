@@ -1,6 +1,6 @@
 /**
- * The server name, Back and Forward, the sidebar toggle, the server update, and the marketplace
- * button - plus the window drag region. A window with the page rail shows the server in the rail, and
+ * The server name, Back and Forward, the sidebar toggle, the server update, the marketplace
+ * button, and an optional detail from the app - plus the window drag region. A window with the page rail shows the server in the rail, and
  * its styles hide the name here. The styles also hide Back, Forward and the update in a compact
  * sidebar that has no room for them.
  */
@@ -134,6 +134,7 @@ export function SidebarTopbar() {
           </Button>
         </Show>
       </div>
+      {props.topbarDetail}
     </div>
   );
 }

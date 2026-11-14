@@ -131,7 +131,6 @@ export const messages = {
   "conversation.voice.phase.thinking": "Düşünüyor",
   "conversation.voice.phase.speaking": "Konuşuyor",
   "conversation.voice.phase.offline": "Bağlı değil",
-  "conversation.voice.speakNow": "Şimdi konuş",
   "conversation.voice.mute": "Mikrofonu sessize al",
   "conversation.voice.interrupt": "Böl",
   "conversation.voice.start": "Sesli konuşma başlat",

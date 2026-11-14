@@ -128,7 +128,6 @@ export const messages = {
   "conversation.voice.phase.thinking": "考えています",
   "conversation.voice.phase.speaking": "話しています",
   "conversation.voice.phase.offline": "未接続",
-  "conversation.voice.speakNow": "話してください",
   "conversation.voice.mute": "マイクをミュート",
   "conversation.voice.interrupt": "中断",
   "conversation.voice.start": "音声会話を開始",

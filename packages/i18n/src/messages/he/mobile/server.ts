@@ -1060,6 +1060,8 @@ export const messages = {
     "OpenBot לא יכול לקרוא את האסימונים השמורים ב-{host}. יש לנתק את סביבת העבודה ולחבר אותה שוב.",
   "mobile.server.connectors.slack.helpRelay":
     "OpenBot ב-{host} לא יכול לקבל אירועים מ-Slack. ב-{host} יש להתחבר, לתת לשרת שם בהגדרות השרת, ולהשאיר את OpenBot פתוח.",
+  "mobile.server.connectors.slack.helpNotLinked":
+    'סביבת העבודה הזו לא מקושרת ל-{host}. הקישו "חיבור מחדש" כדי לקשר אותה.',
   "mobile.server.connectors.slack.orchestratorTitle": "Slack Orchestrator",
   "mobile.server.connectors.slack.orchestratorDescription":
     "הסוכן הזה מקבל כל בקשה מ-Slack. הוא עונה בעצמו על בקשות קצרות, מעביר עבודה אחרת לסוכן המתאים, ומפרסם את התשובה בשרשור.",
@@ -1108,6 +1110,8 @@ export const messages = {
     "OpenBot לא יכול לקרוא את האסימונים השמורים ב-{host}. יש לנתק את שרת Discord ולחבר אותו שוב.",
   "mobile.server.connectors.discord.helpRelay":
     "OpenBot ב-{host} לא יכול לקבל אירועים מ-Discord. ב-{host} יש להתחבר, לתת לשרת שם בהגדרות השרת, ולהשאיר את OpenBot פתוח.",
+  "mobile.server.connectors.discord.helpNotLinked":
+    'שרת ה-Discord הזה לא מקושר ל-{host}. הקישו "חיבור מחדש" כדי לקשר אותו.',
   "mobile.server.connectors.discord.orchestratorTitle": "Discord Orchestrator",
   "mobile.server.connectors.discord.orchestratorDescription":
     "הסוכן הזה מקבל כל בקשה מ-Discord. הוא עונה בעצמו על בקשות קצרות, מעביר עבודה אחרת לסוכן המתאים, ומשיב בערוץ עם התשובה.",
@@ -1143,6 +1147,7 @@ export const messages = {
   "mobile.server.connectors.telegram.helpRelay":
     "OpenBot ב-{host} לא יכול לקבל הודעות מ-Telegram. ב-{host} יש להתחבר, לתת לשרת שם בהגדרות השרת, ולהשאיר את OpenBot פתוח.",
   "mobile.server.connectors.telegram.helpError": "OpenBot לא מצליח להגיע לצ'אט הזה. אפשר לחבר מחדש, או לנתק את הצ'אט.",
+  "mobile.server.connectors.telegram.helpNotLinked": 'הצ\'אט הזה לא מקושר ל-{host}. הקישו "חיבור מחדש" כדי לקשר אותו.',
   // {time} is a time, such as 14:30.
   "mobile.server.connectors.telegram.retryAt": "Telegram ביקש מ-OpenBot להמתין. הוא ינסה שוב בשעה {time}.",
   "mobile.server.connectors.telegram.linkTitle": "קישור צ'אט",
@@ -1184,6 +1189,8 @@ export const messages = {
     "WhatsApp הסיר את השרת הזה ממכשירים מקושרים. יש לקשר את המספר שוב.",
   "mobile.server.connectors.whatsapp.helpError":
     "OpenBot לא מצליח להגיע ל-WhatsApp במספר הזה. אפשר לחבר מחדש, או לנתק את המספר.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "OpenBot לא מצליח לקרוא את המפתחות השמורים של המספר הזה. יש לקשר את המספר שוב.",
   "mobile.server.connectors.whatsapp.retryAt": "WhatsApp ביקש מ-OpenBot להמתין. הוא ינסה שוב בשעה {time}.",
   "mobile.server.connectors.whatsapp.linkAgain": "קישור מחדש",
   "mobile.server.connectors.whatsapp.ownNumber": "מספר אישי",

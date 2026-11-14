@@ -8,6 +8,8 @@ export const messages = {
   "status.agent.instructionsChanged": "Heeft zijn instructies bijgewerkt",
   "status.agent.modelSwitchedForLimit": "Gebruikslimiet bereikt. Overgeschakeld naar {model}.",
   "status.agent.modelReturnedAfterLimit": "Gebruikslimiet voorbij. Teruggeschakeld naar {model}.",
+  "status.agent.routineSkippedRunOpen": "Overgeslagen: de vorige uitvoering was nog niet klaar",
+  "status.agent.routineSkippedUsageLimit": "Overgeslagen: gebruikslimiet bereikt",
   "status.agent.modelSwitchedForError": "Fout bij de aanbieder. Overgeschakeld naar {model}.",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} heeft geen tegoed meer. Overgeschakeld naar {model}. Voeg tegoed toe en selecteer het daarna om het weer te gebruiken.",
@@ -41,6 +43,13 @@ export const messages = {
   "status.agent.serverInstallCommand":
     "Een eenmalige opdracht maken die OpenBot op een andere computer installeert als de server {name} en die aanmeldt bij je account. De agent voert hem daar uit.",
   "status.agent.serverInstallCard": "Installatieopdracht voor de server {name}",
+  "status.agent.browserProfileNamed":
+    "Verplaats {agents} naar het browserprofiel {profile}. Ze krijgen de aanmeldingen en cookies ervan. Hun open tabbladen sluiten.",
+  "status.agent.browserProfileNew":
+    "Maak het nieuwe browserprofiel {profile} en verplaats {agents} ernaartoe. Het heeft geen aanmeldingen. Hun open tabbladen sluiten.",
+  "status.agent.browserProfileShared":
+    "Verplaats {agents} naar het gedeelde browserprofiel. Ze krijgen de aanmeldingen en cookies ervan. Hun open tabbladen sluiten.",
+  "status.agent.browserProfileOwn": "Geef {agents} elk een eigen browserprofiel. Hun open tabbladen sluiten.",
   "status.agent.feedbackSending": "Je feedback wordt naar het OpenBot-team gestuurd…",
   "status.agent.workflowDelete": "Verwijder de workflow {title} met zijn runs en versies. Zijn open stappen stoppen.",
   "status.agent.vaultCardFillFrames": "De kaartvelden staan in frames van {origins}.",

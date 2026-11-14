@@ -87,6 +87,8 @@ export const messages = defineMessages("error.agent", {
     "{provider} repeated a failed step many times, so OpenBot stopped this turn. Send the message again, or choose another model.",
   "error.agent.compactionConnectionLost":
     "The connection stopped while the agent compacted its context, so the task stopped. Check your internet connection, then send a message to continue.",
+  "error.agent.compactionLoopStopped":
+    "{provider} compacted the context again and again, and each time it stayed too full to continue, so OpenBot stopped this turn. Turn off the MCP servers or computer use that this agent does not need, then send a message. If you or the agent changed when {provider} compacts, undo that change.",
   "error.agent.selectedGone": "The selected agent no longer exists.",
   "error.agent.profileEndpointsChanged": "The custom endpoints changed while this was generating. Try again.",
   "error.agent.profileInvalid": "The provider returned an invalid profile. Try revising your prompt.",

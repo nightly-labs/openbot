@@ -322,3 +322,25 @@
     transparent
   );
 }
+
+/* A solid bubble is the agent's color, so it stays opaque on the glass as it is on a solid window. Its
+ * blocks lift from that color as on a solid window; a clear surface would show the glass through it. */
+:root[data-openbot-window-glass]
+  .app-window
+  .message-entry-user
+  .ui-bubble.message-bubble-colored.message-bubble-solid
+  > .ui-bubble-content {
+  --message-solid-surface: color-mix(
+    in srgb,
+    var(--openbot-text-primary) var(--message-surface-lift),
+    var(--message-chat-color)
+  );
+  --openbot-bg-canvas: var(--message-solid-surface);
+  --openbot-bg-sidebar: var(--message-solid-surface);
+  --openbot-bg-surface: var(--message-solid-surface);
+  --openbot-bg-surface-raised: var(--message-solid-surface);
+  --openbot-bg-control: var(--message-solid-surface);
+  --openbot-bg-control-hover: var(--message-solid-surface);
+  --openbot-bg-control-active: var(--message-solid-surface);
+  background: var(--message-chat-color);
+}

@@ -44,8 +44,8 @@ mode map.
    - `open` runs in place of the mode change. The Browser pane uses it to start a tab.
    - `release` runs before the tab closes. The question pane uses it to delete its question.
 6. Release long-lived resources in the owning feature. A store can watch
-   `SidePanelState.panes` and stop when its pane leaves the list, as `createVoiceSessions` does for a
-   voice conversation. A component releases its own resources in `onCleanup`.
+   `SidePanelState.panes` and stop when its pane leaves the list. A component releases its own
+   resources in `onCleanup`.
 
 ### Close behavior
 
@@ -70,12 +70,11 @@ these in the real app:
 - Maximize and restore the panel.
 - File tabs and side threads beside the panes.
 - Switch to another agent or server and back.
-- The question pane deletes its question on close, and the voice conversation stops on close.
+- The question pane deletes its question on close.
 
 `scripts/side-panel-panes-e2e.ts` checks the launcher and Add menu order, selection, close, collapse,
 maximize, an agent change, and the side question release in the `App/Playground` story.
 `scripts/web-side-panel-e2e.ts` compares the web and desktop panels in Storybook.
-`scripts/voice-pane-e2e.ts` checks the Voice pane.
 
 An agent change closes Agent settings, Files, and a file preview (`resetPanelsForAgent` in
 `conversation-scope.ts`). The tabs stay.
