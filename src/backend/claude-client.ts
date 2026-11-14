@@ -107,7 +107,7 @@ import {
   mcpAgentParam,
   usableMcpServers,
 } from "./mcp-provider-shapes";
-import { untakenRunId } from "./message-run-ids";
+import { MAX_RUNS, untakenRunId } from "./message-run-ids";
 import { PendingServerRequests } from "./pending-server-requests";
 import {
   type AccountRateLimitsReadResult,
@@ -560,8 +560,11 @@ const CLAUDE_STOP_CONFIRM_MS = 10_000;
 /** How many message uuids a process keeps to give a message that runs again a new one (#6676). */
 const TAKEN_PROMPT_LIMIT = 1_000;
 
-/** How many times a turn sends its message again after the CLI skipped it. Each try has a new uuid (#9270). */
-const SKIPPED_PROMPT_RETRIES = 3;
+/**
+ * How many times a turn sends its message again after the CLI skipped it (#9270): each run id of the
+ * message, and then one random uuid, which no saved session can hold.
+ */
+const SKIPPED_PROMPT_RETRIES = MAX_RUNS + 1;
 
 /** The start of the user message in which Claude Code gives a blocking Stop hook's reason to the model. */
 const CLAUDE_STOP_HOOK_FEEDBACK = "Stop hook feedback:\n";
@@ -1599,7 +1602,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         this.#scope,
       );
     this.#threads.add(runtime);
-    this.#takenPrompts.set(threadId, runtime.promptIds);
+    // Only a saved session can be resumed.
+    if (config.persistSession) this.#takenPrompts.set(threadId, runtime.promptIds);
   });
 
   readonly #startTurnEffect = Effect.fn("ClaudeAgentClient.startTurn")(function* (
@@ -1784,14 +1788,20 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
    * starts no turn for it. The turn then waited with no end (#9270), so the message goes again with
    * the next uuid of its run, which history import maps back to the same message.
    */
-  #promptLifecycle(runtime: ThreadRuntime, uuid: unknown, state: unknown): void {
+  readonly #promptLifecycle = Effect.fn("ClaudeAgentClient.promptLifecycle")(function* (
+    this: ClaudeAgentClient,
+    runtime: ThreadRuntime,
+    uuid: unknown,
+    state: unknown,
+  ) {
     const turn = runtime.activeTurn;
     const prompt = turn?.prompt;
     if (!turn || !prompt || uuid !== prompt.message.uuid) return;
     if (state === "started") turn.promptStarted = true;
     if (state !== "completed" || turn.promptStarted) return;
     if (prompt.retries >= SKIPPED_PROMPT_RETRIES) {
-      queryLogger.warn("Claude skipped a message again after new ids.", { retries: prompt.retries });
+      queryLogger.warn("Claude skipped a message with each new id.", { threadId: runtime.id, retries: prompt.retries });
+      yield* this.#completeTurn(runtime, "failed", sourceText("error.provider.acpNoAnswer", { provider: "Claude" }));
       return;
     }
     const retryId = promptUuid(runtime, prompt.requestedId ?? turn.id);
@@ -1799,6 +1809,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     prompt.message = { ...prompt.message, uuid: retryId };
     prompt.retries += 1;
     queryLogger.warn("Claude skipped a message that its session holds, so it goes again with a new id.", {
+      threadId: runtime.id,
       retries: prompt.retries,
     });
     try {
@@ -1806,7 +1817,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     } catch {
       // The query closes, and its turn ends with it.
     }
-  }
+  });
 
   readonly #consume = Effect.fn("ClaudeAgentClient.consume")(function* (
     this: ClaudeAgentClient,
@@ -1865,10 +1876,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   ) {
     runtime.lastOutputAt = Date.now();
     if (message.type === "command_lifecycle") {
-      this.#promptLifecycle(runtime, message.command_uuid, message.state);
+      yield* this.#promptLifecycle(runtime, message.command_uuid, message.state);
       return;
     }
-    if (runtime.activeTurn && (message.type === "stream_event" || message.type === "assistant"))
+    // A frame of a background subagent does not show that the CLI took the turn's message.
+    if (
+      runtime.activeTurn &&
+      message.parent_tool_use_id === null &&
+      (message.type === "stream_event" || message.type === "assistant")
+    )
       runtime.activeTurn.promptStarted = true;
     if (message.type === "assistant") {
       // Each content block repeats its request's message; the last copy has the final count.

@@ -151,7 +151,7 @@ const taken = new Set();
 // Claude Code also skips a uuid that the saved session holds with a reply after it, such as the error
 // reply of a refused turn, and only reports it completed (#9270). This stand-in reads each message
 // of the saved session as answered. "session-holds" acts as a message that an earlier run of
-// OpenBot sent, so the session holds its first uuid.
+// OpenBot sent, so the session holds its first uuid. "session-skips" is skipped with each uuid.
 const saved = new Set(previous.map((row) => row.uuid));
 let heldOnce = false;
 const lifecycle = (uuid, state) =>
@@ -174,7 +174,7 @@ process.stdin.on("data", (chunk) => {
       taken.add(message.uuid);
       const held = !heldOnce && line.includes("session-holds");
       if (held) heldOnce = true;
-      if (held || saved.has(message.uuid)) {
+      if (held || saved.has(message.uuid) || line.includes("session-skips")) {
         lifecycle(message.uuid, "completed");
         continue;
       }
@@ -1145,6 +1145,19 @@ try {
     assert.equal(outcome.status, "completed", `The message completes: ${outcome.error}`);
     assert.equal(turns().length, before + 1, "The message runs once.");
     await verifyHistoryKeepsRequests(agent.id);
+    return outcome;
+  });
+
+  await check("a message that Claude skips with each uuid fails with a reason", async () => {
+    const agent = await create("Skipper");
+    await waitFor("the first turn to end", () =>
+      service.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    const before = turns().length;
+    const outcome = await send(agent.id, "session-skips");
+    assert.equal(outcome.status, "failed", "The turn ends.");
+    assert.equal(outcome.error, sourceText("error.provider.acpNoAnswer", { provider: "Claude" }));
+    assert.equal(turns().length, before, "The message did not run.");
     return outcome;
   });
 
