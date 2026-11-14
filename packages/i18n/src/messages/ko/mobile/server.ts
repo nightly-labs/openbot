@@ -1147,8 +1147,6 @@ export const messages = {
   "mobile.server.mcp.http": "URL (HTTP)",
   "mobile.server.mcp.stdioDescription": "서버가 이 서버의 컴퓨터에서 이 명령을 실행해요.",
   "mobile.server.mcp.httpDescription": "모든 제공자가 HTTP MCP 서버를 사용할 수 있어요.",
-  "mobile.server.mcp.providerLimit":
-    "Claude 및 Codex 전용: 작업 디렉터리가 있는 서버는 다른 제공자에게 제공되지 않아요.",
   "mobile.server.mcp.command": "명령",
   "mobile.server.mcp.commandHint": "프로그램만 입력하세요. 뒤에 오는 각 단어는 인수에 넣으세요.",
   "mobile.server.mcp.arguments": "인수",
@@ -1168,7 +1166,7 @@ export const messages = {
   "mobile.server.mcp.passthroughVariable": "전달 변수 {position}",
   "mobile.server.mcp.removePassthrough": "전달 변수 {position} 삭제",
   "mobile.server.mcp.workingDirectory": "작업 디렉터리",
-  "mobile.server.mcp.workingDirectoryHint": "선택 사항이에요. 모든 제공자에게 이 MCP 서버를 제공하려면 비워 두세요.",
+  "mobile.server.mcp.workingDirectoryHint": "선택 사항이에요. 에이전트는 이 디렉터리에서 이 MCP 서버를 시작해요.",
   "mobile.server.mcp.url": "서버 URL",
   "mobile.server.mcp.urlInvalid": "http 또는 https 주소를 입력해 주세요.",
   "mobile.server.mcp.headers": "헤더",

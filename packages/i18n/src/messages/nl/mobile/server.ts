@@ -1170,8 +1170,6 @@ export const messages = {
   "mobile.server.mcp.http": "URL (HTTP)",
   "mobile.server.mcp.stdioDescription": "De server start deze opdracht op de computer van de server.",
   "mobile.server.mcp.httpDescription": "Elke aanbieder kan een HTTP-MCP-server gebruiken.",
-  "mobile.server.mcp.providerLimit":
-    "Alleen Claude en Codex: de andere aanbieders krijgen geen server die een werkmap heeft.",
   "mobile.server.mcp.command": "Opdracht",
   "mobile.server.mcp.commandHint": "Alleen het programma. Zet elk woord daarna in Argumenten.",
   "mobile.server.mcp.arguments": "Argumenten",
@@ -1191,7 +1189,7 @@ export const messages = {
   "mobile.server.mcp.passthroughVariable": "Doorgegeven variabele {position}",
   "mobile.server.mcp.removePassthrough": "Doorgegeven variabele {position} verwijderen",
   "mobile.server.mcp.workingDirectory": "Werkmap",
-  "mobile.server.mcp.workingDirectoryHint": "Optioneel. Laat leeg om deze MCP-server aan elke aanbieder te geven.",
+  "mobile.server.mcp.workingDirectoryHint": "Optioneel. Agents starten deze MCP-server in deze map.",
   "mobile.server.mcp.url": "Server-URL",
   "mobile.server.mcp.urlInvalid": "Voer een http- of https-adres in.",
   "mobile.server.mcp.headers": "Headers",

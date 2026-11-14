@@ -42,8 +42,6 @@ export const messages = {
   "mcp.status.noAnswer": "Yanıt yok",
   "mcp.status.didNotStart": "Başlamadı",
   "mcp.status.unreachable": "Ulaşılamıyor",
-  "mcp.server.providerLimitNote":
-    "Yalnızca Claude ve Codex: Çalışma dizini olan bir sunucu diğer sağlayıcılara verilmez.",
   "mcp.server.runtimeDownloading":
     "Bir STDIO sunucusunun başlatıldığı çalışma zamanı indiriliyor. Tamamlanana kadar başlatılamayabilir.",
   "mcp.server.runtimeDownloadingProgress":
@@ -84,8 +82,7 @@ export const messages = {
   "mcp.panel.passthroughVariable": "{position}. aktarım değişkeni",
   "mcp.panel.removePassthroughVariable": "{position}. aktarım değişkenini kaldır",
   "mcp.panel.workingDirectory": "Çalışma dizini",
-  "mcp.panel.workingDirectoryDescription":
-    "Claude ve Codex ajanları ve bağlantı testi sunucuyu burada başlatır. Bu sunucuyu her sağlayıcıya vermek için boş bırakın: diğer sağlayıcılar bir dizin ayarlayamaz, bu yüzden dizin belirten bir sunucuyu atlarlar.",
+  "mcp.panel.workingDirectoryDescription": "İsteğe bağlı. Ajanlar ve bağlantı testi sunucuyu bu dizinde başlatır.",
   "mcp.panel.endpointTitle": "Uç nokta",
   "mcp.panel.endpointDescription": "Her sağlayıcı bir HTTP MCP sunucusu kullanabilir.",
   "mcp.panel.serverUrl": "Sunucu URL'si",

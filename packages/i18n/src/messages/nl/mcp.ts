@@ -42,8 +42,6 @@ export const messages = {
   "mcp.status.noAnswer": "Geen antwoord",
   "mcp.status.didNotStart": "Niet gestart",
   "mcp.status.unreachable": "Onbereikbaar",
-  "mcp.server.providerLimitNote":
-    "Alleen Claude en Codex: een server met een werkmap wordt niet aan de andere aanbieders gegeven.",
   "mcp.server.runtimeDownloading":
     "De runtime waarmee een STDIO-server start, wordt gedownload. Zo’n server start mogelijk pas als dit klaar is.",
   "mcp.server.runtimeDownloadingProgress":
@@ -84,8 +82,7 @@ export const messages = {
   "mcp.panel.passthroughVariable": "Doorgegeven variabele {position}",
   "mcp.panel.removePassthroughVariable": "Doorgegeven variabele {position} verwijderen",
   "mcp.panel.workingDirectory": "Werkmap",
-  "mcp.panel.workingDirectoryDescription":
-    "Claude- en Codex-agents en de verbindingstest starten de server hier. Laat dit leeg om deze server aan elke aanbieder te geven: de andere aanbieders kunnen geen map instellen, dus die slaan een server met een map over.",
+  "mcp.panel.workingDirectoryDescription": "Optioneel. Agents en de verbindingstest starten de server in deze map.",
   "mcp.panel.endpointTitle": "Endpoint",
   "mcp.panel.endpointDescription": "Elke aanbieder kan een HTTP-MCP-server gebruiken.",
   "mcp.panel.serverUrl": "Server-URL",

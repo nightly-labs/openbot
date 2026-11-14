@@ -1317,8 +1317,6 @@ export const messages = {
   "mobile.server.mcp.http": "URL (HTTP)",
   "mobile.server.mcp.stdioDescription": "Serwer uruchamia to polecenie na komputerze serwera.",
   "mobile.server.mcp.httpDescription": "Każdy dostawca może używać serwera MCP HTTP.",
-  "mobile.server.mcp.providerLimit":
-    "Tylko Claude i Codex: inni dostawcy nie dostają serwera, który ma katalog roboczy.",
   "mobile.server.mcp.command": "Polecenie",
   "mobile.server.mcp.commandHint": "Tylko program. Każde następne słowo wpisz w Argumentach.",
   "mobile.server.mcp.arguments": "Argumenty",
@@ -1338,7 +1336,7 @@ export const messages = {
   "mobile.server.mcp.passthroughVariable": "Przekazywana zmienna {position}",
   "mobile.server.mcp.removePassthrough": "Usuń przekazywaną zmienną {position}",
   "mobile.server.mcp.workingDirectory": "Katalog roboczy",
-  "mobile.server.mcp.workingDirectoryHint": "Opcjonalnie. Zostaw puste, aby dać ten serwer MCP każdemu dostawcy.",
+  "mobile.server.mcp.workingDirectoryHint": "Opcjonalnie. Agenci uruchamiają ten serwer MCP w tym katalogu.",
   "mobile.server.mcp.url": "URL serwera",
   "mobile.server.mcp.urlInvalid": "Wpisz adres http lub https.",
   "mobile.server.mcp.headers": "Nagłówki",

@@ -1313,7 +1313,6 @@ export const messages = {
   "mobile.server.mcp.http": "URL (HTTP)",
   "mobile.server.mcp.stdioDescription": "Сервер запускает эту команду на своём компьютере.",
   "mobile.server.mcp.httpDescription": "Любой провайдер может использовать HTTP-сервер MCP.",
-  "mobile.server.mcp.providerLimit": "Только Claude и Codex: другие провайдеры не получают сервер с рабочей папкой.",
   "mobile.server.mcp.command": "Команда",
   "mobile.server.mcp.commandHint": "Только программа. Каждое следующее слово укажите в аргументах.",
   "mobile.server.mcp.arguments": "Аргументы",
@@ -1333,8 +1332,7 @@ export const messages = {
   "mobile.server.mcp.passthroughVariable": "Передаваемая переменная {position}",
   "mobile.server.mcp.removePassthrough": "Удалить передаваемую переменную {position}",
   "mobile.server.mcp.workingDirectory": "Рабочая папка",
-  "mobile.server.mcp.workingDirectoryHint":
-    "Необязательно. Оставьте пустым, чтобы дать этот сервер MCP всем провайдерам.",
+  "mobile.server.mcp.workingDirectoryHint": "Необязательно. Агенты запускают этот сервер MCP в этой папке.",
   "mobile.server.mcp.url": "URL сервера",
   "mobile.server.mcp.urlInvalid": "Введите адрес http или https.",
   "mobile.server.mcp.headers": "Заголовки",

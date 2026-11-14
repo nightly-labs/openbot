@@ -42,8 +42,6 @@ export const messages = {
   "mcp.status.noAnswer": "応答なし",
   "mcp.status.didNotStart": "起動しませんでした",
   "mcp.status.unreachable": "接続できません",
-  "mcp.server.providerLimitNote":
-    "Claude と Codex のみ: 作業ディレクトリを指定したサーバーは、ほかのプロバイダーには渡されません。",
   "mcp.server.runtimeDownloading":
     "STDIO サーバーの起動に使うランタイムをダウンロードしています。完了するまでサーバーが起動しないことがあります。",
   "mcp.server.runtimeDownloadingProgress":
@@ -84,8 +82,7 @@ export const messages = {
   "mcp.panel.passthroughVariable": "引き継ぐ変数 {position}",
   "mcp.panel.removePassthroughVariable": "引き継ぐ変数 {position} を削除",
   "mcp.panel.workingDirectory": "作業ディレクトリ",
-  "mcp.panel.workingDirectoryDescription":
-    "Claude と Codex のエージェントと接続テストは、ここでサーバーを起動します。空のままにすると、すべてのプロバイダーにこのサーバーを渡します。ほかのプロバイダーはディレクトリを設定できないため、ディレクトリを指定したサーバーは使われません。",
+  "mcp.panel.workingDirectoryDescription": "任意。エージェントと接続テストは、このディレクトリでサーバーを起動します。",
   "mcp.panel.endpointTitle": "エンドポイント",
   "mcp.panel.endpointDescription": "すべてのプロバイダーが HTTP MCP サーバーを使えます。",
   "mcp.panel.serverUrl": "サーバー URL",

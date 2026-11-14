@@ -51,7 +51,6 @@ import {
   mcpConfigErrors,
   mcpConfigIsValid,
   mcpFailureKind,
-  mcpProviderLimitNote,
   mcpSaveConnects,
   mcpStatusLabel,
   mcpStatusVariant,
@@ -736,17 +735,6 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
                             </Show>
                           </>
                         )}
-                      </Show>
-                      {/* Only when no answer is shown: a test the user just ran answers about this
-                          server now, and the standing limit must not push it out of the slot. */}
-                      <Show
-                        when={
-                          test()?.status !== "failed" &&
-                          test()?.status !== "signing-in" &&
-                          mcpProviderLimitNote(config(), t)
-                        }
-                      >
-                        {(note) => <ItemDescription>{note()}</ItemDescription>}
                       </Show>
                     </ItemContent>
                     <ItemActions>

@@ -15,7 +15,7 @@ import {
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Schema } from "effect";
-import { agentLaunchPath, isExecutable, isWindowsRunnable } from "./cli";
+import { agentLaunchPath, cliSpawnTarget, isExecutable, isWindowsRunnable } from "./cli";
 import { causeHelpers } from "./effect-boundary";
 import { isMissingFileError } from "./file-errors";
 import type { McpOperationError } from "./mcp-effects";
@@ -55,6 +55,8 @@ export interface McpToolRuntimes {
    * can start it, and a connection test waits for the download. `null` for every other server.
    */
   readonly catalogCommand?: (config: McpServerConfig) => McpCatalogCommand | "pending" | null;
+  /** The managed Bun, once it is downloaded. See `workingDirectoryLaunch`. */
+  readonly bun?: string;
 }
 
 interface McpCatalogCommand {
@@ -102,8 +104,7 @@ export type McpEndpointSource = (
  * Why an enabled configuration was not given to a provider.
  *
  * `working_directory_unsupported` is the only one that describes a perfectly valid server: it names
- * a provider's limit, not the user's mistake, so it is the same server every time and the panel can
- * say so without probing anything.
+ * a limit of this machine (no launcher, see `workingDirectoryLaunch`), not the user's mistake.
  */
 type McpDropReason =
   | "command_not_found"
@@ -542,10 +543,11 @@ function withUserAgent(headers: Record<string, string>, userAgent: string | unde
  * ACP reads an array, and its environment and headers are `{ name, value }` pairs, not records.
  *
  * **No working directory.** `McpServerStdio` in the ACP schema carries only a name, a command,
- * arguments and an environment, so a server that names a directory is left out rather than started
- * in the provider's own. A server told to open `./data.db` would otherwise pass its test and then
- * create a second, empty database beside the agent's workspace. The form says so before the save,
- * the row says so afterwards, and the hand-off reports it as a drop.
+ * arguments and an environment, and an ACP agent starts the server in its own directory. A server
+ * told to open `./data.db` would then pass its test and create a second, empty database beside the
+ * agent's workspace. So a server that names a directory travels as `workingDirectoryLaunch`, which
+ * changes to that directory first. When no launcher exists on this machine, the hand-off reports
+ * it as a drop (#7357).
  *
  * **Names travel as `providerMcpServerName`.** Antigravity refuses `session/new` with `invalid
  * params` when one name has a space, so a server the user named "My Server" failed every Gemini
@@ -572,9 +574,62 @@ export function acpMcpServerName(config: McpServerConfig, own: readonly string[]
   return own.includes(renamed) || isReservedMcpServerName(renamed) ? name : renamed;
 }
 
+/**
+ * A command that starts `server` in its working directory, for a provider that takes no directory.
+ * `null` when this machine has no way to do it.
+ *
+ * macOS and Linux: `/bin/sh` changes to the directory and then `exec`s the server, so the server
+ * replaces the shell, gets the provider's signals and pipes, and no extra process stays. The
+ * directory, the command and each argument travel as their own arguments, so nothing is quoted.
+ * `CDPATH` is cleared and the output of `cd` is discarded: with `CDPATH` set, `cd` can change to
+ * another directory of the same name and write its path to stdout, which is the MCP channel.
+ *
+ * Windows has no `exec`, and `cmd.exe` cannot be used here: the provider quotes each argument for
+ * the C runtime, which `cmd.exe` does not read. The managed Bun starts the server instead, with
+ * its stdin, stdout and stderr, and it ends with the server's exit code. A `.cmd` wrapper such as
+ * `npx.cmd` starts through `cliSpawnTarget`, as a provider CLI does. Bun starts in the working
+ * directory (`--cwd`), and the server inherits it. Thus Bun does not read the `bunfig.toml` of the
+ * agent's workspace, whose `preload` would otherwise run first and could write to stdout.
+ * `--no-env-file`, because Bun would otherwise add the variables of a `.env` file to the server.
+ */
+function workingDirectoryLaunch(
+  server: ResolvedMcpServer,
+  bun: string | undefined,
+  platform: NodeJS.Platform = process.platform,
+): { command: string; args: string[] } | null {
+  if (platform !== "win32") {
+    return {
+      command: "/bin/sh",
+      args: [
+        "-c",
+        'CDPATH= cd -- "$1" >/dev/null && shift && exec "$@"',
+        "sh",
+        server.workingDirectory,
+        server.command,
+        ...server.args,
+      ],
+    };
+  }
+  if (!bun) return null;
+  const target = cliSpawnTarget(server.command, server.args, platform);
+  return {
+    command: bun,
+    args: ["--no-env-file", `--cwd=${server.workingDirectory}`, "-e", WINDOWS_LAUNCHER, "--", JSON.stringify(target)],
+  };
+}
+
+/** The Bun script of `workingDirectoryLaunch` on Windows. Its one argument is the spawn target as JSON. */
+const WINDOWS_LAUNCHER = [
+  "const t = JSON.parse(process.argv[1]);",
+  'const child = require("node:child_process").spawn(t.command, t.args, { stdio: "inherit", windowsHide: true, windowsVerbatimArguments: t.windowsVerbatimArguments });',
+  'child.on("error", (error) => { console.error(error.message); process.exit(1); });',
+  'child.on("exit", (code) => process.exit(code ?? 1));',
+].join(" ");
+
 export function acpMcpServers(
   servers: readonly UsableMcpServer[],
   own: readonly string[] = [],
+  bun?: string,
 ): McpHandoff<AcpMcpServer[]> {
   const entries: AcpMcpServer[] = [];
   const dropped: McpServerDrop[] = [];
@@ -594,7 +649,10 @@ export function acpMcpServers(
       continue;
     }
     if (config.transport === "stdio") {
-      if (config.workingDirectory) {
+      const launch = server.workingDirectory
+        ? workingDirectoryLaunch(server, bun)
+        : { command: server.command, args: server.args };
+      if (!launch) {
         dropped.push({
           name: config.name,
           reason: "working_directory_unsupported",
@@ -604,8 +662,7 @@ export function acpMcpServers(
       }
       entries.push({
         name,
-        command: server.command,
-        args: server.args,
+        ...launch,
         env: Object.entries(mcpLaunchEnvironment(server)).map(([name, value]) => ({ name, value })),
       });
     } else {

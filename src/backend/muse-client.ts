@@ -518,17 +518,18 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
       )
       .pipe(toProviderClientOperationError);
     const setup = Effect.gen({ self: this }, function* () {
+      const tools = this.#options.mcpToolRuntimes?.();
       const resolved = yield* usableMcpServers(
         agentMcpServers(
           this.#options.profileGeneration ? [] : (this.#options.mcpServers?.(mcpAgentParam(params)) ?? []),
           computerUseParam(params),
         ),
-        this.#options.mcpToolRuntimes?.(),
+        tools,
         this.#options.mcpEndpoint,
         mcpAgentParam(params),
       ).pipe(toProviderClientOperationError);
       for (const secret of mcpSecretValues(resolved.map((server) => server.config))) this.#secrets.add(secret);
-      const handoff = acpMcpServers(resolved);
+      const handoff = acpMcpServers(resolved, [], tools?.bun);
       for (const server of [...handoff.servers, ...bridge.servers]) {
         for (const entry of "headers" in server ? server.headers : server.env) {
           if (!isInheritedProfileValue(entry.name, entry.value)) this.#secrets.add(entry.value);

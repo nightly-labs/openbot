@@ -1174,8 +1174,6 @@ export const messages = {
   "mobile.server.mcp.http": "URL (HTTP)",
   "mobile.server.mcp.stdioDescription": "サーバーは、サーバーのコンピューターでこのコマンドを起動します。",
   "mobile.server.mcp.httpDescription": "すべてのプロバイダーが HTTP MCP サーバーを使えます。",
-  "mobile.server.mcp.providerLimit":
-    "Claude と Codex のみ: 作業ディレクトリがあるサーバーは、ほかのプロバイダーには渡されません。",
   "mobile.server.mcp.command": "コマンド",
   "mobile.server.mcp.commandHint": "プログラムだけを入力します。続く語は引数に入力してください。",
   "mobile.server.mcp.arguments": "引数",
@@ -1195,7 +1193,7 @@ export const messages = {
   "mobile.server.mcp.passthroughVariable": "引き継ぐ変数 {position}",
   "mobile.server.mcp.removePassthrough": "引き継ぐ変数 {position} を削除",
   "mobile.server.mcp.workingDirectory": "作業ディレクトリ",
-  "mobile.server.mcp.workingDirectoryHint": "任意。空にすると、この MCP サーバーをすべてのプロバイダーに渡します。",
+  "mobile.server.mcp.workingDirectoryHint": "任意。エージェントは、この MCP サーバーをこのディレクトリで起動します。",
   "mobile.server.mcp.url": "サーバー URL",
   "mobile.server.mcp.urlInvalid": "http または https のアドレスを入力してください。",
   "mobile.server.mcp.headers": "ヘッダー",

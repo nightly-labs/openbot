@@ -41,7 +41,6 @@ export const messages = {
   "mcp.status.noAnswer": "אין תשובה",
   "mcp.status.didNotStart": "לא הופעל",
   "mcp.status.unreachable": "לא זמין",
-  "mcp.server.providerLimitNote": "Claude ו-Codex בלבד: שרת עם ספריית עבודה לא ניתן לספקים האחרים.",
   "mcp.server.runtimeDownloading": "מוריד את סביבת ההרצה שבה מופעל שרת STDIO. ייתכן ששרת לא יופעל עד שההורדה תסתיים.",
   "mcp.server.runtimeDownloadingProgress":
     "מוריד את סביבת ההרצה שבה מופעל שרת STDIO ({percent}%). ייתכן ששרת לא יופעל עד שההורדה תסתיים.",
@@ -81,8 +80,7 @@ export const messages = {
   "mcp.panel.passthroughVariable": "משתנה מועבר {position}",
   "mcp.panel.removePassthroughVariable": "הסרת משתנה מועבר {position}",
   "mcp.panel.workingDirectory": "ספריית עבודה",
-  "mcp.panel.workingDirectoryDescription":
-    "סוכני Claude ו-Codex ובדיקת החיבור מפעילים את השרת כאן. אם משאירים ריק, השרת ניתן לכל הספקים: הספקים האחרים לא יכולים להגדיר ספרייה, ולכן הם מדלגים על שרת שמציין אחת.",
+  "mcp.panel.workingDirectoryDescription": "אופציונלי. הסוכנים ובדיקת החיבור מפעילים את השרת בספרייה הזו.",
   "mcp.panel.endpointTitle": "נקודת קצה",
   "mcp.panel.endpointDescription": "כל ספק יכול להשתמש בשרת MCP של HTTP.",
   "mcp.panel.serverUrl": "URL של השרת",

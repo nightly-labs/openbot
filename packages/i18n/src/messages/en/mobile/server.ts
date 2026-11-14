@@ -1640,8 +1640,6 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.mcp.http": "URL (HTTP)",
   "mobile.server.mcp.stdioDescription": "The server starts this command on the computer of the server.",
   "mobile.server.mcp.httpDescription": "Every provider can use an HTTP MCP server.",
-  "mobile.server.mcp.providerLimit":
-    "Claude and Codex only: the other providers do not get a server that has a working directory.",
   "mobile.server.mcp.command": "Command",
   "mobile.server.mcp.commandHint": "The program only. Put each word after it in Arguments.",
   "mobile.server.mcp.arguments": "Arguments",
@@ -1661,7 +1659,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.mcp.passthroughVariable": "Passthrough variable {position}",
   "mobile.server.mcp.removePassthrough": "Remove passthrough variable {position}",
   "mobile.server.mcp.workingDirectory": "Working directory",
-  "mobile.server.mcp.workingDirectoryHint": "Optional. Leave it empty to give this MCP server to every provider.",
+  "mobile.server.mcp.workingDirectoryHint": "Optional. Agents start this MCP server in this directory.",
   "mobile.server.mcp.url": "Server URL",
   "mobile.server.mcp.urlInvalid": "Enter an http or https address.",
   "mobile.server.mcp.headers": "Headers",

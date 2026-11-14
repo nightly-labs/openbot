@@ -42,8 +42,6 @@ export const messages = {
   "mcp.status.noAnswer": "Sem resposta",
   "mcp.status.didNotStart": "Não iniciou",
   "mcp.status.unreachable": "Inacessível",
-  "mcp.server.providerLimitNote":
-    "Somente Claude e Codex: um servidor com diretório de trabalho não é fornecido aos outros provedores.",
   "mcp.server.runtimeDownloading":
     "Baixando o ambiente de execução usado para iniciar servidores STDIO. Eles podem não iniciar até o download terminar.",
   "mcp.server.runtimeDownloadingProgress":
@@ -85,7 +83,7 @@ export const messages = {
   "mcp.panel.removePassthroughVariable": "Remover variável repassada {position}",
   "mcp.panel.workingDirectory": "Diretório de trabalho",
   "mcp.panel.workingDirectoryDescription":
-    "Os agentes Claude e Codex e o teste de conexão iniciam o servidor aqui. Deixe em branco para fornecer este servidor a todos os provedores: os demais não podem definir um diretório e ignoram os servidores que especificam um.",
+    "Opcional. Os agentes e o teste de conexão iniciam o servidor neste diretório.",
   "mcp.panel.endpointTitle": "Endpoint",
   "mcp.panel.endpointDescription": "Todos os provedores podem usar um servidor MCP HTTP.",
   "mcp.panel.serverUrl": "URL do servidor",
