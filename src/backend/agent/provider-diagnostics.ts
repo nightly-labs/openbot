@@ -28,11 +28,12 @@ export function isMcpSubsystemDiagnostic(message: string): boolean {
  * Whether an MCP diagnostic says that the server refused the provider for want of a sign-in.
  *
  * Grok's `rmcp` worker writes `AuthRequired(…)` for an http server that answers 401 with an OAuth
- * challenge. Other CLIs write the status next to `HTTP` or `status`, or the word. A bare `401` is
- * not enough: a port, an id or a line number can be 401.
+ * challenge. Other CLIs write the status next to `HTTP` or `status`, or the word. Codex CLI 0.169.0
+ * writes `The <name> MCP server is not logged in.` in its failed startup status (#9360). A bare
+ * `401` is not enough: a port, an id or a line number can be 401.
  */
 export function isMcpSignInDiagnostic(message: string): boolean {
-  return /\bAuthRequired\b|\bunauthori[sz]ed\b|\bnot authenticated\b|\b(?:HTTP|status(?:\s+code)?)\W{0,3}401\b/i.test(
+  return /\bAuthRequired\b|\bunauthori[sz]ed\b|\bnot (?:authenticated|logged in)\b|\b(?:HTTP|status(?:\s+code)?)\W{0,3}401\b/i.test(
     message,
   );
 }

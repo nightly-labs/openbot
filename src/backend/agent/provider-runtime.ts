@@ -4211,8 +4211,9 @@ export class ProviderRuntime implements ProviderPort {
       // server is not in the MCP settings, and its failure stays the provider's error, as before.
       // Codex reports each failed start in `mcpServer/startupStatus/updated` too
       // (`#reportMcpStartupStatus`). Its stderr line of the same failure can give a different
-      // cause, such as `failed to start` beside a status that asks for a sign-in, so the user got
-      // two toasts that disagree (#9360). For Codex, the status is the one report.
+      // cause, such as the `rmcp` worker's `AuthRequired(…)` beside a status that read as a failed
+      // start, so the user got two toasts that disagree (#9360). For Codex, the status is the one
+      // report.
       const mcpServer =
         isMcpSubsystemDiagnostic(message) && !isToolCallDiagnostic(message)
           ? this.#configuredMcpServerIn(redacted)
