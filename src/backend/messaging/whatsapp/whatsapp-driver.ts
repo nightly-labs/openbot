@@ -27,6 +27,7 @@ import {
   MessagingConnectionError,
   type MessagingDriver,
   type MessagingPlace,
+  type RecentMessages,
   type StatusReaction,
   WhatsAppAnswerPartlySent,
 } from "../messaging-types";
@@ -258,6 +259,7 @@ class WhatsAppAdapter implements MessagingAdapter {
   ) {
     yield* this.#checkPlace(target.platformChannelId);
     const skipped: string[] = [];
+    let firstId: string | null = null;
     for (const file of files) {
       const sent = yield* Effect.result(
         Effect.gen({ self: this }, function* () {
@@ -276,13 +278,14 @@ class WhatsAppAdapter implements MessagingAdapter {
                 fileName: file.name.slice(0, 255) || "file",
                 mimetype: DOCUMENT_TYPES[extname(file.name).toLowerCase()] ?? file.mimeType,
               };
-          yield* this.#send(target, content);
+          const messageId = yield* this.#send(target, content);
+          if (messageId) firstId ??= messageId;
           return true;
         }),
       );
       if (Result.isFailure(sent) || !sent.success) skipped.push(file.name);
     }
-    return skipped;
+    return { skipped, firstId };
   });
 
   history(
@@ -299,8 +302,8 @@ class WhatsAppAdapter implements MessagingAdapter {
     platformChannelId: string,
     threadKey: string | null,
     limit: number,
-  ): Effect.Effect<ContextEntry[], MessagingAdapterError> {
-    return Effect.sync(() => this.#handle.chats.recent(platformChannelId, threadKey, limit));
+  ): Effect.Effect<RecentMessages, MessagingAdapterError> {
+    return Effect.sync(() => ({ messages: this.#handle.chats.recent(platformChannelId, threadKey, limit) }));
   }
 
   readonly download = Effect.fnUntraced(function* (

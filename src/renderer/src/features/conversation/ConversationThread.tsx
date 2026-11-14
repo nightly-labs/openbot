@@ -12,9 +12,11 @@ import { createEffect, createMemo, createProjection, createSignal, Show, untrack
 import { actionToast } from "../../action-toast";
 import { useShowAgentSteps } from "../../agent-steps-preference";
 import { toAgentMessages } from "../../app-message-projection";
+import { useChatBubbleStyle } from "../../chat-bubble-style-preference";
 import { useCompactMessageActions } from "../../compact-message-actions-preference";
 import { usePlatform } from "../../platform";
 import { deviceQuoteShortcut, deviceSendShortcut } from "../../send-shortcut-preference";
+import { useThreadVisualReplyCard } from "./ChatVisualReply";
 import { ConversationBrowserTakeover } from "./ConversationBrowserTakeover";
 import { ConversationQuestionPrompt } from "./ConversationQuestionPrompt";
 import { chatSearchOpensMessage } from "./chat-search";
@@ -42,6 +44,7 @@ export function ConversationThread() {
     threadComposer,
     threadQueue,
     threadFocusRequest,
+    requestThreadFocus,
     messagePins,
     threadVoiceLiveText,
     threadVoiceOwned,
@@ -100,6 +103,7 @@ export function ConversationThread() {
   });
   const showAgentSteps = useShowAgentSteps();
   const compactMessageActions = useCompactMessageActions();
+  const bubbleStyle = useChatBubbleStyle();
   const { appFocused } = usePlatform();
   // The person reads the open thread while the window has focus. The mark is the member's, so the
   // phone no longer shows the thread as unread.
@@ -222,6 +226,8 @@ export function ConversationThread() {
   const mcpSignInCard = useThreadMcpSignInCard(
     (body) => props.threads?.onSend(body, [], null) ?? Promise.resolve(false),
   );
+  /** A visual reply page shows as in the agent's chat, and writes in this thread's message box. */
+  const visualReplyCard = useThreadVisualReplyCard(threadComposer.openDraftKey, requestThreadFocus);
   /** The cards that the thread waits for: its browser takeover, and its question as a form. */
   const attention = () => {
     if (!hasAttention()) return undefined;
@@ -312,7 +318,7 @@ export function ConversationThread() {
             onCompactContext={current().threads.onCompactContext}
             waitsForAnswer={props.prompt !== undefined || props.browserTakeover !== undefined}
             attention={attention()}
-            messageCard={mcpSignInCard}
+            messageCard={(message, quote) => visualReplyCard(message, quote) ?? mcpSignInCard(message)}
             olderMessages={current().threads.olderMessages}
             newerMessages={current().threads.newerMessages}
             stepsAbove={turnSteps.stepsAbove}
@@ -323,6 +329,7 @@ export function ConversationThread() {
             onCopyMessage={(message) => void copyMessage(message)}
             copiedMessageId={copiedMessageId()}
             compactMessageActions={compactMessageActions()}
+            bubbleStyle={bubbleStyle()}
             onBranch={branch(current().threads)}
             onDeleteMessage={deleteMessage(current().threads)}
             messagePins={threadPins(current().threads.open?.id)}

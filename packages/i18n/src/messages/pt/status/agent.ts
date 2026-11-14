@@ -8,6 +8,8 @@ export const messages = {
   "status.agent.instructionsChanged": "Atualizou suas instruções",
   "status.agent.modelSwitchedForLimit": "Limite de uso atingido. O modelo mudou para {model}.",
   "status.agent.modelReturnedAfterLimit": "O limite de uso terminou. O modelo voltou para {model}.",
+  "status.agent.routineSkippedRunOpen": "Pulada: a última execução ainda não tinha terminado",
+  "status.agent.routineSkippedUsageLimit": "Pulada: o limite de uso foi atingido",
   "status.agent.modelSwitchedForError": "Erro do provedor. O modelo mudou para {model}.",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} ficou sem créditos. Trocado para {model}. Para usá-lo de novo, adicione créditos e depois selecione-o.",
@@ -36,6 +38,14 @@ export const messages = {
   "status.agent.serverInstallCommand":
     "Criar um comando de uso único que instala o OpenBot em outro computador como o servidor {name} e o conecta à sua conta. O agente o executa lá.",
   "status.agent.serverInstallCard": "Comando de instalação para o servidor {name}",
+  "status.agent.browserProfileNamed":
+    "Mover {agents} para o perfil do navegador {profile}. Eles recebem os logins e cookies dele. As abas abertas deles fecham.",
+  "status.agent.browserProfileNew":
+    "Criar o novo perfil do navegador {profile} e mover {agents} para ele. Ele não tem logins. As abas abertas deles fecham.",
+  "status.agent.browserProfileShared":
+    "Mover {agents} para o perfil do navegador compartilhado. Eles recebem os logins e cookies dele. As abas abertas deles fecham.",
+  "status.agent.browserProfileOwn":
+    "Dar a cada um de {agents} um perfil do navegador próprio. As abas abertas deles fecham.",
   "status.agent.feedbackSending": "Enviando seu feedback para a equipe do OpenBot…",
   "status.agent.workflowDelete":
     "Excluir o fluxo de trabalho {title} com suas execuções e versões. Suas etapas abertas param.",

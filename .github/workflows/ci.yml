@@ -537,6 +537,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:browser-profile-agents
 
+      - name: Run the agent browser profile tool E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:agent-browser-profile-tool
+
       - name: Run the Claude usage after a resume E2E test
         if: ${{ !cancelled() }}
         run: bun run test:claude-usage-resume
@@ -761,6 +765,7 @@ jobs:
             .openbot-build/messaging-owner-card-e2e/
             .openbot-build/agent-profile-accounts-e2e/
             .openbot-build/browser-profile-agents-e2e/
+            .openbot-build/agent-browser-profile-tool-e2e/
             .openbot-build/claude-usage-resume-e2e/
             .openbot-build/claude-background-hold-e2e/
             .openbot-build/claude-turn-context-e2e/

@@ -599,6 +599,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   get provider(): AgentProvider {
     return this.options.provider;
   }
+  readonly mcpToolsFixedAtStart = (): boolean => this.#flavor.mcpToolsFixedAtStart === true;
   /** The memories and section-mates go with the prompts, so a memory change sends no instructions again. */
   readonly turnContext = true;
   readonly #turnContext = new TurnContext();

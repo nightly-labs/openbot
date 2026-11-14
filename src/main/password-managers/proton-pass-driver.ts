@@ -306,8 +306,9 @@ function loginPassword(node: unknown, depth = 0): string | null {
 }
 
 function matchesOrigin(login: IndexedLogin, origin: string): boolean {
-  // Proton Pass has no fill rule for each website; only the same host and port is filled.
-  return login.urls.some((url) => websiteMatchesOrigin({ url, autofill: "exact" }, origin));
+  // `urls` holds only the websites in Proton's `Default` fill mode, which fills on the whole site:
+  // a login saved for `cloudflare.com` also fills on `dash.cloudflare.com`.
+  return login.urls.some((url) => websiteMatchesOrigin({ url, autofill: "anywhere" }, origin));
 }
 
 function registerRecord(record: ProtonPassRecord): void {

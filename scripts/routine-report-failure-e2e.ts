@@ -711,6 +711,13 @@ try {
     (entry) => entry.method === "turn/start" && entry.turnId === quietFailedRun.delivery.turnId,
   )?.text;
   pass("The script-run prompt names the tool", scriptPrompt?.includes("call the routine_report_failure tool") === true);
+  pass(
+    "A script run may pause only its own routine, and a Test run may not change routines (#8963)",
+    scriptPrompt?.includes(`routineId "${quietFailed.id}" and active false`) === true &&
+      !scriptPrompt.includes("Do not create, update, delete, or test routines") &&
+      healthPrompt?.includes(`routineId "${health.id}"`) === false,
+    scriptPrompt,
+  );
 
   // Flows: a failed owner step skips the next agent.
   const healthSteps = await steps("Health check", healthRun.run.id, 2);
@@ -752,6 +759,15 @@ try {
     .listRoutineRuns({ agentId: relay.id, routineId: relayed.id })
     .find((run) => run.id === relayedRun.run.id);
   pass("A linked step's call does not change the owner's run", relayedAfter?.status === "succeeded");
+  const linkedPrompt = fakeEntries().find(
+    (entry) => entry.method === "turn/start" && entry.turnId === linkedDelivery?.turnId,
+  )?.text;
+  pass(
+    "A linked step's agent may not change the routine of another agent (#8963)",
+    linkedPrompt?.includes("Do not create, update, delete, or test routines during this run.") === true &&
+      !linkedPrompt.includes(`routineId "${relayed.id}"`),
+    linkedPrompt,
+  );
 
   // A teammate's answer to a request that a quiet run sent continues the run: its turn can end quiet
   // after `routine_no_update`. The answer to a Test run's request shows (#8364).

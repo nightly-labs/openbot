@@ -75,6 +75,8 @@ export const messages = {
     "{provider} 多次重复了一个失败的步骤，因此 OpenBot 停止了该轮次。请重新发送消息，或选择其他模型。",
   "error.agent.compactionConnectionLost":
     "助手压缩上下文时连接中断，因此任务已停止。请检查网络连接，然后发送消息以继续。",
+  "error.agent.compactionLoopStopped":
+    "{provider} 反复压缩上下文，但每次压缩后仍然太满，无法继续，因此 OpenBot 停止了这一轮。请关闭此智能体不需要的 MCP 服务器或电脑操控，然后发送一条消息。如果你或智能体更改过 {provider} 的压缩时机，请撤销该更改。",
   "error.agent.selectedGone": "所选的助手已不存在。",
   "error.agent.profileEndpointsChanged": "生成期间自定义端点发生了变更，请重试。",
   "error.agent.profileInvalid": "服务商返回了无效的资料，请试着修改提示词。",

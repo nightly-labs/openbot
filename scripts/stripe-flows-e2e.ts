@@ -3082,7 +3082,7 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     );
     // The migration gives 1 to each hosted server row from before it. This row stands for one of them.
     d1(`UPDATE hosted_servers SET legacy_member_limits = 1 WHERE server_id = ${quote(legacyId)}`, z.unknown());
-    // Starter is sold out, so both servers pay Standard. These rows stand for Starter plans from before.
+    // Both servers pay Standard. These rows stand for Starter plans from before the member limits.
     d1(
       `UPDATE billing_subscriptions SET plan = 'starter'
        WHERE stripe_subscription_id IN (${quote(freshSub)}, ${quote(legacySub)})`,

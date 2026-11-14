@@ -232,7 +232,7 @@ one failed), as a site memory, and a class of task as a skill. The review drops 
 host and keeps the fact. The browser guidance has no site memory text: the agent context budget
 (`tools/agent-context/budget.json`) leaves no space for it, and the review saves these steps.
 
-"Learn from my browsing" (Server settings → General → Agents, off by default, `browsing-memory-v1`)
+"Learn from my browsing" (Server settings → Memory, off by default, `browsing-memory-v1`)
 lets the review also learn from what a person does in an agent's tab. `BrowserHost` records steps only
 while a person holds the tab (takeover or Take control), so no step is the agent's own. It skips a
 secret tab, a private sign-in, a tab without an owner agent, and a page that is not http(s). A step is

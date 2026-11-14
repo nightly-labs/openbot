@@ -74,6 +74,9 @@ interface InboundQuote {
   mentionedUserIds: string[];
   /** ISO time. */
   sentAt: string;
+  /** The replied-to message's id and files, for a platform that keeps them apart from the message's own files. */
+  messageId?: string;
+  files?: InboundFile[];
 }
 
 interface InboundActionBase {
@@ -122,6 +125,12 @@ export interface ContextEntry {
   sentAt: string;
   /** The message's files, which the agent gets with the message that it answers. */
   files?: InboundFile[];
+}
+
+/** What the history tool reads of a place. `note` says why the platform gave fewer messages, when it knows. */
+export interface RecentMessages {
+  messages: ContextEntry[];
+  note?: string;
 }
 
 /** A failure the connection cannot recover from alone. The user must act. */
@@ -177,8 +186,14 @@ export interface MessagingAdapter {
    * message of its place, for a platform whose history this device cannot read (WhatsApp).
    */
   rememberPost?(target: MessageTarget, postId: string, text: string): void;
-  /** Uploads files to the conversation, and returns the names it did not send. */
-  upload(target: MessageTarget, files: MessagingAnswerFile[]): Effect.Effect<string[], MessagingAdapterError>;
+  /**
+   * Uploads files to the conversation. Returns the names it did not send, and the id of the first
+   * message it sent when the platform gives one (WhatsApp, Telegram).
+   */
+  upload(
+    target: MessageTarget,
+    files: MessagingAnswerFile[],
+  ): Effect.Effect<{ skipped: string[]; firstId: string | null }, MessagingAdapterError>;
   /** Earlier messages of the conversation, oldest first, after `afterId` and before `beforeId`. */
   history(
     platformChannelId: string,
@@ -195,7 +210,7 @@ export interface MessagingAdapter {
     platformChannelId: string,
     threadKey: string | null,
     limit: number,
-  ): Effect.Effect<ContextEntry[], MessagingAdapterError>;
+  ): Effect.Effect<RecentMessages, MessagingAdapterError>;
   /** Downloads one file to `destination`. Refuses a file larger than `maxBytes`. */
   download(file: InboundFile, destination: string, maxBytes: number): Effect.Effect<void, MessagingAdapterError>;
   authorName(userId: string): Effect.Effect<string, MessagingAdapterError>;
@@ -353,10 +368,21 @@ export interface MessagingIngress {
   ): Effect.Effect<A, MessagingAdapterError>;
   /**
    * Calls `listener` with the Discord guilds that Signal routes to the socket, each time Signal
-   * sends a session. A guild of this host that is not in it was unlinked, or the bot left it.
+   * sends a session, and when Signal refuses a call because it no longer routes a guild here. A guild
+   * of this host that is not in it was linked to another host, unlinked, or the bot left it.
    */
   onDiscordRoutes(listener: (guildIds: ReadonlySet<string>) => void): () => void;
+  /**
+   * Calls `listener` with the Slack workspaces or the Telegram chats that Signal routes to the socket:
+   * at once when the open socket knows them, and each time Signal accepts a new socket. A workspace or
+   * chat of this host that is not in them is linked to another host, or to none. Null when the socket's
+   * account service named no IDs: then nothing is known.
+   */
+  onLinkedRoutes(platform: LinkedRoutePlatform, listener: (ids: ReadonlySet<string> | null) => void): () => void;
 }
+
+/** The platforms whose route ticket the host reads: Discord gets its guilds from Signal's session. */
+export type LinkedRoutePlatform = "slack" | "telegram";
 
 /** The bytes of one `upload` call. */
 export interface DiscordUploadFile {

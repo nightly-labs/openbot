@@ -253,6 +253,11 @@ export class ChannelService {
   readonly #waitingForAgents = new Set<string>();
   /** Turns that the provider started with no delivery. Their rows are no task's reply. */
   readonly #providerTurns = new Set<string>();
+  /**
+   * Provider turns that continue the member's last task, by assignment id: the answer to a
+   * background job that the task's turn started. The channel shows their rows under that task.
+   */
+  readonly #lateTurns = new Map<string, string>();
   readonly #deletedChannels = new Set<string>();
   /**
    * Tasks from a person's message whose owner has not had its one try at a usage limit. The try
@@ -2706,6 +2711,7 @@ export class ChannelService {
     }
     if (event.type === "turn-completed") {
       this.#providerTurns.delete(event.turnId);
+      this.#lateTurns.delete(event.turnId);
       const channelId = this.store.channelForThread(event.threadId);
       if (!channelId) {
         this.#dispatchEvent(this.wake());
@@ -2723,6 +2729,11 @@ export class ChannelService {
       // that task, and the task's own start then failed.
       if (event.origin === "unknown") {
         this.#providerTurns.add(event.turnId);
+        // The member ended its task's turn while a background job ran, and this turn answers that
+        // job. Its progress and result belong to that task. Before, the channel showed nothing, and
+        // the member looked stuck (#9070).
+        const late = this.#lateAssignment(channelId, event.agentId);
+        if (late) this.#lateTurns.set(event.turnId, late.id);
         return true;
       }
       const assignment = this.store
@@ -2814,6 +2825,21 @@ export class ChannelService {
     );
   }
 
+  /**
+   * The member's last assignment, while its task is still completed at that revision in an open
+   * channel. A turn that the provider starts after a background job continues it.
+   */
+  #lateAssignment(channelId: string, agentId: string): ChannelAssignment | undefined {
+    if (this.store.get(channelId).archived) return undefined;
+    const assignment = this.store
+      .assignments(channelId)
+      .filter((item) => item.agentId === agentId && item.turnId !== null)
+      .at(-1);
+    if (assignment?.state !== "completed") return undefined;
+    const task = this.store.tasks(channelId).find((item) => item.id === assignment.taskId);
+    return task?.state === "completed" && task.revision === assignment.taskRevision ? assignment : undefined;
+  }
+
   private capture(snapshot: ConversationSnapshot, turnId?: string): boolean {
     const channelId = snapshot.threadId ? this.store.channelForThread(snapshot.threadId) : null;
     if (!channelId) return false;
@@ -2851,7 +2877,9 @@ export class ChannelService {
         !mcpSignInEvent(message)
       )
         continue;
-      const owner = assignments.find((item) => item.turnId === message.turnId);
+      const lateId = message.turnId === undefined ? undefined : this.#lateTurns.get(message.turnId);
+      const late = lateId === undefined ? undefined : assignments.find((item) => item.id === lateId);
+      const owner = assignments.find((item) => item.turnId === message.turnId) ?? late;
       if (!owner && message.turnId !== undefined && this.#providerTurns.has(message.turnId)) continue;
       const original = existing(message.id);
       // The first rows of a turn come before its assignment knows the turn id, so they go to the
@@ -2868,7 +2896,20 @@ export class ChannelService {
       // A turn sends its final rows before it completes, so a new row of an ended assignment is not
       // part of its reply. After a restart, the Claude history import wrote old turns again with new
       // ids, and each such row showed as a new reply under a completed task.
-      if (!original && !activeAssignment(assignment)) continue;
+      // A row of a turn that continues the task after a background job is part of its reply while the
+      // task is not reopened and the channel is open. It gets its row when it completes: a turn that
+      // fails or stops leaves its row at streaming, and such a row stopped the channel's history (#3673).
+      if (!original && !activeAssignment(assignment)) {
+        const task = tasks.get(assignment.taskId);
+        if (
+          !late ||
+          message.status === "streaming" ||
+          task?.state !== "completed" ||
+          task.revision !== assignment.taskRevision ||
+          this.store.get(channelId).archived
+        )
+          continue;
+      }
       // A streaming row that has only the member's own label so far ("Ana:") waits for its text, so
       // the label does not show for one update and then go.
       if (message.author === "assistant") {
@@ -2922,7 +2963,7 @@ export class ChannelService {
         (!message.itemType || message.itemType === "agentMessage" || message.itemType === "final_answer") &&
         (original
           ? original.message.itemType === "commentary" && original.sequence > end.sequence
-          : activeAssignment(assignment))
+          : activeAssignment(assignment) || late !== undefined)
       )
         message = { ...message, itemType: "commentary" };
       // A channel routine run with nothing to report posts no message: its answers are steps (#7166).

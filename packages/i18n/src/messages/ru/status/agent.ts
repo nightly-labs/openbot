@@ -8,6 +8,8 @@ export const messages = {
   "status.agent.instructionsChanged": "Обновил свои инструкции",
   "status.agent.modelSwitchedForLimit": "Лимит использования исчерпан. Переключено на {model}.",
   "status.agent.modelReturnedAfterLimit": "Лимит использования обновился. Снова используется {model}.",
+  "status.agent.routineSkippedRunOpen": "Пропущено: предыдущий запуск ещё не завершился",
+  "status.agent.routineSkippedUsageLimit": "Пропущено: достигнут лимит использования",
   "status.agent.modelSwitchedForError": "Ошибка провайдера. Переключено на {model}.",
   "status.agent.modelSwitchedForSpentBalance":
     "У {previous} закончились кредиты. Выполнено переключение на {model}. Чтобы снова использовать эту модель, пополните кредиты и выберите её.",
@@ -36,6 +38,14 @@ export const messages = {
   "status.agent.serverInstallCommand":
     "Создать одноразовую команду, которая устанавливает OpenBot на другой компьютер как сервер {name} и подключает его к вашему аккаунту. Агент запускает её там.",
   "status.agent.serverInstallCard": "Команда установки для сервера {name}",
+  "status.agent.browserProfileNamed":
+    "Перенести {agents} в профиль браузера {profile}. Они получат его входы в аккаунты и файлы cookie. Их открытые вкладки закроются.",
+  "status.agent.browserProfileNew":
+    "Создать новый профиль браузера {profile} и перенести в него {agents}. В нём нет входов в аккаунты. Их открытые вкладки закроются.",
+  "status.agent.browserProfileShared":
+    "Перенести {agents} в общий профиль браузера. Они получат его входы в аккаунты и файлы cookie. Их открытые вкладки закроются.",
+  "status.agent.browserProfileOwn":
+    "Дать каждому из {agents} собственный профиль браузера. Их открытые вкладки закроются.",
   "status.agent.feedbackSending": "Отправка отзыва команде OpenBot…",
   "status.agent.workflowDelete":
     "Удалить рабочий процесс {title} вместе с его запусками и версиями. Его открытые шаги остановятся.",

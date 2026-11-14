@@ -81,7 +81,7 @@ a plugin listing - open the app and gives the launcher an icon that stays after 
 #### Theme palette files
 
 OpenBot reads each `<name>.json` file in the `themes` folder of its data folder
-(`~/.config/OpenBot/themes/` on Linux) and lists it under Settings > General > Theme. Another
+(`~/.config/OpenBot/themes/` on Linux) and lists it under Settings > Appearance > Theme. Another
 program, such as an Omarchy theme script, can write the file. OpenBot follows each change to the
 file with no restart. Replace the file with a rename, so that OpenBot never reads half of it:
 
@@ -149,7 +149,7 @@ docker exec -it openbot openbot login
 ```
 
 See [Docker](docs/docker.md) for Compose, the data volume, upgrades and the security limits. For Amazon ECS,
-see [AWS ECS](docs/aws-ecs.md).
+see [AWS ECS](docs/aws-ecs.md). For an Umbrel home server, see [Umbrel](docs/umbrel.md).
 
 ### Nix
 

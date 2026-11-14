@@ -81,7 +81,7 @@ export interface DeliveryPromptSources {
   agentNames: ReadonlyMap<string, string>;
   /** The conversation the delivery joins. A user reply quotes the message it answers from it. */
   snapshot: ConversationSnapshot;
-  routineRun: Pick<RoutineRun, "kind" | "source"> | null;
+  routineRun: Pick<RoutineRun, "kind" | "source" | "agentId"> | null;
   /** The open waits that a routine run wakes. The run continues their requests. */
   wokenWaits?: readonly AgentWait[];
   /** The prompt a channel task or an external message sends in place of the delivery text. */
@@ -335,13 +335,24 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
     const run = sources.routineRun;
     const testRun = run !== null && !quietRoutineRun(run);
     const runKind = testRun ? "manual Test run" : run?.source ? `${run.source} run` : "scheduled run";
+    // A routine whose task says to stop when it is done pauses itself; without this, each run reports
+    // the same result again (#8963). A pause keeps the routine, so the user can turn it on again. A Test
+    // run must not change the routine, and update_routine does not find a webhook routine. A flow
+    // handoff to another agent names the routine too, but has no run of its own: that agent does not
+    // own the routine.
+    const canPause = run !== null && !testRun && run.source !== "webhook" && run.agentId === delivery.recipientAgentId;
     text = [
       "Execute one run of an existing OpenBot routine now.",
       `Routine name: ${delivery.sender.routineName}`,
       `Run type: ${runKind}`,
       `Scheduled for: ${delivery.sender.scheduledFor}`,
       "The routine already exists, and its schedule is already configured.",
-      "Do not create, update, delete, or test routines during this run.",
+      ...(canPause
+        ? [
+            "Do not create, delete, or test routines, and do not change other routines, during this run.",
+            `When the task says to stop after a condition and the condition is met, pause this routine: call openbot.update_routine with routineId "${delivery.sender.routineId}" and active false, then give your report. Make no other change to this routine.`,
+          ]
+        : ["Do not create, update, delete, or test routines during this run."]),
       "Perform the task below now. Do not answer only that the routine or monitoring is active.",
       "Nobody answers you during this run. Do all of the task in this turn: do not stop after a step to report progress or to ask whether to continue.",
       "A task can tell you to remind the user or to send the user a message. When it names no other place, write that message as your final answer. OpenBot shows your final answer to the user in this chat. openbot.send_message sends to other agents, not to the user.",

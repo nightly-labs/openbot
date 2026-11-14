@@ -20,7 +20,7 @@ import { AccountUsageDetails, AccountUsageWindowList } from "@openbot/ui/feature
 import { type AccountUsageProviderRow, accountUsageRowKey } from "@openbot/ui/features/account/account-usage-view";
 import { useText } from "@openbot/ui/text";
 import { Dynamic, type JSX } from "@solidjs/web";
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createMemo, createSignal, For, onSettled, Show } from "solid-js";
 
 /** One rail button. Its name shows as a tooltip, unless it has a `card`: the card shows instead. */
 function RailButton(props: {
@@ -61,6 +61,22 @@ function RailButton(props: {
   );
 }
 
+/** The hover card of a usage ring: the limits of its readings, with no refresh. */
+function UsageCard(props: { rows: AccountUsageProviderRow[] }) {
+  const { t } = useText();
+  return (
+    <AccountUsageDetails
+      rows={props.rows}
+      loading={false}
+      error={null}
+      refreshActive={false}
+      refreshDisabled
+      onRefresh={() => undefined}
+      title={<h2 class="account-usage-popover-title">{t("account.usage.title")}</h2>}
+    />
+  );
+}
+
 /** Two tracks in a 34px box, with 4.5px between their centers. */
 const RING = { size: 34, stroke: 2.25, spacing: 4.5 };
 
@@ -93,17 +109,7 @@ function UsageRings(props: {
   return (
     <RailButton
       label={label()}
-      card={() => (
-        <AccountUsageDetails
-          rows={rows()}
-          loading={false}
-          error={null}
-          refreshActive={false}
-          refreshDisabled
-          onRefresh={() => undefined}
-          title={<h2 class="account-usage-popover-title">{t("account.usage.title")}</h2>}
-        />
-      )}
+      card={() => <UsageCard rows={rows()} />}
       class="window-rail-usage"
       onClick={props.onOpen}
     >
@@ -139,6 +145,56 @@ function UsageRings(props: {
     </RailButton>
   );
 }
+
+/** One usage ring: a reading, and the readings that count the same quota. */
+interface UsageRing {
+  row: AccountUsageProviderRow;
+  shared: AccountUsageProviderRow[];
+}
+
+/** The part left of the reading in the ring with the least left. */
+function ringLeft(ring: UsageRing): number {
+  return Math.min(...[ring.row, ...ring.shared].map((row) => row.remainingPercent ?? 100));
+}
+
+/**
+ * The rings that do not fit in the rail, as one ring with their number. The hover card lists their
+ * readings. A click opens the usage page.
+ */
+function MoreUsageRings(props: { rings: readonly UsageRing[]; onOpen: (button: HTMLElement) => void }) {
+  const { t } = useText();
+  const rows = () => props.rings.flatMap((ring) => [ring.row, ...ring.shared]);
+  return (
+    <RailButton
+      label={t("app.rail.moreUsage", { count: props.rings.length })}
+      card={() => <UsageCard rows={rows()} />}
+      class="window-rail-usage window-rail-usage-more"
+      onClick={props.onOpen}
+    >
+      <svg class="window-rail-usage-ring" viewBox={`0 0 ${RING.size} ${RING.size}`} fill="none" aria-hidden="true">
+        <circle
+          class="window-rail-usage-track"
+          cx={RING.size / 2}
+          cy={RING.size / 2}
+          r={(RING.size - RING.stroke) / 2}
+          stroke-width={RING.stroke}
+        />
+      </svg>
+      <span class="window-rail-usage-count" aria-hidden="true">
+        {t("app.rail.moreUsageCount", { count: props.rings.length })}
+      </span>
+    </RailButton>
+  );
+}
+
+/**
+ * The most ring places in the rail, also in a tall window: four rings and the "+N" ring, or five
+ * rings. A "+N" ring never takes the place of one ring. When the window has space for one place
+ * only, the "+N" ring shows all the readings.
+ */
+const MAX_RING_PLACES = 5;
+/** The space in pixels that stays between the pages and the end of the rail. */
+const RAIL_MIN_FREE = 12;
 
 /** The answer of one custom agent to its usage prompt. OpenBot cannot read a percent from it. */
 export interface CustomAgentUsageRailRow {
@@ -454,13 +510,61 @@ export function PageRail(props: PageRailProps) {
    * One ring per reading, except a reading that counts the quota of another provider's own sign-in,
    * such as Cursor on a merged Grok plan: that ring's card lists it instead.
    */
-  const rings = createMemo(() => {
+  const rings = createMemo((): UsageRing[] => {
     const rows = props.usageRows.filter((row) => row.reportsUsage && row.windows.length > 0);
     const owner = (row: AccountUsageProviderRow) =>
       rows.find((other) => other.accountId === null && other.provider === row.sharedQuotaWith);
     return rows
       .filter((row) => !owner(row))
       .map((row) => ({ row, shared: rows.filter((other) => owner(other) === row) }));
+  });
+  /** The number of ring places that fit between the pages and the end buttons. */
+  const [ringSlots, setRingSlots] = createSignal(MAX_RING_PLACES);
+  /**
+   * When all rings do not fit, the rings with the least left stay, in their order, and one "+N" ring
+   * takes the last place.
+   */
+  const ringLayout = createMemo(() => {
+    const all = rings();
+    if (all.length <= ringSlots()) return { shown: all, more: [] };
+    const kept = new Set([...all].sort((a, b) => ringLeft(a) - ringLeft(b)).slice(0, ringSlots() - 1));
+    return { shown: all.filter((ring) => kept.has(ring)), more: all.filter((ring) => !kept.has(ring)) };
+  });
+  let rail: HTMLElement | undefined;
+  let pageGroup: HTMLElement | undefined;
+  let railEnd: HTMLElement | undefined;
+  let endGroup: HTMLElement | undefined;
+  /* The free height comes from the layout: the rail height, the pages, and the end buttons other
+   * than the rings. One place is one button and the gap after it. */
+  onSettled(() => {
+    if (!rail || !pageGroup || !railEnd || !endGroup) return;
+    const [nav, pagesBox, endBox, end] = [rail, pageGroup, railEnd, endGroup];
+    const measure = () => {
+      const button = end.lastElementChild;
+      if (!(button instanceof HTMLElement) || nav.hidden) return;
+      const slot = button.offsetHeight + Number.parseFloat(getComputedStyle(end).rowGap);
+      const rendered = ringLayout().shown.length + (ringLayout().more.length > 0 ? 1 : 0);
+      const endWithoutRings = endBox.offsetHeight - rendered * slot;
+      const free =
+        nav.getBoundingClientRect().bottom -
+        Number.parseFloat(getComputedStyle(nav).paddingBlockEnd) -
+        pagesBox.getBoundingClientRect().bottom -
+        endWithoutRings -
+        RAIL_MIN_FREE;
+      setRingSlots(Math.max(1, Math.min(MAX_RING_PLACES, Math.floor(free / slot))));
+    };
+    /* A new ring count changes the size of the end group, which this observer watches. The measure
+     * waits for the next frame, so the change does not come back in the same observer loop. */
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(measure);
+    });
+    for (const element of [nav, pagesBox, endBox]) observer.observe(element);
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+    };
   });
   /** The pages that this server has, in rail order. */
   const pages = createMemo((): RailPage[] => {
@@ -501,9 +605,21 @@ export function PageRail(props: PageRailProps) {
     return list;
   });
   return (
-    <nav class="window-rail" aria-label={t("app.rail.label")} hidden={props.hidden}>
+    <nav
+      class="window-rail"
+      aria-label={t("app.rail.label")}
+      hidden={props.hidden}
+      ref={(element) => {
+        rail = element;
+      }}
+    >
       <Show when={props.logo}>{(logo) => <RailLogo variant={logo().variant} href={logo().href} />}</Show>
-      <div class="window-rail-group">
+      <div
+        class="window-rail-group"
+        ref={(element) => {
+          pageGroup = element;
+        }}
+      >
         <RailButton label={t("app.rail.agents")} current={props.current === "agents"} onClick={props.onAgents}>
           <Bot aria-hidden="true" />
         </RailButton>
@@ -516,12 +632,25 @@ export function PageRail(props: PageRailProps) {
         </For>
         <RailMoreMenu pages={pages()} current={props.current} pinned={props.pinned} onPinChange={props.onPinChange} />
       </div>
-      <div class="window-rail-end">
-        <div class="window-rail-group">
+      <div
+        class="window-rail-end"
+        ref={(element) => {
+          railEnd = element;
+        }}
+      >
+        <div
+          class="window-rail-group"
+          ref={(element) => {
+            endGroup = element;
+          }}
+        >
           {/* A status update builds new rows. The key keeps each ring, and its open hover card, mounted. */}
-          <For each={rings()} keyed={(ring) => accountUsageRowKey(ring.row)}>
+          <For each={ringLayout().shown} keyed={(ring) => accountUsageRowKey(ring.row)}>
             {(ring) => <UsageRings row={ring().row} shared={ring().shared} onOpen={props.onUsage} />}
           </For>
+          <Show when={ringLayout().more.length > 0}>
+            <MoreUsageRings rings={ringLayout().more} onOpen={props.onUsage} />
+          </Show>
           <For each={props.customAgentUsage ?? []} keyed={(row) => row.id}>
             {(row) => <CustomAgentUsageButton row={row()} onOpen={props.onUsage} />}
           </For>

@@ -14,8 +14,19 @@ x11-utils
 x11-xserver-utils
 xauth
 xvfb
+# The desktop of the agent display (openbot-desktop): a window manager, the terminal and the file
+# manager of its menu, and the tool that draws the background. Its theme uses DejaVu Sans, which a
+# minimal Ubuntu 26.04 does not have.
+openbox
+lxterminal
+pcmanfm
+hsetroot
+fonts-dejavu-core
 # The Codex sandbox. Without it on PATH, Codex uses its bundled copy and reports an error.
 bubblewrap
+# The Claude sandbox needs bubblewrap and socat. Without socat, each turn of a Claude agent with
+# "Workspace only" fails before it starts.
+socat
 # The Hermes Agent installer clones Hermes with git, and the Node.js that it downloads needs
 # libatomic1. Without them, the install stops, and the service user cannot install them: that user
 # has no sudo.

@@ -95,6 +95,8 @@ export const messages = {
   "app.socialFollow.redditTitle": "Como eu uso o OpenBot",
   "app.rail.usageRings": "Uso de {name}: {windows}. Abrir uso",
   "app.rail.customAgentUsage": "Uso de {name}. Abrir uso",
+  "app.rail.moreUsage": { one: "Mais {count} conta. Abrir uso", other: "Mais {count} contas. Abrir uso" },
+  "app.rail.moreUsageCount": "+{count}",
   "app.rail.mediaCredits": "{name}: restam {credits} créditos. Abrir {name}",
   "app.rail.mediaCreditsQuota": "{name}: restam {credits} dos seus {quota} créditos da equipe. Abrir {name}",
   "app.rail.mediaCreditsMeta": "Créditos",

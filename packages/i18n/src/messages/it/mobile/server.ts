@@ -767,6 +767,8 @@ export const messages = {
     "OpenBot non riesce a leggere i token salvati su {host}. Disconnetti il workspace, poi connettilo di nuovo.",
   "mobile.server.connectors.slack.helpRelay":
     "OpenBot su {host} non riesce a ricevere gli eventi di Slack. Su {host}, accedi, dai un nome al server nelle impostazioni del server e tieni OpenBot aperto.",
+  "mobile.server.connectors.slack.helpNotLinked":
+    "Questo workspace non è collegato a {host}. Tocca Riconnetti per collegarlo.",
   "mobile.server.connectors.slack.orchestratorTitle": "Slack Orchestrator",
   "mobile.server.connectors.slack.orchestratorDescription":
     "Questo agente riceve ogni richiesta da Slack. Risponde da solo a quelle brevi, passa il resto all'agente giusto e pubblica la risposta nel thread.",
@@ -812,6 +814,8 @@ export const messages = {
     "OpenBot non riesce a leggere i token salvati su {host}. Disconnetti il server Discord, poi connettilo di nuovo.",
   "mobile.server.connectors.discord.helpRelay":
     "OpenBot su {host} non riesce a ricevere gli eventi di Discord. Su {host}, accedi, dai un nome al server nelle impostazioni del server e tieni OpenBot aperto.",
+  "mobile.server.connectors.discord.helpNotLinked":
+    "Questo server Discord non è collegato a {host}. Tocca Riconnetti per collegarlo.",
   "mobile.server.connectors.discord.orchestratorTitle": "Discord Orchestrator",
   "mobile.server.connectors.discord.orchestratorDescription":
     "Questo agente riceve ogni richiesta da Discord. Risponde da solo a quelle brevi, passa il resto all'agente giusto e invia la risposta nel canale.",
@@ -846,6 +850,8 @@ export const messages = {
     "OpenBot su {host} non può ricevere i messaggi di Telegram. Su {host}, accedi, dai un nome al server nelle impostazioni del server e tieni OpenBot aperto.",
   "mobile.server.connectors.telegram.helpError":
     "OpenBot non riesce a raggiungere questa chat. Riconnettiti, oppure disconnetti la chat.",
+  "mobile.server.connectors.telegram.helpNotLinked":
+    "Questa chat non è collegata a {host}. Tocca Riconnetti per collegarla.",
   "mobile.server.connectors.telegram.retryAt":
     "Telegram ha chiesto a OpenBot di aspettare. Nuovo tentativo alle {time}.",
   "mobile.server.connectors.telegram.linkTitle": "Collega una chat",
@@ -887,6 +893,8 @@ export const messages = {
     "WhatsApp ha rimosso questo server dai dispositivi collegati. Collega di nuovo il numero.",
   "mobile.server.connectors.whatsapp.helpError":
     "OpenBot non riesce a raggiungere WhatsApp su questo numero. Riconnettiti, oppure disconnetti il numero.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "OpenBot non riesce a leggere le chiavi salvate di questo numero. Collega di nuovo il numero.",
   "mobile.server.connectors.whatsapp.retryAt":
     "WhatsApp ha chiesto a OpenBot di aspettare. Nuovo tentativo alle {time}.",
   "mobile.server.connectors.whatsapp.linkAgain": "Ricollega",

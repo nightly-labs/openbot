@@ -8,6 +8,8 @@ export const messages = {
   "status.agent.instructionsChanged": "指示を更新しました",
   "status.agent.modelSwitchedForLimit": "使用量の上限に達しました。{model} に切り替えました。",
   "status.agent.modelReturnedAfterLimit": "使用量の上限が解除されました。{model} に戻しました。",
+  "status.agent.routineSkippedRunOpen": "スキップ: 前回の実行がまだ終わっていませんでした",
+  "status.agent.routineSkippedUsageLimit": "スキップ: 使用量の上限に達しました",
   "status.agent.modelSwitchedForError": "プロバイダーのエラーが発生しました。{model} に切り替えました。",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} のクレジットがなくなりました。{model} に切り替えました。再び使うには、クレジットを追加してから選択してください。",
@@ -38,6 +40,14 @@ export const messages = {
   "status.agent.serverInstallCommand":
     "別のコンピューターに OpenBot をサーバー {name} としてインストールし、あなたのアカウントにサインインさせる 1 回限りのコマンドを作成します。エージェントがそこで実行します。",
   "status.agent.serverInstallCard": "サーバー {name} のインストールコマンド",
+  "status.agent.browserProfileNamed":
+    "{agents} をブラウザープロファイル {profile} に移動します。そのログイン情報と Cookie を使えるようになります。開いているタブは閉じます。",
+  "status.agent.browserProfileNew":
+    "新しいブラウザープロファイル {profile} を作成し、{agents} を移動します。ログイン情報はありません。開いているタブは閉じます。",
+  "status.agent.browserProfileShared":
+    "{agents} を共有のブラウザープロファイルに移動します。そのログイン情報と Cookie を使えるようになります。開いているタブは閉じます。",
+  "status.agent.browserProfileOwn":
+    "{agents} にそれぞれ専用のブラウザープロファイルを与えます。開いているタブは閉じます。",
   "status.agent.feedbackSending": "フィードバックを OpenBot チームに送信しています…",
   "status.agent.workflowDelete":
     "ワークフロー {title} を実行履歴とバージョンごと削除します。実行中のステップは停止します。",

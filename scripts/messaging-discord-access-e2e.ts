@@ -252,6 +252,7 @@ const ingress: MessagingIngress = {
   telegram: { available: () => false, call: unused, download: unused, upload: unused },
   reconnect: () => {},
   onDiscordRoutes: () => () => {},
+  onLinkedRoutes: () => () => {},
   discord: (request, decode) => {
     // An older Signal does not know `listRoles` and refuses it as an invalid request.
     if (request.op === "listRoles" && request.guildId === GUILD_TWO)

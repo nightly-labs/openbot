@@ -6,7 +6,7 @@ import {
   serverStorageGb,
   serverStorageGbAfter,
 } from "@openbot/contracts/billing";
-import { HOSTED_PLAN_SIZE, HOSTED_SERVER_SIZES } from "@openbot/contracts/hosted-servers";
+import { HOSTED_BOAT_PLAN_SIZE, HOSTED_SERVER_SIZES } from "@openbot/contracts/hosted-servers";
 import { Button, Dialog, Progress } from "@openbot/ui";
 import { For, Show } from "solid-js";
 import { useText } from "../../text";
@@ -50,7 +50,8 @@ export function ServerUpgradeDialog(props: ServerUpgradeDialogProps) {
   const usedBytes = () => Math.max(0, props.totalBytes - props.freeBytes);
   // Round down so that a nearly full disk does not show 100% while space is left.
   const percent = () => (props.totalBytes > 0 ? Math.floor((usedBytes() / props.totalBytes) * 100) : 0);
-  const memoryGb = (plan: BillingPlanId) => HOSTED_SERVER_SIZES[HOSTED_PLAN_SIZE[plan]].memoryGb;
+  // The boat machine of the plan. A new Starter on boat is `default`, so Starter to Standard shows no memory gain.
+  const memoryGb = (plan: BillingPlanId) => HOSTED_SERVER_SIZES[HOSTED_BOAT_PLAN_SIZE[plan]].memoryGb;
   const price = (amount: number) =>
     t(props.interval === "month" ? "billing.server.price.month" : "billing.server.price.year", {
       amount: formatMinorMoney(format, amount, props.currency),

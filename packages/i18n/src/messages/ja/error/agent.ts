@@ -96,6 +96,8 @@ export const messages = {
     "{provider} が失敗した手順を何度も繰り返したため、OpenBot はこのターンを停止しました。メッセージをもう一度送信するか、別のモデルを選択してください。",
   "error.agent.compactionConnectionLost":
     "エージェントがコンテキストを圧縮している間に接続が切れたため、タスクが停止しました。インターネット接続を確認してから、メッセージを送って続けてください。",
+  "error.agent.compactionLoopStopped":
+    "{provider} がコンテキストを何度も圧縮しましたが、毎回いっぱいのままで続行できなかったため、OpenBot はこのターンを停止しました。このエージェントに不要な MCP サーバーやコンピューター操作をオフにしてから、メッセージを送信してください。{provider} が圧縮するタイミングをあなたかエージェントが変更した場合は、その変更を元に戻してください。",
   "error.agent.selectedGone": "選択したエージェントはもう存在しません。",
   "error.agent.profileEndpointsChanged": "生成中にカスタムエンドポイントが変更されました。もう一度お試しください。",
   "error.agent.profileInvalid": "プロバイダーが無効なプロフィールを返しました。指示を修正してみてください。",

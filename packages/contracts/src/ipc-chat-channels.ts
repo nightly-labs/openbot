@@ -315,10 +315,22 @@ export function normalizeChannelDraft(value: unknown): DynamicRecord | undefined
  * with such an icon is still refused.
  */
 function normalizeSavedChannel(value: unknown): DynamicRecord | undefined {
-  const channel = readableBrowser(normalizeChannelDraft(value));
+  const channel = readableLead(readableBrowser(normalizeChannelDraft(value)));
   if (!channel || channel.icon === undefined || channel.icon === null || isChannelIcon(channel.icon)) return channel;
   const { icon: _unreadable, ...rest } = channel;
   return rest;
+}
+
+/**
+ * A lead that is not a member reads as the first member, as `removeDeletedMembers` moves it, or as no
+ * lead when no member is left. Such a row made the channel unreadable, and startup reads every
+ * channel, so no provider started (#9141). A command with such a lead is still refused.
+ */
+function readableLead(channel: DynamicRecord | undefined): DynamicRecord | undefined {
+  if (!channel || !isIdentifier(channel.leadAgentId) || !Array.isArray(channel.members)) return channel;
+  const members = channel.members.filter(isChannelMember);
+  if (members.some((member) => member.agentId === channel.leadAgentId)) return channel;
+  return { ...channel, leadAgentId: members[0]?.agentId ?? null };
 }
 
 /**

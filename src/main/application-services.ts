@@ -231,7 +231,12 @@ import {
 } from "./computer-use-target-window";
 import { isSupportedCuaDriverTarget, resolveCuaDriver } from "./cua-driver-artifact";
 import { CuaDriverDaemonClient } from "./cua-driver-daemon-client";
-import { CuaDriverRuntime, cuaDriverCommandAlias, resolveCuaDriverEndpoint } from "./cua-driver-runtime";
+import {
+  CuaDriverRuntime,
+  cuaDriverCommandAlias,
+  cuaDriverDrivesWayland,
+  resolveCuaDriverEndpoint,
+} from "./cua-driver-runtime";
 import { type CustomAgentChanges, createCustomAgentChanges } from "./custom-agent-changes";
 import { CUSTOM_AGENTS_FILE, CustomAgentStore } from "./custom-agent-store";
 import { type CustomProviderChanges, createCustomProviderChanges } from "./custom-provider-changes";
@@ -394,6 +399,7 @@ import { SERVER_AUDIT_FILE, ServerAuditStore, serverAuditNames } from "./server-
 import { AGENT_PROCESS_VARIABLE, agentProcessEnvironment, ServerMemory } from "./server-memory";
 import { ServerMode, type ServerModeEnvironment } from "./server-mode";
 import { ServerPersonalityPreferenceStore } from "./server-personality-preference-store";
+import { ServerSetupPage } from "./server-setup-page";
 import { ServerTimezonePreferenceStore } from "./server-timezone-preference-store";
 import {
   configureApplicationProtocol,
@@ -1446,6 +1452,8 @@ export async function createApplicationServices({
   });
   // The agent service starts after the browser: a proxy failure before it has no open list to update.
   let browserProxyStatusChanged = () => {};
+  // The profile service needs the agent service, so agents read it after it exists.
+  let agentBrowserProfiles: BrowserProfileService | null = null;
   const browser = new BrowserHost(mainWindow, store.downloadsRoot, join(app.getPath("userData"), BROWSER_STATE_FILE), {
     memoryLow: () => (hostMemory?.level() ?? "ok") !== "ok",
     browserProfile: (agentId) => {
@@ -2134,7 +2142,8 @@ export async function createApplicationServices({
   // Outside every workspace. Each saved key is masked in the logs before the first agent starts. A key
   // file of one agent from a build before agent scope moves into the Vault here. The Vault's keys are
   // written only when an agent lists its keys; a file left from the last run that the agent can no
-  // longer use is removed here.
+  // longer use is removed here, and a key for every agent comes back to the shared path of earlier
+  // versions (#8983).
   const agentApiKeys = new AgentApiKeys(join(app.getPath("userData"), "agent-api-keys"), vault.items);
   await Effect.runPromise(agentApiKeys.registerSaved());
   await Effect.runPromise(agentApiKeys.syncVault().pipe(Effect.ignore));
@@ -2232,6 +2241,8 @@ export async function createApplicationServices({
     hostTurnLimits,
     hostedStorageGb: () => hostedStorageGb,
     agentCursorDrawn: drawsComputerUseHighlight,
+    // An agent display of its own is X11, where the driver records video.
+    computerUseOnWayland: drawsComputerUseHighlight && cuaDriverDrivesWayland(process.platform),
     requestTimeoutMs: 30_000,
     offProviders: providerUse.off(),
     providerAccounts,
@@ -2329,6 +2340,7 @@ export async function createApplicationServices({
     linkWallet: linkAccount,
     agentApiKeys,
     localSkillTools: () => localSkillTools(skills),
+    browserProfiles: () => agentBrowserProfiles,
     // The local read: `listInstalled` asks the marketplace for each skill's latest version.
     reviewSkills: (agentId) => skills.listInstalledForChatTags(agentId),
     routineFlowTools: () => routineFlowRuntime,
@@ -3015,6 +3027,7 @@ export async function createApplicationServices({
     onChanged: () => service.notifyBrowserProfilesChanged(),
   });
   browserProxyStatusChanged = () => service.notifyBrowserProfilesChanged();
+  agentBrowserProfiles = browserProfiles;
   // A computer that comes online or goes offline changes the proxy list.
   browserEgress.on("changed", () => service.notifyBrowserProfilesChanged());
   const customProviderChanges = createCustomProviderChanges({ service, customProviders, providerRuntimes });
@@ -4490,8 +4503,30 @@ export async function createApplicationServices({
       onError: (message, error) => logger.warn(message, toLogValue(error)),
     });
     serverStartRetry.start();
+    // The setup page of a container (docs/umbrel.md). Only a container starts it: on a computer, its
+    // port would be reachable from the network of that computer.
+    const setupPagePort = serverModeEnvironment?.setupPagePort ?? null;
+    let setupPage: ServerSetupPage | null = null;
+    if (setupPagePort !== null && installationMode !== "container") {
+      logger.warn("OPENBOT_SETUP_PAGE_PORT works only in the OpenBot container. The setup page did not start.");
+    } else if (setupPagePort !== null) {
+      const page = new ServerSetupPage({
+        port: setupPagePort,
+        address: "0.0.0.0",
+        rendererRoot: resolve(__dirname, "../renderer"),
+        request: serverMode.setupRequest,
+        onError: (message, error) => logger.warn(message, toLogValue(error)),
+      });
+      await runCauseEffect(page.listen()).then(
+        () => {
+          setupPage = page;
+        },
+        (error) => logger.error("The server setup page did not start:", toLogValue(error)),
+      );
+    }
     teardown.push(TEARDOWN_ORDER.serverMode, "the server control socket", async () => {
       await Effect.runPromise(serverStartRetry.stop());
+      if (setupPage) await Effect.runPromise(setupPage.close());
       await Effect.runPromise(serverMode.close());
     });
   }
