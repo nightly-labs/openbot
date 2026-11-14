@@ -9,8 +9,20 @@ const GLOB = /[*?[]/u;
 const REMOTE_COMMAND = /(?:^|[\s;&|('"])(?:ssh|docker|podman|kubectl)\s/u;
 /** The characters that a backslash escapes in a double-quoted shell word. */
 const DOUBLE_QUOTE_ESCAPES = new Set(["$", "`", '"', "\\", "\n"]);
-/** A shell command that works in a folder or lists one. Its folder operands are the folders that it names. */
-const FOLDER_COMMANDS = new Set(["cd", "pushd", "ls", "dir", "find", "tree", "Set-Location", "Get-ChildItem"]);
+/** A shell command that works in a folder, lists one or searches one. Its absolute operands name the folders. */
+const FOLDER_COMMANDS = new Set([
+  "cd",
+  "pushd",
+  "ls",
+  "dir",
+  "find",
+  "fd",
+  "tree",
+  "grep",
+  "rg",
+  "Set-Location",
+  "Get-ChildItem",
+]);
 /** A thread keeps this many files and this many folders. A folder costs a lookup on each link that misses. */
 const FILE_LIMIT = 200;
 const FOLDER_LIMIT = 50;

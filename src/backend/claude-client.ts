@@ -3558,6 +3558,8 @@ function claudeStepTarget(name: string, input: unknown): Record<string, string> 
 function completedToolInput(input: unknown): Record<string, string> {
   const kept: Record<string, string> = {};
   if (!isRecord(input)) return kept;
-  for (const key of ["skill", "command", "file_path"]) if (typeof input[key] === "string") kept[key] = input[key];
+  // `path` is the folder of a Glob or Grep search, for the thread's work folders.
+  for (const key of ["skill", "command", "file_path", "path"])
+    if (typeof input[key] === "string") kept[key] = input[key];
   return kept;
 }
