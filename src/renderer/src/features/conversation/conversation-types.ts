@@ -10,6 +10,7 @@ import type {
   AgentTask,
   AgentWait,
   AttachmentSummary,
+  AvatarColor,
   AvatarImageInput,
   BrowserControlState,
   BrowserTab,
@@ -279,6 +280,11 @@ export interface ConversationProps {
   responseStyle?: ResponseStyle | undefined;
   presence: TeamPresenceSnapshot;
   currentUserEmail: string;
+  /**
+   * The chat color on the reader's account, or null for none. Undefined when the account service is
+   * from before chat colors; then the reader's member on the server gives it.
+   */
+  currentUserChatColor?: AvatarColor | null | undefined;
   /**
    * Is the stamped sender of a message the reader? Only another person's message draws a face and a
    * name; a message with no sender is the reader's own, as every message was before senders.

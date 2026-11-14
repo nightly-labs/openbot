@@ -429,8 +429,15 @@ export function ConversationTimeline() {
       chatColor: member?.chatColor,
     };
   };
-  /** The reader's own chat color: the member of the server that is the reader. */
-  const ownChatColor = () => props.presence.members.find((member) => props.isOwnSender(member.id))?.chatColor;
+  /**
+   * The reader's own chat color. The account gives it, so it shows also on a computer with no server
+   * and no member list. An account service from before chat colors sends none; then the member of the
+   * server that is the reader gives it.
+   */
+  const ownChatColor = () =>
+    props.currentUserChatColor === undefined
+      ? props.presence.members.find((member) => props.isOwnSender(member.id))?.chatColor
+      : (props.currentUserChatColor ?? undefined);
   /** The agent messages of the chat by their exchange id, so a marker finds its text and its request. */
   const agentMessagesByExchangeId = createMemo(
     () =>
