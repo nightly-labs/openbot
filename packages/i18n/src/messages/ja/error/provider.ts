@@ -291,6 +291,8 @@ export const messages = {
   "error.provider.cursorNotStarted": "Cursor エージェントは見つかりましたが、バージョンを読み取れません。",
   "error.provider.cursorVersionUnreadable": "Cursor エージェントのバージョンを読み取れません。",
   "error.provider.cursorSignIn": "Cursor を使うには Cursor でサインインするか、CURSOR_API_KEY を設定してください。",
+  "error.provider.cursorSignInUnusable":
+    "Cursor がサインイン情報でサーバーに接続できませんでした。インターネット接続を確認してから、もう一度 Cursor にサインインしてください。",
   "error.provider.clineArchivePath": "Cline のアーカイブに予期しないパスがあります。",
   "error.provider.clinePackageMismatch": "Cline のパッケージがランタイムカタログと一致しません。",
   "error.provider.clineChecksum": "Cline ランタイムのチェックサムが一致しません。",

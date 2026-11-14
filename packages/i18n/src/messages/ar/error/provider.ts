@@ -262,6 +262,8 @@ export const messages = {
   "error.provider.cursorNotStarted": "عُثر على وكيل Cursor، لكن تتعذّر قراءة إصداره.",
   "error.provider.cursorVersionUnreadable": "تتعذّر قراءة إصدار وكيل Cursor.",
   "error.provider.cursorSignIn": "سجّل الدخول باستخدام Cursor أو عيّن CURSOR_API_KEY لاستخدام Cursor.",
+  "error.provider.cursorSignInUnusable":
+    "تعذّر على Cursor الاتصال بخادمه باستخدام تسجيل دخولك. تحقّق من اتصالك بالإنترنت، ثم سجّل الدخول إلى Cursor مرة أخرى.",
   "error.provider.clineArchivePath": "يحتوي أرشيف Cline على مسار غير متوقع.",
   "error.provider.clinePackageMismatch": "لا تطابق حزمة Cline كتالوج بيئات التشغيل.",
   "error.provider.clineChecksum": "عدم تطابق المجموع الاختباري لبيئة تشغيل Cline.",

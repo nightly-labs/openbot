@@ -1458,7 +1458,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           (this.options.authenticate?.(connection, initialization) ?? Effect.void).pipe(startTimeout),
         ),
       );
-      this.#models = providerResult(yield* Effect.result(this.#discoverModels(timeoutMs)));
+      let discovered = yield* Effect.result(this.#discoverModels(timeoutMs));
+      // Cursor can fail to reach its server for a moment, and a second session then opens.
+      if (Result.isFailure(discovered) && this.#signInUnusable(discovered.failure.cause))
+        discovered = yield* Effect.result(this.#discoverModels(timeoutMs));
+      this.#models = providerResult(discovered);
       if (this.#models.length === 0 && this.options.noModelsWhenSignedOut) {
         this.#signedIn = false;
         return;
@@ -1487,9 +1491,23 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         this.#signedIn = false;
         return;
       }
+      // Not a broken CLI: the user can sign in again, and the row offers that. The log keeps the cause.
+      const unusable = this.#signInUnusable(error);
+      if (unusable) {
+        logger.warn("An ACP agent could not use its sign-in.", {
+          provider: this.provider,
+          message: this.#redact(failureText(error)),
+        });
+        return yield* providerFailure(new ProviderSignInError({ message: unusable }));
+      }
       return yield* providerFailure(this.#withFailureDetail(error));
     }
   });
+
+  /** The text for a session that the agent's server refused with its sign-in (`AcpFlavor.signInUnusable`). */
+  #signInUnusable(error: unknown): string | null {
+    return error instanceof RequestError ? (this.#flavor.signInUnusable?.(error) ?? null) : null;
+  }
 
   #startTimeout(timeoutMs: number) {
     return Effect.timeoutOrElse({

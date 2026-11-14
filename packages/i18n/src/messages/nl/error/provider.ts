@@ -284,6 +284,8 @@ export const messages = {
   "error.provider.cursorNotStarted": "De Cursor-agent is gevonden, maar de versie kan niet worden gelezen.",
   "error.provider.cursorVersionUnreadable": "Kan de versie van de Cursor-agent niet lezen.",
   "error.provider.cursorSignIn": "Log in met Cursor of stel CURSOR_API_KEY in om Cursor te gebruiken.",
+  "error.provider.cursorSignInUnusable":
+    "Cursor kon met je aanmelding geen verbinding maken met zijn server. Controleer je internetverbinding en log daarna opnieuw in bij Cursor.",
   "error.provider.clineArchivePath": "Het Cline-archief heeft een onverwacht pad.",
   "error.provider.clinePackageMismatch": "Het Cline-pakket komt niet overeen met de runtimecatalogus.",
   "error.provider.clineChecksum": "Checksum van de Cline-runtime komt niet overeen.",

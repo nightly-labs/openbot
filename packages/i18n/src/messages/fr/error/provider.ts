@@ -300,6 +300,8 @@ export const messages = {
   "error.provider.cursorNotStarted": "L’agent Cursor a été trouvé, mais sa version est illisible.",
   "error.provider.cursorVersionUnreadable": "Impossible de lire la version de l’agent Cursor.",
   "error.provider.cursorSignIn": "Connectez-vous avec Cursor ou définissez CURSOR_API_KEY pour utiliser Cursor.",
+  "error.provider.cursorSignInUnusable":
+    "Cursor n’a pas pu se connecter à son serveur avec votre connexion. Vérifiez votre connexion Internet, puis reconnectez-vous à Cursor.",
   "error.provider.clineArchivePath": "L’archive Cline contient un chemin inattendu.",
   "error.provider.clinePackageMismatch":
     "Le paquet Cline ne correspond pas au catalogue des environnements d’exécution.",

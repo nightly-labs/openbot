@@ -286,6 +286,8 @@ export const messages = {
   "error.provider.cursorNotStarted": "Cursor ajanı bulundu ancak sürümü okunamıyor.",
   "error.provider.cursorVersionUnreadable": "Cursor ajan sürümü okunamıyor.",
   "error.provider.cursorSignIn": "Cursor'ı kullanmak için Cursor ile oturum açın veya CURSOR_API_KEY ayarlayın.",
+  "error.provider.cursorSignInUnusable":
+    "Cursor, oturum bilgilerinizle sunucusuna bağlanamadı. İnternet bağlantınızı kontrol edin, ardından Cursor'da yeniden oturum açın.",
   "error.provider.clineArchivePath": "Cline arşivi beklenmeyen bir yola sahip.",
   "error.provider.clinePackageMismatch": "Cline paketi çalışma zamanı kataloğuyla eşleşmiyor.",
   "error.provider.clineChecksum": "Cline çalışma zamanı sağlama toplamı (checksum) eşleşmiyor.",

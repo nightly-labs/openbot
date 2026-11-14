@@ -274,6 +274,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.cursorNotStarted": "The Cursor agent was found, but its version cannot be read.",
   "error.provider.cursorVersionUnreadable": "Unable to read the Cursor agent version.",
   "error.provider.cursorSignIn": "Sign in with Cursor or set CURSOR_API_KEY to use Cursor.",
+  "error.provider.cursorSignInUnusable":
+    "Cursor could not connect to its server with your sign-in. Check your internet connection, then sign in to Cursor again.",
   "error.provider.clineArchivePath": "The Cline archive has an unexpected path.",
   "error.provider.clinePackageMismatch": "The Cline package does not match the runtime catalog.",
   "error.provider.clineChecksum": "Cline runtime checksum mismatch.",
