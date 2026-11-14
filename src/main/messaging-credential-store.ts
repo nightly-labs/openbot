@@ -71,13 +71,16 @@ export class MessagingCredentialStore implements MessagingCredentials {
       this.#values = new Map();
       this.#loadError = null;
       this.#undecrypted = null;
-      const result = yield* Effect.result(this.#read());
+      const envelope = yield* Effect.result(this.#readEnvelope());
+      const result = Result.isFailure(envelope)
+        ? Result.fail(envelope.failure)
+        : yield* Effect.result(this.#decrypt(envelope.success));
       if (Result.isSuccess(result)) this.#values = result.success;
       else {
         const error = result.failure.cause;
         this.#loadError =
           error instanceof Error ? error : new Error(sourceText("error.provider.credentialFileUnreadable"));
-        const envelope = yield* Effect.result(this.#readEnvelope());
+        // A valid envelope whose values this computer cannot decrypt.
         if (Result.isSuccess(envelope) && envelope.success)
           this.#undecrypted = new Map(Object.entries(envelope.success.connections));
       }
@@ -175,8 +178,10 @@ export class MessagingCredentialStore implements MessagingCredentials {
     });
   });
 
-  #read = Effect.fn("MessagingCredentialStore.read")(function* (this: MessagingCredentialStore) {
-    const envelope = yield* this.#readEnvelope();
+  #decrypt = Effect.fn("MessagingCredentialStore.decrypt")(function* (
+    this: MessagingCredentialStore,
+    envelope: z.infer<typeof envelopeSchema> | null,
+  ) {
     if (envelope === null) return new Map<string, Record<string, string>>();
     return yield* messagingSync(() => {
       const values = new Map<string, Record<string, string>>();
