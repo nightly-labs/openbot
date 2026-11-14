@@ -67,6 +67,7 @@ const OWNER_LID = "777001";
 const FRIEND = "48600100300";
 const STRANGER = "48600100400";
 const LID_FRIEND = "48600100500";
+const LID_FRIEND_CHAT = "999123@lid";
 /** A Brazilian mobile number as people type it, and the older form that its WhatsApp account keeps. */
 const BRAZIL_TYPED = "5531988887777";
 const BRAZIL_ACCOUNT = "553188887777";
@@ -149,6 +150,8 @@ class FakeSocket implements WhatsAppSocket {
     lidMapping: {
       getPNForLID: async (lid: string) =>
         lid.startsWith("999") ? `${LID_FRIEND}@s.whatsapp.net` : lid.startsWith(OWNER_LID) ? OWNER_JID : null,
+      // WhatsApp moved this contact to a LID; the other contacts keep their phone number.
+      getLIDForPN: async (pn: string) => (pn === `${LID_FRIEND}@s.whatsapp.net` ? LID_FRIEND_CHAT : null),
     },
   };
 
@@ -816,6 +819,40 @@ try {
       phone.current().receive([lidOnly]);
       await until(() => received(agents, `${LID_FRIEND}@s.whatsapp.net`, lidOnly.key.id ?? ""), "the LID-only message");
       return { chat: `${LID_FRIEND}@s.whatsapp.net` };
+    });
+
+    await step("LID contacts: posts, edits and reactions to a contact with a LID go to the LID chat", async () => {
+      const values = credentials.get(connectionId(agents));
+      assert.ok(values);
+      const adapter = whatsAppDriver({ runtime }).createAdapter(values, { rateLimited: () => {} });
+      await runCauseEffect(adapter.identify());
+      const target = { platformChannelId: `${LID_FRIEND}@s.whatsapp.net`, replyThreadId: null };
+      const sentFrom = phone.sent.length;
+      const status = await runCauseEffect(adapter.post(target, { text: "Working on it" }));
+      await runCauseEffect(adapter.postAnswer(target, "Done", status));
+      await runCauseEffect(adapter.react(target, "IN-LID-REACT", "done", true));
+      // The orchestrator can also answer the earlier messages of this contact: each send must go to the LID.
+      const sent = phone.sent
+        .slice(sentFrom)
+        .filter((entry) => entry.jid === LID_FRIEND_CHAT || entry.jid === `${LID_FRIEND}@s.whatsapp.net`);
+      assert.ok(
+        sent.every((entry) => entry.jid === LID_FRIEND_CHAT),
+        "A post to a contact with a LID went to the phone number, where WhatsApp may not deliver it.",
+      );
+      assert.ok(phone.textsTo(LID_FRIEND_CHAT).includes("Working on it"), "The status post did not go out.");
+      const edit = sent.find((entry) => "edit" in entry.content && entry.content.edit?.id === status)?.content;
+      assert.ok(
+        edit && "edit" in edit && edit.edit?.remoteJid === LID_FRIEND_CHAT,
+        "The answer did not edit the status post in the LID chat.",
+      );
+      const reaction = sent.find(
+        (entry) => "react" in entry.content && entry.content.react.key?.id === "IN-LID-REACT",
+      )?.content;
+      assert.ok(
+        reaction && "react" in reaction && reaction.react.key?.remoteJid === LID_FRIEND_CHAT,
+        "The reaction names another chat.",
+      );
+      return { chat: LID_FRIEND_CHAT, posts: sent.length };
     });
 
     await step(
