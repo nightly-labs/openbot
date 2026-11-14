@@ -955,12 +955,15 @@ export class AttentionRegistry {
   }, Effect.uninterruptible).bind(this);
 
   /**
-   * Whether this agent is waiting on a takeover. Its browser tools are refused while one is outstanding:
-   * the user has the tab, every reference the agent holds is already stale, and a tool call landing
-   * mid-login would act on a page the user is in the middle of.
+   * Whether a pending takeover refuses this browser call: the call targets the tab that the user has,
+   * or it comes from the chat that waits on the card. Every reference to that tab is already stale,
+   * and a call landing mid-login would act on a page the user is in the middle of. The agent's other
+   * chats keep their own tabs and the Vault, so one unanswered card does not stop them (#8012).
    */
-  hasBrowserTakeoverForAgent(agentId: string): boolean {
-    return [...this.#takeovers.values()].some((pending) => pending.request.agentId === agentId);
+  browserTakeoverBlocks(agentId: string, threadId: string, tabId: string | undefined): boolean {
+    return [...this.#takeovers.values()].some(
+      ({ request }) => request.agentId === agentId && (request.tabId === tabId || request.threadId === threadId),
+    );
   }
 
   readonly respondToBrowserTakeover = Effect.fn("AttentionRegistry.respondToBrowserTakeover")(
