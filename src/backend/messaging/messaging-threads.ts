@@ -790,13 +790,15 @@ export class MessagingThreads {
     const prompt = yield* this.#promptContext(link, origin);
     if (prompt.cursor) this.store.touch(link.linkId, prompt.cursor);
     const memories = this.memories.list(link.connectionId);
+    // The author is the OpenBot user when their own account wrote it, whatever the chat: WhatsApp
+    // reports the linked number as the author in every chat the owner writes in, groups included.
+    const fromOwner = connection?.platform === "whatsapp" && origin.authorId === connection.workspaceId;
     const input = {
       platform: connection?.platform ?? "slack",
       workspaceName: prompt.workspaceName ?? connection?.workspaceName ?? null,
       isDirect: link.isDirect,
-      // Only the "Message yourself" chat has the linked number as the author of a direct message:
-      // the owner's messages in other chats never reach OpenBot (`whatsapp-senders.ts`).
-      fromOwner: connection?.platform === "whatsapp" && link.isDirect && origin.authorId === connection.workspaceId,
+      fromOwner,
+      isPrivate: fromOwner && link.isDirect,
       place: prompt.place,
       authorName: origin.authorName,
       authorId: origin.authorId,
