@@ -3823,9 +3823,11 @@ const hitActivatesTarget = Effect.fn("Browser.hitActivatesTarget")(function* (
         objectId: objectIds[0],
         // A pseudo-element hit, such as a styled label's ::after, belongs to its element. A click
         // on a label activates the control it names, as with a custom radio over a hidden input.
+        // Content in a slot shows, and gets the click, inside the slot's element: an icon that a
+        // web component puts into its shadow button belongs to that button.
         functionDeclaration: `function(candidate) {
           const start = candidate instanceof CSSPseudoElement ? candidate.element : candidate;
-          for (let node = start; node; node = node.parentNode || node.host) {
+          for (let node = start; node; node = node.assignedSlot || node.parentNode || node.host) {
             if (node === this) return true;
             if (node.localName === 'label' && node.control === this) return true;
           }
