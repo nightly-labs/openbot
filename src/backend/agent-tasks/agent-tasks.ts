@@ -718,6 +718,7 @@ export class AgentTasks implements TaskLanes {
       closedAt: task.closedAt,
       branch: this.#publicBranch(task),
       routineId: task.routineId,
+      routineRunning: running && task.routineId !== null && this.#mailbox.taskRoutineRunning(task.agentId, task.taskId),
     };
   }
 

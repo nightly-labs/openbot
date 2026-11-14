@@ -30,6 +30,12 @@ export interface SidebarAgentStatesInput {
    * where the host does not report it, as on a remote server.
    */
   usageLimits?: Record<string, number | null>;
+  /**
+   * How many of each agent's routine threads run a routine run now. The queue does not list the work
+   * of a side thread, so a routine that runs in its own thread is found here. Absent where the host
+   * does not report it, as on a joined server: its frozen task routes do not carry it.
+   */
+  runningRoutineThreads?: Record<string, number>;
 }
 
 /**
@@ -115,10 +121,11 @@ export function sidebarAgentWaits(
 
 function routineBadge(agentId: string, input: SidebarAgentStatesInput): SidebarAgentState | undefined {
   const deliveries = (input.queues[agentId]?.deliveries ?? []).filter((delivery) => delivery.sender.kind === "routine");
-  if (deliveries.length === 0) return undefined;
+  const runningThreads = input.runningRoutineThreads?.[agentId] ?? 0;
+  if (deliveries.length === 0 && runningThreads === 0) return undefined;
 
   const running = deliveries.filter((delivery) => delivery.status === "starting" || delivery.status === "running");
-  if (running.length > 0) return routineState("running", running.length);
+  if (running.length + runningThreads > 0) return routineState("running", running.length + runningThreads);
 
   const failedTurnId = input.failedTurns[agentId];
   const failed = deliveries.filter((delivery) => delivery.status === "failed" && delivery.turnId === failedTurnId);

@@ -8,7 +8,7 @@ import {
   isConversationSnapshot,
 } from "./ipc-conversations";
 import { isQueueDelivery, type QueueDelivery } from "./ipc-queue";
-import { isDynamicRecord, isOneOf } from "./runtime-values";
+import { isBoolean, isDynamicRecord, isOneOf } from "./runtime-values";
 
 /**
  * The most tasks of one agent that run a turn at the same time by the agent's own limit, next to its
@@ -123,6 +123,12 @@ export interface AgentTask {
    * never sent on the frozen `agent-tasks-v1` routes.
    */
   routineId?: string | null;
+  /**
+   * True while the running work of the thread is a run of its routine, not a reply to a message that
+   * someone sent there. Absent from an older server, and never sent on the frozen `agent-tasks-v1`
+   * routes.
+   */
+  routineRunning?: boolean;
 }
 
 /** Where a branch was copied from. */
@@ -276,7 +282,8 @@ export function isAgentTask(value: unknown): value is AgentTask {
     isBoundedString(value.updatedAt, 160) &&
     (value.closedAt === null || isBoundedString(value.closedAt, 160)) &&
     (value.branch === undefined || value.branch === null || isAgentTaskBranch(value.branch)) &&
-    (value.routineId === undefined || value.routineId === null || isIdentifier(value.routineId))
+    (value.routineId === undefined || value.routineId === null || isIdentifier(value.routineId)) &&
+    (value.routineRunning === undefined || isBoolean(value.routineRunning))
   );
 }
 
