@@ -28,6 +28,7 @@ export type UserErrorKind =
   | "read-only"
   | "conflict"
   | "service"
+  | "interrupted"
   | "unknown";
 
 /** The catalog key for each kind's sentence. The text lives in `@openbot/i18n` (`error.kind.*`). */
@@ -43,6 +44,7 @@ const USER_ERROR_COPY = {
   permission: "error.kind.permission",
   "rate-limit": "error.kind.rateLimit",
   service: "error.kind.service",
+  interrupted: "error.kind.interrupted",
 } as const satisfies Record<Exclude<UserErrorKind, "unknown">, keyof SourceMessages>;
 
 const NETWORK_CODES = [
@@ -80,6 +82,15 @@ const AUTH_SIGNALS =
  */
 const RATE_LIMIT_SIGNALS = /\b429\s+too many requests\b|\blast status:\s*429\b|"status"\s*:\s*429\b/iu;
 
+/**
+ * Codex ends a turn with this text when the provider's stream closed before its last event, after
+ * its own retries (`codex-rs/protocol/src/error.rs`). The answer on screen can then be cut off, and
+ * the banner showed the protocol words as they were (#9128). Codex starts a content filter stop
+ * with the same words, and that stop is not a closed connection.
+ */
+const INTERRUPTED_ANSWER = /\bstream disconnected before completion\b/iu;
+const CONTENT_FILTER_STOP = /\bcontent_filter\b/u;
+
 /** Runtime output, stack traces, paths and serialized objects: never shown, whatever the kind. */
 const TECHNICAL_OUTPUT =
   /(?:\bSQLITE_\w+|\bERR_\w+|^E[A-Z_]+:|^Command failed|^spawn |\n\s*at |\[object Object\]|^\s*[<{[]|\/(?:Users|home|tmp|private|var|etc|usr)\/|[A-Za-z]:\\)/u;
@@ -92,6 +103,7 @@ export function classifyUserError(error: unknown): UserErrorKind {
   const message = normalizeMessage(error);
   const code = errnoCode(message);
 
+  if (INTERRUPTED_ANSWER.test(message) && !CONTENT_FILTER_STOP.test(message)) return "interrupted";
   if (NETWORK_MESSAGE.test(message) || NETWORK_CODES.includes(code ?? "")) return "network";
   if (
     code === "ETIMEDOUT" ||

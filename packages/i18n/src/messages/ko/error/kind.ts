@@ -14,4 +14,6 @@ export const messages = {
   "error.kind.permission": "이 작업을 할 권한이 없어요. 소유자에게 접근 권한을 요청하세요.",
   "error.kind.rateLimit": "요청이 너무 많아요. 잠시 후 다시 시도해 주세요.",
   "error.kind.service": "서비스를 사용할 수 없어요. 잠시 후 다시 시도해 주세요.",
+  "error.kind.interrupted":
+    "답변이 끝나기 전에 연결이 끊겼어요. 답변 일부가 빠졌을 수 있어요. 메시지를 다시 보내 주세요.",
 } as const satisfies PartialTranslation<typeof source>;

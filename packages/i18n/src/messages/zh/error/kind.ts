@@ -14,4 +14,5 @@ export const messages = {
   "error.kind.permission": "你没有权限完成该操作，请向所有者申请访问权限。",
   "error.kind.rateLimit": "请求过于频繁，请稍等片刻后重试。",
   "error.kind.service": "服务暂时不可用，请稍等片刻后重试。",
+  "error.kind.interrupted": "回答完成前连接已断开，部分回答可能缺失。请重新发送消息。",
 } as const satisfies PartialTranslation<typeof source>;

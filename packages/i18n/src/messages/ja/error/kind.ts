@@ -18,4 +18,6 @@ export const messages = {
   "error.kind.permission": "この操作を行う権限がありません。所有者にアクセスを依頼してください。",
   "error.kind.rateLimit": "リクエストが多すぎます。しばらく待ってから、もう一度お試しください。",
   "error.kind.service": "サービスを利用できません。しばらく待ってから、もう一度お試しください。",
+  "error.kind.interrupted":
+    "回答が完了する前に接続が切れました。回答の一部が欠けている可能性があります。メッセージをもう一度送信してください。",
 } as const satisfies PartialTranslation<typeof source>;
