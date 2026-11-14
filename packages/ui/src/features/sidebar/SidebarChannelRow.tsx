@@ -15,6 +15,7 @@ import { useText } from "../../text";
 import { ChannelAvatar } from "../channels/ChannelAvatar";
 import { SidebarAgentIndicator, SidebarWaitChip, SidebarWaitTooltip } from "./SidebarAgentIndicator";
 import { SidebarChannelContextMenu, SidebarDeletedChannelContextMenu } from "./SidebarChannelContextMenu";
+import { SidebarNameTooltip } from "./SidebarNameTooltip";
 import { sidebarUnreadBadge } from "./sidebar-agent-states";
 import { sidebarAgentStateLabel, sidebarMessageTime } from "./sidebar-filtering";
 import { useSidebarScope } from "./sidebar-scope";
@@ -140,9 +141,20 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
       onDragStart={(event: DragEvent & { currentTarget: HTMLElement }) => startChatDragging(event, rowProps.channel.id)}
       onDragEnd={endChatDragging}
     >
-      <Show when={wait()} fallback={row()}>
+      <Show
+        when={wait()}
+        fallback={
+          <SidebarNameTooltip name={rowProps.channel.name} title={title()} preview={preview()} menuOpen={menuOpen()}>
+            {row()}
+          </SidebarNameTooltip>
+        }
+      >
         {(current) => (
-          <SidebarWaitTooltip wait={current()} menuOpen={menuOpen()}>
+          <SidebarWaitTooltip
+            wait={current()}
+            menuOpen={menuOpen()}
+            name={props.compact ? rowProps.channel.name : undefined}
+          >
             {row()}
           </SidebarWaitTooltip>
         )}

@@ -280,9 +280,15 @@ export function SidebarWaitChip(props: { reason: SidebarWaitReason }) {
 
 /**
  * The tooltip of a row in "Needs you": what the chat waits for, the question or the command, and what
- * selecting the row does. It stays closed while the row's context menu is open.
+ * selecting the row does. It stays closed while the row's context menu is open. The compact sidebar
+ * shows only the avatar, so there `name` puts the chat's name first.
  */
-export function SidebarWaitTooltip(props: { wait: SidebarChannelWait; menuOpen: boolean; children: JSX.Element }) {
+export function SidebarWaitTooltip(props: {
+  wait: SidebarChannelWait;
+  menuOpen: boolean;
+  name?: string | undefined;
+  children: JSX.Element;
+}) {
   const { t } = useText();
   const [open, setOpen] = createSignal(false);
   return (
@@ -300,6 +306,13 @@ export function SidebarWaitTooltip(props: { wait: SidebarChannelWait; menuOpen: 
       </Tooltip.Trigger>
       <Tooltip.Portal>
         <Tooltip.Content class="sidebar-wait-tooltip">
+          <Show when={props.name}>
+            {(name) => (
+              <span class="sidebar-name-tooltip-name" dir="auto">
+                {name()}
+              </span>
+            )}
+          </Show>
           <span class="sidebar-wait-tooltip-title">
             <SidebarWaitIcon reason={props.wait.reason} />
             {t(SIDEBAR_WAIT_TITLE[props.wait.reason])}
