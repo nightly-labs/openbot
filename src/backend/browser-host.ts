@@ -407,6 +407,8 @@ const BROWSER_WEB_PREFERENCES = {
   // page that it is hidden. A hidden tab that nobody uses is throttled at the next idle sweep
   // (`#throttleHiddenTabs`), so its videos and animations do not run without end.
   backgroundThrottling: false,
+  // A page in fullscreen fills its tab view only, not the window or the screen.
+  disableHtmlFullscreenWindowResize: true,
 };
 
 /**
