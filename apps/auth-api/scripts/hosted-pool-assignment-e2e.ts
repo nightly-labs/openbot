@@ -364,6 +364,26 @@ async function purchaseStartsOnThePoolOrOnBoat() {
     },
   );
 
+  // A Starter that waits for its payment has no machine yet. Its `small` row size is not a boat disk.
+  insertServer.run(
+    "starter-unpaid",
+    OWNER.id,
+    "Server starter-unpaid",
+    null,
+    null,
+    HOSTED_PLAN_SIZE.starter,
+    "starter",
+    "eur",
+    "awaiting_payment",
+    "key-starter-unpaid",
+    clock.now,
+    clock.now,
+  );
+  const unpaid = (await Effect.runPromise(service.list(OWNER))).servers.find(
+    (server) => server.serverId === "starter-unpaid",
+  );
+  check("a Starter with no machine yet shows the plan storage of 25 GB", unpaid?.storageGb === 25, { unpaid });
+
   // 5. A server with an earlier boat attempt stays on boat: boat can still make the sandbox of that attempt.
   const spare = await machine(1010, "VPS02", "AMS-01");
   await purchase("retry", "standard", "eur", "tpl_old");

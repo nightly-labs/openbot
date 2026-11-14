@@ -33,7 +33,9 @@ server list (Settings on desktop, Billing on the web) to delete a server. Each s
 has its own Stripe plan. Its machine comes from the plan: a pool machine of the plan (Starter VPS 1,
 Standard VPS 2, Pro VPS 3), or when none is free, a boat sandbox (`HOSTED_BOAT_PLAN_SIZE`): Starter and
 Standard are `default`, and Pro is `large`. Starter sandboxes from before 2026-11-14 are `small` and keep
-12 GB of storage. `leaseweb-pool.ts move` puts a Starter sandbox on a VPS 1 and sets the row to
+12 GB of storage until a change of plan or billing interval moves them to the new Starter price and to
+`default`. Before the boat claim the row has no machine (`provider_template` is NULL), so the storage that
+the server list and Billing show is the plan storage, not the disk of `size`. `leaseweb-pool.ts move` puts a Starter sandbox on a VPS 1 and sets the row to
 `HOSTED_PLAN_SIZE`.
 
 ## Parts

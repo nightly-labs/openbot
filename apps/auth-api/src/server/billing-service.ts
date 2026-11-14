@@ -730,7 +730,8 @@ export class BillingService {
               .prepare(
                 `SELECT s.stripe_subscription_id, s.server_id, h.name AS server_name, s.plan, s.interval, s.currency,
                   s.amount, s.status, s.current_period_end, s.cancel_at_period_end,
-                  hs.operator_host IS NOT NULL AS on_operator_host, COALESCE(hs.pending_size, hs.size) AS server_size
+                  hs.operator_host IS NOT NULL AS on_operator_host,
+                  CASE WHEN hs.provider_template IS NULL THEN NULL ELSE COALESCE(hs.pending_size, hs.size) END AS server_size
            FROM billing_subscriptions s
            LEFT JOIN remote_hosts h ON h.host_id = s.server_id AND h.owner_user_id = s.user_id
            LEFT JOIN hosted_servers hs ON hs.server_id = s.server_id AND hs.owner_user_id = s.user_id

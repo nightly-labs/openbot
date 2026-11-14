@@ -51,7 +51,8 @@ export const HOSTED_BOAT_PLAN_SIZE: Readonly<Record<BillingPlanId, HostedServerS
 /**
  * The storage in GB of a hosted server: the plan storage, and in a boat sandbox not more than its disk.
  * A Starter sandbox from before `HOSTED_BOAT_PLAN_SIZE` is `small` and keeps 12 GB. `size` is the machine
- * after a resize that waits (`pending_size`), else the current one, and null when the server has no row.
+ * after a resize that waits (`pending_size`), else the current one, and null when the server has no row
+ * or no boat sandbox yet.
  */
 export function hostedServerStorageGb(
   plan: BillingPlanId,

@@ -3130,7 +3130,11 @@ function summary(row: HostedServerRow): HostedServerSummary {
     error: row.observed_error,
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
-    storageGb: hostedServerStorageGb(row.plan, row.operator_host !== null, row.pending_size ?? row.size),
+    storageGb: hostedServerStorageGb(
+      row.plan,
+      row.operator_host !== null,
+      row.provider_template === null ? null : (row.pending_size ?? row.size),
+    ),
   };
 }
 

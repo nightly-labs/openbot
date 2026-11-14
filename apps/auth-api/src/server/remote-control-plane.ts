@@ -918,7 +918,8 @@ export class RemoteControlPlane {
              AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted_plan,
            (SELECT s.operator_host FROM hosted_servers s WHERE s.server_id = h.host_id
              AND s.desired_state NOT IN ('deleted', 'stopped')) AS operator_host,
-           (SELECT COALESCE(s.pending_size, s.size) FROM hosted_servers s WHERE s.server_id = h.host_id
+           (SELECT CASE WHEN s.provider_template IS NULL THEN NULL ELSE COALESCE(s.pending_size, s.size) END
+             FROM hosted_servers s WHERE s.server_id = h.host_id
              AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted_size
          FROM remote_memberships m
          JOIN remote_hosts h ON h.host_id = m.host_id
