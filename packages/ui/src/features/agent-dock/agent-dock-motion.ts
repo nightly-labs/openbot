@@ -1,10 +1,10 @@
 /**
  * The shape and the motion of the agent dock. The dock, the chat panel, the neck between them and
  * the drop that carries an agent in or out are one liquid under an SVG "goo" filter. These functions
- * give their geometry, in px, and a small spring engine moves them.
+ * give their geometry, in px. The goo filter and the spring engine are in `liquid.tsx`.
  */
 
-import { prefersReducedMotion } from "../../utils";
+import { LIQUID_PAD, type SpringConfig } from "../../liquid";
 
 export const SEAT = 44;
 const SEAT_GAP = 10;
@@ -58,13 +58,7 @@ const HANDLE_RADIUS = 34.3;
 /** The width of the handle stroke, in px. */
 export const HANDLE_STROKE = 4;
 
-/**
- * The open progress at which the blob is clear of the dock. Before it, the blob slides out and swells
- * to the dock's height; after it, the blob grows to the full panel.
- */
-export const SLIDE_END = 0.42;
-/** The liquid layer starts 40px before the stage and runs 60px past the window edge. */
-export const LIQUID_PAD = 40;
+/** The liquid layer starts LIQUID_PAD before the stage and runs 60px past the window edge. */
 export const LIQUID_WIDTH = STAGE_WIDTH + LIQUID_PAD + 60;
 export const LIQUID_HEIGHT = PANEL_HEIGHT + LIQUID_PAD * 2;
 
@@ -114,32 +108,6 @@ export function addCenterY(seats: number): number {
 export function dockBand(height: number, stretch = 0) {
   const top = LIQUID_PAD + (PANEL_HEIGHT - height) / 2;
   return { top: top - Math.max(0, stretch), bottom: top + height + Math.max(0, -stretch) };
-}
-
-/**
- * A smooth curve through `start` at 0, `middle` at SLIDE_END and `end` at 1. It eases out of `start`,
- * keeps one speed through `middle` (no overshoot), and past 1 it continues in a straight line for the
- * spring's overshoot.
- */
-export function stagedCurve(progress: number, start: number, middle: number, end: number) {
-  const first = (middle - start) / SLIDE_END;
-  const second = (end - middle) / (1 - SLIDE_END);
-  const limit = Math.min(Math.abs(first), Math.abs(second)) * 3;
-  const through = Math.sign(end - start) * Math.min(Math.abs(end - start), limit);
-  const hermite = (t: number, from: number, to: number, slopeFrom: number, slopeTo: number, span: number) => {
-    const t2 = t * t;
-    const t3 = t2 * t;
-    return (
-      (2 * t3 - 3 * t2 + 1) * from +
-      (t3 - 2 * t2 + t) * span * slopeFrom +
-      (-2 * t3 + 3 * t2) * to +
-      (t3 - t2) * span * slopeTo
-    );
-  };
-  if (progress <= SLIDE_END) return hermite(progress / SLIDE_END, start, middle, 0, through, SLIDE_END);
-  if (progress <= 1)
-    return hermite((progress - SLIDE_END) / (1 - SLIDE_END), middle, end, through, second, 1 - SLIDE_END);
-  return end + second * (progress - 1);
 }
 
 /** The scale and the placement of the dock-end profile. Liquid-layer coordinates. */
@@ -254,19 +222,8 @@ export function neckPath(centerY: number, size: number) {
   ].join(" ");
 }
 
-/* ---------- A small spring engine ---------- */
+/* ---------- Dock springs ---------- */
 
-export interface SpringConfig {
-  stiffness: number;
-  damping: number;
-}
-
-export const SOFT: SpringConfig = { stiffness: 170, damping: 19 };
-export const SNAPPY: SpringConfig = { stiffness: 320, damping: 24 };
-export const WOBBLY: SpringConfig = { stiffness: 210, damping: 13 };
-/** The panel opens with a small overshoot and closes with none, so it does not snap into the seat. */
-export const PANEL_OPEN: SpringConfig = { stiffness: 190, damping: 19 };
-export const PANEL_CLOSE: SpringConfig = { stiffness: 280, damping: 33 };
 /** The stretch follows the drag speed closely; when the dock stops, it settles with a wobble (WOBBLY). */
 export const STRETCH_FOLLOW: SpringConfig = { stiffness: 300, damping: 30 };
 /** The dock slides out of the edge with a small overshoot, so it seems to flow out of the frame. */
@@ -277,89 +234,3 @@ export const MAX_STRETCH = 14;
 export const STRETCH_PER_SPEED = 9;
 /** The distance that a tucked dock slides into the edge: past the liquid that the filter spreads. */
 export const TUCK_DISTANCE = 96;
-
-export class Spring {
-  velocity = 0;
-  target: number;
-  private onRest: (() => void) | null = null;
-
-  constructor(
-    public value: number,
-    private config: SpringConfig,
-  ) {
-    this.target = value;
-  }
-
-  to(target: number, onRest?: () => void, config?: SpringConfig) {
-    this.target = target;
-    if (config) this.config = config;
-    this.onRest = onRest ?? null;
-    if (prefersReducedMotion()) this.jump(target);
-  }
-
-  jump(value: number) {
-    this.value = value;
-    this.target = value;
-    this.velocity = 0;
-  }
-
-  /** Advances by `dt` seconds. Returns true while the spring still moves. */
-  step(dt: number): boolean {
-    const force = -this.config.stiffness * (this.value - this.target) - this.config.damping * this.velocity;
-    this.velocity += force * dt;
-    this.value += this.velocity * dt;
-    if (Math.abs(this.velocity) < 0.01 && Math.abs(this.value - this.target) < 0.005) {
-      this.value = this.target;
-      this.velocity = 0;
-      const rest = this.onRest;
-      this.onRest = null;
-      rest?.();
-      return false;
-    }
-    return true;
-  }
-}
-
-/**
- * Steps every spring each frame and calls `render`, until all of them rest. `onActivity` is told when
- * the springs start to move and when all of them rest again.
- */
-export function createMotion(render: () => void, onActivity?: (moving: boolean) => void) {
-  const springs = new Set<Spring>();
-  let frame = 0;
-  let last = 0;
-  const tick = (now: number) => {
-    const dt = Math.min(1 / 30, (now - last) / 1000 || 1 / 60);
-    last = now;
-    let moving = false;
-    // Small sub-steps keep stiff springs stable.
-    for (const spring of springs) {
-      let springMoving = false;
-      for (let i = 0; i < 4; i++) springMoving = spring.step(dt / 4) || springMoving;
-      moving = springMoving || moving;
-    }
-    render();
-    frame = moving ? requestAnimationFrame(tick) : 0;
-    if (!moving) onActivity?.(false);
-  };
-  return {
-    spring(value: number, config: SpringConfig) {
-      const spring = new Spring(value, config);
-      springs.add(spring);
-      return spring;
-    },
-    drop(spring: Spring) {
-      springs.delete(spring);
-    },
-    kick() {
-      if (frame) return;
-      last = performance.now();
-      frame = requestAnimationFrame(tick);
-      onActivity?.(true);
-    },
-    stop() {
-      cancelAnimationFrame(frame);
-      frame = 0;
-    },
-  };
-}

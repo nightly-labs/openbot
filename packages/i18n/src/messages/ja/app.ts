@@ -96,6 +96,8 @@ export const messages = {
   "app.socialFollow.redditTitle": "OpenBot の使い方",
   "app.rail.usageRings": "{name} の使用量: {windows}。使用量を開く",
   "app.rail.customAgentUsage": "{name} の使用量。使用量を開く",
+  "app.rail.moreUsage": { other: "ほかのアカウント {count} 件。使用量を開く" },
+  "app.rail.moreUsageCount": "+{count}",
   "app.rail.mediaCredits": "{name}: 残り {credits} クレジット。{name} を開く",
   "app.rail.mediaCreditsQuota": "{name}: チームのクレジット {quota} のうち残り {credits}。{name} を開く",
   "app.rail.mediaCreditsMeta": "クレジット",

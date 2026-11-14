@@ -130,7 +130,6 @@ export const messages = {
   "conversation.voice.phase.thinking": "Denken",
   "conversation.voice.phase.speaking": "Spreken",
   "conversation.voice.phase.offline": "Niet verbonden",
-  "conversation.voice.speakNow": "Spreek nu",
   "conversation.voice.mute": "Microfoon dempen",
   "conversation.voice.interrupt": "Onderbreken",
   "conversation.voice.start": "Spraakgesprek starten",

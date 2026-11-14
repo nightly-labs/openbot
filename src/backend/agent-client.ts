@@ -32,6 +32,12 @@ export interface AgentClient {
    * instructions, and the provider's cached prefix with them.
    */
   readonly turnContext?: boolean;
+  /**
+   * True when the client gives the model the `note` of an `item/tool/requestUserInput` result, such
+   * as the note that the user wrote a new message instead of answering. Optional, because Codex sends
+   * the result on as it is, and its `request_user_input` response has no field for a note.
+   */
+  readonly userInputNote?: boolean;
   readonly running: boolean;
   readonly readHistory?: ReadProviderHistory;
   /**

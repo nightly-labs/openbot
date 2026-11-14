@@ -62,6 +62,11 @@ export const messages = defineMessages("settings", {
   "settings.chatColor.red": "Red",
   "settings.chatColor.green": "Green",
   "settings.chatColor.blue": "Blue",
+  "settings.bubbleStyle.title": "Your bubbles",
+  "settings.bubbleStyle.description": "In a chat with an agent, your bubbles take the agent's color. Only you see it.",
+  "settings.bubbleStyle.solid": "Solid",
+  "settings.bubbleStyle.tint": "Tint",
+  "settings.bubbleStyle.classic": "Classic",
   // The Settings window, General tab.
   "settings.appBehavior.title": "App behavior",
   "settings.conversations.title": "Conversations",

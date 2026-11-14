@@ -176,6 +176,7 @@ import {
 } from "./agent/attention-registry";
 import { backgroundModel, withBackgroundEffort } from "./agent/background-model";
 import { BootRecovery } from "./agent/boot-recovery";
+import type { AgentBrowserProfiles } from "./agent/browser-profile-tool";
 import { BrowserUploads } from "./agent/browser-uploads";
 import type { ChatVisualPreviewHost } from "./agent/chat-visual-preview";
 import { CodexIdleSessions } from "./agent/codex-idle-sessions";
@@ -409,6 +410,8 @@ export interface AgentServiceOptions {
   feedback?: AgentFeedback | null;
   /** Makes one-time claims for `create_server_install_command` with the account session. */
   serverClaims?: AgentServerClaims | null;
+  /** The named browser profiles, for `read_agent` and `set_browser_profile`. */
+  browserProfiles?: (() => AgentBrowserProfiles | null) | undefined;
   sidebarLayout?: AgentSidebar | null;
   /** The Library folders of this host, for the `folder` of an attach call and `list_library_folders`. */
   libraryFolders?: AgentLibraryFolders | null;
@@ -1956,6 +1959,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       feedbackFacts: options.feedbackFacts ?? null,
       feedback: options.feedback ?? null,
       serverClaims: options.serverClaims ?? null,
+      ...(options.browserProfiles === undefined ? {} : { browserProfiles: options.browserProfiles }),
       apiKeys: options.agentApiKeys ?? null,
       vaultItems: options.vaultItems ?? null,
       codexSubagentParent: (childThreadId) => this.#turn.codexSubagentParent(childThreadId),
@@ -2564,9 +2568,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   signInMcpServer(
     input: TestMcpServerInput,
     open?: McpSignInOpener,
+    deepLinkRedirectUrl?: string,
   ): Effect.Effect<McpTestResult, AgentLifecycleFailed> {
     return this.#mcp
-      .signIn(input, open)
+      .signIn(input, open, deepLinkRedirectUrl)
       .pipe(
         Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "signInMcpServer", cause: failure.cause })),
       );

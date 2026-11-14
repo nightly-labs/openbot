@@ -57,6 +57,8 @@ export interface TestMcpServerOptions {
   signInPlace?: McpSignInPlace;
   /** Where an interactive sign-in shows its page, when not in this computer's own browser. */
   open?: McpSignInOpener;
+  /** The link that the computer of `open` returns to OpenBot on. See `McpOAuth.signIn`. */
+  deepLinkRedirectUrl?: string;
 }
 
 export interface McpGatewayHooks {
@@ -385,7 +387,10 @@ export class McpGateway {
     const open = options.open;
     const opened: Pick<McpOAuthAuthority, "accessToken" | "signIn"> | undefined =
       stored && open
-        ? { accessToken: (url) => stored.accessToken(url), signIn: (url) => stored.signIn(url, open) }
+        ? {
+            accessToken: (url) => stored.accessToken(url),
+            signIn: (url) => stored.signIn(url, open, options.deepLinkRedirectUrl),
+          }
         : (stored ?? undefined);
     const oauth = options.interactive ? opened : silent;
     const outcome = yield* inspectMcpServer(
@@ -451,8 +456,18 @@ export class McpGateway {
    * next turn is handed the new token rather than the tools staying absent until a restart. A draft
    * no agent uses yet refreshes nothing: its save does that.
    */
-  readonly signIn = Effect.fnUntraced(function* (this: McpGateway, input: TestMcpServerInput, open?: McpSignInOpener) {
-    const result = yield* this.test(input, { interactive: true, signInPlace: "here", ...(open ? { open } : {}) });
+  readonly signIn = Effect.fnUntraced(function* (
+    this: McpGateway,
+    input: TestMcpServerInput,
+    open?: McpSignInOpener,
+    deepLinkRedirectUrl?: string,
+  ) {
+    const result = yield* this.test(input, {
+      interactive: true,
+      signInPlace: "here",
+      ...(open ? { open } : {}),
+      ...(open && deepLinkRedirectUrl !== undefined ? { deepLinkRedirectUrl } : {}),
+    });
     const resource = mcpOAuthAccountKey(input.config.url);
     const inUse =
       resource !== null &&

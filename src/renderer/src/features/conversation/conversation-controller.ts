@@ -487,8 +487,8 @@ export function createServerConversationState() {
   const [hiddenAwaitingReplyIds, setHiddenAwaitingReplyIds] = createSignal<ReadonlySet<string>>(new Set());
   // Keyed by agent id, as `rightPanels` is: a side question lives as long as its pane, not its view.
   const [sideQuestions, setSideQuestions] = createStore<Record<string, SideQuestionState>>({});
-  // A voice conversation lives as long as its Voice tab, not its view.
-  const voiceSessions = createVoiceSessions(sidePanels);
+  // A voice conversation lives until End, not as long as its view.
+  const voiceSessions = createVoiceSessions();
 
   return {
     showComposerActions,

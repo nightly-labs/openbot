@@ -1263,6 +1263,39 @@ textarea {
   gap: 3px;
 }
 
+/* The branch of a dev build's worktree (`DevWorktreeLabel.tsx`). The dot has the Dock icon color. It
+ * comes after the buttons and shortens the name to fit. It has no auto margin: the server name already
+ * has one, and a second would move the buttons away from the end of the row. */
+.dev-worktree-label {
+  display: flex;
+  min-width: 0;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+  margin-inline-end: var(--openbot-space-2);
+  color: var(--openbot-text-muted);
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-sm);
+  white-space: nowrap;
+}
+
+.dev-worktree-label-dot {
+  width: var(--openbot-space-2);
+  height: var(--openbot-space-2);
+  flex: 0 0 auto;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-logo-dev);
+}
+
+.dev-worktree-label-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-compact .dev-worktree-label {
+  display: none;
+}
+
 .sidebar-icon-button {
   position: relative;
   z-index: 2;

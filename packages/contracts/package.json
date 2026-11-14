@@ -102,6 +102,7 @@
     "./team-protocol/usage-credits-v1": "./src/team-protocol/usage-credits-v1.ts",
     "./team-protocol/provider-host-sign-in-v1": "./src/team-protocol/provider-host-sign-in-v1.ts",
     "./team-protocol/sign-in-relay-v1": "./src/team-protocol/sign-in-relay-v1.ts",
+    "./team-protocol/sign-in-relay-deep-link-v1": "./src/team-protocol/sign-in-relay-deep-link-v1.ts",
     "./team-protocol/connectors-v1": "./src/team-protocol/connectors-v1.ts",
     "./team-protocol/onepassword-connector-v1": "./src/team-protocol/onepassword-connector-v1.ts",
     "./team-protocol/bitwarden-connector-v1": "./src/team-protocol/bitwarden-connector-v1.ts",

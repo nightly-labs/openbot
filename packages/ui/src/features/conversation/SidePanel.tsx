@@ -1,6 +1,5 @@
 import type { AppTextKey } from "@openbot/i18n";
 import {
-  AudioLines,
   Button,
   buttonVariants,
   DropdownMenu,
@@ -56,7 +55,6 @@ const SIDE_PANEL_PANES = {
     label: "conversation.sidePanel.pane.question",
     icon: () => <MessageCircleQuestionMark aria-hidden="true" />,
   },
-  voice: { label: "conversation.sidePanel.pane.voice", icon: () => <AudioLines aria-hidden="true" /> },
   subagent: { label: "conversation.sidePanel.pane.subagent", icon: () => <Workflow aria-hidden="true" /> },
 } as const satisfies Record<string, { label: AppTextKey; icon: () => JSX.Element }>;
 

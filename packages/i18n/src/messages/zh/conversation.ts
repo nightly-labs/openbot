@@ -126,7 +126,6 @@ export const messages = {
   "conversation.voice.phase.thinking": "正在思考",
   "conversation.voice.phase.speaking": "正在说话",
   "conversation.voice.phase.offline": "未连接",
-  "conversation.voice.speakNow": "现在可以说话",
   "conversation.voice.mute": "麦克风静音",
   "conversation.voice.interrupt": "打断",
   "conversation.voice.start": "开始语音对话",

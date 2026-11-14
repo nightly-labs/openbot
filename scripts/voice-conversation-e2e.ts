@@ -1,4 +1,4 @@
-// Drives the Voice pane in this worktree's two-client harness (`bun run dev:test-client`). The
+// Drives the voice conversation pill in this worktree's two-client harness (`bun run dev:test-client`). The
 // microphone is a fake: the app's own speech model says a question, and getUserMedia plays it once.
 //   1. Local: the host app talks to its Chief agent. The message keeps a WebM/Opus recording and
 //      shows a player; the reply is read aloud.
@@ -8,15 +8,15 @@
 //   4. Interrupt: the host's microphone stays open while the agent thinks and speaks. The question
 //      said again interrupts the agent and becomes the next turn; then the Stop button interrupts it.
 //      Neither interrupt opens the microphone again.
-//   5. Offline: the host stops serving. The client's pane releases the microphone, shows the offline
+//   5. Offline: the host stops serving. The client's pill releases the microphone, shows the offline
 //      error and does not listen. The client stays disconnected after this case: run
 //      `bun run dev:stop` and `bun run dev:test-client` before the next run.
-//   6. Analytics: each window's OpenPanel requests are captured. The pane, turn and spoken reply
+//   6. Analytics: each window's OpenPanel requests are captured. The conversation, turn and spoken reply
 //      events arrive with their metadata, and no request holds what the user said.
 // Start the harness with the capture address, then run the script with `--allow-mutations`:
 //   OPENBOT_ANALYTICS_CAPTURE_URL=http://localhost:47322 bun run dev:test-client
-//   bun scripts/voice-pane-e2e.ts --allow-mutations
-// Writes .openbot-build/voice-pane/report.json and screenshots.
+//   bun scripts/voice-conversation-e2e.ts --allow-mutations
+// Writes .openbot-build/voice-conversation/report.json and screenshots.
 import assert from "node:assert/strict";
 import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -32,11 +32,11 @@ import { type DevInstanceRecord, readDevInstanceRecords } from "./dev-automation
 declare global {
   interface Window {
     openbot: OpenBotDesktopApi;
-    voicePaneE2E?: { arm: (streams?: number) => void; calls: () => number; liveTracks: () => number };
+    voiceConversationE2E?: { arm: (streams?: number) => void; calls: () => number; liveTracks: () => number };
   }
 }
 
-const OUT = resolve(import.meta.dirname, "../.openbot-build/voice-pane");
+const OUT = resolve(import.meta.dirname, "../.openbot-build/voice-conversation");
 const AGENT = "Chief";
 const AGENT_ID = "chief";
 const QUESTION = "What is two plus two? Answer in five words or fewer.";
@@ -59,13 +59,13 @@ const clientRecord = records.find((record) => record.service === "test-client");
 assert.ok(hostRecord && clientRecord, "Start `bun run dev:test-client` for this worktree first.");
 for (const record of [hostRecord, clientRecord])
   assertMutationAllowed({
-    command: "voice-pane-e2e",
+    command: "voice-conversation-e2e",
     allowMutations: process.argv.includes("--allow-mutations"),
     instanceNamed: true,
     target: record.instanceId,
   });
 
-const logger = createOpenBotLogger("voice-pane-e2e");
+const logger = createOpenBotLogger("voice-conversation-e2e");
 const connect = (record: DevInstanceRecord) =>
   connectToDevApp(record.remoteDebuggingPort, logger, {
     expectedRendererPort: record.rendererPort,
@@ -133,7 +133,7 @@ async function installMicrophone(page: Page): Promise<void> {
       streams.push(destination.stream);
       return destination.stream;
     };
-    window.voicePaneE2E = {
+    window.voiceConversationE2E = {
       arm: (streams = 1) => {
         armed = streams;
       },
@@ -200,40 +200,40 @@ async function openAgent(page: Page): Promise<void> {
   await page.getByRole("heading", { name: AGENT, level: 1 }).waitFor();
 }
 
-async function openVoicePane(page: Page, streams = 1): Promise<void> {
-  const panel = page.locator(".voice-panel");
-  if (await panel.count()) {
-    await panel.getByRole("button", { name: "End voice conversation", exact: true }).click();
-    await panel.waitFor({ state: "detached" });
+async function openVoicePill(page: Page, streams = 1): Promise<void> {
+  const pill = page.locator(".voice-pill-dock");
+  if (await pill.count()) {
+    await pill.getByRole("button", { name: "End voice conversation", exact: true }).click();
+    await pill.waitFor({ state: "detached" });
   }
-  await page.evaluate((count) => window.voicePaneE2E?.arm(count), streams);
+  await page.evaluate((count) => window.voiceConversationE2E?.arm(count), streams);
   await page.getByRole("button", { name: "Add to prompt", exact: true }).click();
   await page.getByRole("menuitem", { name: "Voice", exact: true }).click();
-  await panel.waitFor();
+  await pill.waitFor();
 }
 
-async function closeVoicePane(page: Page): Promise<void> {
-  const panel = page.locator(".voice-panel");
-  if (!(await panel.count())) return;
-  await panel.getByRole("button", { name: "End voice conversation", exact: true }).click();
-  await panel.waitFor({ state: "detached" });
+async function closeVoicePill(page: Page): Promise<void> {
+  const pill = page.locator(".voice-pill-dock");
+  if (!(await pill.count())) return;
+  await pill.getByRole("button", { name: "End voice conversation", exact: true }).click();
+  await pill.waitFor({ state: "detached" });
 }
 
-const paneState = (page: Page) =>
+const pillState = (page: Page) =>
   page.evaluate(() => {
-    const panel = document.querySelector(".voice-panel");
+    const pill = document.querySelector(".voice-pill-dock");
     return {
-      phase: panel?.querySelector(".voice-panel-phase")?.textContent?.trim() ?? null,
-      error: panel?.querySelector(".voice-panel-error")?.textContent?.trim() ?? null,
+      phase: pill?.querySelector(".voice-pill-phase")?.textContent?.trim() ?? null,
+      error: pill?.querySelector(".voice-pill-error")?.textContent?.trim() ?? null,
     };
   });
 
-/** Waits until the pane shows `phase` or an error. Returns each phase it showed, in sequence. */
+/** Waits until the pill shows `phase` or an error. Returns each phase it showed, in sequence. */
 async function waitForPhase(page: Page, phase: string): Promise<string[]> {
   const phases: string[] = [];
   const started = Date.now();
   while (Date.now() - started < TURN_TIMEOUT_MS) {
-    const state = await paneState(page);
+    const state = await pillState(page);
     const label = `${state.phase}${state.error ? ` | ${state.error}` : ""}`;
     if (phases.at(-1) !== label) phases.push(label);
     if (state.phase === phase || state.error) break;
@@ -242,14 +242,14 @@ async function waitForPhase(page: Page, phase: string): Promise<string[]> {
   return phases;
 }
 
-/** Waits for one spoken turn after `openVoicePane`: the reply is read aloud, then the pane listens again. */
+/** Waits for one spoken turn after `openVoicePill`: the reply is read aloud, then the pill listens again. */
 async function speakOneTurn(page: Page, name: string) {
   const phases: string[] = [];
   const started = Date.now();
   let spoke = false;
   let error: string | null = null;
   while (Date.now() - started < TURN_TIMEOUT_MS) {
-    const state = await paneState(page);
+    const state = await pillState(page);
     const label = `${state.phase}${state.error ? ` | ${state.error}` : ""}`;
     if (phases.at(-1)?.endsWith(label) !== true) phases.push(`${Date.now() - started}ms ${label}`);
     if (state.phase === "Speaking" && !spoke) {
@@ -301,14 +301,14 @@ try {
   const recordingsBefore = new Set(
     (await hostFiles()).filter((file) => file.mimeType.startsWith("audio/")).map((file) => file.id),
   );
-  await openVoicePane(host);
+  await openVoicePill(host);
   const local = await speakOneTurn(host, "local");
   report.local = local;
   check("local: the reply is read aloud", local.spoke && local.error === null, local.phases);
   check("local: the spoken message shows a player", local.hasPlayer, local.userMessage);
-  await closeVoicePane(host);
+  await closeVoicePill(host);
   await checkEvent(
-    "analytics: the local pane start is sent",
+    "analytics: the local conversation start is sent",
     "host",
     "voice_conversation_action",
     (event) => event.action === "start" && event.result === "succeeded" && event.server_kind === "local",
@@ -336,7 +336,7 @@ try {
       isDuration(event.audio_duration_seconds),
   );
   await checkEvent(
-    "analytics: the local pane end is sent with its turn count",
+    "analytics: the local conversation end is sent with its turn count",
     "host",
     "voice_conversation_action",
     (event) => event.action === "end" && event.turn_count === 1 && isDuration(event.duration_ms),
@@ -359,7 +359,7 @@ try {
   await client.evaluate((id) => window.openbot.servers.select(id), remote.id);
   await openAgent(client);
   const draftsBefore = draftEntries(clientRecord);
-  await openVoicePane(client);
+  await openVoicePill(client);
   const remoteTurn = await speakOneTurn(client, "remote");
   report.remote = remoteTurn;
   check("remote: the reply is read aloud", remoteTurn.spoke && remoteTurn.error === null, remoteTurn.phases);
@@ -408,10 +408,10 @@ try {
   // 4. Interrupt. The first stream says the question; the second, opened while the agent thinks, says
   // it again. A fast reply can start before it: the interrupt event shows that the voice stopped it. The storage case reloaded the host, which removed its microphone.
   await installMicrophone(host);
-  await openVoicePane(host, 2);
+  await openVoicePill(host, 2);
   const thinking = await waitForPhase(host, "Thinking");
   const byVoice = await waitForPhase(host, "Listening");
-  const voiceCalls = await host.evaluate(() => window.voicePaneE2E?.calls() ?? -1);
+  const voiceCalls = await host.evaluate(() => window.voiceConversationE2E?.calls() ?? -1);
   check(
     "interrupt: speech while the agent thinks or speaks interrupts it, on the open microphone",
     byVoice[0] === "Thinking" && byVoice.at(-1) === "Listening",
@@ -420,10 +420,10 @@ try {
   // The next turn is short: the click must come while the agent thinks, before any event check waits.
   const next = await waitForPhase(host, "Thinking");
   // The microphone opens again after the send. The click waits for it, so the Stop button finds it open.
-  await host.waitForFunction(() => window.voicePaneE2E?.calls() === 3);
+  await host.waitForFunction(() => window.voiceConversationE2E?.calls() === 3);
   await host.getByRole("button", { name: "Interrupt", exact: true }).click();
   const byButton = await waitForPhase(host, "Listening");
-  const buttonCalls = await host.evaluate(() => window.voicePaneE2E?.calls() ?? -1);
+  const buttonCalls = await host.evaluate(() => window.voiceConversationE2E?.calls() ?? -1);
   check(
     "interrupt: the Stop button interrupts the next turn, on the open microphone",
     next.at(-1) === "Thinking" && byButton.at(-1) === "Listening" && !byButton.includes("Speaking"),
@@ -446,43 +446,43 @@ try {
     "voice_conversation_action",
     (event) => event.action === "interrupt" && event.trigger === "button" && event.server_kind === "local",
   );
-  await closeVoicePane(host);
+  await closeVoicePill(host);
 
-  // 5. Offline. The client's pane listens; the host stops serving. The dev client reaches the host
+  // 5. Offline. The client's pill listens; the host stops serving. The dev client reaches the host
   // through a local API port that a restarted host does not open again, so the client stays
   // disconnected after this case, and the return to online is not checked here.
   await client.getByText("Listening", { exact: true }).first().waitFor();
   await host.evaluate(() => window.openbot.host.stop());
   hostStopped = true;
   const offlineText = "The server is not connected. The conversation continues when it connects again.";
-  await client.locator(".voice-panel-error", { hasText: offlineText }).waitFor({ timeout: 60_000 });
+  await client.locator(".voice-pill-error", { hasText: offlineText }).waitFor({ timeout: 60_000 });
   await client.screenshot({ path: join(OUT, "offline.png") });
   const offline = {
-    ...(await paneState(client)),
+    ...(await pillState(client)),
     ...(await client.evaluate(() => ({
-      liveTracks: window.voicePaneE2E?.liveTracks() ?? -1,
-      calls: window.voicePaneE2E?.calls() ?? -1,
+      liveTracks: window.voiceConversationE2E?.liveTracks() ?? -1,
+      calls: window.voiceConversationE2E?.calls() ?? -1,
     }))),
   };
   check(
-    "offline: the pane says it is not connected and releases the microphone",
+    "offline: the pill says it is not connected and releases the microphone",
     offline.phase === "Not connected" && offline.liveTracks === 0,
     offline,
   );
   await host.evaluate(() => window.openbot.host.start());
   hostStopped = false;
   const later = await client.evaluate(() => ({
-    calls: window.voicePaneE2E?.calls() ?? -1,
-    error: document.querySelector(".voice-panel-error")?.textContent?.trim() ?? null,
+    calls: window.voiceConversationE2E?.calls() ?? -1,
+    error: document.querySelector(".voice-pill-error")?.textContent?.trim() ?? null,
   }));
   check(
-    "offline: the pane does not open the microphone while the server is offline",
+    "offline: the pill does not open the microphone while the server is offline",
     later.calls === offline.calls && later.error === offlineText,
     later,
   );
-  await closeVoicePane(client);
+  await closeVoicePill(client);
   await checkEvent(
-    "analytics: the remote pane end is sent",
+    "analytics: the remote conversation end is sent",
     "client",
     "voice_conversation_action",
     (event) => event.action === "end" && event.server_kind === "remote",
@@ -509,5 +509,5 @@ try {
 }
 const failed = checks.filter((item) => !item.passed);
 for (const item of failed) logger.error(`Failed: ${item.name}.`, { detail: item.detail });
-assert.equal(failed.length, 0, `${failed.length} of ${checks.length} voice pane checks failed.`);
-logger.info(`Passed ${checks.length} voice pane checks. Wrote ${join(OUT, "report.json")}.`);
+assert.equal(failed.length, 0, `${failed.length} of ${checks.length} voice conversation checks failed.`);
+logger.info(`Passed ${checks.length} voice conversation checks. Wrote ${join(OUT, "report.json")}.`);
