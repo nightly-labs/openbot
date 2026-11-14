@@ -1264,14 +1264,15 @@ textarea {
 }
 
 /* The branch of a dev build's worktree (`DevWorktreeLabel.tsx`). The dot has the Dock icon color. It
- * takes the free room at the end of the top row and shortens the name to fit. */
+ * comes after the buttons and shortens the name to fit. It has no auto margin: the server name already
+ * has one, and a second would move the buttons away from the end of the row. */
 .dev-worktree-label {
   display: flex;
   min-width: 0;
   flex: 0 1 auto;
   align-items: center;
   gap: var(--openbot-space-1-5);
-  margin-inline: auto var(--openbot-space-2);
+  margin-inline-end: var(--openbot-space-2);
   color: var(--openbot-text-muted);
   font-family: var(--openbot-font-mono);
   font-size: var(--openbot-text-sm);

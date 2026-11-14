@@ -30,8 +30,9 @@ export function devWorktree(projectRoot: string): Plugin {
       let watcher: FSWatcher;
       try {
         // Git writes `HEAD.lock` and renames it to `HEAD`, so the directory is watched, not the file.
+        // Some file systems give no file name; the branch is read again then.
         watcher = watch(gitDirectory, (_event, fileName) => {
-          if (fileName !== "HEAD") return;
+          if (fileName && fileName !== "HEAD") return;
           const next = readBranch(gitDirectory);
           if (next === branch) return;
           branch = next;
@@ -40,6 +41,9 @@ export function devWorktree(projectRoot: string): Plugin {
       } catch {
         return;
       }
+      // An error event with no listener stops the dev server, for example when git removes the
+      // worktree. The label then keeps the last branch.
+      watcher.on("error", () => watcher.close());
       server.httpServer?.once("close", () => watcher.close());
     },
   };
