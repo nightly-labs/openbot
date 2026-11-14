@@ -21,5 +21,5 @@ export const messages = {
   "error.kind.rateLimit": "Zu viele Anfragen. Warte einen Moment und versuche es erneut.",
   "error.kind.service": "Der Dienst ist nicht verfügbar. Warte einen Moment und versuche es erneut.",
   "error.kind.interrupted":
-    "Die Verbindung wurde getrennt, bevor die Antwort vollständig war. Ein Teil der Antwort kann fehlen. Sende deine Nachricht erneut.",
+    "Die Verbindung wurde getrennt, bevor die Antwort fertig war. Sende deine Nachricht erneut.",
 } as const satisfies PartialTranslation<typeof source>;

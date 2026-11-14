@@ -17,6 +17,5 @@ export const messages = {
   "error.kind.permission": "Nie masz uprawnień do wykonania tego działania. Poproś właściciela o dostęp.",
   "error.kind.rateLimit": "Za dużo żądań. Poczekaj chwilę, a potem spróbuj ponownie.",
   "error.kind.service": "Usługa jest niedostępna. Poczekaj chwilę, a potem spróbuj ponownie.",
-  "error.kind.interrupted":
-    "Połączenie zostało zamknięte, zanim odpowiedź była kompletna. Może brakować części odpowiedzi. Wyślij wiadomość ponownie.",
+  "error.kind.interrupted": "Połączenie zostało zamknięte, zanim odpowiedź się zakończyła. Wyślij wiadomość ponownie.",
 } as const satisfies PartialTranslation<typeof source>;

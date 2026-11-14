@@ -18,5 +18,5 @@ export const messages = {
   "error.kind.rateLimit": "Troppe richieste. Attendi un momento, poi riprova.",
   "error.kind.service": "Il servizio non è disponibile. Attendi un momento, poi riprova.",
   "error.kind.interrupted":
-    "La connessione si è chiusa prima che la risposta fosse completa. Parte della risposta potrebbe mancare. Invia di nuovo il messaggio.",
+    "La connessione si è chiusa prima che la risposta fosse terminata. Invia di nuovo il messaggio.",
 } as const satisfies PartialTranslation<typeof source>;

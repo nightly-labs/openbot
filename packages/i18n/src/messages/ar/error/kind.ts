@@ -14,5 +14,5 @@ export const messages = {
   "error.kind.permission": "ليس لديك إذن لإكمال هذا الإجراء. اطلب الوصول من المالك.",
   "error.kind.rateLimit": "طلبات كثيرة جدًا. انتظر قليلًا، ثم أعد المحاولة.",
   "error.kind.service": "الخدمة غير متاحة. انتظر قليلًا، ثم أعد المحاولة.",
-  "error.kind.interrupted": "انقطع الاتصال قبل اكتمال الإجابة. قد يكون جزء من الإجابة مفقودًا. أرسل رسالتك مرة أخرى.",
+  "error.kind.interrupted": "انقطع الاتصال قبل اكتمال الإجابة. أرسل رسالتك مرة أخرى.",
 } as const satisfies PartialTranslation<typeof source>;
