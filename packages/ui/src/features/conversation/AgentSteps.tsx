@@ -8,6 +8,7 @@ import { Brain, ChevronRight, Puzzle, Sparkles } from "../../icons";
 import { type TextValue, useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
 import { ActivityShine } from "./ActivityShine";
+import { WordDiff } from "./DiffView";
 import { useDuration } from "./Subagents";
 import { type TraceKeyboard, type TraceSpan, TraceWaterfallDialog } from "./TraceWaterfall";
 
@@ -112,14 +113,14 @@ function stepBody(step: AgentStep, newest: boolean, text: TextValue): JSX.Elemen
     return (
       <span class="agent-step-memory" data-action={change.action}>
         <span class="agent-step-memory-action">{text.t(MEMORY_ACTION_LABEL[change.action])}</span>
-        <Show when={change.previousText}>
-          {(previous) => (
-            <s class="agent-step-memory-previous" dir="auto">
-              {previous()}
-            </s>
-          )}
-        </Show>
-        {change.action === "forgotten" ? <s dir="auto">{change.text}</s> : <span dir="auto">{change.text}</span>}
+        {/* An update shows the words that changed in the one text, removed words struck. */}
+        {change.previousText !== undefined && change.action !== "forgotten" ? (
+          <WordDiff oldText={change.previousText} newText={change.text} />
+        ) : change.action === "forgotten" ? (
+          <s dir="auto">{change.text}</s>
+        ) : (
+          <span dir="auto">{change.text}</span>
+        )}
       </span>
     );
   }
