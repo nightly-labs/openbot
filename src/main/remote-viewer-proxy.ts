@@ -46,9 +46,9 @@ const VIEWER_PAGE_POLICY =
 interface RemoteViewerTransport {
   sendDesktop(serverId: string, data: string | ArrayBuffer): Effect.Effect<void, RemoteWorkflowError>;
   on(event: "desktopData", listener: (serverId: string, data: string | ArrayBuffer) => void): unknown;
-  on(event: "disconnected", listener: (serverId: string) => void): unknown;
+  on(event: "connected" | "disconnected", listener: (serverId: string) => void): unknown;
   off(event: "desktopData", listener: (serverId: string, data: string | ArrayBuffer) => void): unknown;
-  off(event: "disconnected", listener: (serverId: string) => void): unknown;
+  off(event: "connected" | "disconnected", listener: (serverId: string) => void): unknown;
 }
 
 interface RemoteViewerProxyOptions {
@@ -77,8 +77,12 @@ export class RemoteViewerProxy {
   readonly #token = crypto.randomUUID().replaceAll("-", "");
   readonly #webSockets = new webSockets.WebSocketServer({ noServer: true });
   readonly #streams = new Map<string, ViewerStream>();
-  // By server. A host gets a new runtime only when it restarts, and a restart ends its connection.
+  // By server. A host gets a new runtime only when it restarts, and the client then makes a new
+  // connection, so each connection and each disconnection forgets the server's files. The epoch
+  // changes at the same time: a file asked for before the change can come from the earlier host.
   readonly #viewerFiles = new Map<string, KeptViewerFiles>();
+  readonly #viewerFileEpochs = new Map<string, number>();
+  #keepsViewerFiles = true;
   #server: Server | null = null;
   #port: number | null = null;
   readonly #lifecycle = new LifecycleGate<number, RemoteWorkflowError>();
@@ -87,6 +91,7 @@ export class RemoteViewerProxy {
     this.#options = options;
     options.transport.on("desktopData", this.#onDesktopData);
     options.transport.on("disconnected", this.#onDisconnected);
+    options.transport.on("connected", this.#forgetViewerFiles);
   }
 
   readonly viewerUrl = Effect.fn("RemoteViewerProxy.viewerUrl")(function* (
@@ -105,8 +110,11 @@ export class RemoteViewerProxy {
   readonly #stop = Effect.fn("RemoteViewerProxy.stop")(function* (this: RemoteViewerProxy) {
     this.#options.transport.off("desktopData", this.#onDesktopData);
     this.#options.transport.off("disconnected", this.#onDisconnected);
+    this.#options.transport.off("connected", this.#forgetViewerFiles);
     for (const stream of this.#streams.values()) stream.socket.close(1001, "Remote viewer stopped");
     this.#streams.clear();
+    // Nothing forgets them after this.
+    this.#keepsViewerFiles = false;
     this.#viewerFiles.clear();
     while (this.#operations.size)
       yield* Effect.forEach([...this.#operations], Deferred.await, { concurrency: "unbounded" });
@@ -176,9 +184,9 @@ export class RemoteViewerProxy {
     if (!route) return sendText(response, 404, "Not found");
     const viewerFile =
       request.method === "GET" || request.method === "HEAD" ? viewerFilePath(route.upstreamPath) : null;
-    const kept = viewerFile === null ? undefined : this.#keptViewerFiles(route.serverId);
-    const keptFile = viewerFile === null ? undefined : kept?.files.get(viewerFile);
+    const keptFile = viewerFile === null ? undefined : this.#viewerFiles.get(route.serverId)?.files.get(viewerFile);
     if (keptFile) return sendViewerFile(response, request.method, 200, keptFile.contentType, keptFile.bytes);
+    const epoch = this.#viewerFileEpochs.get(route.serverId) ?? 0;
     return yield* Effect.gen({ self: this }, function* () {
       const body =
         request.method === "GET" || request.method === "HEAD" ? undefined : yield* remoteCall(() => readBody(request));
@@ -208,17 +216,8 @@ export class RemoteViewerProxy {
           .replaceAll(namespace, `${prefix}${namespace}`);
         bytes = new TextEncoder().encode(text);
       }
-      // A connection lost during the request may have ended at a host that now runs another runtime.
-      if (
-        viewerFile !== null &&
-        kept !== undefined &&
-        upstream.status === 200 &&
-        this.#viewerFiles.get(route.serverId) === kept &&
-        kept.bytes + bytes.byteLength <= MAX_KEPT_VIEWER_BYTES
-      ) {
-        kept.files.set(viewerFile, { contentType, bytes });
-        kept.bytes += bytes.byteLength;
-      }
+      if (viewerFile !== null && upstream.status === 200)
+        this.#keepViewerFile(route.serverId, epoch, viewerFile, contentType, bytes);
       sendViewerFile(response, request.method, upstream.status, contentType, bytes);
     }).pipe(
       Effect.catch(() =>
@@ -334,17 +333,22 @@ export class RemoteViewerProxy {
     ).catch(() => undefined);
   }
 
-  #keptViewerFiles(serverId: string): KeptViewerFiles {
-    let kept = this.#viewerFiles.get(serverId);
-    if (!kept) {
-      kept = { files: new Map(), bytes: 0 };
-      this.#viewerFiles.set(serverId, kept);
-    }
-    return kept;
+  #keepViewerFile(serverId: string, epoch: number, path: string, contentType: string, bytes: Uint8Array): void {
+    if (!this.#keepsViewerFiles || (this.#viewerFileEpochs.get(serverId) ?? 0) !== epoch) return;
+    const kept = this.#viewerFiles.get(serverId) ?? { files: new Map(), bytes: 0 };
+    if (kept.files.has(path) || kept.bytes + bytes.byteLength > MAX_KEPT_VIEWER_BYTES) return;
+    kept.files.set(path, { contentType, bytes });
+    kept.bytes += bytes.byteLength;
+    this.#viewerFiles.set(serverId, kept);
   }
 
-  readonly #onDisconnected = (serverId: string): void => {
+  readonly #forgetViewerFiles = (serverId: string): void => {
     this.#viewerFiles.delete(serverId);
+    this.#viewerFileEpochs.set(serverId, (this.#viewerFileEpochs.get(serverId) ?? 0) + 1);
+  };
+
+  readonly #onDisconnected = (serverId: string): void => {
+    this.#forgetViewerFiles(serverId);
     for (const [streamId, stream] of this.#streams) {
       if (stream.serverId !== serverId) continue;
       this.#streams.delete(streamId);
@@ -426,7 +430,7 @@ function sendViewerFile(
   };
   if (contentType.includes("text/html")) headers["Content-Security-Policy"] = VIEWER_PAGE_POLICY;
   response.writeHead(status, headers);
-  response.end(method === "HEAD" ? undefined : Buffer.from(bytes));
+  response.end(method === "HEAD" ? undefined : Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength));
 }
 
 function sendText(response: ServerResponse, status: number, body: string): void {
