@@ -144,7 +144,8 @@ show_status() {
   limit=$(value memory_limit)
   if [ -n "$limit" ]; then
     echo "Memory: $(($(value memory_available) / 1048576)) MiB free of $((limit / 1048576)) MiB ($(value memory_level))"
-    echo "Turns at the same time: at most $(value turn_limit)"
+    turns=$(value turn_limit)
+    if [ "$turns" = unlimited ]; then echo "Turns at the same time: no limit"; else echo "Turns at the same time: at most $turns"; fi
   fi
   staged=$(staged_version)
   if [ -n "$staged" ]; then echo "OpenBot $staged is ready to install. Run: sudo openbot update"; fi
@@ -305,6 +306,12 @@ uninstall_command() {
   if [ -f /etc/apparmor.d/openbot-hosted ] && command -v apparmor_parser >/dev/null &&
     [ -d /sys/kernel/security/apparmor ]; then
     apparmor_parser --remove /etc/apparmor.d/openbot-hosted 2>/dev/null || true
+    # The rule that openbot-hosted-update added for the Claude sandbox.
+    if grep -qs '^# OpenBot: ' /etc/apparmor.d/local/bwrap-userns-restrict; then
+      sed -i -e '/^# OpenBot: /d' -e '/^priority=1 allow pix \/\*\* -> &bwrap,$/d' \
+        /etc/apparmor.d/local/bwrap-userns-restrict
+      apparmor_parser --replace /etc/apparmor.d/bwrap-userns-restrict 2>/dev/null || true
+    fi
   fi
   rm -f /etc/apparmor.d/openbot-hosted /usr/local/bin/openbot
   # The desktop .deb also installs into /opt/OpenBot, so only the entries of a server go.

@@ -59,6 +59,7 @@ const ingress: MessagingIngress = {
   reconnect: () => {},
   discord: unused,
   onDiscordRoutes: () => () => {},
+  onLinkedRoutes: () => () => {},
   telegram: {
     available: () => true,
     call<M extends TelegramCallMethod>(

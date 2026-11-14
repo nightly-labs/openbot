@@ -47,6 +47,8 @@ export const messages = {
   "mobile.channel.deleted.restoreFailedBody": "تعذّرت استعادة هذه القناة. حاول مرة أخرى.",
   "mobile.channel.chat.fallbackName": "قناة",
   "mobile.channel.chat.deletedNotice": "قناة محذوفة. للمعاينة فقط.",
+  "mobile.channel.chat.waitBusy": "في الانتظار - {name} يعمل في {channel}",
+  "mobile.channel.chat.waitFull": "في الانتظار - يبدأ {name} عند انتهاء مهمة قيد التشغيل",
   "mobile.channel.records.connect": "اتصل بالخادم لتعديل هذه القناة.",
   "mobile.channel.records.loadFailed": "تعذّر تحميل إعدادات القناة.",
   "mobile.channel.records.gone": "هذا العنصر لم يعد متاحًا.",

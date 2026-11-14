@@ -1,16 +1,21 @@
 import {
+  BILLING_BASE_CURRENCIES,
   BILLING_CURRENCIES,
   BILLING_INTERVALS,
+  BILLING_OPTIONAL_CURRENCIES,
   BILLING_PLAN_IDS,
+  type BillingBaseCurrency,
   type BillingCurrency,
   type BillingInterval,
   type BillingPlanId,
   isBillingAmount,
   isStorageGb,
   isStripeCheckoutUrl,
+  planStorageGb,
 } from "./billing";
 import { INPUT_LIMITS } from "./input-limits";
 import type { ConversationMessage } from "./ipc-conversation-messages";
+import type { StorageDisk } from "./ipc-storage";
 import { type LicenseOrder, parseLicenseOrder } from "./license";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 import { slugifyTeamServerName } from "./validation";
@@ -34,10 +39,54 @@ export const HOSTED_PLAN_SIZE: Readonly<Record<BillingPlanId, HostedServerSize>>
 };
 
 /**
+ * The boat sandbox of each plan. Starter runs on a VPS 1 of the operator. When no VPS 1 is free, it starts
+ * on `default`, because `small` has less disk than the Starter storage. A move to a VPS 1 sets
+ * `HOSTED_PLAN_SIZE` again.
+ */
+export const HOSTED_BOAT_PLAN_SIZE: Readonly<Record<BillingPlanId, HostedServerSize>> = {
+  ...HOSTED_PLAN_SIZE,
+  starter: "default",
+};
+
+/**
+ * The storage in GB of a hosted server: the plan storage, and in a boat sandbox not more than its disk.
+ * A Starter sandbox from before `HOSTED_BOAT_PLAN_SIZE` is `small` and keeps 12 GB. `size` is the machine
+ * after a resize that waits (`pending_size`), else the current one, and null when the server has no row
+ * or no boat sandbox yet.
+ */
+export function hostedServerStorageGb(
+  plan: BillingPlanId,
+  onOperatorHost: boolean,
+  size: HostedServerSize | null,
+): number {
+  const storageGb = planStorageGb(plan, onOperatorHost);
+  if (onOperatorHost || size === null) return storageGb;
+  return Math.min(storageGb, HOSTED_SERVER_SIZES[size].diskGb);
+}
+
+/**
  * The disk of a hosted server that the system and the preinstalled tools use, in GB (measured on the
  * running servers on 2026-11-09: 19 to 22 GB). The plan storage does not count it: it is on top of the plan.
  */
 export const HOSTED_SERVER_BASE_IMAGE_GB = 22;
+
+const GB = 1024 ** 3;
+
+/**
+ * The disk of a hosted server against its plan: the total is the plan storage, and the free space is
+ * what the plan has left after the files of its users. The free space is never more than the disk has.
+ *
+ * A host with `storage-user-files-v1` measures the user's files (`userBytes`). A VPS of the operator
+ * has a disk much larger than the plan, and its system part is not the base image of a boat sandbox.
+ * Without that value, the files of the users are what the disk uses above the base image.
+ */
+export function hostedPlanDisk(disk: StorageDisk, storageGb: number): StorageDisk {
+  const { freeBytes, totalBytes } = disk;
+  if (freeBytes === null || totalBytes === null) return disk;
+  const planBytes = storageGb * GB;
+  const userBytes = disk.userBytes ?? Math.max(0, totalBytes - freeBytes - HOSTED_SERVER_BASE_IMAGE_GB * GB);
+  return { freeBytes: Math.max(0, Math.min(freeBytes, planBytes - userBytes)), totalBytes: planBytes };
+}
 
 export const HOSTED_SERVER_STATES = [
   /** The row exists, and the account server waits for Stripe to confirm the first payment. */
@@ -303,13 +352,20 @@ export interface HostedServerCheckout {
   checkoutUrl: string | null;
 }
 
+/**
+ * The prices of a plan. Every plan has the base currencies. An optional currency (BRL) is there only when the
+ * Stripe Price has it, and an account server before BRL never sends it.
+ */
+export type HostedServerPlanPrices = Record<BillingBaseCurrency, Record<BillingInterval, number>> &
+  Partial<Record<BillingCurrency, Record<BillingInterval, number>>>;
+
 /** One plan as the create dialog shows it. Amounts are in the minor unit of the currency. */
 export interface HostedServerCatalogPlan {
   id: BillingPlanId;
   diskGb: number;
   memberLimit: number;
   relativeSpeed: number;
-  prices: Record<BillingCurrency, Record<BillingInterval, number>>;
+  prices: HostedServerPlanPrices;
   /** No new server can take this plan. Older account servers do not send it. */
   soldOut?: boolean;
 }
@@ -365,16 +421,37 @@ export function parseHostedServerCheckout(value: unknown): HostedServerCheckout 
   return { server, checkoutUrl: value.checkoutUrl };
 }
 
-function parsePlanPrices(value: unknown): HostedServerCatalogPlan["prices"] | null {
+function parsePlanPrice(value: unknown): Record<BillingInterval, number> | null {
+  if (!isDynamicRecord(value) || !isBillingAmount(value.month) || !isBillingAmount(value.year)) return null;
+  return { month: value.month, year: value.year };
+}
+
+/** A plan needs the base currencies. An optional currency that is missing or not valid is left out. */
+function parsePlanPrices(value: unknown): HostedServerPlanPrices | null {
   if (!isDynamicRecord(value)) return null;
-  const prices: Partial<HostedServerCatalogPlan["prices"]> = {};
-  for (const currency of BILLING_CURRENCIES) {
-    const entry = value[currency];
-    if (!isDynamicRecord(entry) || !isBillingAmount(entry.month) || !isBillingAmount(entry.year)) return null;
-    prices[currency] = { month: entry.month, year: entry.year };
+  const eur = parsePlanPrice(value.eur);
+  const usd = parsePlanPrice(value.usd);
+  const pln = parsePlanPrice(value.pln);
+  if (!eur || !usd || !pln) return null;
+  const prices: HostedServerPlanPrices = { eur, usd, pln };
+  for (const currency of BILLING_OPTIONAL_CURRENCIES) {
+    const price = parsePlanPrice(value[currency]);
+    if (price) prices[currency] = price;
   }
-  const { eur, usd, pln } = prices;
-  return eur && usd && pln ? { eur, usd, pln } : null;
+  return prices;
+}
+
+/**
+ * The currencies that an order of these plans can use: the base currencies, and each optional currency that
+ * every plan has. With no plans, only the base currencies.
+ */
+export function catalogCurrencies(plans: readonly HostedServerCatalogPlan[]): BillingCurrency[] {
+  const optional = BILLING_OPTIONAL_CURRENCIES.filter(
+    (currency) => plans.length > 0 && plans.every((plan) => plan.prices[currency] !== undefined),
+  );
+  return BILLING_CURRENCIES.filter(
+    (currency) => isOneOf(BILLING_BASE_CURRENCIES, currency) || isOneOf(optional, currency),
+  );
 }
 
 /** Returns null for a value that is not a plan catalog. A plan that this app cannot read is left out. */

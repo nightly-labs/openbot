@@ -2,7 +2,8 @@
 // background subagent in a turn it sends no update for, as OpenCode 2.2.0 does (#3406). Checks that
 // the background turn shows as a turn of the agent's own, from `session/load`, with all its items;
 // that text before a tool call stays thinking there too; that a message sent meanwhile waits for it;
-// and that a stopped background turn does not come back.
+// that a stopped background turn does not come back; and that a shell command in the background
+// starts the same watch (#7713).
 // `bun run test:opencode-background-turn`. Writes .openbot-build/opencode-background-turn-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -220,6 +221,29 @@ try {
   assert.ok(
     !two.events.some((event) => event.item?.text === "The background task finished: DONE."),
     "The rest of the stopped turn is not shown.",
+  );
+
+  // A shell command in the background has a `shellID` and no `sessionID`. Its turn shows too.
+  const third = await startThread(client, { cwd: workspace });
+  const three = record(client, third);
+  assert.equal((await runTurn(client, third, { text: "background shell" })).status, "completed");
+  const shell = await three.until(
+    "the background shell command's turn",
+    (event) => event.method === "turn/started" && event.unprompted,
+  );
+  await writeFile(join(release, third), "");
+  const shellEnded = await three.until(
+    "the background shell command's turn end",
+    (event) => event.method === "turn/completed" && event.turnId === shell.turnId,
+  );
+  assert.equal(shellEnded.status, "completed");
+  assert.deepEqual(
+    three
+      .items(shell.turnId ?? "")
+      .filter((item) => item?.type === "agentMessage" && item.phase === "final_answer")
+      .map((item) => item?.text),
+    ["The background task finished: DONE."],
+    "The answer after the background shell command shows in the chat.",
   );
   report.passed = true;
 } finally {

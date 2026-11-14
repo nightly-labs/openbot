@@ -262,6 +262,7 @@ export const messages = {
     "Sunucu durur ve yeniden başlar. Bu yaklaşık bir dakika sürer. Çalışan ajan turları durur ve üyeler sunucu geri gelene kadar bağlantıyı kaybeder. Dosyalar ve sohbetler korunur.",
   "mobile.server.settings.restartConfirm": "Yeniden başlat",
   "mobile.server.settings.restarted": "{name} yeniden başlatılıyor",
+  "mobile.server.settings.restartUnsupported": "Buradan yeniden başlatmak için bu sunucudaki OpenBot'u güncelleyin.",
   "mobile.server.settings.leaveTitle": "{name} sunucusundan ayrılmak istiyor musunuz?",
   "mobile.server.settings.leaveBody": "Tekrar katılmak için başka bir davete ihtiyacınız olacak.",
   "mobile.server.settings.leave": "Sunucudan ayrıl",
@@ -331,6 +332,7 @@ export const messages = {
   "mobile.server.route.member": "Üye",
   "mobile.server.route.timezone": "Saat dilimi",
   "mobile.server.route.personality": "Ajan kişiliği",
+  "mobile.server.route.agents": "Ajanlar",
   "mobile.server.settings.storage": "Depolama",
   "mobile.server.route.storage": "Depolama",
   "mobile.server.route.storageFiles": "Tüm dosyalar",
@@ -382,6 +384,34 @@ export const messages = {
   "mobile.server.library.noMatches": "Eşleşen dosya yok",
   "mobile.server.library.showInChat": "Sohbette göster",
   "mobile.server.library.share": "Paylaş",
+  "mobile.server.library.folders.title": "Klasörler",
+  "mobile.server.library.folders.allFiles": "Tüm dosyalar",
+  "mobile.server.library.folders.removedAgents": "Silinen ajanlar",
+  "mobile.server.library.folders.notInFolder": "Klasörde değil",
+  "mobile.server.library.folders.path": "Klasör: {path}",
+  "mobile.server.library.folders.pathHint": "Klasörleri gösterir",
+  "mobile.server.library.folders.new": "Yeni klasör",
+  "mobile.server.library.folders.name": "Klasör adı",
+  "mobile.server.library.folders.inFolder": "{name} içinde",
+  "mobile.server.library.folders.create": "Oluştur",
+  "mobile.server.library.folders.rename": "Yeniden adlandır",
+  "mobile.server.library.folders.renameTitle": "Klasörü yeniden adlandır",
+  "mobile.server.library.folders.save": "Kaydet",
+  "mobile.server.library.folders.delete": "Klasörü sil",
+  "mobile.server.library.folders.deleteTitle": "“{name}” silinsin mi?",
+  "mobile.server.library.folders.deleteBody": "İçindeki klasörler de silinir. Dosyaları ajanda kalır.",
+  "mobile.server.library.folders.moveTo": "Klasöre taşı",
+  "mobile.server.library.folders.actions": "{name} için işlemler",
+  "mobile.server.library.folders.expand": "{name} klasörlerini göster",
+  "mobile.server.library.folders.collapse": "{name} klasörlerini gizle",
+  "mobile.server.library.folders.emptyTitle": "Bu klasörde dosya yok",
+  "mobile.server.library.folders.emptyBody": "{agent}, {path} klasör yoluyla buraya dosya kaydedebilir.",
+  "mobile.server.library.folders.loadFailed": "Klasörler yüklenemedi",
+  "mobile.server.library.folders.changeFailed": "Klasörler değiştirilemedi",
+  "mobile.server.library.folders.gone": "Bu klasör artık sunucuda değil.",
+  "mobile.server.library.folders.fileGone": "Bu dosya artık sunucuda değil ya da onu taşıyamazsınız.",
+  "mobile.server.library.folders.unsupported":
+    "Bu sunucunun Kitaplıkta klasörleri yok. Kullanmak için sunucuyu güncelleyin.",
   "mobile.server.route.providers": "Sağlayıcılar",
   "mobile.server.route.provider": "Sağlayıcı",
   "mobile.server.route.providerModels": "Modeller",
@@ -453,6 +483,25 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "Anı sınırı kaydedilemedi. Tekrar deneyin.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Anı sınırını burada değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.settings.memoryReview": "Bellek incelemesi",
+  "mobile.server.settings.memoryReviewDescription":
+    "Bu sunucudaki ajanların sohbetlerindeki kalıcı bilgileri arka planda ne sıklıkla kaydettiği.",
+  "mobile.server.settings.memoryReviewOff": "Kapalı",
+  "mobile.server.settings.memoryReviewTurns": { one: "Her {count} turda", other: "Her {count} turda" },
+  "mobile.server.settings.memoryReviewLoadFailed": "Bellek incelemesi ayarı yüklenemedi.",
+  "mobile.server.settings.skillLearning": "Beceri öğrenme",
+  "mobile.server.settings.skillLearningDescription":
+    "Bu sunucudaki ajanların öğrendiklerini beceri olarak kaydedip kaydetmeyeceği.",
+  "mobile.server.settings.skillLearningAutomatic": "Otomatik",
+  "mobile.server.settings.skillLearningAsk": "Önce sor",
+  "mobile.server.settings.skillLearningOff": "Kapalı",
+  "mobile.server.settings.skillLearningLoadFailed": "Beceri öğrenme ayarı yüklenemedi.",
+  "mobile.server.settings.browsingMemory": "Gezinmemden öğren",
+  "mobile.server.settings.browsingMemoryDescription":
+    "Bir ajanın tarayıcısını kontrol ettiğinizde, ajan kullandığınız sayfalardan ve düğmelerden sitelerin nasıl çalıştığını öğrenir. Yazdığınız metin saklanmaz.",
+  "mobile.server.settings.browsingMemoryLoadFailed": "Gezinme ayarı yüklenemedi.",
+  "mobile.server.settings.learningSaveFailed": "Bu ayar kaydedilemedi. Tekrar deneyin.",
+  "mobile.server.settings.learningUnsupported": "Bu ayarı burada değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
   "mobile.server.settings.responseStyleDescription":
     "Doğal: ajanlar çalışırken kısa güncellemeler gönderir ve sohbet bunları gösterir. Klasik: ajanlar bitirdiklerinde bir kez yanıt verir.",
   "mobile.server.settings.responseStyleNatural": "Doğal",
@@ -461,8 +510,8 @@ export const messages = {
   "mobile.server.settings.personalitySaveFailed": "Yanıt stili kaydedilemedi. Tekrar deneyin.",
   "mobile.server.settings.personalityUnsupported":
     "Yanıt stilini burada değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
-  "mobile.server.settings.personalityUnavailable":
-    "Ajan kişiliğini değiştirmek için bu sunucuya sahip veya yönetici olarak bağlanın.",
+  "mobile.server.settings.agentsUnavailable":
+    "Ajan ayarlarını değiştirmek için bu sunucuya sahip veya yönetici olarak bağlanın.",
   "mobile.server.route.browserProfiles": "Tarayıcı profilleri",
   "mobile.server.browserProfiles.unavailable":
     "Çevrimiçi bir sunucunun tarayıcı profillerini yalnızca sahibi veya bir yönetici yönetebilir.",
@@ -724,6 +773,8 @@ export const messages = {
     "OpenBot {host} üzerindeki kayıtlı belirteçleri okuyamıyor. Çalışma alanı bağlantısını kesin, ardından tekrar bağlayın.",
   "mobile.server.connectors.slack.helpRelay":
     "{host} üzerindeki OpenBot Slack etkinliklerini alamıyor. {host} üzerinde oturum açın, Sunucu ayarlarında sunucuya bir ad verin ve OpenBot'u açık tutun.",
+  "mobile.server.connectors.slack.helpNotLinked":
+    "Bu çalışma alanı {host} sunucusuna bağlı değil. Bağlamak için Yeniden bağlan'a dokunun.",
   "mobile.server.connectors.slack.orchestratorTitle": "Slack Düzenleyicisi",
   "mobile.server.connectors.slack.orchestratorDescription":
     "Bu ajan Slack'ten gelen her isteği alır. Kısa olanları kendisi yanıtlar, diğer işleri doğru ajana iletir ve yanıtı ileti dizisinde paylaşır.",
@@ -768,6 +819,8 @@ export const messages = {
     "OpenBot {host} üzerindeki kayıtlı belirteçleri okuyamıyor. Discord sunucusu bağlantısını kesin, ardından tekrar bağlayın.",
   "mobile.server.connectors.discord.helpRelay":
     "{host} üzerindeki OpenBot Discord etkinliklerini alamıyor. {host} üzerinde oturum açın, Sunucu ayarlarında sunucuya bir ad verin ve OpenBot'u açık tutun.",
+  "mobile.server.connectors.discord.helpNotLinked":
+    "Bu Discord sunucusu {host} sunucusuna bağlı değil. Bağlamak için Yeniden bağlan'a dokunun.",
   "mobile.server.connectors.discord.orchestratorTitle": "Discord Düzenleyicisi",
   "mobile.server.connectors.discord.orchestratorDescription":
     "Bu ajan Discord'dan gelen her isteği alır. Kısa olanları kendisi yanıtlar, diğer işleri doğru ajana iletir ve yanıtı kanalda verir.",
@@ -801,6 +854,8 @@ export const messages = {
     "{host} üzerindeki OpenBot Telegram mesajlarını alamıyor. {host} üzerinde oturum açın, Sunucu ayarlarında sunucuya bir ad verin ve OpenBot'u açık tutun.",
   "mobile.server.connectors.telegram.helpError":
     "OpenBot bu sohbete ulaşamıyor. Yeniden bağlanın veya sohbetin bağlantısını kesin.",
+  "mobile.server.connectors.telegram.helpNotLinked":
+    "Bu sohbet {host} sunucusuna bağlı değil. Bağlamak için Yeniden bağlan'a dokunun.",
   "mobile.server.connectors.telegram.retryAt":
     "Telegram OpenBot'tan beklemesini istedi. {time} saatinde tekrar deneyecek.",
   "mobile.server.connectors.telegram.linkTitle": "Bir sohbet bağla",
@@ -1028,6 +1083,13 @@ export const messages = {
   "mobile.server.providers.status.ready": "Yüklü",
   "mobile.server.providers.status.notInstalled": "Yüklü değil",
   "mobile.server.providers.status.checking": "Denetleniyor",
+  "mobile.server.providers.accountsKeyHint":
+    "Her ajan bir hesap kullanır. Hesabı ajanın ayarlarından seçin. Yeni bir hesap için o hesabın API anahtarı gerekir.",
+  "mobile.server.providers.accountChangeKey": "Anahtarı değiştir",
+  "mobile.server.providers.accountKeyHint":
+    "{provider} hesabının bir API anahtarını yapıştırın. Anahtar sunucuya gider. Bu telefon onu saklamaz.",
+  "mobile.server.providers.accountKeyChecking": "Anahtar denetleniyor…",
+  "mobile.server.providers.accountKeyAddFailed": "Hesap eklenemedi. Tekrar deneyin.",
   "mobile.server.providers.pool": "Hesapları havuzla",
   "mobile.server.providers.poolHint":
     "Ajanlar bir hesabı kullanım sınırına yaklaşana kadar kullanır, sonra sınırı ilk sıfırlanan hesaba geçer.",
@@ -1111,6 +1173,8 @@ export const messages = {
   "mobile.server.settings.mcpCount": { one: "{count} sunucu", other: "{count} sunucu" },
   "mobile.server.mcp.unsupported": "MCP sunucularını burada yönetmek için bu sunucudaki OpenBot'u güncelleyin.",
   "mobile.server.mcp.unavailable": "MCP sunucularını yönetmek için bu sunucuya sahip veya yönetici olarak bağlanın.",
+  "mobile.server.mcp.accessUnsupported":
+    "MCP sunucularını kimin alacağını seçmek için bu sunucudaki OpenBot'u güncelleyin.",
   "mobile.server.mcp.description":
     "MCP sunucuları bu sunucunun ajanlarına daha fazla araç verir. Claude ve Codex ajanları yalnızca bu listedeki sunucuları alır.",
   "mobile.server.mcp.loading": "MCP sunucuları yükleniyor…",
@@ -1181,6 +1245,21 @@ export const messages = {
   "mobile.server.mcp.removeTitle": "{name} kaldırılsın mı?",
   "mobile.server.mcp.removeBody": "Bu sunucunun ajanları artık araçlarını almaz. Ayarlar saklanmaz.",
   "mobile.server.mcp.remove": "MCP sunucusunu kaldır",
+  "mobile.server.mcp.access.title": "Erişim",
+  "mobile.server.mcp.access.agents": "Ajanlar",
+  "mobile.server.mcp.access.agentsOf": "{name} kullanabilen ajanlar",
+  "mobile.server.mcp.access.allAgents": "Tüm ajanlar",
+  "mobile.server.mcp.access.allAgentsHint": "Tüm ajanlar, daha sonra eklenen her ajanı da kapsar.",
+  "mobile.server.mcp.access.noAgents": "Ajan yok",
+  "mobile.server.mcp.access.someAgents": "{count}/{total}",
+  "mobile.server.mcp.access.use": "Kullanabilir",
+  "mobile.server.mcp.access.fromEveryone": "Herkes ile aynı",
+  "mobile.server.mcp.access.level": "{role} rolünün {name} erişimi",
+  "mobile.server.mcp.access.hint":
+    "Bir üye, Herkes ve rollerinin en yüksek düzeyini alır. Sahipler, yöneticiler ve sunucuyu ekleyen kişi onu her zaman yönetebilir.",
+  "mobile.server.mcp.access.loadFailed": "Bu MCP sunucusunu kimin aldığı yüklenemedi.",
+  "mobile.server.mcp.access.unavailable":
+    "Bu MCP sunucusunu kimin alacağını yalnızca çevrimiçi bir sunucunun sahibi veya yöneticisi seçebilir.",
   "mobile.server.usage.agents": "Ajanlar",
   "mobile.server.usage.agentLine": "{tokens} token · {cost} · {percent}",
   "mobile.server.usage.noAgents": "Bu aralıkta ajan kullanımı kaydedilmedi.",
@@ -1338,6 +1417,10 @@ export const messages = {
   "mobile.server.roles.agentCount": { one: "{count} ajan", other: "{count} ajan" },
   "mobile.server.roles.memberCount": { one: "{count} üye", other: "{count} üye" },
   "mobile.server.roles.agentLevel": "{role} rolünün {agent} erişimi",
+  "mobile.server.roles.changeInEveryone": "Herkes'te değiştir",
+  "mobile.server.roles.setAll": "Tümünü ayarla",
+  "mobile.server.roles.setAllLabel": "Tümünü ayarla: {role} rolünün tüm ajanlara erişimi",
+  "mobile.server.roles.mixed": "Karışık",
   "mobile.server.roles.delete": "Rolü sil",
   "mobile.server.roles.deleteTitle": "{name} silinsin mi?",
   "mobile.server.roles.deleteBody": "Bu role sahip üyeler, rolün verdiği ajanları kaybeder.",
@@ -1457,6 +1540,7 @@ export const messages = {
   "mobile.server.route.transfer": "Aktarım",
   "mobile.server.route.transferExport": "Dışa aktar",
   "mobile.server.route.transferImport": "İçe aktar",
+  "mobile.server.route.transferCopy": "Başka bir sunucuya kopyala",
   "mobile.server.transfer.unsupported": "Aktarımı buradan yapmak için bu sunucudaki OpenBot'u güncelleyin.",
   "mobile.server.transfer.unavailable": "Aktarım yapmak için bu sunucuya sahip veya yönetici olarak bağlanın.",
   "mobile.server.transfer.title": "Bu sunucuyu başka bir bilgisayara taşıyın",
@@ -1520,4 +1604,21 @@ export const messages = {
     "Bu sağlayıcılarda diğer sunucuda oturum açılmıştı, ancak burada oturum açılmamış. Sunucu ayarları › Sağlayıcılar bölümünde bunlarda oturum açın.",
   "mobile.server.transfer.notImported": "İçe aktarılmadı",
   "mobile.server.transfer.warnings": "Bunları kontrol edin",
+  "mobile.server.transfer.copy": "Başka bir sunucuya kopyala",
+  "mobile.server.transfer.copyNote": "Ajanları sunucularınızdan birine gönderin.",
+  "mobile.server.transfer.copyTo": "Hedef",
+  "mobile.server.transfer.copyNoAgents": "Bu sunucuda ajan yok.",
+  "mobile.server.transfer.copyNotMoved":
+    "Kanalları ve paylaşılan klasör de kopyalanır. API anahtarları, oturum açma bilgileri, bağlayıcılar ve sohbet geçmişi kopyalanmaz. Bunları diğer sunucuda yeniden kurun.",
+  "mobile.server.transfer.copySubmit": { one: "{count} ajanı kopyala", other: "{count} ajanı kopyala" },
+  "mobile.server.transfer.copying": "Kopyalanıyor…",
+  "mobile.server.transfer.copyFailed": "Kopyalama tamamlanmadı.",
+  "mobile.server.transfer.copied": {
+    one: "{count} ajan {server} sunucusuna kopyalandı.",
+    other: "{count} ajan {server} sunucusuna kopyalandı.",
+  },
+  "mobile.server.transfer.copyAgents": "Kopyalanacak ajanlar",
+  "mobile.server.transfer.copyNext": "Kopyalanan ajanlar {server} sunucusunun onay kurallarını kullanır.",
+  "mobile.server.transfer.copyNoServer":
+    "Ajanları kopyalamak için başka bir sunucuya sahip veya yönetici olarak bağlanın.",
 } as const satisfies PartialTranslation<typeof source>;

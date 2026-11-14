@@ -101,6 +101,7 @@ function shownInThread(message: AgentMessage): boolean {
     message.body.trim().length > 0 ||
     (message.attachments?.length ?? 0) > 0 ||
     message.imageGeneration !== undefined ||
+    message.videoGeneration !== undefined ||
     message.questionPrompt !== undefined ||
     message.plan !== undefined ||
     message.actionMarker !== undefined
@@ -243,8 +244,13 @@ export interface AgentThreadViewProps {
    * to the latest message shows. `onLoad` reads them in the place of the part.
    */
   newerMessages?: AgentThreadOlderMessages | undefined;
-  /** The card that the app draws in the place of a message row, such as an MCP sign-in. Undefined keeps the row. */
-  messageCard?: ((message: AgentMessage) => JSX.Element | undefined) | undefined;
+  /**
+   * The card that the app draws in the place of a message row, such as an MCP sign-in or a visual
+   * reply page. `quote` puts text in this message box. Undefined keeps the row.
+   */
+  messageCard?:
+    | ((message: AgentMessage, quote: (messageId: string, text: string) => void) => JSX.Element | undefined)
+    | undefined;
   /**
    * The steps of the finished turn above an answer, or on the thinking row of a finished turn with no
    * answer. Undefined for a message that has none.
@@ -785,7 +791,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
           </Show>
           <For each={props.messages.filter(shownRow)} keyed={(message) => message.id}>
             {(message) => {
-              const card = createMemo(() => props.messageCard?.(message()));
+              const card = createMemo(() => props.messageCard?.(message(), quoteSelection));
               return (
                 <div class="virtual-chat-row">
                   <Show when={props.stepsAbove?.(message().id)}>

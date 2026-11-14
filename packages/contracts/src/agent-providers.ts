@@ -121,6 +121,13 @@ export interface AgentProviderDescriptor {
    */
   readonly localCodeSignIn: "device" | "paste" | null;
   /**
+   * How an account after the first signs in. `"key"`: each one is an API key of the provider, so a
+   * client asks for the key and shows no browser sign-in for it. Absent: the browser sign-in. It
+   * mirrors `ProviderKeyAccountSupport` of the driver in `src/backend/provider-drivers.ts`; keep the
+   * two in step. A host adds such an account only with `provider-account-keys-v1`.
+   */
+  readonly accountSignIn?: "key";
+  /**
    * Where the provider's sign-in page ends. `callback`: the page sends the browser to an address on
    * the computer that started it, so a browser tab elsewhere must paste that address back. `page`:
    * the user finishes on the page and the provider sees it by itself, so any browser can run it.
@@ -165,7 +172,8 @@ export interface AgentProviderDescriptor {
   readonly workspaceEnforcement: "tool-sandbox" | "command-sandbox" | "confined-process";
   /**
    * How the CLI takes a message into a running turn. `native`: it reads the message at its next
-   * step (Grok through its `x.ai/interject` ACP extension). `deferred`: the protocol has no steer
+   * step (Grok through its `x.ai/interject` ACP extension, Antigravity through a second
+   * `session/prompt`). `deferred`: the protocol has no steer
    * request (ACP), so the message can wait until the turn ends. Only a `native` provider steers a
    * message sent in `steer` mode; the others queue it.
    */
@@ -318,7 +326,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     homeSkills: "instructions",
     workspaceInstructionFiles: [],
     workspaceEnforcement: "confined-process",
-    steer: "deferred",
+    steer: "native",
     concurrentTurns: true,
     reportsUsage: true,
     approvalsInFullAccess: true,
@@ -336,6 +344,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     defaultModel: "",
     legacyModelPrefix: null,
     authKind: "cursor",
+    accountSignIn: "key",
     pickerOrder: 5,
     localCodeSignIn: "device",
     signInPageEnd: "callback",

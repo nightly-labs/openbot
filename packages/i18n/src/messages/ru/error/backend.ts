@@ -65,6 +65,8 @@ export const messages = {
     "Сжатие не уменьшает этот чат: после двух сжатий он всё ещё занимает {percent}% окна контекста модели, поэтому OpenBot перестаёт его сжимать. Большую часть окна занимают инструменты и инструкции. Отключите MCP-серверы или управление компьютером, которые не нужны этому агенту, или выберите модель с большим окном. Затем начните новый чат.",
   "error.backend.contextCompactionStopped":
     "Два сжатия этого чата подряд не удались, поэтому OpenBot больше не сжимает его автоматически. Каждая попытка отправляет весь чат модели и расходует лимит тарифа. Выберите «Сжать сейчас», чтобы попробовать снова, или начните новый чат.",
+  "error.backend.providerModelAtCapacity":
+    "Модель перегружена. Провайдер повторит попытку через несколько минут. Чтобы продолжить сейчас, остановите ход и выберите другую модель.",
   "error.backend.providerRetrying":
     "Провайдер не выполнил этот запрос {attempts} раза и пробует снова. Если агент не продолжит, остановите ход.",
   "error.backend.providerRetryingLargeContext":
@@ -84,6 +86,10 @@ export const messages = {
     "Дождитесь окончания работы в этом канале, затем удалите его историю.",
   "error.backend.channelCompactUnavailable":
     "Сейчас ни один участник этого канала не может сжать контекст. Сначала участник должен ответить в канале, а его провайдер должен поддерживать сжатие.",
+  "error.backend.channelCompactNoSession":
+    "У участников этого канала ещё нет разговора для сжатия. Сожмите его после того, как участник ответит в канале.",
+  "error.backend.channelCompactNotSupported":
+    "Ни один участник этого канала не может сжимать по запросу. Участники, которые это поддерживают, сжимают контекст автоматически, когда он почти заполнен.",
   "error.backend.channelArchived": "Восстановите этот канал, прежде чем отправлять сообщения или менять задачи.",
   "error.backend.channelReferenceUnavailable": "Сообщение канала, на которое сделана ссылка, недоступно.",
   "error.backend.channelTaskNotFound": "Задача канала не найдена.",
@@ -116,6 +122,7 @@ export const messages = {
   "error.backend.memoryOperationFailed": "Операция с памятью не удалась. Повторите попытку.",
   "error.backend.memoryGone": "Этой записи памяти больше нет.",
   "error.backend.routineGone": "Этой регулярной задачи больше нет.",
+  "error.backend.routineRunGone": "Этого запуска регулярной задачи больше нет.",
   "error.backend.turnNotStarted": "Провайдер не начал этот ход.",
   "error.backend.routineResultConnectionOff":
     "Это подключение к мессенджеру выключено или удалено. Выберите другое место.",
@@ -163,6 +170,10 @@ export const messages = {
   "error.backend.attachBetween": "Прикрепите от 1 до {limit} файлов.",
   "error.backend.attachmentNotFile": "Вложение не является файлом: {path}",
   "error.backend.generatedImageTooLarge": "Созданное изображение превышает лимит 100 МБ.",
+  "error.backend.generatedVideoTooLarge": "Созданное видео превышает лимит 100 МБ.",
+  "error.backend.videoGenerationFailed": "Не удалось создать видео.",
+  "error.backend.videoGenerationNoVideo": "Создание видео не вернуло видео.",
+  "error.backend.videoGenerationInterrupted": "Создание видео прервано.",
   "error.backend.attachmentNotRegularFile": "Прикреплять можно только обычные файлы: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot не смог скопировать {name}.",
   "error.backend.routineNameRequired": "Нужно название регулярной задачи.",
@@ -192,6 +203,8 @@ export const messages = {
   "error.backend.interruptSelf": "Агент не может прервать сам себя.",
   "error.backend.interruptOtherWork":
     "Этот агент работает над задачей, которую начало не ваше сообщение. Остановить её могут только пользователь или отправитель этой задачи.",
+  "error.backend.interruptSharedWork":
+    "Ход этого агента обрабатывает ваше сообщение, а также сообщение пользователя или другого агента. Остановить его может только пользователь кнопкой «Остановить агента» в чате этого агента.",
   "error.backend.interruptStarting": "Этот агент ещё начинает ход. Повторите попытку, когда ход начнётся.",
   "error.backend.interruptNoSession":
     "OpenBot не может прервать этого агента, потому что сессия его провайдера недоступна.",
@@ -353,6 +366,8 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "Прокси {name} отклонил вход, поэтому страница не открылась.",
   "error.backend.browserProxyComputerUnreachable":
     "Компьютер этого профиля не отвечает, поэтому страница не открылась.",
+  "error.backend.browserProxyComputerLocalAddress":
+    "Компьютер, который использует этот профиль, открывает только общедоступные сайты. Он не открывает адреса в локальной сети, поэтому страница не открылась.",
   "error.backend.browserCertificateUntrusted":
     "Сертификат безопасности этого сайта не является доверенным, поэтому страница не открылась.",
   "error.backend.browserLowMemory":

@@ -461,6 +461,12 @@ feature in `apps/auth-api/src/server/mobile-features-config.ts`. The merge deplo
 service. An app with an older version then shows the update header on home. Set it only after the
 store has the build: before, Update opens a store page that cannot install the version.
 
+The Android version in `MOBILE_LATEST_VERSIONS` is also the version of the APK that openbot.run
+offers for a phone with no Google Play. The APK of a store build is a draft GitHub release, which is
+not public. The merge of this step makes it public (the `Publish the Android APK` workflow), before
+the account service deploys. That workflow fails when the version has no draft
+`android-v<version>`: see [Android APK](../apps/mobile/README.md#android-apk).
+
 `scripts/check-release-notes.ts` stops a release when the section is missing, empty or appears two
 times, or when it has an unknown group, a group with no items, an item with no text or outside a
 group, a placeholder such as `TODO`, or a heading with no real date. These steps run it:
@@ -588,6 +594,10 @@ git tag -a vX.Y.Z -m "OpenBot vX.Y.Z"
 # vX.Y.Z now (preflight item 16). Push the tag only after that.
 git push origin vX.Y.Z
 ```
+
+Before the merge of the preparation, the release-upgrade-safety skill starts the `Provider live E2E`
+workflow on that branch (Step 2c). It sends one real message to each provider
+([Live provider test](provider-live-e2e.md)). Do not push the tag when it has a stop.
 
 Pushing the version tag runs `.github/workflows/release.yml`.
 The tag workflow builds nothing until `https://openbot.run/join` and the Apple association file return

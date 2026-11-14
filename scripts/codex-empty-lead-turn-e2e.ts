@@ -8,6 +8,15 @@
 //   3. A person's message that gets an empty turn shows the error and does not run again.
 //   4. With backup models, an empty lead turn runs again on the backup model, with no error.
 //   5. A teammate update that wants no answer can end empty: it completes with no error.
+//   6. In a thread, an empty lead turn of a teammate result runs once more too, and its answer ends
+//      the thread's turn (#8503). A second empty run shows the error in the thread.
+//   7. In a WhatsApp conversation, an empty orchestrator turn of a teammate result runs once more too,
+//      and the conversation gets the answer with no "Stopped." end before it (#8573). A second empty
+//      run ends the conversation's request as failed.
+//   8. In a thread, a person's turn that ran a step and wrote its last words as narration, then an
+//      empty answer, shows that narration as its answer (#8837). With narration only before the
+//      step, the turn ends as before: completed, once, with the narration still a step. A teammate's
+//      such turn still sends the note of its work to the agent that asked (#8214).
 // `bun run test:codex-empty-lead-turn`. Writes .openbot-build/codex-empty-lead-turn-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -58,11 +67,13 @@ const calls = (...items: FakeCall[]) => `<<CALLS${JSON.stringify(items)}CALLS>>`
 /**
  * A Codex app-server with the methods that the service calls. Each turn input decides the turn:
  * - `TEAM-RESULT mode:<mode>`: a lead turn with teammate results. It answers "Team done.", or ends
- *   with only its reasoning: always for `empty-always`, on the first run for `empty-once`, and on
- *   the primary model for `empty-on-primary`.
+ *   with only its reasoning: always for `empty-always` and `thread-empty-always`, on the first run
+ *   for `empty-once` and `thread-empty-once`, and on the primary model for `empty-on-primary`.
  * - `<<CALLS[...]CALLS>>`: calls the named OpenBot tools one at a time, then answers "Asked.".
  * - `TEAM-QUESTION mode:<mode>`: a teammate answers `TEAM-RESULT mode:<mode>`.
  * - `EMPTY-TURN`: ends with only its reasoning.
+ * - `NARRATION-AFTER-STEP` / `NARRATION-BEFORE-STEP`: runs one command, writes narration after or
+ *   before it, then sends an empty answer.
  * Each turn is logged with its model and whether it ended empty.
  */
 const FAKE_CODEX = `#!/usr/bin/env node
@@ -92,8 +103,27 @@ const nextRun = (mode) => {
   writeFileSync(COUNTS, JSON.stringify(counts));
   return run;
 };
+const narrate = (threadId, turnId, id, text) => {
+  const item = { type: "agentMessage", id, text: "", phase: "commentary" };
+  write({ method: "item/started", params: { threadId, turnId, item } });
+  write({ method: "item/agentMessage/delta", params: { threadId, turnId, itemId: id, delta: text } });
+  write({ method: "item/completed", params: { threadId, turnId, item: { ...item, text } } });
+};
 const finish = (turn) => {
   const { threadId, turnId } = turn;
+  if (turn.kind === "narration") {
+    const hex = Buffer.from(turnId).toString("hex");
+    if (!turn.after) narrate(threadId, turnId, "msg_" + hex + "01", "Let me check the folder.");
+    const command = { type: "commandExecution", id: "command-" + turnId, command: "ls", cwd: "/tmp", status: "inProgress" };
+    write({ method: "item/started", params: { threadId, turnId, item: command } });
+    write({ method: "item/completed", params: { threadId, turnId, item: { ...command, status: "completed", exitCode: 0 } } });
+    if (turn.after) narrate(threadId, turnId, "msg_" + hex + "02", "The folder holds two files.");
+    const answer = { type: "agentMessage", id: "msg_" + hex + "03", text: "", phase: "final_answer" };
+    write({ method: "item/started", params: { threadId, turnId, item: answer } });
+    write({ method: "item/completed", params: { threadId, turnId, item: answer } });
+    write({ method: "turn/completed", params: { threadId, turn: { id: turnId, status: "completed" } } });
+    return;
+  }
   if (turn.empty) {
     const item = { type: "reasoning", id: "reasoning-" + turnId, summary: ["Reading the results."], content: [] };
     write({ method: "item/completed", params: { threadId, turnId, item } });
@@ -119,13 +149,15 @@ const decide = (text, model) => {
   if (result) {
     const mode = result[1];
     const run = nextRun(mode);
-    const empty = mode === "empty-always" || (mode === "empty-once" && run === 1) || (mode === "empty-on-primary" && model === PRIMARY);
+    const empty = mode === "empty-always" || mode === "thread-empty-always" || mode === "chat-empty-always" || ((mode === "empty-once" || mode === "thread-empty-once" || mode === "chat-empty-once") && run === 1) || (mode === "empty-on-primary" && model === PRIMARY);
     return { kind: "result", mode, calls: [], empty, reply: "Team done." };
   }
   const named = /<<CALLS([\\s\\S]*?)CALLS>>/.exec(text);
   if (named) return { kind: "calls", calls: JSON.parse(named[1]), empty: false, reply: "Asked." };
   const question = /TEAM-QUESTION mode:([a-z-]+)/.exec(text);
   if (question) return { kind: "question", mode: question[1], calls: [], empty: false, reply: "TEAM-RESULT mode:" + question[1] };
+  const narration = /NARRATION-(AFTER|BEFORE)-STEP/.exec(text);
+  if (narration) return { kind: "narration", after: narration[1] === "AFTER", calls: [], empty: false, reply: "" };
   if (text.includes("EMPTY-TURN")) return { kind: "empty", calls: [], empty: true, reply: "" };
   return { kind: "chat", calls: [], empty: false, reply: "All good." };
 };
@@ -186,7 +218,7 @@ process.stdin.on("data", (chunk) => {
 interface FakeTurn {
   turnId: string;
   model: string;
-  kind: "result" | "calls" | "question" | "empty" | "chat";
+  kind: "result" | "calls" | "question" | "empty" | "chat" | "narration";
   mode: string | null;
   empty: boolean;
 }
@@ -330,6 +362,93 @@ async function askTeam(leadId: string, teammateIds: string[], mode: string) {
   };
 }
 
+/**
+ * The lead asks one teammate from a new thread. Returns when the thread's turn of the result ended
+ * with an answer or a failure, not with a run again.
+ */
+async function askTeammateInThread(leadId: string, teammateId: string, mode: string) {
+  const since = events.length;
+  const task = await runCauseEffect(
+    agents.startTask({
+      agentId: leadId,
+      text: `Ask the team. ${calls({
+        tool: "send_message",
+        arguments: { recipientAgentIds: [teammateId], text: `TEAM-QUESTION mode:${mode}`, expectsReply: true },
+      })}`,
+    }),
+  );
+  const turns = () => fakeTurns().filter((turn) => turn.kind === "result" && turn.mode === mode);
+  await waitFor(`the thread's ${mode} result turn to end`, () => {
+    const last = turns().at(-1);
+    return events
+      .slice(since)
+      .some(
+        (event) =>
+          event.type === "thread-turn-completed" &&
+          event.taskId === task.id &&
+          event.turn.turnId === last?.turnId &&
+          (event.turn.status === "completed" || event.turn.status === "failed"),
+      );
+  });
+  const ended = await waitFor("the thread to be idle", () =>
+    agents.listTasks(leadId).tasks.find((entry) => entry.id === task.id && entry.state === "idle"),
+  );
+  const answer = agents
+    .readTask(leadId, task.id)
+    .messages.findLast((message) => message.author === "assistant" && message.itemType !== "commentary")?.text;
+  return { turns: turns(), outcome: ended.outcome, error: ended.error, answer, errors: errorsFor(leadId, since) };
+}
+
+/**
+ * A WhatsApp message asks the orchestrator, which asks one teammate. Returns when the conversation's
+ * request for the teammate's result ended, with each end that the conversation was told of.
+ */
+async function askTeammateFromWhatsApp(leadId: string, teammateId: string, mode: string) {
+  const since = events.length;
+  const ends: { status: string; followUp: boolean; answer: string | null }[] = [];
+  const stopListening = agents.messaging.onActivity((activity) => {
+    if (activity.type === "finished" && activity.link.platformChannelId === `${mode}@s.whatsapp.net`)
+      ends.push({ status: activity.status, followUp: activity.followUp, answer: activity.answer });
+  });
+  try {
+    const connection = agents.messaging.store.ensureConnection("whatsapp", "48100000000", "Phone");
+    agents.messaging.store.updateConnection(connection.connectionId, { enabled: true });
+    const received = await runCauseEffect(
+      agents.messaging.receive({
+        connectionId: connection.connectionId,
+        agentId: leadId,
+        platformChannelId: `${mode}@s.whatsapp.net`,
+        threadKey: mode,
+        isDirect: true,
+        title: "Client",
+        text: `Ask the team. ${calls({
+          tool: "send_message",
+          arguments: { recipientAgentIds: [teammateId], text: `TEAM-QUESTION mode:${mode}`, expectsReply: true },
+        })}`,
+        sourcePaths: [],
+        origin: { authorId: "48200000000", authorName: "Client", platformMessageId: `${mode}-message` },
+        idempotencyKey: `whatsapp:${mode}`,
+      }),
+    );
+    assert.equal(received.status, "queued");
+    const linkId = received.status === "queued" ? received.link.linkId : "";
+    await waitFor(`the conversation's ${mode} result request to end`, () =>
+      ends.some((end) => end.followUp && end.status !== "interrupted"),
+    );
+    await waitFor(
+      "the conversation's requests to settle",
+      () => mailbox.unresolvedMessagingDeliveries(linkId).length === 0,
+    );
+    return {
+      turns: fakeTurns().filter((turn) => turn.kind === "result" && turn.mode === mode),
+      ends,
+      errors: errorsFor(leadId, since),
+    };
+  } finally {
+    stopListening();
+  }
+}
+
 async function lastAnswer(agentId: string): Promise<string | undefined> {
   const snapshot = await runCauseEffect(agents.readConversation(agentId));
   return snapshot.messages.findLast((message) => message.author === "assistant" && message.itemType !== "commentary")
@@ -440,6 +559,130 @@ try {
     assert.equal(fakeTurns().filter((turn) => turn.kind === "empty").length, emptyBefore + 1);
     assert.deepEqual(errorsFor(alpha.id, since), []);
     return { status: update.status };
+  });
+
+  await check("in a thread, an empty lead turn after a teammate result runs once more", async () => {
+    const outcome = await askTeammateInThread(lead.id, alpha.id, "thread-empty-once");
+    assert.deepEqual(
+      outcome.turns.map((turn) => [turn.model, turn.empty]),
+      [
+        [PRIMARY, true],
+        [PRIMARY, false],
+      ],
+      JSON.stringify(outcome),
+    );
+    assert.equal(outcome.outcome, "completed");
+    assert.equal(outcome.error, null, "The thread does not fail.");
+    assert.equal(outcome.answer, "Team done.");
+    assert.deepEqual(outcome.errors, []);
+    return outcome;
+  });
+
+  await check("in a thread, a second empty run of the same result shows the error", async () => {
+    const outcome = await askTeammateInThread(lead.id, alpha.id, "thread-empty-always");
+    assert.equal(outcome.turns.length, 2, `The result runs again only once: ${JSON.stringify(outcome)}`);
+    assert.equal(outcome.outcome, "failed");
+    assert.equal(outcome.error, NO_ANSWER);
+    return outcome;
+  });
+
+  await check("in a WhatsApp conversation, an empty turn after a teammate result runs once more", async () => {
+    const outcome = await askTeammateFromWhatsApp(lead.id, alpha.id, "chat-empty-once");
+    assert.deepEqual(
+      outcome.turns.map((turn) => [turn.model, turn.empty]),
+      [
+        [PRIMARY, true],
+        [PRIMARY, false],
+      ],
+      JSON.stringify(outcome),
+    );
+    assert.deepEqual(
+      outcome.ends.filter((end) => end.followUp),
+      [{ status: "completed", followUp: true, answer: "Team done." }],
+      "The conversation gets the answer, and no end of the empty run.",
+    );
+    assert.deepEqual(outcome.errors, []);
+    return outcome;
+  });
+
+  await check("in a WhatsApp conversation, a second empty run of the same result fails the request", async () => {
+    const outcome = await askTeammateFromWhatsApp(lead.id, alpha.id, "chat-empty-always");
+    assert.equal(outcome.turns.length, 2, `The result runs again only once: ${JSON.stringify(outcome)}`);
+    assert.deepEqual(
+      outcome.ends.filter((end) => end.followUp),
+      [{ status: "failed", followUp: true, answer: null }],
+    );
+    assert.deepEqual(outcome.errors, [NO_ANSWER]);
+    return outcome;
+  });
+
+  /** A person's message in a new thread. Returns when the thread's turn ended and the thread is idle. */
+  const personInThread = async (text: string) => {
+    const since = events.length;
+    const before = fakeTurns().length;
+    const task = await runCauseEffect(agents.startTask({ agentId: lead.id, text }));
+    const ended = await waitFor("the thread's turn to end and the thread to be idle", () => {
+      const turnEnded = events
+        .slice(since)
+        .some(
+          (event) =>
+            event.type === "thread-turn-completed" &&
+            event.taskId === task.id &&
+            (event.turn.status === "completed" || event.turn.status === "failed"),
+        );
+      const entry = agents.listTasks(lead.id).tasks.find((candidate) => candidate.id === task.id);
+      return turnEnded && entry?.state === "idle" ? entry : null;
+    });
+    const assistant = agents.readTask(lead.id, task.id).messages.filter((message) => message.author === "assistant");
+    return {
+      runs: fakeTurns().length - before,
+      outcome: ended.outcome,
+      error: ended.error,
+      rows: assistant.map((message) => ({ itemType: message.itemType, text: message.text })),
+    };
+  };
+
+  await check("in a thread, narration after the last step becomes the answer of an empty turn", async () => {
+    const outcome = await personInThread("NARRATION-AFTER-STEP");
+    assert.equal(outcome.runs, 1, `The turn does not run again: ${JSON.stringify(outcome)}`);
+    assert.equal(outcome.outcome, "completed");
+    assert.equal(outcome.error, null);
+    assert.deepEqual(outcome.rows, [{ itemType: "final_answer", text: "The folder holds two files." }]);
+    return outcome;
+  });
+
+  await check("in a thread, an empty turn with narration only before its step ends as before", async () => {
+    const outcome = await personInThread("NARRATION-BEFORE-STEP");
+    assert.equal(outcome.runs, 1, `A turn that ran a step does not run again: ${JSON.stringify(outcome)}`);
+    assert.equal(outcome.outcome, "completed");
+    assert.equal(outcome.error, null);
+    assert.equal(
+      outcome.rows.some((row) => row.itemType !== "commentary" && row.text.trim() !== ""),
+      false,
+      "The narration before the step stays a step.",
+    );
+    return outcome;
+  });
+
+  await check("a teammate's empty turn after a step still sends the note of its work", async () => {
+    const before = new Set(agents.listQueue(lead.id).deliveries.map((delivery) => delivery.id));
+    await runCauseEffect(
+      agents.sendMessage({
+        agentId: lead.id,
+        text: `Ask the team. ${calls({
+          tool: "send_message",
+          arguments: { recipientAgentIds: [alpha.id], text: "NARRATION-BEFORE-STEP", expectsReply: true },
+        })}`,
+      }),
+    );
+    const result = await waitFor("the teammate's result to end", () => {
+      const found = newResults(lead.id, before)[0];
+      return found && ended(found.status) ? found : null;
+    });
+    await waitFor("the lead to be idle", () => agents.listQueue(lead.id).deliveries.every((d) => ended(d.status)));
+    assert.match(result.text, /Status: blocked/u, `The lead gets the note: ${result.text}`);
+    assert.match(result.text, /Tool steps in the turn: 1/u);
+    return { status: result.status, text: result.text };
   });
 
   report.passed = true;

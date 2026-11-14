@@ -141,6 +141,10 @@ The `Provider CLI canary` workflow is not a pull request check. It runs every si
 upstream provider CLIs, which reach users without an OpenBot release; see
 [Provider CLI updates](architecture/providers.md#provider-cli-updates).
 
+The `Provider live E2E` workflow is not a pull request check either. It runs only when somebody
+starts it; the release-upgrade-safety skill starts it before a release. On the Mac mini runner, it sends one real message to Codex, Claude and Gemini through the desktop app
+(`bun run test:provider-live`). See [Live provider test](provider-live-e2e.md).
+
 The `Release regression report` workflow is not a pull request check either. Once a day, it compares
 the two newest releases from production analytics and posts the result to a private Discord channel
 when a status changed, on Monday, or on a manual run. It runs only on `main`, with the secrets of the

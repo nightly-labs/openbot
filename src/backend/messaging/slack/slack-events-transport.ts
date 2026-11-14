@@ -33,6 +33,9 @@ export class SlackEventsTransport implements MessagingTransport {
   #sink: TransportSink | null = null;
   #release: (() => void) | null = null;
   #unsubscribe: (() => void) | null = null;
+  #unsubscribeRoutes: (() => void) | null = null;
+  /** False when the socket's route ticket does not name this workspace: Signal sends its events elsewhere. */
+  #linked = true;
 
   constructor(options: SlackEventsTransportOptions) {
     this.#identity = options.identity;
@@ -41,6 +44,10 @@ export class SlackEventsTransport implements MessagingTransport {
 
   start(sink: TransportSink): void {
     this.#sink = sink;
+    this.#unsubscribeRoutes ??= this.#ingress.onLinkedRoutes("slack", (ids) => {
+      this.#linked = ids === null || ids.has(this.#identity.workspaceId);
+      this.#report(this.#ingress.state());
+    });
     this.#release ??= this.#ingress.acquire("slack");
     this.#unsubscribe ??= this.#ingress.onState((state) => this.#report(state));
     this.#report(this.#ingress.state());
@@ -54,6 +61,9 @@ export class SlackEventsTransport implements MessagingTransport {
       this.#sink = null;
       this.#unsubscribe?.();
       this.#unsubscribe = null;
+      this.#unsubscribeRoutes?.();
+      this.#unsubscribeRoutes = null;
+      this.#linked = true;
       this.#release?.();
       this.#release = null;
     }),
@@ -94,7 +104,15 @@ export class SlackEventsTransport implements MessagingTransport {
   );
 
   #report(state: IngressState): void {
-    this.#sink?.state(state === "online" ? "connected" : state === "connecting" ? "connecting" : "relay_unavailable");
+    this.#sink?.state(
+      state === "online"
+        ? this.#linked
+          ? "connected"
+          : "not_linked"
+        : state === "connecting"
+          ? "connecting"
+          : "relay_unavailable",
+    );
   }
 
   /** True when the event was already handled. */

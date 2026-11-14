@@ -3,6 +3,7 @@ import { stat } from "node:fs/promises";
 import { extname } from "node:path";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
+import { parseWhatsAppPhoneNumber } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { WhatsAppStoreUnreadable } from "@openbot/whatsapp/auth-store";
 import {
@@ -26,7 +27,9 @@ import {
   MessagingConnectionError,
   type MessagingDriver,
   type MessagingPlace,
+  type RecentMessages,
   type StatusReaction,
+  WhatsAppAnswerPartlySent,
 } from "../messaging-types";
 import {
   userJid,
@@ -38,7 +41,7 @@ import {
 import { imageSize } from "./whatsapp-image-size";
 import { whatsAppChunks, whatsAppText } from "./whatsapp-render";
 import type { WhatsAppConnectionHandle, WhatsAppRuntime } from "./whatsapp-runtime";
-import { allowsContact } from "./whatsapp-senders";
+import { allowsContact, whatsAppNumberForms } from "./whatsapp-senders";
 import { WhatsAppTransport } from "./whatsapp-transport";
 
 /** WhatsApp takes larger files, but a phone on mobile data should not have to. */
@@ -46,12 +49,6 @@ const WHATSAPP_FILE_BYTES_LIMIT = 64 * 1024 * 1024;
 /** WhatsApp clients show an edit only within 15 minutes; a later edit is lost without an error. */
 const EDIT_WINDOW_MS = 14 * 60_000;
 const PLACE_NAME_TIMEOUT_MS = 5_000;
-/**
- * In "Message yourself", WhatsApp shows OpenBot's posts on the right, as the owner's own. A last line of
- * blank braille characters (U+2800, which WhatsApp does not trim) makes the bubble as wide as the chat
- * allows, so the answer starts at the left, as a reply does. The time stays on that line.
- */
-const SELF_CHAT_SPACER = `\n${"\u2800".repeat(36)}`;
 
 /** The reaction on the person's message: arrived, then done, failed or stopped. */
 const REACTIONS: Record<StatusReaction, string> = {
@@ -159,7 +156,7 @@ class WhatsAppAdapter implements MessagingAdapter {
 
   readonly post = Effect.fnUntraced(function* (this: WhatsAppAdapter, target: MessageTarget, body: MessageBody) {
     const sent = yield* this.#send(target, {
-      text: this.#layout(target, this.#statusText(body)),
+      text: this.#statusText(body),
       ...this.#mentions(body.text),
     });
     if (body.buttons?.length)
@@ -185,9 +182,16 @@ class WhatsAppAdapter implements MessagingAdapter {
       return;
     }
     yield* this.#session().send(target.platformChannelId, {
-      text: this.#layout(target, this.#statusText(body)),
+      text: this.#statusText(body),
       edit: this.#ownKey(target, messageId),
     });
+  });
+
+  /** Deletes a status post for everyone, so a quiet answer leaves no "finished" text in the chat. */
+  readonly remove = Effect.fnUntraced(function* (this: WhatsAppAdapter, target: MessageTarget, messageId: string) {
+    yield* this.#session().send(target.platformChannelId, { delete: this.#ownKey(target, messageId) });
+    this.#handle.chats.forgetMenu(messageId);
+    this.#sentAt.delete(messageId);
   });
 
   /** WhatsApp has no message that only one person sees, so the text is a reply in the chat. */
@@ -219,7 +223,7 @@ class WhatsAppAdapter implements MessagingAdapter {
     replaceMessageId: string | null,
   ) {
     yield* this.#checkPlace(target.platformChannelId);
-    const [first = "", ...rest] = whatsAppChunks(markdown).map((chunk) => this.#layout(target, chunk));
+    const [first = "", ...rest] = whatsAppChunks(markdown);
     const firstMentions = this.#mentions(first);
     let firstId: string | null = null;
     const sentAt = replaceMessageId ? this.#sentAt.get(replaceMessageId) : undefined;
@@ -234,12 +238,17 @@ class WhatsAppAdapter implements MessagingAdapter {
       firstId = yield* this.#send(target, { text: first, ...firstMentions });
       // The status post would stay as "Working on it…" above the answer, so it goes. After the post:
       // when the post fails, the status post stays for the next attempt.
-      if (replaceMessageId)
-        yield* this.#session()
-          .send(target.platformChannelId, { delete: this.#ownKey(target, replaceMessageId) })
-          .pipe(Effect.catch(() => Effect.void));
+      if (replaceMessageId) yield* this.remove(target, replaceMessageId).pipe(Effect.catch(() => Effect.void));
     }
-    for (const chunk of rest) yield* this.#send(target, { text: chunk, ...this.#mentions(chunk) });
+    // Only a later part fails after a part is in the chat: the host then must not touch the status post.
+    for (const chunk of rest)
+      yield* this.#send(target, { text: chunk, ...this.#mentions(chunk) }).pipe(
+        Effect.mapError((failure) =>
+          replaceMessageId
+            ? new MessagingAdapterError({ cause: new WhatsAppAnswerPartlySent(failure.cause) })
+            : failure,
+        ),
+      );
     return firstId;
   });
 
@@ -250,6 +259,7 @@ class WhatsAppAdapter implements MessagingAdapter {
   ) {
     yield* this.#checkPlace(target.platformChannelId);
     const skipped: string[] = [];
+    let firstId: string | null = null;
     for (const file of files) {
       const sent = yield* Effect.result(
         Effect.gen({ self: this }, function* () {
@@ -268,13 +278,14 @@ class WhatsAppAdapter implements MessagingAdapter {
                 fileName: file.name.slice(0, 255) || "file",
                 mimetype: DOCUMENT_TYPES[extname(file.name).toLowerCase()] ?? file.mimeType,
               };
-          yield* this.#send(target, content);
+          const messageId = yield* this.#send(target, content);
+          if (messageId) firstId ??= messageId;
           return true;
         }),
       );
       if (Result.isFailure(sent) || !sent.success) skipped.push(file.name);
     }
-    return skipped;
+    return { skipped, firstId };
   });
 
   history(
@@ -291,8 +302,8 @@ class WhatsAppAdapter implements MessagingAdapter {
     platformChannelId: string,
     threadKey: string | null,
     limit: number,
-  ): Effect.Effect<ContextEntry[], MessagingAdapterError> {
-    return Effect.sync(() => this.#handle.chats.recent(platformChannelId, threadKey, limit));
+  ): Effect.Effect<RecentMessages, MessagingAdapterError> {
+    return Effect.sync(() => ({ messages: this.#handle.chats.recent(platformChannelId, threadKey, limit) }));
   }
 
   readonly download = Effect.fnUntraced(function* (
@@ -372,6 +383,21 @@ class WhatsAppAdapter implements MessagingAdapter {
       for (const group of rules.groups) places.push({ id: group, name: yield* this.placeName(group), kind: "channel" });
       return places;
     });
+  }
+
+  /**
+   * The chat of the owner or of an allowed contact, for a number with a plus, spaces or dashes, or in
+   * its other Brazilian form. WhatsApp delivers only to the form that has the account, which is the saved one.
+   */
+  placeId(placeId: string): string {
+    const [user = "", domain] = placeId.split("@");
+    if (domain !== undefined && domain !== "s.whatsapp.net") return placeId;
+    const number = parseWhatsAppPhoneNumber(user.split(":")[0]);
+    const identity = whatsAppIdentity(this.#handle);
+    if (!number || !identity) return placeId;
+    const rules = this.#runtime.policy.rules(identity.number);
+    const saved = whatsAppNumberForms(number).find((form) => form === identity.number || rules.contacts.has(form));
+    return saved ? userJid(saved) : placeId;
   }
 
   /** WhatsApp notifies a person for `@<number>` when the post also lists them; `post` does that. */
@@ -459,13 +485,6 @@ class WhatsAppAdapter implements MessagingAdapter {
   }
 
   /** Status text from the host, in WhatsApp's formatting, with its buttons as a numbered menu. */
-  /** The text with the spacer line in the owner's own chat, and as it is in every other chat. */
-  #layout(target: MessageTarget, text: string): string {
-    const identity = whatsAppIdentity(this.#handle);
-    const ownChat = identity !== null && userPart(target.platformChannelId) === identity.number;
-    return ownChat ? `${text}${SELF_CHAT_SPACER}` : text;
-  }
-
   #statusText(body: MessageBody): string {
     const actions = new Set(body.buttons?.map((button) => button.action));
     const menu = [

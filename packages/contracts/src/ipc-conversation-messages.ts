@@ -44,6 +44,33 @@ export function isImageGenerationInfo(value: unknown): value is ImageGenerationI
 }
 
 /**
+ * A video that an agent made with a tool (Grok `reference_to_video`). The video file is the
+ * message's attachment. The Team API carries it only to a client with the `video-generation-v1`
+ * capability; an older client shows the attachment alone.
+ */
+export interface VideoGenerationInfo {
+  prompt?: string | undefined;
+  aspectRatio: ImageGenerationAspectRatio;
+  /** The length that the agent asked for, in seconds. The player shows the real length. */
+  durationSeconds?: number | undefined;
+  /** The resolution that the agent asked for, such as "720p". */
+  resolution?: string | undefined;
+  error?: string | undefined;
+}
+
+export function isVideoGenerationInfo(value: unknown): value is VideoGenerationInfo {
+  return (
+    isDynamicRecord(value) &&
+    (value.prompt === undefined || isString(value.prompt)) &&
+    isImageGenerationAspectRatio(value.aspectRatio) &&
+    (value.durationSeconds === undefined ||
+      (isNumber(value.durationSeconds) && Number.isFinite(value.durationSeconds) && value.durationSeconds > 0)) &&
+    (value.resolution === undefined || isBoundedString(value.resolution, 40)) &&
+    (value.error === undefined || isString(value.error))
+  );
+}
+
+/**
  * The id of the question that asks the user to allow or block an MCP plugin request. The plugin
  * takes only one of its options; a typed answer cancels the request.
  */
@@ -224,6 +251,8 @@ export interface ConversationMessage {
   /** What the user said, on a message that a voice turn sent. The agent got only the text. */
   voiceRecording?: AttachmentSummary | undefined;
   imageGeneration?: ImageGenerationInfo | undefined;
+  /** Set on a `video_generation` message. Absent on a message from an older host. */
+  videoGeneration?: VideoGenerationInfo | undefined;
   delivery?: Pick<QueueDelivery, "id" | "status" | "position"> | undefined;
   exchange?: AgentExchangeSummary | undefined;
   reaction?: MessageReaction | null | undefined;
@@ -299,6 +328,7 @@ export function isConversationMessage(value: unknown): value is ConversationMess
         isBoundedString(value.routine.name, INPUT_LIMITS.routineName) &&
         isBoundedString(value.routine.scheduledFor, 160))) &&
     (value.imageGeneration === undefined || isImageGenerationInfo(value.imageGeneration)) &&
+    (value.videoGeneration === undefined || isVideoGenerationInfo(value.videoGeneration)) &&
     (value.questionPrompt === undefined || isConversationQuestionPrompt(value.questionPrompt)) &&
     (value.plan === undefined || isConversationPlan(value.plan)) &&
     (value.subagents === undefined || isConversationSubagents(value.subagents)) &&

@@ -1,5 +1,5 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { TeamMemberSummary } from "@openbot/contracts/ipc";
+import { AGENT_TASK_LIMIT_MAX, type AgentTasksSnapshot, type TeamMemberSummary } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { AGENT_TASKS_CAPABILITY, AGENT_TASKS_ROUTES } from "@openbot/contracts/team-protocol/agent-tasks-v1";
 import { sourceText } from "@openbot/i18n/source";
@@ -15,6 +15,14 @@ import {
   requireListedAgent,
   stringField,
 } from "./request-helpers";
+
+/**
+ * The frozen `agent-tasks-v1` snapshot carries a limit of 1 to 4. A higher host default goes out as 4:
+ * no client starts a turn from it.
+ */
+export function agentTasksWireSnapshot(snapshot: AgentTasksSnapshot): AgentTasksSnapshot {
+  return snapshot.limit <= AGENT_TASK_LIMIT_MAX ? snapshot : { ...snapshot, limit: AGENT_TASK_LIMIT_MAX };
+}
 
 /**
  * `agent-tasks-v1`: the tasks of one agent. A member who can send a message to the agent can use them,
@@ -34,7 +42,7 @@ export async function routeAgentTasks(
   const agentId = stringField(body, "agentId");
   if (hiddenAgentIds.has(agentId)) throw new HttpError(404, sourceText("error.team.agentNotFound"));
   requireListedAgent(tasks, agentId);
-  if (url.pathname === AGENT_TASKS_ROUTES.list) return json(200, tasks.listTasks(agentId));
+  if (url.pathname === AGENT_TASKS_ROUTES.list) return json(200, agentTasksWireSnapshot(tasks.listTasks(agentId)));
   if (url.pathname !== AGENT_TASKS_ROUTES.read) requireAgentLevel(context, agentId, "chat");
   if (url.pathname === AGENT_TASKS_ROUTES.start) return json(200, await startTask(tasks, agentId, body, member));
   const taskId = stringField(body, "taskId");

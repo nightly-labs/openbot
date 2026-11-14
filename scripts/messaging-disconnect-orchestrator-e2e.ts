@@ -67,6 +67,7 @@ const ingress: MessagingIngress = {
   reconnect: () => {},
   discord: unused,
   onDiscordRoutes: () => () => {},
+  onLinkedRoutes: () => () => {},
 };
 
 /** The tokens of each connection, in memory. */

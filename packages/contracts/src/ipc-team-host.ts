@@ -116,6 +116,11 @@ export interface ServerSummary {
   compatibility?: ServerCompatibility | null;
   issue?: ServerConnectionIssue | null;
   connectionSequence?: number;
+  /**
+   * A new connection whose capability read has not ended. The workspace load waits for it, so that one
+   * load reads all the data the host can give. Absent at all other times. Local IPC metadata.
+   */
+  capabilitiesPending?: true;
   /** The host said it restarts into an update (`host-update-v1`). Cleared when the connection comes back. */
   hostRestart?: { state: Exclude<HostRestartState, "none">; version: string | null } | null;
   /**

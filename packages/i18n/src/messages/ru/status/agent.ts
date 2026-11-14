@@ -8,7 +8,11 @@ export const messages = {
   "status.agent.instructionsChanged": "Обновил свои инструкции",
   "status.agent.modelSwitchedForLimit": "Лимит использования исчерпан. Переключено на {model}.",
   "status.agent.modelReturnedAfterLimit": "Лимит использования обновился. Снова используется {model}.",
+  "status.agent.routineSkippedRunOpen": "Пропущено: предыдущий запуск ещё не завершился",
+  "status.agent.routineSkippedUsageLimit": "Пропущено: достигнут лимит использования",
   "status.agent.modelSwitchedForError": "Ошибка провайдера. Переключено на {model}.",
+  "status.agent.modelSwitchedForSpentBalance":
+    "У {previous} закончились кредиты. Выполнено переключение на {model}. Чтобы снова использовать эту модель, пополните кредиты и выберите её.",
   "status.agent.modelReturnedAfterError": "После ошибки провайдера снова используется {model}.",
   "status.agent.marketplaceSuggested": "Предложено приложение из каталога: {app}.",
   "status.agent.channelMemberAdded": "Агент {agent} добавил {member} в канал. Запрос: {person}.",

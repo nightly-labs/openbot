@@ -176,22 +176,36 @@ export const messages = {
   "provider.geminiKey.title": "Clé d’API Gemini",
   "provider.geminiKey.description":
     "Enregistrez une clé d’API Gemini sur cet ordinateur. Une clé enregistrée est utilisée à la place de votre compte Google. Pour vous connecter avec Google, supprimez la clé et sélectionnez « Connecter » sur la ligne Gemini.",
+  "provider.geminiKey.descriptionHost":
+    "Enregistrez une clé d’API Gemini sur l’hôte. Une clé enregistrée est utilisée à la place de votre compte Google. Pour vous connecter avec Google, supprimez la clé et sélectionnez « Connecter » sur la ligne Gemini.",
   "provider.geminiKey.label": "Clé d’API Gemini",
   "provider.claudeKey.title": "Clé d’API Anthropic",
   "provider.claudeKey.description":
     "Enregistrez une clé API Anthropic sur l'hôte. Anthropic facture chaque requête au crédit API de la clé, pas à votre forfait Claude. Pour l'utiliser pour un agent, sélectionnez le compte « Clé API » dans le menu des modèles de l'agent. Si Claude n'est pas connecté, tous les agents utilisent la clé.",
   "provider.claudeKey.label": "Clé d’API Anthropic",
+  "provider.cursorKey.title": "Clé d’API Cursor",
+  "provider.cursorKey.description":
+    "Chaque compte Cursor après le premier utilise une clé d’API. Créez une clé dans le tableau de bord Cursor, sous Integrations, puis collez-la ici. La clé est enregistrée sur cet ordinateur.",
+  "provider.cursorKey.descriptionHost":
+    "Chaque compte Cursor après le premier utilise une clé d’API. Créez une clé dans le tableau de bord Cursor, sous Integrations, puis collez-la ici. La clé est enregistrée sur l’hôte.",
+  "provider.cursorKey.label": "Clé d’API Cursor",
   "provider.inceptionKey.title": "Clé d’API Inception",
   "provider.inceptionKey.description":
     "Enregistrez une clé d’API Inception sur cet ordinateur pour utiliser les modèles Mercury. OpenBot les exécute dans la CLI Pi qu’il télécharge.",
+  "provider.inceptionKey.descriptionHost":
+    "Enregistrez une clé d’API Inception sur l’hôte pour utiliser les modèles Mercury. OpenBot les exécute dans la CLI Pi qu’il télécharge.",
   "provider.inceptionKey.label": "Clé d’API Inception",
   "provider.deepseekKey.title": "Clé d’API DeepSeek",
   "provider.deepseekKey.description":
     "Enregistrez une clé d’API DeepSeek sur cet ordinateur pour utiliser les modèles DeepSeek. OpenBot les exécute dans la CLI Pi qu’il télécharge.",
+  "provider.deepseekKey.descriptionHost":
+    "Enregistrez une clé d’API DeepSeek sur l’hôte pour utiliser les modèles DeepSeek. OpenBot les exécute dans la CLI Pi qu’il télécharge.",
   "provider.deepseekKey.label": "Clé d’API DeepSeek",
   "provider.openrouterKey.title": "Clé d’API OpenRouter",
   "provider.openrouterKey.description":
     "Enregistrez une clé d’API OpenRouter sur cet ordinateur pour utiliser les modèles d’OpenRouter. OpenBot les exécute dans la CLI Pi qu’il télécharge.",
+  "provider.openrouterKey.descriptionHost":
+    "Enregistrez une clé d’API OpenRouter sur l’hôte pour utiliser les modèles d’OpenRouter. OpenBot les exécute dans la CLI Pi qu’il télécharge.",
   "provider.openrouterKey.label": "Clé d’API OpenRouter",
   "provider.openCodeKey.title": "Se connecter à OpenCode Go",
   "provider.openCodeKey.description":
@@ -255,6 +269,10 @@ export const messages = {
     "Une clé API Gemini enregistrée est utilisée à la place d'une connexion Google. Pour utiliser un abonnement Google et ses modèles, supprimez la clé.",
   "provider.settings.versionInstalledByUser": "{version} · installée par vous",
   "provider.settings.versionDownloaded": "{version} · téléchargée par OpenBot",
+  "provider.settings.otherVersionInstalledByUser": "Non utilisée : {version} · installée par vous",
+  "provider.settings.otherVersionDownloaded": "Non utilisée : {version} · téléchargée par OpenBot",
+  "provider.settings.useInstalledVersion": "Utiliser l'installée",
+  "provider.settings.useDownloadedVersion": "Utiliser celle d'OpenBot",
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Cache de prompt",
   "provider.settings.promptCacheDescription":

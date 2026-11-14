@@ -224,6 +224,26 @@ download() {
   wait "$pid"
 }
 
+# Ubuntu 26.04 gives /usr/bin/bwrap a profile that removes all capabilities from the programs that
+# bwrap starts. The Claude sandbox needs CAP_SYS_ADMIN there, so each sandboxed command of a Claude
+# agent with "Workspace only" fails. This adds one rule to the local file of that profile: those
+# programs keep the profile of bwrap. `openbot uninstall` removes the rule.
+allow_sandbox_capabilities() {
+  local profile=/etc/apparmor.d/bwrap-userns-restrict
+  local override=/etc/apparmor.d/local/bwrap-userns-restrict
+  local rule='priority=1 allow pix /** -> &bwrap,'
+  grep -qsF 'include if exists <local/bwrap-userns-restrict>' "$profile" || return 0
+  grep -qsxF "$rule" "$override" && return 0
+  mkdir -p /etc/apparmor.d/local
+  printf '# OpenBot: the Claude sandbox needs capabilities in the programs that bwrap starts.\n%s\n' \
+    "$rule" >>"$override"
+  apparmor_parser --replace "$profile" && return 0
+  # An AppArmor that cannot read the rule must not lose the profile of bwrap at the next boot.
+  sed -i -e '/^# OpenBot: /d' -e '/^priority=1 allow pix \/\*\* -> &bwrap,$/d' "$override"
+  apparmor_parser --replace "$profile" 2>/dev/null || true
+  echo "The AppArmor rule for the Claude sandbox is not installed." >&2
+}
+
 # Installs the server scripts, the AppArmor profile and the units of $1. A script is written next to
 # its target and then renamed, so a running script never reads a half-written file.
 install_hosting() {
@@ -239,6 +259,7 @@ install_hosting() {
   if command -v apparmor_parser >/dev/null && [ -d /sys/kernel/security/apparmor ]; then
     apparmor_parser --replace /etc/apparmor.d/openbot-hosted ||
       echo "The AppArmor profile is not loaded." >&2
+    allow_sandbox_capabilities
   fi
   for unit in "${UNITS[@]}"; do
     sed "s/@SERVICE_USER@/$user/g" "$source/$unit" >"$INSTALL/hosted/.unit.new"

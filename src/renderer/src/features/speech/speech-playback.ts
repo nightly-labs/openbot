@@ -326,7 +326,7 @@ export async function readAloud(
   const calledAt = performance.now();
   const result: ReadAloudResult = { completed: false, firstAudioMs: null, seconds: 0 };
   stopSpeech();
-  const parts = speechParts(text, language);
+  const parts = speechParts(text, language, replyRate);
   const first = parts[0];
   if (first === undefined) return result;
   const own = newReading(true, source);

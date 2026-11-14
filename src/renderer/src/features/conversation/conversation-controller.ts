@@ -45,7 +45,7 @@ import type { SideQuestionState } from "./stores/side-question-store";
 import { createVoiceSessions } from "./stores/voice-session-store";
 import type { VoiceCloudStream } from "./stores/voice-store";
 
-const BROWSER_PANEL_DEFAULT = 380;
+export const BROWSER_PANEL_DEFAULT = 380;
 const BROWSER_PIP_STORAGE_KEY = "openbot:browser-pip-native-bounds";
 
 function readBrowserPipBounds(): BrowserBounds | null {
@@ -168,11 +168,12 @@ export function createStableConversationState(
   const attachmentUploads = createAttachmentUploadStore();
   const [conversationErrors, setConversationErrors] = createSignal<Record<string, string>>({});
   /**
-   * The provider and model of the run behind each conversation error, and the page that fixes the
-   * account (#2419), keyed like `conversationErrors`.
+   * The provider and model of the run behind each conversation error, the page that fixes the
+   * account (#2419), and the provider's text behind a general sentence (#6410), keyed like
+   * `conversationErrors`.
    */
   const [conversationErrorRuns, setConversationErrorRuns] = createSignal<
-    Record<string, { message: string; run: string | null; link?: string }>
+    Record<string, { message: string; run: string | null; link?: string; details?: string }>
   >({});
   createEffect(
     () => {

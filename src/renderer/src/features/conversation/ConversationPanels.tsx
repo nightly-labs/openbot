@@ -4,6 +4,7 @@ import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-pr
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { ROUTINE_RUN_COMMAND_CAPABILITY } from "@openbot/contracts/team-protocol/routine-run-command-v1";
 import { classifyFailure } from "@openbot/telemetry";
+import { PanelResizer } from "@openbot/ui/components/PanelResizer";
 import { SETTINGS_PANEL_DEFAULT, SETTINGS_PANEL_MAX } from "@openbot/ui/components/SettingsPanel";
 import { BROWSER_NEW_TAB_URL } from "@openbot/ui/features/browser/browser-suggestions";
 import { SidePanelHeader, SidePanelLauncher, type SidePanelPane } from "@openbot/ui/features/conversation/SidePanel";
@@ -27,6 +28,7 @@ import { cycleSpeechSpeed, speechSpeed } from "../speech/speech-speed";
 import { ConversationSideThread } from "./ConversationSideThread";
 import { isChatVisualAppShortcut } from "./chat-visual-shortcuts";
 import { htmlAttachmentPageHtml, htmlAttachmentPageUrl } from "./chat-visual-url";
+import { BROWSER_PANEL_DEFAULT } from "./conversation-controller";
 import { useConversationController } from "./conversation-controller-context";
 import { type AgentNotificationLevelCalls, conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
@@ -168,6 +170,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     openSidebarFileBack,
     props,
     setActiveRightPanel,
+    browserPanelWidth,
     setBrowserPanelWidth,
     setSettingsPanelWidth,
     handleRoutineSettingsRequest,
@@ -427,6 +430,14 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     }
     return undefined;
   });
+  const browserPanelMaxWidth = () =>
+    Math.min(
+      BROWSER_PANEL_MAX,
+      Math.max(
+        BROWSER_PANEL_MIN,
+        (conversationPanelElement()?.clientWidth || window.innerWidth) - CONVERSATION_PANEL_MIN,
+      ),
+    );
   const settingsMaxWidth = () =>
     Math.min(
       SETTINGS_PANEL_MAX,
@@ -540,7 +551,24 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
       </Show>
 
       <Show when={launcherShown()}>
-        <aside class="browser-panel side-panel-empty" aria-label={t("conversation.sidePanel.label")}>
+        <aside
+          id="side-panel-launcher"
+          class="browser-panel side-panel-empty"
+          aria-label={t("conversation.sidePanel.label")}
+        >
+          {/* The list has no saved width: each pane keeps its own, so a drag here does not change a pane's width. */}
+          <PanelResizer
+            class="right-panel-resizer"
+            label={t("conversation.sidePanel.resize")}
+            controls="side-panel-launcher"
+            direction="right"
+            value={browserPanelWidth()}
+            defaultValue={BROWSER_PANEL_DEFAULT}
+            min={BROWSER_PANEL_MIN}
+            max={browserPanelMaxWidth}
+            onResize={setBrowserPanelWidth}
+            onResizeEnd={setBrowserPanelWidth}
+          />
           <SidePanelLauncher
             available={sidePanelPanes()}
             settingsLabel={channel ? t("channel.settings.title") : undefined}
@@ -566,15 +594,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                 defaultWidth={() =>
                   (conversationPanelElement()?.clientWidth || window.innerWidth) * BROWSER_PANEL_DEFAULT_RATIO
                 }
-                maxWidth={() =>
-                  Math.min(
-                    BROWSER_PANEL_MAX,
-                    Math.max(
-                      BROWSER_PANEL_MIN,
-                      (conversationPanelElement()?.clientWidth || window.innerWidth) - CONVERSATION_PANEL_MIN,
-                    ),
-                  )
-                }
+                maxWidth={browserPanelMaxWidth}
                 onWidthChange={setBrowserPanelWidth}
                 onOpenLink={(url) => void openExternalMessageUrl(url)}
                 onOpenSharedFile={(path) => openSharedFile(path, "here")}
@@ -687,15 +707,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
           suspended={props.browserVisibilitySuspended || props.globalOverlayOpen || props.remoteDesktopVisible}
           contextKey={`${props.server?.id ?? "local"}:${props.agent?.id ?? ""}`}
           defaultWidth={() => 320}
-          maxWidth={() =>
-            Math.min(
-              BROWSER_PANEL_MAX,
-              Math.max(
-                BROWSER_PANEL_MIN,
-                (conversationPanelElement()?.clientWidth || window.innerWidth) - CONVERSATION_PANEL_MIN,
-              ),
-            )
-          }
+          maxWidth={browserPanelMaxWidth}
           onWidthChange={setBrowserPanelWidth}
           capturePreview={props.runtime?.browser.capturePreview}
           onOpenTab={(tabId, trigger) => {
@@ -772,7 +784,6 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               fastMode={fastMode()}
               ultrafast={ultrafast()}
               onFastModeChange={fastModeChange()}
-              taskLimitEditable={props.server?.kind === "local" || props.remoteTaskLimitLoaded === true}
               backupModelsEditable={props.server?.kind === "local" || props.remoteBackupModelsLoaded === true}
               usageLimited={props.usageLimited}
               providerFailed={props.providerFailed}

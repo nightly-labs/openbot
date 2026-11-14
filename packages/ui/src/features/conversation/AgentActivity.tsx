@@ -7,6 +7,7 @@ import type { AgentProfile } from "../../data";
 import { ChevronDown } from "../../icons";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
+import { ActivityShine } from "./ActivityShine";
 import { type AgentStep, AgentStepList } from "./AgentSteps";
 
 /**
@@ -165,11 +166,25 @@ export function AgentActivityIndicator(props: {
         <AgentAvatar agent={props.agent} mood={mood()} activity={avatarActivity()} class="agent-activity-avatar" />
         <Show
           when={plain()}
-          fallback={<Show when={shownLabel()}>{(text) => <span class="agent-activity-label">{text()}</span>}</Show>}
+          fallback={
+            <Show when={shownLabel()}>
+              {(text) => (
+                <span class="agent-activity-label">
+                  {text()}
+                  <ActivityShine text={text()} />
+                </span>
+              )}
+            </Show>
+          }
         >
           {/* Keyed, so that each new label is a new element and plays its entrance. */}
           <Show when={shownLabel()} keyed>
-            {(text) => <span class="agent-activity-label">{text}</span>}
+            {(text) => (
+              <span class="agent-activity-label">
+                {text}
+                <ActivityShine text={text} />
+              </span>
+            )}
           </Show>
         </Show>
         <Show when={elapsed()}>{(time) => <span class="agent-activity-elapsed">{time()}</span>}</Show>

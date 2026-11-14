@@ -91,7 +91,7 @@ export type ReportContext = Pick<Report, "surface" | "app_version" | "platform" 
  * Change a value only together with ANALYTICS.md.
  */
 export const ANALYTICS_GENERATIONS = {
-  desktop_host: 18,
+  desktop_host: 19,
   desktop: 13,
   web: 2,
   mobile: 4,
@@ -243,13 +243,14 @@ export function classifyFailure(error: unknown): CauseCode {
   )
     return "rate_limit";
   if (
-    /\b(?:insufficient[ _](?:funds|balance|quota|credits?)|payment required|credits? (?:exhausted|depleted)|out of credits)\b/iu.test(
+    /\b(?:insufficient[ _](?:funds|balance|quota|credits?)|payment required|payment (?:is )?past due|credits? (?:exhausted|depleted)|out of credits)\b/iu.test(
       message,
     )
   )
     return "billing";
+  // Claude Code names a spent spend cap "You've hit your monthly spend limit" (#8998).
   if (
-    /\b(?:usage limit|hit your (?:weekly |session |\d+-hour )?limit|quota (?:exceeded|reached|exhausted)|free[ _-]usage[ _-]exhausted|key limit exceeded)\b/iu.test(
+    /\b(?:usage limit|hit your (?:weekly |session |\d+-hour )?limit|hit your (?:[\w']+ ){0,2}spend limit|quota (?:exceeded|reached|exhausted)|free[ _-]usage[ _-]exhausted|key limit exceeded)\b/iu.test(
       message,
     )
   )

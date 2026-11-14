@@ -52,6 +52,8 @@ export const messages = {
   "error.skill.localNotFound": "Этого локального навыка нет. Проверьте его ID в списке локальных навыков.",
   "error.skill.localRevisionNotFound": "У этого локального навыка нет ревизии {revision}. Последняя ревизия: {latest}.",
   "error.skill.localNameTaken": "Локальный навык с таким именем уже существует. Измените его вместо этого.",
+  "error.skill.localNameClash":
+    "Это имя и локальный навык «{name}» оба дают «{slug}». Чтобы изменить этот навык, отредактируйте его. Чтобы добавить новый навык, измените латинские буквы или цифры в этом имени.",
   "error.skill.localKeepName": "При изменении навыка оставьте его имя прежним.",
   "error.skill.localRelativeFolder": "Укажите относительную папку навыка внутри рабочего пространства текущего агента.",
   "error.skill.localSourceOutside": "Источник навыка должен находиться в рабочем пространстве агента.",
@@ -59,4 +61,13 @@ export const messages = {
   "error.skill.localMissingSkillFile": "В корне папки навыка нужен SKILL.md.",
   "error.skill.pathSymlink": "Пути навыков не могут содержать символические ссылки.",
   "error.skill.folderNotRead": "{provider} не читает {folder}. Скопируйте эту папку в {target}.",
+  "error.skill.githubLinkInvalid": "Вставьте ссылку на репозиторий или папку GitHub.",
+  "error.skill.githubNotFound": "OpenBot не может открыть {repository}. Репозиторий закрыт или не существует.",
+  "error.skill.githubNoSkills": "В {folder} нет SKILL.md.",
+  "error.skill.githubUnavailable": "OpenBot сейчас не может прочитать GitHub. Повторите попытку позже.",
+  "error.skill.githubRateLimited":
+    "GitHub ограничивает, как часто OpenBot может читать его без аккаунта. Повторите попытку через час.",
+  "error.skill.githubTooLarge": "OpenBot не может прочитать все файлы {repository}. Репозиторий слишком большой.",
+  "error.skill.githubHostTooOld": "Обновите этот сервер, чтобы добавлять навыки из GitHub.",
+  "error.skill.publishGithub": "{name} взят из GitHub. Публиковать можно только навыки, которые вы создали.",
 } as const satisfies PartialTranslation<typeof source>;

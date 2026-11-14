@@ -101,7 +101,10 @@ the worker claims after it loaded, so the origin stays tainted in that session. 
 page is open, no page of its origin in the same session fills. When it ends, a same-origin page of a
 connected popup or opener keeps that mark, each other open page of the origin must navigate before
 its own fill, and OpenBot clears the origin's Cache Storage and service workers. A fill waits for that purge, and runs it again when no other page of
-the origin is open. A page whose navigation a service worker handled must reload once. Cookies, localStorage and
+the origin is open. A page whose navigation a service worker handled must reload once with `navigate direction=reload`.
+That reload uses `reloadIgnoringCache`, which skips the service worker, also when the page registered it
+again after the purge (#8017). A normal reload, a reload from `evaluate`, or opening the address again
+can go through the worker and refuse the fill again. Cookies, localStorage and
 IndexedDB stay, because clearing them signs the user out and deletes offline data. So a site whose
 own code runs a stored value as code is not protected, as from any other script that the site
 loads. The same rules apply to `fill_card`. A login matches by 1Password's autofill rule, on the registrable domain
@@ -133,7 +136,12 @@ router builds a `form` UI block with one required secret field (`apiKeyFormSpec`
 contract changed. When the Vault is ready, the form also has a segmented "Save for" field: "All agents
 (Vault)", which is selected first, or "Only this agent". For the Vault, `AttentionRegistry` saves the
 value with `VaultItems.saveApiKey` and deletes the asking agent's own key with that name, as
-`save_api_key` does; every agent then reads the `.vault/<NAME>` file. Otherwise, `AttentionRegistry` saves the value with
+`save_api_key` does; `AgentApiKeys.list` then writes the key to `.vault/<agentId>/<NAME>` for each
+agent that can use it. A key for every agent also goes to `.vault/<NAME>`, the path of versions
+before 0.70.0, because scripts, MCP servers and provider configs read it (#8983); a key for chosen
+agents never does. "Only this agent" saves a Vault key for the asking agent. All agents run as
+the same system user, so an agent can read the key files of other agents: the scope controls which
+agents OpenBot gives a key to, not which agents can read it. The Vault text says this. Otherwise, `AttentionRegistry` saves the value with
 `AgentApiKeys` (`src/backend/agent-api-keys.ts`) before the prompt resolves, as
 `<userData>/agent-api-keys/<agentId>/<NAME>`: a 0600 file in a 0700 folder, outside every workspace,
 and not encrypted. A failed save leaves the form open. The agent gets only the name and the path, and
@@ -149,7 +157,11 @@ register a value of 8 or more characters for log redaction when the call arrives
 the Vault registers a shorter value when it saves it. Both work only when a
 person's message in this computer's OpenBot chat started the turn, as for workflow changes: an
 external chat, a team member, a routine, another agent, or a web page cannot replace a key or a
-password. They return no secret. `save_api_key` replaces a Vault key with the same name and deletes
+password. In a channel task, `save_api_key` saves only a value that the request of the root task holds
+as a whole token of 8 or more characters, when this computer's user wrote that request
+(`ChannelService.localRequestHolds`, #6369), and only under a name that the agent has no key for
+yet: the agent also reads the lead's and the other members' words there. Otherwise, it tells the
+agent to call `request_api_key`, whose form works in a channel and can replace a key. They return no secret. `save_api_key` replaces a Vault key with the same name and deletes
 the calling agent's own key with that name, because the agent's own key wins in `list_api_keys`.
 Another agent's own key with that name stays and still wins for that agent. The value is in the provider's
 transcript because the agent sent it; OpenBot keeps no tool arguments in its trace. An agent cannot

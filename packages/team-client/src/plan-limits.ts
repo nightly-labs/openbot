@@ -6,12 +6,18 @@ import {
   accountUsageCoversModel,
   agentProviderDescriptor,
   DEFAULT_PROVIDER_ACCOUNT_ID,
+  decodeUsageCredits,
   type HostProviderAccounts,
   isAccountUsage,
   isAgentProvider,
+  keepUsageCredits,
+  type UsageCredits,
   usageQuotaForModel,
+  withUsageCredits,
 } from "@openbot/contracts/ipc";
+import { decodeRecord } from "@openbot/contracts/ipc-decoding";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { USAGE_CREDITS_ROUTES } from "@openbot/contracts/team-protocol/usage-credits-v1";
 import { Effect, Schema } from "effect";
 import { listProviderAccounts, providerAccountUsage } from "./team-admin-requests";
 import type { TeamApiRequest } from "./team-api-requests";
@@ -154,9 +160,12 @@ export function withUsageEvent(current: AccountUsage | null | undefined, event: 
     const kept = limits.get(usageLimitKey(limit));
     limits.set(
       usageLimitKey(limit),
-      limit.primary || limit.secondary || !kept
-        ? limit
-        : { ...limit, primary: kept.primary, secondary: kept.secondary },
+      keepUsageCredits(
+        kept,
+        limit.primary || limit.secondary || !kept
+          ? limit
+          : { ...limit, primary: kept.primary, secondary: kept.secondary },
+      ),
     );
   }
   return { limits: [...limits.values()] };
@@ -168,29 +177,54 @@ function decodeAccountUsage(value: unknown): AccountUsage {
 }
 
 /**
+ * `usage-credits-v1`: whether each provider account of the host can work on credits. Optional: when
+ * the read fails, the reading shows as it does from a host without it.
+ */
+export function readUsageCredits(request: TeamApiRequest): Effect.Effect<UsageCredits[]> {
+  return Effect.tryPromise(() =>
+    request(
+      "POST",
+      USAGE_CREDITS_ROUTES.list,
+      (value) => decodeUsageCredits(decodeRecord(value, "usage credits").accounts),
+      {},
+    ),
+  ).pipe(Effect.orElseSucceed(() => []));
+}
+
+/**
  * Reads the limits of the provider's own sign-ins, which every member can read. With `accounts`,
- * also reads the accounts after the first and their names: owners and admins only. Those two reads
- * are optional: when one fails, the sign-in limits still show, as they do for a member.
+ * also reads the accounts after the first and their names: owners and admins only. With `credits`,
+ * also reads whether each account can work on credits (`usage-credits-v1`). Those reads are
+ * optional: when one fails, the sign-in limits still show, as they do for a member.
  */
 export const readPlanLimits = Effect.fn("TeamClient.readPlanLimits")(function* (
   request: TeamApiRequest,
   accounts: boolean,
+  credits = false,
 ): Effect.fn.Return<PlanLimits, PlanLimitsRequestError> {
   const signIns = Effect.tryPromise({
     try: () => request("GET", TEAM_API_ROUTES.agents.usage, decodeAccountUsage),
     catch: (cause) => new PlanLimitsRequestError({ cause }),
   });
-  if (!accounts) return { usage: withSignInUsage(null, yield* signIns), accounts: null };
-  const [signInUsage, extra] = yield* Effect.all(
+  const creditRows = credits ? readUsageCredits(request) : Effect.succeed([]);
+  if (!accounts) {
+    const [signInUsage, rows] = yield* Effect.all([signIns, creditRows], { concurrency: "unbounded" });
+    return { usage: withUsageCredits(withSignInUsage(null, signInUsage), rows), accounts: null };
+  }
+  const [signInUsage, extra, rows] = yield* Effect.all(
     [
       signIns,
       Effect.all([providerAccountUsage(request), listProviderAccounts(request)], {
         concurrency: "unbounded",
       }).pipe(Effect.orElseSucceed(() => null)),
+      creditRows,
     ],
     { concurrency: "unbounded" },
   );
-  return { usage: withSignInUsage(extra?.[0], signInUsage), accounts: extra?.[1].providers ?? null };
+  return {
+    usage: withUsageCredits(withSignInUsage(extra?.[0], signInUsage), rows),
+    accounts: extra?.[1].providers ?? null,
+  };
 });
 
 /** A plan window that is spent and has not ended yet, as the composer notice and the model picker read it. */
@@ -199,6 +233,8 @@ export interface SpentUsageWindow {
   window: AccountUsageWindow;
   /** False for a provider-level reading that does not limit the model (`accountUsageCoversModel`). */
   covers: boolean;
+  /** The account keeps working on credits, so the spent window does not stop the model. */
+  onCredits: boolean;
 }
 
 /**
@@ -230,7 +266,12 @@ export function spentUsageWindow(
       if (spent && (window.resetsAt ?? Number.POSITIVE_INFINITY) <= (spent.window.resetsAt ?? Number.POSITIVE_INFINITY))
         continue;
       // A named group is the model's own quota.
-      spent = { slot, window, covers: quota !== limit || accountUsageCoversModel(provider, model) };
+      spent = {
+        slot,
+        window,
+        covers: quota !== limit || accountUsageCoversModel(provider, model),
+        onCredits: limit.creditsAvailable === true,
+      };
     }
     if (spent) return spent;
   }

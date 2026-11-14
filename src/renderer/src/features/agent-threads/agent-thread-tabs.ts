@@ -37,6 +37,8 @@ export interface AgentThreadTabsOptions {
 export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
   const { serverId, activeAgentId, tasks } = options;
   const scopeIsCurrent = createScopeGuard();
+  /** The server of this state. On desktop the server scope makes the state again for each server. */
+  const ownServerId = untrack(serverId);
   const [tabsByServer, setTabsByServer] = createSignal<ThreadTabsByServer>(readThreadTabs());
   /** Agents with a new thread tab. A new thread that has no message is not kept after a restart. */
   const [drafts, setDrafts] = createSignal<ReadonlySet<string>>(new Set());
@@ -386,7 +388,16 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
   /** The first message of the new thread tab starts the thread, which then takes the place of the tab. */
   async function sendDraft(agentId: string, text: string, attachmentDraftIds: string[]): Promise<boolean> {
     const started = await tasks.startTask(agentId, text, attachmentDraftIds);
-    if (!started || !scopeIsCurrent()) return false;
+    if (!started) return false;
+    if (!scopeIsCurrent()) {
+      // The user left the server while its files loaded. The thread started there, and its tab waits there (#9123).
+      const stored = readThreadTabs();
+      const tabs = stored[ownServerId]?.[agentId] ?? NO_TABS;
+      const open = [...tabs.open.filter((entry) => entry !== started.id), started.id];
+      const active = tabs.active === DRAFT_THREAD_ID ? started.id : tabs.active;
+      writeThreadTabs({ ...stored, [ownServerId]: { ...stored[ownServerId], [agentId]: { ...tabs, open, active } } });
+      return true;
+    }
     seen.add(started.id);
     const stillOpen = activeId(agentId) === DRAFT_THREAD_ID;
     setDraft(agentId, false);

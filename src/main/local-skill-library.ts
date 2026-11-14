@@ -9,7 +9,14 @@ import { zipSync } from "fflate";
 import { parse as parseYaml } from "yaml";
 import { causeHelpers } from "../backend/effect-boundary";
 import { MANAGED_SKILL_SLUGS } from "./managed-skill-service";
-import { archiveDirectory, inspectArchive, normalizedFiles, SKILL_FRONTMATTER } from "./skill-package";
+import {
+  archiveDirectory,
+  inspectArchive,
+  normalizedFiles,
+  readSkillArchive,
+  SKILL_FRONTMATTER,
+  skillZippable,
+} from "./skill-package";
 
 /** Owns immutable local revisions. A revision exists only after its directory is published. */
 export class LocalSkillLibrary {
@@ -171,8 +178,16 @@ export class LocalSkillLibrary {
         return yield* new LocalSkillFailure({
           cause: new Error(sourceText("error.skill.managedSlug", { slug: info.slug })),
         });
-      if ((yield* this.list()).some((skill) => skill.slug === info.slug))
-        return yield* new LocalSkillFailure({ cause: new Error(sourceText("error.skill.localNameTaken")) });
+      const taken = (yield* this.list()).find((skill) => skill.slug === info.slug);
+      // A different name can give the same slug, as two names that differ only in Chinese text do (#8693).
+      if (taken)
+        return yield* new LocalSkillFailure({
+          cause: new Error(
+            taken.name === info.name
+              ? sourceText("error.skill.localNameTaken")
+              : sourceText("error.skill.localNameClash", { name: taken.name, slug: info.slug }),
+          ),
+        });
       const id = `local-skill-${randomUUID()}`;
       yield* this.publishEffect(id, 1, bytes);
       return yield* this.get(id, 1);
@@ -292,11 +307,11 @@ function parsesAsYaml(text: string): boolean {
  * The folder in the workspace does not change.
  */
 function withQuotedFrontmatter(bytes: Uint8Array): Uint8Array {
-  const files = normalizedFiles(bytes);
+  const { files, executable } = readSkillArchive(bytes);
   const skillFile = files["SKILL.md"];
   if (!skillFile) return bytes;
   const quoted = quotedSkillMarkdown(skillFile);
-  return quoted ? zipSync({ ...files, "SKILL.md": quoted }, { level: 6 }) : bytes;
+  return quoted ? zipSync(skillZippable({ ...files, "SKILL.md": quoted }, executable), { level: 6 }) : bytes;
 }
 
 /** The `SKILL.md` as `withQuotedFrontmatter` saves it, or null when a save keeps it unchanged. */

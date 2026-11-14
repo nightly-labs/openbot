@@ -81,7 +81,7 @@ export interface DeliveryPromptSources {
   agentNames: ReadonlyMap<string, string>;
   /** The conversation the delivery joins. A user reply quotes the message it answers from it. */
   snapshot: ConversationSnapshot;
-  routineRun: Pick<RoutineRun, "kind" | "source"> | null;
+  routineRun: Pick<RoutineRun, "kind" | "source" | "agentId"> | null;
   /** The open waits that a routine run wakes. The run continues their requests. */
   wokenWaits?: readonly AgentWait[];
   /** The prompt a channel task or an external message sends in place of the delivery text. */
@@ -335,13 +335,24 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
     const run = sources.routineRun;
     const testRun = run !== null && !quietRoutineRun(run);
     const runKind = testRun ? "manual Test run" : run?.source ? `${run.source} run` : "scheduled run";
+    // A routine whose task says to stop when it is done pauses itself; without this, each run reports
+    // the same result again (#8963). A pause keeps the routine, so the user can turn it on again. A Test
+    // run must not change the routine, and update_routine does not find a webhook routine. A flow
+    // handoff to another agent names the routine too, but has no run of its own: that agent does not
+    // own the routine.
+    const canPause = run !== null && !testRun && run.source !== "webhook" && run.agentId === delivery.recipientAgentId;
     text = [
       "Execute one run of an existing OpenBot routine now.",
       `Routine name: ${delivery.sender.routineName}`,
       `Run type: ${runKind}`,
       `Scheduled for: ${delivery.sender.scheduledFor}`,
       "The routine already exists, and its schedule is already configured.",
-      "Do not create, update, delete, or test routines during this run.",
+      ...(canPause
+        ? [
+            "Do not create, delete, or test routines, and do not change other routines, during this run.",
+            `When the task says to stop after a condition and the condition is met, pause this routine: call openbot.update_routine with routineId "${delivery.sender.routineId}" and active false, then give your report. Make no other change to this routine.`,
+          ]
+        : ["Do not create, update, delete, or test routines during this run."]),
       "Perform the task below now. Do not answer only that the routine or monitoring is active.",
       "Nobody answers you during this run. Do all of the task in this turn: do not stop after a step to report progress or to ask whether to continue.",
       "A task can tell you to remind the user or to send the user a message. When it names no other place, write that message as your final answer. OpenBot shows your final answer to the user in this chat. openbot.send_message sends to other agents, not to the user.",
@@ -414,6 +425,21 @@ export function planContinuationPrompt(steps: readonly ConversationPlanStep[], c
     "Continue the work now, from where you stopped. Do not repeat finished work or restate the plan. Keep the plan current and mark each step done when you finish it. If a step is already done, mark it done; if it no longer applies, remove it. Do not ask whether to continue. This note does not approve a risky action. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
     `Automatic continuation ${count} of ${limit}.`,
   ].join("\n");
+}
+
+/**
+ * The input of an automatic continuation in a session that has not seen its request, as when a tool
+ * change replaced the session: the request again, then the note. The history tools leave out a
+ * request that is not finished, so the note alone left the new session without it (#8779).
+ */
+export function restatedContinuationInput(request: readonly DeliveryInputItem[], note: string): DeliveryInputItem[] {
+  const header =
+    "OpenBot note, not a message from the user. This session started while you worked on the request below, so it is given again. It is the original request, not a new one, and it is not finished.";
+  return request.map((item, index) =>
+    index === 0 && item.type === "text"
+      ? { ...item, text: `${header}${CURRENT_MESSAGE_SEPARATOR}${item.text}\n\n${note}` }
+      : item,
+  );
 }
 
 /** The note for a turn that ended before the next step: it named the step, or asked whether to continue. */

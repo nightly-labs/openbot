@@ -412,6 +412,17 @@ The host cuts each request text to 2,000 characters. A wait that is already clos
 host's sentence. The host sends no event when a wait changes, so a client reads the list again after a
 cancel and when a turn of the agent starts or ends.
 
+The optional `pending-approval-v1` capability (protocol 9 only) adds `POST /v1/agent-approvals/read`
+(`agentId`, `requestId`). It returns `{ approval }`, the whole copy of one approval that the agent waits
+on, as the `approval` event carries it. A runtime snapshot cuts each text of an approval to 240
+characters and sets `truncated`, so a client that did not get the event (a phone that connects
+later, a desktop after a restart) reads the whole copy here before it offers Allow. Each client keeps
+the whole copy when the next snapshot comes (`keepWholeApprovals` in
+`packages/team-client/src/runtime-attention.ts`), and shows a cut copy with Deny only.
+`src/main/team-api/route-pending-approval.ts` owns the authorization: a hidden or missing agent gets
+404, a member needs `chat` on the agent (else 403), and a request that no longer waits, or a request of
+another agent, gets 409.
+
 The optional `agent-queue-task-v1` capability (protocol 9 only) adds
 `POST /v1/agent-tasks/from-queued-message` (`agentId`, `deliveryId`, no other keys). It is "Run as a
 new thread" on a message that waits in the queue of the agent's own chat. The host advertises it only
@@ -427,7 +438,7 @@ dev server, with Stop. Only owners and admins can use them (else 403). The host 
 line before it leaves `src/main/background-processes.ts`, cuts it to 500 characters, sends at most
 200 programs and 64 ports each, and never sends the environment of a program. `processes` is null on a
 Windows host, which cannot find these programs. Stop signals only a program that is in the list at
-that time; an unknown id does nothing. This computer shows its own programs in Settings > Agents.
+that time; an unknown id does nothing. This computer shows its own programs in the same place.
 
 The optional `provider-use-v1` capability (protocol 9 only) adds `POST /v1/admin/provider-use/list`
 and `POST /v1/admin/provider-use/set` (`provider`, `on`). They are the on/off switch of the host's
@@ -515,6 +526,19 @@ the list again; the desktop main process adds the list to the snapshot that it f
 `src/main/team-api/route-agent-usage-limit.ts` owns them. Without the capability a client does not show
 the usage-limit card for that host. Only an owner or admin sees "Next time, switch without asking" on
 the card, because the backup models use `agent-backup-models-v1`.
+
+The optional `agent-pending-runtime-v1` capability (protocol 9 only) adds
+`POST /v1/agent-pending-runtime/update` (`agentId`, and one or more of `provider`, `model`,
+`reasoningEffort` and `providerAccountId`, where `default` is the provider's own sign-in). It changes the
+runtime as the pickers on the host's computer do: while the agent works, the host keeps the change as
+`pendingRuntime` and applies it before the next turn, where the released `PATCH /v1/agents/:agentId`
+refuses a provider change. It needs a visible agent (else 404) and `manage` on it (else 403); another
+account needs an owner or admin (else 403), except the new provider's own sign-in on a provider change. For a peer with the
+capability, the host also adds `pendingRuntime` to each agent of `GET /v1/agents` and of the
+`bots-changed` event, so the "After this turn" badge shows on the client.
+`src/main/team-api/route-agent-pending-runtime.ts` owns the route. The desktop with a joined server and
+the web client send a runtime change alone on it when the host has the capability; mobile still uses the
+released route. Without the capability a provider change during work is refused as before.
 
 The optional `hermes-import-v1` capability (protocol 9 only) adds `POST /v1/hermes-import/read` (empty
 body), `POST /v1/hermes-import/apply` (`token`, `profiles` with `key` and `allow`) and

@@ -34,6 +34,7 @@ import {
   type IngressAnswer,
   type IngressHandler,
   type IngressState,
+  type LinkedRoutePlatform,
   MessagingAdapterError,
   type MessagingIngress,
   TelegramCallError,
@@ -50,6 +51,18 @@ function queuedRoute(message: QueuedSignalMessage): string {
   if (message.type === "slack-delivery") return `slack:${message.teamId}`;
   if (message.type === "discord-delivery") return `discord:${message.guildId}`;
   return `telegram:${message.chatId}`;
+}
+
+/** A route ticket, and the Slack workspace or Telegram chat IDs it names. Null IDs: an older account service. */
+interface LinkedRouteTicket {
+  ticket: string;
+  ids: readonly string[] | null;
+}
+
+type LinkedRouteIds = Record<LinkedRoutePlatform, ReadonlySet<string> | null>;
+
+function linkedRouteIds(route: LinkedRouteTicket | null): ReadonlySet<string> | null {
+  return route?.ids ? new Set(route.ids) : null;
 }
 
 const BACKOFF_START_MS = 2_000;
@@ -72,7 +85,7 @@ export interface SignalIngressOptions {
   signedIn(): boolean;
   issueTicket(hostId: string): Effect.Effect<{ ticket: string; signalUrl: string }, RemoteWorkflowError>;
   /** The Slack route ticket: the workspaces that the account service links to this host. */
-  issueSlackRoute(hostId: string): Effect.Effect<string, RemoteWorkflowError>;
+  issueSlackRoute(hostId: string): Effect.Effect<LinkedRouteTicket, RemoteWorkflowError>;
   /** The Discord route ticket: the guilds that the account service links to this host. */
   issueDiscordRoute(hostId: string): Effect.Effect<string, RemoteWorkflowError>;
   /** The generic webhook route ticket: route IDs registered by this host in account metadata. */
@@ -87,7 +100,7 @@ export interface SignalIngressOptions {
    * as an account service without Telegram, leaves the socket without Telegram chats until it opens
    * again later.
    */
-  issueTelegramRoute?(hostId: string): Effect.Effect<string, RemoteWorkflowError>;
+  issueTelegramRoute?(hostId: string): Effect.Effect<LinkedRouteTicket, RemoteWorkflowError>;
   /**
    * The lasting queue key of this host, or null. With it, Signal keeps the events of a hosted server
    * that sleeps, sealed, and sends them when the socket connects.
@@ -99,11 +112,11 @@ class SignalIngressAccount extends Context.Service<
   SignalIngressAccount,
   {
     ticket(hostId: string): Effect.Effect<{ ticket: string; signalUrl: string }, RemoteWorkflowError>;
-    slackRoute(hostId: string): Effect.Effect<string, RemoteWorkflowError>;
+    slackRoute(hostId: string): Effect.Effect<LinkedRouteTicket, RemoteWorkflowError>;
     discordRoute(hostId: string): Effect.Effect<string, RemoteWorkflowError>;
     webhookRoute(hostId: string): Effect.Effect<string, RemoteWorkflowError>;
     githubRoute(hostId: string): Effect.Effect<string, RemoteWorkflowError>;
-    telegramRoute(hostId: string): Effect.Effect<string | null>;
+    telegramRoute(hostId: string): Effect.Effect<LinkedRouteTicket | null>;
   }
 >()("openbot/main/SignalIngressAccount") {
   static layer(options: SignalIngressOptions) {
@@ -218,6 +231,16 @@ export class SignalIngress implements MessagingIngress {
   #telegramBackoffMs = BACKOFF_START_MS;
   readonly #sessionListeners = new Set<(session: DiscordSession | null) => void>();
   readonly #routeListeners = new Set<(guildIds: ReadonlySet<string>) => void>();
+  /** The guilds that Signal routes to the open socket, from its `discord-session`. */
+  #discordGuilds: ReadonlySet<string> | null = null;
+  readonly #linkedRouteListeners: Record<LinkedRoutePlatform, Set<(ids: ReadonlySet<string> | null) => void>> = {
+    slack: new Set(),
+    telegram: new Set(),
+  };
+  /** The workspace and chat IDs of the tickets of the socket that is opening, until its `ready`. */
+  #pendingLinkedRoutes: LinkedRouteIds = { slack: null, telegram: null };
+  /** The workspace and chat IDs that Signal routes to the open socket. Null when not known. */
+  #linkedRoutes: LinkedRouteIds = { slack: null, telegram: null };
   /** What the Signal of the open socket can do, from its `ready`. */
   #capabilities = new Set<string>();
   /** The HTTPS origin of the Signal of the open socket, for Telegram files. */
@@ -415,6 +438,13 @@ export class SignalIngress implements MessagingIngress {
         catch: () => new MessagingAdapterError({ cause: new DiscordApiError(request.op, "invalid_answer") }),
       });
     const refused = Result.getOrNull(Result.try(() => decodeDiscordApiError(JSON.parse(text))));
+    // Signal no longer routes the guild to this socket: the account service linked it to another host.
+    if (
+      refused?.code === "unknown_guild" &&
+      this.#discordSession === session &&
+      this.#discordGuilds?.has(request.guildId)
+    )
+      this.#setDiscordGuilds(new Set([...this.#discordGuilds].filter((guildId) => guildId !== request.guildId)));
     return yield* new MessagingAdapterError({
       cause: new DiscordApiError(request.op, refused?.code ?? `http_${status}`, refused?.retryAfterMs),
     });
@@ -423,6 +453,25 @@ export class SignalIngress implements MessagingIngress {
   onDiscordRoutes(listener: (guildIds: ReadonlySet<string>) => void): () => void {
     this.#routeListeners.add(listener);
     return () => this.#routeListeners.delete(listener);
+  }
+
+  #setDiscordGuilds(guildIds: ReadonlySet<string>): void {
+    this.#discordGuilds = guildIds;
+    for (const listener of [...this.#routeListeners]) listener(guildIds);
+  }
+
+  onLinkedRoutes(platform: LinkedRoutePlatform, listener: (ids: ReadonlySet<string> | null) => void): () => void {
+    const listeners = this.#linkedRouteListeners[platform];
+    listeners.add(listener);
+    const ids = this.#linkedRoutes[platform];
+    if (ids) listener(ids);
+    return () => listeners.delete(listener);
+  }
+
+  #setLinkedRoutes(routes: LinkedRouteIds): void {
+    this.#linkedRoutes = routes;
+    for (const platform of ["slack", "telegram"] as const)
+      for (const listener of [...this.#linkedRouteListeners[platform]]) listener(routes[platform]);
   }
 
   /**
@@ -451,6 +500,8 @@ export class SignalIngress implements MessagingIngress {
     this.#close();
     this.#listeners.clear();
     this.#routeListeners.clear();
+    this.#linkedRouteListeners.slack.clear();
+    this.#linkedRouteListeners.telegram.clear();
     this.#webhookHandler = null;
     this.#webhookHolders = 0;
     this.#githubHandler = null;
@@ -516,10 +567,10 @@ export class SignalIngress implements MessagingIngress {
     }
     const [bootstrap, slackRoute, discordRoute, webhookRoute, telegramRoute, githubRoute] = issued.success;
     const routes = {
-      ...(slackRoute === null ? {} : { slackRoute }),
+      ...(slackRoute === null ? {} : { slackRoute: slackRoute.ticket }),
       ...(discordRoute === null ? {} : { discordRoute }),
       ...(webhookRoute === null ? {} : { webhookRoute }),
-      ...(telegramRoute === null ? {} : { telegramRoute }),
+      ...(telegramRoute === null ? {} : { telegramRoute: telegramRoute.ticket }),
       ...(githubRoute === null ? {} : { githubRoute }),
     };
     // Loaded once: two opens at the same time must not make two keys.
@@ -530,6 +581,7 @@ export class SignalIngress implements MessagingIngress {
     this.#githubMissing = github && githubRoute === null;
     this.#telegramMissing = telegram && telegramRoute === null;
     if (telegram && telegramRoute !== null) this.#telegramBackoffMs = BACKOFF_START_MS;
+    this.#pendingLinkedRoutes = { slack: linkedRouteIds(slackRoute), telegram: linkedRouteIds(telegramRoute) };
     const socket = new WebSocket(bootstrap.signalUrl);
     this.#socket = socket;
     // A socket that stalls before `ready` closes, so that the retry opens a new one.
@@ -558,6 +610,8 @@ export class SignalIngress implements MessagingIngress {
       if (socket !== this.#socket) return;
       this.#socket = null;
       this.#discordSession = null;
+      this.#discordGuilds = null;
+      this.#linkedRoutes = { slack: null, telegram: null };
       this.#endTelegram();
       this.#stopPing();
       this.#clearReadyDeadline();
@@ -643,6 +697,8 @@ export class SignalIngress implements MessagingIngress {
       this.#capabilities = new Set(message.capabilities ?? []);
       this.#backoffMs = BACKOFF_START_MS;
       this.#startPing(socket);
+      // Before `online`, so that a connection that is not linked never shows as connected.
+      this.#setLinkedRoutes(this.#pendingLinkedRoutes);
       this.#setState("online");
       if (this.#webhookMissing || this.#githubMissing || this.#telegramMissing) this.#retryRoutes();
       return;
@@ -693,8 +749,7 @@ export class SignalIngress implements MessagingIngress {
       const session = { token: message.token, url };
       this.#discordSession = session;
       for (const listener of [...this.#sessionListeners]) listener(session);
-      const routes = new Set(message.guilds);
-      for (const listener of [...this.#routeListeners]) listener(routes);
+      this.#setDiscordGuilds(new Set(message.guilds));
       return;
     }
     if (message.type === "discord-delivery") {
@@ -711,6 +766,10 @@ export class SignalIngress implements MessagingIngress {
       return;
     }
     if (message.type === "telegram-delivery") {
+      // Signal routes a chat that it just linked to this socket at once, before any new ticket names it.
+      const chats = this.#linkedRoutes.telegram;
+      if (message.linked === true && chats && !chats.has(message.chatId))
+        this.#linkedRoutes = { ...this.#linkedRoutes, telegram: new Set([...chats, message.chatId]) };
       // Telegram gets no answer: Signal already answered its webhook.
       const handler = this.#handler;
       if (handler)
@@ -881,6 +940,8 @@ export class SignalIngress implements MessagingIngress {
     const socket = this.#socket;
     this.#socket = null;
     this.#discordSession = null;
+    this.#discordGuilds = null;
+    this.#linkedRoutes = { slack: null, telegram: null };
     this.#webhookReady = false;
     this.#loseGitHub();
     if (this.#unheld()) for (const listener of [...this.#sessionListeners]) listener(null);

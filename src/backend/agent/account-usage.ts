@@ -88,6 +88,8 @@ function normalizeAccountLimit(id: string, limit: AccountRateLimitResult): Accou
     id: limit.limitId ?? id,
     primary: normalizeUsageWindow(limit.primary),
     secondary: normalizeUsageWindow(limit.secondary),
+    // A reading with no credit state says that credits do not cover this quota.
+    ...(limit.credits === undefined ? {} : { creditsAvailable: limit.credits?.available ?? false }),
   };
 }
 

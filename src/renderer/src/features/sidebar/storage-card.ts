@@ -1,9 +1,10 @@
+import { hostedPlanDisk } from "@openbot/contracts/hosted-servers";
 import type { ServerSummary, StorageDisk } from "@openbot/contracts/ipc";
 import { STORAGE_DISK_CAPABILITY } from "@openbot/contracts/team-protocol/storage-disk-v1";
 import type { SidebarStorageLevel } from "@openbot/ui/features/sidebar/SidebarStorageCard";
 import { createMemo, createSignal, untrack } from "solid-js";
 import { createUsageRefreshPoll } from "../account/usage-refresh-poll";
-import { canManageStorage, hostedPlanStorageGb, planDisk } from "../files/storage-usage";
+import { canManageStorage, hostedPlanStorageGb } from "../files/storage-usage";
 import { serverSupportsCapability } from "../servers/server-capabilities";
 import { type SidebarCardsPort, sidebarPort } from "./sidebar-port";
 
@@ -21,7 +22,7 @@ const DISMISSED_KEY_PREFIX = "openbot:storage-card-dismissed:";
  * plan). For example, a 50 GB plan is "low" at 40 GB used.
  */
 function storageLevel(disk: StorageDisk, storageGb: number | null): SidebarStorageLevel | null {
-  const { freeBytes, totalBytes } = storageGb === null ? disk : planDisk(disk, storageGb);
+  const { freeBytes, totalBytes } = storageGb === null ? disk : hostedPlanDisk(disk, storageGb);
   if (freeBytes === null || totalBytes === null || totalBytes <= 0) return null;
   if (freeBytes < Math.min(totalBytes * 0.02, GB)) return "full";
   if (freeBytes < (storageGb === null ? Math.min(totalBytes * 0.1, 5 * GB) : Math.min(totalBytes * 0.2, 10 * GB)))
@@ -126,7 +127,7 @@ export function createStorageCard(server: () => ServerSummary | undefined, port:
       if (!current || current.serverId !== target()) return null;
       const plan = storageGb();
       const level = storageLevel(current.disk, plan);
-      const { freeBytes, totalBytes } = plan === null ? current.disk : planDisk(current.disk, plan);
+      const { freeBytes, totalBytes } = plan === null ? current.disk : hostedPlanDisk(current.disk, plan);
       if (!level || freeBytes === null || totalBytes === null) return null;
       dismissals();
       if (level === "low" && readDismissed(current.serverId)) return null;

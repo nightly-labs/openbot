@@ -27,9 +27,11 @@ import {
   CURRENT_MESSAGE_SEPARATOR,
   combinedPromptInput,
   deliveryPromptInput,
+  restatedContinuationInput,
   type TagReferenceSource,
 } from "./delivery-content";
 import type { DuplicationGate } from "./duplication-gate";
+import { handoffHasHistory } from "./handoff-history";
 import type { MailboxSync } from "./mailbox-sync";
 import type { MemoryHold } from "./memory-hold";
 import type { PlanContinuation } from "./plan-continuation";
@@ -924,7 +926,8 @@ export class DrainScheduler {
           agentNames,
         );
       };
-      // The request is already in the session, so a plan continuation sends only its note.
+      // The request is already in the session, so a plan continuation sends only its note. A new
+      // session, which gets the history handoff, gets the request again before the note (#8779).
       const completeInput =
         planNote === undefined ? promptInput(execution?.text) : [{ type: "text" as const, text: planNote }];
       // A channel packet with only unread messages, or an external message without the guidance, goes
@@ -936,8 +939,13 @@ export class DrainScheduler {
       // The handoff that each start sent: the cleanup after the turn removes only that part.
       const sentHandoffs = new Map<string, string>();
       const inputForThread = (providerThreadId: string) => {
-        const input = deltaInput && shortened?.sendsDelta(delivery.id, providerThreadId) ? deltaInput : completeInput;
         const handoff = this.#threads.consumePendingHandoff(providerThreadId);
+        const input =
+          deltaInput && shortened?.sendsDelta(delivery.id, providerThreadId)
+            ? deltaInput
+            : planNote !== undefined && handoff && handoffHasHistory(handoff)
+              ? restatedContinuationInput(promptInput(execution?.text), planNote)
+              : completeInput;
         if (!handoff) return input;
         sentHandoffs.set(providerThreadId, handoff);
         return input.map((item, index) =>
@@ -1321,8 +1329,10 @@ export class DrainScheduler {
    * provider's own sign-in text when the start failed with it, such as a request for an API key, and an
    * expired sign-in otherwise, also when the provider refused the account before its check marked it.
    * Only catalog text goes to the channel: every reader of it sees it, in the reader's language.
+   * Another Codex app that holds the thread is the same: Resume fails until the reader closes it there.
    */
   #channelStartReason(recipient: AgentSummary | undefined, error: unknown): string {
+    if (isCodexThreadInUse(error)) return sourceText("error.provider.codexThreadInUse");
     if (!recipient || !(error instanceof Error)) return CHANNEL_START_FAILED;
     const provider = providerForAgent(recipient);
     const signInText =

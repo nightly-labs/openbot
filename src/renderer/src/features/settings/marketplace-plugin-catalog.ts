@@ -709,6 +709,47 @@ const HIGGSFIELD: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/higgsfield",
 };
 
+const SUNRA: MarketplacePluginDetail = {
+  id: "plugin-sunra",
+  slug: "sunra",
+  name: "Sunra",
+  tagline: "AI images, videos, audio and 3D",
+  description:
+    "Sunra lets agents make images, videos, audio and 3D models with models such as GPT Image, Nano Banana, Seedream, FLUX, Seedance, Kling and Veo, check the credit balance, and read the results. Results go to a project in the user's Sunra account. Each user signs in to their own Sunra account through the browser. Sunra first quotes the cost of each generation, and spends credits of that account only after it is confirmed.",
+  category: "design",
+  creatorName: "Sunra",
+  iconUrl: "https://sunra.ai/apple-icon.png",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-balance", text: "How many Sunra credits do I have?" },
+    { id: "prompt-poster", text: "Make a Sunra poster of a night market in the rain, in portrait format." },
+    { id: "prompt-clip", text: "Make a 5-second Sunra video of a paper boat on a river. Tell me the cost first." },
+  ],
+  apps: [
+    {
+      id: "app-sunra-mcp",
+      name: "Sunra",
+      description:
+        "Image, video, audio and 3D generation, credits and results, over Sunra's MCP server with browser sign-in.",
+      iconUrl: "https://sunra.ai/apple-icon.png",
+      server: {
+        name: "sunra",
+        transport: "http",
+        url: "https://mcp.sunra.ai",
+        auth: [{ id: "sunra-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://sunra.ai",
+  privacyPolicyUrl: "https://sunra.ai/privacy",
+  termsUrl: "https://sunra.ai/terms",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-11-10T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/sunra",
+};
+
 const ELEVENLABS: MarketplacePluginDetail = {
   id: "plugin-elevenlabs",
   slug: "elevenlabs",
@@ -828,6 +869,47 @@ const SENTRY: MarketplacePluginDetail = {
   featured: false,
   updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/sentry",
+};
+
+const APPSIGNAL: MarketplacePluginDetail = {
+  id: "plugin-appsignal",
+  slug: "appsignal",
+  name: "AppSignal",
+  tagline: "Errors, performance and logs",
+  description:
+    "AppSignal lets agents search error incidents and stack traces, find slow actions and traces, read logs, metrics, check-ins and uptime monitors, and build dashboards. Each user signs in to their own AppSignal account through the browser. The sign-in gives all read and write tools, so agents can also change the state, severity and assignee of an incident and add notes.",
+  category: "coding",
+  creatorName: "AppSignal",
+  iconUrl: "https://www.appsignal.com/favicon.ico",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-new-errors", text: "Which new errors did my production app get since the last deploy?" },
+    { id: "prompt-slow-actions", text: "Which actions were the slowest this week, and why?" },
+    { id: "prompt-uptime", text: "Did any uptime monitor or check-in fail in the last 24 hours?" },
+  ],
+  apps: [
+    {
+      id: "app-appsignal-mcp",
+      name: "AppSignal",
+      description:
+        "Error incidents, performance, logs, metrics and dashboards, over AppSignal's MCP server with browser sign-in.",
+      iconUrl: "https://www.appsignal.com/favicon.ico",
+      server: {
+        name: "appsignal",
+        transport: "http",
+        url: "https://appsignal.com/api/mcp",
+        auth: [{ id: "appsignal-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://www.appsignal.com",
+  privacyPolicyUrl: "https://www.appsignal.com/privacy-policy",
+  termsUrl: "https://www.appsignal.com/terms",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-11-10T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/appsignal",
 };
 
 const GITLAB: MarketplacePluginDetail = {
@@ -1212,6 +1294,47 @@ const RENDER: MarketplacePluginDetail = {
   featured: false,
   updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/render",
+};
+
+const CLOUD66: MarketplacePluginDetail = {
+  id: "plugin-cloud66",
+  slug: "cloud66",
+  name: "Cloud 66",
+  tagline: "Applications, deploys and servers",
+  description:
+    "Cloud 66 lets agents list accounts, applications, servers and clouds, read deployments and their logs, start deployments, manage deployment profiles, and create Deploy v3 clusters. Each user signs in to their own Cloud 66 account through the browser and selects the permissions on the consent page. Agents cannot do more than the user's Cloud 66 role permits. Deploying and creating servers can cost money. To delete an application or a deployment profile, or to add a cloud, Cloud 66 asks the agent to show a confirmation link. When the chat cannot show it, do these actions in the Cloud 66 dashboard.",
+  category: "coding",
+  creatorName: "Cloud 66",
+  iconUrl: "https://app.cloud66.com/favicon.ico",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-applications", text: "Which applications are in my Cloud 66 accounts?" },
+    { id: "prompt-failed-deploy", text: "Why did the last deployment of my app fail? Read its logs." },
+    { id: "prompt-deploy", text: "Deploy my staging application and tell me when it is done." },
+  ],
+  apps: [
+    {
+      id: "app-cloud66-mcp",
+      name: "Cloud 66",
+      description:
+        "Applications, deployments, servers, clouds and clusters, over Cloud 66's MCP server with browser sign-in.",
+      iconUrl: "https://app.cloud66.com/favicon.ico",
+      server: {
+        name: "cloud66",
+        transport: "http",
+        url: "https://app.cloud66.com/mcp",
+        auth: [{ id: "cloud66-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://www.cloud66.com",
+  privacyPolicyUrl: "https://www.cloud66.com/privacy",
+  termsUrl: "https://www.cloud66.com/terms",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-11-10T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/cloud66",
 };
 
 const CONTEXT7: MarketplacePluginDetail = {
@@ -1755,6 +1878,46 @@ const POSTIZ: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/postiz",
 };
 
+const TRYPOST: MarketplacePluginDetail = {
+  id: "plugin-trypost",
+  slug: "trypost",
+  name: "TryPost",
+  tagline: "Social media scheduling",
+  description:
+    "TryPost lets agents list your connected channels, and draft, schedule, queue and publish posts on X, LinkedIn, Instagram, Facebook, TikTok, YouTube, Threads, Bluesky, Mastodon, Pinterest and more. Agents can also read analytics, manage ideas and approvals, and set posting times. Sign in to your TryPost account through the browser and choose a workspace. Agents can publish a post immediately, so review each post before you approve it.",
+  category: "automation",
+  creatorName: "TryPost",
+  iconUrl: "https://app.trypost.it/images/integrations/openbot.png",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-week", text: "Which posts are scheduled for this week?" },
+    { id: "prompt-draft", text: "Draft a LinkedIn post about our new release, but do not schedule it." },
+    { id: "prompt-analytics", text: "Which of my posts from last month had the most engagement?" },
+  ],
+  apps: [
+    {
+      id: "app-trypost-mcp",
+      name: "TryPost",
+      description: "Channels, posts, queue, ideas and analytics, over TryPost's MCP server with browser sign-in.",
+      iconUrl: "https://app.trypost.it/images/integrations/openbot.png",
+      server: {
+        name: "trypost",
+        transport: "http",
+        url: "https://app.trypost.it/mcp/trypost",
+        auth: [{ id: "trypost-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://trypost.it",
+  privacyPolicyUrl: "https://trypost.it/en/privacy",
+  termsUrl: "https://trypost.it/en/terms",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-11-10T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/trypost",
+};
+
 const COMPOSIO: MarketplacePluginDetail = {
   id: "plugin-composio",
   slug: "composio",
@@ -2049,6 +2212,47 @@ const PLUGIN_2CHAT: MarketplacePluginDetail = {
   featured: false,
   updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/2chat",
+};
+
+const ADOBE_ANALYTICS: MarketplacePluginDetail = {
+  id: "plugin-adobe-analytics",
+  slug: "adobe-analytics",
+  name: "Adobe Analytics",
+  tagline: "Web analytics reports and segments",
+  description:
+    "Adobe Analytics lets agents find report suites, dimensions, metrics, segments and Workspace projects, and run ranked and trended reports. Each user signs in with their own Adobe ID through the browser and selects an organization. An Adobe administrator must first give the account MCP Read-only Access or MCP Full Access. With MCP Full Access, agents can also create and update segments, calculated metrics, date ranges and Workspace projects.",
+  category: "data-analytics",
+  creatorName: "Adobe",
+  iconUrl: "https://www.adobe.com/favicon.ico",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-top-pages", text: "Which pages had the most visits last week?" },
+    { id: "prompt-trend", text: "Show the daily orders for this month and compare them with last month." },
+    { id: "prompt-segment", text: "Which segments do we have for mobile visitors, and how are they defined?" },
+  ],
+  apps: [
+    {
+      id: "app-adobe-analytics-mcp",
+      name: "Adobe Analytics",
+      description:
+        "Report suites, reports, segments and Workspace projects, over Adobe's MCP server with browser sign-in.",
+      iconUrl: "https://www.adobe.com/favicon.ico",
+      server: {
+        name: "adobe-analytics",
+        transport: "http",
+        url: "https://aa-mcp.adobe.io/mcp",
+        auth: [{ id: "adobe-analytics-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://business.adobe.com/products/analytics/adobe-analytics.html",
+  privacyPolicyUrl: "https://www.adobe.com/privacy/policy.html",
+  termsUrl: "https://www.adobe.com/legal/terms.html",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-11-10T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/adobe-analytics",
 };
 
 const ADSPIRER: MarketplacePluginDetail = {
@@ -6973,46 +7177,6 @@ const MONDAY: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/monday",
 };
 
-const MONGODB: MarketplacePluginDetail = {
-  id: "plugin-mongodb",
-  slug: "mongodb",
-  name: "MongoDB Atlas",
-  tagline: "Atlas clusters and databases",
-  description:
-    "MongoDB Atlas lets agents list projects and clusters, inspect databases and collections, and run queries, in read-only or read-write mode as the organization owner allows. Each user signs in to their own MongoDB Atlas account through the browser.",
-  category: "coding",
-  creatorName: "MongoDB",
-  iconUrl: "https://avatars.githubusercontent.com/u/45120?s=256&v=4",
-  version: "1.0.0",
-  prompts: [
-    { id: "prompt-clusters", text: "List the clusters in my Atlas projects and their status." },
-    { id: "prompt-schema", text: "Describe the schema of the orders collection." },
-    { id: "prompt-query", text: "Find the ten most recent orders with a status of pending." },
-  ],
-  apps: [
-    {
-      id: "app-mongodb-mcp",
-      name: "MongoDB Atlas",
-      description: "Cluster, database, and collection access, over MongoDB's MCP server with browser sign-in.",
-      iconUrl: "https://avatars.githubusercontent.com/u/45120?s=256&v=4",
-      server: {
-        name: "mongodb",
-        transport: "http",
-        url: "https://mcp.mongodb.com",
-        auth: [{ id: "mongodb-oauth", kind: "link", label: "Sign in" }],
-      },
-    },
-  ],
-  websiteUrl: "https://www.mongodb.com",
-  privacyPolicyUrl: "https://www.mongodb.com/legal/privacy/privacy-policy",
-  termsUrl: "https://www.mongodb.com/legal/terms-of-use",
-  skills: [],
-  installs: 0,
-  featured: false,
-  updatedAt: "2026-11-10T00:00:00.000Z",
-  shareUrl: "https://openbot.run/plugins/mongodb",
-};
-
 const MOOMOO: MarketplacePluginDetail = {
   id: "plugin-moomoo",
   slug: "moomoo",
@@ -10372,9 +10536,11 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   FIGMA,
   PAPER,
   HIGGSFIELD,
+  SUNRA,
   ELEVENLABS,
   APPLE_APPS,
   SENTRY,
+  APPSIGNAL,
   GITLAB,
   VERCEL,
   CLOUDFLARE,
@@ -10384,6 +10550,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   NETLIFY,
   RAILWAY,
   RENDER,
+  CLOUD66,
   CONTEXT7,
   HUGGINGFACE,
   STRIPE,
@@ -10395,6 +10562,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   RESEND,
   OMNISEND,
   POSTIZ,
+  TRYPOST,
   COMPOSIO,
   CLICKUP,
   COINBASE,
@@ -10402,6 +10570,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   PLUGIN_1INCH,
   PLUGIN_21ST,
   PLUGIN_2CHAT,
+  ADOBE_ANALYTICS,
   ADSPIRER,
   AFFINITY,
   AGENTMAIL,
@@ -10523,7 +10692,6 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   MOBBIN,
   MONARCH,
   MONDAY,
-  MONGODB,
   MOOMOO,
   MURAL,
   NAVAN,

@@ -59,6 +59,8 @@ export const messages = {
   "error.skill.localRevisionNotFound":
     "Cette compétence locale n’a pas de révision {revision}. Sa dernière révision est {latest}.",
   "error.skill.localNameTaken": "Une compétence locale porte déjà ce nom. Révisez-la plutôt.",
+  "error.skill.localNameClash":
+    "Ce nom et la compétence locale « {name} » donnent tous deux « {slug} ». Pour modifier cette compétence, révisez-la. Pour ajouter une compétence, changez les lettres latines ou les chiffres de ce nom.",
   "error.skill.localKeepName": "Gardez le même nom de compétence lors de sa révision.",
   "error.skill.localRelativeFolder":
     "Utilisez un dossier de compétence relatif dans l’espace de travail de l’agent actuel.",
@@ -67,4 +69,15 @@ export const messages = {
   "error.skill.localMissingSkillFile": "Le dossier de la compétence doit contenir SKILL.md à sa racine.",
   "error.skill.pathSymlink": "Les chemins des compétences ne peuvent pas contenir de liens symboliques.",
   "error.skill.folderNotRead": "{provider} ne lit pas {folder}. Copiez ce dossier dans {target}.",
+  "error.skill.githubLinkInvalid": "Collez un lien vers un dépôt ou un dossier GitHub.",
+  "error.skill.githubNotFound": "OpenBot ne peut pas ouvrir {repository}. Le dépôt est privé ou n'existe pas.",
+  "error.skill.githubNoSkills": "Il n'y a pas de SKILL.md dans {folder}.",
+  "error.skill.githubUnavailable": "OpenBot ne peut pas lire GitHub pour le moment. Réessayez plus tard.",
+  "error.skill.githubRateLimited":
+    "GitHub limite la fréquence à laquelle OpenBot peut le lire sans compte. Réessayez dans une heure.",
+  "error.skill.githubTooLarge":
+    "OpenBot ne peut pas lire tous les fichiers de {repository}. Le dépôt est trop volumineux.",
+  "error.skill.githubHostTooOld": "Mettez à jour ce serveur pour ajouter des compétences depuis GitHub.",
+  "error.skill.publishGithub":
+    "{name} vient de GitHub. Vous pouvez publier uniquement les compétences que vous avez créées.",
 } as const satisfies PartialTranslation<typeof source>;

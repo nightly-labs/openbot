@@ -368,6 +368,17 @@ export class WhatsAppConnect implements WhatsAppPolicy {
     return values ? whatsAppCredentials(values).ownNumber : true;
   }
 
+  /**
+   * True when a post to this chat shows as a message of the owner: the owner's personal number, in a
+   * chat that is not the owner's "Message yourself" chat. The workspace id of a number is its phone
+   * number, and the own chat goes by that number.
+   */
+  postsAsOwner(connectionId: string, platformChannelId: string): boolean {
+    const record = this.#store.connection(connectionId);
+    if (record?.platform !== "whatsapp" || !this.#ownNumber(connectionId)) return false;
+    return platformChannelId.split("@")[0] !== record.workspaceId;
+  }
+
   /** True unless the owner turned off the "Working on it…" post of this number. */
   workingMessage(connectionId: string): boolean {
     const values = this.#credentials.get(connectionId);

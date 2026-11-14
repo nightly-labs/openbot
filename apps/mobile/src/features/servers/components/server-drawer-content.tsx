@@ -58,6 +58,7 @@ import {
 import { DrawerPinnedWorkflows, useDrawerWorkflows } from "@/features/workflows/components/drawer-workflows";
 import { type MobileServer, useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { moveServerId } from "@/features/workspace/model/server-order";
+import { serverRowState } from "@/features/workspace/model/server-row-state";
 import { serverStatusLabel, showsOnline } from "@/features/workspace/model/server-status";
 import { type MenuAction, type MenuComponentRef, MenuView } from "@/shared/components/menu-view";
 import { ProfileAvatar } from "@/shared/components/profile-avatar";
@@ -87,6 +88,8 @@ const LIST_TOP_GAP = 8;
 const DRAWER_ROW_HEIGHT = 46;
 const CLOSED_LIST = { height: 0, overflow: "hidden" } as const;
 const UNPINNED_OPACITY = 0.5;
+/** The same dimming as a disabled settings row. */
+const UNAVAILABLE_OPACITY = 0.45;
 
 interface ServerDrawerContentProps {
   activeServerId: string;
@@ -288,9 +291,14 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
 
   // The plus button opens the plans and the account's hosted servers when the account can have
   // hosted servers and the feature flag of this build is on. A development build can override both.
+  // With the flag off, an account that has hosted servers still opens the sheet to manage them; it
+  // then shows no plans.
   const accountHasPlans = useHostedServerAvailability((state) => state.userId === session.user.id && state.available);
+  const ownsHostedServers = useHostedServerAvailability(
+    (state) => state.userId === session.user.id && state.ownsServers,
+  );
   const cloudServersOn = useMobileFeature(session.apiUrl, "cloudServers");
-  const showsPlans = devFeatureOverride("cloudServers") ?? (accountHasPlans && cloudServersOn);
+  const showsPlans = devFeatureOverride("cloudServers") ?? ((accountHasPlans && cloudServersOn) || ownsHostedServers);
   useEffect(() => {
     if (!open) return;
     void refreshHostedServerAvailability(session.user.id, hostedServerCalls(session));
@@ -586,6 +594,8 @@ interface DrawerTool {
   label: string;
   value?: string | null;
   accentValue?: boolean;
+  /** The server is not connected, and only its last connection had this tool. */
+  disabled?: boolean;
 }
 
 /**
@@ -618,9 +628,20 @@ function DrawerServerTools({
   // The iOS menu host sizes to its content, so a row in a menu gets the width of the list.
   const [rowWidth, setRowWidth] = useState<number>();
   // A connected host that shares its screen. The host decides which members it lets in.
-  const remoteDesktop = useMobileWorkspaceSelector((current) => current.canControlComputer(serverId));
+  const remoteDesktop = useMobileWorkspaceSelector((current) =>
+    serverRowState(current, serverId, (checks) => checks.canControlComputer(serverId)),
+  );
   // An older host has no storage routes, so it has no Library, as on desktop.
-  const library = useMobileWorkspaceSelector((current) => current.canReadServerStorage(serverId));
+  const library = useMobileWorkspaceSelector((current) =>
+    serverRowState(current, serverId, (checks) => checks.canReadServerStorage(serverId)),
+  );
+  // Until the host answers, a server without kept values shows Threads and Workflows from its last connection.
+  const tasksRow = useMobileWorkspaceSelector((current) =>
+    serverRowState(current, serverId, (checks) => checks.canUseTasks(serverId)),
+  );
+  const workflowsRow = useMobileWorkspaceSelector((current) =>
+    serverRowState(current, serverId, (checks) => checks.canUseWorkflows(serverId)),
+  );
   const routes = useMemo(
     (): Record<DrawerRoute, Href> => ({
       tasks: { pathname: "/server-tasks", params: { serverId } },
@@ -635,7 +656,7 @@ function DrawerServerTools({
     }),
     [serverId],
   );
-  // A tool that this server does not have is null.
+  // A tool that this server does not have is null. A tool that only the last connection had is disabled.
   const tools: Record<DrawerToolId, DrawerTool | null> = {
     tasks: values.tasks
       ? {
@@ -644,7 +665,9 @@ function DrawerServerTools({
           value: values.tasks.value,
           accentValue: values.tasks.needsYou,
         }
-      : null,
+      : tasksRow === "disabled"
+        ? { icon: ListChecks, label: t("mobile.app.route.threads"), disabled: true }
+        : null,
     routines: { icon: CalendarClock, label: t("mobile.app.route.schedule"), value: values.nextRoutine },
     workflows: workflows.supported
       ? {
@@ -653,11 +676,19 @@ function DrawerServerTools({
           value: workflows.value,
           accentValue: workflows.needsYou,
         }
-      : null,
+      : workflowsRow === "disabled"
+        ? { icon: Waypoints, label: t("mobile.app.route.workflows"), disabled: true }
+        : null,
     marketplace: { icon: Store, label: t("mobile.app.route.marketplace") },
     usage: { icon: ChartArea, label: t("mobile.app.route.usage"), value: values.usage },
-    library: library ? { icon: GalleryVerticalEnd, label: t("mobile.app.route.library") } : null,
-    remoteDesktop: remoteDesktop ? { icon: Monitor, label: t("mobile.app.route.remoteDesktop") } : null,
+    library:
+      library === "hidden"
+        ? null
+        : { icon: GalleryVerticalEnd, label: t("mobile.app.route.library"), disabled: library === "disabled" },
+    remoteDesktop:
+      remoteDesktop === "hidden"
+        ? null
+        : { icon: Monitor, label: t("mobile.app.route.remoteDesktop"), disabled: remoteDesktop === "disabled" },
     members: { icon: UsersRound, label: t("mobile.app.route.members"), value: values.members },
   };
   const available = layout.order.filter((id) => tools[id] !== null);
@@ -722,6 +753,7 @@ function DrawerServerTools({
                 label={tool.label}
                 value={tool.value}
                 accentValue={tool.accentValue}
+                unavailable={tool.disabled}
                 href={routes[id]}
                 width={rowWidth}
                 onAction={onToolAction}
@@ -949,6 +981,8 @@ interface DrawerRowProps {
   accentValue?: boolean;
   href: Href;
   disabled?: boolean;
+  /** Dimmed and not tappable: the server is not connected, and only its last connection had this tool. */
+  unavailable?: boolean;
   onNavigate: (href: Href) => void;
 }
 
@@ -960,6 +994,7 @@ const DrawerRow = memo(function DrawerRow({
   accentValue = false,
   href,
   disabled = false,
+  unavailable = false,
   onNavigate,
   width,
   accessibilityActions,
@@ -978,11 +1013,13 @@ const DrawerRow = memo(function DrawerRow({
       accessibilityLabel={value ? `${label}, ${value}` : label}
       accessibilityActions={accessibilityActions}
       onAccessibilityAction={(event) => onAccessibilityAction?.(event.nativeEvent.actionName)}
+      accessibilityState={{ disabled: disabled || unavailable }}
       className="flex-row items-center gap-3 rounded-2xl px-3"
-      disabled={disabled}
+      disabled={disabled || unavailable}
       style={({ pressed }) => ({
         height: DRAWER_ROW_HEIGHT,
         width,
+        opacity: unavailable ? UNAVAILABLE_OPACITY : 1,
         backgroundColor: pressed ? String(control) : undefined,
       })}
       onPress={() => {

@@ -124,6 +124,12 @@ export interface ContextEntry {
   files?: InboundFile[];
 }
 
+/** What the history tool reads of a place. `note` says why the platform gave fewer messages, when it knows. */
+export interface RecentMessages {
+  messages: ContextEntry[];
+  note?: string;
+}
+
 /** A failure the connection cannot recover from alone. The user must act. */
 export class MessagingConnectionError extends Error {
   constructor(readonly state: Extract<MessagingConnectionState, "invalid_token">) {
@@ -140,7 +146,7 @@ export interface MessagingAdapter {
   identify(): Effect.Effect<ConnectionIdentity, MessagingAdapterError>;
   post(target: MessageTarget, body: MessageBody): Effect.Effect<string, MessagingAdapterError>;
   edit(target: MessageTarget, messageId: string, body: MessageBody): Effect.Effect<void, MessagingAdapterError>;
-  /** Deletes one of OpenBot's posts, for a platform where a quiet answer takes back its status post (Slack). */
+  /** Deletes one of OpenBot's posts, for a platform where a quiet answer takes back its status post (Slack, WhatsApp). */
   remove?(target: MessageTarget, messageId: string): Effect.Effect<void, MessagingAdapterError>;
   /** A post that only `userId` sees. `replyHandle` is the one of the press that it answers, if any. */
   postPrivate(
@@ -177,8 +183,14 @@ export interface MessagingAdapter {
    * message of its place, for a platform whose history this device cannot read (WhatsApp).
    */
   rememberPost?(target: MessageTarget, postId: string, text: string): void;
-  /** Uploads files to the conversation, and returns the names it did not send. */
-  upload(target: MessageTarget, files: MessagingAnswerFile[]): Effect.Effect<string[], MessagingAdapterError>;
+  /**
+   * Uploads files to the conversation. Returns the names it did not send, and the id of the first
+   * message it sent when the platform gives one (WhatsApp, Telegram).
+   */
+  upload(
+    target: MessageTarget,
+    files: MessagingAnswerFile[],
+  ): Effect.Effect<{ skipped: string[]; firstId: string | null }, MessagingAdapterError>;
   /** Earlier messages of the conversation, oldest first, after `afterId` and before `beforeId`. */
   history(
     platformChannelId: string,
@@ -195,13 +207,18 @@ export interface MessagingAdapter {
     platformChannelId: string,
     threadKey: string | null,
     limit: number,
-  ): Effect.Effect<ContextEntry[], MessagingAdapterError>;
+  ): Effect.Effect<RecentMessages, MessagingAdapterError>;
   /** Downloads one file to `destination`. Refuses a file larger than `maxBytes`. */
   download(file: InboundFile, destination: string, maxBytes: number): Effect.Effect<void, MessagingAdapterError>;
   authorName(userId: string): Effect.Effect<string, MessagingAdapterError>;
   placeName(platformChannelId: string): Effect.Effect<string, MessagingAdapterError>;
   /** The places of this connection that OpenBot can post in now. */
   places(): Effect.Effect<MessagingPlace[], MessagingAdapterError>;
+  /**
+   * The id of a place that an agent named, as `places` lists it, for a platform where one place has
+   * more than one written form (a WhatsApp phone number). The id as it is when no listed place matches.
+   */
+  placeId?(placeId: string): string;
   /** The roles a person can have in this workspace, highest first, for a platform with role lists. */
   roles?(): Effect.Effect<Array<{ id: string; name: string }>, MessagingAdapterError>;
   mention(userId: string): string;
@@ -308,6 +325,14 @@ export class WhatsAppRefusedError extends Error {
   }
 }
 
+/** An answer that failed after its first part replaced the status post: that post now holds the part. */
+export class WhatsAppAnswerPartlySent extends Error {
+  constructor(cause: unknown) {
+    super("A part of the WhatsApp answer was sent.", { cause });
+    this.name = "WhatsAppAnswerPartlySent";
+  }
+}
+
 /**
  * The relay that brings a platform's HTTP requests to this host: Signal's `ingress` socket, which
  * the main process owns. It is open while anything holds it.
@@ -340,10 +365,21 @@ export interface MessagingIngress {
   ): Effect.Effect<A, MessagingAdapterError>;
   /**
    * Calls `listener` with the Discord guilds that Signal routes to the socket, each time Signal
-   * sends a session. A guild of this host that is not in it was unlinked, or the bot left it.
+   * sends a session, and when Signal refuses a call because it no longer routes a guild here. A guild
+   * of this host that is not in it was linked to another host, unlinked, or the bot left it.
    */
   onDiscordRoutes(listener: (guildIds: ReadonlySet<string>) => void): () => void;
+  /**
+   * Calls `listener` with the Slack workspaces or the Telegram chats that Signal routes to the socket:
+   * at once when the open socket knows them, and each time Signal accepts a new socket. A workspace or
+   * chat of this host that is not in them is linked to another host, or to none. Null when the socket's
+   * account service named no IDs: then nothing is known.
+   */
+  onLinkedRoutes(platform: LinkedRoutePlatform, listener: (ids: ReadonlySet<string> | null) => void): () => void;
 }
+
+/** The platforms whose route ticket the host reads: Discord gets its guilds from Signal's session. */
+export type LinkedRoutePlatform = "slack" | "telegram";
 
 /** The bytes of one `upload` call. */
 export interface DiscordUploadFile {

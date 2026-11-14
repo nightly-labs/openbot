@@ -289,6 +289,12 @@ export class MailboxStore {
   readonly #deliveryGate = new MailboxDeliveryGate();
   readonly #stagedGeneratedAttachments = new Map<string, StoredGeneratedAttachment>();
   #state: StoredState = structuredClone(EMPTY_STATE);
+  /**
+   * The app start loads the store before the window opens, and the agent service initializes the same
+   * store again. A second load reads every message and delivery again, which stops the main process
+   * for longer as the history grows (#7686).
+   */
+  #initialized = false;
   /** The rows changed, added or removed, since the last committed write. `#persist` writes only these. */
   readonly #changes = {
     messageIds: new Set<string>(),
@@ -307,6 +313,7 @@ export class MailboxStore {
   initialize = Effect.fn("MailboxStore.initialize")(function* (
     this: MailboxStore,
   ): Effect.fn.Return<void, StoredStateFailure> {
+    if (this.#initialized) return;
     try {
       yield* Effect.all(
         [
@@ -348,6 +355,7 @@ export class MailboxStore {
         .resetDrafts(retainedDrafts.map((draft) => draft.id))
         .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
       yield* this.#drainFileDeletionOutboxEffect();
+      this.#initialized = true;
     } catch (cause) {
       return yield* new StoredStateFailure({ cause });
     }
@@ -397,6 +405,32 @@ export class MailboxStore {
     } catch (cause) {
       return yield* new StoredStateFailure({ cause });
     }
+  }, Effect.uninterruptible).bind(this);
+
+  /**
+   * Keeps a draft as a file with no owner agent, as a generated image is kept, and discards the draft.
+   * Answers the new file, `missing` when there is no such draft, or `type` when its type is not in
+   * `types`. A refused draft stays.
+   */
+  keepDraft = Effect.fn("MailboxStore.keepDraft")(function* (
+    this: MailboxStore,
+    id: string,
+    types: ReadonlySet<string>,
+  ): Effect.fn.Return<AttachmentSummary | "missing" | "type", StoredStateFailure> {
+    const draft = this.#state.drafts.find((candidate) => candidate.id === id);
+    if (!draft) return "missing";
+    if (!types.has(draft.mimeType)) return "type";
+    const source = yield* this.#files
+      .resolveDraft(draft)
+      .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
+    if (!source) return "missing";
+    const kept = yield* this.storeGeneratedAttachment({
+      sourcePath: source.path,
+      name: source.name,
+      mimeType: source.mimeType,
+    });
+    yield* this.discardDraft(id);
+    return kept;
   }, Effect.uninterruptible).bind(this);
 
   discardDraft = Effect.fn("MailboxStore.discardDraft")(function* (
@@ -3188,6 +3222,8 @@ export class MailboxStore {
     input: {
       sourcePath?: string;
       bytes?: Uint8Array;
+      /** Names the size error. Absent: an image. */
+      kind?: "image" | "video";
       name?: string;
       mimeType?: string;
       ownerAgentId?: string;

@@ -7,6 +7,7 @@ import {
   isImageCountDiagnostic,
   isImageTooLargeDiagnostic,
   isImageTooSmallDiagnostic,
+  isUnreadableContentDiagnostic,
   isUsageLimitDiagnostic,
 } from "./agent/provider-diagnostics";
 import { isRecord } from "./protocol";
@@ -71,13 +72,14 @@ function openCodeAuthRequired(error: unknown, model: string | null, endpoint: Ac
 }
 
 /**
- * A request that the model refused for a file, image or audio part in the chat. OpenCode 2.1.1
- * sends a part when the model catalog lists its kind, or when the part has a kind it does not know,
- * such as an MCP resource. Each gateway words the refusal differently; OpenCode itself refuses a
- * kind that the protocol cannot carry.
+ * A request that is larger than the model's context window, also after OpenCode 2.2.6 compacted the
+ * chat. OpenCode names its own failure `compaction.failed` ("cannot be reduced further") or
+ * `compaction.unavailable` ("Nothing to compact yet", when only the first exchange is there); a model
+ * server's refusal comes as its own text: LM Studio, llama.cpp, and OpenAI-compatible servers. A local
+ * server often loads a model with a window smaller than the agent's instructions and tools (#6195).
  */
-const OPENCODE_UNREADABLE_CONTENT =
-  /\[unsupported_content_type\]|\bcontent part type "[^"]*" is not supported\b|\bsupports text-only requests\b|\bdoes not support media type\b/iu;
+const OPENCODE_CONTEXT_TOO_SMALL =
+  /\bcannot be reduced further without losing the latest exchange\b|\bnothing to compact yet\b|\bgreater than the context length\b|\bexceeds the available context size\b|\bexceed_context_size_error\b|\bcontext_length_exceeded\b/iu;
 
 /**
  * The kind of a model request that OpenCode gave up on, first match wins. A provider gateway
@@ -127,16 +129,26 @@ function openCodeRequestFailure(
   // A gateway wraps it as an upstream failure; the turn reads the provider's text to start a new session.
   if (isImageTooSmallDiagnostic(reason) || isImageTooLargeDiagnostic(reason) || isImageCountDiagnostic(reason))
     return redact(reason);
-  // The part stays in the session, so each turn on this model fails until the user picks another.
-  // The provider's text says nothing more to the user; it goes to the log.
-  if (OPENCODE_UNREADABLE_CONTENT.test(reason)) {
+  // The part stays in the session, so the turn reads the provider's text to start a new session.
+  if (isUnreadableContentDiagnostic(reason)) {
     log(`OpenCode model refused the chat content: ${reason}`);
-    return sourceText("error.provider.opencodeUnreadableContent");
+    return redact(reason);
   }
   // OpenCode 2.2.7 names a model reply that ended with no finish reason, or that it could not read.
   // OpenCode retries a cut-off reply by itself, and a weak connection can also cut it off (#6872).
   if (isRecord(error.data) && error.data.errorName === "provider.invalid-output")
     return sourceText("error.provider.opencodeIncompleteReply", { detail: shownFailureDetail(redact(reason)) });
+  // OpenCode 2.2.7 stops the turn when a model starts a second reasoning block before the first ends.
+  // A route such as Vercel AI Gateway's does this at a higher effort; a send again fails the same way (#8621).
+  if (/\breasoning start before end\b/u.test(reason)) {
+    log(`OpenCode could not read the model's reasoning stream: ${reason}`);
+    return sourceText("error.provider.opencodeReasoningOverlap");
+  }
+  // Before the list: a gateway reports an overflow as `Upstream request failed: <reason>` too.
+  if (OPENCODE_CONTEXT_TOO_SMALL.test(reason)) {
+    log(`OpenCode request does not fit the model's context window: ${reason}`);
+    return sourceText("error.provider.opencodeContextTooSmall");
+  }
   const key = OPENCODE_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
   if (!key) return detail;
   return sourceText(key, { detail: shownFailureDetail(redact(reason)) });
@@ -177,13 +189,16 @@ function openCodeFailureCause(error: unknown): CauseCode | null {
 
 export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
   // OpenCode 2.x has a session that 1.x wrote after the one-time `session_v2` copy. It answers with
-  // invalid params and the ID in data.sessionId. The same code with another message is a session of
-  // another directory, which is not missing.
+  // invalid params and the ID in data.sessionId. OpenCode also refuses each resume of a session that
+  // it made in another directory, with data.cwd (#7622): the agent's workspace moved. The agent must
+  // work in its workspace, so the session cannot reopen; the caller replaces it with the transcript.
   sessionNotFound: (error, sessionId) =>
     error.code === -32602
       ? isRecord(error.data) &&
         error.data.sessionId === sessionId &&
-        error.message === `Invalid params: session not found: ${sessionId}`
+        (error.message === `Invalid params: session not found: ${sessionId}` ||
+          (typeof error.data.cwd === "string" &&
+            error.message === `Invalid params: session ${sessionId} does not belong to cwd: ${error.data.cwd}`))
       : null,
   turnFailure: (error, detail, redact, log, model, endpoint) => {
     const authRequired = openCodeAuthRequired(error, model, endpoint);

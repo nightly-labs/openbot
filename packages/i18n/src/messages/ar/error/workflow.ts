@@ -18,6 +18,11 @@ export const messages = {
   "error.workflow.conditionUnclear": "لم يجب النموذج بـ «نعم» أو «لا».",
   "error.workflow.modelFailed": "تعذّر على النموذج الإجابة. شغّل الخطوة مرة أخرى.",
   "error.workflow.modelBusy": "يجري تنفيذ طلب نموذج آخر. شغّل الخطوة مرة أخرى بعد قليل.",
+  "error.workflow.mediaFailed": "تعذّر على النموذج إنشاء الصورة أو الفيديو. شغّل الخطوة مرة أخرى.",
+  "error.workflow.pictureMissing": "الصورة لم تعد على الخادم. أرسلها مرة أخرى.",
+  "error.workflow.pictureType": "استخدم صورة بتنسيق PNG أو JPEG أو WebP.",
+  "error.workflow.mediaInputMissing": "صورة من خطوة سابقة غير متاحة. شغّل تلك الخطوة مرة أخرى.",
+  "error.workflow.mediaInputNotImage": "تقبل هذه الخطوة الصور فقط، لا مقاطع الفيديو. أزل الاتصال من الفيديو.",
   "error.workflow.stepMissing": "لم تعد هذه الخطوة موجودة.",
   "error.workflow.nodeMissing": "هذه الخطوة ليست في سير العمل.",
   "error.workflow.runMissing": "لم يعد هذا التشغيل موجودًا.",
@@ -59,4 +64,14 @@ export const messages = {
   "error.workflow.githubUncertain":
     "توقف التغيير في الطريق. قد يكون على GitHub. تحقق هناك قبل أن تشغّل الخطوة مرة أخرى.",
   "error.workflow.githubNoEvent": "لا توجد على GitHub مشكلة أو طلب سحب يبدأ عليه هذا المشغّل.",
+  "error.workflow.sunraSignIn": "سجّل الدخول إلى Sunra في التطبيقات لاستخدام نماذج Sunra.",
+  "error.workflow.sunraNoCredits":
+    "لا يحتوي حسابك في Sunra على أرصدة كافية. أضف أرصدة من sunra.ai/pricing، ثم شغّل الخطوة مرة أخرى.",
+  "error.workflow.sunraNeedsPlan":
+    "يحتاج نموذج Sunra هذا إلى خطة Sunra. اختر خطة من sunra.ai/pricing أو اختر نموذجًا آخر.",
+  "error.workflow.sunraTeamInputs":
+    "يستخدم Sunra صور الإدخال مع الحساب الشخصي فقط. اختر حسابك الشخصي في Sunra أو أزل اتصالات الصور.",
+  "error.workflow.sunraFailed": "تعذّر على Sunra إنشاء الملف: {reason}",
+  "error.workflow.sunraTimeout":
+    "لم يُنهِ Sunra الملف في الوقت المحدد. راجع مشروع OpenBot على sunra.ai قبل تشغيل الخطوة مرة أخرى.",
 } as const satisfies PartialTranslation<typeof source>;

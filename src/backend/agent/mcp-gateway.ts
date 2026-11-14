@@ -19,7 +19,12 @@ import type { AgentProvider } from "../agent-client";
 import { causeHelpers } from "../effect-boundary";
 import type { McpOperationError } from "../mcp-effects";
 import { McpHandoffLog } from "../mcp-handoff-log";
-import { type McpOAuthAuthority, type McpSignInOpener, mcpOAuthAccountKey } from "../mcp-oauth-provider";
+import {
+  type McpOAuthAuthority,
+  type McpSignInOffer,
+  type McpSignInOpener,
+  mcpOAuthAccountKey,
+} from "../mcp-oauth-provider";
 import { McpOAuthProxy, type McpOAuthProxyTarget, mcpOAuthProxyAgentKey, mcpOAuthProxyRoute } from "../mcp-oauth-proxy";
 import { hasCredentialHeader, inspectMcpServer, type McpProbeOutcome, type McpSignInPlace } from "../mcp-probe";
 import {
@@ -209,16 +214,21 @@ export class McpGateway {
     this: McpGateway,
     configs: readonly McpServerConfig[],
   ): Effect.fn.Return<string | null, McpGatewayFailed> {
-    const proxied = configs
-      .filter((config) => config.enabled && this.#proxied(config))
-      .map((config) => config.id)
-      .sort();
+    const proxied = this.proxiedServerIds(configs);
     if (proxied.length === 0) return null;
     const identity = yield* this.#proxy.identity().pipe(Effect.result);
     // The hand-off leaves these rows out in this case, and the manifest records that.
     if (Result.isFailure(identity)) return JSON.stringify([null, proxied]);
     return JSON.stringify([identity.success, proxied]);
   });
+
+  /** The sorted ids of the enabled rows in `configs` that go through the proxy: the rows with a sign-in. */
+  proxiedServerIds(configs: readonly McpServerConfig[]): string[] {
+    return configs
+      .filter((config) => config.enabled && this.#proxied(config))
+      .map((config) => config.id)
+      .sort();
+  }
 
   /** Stops the OAuth proxy. Called once, after every provider process has stopped. */
   readonly close = Effect.fnUntraced(function* (this: McpGateway) {
@@ -550,13 +560,40 @@ export class McpGateway {
   }
 
   /**
-   * Whether an http row that answered without a sign-in offers one. A key the user pasted into a
-   * header is theirs to manage: a sign-in would not replace it.
+   * The sign-in of the first enabled row on `host` that goes through the OAuth proxy, for a feature
+   * of OpenBot itself that calls that server, such as the Sunra models of the canvas. The token stays
+   * in this process and is read at each use. Null when no such row is signed in.
    */
-  offersSignIn(config: McpServerConfig): Effect.Effect<boolean> {
+  serviceSignIn(host: string): {
+    url: string;
+    token: () => Effect.Effect<string | null, McpOperationError>;
+    refresh: (rejected: string) => Effect.Effect<string | null, McpOperationError>;
+  } | null {
     const oauth = this.#oauth;
-    if (!oauth || config.transport !== "http" || hasCredentialHeader(config)) return Effect.succeed(false);
-    return oauth.offersSignIn(config.url);
+    const config = this.#servers.listEnabled().find((row) => {
+      if (!this.#proxied(row) || !oauth?.signedIn(row.url)) return false;
+      try {
+        return new URL(row.url).hostname === host;
+      } catch {
+        return false;
+      }
+    });
+    if (!config || !oauth) return null;
+    return {
+      url: withoutMcpAccountFragment(config.url),
+      token: () => oauth.accessToken(config.url),
+      refresh: (rejected) => oauth.refreshAccessToken(config.url, rejected),
+    };
+  }
+
+  /**
+   * What Sign in would do for an http row that answered without a sign-in. A key the user pasted
+   * into a header is theirs to manage: a sign-in would not replace it.
+   */
+  signInOffer(config: McpServerConfig): Effect.Effect<McpSignInOffer> {
+    const oauth = this.#oauth;
+    if (!oauth || config.transport !== "http" || hasCredentialHeader(config)) return Effect.succeed("none");
+    return oauth.signInOffer(config.url);
   }
 
   /**

@@ -1,4 +1,5 @@
 import { AppLogo, type AppLogoVariant, ProviderLogo } from "@openbot/brand";
+import { usageTone } from "@openbot/team-client/plan-limits";
 import {
   Bot,
   Button,
@@ -15,7 +16,7 @@ import {
   Waypoints,
   Workflow,
 } from "@openbot/ui";
-import { AccountUsageDetails } from "@openbot/ui/features/account/AccountUsageDetails";
+import { AccountUsageDetails, AccountUsageWindowList } from "@openbot/ui/features/account/AccountUsageDetails";
 import { type AccountUsageProviderRow, accountUsageRowKey } from "@openbot/ui/features/account/account-usage-view";
 import { useText } from "@openbot/ui/text";
 import { Dynamic, type JSX } from "@solidjs/web";
@@ -169,6 +170,112 @@ function CustomAgentUsageButton(props: { row: CustomAgentUsageRailRow; onOpen: (
   );
 }
 
+/** The credits of a media service that a canvas step spends, such as Sunra. */
+export interface MediaCreditsRailRow {
+  provider: "sunra";
+  name: string;
+  /** The credits that the account can spend now. */
+  available: number;
+  /** The limit of a team member, or null for an account with no limit of its own. */
+  quota: number | null;
+}
+
+/**
+ * The credits of one media service. A team quota draws a ring with the part that is left, as the
+ * plan limits of a provider do. An account with no limit of its own shows the logo alone, as a custom
+ * agent does. The hover card shows the number.
+ */
+function MediaCreditsButton(props: { row: MediaCreditsRailRow; onOpen: (button: HTMLElement) => void }) {
+  const { t, format } = useText();
+  /** The part of the quota that is left, 0 to 100. A quota of 0 has nothing left. */
+  const percent = () => {
+    const quota = props.row.quota ?? 0;
+    return quota > 0 ? Math.min(100, Math.round((props.row.available / quota) * 100)) : 0;
+  };
+  const label = () => {
+    const credits = format.number(props.row.available);
+    const quota = props.row.quota;
+    return quota !== null
+      ? t("app.rail.mediaCreditsQuota", { name: props.row.name, credits, quota: format.number(quota) })
+      : t("app.rail.mediaCredits", { name: props.row.name, credits });
+  };
+  const radius = (RING.size - RING.stroke) / 2;
+  return (
+    <RailButton
+      label={label()}
+      card={() => (
+        <ul class="account-usage-providers" aria-label={props.row.name}>
+          <li class="account-usage-provider">
+            <ProviderLogo provider={props.row.provider} class="account-usage-provider-logo" />
+            <Show
+              when={props.row.quota !== null}
+              fallback={
+                <>
+                  <span class="account-usage-provider-copy">
+                    <strong class="account-usage-provider-name">{props.row.name}</strong>
+                    <span class="account-usage-provider-meta">{t("app.rail.mediaCreditsMeta")}</span>
+                  </span>
+                  <strong class="account-usage-provider-remaining">{format.number(props.row.available)}</strong>
+                </>
+              }
+            >
+              <strong class="account-usage-provider-name">{props.row.name}</strong>
+              <AccountUsageWindowList
+                windows={[
+                  {
+                    label: t("app.rail.mediaCreditsWindow", {
+                      credits: format.number(props.row.available),
+                      quota: format.number(props.row.quota ?? 0),
+                    }),
+                    remainingPercent: percent(),
+                    tone: usageTone(percent()),
+                    resetsAt: null,
+                    resetsAtLabel: null,
+                  },
+                ]}
+                now={Date.now()}
+              />
+            </Show>
+          </li>
+        </ul>
+      )}
+      class="window-rail-usage"
+      onClick={props.onOpen}
+    >
+      <Show
+        when={props.row.quota !== null}
+        fallback={
+          <ProviderLogo provider={props.row.provider} class="window-rail-usage-logo window-rail-agent-usage-logo" />
+        }
+      >
+        <svg class="window-rail-usage-ring" viewBox={`0 0 ${RING.size} ${RING.size}`} fill="none" aria-hidden="true">
+          <circle
+            class="window-rail-usage-track"
+            cx={RING.size / 2}
+            cy={RING.size / 2}
+            r={radius}
+            stroke-width={RING.stroke}
+          />
+          <Show when={percent() > 0}>
+            <circle
+              class="window-rail-usage-arc"
+              data-usage-tone={usageTone(percent())}
+              cx={RING.size / 2}
+              cy={RING.size / 2}
+              r={radius}
+              stroke-width={RING.stroke}
+              stroke-linecap="round"
+              pathLength={100}
+              stroke-dasharray={`${percent()} 100`}
+            />
+          </Show>
+        </svg>
+        <ProviderLogo provider={props.row.provider} class="window-rail-usage-logo" />
+      </Show>
+    </RailButton>
+  );
+}
+
 /** The rail pages. Agents and Routines show the same page with a different sidebar list. */
 export type PageRailPage =
   | "agents"
@@ -203,6 +310,10 @@ export interface PageRailProps {
   usageRows: readonly AccountUsageProviderRow[];
   /** The answers of the custom agents on this computer that have a usage prompt. Absent on the web. */
   customAgentUsage?: readonly CustomAgentUsageRailRow[] | undefined;
+  /** The credits of the media services that the open Canvas page can spend. Absent on other pages. */
+  mediaCredits?: readonly MediaCreditsRailRow[] | undefined;
+  /** Opens the app page of a media service. */
+  onMediaCredits?: ((provider: MediaCreditsRailRow["provider"]) => void) | undefined;
   onAgents: () => void;
   /** Absent when the server has no routines. */
   onRoutines?: (() => void) | undefined;
@@ -413,6 +524,9 @@ export function PageRail(props: PageRailProps) {
           </For>
           <For each={props.customAgentUsage ?? []} keyed={(row) => row.id}>
             {(row) => <CustomAgentUsageButton row={row()} onOpen={props.onUsage} />}
+          </For>
+          <For each={props.mediaCredits ?? []} keyed={(row) => row.provider}>
+            {(row) => <MediaCreditsButton row={row()} onOpen={() => props.onMediaCredits?.(row().provider)} />}
           </For>
           <Show when={props.onMarketplace}>
             {(onMarketplace) => (

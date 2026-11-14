@@ -145,6 +145,7 @@ export const messages = {
   "settings.planStart.set": "تعيين",
   "settings.automationLimit.sectionTitle": "الحد",
   "settings.automationLimit.sectionDescription": "ينطبق على كل الوكلاء على هذا الحاسوب.",
+  "settings.automationLimit.sectionDescriptionServer": "ينطبق على كل الوكلاء على هذا الخادم.",
   "settings.automationLimit.title": "الطلبات في الساعة",
   "settings.automationLimit.option": "{limit} في الساعة",
   "settings.automationLimit.note":
@@ -271,6 +272,9 @@ export const messages = {
     "يبقى شريط رفيع حيث يختفي الشريط. قرّب المؤشر منه لإظهار الشريط. تمر موجة ألوان على الشريط عندما يسألك وكيل عن شيء.",
   "settings.agentDock.results.title": "عرض العمل المنجز",
   "settings.agentDock.results.description": "تظهر نتائج الوكلاء لوقت قصير بجانب الشريط.",
+  "settings.agentDock.activeSeats.title": "عرض الوكلاء الذين لديهم جديد",
+  "settings.agentDock.activeSeats.description":
+    "يظهر الوكيل أو القناة غير الموجودة على الشريط عليه ما دامت لديه رسالة جديدة أو ينتظرك.",
   "settings.agentDock.agents.title": "الوكلاء على الشريط",
   "settings.agentDock.agents.description": "وكلاء {server}. لكل خادم شريطه الخاص.",
   "settings.agentDock.agents.empty": "لا يوجد وكلاء على هذا الخادم بعد.",
@@ -752,12 +756,26 @@ export const messages = {
   "settings.transfer.count.noSettings": "لا إعدادات للخادم",
   "settings.transfer.includeAgent": "تضمين {name}",
   "settings.transfer.export.title": "تصدير هذا الخادم",
-  "settings.transfer.export.files": "تضمين ملفات مساحة العمل",
-  "settings.transfer.export.filesDescription":
-    "الملفات التي أنشأها وكلاؤك، والمجلد المشترك. أوقفه للحصول على ملف صغير.",
-  "settings.transfer.export.settings": "تضمين إعدادات الخادم",
+  "settings.transfer.preset.label": "ما يدخل في الملف",
+  "settings.transfer.preset.templates": "القوالب",
+  "settings.transfer.preset.everything": "كل شيء",
+  "settings.transfer.meter.files": "من {total} في ملفات مساحة العمل",
+  "settings.transfer.part.agents": "الوكلاء وإعدادهم",
+  "settings.transfer.part.agentsDescription": "{contents}. موجودة دائمًا في الملف.",
+  "settings.transfer.part.settings": "إعدادات الخادم",
+  "settings.transfer.part.chats": "سجل الدردشات",
+  "settings.transfer.part.chatsDescription":
+    "الدردشات والسلاسل الجانبية مع ملفاتها، وسجل تشغيل المهام الدورية. يتابع الوكلاء هذه الدردشات بسياقها.",
+  "settings.transfer.part.channels": "رسائل القنوات",
+  "settings.transfer.part.channelsDescription":
+    "رسائل القنوات التي يشارك فيها الوكلاء المُصدَّرون، مع ملفاتها وسجل تشغيل المهام الدورية للقنوات.",
+  "settings.transfer.part.files": "ملفات مساحة العمل",
+  "settings.transfer.part.filesDescription": "الملفات التي أنشأها وكلاؤك، والمجلد المشترك.",
+  "settings.transfer.part.preferences": "تفضيلات الخادم",
+  "settings.transfer.part.preferencesDescription":
+    "الاسم والشعار والمنطقة الزمنية والشخصية والإعدادات الافتراضية للوكلاء واختيارات النماذج وإعدادات الذاكرة والمهارات، ومستويات الإشعارات والعناصر المثبّتة لكل شخص.",
   "settings.transfer.export.settingsDescription":
-    "خوادم MCP ومزوّدو النماذج المخصصون وأقسام الشريط الجانبي وتدفقات المهام الدورية.",
+    "خوادم MCP ومزوّدو النماذج المخصصون وأقسام الشريط الجانبي وتدفقات المهام الدورية والمهارات المشتركة.",
   "settings.transfer.export.chooseAgents": "اختيار الوكلاء ({selected} من {total})",
   "settings.transfer.export.hideAgents": "إخفاء الوكلاء",
   "settings.transfer.export.agentsLabel": "الوكلاء المراد تصديرهم",
@@ -783,8 +801,11 @@ export const messages = {
   "settings.transfer.import.agentsLabel": "الوكلاء في الملف",
   "settings.transfer.import.nameExists": "الاسم مستخدم بالفعل",
   "settings.transfer.import.settings": "استيراد إعدادات الخادم",
-  "settings.transfer.import.settingsDescription":
-    "يضيف خوادم MCP ومزوّدي النماذج المخصصين وأقسام الشريط الجانبي غير الموجودة في هذا الخادم.",
+  "settings.transfer.import.settingsAndPreferences":
+    "يضيف خوادم MCP ومزوّدي النماذج المخصصين وأقسام الشريط الجانبي والمهارات المشتركة غير الموجودة في هذا الخادم.",
+  "settings.transfer.import.preferences": "استيراد تفضيلات الخادم",
+  "settings.transfer.import.preferencesDescription":
+    "يستبدل اسم هذا الخادم وشعاره وتفضيلاته، ومستويات الإشعارات والعناصر المثبّتة لكل شخص، بتلك الموجودة في الملف.",
   "settings.transfer.import.submit": {
     zero: "لا وكلاء للاستيراد",
     one: "استيراد وكيل واحد",
@@ -810,4 +831,44 @@ export const messages = {
   "settings.transfer.result.signInButton": "تسجيل الدخول إلى {provider}",
   "settings.transfer.result.notImported": "لم يُستورد",
   "settings.transfer.result.warnings": "تحقق من هذه",
+  "settings.transfer.copy.tileTitle": "النسخ إلى خادم آخر",
+  "settings.transfer.copy.tileText": "أرسل الوكلاء إلى خادم آخر من خوادمك.",
+  "settings.transfer.copy.title": "نسخ الوكلاء إلى خادم آخر",
+  "settings.transfer.copy.from": "من",
+  "settings.transfer.copy.to": "إلى",
+  "settings.transfer.copy.chooseServer": "اختر خادمًا",
+  "settings.transfer.copy.search": "البحث في الوكلاء",
+  "settings.transfer.copy.agentsOn": "الوكلاء على {server}",
+  "settings.transfer.copy.all": {
+    zero: "كل الوكلاء ({count})",
+    one: "كل الوكلاء ({count})",
+    two: "كل الوكلاء ({count})",
+    few: "كل الوكلاء ({count})",
+    many: "كل الوكلاء ({count})",
+    other: "كل الوكلاء ({count})",
+  },
+  "settings.transfer.copy.noAgents": "لا يوجد وكلاء على هذا الخادم.",
+  "settings.transfer.copy.new": "جديد",
+  "settings.transfer.copy.notCopied":
+    "تُنسخ قنواتهم والمجلد المشترك أيضًا. لا يتم نسخ مفاتيح API وتسجيلات الدخول والموصلات وسجل المحادثات. أعد إعدادها على الخادم الآخر.",
+  "settings.transfer.copy.submit": {
+    zero: "لا وكلاء للنسخ",
+    one: "نسخ وكيل واحد",
+    two: "نسخ وكيلين",
+    few: "نسخ {count} وكلاء",
+    many: "نسخ {count} وكيلًا",
+    other: "نسخ {count} وكيل",
+  },
+  "settings.transfer.copy.copying": "جارٍ النسخ…",
+  "settings.transfer.copy.done": {
+    zero: "لم يُنسخ أي وكيل إلى {server}.",
+    one: "نُسخ وكيل واحد إلى {server}.",
+    two: "نُسخ وكيلان إلى {server}.",
+    few: "نُسخ {count} وكلاء إلى {server}.",
+    many: "نُسخ {count} وكيلًا إلى {server}.",
+    other: "نُسخ {count} وكيل إلى {server}.",
+  },
+  "settings.transfer.copy.open": "فتح {server}",
+  "settings.transfer.copy.loadFailed": "تعذرت قراءة الوكلاء",
+  "settings.transfer.copy.failed": "لم يكتمل النسخ",
 } as const satisfies PartialTranslation<typeof source>;

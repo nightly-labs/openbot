@@ -19,7 +19,7 @@ import { desktopAnalytics } from "../../analytics";
  * The transfer calls of one server. On the desktop, main routes them to this computer or to a joined
  * host. In the browser client they go to the connected host, and a download has no folder to show.
  */
-export type ServerTransferCalls = Omit<OpenBotDesktopApi["instanceTransfer"], "showExport"> &
+export type ServerTransferCalls = Omit<OpenBotDesktopApi["instanceTransfer"], "showExport" | "copy"> &
   Partial<Pick<OpenBotDesktopApi["instanceTransfer"], "showExport">>;
 
 interface ServerTransferState {
@@ -150,7 +150,7 @@ export function createServerTransferStore(serverId: string, calls: ServerTransfe
       );
   }
 
-  function importFile(keys: string[], includeSettings: boolean): void {
+  function importFile(keys: string[], includeSettings: boolean, includeServerPreferences = false): void {
     const token = state.preview?.token;
     if (!token) return;
     setState((draft) => {
@@ -158,7 +158,10 @@ export function createServerTransferStore(serverId: string, calls: ServerTransfe
       draft.importError = null;
     });
     void calls
-      .apply({ token, keys, includeSettings }, serverId)
+      .apply(
+        { token, keys, includeSettings, ...(includeServerPreferences ? { includeServerPreferences } : {}) },
+        serverId,
+      )
       .then((result) => {
         desktopAnalytics.track("server_transfer_action", { action: "import", result: "succeeded" });
         setState((draft) => {

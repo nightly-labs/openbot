@@ -17,6 +17,7 @@ import {
   parseSetEnabledSkill,
   parseSubmitSkill,
   parseUninstallSkill,
+  requireSkillId,
 } from "./app-inputs";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { nullishPayload, stringPayload } from "./validation";
@@ -46,7 +47,7 @@ export function skillIpcHandlers({
         runCauseEffect(localSkillTools(skills).install(input)),
       ),
       list: payloadHandler(nullishPayload(parseMarketplaceSkillQuery), (query) => runCauseEffect(skills.list(query))),
-      get: payloadHandler(stringPayload("skillId"), (skillId) => runCauseEffect(skills.get(skillId))),
+      get: payloadHandler(requireSkillId, (skillId) => runCauseEffect(skills.get(skillId))),
       getBySlug: payloadHandler(stringPayload("slug"), (slug) => runCauseEffect(skills.getBySlug(slug))),
       listMine: handler(() => runCauseEffect(skills.listMine())),
       choosePackage: handler(async () => {

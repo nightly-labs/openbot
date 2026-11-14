@@ -40,6 +40,8 @@ import Animated, {
   ReduceMotion,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
+  withSequence,
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -108,7 +110,9 @@ import { ChatMessageGesture } from "./chat-message-gesture";
 import { ChatOutboxStatus, OutboxMessageMenu, type OutboxRowStatus } from "./chat-outbox-status";
 import { ChatSelectableText } from "./chat-selectable-text";
 import { ChatTagActionsContext, useTaggedTabOpener } from "./chat-tag-actions";
+import { ChatVideoGeneration } from "./chat-video-generation";
 import { HistoryShownContext } from "./use-history-shown";
+import { KeptOpenContext } from "./use-kept-open";
 import { useReplyHaptics } from "./use-reply-haptics";
 
 /** The most movement and time of a touch that ends the selection: more is a scroll or a hold. */
@@ -285,6 +289,9 @@ interface ChatMessageListProps {
   browserRequests?: readonly BrowserTakeoverRequest[];
   serverName?: string;
   onRespondApproval?: (approval: PendingApproval, decision: ApprovalDecision) => Promise<void>;
+  /** True when the server can send the whole copy of an approval that the phone has only in part. */
+  readsWholeApprovals?: boolean;
+  onLoadWholeApproval?: (approval: PendingApproval) => Promise<void>;
   foreground: ViewStyle["backgroundColor"];
   historyState: "ready" | "connecting" | "waiting" | "loading" | "error";
   /** True while the chat shows the messages that the phone kept and reads its latest page. */
@@ -311,6 +318,10 @@ interface ChatMessageListProps {
   onMarkUnread?: (message: ChatBubbleMessage) => void;
   /** The messages that Mark unread is on. All agent messages when unset. */
   markUnreadMessageIds?: ReadonlySet<string>;
+  /** Pins or unpins a message of this chat. Absent where the host cannot pin messages. */
+  onTogglePin?: (message: ChatBubbleMessage, pinned: boolean) => Promise<void>;
+  /** The pinned messages of this chat. */
+  pinnedMessageIds?: ReadonlySet<string>;
   /**
    * The host messages from the one where the NEW line shows to the newest, in chat order. The line
    * shows above the first row of them. Keep the set stable while its ids stay the same.
@@ -350,6 +361,8 @@ interface ChatMessageListProps {
   outboxStatuses?: ReadonlyMap<string, OutboxRowStatus>;
   /** A message from search. The chat opens at its row. */
   focusMessageId?: string | null;
+  /** `focusMessageId` is the first unread message: the chat opens at the NEW line, with no highlight. */
+  focusUnread?: boolean;
   onFocusPlaced?: () => void;
 }
 
@@ -393,6 +406,10 @@ interface MessageRowShared {
   deletesAny: boolean;
   /** The host marks an agent's message unread for the reader. */
   canMarkUnread: boolean;
+  /** The host pins messages. */
+  canPin: boolean;
+  /** The pinned messages of this chat. Empty where the chat cannot pin. */
+  pinnedIds: ReadonlySet<string>;
   /** The open channels that the text of a message can go to. Empty where it cannot go to one. */
   sendChannels: readonly { id: string; name: string }[];
   canSelectText: boolean;
@@ -411,6 +428,7 @@ interface MessageRowShared {
     react: (message: ChatBubbleMessage, emoji: string | null) => Promise<void>;
     delete: (message: ChatBubbleMessage) => Promise<void>;
     markUnread: (message: ChatBubbleMessage) => void;
+    togglePin: (message: ChatBubbleMessage, pinned: boolean) => Promise<void>;
     /** Whether Mark unread is on this message. */
     marksUnread: (message: ChatBubbleMessage) => boolean;
     sendToChannel: (message: ChatBubbleMessage, channelId: string) => void;
@@ -650,6 +668,10 @@ const MessageRow = memo(function MessageRow({
               shared.canMarkUnread && bubble.author === "agent" && shared.actions.marksUnread(bubble)
                 ? () => shared.actions.markUnread(bubble)
                 : undefined,
+            pinned: shared.pinnedIds.has(bubble.id),
+            onTogglePin: shared.canPin
+              ? () => shared.actions.togglePin(bubble, !shared.pinnedIds.has(bubble.id))
+              : undefined,
             sendToChannel:
               shared.sendChannels.length > 0 && bubble.body.trim()
                 ? {
@@ -658,6 +680,9 @@ const MessageRow = memo(function MessageRow({
                   }
                 : undefined,
             readAloudId: bubble.author === "agent" ? bubble.id : undefined,
+            files: bubble.attachments?.length
+              ? { serverId: shared.serverId, attachments: bubble.attachments }
+              : undefined,
           }
         : null,
   );
@@ -729,10 +754,11 @@ const MessageRow = memo(function MessageRow({
       ? shared.bubbleTone
       : undefined;
   const textColor = tone ? userForeground : foreground;
-  // A generation owns its first attachment, the image; any further files follow in order.
+  // A generation owns its first attachment, the image or the video; any further files follow in order.
   const files =
     message.kind === "message"
-      ? ((message.imageGeneration ? message.attachments?.slice(1) : message.attachments) ?? [])
+      ? ((message.imageGeneration || message.videoGeneration ? message.attachments?.slice(1) : message.attachments) ??
+        [])
       : [];
   // Two or more images in one message show together, as on desktop. A message that is still
   // sending shows the same stack at once, with the progress on each card, so it does not change
@@ -867,6 +893,14 @@ const MessageRow = memo(function MessageRow({
         {message.imageGeneration ? (
           <ChatImageGeneration
             generation={message.imageGeneration}
+            status={imageGenerationStatus(message.streaming, message.status)}
+            attachment={message.attachments?.[0]}
+            serverId={serverId}
+          />
+        ) : null}
+        {message.videoGeneration ? (
+          <ChatVideoGeneration
+            generation={message.videoGeneration}
             status={imageGenerationStatus(message.streaming, message.status)}
             attachment={message.attachments?.[0]}
             serverId={serverId}
@@ -1030,6 +1064,8 @@ const MessageRow = memo(function MessageRow({
  */
 interface RowContextValue {
   shared: MessageRowShared;
+  /** Each row of the list as it is now, by its id. */
+  rowsById: ReadonlyMap<string, VisibleMessage>;
   arrivals: ReadonlySet<string>;
   revealedIds: ReadonlySet<string>;
   /** The rows after the latest user message, which hide while the first message rises. */
@@ -1054,13 +1090,66 @@ interface RowContextValue {
   unreadLineColor: string | undefined;
   /** The rows where the NEW line already arrived, so a row drawn again does not animate it again. */
   unreadLineAnimated: Set<string>;
+  /** The row of the message that the chat opened at, such as a pinned message, while it is highlighted. */
+  highlightedRowId: string | null;
+  highlightColor: string;
+  /** The rows whose highlight already showed, so a row drawn again does not show it again. */
+  highlightShown: Set<string>;
+}
+
+/** The highlight of a message that the chat opened at, as on desktop: an accent tint that fades out. */
+const FOCUS_HIGHLIGHT_OPACITY = 0.16;
+const FOCUS_HIGHLIGHT_IN_MS = 180;
+const FOCUS_HIGHLIGHT_HOLD_MS = 900;
+const FOCUS_HIGHLIGHT_OUT_MS = 700;
+/** Opacity only, so it shows with reduced motion too: it tells the reader which message opened. */
+const FOCUS_HIGHLIGHT_IN = {
+  duration: FOCUS_HIGHLIGHT_IN_MS,
+  easing: Easing.out(Easing.cubic),
+  reduceMotion: ReduceMotion.Never,
+};
+const FOCUS_HIGHLIGHT_OUT = {
+  duration: FOCUS_HIGHLIGHT_OUT_MS,
+  easing: Easing.out(Easing.cubic),
+  reduceMotion: ReduceMotion.Never,
+};
+
+function FocusHighlight({ rowId, color, shown }: { rowId: string; color: string; shown: Set<string> }) {
+  const opacity = useSharedValue(0);
+  // The list draws a row again when it comes back into view. The highlight shows once.
+  const [first] = useState(() => !shown.has(rowId));
+  useEffect(() => {
+    if (!first) return;
+    shown.add(rowId);
+    opacity.set(
+      withSequence(
+        withTiming(FOCUS_HIGHLIGHT_OPACITY, FOCUS_HIGHLIGHT_IN),
+        withDelay(FOCUS_HIGHLIGHT_HOLD_MS, withTiming(0, FOCUS_HIGHLIGHT_OUT)),
+      ),
+    );
+  }, [first, rowId, shown, opacity]);
+  const style = useAnimatedStyle(() => ({ opacity: opacity.get() }));
+  if (!first) return null;
+  return (
+    <Animated.View
+      pointerEvents="none"
+      className="absolute -inset-x-2 -top-1 rounded-2xl"
+      // The tint reaches 4 pt past the row, so it stays inside the gap to the next row.
+      style={[{ backgroundColor: color, bottom: CHAT_ROW_GAP - 4, borderCurve: "continuous" }, style]}
+    />
+  );
 }
 
 const RowContext = createContext<RowContextValue | null>(null);
 
-function ChatRow({ message }: { message: VisibleMessage }) {
+/**
+ * `item` is the row as the list holds it. The list keeps its rows while only their content changes
+ * (see `useListRows`), so the row reads its message from the context.
+ */
+function ChatRow({ item }: { item: VisibleMessage }) {
   const row = useContext(RowContext);
   if (!row) return null;
+  const message = row.rowsById.get(item.id) ?? item;
   const response = row.responseIds.has(message.id);
   const turn = row.turnSummaries?.get(message.id);
   const openTurn = row.onOpenTurn;
@@ -1071,6 +1160,9 @@ function ChatRow({ message }: { message: VisibleMessage }) {
       accessibilityElementsHidden={response && !row.responseVisible}
       importantForAccessibility={response && !row.responseVisible ? "no-hide-descendants" : "auto"}
     >
+      {message.id === row.highlightedRowId ? (
+        <FocusHighlight rowId={message.id} color={row.highlightColor} shown={row.highlightShown} />
+      ) : null}
       {day ? (
         <Typography.Paragraph type="body-xs" align="center" className="pb-3 pt-1 text-muted">
           {day}
@@ -1112,8 +1204,53 @@ function ChatRow({ message }: { message: VisibleMessage }) {
 }
 
 function renderRow({ item }: { item: VisibleMessage }) {
-  return <ChatRow message={item} />;
+  return <ChatRow item={item} />;
 }
+
+/** True when both lists have the same rows in the same order: the same ids, each of the same kind. */
+function sameRowStructure(
+  previous: readonly VisibleMessage[],
+  next: readonly VisibleMessage[],
+  type: (message: VisibleMessage) => string,
+): boolean {
+  if (previous.length !== next.length) return false;
+  for (let index = 0; index < next.length; index += 1) {
+    const before = previous[index];
+    const after = next[index];
+    if (before === after) continue;
+    if (!before || !after || before.id !== after.id || type(before) !== type(after)) return false;
+  }
+  return true;
+}
+
+/**
+ * The rows that the list gets as its data. A streamed chunk gives one row a new object, and the list
+ * takes a row with a new object as a change of its data: it then reads the key and the place of each
+ * loaded row again, on each chunk. The list needs a new array only when a row comes, goes, moves or
+ * changes its kind. Until then it keeps the array that it has, and each row reads its content from
+ * `RowContext` by its id.
+ */
+function useListRows(rows: VisibleMessage[], type: (message: VisibleMessage) => string): VisibleMessage[] {
+  const kept = useRef(rows);
+  if (kept.current !== rows && !sameRowStructure(kept.current, rows, type)) kept.current = rows;
+  return kept.current;
+}
+
+/** The header and the footer of the list change more often than the list: they read their content from here. */
+const ListHeaderContext = createContext<ReactNode>(null);
+const ListFooterContext = createContext<ReactNode>(null);
+
+function ChatListHeader() {
+  return useContext(ListHeaderContext);
+}
+
+function ChatListFooter() {
+  return useContext(ListFooterContext);
+}
+
+const LIST_HEADER = <ChatListHeader />;
+const LIST_FOOTER = <ChatListFooter />;
+const LIST_STYLE = { flex: 1 } as const;
 
 /**
  * The latest rows of the chat. They include the latest user message when it is near, so the list
@@ -1219,6 +1356,8 @@ export const ChatMessageList = memo(function ChatMessageList({
   browserRequests = NO_BROWSER_REQUESTS,
   serverName = "",
   onRespondApproval,
+  readsWholeApprovals = false,
+  onLoadWholeApproval,
   foreground,
   historyState,
   catchingUp = false,
@@ -1239,6 +1378,8 @@ export const ChatMessageList = memo(function ChatMessageList({
   deletesAnyMessage = false,
   onMarkUnread,
   markUnreadMessageIds,
+  onTogglePin,
+  pinnedMessageIds = NO_IDS,
   unreadLineMessageIds = null,
   sendChannels = NO_CHANNELS,
   onSendToChannel,
@@ -1251,6 +1392,7 @@ export const ChatMessageList = memo(function ChatMessageList({
   onSelectionChange,
   onDismissSelection,
   focusMessageId = null,
+  focusUnread = false,
   onFocusPlaced,
 }: ChatMessageListProps) {
   const { t, format, sourceText } = useText();
@@ -1308,7 +1450,13 @@ export const ChatMessageList = memo(function ChatMessageList({
   const replyHaptics = useReplyHaptics(watchesArrivals && motion.responseVisible);
   const conversationKey = JSON.stringify([target.serverId, target.kind, target.id]);
   const replySession = useMemo(
-    () => ({ key: conversationKey, progress: new Map<string, number>(), revealed: new Set<string>() }),
+    () => ({
+      key: conversationKey,
+      progress: new Map<string, number>(),
+      revealed: new Set<string>(),
+      // The rows that the reader opened or closed in this chat, for a row that the list mounts again.
+      keptOpen: new Map<string, boolean>(),
+    }),
     [conversationKey],
   );
   const [revealedState, setRevealedState] = useState<{ session: typeof replySession; ids: ReadonlySet<string> }>({
@@ -1361,11 +1509,12 @@ export const ChatMessageList = memo(function ChatMessageList({
         ),
         {
           unreadMessageIds: unreadLineMessageIds,
-          focusMessageId,
+          // The NEW line already ends a group, so the group of the first unread message stays folded.
+          focusMessageId: focusUnread ? null : focusMessageId,
           branchRowId: branchDivider?.afterId,
         },
       ),
-    [messages, turnSummaries, unreadLineMessageIds, focusMessageId, branchDivider?.afterId],
+    [messages, turnSummaries, unreadLineMessageIds, focusMessageId, focusUnread, branchDivider?.afterId],
   );
   // One pass over the loaded rows when they change; the rows read their label from the context.
   const dayLabels = useMemo(
@@ -1390,7 +1539,14 @@ export const ChatMessageList = memo(function ChatMessageList({
     [rowsShown, openingShown, startsAtEnd, visibleMessages],
   );
   const tailIndex = rows.findLastIndex((message) => message.kind === "message" && message.author === "user");
-  const focusIndex = focusMessageId ? chatRowIndex(rows, focusMessageId) : -1;
+  // The NEW line stands on the first unread message that has a row, as the line does.
+  const focusIndex = !focusMessageId
+    ? -1
+    : focusUnread
+      ? unreadLineMessageIds
+        ? firstChatRowOf(rows, unreadLineMessageIds)
+        : -1
+      : chatRowIndex(rows, focusMessageId);
   const canLoadOlder = online && hasOlder && !olderLoading;
   useFoldScrollAnchor(motion.listRef);
   // The chat opens at the row of a message from search after the list has its rows in place.
@@ -1398,12 +1554,28 @@ export const ChatMessageList = memo(function ChatMessageList({
   const focusId = historyState === "ready" && rowsShown && focusIndex >= 0 ? (rows[focusIndex]?.id ?? null) : null;
   const focusHandlers = useRef({ openAt: motion.openAt, onFocusPlaced });
   focusHandlers.current = { openAt: motion.openAt, onFocusPlaced };
+  // The row that the chat opened at shows a short highlight once it is in place, as on desktop.
+  const [highlightedRowId, setHighlightedRowId] = useState<string | null>(null);
+  const highlightShown = useRef(new Set<string>());
+  const highlightColor = String(useCSSVariable("--openbot-accent"));
   useEffect(() => {
     if (!focusId || !motion.listPlaced || placedFocus.current === focusId) return;
     placedFocus.current = focusId;
     // The search hold ends after the row is in view, so the chat does not move to the latest message first.
-    void focusHandlers.current.openAt(focusIndex).then(() => focusHandlers.current.onFocusPlaced?.());
-  }, [focusId, focusIndex, motion.listPlaced]);
+    void focusHandlers.current.openAt(focusIndex, focusUnread).then(() => {
+      if (!focusUnread) setHighlightedRowId(focusId);
+      focusHandlers.current.onFocusPlaced?.();
+    });
+  }, [focusId, focusIndex, focusUnread, motion.listPlaced]);
+  // The loaded rows do not show the NEW line, so the chat opens at the latest message.
+  const unreadRowMissing =
+    focusUnread && Boolean(focusMessageId) && historyState === "ready" && rowsShown && focusIndex < 0;
+  // The chat showed without the NEW line, such as while the server connected. It does not move to
+  // the line later, under the reader.
+  const shownWithoutUnread = focusUnread && motion.historyVisible && placedFocus.current === null;
+  useEffect(() => {
+    if (unreadRowMissing || shownWithoutUnread) focusHandlers.current.onFocusPlaced?.();
+  }, [unreadRowMissing, shownWithoutUnread]);
   const header = topInset + 84;
   // The latest user message can always move to the top of the chat: the list adds blank space
   // under it while the rows after it are shorter than the screen.
@@ -1431,6 +1603,7 @@ export const ChatMessageList = memo(function ChatMessageList({
     onDeleteMessage,
     onMarkUnread,
     markUnreadMessageIds,
+    onTogglePin,
     onSendToChannel,
     onSelectText,
     onSelectionChange,
@@ -1443,6 +1616,7 @@ export const ChatMessageList = memo(function ChatMessageList({
     onDeleteMessage,
     onMarkUnread,
     markUnreadMessageIds,
+    onTogglePin,
     onSendToChannel,
     onSelectText,
     onSelectionChange,
@@ -1456,6 +1630,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       react: async (message, emoji) => actionHandlers.current.onReact?.(message, emoji),
       delete: async (message) => actionHandlers.current.onDeleteMessage?.(message),
       markUnread: (message) => actionHandlers.current.onMarkUnread?.(message),
+      togglePin: async (message, pinned) => actionHandlers.current.onTogglePin?.(message, pinned),
       marksUnread: (message) => actionHandlers.current.markUnreadMessageIds?.has(message.id) ?? true,
       sendToChannel: (message, channelId) => actionHandlers.current.onSendToChannel?.(message, channelId),
       selectText: (message) => actionHandlers.current.onSelectText?.(message),
@@ -1499,6 +1674,8 @@ export const ChatMessageList = memo(function ChatMessageList({
   const canReact = Boolean(onReact);
   const canDelete = Boolean(onDeleteMessage);
   const canMarkUnread = Boolean(onMarkUnread);
+  const canPin = Boolean(onTogglePin);
+  const shownPinnedIds = onTogglePin ? pinnedMessageIds : NO_IDS;
   const shownSendChannels = onSendToChannel ? sendChannels : NO_CHANNELS;
   const canSelectText = Boolean(onSelectText);
   const canSelectQuestion = Boolean(onSelectQuestion);
@@ -1532,6 +1709,8 @@ export const ChatMessageList = memo(function ChatMessageList({
       canDelete,
       deletesAny: deletesAnyMessage,
       canMarkUnread,
+      canPin,
+      pinnedIds: shownPinnedIds,
       sendChannels: shownSendChannels,
       canSelectText,
       canSelectQuestion,
@@ -1566,6 +1745,8 @@ export const ChatMessageList = memo(function ChatMessageList({
       canDelete,
       deletesAnyMessage,
       canMarkUnread,
+      canPin,
+      shownPinnedIds,
       shownSendChannels,
       canSelectText,
       canSelectQuestion,
@@ -1624,9 +1805,12 @@ export const ChatMessageList = memo(function ChatMessageList({
     (message: VisibleMessage) => rowType(message, routineGroupsState),
     [routineGroupsState],
   );
+  const listRows = useListRows(rows, routineRowType);
+  const rowsById = useMemo(() => new Map(rows.map((row) => [row.id, row])), [rows]);
   const rowContext = useMemo<RowContextValue>(
     () => ({
       shared,
+      rowsById,
       arrivals,
       revealedIds,
       responseIds,
@@ -1645,9 +1829,13 @@ export const ChatMessageList = memo(function ChatMessageList({
       unreadLineRowId,
       unreadLineColor,
       unreadLineAnimated: unreadLineAnimated.current,
+      highlightedRowId,
+      highlightColor,
+      highlightShown: highlightShown.current,
     }),
     [
       shared,
+      rowsById,
       arrivals,
       revealedIds,
       responseIds,
@@ -1665,6 +1853,8 @@ export const ChatMessageList = memo(function ChatMessageList({
       rowBranchDivider,
       unreadLineRowId,
       unreadLineColor,
+      highlightedRowId,
+      highlightColor,
     ],
   );
   const activitySpec = (activity?: MobileAgentActivity): ChatActivitySpec | null => {
@@ -1745,6 +1935,182 @@ export const ChatMessageList = memo(function ChatMessageList({
     (activities?.length ? activities : [activity]).flatMap((entry) => activitySpec(entry) ?? []),
   );
 
+  // The list is one element while its own inputs stay. A streamed chunk changes the content of a
+  // row, the activity row and the footer, which read the contexts below, so the list and its scroll
+  // view do not render again for it.
+  const startReached = useRef(() => {});
+  startReached.current = () => {
+    if (motion.historyVisible && canLoadOlder && !olderError) onLoadOlder();
+  };
+  const onStartReached = useCallback(() => startReached.current(), []);
+  const contentContainerStyle = useMemo(
+    () => ({
+      paddingLeft: insets.left + LIST_PADDING,
+      paddingRight: insets.right + LIST_PADDING,
+      paddingTop: header,
+    }),
+    [insets.left, insets.right, header],
+  );
+  const dataKey = `${conversationKey}:${motion.latestGeneration}`;
+  const drawDistance = Math.round(screen.height * DRAW_SCREENS);
+  const {
+    listRef,
+    startsAtEnd: listStartsAtEnd,
+    followsEnd,
+    composerHeight,
+    keyboardLiftBehavior,
+    onContentSizeChange,
+    onViewportLayout,
+    onScrollBeginDrag,
+    onScrollEndDrag,
+  } = motion;
+  const list = useMemo(
+    () => (
+      <KeyboardAwareLegendList
+        ref={listRef}
+        data={listRows}
+        // A new data set when the latest messages replace a window around a searched message.
+        dataKey={dataKey}
+        keyExtractor={rowKey}
+        getItemType={routineRowType}
+        renderItem={renderRow}
+        // Rows hold their own state: reveal progress, selection, media and animated sizes. A row
+        // reused for another message would show the state of the message before it.
+        recycleItems={false}
+        estimatedItemSize={ESTIMATED_ROW_SIZE}
+        estimatedListSize={estimatedListSize}
+        drawDistance={drawDistance}
+        experimental_adaptiveRender={ADAPTIVE_RENDER}
+        // A reply can be many times taller than the estimate. Until the list has its size, the row
+        // is laid out but not drawn, so the reader never sees it cut by the next row.
+        experimental_hideItemsUntilMeasured
+        initialScrollAtEnd={listStartsAtEnd}
+        anchoredEndSpace={anchoredEndSpace}
+        maintainVisibleContentPosition={KEEP_VISIBLE_POSITION}
+        maintainScrollAtEnd={followsEnd ? FOLLOW_END : false}
+        sharedValues={sharedValues}
+        contentInsetEndAdjustment={composerHeight}
+        keyboardOffset={keyboardOffset}
+        keyboardLiftBehavior={keyboardLiftBehavior}
+        applyWorkaroundForContentInsetHitTestBug
+        automaticallyAdjustKeyboardInsets={false}
+        onReady={onReady}
+        onStartReached={onStartReached}
+        onStartReachedThreshold={0.5}
+        style={LIST_STYLE}
+        contentContainerStyle={contentContainerStyle}
+        contentInsetAdjustmentBehavior="never"
+        keyboardDismissMode="interactive"
+        keyboardShouldPersistTaps="handled"
+        alwaysBounceVertical
+        onContentSizeChange={onContentSizeChange}
+        onLayout={onViewportLayout}
+        onScrollBeginDrag={onScrollBeginDrag}
+        onScrollEndDrag={onScrollEndDrag}
+        onMomentumScrollEnd={onScrollEndDrag}
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={LIST_HEADER}
+        ListFooterComponent={LIST_FOOTER}
+      />
+    ),
+    [
+      listRef,
+      listRows,
+      dataKey,
+      routineRowType,
+      estimatedListSize,
+      drawDistance,
+      listStartsAtEnd,
+      anchoredEndSpace,
+      followsEnd,
+      sharedValues,
+      composerHeight,
+      keyboardOffset,
+      keyboardLiftBehavior,
+      onReady,
+      onStartReached,
+      contentContainerStyle,
+      onContentSizeChange,
+      onViewportLayout,
+      onScrollBeginDrag,
+      onScrollEndDrag,
+    ],
+  );
+  const listHeader = (
+    <>
+      {hasOlder ? (
+        <View className="items-center pb-3">
+          <Button variant="tertiary" isDisabled={!canLoadOlder} onPress={onLoadOlder}>
+            <Button.Label>
+              {olderLoading
+                ? t("mobile.chat.history.loadingOlder")
+                : olderError
+                  ? t("mobile.chat.history.retryOlder")
+                  : t("mobile.chat.history.loadOlder")}
+            </Button.Label>
+          </Button>
+        </View>
+      ) : null}
+      {historyState === "connecting" || historyState === "loading" ? (
+        <View
+          className="flex-1"
+          accessible
+          accessibilityLabel={
+            historyState === "connecting" ? t("mobile.chat.history.connecting") : t("mobile.chat.history.loading")
+          }
+          accessibilityState={{ busy: true }}
+        />
+      ) : historyState === "error" ? (
+        <View className="flex-1 items-center justify-center gap-2">
+          <Typography.Paragraph align="center" className="text-text-secondary">
+            {t("mobile.chat.history.loadFailed")}
+          </Typography.Paragraph>
+          <Button variant="tertiary" onPress={onRetryHistory}>
+            <Button.Label>{t("common.tryAgain")}</Button.Label>
+          </Button>
+        </View>
+      ) : null}
+    </>
+  );
+  const listFooter = (
+    <>
+      <Animated.View style={motion.responseStyle}>
+        {activityRows.map((spec) => (
+          <ChatActivityRow
+            key={spec.key}
+            spec={spec}
+            foreground={foreground ?? themeForeground}
+            muted={muted ?? themeMuted}
+          />
+        ))}
+      </Animated.View>
+      {activityAccessory}
+      {onRespondApproval && approvals.length ? (
+        <View className="gap-3 pb-3">
+          {approvals.map((approval) => (
+            <ChatApprovalCard
+              key={String(approval.requestId)}
+              approval={approval}
+              agentName={agentsById.get(approval.agentId)?.name ?? target.name}
+              showAgentName={target.kind === "channel"}
+              serverName={serverName}
+              canAnswer={canSend}
+              respond={(decision) => onRespondApproval(approval, decision)}
+              readsWhole={readsWholeApprovals && onLoadWholeApproval !== undefined}
+              loadWhole={() => onLoadWholeApproval?.(approval) ?? Promise.resolve()}
+            />
+          ))}
+        </View>
+      ) : null}
+      {showStarter ? (
+        <View className="gap-1 px-1 py-4">
+          <Typography.Heading type="h4">{t("mobile.chat.starter.title")}</Typography.Heading>
+          <Typography.Paragraph className="text-text-secondary">{t("mobile.chat.starter.body")}</Typography.Paragraph>
+        </View>
+      ) : null}
+    </>
+  );
+
   return (
     <Animated.View
       onTouchStart={selectingMessageId ? onTouchStart : undefined}
@@ -1760,134 +2126,13 @@ export const ChatMessageList = memo(function ChatMessageList({
         <ChatTagActionsContext value={openTaggedTab}>
           <HistoryShownContext value={historyState !== "ready" || motion.historyVisible}>
             <RoutineGroupsContext value={routineGroupsState}>
-              <RowContext value={rowContext}>
-                <KeyboardAwareLegendList
-                  ref={motion.listRef}
-                  data={rows}
-                  // A new data set when the latest messages replace a window around a searched message.
-                  dataKey={`${conversationKey}:${motion.latestGeneration}`}
-                  keyExtractor={rowKey}
-                  getItemType={routineRowType}
-                  renderItem={renderRow}
-                  // Rows hold their own state: reveal progress, selection, media and animated sizes. A row
-                  // reused for another message would show the state of the message before it.
-                  recycleItems={false}
-                  estimatedItemSize={ESTIMATED_ROW_SIZE}
-                  estimatedListSize={estimatedListSize}
-                  drawDistance={Math.round(screen.height * DRAW_SCREENS)}
-                  experimental_adaptiveRender={ADAPTIVE_RENDER}
-                  // A reply can be many times taller than the estimate. Until the list has its size, the row
-                  // is laid out but not drawn, so the reader never sees it cut by the next row.
-                  experimental_hideItemsUntilMeasured
-                  initialScrollAtEnd={motion.startsAtEnd}
-                  anchoredEndSpace={anchoredEndSpace}
-                  maintainVisibleContentPosition={KEEP_VISIBLE_POSITION}
-                  maintainScrollAtEnd={motion.followsEnd ? FOLLOW_END : false}
-                  sharedValues={sharedValues}
-                  contentInsetEndAdjustment={motion.composerHeight}
-                  keyboardOffset={keyboardOffset}
-                  keyboardLiftBehavior={motion.keyboardLiftBehavior}
-                  applyWorkaroundForContentInsetHitTestBug
-                  automaticallyAdjustKeyboardInsets={false}
-                  onReady={onReady}
-                  onStartReached={() => {
-                    if (motion.historyVisible && canLoadOlder && !olderError) onLoadOlder();
-                  }}
-                  onStartReachedThreshold={0.5}
-                  style={{ flex: 1 }}
-                  contentContainerStyle={{
-                    paddingLeft: insets.left + LIST_PADDING,
-                    paddingRight: insets.right + LIST_PADDING,
-                    paddingTop: header,
-                  }}
-                  contentInsetAdjustmentBehavior="never"
-                  keyboardDismissMode="interactive"
-                  keyboardShouldPersistTaps="handled"
-                  alwaysBounceVertical
-                  onContentSizeChange={motion.onContentSizeChange}
-                  onLayout={motion.onViewportLayout}
-                  onScrollBeginDrag={motion.onScrollBeginDrag}
-                  onScrollEndDrag={motion.onScrollEndDrag}
-                  onMomentumScrollEnd={motion.onScrollEndDrag}
-                  showsVerticalScrollIndicator={false}
-                  ListHeaderComponent={
-                    <>
-                      {hasOlder ? (
-                        <View className="items-center pb-3">
-                          <Button variant="tertiary" isDisabled={!canLoadOlder} onPress={onLoadOlder}>
-                            <Button.Label>
-                              {olderLoading
-                                ? t("mobile.chat.history.loadingOlder")
-                                : olderError
-                                  ? t("mobile.chat.history.retryOlder")
-                                  : t("mobile.chat.history.loadOlder")}
-                            </Button.Label>
-                          </Button>
-                        </View>
-                      ) : null}
-                      {historyState === "connecting" || historyState === "loading" ? (
-                        <View
-                          className="flex-1"
-                          accessible
-                          accessibilityLabel={
-                            historyState === "connecting"
-                              ? t("mobile.chat.history.connecting")
-                              : t("mobile.chat.history.loading")
-                          }
-                          accessibilityState={{ busy: true }}
-                        />
-                      ) : historyState === "error" ? (
-                        <View className="flex-1 items-center justify-center gap-2">
-                          <Typography.Paragraph align="center" className="text-text-secondary">
-                            {t("mobile.chat.history.loadFailed")}
-                          </Typography.Paragraph>
-                          <Button variant="tertiary" onPress={onRetryHistory}>
-                            <Button.Label>{t("common.tryAgain")}</Button.Label>
-                          </Button>
-                        </View>
-                      ) : null}
-                    </>
-                  }
-                  ListFooterComponent={
-                    <>
-                      <Animated.View style={motion.responseStyle}>
-                        {activityRows.map((spec) => (
-                          <ChatActivityRow
-                            key={spec.key}
-                            spec={spec}
-                            foreground={foreground ?? themeForeground}
-                            muted={muted ?? themeMuted}
-                          />
-                        ))}
-                      </Animated.View>
-                      {activityAccessory}
-                      {onRespondApproval && approvals.length ? (
-                        <View className="gap-3 pb-3">
-                          {approvals.map((approval) => (
-                            <ChatApprovalCard
-                              key={String(approval.requestId)}
-                              approval={approval}
-                              agentName={agentsById.get(approval.agentId)?.name ?? target.name}
-                              showAgentName={target.kind === "channel"}
-                              serverName={serverName}
-                              canAnswer={canSend}
-                              respond={(decision) => onRespondApproval(approval, decision)}
-                            />
-                          ))}
-                        </View>
-                      ) : null}
-                      {showStarter ? (
-                        <View className="gap-1 px-1 py-4">
-                          <Typography.Heading type="h4">{t("mobile.chat.starter.title")}</Typography.Heading>
-                          <Typography.Paragraph className="text-text-secondary">
-                            {t("mobile.chat.starter.body")}
-                          </Typography.Paragraph>
-                        </View>
-                      ) : null}
-                    </>
-                  }
-                />
-              </RowContext>
+              <KeptOpenContext value={replySession.keptOpen}>
+                <RowContext value={rowContext}>
+                  <ListHeaderContext value={listHeader}>
+                    <ListFooterContext value={listFooter}>{list}</ListFooterContext>
+                  </ListHeaderContext>
+                </RowContext>
+              </KeptOpenContext>
             </RoutineGroupsContext>
           </HistoryShownContext>
         </ChatTagActionsContext>

@@ -152,6 +152,7 @@ export const messages = defineMessages("settings", {
   "settings.planStart.set": "Set",
   "settings.automationLimit.sectionTitle": "Limit",
   "settings.automationLimit.sectionDescription": "It applies to all agents on this computer.",
+  "settings.automationLimit.sectionDescriptionServer": "It applies to all agents on this server.",
   "settings.automationLimit.title": "Requests an hour",
   "settings.automationLimit.option": "{limit} an hour",
   "settings.automationLimit.note":
@@ -273,6 +274,9 @@ export const messages = defineMessages("settings", {
     "A thin strip stays where the dock hides. Move the pointer near it to show the dock. A color wash goes up the strip when an agent asks you something.",
   "settings.agentDock.results.title": "Show finished work",
   "settings.agentDock.results.description": "Results that agents finish show beside the dock for a short time.",
+  "settings.agentDock.activeSeats.title": "Show agents with new messages",
+  "settings.agentDock.activeSeats.description":
+    "An agent or channel that is not on the dock shows on it while it has a new message or waits for you.",
   "settings.agentDock.agents.title": "Agents on the dock",
   "settings.agentDock.agents.description": "The agents of {server}. Each server has its own dock.",
   "settings.agentDock.agents.empty": "This server has no agents yet.",
@@ -770,13 +774,26 @@ export const messages = defineMessages("settings", {
   "settings.transfer.count.noSettings": "No server settings",
   "settings.transfer.includeAgent": "Include {name}",
   "settings.transfer.export.title": "Export this server",
-  "settings.transfer.export.files": "Include workspace files",
-  "settings.transfer.export.filesDescription":
-    "Files your agents made, and the Shared folder. Turn off for a small file.",
-  "settings.transfer.export.settings": "Include server settings",
+  "settings.transfer.preset.label": "What goes into the file",
+  "settings.transfer.preset.templates": "Templates",
+  "settings.transfer.preset.everything": "Everything",
+  "settings.transfer.meter.files": "of {total} in workspace files",
+  "settings.transfer.part.agents": "Agents and their setup",
+  "settings.transfer.part.agentsDescription": "{contents}. Always in the file.",
+  "settings.transfer.part.settings": "Server settings",
+  "settings.transfer.part.chats": "Chat history",
+  "settings.transfer.part.chatsDescription":
+    "The chats and side threads with their files, and the run history of the routines. The agents continue these chats with their context.",
+  "settings.transfer.part.channels": "Channel messages",
+  "settings.transfer.part.channelsDescription":
+    "The messages of the channels that the exported agents are in, with their files and the run history of the channel routines.",
+  "settings.transfer.part.files": "Workspace files",
+  "settings.transfer.part.filesDescription": "Files your agents made, and the Shared folder.",
+  "settings.transfer.part.preferences": "Server preferences",
+  "settings.transfer.part.preferencesDescription":
+    "Name, logo, time zone, personality, agent defaults, model choices, memory and skill settings, and the notification levels and pins of each person.",
   "settings.transfer.export.settingsDescription":
-    "MCP servers, custom model providers, sidebar sections, and routine flows.",
-  "settings.transfer.export.history": "Include chat history",
+    "MCP servers, custom model providers, sidebar sections, routine flows, and shared skills.",
   "settings.transfer.export.historyDescription":
     "The chats, side threads, and channel messages, with the files of the chat messages. The file can be large.",
   "settings.transfer.export.chooseAgents": "Choose agents ({selected} of {total})",
@@ -805,8 +822,11 @@ export const messages = defineMessages("settings", {
   "settings.transfer.import.agentsLabel": "Agents in the file",
   "settings.transfer.import.nameExists": "Name already used",
   "settings.transfer.import.settings": "Import server settings",
-  "settings.transfer.import.settingsDescription":
-    "Adds the MCP servers, custom model providers, and sidebar sections that this server does not have.",
+  "settings.transfer.import.settingsAndPreferences":
+    "Adds the MCP servers, custom model providers, sidebar sections, and shared skills that this server does not have.",
+  "settings.transfer.import.preferences": "Import server preferences",
+  "settings.transfer.import.preferencesDescription":
+    "Replaces the name, logo, and preferences of this server, and the notification levels and pins of each person, with the ones in the file.",
   "settings.transfer.import.submit": { one: "Import {count} agent", other: "Import {count} agents" },
   "settings.transfer.import.submitSettings": "Import server settings",
   "settings.transfer.import.importing": "Importing…",
@@ -819,4 +839,26 @@ export const messages = defineMessages("settings", {
   "settings.transfer.result.signInButton": "Sign in to {provider}",
   "settings.transfer.result.notImported": "Not imported",
   "settings.transfer.result.warnings": "Check these",
+  "settings.transfer.copy.tileTitle": "Copy to another server",
+  "settings.transfer.copy.tileText": "Send agents to another of your servers.",
+  "settings.transfer.copy.title": "Copy agents to another server",
+  "settings.transfer.copy.from": "From",
+  "settings.transfer.copy.to": "To",
+  "settings.transfer.copy.chooseServer": "Choose a server",
+  "settings.transfer.copy.search": "Search agents",
+  "settings.transfer.copy.agentsOn": "Agents on {server}",
+  "settings.transfer.copy.all": { one: "All {count} agent", other: "All {count} agents" },
+  "settings.transfer.copy.noAgents": "This server has no agents.",
+  "settings.transfer.copy.new": "New",
+  "settings.transfer.copy.notCopied":
+    "Their channels and the Shared folder are copied too. API keys, sign-ins, connectors, and chat history are not copied. Set them up again on the other server.",
+  "settings.transfer.copy.submit": { one: "Copy {count} agent", other: "Copy {count} agents" },
+  "settings.transfer.copy.copying": "Copying…",
+  "settings.transfer.copy.done": {
+    one: "{count} agent copied to {server}.",
+    other: "{count} agents copied to {server}.",
+  },
+  "settings.transfer.copy.open": "Open {server}",
+  "settings.transfer.copy.loadFailed": "The agents could not be read",
+  "settings.transfer.copy.failed": "The copy did not finish",
 });

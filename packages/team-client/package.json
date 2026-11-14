@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./ed25519": "./src/ed25519.ts",
+    "./feedback-approval": "./src/feedback-approval.ts",
     "./host-key-handover": "./src/host-key-handover.ts",
     "./remote-directory": "./src/remote-directory.ts",
     "./remote-peer": "./src/remote-peer.ts",

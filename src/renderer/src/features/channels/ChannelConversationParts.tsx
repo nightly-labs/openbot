@@ -4,12 +4,13 @@
  * data, so each part reads the open channel from `useChannels()`.
  */
 
+import type { ChannelPage } from "@openbot/contracts/ipc";
 import { Button, ErrorReference } from "@openbot/ui";
 import { SettingsPanel, SettingsPanelContent, SettingsPanelHeader } from "@openbot/ui/components/SettingsPanel";
 import { ChannelAvatar } from "@openbot/ui/features/channels/ChannelAvatar";
 import { ChannelStoppedTasks } from "@openbot/ui/features/channels/ChannelStoppedTasks";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createStore, Show } from "solid-js";
+import { createEffect, createMemo, createStore, For, Show } from "solid-js";
 import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
 import { AgentMemoriesSettings } from "../conversation/AgentMemoriesSettings";
 import { AgentRoutinesSettings } from "../conversation/AgentRoutinesSettings";
@@ -145,10 +146,30 @@ export function ChannelAboveComposer(props: { channelId: string }) {
       recipientAgentId: null,
     });
   const onCancel = () => (channels.taskCancelSupported() ? cancelTask : undefined);
+  /** Why queued requests do not start, once for each reason. */
+  const waitNotes = (current: ChannelPage) => [
+    ...new Set(
+      (current.waits ?? []).flatMap((wait) => {
+        // An agent that this view does not know yet has no name to show.
+        const agent = channels.agents().find((item) => item.id === wait.agentId)?.name;
+        if (!agent) return [];
+        return wait.reason === "agent-busy"
+          ? [t("queue.hold.named", { name: agent, channel: wait.channelName })]
+          : [t("channel.conversation.waitFull", { name: agent })];
+      }),
+    ),
+  ];
   return (
     <Show when={page()}>
       {(current) => (
         <>
+          <For each={waitNotes(current())}>
+            {(text) => (
+              <p class="channel-wait-note" role="status">
+                {text}
+              </p>
+            )}
+          </For>
           <ChannelStoppedTasks
             tasks={stoppedChannelTasks(current())}
             members={current().channel.members}

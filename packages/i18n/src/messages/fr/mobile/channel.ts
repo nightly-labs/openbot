@@ -42,6 +42,8 @@ export const messages = {
   "mobile.channel.deleted.restoreFailedBody": "Impossible de restaurer ce canal. Réessayez.",
   "mobile.channel.chat.fallbackName": "Canal",
   "mobile.channel.chat.deletedNotice": "Canal supprimé. Aperçu seulement.",
+  "mobile.channel.chat.waitBusy": "En attente – {name} travaille dans {channel}",
+  "mobile.channel.chat.waitFull": "En attente – {name} commence quand une tâche en cours se termine",
   "mobile.channel.records.connect": "Connectez-vous au serveur pour modifier ce canal.",
   "mobile.channel.records.loadFailed": "Impossible de charger les réglages du canal.",
   "mobile.channel.records.gone": "Cet élément n’est plus disponible.",

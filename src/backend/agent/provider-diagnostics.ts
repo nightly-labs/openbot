@@ -28,11 +28,12 @@ export function isMcpSubsystemDiagnostic(message: string): boolean {
  * Whether an MCP diagnostic says that the server refused the provider for want of a sign-in.
  *
  * Grok's `rmcp` worker writes `AuthRequired(…)` for an http server that answers 401 with an OAuth
- * challenge. Other CLIs write the status next to `HTTP` or `status`, or the word. A bare `401` is
- * not enough: a port, an id or a line number can be 401.
+ * challenge. Other CLIs write the status next to `HTTP` or `status`, or the word. Codex CLI 0.169.0
+ * writes `The <name> MCP server is not logged in.` in its failed startup status (#9360). A bare
+ * `401` is not enough: a port, an id or a line number can be 401.
  */
 export function isMcpSignInDiagnostic(message: string): boolean {
-  return /\bAuthRequired\b|\bunauthori[sz]ed\b|\bnot authenticated\b|\b(?:HTTP|status(?:\s+code)?)\W{0,3}401\b/i.test(
+  return /\bAuthRequired\b|\bunauthori[sz]ed\b|\bnot (?:authenticated|logged in)\b|\b(?:HTTP|status(?:\s+code)?)\W{0,3}401\b/i.test(
     message,
   );
 }
@@ -366,11 +367,28 @@ export function isImageTooLargeDiagnostic(message: string): boolean {
  * accepts in one request. The provider session sends each image of the chat again on each turn, so
  * each turn fails the same way until a new session (#6702). vLLM and Venice write "At most 10
  * image(s) may be provided in one request.", OpenCode's gateway "Too many images in request: 31 >
- * 30", and other endpoints "Request contains 52 images, exceeding the maximum of 50 allowed per
- * request". A daily quota of images is not a count in one request, so it does not match.
+ * 30", other endpoints "Request contains 52 images, exceeding the maximum of 50 allowed per
+ * request", and a custom endpoint behind OpenCode "This request has more images than the limit of 4."
+ * (#9038). A daily quota of images is not a count in one request, so it does not match.
  */
 export function isImageCountDiagnostic(message: string): boolean {
-  return /\b(?:at most|a maximum of) \d+ image(?:s|\(s\))? may be provided\b|\btoo many images in (?:the |this |one )?(?:request|prompt|message)\b|\b\d+ images\b[^.\n]{0,40}\bexceed\w* (?:the )?maximum of \d+(?! ?(?:[kmg]i?b|bytes?|px|pixels?)\b)(?: images| allowed)?\b/iu.test(
+  return /\b(?:at most|a maximum of) \d+ image(?:s|\(s\))? may be provided\b|\btoo many images in (?:the |this |one )?(?:request|prompt|message)\b|\b\d+ images\b[^.\n]{0,40}\bexceed\w* (?:the )?maximum of \d+(?! ?(?:[kmg]i?b|bytes?|px|pixels?)\b)(?: images| allowed)?\b|\b(?:request|prompt|message) (?:has|contains) more images than (?:the )?(?:limit|maximum) of \d+\b/iu.test(
+    message,
+  );
+}
+
+/**
+ * Whether a model endpoint refused a file, image or audio part in the request. OpenCode 2.1.1 sends
+ * a part when the model catalog lists its kind, or when the part has a kind it does not know, such as
+ * an MCP resource; OpenCode itself refuses a kind that the protocol cannot carry. The part stays in
+ * the provider session, so each turn fails the same way until a new session. A custom endpoint gets
+ * images by default, and its refusal names no OpenBot setting: "the selected model route accepts text
+ * only" (#6033), OpenAI's "image_url is only supported by certain models", and OpenRouter's "No
+ * endpoints found that support image input". Kimi refuses a PDF that a read tool added: "the message
+ * at position 124 with role 'user' contains an invalid part type: file" (#8654).
+ */
+export function isUnreadableContentDiagnostic(message: string): boolean {
+  return /\[unsupported_content_type\]|\bcontent part type "[^"]*" is not supported\b|\binvalid part type\b|\b(?:supports?|accepts?) (?:text[- ]only|only text)\b|\bdoes not support media type\b|\bimage_url is only supported by certain models\b|\b(?:does not|doesn['’]t|that) support image input\b/iu.test(
     message,
   );
 }

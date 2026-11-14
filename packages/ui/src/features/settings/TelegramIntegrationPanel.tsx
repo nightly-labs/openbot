@@ -93,6 +93,7 @@ const TELEGRAM_TEXT = {
 const STATE_HELP: Partial<Record<MessagingConnection["state"], AppTextKey>> = {
   removed: "connector.telegram.helpRemoved",
   relay_unavailable: "connector.telegram.helpRelayUnavailable",
+  not_linked: "connector.telegram.helpNotLinked",
   invalid_token: "connector.telegram.helpError",
   secret_storage_unavailable: "connector.telegram.helpError",
   error: "connector.telegram.helpError",

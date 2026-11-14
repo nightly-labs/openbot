@@ -278,6 +278,8 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
     // The first message of a new thread starts the thread and opens it, so the key is read before the send.
     key = openDraftKey(),
   ): Promise<boolean> {
+    // The files of the draft belong to the server on screen now; a switch during the import does not move them (#9123).
+    const target = currentConversationTarget(deps.props);
     await importsEnded(key);
     // An import that ended put its reference in the draft after the user pressed Send.
     const images = key ? rowImages(key) : [];
@@ -285,7 +287,6 @@ export function createThreadComposerActions(deps: ThreadComposerActionsDeps) {
     // A thread takes its title from the text, so a message of images only names them.
     const text = typedText || images.map((image) => serializeAttachmentReference(image.name, image.id)).join(" ");
     if (!text) return false;
-    const target = currentConversationTarget(deps.props);
     const before = key ? draft(key).text : "";
     const attachments = key ? draft(key).attachments : [];
     // A server that lost the reply route takes the message without its reply.

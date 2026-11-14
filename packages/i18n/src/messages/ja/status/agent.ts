@@ -8,7 +8,11 @@ export const messages = {
   "status.agent.instructionsChanged": "指示を更新しました",
   "status.agent.modelSwitchedForLimit": "使用量の上限に達しました。{model} に切り替えました。",
   "status.agent.modelReturnedAfterLimit": "使用量の上限が解除されました。{model} に戻しました。",
+  "status.agent.routineSkippedRunOpen": "スキップ: 前回の実行がまだ終わっていませんでした",
+  "status.agent.routineSkippedUsageLimit": "スキップ: 使用量の上限に達しました",
   "status.agent.modelSwitchedForError": "プロバイダーのエラーが発生しました。{model} に切り替えました。",
+  "status.agent.modelSwitchedForSpentBalance":
+    "{previous} のクレジットがなくなりました。{model} に切り替えました。再び使うには、クレジットを追加してから選択してください。",
   "status.agent.modelReturnedAfterError": "プロバイダーのエラーの後、{model} に戻しました。",
   "status.agent.marketplaceSuggested": "マーケットプレイスのアプリを提案しました: {app}。",
   "status.agent.channelMemberAdded": "{agent} が {member} をチャンネルに追加しました。{person} の依頼です。",

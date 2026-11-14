@@ -22,6 +22,7 @@ import {
   type AgentDockSendResult,
   type AgentDockChannel as AgentDockUiChannel,
   type AgentDockSeat as AgentDockUiSeat,
+  agentDockSeatKey,
 } from "@openbot/ui/features/agent-dock/AgentDock";
 import { isDockMessage } from "@openbot/ui/features/agent-dock/AgentDockChat";
 import { markdownPlainText } from "@openbot/ui/features/conversation/MarkdownMessageText";
@@ -208,24 +209,66 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
   const channelState = (channel: ChannelSummary): SidebarAgentState | undefined =>
     sidebarUnreadBadge(channel.unreadCount, channelWaits()[channel.id]) ??
     (channel.activeTasks > 0 ? { kind: "working" } : undefined);
+  /* With the setting on, an agent or a channel that is not on the dock shows at its end while it has a new
+     message or waits for the user, and while its chat is open. A seat that came first stays first. */
+  const temporaryRefs = createMemo(
+    (previous: readonly AgentDockSeatRef[] = []): AgentDockSeatRef[] => {
+      if (!preference().activeSeats) return [];
+      const open = openSeat();
+      const savedKeys = new Set(seatRefs().map(agentDockSeatKey));
+      const shows = (seat: AgentDockSeatRef, state: SidebarAgentState | undefined) =>
+        !savedKeys.has(agentDockSeatKey(seat)) &&
+        (callsForUser(state) || (open?.kind === seat.kind && open.id === seat.id));
+      const active = [
+        ...shownAgents().flatMap((agent): AgentDockSeatRef[] => {
+          const seat: AgentDockSeatRef = { kind: "agent", id: agent.id };
+          return shows(seat, agentStates()[agent.id]) ? [seat] : [];
+        }),
+        ...shownChannels().flatMap((channel): AgentDockSeatRef[] => {
+          const seat: AgentDockSeatRef = { kind: "channel", id: channel.id };
+          return shows(seat, channelState(channel)) ? [seat] : [];
+        }),
+      ];
+      const activeKeys = new Set(active.map(agentDockSeatKey));
+      const kept = previous.filter((seat) => activeKeys.has(agentDockSeatKey(seat)));
+      const keptKeys = new Set(kept.map(agentDockSeatKey));
+      const added = active.filter((seat) => !keptKeys.has(agentDockSeatKey(seat)));
+      /* The dock window shows at most AGENT_DOCK_LIMITS.seats seats; the seats of the user come first.
+         A saved seat of a deleted or hidden agent does not show, so it takes no place. */
+      const shownKeys = new Set([
+        ...shownAgents().map((agent) => agentDockSeatKey({ kind: "agent", id: agent.id })),
+        ...shownChannels().map((channel) => agentDockSeatKey({ kind: "channel", id: channel.id })),
+      ]);
+      const savedShown = [...savedKeys].filter((key) => shownKeys.has(key)).length;
+      return [...kept, ...added].slice(0, Math.max(0, AGENT_DOCK_LIMITS.seats - savedShown));
+    },
+    { equals: sameAgentDockSeats },
+  );
   const seats = createMemo((): AgentDockUiSeat[] => {
     const agents = new Map(shownAgents().map((agent) => [agent.id, agent]));
     const channelById = new Map(shownChannels().map((channel) => [channel.id, channel]));
-    return seatRefs().flatMap((seat): AgentDockUiSeat[] => {
-      if (seat.kind === "agent") {
-        const agent = agents.get(seat.id);
+    const seat = (ref: AgentDockSeatRef, temporary: boolean): AgentDockUiSeat[] => {
+      if (ref.kind === "agent") {
+        const agent = agents.get(ref.id);
         return agent
-          ? [{ kind: "agent", agent, mood: agentMoods()[seat.id] ?? "idle", state: agentStates()[seat.id] }]
+          ? [{ kind: "agent", agent, mood: agentMoods()[ref.id] ?? "idle", state: agentStates()[ref.id], temporary }]
           : [];
       }
-      const channel = channelById.get(seat.id);
-      return channel ? [{ kind: "channel", channel: dockChannel(channel), state: channelState(channel) }] : [];
-    });
+      const channel = channelById.get(ref.id);
+      return channel
+        ? [{ kind: "channel", channel: dockChannel(channel), state: channelState(channel), temporary }]
+        : [];
+    };
+    return [...seatRefs().flatMap((ref) => seat(ref, false)), ...temporaryRefs().flatMap((ref) => seat(ref, true))];
   });
-  const available = createMemo(() => shownAgents().filter((agent) => !seated({ kind: "agent", id: agent.id })));
+  /* The add menu offers what the dock does not show, also as a temporary seat. */
+  const onDock = createMemo(() => new Set([...seatRefs(), ...temporaryRefs()].map(agentDockSeatKey)));
+  const available = createMemo(() =>
+    shownAgents().filter((agent) => !onDock().has(agentDockSeatKey({ kind: "agent", id: agent.id }))),
+  );
   const availableChannels = createMemo(() =>
     shownChannels()
-      .filter((channel) => !seated({ kind: "channel", id: channel.id }))
+      .filter((channel) => !onDock().has(agentDockSeatKey({ kind: "channel", id: channel.id })))
       .map(dockChannel),
   );
 
@@ -371,7 +414,7 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     },
   );
 
-  /* The unread answers of the seated agents, for the finished-work shelf. The shelf hides each one
+  /* The unread answers of the agents on the dock, temporary seats too, for the finished-work shelf. The shelf hides each one
      after some time; the seat keeps its unread badge. Channels have no results. */
   let firstSeen = new Map<string, number>();
   const results = createMemo((): AgentDockResult[] => {
@@ -420,9 +463,10 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
       saveSeats(seatRefs().filter((item) => item.kind !== seat.kind || item.id !== seat.id));
     },
     /* The saved list also keeps seats that the dock does not show now, so the seat goes before its
-       neighbour and not to an index. */
+       neighbour and not to an index. A temporary seat that the user moves goes on the dock. A seat put
+       before a temporary seat goes to the end of the user's seats. */
     move(seat: AgentDockSeatRef, before: AgentDockSeatRef | null) {
-      if (!seated(seat)) return;
+      if (!seated(seat) && !temporaryRefs().some((item) => item.kind === seat.kind && item.id === seat.id)) return;
       const others = seatRefs().filter((item) => item.kind !== seat.kind || item.id !== seat.id);
       const index = before ? others.findIndex((item) => item.kind === before.kind && item.id === before.id) : -1;
       const moved = { kind: seat.kind, id: seat.id };
@@ -524,8 +568,19 @@ function ScreenAgentDock(props: { serverId: string }) {
         .map(
           (seat): AgentDockSeat =>
             seat.kind === "agent"
-              ? { kind: "agent", agent: dockAgent(seat.agent), mood: seat.mood, state: dockSeatState(seat.state) }
-              : { kind: "channel", channel: plainChannel(seat.channel), state: dockSeatState(seat.state) },
+              ? {
+                  kind: "agent",
+                  agent: dockAgent(seat.agent),
+                  mood: seat.mood,
+                  state: dockSeatState(seat.state),
+                  temporary: seat.temporary === true,
+                }
+              : {
+                  kind: "channel",
+                  channel: plainChannel(seat.channel),
+                  state: dockSeatState(seat.state),
+                  temporary: seat.temporary === true,
+                },
         ),
       available: dock.available().slice(0, INPUT_LIMITS.agents).map(dockAgent),
       availableChannels: dock.availableChannels().slice(0, AGENT_DOCK_LIMITS.channels).map(plainChannel),
@@ -651,6 +706,11 @@ function plainChannel(channel: AgentDockUiChannel): AgentDockChannel {
     imageUrl:
       channel.imageUrl && channel.imageUrl.length <= AGENT_DOCK_LIMITS.channelImageUrl ? channel.imageUrl : null,
   };
+}
+
+/** A seat state that asks for the user: a new message, or a wait for an answer or an approval. */
+function callsForUser(state: SidebarAgentState | undefined): boolean {
+  return state?.kind === "waiting" || state?.kind === "unread" || state?.kind === "responded";
 }
 
 /** Plain copies: the IPC clone refuses the store proxies that the app state is made of. */

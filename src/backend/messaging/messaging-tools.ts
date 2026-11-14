@@ -99,7 +99,10 @@ const postShape = {
 };
 const postSchema = z
   .strictObject({ ...postShape, embeds: embedsSchema.optional() })
-  .refine((post) => post.text !== undefined || Boolean(post.embeds?.length), "Give text, embeds, or both.");
+  .refine(
+    (post) => post.text !== undefined || Boolean(post.embeds?.length) || Boolean(post.files?.length),
+    "Give text, files, embeds, or more than one.",
+  );
 
 /** The tools that post on the agent's own initiative. They work in any turn, and they name the place. */
 const MESSAGING_OUTBOUND_TOOLS = new Set(["messaging_list_places", "messaging_post"]);
@@ -150,7 +153,7 @@ export const MESSAGING_TOOL_DEFINITIONS: readonly { name: string; description: s
   },
   {
     name: "messaging_post",
-    description: `Post markdown as OpenBot to a place of a connected Slack workspace, Discord server, Telegram or WhatsApp chat, such as a report from a routine. Get connection and place ids from messaging_list_places. files: local files from your workspace or the OpenBot shared directory, sent after the text. replyTo puts the post in a thread: a Slack thread ts, a Discord or Telegram message id, or t<topic id> for a Telegram forum topic. embeds: Discord only, up to ${DISCORD_EMBEDS_LIMIT} Discord embed objects; text is then optional. Everyone in the place sees the post. A Slack or Discord <@user id>, Telegram @username, or Telegram or WhatsApp @<user id> pings that person. Your final answer still goes only to the conversation you answer. Works in any turn.`,
+    description: `Post markdown as OpenBot to a place of a connected Slack workspace, Discord server, Telegram or WhatsApp chat, such as a report from a routine. Get connection and place ids from messaging_list_places. files: local files from your workspace or the OpenBot shared directory, sent after any text. replyTo puts the post in a thread: a Slack thread ts, a Discord or Telegram message id, or t<topic id> for a Telegram forum topic. embeds: Discord only, up to ${DISCORD_EMBEDS_LIMIT} Discord embed objects; text is then optional. Everyone in the place sees the post. A Slack or Discord <@user id>, Telegram @username, or Telegram or WhatsApp @<user id> pings that person. Your final answer still goes only to the conversation you answer. Works in any turn.`,
     shape: postShape,
   },
 ];
@@ -168,7 +171,7 @@ export type MessagingOutboundToolCall =
       connection: string;
       place: string;
       replyTo: string | null;
-      /** Empty when the post has only embeds. */
+      /** Empty when the post has only embeds or only files. */
       text: string;
       files: string[];
       embeds: DiscordEmbed[];

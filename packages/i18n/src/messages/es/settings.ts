@@ -149,6 +149,7 @@ export const messages = {
   "settings.planStart.set": "Aplicar",
   "settings.automationLimit.sectionTitle": "Límite",
   "settings.automationLimit.sectionDescription": "Se aplica a todos los agentes de este ordenador.",
+  "settings.automationLimit.sectionDescriptionServer": "Se aplica a todos los agentes de este servidor.",
   "settings.automationLimit.title": "Solicitudes por hora",
   "settings.automationLimit.option": "{limit} por hora",
   "settings.automationLimit.note":
@@ -274,6 +275,9 @@ export const messages = {
     "Una franja fina queda donde se oculta el dock. Acerca el puntero para mostrar el dock. Una ola de color sube por la franja cuando un agente te pregunta algo.",
   "settings.agentDock.results.title": "Mostrar trabajo terminado",
   "settings.agentDock.results.description": "Los resultados de los agentes aparecen un momento junto al dock.",
+  "settings.agentDock.activeSeats.title": "Mostrar agentes con novedades",
+  "settings.agentDock.activeSeats.description":
+    "Un agente o canal que no está en el dock aparece en él mientras tiene un mensaje nuevo o te espera.",
   "settings.agentDock.agents.title": "Agentes en el dock",
   "settings.agentDock.agents.description": "Los agentes de {server}. Cada servidor tiene su propio dock.",
   "settings.agentDock.agents.empty": "Este servidor aún no tiene agentes.",
@@ -713,12 +717,26 @@ export const messages = {
   "settings.transfer.count.noSettings": "Sin ajustes del servidor",
   "settings.transfer.includeAgent": "Incluir a {name}",
   "settings.transfer.export.title": "Exportar este servidor",
-  "settings.transfer.export.files": "Incluir archivos del espacio de trabajo",
-  "settings.transfer.export.filesDescription":
-    "Archivos que crearon tus agentes y la carpeta compartida. Desactívalo para obtener un archivo pequeño.",
-  "settings.transfer.export.settings": "Incluir ajustes del servidor",
+  "settings.transfer.preset.label": "Qué va en el archivo",
+  "settings.transfer.preset.templates": "Plantillas",
+  "settings.transfer.preset.everything": "Todo",
+  "settings.transfer.meter.files": "de {total} en archivos del espacio de trabajo",
+  "settings.transfer.part.agents": "Agentes y su configuración",
+  "settings.transfer.part.agentsDescription": "{contents}. Siempre en el archivo.",
+  "settings.transfer.part.settings": "Ajustes del servidor",
+  "settings.transfer.part.chats": "Historial de chats",
+  "settings.transfer.part.chatsDescription":
+    "Los chats y los hilos laterales con sus archivos, y el historial de ejecuciones de las rutinas. Los agentes continúan estos chats con su contexto.",
+  "settings.transfer.part.channels": "Mensajes de canales",
+  "settings.transfer.part.channelsDescription":
+    "Los mensajes de los canales en los que están los agentes exportados, con sus archivos y el historial de ejecuciones de las rutinas de los canales.",
+  "settings.transfer.part.files": "Archivos del espacio de trabajo",
+  "settings.transfer.part.filesDescription": "Archivos que crearon tus agentes y la carpeta compartida.",
+  "settings.transfer.part.preferences": "Preferencias del servidor",
+  "settings.transfer.part.preferencesDescription":
+    "Nombre, logotipo, zona horaria, personalidad, valores predeterminados de los agentes, modelos elegidos, ajustes de recuerdos y habilidades, y los niveles de notificaciones y elementos fijados de cada persona.",
   "settings.transfer.export.settingsDescription":
-    "Servidores MCP, proveedores de modelos personalizados, secciones de la barra lateral y flujos de rutinas.",
+    "Servidores MCP, proveedores de modelos personalizados, secciones de la barra lateral, flujos de rutinas y habilidades compartidas.",
   "settings.transfer.export.chooseAgents": "Elegir agentes ({selected} de {total})",
   "settings.transfer.export.hideAgents": "Ocultar agentes",
   "settings.transfer.export.agentsLabel": "Agentes para exportar",
@@ -745,8 +763,11 @@ export const messages = {
   "settings.transfer.import.agentsLabel": "Agentes del archivo",
   "settings.transfer.import.nameExists": "Nombre ya en uso",
   "settings.transfer.import.settings": "Importar ajustes del servidor",
-  "settings.transfer.import.settingsDescription":
-    "Añade los servidores MCP, los proveedores de modelos personalizados y las secciones de la barra lateral que este servidor no tiene.",
+  "settings.transfer.import.settingsAndPreferences":
+    "Añade los servidores MCP, los proveedores de modelos personalizados, las secciones de la barra lateral y las habilidades compartidas que este servidor no tiene.",
+  "settings.transfer.import.preferences": "Importar preferencias del servidor",
+  "settings.transfer.import.preferencesDescription":
+    "Sustituye el nombre, el logotipo y las preferencias de este servidor, y los niveles de notificación y los elementos fijados de cada persona, por los del archivo.",
   "settings.transfer.import.submit": { one: "Importar {count} agente", other: "Importar {count} agentes" },
   "settings.transfer.import.submitSettings": "Importar ajustes del servidor",
   "settings.transfer.import.importing": "Importando…",
@@ -759,4 +780,26 @@ export const messages = {
   "settings.transfer.result.signInButton": "Iniciar sesión en {provider}",
   "settings.transfer.result.notImported": "No importados",
   "settings.transfer.result.warnings": "Revisa esto",
+  "settings.transfer.copy.tileTitle": "Copiar a otro servidor",
+  "settings.transfer.copy.tileText": "Envía agentes a otro de tus servidores.",
+  "settings.transfer.copy.title": "Copiar agentes a otro servidor",
+  "settings.transfer.copy.from": "Desde",
+  "settings.transfer.copy.to": "A",
+  "settings.transfer.copy.chooseServer": "Elige un servidor",
+  "settings.transfer.copy.search": "Buscar agentes",
+  "settings.transfer.copy.agentsOn": "Agentes en {server}",
+  "settings.transfer.copy.all": { one: "Todos los agentes ({count})", other: "Todos los agentes ({count})" },
+  "settings.transfer.copy.noAgents": "Este servidor no tiene agentes.",
+  "settings.transfer.copy.new": "Nuevo",
+  "settings.transfer.copy.notCopied":
+    "Sus canales y la carpeta compartida también se copian. Las claves de API, los inicios de sesión, los conectores y el historial de chats no se copian. Configúralos de nuevo en el otro servidor.",
+  "settings.transfer.copy.submit": { one: "Copiar {count} agente", other: "Copiar {count} agentes" },
+  "settings.transfer.copy.copying": "Copiando…",
+  "settings.transfer.copy.done": {
+    one: "{count} agente copiado a {server}.",
+    other: "{count} agentes copiados a {server}.",
+  },
+  "settings.transfer.copy.open": "Abrir {server}",
+  "settings.transfer.copy.loadFailed": "No se pudieron leer los agentes",
+  "settings.transfer.copy.failed": "La copia no terminó",
 } as const satisfies PartialTranslation<typeof source>;
