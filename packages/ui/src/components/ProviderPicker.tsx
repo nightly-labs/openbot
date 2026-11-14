@@ -36,6 +36,7 @@ import { ProviderAccountList } from "./ProviderAccountList";
 import { hasKeyAccounts, type ProviderAccountActions, type ProviderPickerAccount } from "./provider-accounts";
 import {
   createProviderRow,
+  customEngineDownloadAction,
   PROVIDER_ACTION_LABEL,
   PROVIDER_ACTION_TEXT,
   type ProviderAction,
@@ -353,13 +354,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
           when={(() => {
             if (!props.onDownloadProvider && !props.onCancelProviderDownload) return undefined;
             if (customReady()) return undefined;
-            const engineOption = engine();
-            const runtime = engineOption.runtimeStatus;
-            if (!runtime) return undefined;
-            if (runtime.phase === "not-downloaded") return "download" as const;
-            if (runtime.phase === "downloading") return "cancel" as const;
-            if (runtime.phase === "download-error") return "retry" as const;
-            return undefined;
+            return customEngineDownloadAction(engine());
           })()}
         >
           {(action) => (

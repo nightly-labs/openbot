@@ -87,6 +87,7 @@ import {
 } from "../../components/provider-accounts";
 import {
   createProviderRow,
+  customEngineDownloadAction,
   PROVIDER_ACTION_LABEL,
   PROVIDER_ACTION_TEXT,
   type ProviderRow,
@@ -2307,6 +2308,14 @@ function CustomEndpointsPage(props: ProviderSettingsPageProps) {
   const endpoints = () => props.customProviders ?? [];
   const engine = () => props.options.find((option) => option.id === "opencode");
   const ready = () => servesCustomEndpoints(props);
+  /**
+   * While OpenCode is not downloaded, Add can do nothing, so the section offers the download that
+   * makes it usable, as the onboarding picker does (#9191).
+   */
+  const engineAction = () => {
+    if (ready() || (!props.onDownloadProvider && !props.onCancelProviderDownload)) return undefined;
+    return customEngineDownloadAction(engine());
+  };
   const runsOn = (endpoint: CustomProviderSummary) =>
     t("customProvider.list.runsOn", {
       name: agentProviderName(endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS),
@@ -2332,17 +2341,39 @@ function CustomEndpointsPage(props: ProviderSettingsPageProps) {
       <SettingsSection
         title={t("provider.settings.endpoints")}
         actions={
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            aria-label={t("provider.custom.addLabel")}
-            disabled={props.disabled || !ready()}
-            onClick={() => props.onAddCustomProvider?.()}
+          <Show
+            when={engineAction()}
+            fallback={
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                aria-label={t("provider.custom.addLabel")}
+                disabled={props.disabled || !ready()}
+                onClick={() => props.onAddCustomProvider?.()}
+              >
+                <Plus aria-hidden="true" />
+                {t("common.add")}
+              </Button>
+            }
           >
-            <Plus aria-hidden="true" />
-            {t("common.add")}
-          </Button>
+            {(action) => (
+              <Button
+                type="button"
+                variant={action() === "download" ? "default" : "outline"}
+                size="sm"
+                aria-label={t(PROVIDER_ACTION_LABEL[action()], { name: engine()?.name ?? "" })}
+                disabled={props.disabled}
+                onClick={() =>
+                  void (action() === "cancel"
+                    ? props.onCancelProviderDownload?.("opencode")
+                    : props.onDownloadProvider?.("opencode"))
+                }
+              >
+                {t(PROVIDER_ACTION_TEXT[action()])}
+              </Button>
+            )}
+          </Show>
         }
       >
         <ItemGroup class="settings-modal-card" aria-label={t("customProvider.list.label")}>
