@@ -27,9 +27,11 @@ import {
   CURRENT_MESSAGE_SEPARATOR,
   combinedPromptInput,
   deliveryPromptInput,
+  restatedContinuationInput,
   type TagReferenceSource,
 } from "./delivery-content";
 import type { DuplicationGate } from "./duplication-gate";
+import { handoffHasHistory } from "./handoff-history";
 import type { MailboxSync } from "./mailbox-sync";
 import type { MemoryHold } from "./memory-hold";
 import type { PlanContinuation } from "./plan-continuation";
@@ -924,7 +926,8 @@ export class DrainScheduler {
           agentNames,
         );
       };
-      // The request is already in the session, so a plan continuation sends only its note.
+      // The request is already in the session, so a plan continuation sends only its note. A new
+      // session, which gets the history handoff, gets the request again before the note (#8779).
       const completeInput =
         planNote === undefined ? promptInput(execution?.text) : [{ type: "text" as const, text: planNote }];
       // A channel packet with only unread messages, or an external message without the guidance, goes
@@ -936,8 +939,13 @@ export class DrainScheduler {
       // The handoff that each start sent: the cleanup after the turn removes only that part.
       const sentHandoffs = new Map<string, string>();
       const inputForThread = (providerThreadId: string) => {
-        const input = deltaInput && shortened?.sendsDelta(delivery.id, providerThreadId) ? deltaInput : completeInput;
         const handoff = this.#threads.consumePendingHandoff(providerThreadId);
+        const input =
+          deltaInput && shortened?.sendsDelta(delivery.id, providerThreadId)
+            ? deltaInput
+            : planNote !== undefined && handoff && handoffHasHistory(handoff)
+              ? restatedContinuationInput(promptInput(execution?.text), planNote)
+              : completeInput;
         if (!handoff) return input;
         sentHandoffs.set(providerThreadId, handoff);
         return input.map((item, index) =>
