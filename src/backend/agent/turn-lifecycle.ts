@@ -942,7 +942,15 @@ export class TurnLifecycle {
         // Each lane of the agent starts its own turns: a task or channel turn takes only the delivery
         // of its own lane.
         const laneId = this.#laneForThread(agentId, threadId);
-        const starting = unprompted ? undefined : this.#mailbox.startingDeliveryForAgent(agentId, laneId)?.delivery;
+        // Codex can answer `turn/start` before it sends `turn/started`. The drain then already marked
+        // the delivery running with this turn, and no delivery is starting. Without this, the channel
+        // took the turn as one that the provider started, and refused its result (#8896).
+        const starting = unprompted
+          ? undefined
+          : (
+              this.#mailbox.findDeliveriesByTurn(agentId, turnId)[0] ??
+              this.#mailbox.startingDeliveryForAgent(agentId, laneId)
+            )?.delivery;
         const sentAt = starting ? Date.parse(starting.createdAt) : Number.NaN;
         const start = starting ? (this.#deliveryStarts.get(starting.id) ?? null) : null;
         // The other deliveries of the batch share this start and start no turn of their own.
