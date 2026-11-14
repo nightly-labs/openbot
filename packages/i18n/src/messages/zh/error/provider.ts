@@ -228,6 +228,8 @@ export const messages = {
   "error.provider.antigravityNotStarted": "找到了 Gemini 服务器，但无法读取其版本。",
   "error.provider.antigravityOverrideInvalid":
     "OPENBOT_ANTIGRAVITY_PATH 中的 Gemini 服务器不存在或不可执行。请更正路径或删除该变量，然后重启 OpenBot。",
+  "error.provider.antigravityOverrideUnreadable":
+    "OPENBOT_ANTIGRAVITY_PATH 中的 Gemini 服务器已启动，但 OpenBot 无法读取其版本。请将该变量设为 Antigravity CLI 1.5.3 或更高版本，或删除该变量，然后重启 OpenBot。",
   "error.provider.antigravityVersionUnreadable": "无法读取 Gemini 服务器版本。",
   "error.provider.antigravitySignIn": "请使用 Google 账号登录以使用 Gemini。",
   "error.provider.antigravityModelAtCapacity":

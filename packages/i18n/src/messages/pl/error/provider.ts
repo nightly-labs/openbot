@@ -253,6 +253,8 @@ export const messages = {
   "error.provider.antigravityNotStarted": "Znaleziono serwer Gemini, ale nie można odczytać jego wersji.",
   "error.provider.antigravityOverrideInvalid":
     "Serwer Gemini z OPENBOT_ANTIGRAVITY_PATH nie istnieje lub nie jest wykonywalny. Popraw ścieżkę lub usuń zmienną, a potem uruchom ponownie OpenBot.",
+  "error.provider.antigravityOverrideUnreadable":
+    "Serwer Gemini z OPENBOT_ANTIGRAVITY_PATH uruchomił się, ale OpenBot nie może odczytać jego wersji. Ustaw zmienną na Antigravity CLI 1.5.3 lub nowszy albo ją usuń, a potem uruchom ponownie OpenBot.",
   "error.provider.antigravityVersionUnreadable": "Nie można odczytać wersji serwera Gemini.",
   "error.provider.antigravitySignIn": "Zaloguj się przez Google, aby używać Gemini.",
   "error.provider.antigravityModelAtCapacity":

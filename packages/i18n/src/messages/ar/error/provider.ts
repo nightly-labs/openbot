@@ -238,6 +238,8 @@ export const messages = {
   "error.provider.antigravityNotStarted": "عُثر على خادم Gemini، لكن تتعذّر قراءة إصداره.",
   "error.provider.antigravityOverrideInvalid":
     "خادم Gemini في OPENBOT_ANTIGRAVITY_PATH غير موجود أو غير قابل للتنفيذ. صحّح المسار أو احذف المتغير، ثم أعد تشغيل OpenBot.",
+  "error.provider.antigravityOverrideUnreadable":
+    "بدأ خادم Gemini في OPENBOT_ANTIGRAVITY_PATH، لكن OpenBot لا يستطيع قراءة إصداره. اضبط المتغير على Antigravity CLI 1.5.3 أو أحدث، أو احذفه، ثم أعد تشغيل OpenBot.",
   "error.provider.antigravityVersionUnreadable": "تتعذّر قراءة إصدار خادم Gemini.",
   "error.provider.antigravitySignIn": "سجّل الدخول باستخدام Google لاستخدام Gemini.",
   "error.provider.antigravityModelAtCapacity":

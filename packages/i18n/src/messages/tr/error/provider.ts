@@ -261,6 +261,8 @@ export const messages = {
   "error.provider.antigravityNotStarted": "Gemini sunucusu bulundu ancak sürümü okunamıyor.",
   "error.provider.antigravityOverrideInvalid":
     "OPENBOT_ANTIGRAVITY_PATH içindeki Gemini sunucusu yok veya çalıştırılabilir değil. Yolu düzeltin ya da değişkeni kaldırın, ardından OpenBot'u yeniden başlatın.",
+  "error.provider.antigravityOverrideUnreadable":
+    "OPENBOT_ANTIGRAVITY_PATH içindeki Gemini sunucusu başladı, ancak OpenBot sürümünü okuyamıyor. Değişkeni Antigravity CLI 1.5.3 veya sonrasına ayarlayın ya da kaldırın, ardından OpenBot'u yeniden başlatın.",
   "error.provider.antigravityVersionUnreadable": "Gemini sunucu sürümü okunamıyor.",
   "error.provider.antigravitySignIn": "Gemini'yi kullanmak için Google ile oturum açın.",
   "error.provider.antigravityModelAtCapacity":
