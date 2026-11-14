@@ -1989,6 +1989,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         runsTurn: (agentId) => this.#runsTurn(agentId),
         interrupt: (agentId, turnId, mayStop) =>
           this.#interruptTurn(agentId, turnId, undefined, mayStop).pipe(toToolOperationFailed),
+        stopOwnTask: (agentId, taskId) =>
+          Effect.gen({ self: this }, function* () {
+            // A task of another agent is not found with this agent id, so the lookup refuses it.
+            const task = yield* lifecycleStep("find own task", () => this.#tasks.require(agentId, taskId));
+            // Stopping a closed task changes nothing, so a second stop is a no-op rather than an error.
+            if (task.closedAt !== null) return;
+            yield* this.closeTask({ agentId, taskId });
+          }).pipe(toToolOperationFailed),
         turnActivity: (agentId, turnId) => ({
           startedAt: turnId ? this.#turn.turnStartedAt(turnId) : null,
           lastEventAt: this.#turn.lastEventAt(agentId),
