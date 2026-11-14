@@ -54,7 +54,7 @@ function queuedRoute(message: QueuedSignalMessage): string {
 }
 
 /** A route ticket, and the Slack workspace or Telegram chat IDs it names. Null IDs: an older account service. */
-export interface LinkedRouteTicket {
+interface LinkedRouteTicket {
   ticket: string;
   ids: readonly string[] | null;
 }
