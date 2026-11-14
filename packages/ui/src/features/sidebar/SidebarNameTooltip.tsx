@@ -1,12 +1,13 @@
 /**
  * The name of a chat in a tooltip at its row. The compact sidebar shows only the avatars, so the
  * tooltip shows what the full row shows: the name of the agent, channel or person, its title and
- * its last message. The full sidebar shows these in the row, so the tooltip stays closed there.
+ * its last message. The full sidebar shows these in the row, so it has no tooltip there.
  */
 
-import { Badge, Tooltip } from "@openbot/ui";
+import { Badge } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createSignal, Show } from "solid-js";
+import { Show } from "solid-js";
+import { SidebarRowTooltip } from "./SidebarRowTooltip";
 import { useSidebarScope } from "./sidebar-scope";
 
 /** The delay of the server rail. After the first tooltip, the next rows open theirs at once. */
@@ -25,23 +26,14 @@ export function SidebarNameTooltip(tooltipProps: {
   children: JSX.Element;
 }) {
   const { props } = useSidebarScope();
-  const [open, setOpen] = createSignal(false);
   return (
-    <Tooltip.Root
-      open={open() && props.compact && tooltipProps.menuOpen !== true}
-      onOpenChange={setOpen}
-      disabled={!props.compact}
-      placement="right"
-      gutter={10}
+    <SidebarRowTooltip
+      enabled={props.compact === true}
       openDelay={SIDEBAR_NAME_TOOLTIP_OPEN_DELAY}
-      closeDelay={0}
-      skipDelayDuration={300}
-    >
-      <Tooltip.Trigger as="div" class="sidebar-agent-tooltip-trigger">
-        {tooltipProps.children}
-      </Tooltip.Trigger>
-      <Tooltip.Portal>
-        <Tooltip.Content class="sidebar-name-tooltip">
+      menuOpen={tooltipProps.menuOpen}
+      class="sidebar-name-tooltip"
+      content={
+        <>
           <span class="sidebar-name-tooltip-heading">
             <span class="sidebar-name-tooltip-name" dir="auto">
               {tooltipProps.name}
@@ -64,8 +56,10 @@ export function SidebarNameTooltip(tooltipProps: {
           <Show when={tooltipProps.detail}>
             {(detail) => <span class="sidebar-name-tooltip-detail">{detail()}</span>}
           </Show>
-        </Tooltip.Content>
-      </Tooltip.Portal>
-    </Tooltip.Root>
+        </>
+      }
+    >
+      {tooltipProps.children}
+    </SidebarRowTooltip>
   );
 }

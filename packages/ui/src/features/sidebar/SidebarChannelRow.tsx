@@ -36,10 +36,11 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
   const channelWait = () => props.channelWaits?.[rowProps.channel.id];
   const badgeState = createMemo(() => sidebarUnreadBadge(rowProps.channel.unreadCount, channelWait()));
   const wait = () => (rowProps.waiting ? channelWait() : undefined);
-  const waitLabel = () => {
+  const stateLabel = () => {
     const current = channelWait();
-    return current ? `. ${sidebarAgentStateLabel(current, t, format)}` : "";
+    return current ? sidebarAgentStateLabel(current, t, format) : "";
   };
+  const waitLabel = () => (stateLabel() ? `. ${stateLabel()}` : "");
   const draggable = () => !rowProps.channel.archived && chatsDraggable() && !props.compact && !rowProps.waiting;
   const [menuOpen, setMenuOpen] = createSignal(false);
   const title = () => rowProps.channel.title.trim();
@@ -144,7 +145,13 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
       <Show
         when={wait()}
         fallback={
-          <SidebarNameTooltip name={rowProps.channel.name} title={title()} preview={preview()} menuOpen={menuOpen()}>
+          <SidebarNameTooltip
+            name={rowProps.channel.name}
+            title={title()}
+            preview={preview()}
+            detail={stateLabel()}
+            menuOpen={menuOpen()}
+          >
             {row()}
           </SidebarNameTooltip>
         }

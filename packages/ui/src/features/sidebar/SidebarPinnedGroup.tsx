@@ -65,11 +65,14 @@ export function SidebarPinnedGroup() {
               const name = () => chatName(item.chat);
               const active = () => chatIsActive(item.chat);
               const [menuOpen, setMenuOpen] = createSignal(false);
-              // The compact tooltip shows the last message, as the row in a section does.
-              const pinnedPreview = () =>
-                item.chat.kind === "agent"
-                  ? item.chat.agent.preview
-                  : (item.chat.channel.lastMessage?.text ?? t("sidebar.channel.noMessages"));
+              /* The compact tooltip shows the last message, as the row in a section does. A channel
+               * from a saved frame has no last message until the list loads, so it shows none. */
+              const pinnedPreview = () => {
+                if (item.chat.kind === "agent") return item.chat.agent.preview;
+                const lastMessage = item.chat.channel.lastMessage;
+                if (lastMessage) return lastMessage.text;
+                return props.channelPreviewsPending === true ? undefined : t("sidebar.channel.noMessages");
+              };
               // A pinned chat that waits stays in its tile, so the tile says what it waits for.
               const channelWait = () => (item.chat.kind === "channel" ? props.channelWaits?.[item.chat.id] : undefined);
               /* A pinned channel shows its unread count as a pinned agent does. */
