@@ -873,11 +873,7 @@ export class McpOAuth implements McpOAuthAuthority {
       redirectUrl: this.#options.redirectUrl,
       // A page that an opener shows is not in this computer's browser, which is what opens the deep link.
       // A relayed page opens on a computer that can name its own.
-      deepLinkRedirectUrl: open
-        ? openedDeepLinkRedirectUrl === undefined
-          ? undefined
-          : () => openedDeepLinkRedirectUrl
-        : this.#options.deepLinkRedirectUrl,
+      deepLinkRedirectUrl: open ? () => openedDeepLinkRedirectUrl : this.#options.deepLinkRedirectUrl,
       openExternal: open ?? this.#options.openExternal,
       isAbandoned,
       legacyIssuer: legacyIssuer(stored),

@@ -17,6 +17,9 @@
 // Dropbox (#8025) answers a registration with 403 `registration_not_supported` unless its loopback
 // path is one that it knows, such as `/callback`, and registers its loopback addresses with no port:
 // OpenBot must register the `/callback` form, send it, and use that registration again.
+// TradingView (#9209) blocks a sign-in page that returns to `127.0.0.1` or `localhost`. A joined
+// server's relayed sign-in for a client that opens `openbot://mcp-auth` must register and send that
+// link after two pages got no grant back. A relay for a client without the link keeps the loopback names.
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
@@ -284,6 +287,7 @@ async function runCase(
     scopes = {},
     registrationForbidden = null,
     storedClient = null,
+    relayDeepLink,
   }: {
     storedDiscovery?: boolean;
     secretAccepted?: boolean;
@@ -292,6 +296,11 @@ async function runCase(
     registrationForbidden?: RegistrationForbidden | null;
     /** A Dropbox registration already on file, with no tokens. */
     storedClient?: string | null;
+    /**
+     * A relayed sign-in: the page opens on the member's computer, which returns on this link (`null`
+     * for none). The firewall blocks each page but the last, and the member cancels it.
+     */
+    relayDeepLink?: string | null;
   } = {},
 ): Promise<Case> {
   const server = await fakeServer(authMethods, secretAccepted, registrationRefused, scopes, registrationForbidden);
@@ -329,13 +338,25 @@ async function runCase(
     redirectUrl: "http://127.0.0.1:28417/mcp-auth",
     signInTimeoutMs: 10_000,
   });
+  let attempt = 0;
+  const relayed = async (page: string) => {
+    server.pagesOpened.push(page);
+    server.redirects.push(`page ${new URL(page).searchParams.get("redirect_uri")}`);
+    const state = new URL(page).searchParams.get("state");
+    assert.ok(state, "the page has a state");
+    setTimeout(() => {
+      if (attempt < attempts - 1) oauth.cancelSignIn(server.url);
+      else oauth.receiveAuthorizationCode(state, "e2e-grant");
+    }, 50);
+  };
   try {
     const authority = {
       accessToken: (url: string) => oauth.accessToken(url),
-      signIn: (url: string) => oauth.signIn(url),
+      signIn: (url: string) =>
+        relayDeepLink === undefined ? oauth.signIn(url) : oauth.signIn(url, relayed, relayDeepLink ?? undefined),
     };
     const results: Case["attempts"] = [];
-    for (let attempt = 0; attempt < attempts; attempt++)
+    for (attempt = 0; attempt < attempts; attempt++)
       results.push(await runCauseEffect(testMcpServer(httpConfig(server.url), 10_000, undefined, authority, "here")));
     return {
       name,
@@ -537,6 +558,38 @@ async function main(): Promise<void> {
       { name: "no-scope-in-resource-metadata", scopes: { resource: [], server: entraScopes }, expected: null },
       { name: "no-scope-anywhere", scopes: { resource: null }, expected: null },
     ];
+    // A joined server's relay (#9209). The host's own system does not open `openbot://`.
+    const loopback = "http://127.0.0.1:28417/mcp-auth";
+    const localhost = "http://localhost:28417/mcp-auth";
+    const deepLink = "openbot://mcp-auth";
+    const pages = (entry: Case) =>
+      entry.redirects.filter((line) => line.startsWith("page ")).map((line) => line.slice("page ".length));
+    const relayed = await runCase("relay-with-deep-link", ["none"], 3, { relayDeepLink: deepLink });
+    check(
+      relayed,
+      pages(relayed).join(" ") === [loopback, localhost, deepLink].join(" "),
+      `the pages returned to ${pages(relayed).join(", ")}`,
+    );
+    check(relayed, relayed.redirects.includes(`register ${deepLink}`), "the deep link was not registered");
+    check(relayed, relayed.redirects.at(-1) === `token ${deepLink}`, "the token request did not name the link");
+    check(relayed, relayed.attempts[2]?.error === null, `the third sign-in failed: ${relayed.attempts[2]?.error}`);
+    check(relayed, relayed.signedIn, "no token is stored after the sign-in");
+    report.cases.push(relayed);
+    // An older desktop client, the web client and the phone cannot open the link.
+    const relayedLoopback = await runCase("relay-without-deep-link", ["none"], 3, { relayDeepLink: null });
+    check(
+      relayedLoopback,
+      pages(relayedLoopback).join(" ") === [loopback, localhost, loopback].join(" "),
+      `the pages returned to ${pages(relayedLoopback).join(", ")}`,
+    );
+    check(
+      relayedLoopback,
+      !relayedLoopback.redirects.some((line) => line.includes(deepLink)),
+      "a client without the link got it",
+    );
+    check(relayedLoopback, relayedLoopback.signedIn, "no token is stored after the sign-in");
+    report.cases.push(relayedLoopback);
+
     for (const { name, scopes, expected } of scopeCases) {
       const entry = await runCase(name, ["none"], 1, { scopes });
       check(entry, entry.attempts[0]?.error === null, `the sign-in failed: ${entry.attempts[0]?.error}`);
