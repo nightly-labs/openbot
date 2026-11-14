@@ -258,8 +258,11 @@ export function reconcileWebRtcHosts(input: WebRtcHostReconciliationInput): WebR
     if (input.isConnected(server.id) && server.publicKey === refreshed.publicKey) {
       refreshed.remoteDesktopAvailable = server.remoteDesktopAvailable;
     }
-    // An account server from before `host-appearance-v1` lists none; the host's own event set it.
-    if (refreshed.appearance === undefined && server.appearance !== undefined) refreshed.appearance = server.appearance;
+    // A connected host sends its look at connect and after each change, so that look is current.
+    // The account copy can be older: a local server child does not copy it, and a copy can fail.
+    // An account server from before `host-appearance-v1` lists none.
+    if (server.appearance !== undefined && (refreshed.appearance === undefined || input.isConnected(server.id)))
+      refreshed.appearance = server.appearance;
     return [refreshed];
   });
   for (const server of listed) {

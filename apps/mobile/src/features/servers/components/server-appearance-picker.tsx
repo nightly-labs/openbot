@@ -39,7 +39,9 @@ export function ServerAppearancePicker({ server }: { server: MobileServer }) {
   const [pending, setPending] = useState<ServerAppearance | null | undefined>();
   const shown = pending === undefined ? (server.appearance ?? null) : pending;
 
-  function save(next: ServerAppearance | null): void {
+  function save(choice: ServerAppearance | null): void {
+    // The squircle in the automatic colour is the automatic look, so it is saved as null, as on desktop.
+    const next = choice?.shape === "squircle" && choice.color === null ? null : choice;
     setPending(next);
     void perform(
       () => setServerAppearance(server.id, next),

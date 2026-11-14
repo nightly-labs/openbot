@@ -417,6 +417,8 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
                         class: "settings-identity-image-trigger server-appearance-trigger",
                       })}
                       aria-label={t("server.settings.appearance")}
+                      // Another action holds `run`, which would refuse the save with no message.
+                      disabled={Boolean(busy()) && busy() !== "appearance"}
                     >
                       <ServerPlushLogo class="server-settings-plush" seed={props.server.id} appearance={appearance()} />
                     </Popover.Trigger>

@@ -37,7 +37,7 @@ import {
   CHAT_COLORS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_CAPABILITY } from "@openbot/contracts/team-protocol/focus-use-v1";
-import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
+import { HOST_APPEARANCE_CAPABILITY, type ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
@@ -1112,8 +1112,10 @@ export function createWebWorkspace(
           if (connected && draft.host?.hostId === connected.hostId) {
             draft.host.name = connected.name;
             draft.host.logoKey = connected.logoKey;
-            // An account server from before `host-appearance-v1` lists none; the host's event stays.
-            if (connected.appearance !== undefined) draft.host.appearance = connected.appearance;
+            // A host with `host-appearance-v1` sends its look itself; the account copy can be older.
+            // An account server from before `host-appearance-v1` lists none.
+            if (connected.appearance !== undefined && !draft.capabilities.includes(HOST_APPEARANCE_CAPABILITY))
+              draft.host.appearance = connected.appearance;
           }
           draft.hosts = hosts;
           draft.hostsLoaded = true;
