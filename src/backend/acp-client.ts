@@ -49,7 +49,7 @@ import {
   OPENCODE_CHILD_UPDATE_METHOD,
   type OpenCodeLaunches,
 } from "./agent/acp-subagent-updates";
-import { isTurnContextBlock, withoutTurnContext } from "./agent/developer-instructions";
+import { BACKGROUND_WAKE_NOTE, isTurnContextBlock, withoutTurnContext } from "./agent/developer-instructions";
 import type { GeneratedMediaKind } from "./agent/image-generation";
 import { acpPlanSteps, PLAN_UPDATED_METHOD } from "./agent/plan-updates";
 import { elicitationFieldQuestions, elicitationValue } from "./agent/prompts";
@@ -726,6 +726,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       configSetUnsaved: options.flavor.configSetUnsaved,
       keepProbeSession: () => options.flavor.closeKeepsSession === true && this.#supportsSessionResume,
       probeCloseDelayMs: options.flavor.probeCloseDelayMs,
+      deletesSessions: () => this.#initialization?.agentCapabilities?.sessionCapabilities?.delete != null,
     });
   }
 
@@ -1996,6 +1997,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
    * OpenCode 2.1.1 can fail a `session/resume` in its first seconds with "Internal service failure"
    * and `ServiceUnavailableError`, because its plugins have not started yet (OpenCode issue #57204).
    * The session is there, and a resume a few seconds later works, so OpenBot tries once more.
+   *
+   * Grok gets the same list check for its "Path not found." answer (#8936), but a listed session is
+   * not tried again: that answer names another missing file, which a second attempt does not fix.
    */
 
   readonly #restoreSessionEffect = Effect.fn("AcpAgentClient.restoreSession")(function* (
@@ -2011,7 +2015,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           : current.loadSession(request),
       );
     let failure: unknown;
-    let recovery: "wait-for-start" | "list-sessions" | null = null;
+    let recovery: ReturnType<NonNullable<AcpFlavor["restoreFailure"]>> = null;
     let restored: LoadSessionResponse | ResumeSessionResponse | undefined;
     try {
       restored = providerResult(yield* Effect.result(providerSync(connection).pipe(Effect.flatMap(restore))));
@@ -2038,6 +2042,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       return yield* restore(current);
     }
     const listing = yield* this.#sessionListingEffect(yield* providerSync(connection), request);
+    if (recovery === "confirm-missing")
+      return yield* providerFailure(
+        listing === "absent"
+          ? new MissingAcpSessionError(`ACP session not found: ${request.sessionId}`, failure)
+          : failure,
+      );
     if (listing === "absent")
       return yield* providerFailure(
         new MissingAcpSessionError(
@@ -2527,12 +2537,35 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       while (providerResult(yield* Effect.result(this.#leaveOutFailedMcpServer(thread, turn, response, params))))
         response = providerResult(yield* send());
       if (thread.activeTurn !== turn || turn.completing) return;
-      // A steer by prompt ends the prompt before it with `end_turn`, and the work goes on under the
-      // steer's prompt. The turn ends with the reply to the last one.
-      for (let steer = turn.steerReplies.shift(); steer; steer = turn.steerReplies.shift()) {
-        this.#reportPromptUsage(thread, turn, response);
-        response = providerResult(yield* Deferred.await(steer));
+      // A wake prompt left the same commands running: the wait ends.
+      let staleWake = false;
+      for (;;) {
+        // A steer by prompt ends the prompt before it with `end_turn`, and the work goes on under the
+        // steer's prompt. The turn ends with the reply to the last one.
+        for (let steer = turn.steerReplies.shift(); steer; steer = turn.steerReplies.shift()) {
+          this.#reportPromptUsage(thread, turn, response);
+          response = providerResult(yield* Deferred.await(steer));
+          if (thread.activeTurn !== turn || turn.completing) return;
+        }
+        // A command still runs in the background (`AcpFlavor.wakesAfterPromptEnds`). The turn stays
+        // open until the session changes, and a prompt then connects the agent's wake-up to it.
+        // The agent can finish a command while no prompt is open and never report it, so a wake-up
+        // after which the same commands still show as running ends the wait. One wake prompt is the
+        // most that a session that changes for another cause costs.
+        const running: string = response.stopReason === "end_turn" && !staleWake ? this.#backgroundCommands(turn) : "";
+        if (!running) break;
+        const wake = yield* this.#awaitSessionChange(thread, turn);
         if (thread.activeTurn !== turn || turn.completing) return;
+        if (wake === "steered") continue;
+        if (wake === "none") break;
+        this.#reportPromptUsage(thread, turn, response);
+        // As the first prompt, a wake prompt that gets no update is sent again once, and then fails.
+        response = providerResult(
+          yield* this.#sendPrompt(thread, turn, [{ type: "text", text: BACKGROUND_WAKE_NOTE }], params),
+        );
+        if (thread.activeTurn !== turn || turn.completing) return;
+        turn.lastActivityAt = Date.now();
+        staleWake = this.#backgroundCommands(turn) === running;
       }
       this.#reportPromptUsage(thread, turn, response);
       // A flavor can fail a turn that ended with no answer (OpenCode, custom agents). A turn told not
@@ -2635,6 +2668,59 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       },
     });
   }
+
+  /**
+   * The IDs of the turn's `execute` tool calls that still run, joined, for an agent that can end a
+   * prompt while they run (`AcpFlavor.wakesAfterPromptEnds`). Empty when none runs. A stopped turn
+   * and one that failed do not wait for them, and a daemon, such as a dev server, runs on by intent.
+   * The wait needs a CLI that joins a second prompt to its work (`#steersByPrompt`): the wake prompt
+   * and the user's messages during the wait both do so.
+   */
+  #backgroundCommands(turn: AcpTurn): string {
+    const failed =
+      turn.providerError !== null ||
+      turn.sdkFailureAt !== null ||
+      this.#flavor.sdkHarness?.answerIsFailure.test(turn.text) === true;
+    if (!this.#flavor.wakesAfterPromptEnds || !this.#steersByPrompt || turn.stopped || failed) return "";
+    return [...turn.toolItems.values()]
+      .filter(
+        (item) =>
+          item.toolKind === "execute" &&
+          item.status === "in_progress" &&
+          !(isRecord(item.arguments) && item.arguments.IsDaemon === true),
+      )
+      .map((item) => item.id)
+      .join("\n");
+  }
+
+  /**
+   * Waits until `session/list` shows that the session changed after its prompt ended: the agent woke
+   * its model for a finished command. "steered" when the user sent a message into the turn, which
+   * connects the work again by itself. "none" when the agent reports no change time, or after
+   * `ACP_BACKGROUND_WATCH_MS` with no change: the turn then ends as before. A `session/list` that
+   * fails, such as one that times out on a busy process, skips that poll only.
+   */
+  readonly #awaitSessionChange = Effect.fn("AcpAgentClient.awaitSessionChange")(function* (
+    this: AcpAgentClient,
+    thread: AcpThread,
+    turn: AcpTurn,
+  ) {
+    const until = Date.now() + ACP_BACKGROUND_WATCH_MS;
+    // The first reading comes one poll after the prompt ended, so the agent's own write of that end
+    // is not taken as a wake-up.
+    let before: string | undefined;
+    while (Date.now() < until) {
+      yield* Effect.sleep(ACP_BACKGROUND_POLL_MS);
+      if (thread.activeTurn !== turn || turn.completing || turn.stopped) return "none";
+      if (turn.steerReplies.length > 0) return "steered";
+      const read = yield* Effect.result(this.#sessionUpdatedAt(thread));
+      if (Result.isFailure(read)) continue;
+      if (read.success === null) return "none";
+      if (before !== undefined && read.success !== before) return "changed";
+      before = read.success;
+    }
+    return "none";
+  });
 
   /**
    * Sends a message into the running turn as a second `session/prompt` (`AcpFlavor.steerByPromptSince`).

@@ -179,7 +179,7 @@ import { BootRecovery } from "./agent/boot-recovery";
 import { BrowserUploads } from "./agent/browser-uploads";
 import type { ChatVisualPreviewHost } from "./agent/chat-visual-preview";
 import { CodexIdleSessions } from "./agent/codex-idle-sessions";
-import { ContextCompaction } from "./agent/context-compaction";
+import { ContextCompaction, compactsOnRequest } from "./agent/context-compaction";
 import { ConversationReader } from "./agent/conversation-reader";
 import { ConversationRuntime } from "./agent/conversation-runtime";
 import { CustomEndpoints, toEndpointChangeFailed } from "./agent/custom-endpoints";
@@ -1833,7 +1833,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         mayContinueOnBackup: (agentId) => this.#mayContinueStoppedWork(agentId),
         requeueChannelDelivery: (deliveryId, continueWork) => this.#requeueChannelDelivery(deliveryId, continueWork),
         quietRoutineDelivery: (deliveryId) => this.#routines.quietRunForDelivery(deliveryId),
-        closeRoutineSession: (externalThreadId) => this.#threads.closeRoutineThread(externalThreadId),
+        closeRoutineSession: (externalThreadId, archive) => this.#threads.closeRoutineThread(externalThreadId, archive),
         conversationTurnEnded: (agentId, sideThreadId, counts, memoryCommitted) =>
           this.#memoryReview.turnEnded(agentId, sideThreadId, counts, memoryCommitted),
         turnStopped: (agentId, taskId, turnId) =>
@@ -1954,6 +1954,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       serverClaims: options.serverClaims ?? null,
       apiKeys: options.agentApiKeys ?? null,
       vaultItems: options.vaultItems ?? null,
+      codexSubagentParent: (childThreadId) => this.#turn.codexSubagentParent(childThreadId),
       hooks: {
         listAgents: () => this.listAgents(),
         listModels: () => this.listModels(),
@@ -4579,19 +4580,39 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     channelId: string,
   ) {
     const contexts = yield* this.channels.compactTargets(channelId);
+    // A provider process stops after some minutes with no turn, and only its process compacts a session.
+    // It starts again as for a turn; a process that a turn would replace is not touched. A busy channel
+    // refuses first, and a provider whose last process could not compact on request does not start.
+    const { agents: members, candidates: found } = yield* lifecycleStep("find channel compact members", () =>
+      this.#channelCompactCandidates(contexts),
+    );
+    const stoppedMembers = [...new Set(found.map(({ agentId }) => members.get(agentId)))].filter(
+      (agent): agent is AgentSummary =>
+        agent !== undefined &&
+        this.#mayCompactOnRequest(agent) &&
+        !this.#providers.agentClientRunning(agent) &&
+        this.#providers.agentClientCurrent(agent),
+    );
+    yield* Effect.forEach(
+      stoppedMembers,
+      (agent) =>
+        this.#providers.ensureAgentClient(agent).pipe(
+          Effect.asVoid,
+          Effect.catch(() =>
+            Effect.sync(() =>
+              logger.warn("A channel member's provider did not start to compact.", { agentId: agent.id }),
+            ),
+          ),
+        ),
+      { discard: true },
+    );
     const sessions = yield* lifecycleStep("compact channel context", () => {
-      const agents = new Map(this.#store.list().map((agent) => [agent.id, agent]));
-      const candidates = contexts.flatMap(({ agentId, threadId }) => {
-        const agent = agents.get(agentId);
-        const session = agent ? this.#store.database.activeProviderSession(threadId, agent.provider) : null;
-        return agent && session ? [{ agentId, threadId, externalSessionId: session.externalSessionId }] : [];
-      });
-      if (candidates.some(({ agentId, threadId }) => this.#channelSessionBusy(agents.get(agentId), threadId)))
-        throw new ContextCompactRefusedError(sourceText("error.backend.channelWaitBeforeCompact"));
+      // Again: a turn can start while a process starts.
+      const { agents, candidates } = this.#channelCompactCandidates(contexts);
       const reserved = candidates.filter(({ agentId, externalSessionId }) =>
         this.#compaction.reserve(agentId, externalSessionId, true),
       );
-      if (!reserved.length) throw new ContextCompactRefusedError(sourceText("error.backend.channelCompactUnavailable"));
+      if (!reserved.length) throw new ContextCompactRefusedError(this.#channelCompactRefusal(candidates, agents));
       return reserved;
     });
     yield* Effect.forEach(
@@ -4601,6 +4622,47 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       { discard: true, concurrency: "unbounded" },
     );
   }, Effect.uninterruptible).bind(this);
+
+  /** The members' channel sessions that can compact. Throws while one of them is busy. */
+  #channelCompactCandidates(contexts: ReadonlyArray<{ agentId: string; threadId: string }>): {
+    agents: Map<string, AgentSummary>;
+    candidates: Array<{ agentId: string; threadId: string; externalSessionId: string }>;
+  } {
+    const agents = new Map(this.#store.list().map((agent) => [agent.id, agent]));
+    const candidates = contexts.flatMap(({ agentId, threadId }) => {
+      const agent = agents.get(agentId);
+      const session = agent ? this.#store.database.activeProviderSession(threadId, agent.provider) : null;
+      return agent && session ? [{ agentId, threadId, externalSessionId: session.externalSessionId }] : [];
+    });
+    if (candidates.some(({ agentId, threadId }) => this.#channelSessionBusy(agents.get(agentId), threadId)))
+      throw new ContextCompactRefusedError(sourceText("error.backend.channelWaitBeforeCompact"));
+    return { agents, candidates };
+  }
+
+  /**
+   * Why no member of a channel compacts. A member with no session has nothing to compact yet. A member
+   * whose provider compacts by itself, or not at all, cannot compact on request. A provider that
+   * never started can, so it gets the general refusal.
+   */
+  #channelCompactRefusal(
+    candidates: ReadonlyArray<{ agentId: string }>,
+    agents: ReadonlyMap<string, AgentSummary>,
+  ): string {
+    if (!candidates.length) return sourceText("error.backend.channelCompactNoSession");
+    const onRequest = candidates.some(({ agentId }) => {
+      const agent = agents.get(agentId);
+      return agent !== undefined && this.#mayCompactOnRequest(agent);
+    });
+    return sourceText(
+      onRequest ? "error.backend.channelCompactUnavailable" : "error.backend.channelCompactNotSupported",
+    );
+  }
+
+  /** False when the last process of the agent's provider could not compact on request. */
+  #mayCompactOnRequest(agent: AgentSummary): boolean {
+    const mode = this.#providers.lastCompactionMode(agent);
+    return mode === undefined || compactsOnRequest(mode);
+  }
 
   /**
    * The new chat that the agent asked for with `start_new_chat`. The drain calls it when the agent's

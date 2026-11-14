@@ -24,6 +24,7 @@ import type {
   BrowserVisibilityInput,
 } from "@openbot/contracts/ipc";
 import { isNumber, isString } from "@openbot/contracts/runtime-values";
+import type { BrowserSignInStorage } from "@openbot/contracts/team-protocol/browser-sign-in-storage-v1";
 import {
   type BrowserSignInCookie,
   browserSignInCookieFitsHost,
@@ -250,6 +251,8 @@ const VIEW_CONTEXT_MENU_MS = 1_500;
 const DIALOG_ACTION_WAIT_MS = 10_000;
 /** How long `open` waits for the load of a redirect before its second read. */
 const OPEN_REDIRECT_WAIT_MS = 5_000;
+/** A page dialog holds a script. The sign-in then loads the page again with the cookies only. */
+const SIGN_IN_STORAGE_WRITE_TIMEOUT_MS = 5_000;
 /** A site can redirect more than one time before its page stays. */
 const OPEN_REDIRECT_READS = 2;
 /**
@@ -315,6 +318,12 @@ const IDLE_TAB_SWEEP_MS = 60_000;
  */
 const MAX_IDLE_AWAKE_TABS = 3;
 const AWAKE_TAB_GRACE_MS = 2 * 60_000;
+/**
+ * What the agent reads on its next tool call on a tab that the idle unload closed. The tab kept its
+ * address and title, so without it the agent reads a missing script or value as a bug of the page.
+ */
+const IDLE_UNLOAD_NOTE =
+  "Note: this tab was not used for some time, so its page was unloaded to free memory and loaded again from its address. Scripts that you injected, page variables, form input and the tab history from before are gone. Set them up again if you need them. An idle tab unloads sooner when several other tabs are open: close the tabs that you no longer need.";
 /**
  * The page load errors that say the proxy of the tab did not answer or refused it, and why, with
  * their Chromium codes. A failed load can give only the code, with no name.
@@ -951,6 +960,7 @@ export class BrowserHost {
               (capture ? yield* Deferred.await(capture.frame).pipe(Effect.catch(() => Effect.succeed(null))) : null);
             if (tab.sleeping !== sleeping || tab.closing || tab.contents.isDestroyed()) return;
             unloaded = true;
+            tab.idleUnloadNoted = new Set();
             yield* this.#closeRenderer(tab);
           }),
         true,
@@ -1321,16 +1331,19 @@ export class BrowserHost {
   /**
    * Sets the cookies of a sign-in that a member made on their own device, then loads the page again.
    * Only the cookies of the site that the tab shows go in: its host, its parent domains, and its
-   * subdomains. Chromium refuses a public suffix domain. The answer is the count that Chromium set.
+   * subdomains. Chromium refuses a public suffix domain. Some sites keep the sign-in in the page
+   * storage, so its pairs go in too, but only when the tab shows the same origin. The answer is the
+   * count of cookies and pairs that were set.
    */
   readonly importSignIn = Effect.fn("BrowserHost.importSignIn")(function* (
     this: BrowserHost,
     tabId: string,
     cookies: readonly BrowserSignInCookie[],
-  ): Effect.fn.Return<number, BrowserOperationError> {
+    storage: BrowserSignInStorage | null = null,
+  ): Effect.fn.Return<{ cookies: number; storage: number }, BrowserOperationError> {
     const tab = yield* this.#requireTab(tabId);
     const page = URL.canParse(tab.contents.getURL()) ? new URL(tab.contents.getURL()) : null;
-    if (!page || (page.protocol !== "https:" && page.protocol !== "http:")) return 0;
+    if (!page || (page.protocol !== "https:" && page.protocol !== "http:")) return { cookies: 0, storage: 0 };
     const target = this.#tabSession(tab);
     const results = yield* Effect.forEach(
       cookies.filter((cookie) => browserSignInCookieFitsHost(cookie.domain, page.hostname)),
@@ -1351,11 +1364,27 @@ export class BrowserHost {
         ).pipe(Effect.match({ onSuccess: () => 1, onFailure: () => 0 })),
     );
     const count = results.reduce((total, set) => total + set, 0);
-    if (count === 0) return 0;
-    yield* browserCall(() => target.cookies.flushStore());
-    // The cookies are set. A page that does not load again shows its own error in the tab.
+    if (count > 0) yield* browserCall(() => target.cookies.flushStore());
+    // The page itself writes the pairs, so they go to the storage of the origin that it shows. The
+    // tab can move while the cookies are set, so the script checks the origin again. A dialog of the
+    // page holds the script, so the write has a deadline.
+    const stored =
+      storage && storage.entries.length > 0 && storage.origin === page.origin
+        ? yield* browserCall(() =>
+            tab.contents.executeJavaScript(
+              `((origin, entries) => { if (location.origin !== origin) return 0; let set = 0; for (const [name, value] of entries) { try { localStorage.setItem(name, value); set += 1; } catch {} } return set; })(${JSON.stringify(storage.origin)}, ${JSON.stringify(storage.entries.map((entry) => [entry.name, entry.value]))})`,
+              true,
+            ),
+          ).pipe(
+            Effect.timeoutOption(SIGN_IN_STORAGE_WRITE_TIMEOUT_MS),
+            Effect.map((set) => (Option.isSome(set) && isNumber(set.value) ? set.value : 0)),
+            Effect.catch(() => Effect.succeed(0)),
+          )
+        : 0;
+    if (count === 0 && stored === 0) return { cookies: 0, storage: 0 };
+    // The sign-in is set. A page that does not load again shows its own error in the tab.
     yield* this.reload(tabId).pipe(Effect.ignore);
-    return count;
+    return { cookies: count, storage: stored };
   }).bind(this);
 
   /**
@@ -2745,8 +2774,10 @@ export class BrowserHost {
     params: DynamicToolCallParams,
     hooks: BrowserDynamicToolHooks = {},
   ): Effect.fn.Return<DynamicToolResult, BrowserOperationError> {
+    let calledTabId: string | undefined;
     const outcome = yield* Effect.gen({ self: this }, function* () {
       const call = yield* browserSync(() => parseBrowserToolCall(params.tool, params.arguments));
+      if ("tabId" in call.args) calledTabId = call.args.tabId;
       yield* browserSync(() => this.#controls.begin(params, call));
       return { result: yield* runBrowserTool(this.#toolHandlers, call.tool, call, params, hooks) };
     })
@@ -2778,7 +2809,7 @@ export class BrowserHost {
           }),
         ),
       );
-    if ("result" in outcome) return outcome.result;
+    if ("result" in outcome) return this.#withIdleUnloadNote(params, calledTabId, outcome.result);
     // The agent's control of the tab ended above, so the wait does not show the agent at work.
     if (hooks.onUserControl) return yield* hooks.onUserControl(outcome.heldTabId);
     return {
@@ -2786,6 +2817,26 @@ export class BrowserHost {
       contentItems: [{ type: "inputText", text: new BrowserUserControlHeld(outcome.heldTabId).message }],
     };
   }).bind(this);
+
+  /**
+   * Adds `IDLE_UNLOAD_NOTE` after the result of a thread's next tool on a tab that the idle unload
+   * closed (#8833). It comes last, so a reader of the first text still gets the tool's own result.
+   * Only a thread that can use the tab gets it, once. A tool that failed before it woke the tab did not
+   * load the page again, so the note waits for the next call.
+   */
+  #withIdleUnloadNote(
+    params: DynamicToolCallParams,
+    tabId: string | undefined,
+    result: DynamicToolResult,
+  ): DynamicToolResult {
+    const tab = tabId === undefined ? undefined : this.#tabs.get(tabId);
+    const noted = tab?.idleUnloadNoted;
+    if (!tab || !noted || tab.pendingRestore || noted.has(params.threadId)) return result;
+    const listed = this.listTabs().find((candidate) => candidate.id === tab.id);
+    if (!listed || !this.#canUseToolTab(params, listed)) return result;
+    noted.add(params.threadId);
+    return { ...result, contentItems: [...result.contentItems, { type: "inputText", text: IDLE_UNLOAD_NOTE }] };
+  }
 
   #toolTabs(params: DynamicToolCallParams): { tabs: BrowserTab[]; activeTabId: string | null } {
     // A page can put a typed card value in its title or address, so they go through the tab's scrub.

@@ -105,13 +105,14 @@ import { AgentInterruptTool } from "./agent-interrupt-tool";
 import type { AgentMemories } from "./agent-memories";
 import { type ApprovalAutomationPolicy, NO_APPROVAL_AUTOMATION } from "./approval-automation";
 import type { AttachmentGateway } from "./attachment-gateway";
-import type { AttentionRegistry } from "./attention-registry";
+import type { AttentionRegistry, CodexSubagentParent } from "./attention-registry";
 import { loadAvatarFile } from "./avatar-file";
 import { saveBrowserScreenshot } from "./browser-screenshot-file";
 import type { BrowserUploads } from "./browser-uploads";
 import {
   CHANNEL_AGENT_TOOL_NAMES,
   CHANNEL_AGENT_TOOL_NEEDS_LOCAL_PERSON,
+  channelAgentToolErrorMessage,
   handleChannelAgentTool,
   listChannelsToolSchema,
 } from "./channel-agent-tools";
@@ -217,7 +218,10 @@ function requestAborted(signal: AbortSignal | undefined) {
   });
 }
 
-/** The characters of an agent description that `list_agents` returns. `read_agent` returns all of it. */
+/**
+ * The characters of an agent description that `list_agents` returns, and of channel instructions that
+ * `list_channels` returns. `read_agent` returns all of a description.
+ */
 const LISTED_DESCRIPTION_LENGTH = 300;
 
 /** What `pin_message` tells the agent when the host refuses its pin. */
@@ -433,6 +437,8 @@ export interface OpenBotToolRouterOptions {
   apiKeys?: AgentApiKeys | null | undefined;
   /** The Vault, where `save_api_key` keeps a key for every agent; null where this server has none. */
   vaultItems?: VaultItems | null | undefined;
+  /** The agent, thread and turn of a running Codex subagent, by the subagent's own thread. */
+  codexSubagentParent?: ((childThreadId: string) => CodexSubagentParent | undefined) | undefined;
   hooks: OpenBotToolRouterHooks;
 }
 
@@ -450,6 +456,7 @@ export class OpenBotToolRouter {
   readonly #mailboxSync: MailboxSync;
   readonly #conversation: ConversationRuntime;
   readonly #attention: AttentionRegistry;
+  readonly #codexSubagentParent: (childThreadId: string) => CodexSubagentParent | undefined;
   readonly #browser: AgentBrowserHost;
   readonly #browserUploads: BrowserUploads;
   readonly #attachments: AttachmentGateway;
@@ -510,6 +517,7 @@ export class OpenBotToolRouter {
     this.#mailboxSync = options.mailboxSync;
     this.#conversation = options.conversation;
     this.#attention = options.attention;
+    this.#codexSubagentParent = options.codexSubagentParent ?? (() => undefined);
     this.#browser = options.browser;
     this.#browserUploads = options.browserUploads;
     this.#attachments = options.attachments;
@@ -555,6 +563,17 @@ export class OpenBotToolRouter {
     });
   }
 
+  /**
+   * A Codex subagent has the tools of the agent that started it, and calls them from its own thread.
+   * The call then runs as that agent, in its chat and its turn, as its approval cards do (#8188, #8657).
+   */
+  #asSubagentParent(params: DynamicToolCallParams): DynamicToolCallParams {
+    if (this.#conversation.agentForThread(params.threadId)) return params;
+    const parent = this.#codexSubagentParent(params.threadId);
+    if (!parent || this.#conversation.agentForThread(parent.threadId) !== parent.agentId) return params;
+    return { ...params, threadId: parent.threadId, turnId: parent.turnId };
+  }
+
   readonly handle = Effect.fn("OpenBotToolRouter.handle")(function* (
     this: OpenBotToolRouter,
     client: AgentClient,
@@ -592,7 +611,7 @@ export class OpenBotToolRouter {
           return;
         case "item/tool/call": {
           if (!isDynamicToolCall(request.params)) throw new Error("Invalid dynamic tool request.");
-          let params = request.params;
+          let params = this.#asSubagentParent(request.params);
           if (params.namespace === "openbot") {
             const deferredMcp = this.#deferredMcpNote(client, params.threadId);
             const invalid = deferredMcp
@@ -870,7 +889,11 @@ export class OpenBotToolRouter {
             // error with "dynamic tool request failed" (#1728, #6011, #6373).
             const correctableFailure = (error: unknown) =>
               Effect.sync(() => {
-                const message = this.#hooks.redactMcp(profileToolErrorMessage(error));
+                const message = this.#hooks.redactMcp(
+                  CHANNEL_AGENT_TOOL_NAMES.has(tool)
+                    ? channelAgentToolErrorMessage(tool, error)
+                    : profileToolErrorMessage(error),
+                );
                 if (!(error instanceof z.ZodError)) logger.warn("An OpenBot tool failed.", { tool, error: message });
                 return openBotToolFailure(message);
               });
@@ -1708,7 +1731,12 @@ export class OpenBotToolRouter {
 
     if (params.tool === "list_channels") {
       const args = listChannelsToolSchema.parse(params.arguments ?? {}, { reportInput: true });
-      return openBotToolResult({ channels: this.#channels.handoffTargets(args.archived === true) });
+      // An agent that created or changed a channel can check its instructions here (#8627).
+      return openBotToolResult({
+        channels: this.#channels
+          .handoffTargets(args.archived === true)
+          .map((channel) => ({ ...channel, instructions: listedDescription(channel.instructions) })),
+      });
     }
     if (CHANNEL_AGENT_TOOL_NAMES.has(params.tool)) {
       // In a channel task, the request that started the task must come from this computer's user.
@@ -1960,8 +1988,11 @@ export class OpenBotToolRouter {
       WORKFLOW_CHANGE_TOOL_NAMES.has(params.tool) &&
       !this.#requestedByPerson(senderAgentId, params.turnId, executionThreadId)
     )
+      // A team member's new message is refused too, so the member is sent to Workflows instead.
       return openBotToolFailure(
-        "Only a person's message, in your OpenBot chat or a thread they opened, can change, delete or run a workflow. Ask the user to request it there.",
+        this.#fromRemoteMember(senderAgentId, params.turnId)
+          ? "Only a person's message, in your OpenBot chat or a thread they opened, can change, delete or run a workflow. A team member's message cannot. Do not retry: ask the member to use Workflows."
+          : "Only a person's message, in your OpenBot chat or a thread they opened, can change, delete or run a workflow. This turn did not start with one, and an answer to ask_user or ask_ui does not change that. Do not retry in this turn: ask the user to send the request there as a new message.",
       );
     // A read gives every workflow, its webhook URLs and its run outputs. The Team API hides these
     // from a member by agent access and admin rights, so a member's message does not get them here.

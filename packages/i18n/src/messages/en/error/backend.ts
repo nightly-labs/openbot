@@ -84,6 +84,10 @@ export const messages = defineMessages("error.backend", {
   "error.backend.channelWaitBeforeDeleteHistory": "Wait until the work in this channel stops, then delete its history.",
   "error.backend.channelCompactUnavailable":
     "No member of this channel can compact its context now. A member must answer in the channel first, and its provider must support compaction.",
+  "error.backend.channelCompactNoSession":
+    "The members of this channel have no conversation to compact yet. Compact it after a member answers in the channel.",
+  "error.backend.channelCompactNotSupported":
+    "No member of this channel can compact on request. Members that support it compact their context automatically when it is almost full.",
   "error.backend.channelArchived": "Restore this channel before sending messages or changing tasks.",
   "error.backend.channelReferenceUnavailable": "The referenced channel message is unavailable.",
   "error.backend.channelTaskNotFound": "Channel task not found.",
@@ -196,6 +200,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.interruptSelf": "An agent cannot interrupt itself.",
   "error.backend.interruptOtherWork":
     "This agent works on a task that your message did not start. Only the user or the sender of that task can stop it.",
+  "error.backend.interruptSharedWork":
+    "This agent's turn works on your message and also on a message from the user or another agent. Only the user can stop it, with Stop agent in that agent's chat.",
   "error.backend.interruptStarting": "This agent is still starting a turn. Try again after the turn starts.",
   "error.backend.interruptNoSession":
     "OpenBot cannot interrupt this agent because its provider session is unavailable.",
@@ -390,6 +396,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserViewProtected": "Browser view is protected during authentication.",
   "error.backend.browserPreviewPageChanged": "The browser page changed during the preview. Try again.",
   "error.backend.browserInputProtected": "Browser input is protected during authentication.",
+  "error.backend.browserClickMoved":
+    "Nothing was clicked. The page moved the target when the pointer came near, and the press went to {element}. Take a fresh snapshot.",
   "error.backend.browserTypingFocusMoved":
     "The page moved focus away from the target before typing. Nothing was typed. Take a fresh snapshot.",
   "error.backend.browserTypingFocusMovedWhileTyping":

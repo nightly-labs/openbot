@@ -209,6 +209,12 @@ const TOKEN_REFRESH_MARGIN_MS = 60_000;
  */
 const MCP_REVOCATION_TIMEOUT_MS = 5_000;
 
+/**
+ * What Sign in would do for a server that answered without one: nothing, open a page, or end at
+ * once because the authorization server cannot take OpenBot as a client.
+ */
+export type McpSignInOffer = "none" | "offered" | "refused";
+
 /** One sign-in, from the browser leaving to the token set being stored. */
 export interface McpSignIn {
   /** Given to the SDK transport, which drives the whole exchange through it. */
@@ -296,8 +302,8 @@ export interface McpOAuthAuthority {
   needsSignIn: (url: string) => boolean;
   /** Whether this computer keeps a sign-in for this URL: current, expired, or ended by the server. */
   hasSignIn: (url: string) => boolean;
-  /** Whether Sign in would open a page for a server that answered without one. See `McpOAuth.offersSignIn`. */
-  offersSignIn: (url: string) => Effect.Effect<boolean>;
+  /** What Sign in would do for a server that answered without one. See `McpOAuth.signInOffer`. */
+  signInOffer: (url: string) => Effect.Effect<McpSignInOffer>;
   /** Drops the tokens and keeps the sign-in app, so the next sign-in uses the same app. */
   signOut: (url: string) => Effect.Effect<void, McpOperationError>;
   /** Drops everything kept for this URL, the sign-in app included. Used when the row is removed. */
@@ -644,23 +650,32 @@ export class McpOAuth implements McpOAuthAuthority {
   }
 
   /**
-   * Whether Sign in would open a page for a server that answered without one: no token is on file,
+   * What Sign in would do for a server that answered without one. `offered`: no token is on file,
    * and its metadata names an authorization server. Some servers list their tools to anyone and want
-   * a token only to run one. Public documents only; a read that fails is a no, because nobody
-   * pressed Sign in to see its error.
+   * a token only to run one. `refused`: that authorization server cannot take OpenBot as a new client,
+   * so Sign in would end at once with the refused-registration sentence (#8827). Public documents
+   * only; a read that fails is `none`, because nobody pressed Sign in to see its error.
    */
-  readonly offersSignIn = Effect.fn("McpOAuth.offersSignIn")(function* (this: McpOAuth, url: string) {
+  readonly signInOffer = Effect.fn("McpOAuth.signInOffer")(function* (this: McpOAuth, url: string) {
     const key = mcpOAuthAccountKey(url);
-    if (!key || this.#options.storage.read(key)?.tokens) return false;
+    const record = key === null ? undefined : this.#options.storage.read(key);
+    if (!key || record?.tokens) return "none";
     const controller = new AbortController();
-    return yield* namesAuthorizationServer(mcpOAuthServerUrl(key), this.#fetch(key, controller.signal)).pipe(
-      Effect.timeoutOrElse({
-        duration: this.#options.refreshTimeoutMs ?? MCP_TOKEN_TIMEOUT_MS,
-        orElse: () => Effect.succeed(false),
-      }),
-      Effect.catch(() => Effect.succeed(false)),
-      Effect.ensuring(Effect.sync(() => controller.abort())),
-    );
+    const fetchFn = this.#fetch(key, controller.signal);
+    const timeoutMs = this.#options.refreshTimeoutMs ?? MCP_TOKEN_TIMEOUT_MS;
+    return yield* Effect.gen(function* () {
+      const issuer = yield* namesAuthorizationServer(mcpOAuthServerUrl(key), fetchFn).pipe(
+        Effect.timeoutOrElse({ duration: timeoutMs, orElse: () => Effect.succeed(null) }),
+        Effect.catch(() => Effect.succeed(null)),
+      );
+      if (!issuer) return "none";
+      // A sign-in app, or a registration with this issuer, is the client: nothing has to register.
+      // The SDK drops a registration bound to another issuer and registers again.
+      const client = record?.client;
+      if (record?.app || (client && (typeof client.issuer !== "string" || issuersMatch(client.issuer, issuer))))
+        return "offered";
+      return (yield* acceptsNewClient(issuer, fetchFn, timeoutMs)) ? "offered" : "refused";
+    }).pipe(Effect.ensuring(Effect.sync(() => controller.abort())));
   });
 
   get redirectUrl(): string {
@@ -1619,8 +1634,8 @@ function mcpOAuthServerUrl(key: string): string {
 }
 
 /**
- * Whether the server publishes protected-resource metadata that names an authorization server, which
- * is what a sign-in needs to open a page. Any answer below 500 that is not such metadata says no: a
+ * The first authorization server that the server's protected-resource metadata names, or `null`. A
+ * sign-in needs one to open a page. Any answer below 500 that is not such metadata says no: a
  * 404, a refusal, or a page that is not metadata. No answer, a server error, or a busy server (408,
  * 429) says nothing about the server, so it fails: a sign-in must not end as if the server asked for
  * none, which left the row showing the result of the earlier test, with no page and no words.
@@ -1642,7 +1657,23 @@ const namesAuthorizationServer = Effect.fnUntraced(function* (resource: string, 
       return Effect.fail(new Error(sourceText("error.backend.mcpSignInMetadataUnreadable")));
     }),
   );
-  return Boolean(metadata?.authorization_servers?.length);
+  return metadata?.authorization_servers?.[0] ?? null;
+});
+
+/**
+ * Whether an authorization server can take a client that OpenBot does not have yet, as the SDK
+ * decides it: a registration endpoint, or the client metadata document. Google's has neither, so
+ * Sign in to Gmail or Drive always ends in the refused-registration sentence (#8827). Metadata that
+ * cannot be read is a yes: the SDK then registers at `/register`, and Sign in says what went wrong.
+ */
+const acceptsNewClient = Effect.fnUntraced(function* (issuer: string, fetchFn: FetchLike, timeoutMs: number) {
+  const metadata = yield* mcpCall(() => discoverAuthorizationServerMetadata(issuer, { fetchFn })).pipe(
+    Effect.timeoutOrElse({ duration: timeoutMs, orElse: () => Effect.succeed(undefined) }),
+    Effect.catch(() => Effect.succeed(undefined)),
+  );
+  return (
+    !metadata || Boolean(metadata.registration_endpoint) || metadata.client_id_metadata_document_supported === true
+  );
 });
 
 /** A legacy binding is useful only when it names an endpoint this client would send credentials to. */

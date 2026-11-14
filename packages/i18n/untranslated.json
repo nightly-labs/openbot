@@ -130,6 +130,22 @@
   "error.auth.companySignInTokenInvalid": ["de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
   "error.auth.companySignInUnavailable": ["de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
   "error.backend.approvalOwnerOnly": ["de", "es", "fr", "it", "ja", "ko", "pl", "pt", "ru", "tr"],
+  "error.backend.browserClickMoved": [
+    "ar",
+    "de",
+    "es",
+    "fr",
+    "he",
+    "it",
+    "ja",
+    "ko",
+    "nl",
+    "pl",
+    "pt",
+    "ru",
+    "tr",
+    "zh"
+  ],
   "error.backend.browserTypingFocusMoved": ["de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
   "error.backend.browserTypingFocusMovedWhileTyping": [
     "de",

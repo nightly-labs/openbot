@@ -176,6 +176,11 @@ import {
   BROWSER_SECRET_VAULT_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
 import {
+  BROWSER_SIGN_IN_STORAGE_CAPABILITY,
+  BROWSER_SIGN_IN_STORAGE_ROUTES,
+  decodeBrowserSignInStorageResult,
+} from "@openbot/contracts/team-protocol/browser-sign-in-storage-v1";
+import {
   BROWSER_TEACH_CAPABILITY,
   BROWSER_TEACH_ROUTES,
   decodeBrowserTeachSteps,
@@ -1667,7 +1672,11 @@ const browser: TeamApiBrowser = {
   startView: unused("startView"),
   dispatchViewInput: unused("dispatchViewInput"),
   copyViewSelection: unused("copyViewSelection"),
-  importSignIn: unused("importSignIn"),
+  // The values never reach the record; only counts and the origin do.
+  importSignIn: (tabId, cookies, storage = null) => {
+    record("importSignIn", tabId, cookies.length, storage?.origin ?? null, storage?.entries.length ?? 0);
+    return Effect.succeed({ cookies: cookies.length, storage: storage?.entries.length ?? 0 });
+  },
 };
 
 // Account tickets that the fake account service redeems. Anything else is a ticket it refuses.
@@ -5848,6 +5857,71 @@ try {
           ],
         ),
       [summary(noSave), summary(saved), summary(discarded)],
+    );
+  }
+
+  // ---- A sign-in kept in the page storage (browser-sign-in-storage-v1, #8686) ----
+  {
+    const capabilities = [BROWSER_SIGN_IN_STORAGE_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises browser-sign-in-storage-v1 on protocol 9 only",
+      list(field(compatibility.body, "capabilities")).includes(BROWSER_SIGN_IN_STORAGE_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(BROWSER_SIGN_IN_STORAGE_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const cookie = {
+      name: "session",
+      value: "fixture",
+      domain: "shop.example",
+      path: "/",
+      secure: true,
+      httpOnly: true,
+      sameSite: "lax",
+      expirationDate: null,
+    };
+    const storage = { origin: "https://shop.example", entries: [{ name: "token", value: "fixture" }] };
+    const json = { tabId: "tab-1", cookies: [cookie], storage };
+    const unsupported = await call("POST", BROWSER_SIGN_IN_STORAGE_ROUTES.import, { token: bobToken, json });
+    check(
+      "the storage sign-in route without the capability gets 400 browserSignInUnsupported",
+      errorIs(unsupported, 400, sourceText("error.backend.browserSignInUnsupported")) &&
+        callsOf("importSignIn").length === 0,
+      summary(unsupported),
+    );
+    const imported = await call("POST", BROWSER_SIGN_IN_STORAGE_ROUTES.import, { token: bobToken, json, capabilities });
+    const cookiesOnly = await call("POST", BROWSER_SIGN_IN_STORAGE_ROUTES.import, {
+      token: bobToken,
+      json: { ...json, storage: null },
+      capabilities,
+    });
+    check(
+      "a member sends cookies and the page storage of one origin; the answer has both counts, which the client decoder takes",
+      imported.status === 200 &&
+        isDeepStrictEqual(decodeBrowserSignInStorageResult(imported.body), { cookies: 1, storage: 1 }) &&
+        cookiesOnly.status === 200 &&
+        isDeepStrictEqual(cookiesOnly.body, { cookies: 1, storage: 0 }) &&
+        isDeepStrictEqual(callsOf("importSignIn"), [
+          ["tab-1", 1, "https://shop.example", 1],
+          ["tab-1", 1, null, 0],
+        ]),
+      [summary(imported), summary(cookiesOnly)],
+    );
+    const withPath = await call("POST", BROWSER_SIGN_IN_STORAGE_ROUTES.import, {
+      token: bobToken,
+      json: { ...json, storage: { ...storage, origin: "https://shop.example/account" } },
+      capabilities,
+    });
+    const extra = await call("POST", BROWSER_SIGN_IN_STORAGE_ROUTES.import, {
+      token: bobToken,
+      json: { ...json, sessionStorage: [] },
+      capabilities,
+    });
+    check(
+      "an origin with a path, or an unknown field, gets 400 and sets nothing",
+      withPath.status === 400 && extra.status === 400 && callsOf("importSignIn").length === 2,
+      [summary(withPath), summary(extra)],
     );
   }
 

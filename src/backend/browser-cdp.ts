@@ -87,6 +87,7 @@ import {
   fillPreparedFields,
 } from "./browser-fill-fields";
 import { describeBrowserTarget, stopLoadingAndWait, waitForLoading } from "./browser-navigation";
+import { guardedPress } from "./browser-press-guard";
 import { createFramePacer } from "./browser-screencast-pacing";
 import { probeSettle, SETTLE_BUSY_WAIT_MS, SETTLE_RESERVE_MS, waitForSettle } from "./browser-settle";
 import { BROWSER_VALUE_TOO_LARGE } from "./model-text-limit";
@@ -219,6 +220,8 @@ const FOCUSED_FRAME_SCRIPT = `(() => {${FOCUSED_SELECTION}
 
 /** Frames inside frames. Past this the focus is treated as in the last frame reached. */
 const MAX_FOCUSED_FRAME_DEPTH = 8;
+/** A click measures its target again when a press went to another element; after this many presses it fails. */
+const CLICK_PRESS_ATTEMPTS = 3;
 
 // Counts the key events that reach the target's window, in the automation world, so the page does
 // not see the listener. `TYPED_KEY_ARRIVED_FUNCTION` reads the count and removes the listener. A key
@@ -976,16 +979,35 @@ export class BrowserCdpEngine {
   ): Effect.fn.Return<void, BrowserOperationError> {
     yield* this.#leaseEffect((send) =>
       Effect.gen({ self: this }, function* () {
-        const point = yield* this.#targetPointEffect(send, target, true, true, deadline);
-        const { sessionId, ...coordinates } = point;
+        const resolved = yield* this.#resolveTargetEffect(send, target, deadline);
+        const element = resolved.backendNodeId;
         const button = options.button ?? "left";
         const totalClicks = options.clickCount ?? 1;
         const modifiers = modifierMask(options.modifiers ?? []);
-        yield* browserSync(() => assertBeforeDeadline(deadline));
-        onDispatch?.();
-        const from = this.#pointerIn(sessionId);
-        this.#pointer = { point: coordinates, sessionId };
-        yield* dispatchMouseClick(send, coordinates, button, totalClicks, modifiers, sessionId, from);
+        const contextId = element
+          ? yield* this.#nodeFrameContextId(send, element, resolved.sessionId).pipe(
+              Effect.catch(() => Effect.succeed(undefined)),
+            )
+          : undefined;
+        // The page can move the target when the pointer comes near, after the point was measured. The
+        // guard stops a press that goes to another element; the next attempt measures the target again.
+        for (let attempt = 1; ; attempt += 1) {
+          yield* browserSync(() => assertBeforeDeadline(deadline));
+          const point = element
+            ? yield* this.#elementPointEffect(send, element, true, resolved.sessionId)
+            : { x: resolved.x, y: resolved.y };
+          const { sessionId, ...coordinates } = point;
+          yield* browserSync(() => assertBeforeDeadline(deadline));
+          if (attempt === 1) onDispatch?.();
+          const from = this.#pointerIn(sessionId);
+          this.#pointer = { point: coordinates, sessionId };
+          const press = dispatchMouseClick(send, coordinates, button, totalClicks, modifiers, sessionId, from);
+          if (!element) return yield* press;
+          const missed = yield* guardedPress(send, element, contextId, sessionId, press);
+          if (missed === undefined) return;
+          if (attempt >= CLICK_PRESS_ATTEMPTS)
+            return yield* browserFailure(new Error(sourceText("error.backend.browserClickMoved", { element: missed })));
+        }
       }),
     );
   });
@@ -3801,9 +3823,11 @@ const hitActivatesTarget = Effect.fn("Browser.hitActivatesTarget")(function* (
         objectId: objectIds[0],
         // A pseudo-element hit, such as a styled label's ::after, belongs to its element. A click
         // on a label activates the control it names, as with a custom radio over a hidden input.
+        // Content in a slot shows, and gets the click, inside the slot's element: an icon that a
+        // web component puts into its shadow button belongs to that button.
         functionDeclaration: `function(candidate) {
           const start = candidate instanceof CSSPseudoElement ? candidate.element : candidate;
-          for (let node = start; node; node = node.parentNode || node.host) {
+          for (let node = start; node; node = node.assignedSlot || node.parentNode || node.host) {
             if (node === this) return true;
             if (node.localName === 'label' && node.control === this) return true;
           }

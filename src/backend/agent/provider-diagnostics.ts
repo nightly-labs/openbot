@@ -382,10 +382,11 @@ export function isImageCountDiagnostic(message: string): boolean {
  * the provider session, so each turn fails the same way until a new session. A custom endpoint gets
  * images by default, and its refusal names no OpenBot setting: "the selected model route accepts text
  * only" (#6033), OpenAI's "image_url is only supported by certain models", and OpenRouter's "No
- * endpoints found that support image input".
+ * endpoints found that support image input". Kimi refuses a PDF that a read tool added: "the message
+ * at position 124 with role 'user' contains an invalid part type: file" (#8654).
  */
 export function isUnreadableContentDiagnostic(message: string): boolean {
-  return /\[unsupported_content_type\]|\bcontent part type "[^"]*" is not supported\b|\b(?:supports?|accepts?) (?:text[- ]only|only text)\b|\bdoes not support media type\b|\bimage_url is only supported by certain models\b|\b(?:does not|doesn['’]t|that) support image input\b/iu.test(
+  return /\[unsupported_content_type\]|\bcontent part type "[^"]*" is not supported\b|\binvalid part type\b|\b(?:supports?|accepts?) (?:text[- ]only|only text)\b|\bdoes not support media type\b|\bimage_url is only supported by certain models\b|\b(?:does not|doesn['’]t|that) support image input\b/iu.test(
     message,
   );
 }

@@ -118,6 +118,12 @@ export interface BrowserHostTab {
    * preview frame stand in for the page until `pendingRestore` loads it again.
    */
   sleeping?: { title: string; preview: BrowserPreview | null } | undefined;
+  /**
+   * Set when the idle unload closes the page: the threads that a tool result has told so since. The tab
+   * keeps its address and title, so without this note an agent cannot tell that its scripts and page
+   * state are gone. Each thread that can use the tab, its owner and a thread it was shared with, reads it once.
+   */
+  idleUnloadNoted?: Set<string>;
   /** When a person or an agent last used the tab. A preview request does not count as use. */
   lastUsedAt: number;
   focusOnVisible: boolean;

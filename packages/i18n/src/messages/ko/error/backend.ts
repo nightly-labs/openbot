@@ -83,6 +83,10 @@ export const messages = {
   "error.backend.channelWaitBeforeDeleteHistory": "이 채널의 작업이 끝날 때까지 기다린 다음 기록을 삭제하세요.",
   "error.backend.channelCompactUnavailable":
     "지금은 이 채널의 어떤 멤버도 컨텍스트를 압축할 수 없습니다. 먼저 멤버가 채널에서 답해야 하고, 그 제공자가 압축을 지원해야 합니다.",
+  "error.backend.channelCompactNoSession":
+    "이 채널의 멤버에게는 아직 압축할 대화가 없습니다. 멤버가 채널에서 답한 후에 압축하세요.",
+  "error.backend.channelCompactNotSupported":
+    "이 채널의 어떤 멤버도 요청 시 압축할 수 없습니다. 지원하는 멤버는 컨텍스트가 거의 가득 차면 자동으로 압축합니다.",
   "error.backend.channelArchived": "메시지를 보내거나 작업을 변경하려면 먼저 이 채널을 복원하세요.",
   "error.backend.channelReferenceUnavailable": "참조한 채널 메시지를 사용할 수 없어요.",
   "error.backend.channelTaskNotFound": "채널 작업을 찾을 수 없어요.",
@@ -192,6 +196,8 @@ export const messages = {
   "error.backend.interruptSelf": "에이전트는 자기 자신을 중단할 수 없어요.",
   "error.backend.interruptOtherWork":
     "이 에이전트는 회원님의 메시지로 시작되지 않은 작업을 하고 있어요. 사용자 또는 해당 작업을 보낸 쪽만 중지할 수 있어요.",
+  "error.backend.interruptSharedWork":
+    "이 에이전트의 턴은 회원님의 메시지와 함께 사용자 또는 다른 에이전트의 메시지도 처리하고 있어요. 사용자만 해당 에이전트 채팅의 에이전트 중지로 멈출 수 있어요.",
   "error.backend.interruptStarting": "이 에이전트가 아직 턴을 시작하는 중이에요. 턴이 시작된 후 다시 시도해 주세요.",
   "error.backend.interruptNoSession": "제공자 세션을 사용할 수 없어서 OpenBot이 이 에이전트를 중단할 수 없어요.",
   "error.backend.memoryTextRequired": "메모리 내용이 필요해요.",

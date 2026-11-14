@@ -62,6 +62,7 @@ import {
   isChannelRoutineTool,
   PERSON_CANCEL_REQUIRED,
   PERSON_REQUEST_REQUIRED,
+  requestPerson,
 } from "./channel-management";
 import { ChannelMemoryStore } from "./channel-memory-store";
 import { CHANNEL_REPLY_ID_PREFIX, channelReplyExpectedResult, checkChannelReply, isReplyTask } from "./channel-replies";
@@ -321,6 +322,7 @@ export class ChannelService {
     id: string;
     name: string;
     title: string;
+    instructions: string;
     leadAgentId: string | null;
     members: Array<{ agentId: string; name: string }>;
   }> {
@@ -334,6 +336,7 @@ export class ChannelService {
         id: channel.id,
         name: channel.name,
         title: channel.title,
+        instructions: channel.instructions,
         leadAgentId: channel.leadAgentId,
         members: this.eligibleMembers(channel).map((agentId) => ({ agentId, name: names.get(agentId) ?? agentId })),
       }));
@@ -1504,11 +1507,43 @@ export class ChannelService {
     );
   }
 
+  /**
+   * The order in which the pump tries the tasks of a channel: a person's queued message first, then
+   * the rest in the order they were made. A channel runs `CHANNEL_PARALLEL_LIMIT` tasks at once, so a
+   * question to a lead that waited for its subtasks waited behind every queued subtask, and the
+   * person saw no answer (#8761). The request of a routine or an agent keeps its place. While a
+   * person's message already runs here, the order stays as made, so delegated work still gets a
+   * place when people keep writing.
+   */
+  #dispatchOrder(channelId: string, tasks: readonly ChannelTask[]): readonly ChannelTask[] {
+    // A task that answers a person's message: a root task of that message (one for each member it
+    // names), the task it continues, or the task that routing gave it. A subtask only inherits the id
+    // of the message.
+    const answersPerson = (task: ChannelTask) => {
+      const request = this.store.message(channelId, task.requestMessageId);
+      return (task.parentTaskId === null || request?.taskId === task.id) && requestPerson(request) !== null;
+    };
+    const running = new Set(
+      this.store
+        .assignments(channelId)
+        .filter(activeAssignment)
+        .map((assignment) => assignment.taskId),
+    );
+    const first: ChannelTask[] = [];
+    const rest: ChannelTask[] = [];
+    for (const task of tasks) {
+      if (running.has(task.id) && answersPerson(task)) return tasks;
+      (task.state === "queued" && answersPerson(task) ? first : rest).push(task);
+    }
+    return [...first, ...rest];
+  }
+
   private readonly pump = Effect.fn("ChannelService.pump")(function* (
     this: ChannelService,
     channelId: string,
   ): Effect.fn.Return<void, ChannelOperationError> {
-    for (const candidate of yield* channelSync(() => this.store.tasks(channelId))) {
+    const listed = yield* channelSync(() => this.store.tasks(channelId));
+    for (const candidate of yield* channelSync(() => this.#dispatchOrder(channelId, listed))) {
       if (this.#stopped || this.#deletedChannels.has(channelId)) return;
       // One row each, not every task of the channel again: a long channel holds thousands of
       // finished tasks, and the whole list for each of them blocked the main process for minutes.

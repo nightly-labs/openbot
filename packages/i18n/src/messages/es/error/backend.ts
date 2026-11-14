@@ -89,6 +89,10 @@ export const messages = {
     "Espera a que termine el trabajo en este canal y luego elimina su historial.",
   "error.backend.channelCompactUnavailable":
     "Ningún miembro de este canal puede compactar su contexto ahora. Un miembro debe responder primero en el canal y su proveedor debe admitir la compactación.",
+  "error.backend.channelCompactNoSession":
+    "Los miembros de este canal aún no tienen una conversación que compactar. Compáctalo después de que un miembro responda en el canal.",
+  "error.backend.channelCompactNotSupported":
+    "Ningún miembro de este canal puede compactar a petición. Los miembros que lo admiten compactan su contexto automáticamente cuando está casi lleno.",
   "error.backend.channelArchived": "Restaura este canal antes de enviar mensajes o cambiar tareas.",
   "error.backend.channelReferenceUnavailable": "El mensaje del canal al que se hace referencia no está disponible.",
   "error.backend.channelTaskNotFound": "No se encontró la tarea del canal.",
@@ -206,6 +210,8 @@ export const messages = {
   "error.backend.interruptSelf": "Un agente no puede interrumpirse a sí mismo.",
   "error.backend.interruptOtherWork":
     "Este agente trabaja en una tarea que no inició tu mensaje. Solo el usuario o quien envió esa tarea puede detenerlo.",
+  "error.backend.interruptSharedWork":
+    "El turno de este agente trabaja en tu mensaje y también en un mensaje del usuario o de otro agente. Solo el usuario puede detenerlo, con Detener agente en el chat de ese agente.",
   "error.backend.interruptStarting":
     "Este agente aún está iniciando un turno. Inténtalo de nuevo cuando empiece el turno.",
   "error.backend.interruptNoSession":

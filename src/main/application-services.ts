@@ -100,8 +100,10 @@ import type {
 import {
   agentBrowserProfile,
   type ChannelCommand,
+  DEFAULT_APP_LANGUAGE,
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
   decodeChannel,
+  defaultVoiceSettings,
   IPC_ENDPOINTS,
   isGroqVoiceModelId,
   isLocalVoiceModelId,
@@ -125,6 +127,7 @@ import {
   Menu,
   Notification,
   nativeImage,
+  net,
   powerMonitor,
   screen,
   shell,
@@ -151,6 +154,7 @@ import { telegramDriver } from "../backend/messaging/telegram/telegram-driver";
 import { whatsAppDriver } from "../backend/messaging/whatsapp/whatsapp-driver";
 import { WhatsAppRuntime } from "../backend/messaging/whatsapp/whatsapp-runtime";
 import { OpenBotDatabase } from "../backend/openbot-database";
+import { PASSWORD_MANAGER_BRANDS } from "../backend/password-vault";
 import { passwordVaultRouter } from "../backend/password-vault-router";
 import { sweepProviderTemp } from "../backend/provider-temp";
 import { SidebarLayoutStore } from "../backend/sidebar-layout-store";
@@ -2316,10 +2320,10 @@ export async function createApplicationServices({
       mcpAuthorization: () => githubConnector.mcpAuthorization().pipe(toMcpGatewayFailed),
     },
     passwordVault: passwordVaultRouter([
-      { prefix: "", vault: onePasswordConnector },
-      { prefix: "bitwarden:", vault: bitwardenConnector },
+      { prefix: "", name: PASSWORD_MANAGER_BRANDS.onepassword, vault: onePasswordConnector },
+      { prefix: "bitwarden:", name: PASSWORD_MANAGER_BRANDS.bitwarden, vault: bitwardenConnector },
       ...passwordManagers.routes(),
-      { prefix: "openbot:", vault: vault.logins },
+      { prefix: "openbot:", name: "the OpenBot Vault", vault: vault.logins },
     ]),
     vaultItems: vault.items,
     linkWallet: linkAccount,
@@ -4109,7 +4113,13 @@ export async function createApplicationServices({
     },
   });
   teardown.push(TEARDOWN_ORDER.remoteDesktop, "remote desktop", () => Effect.runPromise(remoteDesktop.stop()));
-  const voicePreferences = new VoicePreferenceStore(join(app.getPath("userData"), "voice-preference.json"));
+  // Until the user chooses a model, dictation follows the app language they chose, or else the language
+  // of the computer, as `LanguageService` reads it. A language with no app translation, such as Thai,
+  // still counts here.
+  const voicePreferences = new VoicePreferenceStore(join(app.getPath("userData"), "voice-preference.json"), () => {
+    const chosen = language.preference.language;
+    return defaultVoiceSettings(chosen === DEFAULT_APP_LANGUAGE ? app.getLocale() : chosen);
+  });
   await runCauseEffect(voicePreferences.load());
   const voiceApiKeys = new VoiceApiKeyStore({
     path: join(app.getPath("userData"), "voice-api-key.json"),
@@ -4122,6 +4132,10 @@ export async function createApplicationServices({
     cipher: secretCipher,
   });
   await runCauseEffect(groqVoiceKeys.load());
+  // Chromium's network stack uses the computer's proxy settings, as the built-in browser does.
+  // Node `fetch` ignores them, so a model download failed where the browser got the same files.
+  const voiceModelFetch = (input: string | URL | Request, init?: RequestInit) =>
+    net.fetch(input instanceof URL ? input.href : input, init);
   const voice = new VoiceTranscriptionService({
     resourcesRoot: app.isPackaged ? join(process.resourcesPath, "voice") : resolve(".openbot-build/voice"),
     // `voice:prepare` puts Parakeet in `.openbot-build/voice/model` for development. In development
@@ -4147,6 +4161,7 @@ export async function createApplicationServices({
     apiKeys: { elevenlabs: voiceApiKeys, groq: groqVoiceKeys },
     spawnHost: spawnVoiceTranscriptionHost,
     openStreamSocket: openScribeSocket,
+    modelFetch: voiceModelFetch,
   });
   if (app.isPackaged) {
     // Parakeet replaced Whisper. The Whisper model is an application download, not user data.
@@ -4173,6 +4188,7 @@ export async function createApplicationServices({
     preferences: speechPreferences,
     spawnHost: spawnVoiceSpeechHost,
     apiKeys: { elevenlabs: voiceApiKeys, xai: xaiSpeechKeys },
+    modelFetch: voiceModelFetch,
   });
   teardown.push(TEARDOWN_ORDER.speech, "speech", () => Effect.runPromise(speech.shutdown()));
   speech.on("modelStatus", forwardSpeechModelStatus);

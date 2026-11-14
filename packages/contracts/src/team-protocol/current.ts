@@ -49,6 +49,7 @@ import { BROWSER_PROFILES_EVENTS_CAPABILITY } from "./browser-profiles-events-v1
 import { BROWSER_PROFILES_CAPABILITY } from "./browser-profiles-v1";
 import { BROWSER_PROXIES_CAPABILITY } from "./browser-proxies-v1";
 import { BROWSER_SECRET_VAULT_CAPABILITY } from "./browser-secret-vault-v1";
+import { BROWSER_SIGN_IN_STORAGE_CAPABILITY } from "./browser-sign-in-storage-v1";
 import { BROWSER_SIGN_IN_CAPABILITY } from "./browser-sign-in-v1";
 import { BROWSER_TEACH_CAPABILITY } from "./browser-teach-v1";
 import { BROWSER_USER_CONTROL_CAPABILITY } from "./browser-user-control-v1";
@@ -301,6 +302,7 @@ export {
   BROWSER_PROXIES_CAPABILITY,
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SIGN_IN_CAPABILITY,
+  BROWSER_SIGN_IN_STORAGE_CAPABILITY,
   BROWSER_TEACH_CAPABILITY,
   BROWSER_USER_CONTROL_CAPABILITY,
   BROWSING_MEMORY_CAPABILITY,
@@ -647,6 +649,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   CHANNEL_TASK_WAITS_CAPABILITY,
   ROUTINE_FLOW_STOP_CAPABILITY,
   AGENT_PENDING_RUNTIME_CAPABILITY,
+  BROWSER_SIGN_IN_STORAGE_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -879,7 +882,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== USAGE_CREDITS_CAPABILITY &&
     capability !== CHANNEL_TASK_WAITS_CAPABILITY &&
     capability !== ROUTINE_FLOW_STOP_CAPABILITY &&
-    capability !== AGENT_PENDING_RUNTIME_CAPABILITY,
+    capability !== AGENT_PENDING_RUNTIME_CAPABILITY &&
+    capability !== BROWSER_SIGN_IN_STORAGE_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -988,6 +992,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   CHANNEL_TASK_WAITS_CAPABILITY,
   ROUTINE_FLOW_STOP_CAPABILITY,
   AGENT_PENDING_RUNTIME_CAPABILITY,
+  BROWSER_SIGN_IN_STORAGE_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1179,6 +1184,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== USAGE_CREDITS_CAPABILITY &&
       capability !== CHANNEL_TASK_WAITS_CAPABILITY &&
       capability !== ROUTINE_FLOW_STOP_CAPABILITY &&
-      capability !== AGENT_PENDING_RUNTIME_CAPABILITY,
+      capability !== AGENT_PENDING_RUNTIME_CAPABILITY &&
+      capability !== BROWSER_SIGN_IN_STORAGE_CAPABILITY,
   );
 }

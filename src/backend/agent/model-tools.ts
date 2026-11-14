@@ -17,6 +17,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentProvider } from "../agent-client";
+import { isEncodedModelOf } from "../encoded-model-id";
 import { AgentSettingsRefused } from "./agent-settings-refused";
 import { providerLabel } from "./thread-items";
 
@@ -283,10 +284,11 @@ export function requestedBackupModels(
         sourceText("error.provider.accountNotFound", { provider: providerLabel(provider) }),
       );
     }
-    requestedToolModel({ provider, model }, modelsOf({ provider, providerAccountId }));
+    // The listed id, also when the request names the model as its provider lists it.
+    const listed = requestedToolModel({ provider, model }, modelsOf({ provider, providerAccountId }));
     const choice: AgentModelChoice = {
       provider,
-      model,
+      model: listed?.id ?? model,
       ...(accountId === DEFAULT_PROVIDER_ACCOUNT_ID ? {} : { providerAccountId: accountId }),
     };
     if (![own, ...order].some((other) => sameAgentModelChoice(other, choice))) order.push(choice);
@@ -324,10 +326,11 @@ export function requestedToolModel(request: ModelRequest, models: AgentModelOpti
   }
   let chosen: AgentModelOption | null = null;
   if (model !== undefined) {
+    const own = (candidate: AgentModelOption) => provider === undefined || candidate.provider === provider;
     chosen =
-      models.find(
-        (candidate) => candidate.id === model && (provider === undefined || candidate.provider === provider),
-      ) ?? null;
+      models.find((candidate) => candidate.id === model && own(candidate)) ??
+      models.find((candidate) => isEncodedModelOf(candidate.id, model) && own(candidate)) ??
+      null;
     if (!chosen && models.length === 0) throw new AgentSettingsRefused(sourceText("error.agent.modelUnavailable"));
     if (!chosen) {
       // Cursor puts the settings of a model in its value (`grok-4.7[context=256k,…]`) and lists only
