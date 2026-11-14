@@ -1576,6 +1576,8 @@ export class OpenBotToolRouter {
         agent,
         this.#hooks.agentModels({ provider: agent.provider, providerAccountId: agent.providerAccountId }),
       ),
+      // A runtime change saved during work, which applies before the next turn, as update_profile returns it.
+      ...(agent.pendingRuntime ? { pendingRuntime: agent.pendingRuntime } : {}),
       ...agentAccountSetup(agent),
       access,
       permissions,
