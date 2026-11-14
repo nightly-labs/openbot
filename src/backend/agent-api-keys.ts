@@ -105,7 +105,7 @@ export class AgentApiKeys {
         const own = yield* this.#plainKeys(agentId);
         const vault = yield* this.#writeAgent(folder, agentId);
         // The path of earlier versions; it does not change what the agent gets.
-        yield* this.#writeShared(true).pipe(Effect.ignore);
+        yield* this.#writeShared().pipe(Effect.ignore);
         const shown = vault.filter((key) => !own.some((entry) => entry.name === key.name));
         return [...own, ...shown].sort((a, b) => a.name.localeCompare(b.name));
       }),
@@ -126,7 +126,7 @@ export class AgentApiKeys {
         // The folder is there once an agent listed its keys, which wrote the shared files in earlier
         // versions. 0.70.0 deleted those files at start, so they come back here. First, so that a key
         // that is no longer for every agent goes even when the copy of one agent cannot be written.
-        yield* this.#writeShared(agents.includes(VAULT_FOLDER));
+        if (agents.includes(VAULT_FOLDER)) yield* this.#writeShared();
         const vaultFolder = join(this.#root, VAULT_FOLDER);
         const copies = yield* Effect.tryPromise({ try: () => folderNames(vaultFolder), catch: failed });
         for (const agentId of copies.filter((id) => AGENT_ID_PATTERN.test(id)))
@@ -226,10 +226,9 @@ export class AgentApiKeys {
 
   /**
    * Writes the Vault keys for every agent to `<root>/.vault/<NAME>`, where earlier versions wrote them,
-   * and removes the files of other keys. With `all` false, only a file that is there already is
-   * written again.
+   * and removes the files of other keys.
    */
-  #writeShared(all: boolean): Effect.Effect<void, AgentApiKeyFailed> {
+  #writeShared(): Effect.Effect<void, AgentApiKeyFailed> {
     return Effect.gen({ self: this }, function* () {
       const folder = join(this.#root, VAULT_FOLDER);
       const keys = new Map(
@@ -238,9 +237,7 @@ export class AgentApiKeys {
           .map(({ name, value }) => [name, value]),
       );
       yield* removeKeyFiles(folder, keys);
-      const present = all ? null : new Set(yield* Effect.tryPromise({ try: () => folderFiles(folder), catch: failed }));
-      for (const [name, value] of keys)
-        if (!present || present.has(name)) yield* writeIfChanged(join(folder, name), value);
+      for (const [name, value] of keys) yield* writeIfChanged(join(folder, name), value);
     });
   }
 
