@@ -53,6 +53,10 @@ export const messages = {
     "Ana makine yalnızca bu uygulamadan daha eski protokolleri destekliyor. Ana makineyi güncelleyin, ardından tekrar deneyin.",
   "server.compatibility.unsafeDataDescription":
     "Bilinen bir veri yükü geçersiz olduğu için OpenBot bu bağlantıyı durdurdu. Geçerli çalışma alanı verileriniz değiştirilmedi.",
+  "server.compatibility.unsafeDataUpdateHostDescription":
+    "{name} daha eski bir OpenBot sürümü çalıştırıyor ve bu uygulama verilerinin bir kısmını okuyamıyor. {name} üzerine OpenBot güncellemesini yükleyin, ardından tekrar deneyin. Çalışma alanı verileriniz değiştirilmedi.",
+  "server.compatibility.unsafeDataUpdateClientDescription":
+    "{name} daha yeni bir OpenBot sürümü çalıştırıyor ve bu uygulama verilerinin bir kısmını okuyamıyor. Bu uygulamayı güncelleyin, ardından tekrar deneyin. Çalışma alanı verileriniz değiştirilmedi.",
   "server.compatibility.clientVersion": "İstemci sürümü",
   "server.compatibility.hostVersion": "Ana makine sürümü",
   "server.compatibility.negotiatedProtocol": "Anlaşılan protokol",

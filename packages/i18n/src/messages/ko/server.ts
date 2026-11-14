@@ -52,6 +52,10 @@ export const messages = {
     "호스트가 이 앱보다 오래된 프로토콜만 지원해요. 호스트를 업데이트한 후 다시 시도해 주세요.",
   "server.compatibility.unsafeDataDescription":
     "알려진 페이로드가 올바르지 않아 OpenBot이 이 연결을 중지했어요. 현재 워크스페이스 데이터는 변경되지 않았어요.",
+  "server.compatibility.unsafeDataUpdateHostDescription":
+    "{name}에서 이전 버전의 OpenBot이 실행 중이라 이 앱이 일부 데이터를 읽을 수 없어요. {name}에 OpenBot 업데이트를 설치한 다음 다시 시도하세요. 워크스페이스 데이터는 변경되지 않았어요.",
+  "server.compatibility.unsafeDataUpdateClientDescription":
+    "{name}에서 최신 버전의 OpenBot이 실행 중이라 이 앱이 일부 데이터를 읽을 수 없어요. 이 앱을 업데이트한 다음 다시 시도하세요. 워크스페이스 데이터는 변경되지 않았어요.",
   "server.compatibility.clientVersion": "클라이언트 버전",
   "server.compatibility.hostVersion": "호스트 버전",
   "server.compatibility.negotiatedProtocol": "협상된 프로토콜",

@@ -50,6 +50,10 @@ export const messages = {
   "server.compatibility.updateHostDescription": "主机支持的协议版本比该应用更旧，请先更新主机再重试。",
   "server.compatibility.unsafeDataDescription":
     "由于某个已知载荷无效，OpenBot 中止了这次连接。当前工作区数据未被更改。",
+  "server.compatibility.unsafeDataUpdateHostDescription":
+    "{name} 运行的是较旧的 OpenBot 版本，此应用无法读取它的部分数据。请在 {name} 上安装 OpenBot 更新，然后重试。工作区数据未被更改。",
+  "server.compatibility.unsafeDataUpdateClientDescription":
+    "{name} 运行的是较新的 OpenBot 版本，此应用无法读取它的部分数据。请更新此应用，然后重试。工作区数据未被更改。",
   "server.compatibility.clientVersion": "客户端版本",
   "server.compatibility.hostVersion": "主机版本",
   "server.compatibility.negotiatedProtocol": "协商协议",

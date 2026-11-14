@@ -53,6 +53,10 @@ export const messages = {
     "يدعم المضيف بروتوكولات أقدم فقط من هذا التطبيق. حدّث المضيف، ثم أعد المحاولة.",
   "server.compatibility.unsafeDataDescription":
     "أوقف OpenBot هذا الاتصال لأن حمولة معروفة كانت غير صالحة. لم تتغير بيانات مساحة العمل الحالية.",
+  "server.compatibility.unsafeDataUpdateHostDescription":
+    "يعمل {name} بإصدار أقدم من OpenBot، ولا يستطيع هذا التطبيق قراءة بعض بياناته. ثبّت تحديث OpenBot على {name}، ثم أعد المحاولة. لم تتغير بيانات مساحة العمل.",
+  "server.compatibility.unsafeDataUpdateClientDescription":
+    "يعمل {name} بإصدار أحدث من OpenBot، ولا يستطيع هذا التطبيق قراءة بعض بياناته. حدّث هذا التطبيق، ثم أعد المحاولة. لم تتغير بيانات مساحة العمل.",
   "server.compatibility.clientVersion": "إصدار العميل",
   "server.compatibility.hostVersion": "إصدار المضيف",
   "server.compatibility.negotiatedProtocol": "البروتوكول المتفق عليه",

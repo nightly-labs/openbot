@@ -53,6 +53,10 @@ export const messages = {
     "O computador anfitrião só aceita protocolos mais antigos que os deste app. Atualize o computador anfitrião e tente novamente.",
   "server.compatibility.unsafeDataDescription":
     "O OpenBot interrompeu esta conexão porque uma carga de dados conhecida era inválida. Os dados atuais do seu espaço de trabalho não foram alterados.",
+  "server.compatibility.unsafeDataUpdateHostDescription":
+    "{name} usa uma versão mais antiga do OpenBot, e este app não consegue ler alguns dos dados dele. Instale a atualização do OpenBot em {name} e tente novamente. Os dados do seu espaço de trabalho não foram alterados.",
+  "server.compatibility.unsafeDataUpdateClientDescription":
+    "{name} usa uma versão mais recente do OpenBot, e este app não consegue ler alguns dos dados dele. Atualize este app e tente novamente. Os dados do seu espaço de trabalho não foram alterados.",
   "server.compatibility.clientVersion": "Versão do cliente",
   "server.compatibility.hostVersion": "Versão do computador anfitrião",
   "server.compatibility.negotiatedProtocol": "Protocolo negociado",
