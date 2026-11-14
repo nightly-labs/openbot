@@ -1376,6 +1376,7 @@ export async function createApplicationServices({
   const teamWebRtcBridge = new TeamWebRtcBridge({
     developmentUrl: developmentUrl ?? null,
     iceTransportPolicy: developmentUrl && process.env.OPENBOT_DEV_ICE_TRANSPORT_POLICY === "relay" ? "relay" : "all",
+    quitting,
   });
   teamWebRtcBridge.on("accountProfileChanged", refreshAccountProfile);
   teardown.push(TEARDOWN_ORDER.teamWebRtcBridge, "the team WebRTC bridge", () =>

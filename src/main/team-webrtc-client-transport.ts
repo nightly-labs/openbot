@@ -1323,12 +1323,13 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     this.emit("connected", hostId);
   }
 
-  readonly #onDisconnected = (hostId: string): void => {
+  readonly #onDisconnected = (hostId: string, bridgeLost = false): void => {
     const active = this.#active.get(hostId);
     if (!active) return;
     // The handshake started on the channel that closed, and a new channel does not start it again.
-    // Without this, the attempt and each caller that joined it waited for the 30 s timeout.
-    if (!active.connected && active.authentication?.started)
+    // Without this, the attempt and each caller that joined it waited for the 30 s timeout. When the
+    // bridge window is lost, an attempt at any step has no peer, and the next attempt loads a new window.
+    if (!active.connected && (active.authentication?.started || bridgeLost))
       active.cancelConnectionWait?.(new Error(sourceText("error.remote.hostDisconnected")));
     this.#files.setPeerAuthenticated(hostId, false);
     active.connected = false;
