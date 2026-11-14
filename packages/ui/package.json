@@ -152,6 +152,7 @@
     "./features/conversation/ComposerReplyPreview": "./src/features/conversation/ComposerReplyPreview.tsx",
     "./features/conversation/ContextUsage": "./src/features/conversation/ContextUsage.tsx",
     "./features/conversation/ConversationIcons": "./src/features/conversation/ConversationIcons.tsx",
+    "./features/conversation/TabShape": "./src/features/conversation/TabShape.tsx",
     "./features/conversation/ConversationPrompts": "./src/features/conversation/ConversationPrompts.tsx",
     "./features/conversation/DataTable": "./src/features/conversation/DataTable.tsx",
     "./features/conversation/FileReference": "./src/features/conversation/FileReference.ts",

@@ -1,11 +1,13 @@
 import type { BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
 import { Button, Maximize2, Monitor, Skeleton, X } from "@openbot/ui";
 import { PanelResizer } from "@openbot/ui/components/PanelResizer";
+import { SETTINGS_PANEL_DEFAULT } from "@openbot/ui/components/SettingsPanel";
 import { useText } from "@openbot/ui/text";
 import { holdFlag } from "@openbot/ui/utils";
 import { createEffect, createMemo, createSignal, createStore, For, onSettled, Show, untrack } from "solid-js";
 
-const BROWSER_PANEL_MIN = 220;
+/** The side panel has one width for all its panes, so this pane has the smallest width of the settings pane. */
+const BROWSER_PANEL_MIN = SETTINGS_PANEL_DEFAULT;
 const BROWSER_PANEL_MAX = 1600;
 /** How often the preview of a tab that loads, or that an agent acts in, shows the page again. */
 const BUSY_CAPTURE_INTERVAL = 3000;

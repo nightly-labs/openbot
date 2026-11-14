@@ -1,10 +1,13 @@
 import type { BrowserPreview } from "@openbot/contracts/ipc";
 import SharedBrowserPreviewSidebar from "@openbot/ui/features/conversation/BrowserPreviewSidebar";
 import type { ComponentProps } from "@solidjs/web";
-import { readPanelWidth, savePanelWidth } from "../../components/panel-width-storage";
+import {
+  readCustomSidePanelWidth,
+  readSidePanelWidth,
+  resetSidePanelWidth,
+  saveSidePanelWidth,
+} from "../../components/side-panel-width";
 import { conversationPort } from "./conversation-port";
-
-const STORAGE_KEY = "openbot:browser-preview-panel-width";
 
 export default function BrowserPreviewSidebar(
   props: Omit<
@@ -20,10 +23,10 @@ export default function BrowserPreviewSidebar(
           ? undefined
           : (props.capturePreview ?? ((id) => conversationPort().browser.capturePreview(id)))
       }
-      readWidth={(fallback, min, max) => readPanelWidth(STORAGE_KEY, fallback, min, max)}
-      readCustomWidth={() => Number.parseFloat(window.localStorage.getItem(STORAGE_KEY) ?? "")}
-      saveWidth={(width) => savePanelWidth(STORAGE_KEY, width)}
-      resetWidth={() => window.localStorage.removeItem(STORAGE_KEY)}
+      readWidth={readSidePanelWidth}
+      readCustomWidth={readCustomSidePanelWidth}
+      saveWidth={saveSidePanelWidth}
+      resetWidth={resetSidePanelWidth}
     />
   );
 }

@@ -327,6 +327,147 @@
     content: none;
   }
 
+  /* The selected tab of the chat header and of the side panel is part of the card: a shape with the card
+   * fill and the card line goes from the top of the tab down to the card's top line, and two inward curves
+   * join its sides to that line. The shape is behind the content of the tab row. A translucent card would
+   * show the card line through it, so the transparent window keeps the fill of the tabs. */
+  :root:not([data-openbot-window-glass])
+    .app-window
+    > .app-frame-edge
+    :is(.conversation-panel > .conversation-header, .side-panel-docked > .side-panel-header)
+    > .tab-shape {
+    --tab-shape-curve: var(--openbot-radius-md);
+    position: absolute;
+    z-index: -1;
+    top: var(--tab-shape-top, 0);
+    left: var(--tab-shape-left, 0);
+    right: var(--tab-shape-right, 100%);
+    display: block;
+    height: var(--tab-shape-height, 0);
+    border: 1px solid var(--openbot-border);
+    border-bottom: 0;
+    border-start-start-radius: var(--openbot-radius-md);
+    border-start-end-radius: var(--openbot-radius-md);
+    background: var(--openbot-bg-canvas);
+    pointer-events: none;
+    transition:
+      left var(--openbot-duration-overlay) var(--openbot-ease-out) var(--tab-shape-start-delay, 0ms),
+      right var(--openbot-duration-overlay) var(--openbot-ease-out) var(--tab-shape-end-delay, 0ms),
+      top var(--openbot-duration-overlay) var(--openbot-ease-out),
+      height var(--openbot-duration-overlay) var(--openbot-ease-out);
+  }
+
+  :root:not([data-openbot-window-glass])
+    .app-window
+    > .app-frame-edge
+    :is(.conversation-panel > .conversation-header, .side-panel-docked > .side-panel-header)
+    > .tab-shape:is([data-hidden], [data-instant]) {
+    transition: none;
+  }
+
+  :root:not([data-openbot-window-glass])
+    .app-window
+    > .app-frame-edge
+    :is(.conversation-panel > .conversation-header, .side-panel-docked > .side-panel-header)
+    > .tab-shape[data-hidden] {
+    visibility: hidden;
+  }
+
+  /* Each curve is a square with a quarter circle cut out: the line follows the arc, and the card fill is
+   * outside it. The square also covers the bottom of the shape's side line, so that line turns into the
+   * arc and does not go on down beside it. The arc starts on the side line and ends on the card line. */
+  :root:not([data-openbot-window-glass])
+    .app-window
+    > .app-frame-edge
+    :is(.conversation-panel > .conversation-header, .side-panel-docked > .side-panel-header)
+    > .tab-shape::before,
+  :root:not([data-openbot-window-glass])
+    .app-window
+    > .app-frame-edge
+    :is(.conversation-panel > .conversation-header, .side-panel-docked > .side-panel-header)
+    > .tab-shape::after {
+    position: absolute;
+    bottom: 0;
+    width: calc(var(--tab-shape-curve) + 1px);
+    height: calc(var(--tab-shape-curve) + 1px);
+    content: "";
+  }
+
+  :root:not([data-openbot-window-glass])
+    .app-window
+    > .app-frame-edge
+    :is(.conversation-panel > .conversation-header, .side-panel-docked > .side-panel-header)
+    > .tab-shape::before {
+    left: calc(-1 * var(--tab-shape-curve) - 1px);
+    background:
+      radial-gradient(
+        circle at 0 0,
+        transparent var(--tab-shape-curve),
+        var(--openbot-border) var(--tab-shape-curve),
+        var(--openbot-border) calc(var(--tab-shape-curve) + 1px),
+        transparent calc(var(--tab-shape-curve) + 1px)
+      ),
+      radial-gradient(
+        circle at 0 0,
+        transparent var(--tab-shape-curve),
+        var(--openbot-bg-canvas) var(--tab-shape-curve)
+      );
+  }
+
+  :root:not([data-openbot-window-glass])
+    .app-window
+    > .app-frame-edge
+    :is(.conversation-panel > .conversation-header, .side-panel-docked > .side-panel-header)
+    > .tab-shape::after {
+    right: calc(-1 * var(--tab-shape-curve) - 1px);
+    background:
+      radial-gradient(
+        circle at 100% 0,
+        transparent var(--tab-shape-curve),
+        var(--openbot-border) var(--tab-shape-curve),
+        var(--openbot-border) calc(var(--tab-shape-curve) + 1px),
+        transparent calc(var(--tab-shape-curve) + 1px)
+      ),
+      radial-gradient(
+        circle at 100% 0,
+        transparent var(--tab-shape-curve),
+        var(--openbot-bg-canvas) var(--tab-shape-curve)
+      );
+  }
+
+  /* While the shape shows, it is the fill of the selected tab. A selected thread that waits or failed
+   * keeps its state icon, but not its tinted fill. A tab that the pointer drags keeps its fill. */
+  :root:not([data-openbot-window-glass])
+    .app-window
+    > .app-frame-edge
+    .conversation-panel
+    > .conversation-header:has(> .tab-shape:not([data-hidden]))
+    :is(
+      .conversation-title.ui-button[data-tab][data-selected],
+      .agent-threads-tab.ui-sliding-tabs-trigger[aria-selected="true"]:not([data-renaming], [data-dragged=""]),
+      .agent-threads-switcher.ui-button:not(:hover, [aria-expanded="true"])
+    ) {
+    background: transparent;
+  }
+
+  :root:not([data-openbot-window-glass])
+    .app-window
+    > .app-frame-edge
+    .conversation-panel
+    > .conversation-header:has(> .tab-shape:not([data-hidden]))
+    .agent-threads-fill {
+    display: none;
+  }
+
+  :root:not([data-openbot-window-glass])
+    .app-window
+    > .app-frame-edge
+    .side-panel-docked
+    > .side-panel-header:has(> .tab-shape:not([data-hidden]))
+    .side-panel-tab[data-selected]:not([data-dragged=""]) {
+    background: transparent;
+  }
+
   /* The line between the agent list and the chat starts at the card's top line. In the top row, a short
    * line sits above it. */
   .app-window > .app-frame-edge > .sidebar::before {
@@ -1267,5 +1408,13 @@
 @media (prefers-reduced-motion: reduce) {
   .quit-shortcut-backdrop {
     animation: none;
+  }
+
+  :root:not([data-openbot-window-glass])
+    .app-window
+    > .app-frame-edge
+    :is(.conversation-panel > .conversation-header, .side-panel-docked > .side-panel-header)
+    > .tab-shape {
+    transition: none;
   }
 }

@@ -16,6 +16,7 @@ import {
   X,
 } from "@openbot/ui";
 import { PanelResizer } from "@openbot/ui/components/PanelResizer";
+import { SETTINGS_PANEL_DEFAULT } from "@openbot/ui/components/SettingsPanel";
 import type { AgentProfile } from "@openbot/ui/data";
 import { ChatVisual } from "@openbot/ui/features/conversation/ChatVisual";
 import { type CodeToken, fileCodeLanguage, highlightedCodeLines } from "@openbot/ui/features/conversation/CodeBlock";
@@ -29,7 +30,8 @@ import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show
 
 import { MediaFilePreview } from "./MediaFilePreview";
 
-const PANEL_MIN = 220;
+/** The side panel has one width for all its panes, so this pane has the smallest width of the settings pane. */
+const PANEL_MIN = SETTINGS_PANEL_DEFAULT;
 const PANEL_MAX = 1600;
 const TEXT_LIMIT = 1_000_000;
 /** Longer text shows as plain text, so the panel stays responsive. */
@@ -209,8 +211,10 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
     props.onWrapLinesChange(wrap);
   };
 
+  // When the chat gets wider again, the panel goes back to the width from the last drag.
   const resizeDefaultPanel = () => {
-    setPanelWidth(Math.round(Math.min(props.maxWidth(), Math.max(PANEL_MIN, defaultPanelWidth()))));
+    const preferredWidth = props.readWidth(defaultPanelWidth(), PANEL_MIN, PANEL_MAX);
+    setPanelWidth(Math.round(Math.min(props.maxWidth(), Math.max(PANEL_MIN, preferredWidth))));
   };
 
   return (
