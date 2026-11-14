@@ -17,6 +17,21 @@
   gap: 7px;
 }
 
+/* The agent name gives way when the header is narrow: it shortens with an ellipsis, so the title
+   stays inside the heading group and does not paint over the header actions. The avatar and the
+   "+" button keep their width. The fold rules in `agent-threads.css` still win over this one. */
+.conversation-heading-group > .conversation-title {
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.conversation-heading-group > .conversation-title > h1 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .chat-search {
   position: absolute;
   z-index: 13;

@@ -79,7 +79,7 @@ export function WorkspaceFrame(props: WorkspaceFrameProps) {
         },
       ]}
       aria-hidden={props.hidden ? "true" : undefined}
-      style={`--left-panel-width: ${compactWidth() ? LEFT_PANEL_COMPACT : layout.leftPanelWidth()}px`}
+      style={`--left-panel-width: ${compactWidth() ? LEFT_PANEL_COMPACT : layout.leftPanelShownWidth()}px`}
     >
       {props.left}
       <WorkspaceLeftPanelResizer />
