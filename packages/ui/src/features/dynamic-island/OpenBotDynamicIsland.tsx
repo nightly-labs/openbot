@@ -130,6 +130,13 @@ const OPENBOT_COMPACT_HOVER_MOTION = {
   outwardTranslateX: 10,
   translateY: 4,
 } as const;
+/**
+ * The answers on question cards, by server and agent: an agent has one prompt at a time. The card closes
+ * when the island shuts, so the answers stay here, and the card opens again at the next unanswered
+ * question. A question has the first place on the island, so when the island shows no question, no prompt
+ * waits and the answers go.
+ */
+const questionCardAnswers = new Map<string, { requestKey: string; answers: Record<string, string[]> }>();
 const QUESTION_PROGRESS_DURATION = 300;
 const QUESTION_PROGRESS_BLUR = 2;
 const COMPACT_LEADING_SIZE = 20;
@@ -442,6 +449,12 @@ function measureCompactText(text: string, weight: number): number {
 
 export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Element {
   const { t } = useText();
+  createEffect(
+    () => props.presentation.mode === "question",
+    (question) => {
+      if (!question) questionCardAnswers.clear();
+    },
+  );
   const initialPresentation = untrack(() => props.presentation);
   const [visiblePresentation, setVisiblePresentation] = createSignal(initialPresentation);
   const config = () => OPENBOT_ISLAND_MODE_CONFIG[visiblePresentation().mode];
@@ -1360,25 +1373,31 @@ function QuestionContent(props: {
   onClose: () => void;
 }): JSX.Element {
   const { t } = useText();
-  const [questionIndex, setQuestionIndex] = createSignal(0);
-  const [answers, setAnswers] = createSignal<Record<string, string[]>>({});
+  const agentKey = () => JSON.stringify([props.serverId, props.item.agent.id]);
+  const requestKey = () => JSON.stringify([props.item.requestId, props.item.questions.map((question) => question.id)]);
+  // The card can show the prompt of another server or agent with the same request id.
+  const cardKey = createMemo(() => `${agentKey()}\n${requestKey()}`);
+  const savedAnswers = () => {
+    const saved = questionCardAnswers.get(agentKey());
+    return saved?.requestKey === requestKey() ? saved.answers : {};
+  };
+  const [questionIndex, setQuestionIndex] = createSignal(untrack(() => Object.keys(savedAnswers()).length));
+  const [answers, setAnswers] = createSignal<Record<string, string[]>>(untrack(savedAnswers));
   const [questionTransitioning, setQuestionTransitioning] = createSignal(false);
   let questionPrompt: HTMLSpanElement | undefined;
   let questionStep: HTMLDivElement | undefined;
   let questionAnimations: Animation[] = [];
   let questionDisposed = false;
   let questionTransitionVersion = 0;
-  createEffect(
-    () => `${props.item.requestId}:${props.item.questions.map((question) => question.id).join(",")}`,
-    () => {
-      questionTransitionVersion += 1;
-      cancelQuestionAnimations();
-      clearQuestionHidden(questionTransitionElements());
-      setQuestionTransitioning(false);
-      setQuestionIndex(0);
-      setAnswers({});
-    },
-  );
+  createEffect(cardKey, () => {
+    questionTransitionVersion += 1;
+    cancelQuestionAnimations();
+    clearQuestionHidden(questionTransitionElements());
+    setQuestionTransitioning(false);
+    const saved = savedAnswers();
+    setQuestionIndex(Object.keys(saved).length);
+    setAnswers(saved);
+  });
   const questions = () => props.item.questions;
   const directAnswerAvailable = createMemo(
     () =>
@@ -1415,6 +1434,7 @@ function QuestionContent(props: {
     if (!question || !(directAnswerAvailable() || typedAnswerAvailable()) || questionTransitioning()) return false;
     const nextAnswers = { ...answers(), [question.id]: [label] };
     if (questionIndex() < questions().length - 1) {
+      questionCardAnswers.set(agentKey(), { requestKey: requestKey(), answers: nextAnswers });
       props.onHaptic?.();
       void showNextQuestion(nextAnswers);
       return;
