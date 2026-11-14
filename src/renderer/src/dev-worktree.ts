@@ -4,7 +4,6 @@ import { createSignal } from "solid-js";
 interface DevWorktree {
   readonly branch: string | null;
   readonly color: string;
-  readonly path: string;
 }
 
 const [worktree, setWorktree] = createSignal<DevWorktree | null>(null);

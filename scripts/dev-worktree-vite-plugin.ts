@@ -24,7 +24,7 @@ export function devWorktree(projectRoot: string): Plugin {
       const gitDirectory = findGitDirectory(projectRoot);
       const color = developmentWorktreeColor(projectRoot);
       let branch = gitDirectory ? readBranch(gitDirectory) : null;
-      const worktree = () => ({ branch, color, path: projectRoot });
+      const worktree = () => ({ branch, color });
       server.ws.on(REQUEST_EVENT, (_data, client) => client.send(WORKTREE_EVENT, worktree()));
       if (!gitDirectory) return;
       let watcher: FSWatcher;
