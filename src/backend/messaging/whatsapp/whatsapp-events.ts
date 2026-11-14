@@ -161,9 +161,9 @@ export async function whatsAppInbound(
     context.chats.rememberMessage({ id, chatJid, threadKey, authorName: name, text, sentAt: isoTime(message) });
     return null;
   }
-  const quote =
+  const replyTo =
     quotedId && contextInfo?.quotedMessage && !repliesToMe
-      ? quoteOf(contextInfo, { rawChat, chatJid, quotedId, reply: message }, context)
+      ? quoteOf(contextInfo, { rawChat, chatJid, quotedId, isGroup }, context)
       : null;
   const inbound: InboundMessage = {
     dedupKey: `${chatJid}:${id}`,
@@ -176,9 +176,8 @@ export async function whatsAppInbound(
     authorId,
     text: withMentions(text, mentioned, context.me),
     mentionedUserIds: mentioned.filter((jid) => !isMe(jid, context.me)).flatMap((jid) => userOf(jid) ?? []),
-    // The replied-to message's files are context too, as its text is.
-    files: quote ? [...files, ...quote.files] : files,
-    ...(quote ? { replyTo: quote.replyTo } : {}),
+    files,
+    ...(replyTo ? { replyTo } : {}),
   };
   context.chats.rememberMessage({
     id,
@@ -282,12 +281,13 @@ function extension(mimeType: string | null | undefined, fallback: string): strin
 }
 
 /**
- * The replied-to message and its files. A file comes from the stored message when OpenBot saw it
- * arrive, or else from the copy that the reply carries, which is then stored for the download.
+ * The replied-to message, with its files apart from the reply's own. A file comes from the stored
+ * message when OpenBot saw it arrive, or else from the copy that the reply carries, which is then
+ * stored for the download.
  */
 function quoteOf(
   contextInfo: proto.IContextInfo,
-  where: { rawChat: string; chatJid: string; quotedId: string; reply: WAMessage },
+  where: { rawChat: string; chatJid: string; quotedId: string; isGroup: boolean },
   context: WhatsAppInboundContext,
 ) {
   const quoted = normalizeMessageContent(contextInfo.quotedMessage);
@@ -301,25 +301,24 @@ function quoteOf(
   );
   if (files[0] && !stored)
     context.chats.rememberMedia(files[0].id, {
-      // A reply to this number gets no quote, so another person wrote the quoted message.
+      // The key of the quoted message, for a re-upload request. A reply to this number gets no quote,
+      // so another person wrote it; only a group message names its author.
       key: {
         remoteJid: where.rawChat,
         id: where.quotedId,
-        participant: contextInfo.participant ?? null,
         fromMe: false,
+        ...(where.isGroup && contextInfo.participant ? { participant: contextInfo.participant } : {}),
       },
       message: contextInfo.quotedMessage,
-      messageTimestamp: where.reply.messageTimestamp ?? null,
     });
   // Names its files, so that the agent knows which of the message's files are the replied-to ones.
   const names = files.length ? `(Attached files: ${files.map((file) => file.name).join(", ")})` : "";
   return {
-    replyTo: {
-      authorName: (author && context.chats.name(author)) ?? author ?? "WhatsApp",
-      text: [textOf(quoted), names].filter(Boolean).join("\n"),
-      mentionedUserIds: [],
-      sentAt: new Date(context.now).toISOString(),
-    },
+    authorName: (author && context.chats.name(author)) ?? author ?? "WhatsApp",
+    text: [textOf(quoted), names].filter(Boolean).join("\n"),
+    mentionedUserIds: [],
+    sentAt: new Date(context.now).toISOString(),
+    messageId: where.quotedId,
     files,
   };
 }

@@ -1543,20 +1543,26 @@ export class MessagingService {
       Effect.succeed(staging),
       () =>
         Effect.gen({ self: this }, function* () {
-          // The message's own files first, then the newest earlier ones, within the attachment limits.
-          // An earlier message of this conversation that reached OpenBot gave its files with itself.
-          const earlierFiles = earlier
-            .filter(
-              (entry) =>
-                !existing ||
-                !this.#threads.received(
-                  `messaging:${live.record.connectionId}:${message.platformChannelId}:${entry.id}`,
-                ),
-            )
-            .toReversed()
-            .flatMap((entry) =>
-              (entry.files ?? []).map((file) => ({ file, label: `${entry.authorName}: ${file.name}` })),
-            );
+          // The message's own files first, then those of the message it replies to, then the newest
+          // earlier ones, within the attachment limits. An earlier message of this conversation that
+          // reached OpenBot gave its files with itself.
+          const gave = (messageId: string) =>
+            Boolean(existing) &&
+            this.#threads.received(`messaging:${live.record.connectionId}:${message.platformChannelId}:${messageId}`);
+          const quoted =
+            quote?.messageId && !gave(quote.messageId)
+              ? (quote.files ?? []).map((file) => ({ file, label: `${quote.authorName}: ${file.name}` }))
+              : [];
+          const earlierFiles = [
+            ...quoted,
+            ...earlier
+              .filter((entry) => !gave(entry.id))
+              .toReversed()
+              .flatMap((entry) =>
+                (entry.files ?? []).map((file) => ({ file, label: `${entry.authorName}: ${file.name}` })),
+              )
+              .filter((item) => !quoted.some((candidate) => candidate.file.id === item.file.id)),
+          ];
           const { paths, skipped } = yield* this.#download(
             adapter,
             [...message.files, ...earlierFiles.map((item) => item.file)],
