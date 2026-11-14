@@ -2041,12 +2041,14 @@ export class AttentionRegistry {
       // A detached question holds no call, so the turn reads the message, and the card stays.
       if (pending.saving || pending.detached || pending.responseKind === "mcp-elicitation") continue;
       this.#routines.markRunningForTurn(turnId);
-      // The card shows as the user's own skip does.
+      // The card shows each question as skipped, as the user's own skip does. It is not a cancel.
       this.#closePrompt(
         requestId,
         pending,
         userMessagePromptResult(pending.responseKind, pending.uiBlock?.blockId),
-        { status: "cancelled" },
+        pending.uiBlock
+          ? { status: "cancelled" }
+          : promptResolution(pending.questions, Object.fromEntries(pending.questions.map(({ id }) => [id, []]))),
         pending.uiBlock ? answeredUiBlockState(pending.uiBlock.spec, null, undefined, undefined) : undefined,
       );
       changed = true;
