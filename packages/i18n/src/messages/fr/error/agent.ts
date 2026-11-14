@@ -157,6 +157,8 @@ export const messages = {
     "Ce serveur manque de mémoire. Votre message attend dans la file et démarre quand la mémoire est libre.",
   "error.agent.workspaceOnlyToolMissing":
     "« Espace de travail uniquement » nécessite {tool}, qu’OpenBot n’a pas trouvé. Installez-le, ou choisissez « Accès complet » dans les réglages de l’agent.",
+  "error.agent.codexSandboxUnavailable":
+    "« Espace de travail uniquement » nécessite le bac à sable de Codex, que Codex ne peut pas démarrer sur cet ordinateur : les commandes de l’agent échouent. Choisissez « Demander d’abord » ou « Accès complet » dans les réglages de l’agent.",
   "error.agent.claudeSandboxUnavailable":
     "« Espace de travail uniquement » nécessite le bac à sable de Claude, que Claude ne peut pas démarrer sur cet ordinateur : {reason}. Choisissez « Accès complet » ou un autre fournisseur dans les réglages de l’agent.",
   "error.agent.screenCaptureOff":

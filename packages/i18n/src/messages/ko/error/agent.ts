@@ -139,6 +139,8 @@ export const messages = {
     "이 서버의 메모리가 부족해요. 메시지는 대기열에서 기다리다가 메모리가 확보되면 시작돼요.",
   "error.agent.workspaceOnlyToolMissing":
     "워크스페이스 전용 모드에는 {tool}이(가) 필요한데 OpenBot이 찾지 못했어요. 설치하거나 에이전트 설정에서 전체 접근 권한을 선택하세요.",
+  "error.agent.codexSandboxUnavailable":
+    "워크스페이스 전용 모드에는 Codex 샌드박스가 필요하지만 이 컴퓨터에서는 Codex가 샌드박스를 시작할 수 없어서 에이전트의 명령이 실패해요. 에이전트 설정에서 먼저 묻기나 전체 접근을 선택하세요.",
   "error.agent.claudeSandboxUnavailable":
     "워크스페이스 전용 모드에는 Claude 샌드박스가 필요하지만 이 컴퓨터에서는 Claude가 샌드박스를 시작할 수 없어요: {reason}. 에이전트 설정에서 전체 접근 권한이나 다른 제공자를 선택하세요.",
   "error.agent.screenCaptureOff":
