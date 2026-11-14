@@ -29,6 +29,10 @@ export const messages = {
   "error.connector.onePasswordFileTooLarge": "1Password 연결 파일이 너무 커요.",
   "error.connector.bitwardenFailed":
     "Bitwarden을 읽을 수 없어요. bw CLI를 설치하고, 로그인한 후 잠금을 해제하고, Shared with OpenBot이라는 폴더를 하나 만들어 주세요. 새 세션 키로 연결해 주세요.",
+  "error.connector.bitwardenCliMissing":
+    "OpenBot이 Bitwarden CLI를 찾을 수 없습니다. bw를 설치하고 새 터미널에서 작동하는지 확인한 다음 다시 연결하세요.",
+  "error.connector.bitwardenFolderMissing":
+    "Bitwarden에는 Shared with OpenBot이라는 폴더가 정확히 하나 있어야 합니다. 폴더를 만들거나 추가 폴더를 삭제한 다음 다시 연결하세요.",
   "error.connector.bitwardenHostInput":
     "HTTPS 서버 주소, API 키의 client_id와 client_secret, 마스터 비밀번호를 입력해 주세요.",
   "error.connector.bitwardenHostFailed":

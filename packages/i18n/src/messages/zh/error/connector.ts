@@ -26,6 +26,10 @@ export const messages = {
   "error.connector.onePasswordFileTooLarge": "1Password 连接文件过大。",
   "error.connector.bitwardenFailed":
     "无法读取 Bitwarden。请安装 bw CLI、登录并解锁，然后创建一个名为 Shared with OpenBot 的文件夹，用新的会话密钥连接。",
+  "error.connector.bitwardenCliMissing":
+    "OpenBot 找不到 Bitwarden CLI。请安装 bw，确认它在新终端中可以运行，然后重新连接。",
+  "error.connector.bitwardenFolderMissing":
+    "Bitwarden 必须只有一个名为 Shared with OpenBot 的文件夹。请创建它或删除多余的文件夹，然后重新连接。",
   "error.connector.bitwardenHostInput": "请填写 HTTPS 服务器地址、API 密钥的 client_id 和 client_secret，以及主密码。",
   "error.connector.bitwardenHostFailed":
     "无法在该服务器上打开 Bitwarden。请检查服务器地址、API 密钥和主密码，并确认有一个文件夹名为 Shared with OpenBot，然后重新连接。",
