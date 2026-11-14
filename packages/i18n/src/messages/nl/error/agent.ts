@@ -156,6 +156,8 @@ export const messages = {
     "Alleen werkruimte heeft {tool} nodig, maar OpenBot heeft dit niet gevonden. Installeer het, of kies Volledige toegang in de instellingen van de agent.",
   "error.agent.claudeSandboxUnavailable":
     "Alleen werkruimte heeft de Claude-sandbox nodig, maar Claude kan die op deze computer niet starten: {reason}. Kies Volledige toegang of een andere aanbieder in de instellingen van de agent.",
+  "error.agent.claudeSandboxWindows":
+    "Alleen werkruimte werkt nog niet voor Claude op Windows, en geen instelling op deze computer zet het aan. Kies Volledige toegang of een andere aanbieder in de instellingen van de agent.",
   "error.agent.screenCaptureOff":
     "Schermopname staat uit voor deze agent. De gebruiker kan Computerbesturing aanzetten in de instellingen van de agent.",
   "error.agent.screenCaptureUnavailable": "Schermopname is niet beschikbaar op deze computer.",

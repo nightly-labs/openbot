@@ -1782,7 +1782,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       const error = runtime.stderr.addTo(caught);
       const activeTurn = runtime.activeTurn;
       if (activeTurn) yield* this.#completeTurn(runtime, "failed", error);
-      this.#fail(error instanceof Error ? error : new Error(String(error)));
+      // The exit shows as a toast and stays on the provider row, so it gets the same text as the turn.
+      const sandbox = claudeSandboxError(String(error));
+      this.#fail(sandbox ? new Error(sandbox) : error instanceof Error ? error : new Error(String(error)));
     }
   });
 
@@ -2930,6 +2932,14 @@ function removeClaudeQueryFile(file: string | null): Effect.Effect<void> {
 const CLAUDE_SANDBOX_UNAVAILABLE = /Sandbox required but unavailable: (.+?)\.? Set sandbox\.failIfUnavailable=false/s;
 
 /**
+ * The reason on Windows while Anthropic keeps the sandbox off: "sandbox is enabled but the Windows
+ * sandbox is not active on this session (feature gate off)" (Claude Code 2.1.322). No setting on the
+ * computer turns it on, and users read the words as a fault that they can repair (#6206), so this
+ * reason gets its own text with no CLI words.
+ */
+const CLAUDE_WINDOWS_SANDBOX_OFF = /\bWindows sandbox is not active\b/iu;
+
+/**
  * The CLI's report of an Anthropic API key with no API credit: "Credit balance is too low", from the
  * API's "Your credit balance is too low to access the Anthropic API" (Claude Code 2.1.309). A Claude
  * plan does not pay for API key requests, and a plan subscriber read it as a fault (#5550). Only a
@@ -2972,14 +2982,26 @@ function claudeFastModeWarning(reason: string): string | null {
   }
 }
 
+/** The text for a query that stopped because the CLI cannot make its sandbox, or null for another error. */
+function claudeSandboxError(text: string): string | null {
+  const reason = CLAUDE_SANDBOX_UNAVAILABLE.exec(text)?.[1];
+  if (!reason) return null;
+  return CLAUDE_WINDOWS_SANDBOX_OFF.test(reason)
+    ? sourceText("error.agent.claudeSandboxWindows")
+    : sourceText("error.agent.claudeSandboxUnavailable", { reason });
+}
+
 function claudeTurnError(error: unknown, apiKey: boolean): string {
   const text = String(error);
   if (apiKey && CLAUDE_API_CREDIT_EMPTY.test(text)) return sourceText("error.provider.claudeApiKeyNoCredit");
   // With an API key there is no sign-in to renew, so the key turn keeps the CLI text.
   if (!apiKey && CLAUDE_NOT_LOGGED_IN.test(text))
     return sourceText("error.provider.signInExpired", { provider: agentProviderName("claude") });
-  const reason = CLAUDE_SANDBOX_UNAVAILABLE.exec(text)?.[1];
-  return reason ? sourceText("error.agent.claudeSandboxUnavailable", { reason }) : text;
+  const sandbox = claudeSandboxError(text);
+  if (sandbox === null) return text;
+  // The Windows text has no CLI words, so the log keeps them.
+  queryLogger.warn("Claude cannot start its sandbox for a Workspace only turn.", { error: redactText(text) });
+  return sandbox;
 }
 
 /**

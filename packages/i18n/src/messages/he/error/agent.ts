@@ -133,6 +133,8 @@ export const messages = {
     "מצב סביבת עבודה בלבד דורש את {tool}, ש-OpenBot לא מצא. יש להתקין אותו, או לבחור גישה מלאה בהגדרות הסוכן.",
   "error.agent.claudeSandboxUnavailable":
     "מצב סביבת עבודה בלבד דורש את ארגז החול של Claude, ש-Claude לא מצליח להפעיל במחשב הזה: {reason}. יש לבחור גישה מלאה או ספק אחר בהגדרות הסוכן.",
+  "error.agent.claudeSandboxWindows":
+    "מצב סביבת עבודה בלבד עדיין לא פועל עם Claude ב-Windows, ואין במחשב הזה הגדרה שמפעילה אותו. יש לבחור גישה מלאה או ספק אחר בהגדרות הסוכן.",
   "error.agent.screenCaptureOff": "צילום מסך כבוי עבור הסוכן הזה. המשתמש יכול להפעיל שליטה במחשב בהגדרות הסוכן.",
   "error.agent.screenCaptureUnavailable": "צילום מסך אינו זמין במחשב הזה.",
   "error.agent.screenCaptureShared":
