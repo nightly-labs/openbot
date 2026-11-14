@@ -65,7 +65,7 @@ export function createActivityStore(deps: ActivityStoreDeps) {
   /** The channel work of this very agent, which the chat has no turn of its own to show. */
   const heldByOwnChannelWork = createMemo(() => {
     const hold = deps.props.queue?.hold;
-    if (!hold || hold.agentId !== deps.props.agent?.id) return null;
+    if (hold?.reason !== "channel-task" || hold.agentId !== deps.props.agent?.id) return null;
     return deps.props.activeTurnId ? null : hold;
   });
   const activeActivityId = createMemo(() => {

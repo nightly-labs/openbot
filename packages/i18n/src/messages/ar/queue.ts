@@ -7,6 +7,7 @@ export const messages = {
   "queue.attachment": "مرفق",
   "queue.hold.named": "في الانتظار - {name} يعمل في {channel}",
   "queue.hold.unnamed": "في الانتظار - هذا الوكيل يعمل في {channel}",
+  "queue.hold.providerRestart": "في الانتظار - يُعاد تشغيل {provider} بعد انتهاء مهامه الجارية",
   "queue.item.label": "الرسالة المنتظرة {position}: {preview}",
   "queue.item.labelEditing": "الرسالة المنتظرة {position}، قيد التعديل: {preview}",
   "queue.item.editing": "قيد التعديل",

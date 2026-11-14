@@ -6,6 +6,7 @@ export const messages = defineMessages("queue", {
   "queue.attachment": "Attachment",
   "queue.hold.named": "Waiting - {name} is working in {channel}",
   "queue.hold.unnamed": "Waiting - this agent is working in {channel}",
+  "queue.hold.providerRestart": "Waiting - {provider} restarts when its running tasks end",
   "queue.item.label": "Queued message {position}: {preview}",
   "queue.item.labelEditing": "Queued message {position}, editing: {preview}",
   "queue.item.editing": "Editing",

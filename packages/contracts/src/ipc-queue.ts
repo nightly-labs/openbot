@@ -1,3 +1,4 @@
+import { type AgentProviderId, isAgentProvider } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
 import { type AttachmentSummary, isAttachmentSummary } from "./ipc-attachments";
 import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
@@ -131,7 +132,7 @@ function isQueueSender(value: unknown): value is QueueDelivery["sender"] {
   );
 }
 
-export const QUEUE_HOLD_REASONS = ["channel-task"] as const;
+export const QUEUE_HOLD_REASONS = ["channel-task", "provider-restart"] as const;
 export type QueueHoldReason = (typeof QUEUE_HOLD_REASONS)[number];
 
 /**
@@ -140,23 +141,33 @@ export type QueueHoldReason = (typeof QUEUE_HOLD_REASONS)[number];
  * A channel assignment holds the member agent that does it, so an agent with nothing running in its
  * own chat can still be unable to start the message the user just sent it. Without this the wait has
  * no visible cause: the channel turn's events are not the agent's own, so the agent reads as idle.
+ *
+ * A provider that waits to restart, for an update or because the user asked, holds every agent on it
+ * until the turns that run on it end (#8209). Those can be another agent's turns.
  */
-export interface QueueHold {
-  reason: QueueHoldReason;
-  channelId: string;
-  channelName: string;
-  /** The agent the channel work belongs to. Equal to the snapshot's agent when it is its own work. */
-  agentId: string;
-}
+export type QueueHold =
+  | {
+      reason: "channel-task";
+      channelId: string;
+      channelName: string;
+      /** The agent the channel work belongs to. Equal to the snapshot's agent when it is its own work. */
+      agentId: string;
+    }
+  | { reason: "provider-restart"; provider: AgentProviderId };
 
 export function isQueueHold(value: unknown): value is QueueHold {
+  if (!isDynamicRecord(value) || !isOneOf(QUEUE_HOLD_REASONS, value.reason)) return false;
+  if (value.reason === "provider-restart") return isAgentProvider(value.provider);
   return (
-    isDynamicRecord(value) &&
-    isOneOf(QUEUE_HOLD_REASONS, value.reason) &&
     isIdentifier(value.channelId) &&
     isBoundedString(value.channelName, INPUT_LIMITS.agentTitle) &&
     isIdentifier(value.agentId)
   );
+}
+
+/** The agent that does the channel work holding this queue, or null for any other hold. */
+export function queueHoldWorker(hold: QueueHold | null | undefined): string | null {
+  return hold?.reason === "channel-task" ? hold.agentId : null;
 }
 
 export interface QueueSnapshot {

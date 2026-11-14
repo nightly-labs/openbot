@@ -9,6 +9,7 @@ import {
   type BrowserDockSkill,
   type BrowserTab,
   isBrowserDockIsland,
+  queueHoldWorker,
 } from "@openbot/contracts/ipc";
 import { BROWSER_USER_CONTROL_CAPABILITY } from "@openbot/contracts/team-protocol/browser-user-control-v1";
 import type { ComposerAgent, ComposerMcpServer, ComposerSkill } from "@openbot/ui/data";
@@ -171,7 +172,7 @@ export function BrowserDockAdapter(adapterProps: { tab: BrowserTab | undefined; 
   const deliveries = presentedQueueDeliveries;
   const hold = () => {
     const current = props.queue?.hold;
-    return current && current.agentId !== props.agent?.id ? current : null;
+    return current && queueHoldWorker(current) !== props.agent?.id ? current : null;
   };
   const dismissReply = (id: string) => setDismissedReplies((ids) => new Set(ids).add(id));
 
