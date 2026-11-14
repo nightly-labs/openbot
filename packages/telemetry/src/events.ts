@@ -248,8 +248,9 @@ export function classifyFailure(error: unknown): CauseCode {
     )
   )
     return "billing";
+  // Claude Code names a spent spend cap "You've hit your monthly spend limit" (#8998).
   if (
-    /\b(?:usage limit|hit your (?:weekly |session |\d+-hour )?limit|quota (?:exceeded|reached|exhausted)|free[ _-]usage[ _-]exhausted|key limit exceeded)\b/iu.test(
+    /\b(?:usage limit|hit your (?:weekly |session |\d+-hour )?limit|hit your (?:[\w']+ ){0,2}spend limit|quota (?:exceeded|reached|exhausted)|free[ _-]usage[ _-]exhausted|key limit exceeded)\b/iu.test(
       message,
     )
   )
