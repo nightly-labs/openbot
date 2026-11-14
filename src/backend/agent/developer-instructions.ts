@@ -487,7 +487,13 @@ export function developerInstructions(
         : // OpenCode Code Mode puts only the direct tools under `tools.openbot`. A model that read
           // `openbot.create_agent` called `tools.openbot.create_agent`, which OpenCode refuses (#6309).
           agent.provider === "opencode"
-          ? ' In execute, tools.openbot and tools.openbot_browser have only your listed tools; run each other tool as tools.openbot.tool_call({ name: "openbot.create_agent", arguments: {…} }), never as tools.openbot.create_agent or tools.openbot_browser.click.'
+          ? ` In execute, tools.openbot and tools.openbot_browser have only your listed tools; run each other tool as tools.openbot.tool_call({ name: "openbot.create_agent", arguments: {…} }), never as tools.openbot.create_agent or tools.openbot_browser.click.${
+              // A JavaScript string drops a single backslash, so `"C:\Users\…"` reached the
+              // attachment check as `C:Users…` and was not found (#8635).
+              process.platform === "win32"
+                ? " In execute, write Windows paths with forward slashes, such as C:/Users/…: JavaScript drops a single backslash."
+                : ""
+            }`
           : // Grok CLI 1.0.77 gives MCP tools to the model only through its `search_tool` and
             // `use_tool`, as `server__tool`. A model that did not find openbot.send_message in its
             // list said that team messaging was missing and sent nothing (#6716). Only the declared
