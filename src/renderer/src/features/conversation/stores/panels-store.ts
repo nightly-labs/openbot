@@ -778,7 +778,7 @@ function filePreviewError(error: unknown, path: string): string {
   const message = errorMessage(error, fallback);
   // The host names the missing path. A sentence with a full path shows only the fallback, and a retry
   // does not find the path either (#9010).
-  return message === fallback && MISSING_PATH_KEYS.has(matchingSourceKeys(normalizeMessage(error))[0] ?? "")
+  return message === fallback && matchingSourceKeys(normalizeMessage(error)).some((key) => MISSING_PATH_KEYS.has(key))
     ? t("attachment.error.fileNotFound", { name })
     : message;
 }

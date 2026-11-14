@@ -1339,11 +1339,10 @@ const WINDOWS_ABSOLUTE_PATH = /^(?:[A-Za-z]:[/\\]|\\\\)/u;
 /**
  * The target of a link as the agent wrote it, when that is a Windows path. CommonMark reads the `\.`
  * in `C:\me\.logs\x` as an escape, but each backslash of a Windows path is a separator (#9010). A
- * target with a character reference keeps the parsed text, so that it is still decoded.
+ * path written with escaped separators, such as `C:\\me\\.logs`, keeps the parsed text.
  */
 function writtenLinkTarget(token: { raw: string; href: string }): string {
   const { raw, href } = token;
-  if (href.includes("&")) return href;
   for (const match of raw.matchAll(/\]\(\s*<?/gu)) {
     const start = match.index + match[0].length;
     let index = start;
@@ -1356,7 +1355,9 @@ function writtenLinkTarget(token: { raw: string; href: string }): string {
       parsed += 1;
     }
     const written = raw.slice(start, index);
-    if (parsed === href.length && WINDOWS_ABSOLUTE_PATH.test(written)) return written;
+    // Only a network path starts with two backslashes; a pair after that start is an escaped separator.
+    if (parsed !== href.length || !WINDOWS_ABSOLUTE_PATH.test(written)) continue;
+    return written.slice(2).includes("\\\\") ? href : written;
   }
   return href;
 }
