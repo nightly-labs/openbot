@@ -30,16 +30,35 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { AgentSummary } from "@openbot/contracts/ipc";
-import { Effect } from "effect";
+import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { Effect, Exit, Scope } from "effect";
 import { ConversationRuntime } from "../src/backend/agent/conversation-runtime";
+import { MailboxSync } from "../src/backend/agent/mailbox-sync";
+import { RoutineScheduler } from "../src/backend/agent/routine-scheduler";
+import type { OpenBotToolResponse } from "../src/backend/agent/routine-tools";
+import { sendMessageToNewThreads, type TeammateThreadSendDeps } from "../src/backend/agent/teammate-thread-send";
 import { AgentStore } from "../src/backend/agent-store";
 import { AgentTasks } from "../src/backend/agent-tasks/agent-tasks";
 import { AgentThreadStore } from "../src/backend/agent-threads/agent-thread-store";
+import { AgentWaitStore } from "../src/backend/agent-waits/agent-wait-store";
+import { AgentWaits } from "../src/backend/agent-waits/agent-waits";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { MailboxStore } from "../src/backend/mailbox-store";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
+import { RoutineTimer } from "../src/backend/routine-timer";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/teammate-new-thread-e2e");
+
+interface ThreadRow {
+  recipientAgentId: string;
+  taskId: string;
+  messageId: string;
+}
+
+interface RefusalRow {
+  recipientAgentId: string;
+  error: string;
+}
 
 interface Step {
   name: string;
@@ -54,6 +73,9 @@ const step = (name: string, details: Step["details"]): void => {
 };
 
 const root = await mkdtemp(join(tmpdir(), "openbot-teammate-thread-"));
+let timer: RoutineTimer | null = null;
+let conversation: ConversationRuntime | null = null;
+let scope: import("effect").Scope.Closeable | null = null;
 try {
   const database = new OpenBotDatabase(join(root, "state"));
   const store = new AgentStore(join(root, "state"), join(root, "home"), database);
@@ -83,11 +105,56 @@ try {
   const mailbox = new MailboxStore(join(root, "state"), store.sharedRoot, database);
   await runCauseEffect(mailbox.initialize());
 
-  const conversation = new ConversationRuntime(
+  const runtime = new ConversationRuntime(
     store,
     () => {},
     () => store.list(),
   );
+  conversation = runtime;
+  const routineTimer = new RoutineTimer(
+    () => [],
+    () => false,
+    () => {},
+  );
+  timer = routineTimer;
+  const waits = new AgentWaits({
+    store: new AgentWaitStore({ database }),
+    mailbox,
+    hooks: { emit: () => {}, ownsRoutine: () => true, hasRoutine: () => true, requireKnownAgent: () => {} },
+  });
+  const routines = new RoutineScheduler({
+    store,
+    mailbox,
+    conversation: runtime,
+    timer: routineTimer,
+    waits,
+    timezone: () => "UTC",
+    hooks: {
+      emit: () => {},
+      emitError: () => {},
+      emitQueue: () => {},
+      scheduleDrain: () => {},
+      interrupt: () => Effect.void,
+      awaitDrain: () => undefined,
+      syncMailboxMessages: () => {},
+      listAgents: () => store.list(),
+      excludedAgents: () => new Set(),
+      isRunning: () => false,
+      usageLimited: () => false,
+      routineThread: () => null,
+      routineDeleted: () => Effect.void,
+    },
+  });
+  scope = Scope.makeUnsafe();
+  const openScope = scope;
+  const mailboxSync = new MailboxSync({
+    database,
+    mailbox,
+    conversation: runtime,
+    routines,
+    scope: () => openScope,
+    hooks: { emit: () => {}, emitError: () => {}, queueHold: () => null },
+  });
   const threadStore = new AgentThreadStore(database);
   const archivedTasks: string[] = [];
   const tasks = new AgentTasks({
@@ -115,6 +182,26 @@ try {
 
   const chat = (agentId: string) => mailbox.conversationMessages(agentId);
   const has = (agentId: string, text: string) => chat(agentId).some((message) => message.text.includes(text));
+  /** The threads and refusals that a route-level send result names, read with runtime checks. */
+  const routeResult = (response: OpenBotToolResponse): { threads: ThreadRow[]; refused?: RefusalRow[] } => {
+    const parsed = JSON.parse(response.contentItems[0]?.text ?? "{}");
+    if (!isDynamicRecord(parsed) || !Array.isArray(parsed.threads))
+      throw new Error("The route result names no threads.");
+    const threads = parsed.threads.map((row): ThreadRow => {
+      if (!isDynamicRecord(row) || !isString(row.recipientAgentId) || !isString(row.taskId) || !isString(row.messageId))
+        throw new Error("The route result names no thread identity.");
+      return { recipientAgentId: row.recipientAgentId, taskId: row.taskId, messageId: row.messageId };
+    });
+    const refused = Array.isArray(parsed.refused)
+      ? parsed.refused.map((row): RefusalRow => {
+          if (!isDynamicRecord(row) || !isString(row.recipientAgentId) || !isString(row.error))
+            throw new Error("The route result names no refusal reason.");
+          return { recipientAgentId: row.recipientAgentId, error: row.error };
+        })
+      : undefined;
+    return { threads, ...(refused === undefined ? {} : { refused }) };
+  };
+
   /** The message of the typed failure that `run` rejects with, or an empty string when it passes. */
   const refusedMessage = async (run: () => Promise<unknown>): Promise<string> => {
     try {
@@ -430,6 +517,125 @@ try {
     step("11c-archival", { openTasks: tasks.openTaskIds(closer.id).length, archived: archivedTasks.length });
   }
 
+  // -- 12. The route-level send: the real send path that the tool router calls. -------------
+  {
+    const worker = agent("agent-worker", "Worker", "openbot-thread-worker");
+    const second = agent("agent-second", "Second", "openbot-thread-second");
+    const blocked = agent("agent-blocked", "Blocked", "openbot-thread-blocked");
+    const full = agent("agent-full", "Full", "openbot-thread-full");
+    database.replaceAgents(
+      "teammate-new-thread-e2e-route",
+      [alpha, beta, worker, second, blocked, full],
+      "agents.updated",
+    );
+    const deps: TeammateThreadSendDeps = {
+      mailbox,
+      tasks,
+      mailboxSync,
+      conversation: runtime,
+      drain: { scheduleDrain: () => {} },
+      redact: (text) => text,
+    };
+    const routeText = `Route the report ${run}`;
+    const call = {
+      threadId: alpha.threadId ?? "openbot-thread-alpha",
+      turnId: `turn-route-${run}`,
+      callId: `call-route-${run}`,
+    };
+
+    // The route send starts the thread, takes the message into its lane, and names the identity.
+    const first = await runCauseEffect(
+      sendMessageToNewThreads(deps, call, alpha.id, [worker.id], [], routeText, undefined),
+    );
+    const firstResult = routeResult(first);
+    assert.equal(firstResult.threads.length, 1, "the route send names one thread");
+    assert.equal(firstResult.refused, undefined, "a full send reports no refusal");
+    assert.equal(firstResult.threads[0]?.recipientAgentId, worker.id, "the thread belongs to the recipient");
+    assert.equal(tasks.threadId(firstResult.threads[0]?.taskId ?? "") !== null, true, "the named task is open");
+    assert.equal(
+      mailbox
+        .queuedTaskMessages(worker.id, firstResult.threads[0]?.taskId ?? "")
+        .some((message) => message.text.includes(routeText)),
+      true,
+      "the route send takes the message into the task lane",
+    );
+    assert.equal(
+      chat(worker.id).some((message) => message.text.includes(routeText)),
+      false,
+      "the route send hides the request from the recipient's chat",
+    );
+    step("12a-route-send", {
+      taskId: firstResult.threads[0]?.taskId ?? "",
+      messageId: firstResult.threads[0]?.messageId ?? "",
+    });
+
+    // A limit refusal for one recipient names it, and the other recipient's work goes out.
+    for (let index = 0; index < 50; index += 1) tasks.create(full.id, `Full list task ${index}`, "user");
+    const partial = await runCauseEffect(
+      sendMessageToNewThreads(deps, call, alpha.id, [worker.id, full.id], [], `Second route ${run}`, undefined),
+    );
+    const partialResult = routeResult(partial);
+    assert.equal(partialResult.threads.length, 1, "the other recipient's thread started");
+    assert.equal(partialResult.refused?.length, 1, "the refusal names one recipient");
+    assert.equal(partialResult.refused?.[0]?.recipientAgentId, full.id, "the refusal names the refused recipient");
+    assert.match(partialResult.refused[0]?.error ?? "", /50 open threads/, "the refusal carries the localized limit");
+    assert.equal(tasks.openTaskIds(full.id).length, 50, "a refused recipient keeps no thread");
+    step("12b-create-refusal-continues", {
+      refused: partialResult.refused.length,
+      threads: partialResult.threads.length,
+    });
+
+    // A mailbox refusal for one recipient discards its thread, and the other recipient keeps its work.
+    const unblockBlocked = mailbox.blockAgentDeliveries(blocked.id);
+    const racing = await runCauseEffect(
+      sendMessageToNewThreads(deps, call, alpha.id, [second.id, blocked.id], [], `Racing delete ${run}`, undefined),
+    );
+    unblockBlocked();
+    const racingResult = routeResult(racing);
+    assert.equal(racingResult.threads.length, 1, "the recipient that the mailbox took keeps its thread");
+    assert.equal(racingResult.refused?.length, 1, "the deleting recipient is refused");
+    assert.equal(racingResult.refused?.[0]?.recipientAgentId, blocked.id, "the refusal names the blocked recipient");
+    assert.equal(tasks.openTaskIds(blocked.id).length, 0, "a thread that no message took is gone");
+    assert.equal(
+      tasks.openTaskIds(second.id).length === 1 &&
+        mailbox
+          .queuedTaskMessages(second.id, tasks.openTaskIds(second.id)[0] ?? "")
+          .some((message) => message.text.includes(`Racing delete ${run}`)),
+      true,
+      "the other recipient's message runs in its lane",
+    );
+    step("12c-enqueue-refusal-discards", { refused: racingResult.refused[0]?.error ?? "" });
+
+    // A retried call with the same call id reuses the sent thread and message, and takes the refused one.
+    const retryCall = {
+      threadId: alpha.threadId ?? "openbot-thread-alpha",
+      turnId: `turn-retry-${run}`,
+      callId: `call-retry-${run}`,
+    };
+    const unblockRetry = mailbox.blockAgentDeliveries(blocked.id);
+    const attempt = await runCauseEffect(
+      sendMessageToNewThreads(deps, retryCall, alpha.id, [worker.id, blocked.id], [], `Retry route ${run}`, undefined),
+    );
+    unblockRetry();
+    const attemptResult = routeResult(attempt);
+    assert.equal(attemptResult.threads.length, 1, "the retry attempt names the sent thread");
+    const retried = await runCauseEffect(
+      sendMessageToNewThreads(deps, retryCall, alpha.id, [worker.id, blocked.id], [], `Retry route ${run}`, undefined),
+    );
+    const retryResult = routeResult(retried);
+    assert.equal(retryResult.threads.length, 2, "the retry takes both threads");
+    assert.equal(retryResult.refused, undefined, "the unblocked recipient now starts");
+    assert.equal(retryResult.threads[0]?.taskId, attemptResult.threads[0]?.taskId, "the retry reuses the sent thread");
+    assert.equal(
+      retryResult.threads[0]?.messageId,
+      attemptResult.threads[0]?.messageId,
+      "the retry reuses the sent message",
+    );
+    assert.equal(tasks.openTaskIds(worker.id).length, 2, "the retry starts no second thread for the sent recipient");
+    assert.equal(tasks.openTaskIds(blocked.id).length, 1, "the retry takes the refused recipient's thread");
+    step("12d-retry-reuses", { threads: retryResult.threads.length });
+  }
+
   report.passed = report.steps.every((entry) => entry.error === undefined);
 } catch (error) {
   const message = error instanceof Error ? (error.stack ?? error.message) : String(error);
@@ -437,6 +643,9 @@ try {
   process.stdout.write(`uncaught: ${message}\n`);
   report.passed = false;
 } finally {
+  timer?.dispose();
+  conversation?.dispose();
+  if (scope) await Effect.runPromise(Scope.close(scope, Exit.void));
   await rm(root, { recursive: true, force: true });
 }
 mkdirSync(OUT, { recursive: true });

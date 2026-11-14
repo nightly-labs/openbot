@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
@@ -66,7 +66,6 @@ import type { AgentClient, AgentProvider } from "../agent-client";
 import type { AgentTables } from "../agent-data/agent-tables";
 import type { AgentStore } from "../agent-store";
 import type { AgentTasks } from "../agent-tasks/agent-tasks";
-import type { AgentThreadRecord } from "../agent-threads/agent-thread-store";
 import type { AgentWaits } from "../agent-waits/agent-waits";
 import { attachmentCall, attachmentFailure } from "../attachment-effects";
 import { OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
@@ -172,6 +171,7 @@ import {
 } from "./screen-capture";
 import { type AgentSidebar, handleSidebarTool } from "./sidebar-tools";
 import { LOCAL_SKILL_TOOL_DEFINITIONS, type LocalSkillTools, runLocalSkillTool } from "./skill-tools";
+import { sendMessageToNewThreads } from "./teammate-thread-send";
 import { isDynamicToolCall } from "./thread-items";
 import { toolCallIdempotencyKey } from "./tool-call-idempotency";
 import {
@@ -3110,108 +3110,24 @@ export class OpenBotToolRouter {
     text: string,
     expectsReply: boolean | undefined,
   ): Effect.fn.Return<OpenBotToolResponse, ToolOperationFailed> {
-    const turnDeliveries = this.#mailbox.findDeliveriesByTurn(senderAgentId, params.turnId);
-    // A request from a Slack turn: the teammate's answer goes back to that Slack thread.
-    const messagingReturn = turnDeliveries
-      .map(({ delivery }) => this.#mailbox.messagingOrigin(delivery.id))
-      .find((origin) => origin !== null);
-    // A request from a side thread: the teammate's answer goes back to that thread.
-    const senderTaskId = turnDeliveries
-      .map(({ delivery }) => this.#mailbox.taskIdForDelivery(delivery.id))
-      .find((taskId) => taskId !== null);
-    const idempotencyKeyOf = (recipient: string) =>
-      `teammate-thread:${createHash("sha256")
-        .update(JSON.stringify([senderAgentId, params.threadId, params.turnId, params.callId, recipient]))
-        .digest("hex")}`;
-    // One start runs at a time, like `start_task`, so parallel calls cannot pass the task limits.
-    const tasks: AgentThreadRecord[] = [];
-    const opened = yield* Effect.forEach(
+    return yield* sendMessageToNewThreads(
+      {
+        mailbox: this.#mailbox,
+        tasks: this.#tasks,
+        mailboxSync: this.#mailboxSync,
+        conversation: this.#conversation,
+        drain: this.#drain,
+        redact: (text) => this.#hooks.redactMcp(text),
+      },
+      { threadId: params.threadId, turnId: params.turnId, callId: params.callId },
+      senderAgentId,
       recipientValues,
-      (recipient) =>
-        Effect.suspend(() => {
-          // The first call of this tool call made the thread; a retry reuses it.
-          const earlier = this.#mailbox.deliveryForKey(idempotencyKeyOf(recipient));
-          return earlier
-            ? toolStep(() => this.#tasks.require(recipient, this.#mailbox.taskIdForDelivery(earlier.delivery.id) ?? ""))
-            : this.#tasks.teammateThread(recipient, text).pipe(toToolOperationFailed);
-        }),
-      { concurrency: 1 },
-    ).pipe(
-      // A thread that no message took is removed, so a retry starts clean.
-      Effect.catch((failure) =>
-        Effect.sync(() => {
-          for (const task of tasks) {
-            this.#tasks.discard(task);
-            this.#tasks.changed(task.agentId);
-          }
-        }).pipe(Effect.asVoid, Effect.andThen(Effect.fail(failure))),
-      ),
+      paths,
+      text,
+      expectsReply,
     );
-    tasks.push(...opened);
-    const threads: SentThread[] = [];
-    for (const task of tasks) {
-      const receipt = yield* this.#mailbox
-        .enqueue({
-          sender: { kind: "agent", agentId: senderAgentId },
-          recipientAgentIds: [task.agentId],
-          taskId: task.taskId,
-          text,
-          sourcePaths: paths,
-          replyToMessageId: null,
-          ...(expectsReply === undefined ? {} : { expectsReply }),
-          ...(messagingReturn ? { messagingReturn } : {}),
-          ...(senderTaskId ? { senderTaskId } : {}),
-          idempotencyKey: idempotencyKeyOf(task.agentId),
-        })
-        .pipe(
-          toToolOperationFailed,
-          // A thread whose message the mailbox could not take is removed, so a retry starts clean.
-          Effect.catch((failure) =>
-            Effect.sync(() => {
-              this.#tasks.discard(task);
-              this.#tasks.changed(task.agentId);
-            }).pipe(Effect.asVoid, Effect.andThen(Effect.fail(failure))),
-          ),
-        );
-      const delivery = receipt.deliveries[0];
-      if (!delivery) throw new Error(`The message for ${task.agentId} has no delivery.`);
-      threads.push({
-        recipientAgentId: task.agentId,
-        taskId: task.taskId,
-        threadId: task.threadId,
-        title: task.title,
-        messageId: receipt.messageId,
-        deliveryId: delivery.id,
-        status: delivery.status,
-        position: delivery.position,
-      });
-      // A task message does not steer the recipient's chat turn. The drain takes it in the task's lane.
-      this.#tasks.changed(task.agentId);
-      this.#mailboxSync.emitQueue(task.agentId);
-      this.#drain.scheduleDrain(task.agentId);
-    }
-    const snapshot = this.#conversation.ensureSnapshot(senderAgentId, params.threadId);
-    this.#mailboxSync.syncMailboxMessages(snapshot);
-    this.#conversation.emitConversation(snapshot);
-    return {
-      success: true,
-      contentItems: [{ type: "inputText", text: JSON.stringify({ threads }) }],
-    };
   });
 }
-
-type SentThread = {
-  recipientAgentId: string;
-  /** The side thread of the recipient that the message starts and runs in. */
-  taskId: string;
-  threadId: string;
-  title: string;
-  /** The request that the thread runs first. A later reply to it continues the thread. */
-  messageId: string;
-  deliveryId: string;
-  status: QueuedMessageReceipt["deliveries"][number]["status"];
-  position: QueuedMessageReceipt["deliveries"][number]["position"];
-};
 
 type SentDelivery = QueuedMessageReceipt["deliveries"][number] & {
   outcome?: "steered" | "queued";
