@@ -196,7 +196,7 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       slug: "cloud66",
       version: "1.0.0",
       featured: false,
-      detailSha256: "bd0fd2c4bf0742c92f2ff2fc11dbeaea94304a8ca96ed2892251ee07c07429ce",
+      detailSha256: "a587a713c4a697281b8169d1067ee7d4ed02ca534d9e9264bbcc7a6e6868c7cd",
     },
     {
       slug: "context7",
@@ -2669,7 +2669,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     name: "Cloud 66",
     tagline: "Applications, deploys and servers",
     description:
-      "Cloud 66 lets agents list accounts, applications, servers and clouds, read deployments and their logs, start deployments, manage deployment profiles, and create Deploy v3 clusters. Each user signs in to their own Cloud 66 account through the browser and selects the permissions on the consent page. Agents cannot do more than the user's Cloud 66 role permits. Deploying and creating servers can cost money. To delete an application or a deployment profile, or to add a cloud, the user confirms each request on a Cloud 66 page in the browser.",
+      "Cloud 66 lets agents list accounts, applications, servers and clouds, read deployments and their logs, start deployments, manage deployment profiles, and create Deploy v3 clusters. Each user signs in to their own Cloud 66 account through the browser and selects the permissions on the consent page. Agents cannot do more than the user's Cloud 66 role permits. Deploying and creating servers can cost money. To delete an application or a deployment profile, or to add a cloud, Cloud 66 asks the agent to show a confirmation link. When the chat cannot show it, do these actions in the Cloud 66 dashboard.",
     category: "coding",
     creatorName: "Cloud 66",
     iconUrl: "https://app.cloud66.com/favicon.ico",

@@ -341,10 +341,14 @@ The access token is valid for 7 days. A second sign-in of the same client revoke
 Each user can have 10 MCP sessions at a time.
 
 To delete an application or a deployment profile, or to add a cloud, Cloud 66 sends an elicitation
-over the open session, and the user then confirms on a Cloud 66 page in the browser (with 2FA for a
-delete). Not confirmed: which OpenBot providers show that elicitation. With a provider that does not,
-these tools fail with "this tool requires an MCP client with elicitation support"; do the action in
-the Cloud 66 dashboard. The other tools work.
+over the open session. The agent shows a one-time Cloud 66 link, and the user confirms on that page
+in the browser (with 2FA for a delete). Cloud 66 does not document the elicitation mode. OpenBot
+shows a `form` request as a question card in the chat and declines a `url` request
+(`mcpElicitationQuestions` in `src/backend/agent/prompts.ts`). Cloud 66 supports only MCP
+`2025-06-18`, which has no `url` mode, so the request is probably a `form`. Not confirmed with a
+Cloud 66 account. A chat in Slack, Discord or Telegram cancels the request. When the request fails,
+the tool fails with "this tool requires an MCP client with elicitation support" or a decline; do
+the action in the Cloud 66 dashboard. The other tools do not need it.
 
 Troubleshooting:
 
