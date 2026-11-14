@@ -425,6 +425,14 @@
   --message-plain-text-primary: var(--openbot-text-primary);
   --message-plain-text-secondary: var(--openbot-text-secondary);
   --message-plain-text-muted: var(--openbot-text-muted);
+  --message-plain-text-dim: var(--openbot-text-dim);
+  --message-plain-accent: var(--openbot-accent);
+  --message-plain-accent-text: var(--openbot-accent-text);
+  --message-plain-accent-soft: var(--openbot-accent-soft);
+  --message-plain-accent-strong: var(--openbot-accent-strong);
+  --message-plain-success: var(--openbot-success);
+  --message-plain-warning: var(--openbot-warning);
+  --message-plain-danger: var(--openbot-danger);
 }
 
 :root .ui-bubble.message-bubble-colored.message-bubble-solid.message-bubble-solid-dark-text {
@@ -436,6 +444,18 @@
   --openbot-text-primary: var(--message-solid-text);
   --openbot-text-secondary: color-mix(in srgb, var(--message-solid-text) 86%, transparent);
   --openbot-text-muted: color-mix(in srgb, var(--message-solid-text) 72%, transparent);
+  /*
+   * Links, code tokens, marks and states take the text color: an accent or a status color can be
+   * the bubble color itself, and then it does not show.
+   */
+  --openbot-text-dim: color-mix(in srgb, var(--message-solid-text) 60%, transparent);
+  --openbot-accent: var(--message-solid-text);
+  --openbot-accent-text: var(--message-solid-text);
+  --openbot-accent-soft: color-mix(in srgb, var(--message-solid-text) 16%, transparent);
+  --openbot-accent-strong: color-mix(in srgb, var(--message-solid-text) 34%, transparent);
+  --openbot-success: var(--message-solid-text);
+  --openbot-warning: var(--message-solid-text);
+  --openbot-danger: var(--message-solid-text);
   color: var(--message-solid-text);
 }
 
@@ -456,6 +476,14 @@
   --openbot-text-primary: var(--message-plain-text-primary);
   --openbot-text-secondary: var(--message-plain-text-secondary);
   --openbot-text-muted: var(--message-plain-text-muted);
+  --openbot-text-dim: var(--message-plain-text-dim);
+  --openbot-accent: var(--message-plain-accent);
+  --openbot-accent-text: var(--message-plain-accent-text);
+  --openbot-accent-soft: var(--message-plain-accent-soft);
+  --openbot-accent-strong: var(--message-plain-accent-strong);
+  --openbot-success: var(--message-plain-success);
+  --openbot-warning: var(--message-plain-warning);
+  --openbot-danger: var(--message-plain-danger);
   color: var(--openbot-text-primary);
 }
 
