@@ -527,6 +527,7 @@
     "@speed-highlight/core": "catalog:",
     "katex": "catalog:",
     "marked": "catalog:",
+    "marked-cjk-friendly": "catalog:",
     "mermaid": "catalog:",
     "@tanstack/virtual-core": "catalog:",
     "zod": "catalog:",

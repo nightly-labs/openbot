@@ -2,6 +2,7 @@ import { blockChatMath, chatMathBlockStart, chatMathStart, inlineChatMath } from
 import { chatTagReferences } from "@openbot/contracts/chat-tag-references";
 import { replaceEqualDeep } from "@tanstack/react-query";
 import { Marked, type Token, type TokensList } from "marked";
+import markedCjkFriendly from "marked-cjk-friendly";
 
 const markdown = new Marked({
   gfm: true,
@@ -73,6 +74,8 @@ const markdown = new Marked({
     },
   ],
 });
+// Bold and struck text also close next to Chinese, Japanese or Korean punctuation, as in `**待办：**说明`.
+markdown.use(markedCjkFriendly());
 
 function parseChatMarkdown(body: string): TokensList {
   return markdown.lexer(body);
