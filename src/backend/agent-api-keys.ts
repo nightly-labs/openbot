@@ -1,4 +1,5 @@
-import { readdir, readFile, rm } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { lstat, readdir, readFile, readlink, rename, rm, symlink } from "node:fs/promises";
 import { join } from "node:path";
 import { API_KEY_NAME_PATTERN } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
@@ -59,8 +60,12 @@ export type AgentApiKeyVault = Pick<
  *
  * Without a Vault (no OS encryption, or a damaged Vault file), a key for one agent is a plain file,
  * `<root>/<agentId>/<NAME>`, readable only by the user, as before the Vault had agents. When the Vault
- * can be used, each such file moves into it as a key for that agent, and the file is deleted after the
- * Vault keeps it.
+ * can be used, each such file moves into it as a key for that agent. After the Vault keeps the key, a
+ * link to the agent's Vault copy, `../.vault/<agentId>/<NAME>`, replaces the file. Scripts that read the
+ * path of 0.69 and earlier then get the Vault value, and a link is never read as a plain key again.
+ * 0.70.0 deleted these files with no link (#9313). While the agent folder exists, each start writes the
+ * Vault copy and a link for each key for that agent only, so the path of those scripts works again.
+ * Without a link (the system refuses it, as Windows can without Developer Mode), the file is deleted.
  */
 export class AgentApiKeys {
   readonly #root: string;
@@ -89,8 +94,8 @@ export class AgentApiKeys {
       return { name, path } satisfies SavedApiKey;
     }
     yield* vault.saveApiKey({ name, key: value }, agent, true).pipe(Effect.mapError(failed));
-    // A plain file of this name from before would win over the new key.
-    yield* this.#files.withPermit(removeFile(path));
+    // A plain file of this name from before would win over the new key. The link to the Vault copy stays.
+    yield* this.#files.withPermit(removeOldKey(path, ownKeyLinkTarget(agent.id, name)));
     const keys = yield* this.list(agent.id);
     const saved = keys.find((key) => key.name === name && key.source === undefined);
     return saved ?? (yield* failed());
@@ -104,8 +109,9 @@ export class AgentApiKeys {
         yield* this.#moveIntoVault(agentId);
         const own = yield* this.#plainKeys(agentId);
         const vault = yield* this.#writeAgent(folder, agentId);
-        // The path of earlier versions; it does not change what the agent gets.
+        // The paths of earlier versions; they do not change what the agent gets.
         yield* this.#writeShared().pipe(Effect.ignore);
+        yield* this.#linkOwnKeys(agentId);
         const shown = vault.filter((key) => !own.some((entry) => entry.name === key.name));
         return [...own, ...shown].sort((a, b) => a.name.localeCompare(b.name));
       }),
@@ -129,8 +135,20 @@ export class AgentApiKeys {
         if (agents.includes(VAULT_FOLDER)) yield* this.#writeShared();
         const vaultFolder = join(this.#root, VAULT_FOLDER);
         const copies = yield* Effect.tryPromise({ try: () => folderNames(vaultFolder), catch: failed });
+        // A copy that cannot be written does not stop the copies and links of the other agents.
         for (const agentId of copies.filter((id) => AGENT_ID_PATTERN.test(id)))
-          yield* this.#writeAgent(join(vaultFolder, agentId), agentId);
+          yield* this.#writeAgent(join(vaultFolder, agentId), agentId).pipe(Effect.ignore);
+        // The agent folders of 0.69 and earlier: the Vault copy and a link for each key for that agent
+        // only, also when the agent did not list its keys after the update. The link of a key that is
+        // deleted, or now for other agents too, goes.
+        for (const agentId of agents.filter((id) => AGENT_ID_PATTERN.test(id))) {
+          const own = this.#readyVault()
+            ?.apiKeys(agentId)
+            .some((key) => key.own);
+          if (own && !copies.includes(agentId))
+            yield* this.#writeAgent(join(vaultFolder, agentId), agentId).pipe(Effect.ignore);
+          yield* this.#linkOwnKeys(agentId);
+        }
       }),
     );
   });
@@ -141,10 +159,11 @@ export class AgentApiKeys {
     const folder = yield* this.#agentFolder(agentId);
     return yield* this.#files.withPermit(
       Effect.gen({ self: this }, function* () {
-        const plain = yield* removeFile(path);
+        const plain = yield* removeOldKey(path, ownKeyLinkTarget(agentId, name));
         const vault = this.#readyVault();
         const own = vault ? yield* vault.removeAgentApiKey(agentId, name).pipe(Effect.mapError(failed)) : false;
         if (vault) yield* this.#writeAgent(folder, agentId);
+        yield* this.#linkOwnKeys(agentId);
         return plain || own;
       }),
     );
@@ -185,6 +204,7 @@ export class AgentApiKeys {
     return Effect.gen({ self: this }, function* () {
       const vault = this.#readyVault();
       if (!vault) return;
+      const moved: SavedApiKey[] = [];
       for (const key of yield* this.#plainKeys(agentId)) {
         const value = (yield* Effect.promise(() => readFile(key.path, "utf8").catch(() => null)))?.trim();
         if (!value) continue;
@@ -200,9 +220,18 @@ export class AgentApiKeys {
               vault.saveApiKey({ name: key.name, key: value }, { id: agentId, name: undefined }, true),
             ),
           );
-        // A file that cannot be deleted stays. It holds the same key, and `list` gives it to the agent.
-        if (saved) yield* removeFile(key.path).pipe(Effect.orElseSucceed(() => false));
+        if (saved) moved.push(key);
       }
+      if (moved.length === 0) return;
+      // The link replaces a file only after the copy that it points to is there. A file that cannot be
+      // replaced or deleted stays. It holds the same key, and `list` gives it to the agent.
+      const copied = yield* this.#writeAgent(join(this.#root, VAULT_FOLDER, agentId), agentId).pipe(
+        Effect.as(true),
+        Effect.orElseSucceed(() => false),
+      );
+      if (!copied) return;
+      for (const key of moved)
+        yield* replaceWithLink(key.path, ownKeyLinkTarget(agentId, key.name)).pipe(Effect.ignore);
     });
   }
 
@@ -239,6 +268,50 @@ export class AgentApiKeys {
       yield* removeKeyFiles(folder, keys);
       for (const [name, value] of keys) yield* writeIfChanged(join(folder, name), value);
     });
+  }
+
+  /**
+   * Brings the links in the agent folder of 0.69 and earlier in line with the Vault: a link to the Vault
+   * copy for each key for this agent only, and no OpenBot link for another key. Plain files and other
+   * links stay. Nothing changes without the folder or a Vault. A link that cannot be made is skipped.
+   */
+  #linkOwnKeys(agentId: string): Effect.Effect<void> {
+    return Effect.gen({ self: this }, function* () {
+      const vault = this.#readyVault();
+      if (!vault || !AGENT_ID_PATTERN.test(agentId)) return;
+      const folder = join(this.#root, agentId);
+      const own = new Set(
+        vault
+          .apiKeys(agentId)
+          .filter((key) => key.own && API_KEY_NAME_PATTERN.test(key.name))
+          .map((key) => key.name),
+      );
+      const entries = yield* Effect.tryPromise({ try: () => readdir(folder, { withFileTypes: true }), catch: failed });
+      for (const entry of entries) {
+        if (!entry.isSymbolicLink() || own.has(entry.name)) continue;
+        const path = join(folder, entry.name);
+        // The temporary link of a replace that stopped before its rename.
+        if (isStoppedWrite(entry.name)) {
+          yield* Effect.tryPromise({ try: () => rm(path), catch: failed }).pipe(Effect.ignore);
+          continue;
+        }
+        if (!API_KEY_NAME_PATTERN.test(entry.name)) continue;
+        yield* Effect.tryPromise({
+          try: async () => {
+            if ((await readlink(path)) === ownKeyLinkTarget(agentId, entry.name)) await rm(path);
+          },
+          catch: failed,
+        }).pipe(Effect.ignore);
+      }
+      const present = new Set(entries.map((entry) => entry.name));
+      for (const name of own) {
+        if (present.has(name)) continue;
+        yield* Effect.tryPromise({
+          try: () => symlink(ownKeyLinkTarget(agentId, name), join(folder, name)),
+          catch: failed,
+        }).pipe(Effect.ignore);
+      }
+    }).pipe(Effect.ignore);
   }
 
   /** The plain files of this agent: keys saved without a Vault, or not moved into it yet. */
@@ -292,6 +365,52 @@ function removeFile(path: string): Effect.Effect<boolean, AgentApiKeyFailed> {
       ),
     catch: failed,
   });
+}
+
+/**
+ * Removes a key file of 0.69 and earlier, or a link that the user made in its place, but never the link
+ * to the agent's Vault copy (`link`). False when nothing was removed.
+ */
+function removeOldKey(path: string, link: string): Effect.Effect<boolean, AgentApiKeyFailed> {
+  return Effect.tryPromise({
+    try: async () => {
+      const entry = await lstat(path).catch((error: unknown) =>
+        isMissingFileError(error) ? null : Promise.reject(error),
+      );
+      return entry !== null && !(entry.isSymbolicLink() && (await readlink(path)) === link);
+    },
+    catch: failed,
+  }).pipe(Effect.flatMap((old) => (old ? removeFile(path) : Effect.succeed(false))));
+}
+
+/**
+ * The target of the link that replaces a key file of 0.69 and earlier: the agent's Vault copy. It is
+ * relative, so it still works when the data folder moves, such as into a container.
+ */
+function ownKeyLinkTarget(agentId: string, name: string): string {
+  return join("..", VAULT_FOLDER, agentId, name);
+}
+
+/**
+ * Replaces a key file that the Vault keeps with a link to the agent's Vault copy. One rename does it, so
+ * a script never finds the path missing. When the system refuses the link, the file is deleted.
+ */
+function replaceWithLink(path: string, target: string): Effect.Effect<boolean, AgentApiKeyFailed> {
+  const temporary = `${path}.${randomUUID()}.tmp`;
+  return Effect.tryPromise({
+    try: async () => {
+      await symlink(target, temporary);
+      await rename(temporary, path);
+      return true;
+    },
+    catch: failed,
+  }).pipe(
+    Effect.catch(() =>
+      Effect.promise(() => rm(temporary, { force: true }).catch(() => undefined)).pipe(
+        Effect.flatMap(() => removeFile(path)),
+      ),
+    ),
+  );
 }
 
 /** Writes a Vault key file only when it does not hold `value` yet, so a Vault change does not rewrite each key. */
