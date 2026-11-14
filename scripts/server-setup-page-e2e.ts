@@ -136,6 +136,7 @@ const host: ServerModeOptions["host"] = {
       return structuredClone(hostStatus);
     }),
   getMobileConnectHost: () => null,
+  refreshRegistration: () => Effect.void,
 };
 
 const runtime = await mkdtemp(join(tmpdir(), "openbot-setup-page-"));

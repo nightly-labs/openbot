@@ -18,6 +18,7 @@ export const messages = {
   "error.host.publishFailed": "이 OpenBot을 게시할 수 없어요.",
   "error.host.mobileConnectPublishFailed": "모바일 연결용으로 이 OpenBot을 게시할 수 없어요.",
   "error.host.mobileConnectHostChanged": "모바일 연결 호스트가 변경되었어요. 다시 시도해 주세요.",
+  "error.host.mobileConnectHostMismatch": "계정에 이 서버의 다른 키가 등록되어 있어요. 다시 시도해 주세요.",
   "error.host.noServer": "이 컴퓨터에는 변경할 서버가 없어요.",
   "error.host.identityLocalOnly": "서버 이름과 로고는 서버를 실행하는 컴퓨터에서만 변경할 수 있어요.",
   "error.host.timezoneInvalid": "알 수 없는 시간대예요.",

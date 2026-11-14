@@ -1117,6 +1117,21 @@ export class HostService extends EventEmitter<HostEvents> {
   }).bind(this);
 
   /**
+   * Registers the running host again when the user asks for it, as a start does. A start of a running
+   * host does not register, so this sends a key change whose answer was lost and the current key (#9369).
+   */
+  readonly refreshRegistration = Effect.fn("HostService.refreshRegistration")(function* (this: HostService) {
+    const register = this.#options.registerRemoteHost;
+    if (!register) return;
+    yield* remoteDecode(() => this.#options.store.assertOwnerAccount(this.#options.getSignedInUser()));
+    const publicKey = this.#options.store.getIdentity()?.publicKey;
+    yield* this.#registerRemoteHost(register, yield* remoteDecode(() => this.#requiredOwnerMemberId()));
+    const identity = this.#options.store.getIdentity();
+    if (identity && identity.publicKey !== publicKey && this.#isActiveHost(identity.serverId))
+      this.#api.refreshIdentity();
+  }).bind(this);
+
+  /**
    * Every remote step runs under the signed-in account's authentication, so one that started
    * for a host the account no longer has would register or upload on the wrong account's
    * behalf. The store's own guards stop the local half; this stops the network half.
