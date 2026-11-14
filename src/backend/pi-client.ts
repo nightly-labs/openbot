@@ -818,8 +818,12 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
         }),
       ),
     );
+    if (opened) return opened;
     // The model comes from an extension: Pi starts again with its extensions, after this process stops.
-    return opened ?? (yield* this.#open(params, resume, configured));
+    // When that start also fails, for example because the sign-in expired, the next generation checks again.
+    return yield* this.#open(params, resume, configured).pipe(
+      Effect.tapError(() => Effect.sync(() => modelKey && extensionModels.delete(modelKey))),
+    );
   });
 
   readonly #thread = Effect.fn("PiAgentClient.thread")(function* (
