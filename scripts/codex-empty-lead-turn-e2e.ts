@@ -17,6 +17,8 @@
 //      empty answer, shows that narration as its answer (#8837). With narration only before the
 //      step, the turn ends as before: completed, once, with the narration still a step. A teammate's
 //      such turn still sends the note of its work to the agent that asked (#8214).
+//   9. In the agent's own chat, the same turn shows that narration as its answer too, in the
+//      published chat and in the stored page that a reload or a joined client reads (#9422).
 // `bun run test:codex-empty-lead-turn`. Writes .openbot-build/codex-empty-lead-turn-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -27,6 +29,7 @@ import {
   AGENT_PROVIDERS,
   type AgentEvent,
   agentProviderDescriptor,
+  type ConversationMessage,
   defaultProviderModel,
   type QueueDelivery,
 } from "@openbot/contracts/ipc";
@@ -661,6 +664,39 @@ try {
       false,
       "The narration before the step stays a step.",
     );
+    return outcome;
+  });
+
+  await check("in the agent's own chat, narration after the last step becomes the stored answer", async () => {
+    const since = events.length;
+    const before = fakeTurns().length;
+    const receipt = await runCauseEffect(agents.sendMessage({ agentId: lead.id, text: "NARRATION-AFTER-STEP" }));
+    const deliveryId = receipt.deliveries[0]?.id;
+    assert.ok(deliveryId);
+    const delivery = await waitFor("the message to end", () => {
+      const found = mailbox.getDelivery(deliveryId)?.delivery;
+      return ended(found?.status) ? found : null;
+    });
+    const turnRows = (messages: readonly ConversationMessage[]) =>
+      messages
+        .filter((message) => message.author === "assistant" && message.turnId === delivery.turnId)
+        .map((message) => ({ itemType: message.itemType, text: message.text }));
+    const published = events
+      .slice(since)
+      .findLast((event) => event.type === "conversation" && event.snapshot.agentId === lead.id);
+    const outcome = {
+      runs: fakeTurns().length - before,
+      status: delivery.status,
+      errors: errorsFor(lead.id, since),
+      published: published?.type === "conversation" ? turnRows(published.snapshot.messages) : null,
+      stored: turnRows((await runCauseEffect(agents.readConversationPageFor(lead.id, "owner"))).messages),
+    };
+    const answer = [{ itemType: "final_answer", text: "The folder holds two files." }];
+    assert.equal(outcome.runs, 1, `The turn does not run again: ${JSON.stringify(outcome)}`);
+    assert.equal(outcome.status, "completed");
+    assert.deepEqual(outcome.errors, []);
+    assert.deepEqual(outcome.published, answer, "The chat shows the narration as the answer.");
+    assert.deepEqual(outcome.stored, answer, "A reload shows the narration as the answer.");
     return outcome;
   });
 
