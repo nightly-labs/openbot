@@ -477,7 +477,11 @@ function upstreamHeaders(target: McpOAuthProxyTarget, token: string, request: In
   return headers;
 }
 
-/** A fetch that is abandoned when the headers take longer than `timeoutMs`. The body has no limit. */
+/**
+ * A fetch that is abandoned when the headers take longer than `timeoutMs`. The body has no limit.
+ * A connection that could not be opened is tried once more in the same time limit: a VPN or a
+ * busy network can drop one new connection in many, and nothing reached the server (#8947).
+ */
 function upstreamFetch(
   url: URL,
   init: RequestInit,
@@ -488,10 +492,34 @@ function upstreamFetch(
     const timer = setTimeout(() => controller.abort(new Error("The MCP server did not answer in time.")), timeoutMs);
     try {
       return await fetch(url, { ...init, signal: controller.signal });
+    } catch (error) {
+      if (controller.signal.aborted || !notConnected(error)) throw error;
+      logger.info("A connection to the MCP server could not be opened. It is tried once more.", {
+        cause: toLogValue(error),
+      });
+      return await fetch(url, { ...init, signal: controller.signal });
     } finally {
       clearTimeout(timer);
     }
   });
+}
+
+/**
+ * Whether `fetch` failed before a connection was open, so that no part of the request left this
+ * computer. A reset or a closed socket can come after the server read the request, and a tool call
+ * must not run twice, so neither is in this set.
+ */
+function notConnected(error: unknown): boolean {
+  for (let current = error, depth = 0; current instanceof Error && depth < 4; current = current.cause, depth += 1) {
+    if (isDynamicRecord(current)) {
+      const { code, syscall } = current;
+      if (code === "UND_ERR_CONNECT_TIMEOUT" || code === "EAI_AGAIN" || syscall === "connect") return true;
+    }
+    // Node tries each address of a host and gives an `AggregateError` when none of them connects.
+    if (current instanceof AggregateError && current.errors.length > 0 && current.errors.every(notConnected))
+      return true;
+  }
+  return false;
 }
 
 function discard(answer: Response): Effect.Effect<void> {

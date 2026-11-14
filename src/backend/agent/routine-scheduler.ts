@@ -22,6 +22,7 @@ import { routineConversationEventItemType, routineRunConversationEventItemType }
 import type { EventRoutine } from "@openbot/contracts/ipc-events";
 import { type DynamicRecord, isBoolean } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import { collapseMissedOccurrences, RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { Effect, Schema } from "effect";
 import { AgentRoutineStore } from "../agent-routine-store";
@@ -116,6 +117,8 @@ export interface RoutineHooks {
   /** Archives the side thread of a deleted routine. Its history stays, and the user can open it again. */
   routineDeleted(agentId: string, routineId: string): Effect.Effect<void>;
 }
+
+const logger = createOpenBotLogger("routine-scheduler");
 
 /** Enough for every message a busy host queues between restarts; each entry is a few bytes. */
 const DELIVERY_TIMEZONE_LIMIT = 10_000;
@@ -387,7 +390,7 @@ export class RoutineScheduler implements RoutineDueSource {
       Effect.sync(() => this.#deletionAgents.add(input.agentId)),
       () =>
         Effect.gen({ self: this }, function* () {
-          const interruptedRuns = yield* this.#interruptRunsBeforeDeletionEffect(
+          const interruptedRuns = yield* this.#interruptRunsEffect(
             input.agentId,
             this.#routines.activeRuns(input.agentId, input.routineId),
           );
@@ -449,6 +452,43 @@ export class RoutineScheduler implements RoutineDueSource {
         }),
     );
     yield* this.#hooks.routineDeleted(input.agentId, input.routineId);
+  }, Effect.uninterruptible);
+
+  /**
+   * The user's Stop for one run that has not ended. The run ends as cancelled first, so the end of its
+   * turn cannot change that. Then its queued delivery is cancelled and its turn stops, also in the
+   * routine's own side thread. A turn that cannot be stopped, such as one whose provider has exited,
+   * does not keep the run open. A run that has ended stays as it is.
+   */
+  readonly stopRun = Effect.fn("RoutineScheduler.stopRun")(function* (
+    this: RoutineScheduler,
+    input: { agentId: string; routineId: string; runId: string },
+  ) {
+    const runs = yield* routineStep(() => {
+      const live = this.#routines.activeRuns(input.agentId, input.routineId).filter((run) => run.id === input.runId);
+      for (const run of live) {
+        this.#transitionRunWithConversation(run, "cancelled");
+        if (run.deliveryId && this.#mailbox.getDelivery(run.deliveryId)?.delivery.status === "queued")
+          this.#mailbox.cancelNow(input.agentId, run.deliveryId);
+      }
+      return live;
+    });
+    if (runs.length === 0) return;
+    yield* this.#interruptRunsEffect(input.agentId, runs).pipe(
+      Effect.catch((failure) =>
+        Effect.sync(() =>
+          logger.warn("A stopped routine run's turn did not stop.", {
+            runId: input.runId,
+            cause: String(failure.cause),
+          }),
+        ),
+      ),
+    );
+    yield* routineStep(() => {
+      this.#hooks.emitQueue(input.agentId);
+      this.stateChanged(input.agentId);
+      if (this.#mailbox.nextQueued(input.agentId)) this.#hooks.scheduleDrain(input.agentId);
+    });
   }, Effect.uninterruptible);
 
   readonly test = Effect.fn("RoutineScheduler.test")(function* (
@@ -806,7 +846,8 @@ export class RoutineScheduler implements RoutineDueSource {
   reconcileDelivery(delivery: QueueDelivery): boolean {
     if (delivery.sender.kind !== "routine") return false;
     const run = this.#routines.runForDelivery(delivery.id);
-    if (!run) return false;
+    // A run the user stopped stays cancelled when its turn ends after the Stop.
+    if (!run || run.status === "cancelled") return false;
     const status = routineStatusForDelivery(delivery);
     if (run.status === "needs-attention" && ["starting", "running"].includes(delivery.status)) return false;
     if (run.status === status && run.error === delivery.error) return false;
@@ -1026,6 +1067,13 @@ export class RoutineScheduler implements RoutineDueSource {
       if (!deliveryId)
         return yield* new RoutineOperationFailed({ cause: new Error("Unable to create the routine delivery.") });
       const queued = yield* routineStep(() => {
+        // The user stopped the run while its delivery was made: the delivery goes, and the run keeps
+        // how it ended. Attaching it would open the run again.
+        if (!this.#routines.activeRuns(run.agentId, run.routineId).some((entry) => entry.id === run.id)) {
+          if (this.#mailbox.getDelivery(deliveryId)?.delivery.status === "queued")
+            this.#mailbox.cancelNow(agent.id, deliveryId);
+          return this.#routines.listRuns(run.agentId, run.routineId).find((entry) => entry.id === run.id) ?? null;
+        }
         try {
           return this.#routines.attachDelivery(run.id, deliveryId);
         } catch (error) {
@@ -1037,6 +1085,10 @@ export class RoutineScheduler implements RoutineDueSource {
           throw error;
         }
       });
+      if (queued?.deliveryId !== deliveryId) {
+        yield* routineStep(() => this.#hooks.emitQueue(agent.id));
+        return queued ?? { ...run, status: "cancelled" as const };
+      }
       yield* routineStep(() => this.#waits.wakeForRun(run, deliveryId, waitId));
       // A run in the routine's thread shows in that thread's queue, and the chat keeps its preview.
       if (thread) {
@@ -1104,7 +1156,7 @@ export class RoutineScheduler implements RoutineDueSource {
     }
   }
 
-  readonly #interruptRunsBeforeDeletionEffect = Effect.fn("RoutineScheduler.interruptRunsBeforeDeletion")(function* (
+  readonly #interruptRunsEffect = Effect.fn("RoutineScheduler.interruptRuns")(function* (
     this: RoutineScheduler,
     agentId: string,
     runs: RoutineRun[],

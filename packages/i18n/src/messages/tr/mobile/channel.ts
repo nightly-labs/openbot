@@ -44,6 +44,8 @@ export const messages = {
   "mobile.channel.deleted.restoreFailedBody": "Bu kanal geri yüklenemedi. Tekrar deneyin.",
   "mobile.channel.chat.fallbackName": "Kanal",
   "mobile.channel.chat.deletedNotice": "Silinmiş kanal. Yalnızca önizleme.",
+  "mobile.channel.chat.waitBusy": "Bekliyor - {name} {channel} kanalında çalışıyor",
+  "mobile.channel.chat.waitFull": "Bekliyor - {name}, devam eden bir görev bitince başlayacak",
   "mobile.channel.records.connect": "Bu kanalı düzenlemek için sunucuya bağlanın.",
   "mobile.channel.records.loadFailed": "Kanal ayarları yüklenemedi.",
   "mobile.channel.records.gone": "Bu öge artık mevcut değil.",

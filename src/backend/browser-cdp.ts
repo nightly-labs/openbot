@@ -87,6 +87,7 @@ import {
   fillPreparedFields,
 } from "./browser-fill-fields";
 import { describeBrowserTarget, stopLoadingAndWait, waitForLoading } from "./browser-navigation";
+import { guardedPress } from "./browser-press-guard";
 import { createFramePacer } from "./browser-screencast-pacing";
 import { probeSettle, SETTLE_BUSY_WAIT_MS, SETTLE_RESERVE_MS, waitForSettle } from "./browser-settle";
 import { BROWSER_VALUE_TOO_LARGE } from "./model-text-limit";
@@ -219,6 +220,8 @@ const FOCUSED_FRAME_SCRIPT = `(() => {${FOCUSED_SELECTION}
 
 /** Frames inside frames. Past this the focus is treated as in the last frame reached. */
 const MAX_FOCUSED_FRAME_DEPTH = 8;
+/** A click measures its target again when a press went to another element; after this many presses it fails. */
+const CLICK_PRESS_ATTEMPTS = 3;
 
 // Counts the key events that reach the target's window, in the automation world, so the page does
 // not see the listener. `TYPED_KEY_ARRIVED_FUNCTION` reads the count and removes the listener. A key
@@ -429,6 +432,19 @@ export class BrowserCdpEngine {
             node.backendNodeId,
             `function(origin, input) { if (this.isConnected && this.ownerDocument !== document) return 'frame'; return this.isConnected && location.origin === origin && (!input || (this.localName === 'input' && !this.disabled && !this.readOnly && ['password','text','tel','number'].includes(this.type))); }`,
             [origin, input],
+          ).pipe(
+            // The top frame's world cannot reach a node in a frame of another origin in the page's
+            // process, so the check fails before it can name the frame. Only a child frame that holds
+            // the node changes the reason.
+            Effect.catch((failure) =>
+              Effect.gen({ self: this }, function* () {
+                const holder = yield* Effect.gen({ self: this }, function* () {
+                  const childFrames = frameIds(yield* send("Page.getFrameTree", {})).slice(1);
+                  return yield* this.#nodeFrameWorld(send, node.backendNodeId, undefined, childFrames);
+                }).pipe(Effect.catch(() => Effect.succeed(undefined)));
+                return holder === undefined ? yield* Effect.fail(failure) : "frame";
+              }),
+            ),
           );
           if (valid === "frame") return yield* inFrame(index);
           if (valid !== true)
@@ -748,6 +764,8 @@ export class BrowserCdpEngine {
   #retainDebugger = false;
   #ownsDebugger = false;
   #idleDetach: NodeJS.Immediate | undefined;
+  /** The host turned emulated focus off for a hidden, idle tab (`setIdleFocus`). */
+  #idleFocusOff = false;
   #closing = false;
   #disposed = false;
   readonly #scope = Scope.makeUnsafe();
@@ -961,16 +979,35 @@ export class BrowserCdpEngine {
   ): Effect.fn.Return<void, BrowserOperationError> {
     yield* this.#leaseEffect((send) =>
       Effect.gen({ self: this }, function* () {
-        const point = yield* this.#targetPointEffect(send, target, true, true, deadline);
-        const { sessionId, ...coordinates } = point;
+        const resolved = yield* this.#resolveTargetEffect(send, target, deadline);
+        const element = resolved.backendNodeId;
         const button = options.button ?? "left";
         const totalClicks = options.clickCount ?? 1;
         const modifiers = modifierMask(options.modifiers ?? []);
-        yield* browserSync(() => assertBeforeDeadline(deadline));
-        onDispatch?.();
-        const from = this.#pointerIn(sessionId);
-        this.#pointer = { point: coordinates, sessionId };
-        yield* dispatchMouseClick(send, coordinates, button, totalClicks, modifiers, sessionId, from);
+        const contextId = element
+          ? yield* this.#nodeFrameContextId(send, element, resolved.sessionId).pipe(
+              Effect.catch(() => Effect.succeed(undefined)),
+            )
+          : undefined;
+        // The page can move the target when the pointer comes near, after the point was measured. The
+        // guard stops a press that goes to another element; the next attempt measures the target again.
+        for (let attempt = 1; ; attempt += 1) {
+          yield* browserSync(() => assertBeforeDeadline(deadline));
+          const point = element
+            ? yield* this.#elementPointEffect(send, element, true, resolved.sessionId)
+            : { x: resolved.x, y: resolved.y };
+          const { sessionId, ...coordinates } = point;
+          yield* browserSync(() => assertBeforeDeadline(deadline));
+          if (attempt === 1) onDispatch?.();
+          const from = this.#pointerIn(sessionId);
+          this.#pointer = { point: coordinates, sessionId };
+          const press = dispatchMouseClick(send, coordinates, button, totalClicks, modifiers, sessionId, from);
+          if (!element) return yield* press;
+          const missed = yield* guardedPress(send, element, contextId, sessionId, press);
+          if (missed === undefined) return;
+          if (attempt >= CLICK_PRESS_ATTEMPTS)
+            return yield* browserFailure(new Error(sourceText("error.backend.browserClickMoved", { element: missed })));
+        }
       }),
     );
   });
@@ -2200,6 +2237,21 @@ export class BrowserCdpEngine {
     this.#detachOwnedDebugger();
     return true;
   }
+
+  /**
+   * A lease emulates focus, and a page with emulated focus stays visible also when its tab is hidden
+   * and throttled. A debugger that `setEnvironment` keeps attached keeps that focus after the lease,
+   * so the host turns it off for a hidden tab and on again when the tab is shown or used. Until then,
+   * each lease that ends turns it off again (`#restoreIdleFocus`), as a preview capture of the tab.
+   */
+  readonly setIdleFocus = Effect.fn("BrowserCdp.setIdleFocus")(function* (
+    this: BrowserCdpEngine,
+    enabled: boolean,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    this.#idleFocusOff = !enabled;
+    if (!this.#mayEmulateIdleFocus()) return;
+    yield* browserCall(() => this.#contents.debugger.sendCommand("Emulation.setFocusEmulationEnabled", { enabled }));
+  });
 
   readonly setEnvironment = Effect.fn("BrowserCdp.setEnvironment")(function* (
     this: BrowserCdpEngine,
@@ -3605,10 +3657,28 @@ export class BrowserCdpEngine {
         Effect.sync(() => {
           this.#activeLeases -= 1;
           this.#releaseIdleDebugger();
+          this.#restoreIdleFocus();
         }),
       ),
     );
   });
+
+  /** As `#releaseIdleDebugger`, on a later task: a lease can end inside a CDP message. */
+  #restoreIdleFocus(): void {
+    if (!this.#idleFocusOff || this.#activeLeases > 0) return;
+    setImmediate(() => {
+      if (!this.#idleFocusOff || !this.#mayEmulateIdleFocus()) return;
+      void this.#contents.debugger
+        .sendCommand("Emulation.setFocusEmulationEnabled", { enabled: false })
+        .catch(() => {});
+    });
+  }
+
+  /** Only a debugger that this engine keeps attached, between leases, holds a focus that a lease set. */
+  #mayEmulateIdleFocus(): boolean {
+    if (!this.#ownsDebugger || this.#activeLeases > 0 || this.#disposed || this.#closing) return false;
+    return !this.#contents.isDestroyed() && this.#contents.debugger.isAttached();
+  }
 
   #detachOwnedDebugger(): void {
     if (!this.#ownsDebugger) return;
@@ -3753,9 +3823,11 @@ const hitActivatesTarget = Effect.fn("Browser.hitActivatesTarget")(function* (
         objectId: objectIds[0],
         // A pseudo-element hit, such as a styled label's ::after, belongs to its element. A click
         // on a label activates the control it names, as with a custom radio over a hidden input.
+        // Content in a slot shows, and gets the click, inside the slot's element: an icon that a
+        // web component puts into its shadow button belongs to that button.
         functionDeclaration: `function(candidate) {
           const start = candidate instanceof CSSPseudoElement ? candidate.element : candidate;
-          for (let node = start; node; node = node.parentNode || node.host) {
+          for (let node = start; node; node = node.assignedSlot || node.parentNode || node.host) {
             if (node === this) return true;
             if (node.localName === 'label' && node.control === this) return true;
           }

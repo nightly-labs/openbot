@@ -211,7 +211,7 @@ export const messages = {
   "error.provider.opencodeInvalidUpload":
     "Dostawca modelu OpenCode zgłosił nieprawidłowe żądanie przesłania. Wybierz inny model i kontynuuj. Sprawdź zapisane rutyny, zanim utworzysz je ponownie.\n{detail}",
   "error.provider.opencodeUnreadableContent":
-    "Ten model nie może odczytać pliku lub obrazu w tym czacie. Wybierz model, który odczytuje pliki, a potem wyślij wiadomość ponownie.",
+    "Ten model nie może odczytać pliku lub obrazu w tym czacie. OpenBot rozpoczął nową sesję OpenCode z historią czatu. Wyślij wiadomość ponownie bez pliku albo wybierz model, który odczytuje pliki. Jeśli ten model dodano do własnego dostawcy, odznacz „Obrazy” przy „Przyjmuje” w jego ustawieniach.",
   "error.provider.opencodeContextTooSmall":
     "Ten czat nie mieści się w oknie kontekstu modelu. W Ollama lub LM Studio wczytaj model z większą długością kontekstu i wpisz to samo okno w ustawieniach jego dostawcy w OpenBot. Możesz też wybrać większy model.",
   "error.provider.opencodeFreeLimit":
@@ -220,6 +220,8 @@ export const messages = {
     "Wystąpił błąd po stronie dostawcy modelu. Twoje połączenie nie jest przyczyną. Spróbuj ponownie później lub wybierz inny model.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "Odpowiedź modelu została przerwana lub była nieprawidłowa. Wyślij wiadomość ponownie lub wybierz inny model.\n{detail}",
+  "error.provider.opencodeReasoningOverlap":
+    "OpenCode nie mógł odczytać rozumowania tego modelu przy tym poziomie wysiłku. Wybierz niższy wysiłek lub inny model, a potem wyślij wiadomość ponownie.",
   "error.provider.opencodeNetwork":
     "OpenCode nie połączył się z dostawcą modelu. Sprawdź połączenie sieciowe komputera, na którym działa OpenBot, a potem spróbuj ponownie.\n{detail}",
   "error.provider.codexStateBusy":
@@ -253,6 +255,8 @@ export const messages = {
     "Serwer Gemini z OPENBOT_ANTIGRAVITY_PATH nie istnieje lub nie jest wykonywalny. Popraw ścieżkę lub usuń zmienną, a potem uruchom ponownie OpenBot.",
   "error.provider.antigravityVersionUnreadable": "Nie można odczytać wersji serwera Gemini.",
   "error.provider.antigravitySignIn": "Zaloguj się przez Google, aby używać Gemini.",
+  "error.provider.antigravityModelAtCapacity":
+    "Google nie ma teraz wolnej mocy dla tego modelu Gemini. Limit planu nie jest przyczyną. Spróbuj ponownie za kilka minut albo wybierz inny model.\n{detail}",
   "error.provider.antigravityRateLimited":
     "Gemini odrzucił żądanie, ponieważ osiągnięto limit zapytań lub limit planu. Zaczekaj kilka minut lub wybierz inny model, a potem spróbuj ponownie.\n{detail}",
   "error.provider.antigravityQuotaReached":
@@ -318,6 +322,8 @@ export const messages = {
     "Model nie przyjął tego czatu, ponieważ czat zawiera za dużo obrazów. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie.",
   "error.provider.opencodeSessionRejected":
     "OpenCode odrzucił żądanie i nie podał przyczyny. Może się to zdarzyć w długim czacie lub po zmianie modelu. OpenBot rozpoczął nową sesję OpenCode z historią czatu. Spróbuj ponownie. Jeśli błąd się powtarza, wybierz inny model lub niższy wysiłek.",
+  "error.provider.opencodeCompactionFailed":
+    "Model nie zdołał streścić tego długiego czatu, aby zwolnić miejsce w oknie kontekstu. OpenBot rozpoczął nową sesję OpenCode z historią czatu. Spróbuj ponownie. Jeśli błąd się powtarza, wybierz mocniejszy model.",
   "error.provider.museMcpStartupFault":
     "Muse nie mógł uruchomić serwera MCP i zablokował MCP w tej sesji. OpenBot rozpoczął nową sesję Muse z historią czatu. Spróbuj ponownie. Jeśli błąd się powtarza, wyłącz Sterowanie komputerem lub serwer MCP, który zawiódł, dla tego agenta.",
   "error.provider.claudeSessionMissing":
@@ -348,6 +354,8 @@ export const messages = {
     "{provider} odrzucił zapisany klucz API. Zastąp lub usuń klucz w Ustawieniach, a następnie spróbuj ponownie.",
   "error.provider.keyProviderNoBalance":
     "Konto {provider} zapisanego klucza API nie ma środków. Doładuj konto, a następnie spróbuj ponownie.",
+  "error.provider.keyProviderLowCredit":
+    "Konto {provider} zapisanego klucza API nie ma dość środków na odpowiedź tego modelu. Doładuj konto albo wybierz inny model, a następnie spróbuj ponownie.",
   "error.provider.modelServiceRefused":
     "Usługa modelu odrzuciła żądanie. Wybierz inny model albo sprawdź swój dostęp do tego modelu w usłudze.",
   "error.provider.modelServiceRefusedReason":

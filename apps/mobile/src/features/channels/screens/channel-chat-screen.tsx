@@ -97,6 +97,18 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
     return next;
   }, [archived, channel?.leadAgentId, page?.tasks, page?.messages, approvals, serverBrowserRequests, threadIds]);
   const activities = useMemo(() => (online ? memberWork : []), [online, memberWork]);
+  // The host says why a request does not start (channel-task-waits-v1); an older host says nothing.
+  const statusNotes = useMemo(() => {
+    if (archived || !online) return [];
+    const notes = (page?.waits ?? []).flatMap((wait) => {
+      const name = serverAgents.find((agent) => agent.id === wait.agentId)?.name;
+      if (!name) return [];
+      return wait.reason === "agent-busy"
+        ? [t("mobile.channel.chat.waitBusy", { name, channel: wait.channelName })]
+        : [t("mobile.channel.chat.waitFull", { name })];
+    });
+    return [...new Set(notes)];
+  }, [archived, online, page?.waits, serverAgents, t]);
   // A finished turn of a member with no answer, such as a stopped one, shows its steps in its own row.
   // A member's running turn shows them in its activity row. An activity with no turn is the member's latest turn.
   const lastTurnSummaries = useRef<ReadonlyMap<string, TurnStepsSummary> | undefined>(undefined);
@@ -237,6 +249,7 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
       deleteMessage={messageDelete.deleteMessage}
       deletesAnyMessage={messageDelete.deletesAny}
       notice={archived ? t("mobile.channel.chat.deletedNotice") : null}
+      statusNotes={statusNotes}
       activities={activities}
       activeTurnId={null}
       liveChannel={liveChannel}

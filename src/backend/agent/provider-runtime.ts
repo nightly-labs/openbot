@@ -95,7 +95,7 @@ import { recordRestartActivity } from "../restart-activity";
 import { shortenDiagnostic } from "./../stderr-diagnostics";
 import { stopProcessTree } from "../windows-process-tree";
 import { normalizeAccountUsage, usageWindowHasReset, usageWindowResetSince } from "./account-usage";
-import { captureBrowser } from "./browser-capture";
+import { captureBrowser, signInPageByOpenBot } from "./browser-capture";
 import { startCliCodeLogin } from "./cli-code-login";
 import { CliLoginFailed, CliLoginFlow, toCliLoginFailed } from "./cli-login-flow";
 import { CodexLoginFlow, toCodexLoginFailed } from "./codex-login";
@@ -207,6 +207,20 @@ const START_FAILURE_LIMIT = 3;
 const STABLE_RUN_MS = 2 * 60_000;
 /** How often a restart the user asked for checks whether the provider's turns have ended. */
 const PROVIDER_RESTART_POLL_MS = 1_000;
+/**
+ * The waits before a model list that failed is read again. The first read after a CLI update can
+ * fail for a short time, and a read at once failed again.
+ */
+const FAILED_MODEL_LIST_RETRY_DELAYS_MS = [2_000, 15_000];
+/**
+ * How old the model list of a running provider with `relistWhileRunning` can be before the idle
+ * check reads it again. Such a CLI changes its list while it runs: a model that the user adds in its
+ * own settings, such as a GitHub Copilot model with the user's own key. With active agents the
+ * process never stops, so the picker kept the old list until a restart, and a joined server has no
+ * refresh action (#8495). An ACP agent reads its list in a probe session, so the wait is the idle
+ * release time: a process that no turn uses stops after it, and the next turn reads its list.
+ */
+const MODEL_LIST_REREAD_MS = PROVIDER_IDLE_RELEASE_MS;
 /** The start failure of OpenCode 1 on a database that OpenCode 2 made. */
 const OPENCODE_NEWER_DATABASE = /\bDatabase is not empty and has no session table\b/u;
 /**
@@ -493,6 +507,8 @@ export class ProviderRuntime implements ProviderPort {
    */
   readonly #environmentReloadPending = new Set<AgentProvider>();
   readonly #lastUsed = new Map<AgentProvider, number>();
+  /** The compaction mode of each provider's last process. An idle release keeps it. */
+  readonly #compactionModes = new Map<AgentProvider, NonNullable<AgentClient["contextCompaction"]>>();
   /**
    * The last failure of each provider: a start, an exit, a model list or a diagnostic shown to the
    * user. The provider row keeps it after the toast is gone, until a model list that started after
@@ -500,8 +516,12 @@ export class ProviderRuntime implements ProviderPort {
    */
   readonly #lastErrors = new Map<AgentProvider, { message: string; at: number; serial: number }>();
   #errorSerial = 0;
-  /** The providers whose model list is read again after it timed out. */
+  /** The providers whose model list is read again: after it timed out, or because it is old. */
   readonly #relisting = new Set<AgentProvider>();
+  /** When the model lists were last read, for `MODEL_LIST_REREAD_MS`. */
+  #modelsReadAt = 0;
+  /** The clients whose failed model list was read again. Each client gets these reads one time. */
+  readonly #relistedAfterFailure = new WeakSet<AgentClient>();
   /** The MCP server failures shown in this run, by provider, server and kind. */
   readonly #reportedMcpFailures = new Set<string>();
   /** The last usage each provider reported, shown for a released provider instead of starting it. */
@@ -1553,8 +1573,15 @@ export class ProviderRuntime implements ProviderPort {
 
   readonly start = Effect.fn("ProviderRuntime.start")(function* (this: ProviderRuntime) {
     if (this.#scope.state._tag === "Closed") this.#scope = Scope.makeUnsafe();
+    // The model lists are read after the release, so a process that this check stops is not read.
     this.#idleCheck ??= setInterval(
-      () => Effect.runFork(this.#releaseIdleProviders().pipe(Effect.forkIn(this.#scope))),
+      () =>
+        Effect.runFork(
+          Effect.exit(this.#releaseIdleProviders()).pipe(
+            Effect.andThen(this.#rereadModels()),
+            Effect.forkIn(this.#scope),
+          ),
+        ),
       PROVIDER_IDLE_CHECK_MS,
     );
     this.#idleCheck.unref?.();
@@ -1817,7 +1844,7 @@ export class ProviderRuntime implements ProviderPort {
         yield* this.#cliLogin
           .start(provider, (cli) =>
             Effect.gen(function* () {
-              const browser = onHost ? yield* captureBrowser(openExternal) : {};
+              const browser = signInPageByOpenBot(onHost, signIn.command) ? yield* captureBrowser(openExternal) : {};
               const { argv } = signIn.command;
               const target = cliSpawnTarget(
                 cli.executable,
@@ -2703,6 +2730,14 @@ export class ProviderRuntime implements ProviderPort {
   }
 
   /**
+   * The compaction mode of the last process that ran this agent's provider, also after an idle
+   * release stopped it. Undefined before its first start.
+   */
+  lastCompactionMode(agent: AgentSummary): AgentClient["contextCompaction"] | undefined {
+    return this.#compactionModes.get(providerForAgent(agent));
+  }
+
+  /**
    * The process that can read this agent's saved sessions without starting one. An agent on a
    * provider account after the first keeps them in that account's folder, which only its own process
    * reads, so this is null while that process does not run.
@@ -2898,6 +2933,7 @@ export class ProviderRuntime implements ProviderPort {
       });
     }
     this.#confined.set(agentId, { client, key, accountId: own.account?.id ?? null, lastUsed: Date.now() });
+    this.#compactionModes.set(provider, client.contextCompaction ?? "unsupported");
     logger.info("Started an agent's own provider process.", {
       provider,
       agentId,
@@ -3477,6 +3513,7 @@ export class ProviderRuntime implements ProviderPort {
         const wasReleased = this.#released.delete(provider);
         if (!wasReleased && previousClient !== client) this.#countActivation(provider);
         this.#clients.set(provider, client);
+        this.#compactionModes.set(provider, client.contextCompaction ?? "unsupported");
         if (previousClient !== client) this.#activatedAt.set(provider, Date.now());
         this.#cli.set(provider, cli);
         this.#accounts.set(provider, account);
@@ -3969,6 +4006,7 @@ export class ProviderRuntime implements ProviderPort {
           if (!this.#released.has(provider)) this.#countActivation(provider);
           this.#cli.set(provider, resolvedCli);
           this.#clients.set(provider, candidate);
+          this.#compactionModes.set(provider, candidate.contextCompaction ?? "unsupported");
           this.#activatedAt.set(provider, Date.now());
           this.#accounts.set(provider, account.account);
           activated.push(provider);
@@ -4513,8 +4551,9 @@ export class ProviderRuntime implements ProviderPort {
    * fresh one, when the error is older than the refresh. Answers the providers with a fresh catalogue.
    */
   readonly #refreshModelCatalog = Effect.fn("ProviderRuntime.refreshModelCatalog")(function* (this: ProviderRuntime) {
+    this.#modelsReadAt = Date.now();
     const errorSerialAtStart = this.#errorSerial;
-    const { fresh, timedOut } = yield* this.#modelCatalog.refresh();
+    const { fresh, timedOut, failed } = yield* this.#modelCatalog.refresh();
     let cleared = false;
     for (const provider of fresh) {
       const lastError = this.#lastErrors.get(provider);
@@ -4533,23 +4572,85 @@ export class ProviderRuntime implements ProviderPort {
         Effect.forkIn(this.#scope),
       );
     }
+    // A list that failed kept the list from before. After an update of the CLI, that is the list of
+    // the old version: the row showed the new version, and the new models came only after a restart
+    // (#8321). Each client gets these reads one time, so a CLI that always fails starts no loop.
+    for (const provider of failed) {
+      const client = this.#clients.get(provider);
+      // The guard is the client, not the provider: the client that replaces this one during the
+      // waits must get its own reads when its list also fails.
+      if (!client || this.#relistedAfterFailure.has(client)) continue;
+      this.#relistedAfterFailure.add(client);
+      yield* Effect.gen({ self: this }, function* () {
+        for (const delayMs of FAILED_MODEL_LIST_RETRY_DELAYS_MS) {
+          yield* Effect.sleep(delayMs);
+          // The start of a new client reads its own list.
+          if (this.#clients.get(provider) !== client) return;
+          if (yield* this.#relistModels(provider)) return;
+        }
+      }).pipe(Effect.forkIn(this.#scope));
+    }
     return fresh;
   });
 
   /**
    * Reads the model list of a provider again, once, with the full request timeout. A fresh list
    * clears the provider's last error, when the error is older than this read, and publishes the
-   * status, so the renderer reads the catalogue again.
+   * status, so the renderer reads the catalogue again. Answers whether the list is fresh.
    */
   readonly #relistModels = Effect.fn("ProviderRuntime.relistModels")(function* (
     this: ProviderRuntime,
     provider: AgentProvider,
   ) {
     const errorSerialAtStart = this.#errorSerial;
-    if (!(yield* this.#modelCatalog.relist(provider))) return;
+    if (!(yield* this.#modelCatalog.relist(provider))) return false;
     const lastError = this.#lastErrors.get(provider);
     if (lastError && lastError.serial <= errorSerialAtStart) this.#lastErrors.delete(provider);
     this.#setStatus({});
+    return true;
+  });
+
+  /**
+   * Reads the model list of each running provider with `relistWhileRunning` again when the last read
+   * is older than `MODEL_LIST_REREAD_MS`. Each provider reads with `relist`, so a client that another
+   * one replaced changes nothing, and only a fresh list replaces the provider's models. The read is
+   * quiet: the user did not ask for it, so a failure stays in the log. A fresh list clears an older
+   * error of the provider, as `#relistModels` does. The status goes out only when a list or an error
+   * changed.
+   */
+  readonly #rereadModels = Effect.fn("ProviderRuntime.rereadModels")(function* (this: ProviderRuntime) {
+    if (this.#hooks.isStopping() || this.#status.phase !== "ready") return;
+    const now = Date.now();
+    if (now - this.#modelsReadAt < MODEL_LIST_REREAD_MS) return;
+    this.#modelsReadAt = now;
+    const providers = [...this.#clients.keys()].filter(
+      (provider) =>
+        BUILT_IN_PROVIDER_DRIVERS.find((driver) => driver.id === provider)?.catalog?.relistWhileRunning &&
+        !this.#off.has(provider) &&
+        !this.#relisting.has(provider),
+    );
+    if (providers.length === 0) return;
+    const errorSerialAtStart = this.#errorSerial;
+    const listOf = (provider: AgentProvider) =>
+      JSON.stringify(this.#modelCatalog.list().filter((model) => model.provider === provider));
+    let changed = false;
+    for (const provider of providers) this.#relisting.add(provider);
+    yield* Effect.forEach(
+      providers,
+      (provider) =>
+        Effect.gen({ self: this }, function* () {
+          const before = listOf(provider);
+          if (!(yield* this.#modelCatalog.relist(provider, { quiet: true }))) return;
+          if (listOf(provider) !== before) changed = true;
+          const lastError = this.#lastErrors.get(provider);
+          if (lastError && lastError.serial <= errorSerialAtStart) {
+            this.#lastErrors.delete(provider);
+            changed = true;
+          }
+        }).pipe(Effect.ensuring(Effect.sync(() => this.#relisting.delete(provider)))),
+      { concurrency: "unbounded", discard: true },
+    );
+    if (changed) this.#setStatus({});
   });
 
   /** Shows a provider failure to the user and keeps it on the provider row. */

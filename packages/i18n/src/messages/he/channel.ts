@@ -13,6 +13,7 @@ export const messages = {
   "channel.stoppedTask.assignmentLoopMembers":
     "החברים העבירו את המשימה ביניהם יותר מדי פעמים. היא נעצרה כדי למנוע לולאה.",
   "channel.conversation.noMembers": "יש להוסיף סוכנים בהגדרות הערוץ כדי להתחיל לעבוד.",
+  "channel.conversation.waitFull": "ממתין - {name} יתחיל כשמשימה פעילה תסתיים",
   "channel.conversation.archivedNotice": "הערוץ נמחק. תצוגה בלבד.",
   "channel.composer.label": "הודעה לערוץ",
   "channel.composer.placeholder": "הודעה אל {name}",

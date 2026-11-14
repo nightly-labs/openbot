@@ -5762,38 +5762,6 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
-    slug: "mongodb",
-    name: "MongoDB Atlas",
-    tagline: "Atlas clusters and databases",
-    description:
-      "MongoDB Atlas lets agents list projects and clusters, inspect databases and collections, and run queries, in read-only or read-write mode as the organization owner allows. Each user signs in to their own MongoDB Atlas account through the browser.",
-    category: "coding",
-    creatorName: "MongoDB",
-    version: "1.0.0",
-    prompts: [
-      { id: "prompt-clusters", text: "List the clusters in my Atlas projects and their status." },
-      { id: "prompt-schema", text: "Describe the schema of the orders collection." },
-      { id: "prompt-query", text: "Find the ten most recent orders with a status of pending." },
-    ],
-    websiteUrl: "https://www.mongodb.com",
-    privacyPolicyUrl: "https://www.mongodb.com/legal/privacy/privacy-policy",
-    termsUrl: "https://www.mongodb.com/legal/terms-of-use",
-    featured: false,
-    apps: [
-      {
-        id: "app-mongodb-mcp",
-        name: "MongoDB Atlas",
-        description: "Cluster, database, and collection access, over MongoDB's MCP server with browser sign-in.",
-        server: {
-          name: "mongodb",
-          transport: "http",
-          url: "https://mcp.mongodb.com",
-          auth: [{ id: "mongodb-oauth", kind: "link", label: "Sign in" }],
-        },
-      },
-    ],
-  },
-  {
     slug: "moomoo",
     name: "moomoo",
     tagline: "Market quotes and brokerage account",

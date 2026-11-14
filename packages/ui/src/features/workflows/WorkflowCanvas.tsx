@@ -2119,7 +2119,12 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     const onWheel = (event: WheelEvent) => {
       // A popover, such as a video in full screen, is in the canvas but over it.
       if (event.target instanceof Element && event.target.closest(":popover-open")) return;
-      if (event.target instanceof Element && event.target.closest("textarea, [data-wfn-portal]")) return;
+      // A textarea scrolls its own text, but a pinch (Ctrl+wheel) over it zooms the canvas.
+      if (
+        event.target instanceof Element &&
+        event.target.closest(event.ctrlKey ? "[data-wfn-portal]" : "textarea, [data-wfn-portal]")
+      )
+        return;
       event.preventDefault();
       // A wheel can count in lines or in pages, not pixels.
       const unit =

@@ -2234,6 +2234,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       requestId?: string,
     ): Effect.fn.Return<DraftAttachment, RemoteWorkflowError, RemoteRequest> {
       const server = yield* remoteDecode(() => this.#store.require(serverId));
+      const keep = this.#attachments.holdUpload(server.id);
       const url = new URL(TEAM_API_ROUTES.attachments, server.apiUrl);
       url.searchParams.set("name", name);
       url.searchParams.set("mime", mimeType || "application/octet-stream");
@@ -2253,12 +2254,16 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         requestId === undefined ? undefined : this.#importProgress(serverId, requestId),
       );
       const json = yield* remoteCall(() => response.json());
-      return yield* remoteDecode(() =>
+      const draft = yield* remoteDecode(() =>
         addRemotePreviewUrls(
           decodeDraftAttachment(decodeTeamProtocolV1CurrentHttpResponse("POST", url.pathname, response.status, json)),
           server.id,
         ),
       );
+      // The thumbnail shows these bytes at once. Without them, it waited for the same image to come back
+      // from the host. The host keeps the name and the type that it answers, as a download of it gives.
+      if (draft.kind === "image") keep(draft.id, { bytes, name: draft.name, mimeType: draft.mimeType });
+      return draft;
     },
     (operation) => this.#owned(operation),
   ).bind(this);

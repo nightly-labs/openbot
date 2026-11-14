@@ -138,8 +138,8 @@ export class ModelCatalog {
   });
 
   /**
-   * Reads the catalogue of every connected CLI. Answers which providers replied with a fresh one, and
-   * which providers' 5 s `model/list` timed out.
+   * Reads the catalogue of every connected CLI. Answers which providers replied with a fresh one,
+   * which providers' 5 s `model/list` timed out, and which providers' `model/list` failed.
    *
    * A provider that has no client, or whose `model/list` failed or timed out, keeps the models it
    * already had. That is the right catalogue to keep answering with, but it is not proof of what the
@@ -157,8 +157,8 @@ export class ModelCatalog {
           // client in the map has an account: activation refreshes the catalog before it marks the
           // provider available, so the old status alone does not mean signed out.
           if (catalog.hiddenWhenSignedOut && signedOut && !client)
-            return { provider, models: [], fresh: false, timedOut: false };
-          if (!client) return { provider, models: previous, fresh: false, timedOut: false };
+            return { provider, models: [], fresh: false, timedOut: false, failed: false };
+          if (!client) return { provider, models: previous, fresh: false, timedOut: false, failed: false };
           const startedAt = performance.now();
           return yield* Effect.gen({ self: this }, function* () {
             const { models: sorted, listed } = yield* this.read(client, catalog);
@@ -172,9 +172,9 @@ export class ModelCatalog {
               durationMs: Math.round(performance.now() - startedAt),
             });
             if (catalog.fallback && listed === 0) {
-              return { provider, models: catalog.fallback(previous), fresh: false, timedOut: false };
+              return { provider, models: catalog.fallback(previous), fresh: false, timedOut: false, failed: false };
             }
-            return { provider, models: sorted, fresh: true, timedOut: false };
+            return { provider, models: sorted, fresh: true, timedOut: false, failed: false };
           }).pipe(
             Effect.catch((failure) => {
               const timeout = isProviderTimeout(failure.cause);
@@ -190,6 +190,8 @@ export class ModelCatalog {
                 fresh: false,
                 // A slow list already had the full request timeout, so a second read gains nothing.
                 timedOut: timeout && !catalog.slowList,
+                // The list that stays can be the list of a CLI that an update replaced (#8321).
+                failed: !timeout,
               });
             }),
           );
@@ -200,6 +202,7 @@ export class ModelCatalog {
     return {
       fresh: new Set(discovered.filter((entry) => entry.fresh).map((entry) => entry.provider)),
       timedOut: new Set(discovered.filter((entry) => entry.timedOut).map((entry) => entry.provider)),
+      failed: new Set(discovered.filter((entry) => entry.failed).map((entry) => entry.provider)),
     };
   });
 
@@ -208,8 +211,16 @@ export class ModelCatalog {
    * fresh. Only a fresh list replaces the provider's models, so a failed read cannot put an older
    * list back over a fresh one. A client that another one replaced during the read changes nothing:
    * the activation of the new client reads its own list.
+   *
+   * `quiet`: a read that the user did not cause. A failed one goes only to the log, and the provider
+   * row keeps the list that it has, with no error. An empty one is not fresh: a running CLI that lists
+   * no model for a moment must not empty the picker.
    */
-  readonly relist = Effect.fn("ModelCatalog.relist")(function* (this: ModelCatalog, provider: AgentProvider) {
+  readonly relist = Effect.fn("ModelCatalog.relist")(function* (
+    this: ModelCatalog,
+    provider: AgentProvider,
+    options: { quiet?: boolean } = {},
+  ) {
     const client = this.#options.client(provider);
     const catalog = BUILT_IN_PROVIDER_DRIVERS.find((driver) => driver.id === provider)?.catalog ?? {};
     if (!client) return false;
@@ -218,7 +229,7 @@ export class ModelCatalog {
     if (this.#options.client(provider) !== client) return false;
     const durationMs = Math.round(performance.now() - startedAt);
     if (Result.isFailure(result)) {
-      this.#options.recordProviderError(provider, result.failure.cause);
+      if (!options.quiet) this.#options.recordProviderError(provider, result.failure.cause);
       logger.warn("A provider did not list its models.", {
         provider,
         durationMs,
@@ -228,7 +239,7 @@ export class ModelCatalog {
     }
     const { models, listed } = result.success;
     logger.info("A provider listed its models.", { provider, count: models.length, durationMs });
-    if (catalog.fallback && listed === 0) return false;
+    if ((catalog.fallback || options.quiet) && listed === 0) return false;
     const current = this.#models;
     this.#models = BUILT_IN_PROVIDER_DRIVERS.flatMap(({ id }) =>
       id === provider ? models : current.filter((model) => model.provider === id),

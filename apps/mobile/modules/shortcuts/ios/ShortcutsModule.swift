@@ -15,8 +15,8 @@ public class ShortcutsModule: Module {
       return false
     }
 
-    OnStartObserving {
-      ShortcutBridge.shared.listen { [weak self] payload in
+    OnStartObserving { [weak self] in
+      ShortcutBridge.shared.listen { payload in
         self?.sendEvent(openEvent, ["payload": payload])
       }
     }

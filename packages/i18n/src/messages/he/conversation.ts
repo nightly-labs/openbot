@@ -60,6 +60,7 @@ export const messages = {
   "conversation.sidePanel.closePane": "סגירת {name}",
   "conversation.sidePanel.openPane": "פתיחת {name}",
   "conversation.sidePanel.launcher": "פתיחת חלונית",
+  "conversation.sidePanel.resize": "שינוי גודל הלוח הימני",
   "conversation.sidePanel.pane.browser": "דפדפן",
   "conversation.sidePanel.pane.files": "קבצים",
   "conversation.threads.new": "שרשור חדש",

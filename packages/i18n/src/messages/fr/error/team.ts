@@ -90,6 +90,7 @@ export const messages = {
   "error.team.hermesImportUnsupported": "Cette connexion ne peut pas importer de profils Hermes depuis le serveur.",
   "error.team.providerDetectionUnsupported":
     "Cette connexion ne peut pas trouver les serveurs de modèles et les agents du serveur.",
+  "error.team.routineFlowStopUnsupported": "Cette connexion ne peut pas arrêter une exécution de routine.",
   "error.team.sidebarFoldersUnsupported":
     "Les dossiers dans des dossiers ne sont pas pris en charge par cette connexion.",
   "error.team.libraryFoldersUnsupported":

@@ -12,6 +12,7 @@ export const messages = {
   "channel.stoppedTask.assignmentLoop": "{names} 互相传递这个任务的次数过多。为防止循环，任务已停止。",
   "channel.stoppedTask.assignmentLoopMembers": "成员互相传递这个任务的次数过多。为防止循环，任务已停止。",
   "channel.conversation.noMembers": "请在频道设置中添加助手以开始工作。",
+  "channel.conversation.waitFull": "等待中 - 正在运行的任务结束后 {name} 将开始",
   "channel.conversation.archivedNotice": "已删除的频道，仅供预览。",
   "channel.composer.label": "发消息到频道",
   "channel.composer.placeholder": "发消息给 {name}",

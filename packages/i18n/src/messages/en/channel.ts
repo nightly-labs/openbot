@@ -13,6 +13,7 @@ export const messages = defineMessages("channel", {
   "channel.stoppedTask.assignmentLoopMembers":
     "The members passed this task between them too many times. It stopped to prevent a loop.",
   "channel.conversation.noMembers": "Add agents in channel settings to start work.",
+  "channel.conversation.waitFull": "Waiting - {name} starts when a running task ends",
   "channel.conversation.archivedNotice": "Deleted channel. Preview only.",
   "channel.composer.label": "Message to channel",
   "channel.composer.placeholder": "Message {name}",

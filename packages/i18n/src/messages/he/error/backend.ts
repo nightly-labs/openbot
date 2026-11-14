@@ -79,6 +79,9 @@ export const messages = {
   "error.backend.channelWaitBeforeDeleteHistory": "המתינו עד שהעבודה בערוץ הזה תיפסק, ואז מחקו את ההיסטוריה שלו.",
   "error.backend.channelCompactUnavailable":
     "אף חבר בערוץ הזה לא יכול לדחוס את ההקשר שלו כעת. חבר צריך לענות בערוץ קודם, והספק שלו צריך לתמוך בדחיסה.",
+  "error.backend.channelCompactNoSession": "לחברי הערוץ הזה אין עדיין שיחה לדחוס. דחסו אותו אחרי שחבר עונה בערוץ.",
+  "error.backend.channelCompactNotSupported":
+    "אף חבר בערוץ הזה לא יכול לדחוס לפי בקשה. חברים שתומכים בזה דוחסים את ההקשר שלהם אוטומטית כשהוא כמעט מלא.",
   "error.backend.channelArchived": "יש לשחזר את הערוץ הזה לפני שליחת הודעות או שינוי משימות.",
   "error.backend.channelReferenceUnavailable": "הודעת הערוץ שאליה מפנים אינה זמינה.",
   "error.backend.channelTaskNotFound": "משימת הערוץ לא נמצאה.",
@@ -109,6 +112,7 @@ export const messages = {
   "error.backend.memoryOperationFailed": "פעולת הזיכרון נכשלה. יש לנסות שוב.",
   "error.backend.memoryGone": "הזיכרון הזה כבר אינו קיים.",
   "error.backend.routineGone": "השגרה הזו כבר אינה קיימת.",
+  "error.backend.routineRunGone": "הרצת השגרה הזו כבר אינה קיימת.",
   "error.backend.turnNotStarted": "הספק לא התחיל את התור הזה.",
   "error.backend.routineResultConnectionOff": "חיבור ההודעות הזה כבוי או הוסר. יש לבחור מקום אחר.",
   "error.backend.routineResultNoDelivery": "להרצה הזו אין תשובה לשלוח שוב.",
@@ -187,6 +191,8 @@ export const messages = {
   "error.backend.interruptSelf": "סוכן אינו יכול להפסיק את עצמו.",
   "error.backend.interruptOtherWork":
     "הסוכן הזה עובד על משימה שההודעה שלך לא התחילה. רק המשתמש או שולח המשימה יכולים לעצור אותה.",
+  "error.backend.interruptSharedWork":
+    "התור של הסוכן הזה עובד על ההודעה שלך וגם על הודעה מהמשתמש או מסוכן אחר. רק המשתמש יכול לעצור אותו, באמצעות עצירת הסוכן בצ'אט של הסוכן הזה.",
   "error.backend.interruptStarting": "הסוכן הזה עדיין מתחיל תור. יש לנסות שוב אחרי שהתור יתחיל.",
   "error.backend.interruptNoSession": "OpenBot אינו יכול להפסיק את הסוכן הזה כי סשן הספק שלו אינו זמין.",
   "error.backend.memoryTextRequired": "נדרש טקסט לזיכרון.",
