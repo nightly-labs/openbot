@@ -1988,6 +1988,11 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     (operation) => this.#owned(operation),
   ).bind(this);
 
+  /** True while this device has a session, also when the account service has not confirmed it yet. */
+  hasSession(): boolean {
+    return this.#sessionToken !== null;
+  }
+
   /** False when the session can live only in memory, so it would be lost at the next start. */
   canPersistSession(): boolean {
     return this.#options.canPersist();

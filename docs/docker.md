@@ -55,7 +55,8 @@ For Amazon ECS, see [AWS ECS](aws-ecs.md).
 
 The container publishes no port. OpenBot only connects out: to the account server, to the providers,
 and to Signal and TURN for remote use. The Team API listens on `127.0.0.1` in the container.
-The container does not serve a web interface. After `openbot login`, use
+The container does not serve a web interface, except the setup page of
+`OPENBOT_SETUP_PAGE_PORT` (see [Umbrel](umbrel.md#the-setup-page)). After `openbot login`, use
 [`openbot.run/app`](https://openbot.run/app) with the same account to select the server. A web
 client at your own origin is not included in this image. The
 [self-hosted account service](self-hosting.md#what-changes) is a separate deployment with its own
@@ -453,6 +454,7 @@ environment of OpenBot, so they can read these values.
 | `OPENBOT_CODEX_PATH`, `OPENBOT_CLAUDE_PATH`, `OPENBOT_GROK_PATH`, `OPENBOT_OPENCODE_PATH`, `OPENBOT_CURSOR_PATH`, `OPENBOT_CLINE_PATH`, `OPENBOT_KIMI_PATH`, `OPENBOT_DEVIN_PATH`, `OPENBOT_COPILOT_PATH`, `OPENBOT_MISTRAL_PATH`, `OPENBOT_ANTIGRAVITY_PATH`, `OPENBOT_PI_PATH`, `OPENBOT_MUSE_PATH` | Another provider executable. Mount it read-only in the container. |
 | `OPENBOT_AUTH_API_URL` | Another account server, for example a [self-hosted account service](self-hosting.md). |
 | `OPENBOT_DISPLAY_SIZE` | The size of the virtual display that computer use reads, as `WIDTHxHEIGHT` from 640x480 to 2576x2576. The default is 1280x800. A value that is not valid writes a warning in `docker logs`, and the container starts with 1280x800. See [Display size](self-hosted-server.md#display-size) for when to use 1920x1080. `docker/instances/compose.yaml` does not pass it, so an instance uses 1280x800. |
+| `OPENBOT_SETUP_PAGE_PORT` | A port from 1024 to 65535 for the [setup page](umbrel.md#the-setup-page), which signs the server in from a browser. The Umbrel app sets it. Publish the port only behind a proxy that asks for a password: any client that reaches it can sign in a server that is signed out. |
 
 ## Security
 

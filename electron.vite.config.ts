@@ -81,6 +81,8 @@ export default defineConfig({
           browserPip: resolve("src/renderer/browser-pip.html"),
           browserPipControls: resolve("src/renderer/browser-pip-controls.html"),
           teamWebrtc: resolve("src/renderer/team-webrtc.html"),
+          // The setup page of a server in a container. src/main/server-setup-page.ts serves it.
+          serverSetup: resolve("src/renderer/server-setup.html"),
         },
       },
     },

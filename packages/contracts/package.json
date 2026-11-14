@@ -57,6 +57,7 @@
     "./marketplace-links": "./src/marketplace-links.ts",
     "./plugin-links": "./src/plugin-links.ts",
     "./runtime-values": "./src/runtime-values.ts",
+    "./server-setup": "./src/server-setup.ts",
     "./ipc-decoding": "./src/ipc-decoding.ts",
     "./remote-control-plane": "./src/remote-control-plane.ts",
     "./signal-protocol/auth-events": "./src/signal-protocol/auth-events.ts",

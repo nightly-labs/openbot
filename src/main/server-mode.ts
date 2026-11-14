@@ -42,7 +42,15 @@ const DEFAULT_SERVER_NAME = "OpenBot";
 
 export interface ServerModeEnvironment {
   controlSocketPath: string;
+  /**
+   * The TCP port of the setup page (`OPENBOT_SETUP_PAGE_PORT`), or null. Only a container starts the
+   * page: its port is reachable only through the network of the container (src/main/server-setup-page.ts).
+   */
+  setupPagePort: number | null;
 }
+
+/** The requests of the setup page: status and the email-code sign-in. Nothing else. */
+export type ServerSetupAction = "status" | "login_start" | "login_verify" | "retry";
 
 /** Returns null unless this process is a self-hosted server that systemd started. */
 export function takeServerModeEnvironment(
@@ -55,7 +63,18 @@ export function takeServerModeEnvironment(
   if (environment.OPENBOT_HOSTED_SERVER === "1") return null;
   const runtimeDirectory = environment.XDG_RUNTIME_DIR?.trim() ?? "";
   if (!isAbsolute(runtimeDirectory)) return null;
-  return { controlSocketPath: join(runtimeDirectory, CONTROL_SOCKET_FILE) };
+  return {
+    controlSocketPath: join(runtimeDirectory, CONTROL_SOCKET_FILE),
+    setupPagePort: parseSetupPagePort(environment.OPENBOT_SETUP_PAGE_PORT),
+  };
+}
+
+/** A port from 1024 to 65535, else null. A value that is not valid starts no page. */
+function parseSetupPagePort(value: string | undefined): number | null {
+  const text = value?.trim() ?? "";
+  if (!/^[0-9]{4,5}$/u.test(text)) return null;
+  const port = Number(text);
+  return port >= 1024 && port <= 65535 ? port : null;
 }
 
 export interface ServerModeOptions {
@@ -67,6 +86,8 @@ export interface ServerModeOptions {
     | "requestEmailCode"
     | "cancelCompanySignIn"
     | "verifyEmailCode"
+    | "hasSession"
+    | "retry"
     | "canPersistSession"
     | "redeemServerClaim"
     | "logout"
@@ -80,10 +101,11 @@ export interface ServerModeOptions {
   uid?: number;
 }
 
-interface Answer {
+export interface ServerModeAnswer {
   status: number;
   lines: Record<string, string | number | null>;
 }
+type Answer = ServerModeAnswer;
 
 export class ServerMode {
   readonly #options: ServerModeOptions;
@@ -188,6 +210,70 @@ export class ServerMode {
     (operation, _automatic?: boolean) => Effect.uninterruptible(operation),
   ).bind(this);
 
+  /**
+   * A request of the setup page. The page has no sign-out, claim, rename or Mobile Connect: another
+   * program on the network of the container can reach its port, and these change a signed-in server
+   * or give access to the account. The server gets its name in Server Settings of the app.
+   */
+  readonly setupRequest = (
+    action: ServerSetupAction,
+    body: URLSearchParams,
+  ): Effect.Effect<ServerModeAnswer, RemoteWorkflowError> => {
+    switch (action) {
+      case "status":
+        return Effect.sync(() => this.#status());
+      case "login_start":
+        return Effect.suspend(
+          () => this.#setupRefusal(["signed_out", "code_sent"]) ?? this.#startLogin(body.get("email") ?? "", null),
+        );
+      case "login_verify":
+        return Effect.suspend(
+          () =>
+            this.#setupRefusal(["code_sent"]) ??
+            this.#verifySetupLogin(body.get("challenge") ?? "", body.get("code") ?? ""),
+        );
+      case "retry":
+        return this.#retrySetup();
+    }
+  };
+
+  /**
+   * A sign-in of the setup page starts only on a server with no session. A session that the account
+   * service could not confirm at the start (state `error` or `loading`) is still the owner's session:
+   * a code of another account would replace it, and a wrong code would remove it.
+   */
+  #setupRefusal(allowed: readonly CentralAuthState["status"][]): Effect.Effect<Answer> | null {
+    const { centralAuth } = this.#options;
+    const status = centralAuth.getState().status;
+    if (status === "signed_in") return Effect.succeed(failure(409, "signed_in"));
+    if (centralAuth.hasSession() || !allowed.includes(status)) return Effect.succeed(failure(409, `account_${status}`));
+    return null;
+  }
+
+  /**
+   * The page signs in only with the challenge of the current sign-in. Another program on the network
+   * cannot complete an older challenge of its own after the owner asked for a code.
+   */
+  #verifySetupLogin(challenge: string, code: string): Effect.Effect<Answer, RemoteWorkflowError> {
+    const state = this.#options.centralAuth.getState();
+    if (state.status === "code_sent" && state.challengeId !== challenge.trim()) {
+      return Effect.succeed(failure(409, "challenge_replaced", sourceText("error.auth.codeNotVerified")));
+    }
+    return this.#verifyLogin(challenge, code, null);
+  }
+
+  /** The retry of the account screen: it starts the account again, as the app does. Only after an error. */
+  #retrySetup(): Effect.Effect<Answer, RemoteWorkflowError> {
+    return Effect.suspend(() => {
+      const { centralAuth } = this.#options;
+      if (centralAuth.getState().status !== "error") return Effect.sync(() => this.#status());
+      return centralAuth.retry().pipe(
+        Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause })),
+        Effect.map(() => this.#status()),
+      );
+    });
+  }
+
   async #handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
     let answer: Answer;
     try {
@@ -238,6 +324,7 @@ export class ServerMode {
         version: this.#options.version,
         account: account.status,
         email: account.status === "signed_in" ? account.user.email : null,
+        account_issue: account.status === "error" ? account.issue.code : null,
         account_message: account.status === "error" ? account.issue.message : null,
         server: host.phase,
         server_name: host.serverName ?? this.#pendingName,
@@ -273,7 +360,10 @@ export class ServerMode {
       .requestEmailCode(normalized)
       .pipe(Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause })));
     if (state.status === "code_sent" && !state.issue) {
-      return { status: 200, lines: { challenge: state.challengeId, expires_at: state.expiresAt } };
+      return {
+        status: 200,
+        lines: { challenge: state.challengeId, expires_at: state.expiresAt, resend_at: state.resendAvailableAt },
+      };
     }
     // A server has no browser for the company provider. The owner signs in with another email.
     if (state.status === "company_sign_in") {
@@ -290,6 +380,8 @@ export class ServerMode {
     name: string | null,
   ): Effect.fn.Return<Answer, RemoteWorkflowError> {
     if (!challenge.trim() || !code.trim()) return failure(400, "invalid_request");
+    // A code of another account would replace the session. A wrong code would remove the stored session.
+    if (this.#options.centralAuth.getState().status === "signed_in") return failure(409, "signed_in");
     if (name !== null) {
       // The host refuses such a name only when it publishes, after the sign-in.
       const serverName = parseHostedServerName(name);
@@ -391,7 +483,8 @@ function nameFailure(name: string): Answer {
 
 function issueFailure(state: CentralAuthState): Answer {
   if ((state.status === "code_sent" || state.status === "error") && state.issue) {
-    return failure(state.status === "error" ? 502 : 400, state.issue.code, state.issue.message);
+    const answer = failure(state.status === "error" ? 502 : 400, state.issue.code, state.issue.message);
+    return { ...answer, lines: { ...answer.lines, retry_after: state.issue.retryAfterSeconds ?? null } };
   }
   return failure(409, `account_${state.status}`);
 }

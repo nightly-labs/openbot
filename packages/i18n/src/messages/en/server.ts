@@ -797,4 +797,14 @@ export const messages = defineMessages("server", {
   "server.settings.responseStyleNatural": "Natural",
   "server.settings.responseStyleClassic": "Classic",
   "server.settings.personalityLoadFailed": "Could not load the server personality.",
+  // The setup page of a server in a container, such as an Umbrel app (ServerSetupScreen.tsx).
+  "server.setup.pageTitle": "OpenBot server",
+  "server.setup.signedInAs": "Signed in as {email}",
+  "server.setup.online": "{name} is online",
+  "server.setup.starting": "{name} is starting",
+  "server.setup.openApp": "Open OpenBot",
+  "server.setup.signOutDescription": "To use another account, run openbot logout in a terminal of the container.",
+  "server.setup.errorCompany": "This email signs in through your company. Use another email.",
+  "server.setup.errorRefused": "OpenBot refused the request.",
+  "server.setup.errorNoAnswer": "OpenBot does not answer. Reload the page.",
 });

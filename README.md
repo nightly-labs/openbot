@@ -149,7 +149,7 @@ docker exec -it openbot openbot login
 ```
 
 See [Docker](docs/docker.md) for Compose, the data volume, upgrades and the security limits. For Amazon ECS,
-see [AWS ECS](docs/aws-ecs.md).
+see [AWS ECS](docs/aws-ecs.md). For an Umbrel home server, see [Umbrel](docs/umbrel.md).
 
 ### Nix
 
