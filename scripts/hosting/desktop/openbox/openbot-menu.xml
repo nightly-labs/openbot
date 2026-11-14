@@ -3,7 +3,7 @@
 <openbox_menu xmlns="http://openbox.org/3.4/menu">
   <menu id="root-menu" label="OpenBot">
     <item label="Terminal">
-      <action name="Execute"><command>lxterminal --working-directory=~</command></action>
+      <action name="Execute"><command>lxterminal</command></action>
     </item>
     <item label="Files">
       <action name="Execute"><command>pcmanfm ~</command></action>

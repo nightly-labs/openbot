@@ -29,12 +29,22 @@ fi
 export XDG_CONFIG_DIRS="$desktop:${XDG_CONFIG_DIRS:-/etc/xdg}"
 export XDG_DATA_DIRS="$desktop:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
 
+# The programs of the menu start in the home folder. Openbox does not expand "~" after "=".
+cd "$HOME" || true
+
 # A window manager that stops at once, for example because another one runs on the display, does not
-# start again and again.
+# start again and again. openbot.service starts this script at the OOM value of main (-500). Openbox and
+# the programs of its menu get the OOM value and the nice value of agent processes (server-memory.ts),
+# so a build in the menu terminal does not take memory or CPU from main. Their output does not go to
+# the service log: GTK programs write many warnings.
 failures=0
 while [ "$failures" -lt 5 ] && xdpyinfo >/dev/null 2>&1; do
   started=$SECONDS
-  openbox --config-file "$desktop/openbox/openbot-rc.xml" >/dev/null
+  (
+    echo 500 >/proc/self/oom_score_adj 2>/dev/null
+    exec nice -n 10 openbox --config-file "$desktop/openbox/openbot-rc.xml" >/dev/null 2>&1
+  )
   if [ $((SECONDS - started)) -lt 10 ]; then failures=$((failures + 1)); else failures=0; fi
   sleep 2
 done
+[ "$failures" -lt 5 ] || echo "openbox stopped 5 times at start. The agent display has no window manager." >&2
