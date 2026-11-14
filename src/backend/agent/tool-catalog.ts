@@ -271,6 +271,13 @@ const READY_SEARCH_RESULTS = 3;
  * such as "create workflow routine" does not also load the routine schemas and guidance.
  */
 const WORKFLOW_WORDS = new Set(["workflow", "workflows"]);
+/**
+ * The release notes call the board of the Workflows page the Canvas, so users ask an agent for a
+ * canvas. Without these words a search found no workflow tool, and the agent said that it could not
+ * make one (#9367). A canvas can also be the Routines canvas or a canvas on a web page, so these words
+ * add the workflow tools and keep the other results.
+ */
+const CANVAS_WORDS = new Set(["canvas", "canvases"]);
 const WORKFLOW_TOOLS = BUILTIN_TOOL_CATALOG.filter(
   (entry) =>
     entry.namespace === OPENBOT_DYNAMIC_TOOLS.name && words(entry.tool).some((word) => WORKFLOW_WORDS.has(word)),
@@ -490,10 +497,11 @@ export function discoverTools(params: DynamicToolCallParams, provider: AgentProv
         .map(({ entry }) => entry),
     );
     const workflowSearch = [...terms].some((term) => WORKFLOW_WORDS.has(term));
-    if (workflowSearch) {
+    if (workflowSearch)
       // A tool that a query names exactly keeps its schema; other ready results, such as routines, go.
       for (const entry of ready)
         if (!matches.some((match) => match.entry === entry && match.exact)) ready.delete(entry);
+    if (workflowSearch || [...terms].some((term) => CANVAS_WORDS.has(term))) {
       for (const entry of WORKFLOW_TOOLS) {
         if (!found.some((result) => result.entry === entry)) found.push({ entry, strong: true });
         ready.add(entry);
