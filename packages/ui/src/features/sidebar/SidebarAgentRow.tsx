@@ -16,7 +16,12 @@ import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { agentAccessLockLabel } from "../agents/agent-access";
 import { SidebarAgentContextMenu } from "./SidebarAgentContextMenu";
-import { SidebarAgentIndicator, SidebarWaitChip, SidebarWaitTooltip } from "./SidebarAgentIndicator";
+import {
+  SidebarAgentIndicator,
+  SidebarNameTooltip,
+  SidebarWaitChip,
+  SidebarWaitTooltip,
+} from "./SidebarAgentIndicator";
 import { sidebarAgentStateLabel, sidebarMessageTime, sidebarUsageResetTime } from "./sidebar-filtering";
 import { useSidebarScope } from "./sidebar-scope";
 
@@ -78,7 +83,8 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
       : "";
   };
   const routineLabel = () => (state()?.kind === "routine" || limit() ? stateLabel() : "");
-  // Only a waiting row has a tooltip, so the rows in the sections do not each carry one.
+  // A waiting row has a tooltip that says what it waits for. The other rows have one only in the
+  // compact sidebar, where it gives the name that the row does not show.
   const row = (): JSX.Element => (
     <ContextMenu.Root modal={false} onOpenChange={setMenuOpen}>
       <ContextMenu.Trigger
@@ -183,7 +189,14 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
       onDragStart={(event: DragEvent & { currentTarget: HTMLElement }) => startChatDragging(event, rowProps.agent.id)}
       onDragEnd={endChatDragging}
     >
-      <Show when={wait()} fallback={row()}>
+      <Show
+        when={wait()}
+        fallback={
+          <SidebarNameTooltip name={rowProps.agent.name} disabled={!props.compact || menuOpen()}>
+            {row()}
+          </SidebarNameTooltip>
+        }
+      >
         {(current) => (
           <SidebarWaitTooltip wait={current()} menuOpen={menuOpen()}>
             {row()}

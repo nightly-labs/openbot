@@ -13,7 +13,12 @@ import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, Show } from "solid-js";
 import { useText } from "../../text";
 import { ChannelAvatar } from "../channels/ChannelAvatar";
-import { SidebarAgentIndicator, SidebarWaitChip, SidebarWaitTooltip } from "./SidebarAgentIndicator";
+import {
+  SidebarAgentIndicator,
+  SidebarNameTooltip,
+  SidebarWaitChip,
+  SidebarWaitTooltip,
+} from "./SidebarAgentIndicator";
 import { SidebarChannelContextMenu, SidebarDeletedChannelContextMenu } from "./SidebarChannelContextMenu";
 import { sidebarUnreadBadge } from "./sidebar-agent-states";
 import { sidebarAgentStateLabel, sidebarMessageTime } from "./sidebar-filtering";
@@ -140,7 +145,14 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
       onDragStart={(event: DragEvent & { currentTarget: HTMLElement }) => startChatDragging(event, rowProps.channel.id)}
       onDragEnd={endChatDragging}
     >
-      <Show when={wait()} fallback={row()}>
+      <Show
+        when={wait()}
+        fallback={
+          <SidebarNameTooltip name={rowProps.channel.name} disabled={!props.compact || menuOpen()}>
+            {row()}
+          </SidebarNameTooltip>
+        }
+      >
         {(current) => (
           <SidebarWaitTooltip wait={current()} menuOpen={menuOpen()}>
             {row()}
