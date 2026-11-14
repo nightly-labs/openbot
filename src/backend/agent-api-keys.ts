@@ -33,7 +33,10 @@ export class AgentApiKeyFailed extends Schema.TaggedError<AgentApiKeyFailed>()("
 const failed = () => new AgentApiKeyFailed({ cause: new Error(sourceText("error.backend.apiKeySaveFailed")) });
 
 /** The Vault part that `AgentApiKeys` uses. */
-export type AgentApiKeyVault = Pick<VaultItems, "ready" | "apiKeys" | "saveApiKey" | "removeAgentApiKey">;
+export type AgentApiKeyVault = Pick<
+  VaultItems,
+  "ready" | "apiKeys" | "sharedApiKeys" | "saveApiKey" | "removeAgentApiKey"
+>;
 
 /**
  * The API keys of each agent. The agent gets the path of a file with the key and reads the file in its
@@ -45,6 +48,11 @@ export type AgentApiKeyVault = Pick<VaultItems, "ready" | "apiKeys" | "saveApiKe
  * removes those files when the Vault changes. Both run one at a time and read the Vault inside their
  * turn, so a key that the user deleted, or took from the agent, is never written again after its
  * removal. The Vault registers its values for redaction itself.
+ *
+ * Before agent scope (0.70.0), `list` wrote each Vault key to `<root>/.vault/<NAME>`, and scripts, MCP
+ * servers and provider configs read that path (#8983). `list` still writes the keys for every agent
+ * there, and `syncVault` keeps those files in line with the Vault. A key for chosen agents is never
+ * written there.
  *
  * The scope controls which agents get a key file, not which agents can read it: every agent runs as the
  * same system user, so an agent can read the files of the other agents. The Vault text says so.
@@ -96,6 +104,8 @@ export class AgentApiKeys {
         yield* this.#moveIntoVault(agentId);
         const own = yield* this.#plainKeys(agentId);
         const vault = yield* this.#writeAgent(folder, agentId);
+        // The path of earlier versions; it does not change what the agent gets.
+        yield* this.#writeShared(true).pipe(Effect.ignore);
         const shown = vault.filter((key) => !own.some((entry) => entry.name === key.name));
         return [...own, ...shown].sort((a, b) => a.name.localeCompare(b.name));
       }),
@@ -114,11 +124,13 @@ export class AgentApiKeys {
         const agents = yield* Effect.tryPromise({ try: () => folderNames(this.#root), catch: failed });
         for (const agentId of agents.filter((id) => AGENT_ID_PATTERN.test(id))) yield* this.#moveIntoVault(agentId);
         const vaultFolder = join(this.#root, VAULT_FOLDER);
-        // The files of a build before agent scope, for every agent, are directly in the folder.
-        yield* removeKeyFiles(vaultFolder, new Map());
-        const copies = yield* Effect.tryPromise({ try: () => folderNames(vaultFolder), catch: failed });
-        for (const agentId of copies.filter((id) => AGENT_ID_PATTERN.test(id)))
-          yield* this.#writeAgent(join(vaultFolder, agentId), agentId);
+        const copies = (yield* Effect.tryPromise({ try: () => folderNames(vaultFolder), catch: failed })).filter((id) =>
+          AGENT_ID_PATTERN.test(id),
+        );
+        for (const agentId of copies) yield* this.#writeAgent(join(vaultFolder, agentId), agentId);
+        // An agent that listed its keys wrote the shared files in earlier versions. 0.70.0 deleted them
+        // at start, so they come back for such an agent here.
+        yield* this.#writeShared(copies.length > 0);
       }),
     );
   });
@@ -212,6 +224,26 @@ export class AgentApiKeys {
     });
   }
 
+  /**
+   * Writes the Vault keys for every agent to `<root>/.vault/<NAME>`, where earlier versions wrote them,
+   * and removes the files of other keys. With `all` false, only a file that is there already is
+   * written again.
+   */
+  #writeShared(all: boolean): Effect.Effect<void, AgentApiKeyFailed> {
+    return Effect.gen({ self: this }, function* () {
+      const folder = join(this.#root, VAULT_FOLDER);
+      const keys = new Map(
+        (this.#readyVault()?.sharedApiKeys() ?? [])
+          .filter(({ name }) => API_KEY_NAME_PATTERN.test(name))
+          .map(({ name, value }) => [name, value]),
+      );
+      yield* removeKeyFiles(folder, keys);
+      const present = all ? null : new Set(yield* Effect.tryPromise({ try: () => folderFiles(folder), catch: failed }));
+      for (const [name, value] of keys)
+        if (!present || present.has(name)) yield* writeIfChanged(join(folder, name), value);
+    });
+  }
+
   /** The plain files of this agent: keys saved without a Vault, or not moved into it yet. */
   #plainKeys(agentId: string): Effect.Effect<SavedApiKey[], AgentApiKeyFailed> {
     return Effect.gen({ self: this }, function* () {
@@ -292,10 +324,12 @@ async function folderFiles(folder: string): Promise<string[]> {
   }
 }
 
-/** The names in a folder; none when the folder is missing. */
+/** The names of the folders in a folder, not of its files; none when the folder is missing. */
 async function folderNames(folder: string): Promise<string[]> {
   try {
-    return await readdir(folder);
+    return (await readdir(folder, { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory())
+      .map(({ name }) => name);
   } catch (error) {
     if (isMissingFileError(error)) return [];
     throw error;

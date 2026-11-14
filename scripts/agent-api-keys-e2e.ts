@@ -4,7 +4,8 @@
 // no tool result, event or stored message. It also saves API keys in the real Vault and checks that
 // `list` writes to each agent's files only the keys that the agent can use, that a Vault change
 // rewrites or removes the files, and that a key file of one agent from a build before agent scope moves
-// into the Vault. With a Vault, the form saves the key there for every agent by default, and "Only this
+// into the Vault. The keys for every agent also stay at the shared path of earlier versions,
+// `.vault/<NAME>`, and come back there at start after 0.70.0 deleted them (#8983). With a Vault, the form saves the key there for every agent by default, and "Only this
 // agent" saves it there for the agent only. Logins, cards and contacts for chosen agents are hidden
 // from the other agents. A login that an agent saves for one subdomain never changes the password of a
 // login for another subdomain.
@@ -340,7 +341,15 @@ try {
       // The key for this agent only wins over the key for every agent of its name.
       assert.equal(await readFile(join(vaultFolder, "agent-3", "OPENAI_API_KEY"), "utf8"), KEY);
       assert.equal(await readFile(join(vaultFolder, "agent-3", "GITHUB_TOKEN"), "utf8"), VAULT_KEY);
+      // Scripts read the shared path of earlier versions: it has the keys for every agent (#8983).
+      assert.equal(await readFile(join(vaultFolder, "GITHUB_TOKEN"), "utf8"), VAULT_KEY);
+      assert.equal(await readFile(join(vaultFolder, "OPENAI_API_KEY"), "utf8"), "e2e-vault-openai-key-31b0");
+      // 0.70.0 deleted the shared files at start; the next start writes them again.
+      await rm(join(vaultFolder, "GITHUB_TOKEN"));
+      await Effect.runPromise(keys.syncVault());
+      assert.equal(await readFile(join(vaultFolder, "GITHUB_TOKEN"), "utf8"), VAULT_KEY);
       if (process.platform !== "win32") {
+        assert.equal((await stat(join(vaultFolder, "GITHUB_TOKEN"))).mode & 0o777, 0o600);
         assert.equal((await stat(join(vaultFolder, "agent-3", "GITHUB_TOKEN"))).mode & 0o777, 0o600);
         assert.equal((await stat(join(vaultFolder, "agent-3"))).mode & 0o777, 0o700);
       }
@@ -367,6 +376,7 @@ try {
         ["GITHUB_TOKEN", "OPENAI_API_KEY"],
       );
       await assert.rejects(stat(join(vaultFolder, "agent-3", "NOTION_TOKEN")));
+      await assert.rejects(stat(join(vaultFolder, "NOTION_TOKEN")), "a key for a chosen agent is on the shared path");
       // One agent reads one key of a name: a second key of the name for a shared agent is refused.
       await assert.rejects(
         Effect.runPromise(
@@ -392,9 +402,11 @@ try {
       await saveKey(githubId, "GITHUB_TOKEN", NEW_VAULT_KEY);
       assert.equal(await readFile(join(vaultFolder, AGENT, "GITHUB_TOKEN"), "utf8"), NEW_VAULT_KEY);
       assert.equal(await readFile(join(vaultFolder, "agent-3", "GITHUB_TOKEN"), "utf8"), NEW_VAULT_KEY);
+      assert.equal(await readFile(join(vaultFolder, "GITHUB_TOKEN"), "utf8"), NEW_VAULT_KEY);
       await assert.rejects(stat(stoppedWrite));
       await Effect.runPromise(vault.delete(githubId));
       await synced;
+      await assert.rejects(stat(join(vaultFolder, "GITHUB_TOKEN")));
       await assert.rejects(stat(join(vaultFolder, AGENT, "GITHUB_TOKEN")));
       await assert.rejects(stat(join(vaultFolder, "agent-3", "GITHUB_TOKEN")));
       // An agent removes its own key, never a key that other agents use.
@@ -410,6 +422,7 @@ try {
       await Effect.runPromise(vault.load());
       await Effect.runPromise(keys.syncVault());
       await assert.rejects(stat(join(vaultFolder, AGENT, "OPENAI_API_KEY")));
+      await assert.rejects(stat(join(vaultFolder, "OPENAI_API_KEY")));
       await assert.rejects(stat(join(vaultFolder, "agent-3", "NOTION_TOKEN")));
       assert.equal(await readFile(handPlaced, "utf8"), "e2e-hand-placed-private-key");
       assert.ok((await stat(join(vaultFolder, AGENT, "notes"))).isDirectory());

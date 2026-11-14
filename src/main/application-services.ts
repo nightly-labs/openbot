@@ -2134,7 +2134,8 @@ export async function createApplicationServices({
   // Outside every workspace. Each saved key is masked in the logs before the first agent starts. A key
   // file of one agent from a build before agent scope moves into the Vault here. The Vault's keys are
   // written only when an agent lists its keys; a file left from the last run that the agent can no
-  // longer use is removed here.
+  // longer use is removed here, and a key for every agent comes back to the shared path of earlier
+  // versions (#8983).
   const agentApiKeys = new AgentApiKeys(join(app.getPath("userData"), "agent-api-keys"), vault.items);
   await Effect.runPromise(agentApiKeys.registerSaved());
   await Effect.runPromise(agentApiKeys.syncVault().pipe(Effect.ignore));

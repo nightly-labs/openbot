@@ -131,6 +131,11 @@ export interface VaultItems {
    * key for chosen agents that names it, or else the key for every agent. None while the Vault is not ready.
    */
   apiKeys(agentId: string): VaultAgentKey[];
+  /**
+   * The API keys for every agent, not for chosen agents, which `AgentApiKeys` also writes to the shared
+   * path of earlier versions. None while the Vault is not ready.
+   */
+  sharedApiKeys(): Omit<VaultAgentKey, "own">[];
   /** Whether a card that `agentId` can use is saved now. Agents are told about card fill only while one is. */
   hasCards(agentId: string): boolean;
   /** Whether contact info that `agentId` can use is saved now. */
