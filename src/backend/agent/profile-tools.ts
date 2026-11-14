@@ -37,10 +37,7 @@ const profileFields = {
     .string()
     .max(INPUT_LIMITS.agentDescription)
     .describe(`A short summary of the agent's work, at most ${INPUT_LIMITS.agentDescription} characters.`),
-  avatarSeed: z
-    .string()
-    .regex(AVATAR_SEED_PATTERN, "Invalid avatar seed.")
-    .describe("1-128 lowercase letters, digits, colons or hyphens."),
+  avatarSeed: z.string().regex(AVATAR_SEED_PATTERN, "Invalid avatar seed."),
   // A number schema, not z.literal: Gemini rejects a request whose tool schema has a non-string enum.
   avatarHue: z
     .number()
@@ -48,7 +45,7 @@ const profileFields = {
     .refine(isAvatarHue, "Invalid avatar hue.")
     .nullable()
     .describe(
-      `The color of the generated avatar face. Only one of ${AVATAR_HUES.map((hue) => `${hue} ${AVATAR_HUE_NAMES[hue]}`).join(", ")}, or null for an automatic color. For a color that is not in the list, use the nearest one.`,
+      `Face color, only ${AVATAR_HUES.map((hue) => `${hue} ${AVATAR_HUE_NAMES[hue]}`).join(", ")}, or null for automatic. Else use the nearest.`,
     ),
 };
 
@@ -110,7 +107,7 @@ export const updateProfileToolSchema = z
       .min(1)
       .max(INPUT_LIMITS.path)
       .describe(
-        "Local PNG, JPEG, or WebP file, up to 512 KB. The image replaces the generated avatar face, so use it only for an image that the user gives or asks for, never to set a color. Resize or compress a copy with your available tools first if needed. Use an absolute path or a path relative to your workspace. Do not combine with avatarSeed or avatarHue.",
+        "Local PNG, JPEG, or WebP image up to 512 KB, absolute or relative to your workspace. It replaces the generated face; never use it for a color. Not with avatarSeed or avatarHue.",
       )
       .optional(),
     provider: z
