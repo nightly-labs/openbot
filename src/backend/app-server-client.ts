@@ -54,6 +54,16 @@ interface ClientEvents {
 const CRASH_RECORD = /\bpanicked at\b|^(?:\S+\s+)?FATAL\s|^(?:[A-Za-z]*Error|error|fatal)(?: ?\[[^\]]+\])?:\s*\S/u;
 /** How long an exit waits for the rest of stderr. A child of Codex can keep the pipe open. */
 const STDERR_END_WAIT_MS = 250;
+/**
+ * The output of a command that the Codex Windows sandbox could not start because Windows cannot
+ * decrypt the saved password of a sandbox account (Codex 0.169.0, `windows-sandbox-rs/src/dpapi.rs`).
+ * A shell call fails with `execution error: Io(Custom { kind: Other, error: "windows sandbox:
+ * CryptUnprotectData failed: 2148073483" })`, and an `exec_command` call with `Failed to create
+ * unified exec process: …`. Codex uses this sandbox only for a Workspace only agent, and it does not
+ * repair the password. The turn continues, so the user saw only failed commands (#9310).
+ */
+const WINDOWS_SANDBOX_FAILURE =
+  /^(?:execution error|Failed to create unified exec process): .*\bCryptUnprotectData failed\b/su;
 /** The page of `thread/backgroundTerminals/list`. Only the count matters to OpenBot. */
 const decodeBackgroundTerminals = Schema.decodeUnknownSync(Schema.Struct({ data: Schema.Array(Schema.Unknown) }));
 
@@ -100,6 +110,8 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
    * not have saved the blocks of that turn, so the next turn sends them again.
    */
   readonly #openTurns = new Set<string>();
+  /** The turn of each thread that showed the Windows sandbox warning, so that a turn shows it once. */
+  readonly #sandboxWarnings = new Map<string, string>();
   #process: ChildProcessWithoutNullStreams | null = null;
   /** The end of a process that failed. `stop` waits for it, because `#process` no longer holds it. */
   #ending: Fiber.Fiber<void> | null = null;
@@ -482,6 +494,34 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     if (failed || compacted) this.#turnContext.resend(params.threadId);
   }
 
+  /** Tells the user once in a turn what to do when the Windows sandbox cannot start the agent's commands. */
+  #warnWindowsSandbox(method: string, params: unknown): void {
+    if (!isRecord(params) || !isString(params.threadId)) return;
+    const { threadId } = params;
+    if (method === "turn/completed") {
+      if (isRecord(params.turn) && params.turn.id === this.#sandboxWarnings.get(threadId))
+        this.#sandboxWarnings.delete(threadId);
+      return;
+    }
+    const item = params.item;
+    if (
+      method !== "item/completed" ||
+      !isString(params.turnId) ||
+      !isRecord(item) ||
+      item.type !== "commandExecution" ||
+      item.status !== "failed" ||
+      !isString(item.aggregatedOutput) ||
+      !WINDOWS_SANDBOX_FAILURE.test(item.aggregatedOutput) ||
+      this.#sandboxWarnings.get(threadId) === params.turnId
+    )
+      return;
+    this.#sandboxWarnings.set(threadId, params.turnId);
+    this.emit("notification", {
+      method: "warning",
+      params: { threadId, turnId: params.turnId, message: sourceText("error.agent.codexSandboxUnavailable") },
+    });
+  }
+
   /** The process ended: a turn that did not complete may not be saved, so its thread sends its blocks again. */
   #resendOpenTurns(): void {
     for (const threadId of this.#openTurns) this.#turnContext.resend(threadId);
@@ -546,6 +586,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
         }
         this.#observeTurnContext(message.method, message.params);
         this.emit("notification", { method: message.method, params: message.params });
+        this.#warnWindowsSandbox(message.method, message.params);
       }
       return;
     }

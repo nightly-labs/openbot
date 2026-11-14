@@ -131,6 +131,8 @@ export const messages = {
   "error.agent.lowMemoryServer": "בשרת הזה חסר זיכרון. ההודעה שלך ממתינה בתור ותתחיל כשיתפנה זיכרון.",
   "error.agent.workspaceOnlyToolMissing":
     "מצב סביבת עבודה בלבד דורש את {tool}, ש-OpenBot לא מצא. יש להתקין אותו, או לבחור גישה מלאה בהגדרות הסוכן.",
+  "error.agent.codexSandboxUnavailable":
+    "מצב סביבת עבודה בלבד דורש את ארגז החול של Codex, ש-Codex לא מצליח להפעיל במחשב הזה, ולכן הפקודות של הסוכן נכשלות. יש לבחור לשאול קודם או גישה מלאה בהגדרות הסוכן.",
   "error.agent.claudeSandboxUnavailable":
     "מצב סביבת עבודה בלבד דורש את ארגז החול של Claude, ש-Claude לא מצליח להפעיל במחשב הזה: {reason}. יש לבחור גישה מלאה או ספק אחר בהגדרות הסוכן.",
   "error.agent.screenCaptureOff": "צילום מסך כבוי עבור הסוכן הזה. המשתמש יכול להפעיל שליטה במחשב בהגדרות הסוכן.",

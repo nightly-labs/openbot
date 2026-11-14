@@ -123,6 +123,8 @@ export const messages = {
   "error.agent.lowMemoryServer": "该服务器内存不足。你的消息会在队列中等待，内存释放后自动开始。",
   "error.agent.workspaceOnlyToolMissing":
     "“仅工作区”需要 {tool}，但 OpenBot 没有找到它。请安装它，或在助手设置中选择完全访问。",
+  "error.agent.codexSandboxUnavailable":
+    "“仅工作区”需要 Codex 沙盒，但 Codex 无法在这台电脑上启动它，所以助手的命令会失败。请在助手设置中选择先询问或完全访问。",
   "error.agent.claudeSandboxUnavailable":
     "“仅工作区”需要 Claude 沙盒，但 Claude 无法在这台电脑上启动它：{reason}。请在助手设置中选择完全访问或其他服务商。",
   "error.agent.screenCaptureOff": "该助手的截屏功能已关闭，用户可以在助手设置中开启 Computer Use。",

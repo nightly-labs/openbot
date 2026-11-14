@@ -143,6 +143,8 @@ export const messages = {
     "Na tym serwerze brakuje pamięci. Twoja wiadomość czeka w kolejce i ruszy, gdy pamięć się zwolni.",
   "error.agent.workspaceOnlyToolMissing":
     "Tryb „Tylko obszar roboczy” wymaga narzędzia {tool}, którego OpenBot nie znalazł. Zainstaluj je lub wybierz pełny dostęp w ustawieniach agenta.",
+  "error.agent.codexSandboxUnavailable":
+    "Tryb „Tylko obszar roboczy” wymaga piaskownicy Codex, której Codex nie może uruchomić na tym komputerze, więc polecenia agenta kończą się błędem. Wybierz „Najpierw pytaj” lub „Pełny dostęp” w ustawieniach agenta.",
   "error.agent.claudeSandboxUnavailable":
     "Tryb „Tylko obszar roboczy” wymaga piaskownicy Claude, której Claude nie może uruchomić na tym komputerze: {reason}. Wybierz pełny dostęp lub innego dostawcę w ustawieniach agenta.",
   "error.agent.screenCaptureOff":
