@@ -431,25 +431,26 @@ customer_units() {
   return 0
 }
 
-# The folders outside the archive that have files of the service user, one level below the top, such
-# as `/srv/vaults`. The move does not copy them. Issue #8871: Obsidian vaults that were outside the home
-# were missing after a move. The service user owns /opt and /usr/local, and `added_trees` covers them.
-# A file that the customer made as root is not found.
+# The folders outside the archive that have files of the service user, one level below the top (two in
+# /var), such as `/srv/vaults` or `/var/lib/syncthing`. The move does not copy them. Issue #8871: Obsidian
+# vaults that were outside the home were missing after a move. The search skips /opt and /usr: the
+# service user owns /opt and /usr/local, and `added_trees` finds what the customer added there. A file
+# that the customer made as root is not found. The search goes into other mounts, because a folder of
+# the customer can be one. When it fails, it fails `packages`, so that a move never continues on a part
+# of the search.
 customer_folders() {
   local uid
   uid=$(id -u "$SERVICE_USER")
-  # A file that goes away during the search makes find fail. The folders that it found stay valid.
-  {
-    find / -xdev \( -path /proc -o -path /sys -o -path /dev -o -path /run -o -path /tmp -o -path /var/tmp \
-      -o -path /home -o -path "$KEYRING_HOME" -o -path /opt -o -path /usr -o -path /var/spool/cron \
-      -o -path /var/lib/docker -o -path /var/cache -o -path /var/crash -o -path /var/log \) -prune \
-      -o ! -type d -uid "$uid" -print 2>/dev/null || true
-  } | awk -F/ '{ print "/" $2 (NF > 2 ? "/" $3 : "") }' | sort -u
+  find / \( -path /proc -o -path /sys -o -path /dev -o -path /run -o -path /tmp -o -path /var/tmp \
+    -o -path /home -o -path "$KEYRING_HOME" -o -path /opt -o -path /usr -o -path /snap -o -path /var/spool/cron \
+    -o -path /var/lib/docker -o -path /var/cache -o -path /var/crash -o -path /var/log \) -prune \
+    -o ! -type d -uid "$uid" -print |
+    awk -F/ '{ n = $2 == "var" ? 4 : 3; if (n > NF - 1) n = NF - 1; f = ""
+      for (i = 2; i <= n; i++) f = f "/" $i; print f == "" ? $0 : f }' | sort -u
 }
 
 # What the move does not copy, for the report of the import.
 not_moved() {
-  customer_folders | sed 's/$/: files of the customer outside the home/'
   local count
   if command -v docker >/dev/null; then
     count=$(timeout 20 docker ps --all --quiet 2>/dev/null | wc -l) || count=0

@@ -1286,11 +1286,12 @@ still uses the sandbox. The downtime is the export, the copy, the import and the
 
    The move also does not copy files of the customer in other folders outside the home, such as
    Obsidian vaults in `/srv` (issue #8871). `packages` names each folder, one level below the top
-   (`/srv/vaults`), that has a file of `user` outside the paths above, `/tmp`, `/var/log`, `/var/cache`
-   and `/var/crash`. `leaseweb-pool.ts move` then stops before the downtime, and the server stays on
-   boat. With `--folders=<folder>,...`, an operator copies these folders by hand (as root, to the same
-   paths, before `start`) and the move continues. The import report names them again. A file that the
-   customer made as root is not found.
+   (`/srv/vaults`) or two in `/var` (`/var/lib/syncthing`), that has a file of `user` outside the paths
+   above, `/usr`, `/tmp`, `/var/log`, `/var/cache` and `/var/crash`, also on another mount.
+   `leaseweb-pool.ts move` then stops before the downtime, and the server stays on boat. It also stops
+   when the search fails. With `--folders=<folder>,...`, an operator copies these folders by hand (as
+   root, to the same paths, before `start`) and the move continues. A file that the customer made as
+   root is not found.
 
    The move also stops before the downtime when the sandbox has a Docker container (a directory in
    `/var/lib/docker/containers`): the VPS has no Docker, and the archive has no containers or images.

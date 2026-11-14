@@ -1601,6 +1601,8 @@ if ids=$(docker ps -aq 2>/dev/null); then
   echo "docker_restart=$restart"
 fi
 bash "$d/move-from-boat.sh" packages`,
+        // `packages` searches the disk outside the home for files of the customer.
+        600,
       );
       const values = keyValues(output);
       packages = output.split("\n").filter((line) => /^apt=[a-z0-9][a-z0-9+.-]+$/u.test(line));
@@ -1832,7 +1834,10 @@ async function main(args: string[]) {
       operands[1],
       option("units")?.split(",").filter(Boolean),
       args.includes("--docker"),
-      option("folders")?.split(",").filter(Boolean),
+      option("folders")
+        ?.split(",")
+        .map((folder) => folder.replace(/(?<=.)\/+$/u, ""))
+        .filter(Boolean),
     );
   else if (command === "custom" && operands.length === 1 && operands[0])
     await pool.custom(operands[0], {
