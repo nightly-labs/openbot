@@ -865,7 +865,9 @@ export class TurnLifecycle {
       this.#quietRoutineTurn(agentId, threadId, deliveries, this.#noUpdateTurns.has(turnId))
     )
       return false;
-    const snapshot = this.#conversation.ensureSnapshot(agentId, threadId);
+    // The agent's own chat is cached under its own thread id, not the provider's. With the provider's
+    // id, the changes below went to a fresh copy that the turn end read again from SQLite (#9422).
+    const snapshot = this.#conversation.ensureSnapshot(agentId, this.#conversation.publicThreadId(agentId, threadId));
     const { messages } = snapshot;
     if (
       messages.some(
@@ -1776,7 +1778,9 @@ export class TurnLifecycle {
       // channel turn would then end on the agent's own chat, so its task kept running (#6596).
       const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
       this.#browser.endControl(publicThreadId, turnId);
-      const snapshot = this.#conversation.ensureSnapshot(agentId, threadId);
+      // With the provider's id, the agent's own chat was read again from SQLite, and lost the answer
+      // that `#holdCodexNoAnswer` made from the turn's narration (#9422).
+      const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
       // A routine run in its own session ends in the chat's snapshot, where a later turn can still
       // run, such as one the provider started itself. That turn stays active. Cleared, the queue saw an
       // idle chat and asked the busy provider for a turn again and again. An id of a turn that no
