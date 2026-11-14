@@ -24,6 +24,7 @@ import type {
   BrowserVisibilityInput,
 } from "@openbot/contracts/ipc";
 import { isNumber, isString } from "@openbot/contracts/runtime-values";
+import type { BrowserSignInStorage } from "@openbot/contracts/team-protocol/browser-sign-in-storage-v1";
 import {
   type BrowserSignInCookie,
   browserSignInCookieFitsHost,
@@ -250,6 +251,8 @@ const VIEW_CONTEXT_MENU_MS = 1_500;
 const DIALOG_ACTION_WAIT_MS = 10_000;
 /** How long `open` waits for the load of a redirect before its second read. */
 const OPEN_REDIRECT_WAIT_MS = 5_000;
+/** A page dialog holds a script. The sign-in then loads the page again with the cookies only. */
+const SIGN_IN_STORAGE_WRITE_TIMEOUT_MS = 5_000;
 /** A site can redirect more than one time before its page stays. */
 const OPEN_REDIRECT_READS = 2;
 /**
@@ -1321,16 +1324,19 @@ export class BrowserHost {
   /**
    * Sets the cookies of a sign-in that a member made on their own device, then loads the page again.
    * Only the cookies of the site that the tab shows go in: its host, its parent domains, and its
-   * subdomains. Chromium refuses a public suffix domain. The answer is the count that Chromium set.
+   * subdomains. Chromium refuses a public suffix domain. Some sites keep the sign-in in the page
+   * storage, so its pairs go in too, but only when the tab shows the same origin. The answer is the
+   * count of cookies and pairs that were set.
    */
   readonly importSignIn = Effect.fn("BrowserHost.importSignIn")(function* (
     this: BrowserHost,
     tabId: string,
     cookies: readonly BrowserSignInCookie[],
-  ): Effect.fn.Return<number, BrowserOperationError> {
+    storage: BrowserSignInStorage | null = null,
+  ): Effect.fn.Return<{ cookies: number; storage: number }, BrowserOperationError> {
     const tab = yield* this.#requireTab(tabId);
     const page = URL.canParse(tab.contents.getURL()) ? new URL(tab.contents.getURL()) : null;
-    if (!page || (page.protocol !== "https:" && page.protocol !== "http:")) return 0;
+    if (!page || (page.protocol !== "https:" && page.protocol !== "http:")) return { cookies: 0, storage: 0 };
     const target = this.#tabSession(tab);
     const results = yield* Effect.forEach(
       cookies.filter((cookie) => browserSignInCookieFitsHost(cookie.domain, page.hostname)),
@@ -1351,11 +1357,27 @@ export class BrowserHost {
         ).pipe(Effect.match({ onSuccess: () => 1, onFailure: () => 0 })),
     );
     const count = results.reduce((total, set) => total + set, 0);
-    if (count === 0) return 0;
-    yield* browserCall(() => target.cookies.flushStore());
-    // The cookies are set. A page that does not load again shows its own error in the tab.
+    if (count > 0) yield* browserCall(() => target.cookies.flushStore());
+    // The page itself writes the pairs, so they go to the storage of the origin that it shows. The
+    // tab can move while the cookies are set, so the script checks the origin again. A dialog of the
+    // page holds the script, so the write has a deadline.
+    const stored =
+      storage && storage.entries.length > 0 && storage.origin === page.origin
+        ? yield* browserCall(() =>
+            tab.contents.executeJavaScript(
+              `((origin, entries) => { if (location.origin !== origin) return 0; let set = 0; for (const [name, value] of entries) { try { localStorage.setItem(name, value); set += 1; } catch {} } return set; })(${JSON.stringify(storage.origin)}, ${JSON.stringify(storage.entries.map((entry) => [entry.name, entry.value]))})`,
+              true,
+            ),
+          ).pipe(
+            Effect.timeoutOption(SIGN_IN_STORAGE_WRITE_TIMEOUT_MS),
+            Effect.map((set) => (Option.isSome(set) && isNumber(set.value) ? set.value : 0)),
+            Effect.catch(() => Effect.succeed(0)),
+          )
+        : 0;
+    if (count === 0 && stored === 0) return { cookies: 0, storage: 0 };
+    // The sign-in is set. A page that does not load again shows its own error in the tab.
     yield* this.reload(tabId).pipe(Effect.ignore);
-    return count;
+    return { cookies: count, storage: stored };
   }).bind(this);
 
   /**

@@ -28,6 +28,8 @@ const runId = argument("run-id");
 const cases: string[] = [];
 // Fixture values only. The report and the receipts carry cookie names, never values.
 const SESSION_VALUE = "fixture-session";
+// Some sites keep the sign-in in the page storage, not in a cookie (#8686).
+const TOKEN_VALUE = "fixture-token";
 
 // `/sign-in` is the site's sign-in page on this computer; `/home` tells the server's tab whether it is signed in.
 const server = createServer((request, response) => {
@@ -42,7 +44,7 @@ const server = createServer((request, response) => {
     ]);
     const other = url.searchParams.get("other") ?? "";
     response.end(
-      `<!doctype html><meta charset="utf-8"><title>Sign in</title><script>document.cookie = "js=1; path=/";</script><iframe src="${other}/other"></iframe>`,
+      `<!doctype html><meta charset="utf-8"><title>Sign in</title><script>document.cookie = "js=1; path=/"; localStorage.setItem("token", "${TOKEN_VALUE}");</script><iframe src="${other}/other"></iframe>`,
     );
     return;
   }
@@ -167,6 +169,10 @@ async function main(): Promise<void> {
     assert.equal(Number.isInteger(byName.get("pref")?.expirationDate), true);
     assert.deepEqual(signIns.target(), { ...target, host: "127.0.0.1" });
     recordCases("collect-site-only", "collect-drops-address-bound", "collect-keeps-attributes");
+    const storage = await runCauseEffect(signIns.collectStorage());
+    assert.equal(storage?.origin, origin);
+    assert.deepEqual(storage?.entries, [{ name: "token", value: TOKEN_VALUE }]);
+    recordCases("collect-storage-of-tab-site");
 
     // 5. A closed window keeps the sign-in, so Done can still send it; it opens again on the same session.
     const popupClosed = closed(popup);
@@ -177,11 +183,12 @@ async function main(): Promise<void> {
     await windowClosed;
     await opened;
     assert.deepEqual(names(await runCauseEffect(signIns.collect())), ["js", "pref", "session"]);
+    assert.deepEqual(await runCauseEffect(signIns.collectStorage()), storage, "A closed window lost the storage.");
     const reopenedCreated = nextWindow();
     const reopened = runCauseEffect(signIns.open(target, `${origin}/home`));
     const reopenedWindow = await reopenedCreated;
     assert.equal(reopenedWindow.webContents.session, signInSession, "Reopen made a new session.");
-    recordCases("closed-window-keeps-sign-in", "reopen-same-session");
+    recordCases("closed-window-keeps-sign-in", "closed-window-keeps-storage", "reopen-same-session");
 
     // 6. The host sets only the cookies of the tab's site, and loads the page again signed in.
     const foreign: BrowserSignInCookie = {
@@ -194,21 +201,28 @@ async function main(): Promise<void> {
       sameSite: "lax",
       expirationDate: null,
     };
-    assert.equal(await runCauseEffect(host.importSignIn(tab.id, [foreign])), 0, "A foreign cookie was set.");
+    const none = { cookies: 0, storage: 0 };
+    assert.deepEqual(await runCauseEffect(host.importSignIn(tab.id, [foreign])), none, "A foreign cookie was set.");
     // The domain text fits the tab's host, but the URL made from it points to another host.
     const crafted = { ...foreign, name: "crafted", domain: "localhost#.127.0.0.1" };
-    assert.equal(await runCauseEffect(host.importSignIn(tab.id, [crafted])), 0, "A crafted domain was set.");
+    assert.deepEqual(await runCauseEffect(host.importSignIn(tab.id, [crafted])), none, "A crafted domain was set.");
+    const foreignStorage = { origin: otherOrigin, entries: [{ name: "foreign", value: "fixture" }] };
+    assert.deepEqual(await runCauseEffect(host.importSignIn(tab.id, [], foreignStorage)), none);
+    assert.equal(await tabContents.executeJavaScript('localStorage.getItem("foreign")'), null);
     const reloaded = loaded(tabContents);
-    assert.equal(await runCauseEffect(host.importSignIn(tab.id, collected)), 3);
+    assert.deepEqual(await runCauseEffect(host.importSignIn(tab.id, collected, storage)), { cookies: 3, storage: 1 });
     await reloaded;
     assert.equal(tabContents.getTitle(), "signed-in");
+    assert.equal(await tabContents.executeJavaScript('localStorage.getItem("token")'), TOKEN_VALUE);
     assert.deepEqual(await tabContents.session.cookies.get({ url: origin }).then(names), ["js", "pref", "session"]);
     assert.deepEqual(await tabContents.session.cookies.get({ name: "foreign" }).then(names), []);
     assert.deepEqual(await tabContents.session.cookies.get({ name: "crafted" }).then(names), []);
     recordCases(
       "import-refuses-other-site",
       "import-refuses-crafted-domain",
+      "import-refuses-other-origin-storage",
       "import-sets-site-cookies",
+      "import-sets-tab-origin-storage",
       "import-reloads-signed-in",
     );
 
@@ -219,7 +233,7 @@ async function main(): Promise<void> {
     assert(ownContents, "Missing the own-session tab contents.");
     assert.notEqual(ownContents.session, tabContents.session, "The agent tab uses the shared session.");
     const own: BrowserSignInCookie = { ...foreign, name: "own", domain: "127.0.0.1" };
-    assert.equal(await runCauseEffect(host.importSignIn(ownTab.id, [own])), 1);
+    assert.deepEqual(await runCauseEffect(host.importSignIn(ownTab.id, [own])), { cookies: 1, storage: 0 });
     assert.deepEqual(await ownContents.session.cookies.get({ name: "own" }).then(names), ["own"]);
     assert.deepEqual(
       await tabContents.session.cookies.get({ name: "own" }).then(names),

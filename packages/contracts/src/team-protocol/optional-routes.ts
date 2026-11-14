@@ -44,6 +44,7 @@ import { BROWSER_PAGE_STATE_CODECS } from "./browser-page-state-v1";
 import { BROWSER_PROFILES_CODECS } from "./browser-profiles-v1";
 import { BROWSER_PROXIES_CODECS } from "./browser-proxies-v1";
 import { BROWSER_SECRET_VAULT_CODECS } from "./browser-secret-vault-v1";
+import { BROWSER_SIGN_IN_STORAGE_CODECS } from "./browser-sign-in-storage-v1";
 import { BROWSER_SIGN_IN_CODECS } from "./browser-sign-in-v1";
 import { BROWSER_TEACH_CODECS } from "./browser-teach-v1";
 import { BROWSER_USER_CONTROL_CODECS } from "./browser-user-control-v1";
@@ -278,6 +279,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...BROWSER_TEACH_CODECS,
   ...BROWSER_PAGE_STATE_CODECS,
   ...BROWSER_SIGN_IN_CODECS,
+  ...BROWSER_SIGN_IN_STORAGE_CODECS,
   ...AGENT_TASKS_CODECS,
   ...AGENT_THREADS_CODECS,
   ...AGENT_THREAD_READS_CODECS,
