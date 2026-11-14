@@ -116,6 +116,12 @@ function modelAtCapacity(error: DynamicRecord | null, details: string | null): b
   return error?.codexErrorInfo === "serverOverloaded" || (details !== null && MODEL_AT_CAPACITY.test(details));
 }
 const ENDED_TURN_LIMIT = 256;
+/**
+ * How long a quiet turn may send nothing after its no-update call before OpenBot ends it. A model
+ * that ends its turn does so in seconds; Grok tries a reply with only reasoning again for minutes
+ * with no update, until the stall watch fails the finished run (#8629).
+ */
+const QUIET_END_MS = 30_000;
 /** How long before a turn's start its usage records can be, as in host analytics. */
 const TURN_USAGE_MARGIN_MS = 60 * 60 * 1_000;
 /**
@@ -421,6 +427,10 @@ export class TurnLifecycle {
   readonly #quietChannelTurns = new Set<string>();
   /** Quiet routine turns whose provider failed with no answer after the no-update call. The completion takes the entry. */
   readonly #quietEmptyAnswers = new Set<string>();
+  /** The check that ends each quiet turn that sends nothing after its no-update call (`QUIET_END_MS`). */
+  readonly #quietEndTimers = new Map<string, NodeJS.Timeout>();
+  /** Quiet turns that OpenBot stopped after their no-update call. Their `interrupted` end completes them. */
+  readonly #quietStops = new Set<string>();
   /** Running turns whose agent reported that its routine run failed, with the reason. The completion takes it. */
   readonly #reportedFailures = new Map<string, string>();
   /**
@@ -557,6 +567,9 @@ export class TurnLifecycle {
     this.#noUpdateTurns.clear();
     this.#quietChannelTurns.clear();
     this.#quietEmptyAnswers.clear();
+    for (const timer of this.#quietEndTimers.values()) clearTimeout(timer);
+    this.#quietEndTimers.clear();
+    this.#quietStops.clear();
     this.#reportedFailures.clear();
     this.#endedTurns.clear();
     this.#refusedRetries.clear();
@@ -1074,9 +1087,12 @@ export class TurnLifecycle {
         const reported = getString(turn, "status") ?? "completed";
         const noAnswer = reported === "completed" && this.#holdCodexNoAnswer(agentId, threadId, turnId, source);
         // The compaction deadline stopped this turn, not the user: it failed. A quiet routine turn that
-        // failed only because it gave no answer after the no-update call completed.
+        // failed only because it gave no answer after the no-update call completed, as did one that
+        // OpenBot stopped because it sent nothing after that call.
         const status =
-          reported === "failed" && this.#quietEmptyAnswers.has(turnId) && !this.#turnErrors.has(turnId)
+          ((reported === "failed" && this.#quietEmptyAnswers.has(turnId)) ||
+            (reported === "interrupted" && this.#quietStops.has(turnId))) &&
+          !this.#turnErrors.has(turnId)
             ? "completed"
             : (reported === "interrupted" &&
                   this.#compactionFailures.get(turnId)?.stalled &&
@@ -1211,16 +1227,7 @@ export class TurnLifecycle {
           agentId &&
           threadId &&
           errorTurnId &&
-          this.#runningTurns.has(errorTurnId) &&
-          !this.#reportedFailures.has(errorTurnId) &&
-          (this.#quietChannelTurns.has(errorTurnId) ||
-            (this.#noUpdateTurns.has(errorTurnId) &&
-              this.#quietRoutineTurn(
-                agentId,
-                threadId,
-                this.#mailbox.findDeliveriesByTurn(agentId, errorTurnId),
-                true,
-              )))
+          this.#quietAfterNoUpdate(agentId, threadId, errorTurnId)
         ) {
           this.#quietEmptyAnswers.add(errorTurnId);
           logger.info("A quiet turn ended with no answer after its no-update call.", {
@@ -1425,7 +1432,9 @@ export class TurnLifecycle {
   requestNoUpdate(agentId: string, threadId: string, turnId: string, channelRun = false): "quiet" | "shown" | null {
     if (channelRun) {
       this.#quietChannelTurns.add(turnId);
-      return this.#reportedFailures.has(turnId) ? "shown" : "quiet";
+      if (this.#reportedFailures.has(turnId)) return "shown";
+      this.#armQuietEnd(agentId, turnId);
+      return "quiet";
     }
     const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
     if (
@@ -1438,7 +1447,66 @@ export class TurnLifecycle {
     this.#noUpdateTurns.add(turnId);
     // A failed run is never quiet, so its answer must still be written.
     if (this.#reportedFailures.has(turnId)) return "shown";
-    return this.#quietRoutineTurn(agentId, threadId, deliveries, true) ? "quiet" : "shown";
+    if (!this.#quietRoutineTurn(agentId, threadId, deliveries, true)) return "shown";
+    this.#armQuietEnd(agentId, turnId);
+    return "quiet";
+  }
+
+  /** Whether a running turn ends quiet after its no-update call (#6247), a channel routine turn too (#7166). */
+  #quietAfterNoUpdate(agentId: string, threadId: string, turnId: string): boolean {
+    return (
+      this.#runningTurns.has(turnId) &&
+      !this.#reportedFailures.has(turnId) &&
+      (this.#quietChannelTurns.has(turnId) ||
+        (this.#noUpdateTurns.has(turnId) &&
+          this.#quietRoutineTurn(agentId, threadId, this.#mailbox.findDeliveriesByTurn(agentId, turnId), true)))
+    );
+  }
+
+  /**
+   * Stops a quiet turn that sends nothing for `QUIET_END_MS` after its no-update call, and its end
+   * completes it. An open tool step or a provider event, such as thinking, keeps the turn. A Stop of
+   * the user and a reported failure keep their own end.
+   */
+  #armQuietEnd(agentId: string, turnId: string): void {
+    if (this.#quietEndTimers.has(turnId)) return;
+    const calledAt = Date.now();
+    const check = () => {
+      this.#quietEndTimers.delete(turnId);
+      const running = this.#runningTurns.get(turnId);
+      if (!running || this.#quietStops.has(turnId)) return;
+      const { client, threadId } = running;
+      if (
+        !this.#quietAfterNoUpdate(agentId, threadId, turnId) ||
+        this.#hooks.turnStopped(agentId, this.#taskForThread(agentId, threadId), turnId)
+      )
+        return;
+      const silentFor = Date.now() - Math.max(calledAt, this.#lastEventAt.get(agentId) ?? 0);
+      if (running.openTools.size > 0 || silentFor < QUIET_END_MS) {
+        wait(Math.max(QUIET_END_MS - silentFor, 1_000));
+        return;
+      }
+      this.#quietStops.add(turnId);
+      logger.info("A quiet turn sent nothing after its no-update call; OpenBot ends it.", {
+        agentId,
+        turnId,
+        provider: client.provider,
+      });
+      Effect.runFork(client.request("turn/interrupt", { threadId, turnId }, decodeRecordResponse).pipe(Effect.ignore));
+    };
+    const wait = (ms: number) => {
+      const timer = setTimeout(check, ms);
+      timer.unref?.();
+      this.#quietEndTimers.set(turnId, timer);
+    };
+    wait(QUIET_END_MS);
+  }
+
+  #clearQuietEnd(turnId: string): void {
+    const timer = this.#quietEndTimers.get(turnId);
+    if (timer) clearTimeout(timer);
+    this.#quietEndTimers.delete(turnId);
+    this.#quietStops.delete(turnId);
   }
 
   /** Whether the channel shows the answers of this running channel routine turn as steps (#7166). */
@@ -1508,6 +1576,7 @@ export class TurnLifecycle {
       const noUpdateCalled = this.#noUpdateTurns.delete(turnId);
       const quietChannelRun = this.#quietChannelTurns.has(turnId);
       this.#quietEmptyAnswers.delete(turnId);
+      this.#clearQuietEnd(turnId);
       const reportedFailure = this.#reportedFailures.get(turnId);
       this.#reportedFailures.delete(turnId);
       if (running) {
@@ -1997,6 +2066,7 @@ export class TurnLifecycle {
     this.#capacityNotices.delete(turnId);
     this.#reportedFailures.delete(turnId);
     this.#quietEmptyAnswers.delete(turnId);
+    this.#clearQuietEnd(turnId);
     this.#markEnded(turnId);
     this.#instructions.dropTurn(agentId, turnId);
     const trace = this.#traces.take(turnId, new Date().toISOString());
