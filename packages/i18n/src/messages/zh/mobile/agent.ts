@@ -299,6 +299,7 @@ export const messages = {
   "mobile.agent.runtime.effort.xhigh": "极高",
   "mobile.agent.runtime.effort.max": "最高",
   "mobile.agent.runtime.effort.ultra": "超高",
+  "mobile.agent.runtime.fast": "快速",
   "mobile.agent.runtime.retryModels": "重试加载模型",
   "mobile.agent.runtime.loadingModels": "正在加载模型…",
   "mobile.agent.runtime.noModels": "该服务商没有可用模型。",

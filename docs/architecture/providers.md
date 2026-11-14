@@ -986,6 +986,8 @@ is not usable on Windows, where the launcher is a `.cmd` file, so staging writes
 checks the SHA-256 of each file in `files`. `resolveCursorCli` looks for `cursor-agent` on `PATH`,
 never `cursor`, which starts the Cursor editor.
 
+`initialize` tells Cursor that OpenBot can take model parameters (`clientCapabilities._meta.parameterizedModelPicker`). Cursor then sends each model once, plus a fast choice. Without that flag, Composer and Grok arrive only as the fast variant. OpenBot lists both speeds as model values, `composer-2.5[fast=false]` and `composer-2.5[fast=true]`, and the same for context or thinking when Cursor offers more than one. A turn sets the base model, then each parameter. The effort control still owns reasoning. An id saved before this split still selects the row with the same speed.
+
 Sign in is an ACP `authenticate` call with `cursor_login`, in a separate process, as for Gemini.
 `CURSOR_API_KEY` in the environment also signs the CLI in. A confined Cursor process gets
 `CURSOR_CONFIG_DIR=~/.cursor/openbot-confined` (`cursorConfinedEnv`): the CLI writes
