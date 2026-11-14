@@ -10,22 +10,20 @@ export interface XWaylandRestartCommand {
 }
 
 /**
- * The same launch on XWayland: the AppImage itself where there is one, because an AppImage mounts itself
- * for each start and the mount of this process goes away with it; else this executable. The arguments of
- * this launch follow, then `x11Argument`, and the environment carries the restart marker.
+ * The same launch on XWayland: `file`, then the arguments of this launch, then `x11Argument`. The
+ * environment carries the restart marker.
  */
 export function xwaylandRestartCommand(options: {
+  file: string;
   environment: NodeJS.ProcessEnv;
-  execPath: string;
   argv: readonly string[];
   x11Argument: string;
   marker: string;
   reason: string;
 }): XWaylandRestartCommand {
-  const file = options.environment.APPIMAGE || options.execPath;
   return {
-    file,
-    argv: [file, ...options.argv.slice(1), options.x11Argument],
+    file: options.file,
+    argv: [options.file, ...options.argv.slice(1), options.x11Argument],
     env: { ...options.environment, [options.marker]: options.reason },
   };
 }
