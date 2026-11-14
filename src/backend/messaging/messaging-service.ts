@@ -522,9 +522,14 @@ export class MessagingService {
     if (updated) yield* this.#startConnection(updated);
   }, Effect.uninterruptible);
 
-  /** True for a WhatsApp number whose owner turned off the "Waiting" and "Working on it…" posts. */
-  #withoutStatusPost(live: LiveConnection): boolean {
-    return live.record.platform === "whatsapp" && this.#whatsapp?.workingMessage(live.record.connectionId) === false;
+  /**
+   * True for a WhatsApp number whose owner turned off the "Working on it…" message. No status line goes
+   * there: a request that is delegated or stopped, or that ends without an answer, leaves only its
+   * reaction. An error still posts its line, so the person knows that the request did not succeed.
+   */
+  #withoutStatusPost(connectionId: string): boolean {
+    // Only a WhatsApp number stores this value, so another platform always reads true here.
+    return this.#whatsapp?.workingMessage(connectionId) === false;
   }
 
   /**
@@ -1615,7 +1620,12 @@ export class MessagingService {
             yield* this.#serial(
               result.link.linkId,
               Effect.gen({ self: this }, function* () {
-                if (this.#posts.has(key) || !this.#targets.has(key) || this.#withoutStatusPost(live)) return;
+                if (
+                  this.#posts.has(key) ||
+                  !this.#targets.has(key) ||
+                  this.#withoutStatusPost(live.record.connectionId)
+                )
+                  return;
                 const messageId = yield* adapter
                   .post(message.target, { text: sourceText("status.messaging.queued") })
                   .pipe(toMessagingOperationFailed);
@@ -1983,7 +1993,7 @@ export class MessagingService {
       if (!live) return;
       // The owner turned the post off for this WhatsApp number: the reaction shows that OpenBot read
       // the message, the answer is the only post, and a reply of "stop" still stops the request.
-      if (!post?.messageId && this.#withoutStatusPost(live)) {
+      if (!post?.messageId && this.#withoutStatusPost(live.record.connectionId)) {
         // The request is recorded without a post, so a request that a restart ends still gets its end.
         this.#posts.set(key, { connectionId: live.record.connectionId, target, messageId: null, stopToken: null });
         this.#status.restored.delete(key);
@@ -2021,6 +2031,7 @@ export class MessagingService {
       activity,
       this.#threads.awaitsTeammate(activity.link.linkId),
       this.#quietEnd(activity.link.connectionId, target),
+      this.#withoutStatusPost(activity.link.connectionId),
     );
     // In a thread that a ping opened, a person that the answer pings can reply without a mention too.
     if (final.answer && live?.record.platform === "slack") {
@@ -2161,7 +2172,8 @@ export class MessagingService {
         if (!this.#status.restored.has(key)) continue;
         if (this.#threads.isPending(linkId, key.slice(linkId.length + 1))) continue;
         this.#status.restored.delete(key);
-        const text = this.#quietEnd(connectionId, post.target) ? "" : sourceText("status.messaging.stopped");
+        const quiet = this.#withoutStatusPost(connectionId) || this.#quietEnd(connectionId, post.target);
+        const text = quiet ? "" : sourceText("status.messaging.stopped");
         post = { ...post, final: { answer: false, text, reaction: "stopped" } };
         this.#posts.set(key, post);
       }
@@ -2559,18 +2571,21 @@ function token(): string {
 /**
  * The last post of a request and the reaction on the person's message, from how its turn ended. In a
  * quiet chat, a failed or stopped request posts no text: an empty text takes back the status post.
+ * With `answerOnly`, a stopped request, or one that ends without an answer, posts no text either; a
+ * failed one still does.
  */
 function finalPost(
   activity: Exclude<MessagingActivity, { type: "started" | "progress" }>,
   awaitsTeammate: boolean,
   quiet: boolean,
+  answerOnly: boolean,
 ): PendingFinal {
   // A follow-up turn answers a teammate's reply: the person's message already shows how its own turn ended.
   const reacts = activity.type === "cancelled" || !activity.followUp;
   if (activity.type === "cancelled" || activity.status === "interrupted")
     return {
       answer: false,
-      text: quiet ? "" : sourceText("status.messaging.stopped"),
+      text: quiet || answerOnly ? "" : sourceText("status.messaging.stopped"),
       reaction: reacts ? "stopped" : null,
     };
   // The provider's error can hold local paths or MCP values, so the platform gets a fixed sentence.
@@ -2585,6 +2600,7 @@ function finalPost(
   if (activity.answer && isQuietAnswer(activity.answer)) return { answer: false, text: "", reaction };
   // The platform is outside this computer, so a secret in the answer must not reach it.
   if (activity.answer) return { answer: true, text: redactText(activity.answer), reaction };
+  if (answerOnly) return { answer: false, text: "", reaction };
   // A turn that only asked a teammate has nothing to say yet: the answer comes back to this thread.
   if (!activity.followUp && awaitsTeammate)
     return { answer: false, text: sourceText("status.messaging.delegated"), reaction };
