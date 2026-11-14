@@ -128,7 +128,7 @@ export class WhatsAppArchive {
       // The size that the sender declares can be wrong; the limit counts the bytes on disk.
       size = statSync(path).size;
     } catch (cause) {
-      rmSync(part, { force: true });
+      this.#delete(part);
       // Only the name: a WhatsApp error can hold the file's link.
       const reason =
         cause instanceof Error ? (cause.message === "file_too_large" ? cause.message : cause.name) : "unknown";
@@ -158,8 +158,16 @@ export class WhatsAppArchive {
     return resolve(path).startsWith(`${this.#folder}${sep}`);
   }
 
+  /** Never fails: an open file (EBUSY, EPERM) must not stop the download queue or a message event. */
   #delete(path: string): void {
-    if (this.#owns(path)) rmSync(path, { force: true });
+    if (!this.#owns(path)) return;
+    try {
+      rmSync(path, { force: true });
+    } catch (cause) {
+      logger.warn("A saved WhatsApp file could not be deleted.", {
+        cause: cause instanceof Error ? cause.name : "unknown",
+      });
+    }
   }
 }
 
