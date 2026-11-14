@@ -104,3 +104,27 @@ export function knownSideThread(
   const thread = sources.knownThreads(serverId, agentId)?.find((item) => item.threadId === threadId);
   return thread ? { type: "thread", serverId, agentId, taskId: thread.id } : null;
 }
+
+/**
+ * Waits for a server whose compatibility check has not answered yet: the task capability is then
+ * unknown, not missing. A tap on a cold start arrives before the check; the channel list waits for
+ * its host the same way. True when the host serves agent tasks. Stops at once when the check has
+ * answered (`online`) or the host is out of reach (`offline`, `error`), so a host without agent
+ * tasks waits no longer than before.
+ */
+export async function waitTaskCapability(
+  canUseTasks: () => boolean,
+  serverState: () => "unknown" | "connecting" | "online" | "offline" | "error" | undefined,
+  timeoutMs: number,
+  sleep: (ms: number) => Promise<void> = (ms) => new Promise((done) => setTimeout(done, ms)),
+  now: () => number = Date.now,
+): Promise<boolean> {
+  const deadline = now() + timeoutMs;
+  for (;;) {
+    if (canUseTasks()) return true;
+    const state = serverState();
+    if (state === "online" || state === "offline" || state === "error") return false;
+    if (now() >= deadline) return canUseTasks();
+    await sleep(250);
+  }
+}
