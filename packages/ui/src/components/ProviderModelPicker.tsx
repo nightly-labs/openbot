@@ -69,6 +69,7 @@ import {
   providerAvailability,
   providerTurnedOff,
   providerUsable,
+  splitServiceName,
 } from "./provider-model-options";
 import { SwapLabel, type SwapMotion } from "./SwapLabel";
 
@@ -650,11 +651,14 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   };
   /**
    * The model name in the trigger. Beside an account it has no provider word, because the mark
-   * shows the provider and the account needs the room. The tooltip and the label keep the full name.
-   * A form field has the room of its row and keeps the full name.
+   * shows the provider and the account needs the room. An OpenCode model has no service either, as
+   * in its list: "OpenCode Go/DeepSeek" left the model no room (#8591). The tooltip and the label
+   * keep the full name. A form field has the room of its row and keeps the full name.
    */
   const triggerShownName = () => {
-    const name = triggerModelName();
+    const fullName = triggerModelName();
+    const model = splitServiceName(props.provider, fullName).name;
+    const name = !field() && activeProvider() === "opencode" && model.trim() ? model : fullName;
     const prefix = `${railName(activeProvider(), t)} `;
     return !field() && triggerAccount() && name.startsWith(prefix) ? name.slice(prefix.length) || name : name;
   };
