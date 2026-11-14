@@ -1857,6 +1857,14 @@ export class MailboxStore {
    * messaging and task work, which runs outside that turn, and for the answers to a request that went
    * to several teammates: they start together in one turn (`#isHeldReply`), so none goes in alone.
    */
+  /**
+   * The sender already has a request running with one of these recipients and no answer yet, so a
+   * message without an explicit expectsReply amends that request instead of starting a second one.
+   */
+  amendsRunningRequest(senderAgentId: string, recipientAgentIds: readonly string[]): boolean {
+    return amendsRunningRequest(this.#state, senderAgentId, recipientAgentIds);
+  }
+
   chatTurnSteer(deliveryId: string): "joins" | "own-turn" | null {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     if (delivery?.status !== "queued") return null;
@@ -3878,4 +3886,60 @@ function isAnswer(
   message: StoredMessage,
 ): message is StoredMessage & { sender: { kind: "agent"; agentId: string }; replyToMessageId: string } {
   return message.sender.kind === "agent" && message.replyToMessageId !== null && message.expectsReply === false;
+}
+
+/** The two facts this query reads, so it can be tested without a store on disk. */
+interface AmendableState {
+  messages: ReadonlyArray<Pick<StoredMessage, "id" | "sender" | "expectsReply" | "replyToMessageId">>;
+  deliveries: ReadonlyArray<Pick<StoredDelivery, "messageId" | "recipientAgentId" | "status">>;
+}
+
+/**
+ * The stored expectsReply for a message the sender did not label: `false` when it amends a request
+ * already running at the recipient, otherwise unchanged. An explicit flag or a reply always wins.
+ */
+export function amendedExpectsReply(
+  explicit: boolean | undefined,
+  hasReply: boolean,
+  amends: boolean,
+): boolean | undefined {
+  if (explicit !== undefined) return explicit;
+  if (hasReply) return undefined;
+  return amends ? false : undefined;
+}
+
+/**
+ * Whether the agent's next message to one of these recipients corrects a request that is still
+ * running there. A request that already has an answer, or whose deliveries all finished, is not
+ * running any more. Only a payload that is actually in a turn counts: a request that waits for a
+ * free recipient is not one the sender can amend, so a real question keeps its own turn and answer.
+ */
+export function amendsRunningRequest(
+  state: AmendableState,
+  senderAgentId: string,
+  recipientAgentIds: readonly string[],
+): boolean {
+  const recipients = new Set(recipientAgentIds);
+  if (recipients.size === 0) return false;
+  const pending = new Set<string>();
+  let running = false;
+  for (const delivery of state.deliveries) {
+    if (delivery.status !== "running" || !recipients.has(delivery.recipientAgentId)) continue;
+    const message = state.messages.find((candidate) => candidate.id === delivery.messageId);
+    if (!message || message.sender.kind !== "agent" || message.sender.agentId !== senderAgentId) continue;
+    if (message.expectsReply === false) continue;
+    pending.add(message.id);
+    running = true;
+  }
+  if (!running) return false;
+  for (const messageId of pending) {
+    const answered = state.messages.some(
+      (candidate) =>
+        candidate.replyToMessageId === messageId &&
+        candidate.sender.kind === "agent" &&
+        candidate.expectsReply === false,
+    );
+    if (!answered) return true;
+  }
+  return false;
 }
