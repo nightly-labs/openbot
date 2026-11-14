@@ -54,6 +54,28 @@ export const startTaskToolSchema = z.strictObject({
   brief: z.string().trim().min(1).max(INPUT_LIMITS.messageText),
 });
 
+/** A task of this agent; another agent's id fails the same way a missing task does. */
+export function requireOwnTask(store: AgentThreadStore, agentId: string, taskId: string): AgentThreadRecord {
+  const task = store.task(taskId);
+  if (!task || task.agentId !== agentId) throw new Error(sourceText("error.backend.threadNotFound"));
+  return task;
+}
+
+/**
+ * Closes the agent's own task, or reports that it was closed already. A second stop is not an error,
+ * and the record with its thread stays for the task list.
+ */
+export function closeOwnTaskRecord(
+  store: AgentThreadStore,
+  agentId: string,
+  taskId: string,
+): "closed" | "already-closed" {
+  const task = requireOwnTask(store, agentId, taskId);
+  if (task.closedAt !== null) return "already-closed";
+  store.close(taskId);
+  return "closed";
+}
+
 export const STOP_TASK_TOOL = "stop_task";
 
 /** Stops one of the caller's own tasks. A foreign task id is refused by the store lookup. */
@@ -199,9 +221,7 @@ export class AgentTasks implements TaskLanes {
 
   /** A task of this agent, open or closed. */
   require(agentId: string, taskId: string): AgentThreadRecord {
-    const task = this.#store.task(taskId);
-    if (!task || task.agentId !== agentId) throw new Error(sourceText("error.backend.threadNotFound"));
-    return task;
+    return requireOwnTask(this.#store, agentId, taskId);
   }
 
   /** The title is the first line of the message that starts the task. */
