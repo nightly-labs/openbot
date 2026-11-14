@@ -1098,7 +1098,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             ? null
             : { supported: supportedReasoningEfforts, defaultEffort: defaultReasoningEffort },
         );
-        sdkValues.set(id, model.value.trim() || id);
+        // `default` follows Claude Code's own default, which can change, such as at a usage limit,
+        // while the agent keeps its model. Its resolved id names the model that the agent chose (#9071).
+        sdkValues.set(id, model.value.trim() === "default" ? id : model.value.trim() || id);
         return {
           model: id,
           displayName: model.displayName,
