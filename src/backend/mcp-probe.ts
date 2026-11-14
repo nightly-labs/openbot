@@ -22,6 +22,7 @@ import {
   MCP_CLIENT_NAME,
   type McpOAuthAuthority,
   type McpSignIn,
+  namesAuthorizationServer,
   normalizeResource,
   secureOAuthFetch,
 } from "./mcp-oauth-provider";
@@ -158,8 +159,8 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
   const record = (next: McpChallenge) => {
     seen.challenge = next;
   };
-  const failure = (error: unknown): McpProbeOutcome => {
-    const described = describeProbeFailure(error, config, timeoutMs, signIn, seen.challenge, signInPlace);
+  const failure = (error: unknown, signedIn = false): McpProbeOutcome => {
+    const described = describeProbeFailure(error, config, timeoutMs, signIn, seen.challenge, signInPlace, signedIn);
     return {
       toolCount: 0,
       error: boundedError(redactMcpValues(described, probeSecrets(server, signIn))),
@@ -180,7 +181,7 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
         .complete()
         .pipe(toMcpProbeFailure, Effect.andThen(connectAndCountEffect(server, timeoutMs, active, record))),
     );
-    return Result.isFailure(retry) ? failure(retry.failure.cause) : found(retry.success);
+    return Result.isFailure(retry) ? failure(retry.failure.cause, true) : found(retry.success);
   });
   const startedAt = Date.now();
   const first = yield* Effect.result(connectAndCountEffect(server, timeoutMs, signIn, record));
@@ -193,26 +194,20 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
     return begun.success ? yield* afterSignIn(signIn) : found(first.success);
   }
   // A server on the 2025-03 MCP authorization spec answers 401 with no challenge at all, and some
-  // OAuth servers, such as Adobe's (#9232), answer 403; their OAuth metadata at the origin is what
-  // says a sign-in, not a key, is wanted. Only a refusal the sentence would explain is followed up,
+  // OAuth servers, such as Adobe's (#9232), answer 403; their public OAuth metadata is what says a
+  // sign-in, not a key, is wanted. Only a refusal the sentence would explain is followed up,
   // and only public documents are read: no credential is sent.
   const unexplained = seen.challenge;
-  if (
-    !signIn &&
-    signInPlace !== null &&
-    ((unexplained?.status === 401 && !unexplained.bearer) || unexplained?.status === 403) &&
-    !hasCredentialHeader(config)
-  )
+  if (!signIn && signInPlace !== null && unexplained && !hasCredentialHeader(config)) {
     // The same Test deadline covers the lookup: it gets only the time the connection left.
-    seen.challenge = {
-      ...unexplained,
-      // A 403 is a sign-in only where Sign in can start one: `begin` needs the protected-resource document.
-      bearer: yield* advertisesOAuth(
-        config.url,
-        timeoutMs - (Date.now() - startedAt),
-        unexplained.status === 403 ? PROTECTED_RESOURCE_METADATA : OAUTH_METADATA,
-      ),
-    };
+    const remainingMs = timeoutMs - (Date.now() - startedAt);
+    if (unexplained.status === 401 && !unexplained.bearer)
+      seen.challenge = { ...unexplained, bearer: yield* advertisesOAuth(config.url, remainingMs) };
+    // A 403 is a sign-in only where Sign in can start one, and Sign in starts none while a token is
+    // saved: a server that refuses that token refuses the account.
+    else if (unexplained.status === 403 && !server.authorization)
+      seen.challenge = { ...unexplained, bearer: yield* offersSignIn(config.url, remainingMs) };
+  }
   if (!signIn) return failure(first.failure.cause);
   if (first.failure.cause instanceof UnauthorizedError) return yield* afterSignIn(signIn);
   // The SDK starts a sign-in only on a 401, so a 403 with no key of the user's ends the press with
@@ -240,11 +235,14 @@ function describeProbeFailure(
   signIn: McpSignIn | null,
   challenge: McpChallenge | null,
   signInPlace: McpSignInPlace | null,
+  /** The refusal came after the sign-in, so a 403 refuses the account the person has just signed in with. */
+  signedIn: boolean,
 ): string {
   if (signIn?.cancelled()) return sourceText("error.backend.mcpSignInCancelled");
   if (signIn && isRegistrationRefusal(error, signIn)) return REGISTRATION_REFUSED;
   const status = httpStatus(error);
-  if (signIn && status === 401) return sourceText("error.backend.mcpSignInNotAccepted");
+  if (signIn && (status === 401 || (signedIn && status === 403)))
+    return sourceText("error.backend.mcpSignInNotAccepted");
   // The token endpoint refused the grant. Its status says nothing about the address the user typed.
   if (signIn?.exchangeFailed() && status !== null && status >= 400 && status < 500)
     return sourceText("error.backend.mcpSignInNotAccepted");
@@ -458,14 +456,11 @@ function challengeRecordingFetch(onChallenge: (challenge: McpChallenge) => void)
   };
 }
 
-const PROTECTED_RESOURCE_METADATA = ["/.well-known/oauth-protected-resource"];
-const OAUTH_METADATA = [...PROTECTED_RESOURCE_METADATA, "/.well-known/oauth-authorization-server"];
-
-/** Whether the server's origin publishes one of these OAuth metadata documents, read without any credential. */
-const advertisesOAuth = Effect.fnUntraced(function* (url: string, remainingMs: number, documents: string[]) {
+/** Whether the server's origin publishes OAuth metadata, read without any credential. */
+const advertisesOAuth = Effect.fnUntraced(function* (url: string, remainingMs: number) {
   if (remainingMs <= 0) return false;
   const { origin } = new URL(url);
-  const lookups = documents.map((path) =>
+  const lookups = ["/.well-known/oauth-protected-resource", "/.well-known/oauth-authorization-server"].map((path) =>
     Effect.tryPromise({
       try: async (signal) => {
         const response = await fetch(`${origin}${path}`, { signal, headers: { accept: "application/json" } });
@@ -479,6 +474,22 @@ const advertisesOAuth = Effect.fnUntraced(function* (url: string, remainingMs: n
     Effect.timeoutOrElse({ duration: remainingMs, orElse: () => Effect.succeed([false]) }),
   );
   return found.some(Boolean);
+});
+
+/**
+ * Whether Sign in could open a page for this server: the metadata read of `McpSignIn.begin`, without
+ * any credential. A read that fails or gets no answer in the time left is a no.
+ */
+const offersSignIn = Effect.fnUntraced(function* (url: string, remainingMs: number) {
+  if (remainingMs <= 0) return false;
+  const controller = new AbortController();
+  const fetchFn: FetchLike = (input, init) => fetch(input, { ...init, signal: controller.signal });
+  return yield* namesAuthorizationServer(normalizeResource(url) ?? url, fetchFn).pipe(
+    Effect.map((issuer) => issuer !== null),
+    Effect.timeoutOrElse({ duration: remainingMs, orElse: () => Effect.succeed(false) }),
+    Effect.catch(() => Effect.succeed(false)),
+    Effect.ensuring(Effect.sync(() => controller.abort())),
+  );
 });
 
 /** Close both SDK resources and kill a stdio child if it survives transport close. */

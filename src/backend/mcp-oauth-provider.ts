@@ -1646,7 +1646,7 @@ function mcpOAuthServerUrl(key: string): string {
  * 429) says nothing about the server, so it fails: a sign-in must not end as if the server asked for
  * none, which left the row showing the result of the earlier test, with no page and no words.
  */
-const namesAuthorizationServer = Effect.fnUntraced(function* (resource: string, fetchFn: FetchLike) {
+export const namesAuthorizationServer = Effect.fnUntraced(function* (resource: string, fetchFn: FetchLike) {
   let metadataStatus: number | null = null;
   const metadataFetch: FetchLike = async (input, init) => {
     metadataStatus = null;
