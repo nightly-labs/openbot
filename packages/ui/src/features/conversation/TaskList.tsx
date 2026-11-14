@@ -1,5 +1,6 @@
 import { Button, ChevronDown } from "@openbot/ui";
 import { createMemo, createSignal, createUniqueId, For, onSettled, Show, untrack } from "solid-js";
+import { useAmbientMotion } from "../../ambient-motion";
 import { createDigitRoll } from "../../digit-roll";
 import { DigitRuns } from "../../digit-runs";
 import { useText } from "../../text";
@@ -233,14 +234,18 @@ export function TaskMark(props: { state: TaskMarkState }) {
   );
 }
 
-/** Pause task motion while the document is hidden, including in shared web consumers. */
+/**
+ * Pause task motion while the document is hidden, including in shared web consumers, and while the
+ * window does not allow motion that loops by itself (see `AmbientMotion`).
+ */
 export function createTaskListPlayState() {
-  const [playState, setPlayState] = createSignal(document.hidden ? "paused" : "running");
+  const ambientMotion = useAmbientMotion();
+  const [hidden, setHidden] = createSignal(document.hidden);
   onSettled(() => {
-    const refresh = () => setPlayState(document.hidden ? "paused" : "running");
+    const refresh = () => setHidden(document.hidden);
     refresh();
     document.addEventListener("visibilitychange", refresh);
     return () => document.removeEventListener("visibilitychange", refresh);
   });
-  return playState;
+  return () => (hidden() || !ambientMotion() ? "paused" : "running");
 }

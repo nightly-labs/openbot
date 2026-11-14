@@ -776,8 +776,9 @@
   scale: -1 1;
 }
 
-/* The dock is above the other apps. Its loops run only while the user uses the dock. */
-.agent-dock[data-ambient-motion="paused"] :is(.ui-spinner, .agent-row-thinking-dots i) {
+/* The dock is above the other apps. Its loops run only while the user uses the dock. A dock in the main
+   window also pauses its open chat while the user is in another app. */
+.agent-dock[data-ambient-motion="paused"] :is(.ui-spinner, .agent-row-thinking-dots i, .agent-dock-typing-dots i) {
   animation-play-state: paused;
 }
 
