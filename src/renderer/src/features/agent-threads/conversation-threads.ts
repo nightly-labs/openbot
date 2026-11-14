@@ -53,6 +53,8 @@ export interface ConversationThreadsInput {
 export function conversationThreads(input: ConversationThreadsInput): ConversationThreads {
   const { agent, tasks, tabs, approvals, prompts, takeovers, onCompactContext } = input;
   const agentId = agent.id;
+  // A send can wait for its files. It goes to the server that showed the thread, also after a switch (#9123).
+  const serverId = tabs.serverId();
   const snapshot = tasks.snapshot(agentId);
   const list = snapshot?.tasks ?? [];
   const listInput: Omit<ThreadListsInput, "open" | "draft"> = {
@@ -102,7 +104,7 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
       focusMessage: focus?.taskId === task.id ? focus : undefined,
       approval: sideApproval,
       onSend: (text, attachmentDraftIds, replyToMessageId) =>
-        tabs.send(agentId, task.id, text, attachmentDraftIds, replyToMessageId),
+        tabs.send(agentId, task.id, text, attachmentDraftIds, replyToMessageId, serverId),
       onStop: () => tasks.stopTask(agentId, task.id),
       onRead: (messageId) => tasks.markTaskRead(agentId, task.id, messageId),
       onRespondApproval: (decision, options) =>
@@ -175,8 +177,8 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
     acceptsReplies: tasks.repliable(),
     onSend: (text, attachmentDraftIds, replyToMessageId) =>
       open
-        ? tabs.send(agentId, open.id, text, attachmentDraftIds, replyToMessageId)
-        : tabs.sendDraft(agentId, text, attachmentDraftIds),
+        ? tabs.send(agentId, open.id, text, attachmentDraftIds, replyToMessageId, serverId)
+        : tabs.sendDraft(agentId, text, attachmentDraftIds, serverId),
     onStop: () => {
       if (open) tasks.stopTask(agentId, open.id);
     },

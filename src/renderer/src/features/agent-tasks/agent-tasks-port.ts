@@ -27,6 +27,7 @@ export interface AgentTasksPort
       replyToMessageId?: string;
       clientMessageId: string;
     },
+    serverId?: string,
   ): Promise<unknown>;
   /** Missing where the server cannot move a queued message of the agent's own chat to a new thread. */
   runQueuedMessageAsTask?: OpenBotDesktopApi["agent"]["runQueuedMessageAsTask"];
@@ -47,18 +48,19 @@ export interface AgentTasksPort
 
 /**
  * The side threads on desktop: main reaches the active server, or the server that a call names. A
- * delete that waits for its Undo time names its server, so a server switch does not move it.
+ * delete that waits for its Undo time, and a message that waits for its files, name their server, so a
+ * server switch does not move them (#9123).
  * Read on each call: tests and stories replace `window.openbot` per case.
  */
 export function agentTasksPort(): AgentTasksPort {
   const { agent } = window.openbot;
   return {
     listTasks: (agentId) => agent.listTasks(agentId),
-    readTask: (input) => agent.readTask(input),
+    readTask: (input, serverId) => agent.readTask(input, serverId),
     readTaskPage: (input) => agent.readTaskPage(input),
     readTaskAround: (input) => agent.readTaskAround(input),
-    startTask: (input) => agent.startTask(input),
-    sendToTask: (input) => agent.sendMessage(input),
+    startTask: (input, serverId) => agent.startTask(input, serverId),
+    sendToTask: (input, serverId) => agent.sendMessage(input, serverId),
     runQueuedMessageAsTask: (input) => agent.runQueuedMessageAsTask(input),
     branchTask: (input) => agent.branchTask(input),
     stopTask: (input) => agent.stopTask(input),

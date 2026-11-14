@@ -15,7 +15,7 @@ import { createAgentTasks } from "./agent-tasks-state";
 const AgentTasks = createSimpleContext({
   name: "AgentTasks",
   init: () => {
-    const { activeServer, activeServerSupportsCapability } = useServers();
+    const { activeServer, activeServerId, activeServerSupportsCapability } = useServers();
     const { activeAgentId, agentStatus } = useAgents();
     const local = () => {
       const server = activeServer();
@@ -23,6 +23,7 @@ const AgentTasks = createSimpleContext({
     };
     return createAgentTasks({
       port: agentTasksPort,
+      serverId: activeServerId,
       activeAgentId,
       queuedMessageMovable: () => local() || activeServerSupportsCapability("agent-queue-task-v1"),
       available: () => local() || activeServerSupportsCapability("agent-tasks-v1"),

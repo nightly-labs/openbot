@@ -371,25 +371,38 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
     },
   );
 
-  /** Sends a message to a side thread. An archived thread is restored first. */
+  /**
+   * Sends a message to a side thread. An archived thread is restored first. `server` is the server of
+   * the thread: a message that waits for its files goes there, also after a server switch (#9123).
+   */
   async function send(
     agentId: string,
     id: string,
     text: string,
     attachmentDraftIds: string[],
     replyToMessageId: string | null = null,
+    server = serverId(),
   ): Promise<boolean> {
-    if (task(agentId, id)?.state === "closed" && !(await tasks.reopenTask(agentId, id))) return false;
-    return tasks.sendToTask(agentId, id, text, attachmentDraftIds, replyToMessageId);
+    if (task(agentId, id)?.state === "closed" && !(await tasks.reopenTask(agentId, id, server))) return false;
+    return tasks.sendToTask(agentId, id, text, attachmentDraftIds, replyToMessageId, server);
   }
 
-  /** The first message of the new thread tab starts the thread, which then takes the place of the tab. */
-  async function sendDraft(agentId: string, text: string, attachmentDraftIds: string[]): Promise<boolean> {
-    const started = await tasks.startTask(agentId, text, attachmentDraftIds);
+  /**
+   * The first message of the new thread tab starts the thread, which then takes the place of the tab.
+   * After a server switch, the thread starts on `server` and the tabs of the server on screen stay.
+   */
+  async function sendDraft(
+    agentId: string,
+    text: string,
+    attachmentDraftIds: string[],
+    server = serverId(),
+  ): Promise<boolean> {
+    const started = await tasks.startTask(agentId, text, attachmentDraftIds, server);
     if (!started || !scopeIsCurrent()) return false;
     seen.add(started.id);
     const stillOpen = activeId(agentId) === DRAFT_THREAD_ID;
     setDraft(agentId, false);
+    if (serverId() !== server) return true;
     writeTabs(agentId, {
       open: [...keptIds(agentId).filter((entry) => entry !== started.id), started.id],
       active: stillOpen ? started.id : storedTabs(agentId).active,
@@ -499,6 +512,7 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
   );
 
   return {
+    serverId,
     openIds,
     sideIds,
     hasDraft,
