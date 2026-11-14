@@ -15,7 +15,8 @@ search and channel creation - are prop-driven views in `WorkspaceOverlayViews.ts
 host connection, so what an overlay decides from its server is decided in one place.
 The web client gives `PlatformProvider` a fixed `appInfo` in place of the main-process answer.
 There is no separate web dashboard.
-Small screens switch between the same conversation and workspace components. The shared browser
+On a phone, `WebPhoneAppScreen` first points to the phone app. After "Continue in browser", small
+screens switch between the same conversation and workspace components. The shared browser
 panel receives the web live-view runtime and hides unsupported native controls. `BrowserLiveView`
 accepts an explicit runtime; desktop and the existing preview still default to the preload-compatible
 API. The web Storybook runtime uses

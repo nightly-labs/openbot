@@ -37,6 +37,7 @@ import { AnalyticsConsentRow, ConsentNotice } from "../onboarding/AnalyticsConse
 import { createOnboardingTeam, onboardingSessionSeed } from "../onboarding/onboarding-avatars";
 import { deleteRemoteWorkspaceFrames } from "../servers/remote-workspace-frame";
 import { WebLanguageStep } from "./WebLanguageStep";
+import { phoneAppScreenWanted, WebPhoneAppScreen } from "./WebPhoneAppScreen";
 import type { WebWorkspace } from "./WebWorkspace";
 import { createWebAccountCalls } from "./web-account";
 import { deleteSavedAgentPictures } from "./web-agent-pictures";
@@ -520,6 +521,9 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
   const appearancePreference = createWebAppearancePreference();
   // The sign-in starts in the browser language; its language button opens the wheel to change it.
   const [languageWheelOpen, setLanguageWheelOpen] = createSignal(false);
+  // On a phone the web client first points to the phone app. Links in the address wait until the
+  // user continues in the browser.
+  const [phoneAppShown, setPhoneAppShown] = createSignal(phoneAppScreenWanted());
   return (
     <StaticI18nProvider
       locale={resolveLocale(languagePreference.language(), navigator.language)}
@@ -528,7 +532,10 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
       <NotificationObserver onShown={reportNotification}>
         <div class="web-app">
           <Toaster onToastShown={reportNotification} />
-          <Show when={state.loaded}>
+          <Show when={state.loaded && phoneAppShown()}>
+            <WebPhoneAppScreen variant={variant} onContinue={() => setPhoneAppShown(false)} />
+          </Show>
+          <Show when={state.loaded && !phoneAppShown()}>
             <Show
               keyed
               when={state.account?.id}
