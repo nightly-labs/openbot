@@ -2,9 +2,11 @@
 // It pins the image to the digest of the multi-architecture index on GHCR, as the Umbrel app store requires,
 // and copies the seccomp profile of the image into the app folder.
 //
-//   bun scripts/umbrel-app.ts --version <x.y.z> [--out=<folder>]
+//   bun scripts/umbrel-app.ts --version <x.y.z> [--id=<app id>] [--out=<folder>]
 //
-// The default folder is .openbot-build/umbrel/openbot. Copy it to an Umbrel app store as `openbot`.
+// The app id is `openbot` by default. In a community app store, it must start with the id of the store,
+// such as `openbot-server`. The default folder is .openbot-build/umbrel/<app id>. Copy it to the app
+// store as a folder with the name of the app id.
 import { chmodSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -24,7 +26,11 @@ const version = argument("version");
 if (!version || !/^\d+\.\d+\.\d+$/u.test(version)) {
   throw new Error("Give the release as --version <x.y.z>.");
 }
-const out = resolve(ROOT, argument("out") ?? ".openbot-build/umbrel/openbot");
+const appId = argument("id") ?? "openbot";
+if (!/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/u.test(appId)) {
+  throw new Error("Give the app id as lowercase letters, digits and dashes, such as --id openbot-server.");
+}
+const out = resolve(ROOT, argument("out") ?? `.openbot-build/umbrel/${appId}`);
 
 // The folder is replaced. Only an empty folder or an earlier app folder can be replaced, never the repository.
 const notAppFolder = existsSync(out) && readdirSync(out).length > 0 && !existsSync(join(out, "umbrel-app.yml"));
@@ -36,6 +42,7 @@ rmSync(out, { recursive: true, force: true });
 mkdirSync(join(out, "hooks"), { recursive: true });
 for (const file of ["umbrel-app.yml", "docker-compose.yml"]) {
   const text = readFileSync(join(TEMPLATE, file), "utf8")
+    .replaceAll("__APP_ID__", appId)
     .replaceAll("__VERSION__", version)
     .replaceAll("__DIGEST__", digest);
   writeFileSync(join(out, file), text);
@@ -43,7 +50,7 @@ for (const file of ["umbrel-app.yml", "docker-compose.yml"]) {
 cpSync(join(TEMPLATE, "hooks/pre-start"), join(out, "hooks/pre-start"));
 chmodSync(join(out, "hooks/pre-start"), 0o755);
 cpSync(join(ROOT, "docker/seccomp.json"), join(out, "seccomp.json"));
-logger.info(`Wrote the Umbrel app of ${version} (${digest}) to ${out}.`);
+logger.info(`Wrote the Umbrel app ${appId} of ${version} (${digest}) to ${out}.`);
 
 /** The digest of the image index of a release tag. Public images need no sign-in: GHCR gives an anonymous token. */
 async function indexDigest(tag: string): Promise<string> {

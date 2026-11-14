@@ -4,11 +4,23 @@ The Umbrel app runs the [OpenBot image](docker.md) on an [Umbrel](https://umbrel
 is a [self-hosted server](self-hosted-server.md) of your account. You use it from the desktop app, the
 iPhone app or `openbot.run/app`, as any other server.
 
-The app is not in an Umbrel app store yet. The files are in `docker/umbrel/openbot`.
+## Install
+
+The app is in the OpenBot community app store,
+[nightly-labs/openbot-umbrel-store](https://github.com/nightly-labs/openbot-umbrel-store). It is not in
+the official Umbrel App Store yet.
+
+1. On your Umbrel, open the **App Store**.
+2. Open the **⋯** menu at the top right and select **Community App Stores**.
+3. Paste `https://github.com/nightly-labs/openbot-umbrel-store` and select **Add**.
+4. Open the **OpenBot** store and install **OpenBot**.
+
+Umbrel keeps the data of an app in a folder with the name of its app id, here `openbot-server`. An
+OpenBot app from another store has another id and does not get that data.
 
 ## Sign in
 
-1. Install the app and open it from the Umbrel home screen.
+1. Open the app from the Umbrel home screen.
 2. The setup page shows the sign-in screen of the app. Enter your email and select
    **Send sign-in code**.
 3. Enter the code that OpenBot sends to the email. The page signs in when the code is complete.
@@ -62,16 +74,24 @@ Updates offers no update. Do not go back to an older version: see [Upgrades](doc
 ## Make the app for a release
 
 ```sh
-bun scripts/umbrel-app.ts --version <x.y.z>
+bun scripts/umbrel-app.ts --version <x.y.z> [--id <app id>]
 ```
 
-The script writes `.openbot-build/umbrel/openbot`: the manifest and the Compose file with the version
-and the digest of the image index on GHCR, the `pre-start` hook and `seccomp.json`. Copy the folder to
-an app store as `openbot`. The release must contain the setup page: 0.70.0 and older releases do not.
+The script writes `.openbot-build/umbrel/<app id>`: the manifest and the Compose file with the app id,
+the version and the digest of the image index on GHCR, the `pre-start` hook and `seccomp.json`. Copy the
+folder to an app store, with the app id as its name. The app id is `openbot` by default. In a community
+app store, the app id must start with the id of the store. The release must contain the setup page:
+0.71.0 and older releases do not.
+
+The community app store makes its app, `openbot-server`, with this script. Its workflow
+`update.yml` looks for a new release each six hours, runs the script of that release with
+`--id openbot-server` and commits the folder. It skips a release whose templates have no app id, and it
+never goes to an older release. Umbrel offers the update when the store has it. To make the app now,
+run the workflow from the Actions tab of the store.
 
 | File | Use |
 | --- | --- |
-| `umbrel-app.yml` | The manifest. Umbrel opens the app on port 4180. |
+| `umbrel-app.yml` | The manifest. Umbrel opens the app on port 4180. The icon is `openbot.run/icon-512x512.png`. |
 | `docker-compose.yml` | The container, with the same options as `docker/compose.yaml`. `app_proxy` sends the requests to the setup page on port 8080. |
 | `hooks/pre-start` | Makes the data folder and gives it to UID 1000, the user of the image. |
 | `seccomp.json` | A copy of `docker/seccomp.json`. The container stops without it, see [Security](docker.md#security). |
@@ -87,5 +107,7 @@ writes `.openbot-build/server-setup-page-e2e/report.json`.
 - umbrelOS was not checked for AppArmor rules that refuse user namespaces. On such a host, the
   container stops at its start, as on Ubuntu 23.10 or newer (see [Not confirmed](docker.md#not-confirmed)).
 - The terminal of the app in Umbrel was not tested with `openbot logout`.
+- The install steps of the community app store were not done on umbrelOS. They come from Umbrel's
+  [community app store template](https://github.com/getumbrel/umbrel-community-app-store).
 - Umbrel backups of the app data were not tested. A backup must have all of `/data`, see
   [Data](docker.md#data).
