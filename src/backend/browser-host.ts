@@ -960,7 +960,7 @@ export class BrowserHost {
               (capture ? yield* Deferred.await(capture.frame).pipe(Effect.catch(() => Effect.succeed(null))) : null);
             if (tab.sleeping !== sleeping || tab.closing || tab.contents.isDestroyed()) return;
             unloaded = true;
-            tab.unloadedWhileIdle = true;
+            tab.idleUnloadNoted = new Set();
             yield* this.#closeRenderer(tab);
           }),
         true,
@@ -2819,9 +2819,10 @@ export class BrowserHost {
   }).bind(this);
 
   /**
-   * Adds `IDLE_UNLOAD_NOTE` after the result of the agent's next tool on a tab that the idle unload
+   * Adds `IDLE_UNLOAD_NOTE` after the result of a thread's next tool on a tab that the idle unload
    * closed (#8833). It comes last, so a reader of the first text still gets the tool's own result.
-   * Only a thread that can use the tab gets it, and only once.
+   * Only a thread that can use the tab gets it, once. A tool that failed before it woke the tab did not
+   * load the page again, so the note waits for the next call.
    */
   #withIdleUnloadNote(
     params: DynamicToolCallParams,
@@ -2829,10 +2830,11 @@ export class BrowserHost {
     result: DynamicToolResult,
   ): DynamicToolResult {
     const tab = tabId === undefined ? undefined : this.#tabs.get(tabId);
-    if (!tab?.unloadedWhileIdle) return result;
+    const noted = tab?.idleUnloadNoted;
+    if (!tab || !noted || tab.pendingRestore || noted.has(params.threadId)) return result;
     const listed = this.listTabs().find((candidate) => candidate.id === tab.id);
     if (!listed || !this.#canUseToolTab(params, listed)) return result;
-    tab.unloadedWhileIdle = false;
+    noted.add(params.threadId);
     return { ...result, contentItems: [...result.contentItems, { type: "inputText", text: IDLE_UNLOAD_NOTE }] };
   }
 

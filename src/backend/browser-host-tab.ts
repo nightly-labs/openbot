@@ -119,10 +119,11 @@ export interface BrowserHostTab {
    */
   sleeping?: { title: string; preview: BrowserPreview | null } | undefined;
   /**
-   * The idle unload closed the page, and no agent tool on this tab has said so yet. The tab keeps its
-   * address and title, so without this note the agent cannot tell that its scripts and page state are gone.
+   * Set when the idle unload closes the page: the threads that a tool result has told so since. The tab
+   * keeps its address and title, so without this note an agent cannot tell that its scripts and page
+   * state are gone. Each thread that can use the tab, its owner and a thread it was shared with, reads it once.
    */
-  unloadedWhileIdle?: boolean;
+  idleUnloadNoted?: Set<string>;
   /** When a person or an agent last used the tab. A preview request does not count as use. */
   lastUsedAt: number;
   focusOnVisible: boolean;
