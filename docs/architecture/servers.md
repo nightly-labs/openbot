@@ -687,6 +687,17 @@ The desktop discards the window's session after a send that set cookies, on Canc
 A failed send keeps it, so Done can try again. The web client has no menu item: a web page cannot
 read the cookies of another site.
 
+`browser-sign-in-storage-v1` (protocol 9 only) adds `POST /v1/browser/sign-in/storage` with
+`{ tabId, cookies, storage }` and answers with `{ cookies, storage }`, the counts that the host set.
+Some sites keep the sign-in in the page storage (localStorage), not in a cookie (#8686). `storage` is
+null, or the origin of the window's page and its pairs, at most 1000 pairs and 262,144 characters in
+all. The window reads the page storage in its isolated world when the page is on the tab's host,
+at each check and at Done, and keeps the last copy, so a closed window still sends it. The host sets
+the cookies as `browser-sign-in` does. It writes the pairs only when the tab shows the same origin,
+keeps the other pairs of that origin, and loads the tab again when it set a cookie or a pair. A
+desktop uses this route when the server advertises the capability, and `browser-sign-in` with
+cookies only for an older server. The host never sends the values back or records them.
+
 ### Skill events
 
 `skills-events-v1` adds one optional event, `skills-changed { agentId }`. The host sends it after

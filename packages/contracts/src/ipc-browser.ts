@@ -279,7 +279,7 @@ export interface BrowserLocalSignInFinish {
 }
 
 /**
- * The count of cookies that the server set in the tab's session. `signedIn` is false when a checked
+ * The count of cookies, and of page storage pairs, that the server set for the tab. `signedIn` is false when a checked
  * send left the server tab on a sign-in step.
  */
 export interface BrowserLocalSignInResult {
