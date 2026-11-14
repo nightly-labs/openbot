@@ -348,6 +348,15 @@ try {
       await rm(join(vaultFolder, "GITHUB_TOKEN"));
       await Effect.runPromise(keys.syncVault());
       assert.equal(await readFile(join(vaultFolder, "GITHUB_TOKEN"), "utf8"), VAULT_KEY);
+      // Also when no agent listed its keys after 0.70.0: the empty folder shows an earlier list.
+      const emptiedRoot = join(root, "emptied-api-keys");
+      await mkdir(join(emptiedRoot, ".vault"), { recursive: true, mode: 0o700 });
+      await Effect.runPromise(new AgentApiKeys(emptiedRoot, vault.items).syncVault());
+      assert.equal(await readFile(join(emptiedRoot, ".vault", "GITHUB_TOKEN"), "utf8"), VAULT_KEY);
+      // A start writes no key when no agent ever listed its keys.
+      const freshRoot = join(root, "fresh-api-keys");
+      await Effect.runPromise(new AgentApiKeys(freshRoot, vault.items).syncVault());
+      await assert.rejects(stat(join(freshRoot, ".vault")));
       if (process.platform !== "win32") {
         assert.equal((await stat(join(vaultFolder, "GITHUB_TOKEN"))).mode & 0o777, 0o600);
         assert.equal((await stat(join(vaultFolder, "agent-3", "GITHUB_TOKEN"))).mode & 0o777, 0o600);

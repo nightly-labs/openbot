@@ -123,14 +123,14 @@ export class AgentApiKeys {
       Effect.gen({ self: this }, function* () {
         const agents = yield* Effect.tryPromise({ try: () => folderNames(this.#root), catch: failed });
         for (const agentId of agents.filter((id) => AGENT_ID_PATTERN.test(id))) yield* this.#moveIntoVault(agentId);
+        // The folder is there once an agent listed its keys, which wrote the shared files in earlier
+        // versions. 0.70.0 deleted those files at start, so they come back here. First, so that a key
+        // that is no longer for every agent goes even when the copy of one agent cannot be written.
+        yield* this.#writeShared(agents.includes(VAULT_FOLDER));
         const vaultFolder = join(this.#root, VAULT_FOLDER);
-        const copies = (yield* Effect.tryPromise({ try: () => folderNames(vaultFolder), catch: failed })).filter((id) =>
-          AGENT_ID_PATTERN.test(id),
-        );
-        for (const agentId of copies) yield* this.#writeAgent(join(vaultFolder, agentId), agentId);
-        // An agent that listed its keys wrote the shared files in earlier versions. 0.70.0 deleted them
-        // at start, so they come back for such an agent here.
-        yield* this.#writeShared(copies.length > 0);
+        const copies = yield* Effect.tryPromise({ try: () => folderNames(vaultFolder), catch: failed });
+        for (const agentId of copies.filter((id) => AGENT_ID_PATTERN.test(id)))
+          yield* this.#writeAgent(join(vaultFolder, agentId), agentId);
       }),
     );
   });
@@ -324,12 +324,10 @@ async function folderFiles(folder: string): Promise<string[]> {
   }
 }
 
-/** The names of the folders in a folder, not of its files; none when the folder is missing. */
+/** The names in a folder that are not files, such as folders and links to them; none when the folder is missing. */
 async function folderNames(folder: string): Promise<string[]> {
   try {
-    return (await readdir(folder, { withFileTypes: true }))
-      .filter((entry) => entry.isDirectory())
-      .map(({ name }) => name);
+    return (await readdir(folder, { withFileTypes: true })).filter((entry) => !entry.isFile()).map(({ name }) => name);
   } catch (error) {
     if (isMissingFileError(error)) return [];
     throw error;
