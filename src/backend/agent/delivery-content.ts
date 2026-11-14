@@ -81,7 +81,7 @@ export interface DeliveryPromptSources {
   agentNames: ReadonlyMap<string, string>;
   /** The conversation the delivery joins. A user reply quotes the message it answers from it. */
   snapshot: ConversationSnapshot;
-  routineRun: Pick<RoutineRun, "kind" | "source"> | null;
+  routineRun: Pick<RoutineRun, "kind" | "source" | "agentId"> | null;
   /** The open waits that a routine run wakes. The run continues their requests. */
   wokenWaits?: readonly AgentWait[];
   /** The prompt a channel task or an external message sends in place of the delivery text. */
@@ -337,8 +337,10 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
     const runKind = testRun ? "manual Test run" : run?.source ? `${run.source} run` : "scheduled run";
     // A routine whose task says to stop when it is done pauses itself; without this, each run reports
     // the same result again (#8963). A pause keeps the routine, so the user can turn it on again. A Test
-    // run must not change the routine, and update_routine does not find a webhook routine.
-    const canPause = !testRun && run?.source !== "webhook";
+    // run must not change the routine, and update_routine does not find a webhook routine. A flow
+    // handoff to another agent names the routine too, but has no run of its own: that agent does not
+    // own the routine.
+    const canPause = run !== null && !testRun && run.source !== "webhook" && run.agentId === delivery.recipientAgentId;
     text = [
       "Execute one run of an existing OpenBot routine now.",
       `Routine name: ${delivery.sender.routineName}`,
