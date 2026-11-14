@@ -1024,23 +1024,27 @@ export class MessagingService {
    * why the socket is not ready, so that the user knows what to do.
    */
   #telegramReady(ingress: MessagingIngress): Effect.Effect<void, MessagingOperationFailed> {
-    if (ingress.telegram.available()) return Effect.void;
-    // A Signal that answered without Telegram does not gain it on this socket.
-    if (ingress.state() === "online") return Effect.fail(telegramNotReady("online"));
     return Effect.callback<void, MessagingOperationFailed>((resume) => {
-      const stop = ingress.onState((state) => {
+      // True when the wait ends. A Signal that answered without Telegram does not gain it on this
+      // socket. A signed-out state or no name can end soon after the app starts, so they wait.
+      const settled = (state: IngressState) => {
         if (ingress.telegram.available()) resume(Effect.void);
-        // A Signal without Telegram does not gain it. A signed-out state or no name can end soon
-        // after the app starts, so they wait for the retry.
         else if (state === "online") resume(Effect.fail(telegramNotReady(state)));
-        else return;
-        stop();
+        else return false;
+        return true;
+      };
+      if (settled(ingress.state())) return;
+      const stop = ingress.onState((state) => {
+        if (settled(state)) stop();
       });
       return Effect.sync(stop);
     }).pipe(
       Effect.timeoutOrElse({
         duration: TELEGRAM_READY_TIMEOUT_MS,
-        orElse: () => Effect.fail(telegramNotReady(ingress.state())),
+        orElse: () =>
+          Effect.suspend(() =>
+            ingress.telegram.available() ? Effect.void : Effect.fail(telegramNotReady(ingress.state())),
+          ),
       }),
     );
   }
