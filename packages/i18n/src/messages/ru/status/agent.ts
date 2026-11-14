@@ -23,6 +23,7 @@ export const messages = {
   "status.agent.screenCaptureScreen": "Сделать снимок главного экрана и отправить изображение модели агента.",
   "status.agent.screenCaptureChannel":
     "Изображение появится в канале {channel}, и его увидит каждый участник этого сервера, который читает канал.",
+  "status.agent.screenCapturePermissionNext": "Затем macOS может попросить вас разрешить OpenBot запись экрана.",
   "status.agent.screenCaptureDisplay": "Сделать снимок дисплея {name} и отправить изображение модели агента.",
   "status.agent.screenCaptureWindow": "Сделать снимок окна {name} и отправить изображение модели агента.",
   "status.agent.screenCaptureRegion":

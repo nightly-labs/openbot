@@ -162,6 +162,8 @@ export const messages = {
     "해당 영역이 하나의 디스플레이 안에 있지 않아요. list_capture_sources에서 가져온 한 디스플레이 범위 안의 데스크톱 포인트를 사용하세요.",
   "error.agent.screenCapturePermissionMissing":
     "OpenBot에 화면 녹화 권한이 없어요. 사용자에게 시스템 설정 > 개인정보 보호 및 보안 > 화면 및 시스템 오디오 녹화를 열어 OpenBot을 켠 다음, OpenBot을 종료했다가 다시 열도록 요청하세요.",
+  "error.agent.screenCaptureListPermission":
+    "OpenBot에 아직 화면 녹화 권한이 없어서 창 목록을 가져올 수 없어요. 디스플레이를 캡처하려면 target screen으로 capture_screen을 호출하세요. 사용자가 먼저 캡처를 승인하고, 그다음 macOS가 사용자에게 권한을 요청할 수 있어요.",
   "error.agent.screenCaptureEmptyWindows":
     "Windows가 빈 이미지를 반환했어요. 사용자에게 컴퓨터 잠금을 해제하고 보호된 콘텐츠를 닫도록 요청하세요. 조직의 정책이 화면 캡처를 막을 수도 있어요.",
   "error.agent.screenCaptureFailed": "화면 캡처에 실패했어요. 다시 시도해 주세요.",

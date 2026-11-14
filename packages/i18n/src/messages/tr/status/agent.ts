@@ -23,6 +23,7 @@ export const messages = {
   "status.agent.screenCaptureScreen": "Ana ekranı yakala ve görüntüyü ajanın modeline gönder.",
   "status.agent.screenCaptureChannel":
     "Görüntü {channel} kanalında görünür ve bu sunucuda kanalı okuyan her üye onu görebilir.",
+  "status.agent.screenCapturePermissionNext": "Ardından macOS, OpenBot için Ekran Kaydı'na izin vermenizi isteyebilir.",
   "status.agent.screenCaptureDisplay": "{name} ekranını yakala ve görüntüyü ajanın modeline gönder.",
   "status.agent.screenCaptureWindow": "{name} penceresini yakala ve görüntüyü ajanın modeline gönder.",
   "status.agent.screenCaptureRegion":

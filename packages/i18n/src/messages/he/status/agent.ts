@@ -21,6 +21,7 @@ export const messages = {
   "status.agent.channelTaskCancelled": "{agent} ביטל את המשימה ״{task}״ ואת תתי-המשימות שלה. {person} ביקש זאת.",
   "status.agent.screenCaptureScreen": "צילום המסך הראשי ושליחת התמונה אל המודל של הסוכן.",
   "status.agent.screenCaptureChannel": "התמונה מוצגת בערוץ {channel}, וכל חבר בשרת הזה שקורא את הערוץ יכול לראות אותה.",
+  "status.agent.screenCapturePermissionNext": "לאחר מכן macOS עשוי לבקש ממך לאפשר ל-OpenBot את Screen Recording.",
   "status.agent.screenCaptureDisplay": "צילום התצוגה {name} ושליחת התמונה אל המודל של הסוכן.",
   "status.agent.screenCaptureWindow": "צילום החלון {name} ושליחת התמונה אל המודל של הסוכן.",
   "status.agent.screenCaptureRegion":

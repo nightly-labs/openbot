@@ -168,6 +168,8 @@ export const messages = {
     "L'area non è dentro un solo schermo. Usa punti del desktop entro i limiti di uno schermo indicato da list_capture_sources.",
   "error.agent.screenCapturePermissionMissing":
     "OpenBot non ha il permesso Registrazione schermo. Chiedi all'utente di aprire Impostazioni di Sistema > Privacy e sicurezza > Registrazione schermo e audio di sistema, attivare OpenBot, poi uscire e riaprire OpenBot.",
+  "error.agent.screenCaptureListPermission":
+    "OpenBot non ha ancora il permesso Registrazione schermo, quindi non può elencare le finestre. Per catturare uno schermo, chiama capture_screen con target screen. L'utente approva prima la cattura, poi macOS può chiedergli il permesso.",
   "error.agent.screenCaptureEmptyWindows":
     "Windows ha restituito un'immagine vuota. Chiedi all'utente di sbloccare il computer e chiudere i contenuti protetti. Anche un criterio dell'organizzazione può bloccare l'acquisizione dello schermo.",
   "error.agent.screenCaptureFailed": "L'acquisizione dello schermo non è riuscita. Riprova.",

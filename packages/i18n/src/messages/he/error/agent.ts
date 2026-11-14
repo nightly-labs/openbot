@@ -153,6 +153,8 @@ export const messages = {
     "האזור אינו בתוך תצוגה אחת. יש להשתמש בנקודות שולחן עבודה בתוך גבולות תצוגה אחת מתוך list_capture_sources.",
   "error.agent.screenCapturePermissionMissing":
     "ל-OpenBot אין הרשאת Screen Recording. יש לבקש מהמשתמש לפתוח את System Settings > Privacy & Security > Screen & System Audio Recording, להפעיל את OpenBot, ואז לצאת מ-OpenBot ולפתוח אותו שוב.",
+  "error.agent.screenCaptureListPermission":
+    "ל-OpenBot עדיין אין הרשאת Screen Recording, ולכן הוא לא יכול להציג את רשימת החלונות. כדי לצלם תצוגה, יש לקרוא ל-capture_screen עם target screen. המשתמש מאשר קודם את הצילום, ואז macOS עשוי לבקש מהמשתמש את ההרשאה.",
   "error.agent.screenCaptureEmptyWindows":
     "Windows החזירה תמונה ריקה. יש לבקש מהמשתמש לבטל את נעילת המחשב ולסגור תוכן מוגן. גם מדיניות של הארגון יכולה לחסום צילום מסך.",
   "error.agent.screenCaptureFailed": "צילום המסך נכשל. יש לנסות שוב.",

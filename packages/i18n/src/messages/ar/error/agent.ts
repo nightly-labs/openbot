@@ -154,6 +154,8 @@ export const messages = {
     "المنطقة ليست داخل شاشة واحدة. استخدم نقاط سطح المكتب داخل حدود شاشة واحدة من list_capture_sources.",
   "error.agent.screenCapturePermissionMissing":
     "لا يملك OpenBot إذن «تسجيل الشاشة». اطلب من المستخدم فتح System Settings > Privacy & Security > Screen & System Audio Recording، وتشغيل OpenBot، ثم إنهاء OpenBot وفتحه مرة أخرى.",
+  "error.agent.screenCaptureListPermission":
+    "لا يملك OpenBot إذن «تسجيل الشاشة» بعد، لذا لا يمكنه سرد النوافذ. لالتقاط شاشة، استدعِ capture_screen مع target screen. يوافق المستخدم على الالتقاط أولًا، ثم قد يطلب macOS من المستخدم الإذن.",
   "error.agent.screenCaptureEmptyWindows":
     "أعاد Windows صورة فارغة. اطلب من المستخدم إلغاء قفل الحاسوب وإغلاق المحتوى المحمي. يمكن أيضًا لسياسة المؤسسة إيقاف التقاط الشاشة.",
   "error.agent.screenCaptureFailed": "فشل التقاط الشاشة. أعد المحاولة.",

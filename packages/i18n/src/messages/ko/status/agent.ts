@@ -24,6 +24,7 @@ export const messages = {
   "status.agent.screenCaptureScreen": "메인 화면을 캡처해서 이미지를 에이전트의 모델에 보내요.",
   "status.agent.screenCaptureChannel":
     "이미지가 {channel} 채널에 표시되고, 이 채널을 읽는 서버의 모든 멤버가 볼 수 있어요.",
+  "status.agent.screenCapturePermissionNext": "그다음 macOS가 OpenBot의 화면 녹화를 허용할지 물어볼 수 있어요.",
   "status.agent.screenCaptureDisplay": "디스플레이 {name}을(를) 캡처해서 이미지를 에이전트의 모델에 보내요.",
   "status.agent.screenCaptureWindow": "창 {name}을(를) 캡처해서 이미지를 에이전트의 모델에 보내요.",
   "status.agent.screenCaptureRegion":

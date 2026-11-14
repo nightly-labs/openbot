@@ -95,6 +95,11 @@ export class ScreenCaptureFailed extends Schema.TaggedError<ScreenCaptureFailed>
  * the operating system permission. It captures only after the user approves the request.
  */
 export interface ScreenCaptureHost {
+  /** The displays and windows. It never shows a permission prompt of the operating system. */
   listSources(): Effect.Effect<ScreenCaptureSources, ScreenCaptureFailed>;
+  /** The displays. They need no permission of the operating system. */
+  listDisplays(): Effect.Effect<ScreenCaptureSources["displays"]>;
+  /** Whether the next capture shows the permission prompt of the operating system (#9092). */
+  promptsForPermission(): Effect.Effect<boolean>;
   capture(request: ScreenCaptureRequest): Effect.Effect<ScreenCaptureImage, ScreenCaptureFailed>;
 }

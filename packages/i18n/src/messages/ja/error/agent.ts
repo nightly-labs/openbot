@@ -171,6 +171,8 @@ export const messages = {
     "この領域は 1 つのディスプレイの中に収まっていません。list_capture_sources が返す 1 つのディスプレイの範囲内で、デスクトップのポイント座標を使ってください。",
   "error.agent.screenCapturePermissionMissing":
     "OpenBot に画面収録の権限がありません。ユーザーに「システム設定」→「プライバシーとセキュリティ」→「画面収録とシステムオーディオ録音」を開いて OpenBot をオンにし、OpenBot を終了してから再度開くよう依頼してください。",
+  "error.agent.screenCaptureListPermission":
+    "OpenBot にはまだ画面収録の権限がないため、ウインドウを一覧表示できません。ディスプレイをキャプチャするには、target screen で capture_screen を呼び出してください。ユーザーが先にキャプチャを承認し、その後 macOS がユーザーに権限を求めることがあります。",
   "error.agent.screenCaptureEmptyWindows":
     "Windows が空の画像を返しました。コンピューターのロックを解除し、保護されたコンテンツを閉じるようユーザーに依頼してください。組織のポリシーによって画面キャプチャが止められている場合もあります。",
   "error.agent.screenCaptureFailed": "画面キャプチャに失敗しました。もう一度お試しください。",

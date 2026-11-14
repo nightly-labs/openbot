@@ -21,6 +21,7 @@ export const messages = {
   "status.agent.channelTaskCancelled": "{agent} 已取消任务“{task}”及其子任务，这是 {person} 的请求。",
   "status.agent.screenCaptureScreen": "截取主屏幕，并把图像发送给助手的模型。",
   "status.agent.screenCaptureChannel": "图像会显示在频道 {channel} 中，该服务器上每位阅读该频道的成员都能看到。",
+  "status.agent.screenCapturePermissionNext": "之后 macOS 可能会请你允许 OpenBot 进行屏幕录制。",
   "status.agent.screenCaptureDisplay": "截取显示器 {name}，并把图像发送给助手的模型。",
   "status.agent.screenCaptureWindow": "截取窗口 {name}，并把图像发送给助手的模型。",
   "status.agent.screenCaptureRegion": "截取 {x}、{y} 处 {width} × {height} 点的屏幕区域，并把图像发送给助手的模型。",
