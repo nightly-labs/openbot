@@ -61,11 +61,15 @@ const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
 type StepStatus = "pending" | "inProgress" | "completed";
 
-/** One turn of the fake: its plan, its answer, its delay and its OpenBot tool calls. */
+/**
+ * One turn of the fake: its plan, its answer, its delay and its OpenBot tool calls. With `holdUntil`,
+ * the turn ends only after that file exists.
+ */
 interface FakeTurn {
   steps: [string, StepStatus][];
   answer?: string;
   delayMs?: number;
+  holdUntil?: string;
   calls?: { tool: string; arguments: Record<string, string> }[];
 }
 
@@ -103,7 +107,12 @@ const finish = (turn) => {
 };
 const callNext = (turn) => {
   const call = turn.calls.shift();
-  if (!call) return timers.set(turn.turnId, setTimeout(() => finish(turn), turn.script.delayMs || 5));
+  if (!call) {
+    const end = () => timers.set(turn.turnId, setTimeout(() => finish(turn), turn.script.delayMs || 5));
+    const hold = turn.script.holdUntil;
+    const wait = () => (fs.existsSync(hold) ? end() : timers.set(turn.turnId, setTimeout(wait, 25)));
+    return hold ? wait() : end();
+  }
   const id = "tool-" + turn.turnId + "-" + turn.calls.length;
   waiting.set(id, turn);
   write({ id, method: "item/tool/call", params: { threadId: turn.threadId, turnId: turn.turnId, callId: "call-" + id, namespace: "openbot", tool: call.tool, arguments: call.arguments } });
@@ -851,6 +860,7 @@ try {
     const mark = loggedTurns().length;
     const since = current.events.length;
     const request = "Map the warehouse at dock 7.";
+    const release = join(root, "retooled-first-turn");
     const id = await send(
       agent.id,
       `${request} ${plan({
@@ -859,13 +869,14 @@ try {
           ["Draw the map", "pending"],
         ],
         answer: "The map tool is registered.",
-        delayMs: 1_500,
+        holdUntil: release,
       })}`,
     );
     const first = await waitFor("the first turn", () => turnsSince(mark)[0]);
     // Without its tool record, the session no longer has the current tools, as after a new MCP
-    // server: the continuation starts a new session.
+    // server: the continuation starts a new session. The first turn ends only after the removal.
     await rm(join(userData, "provider-toolsets", createHash("sha256").update(first.threadId).digest("hex")));
+    await writeFile(release, "");
     assert.equal(await settled(id), "completed");
     const turns = turnsSince(mark);
     assert.deepEqual(
