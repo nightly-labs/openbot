@@ -700,8 +700,8 @@ export class TurnLifecycle {
    * Whether a completed turn may continue its plan: it served only the user's or the agent's own
    * messages, or teammates' answers to the agent's own requests (#9392), the user did not stop it, its
    * last line asks nothing but whether to continue and does not say it waits, opened no wait and holds no
-   * question, approval or takeover, and no other message waits in its lane. A teammate's request or
-   * update does not continue: its sender, not this agent, owns that work.
+   * question, approval or takeover, and no other message waits in its lane. A turn with a teammate's
+   * request or update does not continue, so the end of the turn sends the result to that teammate.
    */
   #planContinues(
     agentId: string,

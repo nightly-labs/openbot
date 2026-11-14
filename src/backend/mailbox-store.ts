@@ -1832,8 +1832,9 @@ export class MailboxStore {
    */
   #isHeldReply(delivery: StoredDelivery): boolean {
     const reply = this.#requireMessage(delivery.messageId);
+    if (!isAnswer(reply)) return false;
     const request = this.#answeredRequestOf(delivery.recipientAgentId, reply);
-    if (!request || !isAnswer(reply)) return false;
+    if (!request) return false;
     const answeredBy = reply.sender.agentId;
     return this.#state.deliveries.some(
       (candidate) =>
@@ -2156,8 +2157,7 @@ export class MailboxStore {
   }
 
   /** The request of `agentId` that asked for an answer and that `reply` answers, if any. */
-  #answeredRequestOf(agentId: string, reply: StoredMessage): StoredMessage | undefined {
-    if (!isAnswer(reply)) return undefined;
+  #answeredRequestOf(agentId: string, reply: { replyToMessageId: string }): StoredMessage | undefined {
     const request = this.#state.messages.find((message) => message.id === reply.replyToMessageId);
     return request?.sender.kind === "agent" && request.sender.agentId === agentId && request.expectsReply !== false
       ? request
@@ -2167,7 +2167,7 @@ export class MailboxStore {
   /** Whether the message is a teammate's answer to a request that `agentId` sent and that asked for an answer. */
   answersRequestOf(agentId: string, messageId: string): boolean {
     const reply = this.#state.messages.find((message) => message.id === messageId);
-    return reply !== undefined && this.#answeredRequestOf(agentId, reply) !== undefined;
+    return reply !== undefined && isAnswer(reply) && this.#answeredRequestOf(agentId, reply) !== undefined;
   }
 
   /** Whether the message's sender waits for an answer. Unknown messages count as expecting one. */
