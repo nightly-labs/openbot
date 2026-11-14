@@ -207,7 +207,8 @@ ShellRoot {
                 Keys.onPressed: e => {
                     const code = root.keyName(e);
                     if (code) surf.sendInput({ type: "keyDown", keyCode: code, modifiers: surf.mods(e.modifiers) });
-                    if (e.text && e.text.length === 1 && e.text.charCodeAt(0) >= 32 && !(e.modifiers & Qt.ControlModifier))
+                    // Return also needs its char: without the keypress, a form does not submit.
+                    if (e.text && e.text.length === 1 && (e.text.charCodeAt(0) >= 32 || e.text === "\r") && !(e.modifiers & Qt.ControlModifier))
                         surf.sendInput({ type: "char", keyCode: e.text, modifiers: surf.mods(e.modifiers) });
                     e.accepted = true;
                 }
