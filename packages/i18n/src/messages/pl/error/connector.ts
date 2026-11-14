@@ -21,6 +21,10 @@ export const messages = {
   "error.connector.onePasswordCliFailed": "Błąd 1Password CLI: {detail}",
   "error.connector.onePasswordUnexpected": "1Password wysłał nieoczekiwaną odpowiedź: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password nie zaakceptował tokenu konta usługi.",
+  "error.connector.onePasswordUnreachable":
+    "OpenBot nie mógł połączyć się z 1Password. Sprawdź połączenie z internetem i spróbuj ponownie.",
+  "error.connector.onePasswordRateLimited":
+    "1Password otrzymał zbyt wiele żądań. Poczekaj kilka minut i spróbuj ponownie.",
   "error.connector.onePasswordNoVault":
     "Konto usługi nie może odczytać żadnego sejfu. Daj mu dostęp do sejfu i spróbuj ponownie.",
   "error.connector.onePasswordFileUnreadable": "Nie można odczytać pliku połączenia z 1Password.",

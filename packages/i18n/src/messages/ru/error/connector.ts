@@ -21,6 +21,10 @@ export const messages = {
   "error.connector.onePasswordCliFailed": "CLI 1Password завершился с ошибкой: {detail}",
   "error.connector.onePasswordUnexpected": "1Password прислал неожиданный ответ: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password не принял токен сервисного аккаунта.",
+  "error.connector.onePasswordUnreachable":
+    "OpenBot не смог подключиться к 1Password. Проверьте подключение к интернету и повторите попытку.",
+  "error.connector.onePasswordRateLimited":
+    "1Password получил слишком много запросов. Подождите несколько минут и повторите попытку.",
   "error.connector.onePasswordNoVault":
     "Сервисный аккаунт не может читать ни одно хранилище. Дайте ему доступ к хранилищу и повторите попытку.",
   "error.connector.onePasswordFileUnreadable": "Файл подключения 1Password не читается.",

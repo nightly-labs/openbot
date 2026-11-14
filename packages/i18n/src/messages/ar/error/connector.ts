@@ -30,6 +30,9 @@ export const messages = {
   "error.connector.onePasswordCliFailed": "فشل 1Password CLI: {detail}",
   "error.connector.onePasswordUnexpected": "أرسل 1Password إجابة غير متوقعة: {detail}",
   "error.connector.onePasswordTokenRejected": "لم يقبل 1Password رمز حساب الخدمة.",
+  "error.connector.onePasswordUnreachable":
+    "تعذّر على OpenBot الاتصال بـ 1Password. تحقق من الاتصال بالإنترنت، ثم حاول مرة أخرى.",
+  "error.connector.onePasswordRateLimited": "تلقّى 1Password طلبات كثيرة جدًا. انتظر بضع دقائق، ثم حاول مرة أخرى.",
   "error.connector.onePasswordNoVault": "لا يمكن لحساب الخدمة قراءة أي خزنة. امنحه الوصول إلى خزنة، ثم حاول مرة أخرى.",
   "error.connector.onePasswordFileUnreadable": "ملف اتصال 1Password غير قابل للقراءة.",
   "error.connector.onePasswordFileTooLarge": "ملف اتصال 1Password كبير جدًا.",

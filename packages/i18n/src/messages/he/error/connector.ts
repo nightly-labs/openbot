@@ -30,6 +30,9 @@ export const messages = {
   "error.connector.onePasswordCliFailed": "ה-CLI של 1Password נכשל: {detail}",
   "error.connector.onePasswordUnexpected": "1Password שלח תשובה לא צפויה: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password לא קיבל את האסימון של חשבון השירות.",
+  "error.connector.onePasswordUnreachable":
+    "OpenBot לא הצליח להתחבר ל-1Password. יש לבדוק את החיבור לאינטרנט ולנסות שוב.",
+  "error.connector.onePasswordRateLimited": "1Password קיבל יותר מדי בקשות. יש להמתין כמה דקות ולנסות שוב.",
   "error.connector.onePasswordNoVault": "חשבון השירות לא יכול לקרוא אף כספת. יש לתת לו גישה לכספת ולנסות שוב.",
   "error.connector.onePasswordFileUnreadable": "קובץ החיבור ל-1Password אינו קריא.",
   "error.connector.onePasswordFileTooLarge": "קובץ החיבור ל-1Password גדול מדי.",

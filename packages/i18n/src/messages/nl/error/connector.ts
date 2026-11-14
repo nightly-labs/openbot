@@ -21,6 +21,10 @@ export const messages = {
   "error.connector.onePasswordCliFailed": "De 1Password-CLI is mislukt: {detail}",
   "error.connector.onePasswordUnexpected": "1Password gaf een onverwacht antwoord: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password heeft het token van het serviceaccount niet geaccepteerd.",
+  "error.connector.onePasswordUnreachable":
+    "OpenBot kon geen verbinding maken met 1Password. Controleer de internetverbinding en probeer het opnieuw.",
+  "error.connector.onePasswordRateLimited":
+    "1Password heeft te veel verzoeken ontvangen. Wacht een paar minuten en probeer het opnieuw.",
   "error.connector.onePasswordNoVault":
     "Het serviceaccount kan geen kluis lezen. Geef het toegang tot een kluis en probeer het opnieuw.",
   "error.connector.onePasswordFileUnreadable": "Het verbindingsbestand van 1Password is onleesbaar.",

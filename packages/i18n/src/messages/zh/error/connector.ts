@@ -21,6 +21,8 @@ export const messages = {
   "error.connector.onePasswordCliFailed": "1Password CLI 执行失败：{detail}",
   "error.connector.onePasswordUnexpected": "1Password 返回了意外的响应：{detail}",
   "error.connector.onePasswordTokenRejected": "1Password 未接受该服务账号令牌。",
+  "error.connector.onePasswordUnreachable": "OpenBot 无法连接到 1Password，请检查网络连接后重试。",
+  "error.connector.onePasswordRateLimited": "1Password 收到的请求过多，请等待几分钟后重试。",
   "error.connector.onePasswordNoVault": "该服务账号无法读取任何保险库。请授予其保险库访问权限后重试。",
   "error.connector.onePasswordFileUnreadable": "1Password 连接文件无法读取。",
   "error.connector.onePasswordFileTooLarge": "1Password 连接文件过大。",

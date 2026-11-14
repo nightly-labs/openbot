@@ -21,6 +21,10 @@ export const messages = {
   "error.connector.onePasswordCliFailed": "Die 1Password CLI ist fehlgeschlagen: {detail}",
   "error.connector.onePasswordUnexpected": "1Password hat eine unerwartete Antwort gesendet: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password hat das Dienstkonto-Token nicht akzeptiert.",
+  "error.connector.onePasswordUnreachable":
+    "OpenBot konnte keine Verbindung zu 1Password herstellen. Prüfe die Internetverbindung und versuche es erneut.",
+  "error.connector.onePasswordRateLimited":
+    "1Password hat zu viele Anfragen erhalten. Warte ein paar Minuten und versuche es erneut.",
   "error.connector.onePasswordNoVault":
     "Das Dienstkonto kann keinen Tresor lesen. Gib ihm Zugriff auf einen Tresor und versuche es erneut.",
   "error.connector.onePasswordFileUnreadable": "Die 1Password-Verbindungsdatei ist nicht lesbar.",

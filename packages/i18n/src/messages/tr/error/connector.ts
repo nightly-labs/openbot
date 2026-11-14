@@ -22,6 +22,10 @@ export const messages = {
   "error.connector.onePasswordCliFailed": "1Password CLI başarısız oldu: {detail}",
   "error.connector.onePasswordUnexpected": "1Password beklenmeyen bir yanıt gönderdi: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password hizmet hesabı belirtecini kabul etmedi.",
+  "error.connector.onePasswordUnreachable":
+    "OpenBot 1Password'e bağlanamadı. İnternet bağlantısını kontrol edin, ardından tekrar deneyin.",
+  "error.connector.onePasswordRateLimited":
+    "1Password çok fazla istek aldı. Birkaç dakika bekleyin, ardından tekrar deneyin.",
   "error.connector.onePasswordNoVault":
     "Hizmet hesabı bir kasayı okuyamıyor. Ona bir kasaya erişim verin, ardından tekrar deneyin.",
   "error.connector.onePasswordFileUnreadable": "1Password bağlantı dosyası okunamıyor.",
