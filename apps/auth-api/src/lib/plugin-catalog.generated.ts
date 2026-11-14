@@ -10438,7 +10438,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     name: "SpecStream",
     tagline: "Sourced data from the live web",
     description:
-      "SpecStream builds datasets from the live web. Describe the rows you need in plain words, see the most the run can cost, approve that maximum, and read the rows back with the source URL of every value. Each user signs in to their own SpecStream account, and nothing runs until the user approves a price. New accounts start with $10 of work, no card.",
+      "SpecStream builds datasets from the live web. Describe the rows you need in plain words, see the most the run can cost, approve that maximum, and read the rows back with the source URL of every value. Each user signs in to their own SpecStream account, and nothing runs until the user approves a price. New accounts start with $10 of credit, no card.",
     category: "research",
     creatorName: "SpecStream",
     iconUrl: "https://specstream.ai/icons/icon-180.png",
