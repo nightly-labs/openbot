@@ -663,23 +663,19 @@ export class McpOAuth implements McpOAuthAuthority {
     const controller = new AbortController();
     const fetchFn = this.#fetch(key, controller.signal);
     const timeoutMs = this.#options.refreshTimeoutMs ?? MCP_TOKEN_TIMEOUT_MS;
-    const issuer = yield* namesAuthorizationServer(mcpOAuthServerUrl(key), fetchFn).pipe(
-      Effect.timeoutOrElse({ duration: timeoutMs, orElse: () => Effect.succeed(null) }),
-      Effect.catch(() => Effect.succeed(null)),
-    );
-    if (!issuer) {
-      controller.abort();
-      return "none";
-    }
-    // A sign-in app or a registration on file is the client: nothing has to register.
-    if (record?.app || record?.client) {
-      controller.abort();
-      return "offered";
-    }
-    return yield* acceptsNewClient(issuer, fetchFn, timeoutMs).pipe(
-      Effect.map((accepts): McpSignInOffer => (accepts ? "offered" : "refused")),
-      Effect.ensuring(Effect.sync(() => controller.abort())),
-    );
+    return yield* Effect.gen(function* () {
+      const issuer = yield* namesAuthorizationServer(mcpOAuthServerUrl(key), fetchFn).pipe(
+        Effect.timeoutOrElse({ duration: timeoutMs, orElse: () => Effect.succeed(null) }),
+        Effect.catch(() => Effect.succeed(null)),
+      );
+      if (!issuer) return "none";
+      // A sign-in app, or a registration with this issuer, is the client: nothing has to register.
+      // The SDK drops a registration bound to another issuer and registers again.
+      const client = record?.client;
+      if (record?.app || (client && (typeof client.issuer !== "string" || issuersMatch(client.issuer, issuer))))
+        return "offered";
+      return (yield* acceptsNewClient(issuer, fetchFn, timeoutMs)) ? "offered" : "refused";
+    }).pipe(Effect.ensuring(Effect.sync(() => controller.abort())));
   });
 
   get redirectUrl(): string {
