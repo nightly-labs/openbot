@@ -258,6 +258,12 @@ export interface AcpFlavor {
   ownMcpServerNames?(cwd: string, argv: readonly string[]): readonly string[];
   /** Turns OpenBot's servers back on where the agent's own settings for `cwd` turned them off. */
   enableMcpServers?(cwd: string, names: readonly string[]): void;
+  /**
+   * The agent keeps the tools that a session has at its first turn. A server that the agent gets
+   * later, such as on `session/load` or `session/resume` after the user added it, reaches the model
+   * only as a note, and the model cannot call its tools. A changed MCP set must start a new session.
+   */
+  mcpToolsFixedAtStart?: true;
   /** OpenBot compacts by replacing the session, for an agent that reports `usage_update` and has no compact request. */
   contextCompaction?: "handoff";
   /**
@@ -515,6 +521,9 @@ export const KIMI_ACP_FLAVOR: AcpFlavor = {
   // prompt as `end_turn`, and the step's error is lost. The chat then showed no answer and no error
   // (#6722). Kimi's thinking alone is not an answer.
   emptyAnswerFailure: noAnswerUnlessPlanOrCompaction,
+  // Kimi Code 2.6.0 gives a server added to a resumed session only as a `<tools_added>` note. The
+  // agent knew the Tavily tools and could not call them (#8931).
+  mcpToolsFixedAtStart: true,
 };
 
 /**
@@ -591,6 +600,9 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
     resendsAnswer: true,
     turnFailure: hermesTurnFailure,
   },
+  // Kimi Code added as a custom agent (`kimi acp`) keeps the custom rules and the tools of its first
+  // turn, as for the Kimi provider (#8931).
+  kimi: { ...CUSTOM_ACP_FLAVOR, mcpToolsFixedAtStart: true },
 };
 
 /**

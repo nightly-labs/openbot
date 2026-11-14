@@ -9,6 +9,7 @@ import {
   agentQuickAcknowledgementEnabled,
   COMPUTER_USE_MCP_SERVER_ID,
   DEFAULT_RESPONSE_STYLE,
+  GITHUB_CONNECTOR_MCP_SERVER_ID,
   type McpServerConfig,
   type ResponseStyle,
   workspaceAccessEnforced,
@@ -194,6 +195,8 @@ export interface ThreadLifecycleOptions {
   mcpEndpoint?: McpEndpointSource;
   /** What the tool manifest records about the OAuth proxy for a set. See `McpGateway.proxyFingerprint`. */
   mcpProxyFingerprint?: (configs: readonly McpServerConfig[]) => Effect.Effect<string | null, McpOperationError>;
+  /** The rows of a set that have a sign-in. See `McpGateway.proxiedServerIds`. */
+  mcpProxiedServerIds?: (configs: readonly McpServerConfig[]) => readonly string[];
   /**
    * Variables for the commands a Codex agent runs, such as the paths that point `gh` and `git` at
    * the built-in GitHub connection. Claude and the ACP clients read the same source at spawn.
@@ -252,6 +255,7 @@ export class ThreadLifecycle {
   readonly #mcpProxyFingerprint: (
     configs: readonly McpServerConfig[],
   ) => Effect.Effect<string | null, McpOperationError>;
+  readonly #mcpProxiedServerIds: (configs: readonly McpServerConfig[]) => readonly string[];
   readonly #agentEnvironment: () => Readonly<Record<string, string>>;
   readonly #passwordVaultConnected: () => boolean;
   readonly #vaultItems: (agentId: string) => VaultContents;
@@ -307,6 +311,7 @@ export class ThreadLifecycle {
     this.#mcpToolRuntimes = options.mcpToolRuntimes;
     this.#mcpEndpoint = options.mcpEndpoint;
     this.#mcpProxyFingerprint = options.mcpProxyFingerprint ?? (() => Effect.succeed(null));
+    this.#mcpProxiedServerIds = options.mcpProxiedServerIds ?? (() => []);
     this.#agentEnvironment = options.agentEnvironment ?? (() => ({}));
     this.#passwordVaultConnected = options.passwordVaultConnected ?? (() => false);
     this.#vaultItems = options.vaultItems ?? (() => ({ available: false, cards: false, contacts: false }));
@@ -519,10 +524,9 @@ export class ThreadLifecycle {
       );
       if (Result.isSuccess(handoff)) this.#pendingHandoffs.set(session.externalSessionId, handoff.success);
       else if (!missingSessionFile(handoff.failure.cause)) return yield* handoff.failure;
-      // A Codex tool/config change replaces only the provider session, never the public thread.
+      // A tool/config change replaces only the provider session, never the public thread.
       if (
-        client.provider === "codex" &&
-        !(yield* this.hasCurrentToolsEffect(
+        !(yield* this.#hasCurrentSessionTools(
           this.#sessionAgent(currentAgent, publicThreadId),
           client,
           session.externalSessionId,
@@ -833,6 +837,9 @@ export class ThreadLifecycle {
     const givenContext = yield* this.#turnContextKey(owner, client);
     const { agent, mcpServers, toolRuntimes, own, environment, proxy, instructionsFile, params } =
       yield* this.#startParams(owner, client, publicThreadId);
+    // Before the request, with the same reading, as the Codex manifest: a sign-in or a download that
+    // finishes while the provider answers is not what this session was given.
+    const mcpSet = this.#mcpSetFingerprint(mcpServers, toolRuntimes);
     const response = yield* client
       .request("thread/start", { ...params, ephemeral: false }, decodeThreadResponse)
       .pipe(toThreadOperationFailed);
@@ -862,6 +869,8 @@ export class ThreadLifecycle {
             this.toolFingerprint(agent, mcpServers, own, approvals, toolRuntimes, environment, proxy, instructionsFile),
             approvals,
           );
+        } else if (client.mcpToolsFixedAtStart?.(externalThreadId)) {
+          yield* this.#writeToolManifest(externalThreadId, mcpSet, []);
         }
         // The handoff reads the store synchronously. A failure there must also clean up this session.
         const handoff = yield* this.buildProviderHandoff(agent.id, publicThreadId).pipe(
@@ -1328,6 +1337,53 @@ export class ThreadLifecycle {
     return client.provider === "claude" && this.#conversation.channelForThread(publicThreadId) !== null
       ? { channelTools: true }
       : {};
+  }
+
+  /**
+   * Whether a stored session can resume with the tools of now. Codex keeps the configuration of a
+   * resumed session (`hasCurrentToolsEffect`). A provider that keeps the MCP tools of a session's first
+   * turn gives a server added later only as a note: an agent knew the Tavily tools of a resumed Kimi
+   * session and could not call them (#8931). The refresh after an MCP change replaces the sessions,
+   * but it is lost when OpenBot restarts first. A session that this client holds got that refresh,
+   * so only a resume reads the record. The other providers take the current servers on resume.
+   */
+  readonly #hasCurrentSessionTools = Effect.fn("ThreadLifecycle.hasCurrentSessionTools")(function* (
+    this: ThreadLifecycle,
+    agent: AgentSummary,
+    client: AgentClient,
+    sessionId: string,
+  ) {
+    if (client.provider === "codex") return yield* this.hasCurrentToolsEffect(agent, client, sessionId);
+    if (!client.mcpToolsFixedAtStart?.(sessionId) || this.#conversation.loadedClientFor(sessionId) === client)
+      return true;
+    const fingerprint = yield* threadStep(() =>
+      this.#mcpSetFingerprint(this.#agentMcpServers(agent), this.#toolRuntimes()),
+    );
+    const stored = yield* Effect.result(threadIo(() => readFile(this.toolManifestPath(sessionId), "utf8")));
+    if (Result.isSuccess(stored)) return stored.success.split("\n", 1)[0] === fingerprint;
+    if (!missingSessionFile(stored.failure.cause)) return yield* stored.failure;
+    // A session from before this record keeps its provider history: it is compared from now on.
+    yield* this.#writeToolManifest(sessionId, fingerprint, []);
+    return true;
+  });
+
+  /**
+   * The MCP set that a session of `mcpToolsFixedAtStart` was given: the user's servers, which of them
+   * have a sign-in (a row then moves to the proxy), and the managed runtimes, without which an `npx`
+   * server is left out. Not the proxy addresses, and not the built-in Computer Use and GitHub entries:
+   * these change at each start of OpenBot (a new port, a driver that is not ready yet), and a resume
+   * gets the new values while the tools keep their names.
+   */
+  #mcpSetFingerprint(configs: readonly McpServerConfig[], toolRuntimes: McpToolRuntimes): string {
+    const rows = configs.filter(
+      (config) => config.id !== COMPUTER_USE_MCP_SERVER_ID && config.id !== GITHUB_CONNECTOR_MCP_SERVER_ID,
+    );
+    const { binDirectories, commandAliases } = toolRuntimes;
+    return createHash("sha256")
+      .update(
+        JSON.stringify([mcpFingerprintValues(rows), this.#mcpProxiedServerIds(rows), [binDirectories, commandAliases]]),
+      )
+      .digest("hex");
   }
 
   private readonly hasCurrentToolsEffect = Effect.fn("ThreadLifecycle.hasCurrentTools")(function* (
