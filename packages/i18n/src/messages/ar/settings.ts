@@ -859,6 +859,10 @@ export const messages = {
     many: "نسخ {count} وكيلًا",
     other: "نسخ {count} وكيل",
   },
+  "settings.transfer.copy.duplicatesTitle": "هل تريد نسخ وكلاء مكررين؟",
+  "settings.transfer.copy.duplicatesDescription":
+    "يحتوي {server} بالفعل على وكلاء بهذه الأسماء: {names}. يضيف النسخ وكيلًا ثانيًا لكل واحد منهم. كل نسخة وكيل منفصل له دردشاته وملفاته وذكرياته.",
+  "settings.transfer.copy.duplicatesConfirm": "نسخ المكررين",
   "settings.transfer.copy.copying": "جارٍ النسخ…",
   "settings.transfer.copy.done": {
     zero: "لم يُنسخ أي وكيل إلى {server}.",

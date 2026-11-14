@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import { useEffect, useRef, useState } from "react";
+import { Alert } from "react-native";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { agentContents, IncludeRow, toggledKeys } from "@/features/servers/components/import-parts";
 import { TransferResult } from "@/features/servers/screens/server-transfer-import-screen";
@@ -124,6 +125,8 @@ export function ServerTransferCopyScreen() {
   const busy = phase !== "idle";
   const selected = data.agents.filter((agent) => !excluded.has(agent.id));
   const usedNames = new Set(destination.data?.agents.map((agent) => agent.name.toLowerCase()) ?? []);
+  // The duplicate check needs the destination's agents. When they cannot be read, the copy can still start.
+  const readingDestination = destination.isPending && destination.fetchStatus !== "idle";
 
   async function copy(to: { id: string; name: string }) {
     if (running.current) return;
@@ -180,6 +183,22 @@ export function ServerTransferCopyScreen() {
         : phase === "applying"
           ? t("mobile.server.transfer.copying")
           : t("mobile.server.transfer.copySubmit", { count: selected.length });
+  // An agent whose name is already on the destination is copied as a second, separate agent: the user accepts that first.
+  const confirmAndCopy = (to: { id: string; name: string }) => {
+    const duplicates = selected.filter((agent) => usedNames.has(agent.name.toLowerCase()));
+    if (duplicates.length === 0) return void copy(to);
+    Alert.alert(
+      t("mobile.server.transfer.copyDuplicatesTitle"),
+      t("mobile.server.transfer.copyDuplicatesBody", {
+        server: to.name,
+        names: duplicates.map((agent) => agent.name).join(", "),
+      }),
+      [
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("mobile.server.transfer.copyDuplicatesConfirm"), onPress: () => void copy(to) },
+      ],
+    );
+  };
 
   return (
     <SettingsContent>
@@ -229,9 +248,9 @@ export function ServerTransferCopyScreen() {
       <SettingsSection footer={error ?? undefined}>
         <SettingsRow
           disclosure={false}
-          disabled={busy || selected.length === 0 || !target}
+          disabled={busy || selected.length === 0 || !target || readingDestination}
           onPress={() => {
-            if (target) void copy({ id: target.id, name: target.name });
+            if (target) confirmAndCopy({ id: target.id, name: target.name });
           }}
         >
           <Typography.Paragraph className="text-accent">{actionLabel}</Typography.Paragraph>

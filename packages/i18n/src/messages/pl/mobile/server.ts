@@ -1807,6 +1807,10 @@ export const messages = {
     many: "Kopiuj {count} agentów",
     other: "Kopiuj {count} agenta",
   },
+  "mobile.server.transfer.copyDuplicatesTitle": "Skopiować zduplikowanych agentów?",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "{server} ma już agentów o tych nazwach: {names}. Kopiowanie doda drugiego agenta dla każdego z nich. Każda kopia to osobny agent z własnymi czatami, plikami i wspomnieniami.",
+  "mobile.server.transfer.copyDuplicatesConfirm": "Kopiuj duplikaty",
   "mobile.server.transfer.copying": "Kopiowanie…",
   "mobile.server.transfer.copyFailed": "Kopiowanie nie zostało ukończone.",
   "mobile.server.transfer.copied": {

@@ -1495,6 +1495,10 @@ export const messages = {
   "mobile.server.transfer.copyNotMoved":
     "助手所在的频道和共享文件夹也会被复制。API 密钥、登录、连接器和聊天记录不会被复制。请在另一台服务器上重新设置。",
   "mobile.server.transfer.copySubmit": { one: "复制 {count} 个助手", other: "复制 {count} 个助手" },
+  "mobile.server.transfer.copyDuplicatesTitle": "复制重复的助手？",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "{server} 上已有这些名称的助手：{names}。复制会为每个再添加一个助手，每份都是独立助手，拥有各自的对话、文件和记忆。",
+  "mobile.server.transfer.copyDuplicatesConfirm": "复制副本",
   "mobile.server.transfer.copying": "正在复制…",
   "mobile.server.transfer.copyFailed": "复制未完成。",
   "mobile.server.transfer.copied": {

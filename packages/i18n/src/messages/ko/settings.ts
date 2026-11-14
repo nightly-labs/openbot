@@ -767,6 +767,10 @@ export const messages = {
   "settings.transfer.copy.notCopied":
     "에이전트의 채널과 공유 폴더도 복사돼요. API 키, 로그인, 커넥터, 채팅 기록은 복사되지 않아요. 다른 서버에서 다시 설정하세요.",
   "settings.transfer.copy.submit": { other: "에이전트 {count}개 복사" },
+  "settings.transfer.copy.duplicatesTitle": "중복된 에이전트를 복사할까요?",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server}에 이미 같은 이름의 에이전트가 있어요: {names}. 복사하면 각각 에이전트가 하나 더 추가돼요. 사본은 채팅, 파일, 메모리가 따로 있는 별개의 에이전트예요.",
+  "settings.transfer.copy.duplicatesConfirm": "중복 복사",
   "settings.transfer.copy.copying": "복사하는 중…",
   "settings.transfer.copy.done": { other: "에이전트 {count}개를 {server}에 복사했어요." },
   "settings.transfer.copy.open": "{server} 열기",

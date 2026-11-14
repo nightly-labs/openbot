@@ -5,6 +5,7 @@ import {
   Button,
   Checkbox,
   CircleCheck,
+  ConfirmDialog,
   Dialog,
   Input,
   Select,
@@ -78,6 +79,12 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
     return text ? agents().filter((agent) => agent.name.toLowerCase().includes(text)) : agents();
   });
   const takenNames = createMemo(() => new Set((props.toAgents ?? []).map((agent) => agent.name.toLowerCase())));
+  // An agent whose name is already on the destination is copied as a second, separate agent: the user accepts that first.
+  const duplicates = createMemo(() => selected().filter((agent) => takenNames().has(agent.name.toLowerCase())));
+  const [confirmingDuplicates, setConfirmingDuplicates] = createSignal(false);
+  const startCopy = () => props.onCopy(selected().map((agent) => agent.id));
+  // The duplicate check needs the destination's agents. When they cannot be read, the copy can still start.
+  const readingDestination = () => props.toAgents === null && !props.loadError;
   const busy = () => props.phase === "copying";
   const done = () => props.phase === "done";
   const from = () => props.servers.find((server) => server.id === props.fromId) ?? null;
@@ -93,7 +100,7 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
   const doneResult = () => (done() ? props.result : null);
   const doneVariant = () => (props.onOpenServer ? "ghost" : "default");
 
-  return (
+  const dialog = (
     <Dialog.Root
       open
       modal
@@ -247,10 +254,10 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
                     </Button>
                     <Button
                       type="button"
-                      disabled={!to() || selected().length === 0}
+                      disabled={!to() || selected().length === 0 || readingDestination()}
                       loading={busy()}
                       loadingLabel={t("settings.transfer.copy.copying")}
-                      onClick={() => props.onCopy(selected().map((agent) => agent.id))}
+                      onClick={() => (duplicates().length > 0 ? setConfirmingDuplicates(true) : startCopy())}
                     >
                       {t("settings.transfer.copy.submit", { count: selected().length })}
                     </Button>
@@ -273,6 +280,30 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
         </Dialog.Overlay>
       </Dialog.Portal>
     </Dialog.Root>
+  );
+  return (
+    <>
+      {dialog}
+      <ConfirmDialog
+        open={confirmingDuplicates()}
+        tone="default"
+        initialFocus="cancel"
+        title={t("settings.transfer.copy.duplicatesTitle")}
+        description={t("settings.transfer.copy.duplicatesDescription", {
+          server: to()?.name ?? "",
+          names: duplicates()
+            .map((agent) => agent.name)
+            .join(", "),
+        })}
+        cancelLabel={t("common.cancel")}
+        confirmLabel={t("settings.transfer.copy.duplicatesConfirm")}
+        onCancel={() => setConfirmingDuplicates(false)}
+        onConfirm={() => {
+          setConfirmingDuplicates(false);
+          startCopy();
+        }}
+      />
+    </>
   );
 }
 

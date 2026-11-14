@@ -853,6 +853,10 @@ export const messages = defineMessages("settings", {
   "settings.transfer.copy.notCopied":
     "Their channels and the Shared folder are copied too. API keys, sign-ins, connectors, and chat history are not copied. Set them up again on the other server.",
   "settings.transfer.copy.submit": { one: "Copy {count} agent", other: "Copy {count} agents" },
+  "settings.transfer.copy.duplicatesTitle": "Copy duplicate agents?",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} already has agents with these names: {names}. The copy adds a second agent for each one. Each copy is a separate agent with its own chats, files, and memories.",
+  "settings.transfer.copy.duplicatesConfirm": "Copy duplicates",
   "settings.transfer.copy.copying": "Copying…",
   "settings.transfer.copy.done": {
     one: "{count} agent copied to {server}.",

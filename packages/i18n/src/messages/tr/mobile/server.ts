@@ -1605,6 +1605,10 @@ export const messages = {
   "mobile.server.transfer.copyNotMoved":
     "Kanalları ve paylaşılan klasör de kopyalanır. API anahtarları, oturum açma bilgileri, bağlayıcılar ve sohbet geçmişi kopyalanmaz. Bunları diğer sunucuda yeniden kurun.",
   "mobile.server.transfer.copySubmit": { one: "{count} ajanı kopyala", other: "{count} ajanı kopyala" },
+  "mobile.server.transfer.copyDuplicatesTitle": "Yinelenen ajanlar kopyalansın mı?",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "{server} üzerinde bu adlara sahip ajanlar zaten var: {names}. Kopyalama her biri için ikinci bir ajan ekler. Her kopya, kendi sohbetleri, dosyaları ve bellekleri olan ayrı bir ajandır.",
+  "mobile.server.transfer.copyDuplicatesConfirm": "Yinelenenleri kopyala",
   "mobile.server.transfer.copying": "Kopyalanıyor…",
   "mobile.server.transfer.copyFailed": "Kopyalama tamamlanmadı.",
   "mobile.server.transfer.copied": {

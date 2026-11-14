@@ -1627,6 +1627,10 @@ export const messages = {
   "mobile.server.transfer.copyNotMoved":
     "Leurs canaux et le dossier partagé sont aussi copiés. Les clés d’API, les connexions, les connecteurs et l’historique des chats ne sont pas copiés. Configurez-les à nouveau sur l’autre serveur.",
   "mobile.server.transfer.copySubmit": { one: "Copier {count} agent", other: "Copier {count} agents" },
+  "mobile.server.transfer.copyDuplicatesTitle": "Copier des agents en double ?",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "{server} a déjà des agents avec ces noms : {names}. La copie ajoute un deuxième agent pour chacun. Chaque copie est un agent distinct, avec ses propres discussions, fichiers et souvenirs.",
+  "mobile.server.transfer.copyDuplicatesConfirm": "Copier les doublons",
   "mobile.server.transfer.copying": "Copie…",
   "mobile.server.transfer.copyFailed": "La copie n’a pas abouti.",
   "mobile.server.transfer.copied": {

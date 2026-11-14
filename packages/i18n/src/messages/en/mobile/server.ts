@@ -2047,6 +2047,10 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.transfer.copyNotMoved":
     "Their channels and the Shared folder are copied too. API keys, sign-ins, connectors, and chat history are not copied. Set them up again on the other server.",
   "mobile.server.transfer.copySubmit": { one: "Copy {count} agent", other: "Copy {count} agents" },
+  "mobile.server.transfer.copyDuplicatesTitle": "Copy duplicate agents?",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "{server} already has agents with these names: {names}. The copy adds a second agent for each one. Each copy is a separate agent with its own chats, files, and memories.",
+  "mobile.server.transfer.copyDuplicatesConfirm": "Copy duplicates",
   "mobile.server.transfer.copying": "Copying…",
   "mobile.server.transfer.copyFailed": "The copy did not finish.",
   "mobile.server.transfer.copied": {

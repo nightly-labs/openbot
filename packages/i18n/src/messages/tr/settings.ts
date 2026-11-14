@@ -791,6 +791,10 @@ export const messages = {
   "settings.transfer.copy.notCopied":
     "Kanalları ve paylaşılan klasör de kopyalanır. API anahtarları, oturum açma bilgileri, bağlayıcılar ve sohbet geçmişi kopyalanmaz. Bunları diğer sunucuda yeniden kurun.",
   "settings.transfer.copy.submit": { one: "{count} ajanı kopyala", other: "{count} ajanı kopyala" },
+  "settings.transfer.copy.duplicatesTitle": "Yinelenen ajanlar kopyalansın mı?",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} üzerinde bu adlara sahip ajanlar zaten var: {names}. Kopyalama her biri için ikinci bir ajan ekler. Her kopya, kendi sohbetleri, dosyaları ve bellekleri olan ayrı bir ajandır.",
+  "settings.transfer.copy.duplicatesConfirm": "Yinelenenleri kopyala",
   "settings.transfer.copy.copying": "Kopyalanıyor…",
   "settings.transfer.copy.done": {
     one: "{count} ajan {server} sunucusuna kopyalandı.",
