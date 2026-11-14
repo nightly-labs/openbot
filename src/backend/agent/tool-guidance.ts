@@ -140,7 +140,7 @@ function openbotGuidance(namespace: string, tool: string): string {
       return [
         "Read a workflow before a change. Make all changes in one openbot.edit_workflow call: give each new node a ref. add with from also connects. To insert a step, disconnect, add it with from, connect it to the next. The host lays out nodes: send no at; move if asked; tidy cleans up. The result maps refs to ids; do not read again.",
         "Fields by kind: trigger trigger (manual, schedule, webhook, github, discord, telegram, slack), schedule as {kind:daily|weekdays,time:HH:mm}, {kind:weekly,weekday:0-6,time}, {kind:hourly,minute}, {kind:custom,expression:cron}; agent agentId (openbot.list_agents), task; llm prompt, system; condition rule, a yes/no question, edges need branch yes|no; both take provider, model, effort only if asked; approval question; output target notify, chat-channel channelId, channel connectionId, placeId (openbot.messaging_list_places), github, discord, telegram, slack; prompt text. text, note and shape take no edges.",
-        "Only the person's message can change, delete or run a workflow; OpenBot confirms a delete; do not ask in chat. Run one only when asked or to test a build. No tool waits for a run: read it once, then report what ran and what runs.",
+        "Only a person-started turn can change, delete or run a workflow; OpenBot confirms a delete; do not ask in chat. Run one only if asked or to test a build. No tool waits for a run: read it once, then report what ran and what runs.",
       ].join("\n");
     case "html_render":
     case "html_preview":
