@@ -314,6 +314,33 @@ export function SidebarWaitTooltip(props: { wait: SidebarChannelWait; menuOpen: 
   );
 }
 
+/**
+ * The name of a chat in the compact sidebar, where its row shows only the avatar. The first one
+ * waits; while one was open a moment ago, the next row shows its name at once. Off in the wide
+ * sidebar, where the row shows the name.
+ */
+export function SidebarNameTooltip(props: { name: string; disabled: boolean; children: JSX.Element }) {
+  return (
+    <Tooltip.Root
+      placement="right"
+      gutter={10}
+      openDelay={SIDEBAR_WAIT_TOOLTIP_OPEN_DELAY}
+      closeDelay={0}
+      skipDelayDuration={300}
+      disabled={props.disabled}
+    >
+      <Tooltip.Trigger as="div" class="sidebar-agent-tooltip-trigger">
+        {props.children}
+      </Tooltip.Trigger>
+      <Tooltip.Portal>
+        <Tooltip.Content class="ui-tooltip" data-placement="right" dir="auto">
+          {props.name}
+        </Tooltip.Content>
+      </Tooltip.Portal>
+    </Tooltip.Root>
+  );
+}
+
 export function SidebarPinnedAvatar(props: {
   agent: Pick<AgentProfile, "avatarSeed" | "avatarHue" | "avatarColor" | "avatarUrl">;
   mood: AvatarMood;
