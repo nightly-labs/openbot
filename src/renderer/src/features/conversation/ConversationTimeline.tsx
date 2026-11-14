@@ -1492,10 +1492,10 @@ export function ConversationTimeline() {
                     if (currentMessage) void copyMessage(currentMessage);
                   },
                 };
-                // An agent's actions stand beside its answer, and its steps show with them and open only the
-                // trace. In an agent chat, "Show agent steps" keeps the open list above the answer.
-                const stepsInRow = () =>
-                  author().kind === "agent" && !message()?.questionPrompt && (Boolean(channel) || !showAgentSteps());
+                // A channel shows an agent's actions beside the answer, and its steps open only the
+                // trace. An agent chat shows the steps above the answer, as a side thread does, so the
+                // reasoning list can open there with or without "Show agent steps".
+                const stepsInRow = () => author().kind === "agent" && !message()?.questionPrompt && Boolean(channel);
                 // The reader's own actions stand beside the bubble, so a run of their messages sits close.
                 const actionsBeside = () => stepsInRow() || author().kind === "you";
                 const stepsDisclosure = () => (
