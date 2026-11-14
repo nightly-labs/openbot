@@ -1619,8 +1619,9 @@ function mcpOAuthServerUrl(key: string): string {
 }
 
 /**
- * Whether the server publishes protected-resource metadata that names an authorization server, which
- * is what a sign-in needs to open a page. Any answer below 500 that is not such metadata says no: a
+ * Whether the server publishes protected-resource metadata that names an authorization server, or,
+ * without such a document, has authorization server metadata at its origin: what a sign-in needs to
+ * open a page. Any answer below 500 that is not resource metadata moves to the origin: a
  * 404, a refusal, or a page that is not metadata. No answer, a server error, or a busy server (408,
  * 429) says nothing about the server, so it fails: a sign-in must not end as if the server asked for
  * none, which left the row showing the result of the earlier test, with no page and no words.
@@ -1642,7 +1643,14 @@ const namesAuthorizationServer = Effect.fnUntraced(function* (resource: string, 
       return Effect.fail(new Error(sourceText("error.backend.mcpSignInMetadataUnreadable")));
     }),
   );
-  return Boolean(metadata?.authorization_servers?.length);
+  if (metadata) return Boolean(metadata.authorization_servers?.length);
+  // A server on the 2025-03 MCP authorization spec has no resource metadata: its origin is its
+  // authorization server, where the SDK's sign-in looks too. Only metadata found there counts, so
+  // nothing is guessed. A read that fails is a no, as a missing resource document was (#8733).
+  return yield* mcpCall(() => discoverAuthorizationServerMetadata(new URL("/", resource), { fetchFn })).pipe(
+    Effect.map(Boolean),
+    Effect.catch(() => Effect.succeed(false)),
+  );
 });
 
 /** A legacy binding is useful only when it names an endpoint this client would send credentials to. */
