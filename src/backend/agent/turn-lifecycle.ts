@@ -261,8 +261,11 @@ export interface TurnHooks {
   turnStopped(agentId: string, taskId: string | null, turnId: string): boolean;
   /** Whether the agent has an open wait for one of these deliveries. */
   hasOpenWait(agentId: string, deliveryIds: readonly string[]): boolean;
-  /** Ends the provider session of a routine run. Nothing for any other session, or a second time. */
-  closeRoutineSession(externalThreadId: string): Effect.Effect<void>;
+  /**
+   * Ends the provider session of a routine run. Nothing for any other session, or a second time.
+   * `archive` also takes it out of the provider's own thread list.
+   */
+  closeRoutineSession(externalThreadId: string, archive?: boolean): Effect.Effect<void>;
   /** Gives the answer of a routine run in its own session to the session of the agent's chat. */
   routineAnswered(agentId: string, deliveryId: string, answer: string): Effect.Effect<void>;
   /** Attaches the files that a finished answer names by path to it. It never fails the turn. */
@@ -457,6 +460,11 @@ export class TurnLifecycle {
    * the turn ended. Boot recovery stops every subagent, so nothing here outlives the process.
    */
   readonly #subagentTurns = new Map<string, Set<string>>();
+  /**
+   * The routine sessions whose turn ended with no subagent at work. Their close also archives them.
+   * An archive stops the subagents of a Codex session, so a session with one at work stays listed.
+   */
+  readonly #archivableRoutineSessions = new Set<string>();
 
   constructor(options: TurnLifecycleOptions) {
     this.#store = options.store;
@@ -1786,8 +1794,13 @@ export class TurnLifecycle {
       const subagents = snapshot.messages.find((message) => message.id === `${turnId}:subagents`);
       stopRunningSubagents(subagents?.subagents, new Date().toISOString(), { background: false });
       if (this.#trackSubagents(agentId, turnId, subagents?.subagents)) this.#hooks.emitRuntimeSnapshot();
+      let subagentsWork = this.#subagentTurns.get(agentId)?.has(turnId) === true;
       for (const [childId, parent] of this.#codexChildren)
-        if (parent.turnId === turnId) this.#codexChildren.delete(childId);
+        if (parent.turnId === turnId) {
+          subagentsWork = true;
+          this.#codexChildren.delete(childId);
+        }
+      if (routineSession && !subagentsWork) this.#archivableRoutineSessions.add(threadId);
       for (const message of snapshot.messages) {
         if (this.#itemTurns.get(message.id) !== turnId || message.status !== "streaming") continue;
         message.status = normalizeCompletionStatus(
@@ -2049,7 +2062,7 @@ export class TurnLifecycle {
               this.#completingTurns.delete(turnId);
               this.#quietChannelTurns.delete(turnId);
             }),
-            this.#hooks.closeRoutineSession(threadId),
+            () => this.#hooks.closeRoutineSession(threadId, this.#archivableRoutineSessions.delete(threadId)),
           ),
         ),
       ),

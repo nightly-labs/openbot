@@ -3,11 +3,13 @@
 // service on a temporary profile with a fake Codex app-server. The fake keeps the context of each
 // session: each request sends all of the session's earlier input again, as a model request does, and
 // reports that size as input tokens. The chat gets about 45,000 tokens of history, then a routine
-// runs twice. The check asserts that each run starts an ephemeral session and closes it, that its
-// request stays small, that both runs use one routine thread and their answers show there and not in
-// the chat, that the chat keeps its session, and that the chat turns read the answers. While the
-// second run is held, a chat message and a run of a second routine must finish: the lanes do not wait
-// for each other. The second routine opens a wait, which a routine thread can do as the chat can.
+// runs twice. The check asserts that each run starts a session that Codex saves, so that a subagent
+// can fork it (#8743), and that the run closes it and takes it out of the Codex thread list. It also
+// asserts that the run's request stays small, that both runs use one routine thread and their
+// answers show there and not in the chat, that the chat keeps its session, and that the chat turns
+// read the answers. While the second run is held, a chat message and a run of a second routine must
+// finish: the lanes do not wait for each other. The second routine opens a wait, which a routine
+// thread can do as the chat can.
 // A routine with no run place runs in the chat: its answer shows in the chat, and it gets no thread.
 // It also drives saved password and authenticator fills through the routine tool router, checks
 // the sign-in guidance, and checks that no secret reaches the provider. Each run keeps the agent's
@@ -67,8 +69,8 @@ const CODE = "739182";
 
 /**
  * A Codex app-server with the methods that the service calls. It writes each `thread/start`,
- * `thread/resume`, `thread/unsubscribe` and `turn/start` to the log. A routine turn answers with a
- * numbered report; other turns answer "Done.".
+ * `thread/resume`, `thread/unsubscribe`, `thread/archive` and `turn/start` to the log. A routine turn
+ * answers with a numbered report; other turns answer "Done.".
  */
 const FAKE_CODEX = `#!/usr/bin/env node
 const { appendFileSync, existsSync } = require("node:fs");
@@ -125,6 +127,9 @@ const answer = (message) => {
     case "thread/unsubscribe":
       log({ method: "thread/unsubscribe", threadId: params.threadId });
       return write({ id: message.id, result: { status: "Unsubscribed" } });
+    case "thread/archive":
+      log({ method: "thread/archive", threadId: params.threadId });
+      return write({ id: message.id, result: {} });
     case "thread/turns/list":
     case "thread/items/list": return write({ id: message.id, result: { data: [], nextCursor: null } });
     case "thread/read": return write({ id: message.id, result: { thread: { id: params.threadId, turns: [] } } });
@@ -234,6 +239,7 @@ const report: {
   mainSession?: { before: string; after: string };
   threadStarts: Omit<LogEntry, "text">[];
   closedThreads: string[];
+  archivedThreads: string[];
   turns: TurnReport[];
   routineAnswersInChat: string[];
   routineThreads: { routine: string; taskId: string; threadId: string; title: string; answers: string[] }[];
@@ -249,6 +255,7 @@ const report: {
 } = {
   threadStarts: [],
   closedThreads: [],
+  archivedThreads: [],
   turns: [],
   routineAnswersInChat: [],
   routineThreads: [],
@@ -544,7 +551,7 @@ try {
     await settled(runDeliveryId, `routine run ${run}`);
     const entry = await waitFor(`routine run ${run} turn`, () => buildTurns().at(run - 1));
     await waitFor(`routine run ${run} session to close`, () =>
-      fakeEntries().some((item) => item.method === "thread/unsubscribe" && item.threadId === entry.threadId),
+      fakeEntries().some((item) => item.method === "thread/archive" && item.threadId === entry.threadId),
     );
     routineTurns.push(turnEntry(`routine run ${run}`, entry));
   }
@@ -559,7 +566,8 @@ try {
   report.closedThreads = entries
     .filter((entry) => entry.method === "thread/unsubscribe")
     .map((entry) => entry.threadId);
-  const routineStarts = report.threadStarts.filter((entry) => entry.ephemeral === true);
+  report.archivedThreads = entries.filter((entry) => entry.method === "thread/archive").map((entry) => entry.threadId);
+  const routineStarts = report.threadStarts.filter((entry) => entry.persistSession === false);
   const toolResults = entries.filter((entry) => entry.method === "tool-result");
   const results = toolResults.filter((entry) => entry.tool !== "await_event");
   const waitResults = toolResults.filter((entry) => entry.tool === "await_event");
@@ -629,8 +637,8 @@ try {
     ),
   );
   pass(
-    "Routine sessions are ephemeral and not saved",
-    routineStarts.every((entry) => entry.persistSession === false),
+    "Codex saves each routine session, so that a subagent can fork it",
+    routineStarts.every((entry) => entry.ephemeral === false),
   );
   pass(
     "Each routine turn runs in its own session",
@@ -642,6 +650,10 @@ try {
   pass(
     "Each routine session closes after its run",
     routineTurns.every((turn) => report.closedThreads.includes(turn.threadId)),
+  );
+  pass(
+    "Each routine session leaves the Codex thread list after its run",
+    routineTurns.every((turn) => report.archivedThreads.includes(turn.threadId)),
   );
   pass(
     "The first routine request stays small",
@@ -720,7 +732,7 @@ try {
   pass(
     "The chat did not resume or restart its session",
     !fakeEntries().some((entry) => entry.method === "thread/resume") &&
-      report.threadStarts.filter((entry) => entry.ephemeral !== true).length === 1,
+      report.threadStarts.filter((entry) => entry.persistSession !== false).length === 1,
   );
 
   // A routine with no run place runs in the chat, as before 0.61.
