@@ -291,6 +291,12 @@ export function BrowserTakeoverCard(props: BrowserTakeoverCardProps) {
 function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
   const { t } = useText();
   const [submitting, setSubmitting] = createSignal<"complete" | "cancel" | null>(null);
+  // The page does not open by itself, so opening it is the main action until the user has done it.
+  const [opened, setOpened] = createSignal(false);
+  const openPage = () => {
+    setOpened(true);
+    props.onOpen?.();
+  };
   const pageDetails = createMemo(() => browserPageDetails(props.tab, t));
   const completed = () => props.decision === "complete";
   const cancelled = () => props.decision === "cancel";
@@ -375,8 +381,20 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
                     </Button>
                   )}
                 </Show>
+                <Show when={props.onOpen}>
+                  <Button
+                    variant={opened() ? "secondary" : "default"}
+                    size="sm"
+                    type="button"
+                    disabled={Boolean(submitting())}
+                    onClick={openPage}
+                  >
+                    <Maximize2 data-icon="inline-start" aria-hidden="true" />
+                    {t("common.open")}
+                  </Button>
+                </Show>
                 <Button
-                  variant="default"
+                  variant={props.onOpen && !opened() ? "secondary" : "default"}
                   size="sm"
                   type="button"
                   disabled={Boolean(submitting())}
@@ -431,7 +449,7 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
             type="button"
             class="browser-takeover-preview-viewport browser-takeover-preview-open"
             aria-label={t("prompt.browser.openPage", { title: pageDetails().title })}
-            onClick={() => props.onOpen?.()}
+            onClick={openPage}
           >
             <BrowserTakeoverPreview preview={props.preview} previewStatus={props.previewStatus} page={pageDetails()} />
             <span class="browser-takeover-preview-open-label" aria-hidden="true">
