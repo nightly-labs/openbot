@@ -282,6 +282,47 @@ export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   language: AUTOMATIC_VOICE_LANGUAGE,
 };
 
+/** The 25 European languages that Parakeet TDT v3 finds. It cannot write any other language. */
+const PARAKEET_TDT_LANGUAGES = [
+  "bg",
+  "cs",
+  "da",
+  "de",
+  "el",
+  "en",
+  "es",
+  "et",
+  "fi",
+  "fr",
+  "hr",
+  "hu",
+  "it",
+  "lt",
+  "lv",
+  "mt",
+  "nl",
+  "pl",
+  "pt",
+  "ro",
+  "ru",
+  "sk",
+  "sl",
+  "sv",
+  "uk",
+] as const satisfies readonly WhisperLanguage[];
+
+/**
+ * The dictation settings before the user chooses a model, from the language they use (a BCP 47 tag
+ * such as `ko-KR`). Parakeet stays the default for its own languages and for an unknown language.
+ * Another language that Whisper knows gets Whisper turbo with that language set: Parakeet would
+ * write it as wrong words.
+ */
+export function defaultVoiceSettings(locale: string): VoiceSettings {
+  const language = locale.toLowerCase().split(/[-_]/u)[0];
+  if (!isOneOf(WHISPER_LANGUAGES, language) || isOneOf(PARAKEET_TDT_LANGUAGES, language)) return DEFAULT_VOICE_SETTINGS;
+  return { modelId: "whisper-turbo", language };
+}
+
 export type VoiceModelPhase = "missing" | "downloading" | "ready" | "error";
 
 export interface VoiceModelStatus {

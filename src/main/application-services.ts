@@ -100,8 +100,10 @@ import type {
 import {
   agentBrowserProfile,
   type ChannelCommand,
+  DEFAULT_APP_LANGUAGE,
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
   decodeChannel,
+  defaultVoiceSettings,
   IPC_ENDPOINTS,
   isGroqVoiceModelId,
   isLocalVoiceModelId,
@@ -4109,7 +4111,14 @@ export async function createApplicationServices({
     },
   });
   teardown.push(TEARDOWN_ORDER.remoteDesktop, "remote desktop", () => Effect.runPromise(remoteDesktop.stop()));
-  const voicePreferences = new VoicePreferenceStore(join(app.getPath("userData"), "voice-preference.json"));
+  // Until the user chooses a model, dictation follows the app language they chose, or else the first
+  // language of the computer.
+  const voicePreferences = new VoicePreferenceStore(join(app.getPath("userData"), "voice-preference.json"), () => {
+    const chosen = language.preference.language;
+    return defaultVoiceSettings(
+      chosen === DEFAULT_APP_LANGUAGE ? (app.getPreferredSystemLanguages()[0] ?? app.getLocale()) : chosen,
+    );
+  });
   await runCauseEffect(voicePreferences.load());
   const voiceApiKeys = new VoiceApiKeyStore({
     path: join(app.getPath("userData"), "voice-api-key.json"),
