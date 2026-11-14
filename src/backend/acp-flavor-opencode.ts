@@ -82,6 +82,15 @@ const OPENCODE_CONTEXT_TOO_SMALL =
   /\bcannot be reduced further without losing the latest exchange\b|\bnothing to compact yet\b|\bgreater than the context length\b|\bexceeds the available context size\b|\bexceed_context_size_error\b|\bcontext_length_exceeded\b/iu;
 
 /**
+ * NVIDIA's model API answers a model that it does not serve to the account with a 404 and
+ * `Function '<id>': Not found for account '<id>'`, and a model that it cannot run now with a 400 and
+ * "DEGRADED function cannot be invoked". OpenCode 2.2.7 passes both on as invalid requests, so the
+ * chat showed NVIDIA's IDs with no next step (#8699).
+ */
+const NVIDIA_MODEL_NOT_SERVED = /\bFunction '[^']*': Not found for account\b/u;
+const NVIDIA_MODEL_DEGRADED = /\bDEGRADED function cannot be invoked\b/iu;
+
+/**
  * The kind of a model request that OpenCode gave up on, first match wins. A provider gateway
  * reports each kind as `Upstream request failed: <reason>`, so billing and the rate limit come
  * first. The provider's own failure comes before the network: a gateway that could not reach its
@@ -149,6 +158,12 @@ function openCodeRequestFailure(
     log(`OpenCode request does not fit the model's context window: ${reason}`);
     return sourceText("error.provider.opencodeContextTooSmall");
   }
+  if (NVIDIA_MODEL_NOT_SERVED.test(reason)) {
+    log(`The model provider does not serve this model to the account: ${reason}`);
+    return sourceText("error.provider.opencodeModelNotServed");
+  }
+  if (NVIDIA_MODEL_DEGRADED.test(reason))
+    return sourceText("error.provider.opencodeProviderFailed", { detail: shownFailureDetail(redact(reason)) });
   const key = OPENCODE_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
   if (!key) return detail;
   return sourceText(key, { detail: shownFailureDetail(redact(reason)) });
@@ -180,7 +195,11 @@ const OPENCODE_ERROR_CAUSES: Readonly<Record<string, CauseCode>> = {
 };
 
 function openCodeFailureCause(error: unknown): CauseCode | null {
-  if (!(error instanceof RequestError) || !isRecord(error.data)) return null;
+  if (!(error instanceof RequestError)) return null;
+  // OpenCode names both as invalid requests. A degraded model is an outage, so a backup model can take the turn.
+  if (NVIDIA_MODEL_NOT_SERVED.test(error.message)) return "model_not_found";
+  if (NVIDIA_MODEL_DEGRADED.test(error.message)) return "provider_unavailable";
+  if (!isRecord(error.data)) return null;
   const name = error.data.errorName;
   return typeof name === "string" && Object.hasOwn(OPENCODE_ERROR_CAUSES, name)
     ? (OPENCODE_ERROR_CAUSES[name] ?? null)
