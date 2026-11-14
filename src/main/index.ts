@@ -574,8 +574,14 @@ const {
     return createFormat(locale, withHourCycle(locale, systemHourCycle()));
   },
   // The desktop app shows the notifications of a local server, as it does for every joined server.
+  // A hosted or self-hosted server shows its windows on a virtual display that nobody sees, and its
+  // private D-Bus session has no notification service, so each notification failed (#7910). Its
+  // members get the notifications on their own desktop apps and phones.
   desktopNotificationsEnabled: () =>
-    !localServerChild && (services?.notificationPreference.get().desktopNotifications ?? true),
+    !localServerChild &&
+    !serverMode &&
+    !hostedServer &&
+    (services?.notificationPreference.get().desktopNotifications ?? true),
   notificationPreviewEnabled: () => services?.notificationPreference.get().messagePreview ?? true,
   ownAgentNotificationLevels: () => services?.agentNotificationLevels.levels(OWNER_NOTIFICATION_KEY) ?? new Map(),
 });
