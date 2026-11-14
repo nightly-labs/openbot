@@ -8,6 +8,8 @@ export const messages = {
   "status.agent.instructionsChanged": "Heeft zijn instructies bijgewerkt",
   "status.agent.modelSwitchedForLimit": "Gebruikslimiet bereikt. Overgeschakeld naar {model}.",
   "status.agent.modelReturnedAfterLimit": "Gebruikslimiet voorbij. Teruggeschakeld naar {model}.",
+  "status.agent.routineSkippedRunOpen": "Overgeslagen: de vorige uitvoering was nog niet klaar",
+  "status.agent.routineSkippedUsageLimit": "Overgeslagen: gebruikslimiet bereikt",
   "status.agent.modelSwitchedForError": "Fout bij de aanbieder. Overgeschakeld naar {model}.",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} heeft geen tegoed meer. Overgeschakeld naar {model}. Voeg tegoed toe en selecteer het daarna om het weer te gebruiken.",

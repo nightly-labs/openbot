@@ -929,14 +929,21 @@ export class RoutineScheduler implements RoutineDueSource {
           );
           // A run that has not finished already does this routine's work. Another one would only
           // queue behind it, and after a sleep the queue drains as a burst of identical runs. A routine
-          // set to skip drops the occurrence while a spent plan would only make it wait.
-          const queued =
-            this.#hasLiveRun(current.agentId, current.id) ||
-            (current.limitPolicy === "skip" && this.#hooks.usageLimited(current.agentId))
-              ? null
-              : this.#routines.createRun(current, current.trigger.id, "scheduled", scheduledFor.toISOString());
-          this.#routines.advanceTrigger(current.id, current.trigger.id, nextRunAt.toISOString());
+          // set to skip drops the occurrence while a spent plan would only make it wait. The history
+          // records a dropped occurrence and its reason, so the user sees why it did not run.
+          const skipReason = this.#hasLiveRun(current.agentId, current.id)
+            ? sourceText("status.agent.routineSkippedRunOpen")
+            : current.limitPolicy === "skip" && this.#hooks.usageLimited(current.agentId)
+              ? sourceText("status.agent.routineSkippedUsageLimit")
+              : null;
           changedAgents.add(current.agentId);
+          if (skipReason) {
+            const due = new Date(current.trigger.nextRunAt);
+            this.#routines.skipOccurrences(current, due, scheduledFor, nextRunAt, skipReason);
+            return null;
+          }
+          const queued = this.#routines.createRun(current, current.trigger.id, "scheduled", scheduledFor.toISOString());
+          this.#routines.advanceTrigger(current.id, current.trigger.id, nextRunAt.toISOString());
           return queued;
         });
         if (run && !run.deliveryId)

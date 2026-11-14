@@ -852,14 +852,95 @@ export class RoutineStore {
   }
 
   /**
+   * Records the due occurrences from `due` through `scheduledFor` that the scheduler did not start,
+   * with the reason as source text, and moves the trigger. A skip for the same reason that follows
+   * the last one with no occurrence between them extends that record, so a long run does not fill
+   * the history with one entry for each occurrence.
+   */
+  protected skipOccurrenceRow(
+    routine: OwnedRoutine,
+    due: Date,
+    scheduledFor: Date,
+    nextRunAt: Date,
+    reason: string,
+  ): void {
+    const { runTable, ownerColumn } = this.tables;
+    const { schedule } = routine.trigger;
+    const { count } = missedOccurrences(schedule, routine.timezone, due, scheduledFor);
+    const latest = this.database.connection
+      .prepare(
+        `SELECT run_id, trigger_id, status, error, missed_count, scheduled_for, missed_until FROM ${runTable}
+         WHERE routine_id = ? AND ${ownerColumn} = ? ORDER BY created_at DESC, run_id DESC LIMIT 1`,
+      )
+      .get(routine.id, routine.ownerId);
+    if (
+      isDynamicRecord(latest) &&
+      isString(latest.run_id) &&
+      latest.trigger_id === routine.trigger.id &&
+      latest.status === "cancelled" &&
+      latest.error === reason &&
+      typeof latest.missed_count === "number" &&
+      isString(latest.scheduled_for) &&
+      nextRoutineOccurrence(
+        schedule,
+        routine.timezone,
+        new Date(isString(latest.missed_until) ? latest.missed_until : latest.scheduled_for),
+      ).getTime() === due.getTime()
+    ) {
+      this.#extendSkipped(routine, latest.run_id, latest.missed_count + count, scheduledFor, nextRunAt);
+      return;
+    }
+    this.#recordMissed(routine, { first: due, until: scheduledFor, count }, nextRunAt, reason);
+  }
+
+  #extendSkipped(routine: OwnedRoutine, runId: string, count: number, until: Date, nextRunAt: Date): void {
+    const { commandPrefix, eventPrefix, routineAggregate, runAggregate, triggerTable, runTable } = this.tables;
+    const triggerId = routine.trigger.id;
+    const missedCount = Math.min(count, MISSED_WALK_LIMIT);
+    const missedUntil = until.toISOString();
+    const next = nextRunAt.toISOString();
+    this.database.dispatch(
+      `${commandPrefix}-trigger:skipped:${triggerId}:${missedUntil}`,
+      [
+        {
+          aggregateType: runAggregate,
+          aggregateId: routine.id,
+          eventType: `${eventPrefix}.run-missed`,
+          payload: { runId, triggerId, until: missedUntil, count: missedCount },
+        },
+        {
+          aggregateType: routineAggregate,
+          aggregateId: routine.id,
+          eventType: `${eventPrefix}.trigger-advanced`,
+          payload: { triggerId, nextRunAt: next },
+        },
+      ],
+      (db, sequences) => {
+        const timestamp = new Date().toISOString();
+        db.prepare(
+          `UPDATE ${runTable} SET missed_count = ?, missed_until = ?, updated_at = ?, last_event_sequence = ?
+           WHERE run_id = ?`,
+        ).run(missedCount, missedUntil, timestamp, sequences[0] ?? 0, runId);
+        db.prepare(
+          `UPDATE ${triggerTable} SET next_run_at = ?, updated_at = ?, last_event_sequence = ?
+           WHERE trigger_id = ? AND routine_id = ?`,
+        ).run(next, timestamp, sequences[1] ?? 0, triggerId, routine.id);
+        return null;
+      },
+    );
+  }
+
+  /**
    * Records the skipped occurrences on one cancelled run and moves the trigger in one transaction, so
    * a crash cannot record them twice. The run is never queued: it only fills the history. A null
-   * `nextRunAt` is a one-time trigger, which keeps its time and pauses the routine instead.
+   * `nextRunAt` is a one-time trigger, which keeps its time and pauses the routine instead. `reason`
+   * is why the scheduler skipped them; null means that OpenBot was closed.
    */
   #recordMissed(
     routine: OwnedRoutine,
     skipped: { first: Date; until: Date; count: number },
     nextRunAt: Date | null,
+    reason: string | null = null,
   ): void {
     const {
       commandPrefix,
@@ -877,7 +958,7 @@ export class RoutineStore {
     const until = skipped.count > 1 ? skipped.until.toISOString() : null;
     const next = nextRunAt?.toISOString() ?? null;
     this.database.dispatch(
-      `${commandPrefix}-trigger:missed:${triggerId}:${scheduledFor}`,
+      `${commandPrefix}-trigger:${reason ? "skipped" : "missed"}:${triggerId}:${scheduledFor}`,
       [
         {
           aggregateType: runAggregate,
@@ -905,7 +986,7 @@ export class RoutineStore {
           `INSERT INTO ${runTable} (
              run_id, routine_id, ${ownerColumn}, trigger_id, run_kind, scheduled_for, routine_name, instruction,
              status, error, missed_count, missed_until, created_at, updated_at, last_event_sequence
-           ) VALUES (?, ?, ?, ?, 'scheduled', ?, ?, ?, 'cancelled', NULL, ?, ?, ?, ?, ?)`,
+           ) VALUES (?, ?, ?, ?, 'scheduled', ?, ?, ?, 'cancelled', ?, ?, ?, ?, ?, ?)`,
         ).run(
           runId,
           routine.id,
@@ -914,6 +995,7 @@ export class RoutineStore {
           scheduledFor,
           routine.name,
           routine.instruction,
+          reason,
           skipped.count,
           until,
           timestamp,

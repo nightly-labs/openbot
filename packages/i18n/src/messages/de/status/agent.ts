@@ -8,6 +8,8 @@ export const messages = {
   "status.agent.instructionsChanged": "Hat seine Anweisungen aktualisiert",
   "status.agent.modelSwitchedForLimit": "Nutzungslimit erreicht. Zu {model} gewechselt.",
   "status.agent.modelReturnedAfterLimit": "Nutzungslimit beendet. Zurück zu {model} gewechselt.",
+  "status.agent.routineSkippedRunOpen": "Übersprungen: Die letzte Ausführung war noch nicht fertig",
+  "status.agent.routineSkippedUsageLimit": "Übersprungen: Nutzungslimit erreicht",
   "status.agent.modelSwitchedForError": "Anbieterfehler. Zu {model} gewechselt.",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} hat kein Guthaben mehr. Zu {model} gewechselt. Um es wieder zu nutzen, lade Guthaben auf und wähle es dann aus.",
