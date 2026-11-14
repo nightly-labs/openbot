@@ -251,6 +251,8 @@ const VIEW_CONTEXT_MENU_MS = 1_500;
 const DIALOG_ACTION_WAIT_MS = 10_000;
 /** How long `open` waits for the load of a redirect before its second read. */
 const OPEN_REDIRECT_WAIT_MS = 5_000;
+/** A page dialog holds a script. The sign-in then loads the page again with the cookies only. */
+const SIGN_IN_STORAGE_WRITE_TIMEOUT_MS = 5_000;
 /** A site can redirect more than one time before its page stays. */
 const OPEN_REDIRECT_READS = 2;
 /**
@@ -1356,16 +1358,19 @@ export class BrowserHost {
     );
     const count = results.reduce((total, set) => total + set, 0);
     if (count > 0) yield* browserCall(() => target.cookies.flushStore());
-    // The page itself writes the pairs, so they go to the storage of the origin that it shows.
+    // The page itself writes the pairs, so they go to the storage of the origin that it shows. The
+    // tab can move while the cookies are set, so the script checks the origin again. A dialog of the
+    // page holds the script, so the write has a deadline.
     const stored =
       storage && storage.entries.length > 0 && storage.origin === page.origin
         ? yield* browserCall(() =>
             tab.contents.executeJavaScript(
-              `((entries) => { let set = 0; for (const [name, value] of entries) { try { localStorage.setItem(name, value); set += 1; } catch {} } return set; })(${JSON.stringify(storage.entries.map((entry) => [entry.name, entry.value]))})`,
+              `((origin, entries) => { if (location.origin !== origin) return 0; let set = 0; for (const [name, value] of entries) { try { localStorage.setItem(name, value); set += 1; } catch {} } return set; })(${JSON.stringify(storage.origin)}, ${JSON.stringify(storage.entries.map((entry) => [entry.name, entry.value]))})`,
               true,
             ),
           ).pipe(
-            Effect.map((set: unknown) => (isNumber(set) ? set : 0)),
+            Effect.timeoutOption(SIGN_IN_STORAGE_WRITE_TIMEOUT_MS),
+            Effect.map((set) => (Option.isSome(set) && isNumber(set.value) ? set.value : 0)),
             Effect.catch(() => Effect.succeed(0)),
           )
         : 0;

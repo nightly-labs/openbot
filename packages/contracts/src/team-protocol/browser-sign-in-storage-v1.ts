@@ -97,7 +97,7 @@ export function decodeBrowserSignInStorageImport(input: unknown): BrowserSignInS
   if (!isDynamicRecord(input)) throw new Error("Invalid browser sign-in request.");
   const signIn = decodeBrowserSignInImport({ tabId: input.tabId, cookies: input.cookies });
   if (input.storage === null) return { ...signIn, storage: null };
-  const value = storage(input.storage);
+  const value = input.storage;
   if (!isDynamicRecord(value) || !isString(value.origin) || !Array.isArray(value.entries))
     throw new Error("Invalid browser sign-in storage.");
   const entries = value.entries.map((item: unknown) => {
