@@ -66,6 +66,7 @@ import {
   type InboundMessage,
   type IngressAnswer,
   type IngressDelivery,
+  type IngressState,
   type MessageTarget,
   type MessagingAdapter,
   type MessagingAdapterError,
@@ -1018,21 +1019,30 @@ export class MessagingService {
     );
   }
 
-  /** Waits a short time for the socket to be open with a Signal that has Telegram. */
+  /**
+   * Waits a short time for the socket to be open with a Signal that has Telegram. The failure says
+   * why the socket is not ready, so that the user knows what to do.
+   */
   #telegramReady(ingress: MessagingIngress): Effect.Effect<void, MessagingOperationFailed> {
-    const unavailable = () =>
-      new MessagingOperationFailed({ cause: new Error(sourceText("error.messaging.telegramRelayUnavailable")) });
     if (ingress.telegram.available()) return Effect.void;
     // A Signal that answered without Telegram does not gain it on this socket.
-    if (ingress.state() === "online") return Effect.fail(unavailable());
-    return Effect.callback<void>((resume) => {
-      const stop = ingress.onState(() => {
-        if (!ingress.telegram.available()) return;
+    if (ingress.state() === "online") return Effect.fail(telegramNotReady("online"));
+    return Effect.callback<void, MessagingOperationFailed>((resume) => {
+      const stop = ingress.onState((state) => {
+        if (ingress.telegram.available()) resume(Effect.void);
+        // A Signal without Telegram does not gain it. A signed-out state or no name can end soon
+        // after the app starts, so they wait for the retry.
+        else if (state === "online") resume(Effect.fail(telegramNotReady(state)));
+        else return;
         stop();
-        resume(Effect.void);
       });
       return Effect.sync(stop);
-    }).pipe(Effect.timeoutOrElse({ duration: TELEGRAM_READY_TIMEOUT_MS, orElse: () => Effect.fail(unavailable()) }));
+    }).pipe(
+      Effect.timeoutOrElse({
+        duration: TELEGRAM_READY_TIMEOUT_MS,
+        orElse: () => Effect.fail(telegramNotReady(ingress.state())),
+      }),
+    );
   }
 
   #endTelegramLinkLease(): void {
@@ -2479,6 +2489,20 @@ const WHATSAPP_LOCAL_REFUSALS = new Map([
   ["not_connected", WHATSAPP_NOT_CONNECTED],
   ["not_linked", WHATSAPP_NOT_CONNECTED],
 ]);
+
+/**
+ * Why a Telegram link cannot open yet. A Signal without Telegram needs only time. A signed-out
+ * computer or one with no name needs the user. Otherwise this computer cannot reach Signal.
+ */
+function telegramNotReady(state: IngressState): MessagingOperationFailed {
+  const text =
+    state === "online"
+      ? sourceText("error.messaging.telegramServiceUnavailable")
+      : state === "signed_out" || state === "no_host"
+        ? sourceText("error.messaging.telegramRelayUnavailable")
+        : sourceText("error.messaging.telegramRelayUnreachable");
+  return new MessagingOperationFailed({ cause: new Error(text) });
+}
 
 /** The platform's error code, such as Slack's `not_in_channel`, and never its text or a token. */
 function refusal(failure: MessagingAdapterError): string {

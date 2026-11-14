@@ -18,6 +18,8 @@ export const messages = {
   "error.messaging.telegramUnsupported": "Bu bilgisayar Telegram'a bağlanamıyor.",
   "error.messaging.telegramRelayUnavailable":
     "OpenBot bu bilgisayarda Telegram'a ulaşamıyor. Oturum açın, bu bilgisayara bir ad verin ve tekrar deneyin.",
+  "error.messaging.telegramRelayUnreachable":
+    "OpenBot bu bilgisayardan hizmetine bağlanamıyor. İnternet bağlantısını, VPN'i, proxy'yi veya güvenlik duvarını kontrol edin ve tekrar deneyin.",
   "error.messaging.telegramServiceUnavailable": "OpenBot şu anda Telegram'ı bağlayamıyor. Daha sonra tekrar deneyin.",
   // Bağlı bir WhatsApp numarasının ana makinenin gönderdiği hataları.
   "error.messaging.whatsappNotConnected": "Bu WhatsApp numarası bağlı değil.",
