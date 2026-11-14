@@ -56,6 +56,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   decodeExternalLinkTarget,
+  GITHUB_SKILL_ID_MAX_LENGTH,
   IDLE_RESTART_TARGETS,
   isAgentDefaults,
   isAgentDockAction,
@@ -525,11 +526,16 @@ export function parseSubmitSkill(input: unknown): SubmitSkillInput {
   };
 }
 
+/** A skill id: a Marketplace id, or a GitHub id, which names a repository folder and can be long. */
+export function requireSkillId(value: unknown): string {
+  return requireString(value, "skillId", GITHUB_SKILL_ID_MAX_LENGTH);
+}
+
 export function parseInstallSkill(input: unknown): InstallSkillInput {
   if (!isObject(input)) throw new Error("Invalid skill installation.");
   return {
     agentId: requireString(input.agentId, "agentId"),
-    skillId: requireString(input.skillId, "skillId"),
+    skillId: requireSkillId(input.skillId),
     ...(input.versionId === undefined ? {} : { versionId: requireString(input.versionId, "versionId") }),
     ...(input.replaceModified === true ? { replaceModified: true } : {}),
   };
@@ -539,7 +545,7 @@ export function parseUninstallSkill(input: unknown): UninstallSkillInput {
   if (!isObject(input)) throw new Error("Invalid skill removal.");
   return {
     agentId: requireString(input.agentId, "agentId"),
-    skillId: requireString(input.skillId, "skillId"),
+    skillId: requireSkillId(input.skillId),
     ...(input.removeModified === true ? { removeModified: true } : {}),
   };
 }
@@ -550,7 +556,7 @@ export function parseSetEnabledSkill(input: unknown): SetEnabledSkillInput {
   if (enabled === undefined) throw new Error("Invalid skill enablement.");
   return {
     agentId: requireString(input.agentId, "agentId"),
-    skillId: requireString(input.skillId, "skillId"),
+    skillId: requireSkillId(input.skillId),
     enabled,
   };
 }
