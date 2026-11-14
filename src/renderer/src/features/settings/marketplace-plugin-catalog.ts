@@ -7095,46 +7095,6 @@ const MONDAY: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/monday",
 };
 
-const MONGODB: MarketplacePluginDetail = {
-  id: "plugin-mongodb",
-  slug: "mongodb",
-  name: "MongoDB Atlas",
-  tagline: "Atlas clusters and databases",
-  description:
-    "MongoDB Atlas lets agents list projects and clusters, inspect databases and collections, and run queries, in read-only or read-write mode as the organization owner allows. Each user signs in to their own MongoDB Atlas account through the browser.",
-  category: "coding",
-  creatorName: "MongoDB",
-  iconUrl: "https://avatars.githubusercontent.com/u/45120?s=256&v=4",
-  version: "1.0.0",
-  prompts: [
-    { id: "prompt-clusters", text: "List the clusters in my Atlas projects and their status." },
-    { id: "prompt-schema", text: "Describe the schema of the orders collection." },
-    { id: "prompt-query", text: "Find the ten most recent orders with a status of pending." },
-  ],
-  apps: [
-    {
-      id: "app-mongodb-mcp",
-      name: "MongoDB Atlas",
-      description: "Cluster, database, and collection access, over MongoDB's MCP server with browser sign-in.",
-      iconUrl: "https://avatars.githubusercontent.com/u/45120?s=256&v=4",
-      server: {
-        name: "mongodb",
-        transport: "http",
-        url: "https://mcp.mongodb.com",
-        auth: [{ id: "mongodb-oauth", kind: "link", label: "Sign in" }],
-      },
-    },
-  ],
-  websiteUrl: "https://www.mongodb.com",
-  privacyPolicyUrl: "https://www.mongodb.com/legal/privacy/privacy-policy",
-  termsUrl: "https://www.mongodb.com/legal/terms-of-use",
-  skills: [],
-  installs: 0,
-  featured: false,
-  updatedAt: "2026-11-10T00:00:00.000Z",
-  shareUrl: "https://openbot.run/plugins/mongodb",
-};
-
 const MOOMOO: MarketplacePluginDetail = {
   id: "plugin-moomoo",
   slug: "moomoo",
@@ -10648,7 +10608,6 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   MOBBIN,
   MONARCH,
   MONDAY,
-  MONGODB,
   MOOMOO,
   MURAL,
   NAVAN,
