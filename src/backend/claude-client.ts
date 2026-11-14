@@ -466,6 +466,13 @@ interface ActiveTurn {
   retrying: boolean;
   /** The CLI started this turn itself, with no message from OpenBot, such as after a background task ended. */
   unprompted: boolean;
+  /**
+   * The message that started the turn, and the id that OpenBot asked for. The CLI skips a uuid that
+   * its saved session holds and ends no turn, so the message goes again with a new uuid (#9270).
+   */
+  prompt: { requestedId: string | null; message: SDKUserMessage; retries: number } | null;
+  /** The CLI started the prompt, or sent a frame of the turn. */
+  promptStarted: boolean;
 }
 
 interface ThreadRuntime {
@@ -553,6 +560,9 @@ const CLAUDE_STOP_CONFIRM_MS = 10_000;
 /** How many message uuids a process keeps to give a message that runs again a new one (#6676). */
 const TAKEN_PROMPT_LIMIT = 1_000;
 
+/** How many times a turn sends its message again after the CLI skipped it. Each try has a new uuid (#9270). */
+const SKIPPED_PROMPT_RETRIES = 3;
+
 /** The start of the user message in which Claude Code gives a blocking Stop hook's reason to the model. */
 const CLAUDE_STOP_HOOK_FEEDBACK = "Stop hook feedback:\n";
 
@@ -585,6 +595,9 @@ interface ClaudeStreamMessage {
   rate_limit_info?: unknown;
   /** `background_tasks_changed`: every live background task. */
   tasks?: unknown;
+  /** `command_lifecycle`: the uuid of the message that OpenBot sent, and its state, such as `started` or `completed`. */
+  command_uuid?: unknown;
+  state?: unknown;
   /** The uuid of the user message that the turn answers, on the turn's first stream event and assistant message. */
   user_message_uuid?: string;
   /** Set when the turn runs an interrupted turn again, and `user_message_uuid` names that turn's prompt. */
@@ -740,6 +753,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     dispose: (runtime) => this.#closeRuntime(runtime),
     reopen: (threadId, config) => this.#startThread(threadId, config, true),
   });
+  /**
+   * The message uuids that each thread's processes took. A process that resumes the saved session
+   * keeps them: the CLI skips a uuid that the session holds, so a message that the limit put back
+   * in the queue got no answer after an idle close (#9270).
+   */
+  readonly #takenPrompts = new Map<string, Set<string>>();
   readonly #serverRequests = new PendingServerRequests((request) => this.emit("request", request));
   readonly #modelEffortCapabilities = new Map<string, ClaudeEffortCapability>();
   readonly #modelSdkValues = new Map<string, string>();
@@ -879,7 +898,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     this.#threads.forget(threadId);
     // `--resume` opens the same conversation, which holds the memories and section-mates that its
     // turns were sent. They went again on each turn after a runtime reload.
-    if (!resumes) this.#turnContext.forget(threadId);
+    if (!resumes) {
+      this.#turnContext.forget(threadId);
+      this.#takenPrompts.delete(threadId);
+    }
     const runtime = this.#threads.get(threadId);
     if (!runtime) return;
     yield* this.#threads.close(runtime).pipe(toProviderClientOperationError);
@@ -1561,7 +1583,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       subagents: newSubagentState(),
       backgroundTasks: 0,
       lastOutputAt: Date.now(),
-      promptIds: new Set<string>(),
+      promptIds: (resume && this.#takenPrompts.get(threadId)) || new Set<string>(),
       nextTurnId: null,
       streamMessage: { id: null, thinkingBlocks: new Map<number, string>() },
       mcpConfigFile,
@@ -1577,6 +1599,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         this.#scope,
       );
     this.#threads.add(runtime);
+    this.#takenPrompts.set(threadId, runtime.promptIds);
   });
 
   readonly #startTurnEffect = Effect.fn("ClaudeAgentClient.startTurn")(function* (
@@ -1648,13 +1671,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     if (runtime.activeTurn) return yield* providerFailure(this.#turnActiveError(runtime.activeTurn));
     // Only now: a model or effort change that fails above leaves the idle timer armed, so the
     // pool can still release the thread.
-    this.#beginTurn(runtime, turnId, false);
+    const turn = this.#beginTurn(runtime, turnId, false);
     // Blocks of their own, so that history readers can tell them from the text of the turn. A slash
     // command gets none: the CLI can drop the blocks before it, and `/clear` empties the context,
     // so the next turn sends the full blocks.
     const context = this.#turnContext.take(threadId, text.startsWith("/"));
     takePrompt(runtime, turnId);
-    runtime.input.push({
+    const message: SDKUserMessage = {
       type: "user",
       message: {
         role: "user",
@@ -1666,7 +1689,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       parent_tool_use_id: null,
       uuid: turnId,
       session_id: threadId,
-    });
+    };
+    turn.prompt = { requestedId: requestedTurnId ?? null, message, retries: 0 };
+    runtime.input.push(message);
     return { turn: { id: turnId, status: "inProgress" } };
   });
 
@@ -1702,6 +1727,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       billingFailed: false,
       retrying: false,
       unprompted,
+      prompt: null,
+      promptStarted: false,
     };
     runtime.activeTurn = turn;
     runtime.nextTurnId = null;
@@ -1751,6 +1778,35 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     });
     return { turnId: runtime.activeTurn.id };
   });
+
+  /**
+   * The CLI ends a message whose uuid its saved session holds as `completed` with no `started`, and
+   * starts no turn for it. The turn then waited with no end (#9270), so the message goes again with
+   * the next uuid of its run, which history import maps back to the same message.
+   */
+  #promptLifecycle(runtime: ThreadRuntime, uuid: unknown, state: unknown): void {
+    const turn = runtime.activeTurn;
+    const prompt = turn?.prompt;
+    if (!turn || !prompt || uuid !== prompt.message.uuid) return;
+    if (state === "started") turn.promptStarted = true;
+    if (state !== "completed" || turn.promptStarted) return;
+    if (prompt.retries >= SKIPPED_PROMPT_RETRIES) {
+      queryLogger.warn("Claude skipped a message again after new ids.", { retries: prompt.retries });
+      return;
+    }
+    const retryId = promptUuid(runtime, prompt.requestedId ?? turn.id);
+    takePrompt(runtime, retryId);
+    prompt.message = { ...prompt.message, uuid: retryId };
+    prompt.retries += 1;
+    queryLogger.warn("Claude skipped a message that its session holds, so it goes again with a new id.", {
+      retries: prompt.retries,
+    });
+    try {
+      runtime.input.push(prompt.message);
+    } catch {
+      // The query closes, and its turn ends with it.
+    }
+  }
 
   readonly #consume = Effect.fn("ClaudeAgentClient.consume")(function* (
     this: ClaudeAgentClient,
@@ -1808,6 +1864,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     message: ClaudeStreamMessage,
   ) {
     runtime.lastOutputAt = Date.now();
+    if (message.type === "command_lifecycle") {
+      this.#promptLifecycle(runtime, message.command_uuid, message.state);
+      return;
+    }
+    if (runtime.activeTurn && (message.type === "stream_event" || message.type === "assistant"))
+      runtime.activeTurn.promptStarted = true;
     if (message.type === "assistant") {
       // Each content block repeats its request's message; the last copy has the final count.
       const id = getString(message.message, "id");
