@@ -1006,11 +1006,7 @@ export class BrowserCdpEngine {
           const missed = yield* guardedPress(send, element, contextId, sessionId, press);
           if (missed === undefined) return;
           if (attempt >= CLICK_PRESS_ATTEMPTS)
-            return yield* browserFailure(
-              new Error(
-                `Nothing was clicked: the page moved the target when the pointer came near, and the press went to ${missed}. Take a fresh snapshot.`,
-              ),
-            );
+            return yield* browserFailure(new Error(sourceText("error.backend.browserClickMoved", { element: missed })));
         }
       }),
     );
