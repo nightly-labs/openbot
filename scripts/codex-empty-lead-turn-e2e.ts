@@ -13,6 +13,8 @@
 //   7. In a WhatsApp conversation, an empty orchestrator turn of a teammate result runs once more too,
 //      and the conversation gets the answer with no "Stopped." end before it (#8573). A second empty
 //      run ends the conversation's request as failed.
+//   8. A person's message that gets a tool step and no answer stays completed, does not run again,
+//      and shows a notice that names the steps (#8810).
 // `bun run test:codex-empty-lead-turn`. Writes .openbot-build/codex-empty-lead-turn-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -40,6 +42,9 @@ const countsFile = join(root, "empty-counts.json");
 const PRIMARY = defaultProviderModel("codex");
 const BACKUP = `${PRIMARY}-backup`;
 const NO_ANSWER = sourceText("error.provider.acpNoAnswer", { provider: agentProviderDescriptor("codex").displayName });
+const NO_ANSWER_AFTER_STEPS = sourceText("error.provider.noAnswerAfterSteps", {
+  provider: agentProviderDescriptor("codex").displayName,
+});
 
 // Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
@@ -68,6 +73,7 @@ const calls = (...items: FakeCall[]) => `<<CALLS${JSON.stringify(items)}CALLS>>`
  * - `<<CALLS[...]CALLS>>`: calls the named OpenBot tools one at a time, then answers "Asked.".
  * - `TEAM-QUESTION mode:<mode>`: a teammate answers `TEAM-RESULT mode:<mode>`.
  * - `EMPTY-TURN`: ends with only its reasoning.
+ * - `STEP-THEN-EMPTY`: runs one command, then ends with only its reasoning.
  * Each turn is logged with its model and whether it ended empty.
  */
 const FAKE_CODEX = `#!/usr/bin/env node
@@ -99,6 +105,10 @@ const nextRun = (mode) => {
 };
 const finish = (turn) => {
   const { threadId, turnId } = turn;
+  if (turn.step) {
+    const item = { type: "commandExecution", id: "command-" + turnId, command: "ls", cwd: "/", status: "completed", aggregatedOutput: "", exitCode: 0 };
+    write({ method: "item/completed", params: { threadId, turnId, item } });
+  }
   if (turn.empty) {
     const item = { type: "reasoning", id: "reasoning-" + turnId, summary: ["Reading the results."], content: [] };
     write({ method: "item/completed", params: { threadId, turnId, item } });
@@ -131,6 +141,7 @@ const decide = (text, model) => {
   if (named) return { kind: "calls", calls: JSON.parse(named[1]), empty: false, reply: "Asked." };
   const question = /TEAM-QUESTION mode:([a-z-]+)/.exec(text);
   if (question) return { kind: "question", mode: question[1], calls: [], empty: false, reply: "TEAM-RESULT mode:" + question[1] };
+  if (text.includes("STEP-THEN-EMPTY")) return { kind: "step-empty", calls: [], empty: true, step: true, reply: "" };
   if (text.includes("EMPTY-TURN")) return { kind: "empty", calls: [], empty: true, reply: "" };
   return { kind: "chat", calls: [], empty: false, reply: "All good." };
 };
@@ -191,7 +202,7 @@ process.stdin.on("data", (chunk) => {
 interface FakeTurn {
   turnId: string;
   model: string;
-  kind: "result" | "calls" | "question" | "empty" | "chat";
+  kind: "result" | "calls" | "question" | "empty" | "step-empty" | "chat";
   mode: string | null;
   empty: boolean;
 }
@@ -478,6 +489,22 @@ try {
     assert.equal(fakeTurns().filter((turn) => turn.kind === "empty").length, before + 1);
     assert.deepEqual(errorsFor(lead.id, since), [NO_ANSWER]);
     return { status: delivery.status, error: delivery.error };
+  });
+
+  await check("a person's message that gets a step and no answer completes and shows a notice", async () => {
+    const since = events.length;
+    const before = fakeTurns().filter((turn) => turn.kind === "step-empty").length;
+    const receipt = await runCauseEffect(agents.sendMessage({ agentId: lead.id, text: "STEP-THEN-EMPTY" }));
+    const deliveryId = receipt.deliveries[0]?.id;
+    assert.ok(deliveryId);
+    const delivery = await waitFor("the message to end", () => {
+      const found = mailbox.getDelivery(deliveryId)?.delivery;
+      return ended(found?.status) ? found : null;
+    });
+    assert.equal(delivery.status, "completed", "The turn keeps its work.");
+    assert.equal(fakeTurns().filter((turn) => turn.kind === "step-empty").length, before + 1, "It does not run again.");
+    assert.deepEqual(errorsFor(lead.id, since), [NO_ANSWER_AFTER_STEPS]);
+    return { status: delivery.status, errors: errorsFor(lead.id, since) };
   });
 
   await check("with backup models, an empty lead turn runs again on the backup model", async () => {
