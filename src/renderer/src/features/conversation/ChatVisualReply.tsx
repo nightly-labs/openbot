@@ -83,7 +83,7 @@ export function ChatVisualReply(props: {
  * The visual reply pages of a side thread, as `messageCard` of its view. A page writes in the thread's
  * message box, and quotes there, as a page in the agent's chat does in the chat's message box.
  */
-export function useThreadVisualReplyCard(draftKey: () => string | undefined) {
+export function useThreadVisualReplyCard(draftKey: () => string | undefined, focusDraft?: () => void) {
   const { props: view, threadComposer } = useConversationViewScope();
   const setDraft = (next: (draft: string) => string | undefined) => {
     const key = draftKey();
@@ -92,14 +92,20 @@ export function useThreadVisualReplyCard(draftKey: () => string | undefined) {
     if (text !== undefined) threadComposer.setText(key, text);
   };
   return (message: AgentMessage, quote: (messageId: string, text: string) => void) => {
-    const visual = shownVisualReply(message, conversationRuntime(view).visualPage);
+    const visual = shownVisualReply(
+      message,
+      untrack(() => conversationRuntime(view).visualPage),
+    );
     if (!visual) return undefined;
     return (
       <article data-chat-search-message={message.id} aria-label={message.body}>
         <ChatVisualReply
           message={message}
           initial={visual}
-          onMessage={(text) => setDraft((draft) => draftWithPageText(draft, text))}
+          onMessage={(text) => {
+            setDraft((draft) => draftWithPageText(draft, text));
+            focusDraft?.();
+          }}
           onContext={(text) => setDraft((draft) => draftWithPageContext(draft, message.id, text))}
           onQuote={quote}
         />

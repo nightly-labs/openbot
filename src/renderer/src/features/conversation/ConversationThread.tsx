@@ -43,6 +43,7 @@ export function ConversationThread() {
     threadComposer,
     threadQueue,
     threadFocusRequest,
+    requestThreadFocus,
     messagePins,
     threadVoiceLiveText,
     threadVoiceOwned,
@@ -224,7 +225,7 @@ export function ConversationThread() {
     (body) => props.threads?.onSend(body, [], null) ?? Promise.resolve(false),
   );
   /** A visual reply page shows as in the agent's chat, and writes in this thread's message box. */
-  const visualReplyCard = useThreadVisualReplyCard(threadComposer.openDraftKey);
+  const visualReplyCard = useThreadVisualReplyCard(threadComposer.openDraftKey, requestThreadFocus);
   /** The cards that the thread waits for: its browser takeover, and its question as a form. */
   const attention = () => {
     if (!hasAttention()) return undefined;
