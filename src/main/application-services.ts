@@ -1700,6 +1700,9 @@ export async function createApplicationServices({
     isProviderOn: (provider) => !providerUse.off().includes(provider),
     root: providerRuntimesRoot,
     downloadRoot: providerDownloads,
+    // Chromium's network stack uses the computer's proxy settings, as the built-in browser does.
+    // Node `fetch` ignores them, so a download failed where the browser and curl got the file.
+    fetchImpl: (input, init) => net.fetch(input instanceof URL ? input.href : input, init),
     hermesInstaller,
     updateRuntime: (runtime, install, signal, onWait) => {
       if (isManagedToolRuntime(runtime)) return install().pipe(Effect.asVoid);
