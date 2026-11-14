@@ -88,6 +88,13 @@ const KEY_TEXT = {
     descriptionHost: "provider.openrouterKey.descriptionHost",
     label: "provider.openrouterKey.label",
   },
+  trustedrouter: {
+    name: "TrustedRouter",
+    title: "provider.trustedrouterKey.title",
+    description: "provider.trustedrouterKey.description",
+    descriptionHost: "provider.trustedrouterKey.descriptionHost",
+    label: "provider.trustedrouterKey.label",
+  },
 } as const satisfies Record<string, KeyDialogText>;
 
 /** The text of one key: `descriptionHost` is for a key that goes to the host of a joined server. */

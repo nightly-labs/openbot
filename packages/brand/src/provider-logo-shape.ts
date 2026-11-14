@@ -98,6 +98,7 @@ export type ProviderLogoVariant =
   | "inception"
   | "deepseek"
   | "openrouter"
+  | "trustedrouter"
   | "hermes"
   | "sunra"
   | "unknown";
@@ -157,6 +158,7 @@ export function providerLogoShape(provider: ProviderLogoVariant): ProviderLogoSh
     case "pi":
     case "muse":
     case "inception":
+    case "trustedrouter":
       return { viewBox: GRID_24, paths: [{ d: ACP_PROMPT_PATH }, { d: ACP_CURSOR_PATH }] };
     case "unknown":
       return { viewBox: GRID_24, paths: [{ d: UNKNOWN_PATH, evenOdd: true }] };

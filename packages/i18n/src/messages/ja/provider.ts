@@ -194,11 +194,17 @@ export const messages = {
     "DeepSeek モデルを使うには、ホストに DeepSeek API キーを保存します。OpenBot はダウンロードした Pi CLI でモデルを実行します。",
   "provider.deepseekKey.label": "DeepSeek API キー",
   "provider.openrouterKey.title": "OpenRouter API キー",
+  "provider.trustedrouterKey.title": "TrustedRouter API キー",
   "provider.openrouterKey.description":
     "OpenRouter のモデルを使うには、このコンピューターに OpenRouter API キーを保存します。OpenBot はダウンロードした Pi CLI でモデルを実行します。",
   "provider.openrouterKey.descriptionHost":
     "OpenRouter のモデルを使うには、ホストに OpenRouter API キーを保存します。OpenBot はダウンロードした Pi CLI でモデルを実行します。",
+  "provider.trustedrouterKey.description":
+    "TrustedRouter のモデルを使うには、このコンピューターに TrustedRouter API キーを保存します。OpenBot はダウンロードした Pi CLI でモデルを実行します。",
+  "provider.trustedrouterKey.descriptionHost":
+    "TrustedRouter のモデルを使うには、ホストに TrustedRouter API キーを保存します。OpenBot はダウンロードした Pi CLI でモデルを実行します。",
   "provider.openrouterKey.label": "OpenRouter API キー",
+  "provider.trustedrouterKey.label": "TrustedRouter API キー",
 
   "provider.openCodeKey.title": "OpenCode Go にサインイン",
   "provider.openCodeKey.description": "無料モデルにアカウントは不要です。キーがあると有料の Go モデルを使えます。",

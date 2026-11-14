@@ -1262,7 +1262,7 @@ provider added after v8 needs no new protocol version. The `providers-v8` routes
 The host hides a provider from a peer below v8 when that protocol's frozen list does not have it
 (`FROZEN_PROVIDERS` in `src/main/team-api/provider-visibility.ts`). So a new provider is hidden
 from old peers with no change there. Do not edit those lists. A key-only provider
-(`KEY_ONLY_PROVIDERS`, now Inception, DeepSeek and OpenRouter) is not in any frozen list, so a v8
+(`KEY_ONLY_PROVIDERS`, now Inception, DeepSeek, OpenRouter and TrustedRouter) is not in any frozen list, so a v8
 peer is the first to see it. The `providers-v8` key routes read, set and clear its key. A key set
 there starts the host's Pi download when Pi cannot start, and does not wait for it. Until Pi is
 ready no process uses the key, so the route saves only the key; the provider is checked again when Pi
@@ -1614,6 +1614,18 @@ Pi unchanged. The catalog drops the aliases that start with `~`, such as
 `anthropic/claude-sonnet-5.5`. The model picker groups the models by lab (`openRouterLab` in
 `provider-model-options.ts`) and marks the `:free` models as free. A 402 means the account has no
 credits. Peers see OpenRouter from v8, as Inception.
+
+## TrustedRouter
+
+TrustedRouter works as Inception does: a key-only provider on Pi's managed CLI, with no built-in Pi
+provider. The key is stored as the `trustedrouter` API key. `pi-key-providers.ts` writes a key-free
+extension that calls `pi.registerProvider("trustedrouter", …)` with `https://api.trustedrouter.com/v1`,
+the OpenAI chat completions API, and TrustedRouter's routes that take tool calls (`auto`, `efficient`,
+`fast`, `professional`, `advanced`, `frontier`, `zdr` and `e2e`). Model ids keep TrustedRouter's
+`trustedrouter/<route>` form, and the default is `trustedrouter/auto`. Each route picks the upstream
+model per request, so the extension sets no price and OpenBot reports no usage. There is no catalog to
+refresh (`PI_CATALOG_KEY_VARIABLES` is `null`). TrustedRouter is in no frozen protocol list, so peers
+below v8 do not see it.
 
 ## Muse
 

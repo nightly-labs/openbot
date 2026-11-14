@@ -193,11 +193,17 @@ export const messages = {
     "DeepSeek modellerini kullanmak için ana makineye bir DeepSeek API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
   "provider.deepseekKey.label": "DeepSeek API anahtarı",
   "provider.openrouterKey.title": "OpenRouter API anahtarı",
+  "provider.trustedrouterKey.title": "TrustedRouter API anahtarı",
   "provider.openrouterKey.description":
     "OpenRouter modellerini kullanmak için bu bilgisayara bir OpenRouter API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
   "provider.openrouterKey.descriptionHost":
     "OpenRouter modellerini kullanmak için ana makineye bir OpenRouter API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
+  "provider.trustedrouterKey.description":
+    "TrustedRouter modellerini kullanmak için bu bilgisayara bir TrustedRouter API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
+  "provider.trustedrouterKey.descriptionHost":
+    "TrustedRouter modellerini kullanmak için ana makineye bir TrustedRouter API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
   "provider.openrouterKey.label": "OpenRouter API anahtarı",
+  "provider.trustedrouterKey.label": "TrustedRouter API anahtarı",
   "provider.openCodeKey.title": "OpenCode Go'da oturum açın",
   "provider.openCodeKey.description":
     "Ücretsiz modeller hesap gerektirmez. Bir anahtar, ücretli Go modellerinin kilidini açar.",

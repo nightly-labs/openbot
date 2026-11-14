@@ -486,6 +486,7 @@ export const messages = {
   "error.provider.inceptionSignIn": "Devam etmek için bir Inception API anahtarı ekleyin.",
   "error.provider.deepseekSignIn": "Devam etmek için bir DeepSeek API anahtarı ekleyin.",
   "error.provider.openrouterSignIn": "Devam etmek için bir OpenRouter API anahtarı ekleyin.",
+  "error.provider.trustedrouterSignIn": "Devam etmek için bir TrustedRouter API anahtarı ekleyin.",
   "error.provider.terminalLoginFailed":
     "Oturum açma terminali açılamadı. Bu ana makinede sağlayıcı CLI'sini açıp orada oturum açın, ardından sağlayıcıları yenileyin.",
   "error.provider.nativeArchiveInvalid": "Sağlayıcı indirmesi geçerli bir kurulum içermiyor.",

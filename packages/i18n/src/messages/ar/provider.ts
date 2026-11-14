@@ -215,11 +215,17 @@ export const messages = {
     "احفظ مفتاح DeepSeek API على المضيف لاستخدام نماذج DeepSeek. يشغّلها OpenBot في Pi CLI الذي ينزّله.",
   "provider.deepseekKey.label": "مفتاح DeepSeek API",
   "provider.openrouterKey.title": "مفتاح OpenRouter API",
+  "provider.trustedrouterKey.title": "مفتاح TrustedRouter API",
   "provider.openrouterKey.description":
     "احفظ مفتاح OpenRouter API على هذا الحاسوب لاستخدام النماذج التي يقدمها OpenRouter. يشغّلها OpenBot في Pi CLI الذي ينزّله.",
   "provider.openrouterKey.descriptionHost":
     "احفظ مفتاح OpenRouter API على المضيف لاستخدام النماذج التي يقدمها OpenRouter. يشغّلها OpenBot في Pi CLI الذي ينزّله.",
+  "provider.trustedrouterKey.description":
+    "احفظ مفتاح TrustedRouter API على هذا الحاسوب لاستخدام النماذج التي يقدمها TrustedRouter. يشغّلها OpenBot في Pi CLI الذي ينزّله.",
+  "provider.trustedrouterKey.descriptionHost":
+    "احفظ مفتاح TrustedRouter API على المضيف لاستخدام النماذج التي يقدمها TrustedRouter. يشغّلها OpenBot في Pi CLI الذي ينزّله.",
   "provider.openrouterKey.label": "مفتاح OpenRouter API",
+  "provider.trustedrouterKey.label": "مفتاح TrustedRouter API",
   "provider.openCodeKey.title": "تسجيل الدخول إلى OpenCode Go",
   "provider.openCodeKey.description": "لا تحتاج النماذج المجانية إلى حساب. يفتح المفتاح نماذج Go المدفوعة.",
   "provider.openCodeKey.unreadable": "المفتاح المحفوظ غير قابل للقراءة. الصقه مرة أخرى، أو أزله.",
