@@ -105,7 +105,7 @@ import { AgentInterruptTool } from "./agent-interrupt-tool";
 import type { AgentMemories } from "./agent-memories";
 import { type ApprovalAutomationPolicy, NO_APPROVAL_AUTOMATION } from "./approval-automation";
 import type { AttachmentGateway } from "./attachment-gateway";
-import type { AttentionRegistry } from "./attention-registry";
+import type { AttentionRegistry, CodexSubagentParent } from "./attention-registry";
 import { loadAvatarFile } from "./avatar-file";
 import { saveBrowserScreenshot } from "./browser-screenshot-file";
 import type { BrowserUploads } from "./browser-uploads";
@@ -437,6 +437,8 @@ export interface OpenBotToolRouterOptions {
   apiKeys?: AgentApiKeys | null | undefined;
   /** The Vault, where `save_api_key` keeps a key for every agent; null where this server has none. */
   vaultItems?: VaultItems | null | undefined;
+  /** The agent, thread and turn of a running Codex subagent, by the subagent's own thread. */
+  codexSubagentParent?: ((childThreadId: string) => CodexSubagentParent | undefined) | undefined;
   hooks: OpenBotToolRouterHooks;
 }
 
@@ -454,6 +456,7 @@ export class OpenBotToolRouter {
   readonly #mailboxSync: MailboxSync;
   readonly #conversation: ConversationRuntime;
   readonly #attention: AttentionRegistry;
+  readonly #codexSubagentParent: (childThreadId: string) => CodexSubagentParent | undefined;
   readonly #browser: AgentBrowserHost;
   readonly #browserUploads: BrowserUploads;
   readonly #attachments: AttachmentGateway;
@@ -514,6 +517,7 @@ export class OpenBotToolRouter {
     this.#mailboxSync = options.mailboxSync;
     this.#conversation = options.conversation;
     this.#attention = options.attention;
+    this.#codexSubagentParent = options.codexSubagentParent ?? (() => undefined);
     this.#browser = options.browser;
     this.#browserUploads = options.browserUploads;
     this.#attachments = options.attachments;
@@ -559,6 +563,17 @@ export class OpenBotToolRouter {
     });
   }
 
+  /**
+   * A Codex subagent has the tools of the agent that started it, and calls them from its own thread.
+   * The call then runs as that agent, in its chat and its turn, as its approval cards do (#8188, #8657).
+   */
+  #asSubagentParent(params: DynamicToolCallParams): DynamicToolCallParams {
+    if (this.#conversation.agentForThread(params.threadId)) return params;
+    const parent = this.#codexSubagentParent(params.threadId);
+    if (!parent || this.#conversation.agentForThread(parent.threadId) !== parent.agentId) return params;
+    return { ...params, threadId: parent.threadId, turnId: parent.turnId };
+  }
+
   readonly handle = Effect.fn("OpenBotToolRouter.handle")(function* (
     this: OpenBotToolRouter,
     client: AgentClient,
@@ -596,7 +611,7 @@ export class OpenBotToolRouter {
           return;
         case "item/tool/call": {
           if (!isDynamicToolCall(request.params)) throw new Error("Invalid dynamic tool request.");
-          let params = request.params;
+          let params = this.#asSubagentParent(request.params);
           if (params.namespace === "openbot") {
             const deferredMcp = this.#deferredMcpNote(client, params.threadId);
             const invalid = deferredMcp
