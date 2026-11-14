@@ -21,4 +21,8 @@ export const messages = defineMessages("preview", {
   "preview.unsupported.openExternally": "Open externally",
   "preview.spreadsheet.readFailed": "Could not read this spreadsheet.",
   "preview.spreadsheet.truncated": "Preview limited to the first {rows} rows and {columns} columns.",
+  "preview.diff.label": "Changes in {name}",
+  "preview.diff.added": { one: "{count} line added", other: "{count} lines added" },
+  "preview.diff.removed": { one: "{count} line removed", other: "{count} lines removed" },
+  "preview.diff.noChanges": "No changes.",
 });

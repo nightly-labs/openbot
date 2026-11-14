@@ -22,4 +22,8 @@ export const messages = {
   "preview.unsupported.openExternally": "外部アプリで開く",
   "preview.spreadsheet.readFailed": "このスプレッドシートを読み込めませんでした。",
   "preview.spreadsheet.truncated": "プレビューは最初の {rows} 行と {columns} 列までです。",
+  "preview.diff.label": "{name} の変更",
+  "preview.diff.added": { other: "{count} 行追加" },
+  "preview.diff.removed": { other: "{count} 行削除" },
+  "preview.diff.noChanges": "変更はありません。",
 } as const satisfies PartialTranslation<typeof source>;

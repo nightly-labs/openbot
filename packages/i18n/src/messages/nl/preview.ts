@@ -22,4 +22,8 @@ export const messages = {
   "preview.unsupported.openExternally": "Extern openen",
   "preview.spreadsheet.readFailed": "Kan deze spreadsheet niet lezen.",
   "preview.spreadsheet.truncated": "Voorvertoning beperkt tot de eerste {rows} rijen en {columns} kolommen.",
+  "preview.diff.label": "Wijzigingen in {name}",
+  "preview.diff.added": { one: "{count} regel toegevoegd", other: "{count} regels toegevoegd" },
+  "preview.diff.removed": { one: "{count} regel verwijderd", other: "{count} regels verwijderd" },
+  "preview.diff.noChanges": "Geen wijzigingen.",
 } as const satisfies PartialTranslation<typeof source>;

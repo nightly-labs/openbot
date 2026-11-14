@@ -22,4 +22,18 @@ export const messages = {
   "preview.unsupported.openExternally": "Otwórz zewnętrznie",
   "preview.spreadsheet.readFailed": "Nie udało się odczytać tego arkusza kalkulacyjnego.",
   "preview.spreadsheet.truncated": "Podgląd ograniczony do pierwszych wierszy ({rows}) i kolumn ({columns}).",
+  "preview.diff.label": "Zmiany w {name}",
+  "preview.diff.added": {
+    one: "Dodano {count} wiersz",
+    few: "Dodano {count} wiersze",
+    many: "Dodano {count} wierszy",
+    other: "Dodano {count} wiersza",
+  },
+  "preview.diff.removed": {
+    one: "Usunięto {count} wiersz",
+    few: "Usunięto {count} wiersze",
+    many: "Usunięto {count} wierszy",
+    other: "Usunięto {count} wiersza",
+  },
+  "preview.diff.noChanges": "Brak zmian.",
 } as const satisfies PartialTranslation<typeof source>;

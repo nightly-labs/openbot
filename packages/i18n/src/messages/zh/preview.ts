@@ -22,4 +22,8 @@ export const messages = {
   "preview.unsupported.openExternally": "用外部程序打开",
   "preview.spreadsheet.readFailed": "无法读取该表格。",
   "preview.spreadsheet.truncated": "预览仅限前 {rows} 行、{columns} 列。",
+  "preview.diff.label": "{name} 中的更改",
+  "preview.diff.added": { other: "新增 {count} 行" },
+  "preview.diff.removed": { other: "删除 {count} 行" },
+  "preview.diff.noChanges": "没有更改。",
 } as const satisfies PartialTranslation<typeof source>;

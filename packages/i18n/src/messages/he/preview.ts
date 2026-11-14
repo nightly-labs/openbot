@@ -22,4 +22,8 @@ export const messages = {
   "preview.unsupported.openExternally": "פתיחה באפליקציה חיצונית",
   "preview.spreadsheet.readFailed": "לא ניתן לקרוא את הגיליון.",
   "preview.spreadsheet.truncated": "התצוגה המקדימה מוגבלת ל-{rows} השורות הראשונות ול-{columns} העמודות הראשונות.",
+  "preview.diff.label": "שינויים ב־{name}",
+  "preview.diff.added": { one: "שורה אחת נוספה", two: "שתי שורות נוספו", other: "{count} שורות נוספו" },
+  "preview.diff.removed": { one: "שורה אחת הוסרה", two: "שתי שורות הוסרו", other: "{count} שורות הוסרו" },
+  "preview.diff.noChanges": "אין שינויים.",
 } as const satisfies PartialTranslation<typeof source>;
