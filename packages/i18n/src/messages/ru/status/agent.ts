@@ -89,6 +89,8 @@ export const messages = {
     "Память: сохранено {saved}, обновлено {updated}, забыто {forgotten}, не изменено {notChanged}, потому что другая ветка изменила их раньше.",
   "status.agent.nextStepContinues": "Агент остановился перед следующим шагом. Он продолжает ({current} из {limit}).",
   "status.agent.planContinues": "В плане есть незавершённые шаги. Агент продолжает ({current} из {limit}).",
+  "status.agent.planStopped":
+    "Агент остановился, в плане остались незавершённые шаги. Отправьте сообщение, чтобы продолжить.",
   "status.agent.compactionContinues": "Соединение прервалось, пока агент сжимал контекст. Агент продолжает.",
   "status.agent.branchTitle": "Ответвлённый чат",
 } as const satisfies PartialTranslation<typeof source>;

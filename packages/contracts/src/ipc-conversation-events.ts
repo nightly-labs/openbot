@@ -358,7 +358,8 @@ export function isVaultChangeMarker(message: ConversationMessage): boolean {
 
 /**
  * The item type of the note that a turn ended with open steps in the agent's plan, and that the agent
- * continues by itself. The text says which automatic continuation this is.
+ * continues by itself. The text says which automatic continuation this is. The note that the agent
+ * stopped with open steps and no answer has the same type; its text says that the agent stopped.
  */
 export const PLAN_CONTINUATION_ITEM_TYPE = "plan-continuation";
 

@@ -68,6 +68,8 @@ type StepStatus = "pending" | "inProgress" | "completed";
 interface FakeTurn {
   steps: [string, StepStatus][];
   answer?: string;
+  /** The turn ends with its plan only, as a model that stops without an answer does (#8263). */
+  noAnswer?: boolean;
   delayMs?: number;
   holdUntil?: string;
   calls?: { tool: string; arguments: Record<string, string> }[];
@@ -102,7 +104,7 @@ const finish = (turn) => {
   const plan = (turn.script.steps || []).map(([step, status]) => ({ step, status }));
   if (plan.length > 0) write({ method: "turn/plan/updated", params: { threadId: turn.threadId, turnId: turn.turnId, plan } });
   const item = { type: "agentMessage", id: "message-" + turn.turnId, text: turn.script.answer || "Done.", phase: "final_answer" };
-  write({ method: "item/completed", params: { threadId: turn.threadId, turnId: turn.turnId, item } });
+  if (!turn.script.noAnswer) write({ method: "item/completed", params: { threadId: turn.threadId, turnId: turn.turnId, item } });
   write({ method: "turn/completed", params: { threadId: turn.threadId, turn: { id: turn.turnId, status: "completed" } } });
 };
 const callNext = (turn) => {
@@ -321,7 +323,16 @@ function chatMessages(agentId: string, sideThreadId?: string) {
 
 /** The continuation lines of the agent's own chat or of one side thread, as the database holds them. */
 function continuationLines(agentId: string, sideThreadId?: string) {
-  return chatMessages(agentId, sideThreadId).filter((message) => message.itemType === PLAN_CONTINUATION_ITEM_TYPE);
+  return chatMessages(agentId, sideThreadId).filter(
+    (message) => message.itemType === PLAN_CONTINUATION_ITEM_TYPE && !message.id.endsWith(":plan-stopped"),
+  );
+}
+
+/** The lines that say that the agent stopped with open steps in its plan (#8263). */
+function stopLines(agentId: string) {
+  return chatMessages(agentId).filter(
+    (message) => message.itemType === PLAN_CONTINUATION_ITEM_TYPE && message.id.endsWith(":plan-stopped"),
+  );
 }
 
 function errorsFor(agentId: string, since: number) {
@@ -368,6 +379,7 @@ try {
     assert.ok(!note.includes("Write the code"), "The note does not name the done step.");
     assert.ok(note.includes("Automatic continuation 1 of 8."));
     assert.equal(continuationLines(agent.id).length, 1, "One continuation line shows.");
+    assert.equal(stopLines(agent.id).length, 0, "A plan that is done shows no stop line.");
     assert.equal(errorsFor(agent.id, since).length, 0, "No error shows.");
     const completions = current.events
       .slice(since)
@@ -402,6 +414,7 @@ try {
     const names = ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
     const step = (done: number): FakeTurn => ({
       steps: names.map((text, index) => [text, index < done ? "completed" : "pending"]),
+      noAnswer: true,
     });
     const id = await send(agent.id, `Do ten things. ${plan(...names.map((_, done) => step(done)))}`);
     assert.equal(await settled(id), "completed");
@@ -413,6 +426,7 @@ try {
     );
     assert.ok(turns[8]?.text.includes("Automatic continuation 8 of 8."));
     assert.equal(continuationLines(agent.id).length, 8, "Eight continuation lines show.");
+    assert.equal(stopLines(agent.id).length, 1, "The chat says that the agent stopped at the limit.");
     return { turns: turns.length };
   });
 
@@ -424,12 +438,34 @@ try {
         ["Read", "completed"],
         ["Fix", "inProgress"],
       ],
+      noAnswer: true,
     };
     const id = await send(agent.id, `Fix it. ${plan(stuck, stuck, stuck)}`);
     assert.equal(await settled(id), "completed");
     assert.equal(turnsSince(mark).length, 2, "One continuation turn runs.");
     assert.ok(turnsSince(mark)[1]?.text.includes("[in progress] Fix"));
     assert.equal(continuationLines(agent.id).length, 1);
+    const stops = stopLines(agent.id);
+    assert.equal(stops.length, 1, "The chat says that the agent stopped.");
+    assert.equal(stops[0]?.text, "The agent stopped with open steps in its plan. Send a message to continue.");
+    assert.equal(chatMessages(agent.id).at(-1)?.id, stops[0]?.id, "The stop line is the last line of the chat.");
+    return { turns: turnsSince(mark).length };
+  });
+
+  await check("a chain that stops after an answer shows no stop line", async () => {
+    const agent = await createAgent("Answered");
+    const mark = loggedTurns().length;
+    const stuck: FakeTurn = {
+      steps: [
+        ["Read", "completed"],
+        ["Fix", "inProgress"],
+      ],
+      answer: "The fix needs the production key. I do not have it.",
+    };
+    const id = await send(agent.id, `Fix it. ${plan(stuck, stuck, stuck)}`);
+    assert.equal(await settled(id), "completed");
+    assert.equal(turnsSince(mark).length, 2, "One continuation turn runs.");
+    assert.equal(stopLines(agent.id).length, 0, "The answer tells the user where the agent is.");
     return { turns: turnsSince(mark).length };
   });
 

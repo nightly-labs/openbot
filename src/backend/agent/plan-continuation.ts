@@ -12,6 +12,12 @@ export interface PlanContinuationOptions {
  */
 type ContinuationKind = "plan" | "nextStep" | "compaction";
 
+/**
+ * A chain that ended with open steps in the plan: at the limit, or after a continuation turn that
+ * changed no open step. Nothing runs after it, so the chat says that the agent stopped (#8263).
+ */
+const STOPPED = { kind: "stopped" } as const;
+
 /** The most next-step continuations of one request. Each one has no plan to measure progress. */
 const NEXT_STEP_LIMIT = 2;
 /** A longer answer is a report, not a turn that stopped before the step it named. */
@@ -253,6 +259,7 @@ export class PlanContinuation {
    * the turn sent none. `earlierPlan` is the chat's last plan from before that turn; only the first
    * turn of a request reads it. Returns the kind of this continuation, with its number and limit, or
    * null; null also ends the chain. A next-step continuation counts against `NEXT_STEP_LIMIT`.
+   * Returns `stopped`, which ends the chain too, when a chain ends with open steps in the plan.
    */
   consider(input: {
     agentId: string;
@@ -262,7 +269,7 @@ export class PlanContinuation {
     earlierPlan: ConversationPlan | null;
     /** The answer of that turn. */
     answer: string | undefined;
-  }): ({ kind: ContinuationKind } & ContinuationCount) | null {
+  }): ({ kind: ContinuationKind } & ContinuationCount) | typeof STOPPED | null {
     const key = laneKey(input.agentId, input.taskId);
     const previous = this.#chains.get(key);
     this.#chains.delete(key);
@@ -278,14 +285,14 @@ export class PlanContinuation {
           (input.earlierPlan?.steps ?? []).filter((step) => step.status !== "completed").map((step) => stepKey(step)),
         );
     const count = chained ? previous.count : 0;
-    if (count >= this.#limit) return null;
     const open = plan ? openSteps(plan, earlierSteps) : [];
+    if (count >= this.#limit) return chained && open.length > 0 ? STOPPED : null;
     const nextSteps = chained ? previous.nextSteps : 0;
     let kind: ContinuationKind;
     if (open.length > 0) {
       const signature = JSON.stringify(open.map(stepKey));
       // A continuation after a failed compaction keeps the plan of the turn before it.
-      if (chained && previous.kind !== "nextStep" && previous.openSteps === signature) return null;
+      if (chained && previous.kind !== "nextStep" && previous.openSteps === signature) return STOPPED;
       kind = "plan";
     } else if (nextSteps < NEXT_STEP_LIMIT && stoppedBeforeNextStep(input.answer)) kind = "nextStep";
     else return null;
