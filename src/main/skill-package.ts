@@ -80,8 +80,9 @@ export function inspectArchive(bytes: Uint8Array): Omit<SkillPackagePreview, "dr
   if (!isDynamicRecord(metadata)) throw new Error(sourceText("error.skill.metadataInvalid"));
   const name = isString(metadata.name) ? metadata.name.trim() : "";
   const description = isString(metadata.description) ? metadata.description.trim() : "";
-  if (!name || name.length > 80 || !description || description.length > SKILL_DESCRIPTION_MAX_LENGTH)
-    throw new Error(sourceText("error.skill.nameAndDescriptionRequired"));
+  if (!name || name.length > 80 || !description) throw new Error(sourceText("error.skill.nameAndDescriptionRequired"));
+  if (description.length > SKILL_DESCRIPTION_MAX_LENGTH)
+    throw new Error(sourceText("error.skill.descriptionLength", { limit: SKILL_DESCRIPTION_MAX_LENGTH }));
   return { name, description, slug: slugify(name), files: Object.keys(files).sort() };
 }
 
