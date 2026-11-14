@@ -400,7 +400,7 @@ export function syncMcpTokens(editor: HTMLDivElement, servers: ComposerMcpServer
 export function syncSkillTokens(editor: HTMLDivElement, skills: ComposerSkill[]): void {
   const available = new Map(
     skills
-      .filter((skill) => skill.state !== "needs-repair" && skill.enabled !== false)
+      .filter((skill) => skill.state !== "needs-repair" && skill.enabled !== false && skill.problem === undefined)
       .map((skill) => [skill.skillId, skill]),
   );
   for (const token of editor.querySelectorAll<HTMLSpanElement>("[data-skill-id]")) {
@@ -449,7 +449,11 @@ export function renderEditorValue(
     if (target.startsWith("skill:")) {
       const id = target.slice("skill:".length);
       const skill = skills.find(
-        (candidate) => candidate.skillId === id && candidate.state !== "needs-repair" && candidate.enabled !== false,
+        (candidate) =>
+          candidate.skillId === id &&
+          candidate.state !== "needs-repair" &&
+          candidate.enabled !== false &&
+          candidate.problem === undefined,
       );
       editor.append(skill ? createSkillToken(skill) : createUnavailableTagToken("skill", id, name));
       cursor = index + match[0].length;

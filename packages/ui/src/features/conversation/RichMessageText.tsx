@@ -479,7 +479,8 @@ function semanticTagParts(body: string, agents: ComposerAgent[], skills: Compose
       parts.push({ text: reference.name, reference: { kind: reference.kind, id: reference.id } });
     } else {
       const skill = skills.find(
-        (candidate) => candidate.skillId === reference.id && candidate.state !== "needs-repair",
+        (candidate) =>
+          candidate.skillId === reference.id && candidate.state !== "needs-repair" && candidate.problem === undefined,
       );
       parts.push(skill ? { text: skill.name, skill } : { text: reference.name, unavailableKind: "skill" });
     }

@@ -1311,7 +1311,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
               />
             </Show>
             <Show when={skillProblems().length > 0}>
-              <div class="mention-picker-problems">
+              <div class="mention-picker-problems" role="status">
                 <For each={skillProblems()}>
                   {(skill) => (
                     <p class="mention-picker-skill-problem">

@@ -293,8 +293,13 @@ export class SkillMarketplaceService {
           ),
         );
       }
-      installed.push(...(yield* listHomeFolderSkills(new Set(installed.map((skill) => skill.slug)))));
-      return installed.sort((a, b) => a.name.localeCompare(b.name));
+      // A usable skill in `~/.agents/skills` stays when a workspace folder of the same name has a problem.
+      const usableSlugs = new Set(installed.flatMap((skill) => (skill.problem ? [] : [skill.slug])));
+      const home = yield* listHomeFolderSkills(usableSlugs);
+      const homeSlugs = new Set(home.map((skill) => skill.slug));
+      return [...installed.filter((skill) => !(skill.problem && homeSlugs.has(skill.slug))), ...home].sort((a, b) =>
+        a.name.localeCompare(b.name),
+      );
     });
   }
 
