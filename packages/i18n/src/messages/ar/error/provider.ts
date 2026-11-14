@@ -252,6 +252,8 @@ export const messages = {
     "لم تُكمل خدمة Gemini من Google الطلب. أعد المحاولة بعد بضع دقائق.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "رفض Gemini هذا الطلب. اختر نموذجًا آخر، ثم أرسل رسالتك مرة أخرى. إذا فشل مرة أخرى، فابدأ دردشة جديدة.\n{detail}",
+  "error.provider.antigravityNetwork":
+    "توقف الاتصال بـ Gemini قبل اكتمال الإجابة. تحقق من اتصال الشبكة في الكمبيوتر الذي يشغّل OpenBot، ثم أرسل رسالتك مرة أخرى.\n{detail}",
   "error.provider.antigravityConnectionLost": "فقد Gemini الاتصال بوكيله وتوقف. أرسل رسالة للمتابعة.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "على مضيف Windows، يفتح Gemini صفحة Google على المضيف نفسه. اربط Gemini على الكمبيوتر المضيف.",

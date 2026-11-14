@@ -240,6 +240,8 @@ export const messages = {
   "error.provider.antigravityServiceFailure": "Google 的 Gemini 服务未能完成该请求。请过几分钟再试。\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini 拒绝了此请求。请改用其他模型，然后重新发送消息。如果仍然失败，请开始新对话。\n{detail}",
+  "error.provider.antigravityNetwork":
+    "回答完成前，与 Gemini 的连接已中断。请检查运行 OpenBot 的电脑的网络连接，然后重新发送消息。\n{detail}",
   "error.provider.antigravityConnectionLost": "Gemini 与其代理的连接已断开，已停止。请发送一条消息以继续。",
   "error.provider.antigravityRemoteWindowsSignIn":
     "在 Windows 主机上，Gemini 会在主机本身打开 Google 页面。请在主机电脑上连接 Gemini。",

@@ -266,6 +266,8 @@ export const messages = {
     "Сервис Gemini от Google не выполнил запрос. Повторите попытку через несколько минут.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini отклонил этот запрос. Выберите другую модель и отправьте сообщение снова. Если ошибка повторится, начните новый чат.\n{detail}",
+  "error.provider.antigravityNetwork":
+    "Соединение с Gemini прервалось до завершения ответа. Проверьте сетевое подключение компьютера, на котором работает OpenBot, и отправьте сообщение ещё раз.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini потерял соединение со своим агентом и остановился. Отправьте сообщение, чтобы продолжить.",
   "error.provider.antigravityRemoteWindowsSignIn":
