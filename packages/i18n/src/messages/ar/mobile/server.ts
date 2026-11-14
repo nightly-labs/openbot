@@ -1183,6 +1183,8 @@ export const messages = {
     "أزال WhatsApp هذا الخادم من الأجهزة المرتبطة. اربط الرقم مرة أخرى.",
   "mobile.server.connectors.whatsapp.helpError":
     "لا يستطيع OpenBot الوصول إلى WhatsApp على هذا الرقم. أعد الربط، أو اقطع اتصال الرقم.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "لا يستطيع OpenBot قراءة المفاتيح المحفوظة لهذا الرقم. اربط الرقم مرة أخرى.",
   "mobile.server.connectors.whatsapp.retryAt": "طلب WhatsApp من OpenBot الانتظار. سيحاول مرة أخرى في {time}.",
   "mobile.server.connectors.whatsapp.linkAgain": "ربط مرة أخرى",
   "mobile.server.connectors.whatsapp.ownNumber": "رقم شخصي",
