@@ -1,9 +1,10 @@
-import { BILLING_PLAN_IDS, planStorageGb } from "@openbot/contracts/billing";
+import { BILLING_PLAN_IDS } from "@openbot/contracts/billing";
 import {
   HOST_KEY_HANDOVER_LIMIT,
   type HostKeyHandover,
   hostKeyHandoverStatement,
 } from "@openbot/contracts/host-key-handover";
+import { type HostedServerSize, hostedServerStorageGb } from "@openbot/contracts/hosted-servers";
 import { DEFAULT_TEAM_MEMBER_LIMIT } from "@openbot/contracts/input-limits";
 import { isAvatarColor } from "@openbot/contracts/ipc";
 import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
@@ -152,8 +153,12 @@ export type { RemoteMemberRole };
  * The plan storage of a hosted server, in GB. A server on a machine of the operator has more.
  * Nothing for a server without a known plan.
  */
-function hostedStorage(plan: string | null, onOperatorHost: boolean): { storageGb: number } | Record<string, never> {
-  return isOneOf(BILLING_PLAN_IDS, plan) ? { storageGb: planStorageGb(plan, onOperatorHost) } : {};
+function hostedStorage(
+  plan: string | null,
+  onOperatorHost: boolean,
+  size: HostedServerSize | null,
+): { storageGb: number } | Record<string, never> {
+  return isOneOf(BILLING_PLAN_IDS, plan) ? { storageGb: hostedServerStorageGb(plan, onOperatorHost, size) } : {};
 }
 
 export class RemoteControlPlaneError extends Schema.TaggedError<RemoteControlPlaneError>()("RemoteControlPlaneError", {
@@ -912,7 +917,9 @@ export class RemoteControlPlane {
            (SELECT s.plan FROM hosted_servers s WHERE s.server_id = h.host_id
              AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted_plan,
            (SELECT s.operator_host FROM hosted_servers s WHERE s.server_id = h.host_id
-             AND s.desired_state NOT IN ('deleted', 'stopped')) AS operator_host
+             AND s.desired_state NOT IN ('deleted', 'stopped')) AS operator_host,
+           (SELECT COALESCE(s.pending_size, s.size) FROM hosted_servers s WHERE s.server_id = h.host_id
+             AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted_size
          FROM remote_memberships m
          JOIN remote_hosts h ON h.host_id = m.host_id
          WHERE m.user_id = ? AND m.status = 'active'
@@ -929,6 +936,7 @@ export class RemoteControlPlane {
             role: RemoteMemberRole;
             hosted_plan: string | null;
             operator_host: string | null;
+            hosted_size: HostedServerSize | null;
           }>(),
       );
       const keyHandovers = yield* this.#keyHandoversByHost({
@@ -959,7 +967,7 @@ export class RemoteControlPlane {
               // the restart. A client from before this field shows it, and gets the refusal of the restart.
               ...(row.operator_host === null ? {} : { restartAvailable: false }),
               // The storage that the plan of a hosted server gives, so a client warns before the plan is full.
-              ...hostedStorage(row.hosted_plan, row.operator_host !== null),
+              ...hostedStorage(row.hosted_plan, row.operator_host !== null, row.hosted_size),
             };
           }),
         { concurrency: "unbounded" },

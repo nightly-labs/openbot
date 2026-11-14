@@ -33,7 +33,7 @@ export function OpenBotHostedServers() {
         server runs—not in the number of agents you can create.
       </p>
       <p>
-        Starter is for one person, with 12 GB of storage and base speed. It could suit a founder or a freelancer who
+        Starter is for one person, with 25 GB of storage and base speed. It could suit a founder or a freelancer who
         wants agents to keep working on research, routine admin, or client work while the laptop is closed.
       </p>
       <p>

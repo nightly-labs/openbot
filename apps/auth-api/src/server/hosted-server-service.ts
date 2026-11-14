@@ -8,9 +8,9 @@ import {
   type BillingPlanId,
   isOpenBillingStatus,
   memberLimitForPlan,
-  planStorageGb,
 } from "@openbot/contracts/billing";
 import {
+  HOSTED_BOAT_PLAN_SIZE,
   HOSTED_PLAN_SIZE,
   HOSTED_SERVER_ENTRY_POINTS,
   type HostedServerActivityReport,
@@ -25,6 +25,7 @@ import {
   type HostedServerState,
   type HostedServerStatus,
   type HostedServerSummary,
+  hostedServerStorageGb,
   parseHostedServerName,
 } from "@openbot/contracts/hosted-servers";
 import { type LicenseOrder, parseLicenseOrder } from "@openbot/contracts/license";
@@ -1792,6 +1793,7 @@ export class HostedServerService {
     const dependencies = yield* HostedServerDependencies;
     if (row.plan === sync.plan && row.billing_interval === sync.interval && row.currency === sync.currency) return;
     const size = HOSTED_PLAN_SIZE[sync.plan];
+    const boatSize = HOSTED_BOAT_PLAN_SIZE[sync.plan];
     yield* hostedCall(() =>
       dependencies.database
         .prepare(
@@ -1801,7 +1803,7 @@ export class HostedServerService {
              ELSE ? END, updated_at = ?
          WHERE server_id = ? AND desired_state != 'deleted'`,
         )
-        .bind(sync.plan, sync.interval, sync.currency, size, size, size, dependencies.now(), row.server_id)
+        .bind(sync.plan, sync.interval, sync.currency, size, boatSize, boatSize, dependencies.now(), row.server_id)
         .run(),
     );
     if (row.provider_sandbox_id) yield* this.#rename({ ...row, plan: sync.plan }, row.provider_sandbox_id);
@@ -1930,8 +1932,9 @@ export class HostedServerService {
     // A VM that signed in during a lost attempt keeps its session, and the claim stays spent.
     const claim = yield* hostedClaim(secret, row.server_id).pipe(Effect.mapError(hostedFailure));
     const claimHash = yield* sha256(claim).pipe(Effect.mapError(hostedFailure));
-    // A retry sends the request of the first attempt, also after a deploy that changed the template.
+    // A retry sends the request of the first attempt, also after a deploy that changed the template or the size.
     const from = row.provider_template ?? template;
+    const size = row.provider_template ? row.size : HOSTED_BOAT_PLAN_SIZE[row.plan];
     const now = dependencies.now();
     const claimed = yield* hostedCall(() =>
       dependencies.database
@@ -1940,18 +1943,30 @@ export class HostedServerService {
            claim_token_hash = CASE WHEN ${CLAIM_OPEN_SQL} THEN ? ELSE claim_token_hash END,
            claim_expires_at = CASE WHEN ${CLAIM_OPEN_SQL} THEN ? ELSE claim_expires_at END,
            claim_redeemed_at = CASE WHEN ${CLAIM_OPEN_SQL} THEN NULL ELSE claim_redeemed_at END,
+           size = CASE WHEN provider_template IS NULL THEN ? ELSE size END,
            provider_template = COALESCE(provider_template, ?), checkout_session_id = NULL, provider_event_at = ?,
            last_active_at = ?, lease_until = ?, updated_at = ?
          WHERE server_id = ? AND observed_state = 'awaiting_payment' AND desired_state = 'running'
            AND operator_host IS NULL`,
         )
-        .bind(now, claimHash, now + CLAIM_TTL_MS, from, now, now, now + LEASE_TTL_SECONDS * 1000, now, row.server_id)
+        .bind(
+          now,
+          claimHash,
+          now + CLAIM_TTL_MS,
+          size,
+          from,
+          now,
+          now,
+          now + LEASE_TTL_SECONDS * 1000,
+          now,
+          row.server_id,
+        )
         .run(),
     );
     if (claimed.meta.changes !== 1) return;
     // Only the caller that changed the row alerts, so a lost race or a retry before this point sends nothing.
     if (boatReason) yield* this.#alertBoatStart(row, boatReason);
-    const request = createRequest(row, from, claim);
+    const request = createRequest({ ...row, size }, from, claim);
     return yield* Effect.gen({ self: this }, function* () {
       // The same idempotency key and request body make a retry safe: boat returns the sandbox that it made.
       const sandbox = yield* boat.createSandbox(request).pipe(
@@ -1988,7 +2003,7 @@ export class HostedServerService {
         name: "hosted_server_action",
         action: "provisioned",
         plan: row.plan,
-        size: row.size,
+        size,
         machine: "boat",
       });
       if (stored.meta.changes === 1 && isUsable(sandbox.state))
@@ -3115,7 +3130,7 @@ function summary(row: HostedServerRow): HostedServerSummary {
     error: row.observed_error,
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
-    storageGb: planStorageGb(row.plan, row.operator_host !== null),
+    storageGb: hostedServerStorageGb(row.plan, row.operator_host !== null, row.pending_size ?? row.size),
   };
 }
 

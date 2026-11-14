@@ -30,8 +30,11 @@ leaves the page for Stripe). The old page closes first; when the user paid on it
 that server with no page. The server list sends the limit as
 `maxServers`. When the paid servers reach it, the add server dialog disables the plans and opens the
 server list (Settings on desktop, Billing on the web) to delete a server. Each server
-has its own Stripe plan. Its machine comes from the plan
-(`HOSTED_PLAN_SIZE`): Starter is boat `small`, Standard is `default`, and Pro is `large`.
+has its own Stripe plan. Its machine comes from the plan: a pool machine of the plan (Starter VPS 1,
+Standard VPS 2, Pro VPS 3), or when none is free, a boat sandbox (`HOSTED_BOAT_PLAN_SIZE`): Starter and
+Standard are `default`, and Pro is `large`. Starter sandboxes from before 2026-11-14 are `small` and keep
+12 GB of storage. `leaseweb-pool.ts move` puts a Starter sandbox on a VPS 1 and sets the row to
+`HOSTED_PLAN_SIZE`.
 
 ## Parts
 
