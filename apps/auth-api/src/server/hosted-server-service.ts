@@ -8,6 +8,7 @@ import {
   type BillingPlanId,
   isOpenBillingStatus,
   memberLimitForPlan,
+  storageTierOf,
 } from "@openbot/contracts/billing";
 import {
   HOSTED_BOAT_PLAN_SIZE,
@@ -269,12 +270,14 @@ interface HostedServerRow {
   updated_at: number;
   deletion_scheduled_at: number | null;
   deletion_subscription_id: string | null;
+  /** The storage tier that the plan pays for, 0 to 2. Only a server on a VPS of the operator uses it. */
+  storage_tier: number;
 }
 
 const ROW_COLUMNS = `server_id, owner_user_id, name, provider_sandbox_id, provider_template, operator_host, retired_sandbox_id, size, pending_size, plan, billing_interval, currency,
   checkout_session_id, idempotency_key, desired_state, observed_state, observed_error, provider_event_at, auth_session_id,
   last_active_at, lease_until, next_run_at, last_wake_reason, start_requested_at, created_at, updated_at, deletion_scheduled_at,
-  deletion_subscription_id`;
+  deletion_subscription_id, storage_tier`;
 
 /** The billing calls that hosted servers use. */
 export type HostedServerBilling = Pick<
@@ -651,7 +654,10 @@ export class HostedServerService {
           .bind(row.server_id)
           .run(),
       );
-      if (isOpenBillingStatus(sync.status)) yield* this.#followPlan(row, sync);
+      if (isOpenBillingStatus(sync.status)) {
+        yield* this.#followPlan(row, sync);
+        yield* this.#followStorage(row, sync);
+      }
       yield* this.#applyPlan(yield* this.#requireRow(row.server_id));
       yield* this.#resize(yield* this.#requireRow(row.server_id));
     },
@@ -1807,6 +1813,29 @@ export class HostedServerService {
         .run(),
     );
     if (row.provider_sandbox_id) yield* this.#rename({ ...row, plan: sync.plan }, row.provider_sandbox_id);
+  });
+
+  /**
+   * Stores the storage tier that the plan pays for. The subscription decides, so a server with no storage
+   * item has tier 0. The host reads its storage when it starts, so the new storage applies from the next
+   * start of the server.
+   */
+  readonly #followStorage = Effect.fn("HostedServerService.followStorage")(function* (
+    this: HostedServerService,
+    row: HostedServerRow,
+    sync: SubscriptionSync,
+  ): Effect.fn.Return<void, HostedFailure, HostedServerDependencies> {
+    const dependencies = yield* HostedServerDependencies;
+    if (storageTierOf(row.storage_tier) === sync.storageTier) return;
+    yield* hostedCall(() =>
+      dependencies.database
+        .prepare(
+          `UPDATE hosted_servers SET storage_tier = ?, updated_at = ?
+         WHERE server_id = ? AND storage_tier != ? AND desired_state != 'deleted'`,
+        )
+        .bind(sync.storageTier, dependencies.now(), row.server_id, sync.storageTier)
+        .run(),
+    );
   });
 
   /**
@@ -3134,6 +3163,7 @@ function summary(row: HostedServerRow): HostedServerSummary {
       row.plan,
       row.operator_host !== null,
       row.provider_template === null ? null : (row.pending_size ?? row.size),
+      storageTierOf(row.storage_tier),
     ),
   };
 }

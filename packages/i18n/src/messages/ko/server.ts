@@ -169,9 +169,6 @@ export const messages = {
   "server.upgrade.description":
     "{server}의 여유 공간이 거의 없어요. 업그레이드하면 에이전트가 중단 없이 계속 작동해요.",
   "server.upgrade.used": "{total} 중 {used} 사용",
-  "server.upgrade.current": "{plan}(현재)",
-  "server.upgrade.price": "가격",
-  "server.upgrade.action": "{plan}(으)로 업그레이드",
   "server.hosted.progressTitle": "{name} 설정 중",
   // The setup waits for the first payment on the Stripe page in the browser.
   "server.hosted.paymentTitle": "브라우저에서 결제를 완료하세요",

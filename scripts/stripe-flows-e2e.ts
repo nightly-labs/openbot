@@ -25,6 +25,11 @@
  * `bun run api:stripe:bootstrap` to have made the license Prices in the sandbox. A subscription made here
  * with the license metadata stands for a paid license Checkout page, as for a server plan.
  *
+ * The `storage-tier` scenario needs the storage add-on Prices of `bun run api:stripe:bootstrap`. It checks
+ * that a boat server cannot buy storage, then moves the row to a VPS of the operator in D1 and buys tier 1
+ * and tier 2 with `POST /v1/me/billing/storage`: the answer, the D1 tier, the invoices, a refused payment
+ * (402), and the renewal amount. The `portal` scenario checks that the Portal has no plan change.
+ *
  * The license tiers have their own scenarios:
  * - `license-prices`: the 8 license lookup keys give active Prices with the tier, the interval, the bundle
  *   flag and the amounts of `LICENSE_PLAN_PRICES` in EUR, USD and PLN. No license key is a server plan key.
@@ -68,9 +73,12 @@ import {
   type BillingCurrency,
   type BillingPlanId,
   type BillingPortalRequest,
+  type BillingStorageRequest,
   LEGACY_MEMBER_LIMITS,
   memberLimitForPlan,
   parseBillingLookupKey,
+  storageTierGb,
+  storageTierOf,
 } from "@openbot/contracts/billing";
 import { DEFAULT_TEAM_MEMBER_LIMIT } from "@openbot/contracts/input-limits";
 import {
@@ -105,6 +113,7 @@ const SCENARIOS = [
   "failed-renewal",
   "cancel-at-period-end",
   "plan-change",
+  "storage-tier",
   "renew",
   "delete",
   "foreign",
@@ -215,6 +224,19 @@ const planSchema = z.object({
 });
 type Plan = z.infer<typeof planSchema>;
 const billingSchema = z.object({ servers: z.array(planSchema) });
+const storagePlanSchema = planSchema.extend({
+  amount: z.number().nullable(),
+  storageGb: z.number().optional(),
+  storageUpgrades: z
+    .array(z.object({ tier: z.number(), storageGb: z.number(), amount: z.number().nullable() }))
+    .optional(),
+});
+type StoragePlan = z.infer<typeof storagePlanSchema>;
+const storageBillingSchema = z.object({ servers: z.array(storagePlanSchema) });
+const storageRowSchema = z.object({ storage_tier: z.number() });
+const portalConfigurationSchema = z.object({
+  data: z.array(z.object({ features: z.object({ subscription_update: z.object({ enabled: z.boolean() }) }) })),
+});
 const errorSchema = z.object({ error: z.object({ code: z.string() }) });
 const hostSchema = z.object({
   claim_redeemed_at: z.number().nullable(),
@@ -316,6 +338,7 @@ type BrowserApiBody =
   | { name: string; plan: BillingPlanId; interval: "month"; currency: "eur"; license?: LicenseOrder }
   | { confirmName: string }
   | BillingPortalRequest
+  | BillingStorageRequest
   | LicenseCheckoutRequest
   | LicenseUsersRequest
   | LicensePlanRequest
@@ -540,6 +563,23 @@ class Account {
 
   async billing() {
     return billingSchema.parse((await this.request("GET", "v1/me/billing")).body).servers;
+  }
+
+  /** The plan with its amount and storage fields, from the billing state or from a storage purchase answer. */
+  async storagePlan(subscriptionId: string, body?: unknown): Promise<StoragePlan | null> {
+    const state = storageBillingSchema.parse(body ?? (await this.request("GET", "v1/me/billing")).body);
+    return state.servers.find((entry) => entry.subscriptionId === subscriptionId) ?? null;
+  }
+
+  storageTier(serverId: string): number | null {
+    return (
+      d1(`SELECT storage_tier FROM hosted_servers WHERE server_id = ${quote(serverId)}`, storageRowSchema)[0]
+        ?.storage_tier ?? null
+    );
+  }
+
+  buyStorage(subscriptionId: string, tier: BillingStorageRequest["tier"]) {
+    return this.request("POST", "v1/me/billing/storage", { subscriptionId, tier });
   }
 
   async plan(subscriptionId: string): Promise<Plan | null> {
@@ -1423,7 +1463,8 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     await provisioned(account, server.serverId);
     const item = (await subscription(sub)).items.data[0]?.id;
     if (!item) throw new Error("No subscription item");
-    // The Portal upgrade: a higher price now, charged now (`always_invoice`).
+    // A plan change that an operator makes in Stripe (the Portal has no plan change): a higher price now,
+    // charged now (`always_invoice`).
     await stripe("POST", `/v1/subscriptions/${sub}`, idSchema, {
       "items[0][id]": item,
       "items[0][price]": await priceId("pro", "month"),
@@ -1443,7 +1484,7 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     });
     const yearly = await rowWhere(account, server.serverId, "yearly", (row) => row.billing_interval === "year");
     record("plan-change", "month to year: the server interval follows", yearly.plan === "pro", yearly);
-    // The Portal downgrade: a schedule changes the price at the period end.
+    // A downgrade in Stripe: a schedule changes the price at the period end.
     const schedule = await stripe("POST", "/v1/subscription_schedules", scheduleSchema, { from_subscription: sub });
     const phase = schedule.phases[0];
     if (!phase) throw new Error("No schedule phase");
@@ -1470,6 +1511,121 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       downgraded.desired_state === "running",
       downgraded,
     );
+  },
+
+  /**
+   * Storage tiers: a boat server has none. On a VPS of the operator the owner buys tier 1, then tier 2.
+   * Each purchase is invoiced at once, a refused payment changes nothing, and the renewal charges the plan
+   * and the add-on. The check gives the row an operator host in D1, as a move to a VPS does.
+   */
+  async "storage-tier"(account) {
+    const { server } = await account.createServer("Storage");
+    const sub = await account.pay(server.serverId);
+    await provisioned(account, server.serverId);
+    const boat = await account.buyStorage(sub, 1);
+    const boatPlan = await account.storagePlan(sub);
+    record(
+      "storage-tier",
+      "a boat server has no storage upgrades, and a purchase is refused",
+      boat.status === 409 && boat.code === "storage_unavailable" && !boatPlan?.storageUpgrades?.length,
+      { status: boat.status, code: boat.code, plan: boatPlan },
+    );
+    const id = quote(server.serverId);
+    d1(
+      `UPDATE hosted_servers SET operator_host = ${quote(`leaseweb:e2e-${server.serverId}`)},
+         retired_sandbox_id = provider_sandbox_id, provider_sandbox_id = NULL WHERE server_id = ${id}`,
+      z.unknown(),
+    );
+    try {
+      const before = await account.storagePlan(sub);
+      const offered = before?.storageUpgrades ?? [];
+      record(
+        "storage-tier",
+        "a VPS server offers tiers 1 and 2, smallest first, each with the plan and the add-on amount",
+        before?.storageGb === storageTierGb("standard", 0) &&
+          offered.map((upgrade) => upgrade.tier).join() === "1,2" &&
+          offered.every(
+            (upgrade) =>
+              upgrade.storageGb === storageTierGb("standard", storageTierOf(upgrade.tier)) &&
+              upgrade.amount !== null &&
+              before.amount !== null &&
+              upgrade.amount > before.amount,
+          ),
+        before,
+      );
+
+      const first = await account.buyStorage(sub, 1);
+      const tier1 = first.status === 200 ? await account.storagePlan(sub, first.body) : null;
+      const items = (await subscription(sub)).items.data.length;
+      record(
+        "storage-tier",
+        "tier 1: the answer has the new storage and amount, D1 has the tier, and the add-on is invoiced at once",
+        tier1?.storageGb === storageTierGb("standard", 1) &&
+          tier1.amount === offered[0]?.amount &&
+          tier1.storageUpgrades?.map((upgrade) => upgrade.tier).join() === "2" &&
+          account.storageTier(server.serverId) === 1 &&
+          items === 2,
+        { status: first.status, code: first.code, plan: tier1, items, invoices: await invoices(sub) },
+      );
+
+      const again = await account.buyStorage(sub, 1);
+      record(
+        "storage-tier",
+        "tier 1 again is refused: a tier never goes down or repeats",
+        again.status === 409 && again.code === "storage_unavailable",
+        { status: again.status, code: again.code },
+      );
+
+      // The new card goes on the subscription too, as a payment method update in the Portal does.
+      const failing = await account.useCard("pm_card_chargeCustomerFail");
+      await stripe("POST", `/v1/subscriptions/${sub}`, idSchema, { default_payment_method: failing });
+      const refused = await account.buyStorage(sub, 2);
+      const afterRefused = await account.storagePlan(sub);
+      record(
+        "storage-tier",
+        "a refused payment gives 402, and the server keeps tier 1",
+        refused.status === 402 &&
+          refused.code === "storage_payment_failed" &&
+          afterRefused?.storageGb === storageTierGb("standard", 1) &&
+          account.storageTier(server.serverId) === 1,
+        { status: refused.status, code: refused.code, plan: afterRefused },
+      );
+
+      const working = await account.useCard("pm_card_visa");
+      await stripe("POST", `/v1/subscriptions/${sub}`, idSchema, { default_payment_method: working });
+      const second = await account.buyStorage(sub, 2);
+      const tier2 = second.status === 200 ? await account.storagePlan(sub, second.body) : null;
+      const itemsAfter = (await subscription(sub)).items.data.length;
+      record(
+        "storage-tier",
+        "tier 2 after a new card: the storage item changes its Price, and no tier is left to buy",
+        tier2?.storageGb === storageTierGb("standard", 2) &&
+          tier2.amount === offered[1]?.amount &&
+          !tier2.storageUpgrades?.length &&
+          account.storageTier(server.serverId) === 2 &&
+          itemsAfter === 2,
+        { status: second.status, code: second.code, plan: tier2, items: itemsAfter, invoices: await invoices(sub) },
+      );
+
+      await account.advance(32);
+      const renewal = await waitFor("storage renewal", async () => {
+        const list = await invoices(sub);
+        return list.find((invoice) => invoice.reason === "subscription_cycle" && invoice.status === "paid") ?? null;
+      });
+      record(
+        "storage-tier",
+        "the renewal charges the plan and the tier 2 add-on, and the server keeps tier 2",
+        renewal.amount === tier2?.amount && account.storageTier(server.serverId) === 2,
+        { renewal, plan: await account.storagePlan(sub) },
+      );
+    } finally {
+      // The server goes back to its sandbox, so that the scenario end deletes it as a boat server.
+      d1(
+        `UPDATE hosted_servers SET provider_sandbox_id = retired_sandbox_id, retired_sandbox_id = NULL,
+           operator_host = NULL WHERE server_id = ${id}`,
+        z.unknown(),
+      );
+    }
   },
 
   async renew(account) {
@@ -1593,18 +1749,21 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       stored.cancel_at_period_end ? { cancel_at_period_end: "false" } : { cancel_at: "" },
     );
     await planWhere(account, sub, "undo", (plan) => !plan.cancelAtPeriodEnd);
-    print(`PORTAL_UPDATE ${(await account.portal("update", sub)).url}`);
-    const upgraded = await rowWhere(
-      account,
-      server.serverId,
-      "Portal upgrade",
-      (row) => row.plan !== "standard",
-      600_000,
-    );
-    record("portal", "Portal plan change: the server plan follows, and an upgrade is invoiced at once", true, {
-      row: upgraded,
-      invoices: await invoices(sub),
+    // An app from before the storage tiers asks for the plan change page. It gets the Portal home, which
+    // has no plan change.
+    const update = await account.portal("update", sub);
+    const configuration = await stripe("GET", "/v1/billing_portal/configurations", portalConfigurationSchema, {
+      is_default: "true",
+      limit: "1",
     });
+    const planChange = configuration.data[0]?.features.subscription_update.enabled ?? null;
+    print(`PORTAL_MANAGE ${update.url}`);
+    record(
+      "portal",
+      "the plan change flow of an old app opens the Portal home, and the Portal has no plan change",
+      update.status === 200 && update.url !== null && planChange === false,
+      { status: update.status, url: update.url, subscriptionUpdateEnabled: planChange },
+    );
   },
 
   async "customer-deleted"(account) {

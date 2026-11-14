@@ -4,6 +4,7 @@ import {
   BILLING_OPTIONAL_CURRENCIES,
   BILLING_PLAN_IDS,
   BILLING_PLANS,
+  BILLING_STORAGE_UPGRADE_TIERS,
   BILLING_SUBSCRIPTION_STATUSES,
   type BillingCurrency,
   type BillingInterval,
@@ -11,11 +12,18 @@ import {
   type BillingPortalRequest,
   type BillingServerPlan,
   type BillingState,
+  type BillingStorageRequest,
+  type BillingStorageTier,
+  type BillingStorageUpgrade,
+  type BillingStorageUpgradeTier,
   type BillingSubscriptionStatus,
   billingLookupKey,
   isBillingAmount,
   isOpenBillingStatus,
   parseBillingLookupKey,
+  storageTierGb,
+  storageTierLookupKey,
+  storageTierOf,
 } from "@openbot/contracts/billing";
 import {
   type HostedServerCatalog,
@@ -77,8 +85,11 @@ import {
   subscriptionCustomerId,
   subscriptionLatestInvoiceId,
   subscriptionLicenseItem,
+  subscriptionPaymentMethodId,
   subscriptionPeriodEnd,
   subscriptionServerItem,
+  subscriptionStorageItem,
+  subscriptionStorageTier,
   verifyStripeSignature,
 } from "./stripe-client";
 
@@ -94,6 +105,15 @@ const LAPSED_PLAN_BATCH_SIZE = 20;
 /** Prices change only when `stripe-bootstrap.ts` runs, so each isolate reads them once in this time. */
 const CATALOG_TTL_MS = 5 * 60_000;
 const catalogCache = new Map<string, { expiresAt: number; prices: ReadonlyMap<string, StripePrice> }>();
+const NO_PRICES: ReadonlyMap<string, StripePrice> = new Map();
+/**
+ * A storage purchase in this time from the same storage item uses the same Stripe idempotency key, so a
+ * double click is one change, and two purchases at the same time cannot each add a storage item. The key
+ * does not have the tier: Stripe refuses the second purchase, as `idempotency_error`. Stripe keeps a
+ * refused payment for its key, so the key also has the payment method of the subscription: a retry with a
+ * new payment method gets a new key at once, and any retry gets one in the next window.
+ */
+const STORAGE_PURCHASE_WINDOW_MS = 60_000;
 
 export { BillingError } from "./billing-errors";
 
@@ -117,6 +137,8 @@ interface ServerPlanRow {
   on_operator_host: number;
   /** The machine of the hosted server after a resize that waits, or null when the subscription has no server row. */
   server_size: HostedServerSize | null;
+  /** The storage tier of the hosted server, 0 when the subscription has no server row. */
+  storage_tier: number;
 }
 
 /** A subscription that the webhook stored, for a server that its metadata names. */
@@ -129,6 +151,8 @@ export interface SubscriptionSync {
   plan: BillingPlanId;
   interval: BillingInterval;
   currency: BillingCurrency;
+  /** The storage tier that the subscription pays for: 0 with no storage add-on. */
+  storageTier: BillingStorageTier;
 }
 
 export interface BillingServiceOptions {
@@ -731,7 +755,8 @@ export class BillingService {
                 `SELECT s.stripe_subscription_id, s.server_id, h.name AS server_name, s.plan, s.interval, s.currency,
                   s.amount, s.status, s.current_period_end, s.cancel_at_period_end,
                   hs.operator_host IS NOT NULL AS on_operator_host,
-                  CASE WHEN hs.provider_template IS NULL THEN NULL ELSE COALESCE(hs.pending_size, hs.size) END AS server_size
+                  CASE WHEN hs.provider_template IS NULL THEN NULL ELSE COALESCE(hs.pending_size, hs.size) END AS server_size,
+                  COALESCE(hs.storage_tier, 0) AS storage_tier
            FROM billing_subscriptions s
            LEFT JOIN remote_hosts h ON h.host_id = s.server_id AND h.owner_user_id = s.user_id
            LEFT JOIN hosted_servers hs ON hs.server_id = s.server_id AND hs.owner_user_id = s.user_id
@@ -744,8 +769,12 @@ export class BillingService {
         ],
         { concurrency: "unbounded" },
       );
+      // The Price catalog is read only for a server that can buy storage. Without it, no tier is offered.
+      const prices = rows.results.some((row) => canBuyStorage(row) && storageTierOf(row.storage_tier) < 2)
+        ? yield* this.#prices().pipe(Effect.catch(() => Effect.succeed(NO_PRICES)))
+        : NO_PRICES;
       const servers = rows.results.flatMap((row) => {
-        const server = serverPlan(row);
+        const server = serverPlan(row, prices);
         return server ? [server] : [];
       });
       return { available: true, hasCustomer: customer !== null, servers };
@@ -754,8 +783,9 @@ export class BillingService {
   ).bind(this);
 
   /**
-   * Returns a Customer Portal page. The plan change and cancel flows open on one subscription, after
-   * the service checks that the subscription belongs to the account.
+   * Returns a Customer Portal page. The cancel flow opens on one subscription, after the service checks
+   * that the subscription belongs to the account. A plan does not change now, so the `update` flow of an
+   * older client opens the `manage` page.
    */
 
   readonly createPortal = Effect.fn("BillingService.createPortal")(
@@ -771,7 +801,7 @@ export class BillingService {
       if (!customerId) return yield* new BillingError(404, "no_customer", "No billing account exists yet.");
       const returnUrl = portalReturnUrl(origin, target);
       dependencies.analytics.track(userId, { name: "billing_action", action: "portal_opened", flow: request.flow });
-      if (request.flow === "manage") {
+      if (request.flow === "manage" || request.flow === "update") {
         return yield* this.#stripeCall(() => dependencies.stripe.createPortalSession({ customerId, returnUrl }));
       }
       const owned = yield* billingCall(() =>
@@ -784,14 +814,100 @@ export class BillingService {
           .first<{ owned: number }>(),
       );
       if (!owned) return yield* new BillingError(404, "no_subscription", "This plan does not exist.");
-      const type = request.flow === "update" ? "subscription_update" : "subscription_cancel";
       return yield* this.#stripeCall(() =>
         dependencies.stripe.createPortalSession({
           customerId,
           returnUrl,
-          flow: { type, subscriptionId: request.subscriptionId },
+          flow: { type: "subscription_cancel", subscriptionId: request.subscriptionId },
         }),
       );
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  /**
+   * Buys a larger storage tier for the hosted server of one subscription, and returns the billing state
+   * after it. Only a server on a VPS of the operator has tiers, and a tier never goes down. Stripe invoices
+   * the prorated add-on now and refuses the change when that payment fails, so the disk grows only when it
+   * is paid. The sync after the change writes the tier to the server, and the server uses the new storage
+   * from its next start.
+   */
+
+  readonly buyStorage = Effect.fn("BillingService.buyStorage")(
+    function* (
+      this: BillingService,
+      userId: string,
+      request: BillingStorageRequest,
+    ): Effect.fn.Return<BillingState, BillingError | BillingOperationError, BillingDependencies> {
+      const dependencies = yield* BillingDependencies;
+      const customerId = yield* this.#customerId(userId);
+      if (!customerId) return yield* storageUnavailable();
+      const owned = yield* billingCall(() =>
+        dependencies.database
+          .prepare(
+            `SELECT s.server_id FROM billing_subscriptions s
+         JOIN hosted_servers hs ON hs.server_id = s.server_id AND hs.owner_user_id = s.user_id
+         WHERE s.stripe_subscription_id = ? AND s.user_id = ? AND s.stripe_customer_id = ?
+           AND s.status = 'active' AND s.cancel_at_period_end = 0
+           AND hs.operator_host IS NOT NULL AND hs.desired_state <> 'deleted' AND COALESCE(hs.storage_tier, 0) < ?`,
+          )
+          .bind(request.subscriptionId, userId, customerId, request.tier)
+          .first<{ server_id: string }>(),
+      );
+      if (!owned) return yield* storageUnavailable();
+      // D1 can be behind Stripe, so the plan, the status and the tier are checked on the subscription too.
+      const current = yield* this.#stripeCall(() => dependencies.stripe.getSubscription(request.subscriptionId));
+      const serverItem = subscriptionServerItem(current);
+      const key = serverItem ? planLookupKey(serverItem.price) : null;
+      const currency = current.currency.toLowerCase();
+      if (
+        !key ||
+        !isBillingCurrency(currency) ||
+        current.status !== "active" ||
+        current.cancel_at_period_end ||
+        typeof current.cancel_at === "number" ||
+        subscriptionCustomerId(current) !== customerId ||
+        current.metadata[BILLING_METADATA.serverId] !== owned.server_id ||
+        subscriptionStorageTier(current) >= request.tier
+      ) {
+        return yield* storageUnavailable();
+      }
+      const price = (yield* this.#prices()).get(storageTierLookupKey(key.plan, request.tier, key.interval));
+      if (!price || !priceHasCurrency(price, currency)) return yield* storageUnavailable();
+      const storageItem = subscriptionStorageItem(current);
+      const window = Math.floor(dependencies.now() / STORAGE_PURCHASE_WINDOW_MS);
+      const paymentMethod = subscriptionPaymentMethodId(current) ?? "default";
+      const idempotencyKey = `openbot-storage-${current.id}-${storageItem?.price.id ?? "none"}-${paymentMethod}-${window}`;
+      yield* stripeRequest(() =>
+        dependencies.stripe.setStorageItem(
+          { subscriptionId: current.id, itemId: storageItem?.id ?? null, priceId: price.id },
+          idempotencyKey,
+        ),
+      ).pipe(
+        Effect.catch((error) =>
+          Effect.gen(function* () {
+            // With no answer from Stripe, the change can be applied and paid. Read it again, so that a
+            // paid change is kept.
+            if (!(error instanceof StripeRequestError)) {
+              const after = yield* stripeRequest(() => dependencies.stripe.getSubscription(current.id)).pipe(
+                Effect.mapError(stripeFailure),
+              );
+              if (subscriptionStorageItem(after)?.price.id === price.id) return after;
+            }
+            if (error instanceof StripeRequestError && error.type === "idempotency_error") {
+              return yield* storageUnavailable();
+            }
+            return yield* Effect.fail(
+              error instanceof StripeRequestError && error.status === 402
+                ? new BillingError(402, "storage_payment_failed", sourceText("error.billing.storagePaymentFailed"))
+                : stripeFailure(error),
+            );
+          }),
+        ),
+      );
+      // The same sync as a webhook: it stores the new amount and writes the tier to the hosted server.
+      yield* this.#syncSubscription(current.id);
+      return yield* this.getState(userId);
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
@@ -948,10 +1064,7 @@ export class BillingService {
       const ownerId = yield* this.#subscriptionOwner(subscription, customerId);
       return ownerId ? yield* this.license.sync(subscription, ownerId, readAt) : null;
     }
-    // A changed amount moves the lookup key to a new Price, and current subscriptions keep the old one.
-    const key =
-      parseBillingLookupKey(price?.lookup_key) ??
-      parseBillingLookupKey(`openbot_${price?.metadata.openbot_plan}_${price?.metadata.openbot_interval}`);
+    const key = price ? planLookupKey(price) : null;
     const currency = subscription.currency.toLowerCase();
     if (!key || !isBillingCurrency(currency) || !isOneOf(BILLING_SUBSCRIPTION_STATUSES, subscription.status)) {
       console.warn("billing: subscription is not an OpenBot plan", { subscriptionId });
@@ -1061,6 +1174,7 @@ export class BillingService {
         plan: key.plan,
         interval: key.interval,
         currency,
+        storageTier: subscriptionStorageTier(subscription),
       }).pipe(Effect.mapError((error) => (error instanceof BillingError ? error : new BillingOperationError({}))));
     }
     yield* finish;
@@ -1137,7 +1251,10 @@ export class BillingService {
     const now = dependencies.now();
     if (cached && cached.expiresAt > now) return cached.prices;
     const lookupKeys = BILLING_PLAN_IDS.flatMap((plan) =>
-      BILLING_INTERVALS.map((interval) => billingLookupKey(plan, interval)),
+      BILLING_INTERVALS.flatMap((interval) => [
+        billingLookupKey(plan, interval),
+        ...BILLING_STORAGE_UPGRADE_TIERS.map((tier) => storageTierLookupKey(plan, tier, interval)),
+      ]),
     );
     const list = yield* this.#stripeCall(() => dependencies.stripe.listPricesByLookupKeys(lookupKeys));
     const prices = new Map(list.flatMap((price) => (price.lookup_key ? [[price.lookup_key, price] as const] : [])));
@@ -1267,7 +1384,29 @@ function planEndReason(previous: StoredSubscription | null): PlanEndReason {
   return previous?.status === "past_due" || previous?.status === "unpaid" ? "unpaid" : "canceled";
 }
 
-function serverPlan(row: ServerPlanRow): BillingServerPlan | null {
+/**
+ * The plan and interval of a server plan Price. A changed amount moves the lookup key to a new Price, and
+ * current subscriptions keep the old one, so the metadata names them too.
+ */
+function planLookupKey(price: {
+  lookup_key: string | null;
+  metadata: Readonly<Record<string, string>>;
+}): { plan: BillingPlanId; interval: BillingInterval } | null {
+  return (
+    parseBillingLookupKey(price.lookup_key) ??
+    parseBillingLookupKey(`openbot_${price.metadata.openbot_plan}_${price.metadata.openbot_interval}`)
+  );
+}
+
+/**
+ * A server on a VPS of the operator whose paid plan renews. Only such a server can buy a storage tier: a
+ * trial invoices 0 for the change, so the disk would grow before a payment.
+ */
+function canBuyStorage(row: ServerPlanRow): boolean {
+  return row.on_operator_host === 1 && row.status === "active" && row.cancel_at_period_end !== 1;
+}
+
+function serverPlan(row: ServerPlanRow, prices: ReadonlyMap<string, StripePrice>): BillingServerPlan | null {
   if (
     !isOneOf(BILLING_PLAN_IDS, row.plan) ||
     !isOneOf(BILLING_INTERVALS, row.interval) ||
@@ -1277,6 +1416,7 @@ function serverPlan(row: ServerPlanRow): BillingServerPlan | null {
   ) {
     return null;
   }
+  const storageTier = storageTierOf(row.storage_tier);
   return {
     subscriptionId: row.stripe_subscription_id,
     serverId: row.server_id,
@@ -1288,8 +1428,37 @@ function serverPlan(row: ServerPlanRow): BillingServerPlan | null {
     status: row.status,
     currentPeriodEnd: row.current_period_end,
     cancelAtPeriodEnd: row.cancel_at_period_end === 1,
-    storageGb: hostedServerStorageGb(row.plan, row.on_operator_host === 1, row.server_size),
+    storageGb: hostedServerStorageGb(row.plan, row.on_operator_host === 1, row.server_size, storageTier),
+    ...(canBuyStorage(row)
+      ? { storageUpgrades: storageUpgrades(row.plan, row.interval, row.currency, storageTier, row.amount, prices) }
+      : {}),
   };
+}
+
+/**
+ * The tiers above `tier` that have a Price in `currency`, smallest first. The amount of each is the plan
+ * and the add-on of that tier. `amount` holds the plan and the add-on of `tier`, so the add-on of `tier` is
+ * taken out at its catalog Price: after a change of that Price, the amount can differ from the invoice.
+ */
+function storageUpgrades(
+  plan: BillingPlanId,
+  interval: BillingInterval,
+  currency: BillingCurrency,
+  tier: BillingStorageTier,
+  amount: number | null,
+  prices: ReadonlyMap<string, StripePrice>,
+): BillingStorageUpgrade[] {
+  const addOnAmount = (upgrade: BillingStorageUpgradeTier): number | null =>
+    priceAmount(prices.get(storageTierLookupKey(plan, upgrade, interval)), currency);
+  const currentAddOn = tier === 0 ? 0 : addOnAmount(tier);
+  const planAmount = amount !== null && currentAddOn !== null ? amount - currentAddOn : null;
+  return BILLING_STORAGE_UPGRADE_TIERS.flatMap((upgrade): BillingStorageUpgrade[] => {
+    const price = prices.get(storageTierLookupKey(plan, upgrade, interval));
+    if (upgrade <= tier || !price || !priceHasCurrency(price, currency)) return [];
+    const added = addOnAmount(upgrade);
+    const total = planAmount !== null && added !== null ? planAmount + added : null;
+    return [{ tier: upgrade, storageGb: storageTierGb(plan, upgrade), amount: isBillingAmount(total) ? total : null }];
+  });
 }
 
 /** The amount of one period in `currency`: the base amount, or the amount in `currency_options`. */
@@ -1297,6 +1466,10 @@ function priceAmount(price: StripePrice | undefined, currency: BillingCurrency):
   if (!price) return null;
   const amount = price.currency === currency ? price.unit_amount : price.currency_options?.[currency]?.unit_amount;
   return isBillingAmount(amount) ? amount : null;
+}
+
+function storageUnavailable(): BillingError {
+  return new BillingError(409, "storage_unavailable", sourceText("error.billing.storageUnavailable"));
 }
 
 function plansUnavailable(): BillingError {

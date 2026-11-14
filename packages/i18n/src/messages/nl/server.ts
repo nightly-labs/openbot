@@ -160,9 +160,6 @@ export const messages = {
   "server.upgrade.description":
     "{server} heeft weinig vrije ruimte over. Upgrade zodat je agents zonder onderbreking blijven werken.",
   "server.upgrade.used": "{used} van {total} gebruikt",
-  "server.upgrade.current": "{plan} (nu)",
-  "server.upgrade.price": "Prijs",
-  "server.upgrade.action": "Upgraden naar {plan}",
   "server.hosted.progressTitle": "{name} instellen",
   "server.hosted.paymentTitle": "Rond de betaling af in je browser",
   "server.hosted.paymentDescription": "De installatie begint wanneer Stripe de betaling bevestigt.",
