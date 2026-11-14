@@ -1717,10 +1717,10 @@ export class MessagingService {
     const place = link.isDirect
       ? "direct message"
       : yield* live.adapter.placeName(link.platformChannelId).pipe(toMessagingOperationFailed);
-    const messages = yield* live.adapter
+    const recent = yield* live.adapter
       .recent(link.platformChannelId, scope === "conversation" ? link.threadKey : null, limit)
       .pipe(toMessagingOperationFailed);
-    return { platform: live.record.platform, place, messages };
+    return { platform: live.record.platform, place, ...recent };
   });
 
   /** The places of a connection, for the agent's `messaging_list_places` tool. */
@@ -1757,8 +1757,8 @@ export class MessagingService {
           error:
             "This connection has no place with that id. Call openbot.messaging_list_places with the connection for the ids.",
         };
-      const messages = yield* live.adapter.recent(placeId, null, limit);
-      return { history: { platform, place: place.name, messages } };
+      const recent = yield* live.adapter.recent(placeId, null, limit);
+      return { history: { platform, place: place.name, ...recent } };
     }).pipe(
       Effect.catch((failure) =>
         Effect.succeed({ error: `${refusal(failure)} When the platform limits reads, try again in a minute.` }),

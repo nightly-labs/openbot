@@ -27,6 +27,7 @@ import {
   MessagingConnectionError,
   type MessagingDriver,
   type MessagingPlace,
+  type RecentMessages,
   type StatusReaction,
   WhatsAppAnswerPartlySent,
 } from "../messaging-types";
@@ -301,8 +302,8 @@ class WhatsAppAdapter implements MessagingAdapter {
     platformChannelId: string,
     threadKey: string | null,
     limit: number,
-  ): Effect.Effect<ContextEntry[], MessagingAdapterError> {
-    return Effect.sync(() => this.#handle.chats.recent(platformChannelId, threadKey, limit));
+  ): Effect.Effect<RecentMessages, MessagingAdapterError> {
+    return Effect.sync(() => ({ messages: this.#handle.chats.recent(platformChannelId, threadKey, limit) }));
   }
 
   readonly download = Effect.fnUntraced(function* (

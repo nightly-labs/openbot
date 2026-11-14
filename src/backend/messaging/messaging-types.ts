@@ -124,6 +124,12 @@ export interface ContextEntry {
   files?: InboundFile[];
 }
 
+/** What the history tool reads of a place. `note` says why the platform gave fewer messages, when it knows. */
+export interface RecentMessages {
+  messages: ContextEntry[];
+  note?: string;
+}
+
 /** A failure the connection cannot recover from alone. The user must act. */
 export class MessagingConnectionError extends Error {
   constructor(readonly state: Extract<MessagingConnectionState, "invalid_token">) {
@@ -201,7 +207,7 @@ export interface MessagingAdapter {
     platformChannelId: string,
     threadKey: string | null,
     limit: number,
-  ): Effect.Effect<ContextEntry[], MessagingAdapterError>;
+  ): Effect.Effect<RecentMessages, MessagingAdapterError>;
   /** Downloads one file to `destination`. Refuses a file larger than `maxBytes`. */
   download(file: InboundFile, destination: string, maxBytes: number): Effect.Effect<void, MessagingAdapterError>;
   authorName(userId: string): Effect.Effect<string, MessagingAdapterError>;
