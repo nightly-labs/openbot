@@ -3117,7 +3117,6 @@ export class OpenBotToolRouter {
         mailboxSync: this.#mailboxSync,
         conversation: this.#conversation,
         drain: this.#drain,
-        redact: (text) => this.#hooks.redactMcp(text),
       },
       { threadId: params.threadId, turnId: params.turnId, callId: params.callId },
       senderAgentId,

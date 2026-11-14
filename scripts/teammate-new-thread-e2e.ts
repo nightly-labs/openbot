@@ -39,6 +39,7 @@ import type { OpenBotToolResponse } from "../src/backend/agent/routine-tools";
 import { sendMessageToNewThreads, type TeammateThreadSendDeps } from "../src/backend/agent/teammate-thread-send";
 import { AgentStore } from "../src/backend/agent-store";
 import { AgentTasks } from "../src/backend/agent-tasks/agent-tasks";
+import type { AgentThreadRecord } from "../src/backend/agent-threads/agent-thread-store";
 import { AgentThreadStore } from "../src/backend/agent-threads/agent-thread-store";
 import { AgentWaitStore } from "../src/backend/agent-waits/agent-wait-store";
 import { AgentWaits } from "../src/backend/agent-waits/agent-waits";
@@ -53,6 +54,7 @@ interface ThreadRow {
   recipientAgentId: string;
   taskId: string;
   messageId: string;
+  deliveryId: string;
 }
 
 interface RefusalRow {
@@ -188,9 +190,20 @@ try {
     if (!isDynamicRecord(parsed) || !Array.isArray(parsed.threads))
       throw new Error("The route result names no threads.");
     const threads = parsed.threads.map((row): ThreadRow => {
-      if (!isDynamicRecord(row) || !isString(row.recipientAgentId) || !isString(row.taskId) || !isString(row.messageId))
+      if (
+        !isDynamicRecord(row) ||
+        !isString(row.recipientAgentId) ||
+        !isString(row.taskId) ||
+        !isString(row.messageId) ||
+        !isString(row.deliveryId)
+      )
         throw new Error("The route result names no thread identity.");
-      return { recipientAgentId: row.recipientAgentId, taskId: row.taskId, messageId: row.messageId };
+      return {
+        recipientAgentId: row.recipientAgentId,
+        taskId: row.taskId,
+        messageId: row.messageId,
+        deliveryId: row.deliveryId,
+      };
     });
     const refused = Array.isArray(parsed.refused)
       ? parsed.refused.map((row): RefusalRow => {
@@ -244,7 +257,7 @@ try {
   let taskId = "";
   let requestId = "";
   {
-    const task = await runCauseEffect(tasks.teammateThread(beta.id, requestText));
+    const task = await runCauseEffect(tasks.preparedTeammateThread(beta.id, requestText));
     taskId = task.taskId;
     assert.equal(task.agentId, beta.id, "the task belongs to the recipient");
     assert.equal(task.origin, "agent", "an agent started the task");
@@ -284,7 +297,7 @@ try {
       "no turn runs in the lane before the drain starts one",
     );
     // A `start_task` brief takes the same lane reads.
-    const ownTask = await runCauseEffect(tasks.teammateThread(alpha.id, `Own brief ${run}`));
+    const ownTask: AgentThreadRecord = await runCauseEffect(tasks.preparedTeammateThread(alpha.id, `Own brief ${run}`));
     await runCauseEffect(
       mailbox.enqueue({
         sender: { kind: "agent", agentId: alpha.id },
@@ -396,7 +409,7 @@ try {
       authorName: "Slack user",
       platformMessageId: "slack-msg-1",
     };
-    const thread = await runCauseEffect(tasks.teammateThread(beta.id, `External ask ${run}`));
+    const thread = await runCauseEffect(tasks.preparedTeammateThread(beta.id, `External ask ${run}`));
     const receipt = await runCauseEffect(
       mailbox.enqueue({
         sender: { kind: "agent", agentId: alpha.id },
@@ -427,7 +440,7 @@ try {
   {
     const sideTask = tasks.create(alpha.id, `Alpha side thread ${run}`, "user");
     const sideRequestText = `Check the logs ${run}`;
-    const betaThread = await runCauseEffect(tasks.teammateThread(beta.id, sideRequestText));
+    const betaThread = await runCauseEffect(tasks.preparedTeammateThread(beta.id, sideRequestText));
     const sideRequest = await runCauseEffect(
       mailbox.enqueue({
         sender: { kind: "agent", agentId: alpha.id },
@@ -480,7 +493,7 @@ try {
     // Eight tasks with queued work are eight unfinished tasks; the earlier steps left some.
     for (let index = 0; tasks.openTaskIds(beta.id).length < 8; index += 1) {
       const text = `Parallel thread ${run} ${index}`;
-      const thread = await runCauseEffect(tasks.teammateThread(beta.id, text));
+      const thread = await runCauseEffect(tasks.preparedTeammateThread(beta.id, text));
       await runCauseEffect(
         mailbox.enqueue({
           sender: { kind: "agent", agentId: alpha.id },
@@ -492,7 +505,9 @@ try {
         }),
       );
     }
-    const unfinished = await refusedMessage(() => runCauseEffect(tasks.teammateThread(beta.id, `One too many ${run}`)));
+    const unfinished = await refusedMessage(() =>
+      runCauseEffect(tasks.preparedTeammateThread(beta.id, `One too many ${run}`)),
+    );
     assert.match(unfinished, /8 unfinished tasks/, "the unfinished limit names its count");
     step("11a-unfinished-limit", { openTasks: tasks.openTaskIds(beta.id).length, refused: unfinished });
 
@@ -500,10 +515,12 @@ try {
     const person = agent("agent-room", "Roomy", "openbot-thread-room");
     database.replaceAgents("teammate-new-thread-e2e-room", [alpha, beta, person], "agents.updated");
     for (let index = 0; index < 50; index += 1) tasks.create(person.id, `Person task ${index}`, "user");
-    const room = await refusedMessage(() => runCauseEffect(tasks.teammateThread(person.id, `One too many ${run}`)));
+    const room = await refusedMessage(() =>
+      runCauseEffect(tasks.preparedTeammateThread(person.id, `One too many ${run}`)),
+    );
     assert.match(room, /50 open threads/, "a full task list refuses a teammate's thread");
     tasks.close(tasks.require(person.id, tasks.openTaskIds(person.id)[0] ?? ""));
-    const fits = await runCauseEffect(tasks.teammateThread(person.id, `Fits now ${run}`));
+    const fits = await runCauseEffect(tasks.preparedTeammateThread(person.id, `Fits now ${run}`));
     assert.equal(fits.agentId, person.id, "room for one more task takes a teammate's thread");
     step("11b-task-list-room", { refused: room, openAfterClose: tasks.openTaskIds(person.id).length });
 
@@ -511,7 +528,7 @@ try {
     const closer = agent("agent-arch", "Closer", "openbot-thread-arch");
     database.replaceAgents("teammate-new-thread-e2e-arch", [alpha, beta, person, closer], "agents.updated");
     for (let index = 0; index < 11; index += 1)
-      await runCauseEffect(tasks.teammateThread(closer.id, `Finished ${run} ${index}`));
+      await runCauseEffect(tasks.preparedTeammateThread(closer.id, `Finished ${run} ${index}`));
     assert.equal(tasks.openTaskIds(closer.id).length, 9, "the list keeps the newest finished tasks and the new one");
     assert.equal(archivedTasks.length, 2, "the two oldest finished tasks were archived");
     step("11c-archival", { openTasks: tasks.openTaskIds(closer.id).length, archived: archivedTasks.length });
@@ -534,7 +551,6 @@ try {
       mailboxSync,
       conversation: runtime,
       drain: { scheduleDrain: () => {} },
-      redact: (text) => text,
     };
     const routeText = `Route the report ${run}`;
     const call = {
@@ -549,7 +565,6 @@ try {
     );
     const firstResult = routeResult(first);
     assert.equal(firstResult.threads.length, 1, "the route send names one thread");
-    assert.equal(firstResult.refused, undefined, "a full send reports no refusal");
     assert.equal(firstResult.threads[0]?.recipientAgentId, worker.id, "the thread belongs to the recipient");
     assert.equal(tasks.threadId(firstResult.threads[0]?.taskId ?? "") !== null, true, "the named task is open");
     assert.equal(
@@ -569,42 +584,46 @@ try {
       messageId: firstResult.threads[0]?.messageId ?? "",
     });
 
-    // A limit refusal for one recipient names it, and the other recipient's work goes out.
+    // A limit refusal for one recipient refuses the whole send: no thread stays, nothing is sent.
     for (let index = 0; index < 50; index += 1) tasks.create(full.id, `Full list task ${index}`, "user");
-    const partial = await runCauseEffect(
-      sendMessageToNewThreads(deps, call, alpha.id, [worker.id, full.id], [], `Second route ${run}`, undefined),
+    const workerBefore = tasks.openTaskIds(worker.id).length;
+    const refusedSend = await refusedMessage(() =>
+      runCauseEffect(
+        sendMessageToNewThreads(deps, call, alpha.id, [worker.id, full.id], [], `Second route ${run}`, undefined),
+      ),
     );
-    const partialResult = routeResult(partial);
-    assert.equal(partialResult.threads.length, 1, "the other recipient's thread started");
-    assert.equal(partialResult.refused?.length, 1, "the refusal names one recipient");
-    assert.equal(partialResult.refused?.[0]?.recipientAgentId, full.id, "the refusal names the refused recipient");
-    assert.match(partialResult.refused[0]?.error ?? "", /50 open threads/, "the refusal carries the localized limit");
+    assert.match(refusedSend, /50 open threads/, "the refusal carries the localized limit");
+    assert.equal(tasks.openTaskIds(worker.id).length, workerBefore, "the other recipient keeps no empty thread");
     assert.equal(tasks.openTaskIds(full.id).length, 50, "a refused recipient keeps no thread");
-    step("12b-create-refusal-continues", {
-      refused: partialResult.refused.length,
-      threads: partialResult.threads.length,
-    });
+    assert.equal(
+      mailbox
+        .listQueue(worker.id)
+        .deliveries.some((delivery) => delivery.messageId !== undefined && delivery.status === "queued"),
+      false,
+      "no message went out for the refused send",
+    );
+    step("12b-create-refusal-sends-nothing", { refused: refusedSend.slice(0, 40) });
 
-    // A mailbox refusal for one recipient discards its thread, and the other recipient keeps its work.
+    // A mailbox refusal keeps the thread whose message the mailbox took, and removes the rest.
     const unblockBlocked = mailbox.blockAgentDeliveries(blocked.id);
-    const racing = await runCauseEffect(
-      sendMessageToNewThreads(deps, call, alpha.id, [second.id, blocked.id], [], `Racing delete ${run}`, undefined),
+    const racingError = await refusedMessage(() =>
+      runCauseEffect(
+        sendMessageToNewThreads(deps, call, alpha.id, [second.id, blocked.id], [], `Racing delete ${run}`, undefined),
+      ),
     );
     unblockBlocked();
-    const racingResult = routeResult(racing);
-    assert.equal(racingResult.threads.length, 1, "the recipient that the mailbox took keeps its thread");
-    assert.equal(racingResult.refused?.length, 1, "the deleting recipient is refused");
-    assert.equal(racingResult.refused?.[0]?.recipientAgentId, blocked.id, "the refusal names the blocked recipient");
+    assert.match(racingError, /being deleted/, "the refusal names the deleting recipient");
     assert.equal(tasks.openTaskIds(blocked.id).length, 0, "a thread that no message took is gone");
+    const secondTaskId = tasks.openTaskIds(second.id)[0] ?? "";
+    assert.equal(tasks.openTaskIds(second.id).length, 1, "the delivered thread stays");
     assert.equal(
-      tasks.openTaskIds(second.id).length === 1 &&
-        mailbox
-          .queuedTaskMessages(second.id, tasks.openTaskIds(second.id)[0] ?? "")
-          .some((message) => message.text.includes(`Racing delete ${run}`)),
+      mailbox
+        .queuedTaskMessages(second.id, secondTaskId)
+        .some((message) => message.text.includes(`Racing delete ${run}`)),
       true,
-      "the other recipient's message runs in its lane",
+      "the delivered thread keeps its message",
     );
-    step("12c-enqueue-refusal-discards", { refused: racingResult.refused[0]?.error ?? "" });
+    step("12c-enqueue-refusal-keeps-delivered", { error: racingError.slice(0, 40) });
 
     // A retried call with the same call id reuses the sent thread and message, and takes the refused one.
     const retryCall = {
@@ -613,25 +632,46 @@ try {
       callId: `call-retry-${run}`,
     };
     const unblockRetry = mailbox.blockAgentDeliveries(blocked.id);
-    const attempt = await runCauseEffect(
-      sendMessageToNewThreads(deps, retryCall, alpha.id, [worker.id, blocked.id], [], `Retry route ${run}`, undefined),
+    const attemptError = await refusedMessage(() =>
+      runCauseEffect(
+        sendMessageToNewThreads(
+          deps,
+          retryCall,
+          alpha.id,
+          [worker.id, blocked.id],
+          [],
+          `Retry route ${run}`,
+          undefined,
+        ),
+      ),
     );
     unblockRetry();
-    const attemptResult = routeResult(attempt);
-    assert.equal(attemptResult.threads.length, 1, "the retry attempt names the sent thread");
+    assert.match(attemptError, /being deleted/, "the first attempt fails on the gated recipient");
+    assert.equal(tasks.openTaskIds(blocked.id).length, 0, "the gated attempt leaves no thread");
+    const deliveredTaskId =
+      tasks
+        .openTaskIds(worker.id)
+        .find((id) =>
+          mailbox.queuedTaskMessages(worker.id, id).some((message) => message.text.includes(`Retry route ${run}`)),
+        ) ?? "";
+    const deliveredDeliveryId =
+      mailbox
+        .queuedTaskMessages(worker.id, deliveredTaskId)
+        .find((message) => message.text.includes(`Retry route ${run}`))?.deliveryId ?? "";
+    assert.ok(deliveredTaskId && deliveredDeliveryId, "the delivered thread kept its message for the retry");
     const retried = await runCauseEffect(
       sendMessageToNewThreads(deps, retryCall, alpha.id, [worker.id, blocked.id], [], `Retry route ${run}`, undefined),
     );
     const retryResult = routeResult(retried);
     assert.equal(retryResult.threads.length, 2, "the retry takes both threads");
-    assert.equal(retryResult.refused, undefined, "the unblocked recipient now starts");
-    assert.equal(retryResult.threads[0]?.taskId, attemptResult.threads[0]?.taskId, "the retry reuses the sent thread");
-    assert.equal(
-      retryResult.threads[0]?.messageId,
-      attemptResult.threads[0]?.messageId,
-      "the retry reuses the sent message",
-    );
-    assert.equal(tasks.openTaskIds(worker.id).length, 2, "the retry starts no second thread for the sent recipient");
+    assert.equal(retryResult.threads[0]?.taskId, deliveredTaskId, "the retry reuses the delivered thread");
+    assert.equal(retryResult.threads[0]?.deliveryId, deliveredDeliveryId, "the retry reuses the delivered message");
+    const workerRetryThreads = tasks
+      .openTaskIds(worker.id)
+      .filter((id) =>
+        mailbox.queuedTaskMessages(worker.id, id).some((message) => message.text.includes(`Retry route ${run}`)),
+      ).length;
+    assert.equal(workerRetryThreads, 1, "the retry starts no second thread for the sent recipient");
     assert.equal(tasks.openTaskIds(blocked.id).length, 1, "the retry takes the refused recipient's thread");
     step("12d-retry-reuses", { threads: retryResult.threads.length });
   }

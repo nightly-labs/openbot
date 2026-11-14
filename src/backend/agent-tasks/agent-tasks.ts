@@ -621,7 +621,21 @@ export class AgentTasks implements TaskLanes {
    * so a thread that another agent starts cannot fill the task list past it (#8134). A refusal or an
    * empty title fails, because the caller is a tool path that reports the failure's message.
    */
-  readonly teammateThread = Effect.fn("AgentTasks.teammateThread")(function* (
+  /**
+   * Runs one new-thread teammate send in the `start_task` permit, so its check, create and deliver
+   * of every recipient stays serialized against the other starts (#8134). A retried or concurrent
+   * call of the same tool call therefore reads the message that the first one delivered.
+   */
+  readonly withTeammatePermit = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+    this.#starts.withPermit(effect);
+
+  /**
+   * The side thread that one recipient's independent teammate message runs in: the recipient owns it,
+   * and the title is the message's first line. It takes the same limits and archival as `start_task`,
+   * so a thread that another agent starts cannot fill the task list past it (#8134). The caller holds
+   * the `withTeammatePermit` permit, so a refusal fails instead of taking the permit itself.
+   */
+  readonly preparedTeammateThread = Effect.fn("AgentTasks.preparedTeammateThread")(function* (
     this: AgentTasks,
     agentId: string,
     text: string,
@@ -631,14 +645,10 @@ export class AgentTasks implements TaskLanes {
       return yield* Effect.fail(
         new ToolOperationFailed({ cause: new Error(sourceText("error.backend.threadTitleRequired")) }),
       );
-    return yield* this.#starts.withPermit(
-      Effect.gen({ self: this }, function* () {
-        const prepared = yield* this.#preparedAgentTask(agentId, title);
-        if ("refusal" in prepared)
-          return yield* Effect.fail(new ToolOperationFailed({ cause: new Error(prepared.refusal) }));
-        return prepared.task;
-      }),
-    );
+    const prepared = yield* this.#preparedAgentTask(agentId, title);
+    if ("refusal" in prepared)
+      return yield* Effect.fail(new ToolOperationFailed({ cause: new Error(prepared.refusal) }));
+    return prepared.task;
   });
 
   changed(agentId: string): void {

@@ -3,7 +3,7 @@ import type { QueuedMessageReceipt } from "@openbot/contracts/ipc";
 import { Effect, Result } from "effect";
 import type { AgentTasks } from "../agent-tasks/agent-tasks";
 import type { AgentThreadRecord } from "../agent-threads/agent-thread-store";
-import type { MailboxStore, MessagingOrigin } from "../mailbox-store";
+import type { MailboxStore } from "../mailbox-store";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { MailboxSync } from "./mailbox-sync";
 import type { OpenBotToolResponse } from "./routine-tools";
@@ -16,8 +16,6 @@ export interface TeammateThreadSendDeps {
   mailboxSync: MailboxSync;
   conversation: ConversationRuntime;
   drain: { scheduleDrain(agentId: string): void };
-  /** Takes MCP credentials out of a refusal before the agent reads it. */
-  redact(text: string): string;
 }
 
 /** One recipient's thread that the message starts and runs in, as the tool result names it. */
@@ -34,12 +32,6 @@ export interface SentThread {
   position: QueuedMessageReceipt["deliveries"][number]["position"];
 }
 
-/** One recipient whose thread did not start, with the localized reason that the agent can act on. */
-export interface SentThreadRefusal {
-  recipientAgentId: string;
-  error: string;
-}
-
 /** The identity of one tool call, as the mailbox keys its idempotent writes. */
 export interface ToolCallRef {
   threadId: string;
@@ -47,13 +39,27 @@ export interface ToolCallRef {
   callId: string;
 }
 
+interface RecipientWork {
+  recipient: string;
+  task: AgentThreadRecord;
+  /** True when an earlier attempt of this tool call already delivered the message. */
+  reused: boolean;
+  /** True from the moment the mailbox took this recipient's message. */
+  delivered: boolean;
+  /** True once this thread was removed, so one rollback never removes it twice. */
+  removed: boolean;
+}
+
 /**
  * Sends one independent teammate message per recipient (#8134): each message starts a new side
  * thread of its recipient and runs there as its first work, so it does not wait in the recipient's
- * chat. The result still comes back to the sender. The recipients are independent: each one's
- * thread starts and takes its message on its own, so a refusal for one recipient leaves the
- * others' work out, and the result names every refusal. A retried call reuses the thread and the
- * message that the first call made.
+ * chat. The result still comes back to the sender. The whole send runs in the `start_task` permit,
+ * so its check, create and deliver of every recipient stays serialized: a retried or concurrent
+ * call of the same tool call reads the threads and messages that the first attempt made, and starts
+ * no second ones. A limit refusal for one recipient refuses the whole send and leaves no thread
+ * behind and sends nothing; a mailbox refusal keeps the threads whose messages the mailbox took and
+ * removes the ones that took none, so a retry reuses the delivered work and starts clean for the
+ * rest.
  */
 export const sendMessageToNewThreads = Effect.fn("sendMessageToNewThreads")(function* (
   deps: TeammateThreadSendDeps,
@@ -73,115 +79,111 @@ export const sendMessageToNewThreads = Effect.fn("sendMessageToNewThreads")(func
   const senderTaskId = turnDeliveries
     .map(({ delivery }) => deps.mailbox.taskIdForDelivery(delivery.id))
     .find((taskId) => taskId !== null);
+  const idempotencyKeyOf = (recipient: string) =>
+    `teammate-thread:${createHash("sha256")
+      .update(JSON.stringify([senderAgentId, params.threadId, params.turnId, params.callId, recipient]))
+      .digest("hex")}`;
+  const opened: RecipientWork[] = [];
   const threads: SentThread[] = [];
-  const refused: SentThreadRefusal[] = [];
-  for (const recipient of recipientValues) {
-    const outcome = yield* sendToNewThread(deps, {
-      params,
-      senderAgentId,
-      recipient,
-      paths,
-      text,
-      expectsReply,
-      messagingReturn: messagingReturn ?? undefined,
-      senderTaskId: senderTaskId ?? undefined,
-    }).pipe(Effect.result);
-    if (Result.isFailure(outcome)) {
-      refused.push({
-        recipientAgentId: recipient,
-        error: failureMessage(outcome.failure, deps.redact),
-      });
-    } else {
-      threads.push(outcome.success);
+
+  /** Removes the threads of this call from `from` on that took no message. A reused or delivered one stays. */
+  const discardUndelivered = (from: number): void => {
+    for (const entry of opened.slice(from)) {
+      if (entry.reused || entry.delivered || entry.removed) continue;
+      entry.removed = true;
+      deps.tasks.discard(entry.task);
+      deps.tasks.changed(entry.task.agentId);
     }
-  }
+  };
+
+  yield* deps.tasks
+    .withTeammatePermit(
+      Effect.gen(function* () {
+        // One thread exists for each recipient before any message is sent: a limit refusal for one
+        // recipient removes the threads of this call that took no message, so nothing is sent and no
+        // empty thread stays. A thread that an earlier attempt of this tool call delivered is reused
+        // and never removed. The idempotency check reads the mailbox inside the permit, so a
+        // concurrent call of the same tool call finds the message that the first one delivered.
+        for (const recipient of recipientValues) {
+          const key = idempotencyKeyOf(recipient);
+          const receipt = deps.mailbox.receiptForKey(key);
+          if (receipt) {
+            const deliveryId = receipt.deliveries[0]?.id ?? "";
+            const task = yield* toolStep(() =>
+              deps.tasks.require(recipient, deps.mailbox.taskIdForDelivery(deliveryId) ?? ""),
+            );
+            opened.push({ recipient, task, reused: true, delivered: true, removed: false });
+            continue;
+          }
+          const prepared = yield* deps.tasks.preparedTeammateThread(recipient, text).pipe(Effect.result);
+          if (Result.isFailure(prepared)) return yield* Effect.fail(prepared.failure);
+          opened.push({ recipient, task: prepared.success, reused: false, delivered: false, removed: false });
+        }
+        // The mailbox takes one message per thread, in the recipients' order. A thread that an
+        // earlier attempt delivered reads its receipt again; a new one enqueues its message.
+        for (const [index, entry] of opened.entries()) {
+          const key = idempotencyKeyOf(entry.recipient);
+          const known = deps.mailbox.receiptForKey(key);
+          const queued = yield* (
+            known
+              ? Effect.succeed(known)
+              : deps.mailbox
+                  .enqueue({
+                    sender: { kind: "agent", agentId: senderAgentId },
+                    recipientAgentIds: [entry.task.agentId],
+                    taskId: entry.task.taskId,
+                    text,
+                    sourcePaths: [...paths],
+                    replyToMessageId: null,
+                    ...(expectsReply === undefined ? {} : { expectsReply }),
+                    ...(messagingReturn ? { messagingReturn } : {}),
+                    ...(senderTaskId ? { senderTaskId } : {}),
+                    idempotencyKey: key,
+                  })
+                  .pipe(toToolOperationFailed)
+          ).pipe(Effect.result);
+          if (Result.isFailure(queued)) {
+            discardUndelivered(index);
+            return yield* Effect.fail(queued.failure);
+          }
+          const delivery = queued.success.deliveries[0];
+          if (!delivery) {
+            discardUndelivered(index);
+            return yield* Effect.fail(
+              new ToolOperationFailed({ cause: new Error(`The message for ${entry.task.agentId} has no delivery.`) }),
+            );
+          }
+          entry.delivered = true;
+          // A task message does not steer the recipient's chat turn. The drain takes it in the
+          // task's lane.
+          deps.tasks.changed(entry.task.agentId);
+          deps.mailboxSync.emitQueue(entry.task.agentId);
+          deps.drain.scheduleDrain(entry.task.agentId);
+          threads.push({
+            recipientAgentId: entry.task.agentId,
+            taskId: entry.task.taskId,
+            threadId: entry.task.threadId,
+            title: entry.task.title,
+            messageId: queued.success.messageId,
+            deliveryId: delivery.id,
+            status: delivery.status,
+            position: delivery.position,
+          });
+        }
+      }),
+    )
+    .pipe(
+      // A refusal or a mailbox error removes the threads of this call that took no message; a
+      // thread that an earlier attempt delivered stays for the retry to reuse.
+      Effect.catch((failure) =>
+        Effect.sync(() => discardUndelivered(0)).pipe(Effect.asVoid, Effect.andThen(Effect.fail(failure))),
+      ),
+    );
   const snapshot = deps.conversation.ensureSnapshot(senderAgentId, params.threadId);
   deps.mailboxSync.syncMailboxMessages(snapshot);
   deps.conversation.emitConversation(snapshot);
   return {
     success: true,
-    contentItems: [
-      { type: "inputText", text: JSON.stringify({ threads, ...(refused.length > 0 ? { refused } : {}) }) },
-    ],
+    contentItems: [{ type: "inputText", text: JSON.stringify({ threads }) }],
   };
 });
-
-/** Starts one recipient's thread and takes the message into it, or fails with that recipient's reason. */
-const sendToNewThread = Effect.fn("sendToNewThread")(function* (
-  deps: TeammateThreadSendDeps,
-  input: {
-    params: ToolCallRef;
-    senderAgentId: string;
-    recipient: string;
-    paths: readonly string[];
-    text: string;
-    expectsReply: boolean | undefined;
-    messagingReturn: MessagingOrigin | undefined;
-    senderTaskId: string | undefined;
-  },
-): Effect.fn.Return<SentThread, ToolOperationFailed> {
-  const idempotencyKey = `teammate-thread:${createHash("sha256")
-    .update(
-      JSON.stringify([
-        input.senderAgentId,
-        input.params.threadId,
-        input.params.turnId,
-        input.params.callId,
-        input.recipient,
-      ]),
-    )
-    .digest("hex")}`;
-  const earlier = deps.mailbox.deliveryForKey(idempotencyKey);
-  // The first call of this tool call made the thread; a retried call reuses it.
-  const task: AgentThreadRecord = earlier
-    ? yield* toolStep(() =>
-        deps.tasks.require(input.recipient, deps.mailbox.taskIdForDelivery(earlier.delivery.id) ?? ""),
-      )
-    : yield* deps.tasks.teammateThread(input.recipient, input.text).pipe(toToolOperationFailed);
-  const receipt = yield* deps.mailbox
-    .enqueue({
-      sender: { kind: "agent", agentId: input.senderAgentId },
-      recipientAgentIds: [task.agentId],
-      taskId: task.taskId,
-      text: input.text,
-      sourcePaths: [...input.paths],
-      replyToMessageId: null,
-      ...(input.expectsReply === undefined ? {} : { expectsReply: input.expectsReply }),
-      ...(input.messagingReturn ? { messagingReturn: input.messagingReturn } : {}),
-      ...(input.senderTaskId ? { senderTaskId: input.senderTaskId } : {}),
-      idempotencyKey,
-    })
-    .pipe(toToolOperationFailed, Effect.result);
-  if (Result.isFailure(receipt)) {
-    // A thread whose message the mailbox could not take is removed, so a retry starts clean.
-    deps.tasks.discard(task);
-    deps.tasks.changed(task.agentId);
-    return yield* Effect.fail(receipt.failure);
-  }
-  const delivery = receipt.success.deliveries[0];
-  if (!delivery) {
-    deps.tasks.discard(task);
-    deps.tasks.changed(task.agentId);
-    return yield* Effect.fail(
-      new ToolOperationFailed({ cause: new Error(`The message for ${task.agentId} has no delivery.`) }),
-    );
-  }
-  // A task message does not steer the recipient's chat turn. The drain takes it in the task's lane.
-  deps.tasks.changed(task.agentId);
-  deps.mailboxSync.emitQueue(task.agentId);
-  deps.drain.scheduleDrain(task.agentId);
-  return {
-    recipientAgentId: task.agentId,
-    taskId: task.taskId,
-    threadId: task.threadId,
-    title: task.title,
-    messageId: receipt.success.messageId,
-    deliveryId: delivery.id,
-    status: delivery.status,
-    position: delivery.position,
-  };
-});
-
-function failureMessage(failure: ToolOperationFailed, redact: (text: string) => string): string {
-  return failure.cause instanceof Error ? redact(failure.cause.message) : redact(String(failure.cause));
-}
