@@ -516,7 +516,10 @@ export function createRendererForwarders({
     }
   }
 
-  /** A workflow step that waits for the user, or a workflow output. A click shows the main window. */
+  /**
+   * A workflow step that waits for the user, or a workflow output. A click shows the main window with
+   * the workflow, where the user approves the step or reads the output.
+   */
   function forwardWorkflowNotice(notice: WorkflowNotice): void {
     if (!desktopNotificationsEnabled()) return;
     const translate = getTranslate();
@@ -532,7 +535,13 @@ export function createRendererForwarders({
     const notification = new Notification({ title: notice.workflowTitle, body });
     notification.on("click", () => {
       const current = getMainWindow();
-      if (current && !current.isDestroyed()) showMainWindow(current);
+      if (!current || current.isDestroyed()) return;
+      showMainWindow(current);
+      // Workflows run on the host of this computer.
+      sendToRenderer(current, IPC_ENDPOINTS.notifications.workflowOpened, {
+        serverId: LOCAL_SERVER_ID,
+        workflowId: notice.workflowId,
+      });
     });
     showRetainedNotification(notification);
   }

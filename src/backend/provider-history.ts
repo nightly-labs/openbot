@@ -23,6 +23,12 @@ export interface ProviderHistoryRequest {
   items: "none" | "full";
   /** Import recovery from the provider; do not satisfy this read from the durable staging seam. */
   providerOnly?: boolean;
+  /**
+   * Given only when the caller committed every complete turn of its earlier reads. A reader that
+   * keeps a scan cursor can then send only the turns that changed after its last full read with this
+   * key. A reader that keeps no cursor ignores it and sends all turns.
+   */
+  resumeKey?: string;
 }
 
 /** Return false to stop the scan after this fragment. Cursors stay inside the adapter. */

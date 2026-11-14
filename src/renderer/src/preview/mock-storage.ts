@@ -17,8 +17,11 @@ import {
 const GB = 1024 ** 3;
 const FREE_BYTES = 182 * GB;
 
-/** The Files fixtures as one server's storage, so a delete or clear in the preview shows at once. */
-export function createMockStorage(): StorageDesktopApi {
+/**
+ * The Files fixtures as one server's storage, so a delete or clear in the preview shows at once.
+ * `onFoldersChanged` sends `library-folders-changed`, as a host does after each folder change.
+ */
+export function createMockStorage(onFoldersChanged: () => void = () => undefined): StorageDesktopApi {
   let files = structuredClone(FILES_ROWS);
   let breakdown = structuredClone(FILES_BREAKDOWN);
   let removableRuntimes = structuredClone(FILES_REMOVABLE_RUNTIMES);
@@ -79,6 +82,7 @@ export function createMockStorage(): StorageDesktopApi {
         agentIds: { has: () => true },
         fileAgent: (fileId) => files.find((file) => file.id === fileId)?.agentId,
       });
+      onFoldersChanged();
       return structuredClone(libraryFolders);
     },
     getRemovableRuntimes: async () => structuredClone(removableRuntimes),

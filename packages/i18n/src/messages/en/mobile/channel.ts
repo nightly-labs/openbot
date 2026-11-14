@@ -39,6 +39,8 @@ export const messages = defineMessages("mobile.channel", {
   "mobile.channel.deleted.restoreFailedBody": "Could not restore this channel. Try again.",
   "mobile.channel.chat.fallbackName": "Channel",
   "mobile.channel.chat.deletedNotice": "Deleted channel. Preview only.",
+  "mobile.channel.chat.waitBusy": "Waiting - {name} is working in {channel}",
+  "mobile.channel.chat.waitFull": "Waiting - {name} starts when a running task ends",
   "mobile.channel.records.connect": "Connect to the server to edit this channel.",
   "mobile.channel.records.loadFailed": "Could not load channel settings.",
   "mobile.channel.records.gone": "This item is no longer available.",

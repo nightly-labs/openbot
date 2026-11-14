@@ -55,6 +55,8 @@ export const messages = {
   "error.skill.localRevisionNotFound":
     "Deze lokale vaardigheid heeft geen revisie {revision}. De nieuwste revisie is {latest}.",
   "error.skill.localNameTaken": "Er bestaat al een lokale vaardigheid met deze naam. Herzie die in plaats daarvan.",
+  "error.skill.localNameClash":
+    "Deze naam en de lokale vaardigheid “{name}” worden allebei “{slug}”. Herzie die vaardigheid om haar te wijzigen. Wijzig de Latijnse letters of cijfers in deze naam om een nieuwe vaardigheid toe te voegen.",
   "error.skill.localKeepName": "Wijzig de naam van de vaardigheid niet als je haar herziet.",
   "error.skill.localRelativeFolder": "Gebruik een relatieve vaardigheidsmap in de huidige werkruimte van de agent.",
   "error.skill.localSourceOutside": "De bron van de vaardigheid moet in de werkruimte van de agent staan.",
@@ -62,4 +64,14 @@ export const messages = {
   "error.skill.localMissingSkillFile": "De vaardigheidsmap heeft SKILL.md in de hoofdmap nodig.",
   "error.skill.pathSymlink": "Paden van vaardigheden kunnen geen symbolische links bevatten.",
   "error.skill.folderNotRead": "{provider} leest {folder} niet. Kopieer deze map naar {target}.",
+  "error.skill.githubLinkInvalid": "Plak een link naar een GitHub-repository of -map.",
+  "error.skill.githubNotFound": "OpenBot kan {repository} niet openen. De repository is privé of bestaat niet.",
+  "error.skill.githubNoSkills": "Er staat geen SKILL.md in {folder}.",
+  "error.skill.githubUnavailable": "OpenBot kan GitHub nu niet lezen. Probeer het later opnieuw.",
+  "error.skill.githubRateLimited":
+    "GitHub beperkt hoe vaak OpenBot het zonder account kan lezen. Probeer het over een uur opnieuw.",
+  "error.skill.githubTooLarge": "OpenBot kan niet alle bestanden van {repository} lezen. De repository is te groot.",
+  "error.skill.githubHostTooOld": "Werk deze server bij om vaardigheden van GitHub toe te voegen.",
+  "error.skill.publishGithub":
+    "{name} komt van GitHub. Je kunt alleen vaardigheden publiceren die je zelf hebt gemaakt.",
 } as const satisfies PartialTranslation<typeof source>;

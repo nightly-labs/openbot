@@ -849,7 +849,19 @@ try {
         const ids = messaging.whatsappOverview().accounts[0]?.allowedSenders.map((sender) => sender.id) ?? [];
         assert.ok(ids.includes(BRAZIL_ACCOUNT), "The contact was not saved in the form that WhatsApp has.");
         assert.ok(!ids.includes(BRAZIL_TYPED), "The contact was saved as typed.");
-        return { saved: BRAZIL_ACCOUNT };
+        // An agent writes the number as the person typed it: the post goes to the form that WhatsApp has.
+        const posted = await runCauseEffect(
+          agents.messaging.outboundTool(
+            "agent-whatsapp-e2e",
+            { threadId: "thread-whatsapp-e2e", turnId: "turn-whatsapp-e2e" },
+            "messaging_post",
+            { connection: connectionId(agents), place: "+55 31 9 8888-7777", text: "Lembrete" },
+            () => Effect.succeed([]),
+          ),
+        );
+        assert.ok(posted.success, posted.contentItems[0]?.text);
+        await until(() => phone.textsTo(accountJid).includes("Lembrete"), "the post to the typed number");
+        return { saved: BRAZIL_ACCOUNT, postedTo: accountJid };
       },
     );
 
@@ -925,15 +937,14 @@ try {
         adapter.edit({ platformChannelId: OWNER_JID, replyThreadId: null }, "UNKNOWN-POST", { text: "Updated" }),
       );
       await until(() => phone.textsTo(OWNER_JID).length === before + 1, "the edit as a new post");
-      // In the owner's own chat, a last blank line makes the bubble wide, so the answer starts at the left.
-      const spacer = /\n\u2800{20,}$/u;
-      assert.match(phone.textsTo(OWNER_JID).at(-1) ?? "", spacer, "A post in the owner's own chat has no spacer line.");
+      // A post in the owner's own chat ends at its last line of text (#8802).
+      assert.equal(phone.textsTo(OWNER_JID).at(-1), "Updated", "A post in the owner's own chat has extra text.");
       const contactJid = `${STRANGER}@s.whatsapp.net`;
       await runCauseEffect(
         adapter.post({ platformChannelId: contactJid, replyThreadId: null }, { text: "To a contact" }),
       );
       await until(() => phone.textsTo(contactJid).includes("To a contact"), "the post to an allowed contact, as it is");
-      return { refused: true, spacer: true };
+      return { refused: true, ownChatAsIs: true };
     });
 
     await step("adapter: a post that the server refuses in its ack fails, and is not reported as sent", async () => {

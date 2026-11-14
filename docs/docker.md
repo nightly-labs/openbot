@@ -465,7 +465,9 @@ environment of OpenBot, so they can read these values.
 - **Not root.** The image runs as UID 1000. Root owns the release, so agents cannot change it. The
   release has no SUID file. `no-new-privileges` keeps it that way.
 - **Agents have full access in the container.** They run commands, change all of `/data` and use the
-  network. The container is the boundary. Do not mount the Docker socket, your home folder or another
+  network. The container is the boundary. All agents run as UID 1000, so an agent can read the files
+  and processes of the other agents, also the API key files of a Vault key that is for other agents.
+  Put agents that must not share keys in different containers. Do not mount the Docker socket, your home folder or another
   host folder that agents must not change.
 - **Check the image.** Each release image has a build provenance attestation:
 
@@ -486,7 +488,8 @@ that it can make a user namespace, starts D-Bus, two virtual displays and the ke
 becomes OpenBot with `OPENBOT_SERVER=1`. OpenBot shows its windows on `:0`, at 1280x800. The agents
 work on `:1`, at the size of `OPENBOT_DISPLAY_SIZE`, which the script names in
 `OPENBOT_AGENT_DISPLAY`. Computer Use and remote desktop use `:1`, so they do not show the OpenBot
-window. On a stop, tini gives the signal to OpenBot and waits for it.
+window. `:1` has a window manager (Openbox, from `openbot-desktop`), which tini adopts as it adopts
+Xvfb. On a stop, tini gives the signal to OpenBot and waits for it.
 `/opt/OpenBot/hosted/mode` is `container`, so the `openbot` command talks to the control socket and
 does not use systemd.
 
@@ -517,6 +520,10 @@ does not use systemd.
   bridge network connected in 2.0 to 2.6 s and host networking in 2.0 to 2.4 s.
 - The two displays of the entrypoint were tested with a stand-in for OpenBot: `:0` is 1280x800 and
   `:1` has the display size. Computer Use and remote desktop on `:1` were not tested.
+- The Openbox desktop on `:1` was tested in Ubuntu 24.04 and 26.04 containers (arm64) with the
+  steps of `openbot-container` and a stand-in for OpenBot: the background, the menu, the terminal
+  and the file manager, focus, Alt+Tab, Alt+F4, title bar drag, maximize, the close button, and a
+  restart after a kill. The image itself was not built with it.
 - Not tested: a Codex agent with Workspace only access in a container. Codex runs its commands in
   bubblewrap, which mounts its root in a user namespace. The seccomp profile allows `mount` only with
   `CAP_SYS_ADMIN` and always refuses `pivot_root`, and the `docker-default` AppArmor profile refuses

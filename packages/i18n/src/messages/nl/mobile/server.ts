@@ -257,6 +257,7 @@ export const messages = {
     "De server stopt en start opnieuw. Dit duurt ongeveer een minuut. Lopende agentbeurten stoppen en leden verliezen de verbinding tot de server terug is. Bestanden en chats blijven bewaard.",
   "mobile.server.settings.restartConfirm": "Herstarten",
   "mobile.server.settings.restarted": "{name} wordt herstart",
+  "mobile.server.settings.restartUnsupported": "Werk OpenBot bij op deze server om hem hier te herstarten.",
   "mobile.server.settings.leaveTitle": "{name} verlaten?",
   "mobile.server.settings.leaveBody": "Je hebt een nieuwe uitnodiging nodig om weer lid te worden.",
   "mobile.server.settings.leave": "Server verlaten",
@@ -323,6 +324,7 @@ export const messages = {
   "mobile.server.route.member": "Lid",
   "mobile.server.route.timezone": "Tijdzone",
   "mobile.server.route.personality": "Agentpersoonlijkheid",
+  "mobile.server.route.agents": "Agents",
   "mobile.server.settings.storage": "Opslag",
   "mobile.server.route.storage": "Opslag",
   "mobile.server.route.storageFiles": "Alle bestanden",
@@ -374,6 +376,36 @@ export const messages = {
   "mobile.server.library.noMatches": "Geen overeenkomende bestanden",
   "mobile.server.library.showInChat": "Toon in chat",
   "mobile.server.library.share": "Delen",
+  "mobile.server.library.folders.title": "Mappen",
+  "mobile.server.library.folders.allFiles": "Alle bestanden",
+  "mobile.server.library.folders.removedAgents": "Verwijderde agents",
+  "mobile.server.library.folders.notInFolder": "In geen map",
+  "mobile.server.library.folders.path": "Map: {path}",
+  "mobile.server.library.folders.pathHint": "Toont de mappen",
+  "mobile.server.library.folders.new": "Nieuwe map",
+  "mobile.server.library.folders.name": "Mapnaam",
+  "mobile.server.library.folders.inFolder": "In {name}",
+  "mobile.server.library.folders.create": "Aanmaken",
+  "mobile.server.library.folders.rename": "Naam wijzigen",
+  "mobile.server.library.folders.renameTitle": "Mapnaam wijzigen",
+  "mobile.server.library.folders.save": "Opslaan",
+  "mobile.server.library.folders.delete": "Map verwijderen",
+  "mobile.server.library.folders.deleteTitle": "‘{name}’ verwijderen?",
+  "mobile.server.library.folders.deleteBody":
+    "De mappen erin worden ook verwijderd. De bestanden blijven bij de agent.",
+  "mobile.server.library.folders.moveTo": "Naar map verplaatsen",
+  "mobile.server.library.folders.actions": "Acties voor {name}",
+  "mobile.server.library.folders.expand": "Mappen van {name} tonen",
+  "mobile.server.library.folders.collapse": "Mappen van {name} verbergen",
+  "mobile.server.library.folders.emptyTitle": "Geen bestanden in deze map",
+  "mobile.server.library.folders.emptyBody": "{agent} kan hier bestanden opslaan met het mappad {path}.",
+  "mobile.server.library.folders.loadFailed": "Kan de mappen niet laden",
+  "mobile.server.library.folders.changeFailed": "Kan de mappen niet wijzigen",
+  "mobile.server.library.folders.gone": "Deze map staat niet meer op de server.",
+  "mobile.server.library.folders.fileGone":
+    "Dit bestand staat niet meer op de server, of je kunt het niet verplaatsen.",
+  "mobile.server.library.folders.unsupported":
+    "Deze server heeft geen mappen in de Bibliotheek. Werk de server bij om ze te gebruiken.",
   "mobile.server.route.providers": "Aanbieders",
   "mobile.server.route.provider": "Aanbieder",
   "mobile.server.route.providerModels": "Modellen",
@@ -446,6 +478,24 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "Kan de geheugenlimiet niet opslaan. Probeer het opnieuw.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Werk OpenBot bij op deze server om de geheugenlimiet hier te wijzigen.",
+  "mobile.server.settings.memoryReview": "Geheugencontrole",
+  "mobile.server.settings.memoryReviewDescription":
+    "Hoe vaak agents op deze server op de achtergrond blijvende feiten uit hun chats bewaren.",
+  "mobile.server.settings.memoryReviewOff": "Uit",
+  "mobile.server.settings.memoryReviewTurns": { one: "Elke {count} beurt", other: "Elke {count} beurten" },
+  "mobile.server.settings.memoryReviewLoadFailed": "Kan de instelling voor geheugencontrole niet laden.",
+  "mobile.server.settings.skillLearning": "Vaardigheden leren",
+  "mobile.server.settings.skillLearningDescription": "Of agents op deze server wat ze leren als vaardigheden opslaan.",
+  "mobile.server.settings.skillLearningAutomatic": "Automatisch",
+  "mobile.server.settings.skillLearningAsk": "Eerst vragen",
+  "mobile.server.settings.skillLearningOff": "Uit",
+  "mobile.server.settings.skillLearningLoadFailed": "Kan de instelling voor vaardigheden leren niet laden.",
+  "mobile.server.settings.browsingMemory": "Leren van mijn browsen",
+  "mobile.server.settings.browsingMemoryDescription":
+    "Als je de browser van een agent bedient, leert de agent hoe sites werken van de pagina's en knoppen die je gebruikt. Getypte tekst wordt niet bewaard.",
+  "mobile.server.settings.browsingMemoryLoadFailed": "Kan de browse-instelling niet laden.",
+  "mobile.server.settings.learningSaveFailed": "Kan deze instelling niet opslaan. Probeer het opnieuw.",
+  "mobile.server.settings.learningUnsupported": "Werk OpenBot bij op deze server om deze instelling hier te wijzigen.",
   "mobile.server.settings.responseStyleDescription":
     "Natuurlijk: agents sturen korte updates terwijl ze werken, en de chat toont ze. Klassiek: agents antwoorden één keer, als ze klaar zijn.",
   "mobile.server.settings.responseStyleNatural": "Natuurlijk",
@@ -454,8 +504,8 @@ export const messages = {
   "mobile.server.settings.personalitySaveFailed": "Kan de antwoordstijl niet opslaan. Probeer het opnieuw.",
   "mobile.server.settings.personalityUnsupported":
     "Werk OpenBot bij op deze server om de antwoordstijl hier te wijzigen.",
-  "mobile.server.settings.personalityUnavailable":
-    "Maak verbinding met deze server als eigenaar of beheerder om de agentpersoonlijkheid te wijzigen.",
+  "mobile.server.settings.agentsUnavailable":
+    "Maak verbinding met deze server als eigenaar of beheerder om de agentinstellingen te wijzigen.",
   "mobile.server.route.browserProfiles": "Browserprofielen",
   "mobile.server.browserProfiles.unavailable":
     "Alleen een eigenaar of beheerder van een online server kan de browserprofielen beheren.",
@@ -694,6 +744,8 @@ export const messages = {
     "OpenBot kan de opgeslagen tokens op {host} niet lezen. Ontkoppel de werkruimte en verbind hem opnieuw.",
   "mobile.server.connectors.slack.helpRelay":
     "OpenBot op {host} kan geen Slack-gebeurtenissen ontvangen. Log op {host} in, geef de server een naam in Serverinstellingen en houd OpenBot open.",
+  "mobile.server.connectors.slack.helpNotLinked":
+    "Deze werkruimte is niet gekoppeld aan {host}. Tik op Opnieuw verbinden om hem te koppelen.",
   "mobile.server.connectors.slack.orchestratorTitle": "Slack Orchestrator",
   "mobile.server.connectors.slack.orchestratorDescription":
     "Deze agent ontvangt elk verzoek uit Slack. Korte verzoeken beantwoordt hij zelf, ander werk geeft hij aan de juiste agent, en hij plaatst het antwoord in de thread.",
@@ -739,6 +791,8 @@ export const messages = {
     "OpenBot kan de opgeslagen tokens op {host} niet lezen. Ontkoppel de Discord-server en verbind hem opnieuw.",
   "mobile.server.connectors.discord.helpRelay":
     "OpenBot op {host} kan geen Discord-gebeurtenissen ontvangen. Log op {host} in, geef de server een naam in Serverinstellingen en houd OpenBot open.",
+  "mobile.server.connectors.discord.helpNotLinked":
+    "Deze Discord-server is niet gekoppeld aan {host}. Tik op Opnieuw verbinden om hem te koppelen.",
   "mobile.server.connectors.discord.orchestratorTitle": "Discord Orchestrator",
   "mobile.server.connectors.discord.orchestratorDescription":
     "Deze agent ontvangt elk verzoek uit Discord. Korte verzoeken beantwoordt hij zelf, ander werk geeft hij aan de juiste agent, en hij antwoordt in het kanaal.",
@@ -773,6 +827,8 @@ export const messages = {
     "OpenBot op {host} kan geen Telegram-berichten ontvangen. Log op {host} in, geef de server een naam in Serverinstellingen en houd OpenBot open.",
   "mobile.server.connectors.telegram.helpError":
     "OpenBot kan deze chat niet bereiken. Verbind opnieuw of ontkoppel de chat.",
+  "mobile.server.connectors.telegram.helpNotLinked":
+    "Deze chat is niet gekoppeld aan {host}. Tik op Opnieuw verbinden om hem te koppelen.",
   "mobile.server.connectors.telegram.retryAt": "Telegram vroeg OpenBot te wachten. Het probeert het opnieuw om {time}.",
   "mobile.server.connectors.telegram.linkTitle": "Chat koppelen",
   "mobile.server.connectors.telegram.linkAnother": "Nog een chat koppelen",
@@ -999,6 +1055,13 @@ export const messages = {
   "mobile.server.providers.status.ready": "Geïnstalleerd",
   "mobile.server.providers.status.notInstalled": "Niet geïnstalleerd",
   "mobile.server.providers.status.checking": "Controleren",
+  "mobile.server.providers.accountsKeyHint":
+    "Elke agent gebruikt één account. Kies het in de instellingen van de agent. Een nieuw account heeft een API-sleutel van dat account nodig.",
+  "mobile.server.providers.accountChangeKey": "Sleutel wijzigen",
+  "mobile.server.providers.accountKeyHint":
+    "Plak een API-sleutel van het {provider}-account. De sleutel gaat naar de server. Deze telefoon bewaart hem niet.",
+  "mobile.server.providers.accountKeyChecking": "Sleutel controleren…",
+  "mobile.server.providers.accountKeyAddFailed": "Kan het account niet toevoegen. Probeer het opnieuw.",
   "mobile.server.providers.pool": "Accounts bundelen",
   "mobile.server.providers.poolHint":
     "Agents gebruiken één account tot het een gebruikslimiet nadert, en dan het account waarvan de limiet het eerst reset.",
@@ -1084,6 +1147,7 @@ export const messages = {
   "mobile.server.mcp.unsupported": "Werk OpenBot bij op deze server om de MCP-servers hier te beheren.",
   "mobile.server.mcp.unavailable":
     "Maak verbinding met deze server als eigenaar of beheerder om de MCP-servers te beheren.",
+  "mobile.server.mcp.accessUnsupported": "Werk OpenBot bij op deze server om te kiezen wie de MCP-servers krijgt.",
   "mobile.server.mcp.description":
     "MCP-servers geven de agents van deze server meer tools. Claude- en Codex-agents krijgen alleen de servers in deze lijst.",
   "mobile.server.mcp.loading": "MCP-servers laden…",
@@ -1156,6 +1220,21 @@ export const messages = {
   "mobile.server.mcp.removeBody":
     "De agents van deze server krijgen de tools ervan niet meer. De instellingen worden niet bewaard.",
   "mobile.server.mcp.remove": "MCP-server verwijderen",
+  "mobile.server.mcp.access.title": "Toegang",
+  "mobile.server.mcp.access.agents": "Agents",
+  "mobile.server.mcp.access.agentsOf": "Agents die {name} mogen gebruiken",
+  "mobile.server.mcp.access.allAgents": "Alle agents",
+  "mobile.server.mcp.access.allAgentsHint": "Alle agents omvat ook elke agent die later wordt toegevoegd.",
+  "mobile.server.mcp.access.noAgents": "Geen agents",
+  "mobile.server.mcp.access.someAgents": "{count} van {total}",
+  "mobile.server.mcp.access.use": "Mag gebruiken",
+  "mobile.server.mcp.access.fromEveryone": "Zoals Iedereen",
+  "mobile.server.mcp.access.level": "Toegang van {role} tot {name}",
+  "mobile.server.mcp.access.hint":
+    "Een lid krijgt het hoogste niveau van Iedereen en van de eigen rollen. Eigenaren, beheerders en wie de server heeft toegevoegd, kunnen hem altijd beheren.",
+  "mobile.server.mcp.access.loadFailed": "Kan niet laden wie deze MCP-server krijgt.",
+  "mobile.server.mcp.access.unavailable":
+    "Alleen een eigenaar of beheerder van een online server kan kiezen wie deze MCP-server krijgt.",
   "mobile.server.usage.agents": "Agents",
   "mobile.server.usage.agentLine": "{tokens} tokens · {cost} · {percent}",
   "mobile.server.usage.noAgents": "Geen agentgebruik vastgelegd in deze periode.",
@@ -1313,6 +1392,10 @@ export const messages = {
   "mobile.server.roles.agentCount": { one: "{count} agent", other: "{count} agents" },
   "mobile.server.roles.memberCount": { one: "{count} lid", other: "{count} leden" },
   "mobile.server.roles.agentLevel": "Toegang van {role} tot {agent}",
+  "mobile.server.roles.changeInEveryone": "Wijzigen in Iedereen",
+  "mobile.server.roles.setAll": "Alles instellen",
+  "mobile.server.roles.setAllLabel": "Alles instellen: toegang van {role} tot alle agents",
+  "mobile.server.roles.mixed": "Gemengd",
   "mobile.server.roles.delete": "Rol verwijderen",
   "mobile.server.roles.deleteTitle": "{name} verwijderen?",
   "mobile.server.roles.deleteBody": "Leden met deze rol verliezen de agents die deze rol hun geeft.",
@@ -1432,6 +1515,7 @@ export const messages = {
   "mobile.server.route.transfer": "Overdracht",
   "mobile.server.route.transferExport": "Exporteren",
   "mobile.server.route.transferImport": "Importeren",
+  "mobile.server.route.transferCopy": "Kopiëren naar een andere server",
   "mobile.server.transfer.unsupported": "Werk OpenBot op deze server bij om hem hier over te dragen.",
   "mobile.server.transfer.unavailable":
     "Maak verbinding met deze server als eigenaar of beheerder om hem over te dragen.",
@@ -1497,4 +1581,21 @@ export const messages = {
     "Deze aanbieders waren op de andere server ingelogd en zijn hier niet ingelogd. Log bij ze in via Serverinstellingen › Aanbieders.",
   "mobile.server.transfer.notImported": "Niet geïmporteerd",
   "mobile.server.transfer.warnings": "Controleer deze",
+  "mobile.server.transfer.copy": "Kopiëren naar een andere server",
+  "mobile.server.transfer.copyNote": "Stuur agents naar een andere server van je.",
+  "mobile.server.transfer.copyTo": "Naar",
+  "mobile.server.transfer.copyNoAgents": "Deze server heeft geen agents.",
+  "mobile.server.transfer.copyNotMoved":
+    "Hun kanalen en de map Shared worden ook gekopieerd. API-sleutels, aanmeldingen, connectors en chatgeschiedenis worden niet gekopieerd. Stel ze opnieuw in op de andere server.",
+  "mobile.server.transfer.copySubmit": { one: "Kopieer {count} agent", other: "Kopieer {count} agents" },
+  "mobile.server.transfer.copying": "Kopiëren…",
+  "mobile.server.transfer.copyFailed": "Het kopiëren is niet voltooid.",
+  "mobile.server.transfer.copied": {
+    one: "{count} agent gekopieerd naar {server}.",
+    other: "{count} agents gekopieerd naar {server}.",
+  },
+  "mobile.server.transfer.copyAgents": "Agents om te kopiëren",
+  "mobile.server.transfer.copyNext": "Gekopieerde agents gebruiken de goedkeuringsregels van {server}.",
+  "mobile.server.transfer.copyNoServer":
+    "Maak verbinding met een andere server als eigenaar of beheerder om er agents naar te kopiëren.",
 } as const satisfies PartialTranslation<typeof source>;

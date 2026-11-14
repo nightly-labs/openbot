@@ -344,8 +344,11 @@ async function readReply(agent: SpeechAgent, turnId: string, message: DictatedMe
     if (!loading.has(own)) return;
     loading.delete(own);
     const answer = latestTurnAnswer(page.messages, turnId);
+    // Narration that became the turn's answer (#8837) was read already as a progress update.
+    const read = readUpdates.get(agentKey(agent));
+    const heard = answer !== undefined && read?.turnId === turnId && read.ids.has(answer.id);
     await readAfterReadings(
-      answer?.text ?? "",
+      heard ? "" : (answer?.text ?? ""),
       { ...agent, messageId: answer?.id ?? null },
       message.language,
       message.always ? "voice_conversation" : "dictation",

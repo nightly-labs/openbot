@@ -5,12 +5,22 @@
 // 3. ends the subagent with a `wait` call whose `agentsStates` holds its report,
 // 4. sends one more child item, which the ended subagent does not take.
 // The stored `<turn>:subagents` message must hold the child's steps in order and the report.
+// Before the subagent ends, Codex asks for MCP tool consent from its subagent threads (#8188): from
+// `child-1`, from `child-2` that a `subAgentActivity` item names, from an unknown thread, and from
+// `child-2` after it ended. The two running subagents must get a card in the parent chat and turn,
+// and the answer "Allow once"; the others are declined.
+// The same four threads call the `openbot` tool `read_agent` (#8657). The two running subagents must
+// get the parent agent; the unknown thread and the ended subagent get an error.
 // `bun run test:codex-subagent-steps`. Writes .openbot-build/codex-subagent-steps-e2e/report.json.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { AGENT_PROVIDERS, type ConversationSubagent } from "@openbot/contracts/ipc";
+import {
+  AGENT_PROVIDERS,
+  type ConversationSubagent,
+  MCP_ELICITATION_DECISION_QUESTION_ID,
+} from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 
@@ -46,6 +56,25 @@ process.stdout.on("error", (error) => {
 });
 const write = (message) => process.stdout.write(JSON.stringify(message) + "\\n");
 const step = (ms) => new Promise((done) => setTimeout(done, ms));
+const answers = new Map();
+let consents = 0;
+// Codex asks before a tool of an MCP server runs, from the thread of the agent that calls the tool.
+const consent = (threadId, turnId) =>
+  new Promise((done) => {
+    const id = "consent-" + ++consents;
+    answers.set(id, done);
+    write({ id, method: "mcpServer/elicitation/request", params: { threadId, turnId, serverName: "probe", mode: "form",
+      message: 'Allow the probe MCP server to run tool "echo"?', requestedSchema: { type: "object", properties: {} },
+      _meta: { codex_approval_kind: "mcp_tool_call", persist: ["always"] } } });
+  }).then((result) => (result && result.action) || "error");
+let toolCalls = 0;
+// A subagent has the parent's dynamic tools, and calls them from its own thread.
+const readAgent = (threadId, turnId) =>
+  new Promise((done) => {
+    const id = "tool-" + ++toolCalls;
+    answers.set(id, done);
+    write({ id, method: "item/tool/call", params: { threadId, turnId, callId: id, namespace: "openbot", tool: "read_agent", arguments: {} } });
+  }).then((result) => (result && result.success ? JSON.parse(result.contentItems[0].text).id : "error"));
 async function runTurn(threadId, turnId) {
   const parent = (method, item) => write({ method, params: { threadId, turnId, item } });
   const child = (childThread, method, item) =>
@@ -57,6 +86,26 @@ async function runTurn(threadId, turnId) {
   parent("item/completed", { ...spawn, status: "completed", receiverThreadIds: ["child-1"],
     agentsStates: { "child-1": { status: "running", message: null } } });
   await step(20);
+  const activity = (kind) => ({ type: "subAgentActivity", id: "activity-" + kind, kind, agentThreadId: "child-2", agentPath: "/root/review" });
+  parent("item/started", activity("started"));
+  parent("item/completed", activity("started"));
+  await step(20);
+  const consented = {
+    v1: await consent("child-1", "child-turn"),
+    v2: await consent("child-2", "child-turn-2"),
+    unknown: await consent("child-unknown", "child-turn-x"),
+  };
+  const readers = {
+    v1: await readAgent("child-1", "child-turn"),
+    v2: await readAgent("child-2", "child-turn-2"),
+    unknown: await readAgent("child-unknown", "child-turn-x"),
+  };
+  parent("item/completed", activity("completed"));
+  await step(20);
+  consented.ended = await consent("child-2", "child-turn-2");
+  readers.ended = await readAgent("child-2", "child-turn-2");
+  parent("item/completed", { type: "agentMessage", id: "consents-" + turnId, text: "Consents: " + JSON.stringify(consented) });
+  parent("item/completed", { type: "agentMessage", id: "readers-" + turnId, text: "Readers: " + JSON.stringify(readers) });
   const command = { type: "commandExecution", id: "cmd-1", command: "bun test", status: "inProgress" };
   child("child-1", "item/started", command);
   child("child-1", "item/completed", { ...command, status: "completed" });
@@ -113,6 +162,10 @@ process.stdin.on("data", (chunk) => {
     if (line) {
       const message = JSON.parse(line);
       if (message.method && message.id !== undefined) answer(message);
+      else if (answers.has(message.id)) {
+        answers.get(message.id)(message.result);
+        answers.delete(message.id);
+      }
     }
     newline = buffer.indexOf("\\n");
   }
@@ -129,9 +182,19 @@ interface Card {
   steps: string[];
 }
 
+interface ConsentCard {
+  threadId: string;
+  turnId: string;
+  header: string;
+}
+
 interface Report {
   passed: boolean;
   cards?: Card[];
+  consents?: Record<string, string>;
+  readers?: Record<string, string>;
+  consentCards?: ConsentCard[];
+  declineNotices?: number;
   error?: string;
 }
 
@@ -182,6 +245,18 @@ const agents = new AgentService({
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
 });
 
+const consentCards: ConsentCard[] = [];
+let declineNotices = 0;
+agents.on("event", (event) => {
+  if (event.type === "error" && event.code === "mcp_safety_handoff") declineNotices += 1;
+  if (event.type !== "prompt") return;
+  consentCards.push({ threadId: event.threadId, turnId: event.turnId, header: event.questions[0]?.header ?? "" });
+  const answer = { [MCP_ELICITATION_DECISION_QUESTION_ID]: ["Allow once"] };
+  runCauseEffect(agents.respondToPrompt({ requestId: event.requestId, answers: answer })).catch((error: unknown) => {
+    report.error = `The card answer failed: ${String(error)}`;
+  });
+});
+
 try {
   await runCauseEffect(agents.initialize());
   const agent = await runCauseEffect(
@@ -219,8 +294,29 @@ try {
       steps: ["command: bun test", "thinking: Two tests fail.", "text: Fixing the parser.", "text: All tests pass."],
     },
   ];
-  report.passed = JSON.stringify(report.cards) === JSON.stringify(expected);
-  if (!report.passed) report.error = `Expected ${JSON.stringify(expected)}.`;
+  const consentText = snapshot.messages.find((message) => message.text.startsWith("Consents: "))?.text ?? "";
+  report.consents = consentText ? JSON.parse(consentText.slice("Consents: ".length)) : {};
+  report.consentCards = consentCards;
+  report.declineNotices = declineNotices;
+  const expectedConsents = { v1: "accept", v2: "accept", unknown: "decline", ended: "decline" };
+  // A running subagent's OpenBot tool call runs as the parent agent (#8657).
+  const readersText = snapshot.messages.find((message) => message.text.startsWith("Readers: "))?.text ?? "";
+  report.readers = readersText ? JSON.parse(readersText.slice("Readers: ".length)) : {};
+  const expectedReaders = { v1: agent.id, v2: agent.id, unknown: "error", ended: "error" };
+  // A subagent's card shows in the parent chat, in the parent turn.
+  const cardsInParent =
+    consentCards.length === 2 &&
+    consentCards.every(
+      (card) => card.threadId === snapshot.threadId && card.turnId.startsWith("turn-") && card.header === "probe",
+    );
+  report.passed =
+    JSON.stringify(report.cards) === JSON.stringify(expected) &&
+    JSON.stringify(report.consents) === JSON.stringify(expectedConsents) &&
+    JSON.stringify(report.readers) === JSON.stringify(expectedReaders) &&
+    cardsInParent &&
+    declineNotices === 2;
+  if (!report.passed)
+    report.error ??= `Expected cards ${JSON.stringify(expected)}, consents ${JSON.stringify(expectedConsents)}, readers ${JSON.stringify(expectedReaders)}, two consent cards in the parent chat and turn, and two decline notices.`;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);
 } finally {

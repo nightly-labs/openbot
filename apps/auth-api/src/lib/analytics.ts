@@ -19,6 +19,7 @@ import { DOWNLOAD_PLATFORM_ORDER, type DownloadPlatform } from "./download-platf
 import { DPA_ROUTE } from "./dpa";
 import {
   OPENBOT_ALTERNATE_DOWNLOAD_LINKS,
+  OPENBOT_ANDROID_APK_LINK,
   OPENBOT_DOWNLOAD_LINKS,
   OPENBOT_DOWNLOAD_PAGE_LINKS,
   OPENBOT_LINKS,
@@ -236,6 +237,8 @@ const DOWNLOAD_PLATFORMS_BY_HREF = new Map<string, LandingDownloadPlatform>([
   [OPENBOT_ALTERNATE_DOWNLOAD_LINKS.linux, "linux"],
   [MOBILE_APPS.ios.href, "ios"],
   [MOBILE_APPS.android.href, "android"],
+  // The APK is the Android app too. The event has no property that separates it from Google Play.
+  [OPENBOT_ANDROID_APK_LINK, "android"],
 ]);
 
 const LINK_DESTINATIONS = new Map<string, LandingDestination>([

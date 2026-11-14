@@ -442,17 +442,24 @@ export const resolveHermesCli: (input?: {
     for (const candidate of candidates) {
       if (!(yield* isExecutable(candidate.executable))) continue;
       found = true;
-      const attempt = yield* Effect.result(
+      const read = (args: readonly string[]) =>
         Effect.gen(function* () {
-          const { stdout, launch } = yield* readCliVersion(candidate, "hermes");
+          const { stdout, launch } = yield* readCliVersion(candidate, "hermes", args);
           return {
             executable: candidate.executable,
             version: parseHermesVersion(stdout),
             source: "system" as const,
             ...launch,
           };
-        }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
-      );
+        }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))));
+      // `hermes --version` waits for a network update check, which can take more than the limit and
+      // then never saves its result, so every check timed out (#7989). `hermes acp --version` prints
+      // only the version. A Hermes before 0.14 refuses that flag at once and gets `--version`.
+      const quick = yield* Effect.result(read(["acp", "--version"]));
+      const attempt =
+        Result.isSuccess(quick) || isCliTimeout(quick.failure.cause)
+          ? quick
+          : yield* Effect.result(read(["--version"]));
       if (Result.isSuccess(attempt)) return attempt.success;
       const error = attempt.failure.cause;
 
@@ -468,11 +475,12 @@ export const resolveHermesCli: (input?: {
 );
 
 /**
- * Hermes prints its release and its build on the first line, such as
+ * `hermes acp --version` prints only the version, such as `0.21.5+5805.g54bc5e5`. `hermes --version`
+ * prints its release and its build on the first line, such as
  * `Hermes Agent v0.21.5+5805.g54bc5e5 (2026.9.24) · upstream 54bc5e50`. A line about an update can follow.
  */
 function parseHermesVersion(output: string): string {
-  const version = output.match(/^Hermes Agent v(\d+\.\d+\.\d+)\b/mu)?.[1];
+  const version = output.match(/^(?:Hermes Agent v)?(\d+\.\d+\.\d+)\b/mu)?.[1];
   if (!version) throw new CodexCliError(sourceText("error.provider.hermesVersionUnreadable"), "invalid");
   return version;
 }
@@ -898,24 +906,53 @@ export function resolveInstalledFirst<Cli extends AgentCliInfo, E>(
   resolve: (input: { bundledExecutable?: string | null }) => Effect.Effect<Cli, E>,
   bundledExecutable: string | null | undefined,
   preferInstalled: boolean,
+  installedChosen = false,
 ): Effect.Effect<Cli, E> {
+  return chooseInstalledFirst(resolve, bundledExecutable, preferInstalled, installedChosen).pipe(
+    Effect.map((choice) => choice.cli),
+  );
+}
+
+/**
+ * The CLI that runs, and the one the user can switch to: the CLI the user installed while OpenBot's
+ * copy runs, or the newer copy while the user's CLI runs because they chose it.
+ */
+export interface InstalledFirstChoice<Cli> {
+  readonly cli: Cli;
+  readonly passedOver: { readonly source: "system" | "managed"; readonly version: string } | null;
+}
+
+/**
+ * `resolveInstalledFirst`, with the CLI it passed over. `installedChosen`: the user chose their own
+ * CLI, so it runs also when the copy is newer. A launcher of the user's, such as a script that picks
+ * Pi's settings folder, then still runs after an update (#6327).
+ */
+export function chooseInstalledFirst<Cli extends AgentCliInfo, E>(
+  resolve: (input: { bundledExecutable?: string | null }) => Effect.Effect<Cli, E>,
+  bundledExecutable: string | null | undefined,
+  preferInstalled: boolean,
+  installedChosen = false,
+): Effect.Effect<InstalledFirstChoice<Cli>, E> {
   const copy = resolve(bundledExecutable === undefined ? {} : { bundledExecutable });
-  if (!preferInstalled) return copy;
   const installedCli = resolve({ bundledExecutable: null }).pipe(Effect.orElseSucceed(() => null));
-  const choose = (resolved: Cli, installed: Cli | null): Cli =>
-    resolved.source === "managed" &&
-    installed?.source === "system" &&
-    (installed.version === resolved.version || olderVersion(resolved.version, installed.version))
-      ? installed
-      : resolved;
+  const choose = (resolved: Cli, installed: Cli | null): InstalledFirstChoice<Cli> => {
+    if (resolved.source !== "managed" || installed?.source !== "system") return { cli: resolved, passedOver: null };
+    const asNew = installed.version === resolved.version || olderVersion(resolved.version, installed.version);
+    if (preferInstalled && (asNew || installedChosen)) {
+      const copyNewer = olderVersion(installed.version, resolved.version);
+      return { cli: installed, passedOver: copyNewer ? { source: "managed", version: resolved.version } : null };
+    }
+    return { cli: resolved, passedOver: { source: "system", version: installed.version } };
+  };
   return Effect.gen(function* () {
     // With a copy, the two probes run at once: the user's CLI adds no wait unless it is the slower one.
+    // An update starts the copy, but still reads the user's CLI, so that it can offer it afterwards.
     if (bundledExecutable) {
       const [resolved, installed] = yield* Effect.all([copy, installedCli], { concurrency: 2 });
       return choose(resolved, installed);
     }
     const resolved = yield* copy;
-    return resolved.source === "managed" ? choose(resolved, yield* installedCli) : resolved;
+    return resolved.source === "managed" ? choose(resolved, yield* installedCli) : { cli: resolved, passedOver: null };
   });
 }
 
@@ -1293,9 +1330,19 @@ export function cliSpawnTarget(
 /**
  * A busy computer can take many seconds to start a CLI, so the limit is generous. A timeout is
  * reported apart from a failure: the CLI is not broken, and reinstalling it does not help. The
- * provider runtime tries again later, so this limit only has to cover one slow answer.
+ * provider runtime tries again later, with `SLOW_CLI_VERSION_TIMEOUT_MS`.
  */
 const CLI_VERSION_TIMEOUT_MS = 10_000;
+/**
+ * The limit of a version read after a read of the same CLI timed out. The first read from a cold disk
+ * cache took 85 s, and 3 reads with `CLI_VERSION_TIMEOUT_MS` in a row stopped the provider (#8548). The
+ * longer limit stays after a read in time: the files can leave the disk cache again. A read that also
+ * times out with this limit is from a CLI that does not answer, and the next read has the short limit
+ * again: a hung CLI does not hold a start for 2 minutes each time.
+ */
+const SLOW_CLI_VERSION_TIMEOUT_MS = 120_000;
+/** The executables whose next version read waits `SLOW_CLI_VERSION_TIMEOUT_MS`. */
+const slowVersionReads = new Set<string>();
 
 /**
  * A busy computer makes every candidate slow, so the resolvers report the first timeout and do not
@@ -1306,46 +1353,56 @@ function isCliTimeout(error: unknown): error is CodexCliError {
 }
 
 /**
- * Runs `--version` with the `PATH` that the CLI's processes get, so a `#!/usr/bin/env node` CLI that
- * starts here also starts as the provider. `launch` holds that `PATH` for the resolved CLI info.
+ * Runs `--version` (or the fixed `args` that print the version) with the `PATH` that the CLI's
+ * processes get, so a `#!/usr/bin/env node` CLI that starts here also starts as the provider.
+ * `launch` holds that `PATH` for the resolved CLI info.
  */
 const readCliVersion = Effect.fn("Cli.readVersion")(function* (
   { executable: candidate, source }: { executable: string; source: "system" | "managed" },
   provider: AgentProviderId,
+  args: readonly string[] = ["--version"],
 ) {
   const launchPath = yield* cliLaunchPath(candidate, source);
   const launch = launchPath ? { launchPath } : {};
   const target = process.platform === "win32" && [".bat", ".cmd"].includes(extname(candidate).toLowerCase());
-  const timeout = providerCheckTimeoutMs(CLI_VERSION_TIMEOUT_MS);
-  const output = yield* providerCall(() =>
-    target
-      ? execFileAsync(
-          process.env.ComSpec?.trim() || "cmd.exe",
-          ["/d", "/s", "/c", `""${candidate.replaceAll("%", "%%")}" --version"`],
-          {
+  const slow = slowVersionReads.has(candidate);
+  const timeout = providerCheckTimeoutMs(slow ? SLOW_CLI_VERSION_TIMEOUT_MS : CLI_VERSION_TIMEOUT_MS);
+  // The signal stops the process when the start that waits for it ends.
+  const output = yield* Effect.tryPromise({
+    try: (signal) =>
+      target
+        ? execFileAsync(
+            process.env.ComSpec?.trim() || "cmd.exe",
+            ["/d", "/s", "/c", `""${candidate.replaceAll("%", "%%")}" ${args.join(" ")}"`],
+            {
+              signal,
+              timeout,
+              maxBuffer: 64 * 1024,
+              windowsHide: true,
+              windowsVerbatimArguments: true,
+            },
+          )
+        : execFileAsync(candidate, [...args], {
+            signal,
             timeout,
             maxBuffer: 64 * 1024,
-            windowsHide: true,
-            windowsVerbatimArguments: true,
-          },
-        )
-      : execFileAsync(candidate, ["--version"], {
-          timeout,
-          maxBuffer: 64 * 1024,
-          windowsHide: process.platform === "win32",
-          env: { ...process.env, ...cliPathEnvironment(launch) },
-        }),
-  ).pipe(
-    Effect.mapError((failure) =>
-      isDynamicRecord(failure.cause) && failure.cause.killed === true
-        ? providerFailure(
-            new CodexCliError(
-              sourceText("error.provider.cliTimedOutRefresh", { provider: agentProviderName(provider) }),
-              "timeout",
-            ),
-          )
-        : failure,
-    ),
+            windowsHide: process.platform === "win32",
+            env: { ...process.env, ...cliPathEnvironment(launch) },
+          }),
+    catch: providerFailure,
+  }).pipe(
+    Effect.mapError((failure) => {
+      if (!(isDynamicRecord(failure.cause) && failure.cause.killed === true)) return failure;
+      // The timeout changes the limit of the next read (`SLOW_CLI_VERSION_TIMEOUT_MS`).
+      if (slow) slowVersionReads.delete(candidate);
+      else slowVersionReads.add(candidate);
+      return providerFailure(
+        new CodexCliError(
+          sourceText("error.provider.cliTimedOutRefresh", { provider: agentProviderName(provider) }),
+          "timeout",
+        ),
+      );
+    }),
   );
   return { stdout: output.stdout, launch };
 });

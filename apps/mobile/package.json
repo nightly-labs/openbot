@@ -1,7 +1,7 @@
 {
   "name": "@openbot/mobile",
   "main": "expo-router/entry",
-  "version": "1.4.9",
+  "version": "1.4.10",
   "expo": {
     "install": {
       "exclude": [
@@ -28,7 +28,7 @@
     "@config-plugins/react-native-webrtc": "15.0.2",
     "@expo/metro-runtime": "~58.0.15",
     "@expo/ui": "~58.0.22",
-    "@legendapp/list": "3.6.0",
+    "@legendapp/list": "3.7.2",
     "@noble/hashes": "catalog:",
     "@norbert_bodziony/bloub": "catalog:",
     "@openbot/brand": "workspace:*",

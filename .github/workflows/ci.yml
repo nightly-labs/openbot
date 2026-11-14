@@ -481,6 +481,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:codex-usage-reset
 
+      - name: Run the Codex model capacity retry E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:codex-capacity-retry
+
       - name: Run the Codex warning banner E2E test
         if: ${{ !cancelled() }}
         run: bun run test:codex-warning-banner
@@ -669,6 +673,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:cursor-usage
 
+      - name: Run the Cursor key accounts E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:cursor-key-accounts
+
       - name: Run the OpenCode Go usage E2E test
         if: ${{ !cancelled() }}
         run: bun run test:opencode-go-usage
@@ -740,6 +748,7 @@ jobs:
             .openbot-build/codex-idle-thread-release-e2e/
             .openbot-build/codex-usage-metering-e2e/
             .openbot-build/codex-usage-reset-e2e/
+            .openbot-build/codex-capacity-retry-e2e/
             .openbot-build/usage-read-pacing-e2e/
             .openbot-build/routine-fresh-session-e2e/
             .openbot-build/routine-report-failure-e2e/
@@ -782,6 +791,7 @@ jobs:
             .openbot-build/claude-api-key-e2e/
             .openbot-build/claude-stored-sign-in-e2e/
             .openbot-build/cursor-usage-e2e/
+            .openbot-build/cursor-key-accounts-e2e/
             .openbot-build/opencode-go-usage-e2e/
             .openbot-build/pi-sign-in-watch-e2e/
             .openbot-build/provider-launch-order-e2e/
@@ -850,6 +860,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:acp-mcp-names
 
+      - name: Run the Copilot MCP relay E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:copilot-mcp-relay
+
       - name: Run the ACP turn stall E2E test
         if: ${{ !cancelled() }}
         run: bun run test:acp-turn-stall
@@ -865,6 +879,10 @@ jobs:
       - name: Run the ACP audio input E2E test
         if: ${{ !cancelled() }}
         run: bun run test:acp-audio-input
+
+      - name: Run the Antigravity steer E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:antigravity-steer
 
       - name: Run the Grok steer E2E test
         if: ${{ !cancelled() }}
@@ -946,10 +964,12 @@ jobs:
             .openbot-build/acp-additional-directories-e2e/
             .openbot-build/acp-flavor-e2e/
             .openbot-build/acp-mcp-server-names-e2e/
+            .openbot-build/copilot-mcp-relay-e2e/
             .openbot-build/acp-turn-stall-e2e/
             .openbot-build/agent-database-host-start-e2e/
             .openbot-build/acp-instructions-once-e2e/
             .openbot-build/acp-audio-input-e2e/
+            .openbot-build/antigravity-steer-e2e/
             .openbot-build/grok-steer-e2e/
             .openbot-build/grok-question-e2e/
             .openbot-build/grok-partial-model-list-e2e/

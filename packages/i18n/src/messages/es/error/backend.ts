@@ -68,6 +68,8 @@ export const messages = {
     "La compactación no reduce este chat: tras dos compactaciones aún usa el {percent}% de la ventana de contexto del modelo, así que OpenBot deja de compactarlo. Las herramientas y las instrucciones usan la mayor parte de la ventana. Desactiva los servidores MCP o el uso del ordenador que este agente no necesita, o elige un modelo con una ventana mayor. Después, inicia un chat nuevo.",
   "error.backend.contextCompactionStopped":
     "Dos compactaciones seguidas de este chat fallaron, así que OpenBot deja de compactarlo automáticamente. Cada intento envía todo el chat al modelo y consume el límite de tu plan. Selecciona «Compactar ahora» para intentarlo de nuevo o inicia un chat nuevo.",
+  "error.backend.providerModelAtCapacity":
+    "El modelo está al límite de su capacidad. El proveedor lo intentará de nuevo en unos minutos. Para continuar ahora, detén el turno y elige otro modelo.",
   "error.backend.providerRetrying":
     "El proveedor falló esta solicitud {attempts} veces y lo vuelve a intentar. Si el agente no continúa, detén el turno.",
   "error.backend.providerRetryingLargeContext":
@@ -87,6 +89,10 @@ export const messages = {
     "Espera a que termine el trabajo en este canal y luego elimina su historial.",
   "error.backend.channelCompactUnavailable":
     "Ningún miembro de este canal puede compactar su contexto ahora. Un miembro debe responder primero en el canal y su proveedor debe admitir la compactación.",
+  "error.backend.channelCompactNoSession":
+    "Los miembros de este canal aún no tienen una conversación que compactar. Compáctalo después de que un miembro responda en el canal.",
+  "error.backend.channelCompactNotSupported":
+    "Ningún miembro de este canal puede compactar a petición. Los miembros que lo admiten compactan su contexto automáticamente cuando está casi lleno.",
   "error.backend.channelArchived": "Restaura este canal antes de enviar mensajes o cambiar tareas.",
   "error.backend.channelReferenceUnavailable": "El mensaje del canal al que se hace referencia no está disponible.",
   "error.backend.channelTaskNotFound": "No se encontró la tarea del canal.",
@@ -121,6 +127,7 @@ export const messages = {
   "error.backend.memoryOperationFailed": "Falló la operación de memoria. Inténtalo de nuevo.",
   "error.backend.memoryGone": "Este recuerdo ya no existe.",
   "error.backend.routineGone": "Esta rutina ya no existe.",
+  "error.backend.routineRunGone": "Esta ejecución de la rutina ya no existe.",
   "error.backend.turnNotStarted": "El proveedor no inició este turno.",
   "error.backend.routineResultConnectionOff":
     "Esta conexión de mensajería está desactivada o eliminada. Elige otro lugar.",
@@ -170,6 +177,10 @@ export const messages = {
   "error.backend.attachBetween": "Adjunta entre 1 y {limit} archivos.",
   "error.backend.attachmentNotFile": "El adjunto no es un archivo: {path}",
   "error.backend.generatedImageTooLarge": "La imagen generada supera el límite de 100 MB.",
+  "error.backend.generatedVideoTooLarge": "El video generado supera el límite de 100 MB.",
+  "error.backend.videoGenerationFailed": "La generación del video falló.",
+  "error.backend.videoGenerationNoVideo": "La generación del video no devolvió ningún video.",
+  "error.backend.videoGenerationInterrupted": "La generación del video se interrumpió.",
   "error.backend.attachmentNotRegularFile": "Solo se pueden adjuntar archivos normales: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot no pudo copiar {name}.",
   "error.backend.routineNameRequired": "Se requiere un nombre para la rutina.",
@@ -199,6 +210,8 @@ export const messages = {
   "error.backend.interruptSelf": "Un agente no puede interrumpirse a sí mismo.",
   "error.backend.interruptOtherWork":
     "Este agente trabaja en una tarea que no inició tu mensaje. Solo el usuario o quien envió esa tarea puede detenerlo.",
+  "error.backend.interruptSharedWork":
+    "El turno de este agente trabaja en tu mensaje y también en un mensaje del usuario o de otro agente. Solo el usuario puede detenerlo, con Detener agente en el chat de ese agente.",
   "error.backend.interruptStarting":
     "Este agente aún está iniciando un turno. Inténtalo de nuevo cuando empiece el turno.",
   "error.backend.interruptNoSession":
@@ -363,6 +376,8 @@ export const messages = {
     "El proxy {name} rechazó el inicio de sesión, así que la página no se abrió.",
   "error.backend.browserProxyComputerUnreachable":
     "El ordenador que usa este perfil no responde, así que la página no se abrió.",
+  "error.backend.browserProxyComputerLocalAddress":
+    "El ordenador que usa este perfil solo abre sitios públicos. No abre direcciones de una red local, por eso la página no se abrió.",
   "error.backend.browserCertificateUntrusted":
     "El certificado de seguridad de este sitio no es de confianza, así que la página no se abrió.",
   "error.backend.browserLowMemory":

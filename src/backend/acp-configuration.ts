@@ -38,7 +38,7 @@ const MODEL_REASONING_PROBE_TIMEOUT_MS = 1_000;
 /**
  * What the sweep leaves of the discovery deadline for the request that follows it: the restore of the
  * model the session opened on. It is one round trip, and the catalog the caller waits for is already
- * built when it runs. The close of the probe session is not awaited and uses none of it.
+ * built when it runs. The close or delete of the probe session is not awaited and uses none of it.
  */
 const MODEL_REASONING_CLEANUP_MS = 1_000;
 
@@ -98,6 +98,11 @@ export interface AcpConfigurationOptions {
   keepProbeSession?: () => boolean;
   /** `AcpFlavor.probeCloseDelayMs`. */
   probeCloseDelayMs?: number | undefined;
+  /**
+   * Whether the agent answers `session/delete`. OpenCode 2.3.0 keeps a closed session in its history
+   * with one `model-switched` message for each model that the sweep selected (#8816).
+   */
+  deletesSessions?: () => boolean;
 }
 
 /** Owns ACP model discovery and setting translation. The client owns sessions and their state. */
@@ -113,6 +118,14 @@ export class AcpConfiguration {
   #probe: { connection: ClientSideConnection; sessionId: string } | null = null;
   /** One kept-probe discovery at a time: two at once would each open a probe, and one is kept. */
   readonly #probeLock = Semaphore.makeUnsafe(1);
+  /**
+   * The efforts that each model last answered with on this agent process. A sweep that does not reach
+   * a model, as on a busy process, gives the model these and not the efforts of another model (#8236).
+   */
+  #answeredEfforts: {
+    connection: ClientSideConnection;
+    models: Map<string, ReturnType<typeof reasoningFromConfig>>;
+  } | null = null;
   constructor(private readonly options: AcpConfigurationOptions) {}
   readonly discoverModels = Effect.fn("AcpConfiguration.discoverModels")(function* (
     this: AcpConfiguration,
@@ -133,10 +146,7 @@ export class AcpConfiguration {
               this.#probe = { connection, sessionId: probe.sessionId };
             })
           : Effect.forkIn(
-              closeLater(
-                providerCall(() => connection.closeSession({ sessionId: probe.sessionId })).pipe(Effect.ignore),
-                this.options.probeCloseDelayMs,
-              ),
+              closeLater(this.#releaseProbe(connection, probe.sessionId), this.options.probeCloseDelayMs),
               this.options.scope(),
               { startImmediately: true },
             ).pipe(Effect.asVoid),
@@ -166,6 +176,20 @@ export class AcpConfiguration {
   /** The process of the session when it has one of its own, otherwise the agent's. */
   #connection(thread: AcpConfigurationState): ClientSideConnection {
     return thread.transport ? thread.transport.requireConnection() : this.options.connection();
+  }
+
+  /**
+   * The end of a probe session that is not kept. The probe got no prompt and is OpenBot's own, so an
+   * agent that can delete it does: a close leaves it in the agent's session history. A failed delete
+   * still closes it.
+   */
+  #releaseProbe(connection: ClientSideConnection, sessionId: string): Effect.Effect<void> {
+    const close = providerCall(() => connection.closeSession({ sessionId })).pipe(Effect.ignore);
+    if (!this.options.deletesSessions?.()) return close;
+    return providerCall(() => connection.deleteSession({ sessionId })).pipe(
+      Effect.asVoid,
+      Effect.catch(() => close),
+    );
   }
 
   /** A new probe session, or the kept one resumed. A kept session that does not resume is replaced. */
@@ -257,6 +281,9 @@ export class AcpConfiguration {
     const probed: AcpModel[] = [];
     let answered = 0;
     let selected = opening;
+    // A new process can be a new version of the agent, so its models start with no answers.
+    if (this.#answeredEfforts?.connection !== connection) this.#answeredEfforts = { connection, models: new Map() };
+    const answeredEfforts = this.#answeredEfforts.models;
     // The sweep selects models on the process too, also while a turn sets its own.
     this.#processModel = null;
     for (const model of models) {
@@ -269,12 +296,11 @@ export class AcpConfiguration {
         selected = model.id;
         answered += 1;
       }
-      // An unanswered model holds the opening model's options, which say nothing about this model.
-      probed.push(
-        response
-          ? { ...model, ...reasoningFromConfig(response.configOptions) }
-          : { ...model, reasoningEffortConfigurable: true },
-      );
+      const efforts = response ? reasoningFromConfig(response.configOptions) : answeredEfforts.get(model.id);
+      if (response && efforts) answeredEfforts.set(model.id, efforts);
+      // An unanswered model keeps its last answer. With no answer yet, it holds the opening model's
+      // options, which say nothing about this model.
+      probed.push(efforts ? { ...model, ...efforts } : { ...model, reasoningEffortConfigurable: true });
     }
     // Back to the model the session opened on. The session is closed next, but an agent that keeps a
     // "last used model" outside the session would otherwise remember the end of this sweep, and the

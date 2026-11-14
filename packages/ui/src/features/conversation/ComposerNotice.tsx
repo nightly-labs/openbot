@@ -238,12 +238,14 @@ export function formatUsageReset(resetsAt: number | null | undefined, format: Ap
 }
 
 /**
- * A spent plan window can coexist with paid credits. Dismissing the notice only hides the reading;
- * the provider still decides whether to accept the next turn.
+ * A spent plan window can coexist with paid credits. With `onCredits`, the provider reported that the
+ * account keeps working on them, so the notice says that credits are in use, not that work stopped.
+ * Dismissing the notice only hides the reading; the provider still decides whether to accept the next turn.
  */
 export function ComposerUsageLimitNotice(props: {
   provider: AgentProviderId;
   resetsAt?: number | null;
+  onCredits?: boolean;
   onShown?: () => void;
   onDismiss: () => void;
 }) {
@@ -256,11 +258,20 @@ export function ComposerUsageLimitNotice(props: {
   const body = () => {
     const provider = agentProviderName(props.provider);
     const reset = resetAt();
+    if (props.onCredits)
+      return reset
+        ? t("composer.usageLimit.creditsResets", { provider, reset })
+        : t("composer.usageLimit.credits", { provider });
     return reset
       ? t("composer.usageLimit.resets", { provider, reset })
       : t("composer.usageLimit.selectModel", { provider });
   };
   return (
-    <ComposerNotice tone="danger" title={t("composer.usageLimit.title")} body={body()} onDismiss={props.onDismiss} />
+    <ComposerNotice
+      tone={props.onCredits ? "warning" : "danger"}
+      title={props.onCredits ? t("composer.usageLimit.creditsTitle") : t("composer.usageLimit.title")}
+      body={body()}
+      onDismiss={props.onDismiss}
+    />
   );
 }

@@ -17,6 +17,8 @@ const ALLOWED_DIRECTORIES = [
   "apps/auth-api/public/",
   "apps/auth-api/content-art/",
   "apps/auth-api/src/content/guides/media/",
+  // The background logo of the agent display on a server (scripts/hosting/openbot-desktop).
+  "scripts/hosting/desktop/",
 ] as const;
 
 const IMAGE_FILE = /\.(avif|bmp|gif|heic|icns|ico|jpe?g|mov|mp4|png|svg|tiff?|webm|webp)$/i;

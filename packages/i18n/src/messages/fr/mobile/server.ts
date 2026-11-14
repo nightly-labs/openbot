@@ -260,6 +260,7 @@ export const messages = {
     "Le serveur s’arrête puis redémarre. Cela prend environ une minute. Les tours d’agent en cours s’arrêtent et les membres perdent la connexion jusqu’au retour du serveur. Les fichiers et les discussions sont conservés.",
   "mobile.server.settings.restartConfirm": "Redémarrer",
   "mobile.server.settings.restarted": "{name} redémarre",
+  "mobile.server.settings.restartUnsupported": "Mettez à jour OpenBot sur ce serveur pour le redémarrer ici.",
   "mobile.server.settings.leaveTitle": "Quitter {name} ?",
   "mobile.server.settings.leaveBody": "Il vous faudra une nouvelle invitation pour revenir.",
   "mobile.server.settings.leave": "Quitter le serveur",
@@ -326,6 +327,7 @@ export const messages = {
   "mobile.server.route.member": "Membre",
   "mobile.server.route.timezone": "Fuseau horaire",
   "mobile.server.route.personality": "Personnalité de l’agent",
+  "mobile.server.route.agents": "Agents",
   "mobile.server.settings.storage": "Stockage",
   "mobile.server.route.storage": "Stockage",
   "mobile.server.route.storageFiles": "Tous les fichiers",
@@ -378,6 +380,36 @@ export const messages = {
   "mobile.server.library.noMatches": "Aucun fichier correspondant",
   "mobile.server.library.showInChat": "Voir dans la discussion",
   "mobile.server.library.share": "Partager",
+  "mobile.server.library.folders.title": "Dossiers",
+  "mobile.server.library.folders.allFiles": "Tous les fichiers",
+  "mobile.server.library.folders.removedAgents": "Agents supprimés",
+  "mobile.server.library.folders.notInFolder": "Dans aucun dossier",
+  "mobile.server.library.folders.path": "Dossier : {path}",
+  "mobile.server.library.folders.pathHint": "Affiche les dossiers",
+  "mobile.server.library.folders.new": "Nouveau dossier",
+  "mobile.server.library.folders.name": "Nom du dossier",
+  "mobile.server.library.folders.inFolder": "Dans {name}",
+  "mobile.server.library.folders.create": "Créer",
+  "mobile.server.library.folders.rename": "Renommer",
+  "mobile.server.library.folders.renameTitle": "Renommer le dossier",
+  "mobile.server.library.folders.save": "Enregistrer",
+  "mobile.server.library.folders.delete": "Supprimer le dossier",
+  "mobile.server.library.folders.deleteTitle": "Supprimer « {name} » ?",
+  "mobile.server.library.folders.deleteBody":
+    "Les dossiers qu’il contient sont aussi supprimés. Ses fichiers restent avec l’agent.",
+  "mobile.server.library.folders.moveTo": "Déplacer vers un dossier",
+  "mobile.server.library.folders.actions": "Actions pour {name}",
+  "mobile.server.library.folders.expand": "Afficher les dossiers de {name}",
+  "mobile.server.library.folders.collapse": "Masquer les dossiers de {name}",
+  "mobile.server.library.folders.emptyTitle": "Aucun fichier dans ce dossier",
+  "mobile.server.library.folders.emptyBody":
+    "{agent} peut enregistrer des fichiers ici avec le chemin de dossier {path}.",
+  "mobile.server.library.folders.loadFailed": "Impossible de charger les dossiers",
+  "mobile.server.library.folders.changeFailed": "Impossible de modifier les dossiers",
+  "mobile.server.library.folders.gone": "Ce dossier n’est plus sur le serveur.",
+  "mobile.server.library.folders.fileGone": "Ce fichier n’est plus sur le serveur, ou vous ne pouvez pas le déplacer.",
+  "mobile.server.library.folders.unsupported":
+    "Ce serveur n’a pas de dossiers dans la Bibliothèque. Mettez à jour le serveur pour les utiliser.",
   "mobile.server.route.providers": "Fournisseurs",
   "mobile.server.route.provider": "Fournisseur",
   "mobile.server.route.providerModels": "Modèles",
@@ -451,6 +483,25 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "Impossible d’enregistrer la limite de souvenirs. Réessayez.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Mettez à jour OpenBot sur ce serveur pour changer sa limite de souvenirs ici.",
+  "mobile.server.settings.memoryReview": "Revue des souvenirs",
+  "mobile.server.settings.memoryReviewDescription":
+    "À quelle fréquence les agents de ce serveur enregistrent en arrière-plan les faits durables de leurs discussions.",
+  "mobile.server.settings.memoryReviewOff": "Désactivée",
+  "mobile.server.settings.memoryReviewTurns": { one: "Tous les {count} tour", other: "Tous les {count} tours" },
+  "mobile.server.settings.memoryReviewLoadFailed": "Impossible de charger le réglage de revue des souvenirs.",
+  "mobile.server.settings.skillLearning": "Apprentissage des compétences",
+  "mobile.server.settings.skillLearningDescription":
+    "Indique si les agents de ce serveur enregistrent ce qu’ils apprennent sous forme de compétences.",
+  "mobile.server.settings.skillLearningAutomatic": "Automatique",
+  "mobile.server.settings.skillLearningAsk": "Demander d’abord",
+  "mobile.server.settings.skillLearningOff": "Désactivé",
+  "mobile.server.settings.skillLearningLoadFailed": "Impossible de charger le réglage d’apprentissage des compétences.",
+  "mobile.server.settings.browsingMemory": "Apprendre de ma navigation",
+  "mobile.server.settings.browsingMemoryDescription":
+    "Quand vous contrôlez le navigateur d'un agent, l'agent apprend le fonctionnement des sites à partir des pages et des boutons que vous utilisez. Le texte saisi n'est pas conservé.",
+  "mobile.server.settings.browsingMemoryLoadFailed": "Impossible de charger le réglage de navigation.",
+  "mobile.server.settings.learningSaveFailed": "Impossible d’enregistrer ce réglage. Réessayez.",
+  "mobile.server.settings.learningUnsupported": "Mettez à jour OpenBot sur ce serveur pour changer ce réglage ici.",
   "mobile.server.settings.responseStyleDescription":
     "Naturel : les agents envoient de courtes mises à jour pendant leur travail, et le chat les affiche. Classique : les agents répondent une seule fois, à la fin.",
   "mobile.server.settings.responseStyleNatural": "Naturel",
@@ -459,8 +510,8 @@ export const messages = {
   "mobile.server.settings.personalitySaveFailed": "Impossible d’enregistrer le style de réponse. Réessayez.",
   "mobile.server.settings.personalityUnsupported":
     "Mettez à jour OpenBot sur ce serveur pour changer son style de réponse ici.",
-  "mobile.server.settings.personalityUnavailable":
-    "Connectez-vous à ce serveur en tant que propriétaire ou admin pour changer la personnalité de l’agent.",
+  "mobile.server.settings.agentsUnavailable":
+    "Connectez-vous à ce serveur en tant que propriétaire ou admin pour changer les réglages des agents.",
   "mobile.server.route.browserProfiles": "Profils de navigateur",
   "mobile.server.browserProfiles.unavailable":
     "Seul le propriétaire ou un administrateur d’un serveur en ligne peut gérer ses profils de navigateur.",
@@ -725,6 +776,8 @@ export const messages = {
     "OpenBot ne peut pas lire les jetons enregistrés sur {host}. Déconnectez l’espace de travail, puis connectez-le à nouveau.",
   "mobile.server.connectors.slack.helpRelay":
     "OpenBot sur {host} ne peut pas recevoir les événements Slack. Sur {host}, connectez-vous, donnez un nom au serveur dans les Réglages du serveur et gardez OpenBot ouvert.",
+  "mobile.server.connectors.slack.helpNotLinked":
+    "Cet espace de travail n’est pas lié à {host}. Touchez Reconnecter pour le lier.",
   "mobile.server.connectors.slack.orchestratorTitle": "Slack Orchestrator",
   "mobile.server.connectors.slack.orchestratorDescription":
     "Cet agent reçoit chaque demande venant de Slack. Il répond lui-même aux demandes courtes, confie les autres tâches au bon agent et publie la réponse dans le fil.",
@@ -770,6 +823,8 @@ export const messages = {
     "OpenBot ne peut pas lire les jetons enregistrés sur {host}. Déconnectez le serveur Discord, puis connectez-le à nouveau.",
   "mobile.server.connectors.discord.helpRelay":
     "OpenBot sur {host} ne peut pas recevoir les événements Discord. Sur {host}, connectez-vous, donnez un nom au serveur dans les Réglages du serveur et gardez OpenBot ouvert.",
+  "mobile.server.connectors.discord.helpNotLinked":
+    "Ce serveur Discord n’est pas lié à {host}. Touchez Reconnecter pour le lier.",
   "mobile.server.connectors.discord.orchestratorTitle": "Discord Orchestrator",
   "mobile.server.connectors.discord.orchestratorDescription":
     "Cet agent reçoit chaque demande venant de Discord. Il répond lui-même aux demandes courtes, confie les autres tâches au bon agent et répond dans le canal.",
@@ -807,6 +862,8 @@ export const messages = {
     "OpenBot sur {host} ne peut pas recevoir de messages Telegram. Sur {host}, connectez-vous, donnez un nom au serveur dans les Réglages du serveur et gardez OpenBot ouvert.",
   "mobile.server.connectors.telegram.helpError":
     "OpenBot ne peut pas joindre cette discussion. Reconnectez-la ou déconnectez-la.",
+  "mobile.server.connectors.telegram.helpNotLinked":
+    "Cette discussion n’est pas liée à {host}. Touchez Reconnecter pour la lier.",
   "mobile.server.connectors.telegram.retryAt": "Telegram a demandé à OpenBot de patienter. Nouvel essai à {time}.",
   "mobile.server.connectors.telegram.linkTitle": "Associer une discussion",
   "mobile.server.connectors.telegram.linkAnother": "Associer une autre discussion",
@@ -1038,6 +1095,13 @@ export const messages = {
   "mobile.server.providers.status.ready": "Installé",
   "mobile.server.providers.status.notInstalled": "Non installé",
   "mobile.server.providers.status.checking": "Vérification",
+  "mobile.server.providers.accountsKeyHint":
+    "Chaque agent utilise un compte. Choisissez-le dans les réglages de l'agent. Un nouveau compte a besoin d'une clé API de ce compte.",
+  "mobile.server.providers.accountChangeKey": "Changer la clé",
+  "mobile.server.providers.accountKeyHint":
+    "Collez une clé API du compte {provider}. La clé va au serveur. Ce téléphone ne la garde pas.",
+  "mobile.server.providers.accountKeyChecking": "Vérification de la clé…",
+  "mobile.server.providers.accountKeyAddFailed": "Impossible d'ajouter le compte. Réessayez.",
   "mobile.server.providers.pool": "Regrouper les comptes",
   "mobile.server.providers.poolHint":
     "Les agents utilisent un compte jusqu’à ce qu’il approche d’une limite d’usage, puis le compte dont la limite se réinitialise en premier.",
@@ -1124,6 +1188,8 @@ export const messages = {
   "mobile.server.mcp.unsupported": "Mettez à jour OpenBot sur ce serveur pour gérer ses serveurs MCP ici.",
   "mobile.server.mcp.unavailable":
     "Connectez-vous à ce serveur en tant que propriétaire ou administrateur pour gérer ses serveurs MCP.",
+  "mobile.server.mcp.accessUnsupported":
+    "Mettez à jour OpenBot sur ce serveur pour choisir qui reçoit ses serveurs MCP.",
   "mobile.server.mcp.description":
     "Les serveurs MCP donnent plus d’outils aux agents de ce serveur. Les agents Claude et Codex reçoivent uniquement les serveurs de cette liste.",
   "mobile.server.mcp.loading": "Chargement des serveurs MCP…",
@@ -1197,6 +1263,21 @@ export const messages = {
   "mobile.server.mcp.removeBody":
     "Les agents de ce serveur ne reçoivent plus ses outils. Les réglages ne sont pas conservés.",
   "mobile.server.mcp.remove": "Retirer le serveur MCP",
+  "mobile.server.mcp.access.title": "Accès",
+  "mobile.server.mcp.access.agents": "Agents",
+  "mobile.server.mcp.access.agentsOf": "Agents qui peuvent utiliser {name}",
+  "mobile.server.mcp.access.allAgents": "Tous les agents",
+  "mobile.server.mcp.access.allAgentsHint": "Tous les agents inclut aussi chaque agent ajouté plus tard.",
+  "mobile.server.mcp.access.noAgents": "Aucun agent",
+  "mobile.server.mcp.access.someAgents": "{count} sur {total}",
+  "mobile.server.mcp.access.use": "Peut utiliser",
+  "mobile.server.mcp.access.fromEveryone": "Comme Tout le monde",
+  "mobile.server.mcp.access.level": "Accès de {role} à {name}",
+  "mobile.server.mcp.access.hint":
+    "Un membre reçoit le niveau le plus élevé de Tout le monde et de ses rôles. Les propriétaires, les admins et la personne qui a ajouté le serveur peuvent toujours le gérer.",
+  "mobile.server.mcp.access.loadFailed": "Impossible de charger qui reçoit ce serveur MCP.",
+  "mobile.server.mcp.access.unavailable":
+    "Seul un propriétaire ou un admin d’un serveur en ligne peut choisir qui reçoit ce serveur MCP.",
   "mobile.server.usage.agents": "Agents",
   "mobile.server.usage.agentLine": "Jetons : {tokens} · {cost} · {percent}",
   "mobile.server.usage.noAgents": "Aucune utilisation d’agent enregistrée sur cette période.",
@@ -1355,6 +1436,10 @@ export const messages = {
   "mobile.server.roles.agentCount": { one: "{count} agent", other: "{count} agents" },
   "mobile.server.roles.memberCount": { one: "{count} membre", other: "{count} membres" },
   "mobile.server.roles.agentLevel": "Accès de {role} à {agent}",
+  "mobile.server.roles.changeInEveryone": "Modifier dans Tout le monde",
+  "mobile.server.roles.setAll": "Tout définir",
+  "mobile.server.roles.setAllLabel": "Tout définir : accès de {role} à tous les agents",
+  "mobile.server.roles.mixed": "Mixte",
   "mobile.server.roles.delete": "Supprimer le rôle",
   "mobile.server.roles.deleteTitle": "Supprimer {name} ?",
   "mobile.server.roles.deleteBody": "Les membres avec ce rôle perdent les agents qu’il leur donne.",
@@ -1475,6 +1560,7 @@ export const messages = {
   "mobile.server.route.transfer": "Transfert",
   "mobile.server.route.transferExport": "Exporter",
   "mobile.server.route.transferImport": "Importer",
+  "mobile.server.route.transferCopy": "Copier vers un autre serveur",
   "mobile.server.transfer.unsupported": "Mettez à jour OpenBot sur ce serveur pour le transférer ici.",
   "mobile.server.transfer.unavailable":
     "Connectez-vous à ce serveur en tant que propriétaire ou administrateur pour le transférer.",
@@ -1540,4 +1626,21 @@ export const messages = {
     "Ces fournisseurs étaient connectés sur l’autre serveur, mais ne le sont pas ici. Connectez-vous à eux dans Réglages du serveur › Fournisseurs.",
   "mobile.server.transfer.notImported": "Non importé",
   "mobile.server.transfer.warnings": "À vérifier",
+  "mobile.server.transfer.copy": "Copier vers un autre serveur",
+  "mobile.server.transfer.copyNote": "Envoyez des agents vers un autre de vos serveurs.",
+  "mobile.server.transfer.copyTo": "Vers",
+  "mobile.server.transfer.copyNoAgents": "Ce serveur n’a aucun agent.",
+  "mobile.server.transfer.copyNotMoved":
+    "Leurs canaux et le dossier partagé sont aussi copiés. Les clés d’API, les connexions, les connecteurs et l’historique des chats ne sont pas copiés. Configurez-les à nouveau sur l’autre serveur.",
+  "mobile.server.transfer.copySubmit": { one: "Copier {count} agent", other: "Copier {count} agents" },
+  "mobile.server.transfer.copying": "Copie…",
+  "mobile.server.transfer.copyFailed": "La copie n’a pas abouti.",
+  "mobile.server.transfer.copied": {
+    one: "{count} agent copié vers {server}.",
+    other: "{count} agents copiés vers {server}.",
+  },
+  "mobile.server.transfer.copyAgents": "Agents à copier",
+  "mobile.server.transfer.copyNext": "Les agents copiés suivent les règles d’approbation de {server}.",
+  "mobile.server.transfer.copyNoServer":
+    "Connectez-vous à un autre serveur en tant que propriétaire ou administrateur pour y copier des agents.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -507,7 +507,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         })
       : null;
     this.#webrtcTransport?.on("connected", (serverId) => {
-      this.#events.clearReconnectBackoff(serverId);
+      this.#events.transportConnected(serverId);
       this.#events.markSeenOnline(serverId);
       this.#hostRestartAway.delete(serverId);
       const hostedStartAt = this.#hostedStartAt.get(serverId);
@@ -516,14 +516,26 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.#clearHostedStart(serverId);
       this.#hostedStartExpired.delete(serverId);
       this.#connections.markConnected(serverId);
-      this.#emitChanged();
       const server = this.#store.find(serverId);
+      const capabilityRead = server ? this.#connections.startCapabilityRead(serverId) : null;
+      this.#emitChanged();
       this.#background(
         this.#owned(
           Effect.gen({ self: this }, function* () {
-            if (server) yield* this.#client.refreshWebRtcCompatibility(server).pipe(Effect.catch(() => Effect.void));
+            if (server && capabilityRead !== null)
+              yield* this.#client.refreshWebRtcCompatibility(server).pipe(
+                Effect.catch(() => Effect.void),
+                // The renderer holds the workspace load until it sees the end of the read, so the end
+                // and its event stay together on each exit.
+                Effect.ensuring(
+                  Effect.sync(() => {
+                    this.#connections.endCapabilityRead(serverId, capabilityRead);
+                    this.#emitChanged();
+                  }),
+                ),
+              );
             this.#connectTrace?.mark(serverId, "compatibility");
-            this.#emitChanged();
+            if (capabilityRead === null) this.#emitChanged();
             yield* Effect.all(
               [
                 // Another device of the user can have changed the levels while this one was away.
@@ -560,8 +572,11 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       if (!this.#events.isReconnectSuspended(serverId)) this.#connections.setState(serverId, "offline");
       this.#presence.markOffline(serverId);
       this.#emitChanged();
+      const firstDrop = this.#events.transportDisconnected(serverId);
       this.#events.scheduleReconnect(serverId);
-      if (wasOnline) this.emit("directoryInvalidated");
+      // Each read of the host list is a request to the account service. A connection that drops again
+      // after a few seconds already read it after its first drop.
+      if (wasOnline && firstDrop) this.emit("directoryInvalidated");
     });
     // A failed attempt can end with no error event, such as a timeout. The server then stayed offline
     // with no issue, and the full-window loading screen waits for an issue to end (#5273).
@@ -2219,6 +2234,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       requestId?: string,
     ): Effect.fn.Return<DraftAttachment, RemoteWorkflowError, RemoteRequest> {
       const server = yield* remoteDecode(() => this.#store.require(serverId));
+      const keep = this.#attachments.holdUpload(server.id);
       const url = new URL(TEAM_API_ROUTES.attachments, server.apiUrl);
       url.searchParams.set("name", name);
       url.searchParams.set("mime", mimeType || "application/octet-stream");
@@ -2238,12 +2254,16 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         requestId === undefined ? undefined : this.#importProgress(serverId, requestId),
       );
       const json = yield* remoteCall(() => response.json());
-      return yield* remoteDecode(() =>
+      const draft = yield* remoteDecode(() =>
         addRemotePreviewUrls(
           decodeDraftAttachment(decodeTeamProtocolV1CurrentHttpResponse("POST", url.pathname, response.status, json)),
           server.id,
         ),
       );
+      // The thumbnail shows these bytes at once. Without them, it waited for the same image to come back
+      // from the host. The host keeps the name and the type that it answers, as a download of it gives.
+      if (draft.kind === "image") keep(draft.id, { bytes, name: draft.name, mimeType: draft.mimeType });
+      return draft;
     },
     (operation) => this.#owned(operation),
   ).bind(this);

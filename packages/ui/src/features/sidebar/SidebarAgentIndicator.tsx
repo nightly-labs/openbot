@@ -1,4 +1,4 @@
-import { Clock3, MessageCircleQuestionMark, MousePointer2, ShieldCheck, Tooltip, X } from "@openbot/ui";
+import { Clock3, MessageCircleQuestionMark, MousePointer2, ShieldCheck, X } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, Show, untrack } from "solid-js";
 import type { AvatarMood } from "../../bloub-avatar";
@@ -7,6 +7,7 @@ import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
 import { AgentAvatar } from "../agents/AgentAvatar";
+import { SidebarRowTooltip } from "./SidebarRowTooltip";
 import { SIDEBAR_WAIT_ACTION, SIDEBAR_WAIT_HINT, SIDEBAR_WAIT_TITLE } from "./sidebar-filtering";
 import type { SidebarAgentState, SidebarChannelWait, SidebarRoutinePhase, SidebarWaitReason } from "./sidebar-types";
 
@@ -280,26 +281,30 @@ export function SidebarWaitChip(props: { reason: SidebarWaitReason }) {
 
 /**
  * The tooltip of a row in "Needs you": what the chat waits for, the question or the command, and what
- * selecting the row does. It stays closed while the row's context menu is open.
+ * selecting the row does. It stays closed while the row's context menu is open. The compact sidebar
+ * shows only the avatar, so there `name` puts the chat's name first.
  */
-export function SidebarWaitTooltip(props: { wait: SidebarChannelWait; menuOpen: boolean; children: JSX.Element }) {
+export function SidebarWaitTooltip(props: {
+  wait: SidebarChannelWait;
+  menuOpen: boolean;
+  name?: string | undefined;
+  children: JSX.Element;
+}) {
   const { t } = useText();
-  const [open, setOpen] = createSignal(false);
   return (
-    <Tooltip.Root
-      open={open() && !props.menuOpen}
-      onOpenChange={setOpen}
-      placement="right"
-      gutter={10}
+    <SidebarRowTooltip
       openDelay={SIDEBAR_WAIT_TOOLTIP_OPEN_DELAY}
-      closeDelay={0}
-      skipDelayDuration={300}
-    >
-      <Tooltip.Trigger as="div" class="sidebar-agent-tooltip-trigger">
-        {props.children}
-      </Tooltip.Trigger>
-      <Tooltip.Portal>
-        <Tooltip.Content class="sidebar-wait-tooltip">
+      menuOpen={props.menuOpen}
+      class="sidebar-wait-tooltip"
+      content={
+        <>
+          <Show when={props.name}>
+            {(name) => (
+              <span class="sidebar-name-tooltip-name" dir="auto">
+                {name()}
+              </span>
+            )}
+          </Show>
           <span class="sidebar-wait-tooltip-title">
             <SidebarWaitIcon reason={props.wait.reason} />
             {t(SIDEBAR_WAIT_TITLE[props.wait.reason])}
@@ -308,9 +313,11 @@ export function SidebarWaitTooltip(props: { wait: SidebarChannelWait; menuOpen: 
             {(detail) => <span class="sidebar-wait-tooltip-detail">{detail()}</span>}
           </Show>
           <span class="sidebar-wait-tooltip-hint">{t(SIDEBAR_WAIT_HINT[props.wait.reason])}</span>
-        </Tooltip.Content>
-      </Tooltip.Portal>
-    </Tooltip.Root>
+        </>
+      }
+    >
+      {props.children}
+    </SidebarRowTooltip>
   );
 }
 

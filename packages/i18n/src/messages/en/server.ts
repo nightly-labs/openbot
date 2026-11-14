@@ -304,8 +304,7 @@ export const messages = defineMessages("server", {
   "server.settings.generalTitle": "General",
   "server.settings.generalDescription": "Manage this server’s name, logo, and preferences.",
   "server.settings.vaultTitle": "Vault",
-  "server.settings.vaultDescription":
-    "Save logins, cards and contact info that every agent on this server can fill in.",
+  "server.settings.vaultDescription": "Save logins, cards, contact info and API keys for the agents on this server.",
   "server.settings.membersTitle": "Members",
   "server.settings.membersDescription": "Publish this server, invite people, and manage access.",
   "server.settings.desktopTitle": "Remote desktop",
@@ -418,11 +417,24 @@ export const messages = defineMessages("server", {
   "server.settings.later": "Later",
   "server.settings.setUp": "Set up",
   "server.settings.agents": "Agents",
+  "server.settings.agentsDescription":
+    "Choose what the agents on this server can do when you do not set it for an agent.",
   "server.settings.timezone": "Timezone",
   "server.settings.timezoneDescription":
     "New routines use this timezone when the message does not give the sender's timezone.",
   "server.settings.timezoneAutomatic": "Automatic ({zone})",
   "server.settings.timezoneLoadFailed": "Could not load the server timezone.",
+  "server.settings.turnLimit": "Threads at the same time",
+  "server.settings.turnLimitDescription":
+    "How many agent threads can run at the same time on this server. More threads use more memory.",
+  "server.settings.turnLimitAutomatic": "Automatic ({count})",
+  "server.settings.turnLimitAutomaticUnlimited": "Automatic (no limit)",
+  "server.settings.turnLimitUnlimited": "Unlimited",
+  "server.settings.turnLimitsLoadFailed": "Could not load the thread limits of this server.",
+  "server.settings.agentTaskLimit": "Parallel threads per agent",
+  "server.settings.agentTaskLimitDescription":
+    "How many threads each agent can run at the same time when the agent has no limit of its own.",
+  "server.settings.agentTaskLimitDefault": "Default ({count})",
   "server.settings.memoryLimit": "Memories per agent",
   "server.settings.memoryLimitDescription": "How many memories each agent on this server can keep.",
   "server.settings.memoryLimitLoadFailed": "Could not load the memory limit of this server.",

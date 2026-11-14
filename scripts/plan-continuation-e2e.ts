@@ -15,17 +15,22 @@
 //       approval question ("Proceed?"), a real question before it, or a wait does not continue.
 //   4b. A turn with no plan continues when its answer ends on a next step or asks whether to
 //       continue, at most 2 times for one request. A long report that ends on a next step does not.
+//       A Portuguese next step ("Vou consultar o conector agora.") or a status ("I'm checking …")
+//       continues too; one that waits for the user, a later time or a send does not.
 //   5. A turn that opens a wait does not continue.
 //   6. Stop during a continuation ends the chain. The next message works.
 //   7. A message that waits in the queue stops the continuation and runs next.
 //   8. A side thread continues in its own thread only.
 //   9. A routine run does not continue.
+//   9a. A continuation in a new session, as after a tool change, gets the request again before the
+//       note (#8779). The session that ran the request gets the note only (check 1).
 //  10. A restart while a continuation waits completes the request with no new turn.
 // Not checked: a message sent in the short gap before a continuation starts. The drain starts the
 // continuation at once, and a hidden agent refuses new messages. Check 7 covers the same rule.
 // No provider, account or network is used. `bun run test:plan-continuation`.
 // Writes .openbot-build/plan-continuation-e2e/report.json.
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -56,11 +61,15 @@ const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
 type StepStatus = "pending" | "inProgress" | "completed";
 
-/** One turn of the fake: its plan, its answer, its delay and its OpenBot tool calls. */
+/**
+ * One turn of the fake: its plan, its answer, its delay and its OpenBot tool calls. With `holdUntil`,
+ * the turn ends only after that file exists.
+ */
 interface FakeTurn {
   steps: [string, StepStatus][];
   answer?: string;
   delayMs?: number;
+  holdUntil?: string;
   calls?: { tool: string; arguments: Record<string, string> }[];
 }
 
@@ -98,7 +107,12 @@ const finish = (turn) => {
 };
 const callNext = (turn) => {
   const call = turn.calls.shift();
-  if (!call) return timers.set(turn.turnId, setTimeout(() => finish(turn), turn.script.delayMs || 5));
+  if (!call) {
+    const end = () => timers.set(turn.turnId, setTimeout(() => finish(turn), turn.script.delayMs || 5));
+    const hold = turn.script.holdUntil;
+    const wait = () => (fs.existsSync(hold) ? end() : timers.set(turn.turnId, setTimeout(wait, 25)));
+    return hold ? wait() : end();
+  }
   const id = "tool-" + turn.turnId + "-" + turn.calls.length;
   waiting.set(id, turn);
   write({ id, method: "item/tool/call", params: { threadId: turn.threadId, turnId: turn.turnId, callId: "call-" + id, namespace: "openbot", tool: call.tool, arguments: call.arguments } });
@@ -501,6 +515,32 @@ try {
     return { answers: answers.length };
   });
 
+  await check("Portuguese offers, later times, sends and reported problems do not continue", async () => {
+    // A new agent, so that the long chat of the check above does not start a memory turn here.
+    const agent = await createAgent("Cuidadoso");
+    const answers = [
+      "Vou consultar o conector se você quiser.",
+      "Vou verificar depois da sua confirmação.",
+      "Vou rodar os testes amanhã.",
+      "Vou enviar o e-mail agora.",
+      "I'm running late.",
+      "Vou consultar o conector se quiser.",
+      "Vou rodar os testes depois.",
+      "Vou verificar com o time e te retorno.",
+      "I'm running into a permission error.",
+      "I'm checking with the team.",
+      "Estou vendo um erro de permissão no log.",
+    ];
+    for (const answer of answers) {
+      const mark = loggedTurns().length;
+      const id = await send(agent.id, `Check it again. ${plan({ steps: [], answer })}`);
+      assert.equal(await settled(id), "completed");
+      assert.equal(turnsSince(mark).length, 1, `No next-step turn runs after: ${answer}`);
+    }
+    assert.equal(continuationLines(agent.id).length, 0);
+    return { answers: answers.length };
+  });
+
   await check("an answer that only asks whether to continue keeps the plan going", async () => {
     const agent = await createAgent("Permission");
     const mark = loggedTurns().length;
@@ -566,6 +606,32 @@ try {
       "The last answer shows.",
     );
     return { turns: turns.length };
+  });
+
+  await check("a Portuguese next step or a status of running work continues", async () => {
+    const agent = await createAgent("Consultor");
+    const answers = [
+      "Vou consultar o conector agora.",
+      "Estou consultando o conector do Drive.",
+      "Consultando o conector…",
+      "I'm checking the connector now.",
+      "Let me query the connector.",
+      "Deixa eu dar uma olhada no conector.",
+    ];
+    for (const answer of answers) {
+      const mark = loggedTurns().length;
+      const id = await send(
+        agent.id,
+        `Read the sheet. ${plan({ steps: [], answer }, { steps: [], answer: "A planilha tem 3 linhas." })}`,
+      );
+      assert.equal(await settled(id), "completed");
+      assert.deepEqual(
+        turnsSince(mark).map((turn) => turn.note),
+        [false, true],
+        `One next-step continuation turn runs after: ${answer}`,
+      );
+    }
+    return { answers: answers.length };
   });
 
   await check("a request with no plan continues at most 2 times for a next step", async () => {
@@ -787,6 +853,52 @@ try {
     assert.equal(turnsSince(mark).length, 1, "No continuation turn runs.");
     assert.equal(continuationLines(agent.id).length, 0);
     return { turns: 1 };
+  });
+
+  await check("a continuation in a new session gets the request again before the note", async () => {
+    const agent = await createAgent("Retooled");
+    const mark = loggedTurns().length;
+    const since = current.events.length;
+    const request = "Map the warehouse at dock 7.";
+    const release = join(root, "retooled-first-turn");
+    const id = await send(
+      agent.id,
+      `${request} ${plan({
+        steps: [
+          ["Load the map tool", "completed"],
+          ["Draw the map", "pending"],
+        ],
+        answer: "The map tool is registered.",
+        holdUntil: release,
+      })}`,
+    );
+    const first = await waitFor("the first turn", () => turnsSince(mark)[0]);
+    // Without its tool record, the session no longer has the current tools, as after a new MCP
+    // server: the continuation starts a new session. The first turn ends only after the removal.
+    await rm(join(userData, "provider-toolsets", createHash("sha256").update(first.threadId).digest("hex")));
+    await writeFile(release, "");
+    assert.equal(await settled(id), "completed");
+    const turns = turnsSince(mark);
+    assert.deepEqual(
+      turns.map((turn) => turn.note),
+      [false, true],
+      "One continuation turn runs.",
+    );
+    const continued = turns[1];
+    assert.ok(continued && continued.threadId !== first.threadId, "The continuation runs in a new session.");
+    const [header, newest = ""] = continued.text.split("\n\n--- current message ---\n").slice(-2);
+    assert.ok(
+      header?.endsWith("It is the original request, not a new one, and it is not finished."),
+      "A note names the request.",
+    );
+    assert.ok(newest.startsWith(request), "The new session gets the request again.");
+    assert.ok(newest.includes("[pending] Draw the map"), "The note follows the request.");
+    assert.ok(
+      newest.indexOf(request) < newest.indexOf("Your last turn ended while your plan still had open steps"),
+      "The request comes before the note.",
+    );
+    assert.equal(errorsFor(agent.id, since).length, 0, "No error shows.");
+    return { sessions: [first.threadId, continued.threadId] };
   });
 
   await check("a restart while a continuation waits completes the request with no new turn", async () => {

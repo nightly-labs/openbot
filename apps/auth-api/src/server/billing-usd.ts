@@ -7,7 +7,11 @@ const ECB_TIMEOUT_MS = 10_000;
 const ECB_MAX_BYTES = 16 * 1024 * 1024;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 
-export type BillingUsdCurrency = "eur" | "usd" | "pln";
+export type BillingUsdCurrency = "eur" | "usd" | "pln" | "brl";
+
+const BILLING_USD_CURRENCIES: readonly BillingUsdCurrency[] = ["eur", "usd", "pln", "brl"];
+/** The ECB codes that a conversion needs. The ECB gives each rate per euro. */
+const ECB_CURRENCIES = { USD: "usd", PLN: "pln", BRL: "brl" } as const;
 
 export type BillingUsdResult = {
   /** The converted amount in whole US cents. */
@@ -31,10 +35,7 @@ export class BillingUsdError extends Schema.TaggedError<BillingUsdError>()("Bill
   ]),
 }) {}
 
-type HistoricalRate = {
-  usd: number;
-  pln: number;
-};
+type HistoricalRate = Record<(typeof ECB_CURRENCIES)[keyof typeof ECB_CURRENCIES], number>;
 
 type CachedRate = {
   day: unknown;
@@ -43,7 +44,7 @@ type CachedRate = {
 };
 
 /**
- * Converts Stripe's EUR and PLN amounts to USD cents using dated ECB reference rates.
+ * Converts Stripe's EUR, PLN and BRL amounts to USD cents using dated ECB reference rates.
  *
  * The timestamp is a Unix timestamp in seconds, as used by Stripe events. Millisecond Unix
  * timestamps are accepted too because this service is also used by the history importer.
@@ -70,7 +71,7 @@ export class BillingUsd {
       day === null ||
       !Number.isSafeInteger(amountMinor) ||
       amountMinor < 0 ||
-      (currency !== "eur" && currency !== "usd" && currency !== "pln")
+      !BILLING_USD_CURRENCIES.includes(currency)
     ) {
       return yield* new BillingUsdError({ reason: "invalid_input" });
     }
@@ -141,7 +142,7 @@ export class BillingUsd {
     const selected = latestRateOnOrBefore(rates, day, currency);
     if (selected === null) return yield* new BillingUsdError({ reason: "missing_rate" });
 
-    const usdRate = currency === "eur" ? selected.rate.usd : selected.rate.usd / selected.rate.pln;
+    const usdRate = currency === "eur" ? selected.rate.usd : selected.rate.usd / selected.rate[currency];
     if (numberRate(usdRate) === null) return yield* new BillingUsdError({ reason: "invalid_rate" });
 
     yield* Effect.tryPromise({
@@ -230,7 +231,7 @@ function latestRateOnOrBefore(
 function rateForCurrency(rate: HistoricalRate, currency: Exclude<BillingUsdCurrency, "usd">): boolean {
   return currency === "eur"
     ? numberRate(rate.usd) !== null
-    : numberRate(rate.usd) !== null && numberRate(rate.pln) !== null;
+    : numberRate(rate.usd) !== null && numberRate(rate[currency]) !== null;
 }
 
 /** Parses the ECB Cube hierarchy without relying on attribute order or line wrapping. */
@@ -283,21 +284,16 @@ function parseHistoricalRates(document: string): ReadonlyMap<string, HistoricalR
     const parent = stack.at(-1)?.day;
     if (parent === undefined || parent === null || currency === undefined || rate === undefined || attrs.size !== 2)
       return null;
-    if (currency !== "USD" && currency !== "PLN") {
+    if (currency !== "USD" && currency !== "PLN" && currency !== "BRL") {
       if (!selfClosing) stack.push({ day: parent });
       continue;
     }
     const parsedRate = Number(rate);
     if (numberRate(parsedRate) === null) return null;
-    const existing = rates.get(parent) ?? { usd: Number.NaN, pln: Number.NaN };
-    if (
-      (currency === "USD" && Number.isFinite(existing.usd)) ||
-      (currency === "PLN" && Number.isFinite(existing.pln))
-    ) {
-      return null;
-    }
-    if (currency === "USD") existing.usd = parsedRate;
-    else existing.pln = parsedRate;
+    const existing = rates.get(parent) ?? { usd: Number.NaN, pln: Number.NaN, brl: Number.NaN };
+    const key = ECB_CURRENCIES[currency];
+    if (Number.isFinite(existing[key])) return null;
+    existing[key] = parsedRate;
     rates.set(parent, existing);
     if (!selfClosing) stack.push({ day: parent });
   }

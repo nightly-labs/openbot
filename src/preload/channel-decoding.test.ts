@@ -44,3 +44,25 @@ describe("stored channel instructions over the limit", () => {
     expect(() => parseChannelCommand(save(tooLong))).toThrow();
   });
 });
+
+// #9141: a database can hold a channel whose lead is not a member. Startup reads every channel, so
+// refusing that row stopped every provider from starting.
+describe("stored channel lead that is not a member", () => {
+  const members = [{ agentId: "agent-1" }, { agentId: "agent-3" }];
+
+  it("reads the lead as the first member", () => {
+    expect(decodeChannel({ ...CHANNEL, members, leadAgentId: "agent-2" }).leadAgentId).toBe("agent-1");
+  });
+
+  it("reads no lead when the channel has no members", () => {
+    expect(decodeChannel({ ...CHANNEL, members: [], leadAgentId: "agent-2" }).leadAgentId).toBeNull();
+  });
+
+  it("keeps a lead that is a member", () => {
+    expect(decodeChannel({ ...CHANNEL, members, leadAgentId: "agent-3" }).leadAgentId).toBe("agent-3");
+  });
+
+  it("still refuses a save with that lead", () => {
+    expect(() => parseChannelCommand({ ...save(""), draft: { ...save("").draft, leadAgentId: "agent-2" } })).toThrow();
+  });
+});

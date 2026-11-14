@@ -1,7 +1,7 @@
 import {
-  BILLING_CURRENCIES,
   BILLING_INTERVALS,
   BILLING_METADATA,
+  BILLING_OPTIONAL_CURRENCIES,
   BILLING_PLAN_IDS,
   BILLING_PLANS,
   BILLING_SUBSCRIPTION_STATUSES,
@@ -16,12 +16,14 @@ import {
   isBillingAmount,
   isOpenBillingStatus,
   parseBillingLookupKey,
-  planStorageGb,
 } from "@openbot/contracts/billing";
-import type {
-  HostedServerCatalog,
-  HostedServerCatalogPlan,
-  HostedServerEntryPoint,
+import {
+  type HostedServerCatalog,
+  type HostedServerCatalogPlan,
+  type HostedServerEntryPoint,
+  type HostedServerPlanPrices,
+  type HostedServerSize,
+  hostedServerStorageGb,
 } from "@openbot/contracts/hosted-servers";
 import {
   LICENSE_METADATA,
@@ -64,6 +66,7 @@ import type { StripeTransportError } from "./stripe-client";
 import {
   isBillingCurrency,
   parseStripeEvent,
+  priceHasCurrency,
   StripeClient,
   type StripeEvent,
   type StripeFetch,
@@ -112,6 +115,8 @@ interface ServerPlanRow {
   cancel_at_period_end: number;
   /** 1 for a hosted server on a machine of the operator. */
   on_operator_host: number;
+  /** The machine of the hosted server after a resize that waits, or null when the subscription has no server row. */
+  server_size: HostedServerSize | null;
 }
 
 /** A subscription that the webhook stored, for a server that its metadata names. */
@@ -252,7 +257,10 @@ export class BillingService {
     });
   }
 
-  /** The plans with their Stripe prices. A plan with no price in each currency and interval is left out. */
+  /**
+   * The plans with their Stripe prices. A plan with no price in each base currency and interval is left
+   * out. An optional currency, such as BRL, is in a plan only when its Stripe Price has it.
+   */
 
   readonly catalog = Effect.fn("BillingService.catalog")(
     function* (
@@ -260,21 +268,26 @@ export class BillingService {
     ): Effect.fn.Return<HostedServerCatalog, BillingError | BillingOperationError, BillingDependencies> {
       const prices = yield* this.#prices();
       const plans = BILLING_PLANS.flatMap((plan): HostedServerCatalogPlan[] => {
-        const amounts: Partial<HostedServerCatalogPlan["prices"]> = {};
-        for (const currency of BILLING_CURRENCIES) {
+        const amounts = (currency: BillingCurrency): Record<BillingInterval, number> | null => {
           const month = priceAmount(prices.get(billingLookupKey(plan.id, "month")), currency);
           const year = priceAmount(prices.get(billingLookupKey(plan.id, "year")), currency);
-          if (month === null || year === null) return [];
-          amounts[currency] = { month, year };
-        }
-        const { eur, usd, pln } = amounts;
+          return month === null || year === null ? null : { month, year };
+        };
+        const eur = amounts("eur");
+        const usd = amounts("usd");
+        const pln = amounts("pln");
         if (!eur || !usd || !pln) return [];
+        const planPrices: HostedServerPlanPrices = { eur, usd, pln };
+        for (const currency of BILLING_OPTIONAL_CURRENCIES) {
+          const optional = amounts(currency);
+          if (optional) planPrices[currency] = optional;
+        }
         const entry: HostedServerCatalogPlan = {
           id: plan.id,
           diskGb: plan.storageGb,
           memberLimit: plan.memberLimit,
           relativeSpeed: plan.relativeSpeed,
-          prices: { eur, usd, pln },
+          prices: planPrices,
         };
         if (SOLD_OUT_PLANS.has(plan.id)) entry.soldOut = true;
         return [entry];
@@ -342,7 +355,7 @@ export class BillingService {
       const order = request.license;
       const licensePlan = order ? { tier: order.tier, interval: request.interval, bundle: true } : null;
       const licensePrice = licensePlan ? yield* this.license.price(licensePlan) : null;
-      if (licensePlan && !licensePrice)
+      if (licensePlan && (!licensePrice || !priceHasCurrency(licensePrice, request.currency)))
         return yield* new BillingError(503, "license_unavailable", sourceText("error.billing.licenseUnavailable"));
       if (order) yield* this.license.assertCanOrder(request.user.id, order.users);
       yield* this.license.assertCurrency(request.user.id, request.currency);
@@ -717,7 +730,8 @@ export class BillingService {
               .prepare(
                 `SELECT s.stripe_subscription_id, s.server_id, h.name AS server_name, s.plan, s.interval, s.currency,
                   s.amount, s.status, s.current_period_end, s.cancel_at_period_end,
-                  hs.operator_host IS NOT NULL AS on_operator_host
+                  hs.operator_host IS NOT NULL AS on_operator_host,
+                  CASE WHEN hs.provider_template IS NULL THEN NULL ELSE COALESCE(hs.pending_size, hs.size) END AS server_size
            FROM billing_subscriptions s
            LEFT JOIN remote_hosts h ON h.host_id = s.server_id AND h.owner_user_id = s.user_id
            LEFT JOIN hosted_servers hs ON hs.server_id = s.server_id AND hs.owner_user_id = s.user_id
@@ -1274,7 +1288,7 @@ function serverPlan(row: ServerPlanRow): BillingServerPlan | null {
     status: row.status,
     currentPeriodEnd: row.current_period_end,
     cancelAtPeriodEnd: row.cancel_at_period_end === 1,
-    storageGb: planStorageGb(row.plan, row.on_operator_host === 1),
+    storageGb: hostedServerStorageGb(row.plan, row.on_operator_host === 1, row.server_size),
   };
 }
 

@@ -26,3 +26,17 @@ export const MOBILE_LATEST_VERSIONS: MobileLatestVersions = {
   ios: "1.4.9",
   android: "1.4.9",
 };
+
+/**
+ * The first Android version that has its APK on GitHub, from the `Stage the Android APK` workflow.
+ * From this version on, the site offers the APK of the newest Google Play version above, for a phone
+ * with no Google Play (`apps/auth-api/src/lib/android-apk.ts`). A change of this file on main makes
+ * the APK of that version public (the `Publish the Android APK` workflow).
+ *
+ * `null` hides the APK download. Keep it `null`: the APK that Google Play makes does not start
+ * when it is not installed from Google Play. It has Play's automatic integrity protection
+ * (`com.pairip.licensecheck`), which shows "Get this app from Play". The APK of 1.4.9 was public on
+ * 2026-11-13 and showed this. Open the download again only with an APK that starts after an
+ * install from the file.
+ */
+export const ANDROID_APK_FIRST_VERSION: string | null = null;

@@ -54,6 +54,8 @@ interface ChatAttachmentProps {
   tint?: AttachmentTint;
   /** The page of a visual reply, which shows in the chat as desktop shows it, at the agent's height. */
   visual?: { height?: number } | undefined;
+  /** The width over height of a video frame until the video gives its first frame. */
+  videoRatio?: number;
 }
 
 export interface AttachmentTint {
@@ -71,7 +73,8 @@ export function ChatAttachmentView(props: ChatAttachmentProps) {
   const playable =
     props.upload === undefined && download === "download" && !attachment.id.startsWith("mobile-draft-attachment-");
   const media = playable ? kind : null;
-  if (chatVideo && media === "video") return <chatVideo.ChatVideoAttachment {...props} />;
+  if (chatVideo && media === "video")
+    return <chatVideo.ChatVideoAttachment {...props} unknownRatio={props.videoRatio} />;
   if (chatAudio && media === "audio") return <chatAudio.ChatAudioAttachment {...props} />;
   if (
     props.visual &&

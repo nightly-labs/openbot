@@ -7,7 +7,11 @@ export const messages = {
   "status.agent.instructionsChanged": "עדכן את ההוראות שלו",
   "status.agent.modelSwitchedForLimit": "הגעת למכסת השימוש. עבר אל {model}.",
   "status.agent.modelReturnedAfterLimit": "מכסת השימוש התאפסה. חזר אל {model}.",
+  "status.agent.routineSkippedRunOpen": "דולגה ריצה: הריצה הקודמת עוד לא הסתיימה",
+  "status.agent.routineSkippedUsageLimit": "דולגה ריצה: הגעת למכסת השימוש",
   "status.agent.modelSwitchedForError": "שגיאת ספק. עבר אל {model}.",
+  "status.agent.modelSwitchedForSpentBalance":
+    "ל-{previous} לא נשארו קרדיטים. עבר ל-{model}. כדי להשתמש בו שוב, הוסף קרדיטים ואז בחר בו.",
   "status.agent.modelReturnedAfterError": "חזר אל {model} אחרי שגיאת הספק.",
   "status.agent.marketplaceSuggested": "הציע אפליקציה מהחנות: {app}.",
   "status.agent.channelMemberAdded": "{agent} הוסיף את {member} לערוץ. {person} ביקש זאת.",

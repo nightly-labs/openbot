@@ -30,6 +30,8 @@ export interface RemoteServerConnectionStatus {
   // Bumped on every fresh connection. The renderer uses it to tell a reconnect from a still-open
   // connection, so it has to change even when nothing else about the status does.
   connectionSequence: number;
+  // True from a new WebRTC connection until its capability read ends, with or without a result.
+  capabilitiesPending: boolean;
   hostRestart: ServerSummary["hostRestart"];
   /** A hosted server that the account service stopped for no use, or that it starts now. */
   hostedSleep: ServerSummary["hostedSleep"];

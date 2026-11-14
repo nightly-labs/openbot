@@ -66,6 +66,8 @@ export const messages = {
     "圧縮してもこのチャットは小さくなりません。2回圧縮しても、モデルのコンテキストウィンドウの{percent}%を使っているため、OpenBotは自動圧縮を止めます。ウィンドウの大部分はツールと指示が使っています。このエージェントに不要なMCPサーバーやコンピューター操作をオフにするか、より大きなウィンドウのモデルを選んでください。その後、新しいチャットを開始してください。",
   "error.backend.contextCompactionStopped":
     "このチャットの圧縮が2回続けて失敗したため、OpenBot は自動圧縮を停止します。試行のたびにチャット全体がモデルに送信され、プランの上限を消費します。もう一度試すには「今すぐ圧縮」を選択するか、新しいチャットを開始してください。",
+  "error.backend.providerModelAtCapacity":
+    "モデルが混雑しています。プロバイダーは数分後に再試行します。今すぐ続けるには、ターンを停止して別のモデルを選んでください。",
   "error.backend.providerRetrying":
     "プロバイダーでこのリクエストが{attempts}回失敗し、再試行しています。エージェントが続かない場合は、ターンを停止してください。",
   "error.backend.providerRetryingLargeContext":
@@ -85,6 +87,10 @@ export const messages = {
     "このチャンネルの作業が終わるまで待ってから、履歴を削除してください。",
   "error.backend.channelCompactUnavailable":
     "今はこのチャンネルのどのメンバーもコンテキストを圧縮できません。メンバーがまずチャンネルで回答し、そのプロバイダーが圧縮に対応している必要があります。",
+  "error.backend.channelCompactNoSession":
+    "このチャンネルのメンバーには、まだ圧縮する会話がありません。メンバーがチャンネルで回答した後に圧縮してください。",
+  "error.backend.channelCompactNotSupported":
+    "このチャンネルのどのメンバーも、要求に応じて圧縮できません。対応しているメンバーは、コンテキストがほぼいっぱいになると自動で圧縮します。",
   "error.backend.channelArchived":
     "メッセージを送信したりタスクを変更したりする前に、このチャンネルを復元してください。",
   "error.backend.channelReferenceUnavailable": "参照先のチャンネルメッセージを使用できません。",
@@ -123,6 +129,7 @@ export const messages = {
   "error.backend.memoryOperationFailed": "メモリーの操作に失敗しました。もう一度お試しください。",
   "error.backend.memoryGone": "このメモリーはもう存在しません。",
   "error.backend.routineGone": "このルーティンはもう存在しません。",
+  "error.backend.routineRunGone": "このルーティンの実行はもう存在しません。",
   "error.backend.turnNotStarted": "プロバイダーはこのターンを開始しませんでした。",
   "error.backend.routineResultConnectionOff":
     "このメッセージ接続はオフか削除されています。別の送信先を選んでください。",
@@ -171,6 +178,10 @@ export const messages = {
   "error.backend.attachBetween": "1 〜 {limit} 個のファイルを添付してください。",
   "error.backend.attachmentNotFile": "添付ファイルがファイルではありません: {path}",
   "error.backend.generatedImageTooLarge": "生成された画像が 100 MB の上限を超えています。",
+  "error.backend.generatedVideoTooLarge": "生成された動画が 100 MB の上限を超えています。",
+  "error.backend.videoGenerationFailed": "動画の生成に失敗しました。",
+  "error.backend.videoGenerationNoVideo": "動画の生成で動画が返されませんでした。",
+  "error.backend.videoGenerationInterrupted": "動画の生成が中断されました。",
   "error.backend.attachmentNotRegularFile": "添付できるのは通常のファイルだけです: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot は {name} をコピーできませんでした。",
   "error.backend.routineNameRequired": "ルーティン名が必要です。",
@@ -200,6 +211,8 @@ export const messages = {
   "error.backend.interruptSelf": "エージェントは自分自身を中断できません。",
   "error.backend.interruptOtherWork":
     "このエージェントは、あなたのメッセージで開始されていないタスクを実行中です。そのタスクを停止できるのは、ユーザーまたはそのタスクの送信者だけです。",
+  "error.backend.interruptSharedWork":
+    "このエージェントのターンは、あなたのメッセージに加えて、ユーザーまたは別のエージェントからのメッセージも処理しています。停止できるのはユーザーだけで、そのエージェントのチャットの「エージェントを停止」を使います。",
   "error.backend.interruptStarting":
     "このエージェントはまだターンを開始中です。ターンが始まってからもう一度お試しください。",
   "error.backend.interruptNoSession":
@@ -363,6 +376,8 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "プロキシ {name} がサインインを拒否したため、ページを開けませんでした。",
   "error.backend.browserProxyComputerUnreachable":
     "このプロファイルが使うコンピューターが応答しないため、ページを開けませんでした。",
+  "error.backend.browserProxyComputerLocalAddress":
+    "このプロファイルが使うコンピューターは公開サイトだけを開きます。ローカルネットワーク上のアドレスは開かないため、ページを開けませんでした。",
   "error.backend.browserCertificateUntrusted":
     "このサイトのセキュリティ証明書が信頼されていないため、ページを開けませんでした。",
   "error.backend.browserLowMemory":

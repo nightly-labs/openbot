@@ -185,6 +185,8 @@ export const messages = {
     "{provider} CLI bir tur üzerinde çalışıyor. Bitmesini bekleyin, ardından güncelleyin.",
   "error.provider.cliSelectFailed": "OpenBot kurulu yönetilen CLI'yi seçemedi.",
   "error.provider.noAuthenticatedAccount": "{provider} kimliği doğrulanmış bir hesap döndürmedi.",
+  "error.provider.codexModelProvider":
+    "Bu bilgisayardaki Codex başka bir model sağlayıcısı kullanıyor ve bu sağlayıcı ChatGPT oturumu veya OpenAI API anahtarı kullanmıyor. ChatGPT ajanları bu sağlayıcıyı şimdi kullanabilir. ChatGPT hesabınızı kullanmak için Codex model sağlayıcısını yeniden OpenAI olarak ayarlayın.",
   "error.provider.signInExpired": "{provider} oturumunuzun süresi doldu. Devam etmek için yeniden oturum açın.",
   "error.provider.cliActivateFailed": "OpenBot yönetilen CLI'yi etkinleştiremedi.",
   "error.provider.noMainlandChinaSignIn": "{provider} için Çin anakarası oturum açma yok.",
@@ -216,13 +218,17 @@ export const messages = {
   "error.provider.opencodeInvalidUpload":
     "OpenCode'un model sağlayıcısı geçersiz bir yükleme isteği bildirdi. Başka bir model seçin ve devam edin. Kayıtlı rutinleri yeniden oluşturmadan önce denetleyin.\n{detail}",
   "error.provider.opencodeUnreadableContent":
-    "Bu model, bu sohbetteki bir dosyayı veya görseli okuyamıyor. Dosya okuyabilen bir model seçin, ardından mesajınızı yeniden gönderin.",
+    "Bu model, bu sohbetteki bir dosyayı veya görseli okuyamıyor. OpenBot, sohbet geçmişiyle yeni bir OpenCode oturumu başlattı. Mesajınızı dosya olmadan yeniden gönderin veya dosya okuyabilen bir model seçin. Bu modeli özel bir sağlayıcıya eklediyseniz, ayarlarında “Kabul eder” altındaki “Görseller” seçeneğini kaldırın.",
+  "error.provider.opencodeContextTooSmall":
+    "Bu sohbet modelin bağlam penceresine sığmıyor. Ollama veya LM Studio'da modeli daha büyük bir bağlam uzunluğuyla yükleyin ve OpenBot'taki sağlayıcı ayarlarına aynı pencereyi girin. Ya da daha büyük bir model seçin.",
   "error.provider.opencodeFreeLimit":
     "Ücretsiz OpenCode modelleri kullanım sınırına ulaştı. Tüm ücretsiz modeller bu sınırı paylaşır. Devam etmek için OpenCode ayarlarına bir OpenCode Go anahtarı yapıştırın veya başka bir sağlayıcının modelini seçin.",
   "error.provider.opencodeProviderFailed":
     "Model sağlayıcısı kendi tarafında başarısız oldu. Bağlantınız bunun nedeni değildir. Daha sonra tekrar deneyin veya başka bir model seçin.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "Modelin yanıtı yarıda kesildi veya geçerli değildi. Mesajınızı tekrar gönderin veya başka bir model seçin.\n{detail}",
+  "error.provider.opencodeReasoningOverlap":
+    "OpenCode bu efor düzeyinde bu modelin akıl yürütmesini okuyamadı. Daha düşük bir efor ya da başka bir model seçin, sonra mesajınızı yeniden gönderin.",
   "error.provider.opencodeNetwork":
     "OpenCode model sağlayıcısına bağlanamadı. OpenBot'u çalıştıran bilgisayarın ağ bağlantısını kontrol edin, ardından tekrar deneyin.\n{detail}",
   "error.provider.codexStateBusy":
@@ -257,6 +263,8 @@ export const messages = {
     "OPENBOT_ANTIGRAVITY_PATH içindeki Gemini sunucusu yok veya çalıştırılabilir değil. Yolu düzeltin ya da değişkeni kaldırın, ardından OpenBot'u yeniden başlatın.",
   "error.provider.antigravityVersionUnreadable": "Gemini sunucu sürümü okunamıyor.",
   "error.provider.antigravitySignIn": "Gemini'yi kullanmak için Google ile oturum açın.",
+  "error.provider.antigravityModelAtCapacity":
+    "Google'ın şu anda bu Gemini modeli için boş kapasitesi yok. Sebep planınızın kotası değil. Birkaç dakika sonra yeniden deneyin ya da başka bir model seçin.\n{detail}",
   "error.provider.antigravityRateLimited":
     "Bir hız sınırına veya planın kotasına ulaşıldığı için Gemini isteği reddetti. Birkaç dakika bekleyin ya da başka bir model seçin, sonra yeniden deneyin.\n{detail}",
   "error.provider.antigravityQuotaReached":
@@ -306,6 +314,10 @@ export const messages = {
   "error.provider.hermesVersionUnreadable": "Hermes Agent sürümü okunamıyor.",
   "error.provider.hermesSignIn":
     "Hermes'i kullanmak için Nous Portal ile oturum açın veya bir terminalde `hermes setup` komutunu çalıştırın.",
+  "error.provider.hermesTurnFailed":
+    "Hermes bu turu bitiremedi. Yanıtı bir neden veriyorsa onu izleyin. Vermiyorsa bu ajanın bir MCP sunucusu kullanılamıyor olabilir: Sunucu ayarları › MCP bölümünden kontrol edin, sonra mesajınızı yeniden gönderin.",
+  "error.provider.copilotThinkingRejected":
+    "GitHub Copilot bu modeli kullanamadı: model, düşünme ayarını kabul etmedi. Bu ajan için başka bir model seçin, sonra mesajınızı yeniden gönderin.",
   "error.provider.usageLimitReached": "Hesap kullanım sınırına ulaştı.",
   "error.provider.claudeContextFull":
     "Bu sohbet Claude için çok uzun hale geldi. OpenBot sohbet geçmişiyle yeni bir Claude Code oturumu başlattı. Tekrar deneyin.",
@@ -321,6 +333,8 @@ export const messages = {
     "Sohbette çok fazla görsel olduğu için model bu sohbeti kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
   "error.provider.opencodeSessionRejected":
     "OpenCode isteği reddetti ve nedenini belirtmedi. Bu, uzun bir sohbette veya model değişikliğinden sonra olabilir. OpenBot, sohbet geçmişiyle yeni bir OpenCode oturumu başlattı. Yeniden deneyin. Hata sürerse başka bir model veya daha düşük bir efor seçin.",
+  "error.provider.opencodeCompactionFailed":
+    "Model, bağlam penceresinde yer açmak için bu uzun sohbeti özetleyemedi. OpenBot, sohbet geçmişiyle yeni bir OpenCode oturumu başlattı. Yeniden deneyin. Hata sürerse daha güçlü bir model seçin.",
   "error.provider.museMcpStartupFault":
     "Muse bir MCP sunucusunu başlatamadı ve bu oturumda MCP’yi engelledi. OpenBot, sohbet geçmişiyle yeni bir Muse oturumu başlattı. Tekrar deneyin. Hata devam ederse bu ajan için Bilgisayar Kullanımı’nı veya başarısız olan MCP sunucusunu kapatın.",
   "error.provider.claudeSessionMissing":
@@ -341,12 +355,18 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "Tarayıcıda yalnızca HTTPS oturum açma bağlantıları açılabilir.",
   "error.provider.geminiKeyRefused":
     "Gemini kayıtlı API anahtarını reddetti. Ayarlar'da anahtarı değiştirin veya kaldırın, ardından yeniden bağlanın.",
+  "error.provider.geminiAccountSettingsUnreadable":
+    "Gemini bu hesabın ayar dosyasını açamıyor, bu yüzden oturum açamıyor. Bu hesabı kaldırın ve yeniden ekleyin.",
+  "error.provider.geminiSettingsUnreadable":
+    "Gemini bu bilgisayarda ayar dosyasını açamıyor, bu yüzden oturum açamıyor. Gemini kullanan diğer uygulamaları kapatın, ardından OpenBot'u kapatıp yeniden açın.",
   "error.provider.geminiVerificationRequired":
     "Gemini'nin yanıt verebilmesi için Google'ın hesabınızı doğrulaması gerekiyor. Google hesabınızı bir tarayıcıda doğrulayın, ardından mesajınızı yeniden gönderin.",
   "error.provider.keyProviderRefused":
     "{provider} kayıtlı API anahtarını reddetti. Ayarlar'da anahtarı değiştirin veya kaldırın, ardından yeniden deneyin.",
   "error.provider.keyProviderNoBalance":
     "Kayıtlı API anahtarının {provider} hesabında bakiye yok. Hesaba kredi ekleyin, ardından yeniden deneyin.",
+  "error.provider.keyProviderLowCredit":
+    "Kayıtlı API anahtarının {provider} hesabında bu modelin yanıtı için yeterli kredi yok. Hesaba kredi ekleyin veya başka bir model seçin, ardından yeniden deneyin.",
   "error.provider.modelServiceRefused":
     "Model hizmeti isteği reddetti. Başka bir model seçin veya hizmette bu modele erişiminizi kontrol edin.",
   "error.provider.modelServiceRefusedReason":
@@ -400,6 +420,14 @@ export const messages = {
   "error.provider.accountDefault": "İlk {provider} hesabı kaldırılamaz.",
   "error.provider.accountUsesKey":
     "Bu {provider} hesabı kayıtlı API anahtarını kullanır ve oturum açma içermez. Anahtarı Sunucu ayarları → Sağlayıcılar bölümünde değiştirin.",
+  "error.provider.accountNeedsKey":
+    "Yeni bir {provider} hesabı için API anahtarı gerekir. Bu cihazda OpenBot'u güncelleyin, sonra hesabı yeniden ekleyin.",
+  "error.provider.accountKeyRefused":
+    "{provider} bu API anahtarını kabul etmedi. Anahtarı kontrol edin, sonra tekrar deneyin.",
+  "error.provider.accountKeyUnreachable":
+    "OpenBot, API anahtarını kontrol etmek için {provider} hizmetine ulaşamadı. İnternet bağlantısını kontrol edin, sonra tekrar deneyin.",
+  "error.provider.accountKeySignedOut":
+    "{provider} bu hesabın API anahtarını artık kabul etmiyor. Hesaba yeni bir anahtar verin.",
   "error.provider.accountInUse": "Bu hesabı kullanan bir ajan çalışıyor. Ajan durduğunda tekrar deneyin.",
   "error.provider.accountsReadOnly":
     "Kayıtlı sağlayıcı hesapları okunamıyor. Bunları değiştirmeden önce OpenBot'u güncelleyin.",

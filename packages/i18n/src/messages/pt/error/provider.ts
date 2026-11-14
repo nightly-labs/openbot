@@ -187,6 +187,8 @@ export const messages = {
   "error.provider.cliBusyUpdate": "A CLI de {provider} está executando um turno. Aguarde o término e atualize.",
   "error.provider.cliSelectFailed": "O OpenBot não conseguiu selecionar a CLI instalada e gerenciada.",
   "error.provider.noAuthenticatedAccount": "{provider} não retornou uma conta autenticada.",
+  "error.provider.codexModelProvider":
+    "O Codex neste computador usa outro provedor de modelos, e esse provedor não usa login do ChatGPT nem chave de API da OpenAI. Os agentes do ChatGPT já podem usar esse provedor. Para usar sua conta do ChatGPT, volte o provedor de modelos do Codex para OpenAI.",
   "error.provider.signInExpired": "Seu login em {provider} expirou. Entre novamente para continuar.",
   "error.provider.cliActivateFailed": "O OpenBot não conseguiu ativar a CLI gerenciada.",
   "error.provider.noMainlandChinaSignIn": "{provider} não tem login para a China continental.",
@@ -217,13 +219,17 @@ export const messages = {
   "error.provider.opencodeInvalidUpload":
     "O provedor de modelos do OpenCode reportou uma requisição de upload inválida. Escolha outro modelo e continue. Verifique as rotinas salvas antes de recriá-las.\n{detail}",
   "error.provider.opencodeUnreadableContent":
-    "Este modelo não consegue ler um arquivo ou uma imagem neste chat. Escolha um modelo que leia arquivos e envie sua mensagem de novo.",
+    "Este modelo não consegue ler um arquivo ou uma imagem neste chat. O OpenBot iniciou uma nova sessão do OpenCode com o histórico do chat. Envie sua mensagem de novo sem o arquivo ou escolha um modelo que leia arquivos. Se você adicionou este modelo a um provedor personalizado, desmarque “Imagens” em “Aceita” nas configurações dele.",
+  "error.provider.opencodeContextTooSmall":
+    "Esta conversa não cabe na janela de contexto do modelo. No Ollama ou no LM Studio, carregue o modelo com um contexto maior e informe a mesma janela nas configurações do provedor no OpenBot. Ou escolha um modelo maior.",
   "error.provider.opencodeFreeLimit":
     "Os modelos gratuitos do OpenCode atingiram o limite de uso. Todos os modelos gratuitos compartilham esse limite. Para continuar, cole uma chave do OpenCode Go nas configurações do OpenCode ou escolha um modelo de outro provedor.",
   "error.provider.opencodeProviderFailed":
     "Ocorreu uma falha no provedor do modelo. Sua conexão não é a causa. Tente novamente mais tarde ou escolha outro modelo.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "A resposta do modelo foi interrompida ou não era válida. Envie sua mensagem de novo ou escolha outro modelo.\n{detail}",
+  "error.provider.opencodeReasoningOverlap":
+    "O OpenCode não conseguiu ler o raciocínio deste modelo com este esforço. Selecione um esforço menor ou outro modelo e envie sua mensagem de novo.",
   "error.provider.opencodeNetwork":
     "O OpenCode não conseguiu se conectar ao provedor do modelo. Verifique a conexão de rede do computador que executa o OpenBot e tente novamente.\n{detail}",
   "error.provider.codexStateBusy":
@@ -258,6 +264,8 @@ export const messages = {
     "O servidor do Gemini em OPENBOT_ANTIGRAVITY_PATH não existe ou não é executável. Corrija o caminho ou remova a variável e reinicie o OpenBot.",
   "error.provider.antigravityVersionUnreadable": "Não foi possível ler a versão do servidor do Gemini.",
   "error.provider.antigravitySignIn": "Entre com o Google para usar o Gemini.",
+  "error.provider.antigravityModelAtCapacity":
+    "O Google não tem capacidade livre para este modelo do Gemini agora. A cota do seu plano não é a causa. Tente novamente em alguns minutos ou escolha outro modelo.\n{detail}",
   "error.provider.antigravityRateLimited":
     "O Gemini recusou a solicitação porque um limite de requisições ou a cota do plano foi atingido. Aguarde alguns minutos ou escolha outro modelo e tente novamente.\n{detail}",
   "error.provider.antigravityQuotaReached":
@@ -304,6 +312,10 @@ export const messages = {
     "Não foi possível iniciar o Hermes Agent. Execute `hermes --version` em um terminal.",
   "error.provider.hermesVersionUnreadable": "Não é possível ler a versão do Hermes Agent.",
   "error.provider.hermesSignIn": "Entre com o Nous Portal ou execute `hermes setup` em um terminal para usar o Hermes.",
+  "error.provider.hermesTurnFailed":
+    "O Hermes não conseguiu terminar este turno. Se a resposta dele der um motivo, siga o que ela diz. Se não, um servidor MCP deste agente pode estar indisponível: verifique-o em Configurações do servidor › MCP e envie sua mensagem de novo.",
+  "error.provider.copilotThinkingRejected":
+    "O GitHub Copilot não conseguiu usar este modelo: o modelo não aceitou a configuração de raciocínio. Selecione outro modelo para este agente e envie a mensagem de novo.",
   "error.provider.usageLimitReached": "A conta atingiu seu limite de uso.",
   "error.provider.claudeContextFull":
     "Este chat ficou longo demais para o Claude. O OpenBot iniciou uma nova sessão do Claude Code com o histórico do chat. Tente novamente.",
@@ -319,6 +331,8 @@ export const messages = {
     "O modelo não aceitou este chat porque ele tem imagens demais. O OpenBot iniciou uma nova sessão do {provider} com o histórico do chat. Tente novamente.",
   "error.provider.opencodeSessionRejected":
     "O OpenCode recusou a solicitação e não informou a causa. Isso pode acontecer em um chat longo ou depois de trocar de modelo. O OpenBot iniciou uma nova sessão do OpenCode com o histórico do chat. Tente novamente. Se o erro continuar, escolha outro modelo ou um esforço menor.",
+  "error.provider.opencodeCompactionFailed":
+    "O modelo não conseguiu resumir este chat longo para liberar espaço na janela de contexto. O OpenBot iniciou uma nova sessão do OpenCode com o histórico do chat. Tente novamente. Se o erro continuar, escolha um modelo mais potente.",
   "error.provider.museMcpStartupFault":
     "O Muse não conseguiu iniciar um servidor MCP e bloqueou o MCP nesta sessão. O OpenBot iniciou uma nova sessão do Muse com o histórico do chat. Tente novamente. Se o erro continuar, desative o Uso do computador ou o servidor MCP que falhou para este agente.",
   "error.provider.claudeSessionMissing":
@@ -339,12 +353,18 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "Somente links de login HTTPS podem abrir no navegador.",
   "error.provider.geminiKeyRefused":
     "O Gemini recusou a chave de API salva. Substitua ou remova a chave nas Configurações e conecte novamente.",
+  "error.provider.geminiAccountSettingsUnreadable":
+    "O Gemini não consegue abrir o arquivo de configurações desta conta, então não consegue entrar. Remova esta conta e adicione-a novamente.",
+  "error.provider.geminiSettingsUnreadable":
+    "O Gemini não consegue abrir o arquivo de configurações dele neste computador, então não consegue entrar. Feche os outros apps que usam o Gemini e depois feche e abra o OpenBot novamente.",
   "error.provider.geminiVerificationRequired":
     "O Google precisa verificar sua conta antes que o Gemini possa responder. Verifique sua conta do Google em um navegador e envie sua mensagem novamente.",
   "error.provider.keyProviderRefused":
     "O {provider} recusou a chave de API salva. Substitua ou remova a chave nas Configurações e tente novamente.",
   "error.provider.keyProviderNoBalance":
     "A conta do {provider} da chave de API salva não tem saldo. Adicione crédito à conta e tente novamente.",
+  "error.provider.keyProviderLowCredit":
+    "A conta do {provider} da chave de API salva não tem crédito suficiente para uma resposta deste modelo. Adicione crédito à conta ou selecione outro modelo e tente novamente.",
   "error.provider.modelServiceRefused":
     "O serviço do modelo recusou a solicitação. Escolha outro modelo ou verifique seu acesso a este modelo no serviço.",
   "error.provider.modelServiceRefusedReason":
@@ -398,6 +418,13 @@ export const messages = {
   "error.provider.accountDefault": "A primeira conta de {provider} não pode ser removida.",
   "error.provider.accountUsesKey":
     "Esta conta de {provider} usa a chave de API salva e não tem login. Altere a chave em Configurações do servidor → Provedores.",
+  "error.provider.accountNeedsKey":
+    "Uma nova conta de {provider} precisa de uma chave de API. Atualize o OpenBot neste dispositivo e adicione a conta de novo.",
+  "error.provider.accountKeyRefused": "{provider} não aceitou esta chave de API. Verifique a chave e tente novamente.",
+  "error.provider.accountKeyUnreachable":
+    "O OpenBot não conseguiu acessar {provider} para verificar a chave de API. Verifique a conexão com a internet e tente novamente.",
+  "error.provider.accountKeySignedOut":
+    "{provider} não aceita mais a chave de API desta conta. Informe uma nova chave para a conta.",
   "error.provider.accountInUse":
     "Um agente que usa esta conta está trabalhando. Tente novamente quando o agente parar.",
   "error.provider.accountsReadOnly":
