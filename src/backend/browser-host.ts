@@ -319,6 +319,12 @@ const IDLE_TAB_SWEEP_MS = 60_000;
 const MAX_IDLE_AWAKE_TABS = 3;
 const AWAKE_TAB_GRACE_MS = 2 * 60_000;
 /**
+ * What the agent reads on its next tool call on a tab that the idle unload closed. The tab kept its
+ * address and title, so without it the agent reads a missing script or value as a bug of the page.
+ */
+const IDLE_UNLOAD_NOTE =
+  "Note: this tab was not used for some time, so its page was unloaded to free memory and loaded again from its address. Scripts that you injected, page variables, form input and the tab history from before are gone. Set them up again if you need them. An idle tab unloads sooner when several other tabs are open: close the tabs that you no longer need.";
+/**
  * The page load errors that say the proxy of the tab did not answer or refused it, and why, with
  * their Chromium codes. A failed load can give only the code, with no name.
  */
@@ -954,6 +960,7 @@ export class BrowserHost {
               (capture ? yield* Deferred.await(capture.frame).pipe(Effect.catch(() => Effect.succeed(null))) : null);
             if (tab.sleeping !== sleeping || tab.closing || tab.contents.isDestroyed()) return;
             unloaded = true;
+            tab.unloadedWhileIdle = true;
             yield* this.#closeRenderer(tab);
           }),
         true,
@@ -2767,8 +2774,10 @@ export class BrowserHost {
     params: DynamicToolCallParams,
     hooks: BrowserDynamicToolHooks = {},
   ): Effect.fn.Return<DynamicToolResult, BrowserOperationError> {
+    let calledTabId: string | undefined;
     const outcome = yield* Effect.gen({ self: this }, function* () {
       const call = yield* browserSync(() => parseBrowserToolCall(params.tool, params.arguments));
+      if ("tabId" in call.args) calledTabId = call.args.tabId;
       yield* browserSync(() => this.#controls.begin(params, call));
       return { result: yield* runBrowserTool(this.#toolHandlers, call.tool, call, params, hooks) };
     })
@@ -2800,7 +2809,7 @@ export class BrowserHost {
           }),
         ),
       );
-    if ("result" in outcome) return outcome.result;
+    if ("result" in outcome) return this.#withIdleUnloadNote(params, calledTabId, outcome.result);
     // The agent's control of the tab ended above, so the wait does not show the agent at work.
     if (hooks.onUserControl) return yield* hooks.onUserControl(outcome.heldTabId);
     return {
@@ -2808,6 +2817,24 @@ export class BrowserHost {
       contentItems: [{ type: "inputText", text: new BrowserUserControlHeld(outcome.heldTabId).message }],
     };
   }).bind(this);
+
+  /**
+   * Adds `IDLE_UNLOAD_NOTE` after the result of the agent's next tool on a tab that the idle unload
+   * closed (#8833). It comes last, so a reader of the first text still gets the tool's own result.
+   * Only a thread that can use the tab gets it, and only once.
+   */
+  #withIdleUnloadNote(
+    params: DynamicToolCallParams,
+    tabId: string | undefined,
+    result: DynamicToolResult,
+  ): DynamicToolResult {
+    const tab = tabId === undefined ? undefined : this.#tabs.get(tabId);
+    if (!tab?.unloadedWhileIdle) return result;
+    const listed = this.listTabs().find((candidate) => candidate.id === tab.id);
+    if (!listed || !this.#canUseToolTab(params, listed)) return result;
+    tab.unloadedWhileIdle = false;
+    return { ...result, contentItems: [...result.contentItems, { type: "inputText", text: IDLE_UNLOAD_NOTE }] };
+  }
 
   #toolTabs(params: DynamicToolCallParams): { tabs: BrowserTab[]; activeTabId: string | null } {
     // A page can put a typed card value in its title or address, so they go through the tab's scrub.
