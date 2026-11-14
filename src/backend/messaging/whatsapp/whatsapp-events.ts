@@ -309,7 +309,7 @@ function quoteOf(
         fromMe: false,
         ...(where.isGroup && contextInfo.participant ? { participant: contextInfo.participant } : {}),
       },
-      message: contextInfo.quotedMessage,
+      message: contextInfo.quotedMessage ?? null,
     });
   // Names its files, so that the agent knows which of the message's files are the replied-to ones.
   const names = files.length ? `(Attached files: ${files.map((file) => file.name).join(", ")})` : "";
