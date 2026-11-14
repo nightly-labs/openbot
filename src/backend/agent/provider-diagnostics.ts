@@ -366,11 +366,12 @@ export function isImageTooLargeDiagnostic(message: string): boolean {
  * accepts in one request. The provider session sends each image of the chat again on each turn, so
  * each turn fails the same way until a new session (#6702). vLLM and Venice write "At most 10
  * image(s) may be provided in one request.", OpenCode's gateway "Too many images in request: 31 >
- * 30", and other endpoints "Request contains 52 images, exceeding the maximum of 50 allowed per
- * request". A daily quota of images is not a count in one request, so it does not match.
+ * 30", other endpoints "Request contains 52 images, exceeding the maximum of 50 allowed per
+ * request", and a custom endpoint behind OpenCode "This request has more images than the limit of 4."
+ * (#9038). A daily quota of images is not a count in one request, so it does not match.
  */
 export function isImageCountDiagnostic(message: string): boolean {
-  return /\b(?:at most|a maximum of) \d+ image(?:s|\(s\))? may be provided\b|\btoo many images in (?:the |this |one )?(?:request|prompt|message)\b|\b\d+ images\b[^.\n]{0,40}\bexceed\w* (?:the )?maximum of \d+(?! ?(?:[kmg]i?b|bytes?|px|pixels?)\b)(?: images| allowed)?\b/iu.test(
+  return /\b(?:at most|a maximum of) \d+ image(?:s|\(s\))? may be provided\b|\btoo many images in (?:the |this |one )?(?:request|prompt|message)\b|\b\d+ images\b[^.\n]{0,40}\bexceed\w* (?:the )?maximum of \d+(?! ?(?:[kmg]i?b|bytes?|px|pixels?)\b)(?: images| allowed)?\b|\b(?:request|prompt|message) (?:has|contains) more images than (?:the )?(?:limit|maximum) of \d+\b/iu.test(
     message,
   );
 }
