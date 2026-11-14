@@ -231,6 +231,8 @@ export class SignalIngress implements MessagingIngress {
   #telegramBackoffMs = BACKOFF_START_MS;
   readonly #sessionListeners = new Set<(session: DiscordSession | null) => void>();
   readonly #routeListeners = new Set<(guildIds: ReadonlySet<string>) => void>();
+  /** The guilds that Signal routes to the open socket, from its `discord-session`. */
+  #discordGuilds: ReadonlySet<string> | null = null;
   readonly #linkedRouteListeners: Record<LinkedRoutePlatform, Set<(ids: ReadonlySet<string> | null) => void>> = {
     slack: new Set(),
     telegram: new Set(),
@@ -436,6 +438,13 @@ export class SignalIngress implements MessagingIngress {
         catch: () => new MessagingAdapterError({ cause: new DiscordApiError(request.op, "invalid_answer") }),
       });
     const refused = Result.getOrNull(Result.try(() => decodeDiscordApiError(JSON.parse(text))));
+    // Signal no longer routes the guild to this socket: the account service linked it to another host.
+    if (
+      refused?.code === "unknown_guild" &&
+      this.#discordSession === session &&
+      this.#discordGuilds?.has(request.guildId)
+    )
+      this.#setDiscordGuilds(new Set([...this.#discordGuilds].filter((guildId) => guildId !== request.guildId)));
     return yield* new MessagingAdapterError({
       cause: new DiscordApiError(request.op, refused?.code ?? `http_${status}`, refused?.retryAfterMs),
     });
@@ -444,6 +453,11 @@ export class SignalIngress implements MessagingIngress {
   onDiscordRoutes(listener: (guildIds: ReadonlySet<string>) => void): () => void {
     this.#routeListeners.add(listener);
     return () => this.#routeListeners.delete(listener);
+  }
+
+  #setDiscordGuilds(guildIds: ReadonlySet<string>): void {
+    this.#discordGuilds = guildIds;
+    for (const listener of [...this.#routeListeners]) listener(guildIds);
   }
 
   onLinkedRoutes(platform: LinkedRoutePlatform, listener: (ids: ReadonlySet<string> | null) => void): () => void {
@@ -596,6 +610,7 @@ export class SignalIngress implements MessagingIngress {
       if (socket !== this.#socket) return;
       this.#socket = null;
       this.#discordSession = null;
+      this.#discordGuilds = null;
       this.#linkedRoutes = { slack: null, telegram: null };
       this.#endTelegram();
       this.#stopPing();
@@ -734,8 +749,7 @@ export class SignalIngress implements MessagingIngress {
       const session = { token: message.token, url };
       this.#discordSession = session;
       for (const listener of [...this.#sessionListeners]) listener(session);
-      const routes = new Set(message.guilds);
-      for (const listener of [...this.#routeListeners]) listener(routes);
+      this.#setDiscordGuilds(new Set(message.guilds));
       return;
     }
     if (message.type === "discord-delivery") {
@@ -926,6 +940,7 @@ export class SignalIngress implements MessagingIngress {
     const socket = this.#socket;
     this.#socket = null;
     this.#discordSession = null;
+    this.#discordGuilds = null;
     this.#linkedRoutes = { slack: null, telegram: null };
     this.#webhookReady = false;
     this.#loseGitHub();

@@ -564,6 +564,7 @@ export class MessagingService {
     // Signal sends a workspace or chat that is linked to another host there: only a new link brings it here.
     if (this.#live.get(record.connectionId)?.state === "not_linked") {
       if (platform === "slack") return yield* this.connectSlackWorkspace(opensPage);
+      if (platform === "discord") return yield* this.connectDiscordGuild(opensPage);
       if (platform === "telegram")
         return yield* this.connectTelegramChat(workspaceId.startsWith("-") ? "group" : "direct", opensPage);
     }
@@ -2511,6 +2512,9 @@ const WHATSAPP_LOCAL_REFUSALS = new Map([
   ["not_linked", WHATSAPP_NOT_CONNECTED],
 ]);
 
+const DISCORD_NOT_LINKED =
+  "This Discord server is not linked to this OpenBot server now. Another OpenBot server of the user may answer there. Tell the user to open Marketplace, then Apps, then Discord, and to select Reconnect for this Discord server if this server must answer there.";
+
 /** The platform's error code, such as Slack's `not_in_channel`, and never its text or a token. */
 function refusal(failure: MessagingAdapterError): string {
   const cause = failure.cause;
@@ -2519,6 +2523,8 @@ function refusal(failure: MessagingAdapterError): string {
     return `WhatsApp refused the message: ${cause.code}. It was not delivered. Do not post it again: tell the user that WhatsApp did not deliver it.`;
   const local = cause instanceof Error ? WHATSAPP_LOCAL_REFUSALS.get(cause.message) : undefined;
   if (local) return local;
+  // Signal routes the guild to another host of the account, or to none. Only a new link brings it back.
+  if (cause instanceof DiscordApiError && cause.code === "unknown_guild") return DISCORD_NOT_LINKED;
   const code =
     cause instanceof SlackApiError || cause instanceof DiscordApiError || cause instanceof TelegramCallError
       ? cause.code

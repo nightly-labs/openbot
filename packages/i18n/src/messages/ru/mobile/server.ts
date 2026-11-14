@@ -913,6 +913,8 @@ export const messages = {
     "OpenBot не может прочитать сохранённые токены на {host}. Отключите сервер Discord и подключите его снова.",
   "mobile.server.connectors.discord.helpRelay":
     "OpenBot на {host} не может получать события Discord. На {host} войдите в аккаунт, задайте серверу имя в настройках сервера и не закрывайте OpenBot.",
+  "mobile.server.connectors.discord.helpNotLinked":
+    "Этот сервер Discord не связан с {host}. Нажмите «Переподключить», чтобы связать его.",
   "mobile.server.connectors.discord.orchestratorTitle": "Оркестратор Discord",
   "mobile.server.connectors.discord.orchestratorDescription":
     "Этот агент получает все запросы из Discord. Короткие он обрабатывает сам, остальную работу передаёт нужному агенту и отвечает в канале.",

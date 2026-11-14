@@ -823,6 +823,8 @@ export const messages = {
     "O OpenBot não consegue ler os tokens salvos em {host}. Desconecte o servidor do Discord e conecte-o novamente.",
   "mobile.server.connectors.discord.helpRelay":
     "O OpenBot em {host} não consegue receber eventos do Discord. Em {host}, entre na sua conta, dê um nome ao servidor nas Configurações do servidor e mantenha o OpenBot aberto.",
+  "mobile.server.connectors.discord.helpNotLinked":
+    "Este servidor do Discord não está vinculado a {host}. Toque em Reconectar para vinculá-lo.",
   "mobile.server.connectors.discord.orchestratorTitle": "Orquestrador do Discord",
   "mobile.server.connectors.discord.orchestratorDescription":
     "Este agente recebe todas as solicitações do Discord. Ele mesmo responde às curtas, encaminha o restante do trabalho ao agente certo e responde no canal.",

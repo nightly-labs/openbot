@@ -359,7 +359,8 @@ export interface MessagingIngress {
   ): Effect.Effect<A, MessagingAdapterError>;
   /**
    * Calls `listener` with the Discord guilds that Signal routes to the socket, each time Signal
-   * sends a session. A guild of this host that is not in it was unlinked, or the bot left it.
+   * sends a session, and when Signal refuses a call because it no longer routes a guild here. A guild
+   * of this host that is not in it was linked to another host, unlinked, or the bot left it.
    */
   onDiscordRoutes(listener: (guildIds: ReadonlySet<string>) => void): () => void;
   /**

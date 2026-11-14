@@ -798,6 +798,8 @@ export const messages = {
     "OpenBot は {host} に保存されたトークンを読み取れません。Discord サーバーを切断してから、もう一度接続してください。",
   "mobile.server.connectors.discord.helpRelay":
     "{host} の OpenBot は Discord のイベントを受信できません。{host} でサインインし、サーバー設定でサーバーに名前を付けて、OpenBot を開いたままにしてください。",
+  "mobile.server.connectors.discord.helpNotLinked":
+    "この Discord サーバーは {host} にリンクされていません。リンクするには「再接続」をタップしてください。",
   "mobile.server.connectors.discord.orchestratorTitle": "Discord Orchestrator",
   "mobile.server.connectors.discord.orchestratorDescription":
     "このエージェントは Discord からのすべてのリクエストを受け取ります。短いものには自分で回答し、その他の作業は適切なエージェントに任せて、チャンネルで回答を返信します。",

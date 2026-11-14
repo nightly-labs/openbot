@@ -779,6 +779,8 @@ export const messages = {
     "OpenBot이 {host}에 저장된 토큰을 읽을 수 없어요. Discord 서버 연결을 해제한 다음 다시 연결해 주세요.",
   "mobile.server.connectors.discord.helpRelay":
     "{host}의 OpenBot이 Discord 이벤트를 받을 수 없어요. {host}에서 로그인하고, 서버 설정에서 서버 이름을 지정한 다음 OpenBot을 계속 실행해 두세요.",
+  "mobile.server.connectors.discord.helpNotLinked":
+    "이 Discord 서버는 {host}에 연결되어 있지 않습니다. 연결하려면 다시 연결을 누르세요.",
   "mobile.server.connectors.discord.orchestratorTitle": "Discord Orchestrator",
   "mobile.server.connectors.discord.orchestratorDescription":
     "이 에이전트가 Discord의 모든 요청을 받아요. 짧은 요청은 직접 답변하고, 다른 작업은 알맞은 에이전트에게 맡긴 다음 채널에 답장으로 답변해요.",

@@ -92,9 +92,11 @@ function connectionHelp(
       return t(slack ? "mobile.server.connectors.slack.helpRelay" : "mobile.server.connectors.discord.helpRelay", {
         host,
       });
-    // Only Slack reports it: Discord learns its guilds from Signal and reports `invalid_token`.
     case "not_linked":
-      return slack ? t("mobile.server.connectors.slack.helpNotLinked", { host }) : null;
+      return t(
+        slack ? "mobile.server.connectors.slack.helpNotLinked" : "mobile.server.connectors.discord.helpNotLinked",
+        { host },
+      );
     default:
       return null;
   }
