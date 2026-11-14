@@ -852,15 +852,24 @@ export class RoutineStore {
   }
 
   /**
-   * Records a due occurrence that the scheduler did not start, with the reason as source text, and
-   * moves the trigger. A skip for the same reason right after an earlier one extends that record, so
-   * a long run does not fill the history with one entry for each occurrence.
+   * Records the due occurrences from `due` through `scheduledFor` that the scheduler did not start,
+   * with the reason as source text, and moves the trigger. A skip for the same reason that follows
+   * the last one with no occurrence between them extends that record, so a long run does not fill
+   * the history with one entry for each occurrence.
    */
-  protected skipOccurrenceRow(routine: OwnedRoutine, scheduledFor: Date, nextRunAt: Date, reason: string): void {
+  protected skipOccurrenceRow(
+    routine: OwnedRoutine,
+    due: Date,
+    scheduledFor: Date,
+    nextRunAt: Date,
+    reason: string,
+  ): void {
     const { runTable, ownerColumn } = this.tables;
+    const { schedule } = routine.trigger;
+    const { count } = missedOccurrences(schedule, routine.timezone, due, scheduledFor);
     const latest = this.database.connection
       .prepare(
-        `SELECT run_id, trigger_id, status, error, missed_count FROM ${runTable}
+        `SELECT run_id, trigger_id, status, error, missed_count, scheduled_for, missed_until FROM ${runTable}
          WHERE routine_id = ? AND ${ownerColumn} = ? ORDER BY created_at DESC, run_id DESC LIMIT 1`,
       )
       .get(routine.id, routine.ownerId);
@@ -870,12 +879,18 @@ export class RoutineStore {
       latest.trigger_id === routine.trigger.id &&
       latest.status === "cancelled" &&
       latest.error === reason &&
-      typeof latest.missed_count === "number"
+      typeof latest.missed_count === "number" &&
+      isString(latest.scheduled_for) &&
+      nextRoutineOccurrence(
+        schedule,
+        routine.timezone,
+        new Date(isString(latest.missed_until) ? latest.missed_until : latest.scheduled_for),
+      ).getTime() === due.getTime()
     ) {
-      this.#extendSkipped(routine, latest.run_id, latest.missed_count + 1, scheduledFor, nextRunAt);
+      this.#extendSkipped(routine, latest.run_id, latest.missed_count + count, scheduledFor, nextRunAt);
       return;
     }
-    this.#recordMissed(routine, { first: scheduledFor, until: scheduledFor, count: 1 }, nextRunAt, reason);
+    this.#recordMissed(routine, { first: due, until: scheduledFor, count }, nextRunAt, reason);
   }
 
   #extendSkipped(routine: OwnedRoutine, runId: string, count: number, until: Date, nextRunAt: Date): void {

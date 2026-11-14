@@ -938,7 +938,8 @@ export class RoutineScheduler implements RoutineDueSource {
               : null;
           changedAgents.add(current.agentId);
           if (skipReason) {
-            this.#routines.skipOccurrence(current, scheduledFor, nextRunAt, skipReason);
+            const due = new Date(current.trigger.nextRunAt);
+            this.#routines.skipOccurrences(current, due, scheduledFor, nextRunAt, skipReason);
             return null;
           }
           const queued = this.#routines.createRun(current, current.trigger.id, "scheduled", scheduledFor.toISOString());
