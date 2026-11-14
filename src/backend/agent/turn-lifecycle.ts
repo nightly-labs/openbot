@@ -1,3 +1,4 @@
+import { agentProviderName } from "@openbot/contracts/agent-providers";
 import { isNarrationItemId } from "@openbot/contracts/conversation-narration";
 import {
   type AgentEvent,
@@ -413,9 +414,10 @@ export class TurnLifecycle {
   /**
    * Running turns whose own compaction lost the connection, with the error in plain words. `stalled`:
    * the compaction deadline stopped the turn, so its `interrupted` end is a failure. The end of the
-   * turn continues it once, or shows the error.
+   * turn continues it once, or shows the error. `loop`: OpenBot stopped a turn whose provider
+   * compacted again and again with no use (#8985); it does not continue.
    */
-  readonly #compactionFailures = new Map<string, HeldProviderError & { stalled?: true }>();
+  readonly #compactionFailures = new Map<string, HeldProviderError & { stalled?: true; loop?: true }>();
   /** The deadline of the compaction that runs inside a turn, by provider thread. */
   readonly #compactionDeadlines = new Map<string, NodeJS.Timeout>();
   /**
@@ -754,6 +756,29 @@ export class TurnLifecycle {
     this.#compactionDeadlines.set(threadId, timer);
   }
 
+  /**
+   * Stops a turn whose provider compacts again and again with no use: each compaction leaves the
+   * session above the provider's own limit, so the turn makes no progress (#8985). The turn does not
+   * continue, as a turn that lost its connection does: it would compact again.
+   */
+  #stopCompactionLoop(agentId: string, threadId: string, turnId: string, client: AgentClient): void {
+    this.#clearCompactionDeadline(threadId);
+    logger.warn("A provider compacted again and again; OpenBot stops its turn.", { provider: client.provider });
+    this.#holdCompactionFailure(
+      turnId,
+      {
+        causeCode: "context_too_long",
+        provider: client.provider,
+        model: this.#hooks.turnModel(agentId, turnId),
+        turnId,
+        severity: "error",
+      },
+      true,
+      sourceText("error.agent.compactionLoopStopped", { provider: agentProviderName(client.provider) }),
+    );
+    Effect.runFork(client.request("turn/interrupt", { threadId, turnId }, decodeRecordResponse).pipe(Effect.ignore));
+  }
+
   #clearCompactionDeadline(threadId: string): void {
     const timer = this.#compactionDeadlines.get(threadId);
     if (timer) clearTimeout(timer);
@@ -761,11 +786,25 @@ export class TurnLifecycle {
   }
 
   /** Keeps the error of a turn whose compaction lost the connection until the turn ends. */
-  #holdCompactionFailure(turnId: string, context: FailureContext & { causeCode: CauseCode }, stalled: boolean): void {
-    const message = sourceText("error.agent.compactionConnectionLost");
+  #holdCompactionFailure(
+    turnId: string,
+    context: FailureContext & { causeCode: CauseCode },
+    stalled: boolean,
+    loopMessage?: string,
+  ): void {
+    const held = this.#compactionFailures.get(turnId);
+    // An error that Codex sends for the compaction that the loop stop ended keeps the loop's reason.
+    if (held?.loop) return;
+    const loop = loopMessage !== undefined;
+    const message = loopMessage ?? sourceText("error.agent.compactionConnectionLost");
     // An error that Codex sends after the deadline stopped the turn keeps the turn stopped by it.
-    const stopped = stalled || this.#compactionFailures.get(turnId)?.stalled === true;
-    this.#compactionFailures.set(turnId, { message, context, ...(stopped ? { stalled: true as const } : {}) });
+    const stopped = stalled || held?.stalled === true;
+    this.#compactionFailures.set(turnId, {
+      message,
+      context,
+      ...(stopped ? { stalled: true as const } : {}),
+      ...(loop ? { loop: true as const } : {}),
+    });
     // The failed delivery keeps this reason, not the provider's text.
     this.#turnErrors.set(turnId, message);
   }
@@ -1045,9 +1084,11 @@ export class TurnLifecycle {
             source.contextCompaction === "events" &&
             this.#runningTurns.has(turnId) &&
             !this.#compaction.isCompactionTurn(threadId, turnId)
-          )
-            this.#armCompactionDeadline(agentId, threadId, turnId, source);
-          else this.#clearCompactionDeadline(threadId);
+          ) {
+            if (this.#compaction.repeatsCompaction(threadId))
+              this.#stopCompactionLoop(agentId, threadId, turnId, source);
+            else this.#armCompactionDeadline(agentId, threadId, turnId, source);
+          } else this.#clearCompactionDeadline(threadId);
           if (!this.#compaction.isCompactionTurn(threadId, turnId))
             this.#compaction.observeCompaction(
               threadId,
@@ -1739,6 +1780,7 @@ export class TurnLifecycle {
       // continues, and shows no error. A second such stop shows the error (#5822).
       const compactionContinuation =
         compactionFailure !== undefined &&
+        !compactionFailure.loop &&
         failover === undefined &&
         status === "failed" &&
         running !== undefined &&
