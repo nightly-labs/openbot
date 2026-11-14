@@ -26,6 +26,12 @@ export type AccountUsageTone = PlanLimitTone;
 /** One limit window that a provider reported, such as its 5-hour or its weekly window. */
 export interface AccountUsageWindowRow {
   label: string;
+  /**
+   * The named quota group of a window whose group has more than one window. The list shows the
+   * group name once, on a line of its own, and only the short window name on each row, so a cut
+   * label does not hide which window a row is.
+   */
+  group?: { name: string; window: string };
   remainingPercent: number;
   tone: AccountUsageTone;
   /** Unix seconds. */
@@ -153,17 +159,14 @@ function usageRow(
     groups.length > 0
       ? groups.flatMap((group) => {
           const groupWindows = reportedUsageWindows(group);
-          return groupWindows.map((window) =>
-            windowRow(
-              window,
-              groupWindows.length > 1
-                ? text.t("account.usage.window.group", {
-                    group: group.name,
-                    window: usageWindowLabel(window.windowDurationMins, text),
-                  })
-                : group.name,
-            ),
-          );
+          return groupWindows.map((window) => {
+            if (groupWindows.length === 1) return windowRow(window, group.name);
+            const windowName = usageWindowLabel(window.windowDurationMins, text);
+            return {
+              ...windowRow(window, text.t("account.usage.window.group", { group: group.name, window: windowName })),
+              group: { name: group.name, window: windowName },
+            };
+          });
         })
       : ownWindows;
   // OpenCode's third window is a list line only: `secondary` already holds the long window that stops

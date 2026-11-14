@@ -115,28 +115,41 @@ export function AccountUsageWindowList(props: { windows: readonly AccountUsageWi
   return (
     <span class="account-usage-windows">
       <For each={props.windows}>
-        {(usageWindow) => (
-          <span class="account-usage-window" data-usage-tone={usageWindow.tone}>
-            <span class="account-usage-window-label" title={usageWindow.label}>
-              {usageWindow.label}
-            </span>
-            <span class="account-usage-window-bar" aria-hidden="true">
-              <span class="account-usage-window-fill" style={{ "inline-size": `${usageWindow.remainingPercent}%` }} />
-            </span>
-            <strong class="account-usage-window-remaining">
-              {t("account.usage.window.remaining", {
-                percent: text.format.percent(usageWindow.remainingPercent / 100),
-              })}
-            </strong>
-            <span
-              class="account-usage-window-reset"
-              title={
-                usageWindow.resetsAtLabel ? t("account.usage.resetsAt", { time: usageWindow.resetsAtLabel }) : undefined
+        {(usageWindow, index) => (
+          <>
+            <Show
+              when={
+                usageWindow.group && props.windows[index() - 1]?.group?.name !== usageWindow.group.name
+                  ? usageWindow.group.name
+                  : undefined
               }
             >
-              {formatUsageResetIn(usageWindow.resetsAt, props.now, text)}
+              {(groupName) => <span class="account-usage-window-group">{groupName()}</span>}
+            </Show>
+            <span class="account-usage-window" data-usage-tone={usageWindow.tone}>
+              <span class="account-usage-window-label" title={usageWindow.label}>
+                {usageWindow.group?.window ?? usageWindow.label}
+              </span>
+              <span class="account-usage-window-bar" aria-hidden="true">
+                <span class="account-usage-window-fill" style={{ "inline-size": `${usageWindow.remainingPercent}%` }} />
+              </span>
+              <strong class="account-usage-window-remaining">
+                {t("account.usage.window.remaining", {
+                  percent: text.format.percent(usageWindow.remainingPercent / 100),
+                })}
+              </strong>
+              <span
+                class="account-usage-window-reset"
+                title={
+                  usageWindow.resetsAtLabel
+                    ? t("account.usage.resetsAt", { time: usageWindow.resetsAtLabel })
+                    : undefined
+                }
+              >
+                {formatUsageResetIn(usageWindow.resetsAt, props.now, text)}
+              </span>
             </span>
-          </span>
+          </>
         )}
       </For>
     </span>
