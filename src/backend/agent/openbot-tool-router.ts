@@ -65,7 +65,7 @@ import type { AgentApiKeys, SavedApiKey } from "../agent-api-keys";
 import type { AgentClient, AgentProvider } from "../agent-client";
 import type { AgentTables } from "../agent-data/agent-tables";
 import type { AgentStore } from "../agent-store";
-import type { AgentTasks } from "../agent-tasks/agent-tasks";
+import { type AgentTasks, stopTaskToolSchema } from "../agent-tasks/agent-tasks";
 import type { AgentWaits } from "../agent-waits/agent-waits";
 import { attachmentCall, attachmentFailure } from "../attachment-effects";
 import { OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
@@ -363,6 +363,8 @@ export interface OpenBotToolRouterHooks {
   runsTurn(agentId: string): boolean;
   /** `false` when the turn no longer runs or `mayStop` refuses, so no stop was sent. */
   interrupt(agentId: string, turnId: string, mayStop: () => boolean): Effect.Effect<boolean, ToolOperationFailed>;
+  /** Stops one of the agent's own tasks: queued work cancelled, running turn ended, task closed. */
+  stopOwnTask(agentId: string, taskId: string): Effect.Effect<void, ToolOperationFailed>;
   /** Epoch milliseconds from the turn lifecycle; null when this process has not seen the event. */
   turnActivity(agentId: string, turnId: string | null): { startedAt: number | null; lastEventAt: number | null };
   /**
@@ -1887,6 +1889,25 @@ export class OpenBotToolRouter {
     }
 
     if (params.tool === "interrupt_agent") return yield* this.#interruptTool.handle(params, senderAgentId);
+
+    if (params.tool === "stop_task") {
+      const args = stopTaskToolSchema.parse(params.arguments ?? {});
+      yield* this.#hooks.stopOwnTask(senderAgentId, args.taskId);
+      return {
+        success: true,
+        contentItems: [
+          {
+            type: "inputText",
+            text: JSON.stringify({
+              taskId: args.taskId,
+              stopped: true,
+              ...(args.reason ? { reason: args.reason } : {}),
+              note: "The task is closed and keeps its history. Stopping it again changes nothing.",
+            }),
+          },
+        ],
+      };
+    }
 
     if (params.tool === "read_agent") {
       const args = readAgentToolSchema.parse(params.arguments ?? {});

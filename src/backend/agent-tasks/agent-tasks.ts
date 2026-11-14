@@ -54,6 +54,14 @@ export const startTaskToolSchema = z.strictObject({
   brief: z.string().trim().min(1).max(INPUT_LIMITS.messageText),
 });
 
+export const STOP_TASK_TOOL = "stop_task";
+
+/** Stops one of the caller's own tasks. A foreign task id is refused by the store lookup. */
+export const stopTaskToolSchema = z.strictObject({
+  taskId: z.string().min(1).max(INPUT_LIMITS.identifier),
+  reason: z.string().trim().min(1).max(INPUT_LIMITS.messageText).optional(),
+});
+
 export interface AgentTasksHooks {
   emit(event: AgentEvent): void;
   /** The agent, for its provider and its task limit. */

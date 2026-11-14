@@ -43,7 +43,7 @@ import {
 import { LOCAL_SKILL_TOOL_DEFINITIONS } from "./agent/skill-tools";
 import { readVideoToolShape } from "./agent/video-reader";
 import { CREATE_WEBHOOK_ROUTINE_TOOL, UPDATE_WEBHOOK_ROUTINE_TOOL } from "./agent/webhook-routine-tool";
-import { START_TASK_TOOL, startTaskToolSchema } from "./agent-tasks/agent-tasks";
+import { START_TASK_TOOL, STOP_TASK_TOOL, startTaskToolSchema, stopTaskToolSchema } from "./agent-tasks/agent-tasks";
 import {
   AWAIT_EVENT_TOOL,
   awaitEventToolSchema,
@@ -584,6 +584,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     description:
       "List your open waits, or another local agent's when you give agentId: waitId, note, openedAt, routineId (null: any of its routines wakes it), and wokenAt. Use it to find and close waits whose request is done. Read-only.",
     shape: listWaitsToolSchema.shape,
+  },
+  {
+    name: STOP_TASK_TOOL,
+    description:
+      "Stop one of your own tasks: its queued work is cancelled, its running turn ends, and the task closes while keeping its history. Use it when the user drops that work. A task of another agent is refused; stopping a closed task changes nothing. It does not touch interrupt_agent, which ends a turn of another agent.",
+    shape: stopTaskToolSchema.shape,
   },
   {
     name: START_TASK_TOOL,
