@@ -31,6 +31,31 @@ export interface SkillLearner {
   save(agentId: string, draft: LearnedSkillDraft): Effect.Effect<SkillConversationEvent, unknown>;
 }
 
+/** The least share of the current text, and of its non-ASCII letters, that a revision keeps without a question. */
+const KEPT_SHARE = 0.75;
+
+/**
+ * Whether the writer can revise this skill without a question. It writes the whole text again in at
+ * most `LEARNED_INSTRUCTIONS_CHARACTERS`, so a longer skill would lose its rules: the review asks the user.
+ */
+export function writerCanRevise(current: LearnedSkillSource): boolean {
+  return current.instructions.trim().length <= LEARNED_INSTRUCTIONS_CHARACTERS;
+}
+
+/**
+ * Whether a revision keeps the current text. A writer can answer a summary, or write the letters of
+ * the language in ASCII (ş as s); the review then asks the user and does not save it.
+ */
+export function revisionKeepsSkill(current: LearnedSkillSource, instructions: string): boolean {
+  const before = current.instructions.trim();
+  const after = instructions.trim();
+  return after.length >= before.length * KEPT_SHARE && nonAsciiLetters(after) >= nonAsciiLetters(before) * KEPT_SHARE;
+}
+
+function nonAsciiLetters(text: string): number {
+  return text.match(/(?![A-Za-z])\p{L}/gu)?.length ?? 0;
+}
+
 /** The answer of the skill writer. */
 export const SkillWriterResult = Schema.Struct({
   description: Schema.Trim.check(Schema.isNonEmpty(), Schema.isMaxLength(LEARNED_DESCRIPTION_CHARACTERS)),
