@@ -242,7 +242,8 @@ export interface AcpFlavor {
   mcpServersLoadWithSession?: true;
   /**
    * The agent drops a stdio MCP server of `session/new` and `session/load` with no error, although
-   * ACP requires stdio. OpenBot starts each one itself (`startStdioMcpRelay`) and sends it as http.
+   * ACP requires stdio, or keeps it running after the session closes. OpenBot starts each one itself
+   * (`startStdioMcpRelay`), sends it as http, and stops it when the session closes.
    */
   relayStdioMcpServers?: true;
   /**
