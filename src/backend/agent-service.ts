@@ -3479,18 +3479,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /**
    * The pin of an update, or undefined to keep it (#9116). An agent that names an account of a pooled
    * provider pins it, and an agent that names the provider's own sign-in gives the account back to
-   * the pool. A person's change of the runtime in the app, which shows the pool as one choice, ends
-   * the pin. Automatic moves keep it; the store ends it when the agent moves to another account.
+   * the pool. A person's change of the provider, model or account in the app, which shows the pool as
+   * one choice, ends the pin; a change of effort keeps it. Automatic moves keep it too; the store ends
+   * it when the agent moves to another account.
    */
   #accountPin(
     input: AgentUpdate,
-    runtimeFields: boolean,
     move: ModelMove | null,
     initiatingAgentId: string | undefined,
     next: AgentModelChoice | undefined,
   ): string | null | undefined {
     if (move !== null || input.leaveUsageLimit) return undefined;
-    if (initiatingAgentId === undefined) return runtimeFields ? null : undefined;
+    if (initiatingAgentId === undefined)
+      return input.provider !== undefined || input.model !== undefined || input.providerAccountId !== undefined
+        ? null
+        : undefined;
     if (input.providerAccountId === undefined) return undefined;
     return next?.providerAccountId && this.#pooled(next) ? next.providerAccountId : null;
   }
@@ -3689,7 +3692,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       Object.keys(input).every((key) => RUNTIME_UPDATE_KEYS.has(key));
     const pinnedAccountId = this.#accountPin(
       input,
-      runtimeFields,
       move,
       initiatingAgentId,
       previous && requestedProvider

@@ -883,11 +883,11 @@ export class AgentStore {
         if (!isProviderAccountId(input.pinnedAccountId)) throw new Error("Invalid pinned account.");
         next.pinnedAccountId = input.pinnedAccountId;
       } else if (
-        next.provider !== agent.provider ||
-        (next.providerAccountId !== agent.providerAccountId &&
-          (next.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID) !== next.pinnedAccountId)
+        (next.provider !== agent.provider || next.providerAccountId !== agent.providerAccountId) &&
+        (next.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID) !== next.pinnedAccountId
       ) {
-        // A move to another provider or to another account, such as the pool's, ends the pin.
+        // A move to another account, such as the pool's, ends the pin. A queued change that lands on
+        // the pinned account keeps it, also when it changes the provider.
         delete next.pinnedAccountId;
       }
       next.updatedAt = new Date().toISOString();
