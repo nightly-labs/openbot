@@ -1436,8 +1436,8 @@ The VPS is not the same machine as the sandbox:
   until the operator moves it to a VPS 3. Nothing tells the operator about the plan change: look for
   `plan = 'pro'` rows whose machine is a VPS 2. A change up from Starter on a VPS 1 is worse: a
   Standard server shows 75 GB on a 100 GB disk. Move it to a VPS 2 soon.
-- The clients show the vCPU and the memory of the boat size of the plan (2 and 4 GB, 4 and 8 GB, 8
-  and 16 GB) also for a moved server. A VPS has more: the VPS 2 in FRA-01 showed 6 vCPU and 16 GiB.
+- Settings shows the vCPU and the memory of the row `size`, and the upgrade dialog shows the memory of the
+  boat size of the plan (`HOSTED_BOAT_PLAN_SIZE`), also for a moved server. A VPS has more: the VPS 2 in FRA-01 showed 6 vCPU and 16 GiB.
 - After the owner deletes the server, OpenBot still runs on the VPS with a session that is ended. It
   cannot connect, and it has the data until the operator reinstalls the machine.
 
