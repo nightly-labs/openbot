@@ -89,6 +89,8 @@ export const messages = {
     "{provider} başarısız bir adımı birçok kez tekrarladı, bu yüzden OpenBot bu turu durdurdu. Mesajı yeniden gönderin veya başka bir model seçin.",
   "error.agent.compactionConnectionLost":
     "Ajan bağlamını sıkıştırırken bağlantı kesildi, bu yüzden görev durdu. İnternet bağlantınızı kontrol edin, ardından devam etmek için bir mesaj gönderin.",
+  "error.agent.compactionLoopStopped":
+    "{provider} bağlamı tekrar tekrar sıkıştırdı ve her seferinde devam edemeyecek kadar dolu kaldı, bu yüzden OpenBot bu turu durdurdu. Bu ajanın gerek duymadığı MCP sunucularını veya bilgisayar kullanımını kapatın, ardından bir mesaj gönderin. Siz veya ajan {provider} uygulamasının ne zaman sıkıştırdığını değiştirdiyseniz, bu değişikliği geri alın.",
   "error.agent.selectedGone": "Seçilen ajan artık mevcut değil.",
   "error.agent.profileEndpointsChanged": "Bu işlem oluşturulurken özel uç noktalar değişti. Tekrar deneyin.",
   "error.agent.profileInvalid": "Sağlayıcı geçersiz bir profil döndürdü. İsteminizi revize etmeyi deneyin.",
