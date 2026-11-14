@@ -164,15 +164,30 @@ async function openChat(page: Page, name: string): Promise<void> {
   }, `${name},`);
 }
 
-/** Opens `--other` and waits until its rows show, so that the next open starts from a settled chat. */
+/**
+ * Opens `--other` and waits until it is settled: its rows show, it loads no older page, and each picture
+ * in view has loaded. Then the next open starts from a chat that does not move.
+ */
 async function settleOnOther(page: Page): Promise<void> {
   await openChat(page, other);
-  await page.waitForFunction(
-    () => document.querySelectorAll(".conversation-scroll [data-chat-search-message]").length > 0,
-    undefined,
-    { polling: 100, timeout: WAIT_MS },
-  );
-  await page.waitForTimeout(1_000);
+  await page
+    .waitForFunction(
+      () => {
+        const element = document.querySelector(".conversation-scroll");
+        if (!element || element.querySelector("[data-chat-search-message]") === null) return false;
+        if (document.querySelector(".conversation-history-status") !== null) return false;
+        const view = element.getBoundingClientRect();
+        return [...element.querySelectorAll("img")].every((image) => {
+          const box = image.getBoundingClientRect();
+          return box.bottom <= view.top || box.top >= view.bottom || image.complete;
+        });
+      },
+      undefined,
+      { polling: 100, timeout: WAIT_MS },
+    )
+    .catch((error: unknown) => {
+      throw new Error(`Timed out: the chat "${other}" settles.`, { cause: error });
+    });
 }
 
 async function recordOpen(page: Page): Promise<OpenReport> {
@@ -180,6 +195,7 @@ async function recordOpen(page: Page): Promise<OpenReport> {
   await page.evaluate(RECORDER);
   await page.evaluate("window.__chatOpenStart()");
   await openChat(page, chat);
+  // This is the measurement, not a wait for a state: the check is that no frame in this time moves.
   await page.waitForTimeout(seconds * 1000);
   const frames = await page.evaluate<Frame[]>("window.__chatOpenFrames");
   await page.evaluate("window.__chatOpenProbe.remove()");
