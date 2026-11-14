@@ -219,7 +219,7 @@ export class TeamWebRtcHostPeer {
           fetch: (input, init) =>
             Effect.tryPromise({
               try: (signal) => fetch(input, { ...init, signal }),
-              catch: (cause) => new RemoteWorkflowError({ cause }),
+              catch: (cause) => new RemoteWorkflowError({ cause: loopbackFailure(cause) }),
             }),
         }),
       ),
@@ -1253,9 +1253,22 @@ class GatewayError extends Error {
     readonly status: number,
     readonly code: string,
     message: string,
+    options?: ErrorOptions,
   ) {
-    super(message);
+    super(message, options);
   }
+}
+
+/**
+ * A failed call to this host's own Team API. The peer reached the host, so the raw `fetch failed`
+ * must not go back: the client would show it as a lost connection (#5815). Node's fetch ends a
+ * request that has no response head after 5 minutes, such as a long storage scan.
+ */
+function loopbackFailure(cause: unknown): GatewayError {
+  const code = isDynamicRecord(cause) && isDynamicRecord(cause.cause) ? cause.cause.code : undefined;
+  return code === "UND_ERR_HEADERS_TIMEOUT"
+    ? new GatewayError(504, "remote_timeout", sourceText("error.remote.requestTimeout"), { cause })
+    : new GatewayError(500, "host_error", sourceText("error.remote.hostRequestFailed"), { cause });
 }
 
 /**
