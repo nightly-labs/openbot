@@ -578,6 +578,10 @@ interface ClaudeStreamMessage {
   is_error?: boolean;
   /** Why an assistant message is a refusal, such as `rate_limit`. */
   error?: string;
+  /** Why an API error refused the request, such as `usage_limit_reached`. The SDK types do not declare it. */
+  api_error?: string;
+  /** The details of `api_error`, such as the `rate_limit_info` of a usage limit. */
+  api_error_params?: unknown;
   rate_limit_info?: unknown;
   /** `background_tasks_changed`: every live background task. */
   tasks?: unknown;
@@ -1969,12 +1973,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       const turn = this.#outputTurn(runtime);
       const text = messageText(message.message);
       if (message.error === "rate_limit") {
+        const refusal = claudeUsageLimitRefusal(message);
         // A spent balance does not reset, so it is not held: the turn fails with its own text.
         if (isBalanceDiagnostic(text)) {
           turn.usageLimit = null;
           turn.balanceSpent = true;
-        } else if (turn.usageLimit || isPlanLimitDiagnostic(text)) {
-          turn.usageLimit = { resetsAt: turn.usageLimit?.resetsAt ?? null, text: text || null };
+        } else if (turn.usageLimit || refusal || isPlanLimitDiagnostic(text)) {
+          turn.usageLimit = { resetsAt: turn.usageLimit?.resetsAt ?? refusal?.resetsAt ?? null, text: text || null };
           return;
         }
       }
@@ -3168,6 +3173,20 @@ function claudeUsageWindow(value: unknown, windowDurationMins: number): AccountR
     windowDurationMins,
     resetsAt: Number.isFinite(resetMilliseconds) ? resetMilliseconds / 1_000 : null,
   };
+}
+
+/**
+ * The usage limit that refused a request, as the CLI's assistant error frame names it, or null.
+ * Claude Code marks a spent plan window or spend cap with `api_error: "usage_limit_reached"` and
+ * `api_error_params.rate_limit_info`. A turn can get no rejected `rate_limit_event`, and the text,
+ * such as "You've hit your monthly spend limit · your 5-hour limit resets 3:20pm", can name a limit
+ * that no text rule knows (#8998). An older CLI sends neither field.
+ */
+function claudeUsageLimitRefusal(message: ClaudeStreamMessage): { resetsAt: number | null } | null {
+  const params = isDynamicRecord(message.api_error_params) ? message.api_error_params : null;
+  const info = params && isDynamicRecord(params.rate_limit_info) ? params.rate_limit_info : null;
+  if (message.api_error !== "usage_limit_reached" && info?.status !== "rejected") return null;
+  return { resetsAt: claudeResetSeconds(info?.resetsAt) };
 }
 
 /** Claude reports a reset in epoch seconds. A value in milliseconds is converted, so both read the same. */
