@@ -21,12 +21,13 @@ import type { AttachmentOperationError } from "../attachment-effects";
 import { causeHelpers } from "../effect-boundary";
 import type { DeliveryContext, MailboxStore, MessagingOrigin } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
+import { MessagingHistoryStore } from "./messaging-history-store";
 import { MessagingMemoryStore } from "./messaging-memory-store";
 import { type MessagingContextMessage, messagingPromptText, REPLY_CHARACTERS } from "./messaging-prompt";
 import type { MessagingOperationFailed } from "./messaging-service";
 import { type MessagingLink, type MessagingPingInput, MessagingStore } from "./messaging-store";
 import { boundedHistory, parseMessagingOutboundTool, parseMessagingTool } from "./messaging-tools";
-import type { ContextEntry, InboundFile, MessageTarget, MessagingPlace } from "./messaging-types";
+import type { ContextEntry, HistoryFilter, InboundFile, MessageTarget, MessagingPlace } from "./messaging-types";
 
 /** A file the agent attached to its answer, ready to upload. */
 export interface MessagingAnswerFile {
@@ -115,6 +116,7 @@ export interface MessagingOutbound {
     connectionId: string,
     placeId: string,
     limit: number,
+    filter: HistoryFilter,
   ): Effect.Effect<{ history: MessagingHistory } | { error: string }>;
   post(
     connectionId: string,
@@ -302,6 +304,8 @@ export class MessagingThreads {
   readonly store: MessagingStore;
   /** The facts of each connection, which every prompt of its conversations shows. */
   readonly memories: MessagingMemoryStore;
+  /** The messages that a WhatsApp number saw, which WhatsApp does not send to this computer again. */
+  readonly history: MessagingHistoryStore;
   readonly #database: OpenBotDatabase;
   readonly #mailbox: MailboxStore;
   readonly #hooks: MessagingThreadsHooks;
@@ -345,6 +349,7 @@ export class MessagingThreads {
         link: MessagingLink,
         scope: MessagingHistoryScope,
         limit: number,
+        filter: HistoryFilter,
       ) => Effect.Effect<MessagingHistory | null, MessagingOperationFailed>)
     | null = null;
   #outbound: MessagingOutbound | null = null;
@@ -355,6 +360,7 @@ export class MessagingThreads {
   constructor(database: OpenBotDatabase, mailbox: MailboxStore, hooks: MessagingThreadsHooks) {
     this.store = new MessagingStore(database);
     this.memories = new MessagingMemoryStore(database);
+    this.history = new MessagingHistoryStore(database);
     this.#database = database;
     this.#mailbox = mailbox;
     this.#hooks = hooks;
@@ -383,6 +389,7 @@ export class MessagingThreads {
           link: MessagingLink,
           scope: MessagingHistoryScope,
           limit: number,
+          filter: HistoryFilter,
         ) => Effect.Effect<MessagingHistory | null, MessagingOperationFailed>)
       | null,
   ): void {
@@ -517,7 +524,7 @@ export class MessagingThreads {
     const outbound = this.#outbound;
     if (!outbound) return openBotToolFailure(MESSAGING_NOT_RUNNING);
     if (call.tool === "messaging_history") {
-      const read = yield* outbound.history(record.connectionId, call.place, call.limit).pipe(
+      const read = yield* outbound.history(record.connectionId, call.place, call.limit, call.filter).pipe(
         Effect.timeout(HISTORY_TIMEOUT_MS),
         Effect.catch(() => Effect.succeed({ error: HISTORY_NO_ANSWER })),
       );
@@ -678,7 +685,7 @@ export class MessagingThreads {
       case "messaging_history": {
         const source = this.#historySource;
         const history = source
-          ? yield* source(link, call.scope, call.limit).pipe(
+          ? yield* source(link, call.scope, call.limit, call.filter).pipe(
               Effect.timeout(HISTORY_TIMEOUT_MS),
               Effect.map((value) => ({ value })),
               Effect.catch(() => Effect.succeed(null)),

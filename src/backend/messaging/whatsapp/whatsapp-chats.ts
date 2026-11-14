@@ -1,5 +1,7 @@
 import type { WAMessage } from "@openbot/whatsapp/baileys";
-import type { ContextEntry, MessageBody } from "../messaging-types";
+import { matchesHistoryFilter } from "../messaging-history-store";
+import type { ContextEntry, HistoryFilter, InboundFile, MessageBody } from "../messaging-types";
+import type { WhatsAppArchive } from "./whatsapp-archive";
 
 /** What one number remembers of the messages it saw. WhatsApp sends no history to a new device. */
 const RECENT_MESSAGES = 200;
@@ -28,10 +30,11 @@ export interface MenuPost {
 }
 
 /**
- * What the host knows of the chats of one linked number, in memory only: the names of the people and
- * groups it saw, the messages of the chats it answers (the context of a conversation), and the
- * numbered menus of its approval posts. The adapter and the transport share it. A restart forgets it.
- * Only messages of allowed chats come here; the transport drops every other chat before this.
+ * What the host knows of the chats of one linked number: the names of the people and groups it saw,
+ * the messages of the chats it answers (the context of a conversation), and the numbered menus of its
+ * approval posts. The adapter and the transport share it. A restart forgets all but the messages,
+ * which the attached archive saves. Only messages of allowed chats come here; the transport drops
+ * every other chat before this.
  */
 export class WhatsAppChatState {
   readonly #names = new Map<string, string>();
@@ -40,6 +43,19 @@ export class WhatsAppChatState {
   readonly #menus = new Map<string, MenuPost>();
   readonly #keys = new Map<string, MessageKeyFacts>();
   readonly #media = new Map<string, WAMessage>();
+  #archive: WhatsAppArchive | null = null;
+
+  /** Saves the messages from now on, and reads them from the archive. One archive per connection. */
+  attach(archive: WhatsAppArchive): void {
+    if (this.#archive?.connectionId === archive.connectionId) return;
+    this.#archive?.close();
+    this.#archive = archive;
+  }
+
+  detach(): void {
+    this.#archive?.close();
+    this.#archive = null;
+  }
 
   name(userId: string): string | null {
     return this.#names.get(userId) ?? null;
@@ -60,6 +76,8 @@ export class WhatsAppChatState {
   }
 
   rememberMessage(message: RecentMessage): void {
+    const file = message.files?.[0];
+    this.#archive?.save(message.chatJid, message.threadKey, contextEntry(message), file ? this.media(file.id) : null);
     if (this.#recent.some((entry) => entry.id === message.id && entry.chatJid === message.chatJid)) return;
     this.#recent.push(message);
     if (this.#recent.length > RECENT_MESSAGES) this.#recent.shift();
@@ -67,16 +85,23 @@ export class WhatsAppChatState {
 
   /** The messages of one conversation after `afterId` and before `beforeId`, oldest first. */
   history(chatJid: string, threadKey: string, afterId: string | null, beforeId: string): ContextEntry[] {
+    if (this.#archive) return this.#archive.between(chatJid, threadKey, afterId, beforeId);
     const conversation = this.#recent.filter((entry) => entry.chatJid === chatJid && entry.threadKey === threadKey);
     const end = conversation.findIndex((entry) => entry.id === beforeId);
     const start = afterId === null ? -1 : conversation.findIndex((entry) => entry.id === afterId);
     return conversation.slice(start + 1, end === -1 ? undefined : end).map(contextEntry);
   }
 
-  /** The newest messages of one conversation, or of the whole chat for null, oldest first. */
-  recent(chatJid: string, threadKey: string | null, limit: number): ContextEntry[] {
+  /** The newest messages of one conversation, or of the whole chat for null, that match the filter, oldest first. */
+  recent(chatJid: string, threadKey: string | null, limit: number, filter: HistoryFilter = {}): ContextEntry[] {
+    if (this.#archive) return this.#archive.recent(chatJid, threadKey, limit, filter);
     return this.#recent
-      .filter((entry) => entry.chatJid === chatJid && (threadKey === null || entry.threadKey === threadKey))
+      .filter(
+        (entry) =>
+          entry.chatJid === chatJid &&
+          (threadKey === null || entry.threadKey === threadKey) &&
+          matchesHistoryFilter(entry, filter),
+      )
       .slice(-limit)
       .map(contextEntry);
   }
@@ -96,6 +121,16 @@ export class WhatsAppChatState {
 
   media(fileId: string): WAMessage | null {
     return this.#media.get(fileId) ?? null;
+  }
+
+  /** The copy of a file that the archive saved when it arrived, or null. */
+  savedFile(file: InboundFile): string | null {
+    return this.#archive?.savedFile(file) ?? null;
+  }
+
+  /** Deletes the saved messages and files that are older than the archive keeps. */
+  prune(): void {
+    this.#archive?.prune();
   }
 
   rememberMenu(messageId: string, menu: MenuPost): void {

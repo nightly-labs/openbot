@@ -1,7 +1,7 @@
 // Checks the WhatsApp connector end to end against a fake WhatsApp: the link by QR code and by pairing
 // code, the encrypted store and its lock, the sender rules (the owner's own chat, personal chats left
 // alone, pairing codes on a dedicated number, the group mention gate, LID authors), the echo guard,
-// numbered approval answers, the journal replay after a restart, each close code, the send queue while
+// numbered approval answers, the saved history and its search, the journal replay after a restart, each close code, the send queue while
 // the socket is down, and the disconnect. Runs the real agent service, messaging service, WhatsApp
 // driver, runtime, session and store on a temporary profile. Only the Baileys socket is fake: no
 // message leaves this computer. `bun scripts/messaging-whatsapp-e2e.ts`.
@@ -88,7 +88,7 @@ const report: { steps: Step[]; passed: boolean; unverified: string[] } = {
   unverified: [
     "The real WhatsApp servers and the Signal sessions: a fake socket stands in for Baileys. scripts/whatsapp-signal-e2e.ts checks the crypto; only a live smoke with two phones proves interop.",
     "An agent turn: no provider runs, so no answer is posted. Status posts, answers and approvals of a real turn use the same adapter calls that the steps make directly.",
-    "Media download: it needs WhatsApp's media servers.",
+    "Media download, also the download of a file at arrival: it needs WhatsApp's media servers. A file that the step writes stands in for the saved copy.",
   ],
 };
 
@@ -491,6 +491,34 @@ function received(agents: AgentService, chat: string, id: string): boolean {
   return agents.messaging.received(`messaging:${connectionId(agents)}:${chat}:${id}`);
 }
 
+interface HistoryRead {
+  messages: { author: string; sentAt: string; text: string; files?: { name: string; path?: string }[] }[];
+  note: string;
+}
+
+/** A `messaging_history` read of a named place, as a turn that answers no external chat calls it. */
+async function readHistory(
+  agents: AgentService,
+  args: { place: string; query?: string; before?: string },
+): Promise<HistoryRead> {
+  const result = await runCauseEffect(
+    agents.messaging.outboundTool(
+      "agent-whatsapp-e2e",
+      { threadId: "thread-whatsapp-e2e", turnId: "turn-whatsapp-e2e" },
+      "messaging_history",
+      { connection: connectionId(agents), ...args },
+      () => Effect.succeed([]),
+    ),
+  );
+  const text = result.contentItems[0]?.text ?? "";
+  assert.ok(result.success, text);
+  return JSON.parse(text);
+}
+
+/** A saved message older than 90 days, with a copy of its file, which the next start deletes. */
+const OLD_ID = "IN-OLD";
+let oldCopy = "";
+
 async function linkState(messaging: MessagingService, done: (state: WhatsAppLinkState) => boolean, label: string) {
   return until(() => {
     const state = messaging.whatsappLinkState();
@@ -794,6 +822,97 @@ try {
       },
     );
 
+    await step(
+      "saved history: a group message without a mention is saved with its file, and query and before find it",
+      async () => {
+        const id = connectionId(agents);
+        const fileMessage: WAMessage = {
+          key: { remoteJid: GROUP, fromMe: false, id: "IN-FILE", participant: `${FRIEND}@s.whatsapp.net` },
+          message: {
+            documentMessage: { fileName: "plan.pdf", mimetype: "application/pdf", fileLength: 4, caption: "the plan" },
+          },
+          messageTimestamp: Math.floor(Date.now() / 1_000),
+          pushName: "Ewa",
+        };
+        phone.current().receive([fileMessage]);
+        await until(
+          () => agents.messaging.history.recent(id, GROUP, null, 50).some((entry) => entry.id === "IN-FILE"),
+          "the saved file message",
+        );
+        assert.equal(received(agents, GROUP, "IN-FILE"), false, "A group message without a mention started work.");
+        const all = await readHistory(agents, { place: GROUP });
+        const texts = all.messages.map((entry) => entry.text);
+        assert.ok(texts.includes("lunch?"), "A group message without a mention was not saved.");
+        assert.ok(texts.includes("and the changelog"), "A reply was not saved.");
+        const lunch = await readHistory(agents, { place: GROUP, query: "LUNCH" });
+        assert.deepEqual(
+          lunch.messages.map((entry) => entry.text),
+          ["lunch?"],
+        );
+        const byAuthor = await readHistory(agents, { place: GROUP, query: "ewa plan" });
+        assert.equal(byAuthor.messages.length, 1, "The query did not match the author and the text.");
+        assert.deepEqual(byAuthor.messages[0]?.files, [{ name: "plan.pdf" }]);
+        const early = await readHistory(agents, { place: GROUP, before: "2000-01-01T00:00:00Z" });
+        assert.equal(early.messages.length, 0, "before did not limit the read.");
+        const late = await readHistory(agents, { place: GROUP, before: "2999-01-01T00:00:00+02:00" });
+        assert.equal(late.messages.length, all.messages.length);
+        // The fake message has no media key, so the download at arrival fails; a copy stands in for it.
+        const folder = runtime.filesPath(id);
+        mkdirSync(folder, { recursive: true });
+        const copy = join(folder, "copy-plan.pdf");
+        writeFileSync(copy, "plan");
+        assert.ok(agents.messaging.history.saveFilePath(id, GROUP, "IN-FILE", `${GROUP}|IN-FILE`, copy));
+        const withPath = await readHistory(agents, { place: GROUP, query: "plan" });
+        assert.deepEqual(withPath.messages[0]?.files, [{ name: "plan.pdf", path: copy }]);
+        const values = credentials.get(id);
+        assert.ok(values);
+        const adapter = whatsAppDriver({ runtime }).createAdapter(values, { rateLimited: () => {} });
+        await runCauseEffect(adapter.identify());
+        const destination = join(root, "downloaded-plan.pdf");
+        await runCauseEffect(
+          adapter.download(
+            {
+              id: `${GROUP}|IN-FILE`,
+              name: "plan.pdf",
+              mimeType: "application/pdf",
+              size: 4,
+              url: `${GROUP}|IN-FILE`,
+            },
+            destination,
+            1_024,
+          ),
+        );
+        assert.equal(readFileSync(destination, "utf8"), "plan", "The download did not use the saved copy.");
+        // A message that arrived 91 days ago: the next start deletes it and its copy.
+        oldCopy = join(folder, "copy-old.txt");
+        writeFileSync(oldCopy, "old");
+        const sentAt = new Date(Date.now() - 91 * 24 * 60 * 60_000).toISOString();
+        agents.messaging.history.save(
+          id,
+          GROUP,
+          OLD_ID,
+          {
+            id: OLD_ID,
+            authorName: "Ewa",
+            text: "old news",
+            sentAt,
+            files: [
+              {
+                id: `${GROUP}|${OLD_ID}`,
+                name: "old.txt",
+                mimeType: "text/plain",
+                size: 3,
+                url: `${GROUP}|${OLD_ID}`,
+                path: oldCopy,
+              },
+            ],
+          },
+          sentAt,
+        );
+        return { saved: all.messages.length, lunch: lunch.messages.length, copy: true };
+      },
+    );
+
     await step("LID authors: a LID chat with a phone form, and a LID group member, map to their numbers", async () => {
       const input = parseWhatsAppSenderInput({
         workspaceId: OWNER,
@@ -1064,6 +1183,23 @@ try {
       );
       return { reactions: phone.reactionsTo(OWNER_JID) };
     });
+
+    await step(
+      "saved history: the messages stay after a restart, and one older than 90 days goes with its file",
+      async () => {
+        await until(() => !existsSync(oldCopy), "the prune of the old message's file");
+        const id = connectionId(agents);
+        const saved = agents.messaging.history.recent(id, GROUP, null, 200);
+        assert.ok(
+          saved.some((entry) => entry.text === "lunch?"),
+          "The saved messages went at the restart.",
+        );
+        assert.ok(!saved.some((entry) => entry.id === OLD_ID), "A message older than 90 days stayed.");
+        const lunch = await readHistory(agents, { place: GROUP, query: "lunch" });
+        assert.equal(lunch.messages.length, 1);
+        return { saved: saved.length };
+      },
+    );
   });
 
   await step("normal stop: every message the service took is marked handled, so nothing replays", async () => {
@@ -1186,6 +1322,8 @@ try {
       assert.equal(phone.logouts, logouts + 1, "The device was not logged out.");
       assert.equal(existsSync(file), false, "The keys stayed on disk.");
       assert.equal(credentials.status(id), "missing");
+      assert.equal(agents.messaging.history.recent(id, GROUP, null, 200).length, 0, "The saved messages stayed.");
+      assert.equal(existsSync(runtime.filesPath(id)), false, "The saved files stayed.");
       assert.equal(connection(messaging), undefined);
       assert.ok(!agents.listAgents().some((agent) => agent.id === orchestrator), "The orchestrator stayed.");
       assert.ok(

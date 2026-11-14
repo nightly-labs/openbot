@@ -2,6 +2,7 @@ import { rmSync } from "node:fs";
 import { join } from "node:path";
 import { WhatsAppAuthStore } from "@openbot/whatsapp/auth-store";
 import type { SocketConfig, WAVersion } from "@openbot/whatsapp/baileys";
+import type { WhatsAppHistory } from "./whatsapp-archive";
 import { WhatsAppChatState } from "./whatsapp-chats";
 import type { WhatsAppSenderRules } from "./whatsapp-senders";
 import { WhatsAppSession, type WhatsAppSocketFactory } from "./whatsapp-session";
@@ -11,6 +12,8 @@ export interface WhatsAppPolicy {
   rules(workspaceId: string): WhatsAppSenderRules;
   /** The code for an unknown person, and whether it is new. Null when no request can wait now. */
   pairing(workspaceId: string, senderId: string, name: string): { code: string; created: boolean } | null;
+  /** Where the number's messages are saved, or null before it has a connection. */
+  history(workspaceId: string): WhatsAppHistory | null;
 }
 
 /** The open store, session and chat state of one linked number. */
@@ -42,7 +45,7 @@ const NO_RULES: WhatsAppSenderRules = { ownNumber: true, contacts: new Set(), gr
 export class WhatsAppRuntime {
   readonly #options: WhatsAppRuntimeOptions;
   readonly #open = new Map<string, WhatsAppConnectionHandle>();
-  #policy: WhatsAppPolicy = { rules: () => NO_RULES, pairing: () => null };
+  #policy: WhatsAppPolicy = { rules: () => NO_RULES, pairing: () => null, history: () => null };
 
   constructor(options: WhatsAppRuntimeOptions) {
     this.#options = options;
@@ -58,6 +61,16 @@ export class WhatsAppRuntime {
 
   storePath(storeId: string): string {
     return join(this.#options.root, `${storeId}.db`);
+  }
+
+  /** The copies of the files that a connection saved, in a folder only this user can read. */
+  filesPath(connectionId: string): string {
+    return join(this.#options.root, "files", connectionId);
+  }
+
+  /** Deletes the copies of the files of a connection. */
+  deleteFiles(connectionId: string): void {
+    rmSync(this.filesPath(connectionId), { recursive: true, force: true });
   }
 
   /** The handle of a store, opening it the first time. Throws when the store is locked or unreadable. */
@@ -108,6 +121,7 @@ export class WhatsAppRuntime {
   close(storeId: string): void {
     const handle = this.#open.get(storeId);
     this.#open.delete(storeId);
+    handle?.chats.detach();
     handle?.store.close();
   }
 

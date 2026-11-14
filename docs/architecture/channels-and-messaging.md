@@ -874,6 +874,13 @@ is one linked number (`workspace_id` is the number in digits).
   before it hands it on and joins a burst of short messages of one person. A crash replays the journal;
   the mailbox idempotency key drops a copy. Approvals are numbered text answers (`1`, `2`), matched to
   the quoted menu or the newest one of the conversation.
+- **Saved history.** WhatsApp sends no history to a linked device. `WhatsAppArchive` saves each
+  message of an allowed chat, also one that does not mention the number, in
+  `projection_messaging_history` (migration 62, `MessagingHistoryStore`), and downloads its file one at
+  a time to `<userData>/whatsapp/files/<connection id>/`. `seq` keeps the arrival order. The context of
+  a conversation, `messaging_history` and its `query` and `before` filter read the table, and a turn's
+  download copies the saved file. The transport deletes rows and files older than 90 days at start and
+  each hour; a disconnect deletes all of them for the connection.
 - **Not on joined servers.** `connectors-v1` and `routine-results-v1` stay as released: a host leaves
   WhatsApp out of both, and the desktop IPC endpoints `messaging:*-whatsapp-*` are local only.
 

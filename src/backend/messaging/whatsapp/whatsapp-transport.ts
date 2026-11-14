@@ -92,7 +92,11 @@ export class WhatsAppTransport implements MessagingTransport {
       }),
     );
     store.prune();
-    this.#prune = setInterval(() => this.#handle.store.prune(), PRUNE_INTERVAL_MS);
+    this.#handle.chats.prune();
+    this.#prune = setInterval(() => {
+      this.#handle.store.prune();
+      this.#handle.chats.prune();
+    }, PRUNE_INTERVAL_MS);
     this.#prune.unref?.();
     // A connection that starts right after its link finds the socket open already.
     sink.state(session.state === "open" ? "connected" : "connecting");

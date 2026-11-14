@@ -43,6 +43,7 @@ import type { MessagingOrigin } from "../mailbox-store";
 import type { SidebarLayoutStore } from "../sidebar-layout-store";
 import { type DiscordAppPort, DiscordConnect, type DiscordConnectFailed } from "./discord/discord-connect";
 import { discordOrchestratorMemories, discordOrchestratorProfile } from "./discord/discord-orchestrator";
+import { matchesHistoryFilter } from "./messaging-history-store";
 import { mentionNames, withMentionNames } from "./messaging-mentions";
 import { QUIET_ANSWER } from "./messaging-prompt";
 import { MessagingStatusPosts, type PendingFinal, type StatusPost, type StopButton } from "./messaging-status-posts";
@@ -61,6 +62,7 @@ import {
 import {
   type ConnectionIdentity,
   DiscordApiError,
+  type HistoryFilter,
   type InboundAction,
   type InboundFile,
   type InboundMessage,
@@ -73,6 +75,7 @@ import {
   type MessagingDriver,
   type MessagingIngress,
   type MessagingTransport,
+  type RecentMessages,
   TelegramCallError,
   WhatsAppAnswerPartlySent,
   WhatsAppRefusedError,
@@ -273,6 +276,7 @@ export class MessagingService {
       ? new WhatsAppConnect({
           runtime: options.whatsapp,
           store: options.threads.store,
+          history: options.threads.history,
           credentials: options.credentials,
           hooks: {
             prepare: (workspaceId, workspaceName) => this.#prepareWhatsApp(workspaceId, workspaceName),
@@ -311,10 +315,10 @@ export class MessagingService {
         }),
       );
     this.#threads.setContextSource((link, origin) => this.#promptContext(link, origin));
-    this.#threads.setHistorySource((link, scope, limit) => this.#recentMessages(link, scope, limit));
+    this.#threads.setHistorySource((link, scope, limit, filter) => this.#recentMessages(link, scope, limit, filter));
     this.#threads.setOutbound({
       places: (connectionId) => this.#outboundPlaces(connectionId),
-      history: (connectionId, placeId, limit) => this.#outboundHistory(connectionId, placeId, limit),
+      history: (connectionId, placeId, limit, filter) => this.#outboundHistory(connectionId, placeId, limit, filter),
       post: (connectionId, target, markdown, files, embeds) =>
         this.#outboundPost(connectionId, target, markdown, files, embeds),
       discord: (connectionId, send) => this.#outboundDiscord(connectionId, send),
@@ -470,7 +474,8 @@ export class MessagingService {
   /**
    * Unlinks the device from the WhatsApp account (when its socket is open), deletes its keys and stops
    * the connection. As for Telegram, the last number takes the WhatsApp Orchestrator with it. The
-   * allowed senders and the conversations stay, so the same number linked again gets them back.
+   * allowed senders and the conversations stay, so the same number linked again gets them back. The
+   * saved WhatsApp messages and their files go: they are other people's messages.
    */
   readonly disconnectWhatsAppNumber = Effect.fn("MessagingService.disconnectWhatsAppNumber")(function* (
     this: MessagingService,
@@ -484,6 +489,10 @@ export class MessagingService {
     if (handle) yield* handle.session.logout();
     yield* this.#stopConnection(record.connectionId);
     if (storeId) runtime?.delete(storeId);
+    yield* messagingStep(() => {
+      this.#threads.history.forget(record.connectionId);
+      runtime?.deleteFiles(record.connectionId);
+    });
     yield* this.#credentials.clear(record.connectionId);
     yield* messagingStep(() =>
       this.#threads.store.updateConnection(record.connectionId, { enabled: false, lastErrorCode: null }),
@@ -1726,15 +1735,20 @@ export class MessagingService {
     link: MessagingLink,
     scope: MessagingHistoryScope,
     limit: number,
+    filter: HistoryFilter,
   ): Effect.fn.Return<MessagingHistory | null, MessagingOperationFailed> {
     const live = this.#live.get(link.connectionId);
     if (!live?.identity) return null;
     const place = link.isDirect
       ? "direct message"
       : yield* live.adapter.placeName(link.platformChannelId).pipe(toMessagingOperationFailed);
-    const recent = yield* live.adapter
-      .recent(link.platformChannelId, scope === "conversation" ? link.threadKey : null, limit)
-      .pipe(toMessagingOperationFailed);
+    const recent = yield* filteredRecent(
+      live.adapter,
+      link.platformChannelId,
+      scope === "conversation" ? link.threadKey : null,
+      limit,
+      filter,
+    ).pipe(toMessagingOperationFailed);
     return { platform: live.record.platform, place, ...recent };
   });
 
@@ -1761,6 +1775,7 @@ export class MessagingService {
     connectionId: string,
     placeId: string,
     limit: number,
+    filter: HistoryFilter,
   ) {
     const live = this.#live.get(connectionId);
     if (!live?.identity) return { error: MESSAGING_NOT_RUNNING };
@@ -1772,7 +1787,7 @@ export class MessagingService {
           error:
             "This connection has no place with that id. Call openbot.messaging_list_places with the connection for the ids.",
         };
-      const recent = yield* live.adapter.recent(placeId, null, limit);
+      const recent = yield* filteredRecent(live.adapter, placeId, null, limit, filter);
       return { history: { platform, place: place.name, ...recent } };
     }).pipe(
       Effect.catch((failure) =>
@@ -2605,6 +2620,27 @@ function finalPost(
   if (!activity.followUp && awaitsTeammate)
     return { answer: false, text: sourceText("status.messaging.delegated"), reaction };
   return { answer: false, text: sourceText("status.messaging.noAnswer"), reaction };
+}
+
+/**
+ * The newest messages of a place that match the filter. A platform that cannot search its messages
+ * gives its newest ones, and only those are searched; the note says so.
+ */
+function filteredRecent(
+  adapter: MessagingAdapter,
+  platformChannelId: string,
+  threadKey: string | null,
+  limit: number,
+  filter: HistoryFilter,
+): Effect.Effect<RecentMessages, MessagingAdapterError> {
+  if (adapter.searchesHistory || (!filter.query && !filter.before))
+    return adapter.recent(platformChannelId, threadKey, limit, filter);
+  return adapter.recent(platformChannelId, threadKey, limit).pipe(
+    Effect.map((recent) => ({
+      messages: recent.messages.filter((entry) => matchesHistoryFilter(entry, filter)),
+      note: [recent.note, `query and before searched only the newest ${limit} messages.`].filter(Boolean).join(" "),
+    })),
+  );
 }
 
 export class MessagingOperationFailed extends Schema.TaggedError<MessagingOperationFailed>()(

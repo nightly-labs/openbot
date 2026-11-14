@@ -157,8 +157,18 @@ export async function whatsAppInbound(
 
   // In a group, only a mention, or a message of a conversation that an agent answers, counts.
   const addressed = !isGroup || namesMe;
+  // Saved with its file, which an agent can read later with `messaging_history`.
+  const remembered = {
+    id,
+    chatJid,
+    threadKey,
+    authorName: name,
+    text: text || files.map((file) => file.name).join(", "),
+    sentAt: isoTime(message),
+    ...(files.length ? { files } : {}),
+  };
   if (isGroup && !addressed && !quotedThread) {
-    context.chats.rememberMessage({ id, chatJid, threadKey, authorName: name, text, sentAt: isoTime(message) });
+    context.chats.rememberMessage(remembered);
     return null;
   }
   const replyTo =
@@ -179,15 +189,7 @@ export async function whatsAppInbound(
     files,
     ...(replyTo ? { replyTo } : {}),
   };
-  context.chats.rememberMessage({
-    id,
-    chatJid,
-    threadKey,
-    authorName: name,
-    text: text || files.map((file) => file.name).join(", "),
-    sentAt: isoTime(message),
-    ...(files.length ? { files } : {}),
-  });
+  context.chats.rememberMessage(remembered);
   return { type: "message", message: inbound, chatJid, isGroup };
 }
 
