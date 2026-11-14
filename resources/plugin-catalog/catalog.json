@@ -1017,12 +1017,6 @@
       "detailSha256": "d2aece992ac04b73ed82f7ad8bf318a30b4ff1829d835987dce81af836f6ec6f"
     },
     {
-      "slug": "mongodb",
-      "version": "1.0.0",
-      "featured": false,
-      "detailSha256": "cc895db953c8ace5f3fd438a5d4b7ff9365c142ef84ce2621d6b37afc3670587"
-    },
-    {
       "slug": "moomoo",
       "version": "1.0.0",
       "featured": false,
