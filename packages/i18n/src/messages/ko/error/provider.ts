@@ -269,6 +269,8 @@ export const messages = {
     "Google의 Gemini 서비스가 요청을 완료하지 못했어요. 몇 분 후 다시 시도해 주세요.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini가 이 요청을 거부했어요. 다른 모델을 선택한 후 메시지를 다시 보내 주세요. 다시 실패하면 새 채팅을 시작해 주세요.\n{detail}",
+  "error.provider.antigravityLocationUnsupported":
+    "Google이 이 에이전트를 실행하는 컴퓨터의 네트워크 위치에서는 Gemini 사용을 허용하지 않아요. 다른 컴퓨터에서 Gemini를 사용하거나 이 에이전트에 다른 제공자를 선택하세요.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini가 에이전트와의 연결이 끊겨 중지됐어요. 계속하려면 메시지를 보내 주세요.",
   "error.provider.antigravityRemoteWindowsSignIn":
