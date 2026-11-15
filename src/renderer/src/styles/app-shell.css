@@ -3327,11 +3327,21 @@ textarea {
 }
 
 .account-usage-window-bar {
+  position: relative;
   display: block;
   height: 4px;
-  overflow: hidden;
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-border);
+}
+
+/* The amount left at an even pace. It is taller than the bar, so it shows on the fill too. */
+.account-usage-window-pace {
+  position: absolute;
+  inset-block: -2px;
+  width: 2px;
+  margin-inline-start: -1px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-text-primary);
 }
 
 .account-usage-window-fill {
