@@ -213,6 +213,7 @@ const GEMINI_PROMPT_LOG = "Sending user message to conversation ";
  * toolbox of a prompt. One `pattern` with a lookahead, such as the email of Resend's `get-contact`,
  * ends every turn with only "Agent execution terminated due to error." as the answer (#7228). Only
  * the CLI's own log names the tool, in `<Gemini home>/<app data>/log/acp-server-<time>-<pid>.log`.
+ * The 1.5.9 CLI answers with this line itself, and no longer with the short answer (#9568).
  */
 const GEMINI_REFUSED_TOOL = /\bbuilding toolbox: tool "(mcp_[^"]+)" advertises an invalid parameter schema\b/gu;
 /** A log that the CLI wrote in this time can hold the failure of the prompt that just ended. */
@@ -232,12 +233,15 @@ function logTail(file: string, size: number): string {
 }
 
 /**
- * The tools that the CLI refused after the last prompt of the session. Each session has a process,
- * and so a log, of its own. A session that opened again on a new process has an older log too, so
- * only the newest log with a prompt of the session counts. A log that cannot be read gives no tools:
- * the turn then fails as before.
+ * The tools that the CLI refused after the last prompt of the session. The 1.5.9 answer names the
+ * tool. An older CLI names it only in its log. Each session has a process, and so a log, of its own.
+ * A session that opened again on a new process has an older log too, so only the newest log with a
+ * prompt of the session counts. A log that cannot be read gives no tools: the turn then fails as
+ * before.
  */
 function antigravityRefusedMcpTools(text: string, argv: readonly string[], sessionId: string): string[] {
+  const answered = Array.from(text.matchAll(GEMINI_REFUSED_TOOL), (match) => match[1] ?? "");
+  if (answered.length > 0) return answered;
   if (!GEMINI_TERMINATED_ANSWER.test(text)) return [];
   const home = flagValue(argv, GEMINI_DIR_FLAG);
   const appData = flagValue(argv, APP_DATA_DIR_FLAG);
