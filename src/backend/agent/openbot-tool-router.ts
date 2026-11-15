@@ -73,7 +73,7 @@ import type { ChannelService } from "../channel-service";
 import type { ProviderSession } from "../database/provider-sessions";
 import type { MailboxStore } from "../mailbox-store";
 import { agentMcpServers, codexDeferredMcpServers, openCodeMcpServers } from "../mcp-provider-shapes";
-import type { MessagingThreads } from "../messaging/messaging-threads";
+import { type MessagingThreads, PLATFORM_NAMES } from "../messaging/messaging-threads";
 import { isMessagingOutboundCall } from "../messaging/messaging-tools";
 import {
   ACKNOWLEDGE_REQUEST_ACTIONS,
@@ -2144,6 +2144,19 @@ export class OpenBotToolRouter {
           app: args.app,
           next: 'GitHub is already connected for every agent of this server, so no card shows. Do not ask the user to connect it again. Use the GitHub MCP tools; when they are not in your tool list, search your tools for github, or use gh and git, which this connection signs in. When GitHub refuses access to a repository (HTTP 403, "Resource not accessible by integration", "Write access to repository not granted", or "Not Found" for a repository that exists, but not a rate limit), the OpenBotGit app is not installed on it or does not have the permission. Then tell the user: in OpenBot, open Marketplace > Apps > GitHub > Choose repositories, install OpenBotGit on the owner of the repository and select it, then send the request again. To create repositories, an owner of the account also approves the permission request of OpenBotGit on GitHub, in Settings > Applications > Installed GitHub Apps (for an organization, in its settings). Do not try another credential. When something else fails, tell the user in one sentence and call openbot.send_feedback.',
         });
+      // Slack, Discord, Telegram and WhatsApp have no MCP server: the messaging tools reach a connected one (#9696).
+      // A paused or stopped connection still gets the card, which shows its Resume or Reconnect action.
+      const connection = this.#messaging.store
+        .connections()
+        .find((record) => record.enabled && record.lastErrorCode === null && record.platform === args.app);
+      if (connection) {
+        const name = PLATFORM_NAMES[connection.platform];
+        return openBotToolResult({
+          status: "connected",
+          app: args.app,
+          next: `${name} is already connected for every agent of this server, so no card shows. Do not ask the user to connect it again. Call openbot.messaging_list_places for the connection and place ids, then openbot.messaging_post to send the message; search your tools for messaging when they are not in your tool list. When the place is not in the list, tell the user what its result says.`,
+        });
+      }
       const installed = this.#marketplaceAppServer(args.app);
       if (installed && this.#mcpServers)
         return yield* marketplaceAppStatus(this.#mcpServers, installed, (config) =>
