@@ -1,5 +1,5 @@
 import type { OpenBotDesktopApi, VoiceLiveEvent } from "@openbot/contracts/ipc";
-import type { VoicePhase } from "@openbot/ui/features/conversation/VoicePill";
+import type { VoicePhase, VoiceTalkMode } from "@openbot/ui/features/conversation/VoicePill";
 import { currentText } from "@openbot/ui/text";
 import { createStore, onCleanup } from "solid-js";
 import { SPEECH_LEVEL_COUNT } from "../../speech/speech-playback";
@@ -25,6 +25,8 @@ type LiveStep = "starting" | "listening" | "thinking" | "speaking";
 interface LiveState {
   step: LiveStep;
   muted: boolean;
+  /** Push to talk: the user holds the talk button or Space now. */
+  talking: boolean;
   error: string | null;
   levels: number[];
 }
@@ -54,6 +56,7 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
   const [state, setState] = createStore<LiveState>({
     step: "starting",
     muted: false,
+    talking: false,
     error: null,
     levels: quietLevels(),
   });
@@ -75,6 +78,9 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
   // The copies that the logic reads: a store read shows a write only after the next flush.
   let step: LiveStep = "starting";
   let muted = false;
+  /** The microphone is on only while the user holds the talk button. */
+  let pushToTalk = false;
+  let talking = false;
   // Realtime v3 has no command that stops a reply: an interrupted reply plays on mute until its turn ends.
   let currentReply: unknown = null;
   let silencedTurn: unknown = null;
@@ -257,9 +263,47 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
     reply.srcObject = null;
   }
 
-  /** The microphone stays open while it is muted, so unmuting does not start a new call. */
   function toggleMute(): void {
-    muted = !muted;
+    applyMute(!muted);
+  }
+
+  /**
+   * Push to talk: the microphone is off until the user holds the talk button or Space. The realtime
+   * model hears silence when they let go, so it ends the turn as at a pause.
+   */
+  function setTalkMode(mode: VoiceTalkMode): void {
+    const push = mode === "push";
+    if (push === pushToTalk) return;
+    pushToTalk = push;
+    setTalking(false);
+    if (push !== muted) applyMute(push);
+  }
+
+  /** Push to talk: the user presses. A reply stops, and the microphone opens. */
+  function startTalking(): void {
+    if (!pushToTalk || talking) return;
+    setTalking(true);
+    interrupt();
+    if (muted) applyMute(false);
+  }
+
+  /** Push to talk: the user lets go, and the microphone closes. */
+  function stopTalking(): void {
+    if (!pushToTalk || !talking) return;
+    setTalking(false);
+    if (!muted) applyMute(true);
+  }
+
+  function setTalking(next: boolean): void {
+    talking = next;
+    setState((draft) => {
+      draft.talking = next;
+    });
+  }
+
+  /** The microphone stays open while it is muted, so unmuting does not start a new call. */
+  function applyMute(next: boolean): void {
+    muted = next;
     for (const track of microphone?.getAudioTracks() ?? []) track.enabled = !muted;
     setState((draft) => {
       draft.muted = muted;
@@ -298,9 +342,13 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
   return {
     phase,
     muted: () => state.muted,
+    talking: () => state.talking,
     error: () => state.error,
     levels: () => state.levels,
     toggleMute,
+    setTalkMode,
+    startTalking,
+    stopTalking,
     interrupt,
   };
 }

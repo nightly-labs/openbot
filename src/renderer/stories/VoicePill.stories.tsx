@@ -23,16 +23,24 @@ const meta = {
     levels: QUIET,
     error: null,
     onToggleMute: fn(),
+    talkMode: "push",
+    onTalkModeChange: fn(),
+    talking: false,
+    onTalkStart: fn(),
+    onTalkEnd: fn(),
     onInterrupt: fn(),
     onEnd: fn(),
     speed: 1,
     onCycleSpeed: fn(),
   },
-  // Mute, speed and the open pill are local here; in the app the voice conversation and the saved
-  // speed hold them. End sends the pill back into the top edge, and Start brings it out again.
+  // Mute, the way to talk, the press, speed and the open pill are local here; in the app the voice
+  // conversation and the saved preferences hold them. End sends the pill back into the top edge, and
+  // Start brings it out again.
   render: (args) => {
     const { t } = useText();
     const [muted, setMuted] = createSignal(untrack(() => args.muted));
+    const [talkMode, setTalkMode] = createSignal(untrack(() => args.talkMode));
+    const [talking, setTalking] = createSignal(untrack(() => args.talking));
     const [speed, setSpeed] = createSignal(untrack(() => args.speed ?? 1));
     const [open, setOpen] = createSignal(true);
     const [shown, setShown] = createSignal(true);
@@ -65,6 +73,20 @@ const meta = {
               setMuted(!muted());
               args.onToggleMute();
             }}
+            talkMode={talkMode()}
+            onTalkModeChange={(mode) => {
+              setTalkMode(mode);
+              args.onTalkModeChange(mode);
+            }}
+            talking={talking()}
+            onTalkStart={() => {
+              setTalking(true);
+              args.onTalkStart();
+            }}
+            onTalkEnd={() => {
+              setTalking(false);
+              args.onTalkEnd();
+            }}
             speed={speed()}
             onCycleSpeed={
               args.onCycleSpeed
@@ -87,11 +109,17 @@ type Story = StoryObj<typeof meta>;
 
 export const Starting: Story = { args: { phase: "starting" } };
 
-export const Listening: Story = {};
+/** Push to talk, the default: the pad says how to talk, and the microphone is off until a press. */
+export const PushToTalk: Story = { args: { muted: true } };
 
-export const Hearing: Story = { args: { levels: SPEECH } };
+/** The user holds the pad or Space: it takes the accent and shows the voice. */
+export const Talking: Story = { args: { talking: true, levels: SPEECH } };
 
-export const Muted: Story = { args: { muted: true } };
+export const Listening: Story = { args: { talkMode: "open" } };
+
+export const Hearing: Story = { args: { talkMode: "open", levels: SPEECH } };
+
+export const Muted: Story = { args: { talkMode: "open", muted: true } };
 
 export const Thinking: Story = { args: { phase: "thinking" } };
 

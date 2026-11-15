@@ -280,6 +280,79 @@
   font-variant-numeric: tabular-nums;
 }
 
+/*
+ * Push to talk: a quiet pad that says how to talk. While the user holds it, it takes the accent with a
+ * soft halo, as a recording does. The pad keeps its width, so the pill does not jump at a press.
+ */
+.voice-pill .voice-pill-talk {
+  min-width: 196px;
+  flex: 0 0 auto;
+  justify-content: center;
+  gap: var(--openbot-space-2);
+  border-radius: var(--openbot-radius-pill);
+  background: color-mix(in srgb, var(--openbot-text-primary) 6%, transparent);
+  box-shadow: none;
+  color: var(--openbot-text-secondary);
+  touch-action: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  transition-property: background-color, color, box-shadow;
+  transition-duration: var(--openbot-duration-fast);
+  transition-timing-function: var(--openbot-ease-out);
+}
+
+.voice-pill .voice-pill-talk:is(:hover, :focus-visible):not(:disabled) {
+  background: color-mix(in srgb, var(--openbot-text-primary) 10%, transparent);
+  color: var(--openbot-text-primary);
+}
+
+.voice-pill .voice-pill-talk[aria-pressed="true"]:not(:disabled) {
+  background: var(--openbot-accent);
+  box-shadow: 0 0 0 4px var(--openbot-accent-soft);
+  color: var(--openbot-text-on-accent);
+}
+
+.voice-pill-talk svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  flex: 0 0 auto;
+}
+
+/* While the user holds the pad, the voice takes the text colour of the accent. */
+.voice-pill-talk[aria-pressed="true"] .voice-pill-waveform {
+  color: inherit;
+}
+
+.voice-pill-talk-hint {
+  overflow: hidden;
+  font-size: var(--openbot-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The open microphone or push to talk: two round icons, with the pill under the one in use. */
+.voice-pill-modes.ui-sliding-tabs {
+  flex: 0 0 auto;
+  border-radius: var(--openbot-radius-pill);
+}
+
+.voice-pill-modes .ui-sliding-tabs-pill,
+.voice-pill-modes .voice-pill-mode {
+  border-radius: var(--openbot-radius-pill);
+}
+
+.voice-pill-modes .voice-pill-mode {
+  width: var(--openbot-control-sm);
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+}
+
+.voice-pill-mode svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
 .voice-pill-error {
   max-width: min(480px, 100%);
   margin: 0;

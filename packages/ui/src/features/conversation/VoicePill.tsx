@@ -1,5 +1,16 @@
 import type { AppTextKey } from "@openbot/i18n";
-import { Button, LabelTooltip, LabelTooltipTrigger, Mic, MicOff, X } from "@openbot/ui";
+import {
+  AudioLines,
+  Button,
+  Hand,
+  Kbd,
+  LabelTooltip,
+  LabelTooltipTrigger,
+  Mic,
+  MicOff,
+  SlidingTabs,
+  X,
+} from "@openbot/ui";
 import type { AgentProfile } from "@openbot/ui/data";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { StopIcon } from "@openbot/ui/features/conversation/ConversationIcons";
@@ -18,10 +29,38 @@ import {
 import { useText } from "@openbot/ui/text";
 import { clamp, mix } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createUniqueId, onSettled, Show, untrack } from "solid-js";
+import { createEffect, createUniqueId, For, onSettled, Show, untrack } from "solid-js";
 
 /** What a voice conversation does now. */
 export type VoicePhase = "starting" | "listening" | "thinking" | "speaking" | "offline";
+
+/**
+ * How the user talks: `push` opens the microphone only while they hold the talk button or Space, and
+ * sends when they let go; `open` listens all the time and sends at a pause.
+ */
+export type VoiceTalkMode = "push" | "open";
+
+const TALK_MODES = ["open", "push"] as const satisfies readonly VoiceTalkMode[];
+
+const TALK_MODE_LABELS: Record<VoiceTalkMode, AppTextKey> = {
+  open: "conversation.voice.talkMode.open",
+  push: "conversation.voice.talkMode.push",
+};
+
+function isVoiceTalkMode(value: string): value is VoiceTalkMode {
+  return TALK_MODES.some((mode) => mode === value);
+}
+
+/** Space types in a text field, so it talks only outside one. */
+function typingTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement &&
+    (target.isContentEditable ||
+      target.tagName === "INPUT" ||
+      target.tagName === "TEXTAREA" ||
+      target.tagName === "SELECT")
+  );
+}
 
 const PHASE_LABELS: Record<VoicePhase, AppTextKey> = {
   starting: "conversation.voice.phase.starting",
@@ -48,6 +87,14 @@ export interface VoicePillProps {
   /** Why the conversation stopped listening. */
   error: string | null;
   onToggleMute: () => void;
+  talkMode: VoiceTalkMode;
+  onTalkModeChange: (mode: VoiceTalkMode) => void;
+  /** Push to talk: the user holds the talk button or Space now. */
+  talking: boolean;
+  /** Push to talk: the user presses the talk button or Space. */
+  onTalkStart: () => void;
+  /** Push to talk: the user lets go. What they said is sent. */
+  onTalkEnd: () => void;
   /** Stops the reply, or the wait for it, and listens again. */
   onInterrupt: () => void;
   onEnd: () => void;
@@ -61,26 +108,36 @@ export interface VoicePillProps {
 }
 
 /**
- * A conversation by voice, in a pill at the top of the chat. The agent listens until you stop
- * speaking, sends what you said to the chat, and reads its reply aloud; then it listens again. The
- * chat and the message box stay as they are, so the turns show in the chat as they are sent. The pill
- * comes out of the window frame at the top edge of the chat as a drop, gets wider, and comes off the
- * frame on a thin neck; it closes the same way back. It uses the goo and the springs of the agent
- * dock (`liquid.tsx`).
+ * A conversation by voice, in a pill at the top of the chat. With push to talk, the user holds the
+ * talk button or Space while they speak, and what they said goes to the chat when they let go. With the
+ * open microphone, the agent listens until you stop speaking. The agent reads its reply aloud; then it
+ * listens again. The chat and the message box stay as they are, so the turns show in the chat as they
+ * are sent. The pill comes out of the window frame at the top edge of the chat as a drop, gets wider,
+ * and comes off the frame on a thin neck; it closes the same way back. It uses the goo and the springs
+ * of the agent dock (`liquid.tsx`).
  */
 export function VoicePill(props: VoicePillProps) {
   const { t, format } = useText();
   const speed = () => format.number(props.speed ?? 1);
+  const push = () => props.talkMode === "push";
   const hearing = () => props.phase === "listening" && !props.muted;
+  /** The user turned the open microphone off. Push to talk waits with it off, and is not muted. */
+  const micOff = () => props.muted && !push();
   // While the conversation runs, the face changes as the sidebar avatar of a working agent does.
   const live = () =>
-    !props.muted && (props.phase === "listening" || props.phase === "thinking" || props.phase === "speaking");
+    !micOff() && (props.phase === "listening" || props.phase === "thinking" || props.phase === "speaking");
+  const phaseLabel = (): AppTextKey => {
+    if (props.phase !== "listening") return PHASE_LABELS[props.phase];
+    if (push()) return props.talking ? PHASE_LABELS.listening : "conversation.voice.talkMode.push";
+    return props.muted ? "conversation.voice.phase.muted" : PHASE_LABELS.listening;
+  };
   const filterId = `voice-pill-goo-${createUniqueId()}`;
   let dock!: HTMLDivElement;
   let body!: HTMLDivElement;
   let neck!: HTMLDivElement;
   let shape!: HTMLDivElement;
   let face!: HTMLElement;
+  let talkPad: HTMLButtonElement | undefined;
   let ready = false;
   /** The height of the pill: the height of its content. */
   let depth = 0;
@@ -178,9 +235,43 @@ export function VoicePill(props: VoicePillProps) {
     observer.observe(face);
     // A new chat width moves the centre: the pill must be placed again.
     observer.observe(dock);
+    // Push to talk: Space held talks, outside a text field and outside the other controls. A lost key-up,
+    // such as at a switch to another window, must not leave the microphone on.
+    const spaceTalks = (event: KeyboardEvent) =>
+      event.code === "Space" &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      props.talkMode === "push" &&
+      props.open !== false &&
+      !typingTarget(event.target) &&
+      !(event.target instanceof Element && event.target.closest("button, a") && !talkPad?.contains(event.target));
+    const down = (event: KeyboardEvent) => {
+      if (!spaceTalks(event)) return;
+      event.preventDefault();
+      if (!event.repeat) props.onTalkStart();
+    };
+    const up = (event: KeyboardEvent) => {
+      if (!spaceTalks(event)) return;
+      event.preventDefault();
+      props.onTalkEnd();
+    };
+    const release = () => props.onTalkEnd();
+    const hidden = () => {
+      if (document.hidden) release();
+    };
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    window.addEventListener("blur", release);
+    document.addEventListener("visibilitychange", hidden);
     return () => {
       observer.disconnect();
       motion.stop();
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", release);
+      document.removeEventListener("visibilitychange", hidden);
+      release();
     };
   });
 
@@ -217,7 +308,7 @@ export function VoicePill(props: VoicePillProps) {
         class="voice-pill"
         aria-label={t("conversation.voice.label", { name: props.agent.name })}
         data-phase={props.phase}
-        data-muted={props.muted ? "" : undefined}
+        data-muted={micOff() ? "" : undefined}
         inert={props.open === false ? true : undefined}
         ref={face}
       >
@@ -229,12 +320,46 @@ export function VoicePill(props: VoicePillProps) {
           class="voice-pill-avatar"
         />
         <span class="voice-pill-phase sr-only" aria-live="polite">
-          {t(props.muted && props.phase === "listening" ? "conversation.voice.phase.muted" : PHASE_LABELS[props.phase])}
+          {t(phaseLabel())}
         </span>
-        <VoiceWaveform
-          levels={hearing() || props.phase === "speaking" ? props.levels.slice(-PILL_LEVELS) : []}
-          class="voice-pill-waveform"
-        />
+        <Show
+          when={push()}
+          fallback={
+            <VoiceWaveform
+              levels={hearing() || props.phase === "speaking" ? props.levels.slice(-PILL_LEVELS) : []}
+              class="voice-pill-waveform"
+            />
+          }
+        >
+          <TalkPad
+            ref={(element) => {
+              talkPad = element;
+            }}
+            talking={props.talking}
+            disabled={props.phase === "starting" || props.phase === "offline"}
+            levels={hearing() || props.phase === "speaking" ? props.levels.slice(-PILL_LEVELS) : null}
+            onStart={() => props.onTalkStart()}
+            onEnd={() => props.onTalkEnd()}
+          />
+        </Show>
+        <SlidingTabs.Root
+          value={props.talkMode}
+          onChange={(value: string) => {
+            if (isVoiceTalkMode(value)) props.onTalkModeChange(value);
+          }}
+        >
+          <SlidingTabs.List class="voice-pill-modes" aria-label={t("conversation.voice.talkMode")}>
+            <For each={TALK_MODES}>
+              {(mode) => (
+                <SlidingTabs.Trigger value={mode} class="voice-pill-mode" aria-label={t(TALK_MODE_LABELS[mode])}>
+                  <Show when={mode === "push"} fallback={<AudioLines aria-hidden="true" />}>
+                    <Hand aria-hidden="true" />
+                  </Show>
+                </SlidingTabs.Trigger>
+              )}
+            </For>
+          </SlidingTabs.List>
+        </SlidingTabs.Root>
         <Show when={props.onCycleSpeed}>
           {(cycleSpeed) => (
             <PillAction
@@ -247,11 +372,14 @@ export function VoicePill(props: VoicePillProps) {
             </PillAction>
           )}
         </Show>
-        <PillAction text={t("conversation.voice.mute")} pressed={props.muted} onClick={() => props.onToggleMute()}>
-          <Show when={props.muted} fallback={<Mic aria-hidden="true" />}>
-            <MicOff aria-hidden="true" />
-          </Show>
-        </PillAction>
+        {/* Push to talk has no mute: the microphone is off until the user holds the talk button. */}
+        <Show when={!push()}>
+          <PillAction text={t("conversation.voice.mute")} pressed={props.muted} onClick={() => props.onToggleMute()}>
+            <Show when={props.muted} fallback={<Mic aria-hidden="true" />}>
+              <MicOff aria-hidden="true" />
+            </Show>
+          </PillAction>
+        </Show>
         <PillAction
           text={t("conversation.voice.interrupt")}
           disabled={props.phase !== "speaking" && props.phase !== "thinking"}
@@ -271,6 +399,65 @@ export function VoicePill(props: VoicePillProps) {
         )}
       </Show>
     </div>
+  );
+}
+
+/**
+ * Push to talk: hold it with the pointer, or with Enter while it has the focus. It says how to talk, and
+ * shows the voice while the user talks or the agent speaks. It takes the accent while it is held.
+ */
+function TalkPad(props: {
+  ref: (element: HTMLButtonElement) => void;
+  talking: boolean;
+  disabled: boolean;
+  /** The voice that is heard now, or null while nobody speaks. */
+  levels: readonly number[] | null;
+  onStart: () => void;
+  onEnd: () => void;
+}) {
+  const { t } = useText();
+  return (
+    <Button
+      ref={props.ref}
+      variant="ghost"
+      size="sm"
+      type="button"
+      class="voice-pill-talk"
+      aria-label={t("conversation.voice.holdToTalk")}
+      aria-pressed={props.talking ? "true" : "false"}
+      disabled={props.disabled}
+      onPointerDown={(event: PointerEvent & { currentTarget: HTMLButtonElement }) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        event.currentTarget.setPointerCapture(event.pointerId);
+        props.onStart();
+      }}
+      onPointerUp={() => props.onEnd()}
+      onPointerCancel={() => props.onEnd()}
+      onLostPointerCapture={() => props.onEnd()}
+      onContextMenu={(event: MouseEvent) => event.preventDefault()}
+      onKeyDown={(event: KeyboardEvent) => {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        if (!event.repeat) props.onStart();
+      }}
+      onKeyUp={(event: KeyboardEvent) => {
+        if (event.key === "Enter") props.onEnd();
+      }}
+    >
+      <Show
+        when={props.levels}
+        fallback={
+          <>
+            <Mic aria-hidden="true" />
+            <span class="voice-pill-talk-hint">{t("conversation.voice.holdToTalk")}</span>
+            <Kbd aria-hidden="true">{t("conversation.voice.spaceKey")}</Kbd>
+          </>
+        }
+      >
+        {(levels) => <VoiceWaveform levels={levels()} class="voice-pill-waveform" />}
+      </Show>
+    </Button>
   );
 }
 

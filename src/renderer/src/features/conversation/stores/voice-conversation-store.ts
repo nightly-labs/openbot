@@ -5,7 +5,7 @@ import {
   VOICE_MODELS,
   VOICE_STREAM_LIMITS,
 } from "@openbot/contracts/ipc";
-import type { VoicePhase } from "@openbot/ui/features/conversation/VoicePill";
+import type { VoicePhase, VoiceTalkMode } from "@openbot/ui/features/conversation/VoicePill";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore, onCleanup } from "solid-js";
 import { desktopAnalytics } from "../../../analytics";
@@ -47,6 +47,8 @@ const SILENT_RECORDING_MS = 4_000;
 const RESTART_QUIET_MS = 600;
 /** The pause after speech that ends the turn. */
 const TURN_END_SILENCE_MS = 1_200;
+/** A push to talk that is shorter than this is a tap, not a turn: nothing is sent. */
+const PUSH_TO_TALK_MIN_MS = 300;
 /** How often the words so far are transcribed again while the user speaks. */
 const LIVE_TRANSCRIPT_INTERVAL_MS = 1_200;
 /** The same loudness scale as the dictation waveform, in dB. */
@@ -81,6 +83,8 @@ interface VoiceConversationState {
   phase: VoiceConversationStep;
   /** The microphone stays off until the user unmutes it. */
   muted: boolean;
+  /** Push to talk: the user holds the talk button or Space now. */
+  talking: boolean;
   /** The agent's server is not connected, so the pane does not listen. */
   offline: boolean;
   /** What the user said in this turn, so far. */
@@ -142,6 +146,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   const [state, setState] = createStore<VoiceConversationState>({
     phase: "starting",
     muted: false,
+    talking: false,
     offline: false,
     heard: "",
     error: null,
@@ -153,6 +158,11 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   let turn: Turn | undefined;
   /** Both models are ready, so a turn can be transcribed and its reply read aloud. */
   let ready = false;
+  /** The models load now. An unmute in this time does not start them again. */
+  let loading = false;
+  /** The turn ends when the user lets go of the talk button, not at a pause. */
+  let pushToTalk = false;
+  let talking = false;
   let livePreview = false;
   let streamed = false;
   /** A cloud model takes the dictation: ElevenLabs streams, Groq takes each whole turn. */
@@ -202,6 +212,13 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     });
   }
 
+  function setTalking(next: boolean): void {
+    talking = next;
+    setState((draft) => {
+      draft.talking = next;
+    });
+  }
+
   const stopReplyEnd = onDictatedReplyEnd((agent) => {
     if (agent.serverId !== deps.serverId || agent.agentId !== deps.agentId) return;
     if (held) heldReplyEnded = true;
@@ -236,6 +253,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     const own = generation;
     const analytics = desktopAnalytics.scope();
     const startingAt = performance.now();
+    loading = true;
     try {
       const speech = speechPort().voice;
       const server = await speech.getServer();
@@ -298,6 +316,8 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       setState((draft) => {
         draft.error = currentText().errorMessage(error, currentText().t("conversation.voice.error"));
       });
+    } finally {
+      loading = false;
     }
   }
 
@@ -556,7 +576,8 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
         } else {
           loudFor = 0;
           quietFor += LEVEL_INTERVAL_MS;
-          if (current.spoke && quietFor >= TURN_END_SILENCE_MS) endTurn(current);
+          // With push to talk, the user ends the turn when they let go.
+          if (current.spoke && quietFor >= TURN_END_SILENCE_MS && !pushToTalk) endTurn(current);
         }
         if (held && heldAt !== undefined && current.spoke && performance.now() - heldAt >= HOLD_WORDS_MS)
           checkHeldWords(current);
@@ -795,18 +816,63 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   }
 
   function toggleMute(): void {
-    setMuted(!muted);
     desktopAnalytics.track("voice_conversation_action", {
-      action: muted ? "mute" : "unmute",
+      action: muted ? "unmute" : "mute",
       server_kind: serverKind,
       result: "succeeded",
     });
+    applyMute(!muted);
+  }
+
+  /**
+   * Push to talk: the microphone is off until the user holds the talk button or Space, and the turn
+   * ends when they let go. The open microphone listens all the time and ends a turn at a pause.
+   */
+  function setTalkMode(mode: VoiceTalkMode): void {
+    const push = mode === "push";
+    if (push === pushToTalk) return;
+    pushToTalk = push;
+    setTalking(false);
+    if (push !== muted) applyMute(push);
+  }
+
+  /** Push to talk: the user presses. A reply that plays stops, and the microphone opens. */
+  function startTalking(): void {
+    if (!pushToTalk || talking) return;
+    setTalking(true);
+    if (step === "waiting") interrupt();
+    if (muted) applyMute(false);
+  }
+
+  /** Push to talk: the user lets go. What they said is the turn, and the microphone closes. */
+  function stopTalking(): void {
+    if (!pushToTalk || !talking) return;
+    setTalking(false);
+    if (muted) return;
+    const current = turn;
+    if (
+      current &&
+      step === "listening" &&
+      current.recorder.state === "recording" &&
+      performance.now() - current.startedAt >= PUSH_TO_TALK_MIN_MS
+    ) {
+      // The ended recording is transcribed and sent after the microphone closes.
+      endTurn(current);
+      setMuted(true);
+      releaseTurn();
+      return;
+    }
+    applyMute(true);
+  }
+
+  function applyMute(next: boolean): void {
+    setMuted(next);
     if (!muted)
       setState((draft) => {
         draft.error = null;
       });
-    // A start that failed starts again.
-    if (!muted && !ready) {
+    // A start that failed starts again. A start that still loads goes on.
+    if (!muted && !ready && !loading) {
       setStep("starting");
       void start();
       return;
@@ -882,9 +948,13 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   return {
     phase,
     muted: () => state.muted,
+    talking: () => state.talking,
     error: () => state.error,
     levels: () => (phase() === "speaking" ? (reading()?.levels ?? state.levels) : state.levels),
     toggleMute,
+    setTalkMode,
+    startTalking,
+    stopTalking,
     interrupt,
   };
 }
