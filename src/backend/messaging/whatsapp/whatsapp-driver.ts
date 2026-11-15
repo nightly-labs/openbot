@@ -1,14 +1,10 @@
-import { createWriteStream } from "node:fs";
-import { stat } from "node:fs/promises";
+import { chmod, copyFile, stat } from "node:fs/promises";
 import { extname } from "node:path";
-import { Transform } from "node:stream";
-import { pipeline } from "node:stream/promises";
 import { parseWhatsAppPhoneNumber } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { WhatsAppStoreUnreadable } from "@openbot/whatsapp/auth-store";
 import {
   type AnyMessageContent,
-  downloadMediaMessage,
   isJidGroup,
   type MiscMessageGenerationOptions,
   type WAMessage,
@@ -19,6 +15,7 @@ import type { MessagingAnswerFile } from "../messaging-threads";
 import {
   type ConnectionIdentity,
   type ContextEntry,
+  type HistoryFilter,
   type InboundFile,
   type MessageBody,
   type MessageTarget,
@@ -31,6 +28,7 @@ import {
   type StatusReaction,
   WhatsAppAnswerPartlySent,
 } from "../messaging-types";
+import { WhatsAppArchive } from "./whatsapp-archive";
 import {
   userJid,
   WHATSAPP_DIRECT_THREAD,
@@ -39,6 +37,7 @@ import {
   whatsAppThreadKey,
 } from "./whatsapp-events";
 import { imageSize } from "./whatsapp-image-size";
+import { downloadWhatsAppMedia } from "./whatsapp-media";
 import { whatsAppChunks, whatsAppText } from "./whatsapp-render";
 import type { WhatsAppConnectionHandle, WhatsAppRuntime } from "./whatsapp-runtime";
 import { allowsContact, whatsAppNumberForms } from "./whatsapp-senders";
@@ -105,6 +104,7 @@ export function maskedNumber(number: string): string {
 /** The outbound side of one linked number. It never logs message text or phone numbers. */
 class WhatsAppAdapter implements MessagingAdapter {
   readonly platform = "whatsapp" as const;
+  readonly searchesHistory = true;
   readonly #runtime: WhatsAppRuntime;
   readonly #credentials: WhatsAppCredentials;
   #opened: WhatsAppConnectionHandle | null = null;
@@ -294,49 +294,46 @@ class WhatsAppAdapter implements MessagingAdapter {
     afterId: string | null,
     beforeId: string,
   ): Effect.Effect<ContextEntry[], MessagingAdapterError> {
-    return Effect.sync(() => this.#handle.chats.history(platformChannelId, threadKey, afterId, beforeId));
+    return Effect.try({
+      try: () => this.#handle.chats.history(platformChannelId, threadKey, afterId, beforeId),
+      catch: (cause) => new MessagingAdapterError({ cause }),
+    });
   }
 
-  /** WhatsApp sends no history to this device: this is what it saw since it started. */
+  /** WhatsApp sends no history to this device: this is what it saw and saved, for 90 days. */
   recent(
     platformChannelId: string,
     threadKey: string | null,
     limit: number,
+    filter?: HistoryFilter,
   ): Effect.Effect<RecentMessages, MessagingAdapterError> {
-    return Effect.sync(() => ({ messages: this.#handle.chats.recent(platformChannelId, threadKey, limit) }));
+    return Effect.try({
+      try: () => ({ messages: this.#handle.chats.recent(platformChannelId, threadKey, limit, filter) }),
+      catch: (cause) => new MessagingAdapterError({ cause }),
+    });
   }
 
+  /** Copies the file that the archive saved at arrival, or else downloads it from WhatsApp. */
   readonly download = Effect.fnUntraced(function* (
     this: WhatsAppAdapter,
     file: InboundFile,
     destination: string,
     maxBytes: number,
   ) {
+    if (file.size > maxBytes) return yield* new MessagingAdapterError({ cause: new Error("file_too_large") });
+    const chats = this.#handle.chats;
+    const saved = yield* Effect.promise(() => chats.savedFile(file));
+    if (saved) {
+      const copied = yield* Effect.tryPromise(() => copySaved(saved, destination, maxBytes)).pipe(
+        Effect.orElseSucceed(() => false),
+      );
+      if (copied) return;
+    }
     const message = this.#handle.chats.media(file.url);
     if (!message) return yield* new MessagingAdapterError({ cause: new Error("file_unavailable") });
-    if (file.size > maxBytes) return yield* new MessagingAdapterError({ cause: new Error("file_too_large") });
-    const socket = this.#handle.session.socket();
+    const session = this.#handle.session;
     yield* Effect.tryPromise({
-      try: async () => {
-        const stream = await downloadMediaMessage(
-          message,
-          "stream",
-          {},
-          {
-            logger: silentLogger,
-            reuploadRequest: (stale) =>
-              socket ? socket.updateMediaMessage(stale) : Promise.reject(new Error("not_connected")),
-          },
-        );
-        let total = 0;
-        const limit = new Transform({
-          transform(chunk: Buffer, _encoding, done) {
-            total += chunk.byteLength;
-            done(total > maxBytes ? new Error("file_too_large") : null, chunk);
-          },
-        });
-        await pipeline(stream, limit, createWriteStream(destination, { mode: 0o600 }));
-      },
+      try: () => downloadWhatsAppMedia(session, message, destination, maxBytes),
       catch: (cause) => new MessagingAdapterError({ cause }),
     });
   });
@@ -446,6 +443,8 @@ class WhatsAppAdapter implements MessagingAdapter {
       id: postId,
       chatJid: target.platformChannelId,
       threadKey: this.#threadKey(target, postId),
+      // The linked number sent it: an edit or a delete from the owner's phone matches.
+      authorId: whatsAppIdentity(this.#handle)?.number ?? "",
       authorName: "OpenBot",
       text,
       sentAt: new Date().toISOString(),
@@ -523,6 +522,15 @@ export function whatsAppDriver(options: WhatsAppDriverOptions): MessagingDriver 
       const values = whatsAppCredentials(credentials);
       const handle = runtime.open(values.storeId, values.storeKey);
       const me = whatsAppIdentity(handle) ?? { number: identity.workspaceId, lid: null };
+      const history = runtime.policy.history(identity.workspaceId);
+      if (history)
+        handle.chats.attach(
+          new WhatsAppArchive({
+            ...history,
+            folder: runtime.filesPath(history.connectionId),
+            session: handle.session,
+          }),
+        );
       return new WhatsAppTransport({ runtime, handle, identity: me, workspaceId: identity.workspaceId });
     },
   };
@@ -532,12 +540,11 @@ function userPart(jid: string): string | null {
   return jid.split("@")[0]?.split(":")[0] ?? null;
 }
 
-const silentLogger = {
-  level: "silent",
-  child: () => silentLogger,
-  trace: () => undefined,
-  debug: () => undefined,
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined,
-};
+/** Copies a saved file. False when the copy is gone or larger than `maxBytes`. */
+async function copySaved(path: string, destination: string, maxBytes: number): Promise<boolean> {
+  const { size } = await stat(path);
+  if (size > maxBytes) return false;
+  await copyFile(path, destination);
+  await chmod(destination, 0o600);
+  return true;
+}

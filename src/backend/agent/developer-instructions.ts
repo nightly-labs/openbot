@@ -501,8 +501,10 @@ export function developerInstructions(
     `openbot.tool_search finds the other OpenBot and browser tools by short capability phrases, openbot.tool_describe loads their schemas and guidance, and openbot.tool_call runs one. Use the returned namespace.tool names exactly. tool_call does not run bridge tools.${
       // Codex makes the `openbot` namespace direct-only (`CODEX_DIRECT_ONLY_NAMESPACES`), so `exec`
       // leaves it out of `ALL_TOOLS`; a model that looked only there said the browser was gone (#5036).
+      // Codex 0.167 and later keeps no more than 8 MiB of image data URL from one `exec`, and `view_image`
+      // gives the whole file, so a phone photo did not reach the model (#9522).
       agent.provider === "codex"
-        ? " In exec, ALL_TOOLS does not list the openbot and openbot_browser tools; call them directly."
+        ? " In exec, ALL_TOOLS does not list the openbot and openbot_browser tools; call them directly. For a local photo, call openbot.read_image: view_image in exec drops a file over 6 MB."
         : // OpenCode Code Mode puts only the direct tools under `tools.openbot`. A model that read
           // `openbot.create_agent` called `tools.openbot.create_agent`, which OpenCode refuses (#6309).
           agent.provider === "opencode"

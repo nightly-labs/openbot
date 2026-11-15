@@ -26,6 +26,7 @@ import {
   type TeamSessionSummary,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { type ServerAppearance, serverAppearanceOrNull } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { normalizeEmailAddress, slugifyTeamServerName } from "@openbot/contracts/validation";
 import { sourceText } from "@openbot/i18n/source";
 import { Context, Deferred, Effect, Layer, Result, Schema } from "effect";
@@ -118,6 +119,11 @@ interface StoredTeam {
         mimeType: AvatarImageInput["mimeType"];
       }
     | undefined;
+  /**
+   * The shape and colour that the server shows with no logo. Absent for the automatic look. Read
+   * with `serverAppearanceOrNull`, so a bad value gives the automatic look and the file still loads.
+   */
+  serverAppearance?: ServerAppearance | undefined;
   members: StoredMember[];
   invites: StoredInvite[];
   sessions: StoredSession[];
@@ -164,6 +170,7 @@ export interface TeamIdentity {
   publicKey: string;
   enabledOnLaunch: boolean;
   logoVersion: string | null;
+  appearance: ServerAppearance | null;
 }
 
 export interface CreatedInvite {
@@ -651,12 +658,12 @@ export class TeamStore {
   readonly updateIdentity = Effect.fn("TeamStore.updateIdentity")(
     function* (
       this: TeamStore,
-      input: { serverName?: string; logo?: AvatarImageInput | null },
+      input: { serverName?: string; logo?: AvatarImageInput | null; appearance?: ServerAppearance | null },
     ): Effect.fn.Return<TeamIdentity, RemoteWorkflowError, TeamStoreFiles> {
       const state = yield* remoteDecode(() => this.#requireState());
       const serverName = input.serverName;
       if (serverName !== undefined) yield* remoteDecode(() => validateServerName(serverName));
-      if (input.serverName === undefined && input.logo === undefined) {
+      if (input.serverName === undefined && input.logo === undefined && input.appearance === undefined) {
         const identity = this.getIdentity();
         if (!identity)
           return yield* new RemoteWorkflowError({ cause: new TeamStoreError(sourceText("error.team.notConfigured")) });
@@ -665,6 +672,7 @@ export class TeamStore {
 
       const previousName = state.serverName;
       const previousLogo = state.serverLogo;
+      const previousAppearance = state.serverAppearance;
       const nextLogo =
         input.logo === undefined
           ? previousLogo
@@ -683,6 +691,8 @@ export class TeamStore {
       if (input.serverName !== undefined) state.serverName = input.serverName.trim();
       if (nextLogo === undefined) delete state.serverLogo;
       else state.serverLogo = nextLogo;
+      if (input.appearance === null) delete state.serverAppearance;
+      else if (input.appearance !== undefined) state.serverAppearance = { ...input.appearance };
       const attempt6 = yield* Effect.gen({ self: this }, function* () {
         yield* this.#persistEffect();
       }).pipe(Effect.result);
@@ -691,6 +701,8 @@ export class TeamStore {
         state.serverName = previousName;
         if (previousLogo === undefined) delete state.serverLogo;
         else state.serverLogo = previousLogo;
+        if (previousAppearance === undefined) delete state.serverAppearance;
+        else state.serverAppearance = previousAppearance;
         if (nextLogo && nextLogo.version !== previousLogo?.version) {
           yield* this.#removeLogoEffect(nextLogo).pipe(Effect.catch(() => Effect.void));
         }
@@ -1747,6 +1759,7 @@ function identityOf(host: StoredTeam): TeamIdentity {
     publicKey: host.publicKey,
     enabledOnLaunch: host.enabledOnLaunch,
     logoVersion: host.serverLogo?.version ?? null,
+    appearance: serverAppearanceOrNull(host.serverAppearance),
   };
 }
 
@@ -1792,6 +1805,9 @@ function reconcileHost(baseline: StoredTeam, mine: StoredTeam, theirs: StoredTea
   const serverLogo = pickChanged(baseline.serverLogo, mine.serverLogo, theirs.serverLogo);
   if (serverLogo === undefined) delete merged.serverLogo;
   else merged.serverLogo = serverLogo;
+  const serverAppearance = pickChanged(baseline.serverAppearance, mine.serverAppearance, theirs.serverAppearance);
+  if (serverAppearance === undefined) delete merged.serverAppearance;
+  else merged.serverAppearance = serverAppearance;
   return merged;
 }
 

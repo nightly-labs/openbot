@@ -359,7 +359,7 @@ export interface WebWorkspaceRuntime {
   listAgents(): Promise<ClientAgentSummary[]>;
   conversation(agentId: string, before?: string): Promise<ConversationPage>;
   /** The page of an agent's conversation around one message, or the newest page from an older host. */
-  conversationAround?: (agentId: string, messageId: string) => Promise<ConversationPage>;
+  conversationAround?: (agentId: string, messageId: string, limit?: number) => Promise<ConversationPage>;
   /** Marks this member's messages from the agent read through `throughMessageId`, or all when it is null. */
   markRead(agentId: string, throughMessageId: string | null): Promise<ConversationReadState>;
   /** With `conversation-unread-from-v1`: marks one message and the messages after it unread, for this member. */
@@ -1415,10 +1415,10 @@ export function createWebWorkspaceRuntime(
       const query = new URLSearchParams({ limit: "50", ...(before ? { before } : {}) });
       return decodeWebConversationPage(await request("GET", `${TEAM_API_ROUTES.agent.conversationPage(id)}?${query}`));
     },
-    async conversationAround(id, messageId) {
+    async conversationAround(id, messageId, limit = 50) {
       if (!capabilities.includes("conversation-pagination"))
         return decodeWebConversationSnapshot(await request("GET", TEAM_API_ROUTES.agent.conversation(id)));
-      const query = new URLSearchParams({ limit: "50", around: messageId });
+      const query = new URLSearchParams({ limit: String(limit), around: messageId });
       return decodeWebConversationPage(await request("GET", `${TEAM_API_ROUTES.agent.conversationPage(id)}?${query}`));
     },
     async markRead(id, throughMessageId) {

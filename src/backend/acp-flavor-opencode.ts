@@ -247,6 +247,9 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
   // OpenCode 2.1.4 adds each session's MCP servers to the session's directory under their names. A
   // second chat of the agent replaced the `openbot` token, and closing it left the first refused.
   mcpServersPerDirectory: true,
+  // OpenCode 2.3.0 keeps a session's MCP servers for its directory after `session/close`. Each new
+  // chat or subagent added more stdio servers that nothing stopped (#9254). OpenBot starts and ends them.
+  relayStdioMcpServers: true,
   // OpenCode 2.2.5 sends each subagent's session as `opencode/session/child_update` when the client
   // asks. Without it, the subagent's tool calls showed as the parent's, and nothing told when it ended.
   childSessionUpdates: true,

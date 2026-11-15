@@ -275,6 +275,13 @@ export const messages = {
   "mobile.server.settings.identityUnsupported":
     "여기에서 이름과 로고를 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
   "mobile.server.settings.identityOffline": "서버 이름과 로고를 변경하려면 이 서버에 연결하세요.",
+  "mobile.server.settings.appearance": "모양과 색상",
+  "mobile.server.settings.appearanceShape": "모양",
+  "mobile.server.settings.appearanceShapeOption": "모양 {number}",
+  "mobile.server.settings.appearanceColor": "서버 색상",
+  "mobile.server.settings.appearanceAutomatic": "자동",
+  "mobile.server.settings.appearanceReset": "초기화",
+  "mobile.server.settings.appearanceSaveFailed": "서버 모양과 색상을 저장하지 못했어요. 다시 시도해 주세요.",
   "mobile.server.route.cropLogo": "로고 자르기",
   "mobile.server.members.remove": "멤버 삭제",
   "mobile.server.members.invitePeople": "사람 초대",

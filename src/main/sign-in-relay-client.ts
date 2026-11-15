@@ -51,6 +51,11 @@ export interface SignInRelayClientDependencies {
   language: Pick<LanguageService, "locale" | "translate">;
   /** The MCP grant listener of this computer, which takes the callbacks on its port and paths by `state`. */
   ownListener: () => { port: number; paths: readonly string[] } | null;
+  /**
+   * `openbot://mcp-auth` while the operating system opens it in this app, or `undefined`. Its
+   * callbacks reach `deliver` by `state` (`sign-in-relay-deep-link-v1`).
+   */
+  deepLinkRedirectUrl: () => string | undefined;
 }
 
 interface Waiting {
@@ -110,6 +115,11 @@ export class SignInRelayClient {
       return true;
     }
     return false;
+  }
+
+  /** Whether a host's sign-in can return to this computer through `openbot://mcp-auth`. */
+  receivesDeepLink(): boolean {
+    return this.#dependencies.deepLinkRedirectUrl() !== undefined;
   }
 
   /** Opens the page of the sign-in of `key` in the user's browser again. */
@@ -191,8 +201,13 @@ export class SignInRelayClient {
         (server) => Effect.promise(() => server?.close() ?? Promise.resolve()),
       );
       const own = self.#dependencies.ownListener();
+      // A page that returns to `openbot://mcp-auth` comes back through `deliver` by itself.
+      const deepLink =
+        callback === null && page.searchParams.get("redirect_uri") === self.#dependencies.deepLinkRedirectUrl();
       const routed =
-        callback !== null && (listener !== null || (own?.port === callback.port && own.paths.includes(callback.path)));
+        deepLink ||
+        (callback !== null &&
+          (listener !== null || (own?.port === callback.port && own.paths.includes(callback.path))));
       wait({
         page: { authorizeHost: page.host, listening: routed, pasteable: true },
         url: page.toString(),

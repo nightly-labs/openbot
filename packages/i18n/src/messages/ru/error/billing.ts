@@ -8,6 +8,8 @@ export const messages = {
   "error.billing.restartUnavailable": "Этот сервер нельзя перезапустить отсюда. Обратитесь в поддержку.",
   "error.billing.planRequired": "Тариф этого сервера закончился. Продлите его, чтобы запустить сервер.",
   "error.billing.planSoldOut": "Этот тариф распродан. Выберите другой тариф.",
+  "error.billing.storageUnavailable": "Это хранилище недоступно для этого сервера.",
+  "error.billing.storagePaymentFailed": "Оплата хранилища не прошла. Обновите способ оплаты и попробуйте снова.",
   "error.billing.licenseExists": "У этого аккаунта уже есть лицензия. Вместо этого измените число пользователей.",
   "error.billing.licenseCurrency": "Лицензия должна использовать валюту ваших других планов.",
   "error.billing.planCurrency": "Новый план должен использовать валюту ваших других планов.",

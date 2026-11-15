@@ -8,6 +8,10 @@ import {
 } from "@openbot/contracts/ipc";
 import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
 import { type DynamicRecord, isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
+import {
+  optionalServerAppearanceField,
+  type ServerAppearance,
+} from "@openbot/contracts/team-protocol/host-appearance-v1";
 
 /** The account API's answers, and the decoders that `CentralAuthManager` checks them with. */
 
@@ -23,6 +27,11 @@ export interface RemoteHostSummary {
   hostId: string;
   name: string;
   logoKey: string | null;
+  /**
+   * The shape and colour that the server shows with no logo; null for the automatic look. An older
+   * account server sends none, and a bad value is dropped.
+   */
+  appearance?: ServerAppearance | null;
   devicePublicKey: string | null;
   /** The host's signed key handovers. An account server from before handovers sends none. */
   keyHandovers: HostKeyHandover[];
@@ -190,6 +199,7 @@ export function decodeRemoteHosts(value: unknown): RemoteHostSummary[] {
       hostId: requiredString(host, "hostId"),
       name: requiredString(host, "name"),
       logoKey: host.logoKey,
+      ...optionalServerAppearanceField(host.appearance),
       devicePublicKey: host.devicePublicKey,
       keyHandovers: optionalHostKeyHandovers(host.keyHandovers),
       authEpoch: host.authEpoch,

@@ -8,10 +8,11 @@ import {
   type BillingCurrency,
   type BillingInterval,
   type BillingPlanId,
+  type BillingStorageTier,
+  hostedPlanStorageGb,
   isBillingAmount,
   isStorageGb,
   isStripeCheckoutUrl,
-  planStorageGb,
 } from "./billing";
 import { INPUT_LIMITS } from "./input-limits";
 import type { ConversationMessage } from "./ipc-conversation-messages";
@@ -49,17 +50,18 @@ export const HOSTED_BOAT_PLAN_SIZE: Readonly<Record<BillingPlanId, HostedServerS
 };
 
 /**
- * The storage in GB of a hosted server: the plan storage, and in a boat sandbox not more than its disk.
- * A Starter sandbox from before `HOSTED_BOAT_PLAN_SIZE` is `small` and keeps 12 GB. `size` is the machine
- * after a resize that waits (`pending_size`), else the current one, and null when the server has no row
- * or no boat sandbox yet.
+ * The storage in GB of a hosted server: the plan storage with its storage tier on a VPS of the operator,
+ * and in a boat sandbox not more than its disk. A Starter sandbox from before `HOSTED_BOAT_PLAN_SIZE` is
+ * `small` and keeps 12 GB. `size` is the machine after a resize that waits (`pending_size`), else the
+ * current one, and null when the server has no row or no boat sandbox yet.
  */
 export function hostedServerStorageGb(
   plan: BillingPlanId,
   onOperatorHost: boolean,
   size: HostedServerSize | null,
+  storageTier: BillingStorageTier,
 ): number {
-  const storageGb = planStorageGb(plan, onOperatorHost);
+  const storageGb = hostedPlanStorageGb(plan, onOperatorHost, storageTier);
   if (onOperatorHost || size === null) return storageGb;
   return Math.min(storageGb, HOSTED_SERVER_SIZES[size].diskGb);
 }

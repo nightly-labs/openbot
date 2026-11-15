@@ -63,7 +63,7 @@ import { causeHelpers } from "../effect-boundary";
 import { isPythonKimiCli, type SignInRegion } from "../kimi-region";
 import { readKimiUsage } from "../kimi-usage";
 import { McpHandoffLog } from "./../mcp-handoff-log";
-import { providerMcpServerName } from "./../mcp-provider-shapes";
+import { grokMcpServerName, providerMcpServerName } from "./../mcp-provider-shapes";
 import { customProvidersOn, openCodeSignInMessage } from "./../opencode-config";
 import { readOpenCodeGoUsage } from "./../opencode-usage";
 import type { ProcessConfinement } from "../process-confinement";
@@ -1813,13 +1813,23 @@ export class ProviderRuntime implements ProviderPort {
     onHost: boolean,
     region: SignInRegion = "global",
   ) {
+    const state = () => this.#status.providers?.find((row) => row.id === provider)?.state;
+    const before = state();
     this.#startFailures.delete(provider);
     const start = this.#providerStarts.get(provider);
     if (start) yield* Deferred.await(start);
     if (start && this.#clients.has(provider) && this.#accounts.has(provider)) return this.status();
-    if (this.#providerRefresh || (!start && ["starting", "restarting"].includes(this.#status.phase))) {
-      return this.status();
+    // A check of the providers cancels each sign-in that has not finished (`#refreshProviders`), so a
+    // Connect during a check waits for its end. Before, the Connect ended with no sign-in and no
+    // message (#9384). When the check finds a signed-out provider connected, the Connect has nothing
+    // to do. A row that showed the check gives no such state, so its Connect signs in.
+    let waited = false;
+    while (this.#providerRefresh) {
+      waited = true;
+      yield* Deferred.await(this.#providerRefresh).pipe(Effect.ignore);
     }
+    if (waited && before !== "available" && before !== "checking" && state() === "available") return this.status();
+    if (!start && ["starting", "restarting"].includes(this.#status.phase)) return this.status();
     const signIn = requireProviderDriver(provider).signIn;
     return yield* this.#runProviderConnectionCommand(provider, () =>
       this.#signIn(provider, signIn, openExternal, onHost, region),
@@ -4681,8 +4691,9 @@ export class ProviderRuntime implements ProviderPort {
    * is what the two forms share, and the longest path that matches picks between two servers on one
    * host. The URL is read first. The host counts only as a whole URL authority, so `example.com` is
    * not in `mcp.example.com` and `localhost:3000` is not in `localhost:30001`. A name counts only as
-   * a whole word, so `git` is not in `github`; a name the provider was given counts too, and one with
-   * no letter or digit, such as `__`, would match every `mcp__server__tool` line.
+   * a whole word, so `git` is not in `github`; a name the provider was given counts too, also in
+   * Grok's form (`grokMcpServerName`), and one with no letter or digit, such as `__`, would match
+   * every `mcp__server__tool` line.
    */
   #configuredMcpServerIn(message: string): { name: string; builtIn: boolean } | null {
     const configs = this.#credentials.mcpServers();
@@ -4700,7 +4711,9 @@ export class ProviderRuntime implements ProviderPort {
     const word = (text: string) => bounded(text, "(?<![\\w-])", "(?![\\w-])");
     const named = (name: string) => {
       const given = providerMcpServerName(name);
-      return (name !== "" && word(name)) || (/[A-Za-z0-9]/u.test(given) && word(given));
+      return (
+        (name !== "" && word(name)) || (/[A-Za-z0-9]/u.test(given) && (word(given) || word(grokMcpServerName(given))))
+      );
     };
     const config = configs.find((row) => named(row.name));
     if (config) return { name: config.name, builtIn: builtIn(config.id) };

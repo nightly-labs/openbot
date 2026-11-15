@@ -279,6 +279,8 @@ export const messages = {
     "Google の Gemini サービスがリクエストを完了しませんでした。数分後にもう一度お試しください。\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini がこのリクエストを拒否しました。別のモデルを選んでから、メッセージをもう一度送信してください。再び失敗する場合は、新しいチャットを始めてください。\n{detail}",
+  "error.provider.antigravityLocationUnsupported":
+    "Google は、このエージェントを実行しているコンピューターのネットワーク上の場所からの Gemini の利用を許可していません。別のコンピューターで Gemini を使うか、このエージェントに別のプロバイダーを選んでください。\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini はエージェントとの接続が切れたため停止しました。続けるには、メッセージを送信してください。",
   "error.provider.antigravityRemoteWindowsSignIn":
@@ -337,6 +339,8 @@ export const messages = {
     "画像が大きすぎるため、モデルはこのチャットの画像を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.imageCountLimit":
     "画像が多すぎるため、モデルはこのチャットを受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
+  "error.provider.requestTooLarge":
+    "このチャットは大きくなりすぎて、モデルに送信できません。多くの場合、チャット内の画像が原因です。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.opencodeSessionRejected":
     "OpenCode がリクエストを拒否しましたが、原因は示されていません。長いチャットやモデルの変更後に起こることがあります。OpenBot はチャット履歴を引き継いだ新しい OpenCode セッションを開始しました。もう一度お試しください。エラーが続く場合は、別のモデルを選ぶか推論レベルを下げてください。",
   "error.provider.opencodeCompactionFailed":
@@ -354,6 +358,8 @@ export const messages = {
     "Gemini はブラウザーでサインインページを開けませんでした。既定のブラウザーを確認してから、もう一度接続してください。",
   "error.provider.acpSignInFailed": "サインインが完了しませんでした。",
   "error.provider.acpSignInFailedReason": "サインインが完了しませんでした: {reason}",
+  "error.provider.acpSignInNetwork":
+    "サインインでプロバイダーのサーバーに接続できませんでした。OpenBot を実行しているコンピューターのネットワーク接続と DNS 設定を確認してから、もう一度お試しください。",
   "error.provider.acpSignOutFailed": "サインアウトが完了しませんでした。",
   "error.provider.acpSignOutFailedReason": "サインアウトが完了しませんでした: {reason}",
   "error.provider.acpSignInMethodMissing":
@@ -361,6 +367,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "ブラウザーで開けるのは HTTPS のサインインリンクだけです。",
   "error.provider.geminiKeyRefused":
     "Gemini は保存された API キーを拒否しました。設定でキーを置き換えるか削除してから、もう一度接続してください。",
+  "error.provider.geminiKeyRateLimited":
+    "保存された Gemini API キーがレート制限または割り当てに達したため、Gemini がリクエストを拒否しました。このキーは Google のプランの代わりに使われています。数分待つか別のモデルを選んでから、もう一度お試しください。Google のプランを使うには、設定でキーを削除してください。\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "保存された Gemini API キーには、このモデルの割り当てがありません。このキーは Google のプランの代わりに使われています。別のモデルを選ぶか、Google のプランを使うために設定でキーを削除してください。\n{detail}",
   "error.provider.geminiAccountSettingsUnreadable":
     "Gemini がこのアカウントの設定ファイルを開けないため、サインインできません。このアカウントを削除してから、もう一度追加してください。",
   "error.provider.geminiSettingsUnreadable":
@@ -458,6 +468,8 @@ export const messages = {
   "error.provider.piSessionMissing": "Pi のセッションファイルがこのコンピューターにありません。",
   "error.provider.piResumeCancelled": "Pi がセッションの再開をキャンセルしました。もう一度お試しください。",
   "error.provider.piSessionIdentity": "Pi が別のセッションを返しました。保存されたセッションは置き換えられていません。",
+  "error.provider.piExtensionFailed":
+    "拡張機能を読み込めなかったため、Pi が停止しました。この拡張機能を削除または更新してから、もう一度お試しください。{detail}",
   "error.provider.piModelInvalid": "プロバイダーを含む Pi のモデルを選択してください。",
   "error.provider.piToolInvalid": "ツールが無効な結果を返しました。",
   "error.provider.piSignIn":

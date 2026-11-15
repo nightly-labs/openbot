@@ -1,5 +1,5 @@
-import type { HostReleaseStatus, HostUpdateStatus } from "@openbot/contracts/ipc";
-import { onSettled, snapshot } from "solid-js";
+import type { HostReleaseStatus, HostUpdateStatus, ServerAppearance } from "@openbot/contracts/ipc";
+import { createSignal, onSettled, snapshot } from "solid-js";
 import { fn } from "storybook/test";
 import { ServerSettingsModal, type ServerSettingsModalProps } from "../src/features/servers/ServerSettingsModal";
 import { STORY_HOST_STATUS, STORY_INVITES, STORY_PRESENCE, STORY_SERVERS } from "../src/preview/fixtures";
@@ -28,6 +28,7 @@ export const serverSettingsArgs = () =>
     loadError: null,
     onRetry: fn(async () => undefined),
     onSaveIdentity: fn(async () => undefined),
+    onSaveAppearance: fn(async () => undefined),
     onSetPublished: fn(async () => undefined),
     onCreateInvite: fn(async (input) => ({
       id: "invite-story",
@@ -65,9 +66,21 @@ export function ServerSettingsStory(props: {
     mock.dispose();
     window.openbot = previous;
   });
+  // The app updates the server list when a look is saved; the story keeps the last saved look.
+  const [appearance, setAppearance] = createSignal<ServerAppearance | null | undefined>(undefined);
+  const server = () => {
+    const saved = appearance();
+    return saved === undefined ? props.settings.server : { ...props.settings.server, appearance: saved };
+  };
+  const saveAppearance = async (next: ServerAppearance | null) => {
+    await props.settings.onSaveAppearance?.(next);
+    setAppearance(next);
+  };
   return (
     <SettingsPageStory title="Server settings">
-      {(page) => <ServerSettingsModal {...props.settings} page={page()} />}
+      {(page) => (
+        <ServerSettingsModal {...props.settings} server={server()} onSaveAppearance={saveAppearance} page={page()} />
+      )}
     </SettingsPageStory>
   );
 }

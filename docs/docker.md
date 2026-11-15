@@ -529,4 +529,7 @@ does not use systemd.
 - Not tested: a Codex agent with Workspace only access in a container. Codex runs its commands in
   bubblewrap, which mounts its root in a user namespace. The seccomp profile allows `mount` only with
   `CAP_SYS_ADMIN` and always refuses `pivot_root`, and the `docker-default` AppArmor profile refuses
-  `mount`, so these commands can fail. An agent with Full access does not use bubblewrap.
+  `mount`, so these commands can fail. A user report confirms the failure
+  (`bwrap: Failed to make / slave: Operation not permitted`, #9694). The chat then shows a warning
+  that tells the user to choose Ask first or Full access. Agents with these two options do not use
+  bubblewrap.

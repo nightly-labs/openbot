@@ -106,6 +106,7 @@ let hostStatus: HostStatus = {
   serverName: null,
   apiUrl: null,
   logoUrl: null,
+  appearance: null,
   apiOnline: false,
   remoteDesktopReady: false,
   remoteDesktopScreenRecordingDenied: false,
@@ -135,6 +136,7 @@ const host: ServerModeOptions["host"] = {
       return structuredClone(hostStatus);
     }),
   getMobileConnectHost: () => null,
+  refreshRegistration: () => Effect.void,
 };
 
 const runtime = await mkdtemp(join(tmpdir(), "openbot-setup-page-"));

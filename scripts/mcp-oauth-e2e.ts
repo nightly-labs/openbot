@@ -896,7 +896,9 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
       }),
     );
     assert.equal(oauth.signedIn(away.url), false);
-    assert.deepEqual(await endpointOf(gateway, away), awayRoute);
+    // The 502 above was a failed `initialize` on this route: the next hand-off has a new address
+    // with the same bearer, so a provider that keeps a failed server connects again (#9526).
+    assert.deepEqual(await endpointOf(gateway, away), { ...awayRoute, url: `${awayRoute.url}?attempt=1` });
     assert.equal(await runCauseEffect(gateway.proxyFingerprint(servers.listEnabled())), fingerprintBeforeExpiry);
     const expiredWithoutRefresh = { sameRoute: true, sameFingerprint: true };
 

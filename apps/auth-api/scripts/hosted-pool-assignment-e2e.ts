@@ -201,6 +201,7 @@ async function purchaseStartsOnThePoolOrOnBoat() {
         plan,
         interval: "month",
         currency: currency === "usd" ? "usd" : "eur",
+        storageTier: 0,
       }),
     );
     await Promise.all(work.splice(0));
@@ -599,6 +600,7 @@ async function purchaseStartsOnThePoolOrOnBoat() {
       plan: "standard",
       interval: "month",
       currency: "eur",
+      storageTier: 0,
     }),
   );
   await Promise.all(work.splice(0));

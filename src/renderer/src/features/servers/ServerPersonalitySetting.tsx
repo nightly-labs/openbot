@@ -92,6 +92,7 @@ export function ServerPersonalitySetting(
         {(current) => (
           <ItemActions>
             <Select<ResponseStyle>
+              class="settings-modal-select"
               options={[...RESPONSE_STYLES]}
               value={current().responseStyle}
               disabled={props.disabled}

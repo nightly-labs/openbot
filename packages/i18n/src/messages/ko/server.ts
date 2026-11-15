@@ -169,9 +169,6 @@ export const messages = {
   "server.upgrade.description":
     "{server}의 여유 공간이 거의 없어요. 업그레이드하면 에이전트가 중단 없이 계속 작동해요.",
   "server.upgrade.used": "{total} 중 {used} 사용",
-  "server.upgrade.current": "{plan}(현재)",
-  "server.upgrade.price": "가격",
-  "server.upgrade.action": "{plan}(으)로 업그레이드",
   "server.hosted.progressTitle": "{name} 설정 중",
   // The setup waits for the first payment on the Stripe page in the browser.
   "server.hosted.paymentTitle": "브라우저에서 결제를 완료하세요",
@@ -344,6 +341,13 @@ export const messages = {
   "server.settings.editLogo": "서버 로고 편집",
   "server.settings.addLogo": "서버 로고 추가",
   "server.settings.removeLogo": "서버 로고 삭제",
+  "server.settings.appearance": "모양과 색상",
+  "server.settings.appearanceShapes": "서버 모양",
+  "server.settings.appearanceShapeOption": "모양 {number}",
+  "server.settings.appearanceColors": "서버 색상",
+  "server.settings.appearanceAutoColor": "서버 색상 자동",
+  "server.settings.appearanceColorOption": "{color} 서버 색상",
+  "server.settings.appearanceReset": "모양과 색상 초기화",
   "server.settings.access": "접근 권한",
   "server.companySignIn.desktopOnly": "싱글 사인온은 OpenBot 데스크톱 앱에서 설정하세요.",
   "server.settings.publish": "이 서버 게시",

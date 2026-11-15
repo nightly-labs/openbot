@@ -3,6 +3,7 @@ import type {
   HostedSitesDesktopApi,
   HostStatus,
   InviteSummary,
+  ServerAppearance,
   ServerSummary,
   TeamInviteSummary,
   TeamPresenceMember,
@@ -113,6 +114,11 @@ export interface ServerSettingsModalProps {
   restoreFocusTarget?: HTMLElement | null;
   onRetry: () => Promise<void>;
   onSaveIdentity: (input: { serverName: string; logo?: AvatarImageInput | null }) => Promise<void>;
+  /**
+   * Saves the plush look that the server shows with no logo; null gives the automatic look. The
+   * picker shows only where a caller supplies this.
+   */
+  onSaveAppearance?: ((appearance: ServerAppearance | null) => Promise<void>) | undefined;
   onSetPublished: (published: boolean) => Promise<void>;
   /**
    * Changes the key of the server on this computer, and paired devices follow it. The Server key

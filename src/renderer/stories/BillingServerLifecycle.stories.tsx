@@ -11,6 +11,7 @@ import { createSettingsHostedServersStore } from "@openbot/ui/features/settings/
 import { useText } from "@openbot/ui/text";
 import { createStore, For, untrack } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
+import { previewStorageFields } from "../src/preview/mock-billing";
 import { createMockHostedServers } from "../src/preview/mock-hosted-servers";
 import "./billing-server-lifecycle-story.css";
 
@@ -240,7 +241,7 @@ export const RequestError: Story = { args: { action: "cancel", error: true } };
 export const FailedAction: Story = { args: { failNext: true } };
 export const Narrow: Story = { args: { narrow: true } };
 
-/** The app's real controller and panel, with in-memory account API responses. */
+/** The app's real controller and panel, with in-memory account API responses. "Add storage" moves a server up a tier. */
 function ApplicationBillingStory(props: { failNext?: boolean }) {
   const { t } = useText();
   let failNext = untrack(() => props.failNext) ?? false;
@@ -265,10 +266,10 @@ function ApplicationBillingStory(props: { failNext?: boolean }) {
     plan: server.plan,
     interval: "month",
     currency: "eur",
-    amount: server.amount * 100,
     status: "active",
     currentPeriodEnd: server.paidThrough,
     cancelAtPeriodEnd: server.cancelAtPeriodEnd,
+    ...previewStorageFields({ plan: server.plan, interval: "month", currency: "eur" }, 0),
   }));
   const hosting = createSettingsHostedServersStore(
     {
@@ -314,6 +315,14 @@ function ApplicationBillingStory(props: { failNext?: boolean }) {
     () => ({
       getState: async () => structuredClone({ available: true, hasCustomer: true, servers: plans }),
       openPortal: async () => undefined,
+      buyStorage: async (request) => {
+        plans = plans.map((plan) =>
+          plan.subscriptionId === request.subscriptionId
+            ? { ...plan, ...previewStorageFields(plan, request.tier) }
+            : plan,
+        );
+        return structuredClone({ available: true, hasCustomer: true, servers: plans });
+      },
     }),
     () => state.open,
   );

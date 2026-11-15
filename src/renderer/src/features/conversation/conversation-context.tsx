@@ -6,6 +6,7 @@ import {
   type ConversationPageInfo,
   type ConversationReadState,
   type ConversationSnapshot,
+  openExchangesOutside,
 } from "@openbot/contracts/ipc";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import type { AgentMessage } from "@openbot/ui/data";
@@ -788,6 +789,9 @@ const Conversation = createSimpleContext({
         conversation.revision = page.revision;
         conversation.loaded = true;
       });
+      if (merge === "latest")
+        for (const messageId of openExchangesOutside(conversations[page.agentId]?.messages ?? [], page.messages))
+          refreshOpenExchange(page.agentId, messageId);
       setActiveTurns((current) => ({
         ...current,
         [page.agentId]: completedTurnByAgent.get(page.agentId) === page.activeTurnId ? null : page.activeTurnId,
@@ -802,6 +806,47 @@ const Conversation = createSimpleContext({
         applyConversationReadState(page.agentId, retainedState ?? page.readState);
       }
       return true;
+    }
+
+    /** The reads of loaded open requests that a latest page left out. A change during a read reads it again. */
+    const openExchangeReads = new Map<string, { again: boolean }>();
+
+    /** Puts the host's current copy of one loaded request in place. The rest of the chat stays as it is. */
+    function refreshOpenExchange(agentId: string, messageId: string): void {
+      const key = agentMessageKey(agentId, messageId);
+      const running = openExchangeReads.get(key);
+      if (running) {
+        running.again = true;
+        return;
+      }
+      const read = { again: true };
+      openExchangeReads.set(key, read);
+      void (async () => {
+        try {
+          while (read.again && scopeIsCurrent()) {
+            read.again = false;
+            // The page around the request holds its whole turn at least, with the request as the host has it.
+            const page = await conversationPort().agent.readConversationPage({
+              agentId,
+              anchor: { type: "around", messageId },
+              limit: 1,
+            });
+            const message = page.messages.find((candidate) => candidate.id === messageId);
+            if (!scopeIsCurrent() || !message) return;
+            const fresh = toAgentMessage(message, agentId);
+            updateConversation(agentId, (conversation) => {
+              const stored = conversation.messages.find((candidate) => candidate.id === messageId);
+              if (stored && page.revision >= (conversation.revision ?? -1) && !agentMessagesEqual(stored, fresh))
+                updateStored(stored, stored.animate === undefined ? fresh : { ...fresh, animate: stored.animate });
+            });
+          }
+        } finally {
+          // In the same step as the last check, so a later page starts a new read and is not lost.
+          openExchangeReads.delete(key);
+        }
+      })()
+        // The next latest page reads it again.
+        .catch(() => undefined);
     }
 
     async function loadOlderAgentMessages(agentId = activeAgent()?.id): Promise<void> {

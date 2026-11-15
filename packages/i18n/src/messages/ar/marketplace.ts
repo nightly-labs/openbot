@@ -147,6 +147,10 @@ export const messages = {
   "marketplace.app.remove.action": "إزالة",
   "marketplace.app.remove.confirmTitle": "إزالة {name}؟",
   "marketplace.app.remove.keep": "إبقاء",
+  "marketplace.app.replace.title": "استبدال {server}؟",
+  "marketplace.app.replace.description":
+    "لديك بالفعل خادم باسم {server}، لكنه ليس {name}. هل تريد استبداله بـ {name}؟ سيتم حذف عنوانه ومفاتيحه المحفوظة.",
+  "marketplace.app.replace.action": "استبدال",
   "marketplace.app.connection": "الاتصال",
   "marketplace.app.access.use": "يمكنه الاستخدام",
   "marketplace.app.access.noAgents": "لا يوجد وكلاء",

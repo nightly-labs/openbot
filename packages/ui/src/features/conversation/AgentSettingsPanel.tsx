@@ -189,6 +189,8 @@ export interface AgentSettingsPanelProps {
   width: number;
   onResize: (width: number) => void;
   onResizeEnd: (width: number) => void;
+  /** The width from the last drag. When the chat gets wider again, the panel goes back to it. */
+  preferredWidth?: (() => number) | undefined;
   /** Application-owned navigation and detail surfaces, in the existing panel layout. */
   links?: JSX.Element;
   detailOpen?: boolean;
@@ -1035,6 +1037,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       width={props.width}
       maxWidth={props.maxWidth}
       onResize={props.onResize}
+      preferredWidth={props.preferredWidth}
     >
       <Show when={!props.detailOpen}>
         <Show

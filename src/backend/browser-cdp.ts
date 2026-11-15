@@ -245,6 +245,64 @@ const TYPED_KEY_ARRIVED_FUNCTION = `function(expected) {
 const SAVE_TYPED_TEXT_FUNCTION = `function() {
   if (globalThis.openbotTypedKeys) globalThis.openbotTypedKeys.text = 'value' in this ? String(this.value) : this.textContent;
 }`;
+/** How long an editor that stopped the paste has to show the pasted text before the text is inserted. */
+const PASTE_APPLY_WAIT_MS = 1000;
+/** Longer than the timer in which a paste-bin editor reads the paste: 1 ms in Quill 1. */
+const PASTE_HANDLER_WAIT_MS = 50;
+/**
+ * Sends `text` to an editable element as a plain-text paste. True when the editor stopped the paste
+ * and its text or selection changed, so it took the text, or the editor's form got a new element, as
+ * a chat composer that shows a long paste as an attachment does. Elements that the page adds outside
+ * the form, such as a notice or a feed, do not count, so that a blocked paste does not lose the text.
+ * False for a field, for a page that lets the paste through (a synthetic paste inserts nothing), and
+ * for an editor that stopped the paste but shows no change in time: the caller then inserts the text.
+ *
+ * A paste-bin editor, such as Quill 1, lets the paste through, moves focus and the selection to a
+ * hidden element for the browser to paste into, and reads it in a timer. That timer runs before the
+ * text is inserted, so that it cannot change the inserted text. A synthetic paste pastes nothing in
+ * the hidden element, so focus and the selection then go back to the editor, unless the editor put
+ * them back itself.
+ */
+const PASTE_TEXT_FUNCTION = `function(text) {
+  if ('value' in this || !this.isContentEditable) return false;
+  let host = this;
+  while (host.parentElement?.isContentEditable) host = host.parentElement;
+  const root = host.getRootNode();
+  const selection = () => typeof root.getSelection === 'function' ? root.getSelection() : host.ownerDocument.getSelection();
+  const state = () => JSON.stringify([host.textContent, selection()?.toString() ?? '']);
+  const before = state();
+  const focused = root.activeElement;
+  const range = selection()?.rangeCount ? selection().getRangeAt(0).cloneRange() : null;
+  const notTaken = () => {
+    if (host.contains(root.activeElement) && host.contains(selection()?.anchorNode ?? null)) return false;
+    focused?.focus({ preventScroll: true });
+    if (range) { selection()?.removeAllRanges(); selection()?.addRange(range); }
+    return false;
+  };
+  let elsewhere = false;
+  const taken = (records) => {
+    elsewhere ||= records.some((record) => !host.contains(record.target) && [...record.addedNodes].some((node) => node.nodeType === 1));
+    return elsewhere || state() !== before;
+  };
+  let finish = () => {};
+  const observer = new MutationObserver((records) => { if (taken(records)) finish(); });
+  observer.observe(host, { childList: true, subtree: true, characterData: true });
+  const form = host.closest('form');
+  if (form) observer.observe(form, { childList: true, subtree: true });
+  const data = new DataTransfer();
+  data.setData('text/plain', text);
+  const event = new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true, composed: true });
+  const stopped = !this.dispatchEvent(event);
+  if (!stopped) {
+    observer.disconnect();
+    return new Promise((resolve) => setTimeout(() => resolve(notTaken()), ${PASTE_HANDLER_WAIT_MS}));
+  }
+  if (taken(observer.takeRecords())) { observer.disconnect(); return true; }
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => finish(), ${PASTE_APPLY_WAIT_MS});
+    finish = () => { observer.disconnect(); clearTimeout(timer); resolve(taken(observer.takeRecords()) || notTaken()); };
+  });
+}`;
 /**
  * True when this node holds focus in its own document: every shadow root on the way up names it or
  * its host as active. It starts inside the node, so a closed shadow root does not hide it.
@@ -369,6 +427,11 @@ export class BrowserCdpEngine {
     {
       enter: (secret: string) => Effect.Effect<void, BrowserOperationError>;
       clear: (secret: string) => Effect.Effect<boolean, BrowserOperationError>;
+      /**
+       * Hides the value from what the agent reads of this tab until the document goes. When the page
+       * still shows it, waits and targets that query the raw page are also refused.
+       */
+      hide: (secret: string, shown: boolean) => void;
       /**
        * Which secret the fields are built for, so a fill that no user approves goes only there: every
        * field is a password field, or every field asks for a one-time code. A text field that the page
@@ -613,7 +676,8 @@ export class BrowserCdpEngine {
           return !recordValue(scan.exceptionDetails) && recordValue(scan.result)?.value === false;
         }),
       ).pipe(Effect.catch(() => Effect.succeed(false)));
-    return { enter, clear, fields: nodes.fields, servedByWorker: nodes.servedByWorker };
+    const hide = (secret: string, shown: boolean) => this.#cardScrub.addDocumentSecret(secret, shown);
+    return { enter, clear, hide, fields: nodes.fields, servedByWorker: nodes.servedByWorker };
   });
 
   /**
@@ -1120,22 +1184,37 @@ export class BrowserCdpEngine {
           // A handler that removed the target after the key shows that the key arrived.
           Effect.catch(() => Effect.succeed(true)),
         );
-        yield* dispatchText(send, text, resolved.sessionId, {
-          keyArrived,
-          saveText: this.#callOnNode(
-            send,
-            resolved.backendNodeId,
-            SAVE_TYPED_TEXT_FUNCTION,
-            [],
-            resolved.sessionId,
-          ).pipe(Effect.asVoid),
-          // Short text arrives one key at a time. The deadline can pass, or a key handler can move focus
-          // to another element, after the page already has part of the text.
-          beforeNext: (typed, total) =>
-            browserSync(() => assertTypingProgressBeforeDeadline(deadline, typed, total)).pipe(
-              Effect.andThen(checkFocus("error.backend.browserTypingFocusMovedWhileTyping")),
-            ),
-        });
+        // A rich-text editor, such as Naver SmartEditor or Lexical, keeps its own document and takes one
+        // inserted text as one paragraph, so the line breaks in it are lost. The editor splits pasted
+        // text into paragraphs, and a paste cannot submit a chat message as an Enter key can. A field,
+        // and an editor that does not take the paste, gets the text inserted as before.
+        const multiline = /[\n\r]/.test(text);
+        const pasted =
+          multiline &&
+          (yield* this.#callOnNode(send, resolved.backendNodeId, PASTE_TEXT_FUNCTION, [text], resolved.sessionId)) ===
+            true;
+        if (multiline && !pasted) {
+          // The paste can wait for the editor, and its handler can move focus.
+          yield* checkFocus("error.backend.browserTypingFocusMoved");
+          yield* browserSync(() => assertBeforeDeadline(deadline));
+        }
+        if (!pasted)
+          yield* dispatchText(send, text, resolved.sessionId, {
+            keyArrived,
+            saveText: this.#callOnNode(
+              send,
+              resolved.backendNodeId,
+              SAVE_TYPED_TEXT_FUNCTION,
+              [],
+              resolved.sessionId,
+            ).pipe(Effect.asVoid),
+            // Short text arrives one key at a time. The deadline can pass, or a key handler can move focus
+            // to another element, after the page already has part of the text.
+            beforeNext: (typed, total) =>
+              browserSync(() => assertTypingProgressBeforeDeadline(deadline, typed, total)).pipe(
+                Effect.andThen(checkFocus("error.backend.browserTypingFocusMovedWhileTyping")),
+              ),
+          });
         // Submitting is part of typing rather than a second action, because it has to reach the node
         // this lease already resolved. Re-resolving a snapshot ref here would fingerprint the element
         // against its pre-typing text, so a contenteditable would fail with "The target changed after
@@ -1785,25 +1864,28 @@ export class BrowserCdpEngine {
             );
           }
           const dragData = yield* Deferred.await(interceptedDragData);
-          if (!dragData) return yield* browserFailure(new Error("The source did not start a native drag operation."));
-          yield* send("Input.dispatchDragEvent", { type: "dragEnter", x: to.x, y: to.y, data: dragData }, sessionId);
-          yield* send("Input.dispatchDragEvent", { type: "dragOver", x: to.x, y: to.y, data: dragData }, sessionId);
-          // The wait only helps the page. The drop still goes, before the deadline, when no frame comes.
-          const frameWaitMs =
-            deadline === undefined
-              ? DROP_FRAME_WAIT_MS
-              : Math.min(DROP_FRAME_WAIT_MS, deadline - Date.now() - SETTLE_RESERVE_MS);
-          if (frameWaitMs > 0) {
-            yield* Effect.gen(function* () {
-              const contextId = yield* automationContextId(send, sessionId);
-              yield* send(
-                "Runtime.evaluate",
-                { expression: DROP_FRAME_SCRIPT, contextId, awaitPromise: true },
-                sessionId,
-              );
-            }).pipe(Effect.timeoutOrElse({ duration: frameWaitMs, orElse: () => Effect.void }), Effect.ignore);
+          // A page that drags with pointer events (a slider, a canvas) starts no native drag.
+          // The press and the moves already reached it, and the release below ends its drag.
+          if (dragData) {
+            yield* send("Input.dispatchDragEvent", { type: "dragEnter", x: to.x, y: to.y, data: dragData }, sessionId);
+            yield* send("Input.dispatchDragEvent", { type: "dragOver", x: to.x, y: to.y, data: dragData }, sessionId);
+            // The wait only helps the page. The drop still goes, before the deadline, when no frame comes.
+            const frameWaitMs =
+              deadline === undefined
+                ? DROP_FRAME_WAIT_MS
+                : Math.min(DROP_FRAME_WAIT_MS, deadline - Date.now() - SETTLE_RESERVE_MS);
+            if (frameWaitMs > 0) {
+              yield* Effect.gen(function* () {
+                const contextId = yield* automationContextId(send, sessionId);
+                yield* send(
+                  "Runtime.evaluate",
+                  { expression: DROP_FRAME_SCRIPT, contextId, awaitPromise: true },
+                  sessionId,
+                );
+              }).pipe(Effect.timeoutOrElse({ duration: frameWaitMs, orElse: () => Effect.void }), Effect.ignore);
+            }
+            yield* send("Input.dispatchDragEvent", { type: "drop", x: to.x, y: to.y, data: dragData }, sessionId);
           }
-          yield* send("Input.dispatchDragEvent", { type: "drop", x: to.x, y: to.y, data: dragData }, sessionId);
           yield* send(
             "Input.dispatchMouseEvent",
             { type: "mouseReleased", x: to.x, y: to.y, button: "left", clickCount: 1 },
@@ -2802,6 +2884,13 @@ export class BrowserCdpEngine {
   ): Effect.fn.Return<void, BrowserOperationError> {
     if (this.#namesCardValue(condition.text, condition.url))
       return yield* browserFailure(new Error("A wait cannot name a filled card value."));
+    // Each answer would tell whether a part of a typed password or code is on the page.
+    if (this.#cardScrub.documentSecretShown && (condition.text || condition.url))
+      return yield* browserFailure(
+        new Error(
+          "A wait cannot check page text or the address while the page can show a password or code that OpenBot typed. Use snapshots until it navigates.",
+        ),
+      );
     yield* this.#leaseEffect((send) =>
       Effect.gen({ self: this }, function* () {
         const deadline = Date.now() + clamp(timeoutMs, 1, WAIT_TIMEOUT_MS);
@@ -2878,7 +2967,9 @@ export class BrowserCdpEngine {
   ): Effect.fn.Return<BrowserJsonValue, BrowserOperationError> {
     return yield* this.#leaseEffect((send) =>
       Effect.gen({ self: this }, function* () {
-        yield* send("Runtime.enable");
+        // No `Runtime.enable`: Runtime.evaluate does not need it. While it is on, Chromium serializes
+        // each console argument for DevTools, and bot checks (DataDome, rebrowser) see that from the
+        // page and block the agent.
         const result = yield* send("Runtime.evaluate", {
           expression,
           awaitPromise,
@@ -3035,6 +3126,16 @@ export class BrowserCdpEngine {
       )
     )
       return yield* browserFailure(new Error("A target cannot name a filled card value."));
+    // A name, text or CSS query can test a part of a typed password or code that the page still shows.
+    if (
+      this.#cardScrub.documentSecretShown &&
+      (target.kind === "text" || target.kind === "css" || (target.kind === "role" && target.name !== undefined))
+    )
+      return yield* browserFailure(
+        new Error(
+          "While the page can show a password or code that OpenBot typed, use a ref from a fresh snapshot as the target until it navigates.",
+        ),
+      );
     if (target.kind === "point") {
       const metrics = yield* send("Page.getLayoutMetrics");
       const viewport = recordValue(metrics.cssLayoutViewport);

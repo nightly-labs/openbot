@@ -189,16 +189,12 @@ export const messages = defineMessages("server", {
   "server.upsell.offline": "An OpenBot server stays on 24/7, so routines keep running.",
   "server.upsell.seePlans": "See plans",
   "server.upsell.notNow": "Not now",
-  // The dialog that offers the next plan when the disk of a hosted server is almost full.
+  // The dialog that offers more storage when the disk of a hosted server is almost full.
   "server.upgrade.title": "Your agents are running out of space",
   "server.upgrade.description":
     "{server} has little free space left. Upgrade to keep your agents working without interruptions.",
   // Under the disk meter, for example "11 GB of 12 GB used".
   "server.upgrade.used": "{used} of {total} used",
-  // The column of the plan that the server has now, for example "Starter (now)".
-  "server.upgrade.current": "{plan} (now)",
-  "server.upgrade.price": "Price",
-  "server.upgrade.action": "Upgrade to {plan}",
   "server.hosted.progressTitle": "Setting up {name}",
   // The setup waits for the first payment on the Stripe page in the browser.
   "server.hosted.paymentTitle": "Finish the payment in your browser",
@@ -378,6 +374,13 @@ export const messages = defineMessages("server", {
   "server.settings.editLogo": "Edit server logo",
   "server.settings.addLogo": "Add server logo",
   "server.settings.removeLogo": "Remove server logo",
+  "server.settings.appearance": "Shape and color",
+  "server.settings.appearanceShapes": "Server shapes",
+  "server.settings.appearanceShapeOption": "Shape {number}",
+  "server.settings.appearanceColors": "Server color",
+  "server.settings.appearanceAutoColor": "Automatic server color",
+  "server.settings.appearanceColorOption": "{color} server color",
+  "server.settings.appearanceReset": "Reset shape and color",
   "server.settings.access": "Access",
   "server.companySignIn.title": "Company sign-in",
   "server.companySignIn.sso": "Single sign-on",

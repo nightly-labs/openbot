@@ -196,6 +196,19 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
           />
         )}
       </Show>
+      <Show when={controller.serverReplace()} keyed>
+        {(replace) => (
+          <ConfirmDialog
+            open={true}
+            onCancel={() => replace.settle(false)}
+            onConfirm={() => replace.settle(true)}
+            title={t("marketplace.app.replace.title", { server: replace.server })}
+            description={t("marketplace.app.replace.description", { server: replace.server, name: replace.app })}
+            confirmLabel={t("marketplace.app.replace.action")}
+            initialFocus="cancel"
+          />
+        )}
+      </Show>
       <Show when={controller.agentUpdate()} keyed>
         {(pending) => (
           <AgentUpdateDialog

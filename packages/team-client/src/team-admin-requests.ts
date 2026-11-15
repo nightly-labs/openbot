@@ -81,6 +81,7 @@ import { CUSTOM_AGENTS_ROUTES } from "@openbot/contracts/team-protocol/custom-ag
 import type { CUSTOM_PROVIDER_EDIT_ROUTES } from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
 import type { CUSTOM_PROVIDER_HARNESS_ROUTES } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import { DISCORD_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/discord-access-v1";
+import { HOST_APPEARANCE_ROUTES, type ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { HOST_KEY_ROTATION_ROUTES } from "@openbot/contracts/team-protocol/host-key-rotation-v1";
 import { HOST_MEMBER_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-member-update-v1";
 import { HOST_PERSONALITY_ROUTES } from "@openbot/contracts/team-protocol/host-personality-v1";
@@ -716,6 +717,18 @@ export function updateHostIdentity(
   if (input.logo !== undefined)
     body.logo = input.logo ? { mimeType: input.logo.mimeType, data: bytesToBase64(input.logo.bytes) } : null;
   return adminCall(() => request("POST", HOST_ADMIN_ROUTES.identity, ignoreResponse, body));
+}
+
+/** An owner or admin sets the server plush (`host-appearance-v1`). `null` gives the automatic look. */
+export function setHostAppearance(
+  request: TeamApiRequest,
+  appearance: ServerAppearance | null,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", HOST_APPEARANCE_ROUTES.appearance, ignoreResponse, {
+      appearance: appearance ? { shape: appearance.shape, color: appearance.color } : null,
+    }),
+  );
 }
 
 export function getHostUpdateStatus(

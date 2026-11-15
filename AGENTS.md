@@ -118,6 +118,22 @@ tokens and contracts; it does not render SolidJS DOM components.
 
 Read [packages/ui/AGENTS.md](packages/ui/AGENTS.md) before changing shared UI.
 
+## Phone screens
+
+Phones use the native app (`apps/mobile`). The desktop renderer, the web client and `packages/ui`
+are designed for a computer screen only.
+
+- Do not design, style, write stories or take screenshots for these surfaces at a phone width, and
+  do not list phone gaps in reports. A narrow desktop window and the compact sidebar stay in scope.
+  The narrowest window is the `minWidth` in `src/main/main-window.ts`: 960 px for the main window
+  and 380 px for a separate chat window. Design the web client for 960 px and wider too.
+- On a phone (narrow screen and touch pointer), the web client opens on `WebPhoneAppScreen`, which
+  links to the App Store and Google Play. "Continue in browser" keeps the old phone layout
+  (`WebMobileNavigation` and the `max-width: 720px` rules in `web-client.css`). Keep it working;
+  do not add to it.
+- Put a phone feature in `apps/mobile`. [Joined servers](#joined-servers) says when one is needed.
+- The public site (`apps/auth-api` pages other than `/app`) stays responsive: phone visitors read it.
+
 ## Interface text
 
 Text that a user reads comes from `@openbot/i18n` catalog keys, on desktop, web and mobile. Do not

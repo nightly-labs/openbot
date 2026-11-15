@@ -253,6 +253,8 @@ export const messages = {
     "השירות Gemini של Google לא השלים את הבקשה. יש לנסות שוב בעוד כמה דקות.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini דחה את הבקשה הזו. יש לבחור מודל אחר ולשלוח את ההודעה שוב. אם זה נכשל שוב, יש להתחיל צ'אט חדש.\n{detail}",
+  "error.provider.antigravityLocationUnsupported":
+    "חברת Google לא מאפשרת ל-Gemini לפעול ממיקום הרשת של המחשב שמריץ את הסוכן הזה. יש להשתמש ב-Gemini במחשב אחר, או לבחור ספק אחר לסוכן הזה.\n{detail}",
   "error.provider.antigravityConnectionLost": "Gemini איבד את החיבור לסוכן שלו ונעצר. יש לשלוח הודעה כדי להמשיך.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "במארח Windows, ‏Gemini פותח את דף Google במארח עצמו. יש לחבר את Gemini במחשב המארח.",
@@ -304,6 +306,8 @@ export const messages = {
     "המודל לא קיבל תמונה בצ'אט הזה כי התמונה גדולה מדי. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
   "error.provider.imageCountLimit":
     "המודל לא קיבל את הצ'אט הזה כי יש בו יותר מדי תמונות. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
+  "error.provider.requestTooLarge":
+    "הצ'אט הזה נעשה גדול מדי לשליחה למודל. תמונות בצ'אט גורמות לכך לעיתים קרובות. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
   "error.provider.opencodeSessionRejected":
     "OpenCode דחה את הבקשה ולא מסר את הסיבה. זה יכול לקרות בצ'אט ארוך או אחרי החלפת מודל. OpenBot התחיל סשן חדש של OpenCode עם היסטוריית הצ'אט. יש לנסות שוב. אם השגיאה נמשכת, יש לבחור מודל אחר או רמת מאמץ נמוכה יותר.",
   "error.provider.opencodeCompactionFailed":
@@ -321,6 +325,8 @@ export const messages = {
     "Gemini לא הצליח לפתוח את דף ההתחברות בדפדפן שלך. יש לבדוק את דפדפן ברירת המחדל ואז להתחבר שוב.",
   "error.provider.acpSignInFailed": "ההתחברות לא הושלמה.",
   "error.provider.acpSignInFailedReason": "ההתחברות לא הושלמה: {reason}",
+  "error.provider.acpSignInNetwork":
+    "ההתחברות לא הצליחה להגיע לשרת של הספק. בדקו את חיבור הרשת ואת הגדרות ה-DNS של המחשב שמריץ את OpenBot, ואז נסו שוב.",
   "error.provider.acpSignOutFailed": "ההתנתקות לא הושלמה.",
   "error.provider.acpSignOutFailedReason": "ההתנתקות לא הושלמה: {reason}",
   "error.provider.acpSignInMethodMissing":
@@ -328,6 +334,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "רק קישורי התחברות מסוג HTTPS יכולים להיפתח בדפדפן.",
   "error.provider.geminiKeyRefused":
     "Gemini דחה את מפתח ה-API השמור. יש להחליף או להסיר את המפתח בהגדרות, ואז להתחבר שוב.",
+  "error.provider.geminiKeyRateLimited":
+    "Gemini דחה את הבקשה כי מפתח ה-API השמור של Gemini הגיע למגבלת קצב או למכסה שלו. המפתח משמש במקום תוכנית Google שלך. יש להמתין כמה דקות או לבחור מודל אחר, ואז לנסות שוב. כדי להשתמש בתוכנית Google, יש להסיר את המפתח בהגדרות.\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "למפתח ה-API השמור של Gemini אין מכסה למודל הזה. המפתח משמש במקום תוכנית Google שלך. יש לבחור מודל אחר, או להסיר את המפתח בהגדרות כדי להשתמש בתוכנית Google.\n{detail}",
   "error.provider.geminiAccountSettingsUnreadable":
     "Gemini לא יכול לפתוח את קובץ ההגדרות של החשבון הזה, ולכן אינו יכול להתחבר. יש להסיר את החשבון ולהוסיף אותו שוב.",
   "error.provider.geminiSettingsUnreadable":
@@ -409,6 +419,8 @@ export const messages = {
   "error.provider.piSessionMissing": "קובץ הסשן של Pi אינו זמין במחשב הזה.",
   "error.provider.piResumeCancelled": "Pi ביטל את חידוש הסשן. יש לנסות שוב.",
   "error.provider.piSessionIdentity": "Pi החזיר סשן אחר. הסשן השמור לא הוחלף.",
+  "error.provider.piExtensionFailed":
+    "Pi נעצר כי לא הצליח לטעון הרחבה. יש להסיר או לעדכן את ההרחבה הזו ולנסות שוב. {detail}",
   "error.provider.piModelInvalid": "יש לבחור מודל Pi שכולל את הספק שלו.",
   "error.provider.piToolInvalid": "הכלי החזיר תוצאה לא תקינה.",
   "error.provider.piSignIn": "יש להשתמש ב-/login ב-Pi במחשב המארח. יש לסגור את Pi כשההתחברות הושלמה.",

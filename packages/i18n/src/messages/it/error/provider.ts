@@ -275,6 +275,8 @@ export const messages = {
     "Il servizio Gemini di Google non ha completato la richiesta. Riprova tra qualche minuto.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini ha rifiutato questa richiesta. Scegli un altro modello, poi invia di nuovo il messaggio. Se non funziona ancora, inizia una nuova chat.\n{detail}",
+  "error.provider.antigravityLocationUnsupported":
+    "Google non consente a Gemini di funzionare dalla posizione di rete del computer che esegue questo agente. Usa Gemini su un altro computer oppure scegli un altro provider per questo agente.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini ha perso la connessione con il suo agente e si è fermato. Invia un messaggio per continuare.",
   "error.provider.antigravityRemoteWindowsSignIn":
@@ -329,6 +331,8 @@ export const messages = {
     "Il modello non ha accettato un'immagine in questa chat perché l'immagine è troppo grande. OpenBot ha avviato una nuova sessione {provider} con la cronologia della chat. Riprova.",
   "error.provider.imageCountLimit":
     "Il modello non ha accettato questa chat perché contiene troppe immagini. OpenBot ha avviato una nuova sessione {provider} con la cronologia della chat. Riprova.",
+  "error.provider.requestTooLarge":
+    "Questa chat è diventata troppo grande da inviare al modello. Spesso la causa sono le immagini nella chat. OpenBot ha avviato una nuova sessione {provider} con la cronologia della chat. Riprova.",
   "error.provider.opencodeSessionRejected":
     "OpenCode ha rifiutato la richiesta senza indicarne la causa. Può succedere in una chat lunga o dopo un cambio di modello. OpenBot ha avviato una nuova sessione OpenCode con la cronologia della chat. Riprova. Se l’errore continua, scegli un altro modello o un impegno minore.",
   "error.provider.opencodeCompactionFailed":
@@ -346,6 +350,8 @@ export const messages = {
     "Gemini non è riuscito ad aprire la pagina di accesso nel browser. Controlla il browser predefinito, poi connettiti di nuovo.",
   "error.provider.acpSignInFailed": "L'accesso non è stato completato.",
   "error.provider.acpSignInFailedReason": "L'accesso non è stato completato: {reason}",
+  "error.provider.acpSignInNetwork":
+    "L'accesso non è riuscito a raggiungere il server del provider. Controlla la connessione di rete e le impostazioni DNS del computer che esegue OpenBot, poi riprova.",
   "error.provider.acpSignOutFailed": "La disconnessione non è stata completata.",
   "error.provider.acpSignOutFailedReason": "La disconnessione non è stata completata: {reason}",
   "error.provider.acpSignInMethodMissing":
@@ -353,6 +359,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "Solo i link di accesso HTTPS possono aprirsi nel browser.",
   "error.provider.geminiKeyRefused":
     "Gemini ha rifiutato la chiave API salvata. Sostituisci o rimuovi la chiave nelle Impostazioni, poi connettiti di nuovo.",
+  "error.provider.geminiKeyRateLimited":
+    "Gemini ha rifiutato la richiesta perché la chiave API di Gemini salvata ha raggiunto un limite di richieste o la sua quota. La chiave viene usata al posto del tuo piano Google. Attendi qualche minuto o scegli un altro modello, poi riprova. Per usare il tuo piano Google, rimuovi la chiave nelle Impostazioni.\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "La chiave API di Gemini salvata non ha quota per questo modello. La chiave viene usata al posto del tuo piano Google. Scegli un altro modello, oppure rimuovi la chiave nelle Impostazioni per usare il tuo piano Google.\n{detail}",
   "error.provider.geminiAccountSettingsUnreadable":
     "Gemini non riesce ad aprire il file delle impostazioni di questo account, quindi non può accedere. Rimuovi questo account e aggiungilo di nuovo.",
   "error.provider.geminiSettingsUnreadable":
@@ -445,6 +455,8 @@ export const messages = {
   "error.provider.piResumeCancelled": "Pi ha annullato la ripresa della sessione. Riprova.",
   "error.provider.piSessionIdentity":
     "Pi ha restituito una sessione diversa. La sessione salvata non è stata sostituita.",
+  "error.provider.piExtensionFailed":
+    "Pi si è fermato perché non è riuscito a caricare un'estensione. Rimuovi o aggiorna questa estensione, poi riprova. {detail}",
   "error.provider.piModelInvalid": "Seleziona un modello di Pi che includa il suo provider.",
   "error.provider.piToolInvalid": "Il tool ha restituito un risultato non valido.",
   "error.provider.piSignIn": "Usa /login in Pi sul computer host. Chiudi Pi quando l'accesso è completato.",
