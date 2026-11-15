@@ -1382,6 +1382,7 @@ export class TurnLifecycle {
               source.provider !== "opencode" &&
               source.provider !== "kimi" &&
               agentProviderDescriptor(source.provider).reportsUsage) ||
+              (source.provider === "antigravity" && isBalanceDiagnostic(message)) ||
               isPlanLimitDiagnostic(message))) ||
           (errorTurnId !== null && this.#limitedTurns.has(errorTurnId))
         ) {
