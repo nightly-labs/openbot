@@ -1808,7 +1808,7 @@ export class BrowserHost {
                         keepQueueBlocked,
                       ).pipe(Effect.catch(() => Effect.succeed(false)));
                       if (!protection.replaced && (cleared || !leaked)) {
-                        entry.hide(secret);
+                        entry.hide(secret, !cleared);
                         kept = true;
                         shown = !cleared;
                       }

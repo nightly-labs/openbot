@@ -427,8 +427,11 @@ export class BrowserCdpEngine {
     {
       enter: (secret: string) => Effect.Effect<void, BrowserOperationError>;
       clear: (secret: string) => Effect.Effect<boolean, BrowserOperationError>;
-      /** Hides the value from what the agent reads of this tab until the document goes. */
-      hide: (secret: string) => void;
+      /**
+       * Hides the value from what the agent reads of this tab until the document goes. When the page
+       * still shows it, waits and targets that query the raw page are also refused.
+       */
+      hide: (secret: string, shown: boolean) => void;
       /**
        * Which secret the fields are built for, so a fill that no user approves goes only there: every
        * field is a password field, or every field asks for a one-time code. A text field that the page
@@ -673,7 +676,7 @@ export class BrowserCdpEngine {
           return !recordValue(scan.exceptionDetails) && recordValue(scan.result)?.value === false;
         }),
       ).pipe(Effect.catch(() => Effect.succeed(false)));
-    const hide = (secret: string) => this.#cardScrub.addDocumentSecret(secret);
+    const hide = (secret: string, shown: boolean) => this.#cardScrub.addDocumentSecret(secret, shown);
     return { enter, clear, hide, fields: nodes.fields, servedByWorker: nodes.servedByWorker };
   });
 
@@ -2881,6 +2884,13 @@ export class BrowserCdpEngine {
   ): Effect.fn.Return<void, BrowserOperationError> {
     if (this.#namesCardValue(condition.text, condition.url))
       return yield* browserFailure(new Error("A wait cannot name a filled card value."));
+    // Each answer would tell whether a part of a typed password or code is on the page.
+    if (this.#cardScrub.documentSecretShown && (condition.text || condition.url))
+      return yield* browserFailure(
+        new Error(
+          "A wait cannot check page text or the address while the page can show a password or code that OpenBot typed. Use snapshots until it navigates.",
+        ),
+      );
     yield* this.#leaseEffect((send) =>
       Effect.gen({ self: this }, function* () {
         const deadline = Date.now() + clamp(timeoutMs, 1, WAIT_TIMEOUT_MS);
@@ -3116,6 +3126,16 @@ export class BrowserCdpEngine {
       )
     )
       return yield* browserFailure(new Error("A target cannot name a filled card value."));
+    // A name, text or CSS query can test a part of a typed password or code that the page still shows.
+    if (
+      this.#cardScrub.documentSecretShown &&
+      (target.kind === "text" || target.kind === "css" || (target.kind === "role" && target.name !== undefined))
+    )
+      return yield* browserFailure(
+        new Error(
+          "While the page can show a password or code that OpenBot typed, use a ref from a fresh snapshot as the target until it navigates.",
+        ),
+      );
     if (target.kind === "point") {
       const metrics = yield* send("Page.getLayoutMetrics");
       const viewport = recordValue(metrics.cssLayoutViewport);

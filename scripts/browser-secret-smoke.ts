@@ -23,11 +23,11 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
     if (url.pathname === "/modal") {
       modalPageLoads += 1;
       // A password step in a dialog that holds more fields (#9643). The page copies the password into
-      // an attribute and its title, so the value stays in the page after OpenBot empties the field.
+      // an attribute, its text and its title, so the value stays in the page after OpenBot empties the field.
       return new Response(
         `<!doctype html><body>
         <dialog id="verify"><form method="dialog">
-        <label>Password<input id="password" type="password" oninput="document.querySelector('#strength').dataset.value = this.value; document.title = this.value"></label>
+        <label>Password<input id="password" type="password" oninput="const copy = document.querySelector('#strength'); copy.dataset.value = this.value; copy.textContent = this.value; document.title = this.value"></label>
         <label>Code<input id="code" inputmode="numeric"></label>
         <span id="strength"></span>
         <button id="validate" type="button">Validate</button></form></dialog></body>`,
@@ -503,8 +503,42 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
             true,
           ),
         );
-      const snapshot = JSON.stringify(await runCauseEffect(browser.snapshot(modalTab.id)));
+      const read = await runCauseEffect(browser.snapshot(modalTab.id));
+      const snapshot = JSON.stringify(read);
       const listed = JSON.stringify(browser.listTabs().find((tab) => tab.id === modalTab.id));
+      // The page keeps a copy, so a query of its raw text could find the value one part at a time.
+      // A ref from a snapshot still works.
+      const tool = (name: string, args: DynamicToolCallParams["arguments"]) =>
+        runCauseEffect(
+          browser.handleDynamicTool({
+            namespace: "openbot_browser",
+            tool: name,
+            threadId: "secret-thread",
+            ownerAgentId: "secret-agent",
+            turnId: "secret-turn",
+            callId: `dialog-${name}`,
+            arguments: args,
+          }),
+        ).then(
+          (result) => result.success,
+          () => false,
+        );
+      const partialWaitRefused = !(await tool("wait_for", {
+        tabId: modalTab.id,
+        text: secret.slice(0, 4),
+        timeoutMs: 1_000,
+      }));
+      const cssTargetRefused = !(await tool("click", {
+        tabId: modalTab.id,
+        target: { kind: "css", selector: `[data-value^="${secret.slice(0, 4)}"]` },
+      }));
+      const validate = read.elements.find((element) => element.name === "Validate");
+      const refClickWorks =
+        validate !== undefined &&
+        (await tool("click", {
+          tabId: modalTab.id,
+          target: { kind: "ref", ref: validate.ref, revision: read.revision },
+        }));
       const screenshotRefused = await runCauseEffect(browser.screenshot(modalTab.id)).then(
         () => false,
         () => true,
@@ -518,7 +552,10 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
           page.copy === secret &&
           !snapshot.includes(secret) &&
           !listed.includes(secret) &&
-          screenshotRefused
+          screenshotRefused &&
+          partialWaitRefused &&
+          cssTargetRefused &&
+          refClickWorks
             ? "passed"
             : "issues_found",
         submission,
@@ -529,6 +566,9 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
         snapshotHasValue: snapshot.includes(secret),
         tabListHasValue: listed.includes(secret),
         screenshotRefused,
+        partialWaitRefused,
+        cssTargetRefused,
+        refClickWorks,
       };
       await mkdir(".openbot-build", { recursive: true });
       await writeFile(".openbot-build/browser-secret-dialog.json", JSON.stringify(report, null, 2));

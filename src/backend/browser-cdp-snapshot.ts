@@ -978,6 +978,7 @@ export class CardValueScrub {
   readonly #numbers = new Map<string, { pattern: RegExp; replacement: string }>();
   /** Values of the current document only: security codes and typed passwords. */
   #documentValues = new Map<string, RegExp>();
+  #documentSecretShown = false;
 
   add(number: string, securityCode: string): void {
     const digits = number.replace(/[^0-9]/gu, "");
@@ -996,8 +997,11 @@ export class CardValueScrub {
    * Hides a password or code that `submit_secret` typed, as the page or its address can show it,
    * until the document goes. A code is hidden only as a whole number, and a value of one to three
    * characters only where it stands alone, so neither hides parts of other words and numbers.
+   * `shown` says that the page still holds a copy, so a query of its raw text could tell the agent
+   * the value one part at a time.
    */
-  addDocumentSecret(secret: string): void {
+  addDocumentSecret(secret: string, shown: boolean): void {
+    this.#documentSecretShown ||= shown;
     const forms = [secret, encodeURIComponent(secret), new URLSearchParams({ v: secret }).toString().slice(2)];
     for (const value of new Set(forms)) {
       if (!value || this.#documentValues.has(value)) continue;
@@ -1014,6 +1018,12 @@ export class CardValueScrub {
   /** The filled document was replaced: its security code is no longer on the page. */
   endDocument(): void {
     this.#documentValues = new Map();
+    this.#documentSecretShown = false;
+  }
+
+  /** The current document can still show a typed password or code. */
+  get documentSecretShown(): boolean {
+    return this.#documentSecretShown;
   }
 
   get active(): boolean {
