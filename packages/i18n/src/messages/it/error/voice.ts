@@ -25,6 +25,8 @@ export const messages = {
   "error.voice.speech.modelRequired": "Scarica il modello di sintesi vocale in Impostazioni → Voce.",
   "error.voice.speech.timedOut": "La lettura ad alta voce della risposta è scaduta.",
   "error.voice.speech.failed": "OpenBot non è riuscito a leggere la risposta ad alta voce.",
+  "error.voice.speech.providerFailed": "{provider} non ha inviato l'audio. Riprova.",
+  "error.voice.speech.providerUnreachable": "Impossibile connettersi a {provider}. Controlla la connessione.",
   "error.voice.recordingNotKept": "OpenBot non è riuscito a conservare la registrazione vocale.",
   "error.voice.live.timedOut": "La voce dal vivo di Codex non si è avviata in tempo. Riprova.",
   "error.voice.live.failed": "La voce dal vivo si è interrotta: {reason}",
@@ -37,4 +39,10 @@ export const messages = {
   "error.voice.live.refused":
     "OpenAI ha rifiutato di avviare la voce dal vivo. Riprova più tardi, oppure disattiva la voce dal vivo in Impostazioni per parlare a voce.",
   "error.voice.live.off": "La voce dal vivo di Codex è disattivata. Attivala in Impostazioni → Voce.",
+  "error.voice.server.routeOff": "Il server vocale non è configurato per questo. Controlla Impostazioni → Voce.",
+  "error.voice.server.keyRefused": "{host} ha rifiutato la chiave API.",
+  "error.voice.server.invalidAnswer": "{host} non ha inviato una risposta compatibile con OpenAI.",
+  "error.voice.server.invalidAudio":
+    "{host} ha inviato audio che OpenBot non può riprodurre. Usa un server che invia WAV.",
+  "error.voice.server.tooLarge": "La risposta di {host} è troppo grande.",
 } as const satisfies PartialTranslation<typeof source>;

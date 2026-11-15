@@ -207,6 +207,12 @@ export const messages = {
     "Il messaggio è stato inviato, ma non è stato possibile aggiornare la cronologia della chat.",
   "error.remote.taskHistoryRefreshFailed":
     "L'attività è stata modificata, ma non è stato possibile aggiornare la cronologia della chat.",
+  "error.remote.localServerStartFailed": "Il server su questo computer non si è avviato.",
+  "error.remote.localServerNotFound": "Questo server non è su questo computer.",
   "error.remote.localServerAccountRemovalFailed":
     "Il server è eliminato sul suo computer, ma l’account lo elenca ancora. Eliminalo di nuovo per rimuoverlo dall’account.",
+  "error.remote.localServerLimit":
+    "Puoi avere al massimo {limit} server su questo computer. Eliminane uno per crearne un altro.",
+  "error.remote.localServersReadOnly":
+    "Questa versione di OpenBot non può leggere l'elenco dei server su questo computer. Aggiorna OpenBot.",
 } as const satisfies PartialTranslation<typeof source>;
