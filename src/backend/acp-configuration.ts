@@ -538,23 +538,14 @@ export class AcpConfiguration {
       Effect.timeoutOrElse({
         duration: this.options.requestTimeoutMs,
         // The chat shows this text, so the protocol method goes to the log only (#9738).
-        orElse: () =>
-          Effect.sync(() =>
-            logger.warn("An agent did not answer a configuration request in time.", {
-              provider: this.options.provider,
-              method,
-            }),
-          ).pipe(
-            Effect.andThen(
-              Effect.fail(
-                providerFailure(
-                  new TimeoutError(
-                    sourceText("error.provider.acpSettingsTimedOut", { provider: this.options.label() }),
-                  ),
-                ),
-              ),
-            ),
-          ),
+        orElse: () => {
+          logger.warn("An agent did not answer a configuration request in time.", {
+            provider: this.options.provider,
+            method,
+          });
+          const message = sourceText("error.provider.acpSettingsTimedOut", { provider: this.options.label() });
+          return Effect.fail(providerFailure(new TimeoutError(message)));
+        },
       }),
     );
   }
