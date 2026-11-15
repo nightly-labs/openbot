@@ -2257,6 +2257,7 @@ export async function createApplicationServices({
     agentCursorDrawn: drawsComputerUseHighlight,
     // An agent display of its own is X11, where the driver records video.
     computerUseOnWayland: agentsShareDisplay && cuaDriverDrivesWayland(process.platform),
+    computerUseInputRefused: () => agentsShareDisplay && cuaDriver.waylandInputRefused(),
     requestTimeoutMs: 30_000,
     offProviders: providerUse.off(),
     providerAccounts,
