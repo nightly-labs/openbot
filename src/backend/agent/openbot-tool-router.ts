@@ -626,6 +626,7 @@ export class OpenBotToolRouter {
         case "item/tool/call": {
           if (!isDynamicToolCall(request.params)) throw new Error("Invalid dynamic tool request.");
           let params = this.#asSubagentParent(request.params);
+          const fromSubagent = params.threadId !== request.params.threadId;
           if (params.namespace === "openbot") {
             const deferredMcp = this.#deferredMcpNote(client, params.threadId);
             const invalid = deferredMcp
@@ -759,8 +760,13 @@ export class OpenBotToolRouter {
               );
             return;
           }
-          // Keep the transport identifiers and abort signal; enter the original dispatch below.
-          const toolRequest = { ...request, params };
+          // Keep the transport identifiers and abort signal; enter the original dispatch below. A card of
+          // a subagent's call then waits for the end of the subagent's turn, not of the parent's (#9727).
+          const toolRequest: AppServerRequest & { params: DynamicToolCallParams } = {
+            ...request,
+            params,
+            ...(fromSubagent ? { subagent: true as const } : {}),
+          };
           if (toolRequest.params.namespace === OPENBOT_BROWSER_NAMESPACE) {
             const agentId = this.#conversation.agentForThread(toolRequest.params.threadId);
             if (!agentId) throw new Error("The browsing OpenBot agent is unknown.");
