@@ -1254,10 +1254,13 @@ export class RoutineStore {
     };
   }
 
-  /** The limit counts routines of every trigger kind. */
+  /** The limit counts routines of every trigger kind, but not a routine that the lists leave out. */
   #assertBelowLimit(ownerId: string): void {
     const row = this.database.connection
-      .prepare(`SELECT COUNT(*) AS count FROM ${this.tables.routineTable} WHERE ${this.tables.ownerColumn} = ?`)
+      .prepare(
+        `SELECT COUNT(*) AS count FROM ${this.tables.routineTable}
+         WHERE ${this.tables.ownerColumn} = ? AND ${this.#hasTrigger}`,
+      )
       .get(ownerId);
     if (isDynamicRecord(row) && requiredNumberColumn(row, "count") >= this.tables.limit) {
       throw new RoutineInputError(this.tables.limitMessage);
