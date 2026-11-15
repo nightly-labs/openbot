@@ -1748,6 +1748,15 @@ sends the operator one message:
 | A server starts on boat: no ready machine, the pool query failed, or its pool machine did not start it | `A <plan> server (<currency>, <server ID prefix>) starts on boat: <reason>.` | `move` it when a machine is ready. `leaseweb-pool.ts boat` lists it. |
 | A pool start is lost (no sign-in in 4 minutes) | `A <plan> server (<server ID prefix>) did not start on pool machine <host ID>. Prepare the machine again.` | `prepare --reinstall` the machine. |
 
+The same webhook also gets one message for each paid invoice line of a server plan or a license,
+such as `Sale: standard server, each month, 29.00 USD, first purchase.` or
+`Sale: license for 5 users, each year, 480.00 PLN, renewal.` The kind is `first purchase`, `renewal`
+or `adjustment` (a plan change or a manual invoice). A server order with a license sends two messages.
+The sales ledger sends it (`BillingSales.processPending`, in the cron of each 5 minutes), in the run that
+puts the payment in the OpenPanel ledger, so the message comes at most some minutes after the payment
+and one time. It needs `OPENPANEL_CLIENT_ID` and `OPENPANEL_CLIENT_SECRET` too. A failed payment, a
+refund and an imported payment send no message. `bun run test:billing-sale-alert` checks the messages.
+
 A message has no account, email or name. The boat message goes out only after the Worker stores the
 boat start, so a lost race, a retry of a boat attempt, or a pool change whose answer was lost sends
 nothing. A failed send logs one line and is not sent again. Without the secret there are no messages.

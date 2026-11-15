@@ -19,6 +19,7 @@ import {
 } from "./account-analytics";
 import { AccountAttribution } from "./account-attribution";
 import { BillingUsd, BillingUsdError } from "./billing-usd";
+import type { HostedPoolAlert } from "./hosted-pool-alert";
 import { SalesAnalyticsDelivery, SalesAnalyticsDeliveryError } from "./sales-analytics-delivery";
 import type { StripeEvent } from "./stripe-client";
 
@@ -41,6 +42,11 @@ export interface BillingSalesOptions {
   clientId: string | undefined;
   clientSecret: string | undefined;
   now?: () => number;
+  /**
+   * Sends the operator one message for each paid invoice line of a server plan or a license
+   * (docs/hosted-servers.md#pool-alerts). Only `processPending` sends it.
+   */
+  saleAlert?: HostedPoolAlert | null;
 }
 
 export interface BillingSalesCheckout {
@@ -155,6 +161,27 @@ interface FactAttributes {
   suppressBillingAction?: boolean;
 }
 
+const SALE_KIND_TEXT = { first_purchase: "first purchase", renewal: "renewal", adjustment: "adjustment" } as const;
+
+/** The operator message of one paid invoice line. It has no account, email, name or server. */
+function saleAlertText(attributes: FactAttributes): string {
+  const product =
+    (attributes.product ?? "server") === "license"
+      ? attributes.users === undefined
+        ? "license"
+        : `license for ${attributes.users} user${attributes.users === 1 ? "" : "s"}`
+      : `${attributes.plan ?? "unknown"} server`;
+  const parts = [
+    product,
+    ...(attributes.interval ? [`each ${attributes.interval}`] : []),
+    ...(attributes.amount !== undefined && attributes.currency
+      ? [`${(attributes.amount / 100).toFixed(2)} ${attributes.currency.toUpperCase()}`]
+      : []),
+    SALE_KIND_TEXT[attributes.paymentKind ?? "adjustment"],
+  ];
+  return `Sale: ${parts.join(", ")}.`;
+}
+
 interface CheckoutRow {
   session_id: string;
   user_id: string;
@@ -179,8 +206,10 @@ export class BillingSales {
   readonly #now: () => number;
   readonly #fetch: (input: string, init: RequestInit) => Promise<Response>;
   readonly #delivery: SalesAnalyticsDelivery;
+  readonly #saleAlert: HostedPoolAlert | null;
 
   constructor(options: BillingSalesOptions) {
+    this.#saleAlert = options.saleAlert ?? null;
     this.#database = options.database;
     this.#now = options.now ?? Date.now;
     this.#fetch = options.fetch;
@@ -883,7 +912,7 @@ export class BillingSales {
                 };
       yield* this.#enqueue(`billing:${row.source_key}`, profileId, eventName, eventProperties, eventTimestamp);
     }
-    yield* d1(this.#database, () =>
+    const marked = yield* d1(this.#database, () =>
       this.#database
         .prepare(
           `UPDATE billing_sales_facts SET delivery_enqueued_at = ?
@@ -892,6 +921,15 @@ export class BillingSales {
         .bind(this.#now(), row.source_key)
         .run(),
     );
+    // Only the run that marked the fact sends the message, so a fact that stayed pending after a failed
+    // FX lookup, or that two cron runs read, sends one message. An imported payment sends none.
+    if (
+      this.#saleAlert &&
+      row.fact_type === "payment_succeeded" &&
+      marked.meta.changes === 1 &&
+      !attributes.suppressBillingAction
+    )
+      yield* this.#saleAlert(saleAlertText(attributes));
   }).bind(this);
 
   readonly #usd = Effect.fn("BillingSales.usd")(function* (

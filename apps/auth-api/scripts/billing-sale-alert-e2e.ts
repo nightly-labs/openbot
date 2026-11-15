@@ -1,0 +1,181 @@
+// Runs the real sales ledger of the account server on a migrated SQLite database, with paid Stripe
+// invoices of a server plan and of a license. `processPending` must send the operator one message for
+// each paid invoice line, with the product, the interval, the amount and the kind of payment, and with
+// no account. A fact that stays pending after a failed FX lookup sends its message one time, in the run
+// that ends it. A failed payment, an imported payment, and a ledger with no alert send no message.
+//
+// Run: bun run test:billing-sale-alert
+// It writes .openbot-build/billing-sale-alert-e2e/report.json and exits non-zero on a failure.
+import { readdirSync, readFileSync } from "node:fs";
+import { mkdir, writeFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
+import { DatabaseSync } from "node:sqlite";
+import { Effect } from "effect";
+import { BillingSales, type BillingSalesSynced } from "../src/server/billing-sales";
+import { createHostedPoolAlert } from "../src/server/hosted-pool-alert";
+import type { StripeEvent } from "../src/server/stripe-client";
+import { sqliteD1 } from "./sqlite-d1";
+
+const ROOT = resolve(import.meta.dirname, "../../..");
+const OUT = join(ROOT, ".openbot-build", "billing-sale-alert-e2e");
+const MIGRATIONS = join(ROOT, "apps", "auth-api", "migrations");
+const ALERT_URL = "https://alerts.example/webhook";
+const NOW = Date.UTC(2026, 10, 15, 12);
+const DAY = "2026-11-15";
+const OWNER = { id: "owner", email: "owner@example.test" };
+
+const checks: { name: string; passed: boolean; detail?: unknown }[] = [];
+function check(name: string, passed: boolean, detail?: unknown) {
+  checks.push({ name, passed, ...(detail === undefined ? {} : { detail }) });
+}
+
+function invoice(type: StripeEvent["type"], id: string, object: StripeEvent["data"]["object"]): StripeEvent {
+  return { id: `evt_${id}`, type, created: NOW / 1_000, data: { object: { id: `in_${id}`, ...object } } };
+}
+
+async function eachPaidInvoiceSendsOneMessage() {
+  const database = new DatabaseSync(":memory:");
+  database.exec("PRAGMA foreign_keys = ON");
+  for (const name of readdirSync(MIGRATIONS).sort()) database.exec(readFileSync(join(MIGRATIONS, name), "utf8"));
+  database
+    .prepare("INSERT INTO users(id, identity_key, email, created_at, updated_at) VALUES (?, ?, ?, 1, 1)")
+    .run(OWNER.id, `email:${OWNER.email}`, OWNER.email);
+
+  const alerts: string[] = [];
+  const fetch = async (input: string, init: RequestInit) => {
+    if (input === ALERT_URL) {
+      alerts.push(String(JSON.parse(String(init.body)).content));
+      return new Response(null, { status: 204 });
+    }
+    // The ECB rates and OpenPanel are not there in this test.
+    return new Response(null, { status: 503 });
+  };
+  const options = { database: sqliteD1(database), clientId: "client", clientSecret: "secret", fetch, now: () => NOW };
+  const sales = new BillingSales({ ...options, saleAlert: createHostedPoolAlert(ALERT_URL, fetch) });
+  const run = (work: Effect.Effect<void, unknown>) => Effect.runPromise(work);
+  const pending = () =>
+    Number(
+      database.prepare("SELECT count(*) AS n FROM billing_sales_facts WHERE delivery_enqueued_at IS NULL").get()?.n,
+    );
+
+  const server: BillingSalesSynced = { userId: OWNER.id, plan: "standard", interval: "month", currency: "usd" };
+  const license: BillingSalesSynced = {
+    product: "license",
+    userId: OWNER.id,
+    users: 5,
+    interval: "year",
+    currency: "pln",
+  };
+
+  await run(
+    sales.webhook(
+      invoice("invoice.paid", "server", {
+        subscription: "sub_server",
+        currency: "usd",
+        amount_paid: 2900,
+        billing_reason: "subscription_create",
+      }),
+      server,
+    ),
+  );
+  await run(
+    sales.webhook(
+      invoice("invoice.payment_failed", "failed", {
+        subscription: "sub_server",
+        currency: "usd",
+        amount_due: 2900,
+        billing_reason: "subscription_cycle",
+        attempt_count: 1,
+      }),
+      server,
+    ),
+  );
+  await run(
+    sales.webhook(
+      invoice("invoice.paid", "imported", {
+        subscription: "sub_server",
+        currency: "usd",
+        amount_paid: 2900,
+        billing_reason: "subscription_cycle",
+      }),
+      server,
+      null,
+      { suppressBillingAction: true },
+    ),
+  );
+  check("a webhook sends no message: only the ledger run does", alerts.length === 0, alerts);
+
+  await run(sales.processPending());
+  check(
+    "a paid server plan sends one message with the plan, the interval, the amount and the kind",
+    alerts.length === 1 && alerts[0] === "Sale: standard server, each month, 29.00 USD, first purchase.",
+    alerts,
+  );
+  check("a failed payment and an imported payment send no message, and no fact stays pending", pending() === 0, {
+    pending: pending(),
+  });
+
+  await run(
+    sales.webhook(
+      invoice("invoice.paid", "license", {
+        subscription: "sub_license",
+        currency: "pln",
+        amount_paid: 48000,
+        billing_reason: "subscription_cycle",
+      }),
+      license,
+    ),
+  );
+  await run(sales.processPending());
+  check(
+    "a paid license whose FX lookup fails stays pending and sends no message",
+    alerts.length === 1 && pending() === 1,
+    { alerts, pending: pending() },
+  );
+
+  database
+    .prepare("INSERT INTO billing_fx_rates (day, currency, source_day, usd_rate) VALUES (?, 'pln', ?, 0.25)")
+    .run(DAY, DAY);
+  await run(sales.processPending());
+  await run(sales.processPending());
+  check(
+    "the run that ends the fact sends its message one time",
+    alerts.length === 2 && alerts[1] === "Sale: license for 5 users, each year, 480.00 PLN, renewal.",
+    alerts,
+  );
+  check(
+    "a message has no account",
+    alerts.every((alert) => !alert.includes(OWNER.id) && !alert.includes("@") && !alert.includes("sub_")),
+    alerts,
+  );
+
+  const silent = new BillingSales(options);
+  await run(
+    silent.webhook(
+      invoice("invoice.paid", "silent", {
+        subscription: "sub_server",
+        currency: "usd",
+        amount_paid: 2900,
+        billing_reason: "subscription_cycle",
+      }),
+      server,
+    ),
+  );
+  await run(silent.processPending());
+  check("a ledger with no alert ends the fact and sends nothing", alerts.length === 2 && pending() === 0, {
+    alerts,
+    pending: pending(),
+  });
+}
+
+let passed = false;
+try {
+  await eachPaidInvoiceSendsOneMessage();
+  passed = checks.every((item) => item.passed);
+} finally {
+  await mkdir(OUT, { recursive: true });
+  await writeFile(join(OUT, "report.json"), `${JSON.stringify({ passed, checks }, null, 2)}\n`);
+}
+for (const item of checks) console.log(`${item.passed ? "ok  " : "FAIL"} ${item.name}`);
+console.log(`Report: ${join(OUT, "report.json")}`);
+if (!passed) process.exit(1);
