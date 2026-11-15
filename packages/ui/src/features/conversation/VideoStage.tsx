@@ -3,7 +3,7 @@ import type { JSX } from "@solidjs/web";
 import { For, Show } from "solid-js";
 import { MediaGenerationSpecs } from "./media-generation-frame";
 
-export interface VideoStageAction {
+interface VideoStageAction {
   label: string;
   onSelect: () => void;
 }
