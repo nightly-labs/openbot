@@ -132,6 +132,11 @@ export interface AcpFlavor {
    */
   processWideModel?: true;
   /**
+   * A model or effort that the session already has is not sent again before a turn. Each set makes
+   * the agent do slow work of its own, and a set that does not answer in time fails the turn.
+   */
+  setsConfigOnlyOnChange?: true;
+  /**
    * A `session/set_model` failure after which the session already runs on the new model. The agent
    * changes the session first and then fails to save the model as its default.
    */
@@ -492,6 +497,9 @@ export const HERMES_ACP_FLAVOR: AcpFlavor = {
   sessionNotFound: hermesSessionNotFound,
   lostTurns: HERMES_LOST_TURNS,
   refusesUntilRestart: hermesRefusal,
+  // Hermes Agent sends each set to its gateway, which reads the full session for it. A set before
+  // each turn failed every turn when the gateway was slow (#9738).
+  setsConfigOnlyOnChange: true,
   // Hermes Agent 0.23.0 streams the answer, and then sends all of it again when a plugin rewrote it
   // (`transform_llm_output`). The rewrite has the streamed message's ID, so the answer showed two
   // times in one message (#6433).
@@ -624,13 +632,14 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
   omp: OMP_ACP_FLAVOR,
   // Hermes Agent added as a custom agent (`hermes acp`) keeps the custom rules. Its missing session
   // is found, its lost turns are discarded, its answer sent again replaces the streamed one, and its
-  // failed turn is explained, and a process that starts to refuse each prompt ends, as for the Hermes
-  // provider (#9718).
+  // failed turn is explained, a process that starts to refuse each prompt ends, and an unchanged
+  // model or effort is not sent again, as for the Hermes provider (#9718, #9738).
   hermes: {
     ...CUSTOM_ACP_FLAVOR,
     sessionNotFound: (error, sessionId) => hermesSessionNotFound(error) ?? ompSessionNotFound(error, sessionId),
     lostTurns: HERMES_LOST_TURNS,
     refusesUntilRestart: hermesRefusal,
+    setsConfigOnlyOnChange: true,
     resendsAnswer: true,
     turnFailure: hermesTurnFailure,
   },
