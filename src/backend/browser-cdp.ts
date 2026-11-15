@@ -2878,7 +2878,9 @@ export class BrowserCdpEngine {
   ): Effect.fn.Return<BrowserJsonValue, BrowserOperationError> {
     return yield* this.#leaseEffect((send) =>
       Effect.gen({ self: this }, function* () {
-        yield* send("Runtime.enable");
+        // No `Runtime.enable`: Runtime.evaluate does not need it. While it is on, Chromium serializes
+        // each console argument for DevTools, and bot checks (DataDome, rebrowser) see that from the
+        // page and block the agent.
         const result = yield* send("Runtime.evaluate", {
           expression,
           awaitPromise,
