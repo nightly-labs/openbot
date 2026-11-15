@@ -1829,6 +1829,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
                 ),
               ),
               this.#ownMcpServerNames(cwd),
+              this.#flavor.mcpServerName,
             );
             this.options.reportMcpDrops?.(this.provider, handoff.dropped);
             let given = handoff.servers;
@@ -3049,7 +3050,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   /** Reports a server that OpenBot gave and the agent did not start, by the name that the user saved. */
   #reportFailedMcpServer(thread: AcpThread, name: string, detail: string): void {
     const own = this.#ownMcpServerNames(thread.cwd);
-    const configured = this.options.mcpServers?.().find((config) => acpMcpServerName(config, own) === name);
+    const configured = this.options
+      .mcpServers?.()
+      .find((config) => acpMcpServerName(config, own, this.#flavor.mcpServerName) === name);
     this.options.reportMcpDrops?.(this.provider, [
       { name: configured?.name ?? name, reason: "failed_to_start", detail },
     ]);
@@ -3072,7 +3075,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (!failure || thread.mcp.servers.some((bridge) => bridge.name === failure.name)) return null;
     this.emit("diagnostic", this.#redact(detail));
     const own = this.#ownMcpServerNames(thread.cwd);
-    const configured = this.options.mcpServers?.().find((config) => acpMcpServerName(config, own) === failure.name);
+    const configured = this.options
+      .mcpServers?.()
+      .find((config) => acpMcpServerName(config, own, this.#flavor.mcpServerName) === failure.name);
     return configured
       ? sourceText("error.backend.mcpServerFailedForProvider", { provider: this.#label, name: configured.name })
       : sourceText("error.provider.acpOwnMcpServerFailed", { provider: this.#label, name: failure.name });

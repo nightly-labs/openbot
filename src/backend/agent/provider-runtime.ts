@@ -63,7 +63,7 @@ import { causeHelpers } from "../effect-boundary";
 import { isPythonKimiCli, type SignInRegion } from "../kimi-region";
 import { readKimiUsage } from "../kimi-usage";
 import { McpHandoffLog } from "./../mcp-handoff-log";
-import { providerMcpServerName } from "./../mcp-provider-shapes";
+import { grokMcpServerName, providerMcpServerName } from "./../mcp-provider-shapes";
 import { customProvidersOn, openCodeSignInMessage } from "./../opencode-config";
 import { readOpenCodeGoUsage } from "./../opencode-usage";
 import type { ProcessConfinement } from "../process-confinement";
@@ -4691,8 +4691,9 @@ export class ProviderRuntime implements ProviderPort {
    * is what the two forms share, and the longest path that matches picks between two servers on one
    * host. The URL is read first. The host counts only as a whole URL authority, so `example.com` is
    * not in `mcp.example.com` and `localhost:3000` is not in `localhost:30001`. A name counts only as
-   * a whole word, so `git` is not in `github`; a name the provider was given counts too, and one with
-   * no letter or digit, such as `__`, would match every `mcp__server__tool` line.
+   * a whole word, so `git` is not in `github`; a name the provider was given counts too, also in
+   * Grok's form (`grokMcpServerName`), and one with no letter or digit, such as `__`, would match
+   * every `mcp__server__tool` line.
    */
   #configuredMcpServerIn(message: string): { name: string; builtIn: boolean } | null {
     const configs = this.#credentials.mcpServers();
@@ -4710,7 +4711,9 @@ export class ProviderRuntime implements ProviderPort {
     const word = (text: string) => bounded(text, "(?<![\\w-])", "(?![\\w-])");
     const named = (name: string) => {
       const given = providerMcpServerName(name);
-      return (name !== "" && word(name)) || (/[A-Za-z0-9]/u.test(given) && word(given));
+      return (
+        (name !== "" && word(name)) || (/[A-Za-z0-9]/u.test(given) && (word(given) || word(grokMcpServerName(given))))
+      );
     };
     const config = configs.find((row) => named(row.name));
     if (config) return { name: config.name, builtIn: builtIn(config.id) };
