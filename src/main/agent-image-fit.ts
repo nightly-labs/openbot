@@ -38,7 +38,8 @@ export function fitImageForAgent(bytes: Uint8Array): ImageFitResult {
   const png = file.length >= 24 && file.subarray(0, 8).equals(PNG_SIGNATURE);
   if (!jpeg && !png) return "unsupported";
   const facts = jpeg ? jpegFacts(file) : { orientation: 1, pixels: file.readUInt32BE(16) * file.readUInt32BE(20) };
-  if (facts.pixels > MAX_PIXELS) return "tooLarge";
+  // A JPEG with no frame header that the scan finds could hide any size from the check.
+  if (facts.pixels > MAX_PIXELS || facts.pixels === 0) return "tooLarge";
   const source = nativeImage.createFromBuffer(file);
   if (source.isEmpty()) return "unsupported";
   const { width, height } = source.getSize();
@@ -96,10 +97,11 @@ function jpegFacts(file: Buffer): { orientation: number; pixels: number } {
   let orientation = 1;
   let pixels = 0;
   let offset = 2;
-  while (offset + 4 <= file.length && file[offset] === 0xff) {
+  while (offset + 4 <= file.length) {
     const marker = file[offset + 1] ?? 0;
-    // Fill bytes (0xFF) can come before a marker, and some markers have no length.
-    if (marker === 0xff) {
+    // libjpeg skips extra bytes before a marker. Fill bytes (0xFF) can come before a marker, and some
+    // markers have no length.
+    if (file[offset] !== 0xff || marker === 0xff) {
       offset += 1;
       continue;
     }
@@ -111,7 +113,8 @@ function jpegFacts(file: Buffer): { orientation: number; pixels: number } {
     if (marker === 0xda) break;
     const end = Math.min(file.length, offset + 2 + file.readUInt16BE(offset + 2));
     const frame = marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
-    if (frame && offset + 9 <= end) pixels = file.readUInt16BE(offset + 5) * file.readUInt16BE(offset + 7);
+    if (frame && offset + 9 <= end)
+      pixels = Math.max(pixels, file.readUInt16BE(offset + 5) * file.readUInt16BE(offset + 7));
     if (marker === 0xe1 && file.toString("latin1", offset + 4, offset + 10) === "Exif\0\0") {
       orientation = exifOrientation(file, offset + 10, end);
     }
