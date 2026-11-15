@@ -47,6 +47,7 @@ import {
   stripeFailure,
   stripeRequest,
 } from "./billing-errors";
+import { type BillingPurchase, purchaseEvent, reportPurchase, subscriptionEnd } from "./billing-purchase";
 import type { BillingSales } from "./billing-sales";
 import type { LicenseEmailInput } from "./email-templates";
 import type { RemoteFailure } from "./remote-control-plane";
@@ -177,6 +178,11 @@ export interface LicenseServiceOptions {
    * the webhook answers.
    */
   onLicenseEmail?: (message: SmtpLicenseMessage) => void;
+  /**
+   * Runs once for each license that starts, ends, or cancels or resumes its renewal, with the email of
+   * its account. It must not throw or wait.
+   */
+  onPurchase?: (purchase: BillingPurchase) => void;
 }
 
 class LicenseDependencies extends Context.Service<
@@ -199,6 +205,7 @@ export class LicenseService {
   readonly #now: () => number;
   readonly #onLicenseChanged: LicenseServiceOptions["onLicenseChanged"] | null;
   readonly #onLicenseEmail: LicenseServiceOptions["onLicenseEmail"] | null;
+  readonly #onPurchase: ((purchase: BillingPurchase) => void) | null;
 
   constructor(options: LicenseServiceOptions) {
     this.#secretKey = options.secretKey;
@@ -209,6 +216,7 @@ export class LicenseService {
     this.#sales = options.sales ?? null;
     this.#onLicenseChanged = options.onLicenseChanged ?? null;
     this.#onLicenseEmail = options.onLicenseEmail ?? null;
+    this.#onPurchase = options.onPurchase ?? null;
     this.#layer = Layer.succeed(LicenseDependencies, {
       database: options.database,
       stripe: options.stripe,
@@ -933,6 +941,27 @@ export class LicenseService {
           ...(reactivated === undefined ? {} : { reactivated }),
           ...(change.endReason ? { endReason: change.endReason } : {}),
         });
+        const event = purchaseEvent(change.action);
+        if (event) {
+          yield* reportPurchase(
+            { database: dependencies.database, now: dependencies.now, send: this.#onPurchase },
+            subscription.id,
+            ownerId,
+            {
+              event,
+              periodEnd: subscriptionEnd(subscription),
+              ...(change.endReason ? { endReason: change.endReason } : {}),
+              product: "license",
+              tier: plan.tier,
+              users,
+              bundle: plan.bundle,
+              interval: plan.interval,
+              currency,
+              amount: licensePeriodAmount(plan, users, currency),
+              trial: subscription.status === "trialing",
+            },
+          );
+        }
       }
       // A `past_due` license stops giving its users at its period end with no change to its row. The lapse
       // sweep reads it after that time, so the view at the previous write's time is the one to compare.
