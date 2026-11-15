@@ -17,11 +17,7 @@ const HOLD_TEXT = {
 } as const satisfies Record<Exclude<AgentTaskHold, "task-limit">, MobileTextKey>;
 
 /** As on desktop: what a running task does now, else how its last turn ended. */
-export function agentTaskStatus(
-  task: AgentTask,
-  t: MobileTranslate,
-  sourceText: MobileText["sourceText"],
-): string {
+export function agentTaskStatus(task: AgentTask, t: MobileTranslate, sourceText: MobileText["sourceText"]): string {
   if (task.state === "running")
     return task.progress ? sourceText(task.progress) : t("mobile.server.threads.state.running");
   if (task.state === "queued") return t("mobile.server.threads.state.queued");
