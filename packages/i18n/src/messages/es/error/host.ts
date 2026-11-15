@@ -20,6 +20,7 @@ export const messages = {
   "error.host.publishFailed": "No se pudo publicar este OpenBot.",
   "error.host.mobileConnectPublishFailed": "No se pudo publicar este OpenBot para la conexión móvil.",
   "error.host.mobileConnectHostChanged": "El host de la conexión móvil cambió. Inténtalo de nuevo.",
+  "error.host.mobileConnectHostMismatch": "Tu cuenta tiene otra clave para este servidor. Inténtalo de nuevo.",
   "error.host.noServer": "Este equipo no tiene ningún servidor que se pueda cambiar.",
   "error.host.identityLocalOnly":
     "El nombre y el logotipo del servidor solo se pueden cambiar en el equipo que lo ejecuta.",

@@ -141,6 +141,8 @@ export const messages = defineMessages("error.agent", {
     "This server is low on memory. Your message waits in the queue and starts when memory is free.",
   "error.agent.workspaceOnlyToolMissing":
     "Workspace only needs {tool}, which OpenBot did not find. Install it, or choose Full access in the agent settings.",
+  "error.agent.codexSandboxUnavailable":
+    "Workspace only needs the Codex sandbox, which Codex cannot start on this computer, so the agent's commands fail. Choose Ask first or Full access in the agent settings.",
   "error.agent.claudeSandboxUnavailable":
     "Workspace only needs the Claude sandbox, which Claude cannot start on this computer: {reason}. Choose Full access or another provider in the agent settings.",
   "error.agent.screenCaptureOff":

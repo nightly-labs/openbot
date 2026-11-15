@@ -10,7 +10,6 @@ export const messages = {
   "app.action.unavailable": "Eylem kullanılamıyor",
   "app.error.actionFailed": "Eylem tamamlanamadı. Tekrar deneyin.",
   "app.errorStatus.queueLoad": "Kuyruktaki mesajlar yüklenemedi",
-  "app.errorStatus.waitsLoad": "Açık beklemeler yüklenemedi",
   "app.errorStatus.answer": "Yanıtınız gönderilemedi",
   "app.errorStatus.approval": "Kararınız gönderilemedi",
   "app.errorStatus.browserTakeover": "Tarayıcı devralma sonlandırılamadı",

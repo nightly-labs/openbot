@@ -222,7 +222,6 @@ const Providers = createSimpleContext({
     }
 
     async function startBrowserSignIn(provider: AgentProviderId, start: () => Promise<AgentStatus>): Promise<void> {
-      if (refreshingProviders()) return;
       const analytics = beginProviderConnection(provider, "browser");
       try {
         const status = await start();

@@ -10,6 +10,7 @@ import type {
   McpSignInState,
   McpTestResult,
   SaveMcpSignInAppInput,
+  ServerAppearance,
   ServerSummary,
   TeamInviteSummary,
   TeamPresenceMember,
@@ -283,6 +284,38 @@ const ServerSettings = createSimpleContext({
         }
         throw error;
       }
+    }
+
+    /**
+     * Saves the plush look of the server in the settings. The list shows it before the host answers,
+     * so each mark of the server changes at the click; a failure puts the previous look back.
+     */
+    async function saveServerAppearance(appearance: ServerAppearance | null): Promise<void> {
+      const server = serverSettingsTarget();
+      if (!serverCanAdminister(server, "host-appearance-v1"))
+        throw new Error(currentText().t("error.team.hostIdentityUnsupported"));
+      const serverId = server.id;
+      const previous = server.appearance;
+      const patch = (value: ServerAppearance | null | undefined) =>
+        setServers((current) =>
+          current.map((item) => {
+            if (item.id !== serverId) return item;
+            const { appearance: _previous, ...rest } = item;
+            return value === undefined ? rest : { ...rest, appearance: value };
+          }),
+        );
+      patch(appearance);
+      try {
+        if (server.kind === "local") setHostStatus(await serversPort().host.updateIdentity({ appearance }));
+        else {
+          const updated = await serversPort().hostAdmin.updateIdentity({ appearance }, serverId);
+          setServers((current) => current.map((item) => (item.id === serverId ? updated : item)));
+        }
+      } catch (error) {
+        patch(previous);
+        throw error;
+      }
+      setServers(await serversPort().servers.list());
     }
 
     /**
@@ -754,6 +787,7 @@ const ServerSettings = createSimpleContext({
       openServerSettings,
       refreshServerSettings,
       saveServerIdentity,
+      saveServerAppearance,
       recheckScreenRecording,
       rotateHostKey,
       setServerPublished,

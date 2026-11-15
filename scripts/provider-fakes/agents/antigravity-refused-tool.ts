@@ -4,7 +4,9 @@
 // error." and ends the turn as a success. A session keeps the servers that its process started, also
 // after a resume without them. This fake does the same: a session with the server `resend` refuses
 // `mcp_resend_get-contact`, and a prompt with `REFUSE_TOOL=<tool>` refuses that tool, as for a server from the
-// user's own `mcp_config.json`.
+// user's own `mcp_config.json`. A prompt with `CLI_1_5_9` gets the answer of the CLI 1.5.9, which names
+// the tool (#9568). The real 1.5.9 also logs the line; this fake does not, so only the answer can
+// name the tool.
 import { appendFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { type AcpHandler, type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
@@ -59,10 +61,10 @@ serveFakeAcpAgent({
       /REFUSE_TOOL=(\S+)/u.exec(text)?.[1] ??
       (started.get(sessionId)?.includes("resend") ? "mcp_resend_get-contact" : null);
     logEntry({ method: request.method, sessionId, pid: process.pid, refused });
-    if (refused) {
-      log(
-        `E1111 00:00:00.200000     294 errorreport.go:273] agent executor error: building toolbox: tool "${refused}" advertises an invalid parameter schema: "schema://tool-parameters.json#" is not valid against metaschema`,
-      );
+    const failure = `agent executor error: building toolbox: tool "${refused}" advertises an invalid parameter schema: "schema://tool-parameters.json#" is not valid against metaschema`;
+    if (refused && text.includes("CLI_1_5_9")) peer.say(sessionId, `\n⚠ ${failure}\n`);
+    else if (refused) {
+      log(`E1111 00:00:00.200000     294 errorreport.go:273] ${failure}`);
       peer.say(sessionId, "\n⚠ Agent execution terminated due to error.\n");
     } else peer.say(sessionId, "OK");
     peer.reply(request, { stopReason: "end_turn" });

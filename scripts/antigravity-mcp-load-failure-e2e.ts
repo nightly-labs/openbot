@@ -15,6 +15,8 @@
 // its own log, and keeps the server after a resume in the same process. The session opens again on a
 // new process without the server, and the turn answers. A refused tool of the user's own server
 // leaves out no server of OpenBot's, also when an OpenBot server name is the start of its name.
+// From #9568: the CLI 1.5.9 names the refused tool in its answer, and no longer answers with the
+// short text after which OpenBot reads the log. The server is left out the same way.
 // `bun run test:antigravity-mcp-load-failure`. Writes
 // .openbot-build/antigravity-mcp-load-failure-e2e/report.json.
 import assert from "node:assert/strict";
@@ -298,6 +300,31 @@ try {
   report.turns.ownRefusedTool = ownRefused;
   assert.equal(ownRefused.status, "failed", "The turn fails.");
   assert.equal(refusedDrops.length, 1, "No server of OpenBot is left out.");
+
+  // 8. The CLI 1.5.9 names the refused tool in its answer (#9568). The fake writes no log line for
+  // it, so only the answer can name the tool.
+  const dropsBefore = refusedDrops.length;
+  const answerThread = await startThread(refusedClient, { cwd: refusedWorkspace });
+  const answerTurn = await runTurn(refusedClient, answerThread, {
+    text: "CLI_1_5_9 Reply with OK only.",
+    timeoutMs: 30_000,
+  });
+  report.turns.refusedToolAnswer = answerTurn;
+  assert.equal(answerTurn.error, null, "The turn with a refused tool in the answer has no error.");
+  assert.equal(answerTurn.reply, "OK", "The turn answers without the server.");
+  assert.deepEqual(
+    refusedDrops.slice(dropsBefore).map((drop) => drop.name),
+    ["resend"],
+    "The server of the tool in the answer is reported as left out.",
+  );
+  const answerPrompts = (await readJsonl<RefusedEntry>(refusedLog)).filter(
+    (entry) => entry.method === "session/prompt" && entry.sessionId === answerThread,
+  );
+  assert.deepEqual(
+    answerPrompts.map((entry) => entry.refused),
+    ["mcp_resend_get-contact", null],
+    "The prompt runs once more, and then without the refused tool.",
+  );
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

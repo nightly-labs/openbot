@@ -158,6 +158,29 @@ export interface PendingSkillConfirm {
 }
 
 /**
+ * Whether two http addresses share one sign-in on the host, which keys it by the parsed address
+ * without a fragment, plus an account fragment (`mcpOAuthAccountKey`).
+ */
+function sameSignInAddress(a: string, b: string): boolean {
+  if (!URL.canParse(a.trim()) || !URL.canParse(b.trim())) return false;
+  if (mcpAccountFragment(a) !== mcpAccountFragment(b)) return false;
+  const [first, second] = [new URL(a.trim()), new URL(b.trim())];
+  first.hash = "";
+  second.hash = "";
+  return first.href === second.href;
+}
+
+/**
+ * The question before an app takes the name of a server that is not the app's. `server` is that
+ * name, `app` the name of the app.
+ */
+export interface PendingServerReplace {
+  server: string;
+  app: string;
+  settle: (confirmed: boolean) => void;
+}
+
+/**
  * The question before an agent update that meets skills with local changes. `settle` gets the ids
  * of the skills to replace, or null when the user cancels.
  */
@@ -518,6 +541,22 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     });
   }
 
+  const [serverReplace, setServerReplace] = createSignal<PendingServerReplace | null>(null);
+  /** Asks to replace the server `server` with the app `app`. False when the user cancels. */
+  function confirmServerReplace(server: string, app: string): Promise<boolean> {
+    untrack(serverReplace)?.settle(false);
+    return new Promise((resolve) => {
+      setServerReplace({
+        server,
+        app,
+        settle: (confirmed) => {
+          setServerReplace(null);
+          resolve(confirmed);
+        },
+      });
+    });
+  }
+
   /** One sentence for the agents that did not change: the reason alone when only one agent was asked. */
   function skillFailure(name: string, failed: readonly string[], reasons: ReadonlySet<string>, asked: number) {
     const reason = [...reasons].join(" ");
@@ -869,6 +908,12 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
   };
   /** The first row of this app, or nothing. */
   const heldApp = (app: MarketplacePluginApp): McpServerConfig | undefined => heldApps(app)[0];
+  /**
+   * A row with the app's server name that is not the app's, such as one the user added by hand at
+   * another address. The host keeps names unique, so the app can connect only in place of it.
+   */
+  const otherRowNamed = (app: MarketplacePluginApp): McpServerConfig | undefined =>
+    heldApp(app) ? undefined : servers().find((row) => row.name === app.server.name);
   /** Which held http rows have a sign-in, by row id. Read with the rows. */
   const [signIns, setSignIns] = createSignal<Readonly<Record<string, McpSignInState>>>({});
   /**
@@ -1292,6 +1337,15 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     mark(key, true);
     const analytics = desktopAnalytics.scope();
     const installed = await run(async () => {
+      /* Asked before the skills and the sign-in, so a cancel changes nothing. The other row is removed
+         only after the app connected, as Remove server does: its sign-in, access and owner go with it. */
+      const replacing = new Map<string, McpServerConfig>();
+      for (const app of plugin.apps) {
+        const other = otherRowNamed(app);
+        if (!other) continue;
+        if (!(await confirmServerReplace(other.name, app.name))) return false;
+        replacing.set(app.id, other);
+      }
       const addedSkills: string[] = [];
       try {
         for (const skill of plugin.skills) {
@@ -1311,7 +1365,14 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
             await undoSkills(agentId, addedSkills);
             return false;
           }
-          setServers(await calls().mcp.saveMcpServer({ config: connected }, serverId));
+          const replaced = replacing.get(app.id);
+          /* A removal forgets the sign-in of its address. When the app's address shares it, as
+             `https://mcp.stripe.com/` does with `https://mcp.stripe.com`, the app is saved on the old row instead. */
+          const sharesSignIn = replaced !== undefined && sameSignInAddress(replaced.url, connected.url);
+          if (replaced && !sharesSignIn)
+            setServers(await calls().mcp.removeMcpServer({ mcpServerId: replaced.id }, serverId));
+          const saved = replaced && sharesSignIn ? { ...connected, id: replaced.id } : connected;
+          setServers(await calls().mcp.saveMcpServer({ config: saved }, serverId));
         }
       } catch (cause) {
         await undoSkills(agentId, addedSkills);
@@ -1632,6 +1693,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
   const stopDialogs = () => {
     untrack(connecting)?.settle(null);
     untrack(skillConfirm)?.settle(false);
+    untrack(serverReplace)?.settle(false);
     untrack(agentUpdate)?.settle(null);
     setUninstalling(null);
   };
@@ -1644,6 +1706,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
   onCleanup(() => {
     untrack(connecting)?.settle(null);
     untrack(skillConfirm)?.settle(false);
+    untrack(serverReplace)?.settle(false);
     untrack(agentUpdate)?.settle(null);
   });
 
@@ -1754,6 +1817,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     connecting,
     uninstalling,
     skillConfirm,
+    serverReplace,
     agentUpdate,
     uninstallPlan,
     uninstallPlugin,

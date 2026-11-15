@@ -151,6 +151,8 @@ export const messages = {
     "Questo server ha poca memoria. Il tuo messaggio resta in coda e parte quando si libera memoria.",
   "error.agent.workspaceOnlyToolMissing":
     "Solo workspace richiede {tool}, che OpenBot non ha trovato. Installalo, oppure scegli Accesso completo nelle impostazioni dell'agente.",
+  "error.agent.codexSandboxUnavailable":
+    "Solo workspace richiede la sandbox di Codex, che Codex non riesce ad avviare su questo computer, quindi i comandi dell'agente non riescono. Scegli Chiedi prima o Accesso completo nelle impostazioni dell'agente.",
   "error.agent.claudeSandboxUnavailable":
     "Solo workspace richiede la sandbox di Claude, che Claude non riesce ad avviare su questo computer: {reason}. Scegli Accesso completo o un altro provider nelle impostazioni dell'agente.",
   "error.agent.screenCaptureOff":

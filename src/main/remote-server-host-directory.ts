@@ -225,6 +225,7 @@ export function reconcileWebRtcHosts(input: WebRtcHostReconciliationInput): WebR
         encryptedToken: "",
         remoteDesktopAvailable: false,
         logoVersion: host.logoKey,
+        ...(host.appearance === undefined ? {} : { appearance: host.appearance }),
         role: host.role,
         ...(host.memberLimit === undefined ? {} : { memberLimit: host.memberLimit }),
         ...(host.hosted === undefined ? {} : { hosted: host.hosted }),
@@ -257,6 +258,11 @@ export function reconcileWebRtcHosts(input: WebRtcHostReconciliationInput): WebR
     if (input.isConnected(server.id) && server.publicKey === refreshed.publicKey) {
       refreshed.remoteDesktopAvailable = server.remoteDesktopAvailable;
     }
+    // A connected host sends its look at connect and after each change, so that look is current.
+    // The account copy can be older: a local server child does not copy it, and a copy can fail.
+    // An account server from before `host-appearance-v1` lists none.
+    if (server.appearance !== undefined && (refreshed.appearance === undefined || input.isConnected(server.id)))
+      refreshed.appearance = server.appearance;
     return [refreshed];
   });
   for (const server of listed) {

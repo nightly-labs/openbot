@@ -32,6 +32,7 @@ import { type AgentDefaultsSettingsService, createAgentDefaultsSettings } from "
 import { agentDisplayEnvironment, hasSeparateAgentDisplay } from "./agent-display";
 import { type AgentFolders, createAgentFolders } from "./agent-folders";
 import { type AgentHostSettingsService, createAgentHostSettings } from "./agent-host-settings";
+import { fitImageForAgent } from "./agent-image-fit";
 import { type AgentInstructionsFiles, createAgentInstructionsFiles } from "./agent-instructions-files";
 import {
   type BrowserProfileService,
@@ -291,7 +292,12 @@ import { LibraryFoldersService } from "./library-folders-service";
 import { LinkAccountService } from "./link-account-service";
 import { LinkAccountStore } from "./link-account-store";
 import { relaunchApp } from "./linux-appimage-relaunch";
-import { aboveAppsWindowKind, ozonePlatformArguments, setAboveAppsXWayland } from "./linux-wayland-output";
+import {
+  aboveAppsWindowKind,
+  ozonePlatformArguments,
+  setAboveAppsXWayland,
+  usesX11Windows,
+} from "./linux-wayland-output";
 import { localRoutineFeedDocument } from "./local-routine-calendar";
 import {
   formatLocalServerMembersRequest,
@@ -1144,6 +1150,7 @@ export async function createApplicationServices({
     getDisplays: () => screen.getAllDisplays(),
     getPrimaryDisplay: () => screen.getPrimaryDisplay(),
     getMainWindow: windows.getMainWindow,
+    getFocusedWindow: () => BrowserWindow.getFocusedWindow(),
     ensureMainWindow: windows.ensureMainWindow,
     presentMainWindow: showMainWindow,
     performHaptic: () => macHapticFeedback.performAlignment(),
@@ -1828,9 +1835,16 @@ export async function createApplicationServices({
   let mcpOAuthAuthority: McpOAuth | null = null;
   // A joined server's sign-in can send its callback to this same port: the host's own listener
   // uses the same port number. A `state` that no local sign-in started goes to the relay.
+  // A development build on macOS or Windows, and a Linux desktop that refused the scheme, do not
+  // open `openbot://` in this app (`presentApplication`), so their sign-ins keep the loopback names.
+  const mcpOAuthDeepLink = () =>
+    (process.platform === "linux" || app.isPackaged) && app.isDefaultProtocolClient("openbot")
+      ? MCP_OAUTH_REDIRECT_URL
+      : undefined;
   const signInRelayClient = new SignInRelayClient({
     openExternal: openLink,
     language,
+    deepLinkRedirectUrl: mcpOAuthDeepLink,
     ownListener: () =>
       mcpOAuthRedirect
         ? { port: Number(new URL(mcpOAuthRedirect.redirectUrl).port), paths: MCP_OAUTH_REDIRECT_PATHS }
@@ -1866,12 +1880,7 @@ export async function createApplicationServices({
     storage: mcpOAuthStore,
     openExternal: openLink,
     redirectUrl: mcpOAuthRedirect?.redirectUrl ?? MCP_OAUTH_REDIRECT_URL,
-    // A development build on macOS or Windows, and a Linux desktop that refused the scheme, do not
-    // open `openbot://` in this app (`presentApplication`), so their sign-ins keep the loopback names.
-    deepLinkRedirectUrl: () =>
-      (process.platform === "linux" || app.isPackaged) && app.isDefaultProtocolClient("openbot")
-        ? MCP_OAUTH_REDIRECT_URL
-        : undefined,
+    deepLinkRedirectUrl: mcpOAuthDeepLink,
     logger: createOpenBotLogger("mcp-oauth"),
   });
   mcpOAuthAuthority = mcpOAuth;
@@ -2106,7 +2115,11 @@ export async function createApplicationServices({
   });
   // The overlays are OpenBot windows, so they can mark only the display OpenBot is on. With an agent
   // display of its own, the driver works where they cannot be drawn.
-  const drawsComputerUseHighlight = !hasSeparateAgentDisplay(process.platform);
+  const agentsShareDisplay = !hasSeparateAgentDisplay(process.platform);
+  // Not on Wayland windows either, as the agent dock and the Dynamic Island: a Wayland client cannot
+  // place a window or keep it out of the dock. There the overlay was a blank window of the display's
+  // size in the dock, and closing it only made the next tick open it again (#9655).
+  const drawsComputerUseHighlight = agentsShareDisplay && (process.platform !== "linux" || usesX11Windows());
   const computerUsePermissionHelp = new ComputerUsePermissionHelpWindowController({
     createWindow: () =>
       createComputerUsePermissionHelpWindow(language.translate, () => localeDirection(language.locale)),
@@ -2181,6 +2194,7 @@ export async function createApplicationServices({
       if (!clearFlatBackground(pixels, size.width, size.height)) return null;
       return nativeImage.createFromBitmap(pixels, size).toPNG();
     },
+    fitImage: fitImageForAgent,
     videoReader: new VideoReader({
       runtimeDirectory: join(app.getPath("userData"), "runtimes", "yt-dlp"),
       target: runtimeTarget(process.platform, process.arch),
@@ -2242,7 +2256,7 @@ export async function createApplicationServices({
     hostedStorageGb: () => hostedStorageGb,
     agentCursorDrawn: drawsComputerUseHighlight,
     // An agent display of its own is X11, where the driver records video.
-    computerUseOnWayland: drawsComputerUseHighlight && cuaDriverDrivesWayland(process.platform),
+    computerUseOnWayland: agentsShareDisplay && cuaDriverDrivesWayland(process.platform),
     requestTimeoutMs: 30_000,
     offProviders: providerUse.off(),
     providerAccounts,
@@ -3614,6 +3628,8 @@ export async function createApplicationServices({
       centralAuth.removeRemoteMember(hostId, membershipId).pipe(toRemoteWorkflowError),
     updateRemoteHostLogo: (hostId, image, version) =>
       centralAuth.updateRemoteHostLogo(hostId, image, version).pipe(toRemoteWorkflowError),
+    updateRemoteHostAppearance: (hostId, appearance) =>
+      centralAuth.updateRemoteHostAppearance(hostId, appearance).pipe(toRemoteWorkflowError),
     localDevelopmentHost: developmentRemoteRole === "host",
     passwordOwner: localServerChild !== null,
     logDirectory: join(app.getPath("userData"), "logs", "remote"),

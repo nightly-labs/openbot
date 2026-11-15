@@ -143,6 +143,8 @@ export const messages = {
     "Bu sunucunun belleği azaldı. Mesajınız kuyrukta bekler ve bellek boşaldığında başlar.",
   "error.agent.workspaceOnlyToolMissing":
     "“Yalnızca çalışma alanı” seçeneği, OpenBot'un bulamadığı {tool} aracına ihtiyaç duyar. Aracı yükleyin veya ajan ayarlarından Tam erişim'i seçin.",
+  "error.agent.codexSandboxUnavailable":
+    "“Yalnızca çalışma alanı” Codex korumalı alanına ihtiyaç duyar, ancak Codex bu bilgisayarda onu başlatamıyor, bu yüzden ajanın komutları başarısız oluyor. Ajan ayarlarından Önce sor'u veya Tam erişim'i seçin.",
   "error.agent.claudeSandboxUnavailable":
     "“Yalnızca çalışma alanı” Claude korumalı alanına ihtiyaç duyar, ancak Claude bu bilgisayarda onu başlatamıyor: {reason}. Ajan ayarlarından Tam erişim'i veya başka bir sağlayıcıyı seçin.",
   "error.agent.screenCaptureOff":

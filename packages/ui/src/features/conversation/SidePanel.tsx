@@ -19,6 +19,7 @@ import {
   attachmentReferenceTone,
 } from "@openbot/ui/features/conversation/AttachmentReference";
 import { ComputerIcon } from "@openbot/ui/features/conversation/ConversationIcons";
+import { TabShape } from "@openbot/ui/features/conversation/TabShape";
 import type { ThreadItem } from "@openbot/ui/features/conversation/threads/thread-types";
 import { type TextValue, useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
@@ -634,6 +635,9 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
             </Button>
           </Show>
         </div>
+        <Show when={hasTabs()}>
+          <TabShape selected=".side-panel-tab[data-selected]" sized=".side-panel-tabs, .side-panel-tab" />
+        </Show>
       </Tabs.Root>
       <Show when={carriedHere()}>
         <div class="side-panel-drop" aria-hidden="true">

@@ -278,9 +278,12 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    invoice of the PaymentIntent (`GET /v1/invoice_payments`). A refund or dispute of a payment that
    is not an OpenBot plan invoice changes nothing. A refund that fails after it succeeded does not
    start the plan again.
-8. **Plan change.** In the Customer Portal an upgrade is charged at once, and a downgrade or a
-   shorter interval starts at the next period. The Worker copies the new plan, interval and currency
-   to the server. boat changes the machine of a sandbox only on a resume (`type`), so the Worker
+8. **Plan change.** The Customer Portal has no plan change (`subscription_update` is off), so only an
+   operator changes a plan, in the Stripe Dashboard. A portal request with `flow: "update"` from an
+   older app opens the Portal home. The owner of a server on a VPS can buy more storage: see
+   [Storage tiers](#storage-tiers). When an operator changes a plan, an upgrade is charged at once, and
+   a downgrade or a shorter interval starts at the next period. The Worker copies the new plan,
+   interval and currency to the server. boat changes the machine of a sandbox only on a resume (`type`), so the Worker
    stops a running server (boat saves the disk) and resumes it on the machine of the new plan. The
    server is offline for this time, so the Worker waits until the server has no use: no activity
    report for 7 minutes (a server in use reports each 5 minutes). A server that stops for no use,
@@ -1596,6 +1599,55 @@ Not confirmed for Leaseweb:
 - `resetPassword`, which needs the guest agent, and a custom image for a VPS;
 - why the start after `detachIso` took 173 seconds;
 - WebRTC with a rule set that also filters incoming connections.
+
+### Storage tiers
+
+The owner of a server on a VPS of the operator (`hosted_servers.operator_host` is set) can buy one of
+two larger storage tiers. A boat sandbox has no tiers. A tier never goes down, and the owner can buy
+tier 2 from tier 0 or tier 1. Tier 2 is the whole disk of the plan's VPS.
+
+| Plan | Tier 0 (plan) | Tier 1 | Tier 2 | Add-on a month, tier 1 / tier 2 (EUR) |
+| --- | --- | --- | --- | --- |
+| Starter | 25 GB | 50 GB | 100 GB | 10 / 20 |
+| Standard | 75 GB | 125 GB | 200 GB | 20 / 40 |
+| Pro | 150 GB | 200 GB | 300 GB | 20 / 45 |
+
+The sizes and prices are in `packages/contracts/src/billing.ts` (`STORAGE_TIER_GB`,
+`storageTierListPrices`). A year is 12 months less 20%. USD is EUR times 1.2, PLN times 4 and BRL
+times 6.
+
+- **Stripe.** Each tier is a second item on the plan subscription: a Price of the Product
+  `openbot_storage_<plan>` with the lookup key `openbot_storage_<plan>_<tier>_<interval>` and the
+  metadata `openbot_kind: storage`. `bun run api:stripe:bootstrap` makes them. The Worker also knows
+  an old Price by its metadata after the bootstrap moved a lookup key.
+- **Purchase.** `POST /v1/me/billing/storage` (desktop) or `/api/browser/v1/me/billing/storage`
+  (browser) with `{subscriptionId, tier}`. The Worker checks in D1 and in Stripe that the plan is
+  active (not trialing: a trial invoices 0 for the change), does not end, belongs to the user and to a server with an operator host, and
+  has a lower tier. Then it adds or changes the storage item with `proration_behavior=always_invoice`
+  and `payment_behavior=error_if_incomplete`: Stripe charges the prorated add-on now, and refuses the
+  change when the payment fails. The answer is the full billing state (200). Errors:
+  `400 invalid_billing_request`, `409 storage_unavailable`, and `402 storage_payment_failed` (nothing
+  changed). The Stripe idempotency key has the subscription, the old Price, the payment method of
+  the subscription and a 1-minute window, but not the new Price. A double click is one change, and two
+  purchases at the same time (for example on two devices) cannot each add a storage item: Stripe
+  refuses the second with `idempotency_error`, and the Worker answers `409 storage_unavailable`. A
+  retry of a different tier with the same card waits for the next window.
+- **Server.** The sync after the purchase, and each subscription webhook, copies the tier of the
+  subscription to `hosted_servers.storage_tier` (migration `0057`). The server list, the hosting
+  list, the host list and the billing state send the storage of the tier. The host reads its storage
+  at its next start. Nothing changes the disk: each tier fits in the disk of the plan's VPS. A
+  server on a smaller VPS than its plan (a Pro server on a VPS 2) must move before it can use tier 2.
+- **Amounts.** The billing state `amount` is the plan item and the storage item. `storageUpgrades`
+  lists the tiers above the current tier, only for an active plan that does not end. Its
+  `amount` is the plan amount and the add-on list price of that tier. After a tier 1 purchase the
+  plan amount is the current amount less the list price of tier 1, so a tier 1 Price from before a
+  price change gives an approximate amount for tier 2.
+- **Revenue.** MRR, the sales facts and the snapshots count each item that is not a license as server
+  revenue, so the add-on is in them.
+
+The bootstrap of the storage Prices and the `storage-tier` scenario of `scripts/stripe-flows-e2e.ts`
+ran against a local Worker and Stripe test mode. That the Portal sets a new payment method on the subscription, which
+gives a retry a new idempotency key at once, is not confirmed.
 
 ### Reuse a pool machine
 

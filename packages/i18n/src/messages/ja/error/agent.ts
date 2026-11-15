@@ -154,6 +154,8 @@ export const messages = {
     "このサーバーはメモリーが不足しています。メッセージはキューで待機し、メモリーが空くと開始します。",
   "error.agent.workspaceOnlyToolMissing":
     "「ワークスペースのみ」には {tool} が必要ですが、OpenBot は見つけられませんでした。インストールするか、エージェントの設定で「フルアクセス」を選んでください。",
+  "error.agent.codexSandboxUnavailable":
+    "「ワークスペースのみ」には Codex のサンドボックスが必要ですが、このコンピューターでは Codex がサンドボックスを開始できないため、エージェントのコマンドが失敗します。エージェントの設定で「事前に確認」か「フルアクセス」を選んでください。",
   "error.agent.claudeSandboxUnavailable":
     "「ワークスペースのみ」には Claude のサンドボックスが必要ですが、このコンピューターでは Claude がサンドボックスを開始できません: {reason}。エージェントの設定で「フルアクセス」か別のプロバイダーを選んでください。",
   "error.agent.screenCaptureOff":

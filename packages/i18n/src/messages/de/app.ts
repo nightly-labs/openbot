@@ -10,7 +10,6 @@ export const messages = {
   "app.action.unavailable": "Aktion nicht verfügbar",
   "app.error.actionFailed": "Die Aktion konnte nicht abgeschlossen werden. Versuche es erneut.",
   "app.errorStatus.queueLoad": "Wartende Nachrichten konnten nicht geladen werden",
-  "app.errorStatus.waitsLoad": "Offene Wartevorgänge konnten nicht geladen werden",
   "app.errorStatus.answer": "Deine Antwort konnte nicht gesendet werden",
   "app.errorStatus.approval": "Deine Entscheidung konnte nicht gesendet werden",
   "app.errorStatus.browserTakeover": "Die Browserübernahme konnte nicht beendet werden",

@@ -5,7 +5,7 @@ import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/br
 import { ROUTINE_RUN_COMMAND_CAPABILITY } from "@openbot/contracts/team-protocol/routine-run-command-v1";
 import { classifyFailure } from "@openbot/telemetry";
 import { PanelResizer } from "@openbot/ui/components/PanelResizer";
-import { SETTINGS_PANEL_DEFAULT, SETTINGS_PANEL_MAX } from "@openbot/ui/components/SettingsPanel";
+import { settingsPanelMaxWidth } from "@openbot/ui/components/SettingsPanel";
 import { BROWSER_NEW_TAB_URL } from "@openbot/ui/features/browser/browser-suggestions";
 import { SidePanelHeader, SidePanelLauncher, type SidePanelPane } from "@openbot/ui/features/conversation/SidePanel";
 import { SideQuestionPanel } from "@openbot/ui/features/conversation/SideQuestionPanel";
@@ -15,6 +15,12 @@ import { McpSignInRelayDialog } from "@openbot/ui/features/settings/McpSignInPag
 import { useText } from "@openbot/ui/text";
 import { actionToast } from "../../action-toast";
 import { useChatBubbleStyle } from "../../chat-bubble-style-preference";
+import {
+  readSidePanelWidth,
+  resetSidePanelWidth,
+  SIDE_PANEL_DEFAULT,
+  saveSidePanelWidth,
+} from "../../components/side-panel-width";
 import { deviceQuoteShortcut } from "../../send-shortcut-preference";
 import { type AgentTemplatePublishCalls, agentTemplatesPort } from "../agent-templates/agent-templates-port";
 import { createPublishAgent } from "../agent-templates/PublishAgent";
@@ -29,7 +35,6 @@ import { cycleSpeechSpeed, speechSpeed } from "../speech/speech-speed";
 import { ConversationSideThread } from "./ConversationSideThread";
 import { isChatVisualAppShortcut } from "./chat-visual-shortcuts";
 import { htmlAttachmentPageHtml, htmlAttachmentPageUrl } from "./chat-visual-url";
-import { BROWSER_PANEL_DEFAULT } from "./conversation-controller";
 import { useConversationController } from "./conversation-controller-context";
 import { type AgentNotificationLevelCalls, conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
@@ -39,10 +44,6 @@ import type { RoutineResultsCalls } from "./routines-port";
 import { type CodexLivePort, createCodexLiveConversation } from "./stores/codex-live-conversation-store";
 import type { VoiceConversationKind } from "./stores/voice-session-store";
 
-const BROWSER_PANEL_DEFAULT_RATIO = 0.5;
-const BROWSER_PANEL_MIN = 220;
-const BROWSER_PANEL_MAX = 1600;
-const CONVERSATION_PANEL_MIN = 96;
 const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
 
 import { type HostFolderPick, HostFolderPicker } from "@openbot/ui/features/conversation/HostFolderPicker";
@@ -178,9 +179,8 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     openSidebarFileBack,
     props,
     setActiveRightPanel,
-    browserPanelWidth,
-    setBrowserPanelWidth,
-    setSettingsPanelWidth,
+    sidePanelWidth,
+    setSidePanelWidth,
     handleRoutineSettingsRequest,
     sidebarFilePreview,
     settingsOpen,
@@ -460,22 +460,8 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     }
     return undefined;
   });
-  const browserPanelMaxWidth = () =>
-    Math.min(
-      BROWSER_PANEL_MAX,
-      Math.max(
-        BROWSER_PANEL_MIN,
-        (conversationPanelElement()?.clientWidth || window.innerWidth) - CONVERSATION_PANEL_MIN,
-      ),
-    );
-  const settingsMaxWidth = () =>
-    Math.min(
-      SETTINGS_PANEL_MAX,
-      Math.max(
-        SETTINGS_PANEL_DEFAULT,
-        (conversationPanelElement()?.clientWidth || window.innerWidth) - CONVERSATION_PANEL_MIN,
-      ),
-    );
+  /** All panes of the side panel have one width, so they also have one largest width. */
+  const sidePanelMaxWidth = () => settingsPanelMaxWidth(conversationPanelElement());
   /** Agent settings > Files. */
   const agentFiles = (server: ServerSummary | undefined, agentId: string): AgentFilesOptions | undefined => {
     if (!storageReachable() || !serverHasStorage(server)) return undefined;
@@ -586,18 +572,25 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
           class="browser-panel side-panel-empty"
           aria-label={t("conversation.sidePanel.label")}
         >
-          {/* The list has no saved width: each pane keeps its own, so a drag here does not change a pane's width. */}
+          {/* The list has the width of the panes, so a drag here also sets the width of each pane. */}
           <PanelResizer
             class="right-panel-resizer"
             label={t("conversation.sidePanel.resize")}
             controls="side-panel-launcher"
             direction="right"
-            value={browserPanelWidth()}
-            defaultValue={BROWSER_PANEL_DEFAULT}
-            min={BROWSER_PANEL_MIN}
-            max={browserPanelMaxWidth}
-            onResize={setBrowserPanelWidth}
-            onResizeEnd={setBrowserPanelWidth}
+            value={sidePanelWidth()}
+            defaultValue={SIDE_PANEL_DEFAULT}
+            min={SIDE_PANEL_DEFAULT}
+            max={sidePanelMaxWidth}
+            onResize={setSidePanelWidth}
+            onResizeEnd={saveSidePanelWidth}
+            // A narrower chat makes the panel narrower only for now. When the chat gets wider, the panel goes
+            // back to the width from the last drag.
+            onParentResize={() => setSidePanelWidth(Math.round(Math.min(sidePanelMaxWidth(), readSidePanelWidth())))}
+            onReset={() => {
+              resetSidePanelWidth();
+              setSidePanelWidth(SIDE_PANEL_DEFAULT);
+            }}
           />
           <SidePanelLauncher
             available={sidePanelPanes()}
@@ -621,11 +614,8 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                 preview={file().preview}
                 directory={file().directory ?? null}
                 agents={props.agents}
-                defaultWidth={() =>
-                  (conversationPanelElement()?.clientWidth || window.innerWidth) * BROWSER_PANEL_DEFAULT_RATIO
-                }
-                maxWidth={browserPanelMaxWidth}
-                onWidthChange={setBrowserPanelWidth}
+                maxWidth={sidePanelMaxWidth}
+                onWidthChange={setSidePanelWidth}
                 onOpenLink={(url) => void openExternalMessageUrl(url)}
                 onOpenSharedFile={(path) => openSharedFile(path, "here")}
                 onOpenWorkspaceFile={previewWorkspaceAgentId() ? openWorkspaceFolderEntry : undefined}
@@ -738,9 +728,8 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
           hidden={browserExpandedOpen()}
           suspended={props.browserVisibilitySuspended || props.globalOverlayOpen || props.remoteDesktopVisible}
           contextKey={`${props.server?.id ?? "local"}:${props.agent?.id ?? ""}`}
-          defaultWidth={() => 320}
-          maxWidth={browserPanelMaxWidth}
-          onWidthChange={setBrowserPanelWidth}
+          maxWidth={sidePanelMaxWidth}
+          onWidthChange={setSidePanelWidth}
           capturePreview={props.runtime?.browser.capturePreview}
           onOpenTab={(tabId, trigger) => {
             browserPreviewTrigger = trigger;
@@ -762,8 +751,8 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
       {channel ? (
         <Show when={settingsOpen()}>
           <channel.SettingsPane
-            maxWidth={settingsMaxWidth}
-            onWidthChange={setSettingsPanelWidth}
+            maxWidth={sidePanelMaxWidth}
+            onWidthChange={setSidePanelWidth}
             onClose={() => closeSidePanelPane("settings")}
           />
         </Show>
@@ -879,9 +868,9 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               }
               modelOptions={props.modelOptions}
               working={agentActivity() === "Working"}
-              maxWidth={settingsMaxWidth}
+              maxWidth={sidePanelMaxWidth}
               onClose={() => closeSidePanelPane("settings")}
-              onWidthChange={setSettingsPanelWidth}
+              onWidthChange={setSidePanelWidth}
               onUpdateAgent={props.onUpdateAgent}
               onUpdateRuntimeSettings={updateRuntimeSettings}
               onSetAgentAvatar={props.onSetAgentAvatar}

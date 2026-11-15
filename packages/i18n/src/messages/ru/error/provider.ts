@@ -266,6 +266,8 @@ export const messages = {
     "Сервис Gemini от Google не выполнил запрос. Повторите попытку через несколько минут.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini отклонил этот запрос. Выберите другую модель и отправьте сообщение снова. Если ошибка повторится, начните новый чат.\n{detail}",
+  "error.provider.antigravityLocationUnsupported":
+    "Google не разрешает Gemini работать из сетевого местоположения компьютера, на котором работает этот агент. Используйте Gemini на другом компьютере или выберите другого провайдера для этого агента.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini потерял соединение со своим агентом и остановился. Отправьте сообщение, чтобы продолжить.",
   "error.provider.antigravityRemoteWindowsSignIn":
@@ -320,6 +322,8 @@ export const messages = {
     "Модель не приняла изображение в этом чате, потому что изображение слишком большое. OpenBot начал новый сеанс {provider} с историей чата. Попробуйте снова.",
   "error.provider.imageCountLimit":
     "Модель не приняла этот чат, потому что в нем слишком много изображений. OpenBot начал новый сеанс {provider} с историей чата. Попробуйте снова.",
+  "error.provider.requestTooLarge":
+    "Этот чат стал слишком большим, чтобы отправить его модели. Часто причина — изображения в чате. OpenBot начал новый сеанс {provider} с историей чата. Попробуйте снова.",
   "error.provider.opencodeSessionRejected":
     "OpenCode отклонил запрос и не указал причину. Это может произойти в длинном чате или после смены модели. OpenBot начал новый сеанс OpenCode с историей чата. Повторите попытку. Если ошибка не исчезнет, выберите другую модель или меньший уровень усилий.",
   "error.provider.opencodeCompactionFailed":
@@ -337,6 +341,8 @@ export const messages = {
     "Gemini не удалось открыть страницу входа в браузере. Проверьте браузер по умолчанию и подключитесь снова.",
   "error.provider.acpSignInFailed": "Вход не завершён.",
   "error.provider.acpSignInFailedReason": "Вход не завершён: {reason}",
+  "error.provider.acpSignInNetwork":
+    "Не удалось связаться с сервером провайдера при входе. Проверьте подключение к сети и настройки DNS компьютера, на котором работает OpenBot, и повторите попытку.",
   "error.provider.acpSignOutFailed": "Выход не завершён.",
   "error.provider.acpSignOutFailedReason": "Выход не завершён: {reason}",
   "error.provider.acpSignInMethodMissing":
@@ -344,6 +350,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "В браузере можно открыть только ссылки для входа по HTTPS.",
   "error.provider.geminiKeyRefused":
     "Gemini отклонил сохранённый ключ API. Замените или удалите ключ в настройках, затем подключитесь снова.",
+  "error.provider.geminiKeyRateLimited":
+    "Gemini отклонил запрос: сохранённый ключ Gemini API достиг лимита частоты запросов или своей квоты. Ключ используется вместо вашего тарифа Google. Подождите несколько минут или выберите другую модель и повторите попытку. Чтобы использовать тариф Google, удалите ключ в настройках.\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "У сохранённого ключа Gemini API нет квоты для этой модели. Ключ используется вместо вашего тарифа Google. Выберите другую модель или удалите ключ в настройках, чтобы использовать тариф Google.\n{detail}",
   "error.provider.geminiAccountSettingsUnreadable":
     "Gemini не может открыть файл настроек этого аккаунта, поэтому не может войти. Удалите этот аккаунт и добавьте его снова.",
   "error.provider.geminiSettingsUnreadable":
@@ -435,6 +445,8 @@ export const messages = {
   "error.provider.piSessionMissing": "Файл сессии Pi недоступен на этом компьютере.",
   "error.provider.piResumeCancelled": "Pi отменил возобновление сессии. Повторите попытку.",
   "error.provider.piSessionIdentity": "Pi вернул другую сессию. Сохранённая сессия не заменена.",
+  "error.provider.piExtensionFailed":
+    "Pi остановился, потому что не смог загрузить расширение. Удалите или обновите это расширение и повторите попытку. {detail}",
   "error.provider.piModelInvalid": "Выберите модель Pi с указанием её провайдера.",
   "error.provider.piToolInvalid": "Инструмент вернул некорректный результат.",
   "error.provider.piSignIn": "Выполните /login в Pi на компьютере-хосте. Закройте Pi, когда вход завершится.",

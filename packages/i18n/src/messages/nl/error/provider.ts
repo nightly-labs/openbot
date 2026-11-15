@@ -273,6 +273,8 @@ export const messages = {
     "De Gemini-service van Google heeft het verzoek niet voltooid. Probeer het over een paar minuten opnieuw.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini heeft dit verzoek geweigerd. Kies een ander model en stuur je bericht opnieuw. Mislukt het weer, start dan een nieuwe chat.\n{detail}",
+  "error.provider.antigravityLocationUnsupported":
+    "Google staat Gemini niet toe vanaf de netwerklocatie van de computer waarop deze agent draait. Gebruik Gemini op een andere computer, of kies een andere aanbieder voor deze agent.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini is de verbinding met zijn agent kwijtgeraakt en is gestopt. Stuur een bericht om verder te gaan.",
   "error.provider.antigravityRemoteWindowsSignIn":
@@ -326,6 +328,8 @@ export const messages = {
     "Het model accepteerde een afbeelding in deze chat niet, omdat de afbeelding te groot is. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.imageCountLimit":
     "Het model accepteerde deze chat niet, omdat de chat te veel afbeeldingen bevat. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
+  "error.provider.requestTooLarge":
+    "Deze chat is te groot geworden om naar het model te sturen. Afbeeldingen in de chat zijn vaak de oorzaak. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.opencodeSessionRejected":
     "OpenCode heeft het verzoek geweigerd zonder de oorzaak te geven. Dit kan gebeuren in een lange chat of na een modelwijziging. OpenBot heeft een nieuwe OpenCode-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Blijft de fout, kies dan een ander model of een lager niveau.",
   "error.provider.opencodeCompactionFailed":
@@ -343,6 +347,8 @@ export const messages = {
     "Gemini kon de inlogpagina niet in je browser openen. Controleer je standaardbrowser en verbind daarna opnieuw.",
   "error.provider.acpSignInFailed": "Het inloggen is niet voltooid.",
   "error.provider.acpSignInFailedReason": "Het inloggen is niet voltooid: {reason}",
+  "error.provider.acpSignInNetwork":
+    "Het inloggen kon de server van de provider niet bereiken. Controleer de netwerkverbinding en de DNS-instellingen van de computer waarop OpenBot draait en probeer het opnieuw.",
   "error.provider.acpSignOutFailed": "Het uitloggen is niet voltooid.",
   "error.provider.acpSignOutFailedReason": "Het uitloggen is niet voltooid: {reason}",
   "error.provider.acpSignInMethodMissing":
@@ -350,6 +356,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "Alleen HTTPS-inloglinks kunnen in de browser worden geopend.",
   "error.provider.geminiKeyRefused":
     "Gemini heeft de opgeslagen API-sleutel geweigerd. Vervang of verwijder de sleutel in Instellingen en verbind opnieuw.",
+  "error.provider.geminiKeyRateLimited":
+    "Gemini heeft het verzoek geweigerd, omdat je opgeslagen Gemini API-sleutel een limiet op het aantal verzoeken of zijn quotum heeft bereikt. De sleutel wordt gebruikt in plaats van je Google-abonnement. Wacht een paar minuten of kies een ander model, en probeer het opnieuw. Verwijder de sleutel in Instellingen om je Google-abonnement te gebruiken.\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "Je opgeslagen Gemini API-sleutel heeft geen quotum voor dit model. De sleutel wordt gebruikt in plaats van je Google-abonnement. Kies een ander model, of verwijder de sleutel in Instellingen om je Google-abonnement te gebruiken.\n{detail}",
   "error.provider.geminiAccountSettingsUnreadable":
     "Gemini kan het instellingenbestand van dit account niet openen en kan dus niet inloggen. Verwijder dit account en voeg het opnieuw toe.",
   "error.provider.geminiSettingsUnreadable":
@@ -443,6 +453,8 @@ export const messages = {
   "error.provider.piSessionMissing": "Het Pi-sessiebestand is niet beschikbaar op deze computer.",
   "error.provider.piResumeCancelled": "Pi heeft het hervatten van de sessie geannuleerd. Probeer het opnieuw.",
   "error.provider.piSessionIdentity": "Pi gaf een andere sessie terug. De opgeslagen sessie is niet vervangen.",
+  "error.provider.piExtensionFailed":
+    "Pi is gestopt omdat een extensie niet kon worden geladen. Verwijder of werk deze extensie bij en probeer het opnieuw. {detail}",
   "error.provider.piModelInvalid": "Kies een Pi-model dat de aanbieder bevat.",
   "error.provider.piToolInvalid": "De tool gaf een ongeldig resultaat terug.",
   "error.provider.piSignIn": "Gebruik /login in Pi op de hostcomputer. Sluit Pi als het inloggen klaar is.",

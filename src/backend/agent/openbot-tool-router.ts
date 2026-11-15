@@ -73,7 +73,7 @@ import type { ChannelService } from "../channel-service";
 import type { ProviderSession } from "../database/provider-sessions";
 import type { MailboxStore } from "../mailbox-store";
 import { agentMcpServers, codexDeferredMcpServers, openCodeMcpServers } from "../mcp-provider-shapes";
-import type { MessagingThreads } from "../messaging/messaging-threads";
+import { type MessagingThreads, PLATFORM_NAMES } from "../messaging/messaging-threads";
 import { isMessagingOutboundCall } from "../messaging/messaging-tools";
 import {
   ACKNOWLEDGE_REQUEST_ACTIONS,
@@ -129,6 +129,7 @@ import type { DrainScheduler } from "./drain-scheduler";
 import { HistoryTools, historyCursorThread, isHistoryBrowse, MAIN_CHAT_TASK_ID } from "./history-tools";
 import type { HostedSiteCoordinator } from "./hosted-site-coordinator";
 import { isHostedSiteMutationTool } from "./hosted-site-events";
+import { type ImageFitter, READ_IMAGE_MAX_FILE_BYTES, readImageToolSchema } from "./image-reader";
 import { type AgentLibraryFolders, listLibraryFolders, listLibraryFoldersToolSchema } from "./library-folder-tools";
 import type { MailboxSync } from "./mailbox-sync";
 import {
@@ -426,6 +427,8 @@ export interface OpenBotToolRouterOptions {
   screenCapture?: ScreenCaptureHost | null | undefined;
   /** Downloads and reads online videos for `read_video`; null where this process cannot decode them. */
   videoReader?: VideoReaderHost | null | undefined;
+  /** Decodes and fits pictures for `read_image`; null where this process cannot decode them. */
+  fitImage?: ImageFitter | null | undefined;
   /** The MCP servers of this OpenBot server, for the MCP tools; null where nothing holds them. */
   mcpServers?: AgentMcpServers | null | undefined;
   /** The saved server that a Marketplace app installs, or null when it is not installed. */
@@ -486,6 +489,7 @@ export class OpenBotToolRouter {
   readonly #visualPreview: ChatVisualPreviewHost | null;
   readonly #screenCapture: ScreenCaptureHost | null;
   readonly #videoReader: VideoReaderHost | null;
+  readonly #fitImage: ImageFitter | null;
   readonly #mcpServers: AgentMcpServers | null;
   readonly #marketplaceAppServer: (appId: string) => MarketplaceAppServer | null;
   readonly #githubConnected: () => boolean;
@@ -548,6 +552,7 @@ export class OpenBotToolRouter {
     this.#visualPreview = options.visualPreview ?? null;
     this.#screenCapture = options.screenCapture ?? null;
     this.#videoReader = options.videoReader ?? null;
+    this.#fitImage = options.fitImage ?? null;
     this.#mcpServers = options.mcpServers ?? null;
     this.#marketplaceAppServer = options.marketplaceAppServer ?? (() => null);
     this.#githubConnected = options.githubConnected ?? (() => false);
@@ -912,6 +917,7 @@ export class OpenBotToolRouter {
               tool.startsWith("channel_") ||
               tool === "list_channels" ||
               tool === "attach_files_to_response" ||
+              tool === "read_image" ||
               tool === "list_library_folders" ||
               tool === "send_message" ||
               tool === "messaging_post" ||
@@ -1536,8 +1542,10 @@ export class OpenBotToolRouter {
   }
 
   #requireAgent(agentId: string): AgentSummary {
-    const agent = this.#hooks.listAgents().find((candidate) => candidate.id === agentId);
-    if (!agent) throw new Error(sourceText("error.agent.unknown", { id: agentId }));
+    const agents = this.#hooks.listAgents();
+    const agent = agents.find((candidate) => candidate.id === agentId);
+    // The error names the agent that a mistyped id or an id without `agent-` most likely means (#9658).
+    if (!agent) throw new Error(unknownAgentMessage(agentId, agents));
     return agent;
   }
 
@@ -1817,6 +1825,10 @@ export class OpenBotToolRouter {
 
     if (params.tool === "read_video") {
       return yield* this.#readVideo(params);
+    }
+
+    if (params.tool === "read_image") {
+      return yield* this.#readImage(senderAgentId, params);
     }
 
     if (params.tool === "list_sites") {
@@ -2132,6 +2144,19 @@ export class OpenBotToolRouter {
           app: args.app,
           next: 'GitHub is already connected for every agent of this server, so no card shows. Do not ask the user to connect it again. Use the GitHub MCP tools; when they are not in your tool list, search your tools for github, or use gh and git, which this connection signs in. When GitHub refuses access to a repository (HTTP 403, "Resource not accessible by integration", "Write access to repository not granted", or "Not Found" for a repository that exists, but not a rate limit), the OpenBotGit app is not installed on it or does not have the permission. Then tell the user: in OpenBot, open Marketplace > Apps > GitHub > Choose repositories, install OpenBotGit on the owner of the repository and select it, then send the request again. To create repositories, an owner of the account also approves the permission request of OpenBotGit on GitHub, in Settings > Applications > Installed GitHub Apps (for an organization, in its settings). Do not try another credential. When something else fails, tell the user in one sentence and call openbot.send_feedback.',
         });
+      // Slack, Discord, Telegram and WhatsApp have no MCP server: the messaging tools reach a connected one (#9696).
+      // A paused or stopped connection still gets the card, which shows its Resume or Reconnect action.
+      const connection = this.#messaging.store
+        .connections()
+        .find((record) => record.enabled && record.lastErrorCode === null && record.platform === args.app);
+      if (connection) {
+        const name = PLATFORM_NAMES[connection.platform];
+        return openBotToolResult({
+          status: "connected",
+          app: args.app,
+          next: `${name} is already connected for every agent of this server, so no card shows. Do not ask the user to connect it again. Call openbot.messaging_list_places for the connection and place ids, then openbot.messaging_post to send the message; search your tools for messaging when they are not in your tool list. When the place is not in the list, tell the user what its result says.`,
+        });
+      }
       const installed = this.#marketplaceAppServer(args.app);
       if (installed && this.#mcpServers)
         return yield* marketplaceAppStatus(this.#mcpServers, installed, (config) =>
@@ -2314,6 +2339,50 @@ export class OpenBotToolRouter {
         ),
         Effect.catchTag("ChatVisualPreviewFailed", (failure) => Effect.succeed(openBotToolFailure(failure.reason))),
       );
+  });
+
+  /**
+   * `read_image`: gives the agent a local picture that a model can take. In Code Mode, Codex drops an
+   * image file over about 6 MB that `view_image` reads (#9522).
+   */
+  readonly #readImage = Effect.fn("OpenBotToolRouter.readImage")(function* (
+    this: OpenBotToolRouter,
+    senderAgentId: string,
+    params: DynamicToolCallParams,
+  ) {
+    const parsed = readImageToolSchema.safeParse(params.arguments, { reportInput: true });
+    if (!parsed.success) return openBotToolFailure(profileToolErrorMessage(parsed.error));
+    const fitImage = this.#fitImage;
+    if (!fitImage) return openBotToolFailure("This OpenBot cannot open images.");
+    // An agent can read each file that its user can: Workspace limits only writes (`AttachmentSourceScope`).
+    const bytes = yield* Effect.acquireUseRelease(
+      this.#attachments.openSources(senderAgentId, [parsed.data.path], { allowAnyReadablePath: true }),
+      ([source]) =>
+        attachmentCall(async () => {
+          if (!source) throw new Error("The image file was not found.");
+          const { size } = await source.handle.stat();
+          if (size > READ_IMAGE_MAX_FILE_BYTES)
+            throw new Error(`The image file is larger than ${READ_IMAGE_MAX_FILE_BYTES / 1024 / 1024} MB.`);
+          // A file that grows after the check is read only to the size it had.
+          const bytes = Buffer.alloc(size);
+          const { bytesRead } = await source.handle.read(bytes, 0, size, 0);
+          return bytes.subarray(0, bytesRead);
+        }),
+      (sources) => Effect.promise(() => Promise.allSettled(sources.map((source) => source.handle.close()))),
+    );
+    const image = fitImage(bytes);
+    if (image === "unsupported")
+      return openBotToolFailure("OpenBot can open only PNG and JPEG images. Make a PNG or JPEG copy first.");
+    if (image === "tooLarge")
+      return openBotToolFailure("The image has too many pixels. Make a smaller copy first, such as 4000 pixels wide.");
+    const { dataUrl, ...size } = image;
+    return {
+      success: true,
+      contentItems: [
+        { type: "inputText", text: JSON.stringify(size) },
+        { type: "inputImage", imageUrl: dataUrl },
+      ],
+    } satisfies DynamicToolResult;
   });
 
   /**

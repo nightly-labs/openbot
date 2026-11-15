@@ -10,7 +10,6 @@ export const messages = {
   "app.action.unavailable": "הפעולה אינה זמינה",
   "app.error.actionFailed": "לא ניתן להשלים את הפעולה. יש לנסות שוב.",
   "app.errorStatus.queueLoad": "לא ניתן לטעון הודעות בתור",
-  "app.errorStatus.waitsLoad": "לא ניתן לטעון המתנות פתוחות",
   "app.errorStatus.answer": "לא ניתן לשלוח את התשובה",
   "app.errorStatus.approval": "לא ניתן לשלוח את ההחלטה",
   "app.errorStatus.browserTakeover": "לא ניתן לסיים את השליטה בדפדפן",

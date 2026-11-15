@@ -98,12 +98,21 @@ function geminiMcpLoadFailure(text: string): { name: string; reason: string } | 
  * MODEL_CAPACITY_EXHAUSTED and "No capacity available for model …". It is not the plan's quota,
  * so it is matched before the rate limit (#8554). Not the word "capacity" alone: Google's quota
  * text "You have exhausted your capacity on this model" is a spent quota.
+ *
+ * Google refuses all requests from some network addresses, also server addresses in a supported
+ * country, with FAILED_PRECONDITION "User location is not supported for the API use." Waiting or
+ * another model does not help (#9681). Not the status name: Google also uses it for other failures.
  */
 const GEMINI_REQUEST_FAILURES = [
+  ["error.provider.antigravityLocationUnsupported", /\bUser location is not supported\b/iu],
   [
     "error.provider.antigravityModelAtCapacity",
     /\bMODEL_CAPACITY_EX(?:HAUSTED|CEEDED)\b|\b[Nn]o capacity available for model\b/u,
   ],
+  // Google's text for a spent plan quota: "Individual quota reached. Please upgrade your subscription
+  // to increase your limits. Resets in 152h1m7s." It resets in days, so "wait a few minutes" is
+  // wrong for it, and before this it showed with no advice (#9675).
+  ["error.provider.antigravityQuotaReached", /\bquota\b.{0,40}\breached\b/iu],
   ["error.provider.antigravityRateLimited", /\bRESOURCE_EXHAUSTED\b/u],
   [
     "error.provider.antigravityRateLimited",
@@ -137,10 +146,36 @@ function geminiTurnFailure(answer: string): string {
   return key ? sourceText(key, { detail: shownFailureDetail(text) }) : shownFailureDetail(text);
 }
 
+/** The prefix that the ACP SDK puts before the server's text of a failed request. */
+const GEMINI_INTERNAL_ERROR_PREFIX = /^(?:RequestError:\s*)?Internal error:\s*/u;
+/**
+ * Google's quota of 0 for the model, such as a free-tier key on a paid model: "Quota exceeded for
+ * metric: ..._free_tier_requests, limit: 0". Waiting does not help. Not "limit: 0.5" or "limit: 05".
+ */
+const GEMINI_ZERO_LIMIT = /\blimit:\s*0(?!\d|\.\d)/u;
+
+/**
+ * The message of a rate limit or quota refusal while a saved Gemini API key serves the turns, or
+ * `null` for another failure. The key's quota is not the Google plan's, so the plan's text misled
+ * the user, and for a quota of 0 its advice to wait never helped (#9517). The same failure texts as
+ * the flavor's, from the answer (`error` is absent) or from a failed request.
+ */
+export function geminiSavedKeyLimitFailure(text: string, error?: unknown): string | null {
+  if (error !== undefined && !(error instanceof RequestError)) return null;
+  const reason = text.replace(GEMINI_WARNING_ANSWER, "").replace(GEMINI_INTERNAL_ERROR_PREFIX, "");
+  if (geminiAccountLink(reason) !== null || GEMINI_CONNECTION_LOST_ANSWER.test(reason)) return null;
+  const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
+  if (key !== "error.provider.antigravityRateLimited") return null;
+  return sourceText(
+    GEMINI_ZERO_LIMIT.test(reason) ? "error.provider.geminiKeyQuotaZero" : "error.provider.geminiKeyRateLimited",
+    { detail: shownFailureDetail(reason) },
+  );
+}
+
 /** Only a failure the server answered with: a local failure is not Google's to explain. */
 function geminiRequestFailure(error: unknown, detail: string): string {
   if (!(error instanceof RequestError)) return detail;
-  const reason = detail.replace(/^(?:RequestError:\s*)?Internal error:\s*/u, "");
+  const reason = detail.replace(GEMINI_INTERNAL_ERROR_PREFIX, "");
   const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
   return key ? sourceText(key, { detail: shownFailureDetail(reason) }) : detail;
 }
@@ -187,6 +222,7 @@ const GEMINI_PROMPT_LOG = "Sending user message to conversation ";
  * toolbox of a prompt. One `pattern` with a lookahead, such as the email of Resend's `get-contact`,
  * ends every turn with only "Agent execution terminated due to error." as the answer (#7228). Only
  * the CLI's own log names the tool, in `<Gemini home>/<app data>/log/acp-server-<time>-<pid>.log`.
+ * The 1.5.9 CLI answers with this line itself, and no longer with the short answer (#9568).
  */
 const GEMINI_REFUSED_TOOL = /\bbuilding toolbox: tool "(mcp_[^"]+)" advertises an invalid parameter schema\b/gu;
 /** A log that the CLI wrote in this time can hold the failure of the prompt that just ended. */
@@ -206,12 +242,15 @@ function logTail(file: string, size: number): string {
 }
 
 /**
- * The tools that the CLI refused after the last prompt of the session. Each session has a process,
- * and so a log, of its own. A session that opened again on a new process has an older log too, so
- * only the newest log with a prompt of the session counts. A log that cannot be read gives no tools:
- * the turn then fails as before.
+ * The tools that the CLI refused after the last prompt of the session. The 1.5.9 answer names the
+ * tool. An older CLI names it only in its log. Each session has a process, and so a log, of its own.
+ * A session that opened again on a new process has an older log too, so only the newest log with a
+ * prompt of the session counts. A log that cannot be read gives no tools: the turn then fails as
+ * before.
  */
 function antigravityRefusedMcpTools(text: string, argv: readonly string[], sessionId: string): string[] {
+  const answered = Array.from(text.matchAll(GEMINI_REFUSED_TOOL), (match) => match[1] ?? "");
+  if (answered.length > 0) return answered;
   if (!GEMINI_TERMINATED_ANSWER.test(text)) return [];
   const home = flagValue(argv, GEMINI_DIR_FLAG);
   const appData = flagValue(argv, APP_DATA_DIR_FLAG);

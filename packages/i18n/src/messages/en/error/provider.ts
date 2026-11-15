@@ -263,6 +263,8 @@ export const messages = defineMessages("error.provider", {
     "Google's Gemini service did not complete the request. Try again in a few minutes.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini refused this request. Choose another model, then send your message again. If it fails again, start a new chat.\n{detail}",
+  "error.provider.antigravityLocationUnsupported":
+    "Google does not let Gemini work from the network location of the computer that runs this agent. Use Gemini on another computer, or choose another provider for this agent.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini lost the connection to its agent and stopped. Send a message to continue.",
   "error.provider.antigravityRemoteWindowsSignIn":
@@ -315,6 +317,8 @@ export const messages = defineMessages("error.provider", {
     "The model did not accept an image in this chat because the image is too large. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.imageCountLimit":
     "The model did not accept this chat because the chat has too many images. OpenBot started a new {provider} session with the chat history. Try again.",
+  "error.provider.requestTooLarge":
+    "This chat became too large to send to the model. Images in the chat often cause this. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.opencodeSessionRejected":
     "OpenCode refused the request and did not give the cause. This can occur in a long chat or after a model change. OpenBot started a new OpenCode session with the chat history. Try again. If the error continues, select a different model or a lower effort.",
   "error.provider.opencodeCompactionFailed":
@@ -332,6 +336,8 @@ export const messages = defineMessages("error.provider", {
     "Gemini could not open the sign-in page in your browser. Check your default browser, then connect again.",
   "error.provider.acpSignInFailed": "The sign-in did not complete.",
   "error.provider.acpSignInFailedReason": "The sign-in did not complete: {reason}",
+  "error.provider.acpSignInNetwork":
+    "The sign-in could not reach the provider's server. Check the network connection and the DNS settings of the computer that runs OpenBot, then try again.",
   "error.provider.acpSignOutFailed": "The sign-out did not complete.",
   "error.provider.acpSignOutFailedReason": "The sign-out did not complete: {reason}",
   "error.provider.acpSignInMethodMissing":
@@ -339,6 +345,10 @@ export const messages = defineMessages("error.provider", {
   "error.provider.httpsSignInLinkOnly": "Only HTTPS sign-in links can open in the browser.",
   "error.provider.geminiKeyRefused":
     "Gemini refused the saved API key. Replace or remove the key in Settings, then connect again.",
+  "error.provider.geminiKeyRateLimited":
+    "Gemini refused the request because your saved Gemini API key reached a rate limit or its quota. The key is used instead of your Google plan. Wait a few minutes or choose another model, then try again. To use your Google plan, remove the key in Settings.\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "Your saved Gemini API key has no quota for this model. The key is used instead of your Google plan. Choose another model, or remove the key in Settings to use your Google plan.\n{detail}",
   "error.provider.geminiAccountSettingsUnreadable":
     "Gemini cannot open the settings file of this account, so it cannot sign in. Remove this account and add it again.",
   "error.provider.geminiSettingsUnreadable":
@@ -425,6 +435,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.piSessionMissing": "The Pi session file is not available on this computer.",
   "error.provider.piResumeCancelled": "Pi cancelled the session resume. Try again.",
   "error.provider.piSessionIdentity": "Pi returned a different session. The saved session was not replaced.",
+  "error.provider.piExtensionFailed":
+    "Pi stopped because it could not load an extension. Remove or update this extension, then try again. {detail}",
   "error.provider.piModelInvalid": "Select a Pi model that includes its provider.",
   "error.provider.piToolInvalid": "The tool returned an invalid result.",
   "error.provider.piSignIn": "Use /login in Pi on the host computer. Close Pi when sign-in is complete.",

@@ -1,4 +1,8 @@
 import { basename } from "node:path";
+import {
+  Client as ModernClient,
+  StreamableHTTPClientTransport as ModernHttpTransport,
+} from "@modelcontextprotocol/client";
 import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -22,6 +26,7 @@ import {
   MCP_CLIENT_NAME,
   type McpOAuthAuthority,
   type McpSignIn,
+  namesAuthorizationServer,
   normalizeResource,
   secureOAuthFetch,
 } from "./mcp-oauth-provider";
@@ -37,7 +42,12 @@ import {
 } from "./mcp-provider-shapes";
 import { redactMcpSecrets, redactMcpValues } from "./mcp-redaction";
 
-const MCP_PROBE_TIMEOUT_MS = 10_000;
+/**
+ * The deadline for an http server, from the handshake to the last tool page. A hosted server can
+ * need more than 10 seconds to start (#9625). Codex gives each MCP step 30 seconds, so a server that
+ * passes this test also starts in a Codex turn.
+ */
+const MCP_PROBE_TIMEOUT_MS = 30_000;
 
 /**
  * The deadline for a stdio server. Its first start can download the package and all its
@@ -136,7 +146,10 @@ export const inspectMcpServer = Effect.fnUntraced(function* (
 /** The last refusal an http server answered a connection without a sign-in provider. */
 interface McpChallenge {
   status: number;
-  /** Whether `WWW-Authenticate` names the Bearer scheme, which is what an OAuth server asks for. */
+  /**
+   * Whether the refusal asks for an OAuth sign-in: a 401 whose `WWW-Authenticate` names the Bearer
+   * scheme, or a refusal that the server's public OAuth metadata explains.
+   */
   bearer: boolean;
   /** Where the request ended up after any redirect. */
   url: string;
@@ -155,8 +168,8 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
   const record = (next: McpChallenge) => {
     seen.challenge = next;
   };
-  const failure = (error: unknown): McpProbeOutcome => {
-    const described = describeProbeFailure(error, config, timeoutMs, signIn, seen.challenge, signInPlace);
+  const failure = (error: unknown, signedIn = false): McpProbeOutcome => {
+    const described = describeProbeFailure(error, config, timeoutMs, signIn, seen.challenge, signInPlace, signedIn);
     return {
       toolCount: 0,
       error: boundedError(redactMcpValues(described, probeSecrets(server, signIn))),
@@ -177,7 +190,7 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
         .complete()
         .pipe(toMcpProbeFailure, Effect.andThen(connectAndCountEffect(server, timeoutMs, active, record))),
     );
-    return Result.isFailure(retry) ? failure(retry.failure.cause) : found(retry.success);
+    return Result.isFailure(retry) ? failure(retry.failure.cause, true) : found(retry.success);
   });
   const startedAt = Date.now();
   const first = yield* Effect.result(connectAndCountEffect(server, timeoutMs, signIn, record));
@@ -189,24 +202,38 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
     if (Result.isFailure(begun)) return failure(begun.failure.cause);
     return begun.success ? yield* afterSignIn(signIn) : found(first.success);
   }
-  // A server on the 2025-03 MCP authorization spec answers 401 with no challenge at all; its OAuth
-  // metadata at the origin is what says a sign-in, not a key, is wanted. Only a refusal the sentence
-  // would explain is followed up, and only public documents are read: no credential is sent.
+  // A server on the 2025-03 MCP authorization spec answers 401 with no challenge at all, and some
+  // OAuth servers, such as Adobe's (#9232), answer 403; their public OAuth metadata is what says a
+  // sign-in, not a key, is wanted. Only a refusal the sentence would explain is followed up,
+  // and only public documents are read: no credential is sent.
   const unexplained = seen.challenge;
-  if (
-    !signIn &&
-    signInPlace !== null &&
-    unexplained?.status === 401 &&
-    !unexplained.bearer &&
-    !hasCredentialHeader(config)
-  )
+  if (!signIn && signInPlace !== null && unexplained && !hasCredentialHeader(config)) {
     // The same Test deadline covers the lookup: it gets only the time the connection left.
-    seen.challenge = {
-      ...unexplained,
-      bearer: yield* advertisesOAuth(config.url, timeoutMs - (Date.now() - startedAt)),
-    };
-  if (!signIn || !(first.failure.cause instanceof UnauthorizedError)) return failure(first.failure.cause);
-  return yield* afterSignIn(signIn);
+    const lookupMs = timeoutMs - (Date.now() - startedAt);
+    if (unexplained.status === 401 && !unexplained.bearer)
+      seen.challenge = { ...unexplained, bearer: yield* advertisesOAuth(config.url, lookupMs) };
+    // A 403 is a sign-in only where Sign in can start one, and Sign in starts none while a token is
+    // saved: a server that refuses that token refuses the account.
+    else if (unexplained.status === 403 && !server.authorization)
+      seen.challenge = { ...unexplained, bearer: yield* offersSignIn(config.url, lookupMs) };
+  }
+  // A server of revision 2026-07-28 alone answers the 2025 handshake with 400, while the agents,
+  // which speak that revision, use its tools (#9234). Only then is that revision tried, in the time
+  // the first connection left; a server that passed before keeps the same single connection. When
+  // the second answer fails too, the first one is what the user reads.
+  const remainingMs = timeoutMs - (Date.now() - startedAt);
+  if (!signIn && config.transport === "http" && httpStatus(first.failure.cause) === 400 && remainingMs > 0) {
+    const modern = yield* Effect.result(connectAndCountModernEffect(server, remainingMs));
+    if (Result.isSuccess(modern)) return found(modern.success);
+  }
+  if (!signIn) return failure(first.failure.cause);
+  if (first.failure.cause instanceof UnauthorizedError) return yield* afterSignIn(signIn);
+  // The SDK starts a sign-in only on a 401, so a 403 with no key of the user's ends the press with
+  // nothing opened. Its sign-in starts here, as for a server that answered.
+  if (httpStatus(first.failure.cause) !== 403 || hasCredentialHeader(config)) return failure(first.failure.cause);
+  const begun = yield* Effect.result(signIn.begin());
+  if (Result.isFailure(begun)) return failure(begun.failure.cause);
+  return begun.success ? yield* afterSignIn(signIn) : failure(first.failure.cause);
 });
 
 /**
@@ -215,8 +242,9 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
  * The SDK reports a token the server refused right after a sign-in as a bare 401, which would read
  * as "check the API key" to someone who has just signed in. And a server that answers a Bearer
  * challenge to a probe that could not sign in wants a sign-in, not a key: that is what Granola
- * answers, and the header fields alone gave the user no way forward. A key pasted into a header
- * is the exception: Composio Connect ignores a key in the wrong header and sends the same challenge.
+ * answers, and the header fields alone gave the user no way forward. Adobe's answers 403, which its
+ * OAuth metadata explains in the same way (#9232). A key pasted into a header is the exception:
+ * Composio Connect ignores a key in the wrong header and sends the same challenge.
  */
 function describeProbeFailure(
   error: unknown,
@@ -225,16 +253,19 @@ function describeProbeFailure(
   signIn: McpSignIn | null,
   challenge: McpChallenge | null,
   signInPlace: McpSignInPlace | null,
+  /** The refusal came after the sign-in, so a 403 refuses the account the person has just signed in with. */
+  signedIn: boolean,
 ): string {
   if (signIn?.cancelled()) return sourceText("error.backend.mcpSignInCancelled");
   if (signIn && isRegistrationRefusal(error, signIn)) return REGISTRATION_REFUSED;
   const status = httpStatus(error);
-  if (signIn && status === 401) return sourceText("error.backend.mcpSignInNotAccepted");
+  if (signIn && (status === 401 || (signedIn && status === 403)))
+    return sourceText("error.backend.mcpSignInNotAccepted");
   // The token endpoint refused the grant. Its status says nothing about the address the user typed.
   if (signIn?.exchangeFailed() && status !== null && status >= 400 && status < 500)
     return sourceText("error.backend.mcpSignInNotAccepted");
   // A key the user pasted into a header is theirs to fix; the sign-in would not replace it.
-  if (challenge?.status === 401 && challenge.bearer && !hasCredentialHeader(config)) {
+  if (challenge?.bearer && !hasCredentialHeader(config)) {
     const described = describeSignInChallenge(config.url, challenge.url, signInPlace);
     if (described) return described;
   }
@@ -266,13 +297,13 @@ function httpsAddress(finalUrl: string, url: string): string {
 }
 
 /**
- * What the refusal asks of the user, decided as `describeProbeFailure` words it: a Bearer challenge
- * to a row with no credential header of its own wants a sign-in, any other refusal a key. A
- * sign-in over plain http needs a new address first, which the error names.
+ * What the refusal asks of the user, decided as `describeProbeFailure` words it: a refusal that asks
+ * for a sign-in, to a row with no credential header of its own, wants a sign-in, any other refusal a
+ * key. A sign-in over plain http needs a new address first, which the error names.
  */
 function probeNeed(config: McpServerConfig, challenge: McpChallenge | null): McpProbeNeed | null {
   if (!challenge || !isAccessRefusal(challenge.status)) return null;
-  if (challenge.status !== 401 || !challenge.bearer || hasCredentialHeader(config)) return "key";
+  if (!challenge.bearer || hasCredentialHeader(config)) return "key";
   return normalizeResource(config.url) ? "sign_in" : null;
 }
 
@@ -299,6 +330,9 @@ function probeSecrets(server: UsableMcpServer, signIn: McpSignIn | null): string
   return [...values, ...(signIn?.secrets() ?? [])];
 }
 
+/** How the probe names itself to a server, in both protocol versions. */
+const PROBE_CLIENT_INFO = { name: "openbot-probe", version: "1" };
+
 /** One connection, from the handshake to the tool count, closed again whatever it answered. */
 const connectAndCountEffect = Effect.fnUntraced(function* (
   server: ResolvedMcpServer,
@@ -306,17 +340,55 @@ const connectAndCountEffect = Effect.fnUntraced(function* (
   signIn: McpSignIn | null,
   onChallenge: (challenge: McpChallenge) => void,
 ) {
+  return yield* countOverEffect(timeoutMs, () => {
+    const client = new Client(PROBE_CLIENT_INFO, { capabilities: {} });
+    const transport = createTransport(server, signIn, onChallenge);
+    return { client, transport, connect: (signal) => client.connect(transport, { signal }) };
+  });
+});
+
+/**
+ * `connectAndCountEffect` in MCP revision 2026-07-28, which the 2025 client cannot speak: the SDK v2
+ * client sends the `Mcp-Method` and `Mcp-Name` headers that revision requires. Same headers and
+ * stored token as the first connection, and no sign-in.
+ */
+const connectAndCountModernEffect = Effect.fnUntraced(function* (server: ResolvedMcpServer, timeoutMs: number) {
+  return yield* countOverEffect(timeoutMs, () => {
+    const client = new ModernClient(PROBE_CLIENT_INFO, {
+      capabilities: {},
+      versionNegotiation: { mode: { pin: MODERN_PROTOCOL_VERSION } },
+    });
+    const transport = new ModernHttpTransport(new URL(server.config.url), {
+      requestInit: { headers: mcpHandoffHeaders(server) },
+    });
+    return { client, transport, connect: (signal) => client.connect(transport, { signal }) };
+  });
+});
+
+const MODERN_PROTOCOL_VERSION = "2026-07-28";
+
+/** What the probe uses of an SDK v1 or v2 client. */
+interface ProbeClient {
+  listTools(
+    params: { cursor: string } | undefined,
+    options: { signal: AbortSignal },
+  ): Promise<{ tools: ReadonlyArray<{ name: string }>; nextCursor?: string | undefined }>;
+  close(): Promise<void>;
+}
+
+interface ProbeConnection {
+  client: ProbeClient;
+  transport: Pick<Transport, "close">;
+  connect: (signal: AbortSignal) => Promise<void>;
+}
+
+/** Opens the connection, counts its tools within the deadline, and closes it whatever it answered. */
+const countOverEffect = Effect.fnUntraced(function* (timeoutMs: number, open: () => ProbeConnection) {
   return yield* Effect.acquireUseRelease(
-    Effect.try({
-      try: () => ({
-        client: new Client({ name: "openbot-probe", version: "1" }, { capabilities: {} }),
-        transport: createTransport(server, signIn, onChallenge),
-      }),
-      catch: (cause) => new McpProbeFailure({ cause }),
-    }),
-    ({ client, transport }) =>
+    Effect.try({ try: open, catch: (cause) => new McpProbeFailure({ cause }) }),
+    ({ client, connect }) =>
       Effect.gen(function* () {
-        yield* probeIo((signal) => client.connect(transport, { signal }));
+        yield* probeIo(connect);
         return yield* countToolsEffect(client);
       }).pipe(
         Effect.timeoutOrElse({
@@ -335,7 +407,7 @@ interface ListedTools {
 }
 
 /** Count all pages within the connection deadline, without repeating a cursor. */
-const countToolsEffect = Effect.fnUntraced(function* (client: Client) {
+const countToolsEffect = Effect.fnUntraced(function* (client: ProbeClient) {
   const seen = new Set<string>();
   const names: string[] = [];
   let count = 0;
@@ -434,7 +506,8 @@ function challengeRecordingFetch(onChallenge: (challenge: McpChallenge) => void)
       onChallenge({
         status: response.status,
         // `Headers.get` joins several challenges with commas, so Bearer may follow another scheme.
-        bearer: /(?:^|,)\s*bearer\b/iu.test(response.headers.get("www-authenticate") ?? ""),
+        // A 403 that names Bearer can refuse a key as well: only the server's metadata decides it.
+        bearer: response.status === 401 && /(?:^|,)\s*bearer\b/iu.test(response.headers.get("www-authenticate") ?? ""),
         url: response.url || input.toString(),
       });
     }
@@ -462,8 +535,24 @@ const advertisesOAuth = Effect.fnUntraced(function* (url: string, remainingMs: n
   return found.some(Boolean);
 });
 
+/**
+ * Whether Sign in could open a page for this server: the metadata read of `McpSignIn.begin`, without
+ * any credential. A read that fails or gets no answer in the time left is a no.
+ */
+const offersSignIn = Effect.fnUntraced(function* (url: string, remainingMs: number) {
+  if (remainingMs <= 0) return false;
+  const controller = new AbortController();
+  const fetchFn: FetchLike = (input, init) => fetch(input, { ...init, signal: controller.signal });
+  return yield* namesAuthorizationServer(normalizeResource(url) ?? url, fetchFn).pipe(
+    Effect.map((issuer) => issuer !== null),
+    Effect.timeoutOrElse({ duration: remainingMs, orElse: () => Effect.succeed(false) }),
+    Effect.catch(() => Effect.succeed(false)),
+    Effect.ensuring(Effect.sync(() => controller.abort())),
+  );
+});
+
 /** Close both SDK resources and kill a stdio child if it survives transport close. */
-const closeQuietlyEffect = Effect.fnUntraced(function* (client: Client, transport: Transport) {
+const closeQuietlyEffect = Effect.fnUntraced(function* (client: ProbeClient, transport: Pick<Transport, "close">) {
   yield* probeIo(() => client.close()).pipe(Effect.catch(() => Effect.void));
   yield* probeIo(() => transport.close()).pipe(Effect.catch(() => Effect.void));
   const pid = transport instanceof StdioClientTransport ? transport.pid : null;

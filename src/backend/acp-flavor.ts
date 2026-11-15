@@ -11,6 +11,7 @@ import type { CauseCode } from "@openbot/telemetry";
 import type { GeneratedMediaKind } from "./agent/image-generation";
 import { enableCursorMcpServers } from "./cursor-mcp-disabled";
 import { grokMediaItem, grokMediaKind, grokMediaToolKind } from "./grok-media";
+import { grokMcpServerName } from "./mcp-provider-shapes";
 import { isRecord, type ThreadItem } from "./protocol";
 
 /** The custom endpoint that serves a model, as a turn's error names it. Never a credential itself. */
@@ -166,7 +167,8 @@ export interface AcpFlavor {
     mcpLoadFailure(text: string): { name: string; reason: string } | null;
     /**
      * The MCP tools whose parameter schema the agent refused in the session's last prompt, from the
-     * agent's own log, for a failure text that names no cause. Each name is `mcp_<server>_<tool>`.
+     * failure text, or from the agent's own log when the text names no cause. Each name is
+     * `mcp_<server>_<tool>`.
      */
     refusedMcpTools?(text: string, argv: readonly string[], sessionId: string): string[];
     /** A failure text after which the agent no longer has the session, so the next prompt opens it again. */
@@ -242,7 +244,8 @@ export interface AcpFlavor {
   mcpServersLoadWithSession?: true;
   /**
    * The agent drops a stdio MCP server of `session/new` and `session/load` with no error, although
-   * ACP requires stdio. OpenBot starts each one itself (`startStdioMcpRelay`) and sends it as http.
+   * ACP requires stdio, or keeps it running after the session closes. OpenBot starts each one itself
+   * (`startStdioMcpRelay`), sends it as http, and stops it when the session closes.
    */
   relayStdioMcpServers?: true;
   /**
@@ -250,6 +253,11 @@ export interface AcpFlavor {
    * leaves the server out of the session with no error, so OpenBot reports it as a dropped server.
    */
   mcpServerFailure?(method: string, params: DynamicRecord): AcpMcpServerFailure | null;
+  /**
+   * The agent's own rule for an MCP server name, applied after `providerMcpServerName`. The agent
+   * skips each tool of a server whose name breaks the rule, with no error.
+   */
+  mcpServerName?(name: string): string;
   /**
    * The MCP server names in the agent's own files for `cwd`. The agent starts its own entry in place
    * of a session server with the same name, so that server travels as `openbot_<name>`. `argv` is
@@ -389,6 +397,7 @@ export const GROK_ACP_FLAVOR: AcpFlavor = {
   // The chat then showed no answer and no error (#6529).
   emptyAnswerFailure: noAnswerUnlessPlanOrCompaction,
   mcpServerFailure: grokMcpServerFailure,
+  mcpServerName: grokMcpServerName,
   // Grok CLI 1.0.77 keeps a session in a folder named by its working directory. A resume of a session
   // that is not in the folder of the workspace, such as after the workspace moved, fails with "Path
   // not found." and `data.code` `FS_NOT_FOUND`, which Grok also sends for any other missing file. The

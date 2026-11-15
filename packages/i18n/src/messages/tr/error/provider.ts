@@ -275,6 +275,8 @@ export const messages = {
     "Google'ın Gemini hizmeti isteği tamamlamadı. Birkaç dakika sonra yeniden deneyin.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini bu isteği reddetti. Başka bir model seçin, sonra mesajınızı yeniden gönderin. Yine başarısız olursa yeni bir sohbet başlatın.\n{detail}",
+  "error.provider.antigravityLocationUnsupported":
+    "Google, bu ajanı çalıştıran bilgisayarın ağ konumundan Gemini'nin çalışmasına izin vermiyor. Gemini'yi başka bir bilgisayarda kullanın veya bu ajan için başka bir sağlayıcı seçin.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini, aracısıyla bağlantısını kaybetti ve durdu. Devam etmek için bir mesaj gönderin.",
   "error.provider.antigravityRemoteWindowsSignIn":
@@ -331,6 +333,8 @@ export const messages = {
     "Görsel çok büyük olduğu için model bu sohbetteki bir görseli kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
   "error.provider.imageCountLimit":
     "Sohbette çok fazla görsel olduğu için model bu sohbeti kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
+  "error.provider.requestTooLarge":
+    "Bu sohbet, modele gönderilemeyecek kadar büyüdü. Bunun nedeni çoğu zaman sohbetteki görsellerdir. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
   "error.provider.opencodeSessionRejected":
     "OpenCode isteği reddetti ve nedenini belirtmedi. Bu, uzun bir sohbette veya model değişikliğinden sonra olabilir. OpenBot, sohbet geçmişiyle yeni bir OpenCode oturumu başlattı. Yeniden deneyin. Hata sürerse başka bir model veya daha düşük bir efor seçin.",
   "error.provider.opencodeCompactionFailed":
@@ -348,6 +352,8 @@ export const messages = {
     "Gemini oturum açma sayfasını tarayıcınızda açamadı. Varsayılan tarayıcınızı kontrol edin, ardından yeniden bağlanın.",
   "error.provider.acpSignInFailed": "Oturum açma tamamlanmadı.",
   "error.provider.acpSignInFailedReason": "Oturum açma tamamlanmadı: {reason}",
+  "error.provider.acpSignInNetwork":
+    "Oturum açma, sağlayıcının sunucusuna ulaşamadı. OpenBot'u çalıştıran bilgisayarın ağ bağlantısını ve DNS ayarlarını kontrol edip yeniden deneyin.",
   "error.provider.acpSignOutFailed": "Oturum kapatma tamamlanmadı.",
   "error.provider.acpSignOutFailedReason": "Oturum kapatma tamamlanmadı: {reason}",
   "error.provider.acpSignInMethodMissing":
@@ -355,6 +361,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "Tarayıcıda yalnızca HTTPS oturum açma bağlantıları açılabilir.",
   "error.provider.geminiKeyRefused":
     "Gemini kayıtlı API anahtarını reddetti. Ayarlar'da anahtarı değiştirin veya kaldırın, ardından yeniden bağlanın.",
+  "error.provider.geminiKeyRateLimited":
+    "Kayıtlı Gemini API anahtarınız bir hız sınırına veya kotasına ulaştığı için Gemini isteği reddetti. Anahtar, Google planınızın yerine kullanılıyor. Birkaç dakika bekleyin ya da başka bir model seçin, sonra yeniden deneyin. Google planınızı kullanmak için Ayarlar'da anahtarı kaldırın.\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "Kayıtlı Gemini API anahtarınızın bu model için kotası yok. Anahtar, Google planınızın yerine kullanılıyor. Başka bir model seçin ya da Google planınızı kullanmak için Ayarlar'da anahtarı kaldırın.\n{detail}",
   "error.provider.geminiAccountSettingsUnreadable":
     "Gemini bu hesabın ayar dosyasını açamıyor, bu yüzden oturum açamıyor. Bu hesabı kaldırın ve yeniden ekleyin.",
   "error.provider.geminiSettingsUnreadable":
@@ -444,6 +454,8 @@ export const messages = {
   "error.provider.piSessionMissing": "Pi oturum dosyası bu bilgisayarda yok.",
   "error.provider.piResumeCancelled": "Pi oturumu sürdürmeyi iptal etti. Tekrar deneyin.",
   "error.provider.piSessionIdentity": "Pi farklı bir oturum döndürdü. Kayıtlı oturum değiştirilmedi.",
+  "error.provider.piExtensionFailed":
+    "Pi bir uzantıyı yükleyemediği için durdu. Bu uzantıyı kaldırın veya güncelleyin, ardından tekrar deneyin. {detail}",
   "error.provider.piModelInvalid": "Sağlayıcısını içeren bir Pi modeli seçin.",
   "error.provider.piToolInvalid": "Araç geçersiz bir sonuç döndürdü.",
   "error.provider.piSignIn": "Ana makinede Pi içinde /login komutunu kullanın. Oturum açma tamamlanınca Pi'yi kapatın.",

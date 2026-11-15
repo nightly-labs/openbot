@@ -13,6 +13,7 @@ import { haptics } from "@/shared/lib/haptics";
 import { type MobileText, useText } from "@/shared/lib/text";
 import { attachmentFrame, FILL, FRAME_RADIUS, MAX_FRAME_WIDTH } from "../model/attachment-frame";
 import { playbackTime } from "../model/playback-time";
+import { shareTypeOptions } from "../model/share-file-type";
 import { knownImageDimensions, rememberImageDimensions } from "./attachment-preview";
 import { useListSettled } from "./use-list-settled";
 import { useMediaFile } from "./use-media-file";
@@ -158,7 +159,7 @@ export function ChatVideoAttachment({
     await runFileAction(
       async () => {
         if (!(await Sharing.isAvailableAsync())) throw new Error(t("mobile.chat.attachment.sharingUnavailable"));
-        await Sharing.shareAsync(uri, { mimeType: attachment.mimeType, dialogTitle: attachment.name });
+        await Sharing.shareAsync(uri, { ...shareTypeOptions(uri, attachment.mimeType), dialogTitle: attachment.name });
       },
       t("mobile.chat.attachment.openFailed"),
       text,

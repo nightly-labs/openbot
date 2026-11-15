@@ -8,6 +8,8 @@ export const messages = {
   "error.billing.restartUnavailable": "لا يمكن إعادة تشغيل هذا الخادم من هنا. تواصل مع الدعم.",
   "error.billing.planRequired": "انتهت خطة هذا الخادم. جدّدها لتشغيل الخادم.",
   "error.billing.planSoldOut": "نفدت هذه الخطة. اختر خطة أخرى.",
+  "error.billing.storageUnavailable": "هذه السعة التخزينية غير متاحة لهذا الخادم.",
+  "error.billing.storagePaymentFailed": "أخفق الدفع مقابل السعة التخزينية. حدّث طريقة الدفع وأعد المحاولة.",
   "error.billing.licenseExists": "لهذا الحساب ترخيص بالفعل. غيّر مستخدميه بدلًا من ذلك.",
   "error.billing.licenseCurrency": "يجب أن يستخدم الترخيص عملة خططك الأخرى.",
   "error.billing.planCurrency": "يجب أن تستخدم الخطة الجديدة عملة خططك الأخرى.",
