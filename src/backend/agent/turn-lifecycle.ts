@@ -204,6 +204,7 @@ const CONTINUE_CAUSES: ReadonlySet<CauseCode> = new Set([
   "network",
   "timeout",
 ]);
+const SPENT_CAUSES: ReadonlySet<CauseCode> = new Set(["usage_limit", "billing"]);
 const POOL_PASS_OVER_CAUSES: ReadonlySet<CauseCode> = new Set([
   "usage_limit",
   "provider_unavailable",
@@ -1165,7 +1166,7 @@ export class TurnLifecycle {
   #mayHoldError(agentId: string, turnId: string, causeCode: CauseCode): boolean {
     return (
       this.#hooks.mayFailOver(agentId) ||
-      (causeCode === "usage_limit" &&
+      (SPENT_CAUSES.has(causeCode) &&
         this.#carriesWork(agentId, turnId, this.#runningTurns.get(turnId)) &&
         this.#hooks.mayContinueOnBackup(agentId))
     );
@@ -2305,7 +2306,7 @@ export class TurnLifecycle {
       const mayRunAgain = failedOnProvider && !running.acted;
       const tokenRefused = failover !== undefined && isRefusedGeminiToken(failover.context.provider, failover.message);
       const stoppedAfterWork = failedOnProvider && this.#carriesWork(agentId, turnId, running);
-      const spentAfterWork = stoppedAfterWork && failover.context.causeCode === "usage_limit";
+      const spentAfterWork = stoppedAfterWork && SPENT_CAUSES.has(failover.context.causeCode);
       const failedAfterWork = stoppedAfterWork && CONTINUE_CAUSES.has(failover.context.causeCode);
       const mayContinue = spentAfterWork || failedAfterWork;
       const failingSession =
