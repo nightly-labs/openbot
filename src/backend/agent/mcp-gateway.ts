@@ -410,7 +410,8 @@ export class McpGateway {
    * this run did not see from that row. A provider lists a server's tools when it loads a session,
    * and a server can add tools behind the same address: no saved value changes, so nothing else
    * replaces a session that has the old list (#6199). The first test of a row in a run refreshes
-   * too, because a loaded session can be older than the change. A draft refreshes nothing.
+   * too, because a loaded session can be older than the change. So does a test after a provider's
+   * start through the sign-in proxy failed for that row. A draft refreshes nothing.
    */
   readonly #refreshForTestedTools = Effect.fnUntraced(function* (
     this: McpGateway,
@@ -422,9 +423,14 @@ export class McpGateway {
     const [key] = saved ? mcpFingerprintValues([saved]) : [];
     if (key === undefined || key !== mcpFingerprintValues([{ ...config, enabled: true }])[0]) return;
     const tools = [String(outcome.toolCount), ...[...outcome.tools].sort()].join("\u0000");
-    if (this.#testedTools.get(key) === tools) return;
+    // A provider whose start through the proxy failed keeps the server without tools until its
+    // session gets the new address (`McpOAuthProxy.route`), also when the tools did not change (#9526).
+    const route = saved !== undefined && this.#proxied(saved) ? mcpOAuthProxyRoute(saved.id, saved.url) : null;
+    const failedStart = route !== null && this.#proxy.failedStart(route);
+    if (this.#testedTools.get(key) === tools && !failedStart) return;
     // Recorded after the refresh, so a refresh that fails is tried again at the next test.
     yield* this.#hooks.refreshAllAgentRuntimes();
+    if (route !== null && failedStart) this.#proxy.reportedFailedStart(route);
     this.#testedTools.set(key, tools);
   });
 
