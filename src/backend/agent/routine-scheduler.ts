@@ -841,8 +841,12 @@ export class RoutineScheduler implements RoutineDueSource {
         INPUT_LIMITS.identifier,
         "routineId is required.",
       );
-      this.#requireToolRoutine(agentId, routineId);
-      this.#refuseWebhookTest(agentId, routineId);
+      // test_routine does not test a webhook routine; the user does it in Routines settings.
+      if (this.#requireToolRoutine(agentId, routineId).trigger.kind === "webhook") {
+        throw new RoutineInputError(
+          `Routine ${routineId} is a webhook routine. Only the user tests it, in Routines settings. Tell the user to do it there.`,
+        );
+      }
       return openBotToolResult(yield* this.test({ agentId, routineId }));
     }
 
@@ -1305,14 +1309,6 @@ export class RoutineScheduler implements RoutineDueSource {
       owner
         ? `${routineId} is the trigger.id of routine "${owner.name}", not a routineId. Use its routineId ${owner.id}.`
         : `No routine of agent ${agentId} has routineId ${routineId}. Call list_routines and use the id of the routine, not its trigger.id.`,
-    );
-  }
-
-  /** `test_routine` does not test a webhook routine; the user does it in Routines settings. */
-  #refuseWebhookTest(agentId: string, routineId: string): void {
-    if (this.#routines.getRecord(agentId, routineId)?.trigger.kind !== "webhook") return;
-    throw new RoutineInputError(
-      `Routine ${routineId} is a webhook routine. Only the user tests it, in Routines settings. Tell the user to do it there.`,
     );
   }
 
