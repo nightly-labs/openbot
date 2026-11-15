@@ -252,6 +252,7 @@ export const queryKeys = {
   ],
   /** The tasks of a server. The task events write the lists and the conversations under this prefix. */
   serverTasks: (scope: QueryScope, serverId: string) => ["server-tasks", ...scope, serverId],
+  activityInbox: (scope: QueryScope, serverId: string) => [...queryKeys.serverTasks(scope, serverId), "activity-inbox"],
   agentTasks: (scope: QueryScope, serverId: string, agentId: string) => [
     ...queryKeys.serverTasks(scope, serverId),
     "agent",

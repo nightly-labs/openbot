@@ -1,5 +1,10 @@
 import type { AttachmentSupport } from "@openbot/contracts/attachment-files";
 import type {
+  ActivityInboxClassifyInput,
+  ActivityInboxFollowupInput,
+  ActivityInboxFollowupReceipt,
+  ActivityInboxItem,
+  ActivityInboxSnapshot,
   AddAgentFolderInput,
   AddedAgent,
   AddMessagingOrchestratorResult,
@@ -1079,6 +1084,8 @@ export interface MobileWorkspaceContextValue {
   searchFiles: (query: string, serverId: string, cursor?: string) => Promise<ConversationFileSearchPage>;
   /** True when the host advertises `agent-tasks-v1`. A member who can message an agent can use its tasks. */
   canUseTasks: (serverId: string) => boolean;
+  /** True when the host advertises `activity-inbox-v1`. */
+  canUseActivityInbox: (serverId: string) => boolean;
   /** True when the host advertises `agent-threads-v1`: a member who can message an agent can rename and delete its threads. */
   canEditThreads: (serverId: string) => boolean;
   /** True when the host advertises `agent-thread-reads-v1`: the host keeps the person's read mark of each thread. */
@@ -1133,6 +1140,12 @@ export interface MobileWorkspaceContextValue {
   runWorkflowGitHubLastEvent: (input: WorkflowTriggerInput, serverId: string) => Promise<WorkflowRunDetail>;
   /** The tasks of one agent. The host answers 404 for an agent that this member cannot see. */
   loadAgentTasks: (agentId: string, serverId: string) => Promise<AgentTasksSnapshot>;
+  loadActivityInbox: (serverId: string) => Promise<ActivityInboxSnapshot>;
+  classifyActivityInboxItem: (input: ActivityInboxClassifyInput, serverId: string) => Promise<ActivityInboxItem>;
+  followupActivityInboxItem: (
+    input: ActivityInboxFollowupInput,
+    serverId: string,
+  ) => Promise<ActivityInboxFollowupReceipt>;
   loadAgentTaskConversation: (input: AgentTaskInput, serverId: string) => Promise<ConversationSnapshot>;
   /** Files need `canAttachThreadFiles`: `agent-tasks-v1` carries text only. */
   startAgentTask: (
@@ -1259,6 +1272,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canInstallAgentTemplate"
   | "canSearchFiles"
   | "canUseTasks"
+  | "canUseActivityInbox"
   | "canEditThreads"
   | "canReadThreads"
   | "canAttachThreadFiles"

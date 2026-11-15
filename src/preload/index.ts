@@ -252,6 +252,9 @@ import {
   decodeComputerUseState,
 } from "./computer-use-decoding";
 import {
+  decodeActivityInbox,
+  decodeActivityInboxFollowupReceipt,
+  decodeActivityInboxItem,
   decodeAgentTask,
   decodeAgentTaskReadState,
   decodeAgentTaskReadStates,
@@ -666,6 +669,9 @@ const agentGroup = bridgeGroup(IPC_ENDPOINTS.agent, {
   setMessagePinned: decodePinnedMessages,
   cancelWait: decodeVoid,
   listTasks: decodeAgentTasks,
+  listActivityInbox: decodeActivityInbox,
+  classifyActivityInboxItem: decodeActivityInboxItem,
+  followupActivityInboxItem: decodeActivityInboxFollowupReceipt,
   readTask: decodeTaskConversation,
   readTaskPage: decodeTaskPage,
   readTaskAround: decodeTaskWindow,

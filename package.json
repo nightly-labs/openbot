@@ -90,6 +90,8 @@
     "node": ">=24.0.0"
   },
   "scripts": {
+    "test:activity-inbox": "node --import tsx scripts/activity-inbox-e2e.ts",
+    "test:activity-inbox-pilot": "node --import tsx scripts/activity-inbox-runtime-pilot.mts",
     "prepare": "bun scripts/install-git-hooks.ts",
     "postinstall": "bun scripts/electron-dist-cache.ts restore && bun scripts/install-electron.ts && bun scripts/electron-dist-cache.ts save && bun scripts/stamp-install.ts",
     "api:start": "bun run --cwd apps/auth-api start",

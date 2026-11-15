@@ -78,6 +78,11 @@ export function TasksPanel(props: TasksPanelProps) {
         layout.setSidebarView("agents");
         selectAgent(task.agentId);
       }}
+      onOpenReport={(item) => {
+        tabs.open(item.agentId, item.taskId);
+        layout.setSidebarView("agents");
+        selectAgent(item.agentId);
+      }}
       sendShortcut={deviceSendShortcut(platform.appInfo()?.platform)}
       // The thread state reaches the active server, which the page follows.
       onRead={(input, messageId) => threads.markTaskRead(input.agentId, input.taskId, messageId)}

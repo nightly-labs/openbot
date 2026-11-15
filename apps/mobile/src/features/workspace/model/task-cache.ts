@@ -106,6 +106,8 @@ export function applyTaskEvent(
   serverId: string,
   event: AgentEvent | TeamRealtimeEvent,
 ): void {
+  if (event.type === "agent-tasks-changed" || event.type === "agent-task-conversation")
+    void queryClient.invalidateQueries({ queryKey: queryKeys.activityInbox(scope, serverId), exact: true });
   if (event.type === "agent-tasks-changed") {
     const key = queryKeys.agentTasks(scope, serverId, event.snapshot.agentId);
     const stored = queryClient.getQueryData<AgentTasksSnapshot>(key);

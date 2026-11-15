@@ -42,6 +42,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { ACTIVITY_INBOX_CAPABILITY } from "@openbot/contracts/team-protocol/activity-inbox-v1";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_ADMIN_CAPABILITY, AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import {
@@ -319,11 +320,14 @@ import {
   applyAgentImport,
   applyInstanceTransfer,
   branchAgentThread,
+  classifyActivityInboxItem,
   clearAgentContext,
   deleteAgentThread,
   discardAgentImport,
   discardInstanceTransfer,
   downloadInstanceTransfer,
+  followupActivityInboxItem,
+  listActivityInbox,
   listAgentTasks,
   listAgentThreadBranches,
   listAgentThreadReads,
@@ -415,6 +419,9 @@ type HostRequestActions = Pick<
   | "loadHostAnalytics"
   | "searchMessages"
   | "searchFiles"
+  | "loadActivityInbox"
+  | "classifyActivityInboxItem"
+  | "followupActivityInboxItem"
   | "loadAgentTasks"
   | "loadAgentTaskConversation"
   | "startAgentTask"
@@ -660,6 +667,7 @@ export function createHostRequestChecks(capabilities: ServerCapabilities): HostR
   const has = (serverId: string, capability: string) => hasCapability(capabilities, serverId, capability);
   return {
     canSearchFiles: (serverId) => has(serverId, CONVERSATION_FILE_SEARCH_CAPABILITY),
+    canUseActivityInbox: (serverId) => has(serverId, ACTIVITY_INBOX_CAPABILITY),
     canUseTasks: (serverId) => has(serverId, AGENT_TASKS_CAPABILITY),
     canEditThreads: (serverId) => has(serverId, AGENT_THREADS_CAPABILITY),
     canReadThreads: (serverId) => has(serverId, AGENT_THREAD_READS_CAPABILITY),
@@ -755,6 +763,8 @@ export function createHostRequestActions({
   /** The tasks are an optional route set. Any member who can message the agent can use them. */
   const tasksApi = (serverId: string) =>
     capabilityApi(serverId, AGENT_TASKS_CAPABILITY, "mobile.server.threads.unsupported");
+  const activityInboxApi = (serverId: string) =>
+    capabilityApi(serverId, ACTIVITY_INBOX_CAPABILITY, "mobile.server.activityInbox.unavailable");
   /** Rename and delete of a thread are an optional route set beside the tasks. */
   const threadsApi = (serverId: string) =>
     capabilityApi(serverId, AGENT_THREADS_CAPABILITY, "mobile.chat.threads.unsupported");
@@ -1261,6 +1271,11 @@ export function createHostRequestActions({
       const links = await runTeamRequest(listAgentThreadBranches(threadBranchesApi(serverId), agentId));
       return withAgentThreadBranches(snapshot, links);
     },
+    loadActivityInbox: async (serverId) => runTeamRequest(listActivityInbox(activityInboxApi(serverId))),
+    classifyActivityInboxItem: async (input, serverId) =>
+      runTeamRequest(classifyActivityInboxItem(activityInboxApi(serverId), input)),
+    followupActivityInboxItem: async (input, serverId) =>
+      runTeamRequest(followupActivityInboxItem(activityInboxApi(serverId), input)),
     loadAgentTaskConversation: async (input, serverId) => runTeamRequest(readAgentTask(tasksApi(serverId), input)),
     startAgentTask: async (input, serverId) =>
       runTeamRequest(startAgentTask(threadMessageApi(serverId, input.attachmentDraftIds), input)),

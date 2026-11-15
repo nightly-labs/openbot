@@ -3650,6 +3650,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         setMobilePane("conversation");
                         void select(task.agentId);
                       }}
+                      onOpenReport={(item) => {
+                        agentThreads()?.tabs.open(item.agentId, item.taskId);
+                        layout.setSidebarView("agents");
+                        setMobilePane("conversation");
+                        void select(item.agentId);
+                      }}
                       sendShortcut={deviceSendShortcut()}
                     />
                   </Loading>

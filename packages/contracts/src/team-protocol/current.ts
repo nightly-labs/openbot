@@ -3,6 +3,7 @@ import { CHANNEL_DELETE_CAPABILITY, CHANNEL_TASK_CANCEL_CAPABILITY } from "../ip
 import { MCP_SERVERS_CAPABILITY } from "../ipc-mcp-servers";
 import { STORAGE_CAPABILITY } from "../ipc-storage";
 import { ACP_REGISTRY_CAPABILITY } from "./acp-registry-v1";
+import { ACTIVITY_INBOX_CAPABILITY } from "./activity-inbox-v1";
 import { AGENT_ACCESS_CAPABILITY } from "./agent-access-v1";
 import { AGENT_ADMIN_CAPABILITY } from "./agent-admin-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "./agent-backup-models-v1";
@@ -257,6 +258,7 @@ export const TEAM_MEMBER_LEAVE_CAPABILITY = "member-leave-v1";
 export const TEAM_QUEUE_WINDOW_CAPABILITY = "queue-window-v1";
 export {
   ACP_REGISTRY_CAPABILITY,
+  ACTIVITY_INBOX_CAPABILITY,
   AGENT_ACCESS_CAPABILITY,
   AGENT_ADMIN_CAPABILITY,
   AGENT_BACKUP_MODELS_CAPABILITY,
@@ -512,6 +514,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   TEAM_QUEUE_WINDOW_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
   AGENT_TASKS_CAPABILITY,
+  ACTIVITY_INBOX_CAPABILITY,
   BROWSER_USER_CONTROL_CAPABILITY,
   BROWSER_PAGE_STATE_CAPABILITY,
   BROWSER_SIGN_IN_CAPABILITY,
@@ -891,6 +894,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
  * leaves these out of the compatibility list of an older peer (`teamCapabilitiesVisibleToProtocol`).
  */
 export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<TeamCurrentCapability>([
+  ACTIVITY_INBOX_CAPABILITY,
   TEAM_LONG_CAPABILITY_LISTS_CAPABILITY,
   AGENT_NOTIFICATION_LEVELS_CAPABILITY,
   AGENT_NEW_CHAT_CAPABILITY,

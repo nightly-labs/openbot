@@ -5,6 +5,9 @@
 // carries, so a value the renderer reads always has the shape its type says.
 
 import {
+  type ActivityInboxFollowupReceipt,
+  type ActivityInboxItem,
+  type ActivityInboxSnapshot,
   type AgentApproval,
   type AgentTask,
   type AgentTaskPage,
@@ -23,6 +26,9 @@ import {
   type ConversationWithReadState,
   type DraftAttachment,
   type FilePreview,
+  isActivityInboxFollowupReceipt,
+  isActivityInboxItem,
+  isActivityInboxSnapshot,
   isAgentApproval,
   isAgentTask,
   isAgentTaskPage,
@@ -232,6 +238,21 @@ export function decodeAgentTasks(value: unknown): AgentTasksSnapshot {
   if (!isAgentTasksSnapshot(value)) {
     throw new Error("Invalid task list response.");
   }
+  return value;
+}
+
+export function decodeActivityInbox(value: unknown): ActivityInboxSnapshot {
+  if (!isActivityInboxSnapshot(value)) throw new Error("Invalid activity inbox response.");
+  return value;
+}
+
+export function decodeActivityInboxItem(value: unknown): ActivityInboxItem {
+  if (!isActivityInboxItem(value)) throw new Error("Invalid activity inbox item response.");
+  return value;
+}
+
+export function decodeActivityInboxFollowupReceipt(value: unknown): ActivityInboxFollowupReceipt {
+  if (!isActivityInboxFollowupReceipt(value)) throw new Error("Invalid activity inbox follow-up receipt.");
   return value;
 }
 

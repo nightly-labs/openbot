@@ -225,6 +225,7 @@ function TasksPageStory(props: {
           onRespondApproval={fn(async () => true)}
           waitsForAnswer={props.waitsForAnswer}
           onOpenInChat={fn()}
+          onOpenReport={fn()}
         />
       </div>
     </PlatformProvider>
@@ -268,4 +269,14 @@ export const WaitingForApproval: Story = {
 /** A running task asks a question. Open it: its panel sends you to the chat, which answers it. */
 export const WaitingForAnswer: Story = {
   render: () => <TasksPageStory tasks={TASKS} waitsForAnswer={(task) => task.id === "task-papers"} />,
+};
+
+/** One task per inbox outcome, with a replayed active approval to check request deduplication. */
+export const ActivityInboxPilot: Story = {
+  render: () => (
+    <TasksPageStory
+      tasks={TASKS.filter((task) => ["task-board-update", "task-hiring-loops", "task-citations"].includes(task.id))}
+      approvals={[WAITING_APPROVAL, { ...WAITING_APPROVAL }]}
+    />
+  ),
 };

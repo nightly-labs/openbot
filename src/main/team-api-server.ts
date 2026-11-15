@@ -33,6 +33,7 @@ import {
 import { isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { ACP_REGISTRY_CAPABILITY } from "@openbot/contracts/team-protocol/acp-registry-v1";
+import { ACTIVITY_INBOX_CAPABILITY } from "@openbot/contracts/team-protocol/activity-inbox-v1";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { AGENT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-colors-v1";
@@ -291,6 +292,7 @@ import {
   stringField,
 } from "./team-api/request-helpers";
 import { routeAcpRegistry } from "./team-api/route-acp-registry";
+import { routeActivityInbox } from "./team-api/route-activity-inbox";
 import { routeAgentAccess } from "./team-api/route-agent-access";
 import {
   routeAgentAdmin,
@@ -1255,6 +1257,7 @@ export class TeamApiServer {
         return;
       if ((await routeSidebarPins(context, this.#options.sidebarPins, hidden)) === "handled") return;
       if ((await routeAgentTasks(context, this.#options.agentTasks, hidden)) === "handled") return;
+      if ((await routeActivityInbox(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeAgentQueueTask(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentThreadQueue(context, this.#options.agentTasks, this.#options.agents, hidden)) === "handled")
         return;
@@ -2612,6 +2615,7 @@ export class TeamApiServer {
           // The chat colour route uses the agent operations and the member list, which every host has.
           if (capability === CHAT_COLORS_CAPABILITY) return true;
           if (capability === AGENT_TASKS_CAPABILITY) return this.#options.agentTasks !== undefined;
+          if (capability === ACTIVITY_INBOX_CAPABILITY) return this.#options.agents.listActivityInbox !== undefined;
           if (capability === AGENT_QUEUE_TASK_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_THREAD_QUEUE_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_THREADS_CAPABILITY) return this.#options.agentTasks !== undefined;

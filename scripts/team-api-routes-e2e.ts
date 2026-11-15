@@ -1028,6 +1028,11 @@ const fakeAgents: TeamApiAgents = {
     throw new Error(`The status backend failed with ${FAKE_SECRET}.`);
   },
   listAgents: () => agents,
+  listActivityInbox: () => ({ items: [], complete: true, coverage: "current", nextCursor: null, gapCount: 0 }),
+  readActivityInboxItem: () => null,
+  classifyActivityInboxItem: unused("classifyActivityInboxItem"),
+  followupActivityInboxItem: unused("followupActivityInboxItem"),
+
   listWaits: (agentId) => {
     record("listWaits", agentId);
     return {

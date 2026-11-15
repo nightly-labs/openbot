@@ -1,4 +1,5 @@
 import { ACP_REGISTRY_CODECS } from "./acp-registry-v1";
+import { ACTIVITY_INBOX_CODECS } from "./activity-inbox-v1";
 // The optional admin routes, one table. `teamSideRouteCodec` in `side-routes.ts` asks here, so every
 // HTTP and WebRTC transport encodes an admin route with its frozen codec. A path that is not listed
 // goes to the protocol adapter.
@@ -281,6 +282,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...BROWSER_SIGN_IN_CODECS,
   ...BROWSER_SIGN_IN_STORAGE_CODECS,
   ...AGENT_TASKS_CODECS,
+  ...ACTIVITY_INBOX_CODECS,
   ...AGENT_THREADS_CODECS,
   ...AGENT_THREAD_READS_CODECS,
   ...AGENT_THREAD_FILES_CODECS,

@@ -1988,6 +1988,13 @@ export class MailboxStore {
     );
   }
 
+  /** Every terminal or active delivery that the mailbox binds to one exact turn. */
+  deliveriesForTurn(agentId: string, turnId: string): DeliveryContext[] {
+    return this.#contexts(
+      this.#state.deliveries.filter((delivery) => delivery.recipientAgentId === agentId && delivery.turnId === turnId),
+    );
+  }
+
   /** Without `taskId`, any lane of the agent; with it, only that lane (null: the agent's own chat). */
   startingDeliveryForAgent(agentId: string, taskId?: string | null): DeliveryContext | null {
     const delivery = this.#state.deliveries.find((candidate) => this.#startingIn(candidate, agentId, taskId));

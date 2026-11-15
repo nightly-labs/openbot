@@ -121,6 +121,20 @@ export class DatabaseCore {
     const ownsTransaction = !db.isTransaction;
     if (ownsTransaction) db.exec("BEGIN IMMEDIATE");
     try {
+      // Another connection can commit the same command after the optimistic read above but before
+      // this connection owns the write lock. Recheck under `BEGIN IMMEDIATE` to return that receipt
+      // instead of appending a duplicate command or racing the unique receipt constraint.
+      if (ownsTransaction) {
+        const committed = decodeReceiptRow(
+          db
+            .prepare("SELECT last_sequence, result_json FROM orchestration_command_receipts WHERE command_id = ?")
+            .get(commandId),
+        );
+        if (committed) {
+          db.exec("COMMIT");
+          return JSON.parse(committed.result_json);
+        }
+      }
       const sequences: number[] = [];
       const append = db.prepare(`
         INSERT INTO orchestration_events (

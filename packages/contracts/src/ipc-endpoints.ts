@@ -43,6 +43,13 @@ import type {
   ServerClaim,
 } from "./hosted-servers";
 import type {
+  ActivityInboxClassifyInput,
+  ActivityInboxFollowupInput,
+  ActivityInboxFollowupReceipt,
+  ActivityInboxItem,
+  ActivityInboxSnapshot,
+} from "./ipc-activity-inbox";
+import type {
   AddedAgent,
   AgentAdminSettings,
   AgentBackupModelSettings,
@@ -1814,6 +1821,13 @@ export const IPC_ENDPOINTS = {
     setMessagePinned: scopedRequest<SetMessagePinnedInput, PinnedMessagesSnapshot>()("agent:set-message-pinned"),
     // A joined server takes these through `agent-tasks-v1`, except `runQueuedMessageAsTask`, which is local only.
     listTasks: scopedRequest<string, AgentTasksSnapshot>()("agent:tasks:list"),
+    listActivityInbox: scopedQuery<ActivityInboxSnapshot>()("agent:activity-inbox:list"),
+    classifyActivityInboxItem: scopedRequest<ActivityInboxClassifyInput, ActivityInboxItem>()(
+      "agent:activity-inbox:classify",
+    ),
+    followupActivityInboxItem: scopedRequest<ActivityInboxFollowupInput, ActivityInboxFollowupReceipt>()(
+      "agent:activity-inbox:follow-up",
+    ),
     readTask: scopedRequest<AgentTaskInput, ConversationSnapshot>()("agent:tasks:read"),
     // A joined server takes this through `agent-thread-pages-v1`.
     readTaskPage: scopedRequest<ReadAgentTaskPageInput, AgentTaskPage>()("agent:tasks:read-page"),

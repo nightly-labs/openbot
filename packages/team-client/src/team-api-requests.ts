@@ -8,6 +8,11 @@ import { bytesToBase64 } from "./base64";
 // stays at its call site.
 
 import {
+  type ActivityInboxClassifyInput,
+  type ActivityInboxFollowupInput,
+  type ActivityInboxFollowupReceipt,
+  type ActivityInboxItem,
+  type ActivityInboxSnapshot,
   type AgentApproval,
   type AgentImportPreview,
   type AgentMemory,
@@ -45,6 +50,9 @@ import {
   type InstalledSkill,
   type InstanceTransferPreview,
   type InstanceTransferSummary,
+  isActivityInboxFollowupReceipt,
+  isActivityInboxItem,
+  isActivityInboxSnapshot,
   isAgentMemory,
   isAgentMemorySelectionState,
   isAgentTask,
@@ -84,6 +92,7 @@ import {
 import { guardedDecoder, guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { ACTIVITY_INBOX_ROUTES } from "@openbot/contracts/team-protocol/activity-inbox-v1";
 import { AGENT_IMPORT_ROUTES, AGENT_IMPORT_UPLOAD_BYTES } from "@openbot/contracts/team-protocol/agent-import-v1";
 import {
   AGENT_IMPORT_V2_CHUNK_BYTES,
@@ -267,11 +276,14 @@ export const stopLiveVoice = Effect.fn("TeamClient.stopLiveVoice")(function* (
 });
 
 const decodeAgentTasks = guardedDecoder(isAgentTasksSnapshot, "agent tasks response");
+const decodeActivityInbox = guardedDecoder(isActivityInboxSnapshot, "activity inbox response");
 const decodeAgentTask = guardedDecoder(isAgentTask, "agent task response");
 const decodeTaskConversation = guardedDecoder(isConversationSnapshot, "task conversation response");
 const decodeTaskPage = guardedDecoder(isAgentTaskPage, "thread page response");
 const decodeTaskWindow = guardedDecoder(isAgentTaskWindow, "thread part response");
 const decodeTaskReceipt = guardedDecoder(isQueuedMessageReceipt, "task message receipt");
+const decodeInboxItem = guardedDecoder(isActivityInboxItem, "activity inbox item");
+const decodeInboxFollowup = guardedDecoder(isActivityInboxFollowupReceipt, "activity inbox follow-up receipt");
 
 /**
  * The tasks of one agent. Send them only to a host that serves `agent-tasks-v1`. A start and a
@@ -282,6 +294,38 @@ export const listAgentTasks = Effect.fn("TeamClient.listAgentTasks")(function* (
   agentId: string,
 ): Effect.fn.Return<AgentTasksSnapshot, TeamRequestError> {
   return yield* teamCall(() => request("POST", AGENT_TASKS_ROUTES.list, decodeAgentTasks, { agentId }));
+});
+
+export const listActivityInbox = Effect.fn("TeamClient.listActivityInbox")(function* (
+  request: TeamApiRequest,
+): Effect.fn.Return<ActivityInboxSnapshot, TeamRequestError> {
+  return yield* teamCall(() => request("POST", ACTIVITY_INBOX_ROUTES.list, decodeActivityInbox, {}));
+});
+
+export const classifyActivityInboxItem = Effect.fn("TeamClient.classifyActivityInboxItem")(function* (
+  request: TeamApiRequest,
+  input: ActivityInboxClassifyInput,
+): Effect.fn.Return<ActivityInboxItem, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", ACTIVITY_INBOX_ROUTES.classify, decodeInboxItem, {
+      itemId: input.itemId,
+      classification: input.classification,
+    }),
+  );
+});
+
+export const followupActivityInboxItem = Effect.fn("TeamClient.followupActivityInboxItem")(function* (
+  request: TeamApiRequest,
+  input: ActivityInboxFollowupInput,
+): Effect.fn.Return<ActivityInboxFollowupReceipt, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", ACTIVITY_INBOX_ROUTES.followup, decodeInboxFollowup, {
+      itemId: input.itemId,
+      actionId: input.actionId,
+      clientMessageId: input.clientMessageId,
+      text: input.text,
+    }),
+  );
 });
 
 export const readAgentTask = Effect.fn("TeamClient.readAgentTask")(function* (

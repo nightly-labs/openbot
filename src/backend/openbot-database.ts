@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import type {
+  ActivityInboxFollowupInput,
+  ActivityInboxFollowupReceipt,
+  ActivityInboxItem,
+  ActivityInboxSnapshot,
   AgentProviderId,
   AgentSummary,
   ConversationFileSearchPage,
@@ -13,6 +17,8 @@ import type {
   MessagePinner,
   SentMessageStats,
 } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
+import { ActivityInboxStore } from "./database/activity-inbox-store";
 import { AgentHistoryQueries, type AgentHistorySelection } from "./database/agent-history-queries";
 import { type AgentModelChange, AgentRoster } from "./database/agent-roster";
 import { AgentUsage } from "./database/agent-usage";
@@ -92,10 +98,12 @@ export class OpenBotDatabase {
   readonly #agentHistory: AgentHistoryQueries;
   readonly #providerHistory: ProviderHistoryStore;
   readonly #summaries: ThreadSummaries;
+  readonly #activityInbox: ActivityInboxStore;
 
   constructor(readonly userDataPath: string) {
     this.#core = new DatabaseCore({ userDataPath });
     this.usage = new AgentUsage(this.#core);
+    this.#activityInbox = new ActivityInboxStore(this.#core);
     this.#conversations = new ConversationQueries({ core: this.#core });
     this.#roster = new AgentRoster({ core: this.#core });
     this.#conversationWrites = new ConversationWriter({ core: this.#core, roster: this.#roster });
@@ -113,7 +121,7 @@ export class OpenBotDatabase {
   }
 
   initialize() {
-    return this.#core.initialize();
+    return this.#core.initialize().pipe(Effect.tap(() => Effect.sync(() => this.#activityInbox.activate())));
   }
 
   close(): void {
@@ -194,6 +202,44 @@ export class OpenBotDatabase {
 
   readConversation(agentId: string, threadId: string | null): ConversationSnapshot {
     return this.#conversations.readConversation(agentId, threadId);
+  }
+
+  listActivityInbox(visibleAgentIds?: readonly string[]): ActivityInboxSnapshot {
+    return this.#activityInbox.list(visibleAgentIds);
+  }
+
+  readActivityInboxItem(itemId: string, visibleAgentIds?: readonly string[]): ActivityInboxItem | null {
+    return this.#activityInbox.readItem(itemId, visibleAgentIds);
+  }
+
+  classifyActivityInboxItem(input: { itemId: string; classification: "reference" | "actionable"; actorId: string }) {
+    return this.#activityInbox.classify(input);
+  }
+
+  beginActivityInboxFollowup(input: ActivityInboxFollowupInput & { actorId: string }) {
+    return this.#activityInbox.beginFollowup(input);
+  }
+
+  recordActivityInboxFollowup(input: { itemId: string; receipt: ActivityInboxFollowupReceipt }) {
+    return this.#activityInbox.recordFollowupReceipt(input);
+  }
+
+  linkActivityInboxFollowupResult(input: { itemId: string; deliveryId: string; turnId: string }) {
+    return this.#activityInbox.linkFollowupResult(input);
+  }
+
+  linkActivityInboxFollowupResultForDelivery(input: {
+    agentId: string;
+    taskId: string;
+    threadId: string;
+    deliveryId: string;
+    turnId: string;
+  }): number {
+    return this.#activityInbox.linkFollowupResultForDelivery(input);
+  }
+
+  captureActivityInboxFinalTaskTurn(input: { agentId: string; threadId: string; turnId: string }): void {
+    this.#activityInbox.captureFinalTaskTurn(input);
   }
 
   readTurnAssistantMessages(agentId: string, turnId: string): ConversationMessage[] {

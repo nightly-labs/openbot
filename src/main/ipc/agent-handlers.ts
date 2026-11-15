@@ -78,6 +78,13 @@ import {
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
+  ACTIVITY_INBOX_CAPABILITY,
+  ACTIVITY_INBOX_ROUTES,
+  decodeActivityInboxFollowupResponse,
+  decodeActivityInboxItemResponse,
+  decodeActivityInboxResponse,
+} from "@openbot/contracts/team-protocol/activity-inbox-v1";
+import {
   AGENT_QUEUE_TASK_CAPABILITY,
   AGENT_QUEUE_TASK_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-queue-task-v1";
@@ -202,6 +209,8 @@ import { OWNER_PIN_KEY, type SidebarPinStore } from "../sidebar-pin-store";
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
 import {
   parseAcknowledgeFailedTurn,
+  parseActivityInboxClassify,
+  parseActivityInboxFollowup,
   parseAgentId,
   parseAgentTask,
   parseApprovalResponse,
@@ -1247,6 +1256,45 @@ export function agentIpcHandlers({
             remoteServers.request(serverId, AGENT_WAITS_ROUTES.cancel, acceptEmpty, {
               method: "POST",
               body: { agentId: parsed.agentId, waitId: parsed.waitId },
+            }),
+          );
+        },
+      }),
+      listActivityInbox: scopedQueryHandler({
+        local: () => service.listActivityInbox(),
+        remote: (serverId) => {
+          if (!remoteServers.supportsCapability(serverId, ACTIVITY_INBOX_CAPABILITY))
+            return { items: [], complete: false, coverage: "unknown", nextCursor: null, gapCount: 0 };
+          return runCauseEffect(
+            remoteServers.request(serverId, ACTIVITY_INBOX_ROUTES.list, decodeActivityInboxResponse, {
+              method: "POST",
+              body: {},
+            }),
+          );
+        },
+      }),
+      classifyActivityInboxItem: scopedHandler(parseActivityInboxClassify, {
+        local: (input) => runCauseEffect(service.classifyActivityInboxItem(input, host.conversationSender())),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, ACTIVITY_INBOX_CAPABILITY))
+            throw new Error(sourceText("error.team.agentNotFound"));
+          return runCauseEffect(
+            remoteServers.request(serverId, ACTIVITY_INBOX_ROUTES.classify, decodeActivityInboxItemResponse, {
+              method: "POST",
+              body: input,
+            }),
+          );
+        },
+      }),
+      followupActivityInboxItem: scopedHandler(parseActivityInboxFollowup, {
+        local: (input) => runCauseEffect(service.followupActivityInboxItem(input, host.conversationSender())),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, ACTIVITY_INBOX_CAPABILITY))
+            throw new Error(sourceText("error.team.agentNotFound"));
+          return runCauseEffect(
+            remoteServers.request(serverId, ACTIVITY_INBOX_ROUTES.followup, decodeActivityInboxFollowupResponse, {
+              method: "POST",
+              body: input,
             }),
           );
         },

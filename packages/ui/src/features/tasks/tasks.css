@@ -74,6 +74,89 @@
   margin-inline-start: calc(-1 * var(--openbot-space-1));
 }
 
+.tasks-page-reports {
+  display: grid;
+  gap: var(--openbot-space-2);
+  margin-block: var(--openbot-space-2) var(--openbot-space-3);
+}
+
+.tasks-page-reports h2 {
+  margin: 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.tasks-page-reports-note {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.tasks-page-report {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 0;
+  align-items: start;
+  justify-content: stretch;
+  gap: var(--openbot-space-3);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-surface);
+  padding: var(--openbot-space-3);
+}
+
+.tasks-page-report-actions,
+.tasks-page-report-followup {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--openbot-space-2);
+}
+
+.tasks-page-report-followup {
+  grid-column: 1 / -1;
+}
+
+.tasks-page-report-followup .ui-textarea {
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+
+@media (max-width: 40rem) {
+  .tasks-page-report {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tasks-page-report-actions {
+    grid-column: 1;
+  }
+}
+
+.tasks-page-report-copy {
+  display: grid;
+  min-width: 0;
+  gap: var(--openbot-space-1);
+}
+
+.tasks-page-report-copy > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tasks-page-report-copy strong {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.tasks-page-report-copy span {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
 /* As the header model switcher: the face of a newly chosen agent springs in, and the chevron turns. */
 .tasks-page-agent-face {
   display: flex;

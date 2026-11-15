@@ -1,4 +1,10 @@
-import type { AgentTask, DraftAttachment } from "@openbot/contracts/ipc";
+import type {
+  ActivityInboxFollowupReceipt,
+  ActivityInboxItem,
+  AgentApproval,
+  AgentTask,
+  DraftAttachment,
+} from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   plainTaskTitle,
@@ -19,6 +25,7 @@ import {
   Mic,
   Popover,
   Search,
+  Textarea,
   X,
 } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
@@ -95,6 +102,14 @@ interface TasksPageProps {
   agents: AgentProfile[];
   /** The tasks of all agents, also a start that waits. */
   tasks: readonly AgentTask[];
+  /** Recent report references captured from completed side-thread turns. */
+  reports: readonly ActivityInboxItem[];
+  pendingApprovals?: readonly { approval: AgentApproval; task: AgentTask }[] | undefined;
+  /** False when a joined server predates the optional activity-inbox capability. */
+  reportsComplete: boolean;
+  onOpenReport: (item: ActivityInboxItem) => void;
+  onClassifyReport: (item: ActivityInboxItem, classification: "reference" | "actionable") => Promise<void>;
+  onFollowupReport: (item: ActivityInboxItem, text: string) => Promise<ActivityInboxFollowupReceipt>;
   /** Whether the task lists of all agents loaded. Only then does a page with no task show how tasks work. */
   loaded?: boolean | undefined;
   /** The agent of the next task. */
@@ -850,7 +865,7 @@ function TasksSidePanel(props: {
  * can be undone for a few seconds. A task opens in the panel beside the list.
  */
 export function TasksPage(props: TasksPageProps) {
-  const { t } = useText();
+  const { t, format } = useText();
   const headingId = createUniqueId();
   // The first start adds a task that waits, so the page shows the list as soon as the user sends.
   const empty = () => props.loaded === true && props.tasks.length === 0;
@@ -870,6 +885,176 @@ export function TasksPage(props: TasksPageProps) {
             <TasksEmptyPitch />
           </Show>
           <TasksComposer {...props} />
+          <Show when={props.reports.length > 0 || props.pendingApprovals?.length || !props.reportsComplete}>
+            <section class="tasks-page-reports" aria-label={t("chat.activityInbox.title")}>
+              <h2>{t("chat.activityInbox.title")}</h2>
+              <Show when={!props.reportsComplete}>
+                <p class="tasks-page-reports-note">{t("chat.activityInbox.unavailable")}</p>
+              </Show>
+              <For each={props.pendingApprovals}>
+                {({ approval, task }) => (
+                  <article class="tasks-page-report">
+                    <div class="tasks-page-report-copy">
+                      <strong>{task.title}</strong>
+                      <span>{t("chat.activityInbox.approval")}</span>
+                      <span>
+                        {t("chat.activityInbox.owner", {
+                          owner: agentOf(props.agents, approval.agentId)?.name ?? approval.agentId,
+                        })}
+                      </span>
+                      <span>
+                        {t("chat.activityInbox.nextAction", { action: t("chat.activityInbox.approvalAction") })}
+                      </span>
+                    </div>
+                    <div class="tasks-page-report-actions">
+                      <Button variant="outline" size="sm" onClick={() => props.onSelect(task.id)}>
+                        {t("chat.activityInbox.open")}
+                      </Button>
+                    </div>
+                  </article>
+                )}
+              </For>
+              <For each={props.reports}>
+                {(item) => {
+                  const [draft, setDraft] = createSignal("");
+                  const [sending, setSending] = createSignal(false);
+                  const [error, setError] = createSignal(false);
+                  const receipt = () => item.followupReceipt;
+                  const statusText = () => {
+                    if (receipt()?.reasonCode === "action-payload-mismatch")
+                      return t("chat.activityInbox.status.payloadMismatch");
+                    switch (receipt()?.status) {
+                      case "pending":
+                        return t("chat.activityInbox.status.pending");
+                      case "queued":
+                        return t("chat.activityInbox.status.queued");
+                      case "running":
+                        return t("chat.activityInbox.status.running");
+                      case "result_linked":
+                        return t("chat.activityInbox.status.resultLinked");
+                      case "rejected":
+                        return t("chat.activityInbox.status.rejected");
+                      case "unknown":
+                        return t("chat.activityInbox.status.unknown");
+                      default:
+                        return item.kind === "reference"
+                          ? t("chat.activityInbox.reference")
+                          : t("chat.activityInbox.status.unrouted");
+                    }
+                  };
+                  const canFollowUp = () =>
+                    !receipt() ||
+                    receipt()?.status === "pending" ||
+                    (receipt()?.status === "unknown" && receipt()?.reasonCode !== "action-payload-mismatch") ||
+                    (receipt()?.status === "rejected" && receipt()?.deliveryId === null);
+                  const classify = async (classification: "reference" | "actionable") => {
+                    setError(false);
+                    try {
+                      await props.onClassifyReport(item, classification);
+                    } catch {
+                      setError(true);
+                    }
+                  };
+                  const submitFollowup = async () => {
+                    if (!draft().trim() || sending()) return;
+                    setSending(true);
+                    setError(false);
+                    try {
+                      const outcome = await props.onFollowupReport(item, draft().trim());
+                      if (
+                        outcome.status === "queued" ||
+                        outcome.status === "running" ||
+                        outcome.status === "result_linked"
+                      )
+                        setDraft("");
+                    } catch {
+                      setError(true);
+                    } finally {
+                      setSending(false);
+                    }
+                  };
+                  return (
+                    <article class="tasks-page-report">
+                      <div class="tasks-page-report-copy">
+                        <strong>{item.title}</strong>
+                        <span>
+                          {t("conversation.tasks.title")} · {agentOf(props.agents, item.agentId)?.name ?? item.agentId}{" "}
+                          · {format.date(new Date(item.observedAt), { dateStyle: "medium", timeStyle: "short" })}
+                        </span>
+                        <span>
+                          {t(
+                            item.sourceOutcome === "failed"
+                              ? "chat.activityInbox.failed"
+                              : "chat.activityInbox.completed",
+                          )}
+                        </span>
+                        <span>
+                          {t("chat.activityInbox.owner", {
+                            owner:
+                              agentOf(props.agents, item.assignedOwnerId ?? item.agentId)?.name ??
+                              item.assignedOwnerId ??
+                              item.agentId,
+                          })}
+                        </span>
+                        <span>{t("chat.activityInbox.nextAction", { action: item.nextAction })}</span>
+                        <Show when={receipt()}>
+                          <span>{statusText()}</span>
+                        </Show>
+                        <Show when={receipt()?.status === "result_linked"}>
+                          <span>{t("chat.activityInbox.resultTurn", { turnId: receipt()?.resultTurnId ?? "" })}</span>
+                        </Show>
+                      </div>
+                      <div class="tasks-page-report-actions">
+                        <Button variant="outline" size="sm" onClick={() => props.onOpenReport(item)}>
+                          {receipt()?.status === "result_linked"
+                            ? t("chat.activityInbox.openResult")
+                            : t("chat.activityInbox.open")}
+                        </Button>
+                        <Show when={item.state === "received_unrouted"}>
+                          <Button variant="outline" size="sm" onClick={() => void classify("reference")}>
+                            {t("chat.activityInbox.keepReference")}
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => void classify("actionable")}>
+                            {t("chat.activityInbox.markActionable")}
+                          </Button>
+                        </Show>
+                      </div>
+                      <Show
+                        when={
+                          item.kind === "reference" ||
+                          item.state === "reference_only" ||
+                          item.state === "triage" ||
+                          receipt()
+                        }
+                      >
+                        <div class="tasks-page-report-followup">
+                          <Textarea
+                            size="sm"
+                            aria-label={t("chat.activityInbox.followupLabel")}
+                            placeholder={t("chat.activityInbox.followupPlaceholder")}
+                            value={draft()}
+                            onValueChange={setDraft}
+                            disabled={!canFollowUp() || sending()}
+                            maxlength={4_000}
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() => void submitFollowup()}
+                            disabled={!canFollowUp() || !draft().trim() || sending()}
+                          >
+                            {sending() ? t("chat.activityInbox.sending") : t("chat.activityInbox.followup")}
+                          </Button>
+                          <Show when={error()}>
+                            <span role="status">{t("chat.activityInbox.actionFailed")}</span>
+                          </Show>
+                        </div>
+                      </Show>
+                    </article>
+                  );
+                }}
+              </For>
+            </section>
+          </Show>
           <div class="tasks-page-took-slot" aria-live="polite">
             <Show when={props.took}>{(took) => <TaskTookLine {...props} took={took()} />}</Show>
           </div>

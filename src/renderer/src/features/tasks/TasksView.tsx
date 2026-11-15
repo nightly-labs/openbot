@@ -5,6 +5,8 @@ import {
 } from "@openbot/contracts/attachment-references";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
+  ActivityInboxItem,
+  ActivityInboxSnapshot,
   AgentApproval,
   AgentTask,
   AgentTaskInput,
@@ -122,6 +124,8 @@ interface TasksViewProps {
   waitsForAnswer?: ((task: AgentTask) => boolean) | undefined;
   /** Opens the task as a thread tab in its agent's chat, and leaves the page. */
   onOpenInChat?: ((task: AgentTask) => void) | undefined;
+  /** Opens the original task thread of a captured report. */
+  onOpenReport: (item: ActivityInboxItem) => void;
   sendShortcut?: SendShortcut | undefined;
 }
 
@@ -199,9 +203,31 @@ export function TasksView(props: TasksViewProps) {
   const listRequests = new Map<string, number>();
   const readRequests = new Map<string, number>();
   const [pastePreviews, setPastePreviews] = createSignal<readonly PastePreview[]>([]);
+  const [activityInbox, setActivityInbox] = createSignal<ActivityInboxSnapshot>({
+    items: [],
+    complete: false,
+    coverage: "unknown",
+    nextCursor: null,
+    gapCount: 0,
+  });
   const filesOf = (key: string) => state.files[key] ?? [];
   const pendingImagesOf = (key: string) => pastePreviews().filter((preview) => preview.draftKey === key);
   const filesAccepted = () => props.files?.accepted() === true;
+  let inboxRequest = 0;
+
+  function loadActivityInbox(serverId: string): void {
+    const current = generation;
+    const request = ++inboxRequest;
+    void props.source.listActivityInbox(serverId).then(
+      (snapshot) => {
+        if (current === generation && request === inboxRequest) setActivityInbox(snapshot);
+      },
+      () => {
+        if (current === generation && request === inboxRequest)
+          setActivityInbox({ items: [], complete: false, coverage: "unknown", nextCursor: null, gapCount: 0 });
+      },
+    );
+  }
 
   function discardFiles(attachments: readonly DraftAttachment[], serverId: string): void {
     for (const attachment of attachments) void props.files?.discard(attachment.id, serverId).catch(() => undefined);
@@ -351,10 +377,12 @@ export function TasksView(props: TasksViewProps) {
   function applyEvent(event: TaskEvent): void {
     if (event.type === "agent-tasks-changed") {
       applySnapshot(event.snapshot);
+      loadActivityInbox(props.serverId);
       return;
     }
     if (event.type === "agent-task-conversation") {
       applyConversation(event.taskId, event.snapshot);
+      loadActivityInbox(props.serverId);
       return;
     }
     const stored = state.conversations[event.taskId];
@@ -711,13 +739,16 @@ export function TasksView(props: TasksViewProps) {
         // Agent IDs can repeat on two servers, so the new server starts from its own saved agent.
         draft.agentId = "";
       });
+      setActivityInbox({ items: [], complete: false, coverage: "unknown", nextCursor: null, gapCount: 0 });
       // The agents of the new server load again, also an agent ID that the old server had.
       listRequests.clear();
       readRequests.clear();
       untrack(() => loadLists(props.agents.map((agent) => agent.id)));
+      untrack(() => loadActivityInbox(serverId));
       // A turn can end while the host is away, so the open task reads its whole conversation again.
       const unsubscribe = props.source.onEvent(serverId, applyEvent, () => {
         loadLists(props.agents.map((agent) => agent.id));
+        loadActivityInbox(serverId);
         const task = state.selectedId ? taskOf(state.selectedId) : undefined;
         if (task && !task.id.startsWith("pending:")) readTask(task);
       });
@@ -975,6 +1006,45 @@ export function TasksView(props: TasksViewProps) {
         })
       }
       selectedId={state.selectedId}
+      pendingApprovals={Array.from(
+        new Map(
+          props.approvals.flatMap((approval) => {
+            const task = props.agents.some((agent) => agent.id === approval.agentId)
+              ? tasks().find((task) => task.agentId === approval.agentId && task.threadId === approval.threadId)
+              : undefined;
+            return task
+              ? [
+                  [
+                    JSON.stringify([approval.agentId, approval.threadId, approval.turnId, approval.requestId]),
+                    { approval, task },
+                  ] as const,
+                ]
+              : [];
+          }),
+        ).values(),
+      )}
+      reports={activityInbox().items.filter((item) => props.agents.some((agent) => agent.id === item.agentId))}
+      reportsComplete={activityInbox().complete}
+      onOpenReport={props.onOpenReport}
+      onClassifyReport={async (item, classification) => {
+        await props.source.classifyActivityInboxItem({ itemId: item.itemId, classification }, props.serverId);
+        loadActivityInbox(props.serverId);
+      }}
+      onFollowupReport={async (item, text) => {
+        const previous = item.followupReceipt;
+        const retry = previous?.status === "pending" || previous?.status === "unknown" ? previous : null;
+        const receipt = await props.source.followupActivityInboxItem(
+          {
+            itemId: item.itemId,
+            actionId: retry ? retry.actionId : crypto.randomUUID(),
+            clientMessageId: retry ? retry.clientMessageId : crypto.randomUUID(),
+            text,
+          },
+          props.serverId,
+        );
+        loadActivityInbox(props.serverId);
+        return receipt;
+      }}
       waitOf={waitOf}
       sendShortcut={props.sendShortcut}
       macWindowControls={appInfo()?.platform === "darwin"}

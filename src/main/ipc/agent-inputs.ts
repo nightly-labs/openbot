@@ -1,6 +1,8 @@
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AcknowledgeFailedTurnInput,
+  type ActivityInboxClassifyInput,
+  type ActivityInboxFollowupInput,
   type AgentIpcRequest,
   type AgentMemorySelectionChange,
   type AgentTaskInput,
@@ -625,6 +627,30 @@ export function parseAgentTask(value: unknown): AgentTaskInput {
   return {
     agentId: requireString(value.agentId, "agentId"),
     taskId: requireString(value.taskId, "taskId"),
+  };
+}
+
+export function parseActivityInboxClassify(value: unknown): ActivityInboxClassifyInput {
+  if (!isObject(value)) throw new Error("Invalid activity inbox classification.");
+  const classification = requireString(value.classification, "classification", 16);
+  if (!isOneOf(["reference", "actionable"] as const, classification))
+    throw new Error("Invalid activity inbox classification.");
+  return {
+    itemId: requireString(value.itemId, "itemId", INPUT_LIMITS.identifier),
+    classification,
+  };
+}
+
+export function parseActivityInboxFollowup(value: unknown): ActivityInboxFollowupInput {
+  if (!isObject(value)) throw new Error("Invalid activity inbox follow-up.");
+  const itemId = requireString(value.itemId, "itemId", INPUT_LIMITS.identifier);
+  const actionId = requireString(value.actionId, "actionId", INPUT_LIMITS.identifier);
+  const clientMessageId = requireString(value.clientMessageId, "clientMessageId", INPUT_LIMITS.identifier);
+  return {
+    itemId,
+    actionId,
+    clientMessageId,
+    text: requireString(value.text, "text", INPUT_LIMITS.messageText),
   };
 }
 

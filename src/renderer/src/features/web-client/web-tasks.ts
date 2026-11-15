@@ -1,6 +1,10 @@
+import { ACTIVITY_INBOX_CAPABILITY } from "@openbot/contracts/team-protocol/activity-inbox-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import {
   agentTaskControl,
+  classifyActivityInboxItem,
+  followupActivityInboxItem,
+  listActivityInbox,
   listAgentTasks,
   readAgentTask,
   sendAgentTaskMessage,
@@ -22,6 +26,12 @@ export function webTasksSource(
     runTeamEffect(effect.pipe(Effect.mapError((error) => error.cause)));
 
   return {
+    listActivityInbox: (serverId) =>
+      workspace.state.capabilities.includes(ACTIVITY_INBOX_CAPABILITY)
+        ? run(listActivityInbox(hostRequest(serverId)))
+        : Promise.resolve({ items: [], complete: false, coverage: "unknown", nextCursor: null, gapCount: 0 }),
+    classifyActivityInboxItem: (input, serverId) => run(classifyActivityInboxItem(hostRequest(serverId), input)),
+    followupActivityInboxItem: (input, serverId) => run(followupActivityInboxItem(hostRequest(serverId), input)),
     list: (agentId, serverId) => run(listAgentTasks(hostRequest(serverId), agentId)),
     read: (input, serverId) => run(readAgentTask(hostRequest(serverId), input).pipe(Effect.map(withoutPreviewUrls))),
     start: (input, serverId) => run(startAgentTask(hostRequest(serverId), input)),
@@ -29,9 +39,11 @@ export function webTasksSource(
     stop: (input, serverId) => run(agentTaskControl(hostRequest(serverId), "stop", input)),
     close: (input, serverId) => run(agentTaskControl(hostRequest(serverId), "close", input)),
     reopen: (input, serverId) => run(agentTaskControl(hostRequest(serverId), "reopen", input)),
-    onEvent: (serverId, apply, reload) =>
+    onEvent: (serverId, apply, reload, commandsChanged) =>
       workspace.onHostEvent((event) => {
         if (workspace.state.host?.hostId !== serverId) return;
+        if (["queue-changed", "queue-invalidated", "conversation", "conversation-invalidated"].includes(event.type))
+          commandsChanged?.();
         // A snapshot comes after a reconnect: a task can change while the host is away.
         if (event.type === "runtime-snapshot") reload();
         else if (event.type === "agent-task-conversation")

@@ -47,6 +47,8 @@ export const messages = defineMessages("error.team", {
   "error.team.signInRequired": "OpenBot sign-in is required.",
   "error.team.authenticationRequired": "Authentication required.",
   "error.team.agentNotFound": "Agent not found.",
+  "error.team.activityInboxItemNotFound": "Inbox item not found.",
+  "error.team.activityInboxClassificationInvalid": "Choose reference or actionable.",
   "error.team.routeNotFound": "Route not found.",
   "error.team.requestFailed": "Request failed.",
   "error.team.tooManySignInAttempts": "Too many sign-in attempts. Try again later.",

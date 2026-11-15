@@ -1,10 +1,16 @@
 import { AGENT_MEMORY_CONTEXT_BUDGET_BYTES, essentialMemoryBytes } from "@openbot/contracts/agent-memory-context";
 import type {
   AcpRegistryEntry,
+  ActivityInboxClassifyInput,
+  ActivityInboxFollowupInput,
+  ActivityInboxFollowupReceipt,
+  ActivityInboxItem,
+  ActivityInboxSnapshot,
   AgentProviderRef,
   AgentSessionSettings,
   CreateAgentInput,
   HiddenAgentsSnapshot,
+  IntakeMachinePacketV2,
   McpSignInApp,
   McpSignInAppState,
   ServerNotificationLevel,
@@ -791,6 +797,10 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   };
   const runtime: MockRuntime = { emit, schedule };
   const emptyQueue = (agentId: string): QueueSnapshot => ({ agentId, deliveries: [] });
+  const activityInboxUpdates = new Map<
+    string,
+    { classification: "reference" | "actionable" | null; receipt: ActivityInboxFollowupReceipt | null }
+  >();
   const queueEdits = new Map<string, { agentId: string; delivery: QueueDelivery }>();
   const queueSeeds = clone(options.queues ?? STORY_QUEUES);
   const queues = new Map<string, QueueSnapshot>(
@@ -951,6 +961,141 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       tasks: clone([...list.filter((task) => !task.closedAt), ...list.filter((task) => task.closedAt)]),
       limit: agentTaskLimitOf(agentId),
     };
+  }
+
+  async function hashInboxText(text: string): Promise<string> {
+    const digest = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+    return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+
+  function activityInbox(): ActivityInboxSnapshot {
+    const items = [...tasks.values()].flatMap((entries) =>
+      entries.flatMap((task) => {
+        if (task.outcome !== "completed" && task.outcome !== "failed") return [];
+        const failed = task.outcome === "failed";
+        const report = taskConversation(task)
+          .messages.filter((message) => message.author === "assistant")
+          .at(-1);
+        if (!report && !failed) return [];
+        const turnId = report?.turnId ?? `turn-${task.id}`;
+        const messageIds = report ? [report.id] : [];
+        const sourceEventKey = JSON.stringify([task.agentId, task.threadId, turnId]);
+        const itemId = `mock-${task.id}-${turnId}`;
+        const sourceRef = {
+          agentId: task.agentId,
+          taskId: task.id,
+          threadId: task.threadId,
+          turnId,
+          eventType: "turn.completed" as const,
+          eventSequence: 1,
+          messageIds,
+          sourceOccurredAt: task.updatedAt,
+        };
+        const update = activityInboxUpdates.get(itemId);
+        const explicitClassification = update?.classification ?? null;
+        const classification = explicitClassification ?? (failed ? "actionable" : "reference");
+        const receipt = update?.receipt ?? null;
+        const phase = receipt
+          ? receipt.status === "result_linked"
+            ? "followup_result_linked"
+            : receipt.status === "running"
+              ? "followup_running"
+              : receipt.status === "queued" || receipt.status === "pending"
+                ? receipt.status === "queued"
+                  ? "followup_queued"
+                  : "followup_pending"
+                : "blocked"
+          : explicitClassification === "reference"
+            ? "reference_only"
+            : classification === "actionable"
+              ? "triage"
+              : "intake_received_unrouted";
+        const nextAction = receipt
+          ? receipt.status === "queued"
+            ? "await owner delivery"
+            : receipt.status === "running"
+              ? "await correlated result"
+              : receipt.status === "result_linked"
+                ? "review linked result"
+                : receipt.status === "unknown"
+                  ? "reconcile using the same action and message ids"
+                  : receipt.status === "rejected"
+                    ? "fix the route and retry"
+                    : "await owner send receipt"
+          : explicitClassification === "reference"
+            ? "reference only"
+            : classification === "actionable"
+              ? "Inspect the failure and decide whether to retry"
+              : "Review the completed task";
+        const packet: IntakeMachinePacketV2 = {
+          packetType: "openbot.inbox.intake",
+          packet_version: 2,
+          phase,
+          packet_id: itemId,
+          revision: update ? 1 : 0,
+          source_event_key: sourceEventKey,
+          source_event_sequence: 1,
+          source_message_ids: messageIds,
+          assigned_owner_id: failed || (receipt && receipt.status !== "rejected") ? task.agentId : null,
+          source_ref: sourceRef,
+          classification: classification ?? "unknown",
+          next_action: nextAction,
+          context: "unknown",
+          followup_receipt_ref: receipt?.actionId ?? null,
+          canonical_execution_ref: null,
+          updated_at: task.updatedAt,
+        };
+        const state: ActivityInboxItem["state"] = receipt
+          ? receipt.status === "queued"
+            ? "followup_queued"
+            : receipt.status === "pending"
+              ? "followup_pending"
+              : receipt.status === "running"
+                ? "followup_running"
+                : receipt.status === "result_linked"
+                  ? "followup_result_linked"
+                  : "blocked"
+          : explicitClassification === "reference"
+            ? "reference_only"
+            : classification === "actionable"
+              ? "triage"
+              : "received_unrouted";
+        const kind: ActivityInboxItem["kind"] = classification;
+        return [
+          {
+            schemaVersion: 1 as const,
+            itemId,
+            sourceId: "openbot:agent-task" as const,
+            sourceEventKey,
+            sourceEventSequence: 1,
+            sourceOccurredAt: task.updatedAt,
+            eventType: failed ? ("agent-task.turn.failed" as const) : ("agent-task.turn.completed" as const),
+            kind,
+            state,
+            agentId: task.agentId,
+            taskId: task.id,
+            title: task.title,
+            threadId: task.threadId,
+            turnId,
+            messageIds,
+            attachmentRefs: [],
+            sourceOutcome: failed ? ("failed" as const) : ("completed" as const),
+            assignedOwnerId: failed || (receipt && receipt.status !== "rejected") ? task.agentId : null,
+            receivedAt: task.updatedAt,
+            observedAt: task.updatedAt,
+            acceptedAt: task.updatedAt,
+            nextAction,
+            coverage: receipt?.status === "unknown" ? ("unknown" as const) : ("current" as const),
+            sourceRef,
+            followupActionId: receipt?.actionId ?? null,
+            followupReceipt: receipt,
+            canonicalExecutionRef: null,
+            packet,
+          },
+        ];
+      }),
+    );
+    return { items, complete: true, coverage: "current", nextCursor: null, gapCount: 0 };
   }
 
   function agentTaskLimitOf(agentId: string): number {
@@ -3308,6 +3453,43 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       listQueue: async (agentId) => clone(queues.get(agentId) ?? emptyQueue(agentId)),
       listWaits: async (agentId) => ({ agentId, waits: [] }),
       cancelWait: async () => undefined,
+      listActivityInbox: async () => activityInbox(),
+      classifyActivityInboxItem: async (input: ActivityInboxClassifyInput) => {
+        const item = activityInbox().items.find((candidate) => candidate.itemId === input.itemId);
+        if (!item) throw new Error("Activity inbox item not found.");
+        activityInboxUpdates.set(item.itemId, {
+          classification: input.classification,
+          receipt: item.followupReceipt,
+        });
+        return clone(activityInbox().items.find((candidate) => candidate.itemId === item.itemId) ?? item);
+      },
+      followupActivityInboxItem: async (input: ActivityInboxFollowupInput) => {
+        const item = activityInbox().items.find((candidate) => candidate.itemId === input.itemId);
+        if (!item) throw new Error("Activity inbox item not found.");
+        const prior = item.followupReceipt;
+        if (prior && ["queued", "running", "result_linked"].includes(prior.status)) return clone(prior);
+        const now = new Date().toISOString();
+        const receipt: ActivityInboxFollowupReceipt = {
+          actionId: input.actionId,
+          actorId: "preview-user",
+          clientMessageId: input.clientMessageId,
+          requestHash: await hashInboxText(input.text),
+          targetAgentId: item.agentId,
+          targetTaskId: item.taskId,
+          targetThreadId: item.threadId,
+          status: "queued",
+          messageId: `preview-message-${input.actionId}`,
+          deliveryId: `preview-delivery-${input.actionId}`,
+          resultTurnId: null,
+          resultEventSequence: null,
+          resultMessageIds: [],
+          reasonCode: null,
+          createdAt: prior?.createdAt ?? now,
+          updatedAt: now,
+        };
+        activityInboxUpdates.set(item.itemId, { classification: "actionable", receipt });
+        return clone(receipt);
+      },
       listTasks: async (agentId) => taskList(agentId),
       // As the host: the read has the newest 100 messages, and the page route the ones before.
       readTask: async (input) => {

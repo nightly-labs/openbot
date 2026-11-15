@@ -56,6 +56,7 @@ export const startTaskToolSchema = z.strictObject({
 
 export interface AgentTasksHooks {
   emit(event: AgentEvent): void;
+  captureFinalTaskTurn(input: { agentId: string; taskId: string; threadId: string; turnId: string }): void;
   /** The agent, for its provider and its task limit. */
   agent(agentId: string): AgentSummary | undefined;
   /** The task limit of an agent that has no limit of its own on this host. */
@@ -644,6 +645,31 @@ export class AgentTasks implements TaskLanes {
           task.taskId,
           event.status === "completed" ? "completed" : event.status === "failed" ? "failed" : "interrupted",
         );
+        if (
+          (event.status === "completed" || event.status === "failed") &&
+          !event.quiet &&
+          !event.continues &&
+          task.routineId === null
+        ) {
+          try {
+            this.#hooks.captureFinalTaskTurn({
+              agentId: task.agentId,
+              taskId: task.taskId,
+              threadId: task.threadId,
+              turnId: event.turnId,
+            });
+          } catch (error) {
+            logger.warn(
+              "Could not capture the terminal task report; the durable turn event remains available for recovery.",
+              {
+                agentId: task.agentId,
+                threadId: task.threadId,
+                turnId: event.turnId,
+                error: error instanceof Error ? error.name : "UnknownError",
+              },
+            );
+          }
+        }
         this.changed(task.agentId);
         // The waiters leave the map here, so a wait that a failed Stop never runs does not stay.
         const waiters = this.#turnEndWaiters.get(task.taskId);

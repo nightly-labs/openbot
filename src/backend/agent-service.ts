@@ -8,6 +8,10 @@ import { developmentStartingModel } from "@openbot/contracts/development-default
 import type { FeedbackFacts } from "@openbot/contracts/feedback";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
+  ActivityInboxFollowupInput,
+  ActivityInboxFollowupReceipt,
+  ActivityInboxItem,
+  ActivityInboxSnapshot,
   AgentAccessLevel,
   AgentAnalyticsInput,
   AgentApproval,
@@ -759,6 +763,22 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       conversation: this.#conversation,
       hooks: {
         emit: (event) => this.#emit(event),
+        captureFinalTaskTurn: (input) => {
+          store.database.captureActivityInboxFinalTaskTurn(input);
+          for (const delivery of mailbox.deliveriesForTurn(input.agentId, input.turnId)) {
+            if (
+              delivery.delivery.status === "completed" &&
+              mailbox.taskIdForDelivery(delivery.delivery.id) === input.taskId
+            )
+              store.database.linkActivityInboxFollowupResultForDelivery({
+                agentId: input.agentId,
+                taskId: input.taskId,
+                threadId: input.threadId,
+                deliveryId: delivery.delivery.id,
+                turnId: input.turnId,
+              });
+          }
+        },
         agent: (agentId) => store.list().find((agent) => agent.id === agentId),
         defaultTaskLimit: () => this.#defaultTaskLimit(),
         // Read late: the drain is built further down this constructor.
@@ -5825,6 +5845,116 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#tasks.snapshot(agentId);
   }
 
+  listActivityInbox(visibleAgentIds?: readonly string[]): ActivityInboxSnapshot {
+    return this.#store.database.listActivityInbox(visibleAgentIds);
+  }
+
+  readActivityInboxItem(itemId: string, visibleAgentIds?: readonly string[]): ActivityInboxItem | null {
+    return this.#store.database.readActivityInboxItem(itemId, visibleAgentIds);
+  }
+
+  classifyActivityInboxItem = Effect.fn("AgentService.classifyActivityInboxItem")(function* (
+    this: AgentService,
+    input: { itemId: string; classification: "reference" | "actionable" },
+    sender?: ConversationMessageSender,
+  ): Effect.fn.Return<ActivityInboxItem, AgentLifecycleFailed> {
+    if (!sender)
+      return yield* new AgentLifecycleFailed({
+        operation: "classify inbox item",
+        cause: new Error(sourceText("error.backend.activityInboxActorUnavailable")),
+      });
+    const item = this.#store.database.classifyActivityInboxItem({ ...input, actorId: sender.id });
+    if (!item)
+      return yield* new AgentLifecycleFailed({
+        operation: "classify inbox item",
+        cause: new Error(sourceText("error.backend.activityInboxItemUnavailable")),
+      });
+    return item;
+  }).bind(this);
+
+  followupActivityInboxItem = Effect.fn("AgentService.followupActivityInboxItem")(function* (
+    this: AgentService,
+    input: ActivityInboxFollowupInput,
+    sender?: ConversationMessageSender,
+  ): Effect.fn.Return<ActivityInboxFollowupReceipt, AgentLifecycleFailed> {
+    if (!sender)
+      return yield* new AgentLifecycleFailed({
+        operation: "follow up inbox item",
+        cause: new Error(sourceText("error.backend.activityInboxActorUnavailable")),
+      });
+    const prepared = this.#store.database.beginActivityInboxFollowup({ ...input, actorId: sender.id });
+    if (!prepared.item || !prepared.receipt)
+      return yield* new AgentLifecycleFailed({
+        operation: "follow up inbox item",
+        cause: new Error(sourceText("error.backend.activityInboxItemUnavailable")),
+      });
+    if (!prepared.shouldSend) return prepared.receipt;
+    const sent = yield* Effect.result(
+      this.sendMessage(
+        {
+          agentId: prepared.receipt.targetAgentId,
+          taskId: prepared.receipt.targetTaskId,
+          text: input.text,
+          clientMessageId: prepared.receipt.clientMessageId,
+        },
+        sender,
+      ),
+    );
+    if (Result.isFailure(sent)) {
+      const unknown: ActivityInboxFollowupReceipt = {
+        ...prepared.receipt,
+        status: "unknown",
+        reasonCode: "delivery-receipt-unavailable",
+        updatedAt: new Date().toISOString(),
+      };
+      this.#store.database.recordActivityInboxFollowup({ itemId: input.itemId, receipt: unknown });
+      return unknown;
+    }
+    const delivery = sent.success.deliveries.find((item) => item.recipientAgentId === prepared.receipt?.targetAgentId);
+    if (!delivery) {
+      const unknown: ActivityInboxFollowupReceipt = {
+        ...prepared.receipt,
+        messageId: sent.success.messageId,
+        status: "unknown",
+        reasonCode: "delivery-receipt-missing",
+        updatedAt: new Date().toISOString(),
+      };
+      this.#store.database.recordActivityInboxFollowup({ itemId: input.itemId, receipt: unknown });
+      return unknown;
+    }
+    const status: ActivityInboxFollowupReceipt["status"] =
+      delivery.status === "queued"
+        ? "queued"
+        : delivery.status === "starting" || delivery.status === "running" || delivery.status === "completed"
+          ? "running"
+          : "unknown";
+    const receipt: ActivityInboxFollowupReceipt = {
+      ...prepared.receipt,
+      status,
+      messageId: sent.success.messageId,
+      deliveryId: delivery.id,
+      reasonCode: status === "unknown" ? "owner-delivery-ended-without-result" : null,
+      updatedAt: new Date().toISOString(),
+    };
+    this.#store.database.recordActivityInboxFollowup({ itemId: input.itemId, receipt });
+    const deliveryContext = this.#mailbox.getDelivery(delivery.id);
+    if (
+      deliveryContext &&
+      ["starting", "running", "completed"].includes(deliveryContext.delivery.status) &&
+      this.#mailbox.taskIdForDelivery(delivery.id) === receipt.targetTaskId
+    ) {
+      const running = { ...receipt, status: "running" as const, updatedAt: new Date().toISOString() };
+      this.#store.database.recordActivityInboxFollowup({ itemId: input.itemId, receipt: running });
+      if (deliveryContext.delivery.status === "completed" && deliveryContext.delivery.turnId)
+        this.#store.database.linkActivityInboxFollowupResult({
+          itemId: input.itemId,
+          deliveryId: delivery.id,
+          turnId: deliveryContext.delivery.turnId,
+        });
+    }
+    return this.#store.database.readActivityInboxItem(input.itemId)?.followupReceipt ?? receipt;
+  }).bind(this);
+
   /** The conversation of one task, for its panel. */
   readTask(agentId: string, taskId: string): ConversationSnapshot {
     return structuredClone(this.#tasks.read(agentId, taskId));
@@ -6864,9 +6994,52 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     recordAgentRestartActivity(event);
     // The account in use is not saved: a new reading, as at start, sets it again.
     if (event.type === "usage-changed") for (const provider of AGENT_PROVIDERS) this.#refreshPoolInUse(provider);
+    if (event.type === "agent-tasks-changed") {
+      try {
+        this.#syncActivityInboxFollowups(event.snapshot.agentId);
+      } catch (error) {
+        logger.warn("Could not refresh an activity inbox owner receipt.", {
+          agentId: event.snapshot.agentId,
+          error: error instanceof Error ? error.name : "UnknownError",
+        });
+      }
+    }
     this.#liveVoice?.observe(event);
     if (this.channels?.event(event) || this.messaging?.event(event, this.#scope) || this.#tasks?.event(event)) return;
     this.emit("event", event, memberId);
+  }
+
+  #syncActivityInboxFollowups(agentId: string): void {
+    for (const item of this.#store.database.listActivityInbox([agentId]).items) {
+      const receipt = item.followupReceipt;
+      if (!receipt?.deliveryId || receipt.status === "result_linked" || receipt.status === "rejected") continue;
+      const delivery = this.#mailbox.getDelivery(receipt.deliveryId)?.delivery;
+      if (!delivery || this.#mailbox.taskIdForDelivery(receipt.deliveryId) !== receipt.targetTaskId) continue;
+      if ((delivery.status === "starting" || delivery.status === "running") && receipt.status !== "running") {
+        this.#store.database.recordActivityInboxFollowup({
+          itemId: item.itemId,
+          receipt: { ...receipt, status: "running", reasonCode: null, updatedAt: new Date().toISOString() },
+        });
+      } else if (["failed", "interrupted", "cancelled"].includes(delivery.status)) {
+        this.#store.database.recordActivityInboxFollowup({
+          itemId: item.itemId,
+          receipt: {
+            ...receipt,
+            status: "unknown",
+            reasonCode: "owner-delivery-ended-without-result",
+            updatedAt: new Date().toISOString(),
+          },
+        });
+      } else if (delivery.status === "completed" && delivery.turnId) {
+        this.#store.database.linkActivityInboxFollowupResultForDelivery({
+          agentId,
+          taskId: receipt.targetTaskId,
+          threadId: receipt.targetThreadId,
+          deliveryId: receipt.deliveryId,
+          turnId: delivery.turnId,
+        });
+      }
+    }
   }
 
   /** Removes live provider state for an execution thread before its durable rows are deleted. */
