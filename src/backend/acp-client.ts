@@ -645,6 +645,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   readonly #cli: AgentCliInfo;
   /** Whether `#endIfUnresponsive` waits for its probe. */
   #probing = false;
+  /** Whether the agent's process answered a prompt (`AcpFlavor.refusesUntilRestart`). */
+  #promptAnswered = false;
   readonly #bridge = new LocalMcpBridge();
   /** The stdio relays that the sessions of a directory share, by directory and server name. */
   readonly #sharedRelays = new Map<string, SharedStdioRelay>();
@@ -2656,6 +2658,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       )
         sent = yield* send();
       let response = providerResult(sent);
+      if (!thread.transport) this.#promptAnswered = true;
       while (providerResult(yield* Effect.result(this.#leaveOutFailedMcpServer(thread, turn, response, params))))
         response = providerResult(yield* send());
       if (thread.activeTurn !== turn || turn.completing) return;
@@ -2775,6 +2778,18 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         return;
       }
       yield* this.#completeTurn(thread, turn, turn.stopped ? "interrupted" : "failed", turn.stopped ? null : failure);
+      // A process that answered before and now refuses can refuse each prompt until it ends (#9718).
+      // A turn of another session must not end with it.
+      if (
+        !turn.stopped &&
+        !transport &&
+        this.#promptAnswered &&
+        this.#flavor.refusesUntilRestart?.(failure) &&
+        ![...this.#threads.ids()].some((id) => id !== thread.id && this.#threads.get(id)?.activeTurn)
+      ) {
+        this.#promptAnswered = false;
+        yield* this.#endAgentProcess(sourceText("error.provider.acpRefusedUntilRestart", { provider: this.#label }));
+      }
     }
   });
 
