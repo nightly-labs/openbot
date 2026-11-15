@@ -2345,14 +2345,21 @@ export class OpenBotToolRouter {
       ([source]) =>
         attachmentCall(async () => {
           if (!source) throw new Error("The image file was not found.");
-          if ((await source.handle.stat()).size > READ_IMAGE_MAX_FILE_BYTES)
+          const { size } = await source.handle.stat();
+          if (size > READ_IMAGE_MAX_FILE_BYTES)
             throw new Error(`The image file is larger than ${READ_IMAGE_MAX_FILE_BYTES / 1024 / 1024} MB.`);
-          return source.handle.readFile();
+          // A file that grows after the check is read only to the size it had.
+          const bytes = Buffer.alloc(size);
+          const { bytesRead } = await source.handle.read(bytes, 0, size, 0);
+          return bytes.subarray(0, bytesRead);
         }),
       (sources) => Effect.promise(() => Promise.allSettled(sources.map((source) => source.handle.close()))),
     );
     const image = fitImage(bytes);
-    if (!image) return openBotToolFailure("OpenBot can open only PNG and JPEG images. Make a PNG or JPEG copy first.");
+    if (image === "unsupported")
+      return openBotToolFailure("OpenBot can open only PNG and JPEG images. Make a PNG or JPEG copy first.");
+    if (image === "tooLarge")
+      return openBotToolFailure("The image has too many pixels. Make a smaller copy first, such as 4000 pixels wide.");
     const { dataUrl, ...size } = image;
     return {
       success: true,

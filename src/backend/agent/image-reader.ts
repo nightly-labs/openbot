@@ -23,5 +23,8 @@ export interface FittedImage {
   sourceHeight: number;
 }
 
-/** Decodes a PNG or JPEG file and makes it small enough for a model; null when it cannot decode it. */
-export type ImageFitter = (bytes: Uint8Array) => FittedImage | null;
+/** The picture, or why there is none: not a PNG or JPEG file, or more pixels than this process decodes. */
+export type ImageFitResult = FittedImage | "unsupported" | "tooLarge";
+
+/** Decodes a PNG or JPEG file and makes it small enough for a model. */
+export type ImageFitter = (bytes: Uint8Array) => ImageFitResult;
