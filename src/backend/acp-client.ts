@@ -618,6 +618,11 @@ export interface AcpProviderOptions {
     connection: ClientSideConnection,
     message: { sessionId: string; messageId: string | null; blocks: ContentBlock[] },
   ): Effect.Effect<void, ProviderClientOperationError>;
+  /**
+   * Whether this process has the `steer` extension, for an agent that got it in a later release and
+   * reports it at `initialize`. Without this, each process of the agent has it.
+   */
+  steers?(initialization: InitializeResponse): boolean;
 }
 
 export class AcpAgentClient extends EventEmitter<ClientEvents> {
@@ -1379,7 +1384,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       }
       case "turn/steer": {
         // Most ACP agents cancel the active turn on a second prompt. Keep deferred input in the mailbox.
-        const steer = this.options.steer;
+        const steer = this.#steerExtension;
         const byPrompt = this.#steersByPrompt;
         if (!steer && !byPrompt) return yield* providerFailure(new Error(sourceText("error.backend.steerUnsupported")));
         const threadId = yield* providerSync(() => requiredString(params, "threadId"));
@@ -1707,6 +1712,13 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   /** Whether the agent takes audio blocks in a prompt. Antigravity does; Grok and OpenCode do not. */
   get #acceptsAudio(): boolean {
     return this.#initialization?.agentCapabilities?.promptCapabilities?.audio === true;
+  }
+
+  /** The agent's own steer request (`AcpProviderOptions.steer`), when this process has it. */
+  get #steerExtension(): AcpProviderOptions["steer"] {
+    const { steer, steers } = this.options;
+    if (!steers) return steer;
+    return this.#initialization && steers(this.#initialization) ? steer : undefined;
   }
 
   /** Whether a second prompt joins the running turn (`AcpFlavor.steerByPromptSince`). */

@@ -30,7 +30,7 @@ import {
   GEMINI_DIR_FLAG,
   geminiSavedKeyLimitFailure,
 } from "./acp-flavor-antigravity";
-import { OPENCODE_ACP_FLAVOR } from "./acp-flavor-opencode";
+import { OPENCODE_ACP_FLAVOR, openCodeSteers, steerOpenCode } from "./acp-flavor-opencode";
 import type { AcpArgv, AcpExtensionMethod } from "./acp-sign-in";
 import { readMuseAccount } from "./agent/muse-login";
 import { claudeModelName, modelsAfterOpenCodeDiscoveryFailure, serviceTierFields } from "./agent/provider-models";
@@ -1165,6 +1165,8 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
           readOpenCodeGoUsage(context.apiKey("opencode")).pipe(
             Effect.mapError((failure) => providerFailure(failure.cause)),
           ),
+        steer: steerOpenCode,
+        steers: openCodeSteers,
         history: context.history?.("opencode"),
       }),
     createProfileClient: (cli, timeout, context) =>
