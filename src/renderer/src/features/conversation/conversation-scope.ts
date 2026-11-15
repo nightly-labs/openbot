@@ -1067,7 +1067,7 @@ export function createConversationViewScope(props: ConversationProps) {
     onNew();
     // The new thread shows first, so that its editor takes the request.
     flush();
-    setThreadFocusRequest((current) => current + 1);
+    requestThreadFocus();
   };
   /** Dictates into the open side thread's draft. */
   const startThreadVoiceRecording = () => {
