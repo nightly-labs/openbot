@@ -247,6 +247,8 @@ const SAVE_TYPED_TEXT_FUNCTION = `function() {
 }`;
 /** How long an editor that stopped the paste has to show the pasted text before the text is inserted. */
 const PASTE_APPLY_WAIT_MS = 1000;
+/** Longer than the timer in which a paste-bin editor reads the paste: 1 ms in Quill 1. */
+const PASTE_HANDLER_WAIT_MS = 50;
 /**
  * Sends `text` to an editable element as a plain-text paste. True when the editor stopped the paste
  * and its text or selection changed, so it took the text, or the editor's form got a new element, as
@@ -255,9 +257,11 @@ const PASTE_APPLY_WAIT_MS = 1000;
  * False for a field, for a page that lets the paste through (a synthetic paste inserts nothing), and
  * for an editor that stopped the paste but shows no change in time: the caller then inserts the text.
  *
- * A paste-bin editor moves focus and the selection to a hidden element on paste, for the browser to
- * paste into. A synthetic paste pastes nothing there, so focus and the selection go back to where the
- * caller put them before the text is inserted.
+ * A paste-bin editor, such as Quill 1, lets the paste through, moves focus and the selection to a
+ * hidden element for the browser to paste into, and reads it in a timer. That timer runs before the
+ * text is inserted, so that it cannot change the inserted text. A synthetic paste pastes nothing in
+ * the hidden element, so focus and the selection then go back to the editor, unless the editor put
+ * them back itself.
  */
 const PASTE_TEXT_FUNCTION = `function(text) {
   if ('value' in this || !this.isContentEditable) return false;
@@ -270,7 +274,8 @@ const PASTE_TEXT_FUNCTION = `function(text) {
   const focused = root.activeElement;
   const range = selection()?.rangeCount ? selection().getRangeAt(0).cloneRange() : null;
   const notTaken = () => {
-    if (root.activeElement !== focused) focused?.focus({ preventScroll: true });
+    if (host.contains(root.activeElement) && host.contains(selection()?.anchorNode ?? null)) return false;
+    focused?.focus({ preventScroll: true });
     if (range) { selection()?.removeAllRanges(); selection()?.addRange(range); }
     return false;
   };
@@ -288,7 +293,11 @@ const PASTE_TEXT_FUNCTION = `function(text) {
   data.setData('text/plain', text);
   const event = new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true, composed: true });
   const stopped = !this.dispatchEvent(event);
-  if (!stopped || taken(observer.takeRecords())) { observer.disconnect(); return stopped || notTaken(); }
+  if (!stopped) {
+    observer.disconnect();
+    return new Promise((resolve) => setTimeout(() => resolve(notTaken()), ${PASTE_HANDLER_WAIT_MS}));
+  }
+  if (taken(observer.takeRecords())) { observer.disconnect(); return true; }
   return new Promise((resolve) => {
     const timer = setTimeout(() => finish(), ${PASTE_APPLY_WAIT_MS});
     finish = () => { observer.disconnect(); clearTimeout(timer); resolve(taken(observer.takeRecords()) || notTaken()); };
