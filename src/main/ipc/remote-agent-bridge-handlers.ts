@@ -4,6 +4,7 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import {
   REMOTE_AGENT_BRIDGE_CAPABILITY,
   REMOTE_AGENT_BRIDGE_ROUTES,
+  type RemoteAgentBridgeReachStatus,
 } from "@openbot/contracts/team-protocol/remote-agent-bridge-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -12,6 +13,7 @@ import type {
   RemoteAgentBridgeInvite,
   RemoteAgentBridgeLink,
 } from "../../backend/remote-agent-bridge";
+import type { RemoteAgentBridgeReach } from "../remote-agent-bridge-reach";
 import type { RemoteServerManager } from "../remote-server-manager";
 import { agentRequest, agentScope } from "./agent-inputs";
 import { type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
@@ -20,8 +22,23 @@ import { stringPayload } from "./validation";
 
 export interface RemoteAgentBridgeIpcDependencies {
   bridge: RemoteAgentBridge | null;
+  bridgeReach: RemoteAgentBridgeReach | null;
   remoteServers: RemoteServerManager;
   serverName: () => string;
+}
+
+function decodeReachStatus(value: unknown): RemoteAgentBridgeReachStatus {
+  if (!isDynamicRecord(value) || typeof value.ready !== "boolean" || typeof value.tailscaleConnected !== "boolean")
+    throw new Error(sourceText("error.remote.invalidData"));
+  if (typeof value.serveConfigured !== "boolean" || !isString(value.reach) || !isString(value.dnsName))
+    throw new Error(sourceText("error.remote.invalidData"));
+  return {
+    ready: value.ready,
+    reach: value.reach,
+    tailscaleConnected: value.tailscaleConnected,
+    serveConfigured: value.serveConfigured,
+    dnsName: value.dnsName,
+  };
 }
 
 function decodeInvite(value: unknown): RemoteAgentBridgeInvite {
@@ -48,12 +65,17 @@ function decodeLink(value: unknown): RemoteAgentBridgeLink {
 
 export function remoteAgentBridgeIpcHandlers({
   bridge,
+  bridgeReach,
   remoteServers,
   serverName,
 }: RemoteAgentBridgeIpcDependencies): Pick<IpcGroupHandlers, "remoteAgentBridge"> {
   const local = (): RemoteAgentBridge => {
     if (!bridge) throw new Error(sourceText("error.backend.remoteAgentBridgeUnsupported"));
     return bridge;
+  };
+  const localReach = (): RemoteAgentBridgeReach => {
+    if (!bridgeReach) throw new Error(sourceText("error.backend.remoteAgentBridgeUnsupported"));
+    return bridgeReach;
   };
   function remote<T>(serverId: string, route: string, body: unknown, decode: (value: unknown) => T): Promise<T> {
     if (!remoteServers.supportsCapability(serverId, REMOTE_AGENT_BRIDGE_CAPABILITY))
@@ -106,6 +128,18 @@ export function remoteAgentBridgeIpcHandlers({
           local: () => runCauseEffect(local().revokeLink(payload)),
           remote: (target) =>
             remote(target, REMOTE_AGENT_BRIDGE_ROUTES.revokeLink, { linkId: payload }, () => undefined),
+        }),
+      ),
+      reachStatus: payloadHandler(agentScope, ({ serverId }) =>
+        routeToServer(serverId, {
+          local: () => localReach().status(),
+          remote: (target) => remote(target, REMOTE_AGENT_BRIDGE_ROUTES.reachStatus, {}, decodeReachStatus),
+        }),
+      ),
+      prepareReach: payloadHandler(agentScope, ({ serverId }) =>
+        routeToServer(serverId, {
+          local: () => runCauseEffect(localReach().prepare()),
+          remote: (target) => remote(target, REMOTE_AGENT_BRIDGE_ROUTES.prepareReach, {}, decodeReachStatus),
         }),
       ),
     },

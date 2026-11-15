@@ -350,6 +350,8 @@ type Section = ServerSettingsSection;
 
 const desktopRemoteAgentBridgeCalls: RemoteAgentBridgeCalls = {
   list: (serverId) => window.openbot.remoteAgentBridge.list(serverId),
+  reachStatus: (serverId) => window.openbot.remoteAgentBridge.reachStatus(serverId),
+  prepareReach: (serverId) => window.openbot.remoteAgentBridge.prepareReach(serverId),
   createInvite: (serverId) => window.openbot.remoteAgentBridge.createInvite(serverId),
   revokeInvite: (inviteId, serverId) => window.openbot.remoteAgentBridge.revokeInvite(inviteId, serverId),
   redeem: (code, serverId) => window.openbot.remoteAgentBridge.redeem(code, serverId),

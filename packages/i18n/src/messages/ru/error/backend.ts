@@ -166,6 +166,18 @@ export const messages = {
   "error.backend.mailboxStateCorrupt":
     "Состояние почтового ящика повреждено или создано более новой версией OpenBot; перезапись отклонена.",
   "error.backend.recipientDeleting": "Получатель удаляется. Повторите попытку, когда удаление завершится.",
+  "error.backend.remoteAgentBridgePeerDown": "Связанный сервер не ответил. Повторите попытку, когда он включён.",
+  "error.backend.remoteAgentBridgeInviteExpired": "Срок действия кода связи истёк. Создайте новый.",
+  "error.backend.remoteAgentBridgeInviteUsed": "Этот код связи больше не действителен.",
+  "error.backend.remoteAgentBridgeSameServer": "Сервер не может связаться сам с собой.",
+  "error.backend.remoteAgentBridgeRevoked": "Связь с этим сервером удалена.",
+  "error.backend.remoteAgentBridgeFileTooLarge": "Файл превышает лимит вложений. Ничего не отправлено.",
+  "error.backend.remoteAgentBridgeUnsupported": "Обновите OpenBot на этом сервере, чтобы связать другой сервер.",
+  "error.backend.remoteAgentBridgeTailscaleMissing":
+    "Установите Tailscale на этом компьютере, войдите и повторите попытку.",
+  "error.backend.remoteAgentBridgeTailscaleOffline": "Tailscale не подключён на этом компьютере.",
+  "error.backend.remoteAgentBridgeReachFailed":
+    "Не удалось подготовить адрес связанных серверов в Tailscale. Повторите попытку.",
   "error.backend.recipientHidden": "Этот агент скрыт. Восстановите его, чтобы отправлять сообщения.",
   "error.backend.agentIdUnknown": "Нет агента с ID {id}. Получите ID через openbot.list_agents и повторите попытку.",
   "error.backend.agentIdNear":

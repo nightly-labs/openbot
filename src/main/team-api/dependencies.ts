@@ -34,6 +34,7 @@ import type { ProviderDetection } from "../provider-detection";
 import type { ProviderDetectionSettingsStore } from "../provider-detection-settings-store";
 import type { ProviderEnvironmentControl } from "../provider-environment-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
+import type { RemoteAgentBridgeReach } from "../remote-agent-bridge-reach";
 import type { RemoteWorkflowError } from "../remote-service-effects";
 import type { RequestedUpdate } from "../requested-update";
 import type { ServerAuditStore } from "../server-audit-store";
@@ -599,6 +600,8 @@ export interface TeamApiAdmin {
   };
   /** `remote-agent-bridge-v1`: a link to another host so agents can send messages and files. */
   remoteAgentBridge?: RemoteAgentBridge;
+  /** Tailscale Serve for bridge peer paths on this host. */
+  remoteAgentBridgeReach?: RemoteAgentBridgeReach;
   /** The name this host puts on an invite and on a message it sends across a link. */
   serverName?: () => string;
   /** `agent-memory-limit-v1`: how many memories each agent of this computer can keep. */

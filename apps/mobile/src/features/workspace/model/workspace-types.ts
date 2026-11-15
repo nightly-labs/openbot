@@ -544,6 +544,20 @@ export interface MobileWorkspaceContextValue {
     invites: { inviteId: string; code: string; expiresAt: string; serverName: string }[];
     links: { linkId: string; peerName: string; createdAt: string }[];
   }>;
+  remoteAgentBridgeReachStatus: (serverId: string) => Promise<{
+    ready: boolean;
+    reach: string;
+    tailscaleConnected: boolean;
+    serveConfigured: boolean;
+    dnsName: string;
+  }>;
+  prepareRemoteAgentBridgeReach: (serverId: string) => Promise<{
+    ready: boolean;
+    reach: string;
+    tailscaleConnected: boolean;
+    serveConfigured: boolean;
+    dnsName: string;
+  }>;
   createRemoteAgentBridgeInvite: (serverId: string) => Promise<{ inviteId: string; code: string; expiresAt: string }>;
   redeemRemoteAgentBridge: (code: string, serverId: string) => Promise<{ linkId: string; peerName: string }>;
   revokeRemoteAgentBridgeInvite: (inviteId: string, serverId: string) => Promise<void>;

@@ -499,6 +499,18 @@ export const messages = {
   "mobile.server.settings.moveSection": "Импорт и перенос",
   "mobile.server.settings.serverSection": "Сервер",
   "mobile.server.settings.timezone": "Часовой пояс",
+  "mobile.server.settings.remoteAgents": "Связанные серверы",
+  "mobile.server.settings.remoteAgentsDescription":
+    "Агенты здесь могут отправлять сообщения агентам на связанном сервере.",
+  "mobile.server.settings.remoteAgentsCreate": "Создать код связи",
+  "mobile.server.settings.remoteAgentsPaste": "Активировать код",
+  "mobile.server.settings.remoteAgentsRevoke": "Удалить",
+  "mobile.server.settings.remoteAgentsExpires": "Истекает {date}",
+  "mobile.server.settings.remoteAgentsEmpty": "Нет связанных серверов.",
+  "mobile.server.settings.remoteAgentsCode": "Код связи",
+  "mobile.server.settings.remoteAgentsPrepareCrossNetwork": "Подготовить связь между сетями",
+  "mobile.server.settings.remoteAgentsPrepareCrossNetworkHint":
+    "Сделайте это на хосте с Tailscale до создания кода для другой сети.",
   "mobile.server.settings.timezoneAutomatic": "Автоматически",
   "mobile.server.settings.timezoneSystem": "Пояс сервера: {zone}",
   "mobile.server.settings.timezonePhone": "Этот телефон",

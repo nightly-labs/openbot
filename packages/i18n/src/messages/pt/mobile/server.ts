@@ -449,6 +449,18 @@ export const messages = {
   "mobile.server.settings.moveSection": "Importação e transferência",
   "mobile.server.settings.serverSection": "Servidor",
   "mobile.server.settings.timezone": "Fuso horário",
+  "mobile.server.settings.remoteAgents": "Servidores ligados",
+  "mobile.server.settings.remoteAgentsDescription":
+    "Os agentes aqui podem enviar mensagens aos agentes de um servidor ligado.",
+  "mobile.server.settings.remoteAgentsCreate": "Criar código de ligação",
+  "mobile.server.settings.remoteAgentsPaste": "Resgatar um código",
+  "mobile.server.settings.remoteAgentsRevoke": "Remover",
+  "mobile.server.settings.remoteAgentsExpires": "Expira em {date}",
+  "mobile.server.settings.remoteAgentsEmpty": "Nenhum servidor ligado.",
+  "mobile.server.settings.remoteAgentsCode": "Código de ligação",
+  "mobile.server.settings.remoteAgentsPrepareCrossNetwork": "Preparar ligação entre redes",
+  "mobile.server.settings.remoteAgentsPrepareCrossNetworkHint":
+    "Faça isto no anfitrião com Tailscale antes de criar um código para outra rede.",
   "mobile.server.settings.timezoneAutomatic": "Automático",
   "mobile.server.settings.timezoneSystem": "Fuso do servidor: {zone}",
   "mobile.server.settings.timezonePhone": "Este telefone",

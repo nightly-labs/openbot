@@ -13,6 +13,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { RemoteAgentBridgeError, type RemoteAgentBridgeMessage } from "../../backend/remote-agent-bridge";
 import { readBodyWithin } from "../http-body";
+import { RemoteAgentBridgeReachError } from "../remote-agent-bridge-reach";
 import type { TeamApiAdmin } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
@@ -25,6 +26,8 @@ const MEMBER_PATHS: ReadonlySet<string> = new Set([
   REMOTE_AGENT_BRIDGE_ROUTES.redeem,
   REMOTE_AGENT_BRIDGE_ROUTES.links,
   REMOTE_AGENT_BRIDGE_ROUTES.revokeLink,
+  REMOTE_AGENT_BRIDGE_ROUTES.prepareReach,
+  REMOTE_AGENT_BRIDGE_ROUTES.reachStatus,
 ]);
 
 const MESSAGE_BODY_LIMIT = Math.ceil(ATTACHMENT_LIMITS.totalBytes * 1.4) + 1024 * 1024;
@@ -36,6 +39,12 @@ export function remoteAgentBridgePeerPath(pathname: string): boolean {
 
 function asBridgeError(error: unknown): never {
   if (error instanceof RemoteAgentBridgeError) throw new HttpError(error.status, error.message);
+  if (error instanceof RemoteAgentBridgeReachError) throw new HttpError(error.status, error.message);
+  throw error;
+}
+
+function asReachCause(error: unknown): never {
+  if (error instanceof RemoteAgentBridgeReachError) throw new HttpError(error.status, error.message);
   throw error;
 }
 
@@ -60,6 +69,17 @@ export async function routeRemoteAgentBridge(
   if (path === REMOTE_AGENT_BRIDGE_ROUTES.createInvite) {
     const invite = await runCauseEffect(bridge.createInvite(admin?.serverName?.() ?? "OpenBot")).catch(asBridgeError);
     return context.json(201, invite);
+  }
+  const bridgeReach = admin?.remoteAgentBridgeReach;
+  if (path === REMOTE_AGENT_BRIDGE_ROUTES.reachStatus) {
+    if (!bridgeReach) throw new HttpError(400, sourceText("error.backend.remoteAgentBridgeUnsupported"));
+    const status = await bridgeReach.status();
+    return context.json(200, status);
+  }
+  if (path === REMOTE_AGENT_BRIDGE_ROUTES.prepareReach) {
+    if (!bridgeReach) throw new HttpError(400, sourceText("error.backend.remoteAgentBridgeUnsupported"));
+    const status = await runCauseEffect(bridgeReach.prepare()).catch(asReachCause);
+    return context.json(200, status);
   }
   const body = await readJson(context.request);
   if (path === REMOTE_AGENT_BRIDGE_ROUTES.revokeInvite) {

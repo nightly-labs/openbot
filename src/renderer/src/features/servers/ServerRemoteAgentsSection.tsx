@@ -3,6 +3,7 @@ import {
   Alert,
   AlertContent,
   AlertDescription,
+  Badge,
   Button,
   CopyButton,
   Field,
@@ -19,15 +20,44 @@ import {
 import { useText } from "@openbot/ui/text";
 import { createSignal, For, Show } from "solid-js";
 
+export interface RemoteAgentBridgeReachStatus {
+  ready: boolean;
+  reach: string;
+  tailscaleConnected: boolean;
+  serveConfigured: boolean;
+  dnsName: string;
+}
+
 export interface RemoteAgentBridgeCalls {
   list(serverId: string): Promise<{
     invites: { inviteId: string; code: string; expiresAt: string; serverName: string }[];
     links: { linkId: string; peerName: string; createdAt: string }[];
   }>;
+  reachStatus(serverId: string): Promise<RemoteAgentBridgeReachStatus>;
+  prepareReach(serverId: string): Promise<RemoteAgentBridgeReachStatus>;
   createInvite(serverId: string): Promise<{ inviteId: string; code: string; expiresAt: string }>;
   revokeInvite(inviteId: string, serverId: string): Promise<void>;
   redeem(code: string, serverId: string): Promise<{ linkId: string; peerName: string }>;
   revokeLink(linkId: string, serverId: string): Promise<void>;
+}
+
+export function decodeBridgeReachStatus(value: unknown): RemoteAgentBridgeReachStatus {
+  const record = bridgeRecord(value);
+  if (
+    typeof record.ready !== "boolean" ||
+    typeof record.tailscaleConnected !== "boolean" ||
+    typeof record.serveConfigured !== "boolean" ||
+    !isString(record.reach) ||
+    !isString(record.dnsName)
+  )
+    throw new Error("Invalid server link.");
+  return {
+    ready: record.ready,
+    reach: record.reach,
+    tailscaleConnected: record.tailscaleConnected,
+    serveConfigured: record.serveConfigured,
+    dnsName: record.dnsName,
+  };
 }
 
 function bridgeRecord(value: unknown): DynamicRecord {
@@ -83,7 +113,11 @@ export function decodeBridgeLinks(value: unknown): ReturnType<typeof decodeBridg
 
 /** Owner or admin links this server to another. Hidden when the host has no remote-agent-bridge-v1. */
 export function ServerRemoteAgentsSection(props: { serverId: string; calls: RemoteAgentBridgeCalls }) {
-  const { t } = useText();
+  const { t, errorMessage } = useText();
+
+  function showError(cause: unknown): void {
+    setError(errorMessage(cause, t("server.settings.actionFailed")));
+  }
   const [invites, setInvites] = createSignal<
     { inviteId: string; code: string; expiresAt: string; serverName: string }[]
   >([]);
@@ -91,11 +125,13 @@ export function ServerRemoteAgentsSection(props: { serverId: string; calls: Remo
   const [code, setCode] = createSignal("");
   const [created, setCreated] = createSignal<string | null>(null);
   const [error, setError] = createSignal<string | null>(null);
+  const [reachStatus, setReachStatus] = createSignal<RemoteAgentBridgeReachStatus | null>(null);
 
   async function reload(): Promise<void> {
     const snapshot = await props.calls.list(props.serverId);
     setInvites(snapshot.invites);
     setLinks(snapshot.links);
+    setReachStatus(await props.calls.reachStatus(props.serverId));
   }
 
   async function run(action: () => Promise<void>): Promise<void> {
@@ -104,11 +140,11 @@ export function ServerRemoteAgentsSection(props: { serverId: string; calls: Remo
       await action();
       await reload();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      showError(cause);
     }
   }
 
-  void reload().catch((cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause)));
+  void reload().catch((cause: unknown) => showError(cause));
 
   return (
     <SettingsSection
@@ -125,6 +161,43 @@ export function ServerRemoteAgentsSection(props: { serverId: string; calls: Remo
         )}
       </Show>
       <ItemGroup class="settings-modal-card">
+        <Item>
+          <ItemContent>
+            <ItemTitle>{t("server.settings.remoteAgentsCrossNetworkTitle")}</ItemTitle>
+            <ItemDescription>{t("server.settings.remoteAgentsCrossNetworkDescription")}</ItemDescription>
+            <Show when={reachStatus()}>
+              {(status) => (
+                <ItemDescription class="flex flex-wrap items-center gap-2 pt-2">
+                  <Show when={status().ready}>
+                    <Badge variant="success-light">{t("server.settings.remoteAgentsCrossNetworkReady")}</Badge>
+                  </Show>
+                  <Show when={!status().ready && status().tailscaleConnected}>
+                    <Badge variant="warning-light">{t("server.settings.remoteAgentsCrossNetworkPending")}</Badge>
+                  </Show>
+                  <Show when={!status().tailscaleConnected}>
+                    <Badge variant="secondary">{t("server.settings.remoteAgentsCrossNetworkNoTailscale")}</Badge>
+                  </Show>
+                  <Show when={status().reach}>
+                    <Text class="font-mono text-xs">{status().reach}</Text>
+                  </Show>
+                </ItemDescription>
+              )}
+            </Show>
+          </ItemContent>
+          <ItemActions>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() =>
+                void run(async () => {
+                  setReachStatus(await props.calls.prepareReach(props.serverId));
+                })
+              }
+            >
+              {t("server.settings.remoteAgentsCrossNetworkPrepare")}
+            </Button>
+          </ItemActions>
+        </Item>
         <Item>
           <ItemContent>
             <ItemTitle>{t("server.settings.remoteAgentsCreate")}</ItemTitle>

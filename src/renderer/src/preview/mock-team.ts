@@ -528,6 +528,20 @@ export function createMockTeam(
     localServers: localServersApi,
     remoteAgentBridge: {
       list: async () => ({ invites: [], links: [] }),
+      reachStatus: async () => ({
+        ready: true,
+        reach: "https://preview.example.ts.net",
+        tailscaleConnected: true,
+        serveConfigured: true,
+        dnsName: "preview.example.ts.net",
+      }),
+      prepareReach: async () => ({
+        ready: true,
+        reach: "https://preview.example.ts.net",
+        tailscaleConnected: true,
+        serveConfigured: true,
+        dnsName: "preview.example.ts.net",
+      }),
       createInvite: async () => ({
         inviteId: "invite",
         code: "preview-code",

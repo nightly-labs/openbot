@@ -319,6 +319,7 @@ import { decodeProviderRuntimeSnapshot } from "./provider-runtime";
 import {
   decodeRemoteAgentBridgeInvite,
   decodeRemoteAgentBridgeLink,
+  decodeRemoteAgentBridgeReachStatus,
   decodeRemoteAgentBridgeSnapshot,
 } from "./remote-agent-bridge-decoding";
 import { decodeRoutineFlowCanvas, decodeRoutineFlowLink } from "./routine-flow-decoding";
@@ -1185,6 +1186,8 @@ const openbotApi: OpenBotDesktopApi = {
     revokeInvite: decodeVoid,
     redeem: decodeRemoteAgentBridgeLink,
     revokeLink: decodeVoid,
+    reachStatus: decodeRemoteAgentBridgeReachStatus,
+    prepareReach: decodeRemoteAgentBridgeReachStatus,
   }),
   customProviders: bridgeGroup(IPC_ENDPOINTS.customProviders, {
     list: decodeCustomProviders,

@@ -439,6 +439,18 @@ export const messages = {
   "mobile.server.settings.moveSection": "インポートと移行",
   "mobile.server.settings.serverSection": "サーバー",
   "mobile.server.settings.timezone": "タイムゾーン",
+  "mobile.server.settings.remoteAgents": "リンク済みサーバー",
+  "mobile.server.settings.remoteAgentsDescription":
+    "このサーバーのエージェントは、リンク先サーバーのエージェントにメッセージできます。",
+  "mobile.server.settings.remoteAgentsCreate": "リンクコードを作成",
+  "mobile.server.settings.remoteAgentsPaste": "コードを入力",
+  "mobile.server.settings.remoteAgentsRevoke": "削除",
+  "mobile.server.settings.remoteAgentsExpires": "有効期限 {date}",
+  "mobile.server.settings.remoteAgentsEmpty": "リンク済みサーバーはありません。",
+  "mobile.server.settings.remoteAgentsCode": "リンクコード",
+  "mobile.server.settings.remoteAgentsPrepareCrossNetwork": "ネットワーク間リンクを準備",
+  "mobile.server.settings.remoteAgentsPrepareCrossNetworkHint":
+    "別ネットワーク用のコードを作る前に、Tailscale のホストで実行してください。",
   "mobile.server.settings.timezoneAutomatic": "自動",
   "mobile.server.settings.timezoneSystem": "サーバーのゾーン: {zone}",
   "mobile.server.settings.timezonePhone": "この電話",

@@ -450,6 +450,18 @@ export const messages = {
   "mobile.server.settings.moveSection": "İçe aktarma ve aktarım",
   "mobile.server.settings.serverSection": "Sunucu",
   "mobile.server.settings.timezone": "Saat dilimi",
+  "mobile.server.settings.remoteAgents": "Bağlı sunucular",
+  "mobile.server.settings.remoteAgentsDescription":
+    "Buradaki aracılar, bağlı bir sunucudaki aracılara mesaj gönderebilir.",
+  "mobile.server.settings.remoteAgentsCreate": "Bağlantı kodu oluştur",
+  "mobile.server.settings.remoteAgentsPaste": "Kodu kullan",
+  "mobile.server.settings.remoteAgentsRevoke": "Kaldır",
+  "mobile.server.settings.remoteAgentsExpires": "{date} tarihinde sona erer",
+  "mobile.server.settings.remoteAgentsEmpty": "Bağlı sunucu yok.",
+  "mobile.server.settings.remoteAgentsCode": "Bağlantı kodu",
+  "mobile.server.settings.remoteAgentsPrepareCrossNetwork": "Ağlar arası bağlantıyı hazırla",
+  "mobile.server.settings.remoteAgentsPrepareCrossNetworkHint":
+    "Başka ağ için kod oluşturmadan önce Tailscale olan ana bilgisayarda çalıştırın.",
   "mobile.server.settings.timezoneAutomatic": "Otomatik",
   "mobile.server.settings.timezoneSystem": "Sunucu dilimi: {zone}",
   "mobile.server.settings.timezonePhone": "Bu telefon",

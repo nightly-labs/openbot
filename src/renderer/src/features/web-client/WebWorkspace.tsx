@@ -292,6 +292,7 @@ import {
   decodeBridgeInvites,
   decodeBridgeLink,
   decodeBridgeLinks,
+  decodeBridgeReachStatus,
   type RemoteAgentBridgeCalls,
 } from "../servers/ServerRemoteAgentsSection";
 import type { HostAgentAccessCalls } from "../servers/ServerRolesSection";
@@ -1727,6 +1728,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       const links = await request("POST", REMOTE_AGENT_BRIDGE_ROUTES.links, decodeBridgeLinks, {});
       return { invites, links };
     },
+    reachStatus: (serverId) =>
+      hostRequest(serverId)("POST", REMOTE_AGENT_BRIDGE_ROUTES.reachStatus, decodeBridgeReachStatus, {}),
+    prepareReach: (serverId) =>
+      hostRequest(serverId)("POST", REMOTE_AGENT_BRIDGE_ROUTES.prepareReach, decodeBridgeReachStatus, {}),
     createInvite: (serverId) =>
       hostRequest(serverId)("POST", REMOTE_AGENT_BRIDGE_ROUTES.createInvite, decodeBridgeInvite, {}),
     revokeInvite: async (inviteId, serverId) => {

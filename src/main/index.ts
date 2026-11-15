@@ -916,6 +916,7 @@ function registerIpcHandlers({
   sidebarLayout,
   sidebarPins,
   host,
+  remoteAgentBridgeReach,
   remoteDesktop,
   remoteServers,
   centralAuth,
@@ -1075,6 +1076,7 @@ function registerIpcHandlers({
     ...localServerIpcHandlers({ localServers }),
     ...remoteAgentBridgeIpcHandlers({
       bridge: service.remoteAgentBridge,
+      bridgeReach: remoteAgentBridgeReach,
       remoteServers,
       serverName: () => teamStore.getIdentity()?.serverName ?? "OpenBot",
     }),

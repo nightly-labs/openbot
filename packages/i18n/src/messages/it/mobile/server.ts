@@ -452,6 +452,9 @@ export const messages = {
   "mobile.server.settings.remoteAgentsExpires": "Scade il {date}",
   "mobile.server.settings.remoteAgentsEmpty": "Nessun server collegato.",
   "mobile.server.settings.remoteAgentsCode": "Codice di collegamento",
+  "mobile.server.settings.remoteAgentsPrepareCrossNetwork": "Prepara collegamento tra reti",
+  "mobile.server.settings.remoteAgentsPrepareCrossNetworkHint":
+    "Esegui su questo host con Tailscale prima di creare un codice per un'altra rete.",
   "mobile.server.settings.timezoneAutomatic": "Automatico",
   "mobile.server.settings.timezoneSystem": "Fuso del server: {zone}",
   "mobile.server.settings.timezonePhone": "Questo telefono",

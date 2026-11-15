@@ -34,6 +34,12 @@ import { runCauseEffect } from "../src/backend/effect-boundary";
 import { type DeliveryContext, MailboxStore } from "../src/backend/mailbox-store";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { RemoteAgentBridgeError } from "../src/backend/remote-agent-bridge";
+import {
+  bridgeServeConfigured,
+  mergeBridgeServeConfig,
+  RemoteAgentBridgeReach,
+  tailscaleWebKey,
+} from "../src/main/remote-agent-bridge-reach";
 import type { TeamApiBrowser } from "../src/main/team-api/dependencies";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/remote-agent-bridge-e2e");
@@ -202,14 +208,24 @@ async function startHost(name: string): Promise<Host> {
   if (!team.getIdentity()) await runCauseEffect(team.configure(name, OWNER.username, OWNER.password));
   const agent = await runCauseEffect(store.createAgent({ name, description: "", avatarSeed: "ada", avatarHue: null }));
   const agents = new AgentService({ store, mailbox, browser: agentBrowser, serverName: () => name });
+  let serverRef: InstanceType<typeof TeamApiServer> | null = null;
+  const bridgeReach = new RemoteAgentBridgeReach({
+    bridge: agents.remoteAgentBridge,
+    teamApiPort: () => serverRef?.port ?? null,
+  });
   const server = new TeamApiServer({
     store: team,
     agents,
     mailbox,
     browser: teamBrowser,
     appVersion: HOST_VERSION,
-    admin: { remoteAgentBridge: agents.remoteAgentBridge, serverName: () => name },
+    admin: {
+      remoteAgentBridge: agents.remoteAgentBridge,
+      remoteAgentBridgeReach: bridgeReach,
+      serverName: () => name,
+    },
   });
+  serverRef = server;
   const port = await Effect.runPromise(server.start());
   return { name, database, store, mailbox, agents, server, port, agentId: agent.id };
 }
@@ -277,6 +293,24 @@ try {
   const right = hostB;
   const tokenA = await login(left);
   const tokenB = await login(right);
+
+  await step("Tailscale serve config merges the bridge handler only", async () => {
+    const key = tailscaleWebKey("host.example.ts.net.");
+    const merged = mergeBridgeServeConfig(null, key, 18_090);
+    assert.equal(bridgeServeConfigured(merged, key, 18_090), true);
+    assert.equal(bridgeServeConfigured(merged, key, 18_091), false);
+  });
+
+  await step("reach status without Tailscale is not ready", async () => {
+    const response = await call(right, "POST", REMOTE_AGENT_BRIDGE_ROUTES.reachStatus, { token: tokenB, body: {} });
+    assert.equal(response.status, 200);
+    assert.ok(isDynamicRecord(response.body) && response.body.ready === false);
+  });
+
+  await step("prepare without Tailscale fails", async () => {
+    const response = await call(right, "POST", REMOTE_AGENT_BRIDGE_ROUTES.prepareReach, { token: tokenB, body: {} });
+    assert.equal(response.status, 503);
+  });
 
   await step("protocol 9 advertises the link and protocol 8 does not", async () => {
     assert.ok(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9).includes(REMOTE_AGENT_BRIDGE_CAPABILITY));

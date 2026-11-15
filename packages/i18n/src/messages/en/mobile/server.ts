@@ -554,6 +554,9 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.settings.remoteAgentsExpires": "Expires {date}",
   "mobile.server.settings.remoteAgentsEmpty": "No linked servers.",
   "mobile.server.settings.remoteAgentsCode": "Link code",
+  "mobile.server.settings.remoteAgentsPrepareCrossNetwork": "Prepare link across networks",
+  "mobile.server.settings.remoteAgentsPrepareCrossNetworkHint":
+    "Run this on the host computer with Tailscale before you create a code for another network.",
   "mobile.server.settings.timezoneAutomatic": "Automatic",
   "mobile.server.settings.timezoneSystem": "Server zone: {zone}",
   "mobile.server.settings.timezonePhone": "This phone",

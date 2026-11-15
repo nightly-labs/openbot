@@ -502,6 +502,8 @@ type HostRequestActions = Pick<
   | "loadServerTimezone"
   | "setServerTimezone"
   | "loadRemoteAgentBridge"
+  | "remoteAgentBridgeReachStatus"
+  | "prepareRemoteAgentBridgeReach"
   | "createRemoteAgentBridgeInvite"
   | "redeemRemoteAgentBridge"
   | "revokeRemoteAgentBridgeInvite"
@@ -772,6 +774,31 @@ function decodeBridgeLinks(value: unknown): ReturnType<typeof decodeBridgeLink>[
   return value.links.map(decodeBridgeLink);
 }
 
+function decodeBridgeReachStatus(value: unknown): {
+  ready: boolean;
+  reach: string;
+  tailscaleConnected: boolean;
+  serveConfigured: boolean;
+  dnsName: string;
+} {
+  if (
+    !isDynamicRecord(value) ||
+    typeof value.ready !== "boolean" ||
+    typeof value.tailscaleConnected !== "boolean" ||
+    typeof value.serveConfigured !== "boolean" ||
+    !isString(value.reach) ||
+    !isString(value.dnsName)
+  )
+    throw new Error("Invalid server link.");
+  return {
+    ready: value.ready,
+    reach: value.reach,
+    tailscaleConnected: value.tailscaleConnected,
+    serveConfigured: value.serveConfigured,
+    dnsName: value.dnsName,
+  };
+}
+
 /** Workspace actions that only send host requests and read advertised capabilities. */
 export function createHostRequestActions({
   request,
@@ -947,6 +974,24 @@ export function createHostRequestActions({
       const invites = await request("POST", REMOTE_AGENT_BRIDGE_ROUTES.invites, decodeBridgeInvites, {}, serverId);
       const links = await request("POST", REMOTE_AGENT_BRIDGE_ROUTES.links, decodeBridgeLinks, {}, serverId);
       return { invites, links };
+    },
+    remoteAgentBridgeReachStatus: async (serverId) => {
+      requireCapability(
+        capabilities,
+        serverId,
+        "remote-agent-bridge-v1",
+        "mobile.server.settings.remoteAgentsDescription",
+      );
+      return request("POST", REMOTE_AGENT_BRIDGE_ROUTES.reachStatus, decodeBridgeReachStatus, {}, serverId);
+    },
+    prepareRemoteAgentBridgeReach: async (serverId) => {
+      requireCapability(
+        capabilities,
+        serverId,
+        "remote-agent-bridge-v1",
+        "mobile.server.settings.remoteAgentsDescription",
+      );
+      return request("POST", REMOTE_AGENT_BRIDGE_ROUTES.prepareReach, decodeBridgeReachStatus, {}, serverId);
     },
     createRemoteAgentBridgeInvite: async (serverId) => {
       requireCapability(

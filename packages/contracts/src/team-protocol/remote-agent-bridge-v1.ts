@@ -7,7 +7,7 @@
 // and the link token cannot call a released route. Widening any of it needs a second capability
 // string.
 import { isDynamicRecord, isString } from "../runtime-values";
-import { adminRoute, empty, fields, identifier, list, type OptionalRouteCodec, string } from "./admin-wire";
+import { adminRoute, boolean, empty, fields, identifier, list, type OptionalRouteCodec, string } from "./admin-wire";
 import type { TeamProtocolV7BaseJsonObject, TeamProtocolV7BaseJsonValue } from "./v7-base";
 
 export const REMOTE_AGENT_BRIDGE_CAPABILITY = "remote-agent-bridge-v1";
@@ -22,11 +22,22 @@ export const REMOTE_AGENT_BRIDGE_ROUTES = {
   redeem: "/v1/admin/host/remote-agent-bridge/redeem",
   links: "/v1/admin/host/remote-agent-bridge/links",
   revokeLink: "/v1/admin/host/remote-agent-bridge/links/revoke",
+  prepareReach: "/v1/admin/host/remote-agent-bridge/reach/prepare",
+  reachStatus: "/v1/admin/host/remote-agent-bridge/reach/status",
   accept: "/v1/remote-agent-bridge/accept",
   agents: "/v1/remote-agent-bridge/agents",
   message: "/v1/remote-agent-bridge/message",
   peerRevoke: "/v1/remote-agent-bridge/revoke",
 } as const;
+
+/** Whether this host can give link codes to a server on another network. */
+export interface RemoteAgentBridgeReachStatus {
+  ready: boolean;
+  reach: string;
+  tailscaleConnected: boolean;
+  serveConfigured: boolean;
+  dnsName: string;
+}
 
 const PEER_PATHS = new Set<string>([
   REMOTE_AGENT_BRIDGE_ROUTES.accept,
@@ -60,6 +71,14 @@ const link = fields({
 const agent = fields({ id: identifier, name });
 const file = fields({ name: string(255), data: fileData });
 
+const reachStatus = fields({
+  ready: boolean,
+  reach,
+  tailscaleConnected: boolean,
+  serveConfigured: boolean,
+  dnsName: string(255),
+});
+
 export const REMOTE_AGENT_BRIDGE_CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   [REMOTE_AGENT_BRIDGE_ROUTES.invites, adminRoute(empty, fields({ invites: list(invite, 64) }))],
   [REMOTE_AGENT_BRIDGE_ROUTES.createInvite, adminRoute(empty, invite)],
@@ -67,6 +86,8 @@ export const REMOTE_AGENT_BRIDGE_CODECS: ReadonlyMap<string, OptionalRouteCodec>
   [REMOTE_AGENT_BRIDGE_ROUTES.redeem, adminRoute(fields({ code }), link)],
   [REMOTE_AGENT_BRIDGE_ROUTES.links, adminRoute(empty, fields({ links: list(link, 64) }))],
   [REMOTE_AGENT_BRIDGE_ROUTES.revokeLink, adminRoute(fields({ linkId: identifier }), empty)],
+  [REMOTE_AGENT_BRIDGE_ROUTES.prepareReach, adminRoute(empty, reachStatus)],
+  [REMOTE_AGENT_BRIDGE_ROUTES.reachStatus, adminRoute(empty, reachStatus)],
   [
     REMOTE_AGENT_BRIDGE_ROUTES.accept,
     adminRoute(

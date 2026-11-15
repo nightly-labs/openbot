@@ -18,7 +18,7 @@ interface LinkRow {
 
 /** Server settings > Linked servers. An owner or admin creates an invite or pastes one. */
 export function ServerRemoteAgentsScreen() {
-  const { t } = useText();
+  const { t, errorMessage } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
   const actions = useMobileWorkspaceActions();
   const [invites, setInvites] = useState<InviteRow[]>([]);
@@ -26,6 +26,7 @@ export function ServerRemoteAgentsScreen() {
   const [code, setCode] = useState("");
   const [created, setCreated] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reachReady, setReachReady] = useState<boolean | null>(null);
 
   async function reload(): Promise<void> {
     if (!serverId) return;
@@ -36,14 +37,18 @@ export function ServerRemoteAgentsScreen() {
 
   useEffect(() => {
     if (!serverId) return;
-    void actions
-      .loadRemoteAgentBridge(serverId)
-      .then((snapshot) => {
+    void (async () => {
+      try {
+        const snapshot = await actions.loadRemoteAgentBridge(serverId);
         setInvites(snapshot.invites);
         setLinks(snapshot.links);
-      })
-      .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause)));
-  }, [serverId, actions]);
+        const status = await actions.remoteAgentBridgeReachStatus(serverId);
+        setReachReady(status.ready);
+      } catch (cause: unknown) {
+        setError(errorMessage(cause, t("mobile.server.update.actionFailed")));
+      }
+    })();
+  }, [serverId, actions, errorMessage, t]);
 
   async function run(action: () => Promise<void>): Promise<void> {
     setError(null);
@@ -51,7 +56,7 @@ export function ServerRemoteAgentsScreen() {
       await action();
       await reload();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(errorMessage(cause, t("mobile.server.update.actionFailed")));
     }
   }
 
@@ -60,6 +65,21 @@ export function ServerRemoteAgentsScreen() {
       <SettingsSection title={t("mobile.server.settings.remoteAgents")}>
         <SettingsNote>{t("mobile.server.settings.remoteAgentsDescription")}</SettingsNote>
         {error ? <SettingsNote>{error}</SettingsNote> : null}
+        <Pressable
+          accessibilityRole="button"
+          onPress={() =>
+            void run(async () => {
+              if (!serverId) return;
+              const status = await actions.prepareRemoteAgentBridgeReach(serverId);
+              setReachReady(status.ready);
+            })
+          }
+        >
+          <Typography.Paragraph>{t("mobile.server.settings.remoteAgentsPrepareCrossNetwork")}</Typography.Paragraph>
+        </Pressable>
+        {reachReady === false ? (
+          <SettingsNote>{t("mobile.server.settings.remoteAgentsPrepareCrossNetworkHint")}</SettingsNote>
+        ) : null}
         <Pressable
           accessibilityRole="button"
           onPress={() =>

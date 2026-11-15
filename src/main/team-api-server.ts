@@ -668,7 +668,11 @@ export class TeamApiServer {
     });
     const port = yield* remoteCall(() => listenLoopback(server, () => new Error(sourceText("error.team.bindFailed"))));
     this.#port = port;
-    this.#options.admin?.remoteAgentBridge?.setReach(`http://127.0.0.1:${port}`);
+    const bridge = this.#options.admin?.remoteAgentBridge;
+    const currentReach = bridge?.reach() ?? "";
+    if (!currentReach || currentReach.startsWith("http://127.0.0.1")) {
+      bridge?.setReach(`http://127.0.0.1:${port}`);
+    }
     this.#agentListener = (event, memberId) => this.#broadcastAgentEvent(event, memberId);
     this.#options.agents.on("event", this.#agentListener);
     this.#sidebarLayoutListener = (layout) => this.#broadcastAgentEvent({ type: "sidebar-layout-changed", layout });

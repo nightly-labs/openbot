@@ -1721,6 +1721,20 @@ export const IPC_ENDPOINTS = {
       "remote-agent-bridge:redeem",
     ),
     revokeLink: scopedRequest<string, void>()("remote-agent-bridge:revoke-link"),
+    reachStatus: scopedQuery<{
+      ready: boolean;
+      reach: string;
+      tailscaleConnected: boolean;
+      serveConfigured: boolean;
+      dnsName: string;
+    }>()("remote-agent-bridge:reach-status"),
+    prepareReach: scopedQuery<{
+      ready: boolean;
+      reach: string;
+      tailscaleConnected: boolean;
+      serveConfigured: boolean;
+      dnsName: string;
+    }>()("remote-agent-bridge:prepare-reach"),
   },
   marketplaceAgents: {
     list: request<MarketplaceAgentQuery | undefined, MarketplaceAgentPage>()("marketplace-agents:list"),

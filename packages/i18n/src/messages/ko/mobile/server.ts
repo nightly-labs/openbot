@@ -431,6 +431,18 @@ export const messages = {
   "mobile.server.settings.moveSection": "가져오기 및 이전",
   "mobile.server.settings.serverSection": "서버",
   "mobile.server.settings.timezone": "시간대",
+  "mobile.server.settings.remoteAgents": "연결된 서버",
+  "mobile.server.settings.remoteAgentsDescription":
+    "이 서버의 에이전트는 연결된 서버의 에이전트에게 메시지를 보낼 수 있습니다.",
+  "mobile.server.settings.remoteAgentsCreate": "연결 코드 만들기",
+  "mobile.server.settings.remoteAgentsPaste": "코드 사용",
+  "mobile.server.settings.remoteAgentsRevoke": "제거",
+  "mobile.server.settings.remoteAgentsExpires": "{date}에 만료",
+  "mobile.server.settings.remoteAgentsEmpty": "연결된 서버가 없습니다.",
+  "mobile.server.settings.remoteAgentsCode": "연결 코드",
+  "mobile.server.settings.remoteAgentsPrepareCrossNetwork": "네트워크 간 연결 준비",
+  "mobile.server.settings.remoteAgentsPrepareCrossNetworkHint":
+    "다른 네트워크용 코드를 만들기 전에 Tailscale이 있는 호스트에서 실행하세요.",
   "mobile.server.settings.timezoneAutomatic": "자동",
   "mobile.server.settings.timezoneSystem": "서버 시간대: {zone}",
   "mobile.server.settings.timezonePhone": "이 휴대폰",

@@ -172,6 +172,19 @@ export const messages = {
     "El estado del buzón está dañado o pertenece a una versión más reciente de OpenBot; no se sobrescribirá.",
   "error.backend.recipientDeleting":
     "El destinatario se está eliminando. Inténtalo de nuevo cuando termine la eliminación.",
+  "error.backend.remoteAgentBridgePeerDown":
+    "El servidor vinculado no respondió. Vuelve a intentarlo cuando esté encendido.",
+  "error.backend.remoteAgentBridgeInviteExpired": "Este código de enlace ha caducado. Crea uno nuevo.",
+  "error.backend.remoteAgentBridgeInviteUsed": "Este código de enlace ya no es válido.",
+  "error.backend.remoteAgentBridgeSameServer": "Un servidor no puede vincularse consigo mismo.",
+  "error.backend.remoteAgentBridgeRevoked": "Se eliminó el vínculo con este servidor.",
+  "error.backend.remoteAgentBridgeFileTooLarge": "Un archivo supera el límite de adjuntos. No se envió nada.",
+  "error.backend.remoteAgentBridgeUnsupported": "Actualiza OpenBot en este servidor para vincular otro servidor.",
+  "error.backend.remoteAgentBridgeTailscaleMissing":
+    "Instala Tailscale en este equipo, inicia sesión e inténtalo de nuevo.",
+  "error.backend.remoteAgentBridgeTailscaleOffline": "Tailscale no está conectado en este equipo.",
+  "error.backend.remoteAgentBridgeReachFailed":
+    "No se pudo preparar la dirección de servidores vinculados en Tailscale. Inténtalo de nuevo.",
   "error.backend.recipientHidden": "Este agente está oculto. Restáuralo para enviarle mensajes.",
   "error.backend.agentIdUnknown":
     "Ningún agente tiene el ID {id}. Obtén los ID con openbot.list_agents y vuelve a intentarlo.",

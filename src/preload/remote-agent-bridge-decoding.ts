@@ -36,6 +36,31 @@ export function decodeRemoteAgentBridgeLink(value: unknown): {
   };
 }
 
+export function decodeRemoteAgentBridgeReachStatus(value: unknown): {
+  ready: boolean;
+  reach: string;
+  tailscaleConnected: boolean;
+  serveConfigured: boolean;
+  dnsName: string;
+} {
+  if (
+    !isDynamicRecord(value) ||
+    typeof value.ready !== "boolean" ||
+    typeof value.tailscaleConnected !== "boolean" ||
+    typeof value.serveConfigured !== "boolean" ||
+    !isString(value.reach) ||
+    !isString(value.dnsName)
+  )
+    invalid();
+  return {
+    ready: value.ready,
+    reach: value.reach,
+    tailscaleConnected: value.tailscaleConnected,
+    serveConfigured: value.serveConfigured,
+    dnsName: value.dnsName,
+  };
+}
+
 export function decodeRemoteAgentBridgeSnapshot(value: unknown): {
   invites: ReturnType<typeof decodeRemoteAgentBridgeInvite>[];
   links: ReturnType<typeof decodeRemoteAgentBridgeLink>[];

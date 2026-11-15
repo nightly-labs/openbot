@@ -178,6 +178,20 @@ export const messages = {
     "Der Postfachzustand ist beschädigt oder stammt aus einer neueren OpenBot-Version. Er wird nicht überschrieben.",
   "error.backend.recipientDeleting":
     "Der Empfänger wird gelöscht. Versuche es nach Abschluss des Löschvorgangs erneut.",
+  "error.backend.remoteAgentBridgePeerDown":
+    "Der verknüpfte Server hat nicht geantwortet. Versuche es erneut, wenn er online ist.",
+  "error.backend.remoteAgentBridgeInviteExpired": "Dieser Linkcode ist abgelaufen. Erstelle einen neuen.",
+  "error.backend.remoteAgentBridgeInviteUsed": "Dieser Linkcode ist nicht mehr gültig.",
+  "error.backend.remoteAgentBridgeSameServer": "Ein Server kann sich nicht mit sich selbst verknüpfen.",
+  "error.backend.remoteAgentBridgeRevoked": "Diese Serververknüpfung wurde entfernt.",
+  "error.backend.remoteAgentBridgeFileTooLarge": "Eine Datei überschreitet das Anhangslimit. Es wurde nichts gesendet.",
+  "error.backend.remoteAgentBridgeUnsupported":
+    "Aktualisiere OpenBot auf diesem Server, um einen anderen Server zu verknüpfen.",
+  "error.backend.remoteAgentBridgeTailscaleMissing":
+    "Installiere Tailscale auf diesem Computer, melde dich an und versuche es erneut.",
+  "error.backend.remoteAgentBridgeTailscaleOffline": "Tailscale ist auf diesem Computer nicht verbunden.",
+  "error.backend.remoteAgentBridgeReachFailed":
+    "Die Adresse für verknüpfte Server konnte auf Tailscale nicht vorbereitet werden. Versuche es erneut.",
   "error.backend.recipientHidden": "Dieser Agent ist ausgeblendet. Stelle ihn wieder her, um Nachrichten zu senden.",
   "error.backend.agentIdUnknown":
     "Kein Agent hat die ID {id}. Hole die IDs mit openbot.list_agents und versuche es erneut.",
