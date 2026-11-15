@@ -15,7 +15,7 @@ import { isTailscaleConnected } from "./private-network-detection";
 const execFileAsync = promisify(execFile);
 
 /** Exact peer paths only; no directory prefix that could proxy the rest of the Team API. */
-export const BRIDGE_SERVE_PATHS = [
+const BRIDGE_SERVE_PATHS = [
   REMOTE_AGENT_BRIDGE_ROUTES.accept,
   REMOTE_AGENT_BRIDGE_ROUTES.agents,
   REMOTE_AGENT_BRIDGE_ROUTES.message,

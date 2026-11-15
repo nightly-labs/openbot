@@ -231,7 +231,7 @@ function token(): string {
   return value;
 }
 
-export function normalizeReach(value: string): string {
+function normalizeReach(value: string): string {
   const trimmed = value.trim();
   try {
     const url = new URL(trimmed);
@@ -252,7 +252,7 @@ export function parseRemoteAgentId(id: string): { linkId: string; agentId: strin
   return { linkId: rest.slice(0, split), agentId: rest.slice(split + 1) };
 }
 
-export function remoteAgentId(linkId: string, agentId: string): string {
+function remoteAgentId(linkId: string, agentId: string): string {
   return `remote:${linkId}:${agentId}`;
 }
 
