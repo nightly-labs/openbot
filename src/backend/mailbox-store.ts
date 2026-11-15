@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { playableMediaKind } from "@openbot/contracts/attachment-files";
 import { rewriteAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -53,6 +54,7 @@ import { isEmptyStoredFile, parseStoredJson } from "./atomic-json-file";
 import { routineNameInLimit } from "./database/legacy-conversation-message";
 import { mailboxReactionRowKey } from "./database/mailbox-projection";
 import { MailboxDeliveryGate } from "./mailbox-delivery-gate";
+import { MailboxSourceTurnIndex } from "./mailbox-source-turn-index";
 import { runIdOrigins } from "./message-run-ids";
 import { OpenBotDatabase } from "./openbot-database";
 import { isRecord } from "./protocol";
@@ -287,6 +289,7 @@ export class MailboxStore {
   readonly #database: OpenBotDatabase;
   readonly #queueUpdates = new Set<string>();
   readonly #deliveryGate = new MailboxDeliveryGate();
+  readonly #sourceTurns = new MailboxSourceTurnIndex();
   readonly #stagedGeneratedAttachments = new Map<string, StoredGeneratedAttachment>();
   #state: StoredState = structuredClone(EMPTY_STATE);
   /**
@@ -330,7 +333,9 @@ export class MailboxStore {
         this.#state = normalizeStoredState(persisted);
         // Each read accepts rows in an older form, and a write stores only the rows that changed. So
         // rows that the read had to bring to the current form are all written once, here.
-        if (JSON.stringify(this.#state) !== JSON.stringify(stored)) {
+        // These values came from JSON. Compare them without copying every message text into two
+        // large strings. Property order alone does not require a projection rewrite.
+        if (!isDeepStrictEqual(this.#state, stored)) {
           this.#persist("mailbox.normalized", undefined, [], true);
         }
       } else {
@@ -700,7 +705,10 @@ export class MailboxStore {
       this.#state.messages.push(message);
       recordRestartActivity();
       this.#state.deliveries.push(...deliveries);
-      if (input.idempotencyKey) this.#state.idempotency[input.idempotencyKey] = messageId;
+      if (input.idempotencyKey) {
+        this.#state.idempotency[input.idempotencyKey] = messageId;
+        this.#sourceTurns.invalidate();
+      }
       const usedDrafts = voiceDraft ? [...drafts, voiceDraft] : drafts;
       this.#state.drafts = this.#state.drafts.filter((draft) => !usedDrafts.includes(draft));
       this.#changes.messageIds.add(messageId);
@@ -714,6 +722,7 @@ export class MailboxStore {
         this.#state.deliveries = this.#state.deliveries.filter((candidate) => !deliveryIds.has(candidate.id));
         if (input.idempotencyKey && this.#state.idempotency[input.idempotencyKey] === messageId) {
           delete this.#state.idempotency[input.idempotencyKey];
+          this.#sourceTurns.invalidate();
         }
         for (const draft of usedDrafts) {
           if (!this.#state.drafts.some((candidate) => candidate.id === draft.id)) {
@@ -1114,6 +1123,7 @@ export class MailboxStore {
       this.#state.reactions = this.#state.reactions.filter((reaction) => !ids.has(reaction.messageId));
       for (const [key, messageId] of Object.entries(this.#state.idempotency))
         if (ids.has(messageId)) delete this.#state.idempotency[key];
+      this.#sourceTurns.invalidate();
       for (const id of ids) this.#changes.messageIds.add(id);
       for (const delivery of deliveries) this.#changes.deliveryIds.add(delivery.id);
       for (const reaction of reactions)
@@ -1212,6 +1222,7 @@ export class MailboxStore {
         for (const id of removedMessageIds) this.#changes.messageIds.add(id);
         for (const [key, keyMessageId] of Object.entries(this.#state.idempotency))
           if (removedMessageIds.has(keyMessageId)) delete this.#state.idempotency[key];
+        this.#sourceTurns.invalidate();
         const inUse = new Set(
           this.#fileRecords()
             .filter((record) => !record.deletedAt)
@@ -1295,6 +1306,7 @@ export class MailboxStore {
         this.#changes.reactionKeys.add(mailboxReactionRowKey(reaction.agentId, reaction.messageId, reaction.actor));
       for (const [key, keyMessageId] of Object.entries(this.#state.idempotency))
         if (removedIds.has(keyMessageId)) delete this.#state.idempotency[key];
+      this.#sourceTurns.invalidate();
       const inUse = new Set(
         this.#fileRecords()
           .filter((record) => !record.deletedAt)
@@ -1687,17 +1699,10 @@ export class MailboxStore {
   }, Effect.uninterruptible).bind(this);
 
   /**
-   * The turn that sent each message, by message id, read once for a whole lookup: agent keys are
-   * kept for good, so a scan of every key for each message grows with the square of the history.
+   * Reuse this derived lookup until keys change. State replacement also discards the old lookup.
    */
-  #sourceTurnIds(): Map<string, string | undefined> {
-    const turnIds = new Map<string, string | undefined>();
-    for (const [key, messageId] of Object.entries(this.#state.idempotency)) {
-      if (turnIds.has(messageId)) continue;
-      const parts = key.split(":");
-      turnIds.set(messageId, parts.length >= 3 ? parts.at(-2) : undefined);
-    }
-    return turnIds;
+  #sourceTurnIds(): ReadonlyMap<string, string | undefined> {
+    return this.#sourceTurns.read(this.#state.idempotency);
   }
 
   senderAgentIdsForRecipient(agentId: string): string[] {
