@@ -687,7 +687,6 @@ interface HistoryItemPage {
   nextCursor: string | null;
 }
 
-/** The params without the fields that `ThreadLifecycle` adds for a client with `turnContext`. */
 /** The environment of the Codex process. Windows compares variable names without case. */
 function codexEnvironment(extraEnv: Readonly<Record<string, string>> | undefined): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env, ...extraEnv };
@@ -695,6 +694,7 @@ function codexEnvironment(extraEnv: Readonly<Record<string, string>> | undefined
   return env;
 }
 
+/** The params without the fields that `ThreadLifecycle` adds for a client with `turnContext`. */
 function withoutTurnContextParams(params: unknown): DynamicRecord {
   if (!isRecord(params)) return {};
   const {
