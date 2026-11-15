@@ -98,8 +98,13 @@ function geminiMcpLoadFailure(text: string): { name: string; reason: string } | 
  * MODEL_CAPACITY_EXHAUSTED and "No capacity available for model …". It is not the plan's quota,
  * so it is matched before the rate limit (#8554). Not the word "capacity" alone: Google's quota
  * text "You have exhausted your capacity on this model" is a spent quota.
+ *
+ * Google refuses all requests from some network addresses, also server addresses in a supported
+ * country, with FAILED_PRECONDITION "User location is not supported for the API use." Waiting or
+ * another model does not help (#9681). Not the status name: Google also uses it for other failures.
  */
 const GEMINI_REQUEST_FAILURES = [
+  ["error.provider.antigravityLocationUnsupported", /\bUser location is not supported\b/iu],
   [
     "error.provider.antigravityModelAtCapacity",
     /\bMODEL_CAPACITY_EX(?:HAUSTED|CEEDED)\b|\b[Nn]o capacity available for model\b/u,
