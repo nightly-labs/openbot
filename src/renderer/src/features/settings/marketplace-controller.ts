@@ -158,6 +158,16 @@ export interface PendingSkillConfirm {
 }
 
 /**
+ * The question before an app takes the name of a server that is not the app's. `server` is that
+ * name, `app` the name of the app.
+ */
+export interface PendingServerReplace {
+  server: string;
+  app: string;
+  settle: (confirmed: boolean) => void;
+}
+
+/**
  * The question before an agent update that meets skills with local changes. `settle` gets the ids
  * of the skills to replace, or null when the user cancels.
  */
@@ -518,6 +528,22 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     });
   }
 
+  const [serverReplace, setServerReplace] = createSignal<PendingServerReplace | null>(null);
+  /** Asks to replace the server `server` with the app `app`. False when the user cancels. */
+  function confirmServerReplace(server: string, app: string): Promise<boolean> {
+    untrack(serverReplace)?.settle(false);
+    return new Promise((resolve) => {
+      setServerReplace({
+        server,
+        app,
+        settle: (confirmed) => {
+          setServerReplace(null);
+          resolve(confirmed);
+        },
+      });
+    });
+  }
+
   /** One sentence for the agents that did not change: the reason alone when only one agent was asked. */
   function skillFailure(name: string, failed: readonly string[], reasons: ReadonlySet<string>, asked: number) {
     const reason = [...reasons].join(" ");
@@ -869,6 +895,12 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
   };
   /** The first row of this app, or nothing. */
   const heldApp = (app: MarketplacePluginApp): McpServerConfig | undefined => heldApps(app)[0];
+  /**
+   * A row with the app's server name that is not the app's, such as one the user added by hand at
+   * another address. The host keeps names unique, so the app can connect only in place of it.
+   */
+  const otherRowNamed = (app: MarketplacePluginApp): McpServerConfig | undefined =>
+    heldApp(app) ? undefined : servers().find((row) => row.name === app.server.name);
   /** Which held http rows have a sign-in, by row id. Read with the rows. */
   const [signIns, setSignIns] = createSignal<Readonly<Record<string, McpSignInState>>>({});
   /**
@@ -1292,6 +1324,15 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     mark(key, true);
     const analytics = desktopAnalytics.scope();
     const installed = await run(async () => {
+      /* Asked before the skills and the sign-in, so a cancel changes nothing. A replaced row keeps only
+         its id: its address, keys and headers belong to the other server. */
+      const replacing = new Map<string, string>();
+      for (const app of plugin.apps) {
+        const other = otherRowNamed(app);
+        if (!other) continue;
+        if (!(await confirmServerReplace(other.name, app.name))) return false;
+        replacing.set(app.id, other.id);
+      }
       const addedSkills: string[] = [];
       try {
         for (const skill of plugin.skills) {
@@ -1300,7 +1341,8 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
           if (!held) addedSkills.push(skill.id);
         }
         for (const app of plugin.apps) {
-          const config = pluginAppConfig(app);
+          const replacedId = replacing.get(app.id);
+          const config = replacedId ? { ...createPluginAppConfig(app), id: replacedId } : pluginAppConfig(app);
           const invalid = Object.values(mcpConfigErrors(config))[0];
           if (invalid) throw new Error(t("marketplace.error.appInvalid", { name: app.name, reason: invalid }));
           /* What is saved is the configuration that connected, not the one the listing describes:
@@ -1632,6 +1674,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
   const stopDialogs = () => {
     untrack(connecting)?.settle(null);
     untrack(skillConfirm)?.settle(false);
+    untrack(serverReplace)?.settle(false);
     untrack(agentUpdate)?.settle(null);
     setUninstalling(null);
   };
@@ -1644,6 +1687,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
   onCleanup(() => {
     untrack(connecting)?.settle(null);
     untrack(skillConfirm)?.settle(false);
+    untrack(serverReplace)?.settle(false);
     untrack(agentUpdate)?.settle(null);
   });
 
@@ -1754,6 +1798,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     connecting,
     uninstalling,
     skillConfirm,
+    serverReplace,
     agentUpdate,
     uninstallPlan,
     uninstallPlugin,
