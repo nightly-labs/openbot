@@ -211,6 +211,19 @@ export const RelayDevice: Story = {
   },
 };
 
+/** An address that is too long to send has no copy button. */
+export const RelayNoLink: Story = {
+  args: {
+    state: {
+      phase: "relay",
+      hostName: "Cloud server",
+      page: { authorizeHost: "auth.openai.com", url: null, listening: false, pasteable: false },
+    },
+    onOpenRelayPage: fn(),
+    onPasteRelayAddress: fn(),
+  },
+};
+
 /** A relayed sign-in that this computer cannot take back by itself, so the user pastes the address. */
 export const RelayPaste: Story = {
   args: {
