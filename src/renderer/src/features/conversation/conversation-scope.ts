@@ -850,17 +850,17 @@ export function createConversationViewScope(props: ConversationProps) {
   // reports, so the chat shows a failed send, and a send that the host is slow to answer (`late`),
   // until the host's row is drawn: a message is never out of view while a slow host answers, or
   // while an earlier send of the chat is in flight.
-  const pendingMessages = createMemo(() =>
-    currentPendingSends()
+  const pendingMessages = createMemo(() => {
+    // Read on each run, so the deliveries are recorded when the send starts and not when it is late.
+    const queuedIds = queuedSendIds();
+    return currentPendingSends()
       .filter((send) => {
         const messageId = sentMessageId(send);
         return !(messageId && drawnHostIds().has(messageId));
       })
-      .filter(
-        (send) => !send.queued || send.state === "failed" || (send.late && !queuedSendIds().has(send.clientMessageId)),
-      )
-      .map(pendingSendMessage),
-  );
+      .filter((send) => !send.queued || send.state === "failed" || (send.late && !queuedIds.has(send.clientMessageId)))
+      .map(pendingSendMessage);
+  });
   /** The pending send a timeline row draws, by the row's message id. */
   const pendingSendFor = (messageId: string | undefined) =>
     messageId?.startsWith(PENDING_SEND_ID_PREFIX)
