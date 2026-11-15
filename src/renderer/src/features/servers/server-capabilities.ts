@@ -121,6 +121,7 @@ export function serverSupportsCapability(
       capability === "webhook-sender-secret-v1" ||
       capability === "agent-import-v1" ||
       capability === "instance-transfer-v1" ||
+      capability === "remote-agent-bridge-v1" ||
       capability === "instance-transfer-chunks-v1" ||
       capability === "instance-transfer-full-copy-v1" ||
       capability === "agent-hidden-v1" ||

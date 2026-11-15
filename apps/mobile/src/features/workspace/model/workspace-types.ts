@@ -534,10 +534,20 @@ export interface MobileWorkspaceContextValue {
   restartServerItself: (serverId: string) => Promise<void>;
   /** An owner or admin of an online host that serves `host-timezone-v1`. The host checks the role again. */
   canManageServerTimezone: (serverId: string) => boolean;
+  /** An owner or admin of an online host that serves `remote-agent-bridge-v1`. */
+  canManageRemoteAgentBridge: (serverId: string) => boolean;
   /** The zone of a routine that an agent creates with no zone. Owners and admins only. */
   loadServerTimezone: (serverId: string) => Promise<HostTimezoneSettings>;
   /** `null` is automatic: the host system zone. The host refuses a zone that it cannot resolve. */
   setServerTimezone: (timezone: string | null, serverId: string) => Promise<HostTimezoneSettings>;
+  loadRemoteAgentBridge: (serverId: string) => Promise<{
+    invites: { inviteId: string; code: string; expiresAt: string; serverName: string }[];
+    links: { linkId: string; peerName: string; createdAt: string }[];
+  }>;
+  createRemoteAgentBridgeInvite: (serverId: string) => Promise<{ inviteId: string; code: string; expiresAt: string }>;
+  redeemRemoteAgentBridge: (code: string, serverId: string) => Promise<{ linkId: string; peerName: string }>;
+  revokeRemoteAgentBridgeInvite: (inviteId: string, serverId: string) => Promise<void>;
+  revokeRemoteAgentBridgeLink: (linkId: string, serverId: string) => Promise<void>;
   /** An owner or admin of an online host that serves `agent-memory-limit-v1`. The host checks the role again. */
   canManageAgentMemoryLimit: (serverId: string) => boolean;
   /** How many memories each agent of the server can keep, and the values that the host permits. */
@@ -1325,6 +1335,7 @@ type ServerCheckKey =
   | "canCreateLocalServers"
   | "canRestartServerItself"
   | "canManageServerTimezone"
+  | "canManageRemoteAgentBridge"
   | "canReadMachineMetrics"
   | "canManageAgentMemoryLimit"
   | "canManageMemoryReview"

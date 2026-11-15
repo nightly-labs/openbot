@@ -55,6 +55,7 @@ export function encodeTeamProtocolV7WebRtcHttpResponse(
     subagents?: boolean;
     promptMultiSelect?: boolean;
     videoGeneration?: boolean;
+    remoteSender?: boolean;
   } = {},
 ) {
   if (status === 204) return {};
@@ -78,6 +79,7 @@ export function createTeamProtocolV7Event(
     subagents?: boolean;
     promptMultiSelect?: boolean;
     videoGeneration?: boolean;
+    remoteSender?: boolean;
   } = {},
 ): TeamProtocolV2EventFrame {
   const decoded = decodeTeamProtocolV7BaseCurrentEvent(value);

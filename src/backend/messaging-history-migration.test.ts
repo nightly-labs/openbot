@@ -18,6 +18,8 @@ const HISTORY_TABLES = {
   projection_messaging_history: [],
   ...CRM_TABLES_AFTER_MIGRATION,
   ...THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION,
+  remote_agent_bridge_invites: [],
+  remote_agent_bridge_links: [],
 };
 
 function databaseAt(version: number): DatabaseSync {

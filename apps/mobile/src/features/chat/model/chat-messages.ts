@@ -60,6 +60,8 @@ export type ChatMessage =
       id: string;
       kind: "exchange";
       exchange: AgentExchangeSummary;
+      /** An agent of a linked server. Absent when the host does not send it. */
+      remoteSender?: { agentId: string; agentName: string; serverName: string };
       /** Incoming files show under the marker, so the marker keeps a row of its own. */
       standalone: boolean;
     }
@@ -556,6 +558,7 @@ export function projectChatMessages(
           id: `exchange:${message.id}`,
           kind: "exchange",
           exchange,
+          ...(message.remoteSender ? { remoteSender: message.remoteSender } : {}),
           standalone: exchange.direction === "incoming" && Boolean(message.attachments?.length),
         })),
       );

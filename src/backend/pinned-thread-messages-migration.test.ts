@@ -84,9 +84,11 @@ function contents(db: DatabaseSync): Record<string, unknown[]> {
 
 const PIN_TABLES = {
   projection_messaging_history: [],
-  projection_pinned_thread_messages: [],
   ...CRM_TABLES_AFTER_MIGRATION,
   ...THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION,
+  projection_pinned_thread_messages: [],
+  remote_agent_bridge_invites: [],
+  remote_agent_bridge_links: [],
 };
 
 function pinTables(db: DatabaseSync) {

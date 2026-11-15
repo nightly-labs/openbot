@@ -19,9 +19,11 @@ const SOURCES = Array.from({ length: 52 }, (_, index) => index + 8);
 // Migration 61 runs after 60 and adds this empty table.
 const LATER_TABLES = {
   projection_messaging_history: [],
-  projection_pinned_thread_messages: [],
   ...CRM_TABLES_AFTER_MIGRATION,
   ...THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION,
+  projection_pinned_thread_messages: [],
+  remote_agent_bridge_invites: [],
+  remote_agent_bridge_links: [],
 };
 
 function databaseAt(version: number): DatabaseSync {

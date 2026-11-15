@@ -145,6 +145,7 @@ import {
   PUSH_NOTIFICATION_THREADS_CAPABILITY,
   PUSH_NOTIFICATIONS_CAPABILITY,
   QUIET_TURN_CAPABILITY,
+  REMOTE_AGENT_BRIDGE_CAPABILITY,
   ROUTINE_FLOW_STOP_CAPABILITY,
   ROUTINE_FLOWS_CAPABILITY,
   ROUTINE_PAUSE_REASONS_CAPABILITY,
@@ -432,6 +433,11 @@ import { routeProviderUsageReset } from "./team-api/route-provider-usage-reset";
 import { routeProviderUse } from "./team-api/route-provider-use";
 import { routeProviders } from "./team-api/route-providers";
 import { routePushNotifications } from "./team-api/route-push-notifications";
+import {
+  remoteAgentBridgePeerPath,
+  routeRemoteAgentBridge,
+  routeRemoteAgentBridgePeer,
+} from "./team-api/route-remote-agent-bridge";
 import { routeRemoteScreen } from "./team-api/route-remote-screen";
 import { routeRoutineFlows } from "./team-api/route-routine-flows";
 import { routeRoutinePauseReasons } from "./team-api/route-routine-pause-reasons";
@@ -662,6 +668,7 @@ export class TeamApiServer {
     });
     const port = yield* remoteCall(() => listenLoopback(server, () => new Error(sourceText("error.team.bindFailed"))));
     this.#port = port;
+    this.#options.admin?.remoteAgentBridge?.setReach(`http://127.0.0.1:${port}`);
     this.#agentListener = (event, memberId) => this.#broadcastAgentEvent(event, memberId);
     this.#options.agents.on("event", this.#agentListener);
     this.#sidebarLayoutListener = (layout) => this.#broadcastAgentEvent({ type: "sidebar-layout-changed", layout });
@@ -1154,6 +1161,21 @@ export class TeamApiServer {
         return this.#json(response, 200, await runCauseEffect(this.#options.store.loginWithAccount(user)));
       }
 
+      // A link token is not a member session. These paths answer before the member gate, and a
+      // bad token is 401. They do not fall through to member authentication.
+      if (remoteAgentBridgePeerPath(url.pathname)) {
+        await routeRemoteAgentBridgePeer(
+          request,
+          url.pathname,
+          request.socket.remoteAddress ?? "local",
+          this.#options.admin,
+          (status, value) => {
+            this.#json(response, status, value);
+          },
+        );
+        return;
+      }
+
       // The auth gate does not look at the path. An unknown route without a token is 401, not 404,
       // and that is deliberate: answering 404 would let anyone map which endpoints this host has.
       const token = bearerToken(request.headers.authorization);
@@ -1355,6 +1377,7 @@ export class TeamApiServer {
       if ((await routeHostPersonality(context, this.#options.admin)) === "handled") return;
       if ((await routeHostKeyRotation(context, this.#options.admin)) === "handled") return;
       if ((await routeLocalServers(context, this.#options.admin)) === "handled") return;
+      if ((await routeRemoteAgentBridge(context, this.#options.admin)) === "handled") return;
       if ((await routeAgentMemoryLimit(context, this.#options.admin)) === "handled") return;
       if ((await routeMemoryReview(context, this.#options.admin)) === "handled") return;
       if ((await routeSkillLearning(context, this.#options.admin)) === "handled") return;
@@ -1643,6 +1666,7 @@ export class TeamApiServer {
         promptMultiSelect: capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
         videoGeneration: capabilities.has(TEAM_VIDEO_GENERATION_CAPABILITY),
         memoryChanges: capabilities.has(TEAM_MEMORY_CHANGES_CAPABILITY),
+        remoteSender: capabilities.has(REMOTE_AGENT_BRIDGE_CAPABILITY),
       });
       if (encoded === null) return null;
       const answered = capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)
@@ -2499,6 +2523,7 @@ export class TeamApiServer {
       promptMultiSelect: route.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
       videoGeneration: route.capabilities.has(TEAM_VIDEO_GENERATION_CAPABILITY),
       memoryChanges: route.capabilities.has(TEAM_MEMORY_CHANGES_CAPABILITY),
+      remoteSender: route.capabilities.has(REMOTE_AGENT_BRIDGE_CAPABILITY),
       usageTertiary: route.capabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
       agentPendingRuntime: route.capabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
     };
@@ -2888,6 +2913,8 @@ export class TeamApiServer {
           if (capability === HOST_PERSONALITY_CAPABILITY) return this.#options.admin?.personality !== undefined;
           if (capability === HOST_KEY_ROTATION_CAPABILITY) return this.#options.admin?.hostKey !== undefined;
           if (capability === LOCAL_SERVERS_CAPABILITY) return this.#options.admin?.localServers !== undefined;
+          if (capability === REMOTE_AGENT_BRIDGE_CAPABILITY)
+            return this.#options.admin?.remoteAgentBridge !== undefined;
           if (capability === AGENT_MEMORY_LIMIT_CAPABILITY) return this.#options.admin?.memoryLimit !== undefined;
           if (capability === MEMORY_REVIEW_CAPABILITY) return this.#options.admin?.memoryReview !== undefined;
           if (capability === SKILL_LEARNING_CAPABILITY) return this.#options.admin?.skillLearning !== undefined;

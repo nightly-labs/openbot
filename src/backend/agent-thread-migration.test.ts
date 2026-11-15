@@ -135,6 +135,8 @@ function withoutTasks(rows: Record<string, unknown[]>): Record<string, unknown[]
     projection_messaging_pings: _pings,
     projection_pinned_thread_messages: _pins,
     projection_messaging_history: _history,
+    remote_agent_bridge_invites: _bridgeInvites,
+    remote_agent_bridge_links: _bridgeLinks,
     ...kept
   } = rows;
   // Migration 63 adds the CRM tables.

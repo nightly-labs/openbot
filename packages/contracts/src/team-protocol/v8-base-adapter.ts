@@ -18,6 +18,7 @@ import {
 } from "./current-agent-keys";
 import { withConversationMemoryChanges } from "./memory-changes-v1";
 import { eventHasPromptQuestions, withEventPromptMultiSelect } from "./prompt-multi-select-v1";
+import { withConversationRemoteSender } from "./remote-agent-bridge-v1";
 import { withConversationSubagents } from "./subagents-v1";
 import { withConversationUiBlocks } from "./ui-blocks-v1";
 import { withUsageEventTertiary } from "./usage-tertiary-v1";
@@ -76,6 +77,7 @@ export function decodeTeamProtocolV8BaseCurrentEvent(value: unknown): TeamProtoc
         value,
         value,
         value,
+        value,
       ),
       value,
     );
@@ -98,6 +100,7 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
     subagents?: boolean;
     promptMultiSelect?: boolean;
     videoGeneration?: boolean;
+    remoteSender?: boolean;
     contextUsage?: boolean;
     usageTertiary?: boolean;
     agentPendingRuntime?: boolean;
@@ -141,6 +144,7 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
     options.subagents ? currentValue : null,
     options.videoGeneration ? currentValue : null,
     options.memoryChanges ? currentValue : null,
+    options.remoteSender ? currentValue : null,
   );
   const withMultiSelect = promptMultiSelect ? withEventPromptMultiSelect(withPlans, currentValue) : withPlans;
   const withContext = contextUsage
@@ -168,6 +172,7 @@ function withEventConversationPlans(
   subagentSource: unknown,
   videoSource: unknown,
   memorySource: unknown,
+  remoteSource: unknown,
 ): TeamProtocolV8BaseJsonValue {
   if (projected === null || Array.isArray(projected) || typeof projected !== "object") return projected;
   if (!isDynamicRecord(source)) return projected;
@@ -186,7 +191,10 @@ function withEventConversationPlans(
     : withSubagents;
   return {
     ...projected,
-    [key]: isDynamicRecord(memorySource) ? withConversationMemoryChanges(withVideo, memorySource[key]) : withVideo,
+    [key]: withConversationRemoteSender(
+      isDynamicRecord(memorySource) ? withConversationMemoryChanges(withVideo, memorySource[key]) : withVideo,
+      isDynamicRecord(remoteSource) ? remoteSource[key] : undefined,
+    ),
   };
 }
 

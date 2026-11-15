@@ -1,5 +1,6 @@
 import type { Effect } from "effect";
 import type { ChannelService } from "../../backend/channel-service";
+import type { RemoteAgentBridge } from "../../backend/remote-agent-bridge";
 import type { AcpRegistry } from "../acp-registry";
 import type { AgentAccessStore } from "../agent-access-store";
 import type { AgentAdminSettingsService } from "../agent-admin-settings";
@@ -596,6 +597,10 @@ export interface TeamApiAdmin {
     /** Moves the server's data to the Trash and removes it from the account. */
     delete(serverId: string): Effect.Effect<void, RemoteWorkflowError>;
   };
+  /** `remote-agent-bridge-v1`: a link to another host so agents can send messages and files. */
+  remoteAgentBridge?: RemoteAgentBridge;
+  /** The name this host puts on an invite and on a message it sends across a link. */
+  serverName?: () => string;
   /** `agent-memory-limit-v1`: how many memories each agent of this computer can keep. */
   memoryLimit?: AgentMemoryLimitSetting;
   /** `memory-review-v1`: how often this computer's agents review their memories in the background. */

@@ -62,10 +62,15 @@ export function ChatExchangeMarker({
         key={id ?? legacyName}
         agent={participant}
         name={
-          participant?.name ??
-          (message.kind === "channel-routing"
-            ? (legacyName ?? t("mobile.chat.exchange.unavailableAgent"))
-            : t("mobile.chat.exchange.unknownAgent"))
+          message.kind === "exchange" && message.remoteSender
+            ? t("mobile.chat.exchange.remoteSender", {
+                name: message.remoteSender.agentName,
+                server: message.remoteSender.serverName,
+              })
+            : (participant?.name ??
+              (message.kind === "channel-routing"
+                ? (legacyName ?? t("mobile.chat.exchange.unavailableAgent"))
+                : t("mobile.chat.exchange.unknownAgent")))
         }
         muted={muted}
       />

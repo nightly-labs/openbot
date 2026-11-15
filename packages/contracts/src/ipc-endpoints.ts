@@ -1704,6 +1704,24 @@ export const IPC_ENDPOINTS = {
     restart: request<string, void>()("local-servers:restart"),
     delete: request<string, void>()("local-servers:delete"),
   },
+  // An owner or an admin links this server to another so their agents can send messages and files.
+  remoteAgentBridge: {
+    list: scopedQuery<{
+      invites: { inviteId: string; code: string; expiresAt: string; serverName: string }[];
+      links: { linkId: string; peerName: string; peerReach: string; createdAt: string }[];
+    }>()("remote-agent-bridge:list"),
+    createInvite: scopedQuery<{
+      inviteId: string;
+      code: string;
+      expiresAt: string;
+      serverName: string;
+    }>()("remote-agent-bridge:create-invite"),
+    revokeInvite: scopedRequest<string, void>()("remote-agent-bridge:revoke-invite"),
+    redeem: scopedRequest<string, { linkId: string; peerName: string; peerReach: string; createdAt: string }>()(
+      "remote-agent-bridge:redeem",
+    ),
+    revokeLink: scopedRequest<string, void>()("remote-agent-bridge:revoke-link"),
+  },
   marketplaceAgents: {
     list: request<MarketplaceAgentQuery | undefined, MarketplaceAgentPage>()("marketplace-agents:list"),
     get: request<string, MarketplaceAgentDetail>()("marketplace-agents:get"),
@@ -2536,6 +2554,7 @@ export const IPC_GROUP_PATHS = {
   license: "license",
   hostedServers: "hostedServers",
   localServers: "localServers",
+  remoteAgentBridge: "remoteAgentBridge",
   marketplaceAgents: "marketplaceAgents",
   agentTemplates: "agentTemplates",
   auth: "auth",

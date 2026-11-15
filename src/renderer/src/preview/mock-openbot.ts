@@ -3728,6 +3728,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     },
     servers: mockTeam.servers,
     localServers: mockTeam.localServers,
+    remoteAgentBridge: mockTeam.remoteAgentBridge,
     plugins: {
       // The preview is never opened by a link, so there is nothing pending and nothing to push.
       takePendingListing: async () => null,

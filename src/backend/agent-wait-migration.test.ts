@@ -114,6 +114,8 @@ describe("agent wait migration", () => {
         projection_messaging_history: [],
         ...CRM_TABLES_AFTER_MIGRATION,
         ...THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION,
+        remote_agent_bridge_invites: [],
+        remote_agent_bridge_links: [],
         projection_pinned_thread_messages: [],
       });
       expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 65 });
@@ -167,6 +169,8 @@ describe("agent wait migration", () => {
       projection_messaging_history: [],
       ...CRM_TABLES_AFTER_MIGRATION,
       ...THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION,
+      remote_agent_bridge_invites: [],
+      remote_agent_bridge_links: [],
       projection_pinned_thread_messages: [],
     });
   });

@@ -85,6 +85,10 @@ import { MCP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-sig
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
+import {
+  REMOTE_AGENT_BRIDGE_CAPABILITY,
+  REMOTE_AGENT_BRIDGE_ROUTES,
+} from "@openbot/contracts/team-protocol/remote-agent-bridge-v1";
 import { ROUTINE_FLOW_STOP_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flow-stop-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
@@ -283,6 +287,13 @@ import type { HostServerAuditCalls } from "../servers/ServerAuditSection";
 import type { HostBrowsingMemoryCalls } from "../servers/ServerBrowsingMemorySetting";
 import type { HostMemoryLimitCalls } from "../servers/ServerMemoryLimitSetting";
 import type { HostMemoryReviewCalls } from "../servers/ServerMemoryReviewSetting";
+import {
+  decodeBridgeInvite,
+  decodeBridgeInvites,
+  decodeBridgeLink,
+  decodeBridgeLinks,
+  type RemoteAgentBridgeCalls,
+} from "../servers/ServerRemoteAgentsSection";
 import type { HostAgentAccessCalls } from "../servers/ServerRolesSection";
 import type { ServerHostedSitesOptions, ServerSettingsSection } from "../servers/ServerSettingsModal";
 import type { HostSkillLearningCalls } from "../servers/ServerSkillLearningSetting";
@@ -1708,6 +1719,24 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       runTeamEffect(
         setHostUpdateSettings(hostRequest(serverId), settings).pipe(Effect.mapError((error) => error.cause)),
       ),
+  };
+  const remoteAgentBridgeCalls: RemoteAgentBridgeCalls = {
+    list: async (serverId) => {
+      const request = hostRequest(serverId);
+      const invites = await request("POST", REMOTE_AGENT_BRIDGE_ROUTES.invites, decodeBridgeInvites, {});
+      const links = await request("POST", REMOTE_AGENT_BRIDGE_ROUTES.links, decodeBridgeLinks, {});
+      return { invites, links };
+    },
+    createInvite: (serverId) =>
+      hostRequest(serverId)("POST", REMOTE_AGENT_BRIDGE_ROUTES.createInvite, decodeBridgeInvite, {}),
+    revokeInvite: async (inviteId, serverId) => {
+      await hostRequest(serverId)("POST", REMOTE_AGENT_BRIDGE_ROUTES.revokeInvite, () => undefined, { inviteId });
+    },
+    redeem: (code, serverId) =>
+      hostRequest(serverId)("POST", REMOTE_AGENT_BRIDGE_ROUTES.redeem, decodeBridgeLink, { code }),
+    revokeLink: async (linkId, serverId) => {
+      await hostRequest(serverId)("POST", REMOTE_AGENT_BRIDGE_ROUTES.revokeLink, () => undefined, { linkId });
+    },
   };
   const hostTimezoneCalls: HostTimezoneCalls = {
     getTimezone: async (serverId) =>
@@ -3624,6 +3653,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         providers={providerSettings()}
                         hostUpdate={{ calls: hostUpdateCalls }}
                         hostTimezone={{ calls: hostTimezoneCalls }}
+                        remoteAgentBridge={
+                          workspace.state.capabilities.includes(REMOTE_AGENT_BRIDGE_CAPABILITY)
+                            ? remoteAgentBridgeCalls
+                            : undefined
+                        }
                         hostTurnLimits={{ calls: hostTurnLimitsCalls }}
                         hostPersonality={{ calls: hostPersonalityCalls }}
                         hostMemoryLimit={{ calls: hostMemoryLimitCalls }}

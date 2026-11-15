@@ -526,6 +526,23 @@ export function createMockTeam(
   return {
     servers: serversApi,
     localServers: localServersApi,
+    remoteAgentBridge: {
+      list: async () => ({ invites: [], links: [] }),
+      createInvite: async () => ({
+        inviteId: "invite",
+        code: "preview-code",
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        serverName: "Preview",
+      }),
+      revokeInvite: async () => undefined,
+      redeem: async () => ({
+        linkId: "link",
+        peerName: "Other",
+        peerReach: "http://127.0.0.1:9",
+        createdAt: new Date().toISOString(),
+      }),
+      revokeLink: async () => undefined,
+    },
     /** The server the preview shows, which its agent events belong to. */
     activeServerId: () => servers.find((server) => server.active)?.id ?? "local",
     host,

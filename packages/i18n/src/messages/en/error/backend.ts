@@ -162,6 +162,13 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mailboxStateCorrupt":
     "Mailbox state is corrupt or from a newer OpenBot version; refusing to overwrite it.",
   "error.backend.recipientDeleting": "The recipient is being deleted. Retry after deletion finishes.",
+  "error.backend.remoteAgentBridgePeerDown": "The linked server did not answer. Try again when it is on.",
+  "error.backend.remoteAgentBridgeInviteExpired": "This link code has expired. Create a new one.",
+  "error.backend.remoteAgentBridgeInviteUsed": "This link code is no longer valid.",
+  "error.backend.remoteAgentBridgeSameServer": "A server cannot link to itself.",
+  "error.backend.remoteAgentBridgeRevoked": "This server link was removed.",
+  "error.backend.remoteAgentBridgeFileTooLarge": "A file is over the attachment limit. Nothing was sent.",
+  "error.backend.remoteAgentBridgeUnsupported": "Update OpenBot on this server to link another server.",
   "error.backend.recipientHidden": "This agent is hidden. Restore it to send messages.",
   "error.backend.agentIdUnknown": "No agent has the id {id}. Get the ids from openbot.list_agents, then try again.",
   "error.backend.agentIdNear":

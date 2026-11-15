@@ -71,6 +71,8 @@ export function encodeTeamProtocolV7BaseCurrentEvent(
     subagents?: boolean;
     promptMultiSelect?: boolean;
     videoGeneration?: boolean;
+    /** Protocol 7 does not send `remoteSender`. */
+    remoteSender?: boolean;
   } = {},
 ): string | null {
   // `turn-progress` bypasses the frozen codec, so it needs the vocabulary swap applied by hand.

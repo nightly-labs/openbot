@@ -262,6 +262,8 @@ export interface AgentMessage {
   uiBlock?: ConversationUiBlock;
   citations?: MessageCitation[];
   exchange?: AgentExchangeSummary | undefined;
+  /** An agent of a linked server. Absent on a host that does not send it. */
+  remoteSender?: { agentId: string; agentName: string; serverName: string } | undefined;
   reaction?: MessageReaction | null | undefined;
   reactions?: ConversationReaction[];
   reactionSummary?: MessageReactionSummary;
