@@ -10,6 +10,9 @@ export const messages = {
   "error.provider.acpUnresponsive": "{provider} non ha risposto in tempo, quindi OpenBot ha terminato il suo processo.",
   "error.provider.acpSignInLost":
     "{provider} ha perso l’accesso, quindi OpenBot ha terminato il suo processo. Invia di nuovo il messaggio.",
+  "error.provider.acpRefusedUntilRestart":
+    "{provider} ha rifiutato un messaggio, quindi OpenBot ha terminato il suo processo. Invia di nuovo il messaggio.",
+  "error.provider.acpSettingsTimedOut": "{provider} non ha risposto in tempo. Riprova tra un momento.",
   "error.provider.acpPlanUsedUp":
     "{provider} segnala che il tuo piano è esaurito. Scegli un altro modello o passa a un piano {provider} superiore.",
   "error.provider.acpMcpNotLoaded":
@@ -316,6 +319,8 @@ export const messages = {
   "error.provider.hermesSignIn": "Accedi con Nous Portal o esegui `hermes setup` in un terminale per usare Hermes.",
   "error.provider.hermesTurnFailed":
     "Hermes non è riuscito a completare questo turno. Se la risposta indica un motivo, segui le sue indicazioni. Altrimenti un server MCP di questo agente potrebbe non essere disponibile: controllalo in Impostazioni server › MCP, poi invia di nuovo il messaggio.",
+  "error.provider.hermesRefused":
+    "Hermes ha rifiutato questo messaggio prima di iniziare. Invialo di nuovo. Se Hermes rifiuta ogni messaggio, riavvia OpenBot sul computer che esegue questo agente.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot non ha potuto usare questo modello: il modello non ha accettato la sua impostazione di ragionamento. Seleziona un altro modello per questo agente, poi invia di nuovo il messaggio.",
   "error.provider.usageLimitReached": "L'account ha raggiunto il limite di utilizzo.",

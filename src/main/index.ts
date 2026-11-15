@@ -1629,11 +1629,12 @@ if (!hasSingleInstanceLock) {
             return;
         }
       };
-      // Routes belong to the signed-in account. A token refresh does not change them.
-      let webhookPrincipalId = centralAuthPrincipalId(built.centralAuth.getState());
+      // Routes belong to the signed-in account, or, on a server on this computer, to the machine token
+      // that the desktop app gives it (`webhookPrincipal`). A token refresh does not change them.
+      let webhookPrincipalId = built.webhookPrincipal();
       built.eventsRuntime.setAccountPrincipal(webhookPrincipalId);
-      const refreshWebhookRoutes = (state: CentralAuthState): void => {
-        const principalId = centralAuthPrincipalId(state);
+      const refreshWebhookRoutes = (): void => {
+        const principalId = built.webhookPrincipal();
         if (principalId === webhookPrincipalId) return;
         webhookPrincipalId = principalId;
         built.eventsRuntime.setAccountPrincipal(principalId);
@@ -1646,7 +1647,7 @@ if (!hasSingleInstanceLock) {
         const hostIdentityChanged = status.serverId !== webhookHostId;
         webhookHostId = status.serverId;
         forwardHostStatus(status);
-        const principalId = centralAuthPrincipalId(built.centralAuth.getState());
+        const principalId = built.webhookPrincipal();
         if (hostIdentityChanged && principalId !== null && status.serverId !== null)
           built.eventsRuntime.syncRoutes({ all: true });
       };

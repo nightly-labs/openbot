@@ -626,6 +626,7 @@ export class OpenBotToolRouter {
         case "item/tool/call": {
           if (!isDynamicToolCall(request.params)) throw new Error("Invalid dynamic tool request.");
           let params = this.#asSubagentParent(request.params);
+          const fromSubagent = params.threadId !== request.params.threadId;
           if (params.namespace === "openbot") {
             const deferredMcp = this.#deferredMcpNote(client, params.threadId);
             const invalid = deferredMcp
@@ -759,8 +760,13 @@ export class OpenBotToolRouter {
               );
             return;
           }
-          // Keep the transport identifiers and abort signal; enter the original dispatch below.
-          const toolRequest = { ...request, params };
+          // Keep the transport identifiers and abort signal; enter the original dispatch below. A card of
+          // a subagent's call then waits for the end of the subagent's turn, not of the parent's (#9727).
+          const toolRequest: AppServerRequest & { params: DynamicToolCallParams } = {
+            ...request,
+            params,
+            ...(fromSubagent ? { subagent: true as const } : {}),
+          };
           if (toolRequest.params.namespace === OPENBOT_BROWSER_NAMESPACE) {
             const agentId = this.#conversation.agentForThread(toolRequest.params.threadId);
             if (!agentId) throw new Error("The browsing OpenBot agent is unknown.");
@@ -2768,9 +2774,9 @@ export class OpenBotToolRouter {
       // model does not support, is an error the calling agent can correct, never a silent default.
       const named = requestedToolModel(args, listed);
       if (named) requireRunnableProvider(named, this.#hooks.providerStatuses());
-      // A request that names no provider and no model gives the new agent the caller's own model, so
-      // a team that one agent recruits runs where that agent runs. When the caller's provider no
-      // longer lists that model, the new agent starts where one the user creates does.
+      // A request that names no provider and no model gives the new agent the caller's own model and
+      // account, so a team that one agent recruits runs where that agent runs (#9701). When the caller's
+      // provider no longer lists that model, the new agent starts where one the user creates does.
       const inherited =
         named === null
           ? (listed.find((model) => model.provider === caller.provider && model.id === caller.model) ?? null)
@@ -2800,6 +2806,7 @@ export class OpenBotToolRouter {
                   provider: requested.provider,
                   model: requested.id,
                   ...(reasoningEffort ? { reasoningEffort } : {}),
+                  ...(inherited && caller.providerAccountId ? { providerAccountId: caller.providerAccountId } : {}),
                 }
               : {}),
           },
@@ -2995,6 +3002,12 @@ export class OpenBotToolRouter {
       if (!isRecord(args) || !isMessageReaction(args.emoji)) {
         throw new Error("emoji must be exactly one complete Unicode emoji.");
       }
+      // Only the agent's own chat shows reactions. A side thread, a channel or a messaging thread
+      // does not, so a reaction there would report success that the person never sees.
+      if (this.#conversation.isExecutionThread(this.#conversation.publicThreadId(senderAgentId, params.threadId)))
+        return openBotToolFailure(
+          "Reactions show only in your own chat, not in this thread. Do not react here; answer in text if needed.",
+        );
       // The newest one when the turn started with several of the person's messages.
       const delivery = this.#mailbox
         .findDeliveriesByTurn(senderAgentId, params.turnId)
