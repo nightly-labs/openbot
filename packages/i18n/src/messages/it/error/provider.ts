@@ -323,6 +323,8 @@ export const messages = {
     "Questa chat è diventata troppo lunga per Claude. OpenBot ha avviato una nuova sessione di Claude Code con la cronologia della chat. Riprova.",
   "error.provider.claudeApiKeyNoCredit":
     "La chiave API di Anthropic non ha credito API. Un piano Claude non paga le richieste fatte con una chiave API. Aggiungi credito nella Anthropic Console, oppure accedi a Claude nelle Impostazioni e seleziona l'account Claude nel menu dei modelli dell'agente.",
+  "error.provider.claudeAccountNoCredit":
+    "Il saldo crediti del tuo account Claude è troppo basso. Alcune richieste, come la modalità veloce, usano crediti di utilizzo anche se il tuo piano Claude non è esaurito. Aggiungi crediti nel tuo account Claude, oppure scegli un altro modello nel menu dei modelli dell'agente.",
   "error.provider.foreignReasoning":
     "{provider} non ha accettato il ragionamento precedente in questa chat, perché lo ha ricevuto un altro account o un'altra chiave API. OpenBot ha avviato una nuova sessione di {provider} con la cronologia della chat. Riprova.",
   "error.provider.imageTooSmall":

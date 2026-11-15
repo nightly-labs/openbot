@@ -309,6 +309,8 @@ export const messages = defineMessages("error.provider", {
     "This chat became too long for Claude. OpenBot started a new Claude Code session with the chat history. Try again.",
   "error.provider.claudeApiKeyNoCredit":
     "The credit balance of the Anthropic API key is too low. A Claude plan does not pay for requests with an API key. Add credit in the Anthropic Console, or sign in to Claude in Settings and select the Claude account in the agent's model menu.",
+  "error.provider.claudeAccountNoCredit":
+    "The credit balance of your Claude account is too low. Some requests, such as fast mode, use usage credits also when your Claude plan has usage left. Add usage credits in your Claude account, or select a different model in the agent's model menu.",
   "error.provider.foreignReasoning":
     "{provider} did not accept the earlier reasoning in this chat, because a different account or API key received it. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.imageTooSmall":

@@ -317,6 +317,8 @@ export const messages = {
     "이 채팅이 Claude가 처리하기에 너무 길어졌어요. OpenBot이 채팅 기록으로 새 Claude Code 세션을 시작했어요. 다시 시도해 주세요.",
   "error.provider.claudeApiKeyNoCredit":
     "Anthropic API 키에 API 크레딧이 없어요. Claude 플랜은 API 키로 보낸 요청에 사용되지 않아요. Anthropic Console에서 크레딧을 추가하거나, 설정에서 Claude에 로그인한 다음 에이전트의 모델 메뉴에서 Claude 계정을 선택하세요.",
+  "error.provider.claudeAccountNoCredit":
+    "Claude 계정의 크레딧 잔액이 너무 적어요. 빠른 모드 같은 일부 요청은 Claude 플랜에 사용량이 남아 있어도 사용 크레딧을 써요. Claude 계정에서 사용 크레딧을 추가하거나, 에이전트의 모델 메뉴에서 다른 모델을 선택하세요.",
   "error.provider.foreignReasoning":
     "다른 계정이나 API 키가 받은 추론이라서 {provider}이(가) 이 채팅의 이전 추론을 수락하지 않았어요. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했어요. 다시 시도해 주세요.",
   "error.provider.imageTooSmall":

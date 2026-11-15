@@ -331,6 +331,8 @@ export const messages = {
     "このチャットは Claude には長くなりすぎました。OpenBot はチャット履歴を引き継いだ新しい Claude Code セッションを開始しました。もう一度お試しください。",
   "error.provider.claudeApiKeyNoCredit":
     "Anthropic API キーに API クレジットがありません。Claude のプランは API キーでのリクエストには使われません。Anthropic Console でクレジットを追加するか、設定で Claude にサインインして、エージェントのモデルメニューで Claude アカウントを選択してください。",
+  "error.provider.claudeAccountNoCredit":
+    "Claude アカウントのクレジット残高が不足しています。高速モードなど一部のリクエストは、Claude のプランに使用量が残っていても使用クレジットを使います。Claude アカウントで使用クレジットを追加するか、エージェントのモデルメニューで別のモデルを選択してください。",
   "error.provider.foreignReasoning":
     "別のアカウントまたは API キーが受け取ったため、{provider} はこのチャットの以前の推論を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.imageTooSmall":

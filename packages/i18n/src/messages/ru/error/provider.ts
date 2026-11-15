@@ -314,6 +314,8 @@ export const messages = {
     "Этот чат стал слишком длинным для Claude. OpenBot начал новую сессию Claude Code с историей чата. Повторите попытку.",
   "error.provider.claudeApiKeyNoCredit":
     "На API-ключе Anthropic нет кредитов API. Тариф Claude не оплачивает запросы с API-ключом. Пополните кредиты в Anthropic Console или войдите в Claude в настройках и выберите аккаунт Claude в меню моделей агента.",
+  "error.provider.claudeAccountNoCredit":
+    "На аккаунте Claude слишком мало кредитов. Некоторые запросы, например в быстром режиме, расходуют кредиты использования, даже когда в тарифе Claude ещё есть лимит. Пополните кредиты использования в аккаунте Claude или выберите другую модель в меню моделей агента.",
   "error.provider.foreignReasoning":
     "{provider} не принял предыдущие рассуждения в этом чате, потому что их получил другой аккаунт или API-ключ. OpenBot начал новую сессию {provider} с историей чата. Повторите попытку.",
   "error.provider.imageTooSmall":

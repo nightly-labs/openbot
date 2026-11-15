@@ -298,6 +298,8 @@ export const messages = {
     "أصبحت هذه الدردشة طويلة جدًا على Claude. بدأ OpenBot جلسة Claude Code جديدة بسجل الدردشة. أعد المحاولة.",
   "error.provider.claudeApiKeyNoCredit":
     "لا يوجد رصيد API في مفتاح Anthropic API. لا تدفع خطة Claude مقابل الطلبات التي تستخدم مفتاح API. أضف رصيدًا في Anthropic Console، أو سجّل الدخول إلى Claude في الإعدادات واختر حساب Claude في قائمة نموذج الوكيل.",
+  "error.provider.claudeAccountNoCredit":
+    "رصيد حسابك على Claude منخفض جدًا. بعض الطلبات، مثل الوضع السريع، تستخدم أرصدة الاستخدام حتى إذا بقي استخدام في خطة Claude. أضف أرصدة استخدام في حسابك على Claude، أو اختر نموذجًا آخر في قائمة نموذج الوكيل.",
   "error.provider.foreignReasoning":
     "لم يقبل {provider} الاستدلال السابق في هذه الدردشة، لأن حسابًا أو مفتاح API مختلفًا استلمه. بدأ OpenBot جلسة {provider} جديدة بسجل الدردشة. أعد المحاولة.",
   "error.provider.imageTooSmall":

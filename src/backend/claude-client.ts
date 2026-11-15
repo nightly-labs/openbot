@@ -1287,6 +1287,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     return Boolean({ ...claudeEnvironment(this.#cli), ...this.#environment(this.#onApiKey) }.ANTHROPIC_API_KEY);
   }
 
+  /** Whether the CLI sends its requests to an API other than the Anthropic API, such as Bedrock or a gateway. */
+  #usesOtherApi(): boolean {
+    const environment = { ...claudeEnvironment(this.#cli), ...this.#environment(this.#onApiKey) };
+    return CLAUDE_OTHER_API_VARIABLES.some((name) => Boolean(environment[name]));
+  }
+
   /** The agent environment, with the saved key when `withApiKey`. */
   #environment(withApiKey: boolean): Readonly<Record<string, string>> {
     const key = withApiKey ? this.#fallbackApiKey?.() : null;
@@ -2579,7 +2585,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         params: {
           threadId: runtime.id,
           turnId: turn.id,
-          message: claudeTurnError(error, this.#usesApiKey()),
+          message: claudeTurnError(error, this.#usesApiKey(), this.#usesOtherApi()),
           ...(signInFailed ? { causeCode: "authentication" } : billing ? { causeCode: "billing" } : {}),
         },
       });
@@ -3017,9 +3023,11 @@ const CLAUDE_SANDBOX_UNAVAILABLE = /Sandbox required but unavailable: (.+?)\.? S
  * The CLI's report of an Anthropic API key with no API credit: "Credit balance is too low", from the
  * API's "Your credit balance is too low to access the Anthropic API" (Claude Code 2.1.309). A Claude
  * plan does not pay for API key requests, and a plan subscriber read it as a fault (#5550). Only a
- * turn on a key gets the key text: a gateway or a plan's extra usage can send the same words. The
- * key text keeps "credit balance is too low", so `isUsageLimitDiagnostic` still moves the turn to a
- * backup model (#4616).
+ * turn on a key gets the key text. A plan's usage credits can send the same words; the plan text
+ * names the Claude account, because the CLI text names no provider (#9710). A turn on another API
+ * (`CLAUDE_OTHER_API_VARIABLES`) keeps the CLI text: OpenBot does not know that account. Both texts
+ * keep "credit balance … too low", so `isUsageLimitDiagnostic` still moves the turn to a backup
+ * model (#4616).
  */
 const CLAUDE_API_CREDIT_EMPTY = /\bcredit balance (?:is )?too low\b/iu;
 
@@ -3056,9 +3064,10 @@ function claudeFastModeWarning(reason: string): string | null {
   }
 }
 
-function claudeTurnError(error: unknown, apiKey: boolean): string {
+function claudeTurnError(error: unknown, apiKey: boolean, otherApi: boolean): string {
   const text = String(error);
   if (apiKey && CLAUDE_API_CREDIT_EMPTY.test(text)) return sourceText("error.provider.claudeApiKeyNoCredit");
+  if (!otherApi && CLAUDE_API_CREDIT_EMPTY.test(text)) return sourceText("error.provider.claudeAccountNoCredit");
   // With an API key there is no sign-in to renew, so the key turn keeps the CLI text.
   if (!apiKey && CLAUDE_NOT_LOGGED_IN.test(text))
     return sourceText("error.provider.signInExpired", { provider: agentProviderName("claude") });

@@ -335,6 +335,8 @@ export const messages = {
     "Dieser Chat ist für Claude zu lang geworden. OpenBot hat eine neue Claude-Code-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.claudeApiKeyNoCredit":
     "Der Anthropic-API-Schlüssel hat kein API-Guthaben. Ein Claude-Abo bezahlt keine Anfragen mit einem API-Schlüssel. Lade Guthaben in der Anthropic Console auf, oder melde dich in den Einstellungen bei Claude an und wähle das Claude-Konto im Modellmenü des Agenten.",
+  "error.provider.claudeAccountNoCredit":
+    "Das Guthaben deines Claude-Kontos ist zu niedrig. Manche Anfragen, zum Beispiel im Schnellmodus, nutzen Nutzungsguthaben, auch wenn dein Claude-Abo noch Nutzung übrig hat. Lade Nutzungsguthaben in deinem Claude-Konto auf, oder wähle ein anderes Modell im Modellmenü des Agenten.",
   "error.provider.foreignReasoning":
     "{provider} hat die früheren Überlegungen in diesem Chat nicht akzeptiert, da ein anderes Konto oder ein anderer API-Schlüssel sie erhalten hat. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.imageTooSmall":

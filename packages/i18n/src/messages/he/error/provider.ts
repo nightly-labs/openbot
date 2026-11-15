@@ -298,6 +298,8 @@ export const messages = {
     "הצ'אט הזה נעשה ארוך מדי עבור Claude. OpenBot התחיל סשן חדש של Claude Code עם היסטוריית הצ'אט. יש לנסות שוב.",
   "error.provider.claudeApiKeyNoCredit":
     "אין קרדיט API במפתח Anthropic API. מינוי Claude לא משלם על בקשות עם מפתח API. אפשר להוסיף קרדיט ב-Anthropic Console, או להתחבר ל-Claude בהגדרות ולבחור את חשבון Claude בתפריט המודל של הסוכן.",
+  "error.provider.claudeAccountNoCredit":
+    "יתרת הקרדיט בחשבון Claude שלך נמוכה מדי. חלק מהבקשות, כמו המצב המהיר, משתמשות בקרדיטים לשימוש גם כשנשאר שימוש במינוי Claude. אפשר להוסיף קרדיטים לשימוש בחשבון Claude, או לבחור מודל אחר בתפריט המודל של הסוכן.",
   "error.provider.foreignReasoning":
     "{provider} לא קיבל את החשיבה הקודמת בצ'אט הזה, כי חשבון או מפתח API אחר קיבל אותה. OpenBot התחיל סשן חדש של {provider} עם היסטוריית הצ'אט. יש לנסות שוב.",
   "error.provider.imageTooSmall":
