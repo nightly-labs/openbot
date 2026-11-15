@@ -38,6 +38,8 @@ export interface McpConnectDialogProps {
   signInHostName?: string | undefined;
   /** Stops the sign-in, for the user who closes the dialog while it waits. */
   onCancelSignIn?: (() => void) | undefined;
+  /** Copies the page of a sign-in that waits on this computer. Without it the dialog shows no copy button. */
+  onCopySignInLink?: (() => Promise<void>) | undefined;
   /** What opens over a sign-in while it waits, such as the page of a relayed sign-in. */
   signInExtra?: JSX.Element;
 }
@@ -90,6 +92,7 @@ export function McpConnectDialog(props: McpConnectDialogProps) {
           connectOnOpen
           hostName={props.signInHostName}
           onCancelSignIn={props.onCancelSignIn}
+          onCopySignInLink={props.onCopySignInLink}
           alternative={alternative()}
         />
         {props.signInExtra}

@@ -67,6 +67,7 @@ type McpServerService = Pick<
   | "testMcpServer"
   | "signInMcpServer"
   | "cancelMcpSignIn"
+  | "mcpSignInLink"
   | "signOutMcpServer"
   | "listMcpSignIns"
   | "mcpSignInApp"
@@ -136,6 +137,8 @@ interface McpServerIpcDependencies {
   toolRuntimes: () => McpToolRuntimes;
   /** Opens the page of a joined server's sign-in in this computer's browser, and relays the callback. */
   relay: Pick<SignInRelayClient, "run" | "page" | "open" | "paste" | "receivesDeepLink">;
+  /** Puts text on this computer's clipboard. */
+  writeClipboard: (text: string) => void;
 }
 
 /** How long a connection test waits for the managed runtimes before probing without them. */
@@ -156,6 +159,7 @@ export function mcpServerIpcHandlers({
   ensureToolRuntimesReady,
   toolRuntimes,
   relay,
+  writeClipboard,
 }: McpServerIpcDependencies): Pick<IpcGroupHandlers, "mcpServers"> {
   /** A host that predates the capability answers 404, so the reason is stated before the request. */
   function requireRemoteSupport(serverId: string): void {
@@ -370,6 +374,16 @@ export function mcpServerIpcHandlers({
             }),
           );
         },
+      }),
+      copyMcpSignInLink: scopedHandler(parseCancelMcpSignIn, {
+        local: (parsed) => {
+          const link = service.mcpSignInLink(parsed);
+          if (!link) throw new Error(sourceText("error.mcp.signInLinkNotReady"));
+          writeClipboard(link);
+        },
+        // A joined server's page opens in the host's browser or through the relay, which has its own
+        // controls, and the host sends no client the address of its sign-in.
+        remote: () => signInOnHost(),
       }),
       // A sign-out names its row the way a removal does, so it is read by the same parser.
       signOutMcpServer: scopedHandler(parseRemoveMcpServer, {
