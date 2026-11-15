@@ -292,7 +292,12 @@ import { LibraryFoldersService } from "./library-folders-service";
 import { LinkAccountService } from "./link-account-service";
 import { LinkAccountStore } from "./link-account-store";
 import { relaunchApp } from "./linux-appimage-relaunch";
-import { aboveAppsWindowKind, ozonePlatformArguments, setAboveAppsXWayland } from "./linux-wayland-output";
+import {
+  aboveAppsWindowKind,
+  ozonePlatformArguments,
+  setAboveAppsXWayland,
+  usesX11Windows,
+} from "./linux-wayland-output";
 import { localRoutineFeedDocument } from "./local-routine-calendar";
 import {
   formatLocalServerMembersRequest,
@@ -2110,7 +2115,11 @@ export async function createApplicationServices({
   });
   // The overlays are OpenBot windows, so they can mark only the display OpenBot is on. With an agent
   // display of its own, the driver works where they cannot be drawn.
-  const drawsComputerUseHighlight = !hasSeparateAgentDisplay(process.platform);
+  const agentsShareDisplay = !hasSeparateAgentDisplay(process.platform);
+  // Not on Wayland windows either, as the agent dock and the Dynamic Island: a Wayland client cannot
+  // place a window or keep it out of the dock. There the overlay was a blank window of the display's
+  // size in the dock, and closing it only made the next tick open it again (#9655).
+  const drawsComputerUseHighlight = agentsShareDisplay && (process.platform !== "linux" || usesX11Windows());
   const computerUsePermissionHelp = new ComputerUsePermissionHelpWindowController({
     createWindow: () =>
       createComputerUsePermissionHelpWindow(language.translate, () => localeDirection(language.locale)),
@@ -2247,7 +2256,7 @@ export async function createApplicationServices({
     hostedStorageGb: () => hostedStorageGb,
     agentCursorDrawn: drawsComputerUseHighlight,
     // An agent display of its own is X11, where the driver records video.
-    computerUseOnWayland: drawsComputerUseHighlight && cuaDriverDrivesWayland(process.platform),
+    computerUseOnWayland: agentsShareDisplay && cuaDriverDrivesWayland(process.platform),
     requestTimeoutMs: 30_000,
     offProviders: providerUse.off(),
     providerAccounts,
