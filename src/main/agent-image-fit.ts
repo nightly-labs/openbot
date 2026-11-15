@@ -99,13 +99,13 @@ function jpegFacts(file: Buffer): { orientation: number; pixels: number } {
   let offset = 2;
   while (offset + 4 <= file.length) {
     const marker = file[offset + 1] ?? 0;
-    // libjpeg skips extra bytes before a marker. Fill bytes (0xFF) can come before a marker, and some
-    // markers have no length.
+    // Step as libjpeg's `next_marker` does: it skips extra bytes, fill bytes (0xFF) and an `FF 00` pair,
+    // and some markers have no length.
     if (file[offset] !== 0xff || marker === 0xff) {
       offset += 1;
       continue;
     }
-    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
+    if (marker === 0x00 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
       offset += 2;
       continue;
     }
