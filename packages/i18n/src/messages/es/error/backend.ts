@@ -253,6 +253,8 @@ export const messages = {
   "error.backend.mcpServerInvalid": "OpenBot no puede guardar esta configuración del servidor MCP.",
   "error.backend.mcpServerNoAnswer": "El servidor no respondió en {seconds} segundos.",
   "error.backend.mcpSignInNotAccepted": "El servidor no aceptó ese inicio de sesión.",
+  "error.backend.mcpSignInAccountRefused":
+    "El servicio rechazó esta cuenta. Puede que la cuenta no tenga acceso, por ejemplo con su plan actual. Cierra sesión y luego inicia sesión con una cuenta que tenga acceso.",
   "error.backend.mcpSignInClientRefused":
     "El servidor de inicio de sesión no aceptó a OpenBot al completar el inicio de sesión. Inicia sesión de nuevo: OpenBot se registra otra vez en el servidor.",
   "error.backend.mcpCommandNotFound": "No se encontró el comando: {command}",

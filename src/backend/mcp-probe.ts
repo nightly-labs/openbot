@@ -164,7 +164,9 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
     seen.challenge = next;
   };
   const failure = (error: unknown, signedIn = false): McpProbeOutcome => {
-    const described = describeProbeFailure(error, config, timeoutMs, signIn, seen.challenge, signInPlace, signedIn);
+    // A saved sign-in counts as the person's own only when no key header of the row was sent with it.
+    const accountToken = signedIn || (server.authorization !== null && !hasCredentialHeader(config));
+    const described = describeProbeFailure(error, config, timeoutMs, signIn, seen.challenge, signInPlace, accountToken);
     return {
       toolCount: 0,
       error: boundedError(redactMcpValues(described, probeSecrets(server, signIn))),
@@ -248,14 +250,19 @@ function describeProbeFailure(
   signIn: McpSignIn | null,
   challenge: McpChallenge | null,
   signInPlace: McpSignInPlace | null,
-  /** The refusal came after the sign-in, so a 403 refuses the account the person has just signed in with. */
-  signedIn: boolean,
+  /**
+   * The request carried a token of the person's sign-in, just completed or saved, so a 403 refuses
+   * their account, not a key: Mobbin answers it to an account whose plan has no MCP access (#9507).
+   */
+  accountToken: boolean,
 ): string {
   if (signIn?.cancelled()) return sourceText("error.backend.mcpSignInCancelled");
   if (signIn && isRegistrationRefusal(error, signIn)) return REGISTRATION_REFUSED;
   const status = httpStatus(error);
-  if (signIn && (status === 401 || (signedIn && status === 403)))
-    return sourceText("error.backend.mcpSignInNotAccepted");
+  if (signIn && status === 401) return sourceText("error.backend.mcpSignInNotAccepted");
+  // A token endpoint that refused the grant gave no token, so it refused the sign-in, not the account.
+  if (accountToken && status === 403 && !signIn?.exchangeFailed())
+    return sourceText("error.backend.mcpSignInAccountRefused");
   // The token endpoint refused the grant. Its status says nothing about the address the user typed.
   if (signIn?.exchangeFailed() && status !== null && status >= 400 && status < 500)
     return sourceText("error.backend.mcpSignInNotAccepted");

@@ -227,6 +227,8 @@ export const messages = {
   "error.backend.mcpServerInvalid": "OpenBot אינו יכול לשמור את תצורת שרת ה-MCP הזו.",
   "error.backend.mcpServerNoAnswer": "השרת לא ענה תוך {seconds} שניות.",
   "error.backend.mcpSignInNotAccepted": "השרת לא קיבל את ההתחברות הזו.",
+  "error.backend.mcpSignInAccountRefused":
+    "השירות דחה את החשבון הזה. ייתכן שלחשבון אין גישה, למשל בתוכנית הנוכחית שלו. התנתקו, ואז התחברו עם חשבון שיש לו גישה.",
   "error.backend.mcpSignInClientRefused":
     "שרת ההתחברות לא קיבל את OpenBot כשהתחברות הושלמה. יש להתחבר שוב: OpenBot ירשום את עצמו שוב בשרת.",
   "error.backend.mcpCommandNotFound": "הפקודה לא נמצאה: {command}",

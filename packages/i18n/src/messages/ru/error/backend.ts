@@ -245,6 +245,8 @@ export const messages = {
   "error.backend.mcpServerInvalid": "OpenBot не может сохранить эту конфигурацию сервера MCP.",
   "error.backend.mcpServerNoAnswer": "Сервер не ответил за {seconds} с.",
   "error.backend.mcpSignInNotAccepted": "Сервер не принял этот вход.",
+  "error.backend.mcpSignInAccountRefused":
+    "Сервис отклонил этот аккаунт. Возможно, у аккаунта нет доступа, например на текущем тарифе. Выйдите, затем войдите с аккаунтом, у которого есть доступ.",
   "error.backend.mcpSignInClientRefused":
     "Сервер входа не принял OpenBot при завершении входа. Войдите снова: OpenBot заново зарегистрируется на сервере.",
   "error.backend.mcpCommandNotFound": "Команда не найдена: {command}",
