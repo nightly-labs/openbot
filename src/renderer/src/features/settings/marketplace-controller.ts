@@ -158,6 +158,19 @@ export interface PendingSkillConfirm {
 }
 
 /**
+ * Whether two http addresses share one sign-in on the host, which keys it by the parsed address
+ * without a fragment, plus an account fragment (`mcpOAuthAccountKey`).
+ */
+function sameSignInAddress(a: string, b: string): boolean {
+  if (!URL.canParse(a.trim()) || !URL.canParse(b.trim())) return false;
+  if (mcpAccountFragment(a) !== mcpAccountFragment(b)) return false;
+  const [first, second] = [new URL(a.trim()), new URL(b.trim())];
+  first.hash = "";
+  second.hash = "";
+  return first.href === second.href;
+}
+
+/**
  * The question before an app takes the name of a server that is not the app's. `server` is that
  * name, `app` the name of the app.
  */
@@ -1326,12 +1339,12 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     const installed = await run(async () => {
       /* Asked before the skills and the sign-in, so a cancel changes nothing. The other row is removed
          only after the app connected, as Remove server does: its sign-in, access and owner go with it. */
-      const replacing = new Map<string, string>();
+      const replacing = new Map<string, McpServerConfig>();
       for (const app of plugin.apps) {
         const other = otherRowNamed(app);
         if (!other) continue;
         if (!(await confirmServerReplace(other.name, app.name))) return false;
-        replacing.set(app.id, other.id);
+        replacing.set(app.id, other);
       }
       const addedSkills: string[] = [];
       try {
@@ -1341,8 +1354,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
           if (!held) addedSkills.push(skill.id);
         }
         for (const app of plugin.apps) {
-          const replacedId = replacing.get(app.id);
-          const config = replacedId ? createPluginAppConfig(app) : pluginAppConfig(app);
+          const config = pluginAppConfig(app);
           const invalid = Object.values(mcpConfigErrors(config))[0];
           if (invalid) throw new Error(t("marketplace.error.appInvalid", { name: app.name, reason: invalid }));
           /* What is saved is the configuration that connected, not the one the listing describes:
@@ -1353,8 +1365,14 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
             await undoSkills(agentId, addedSkills);
             return false;
           }
-          if (replacedId) setServers(await calls().mcp.removeMcpServer({ mcpServerId: replacedId }, serverId));
-          setServers(await calls().mcp.saveMcpServer({ config: connected }, serverId));
+          const replaced = replacing.get(app.id);
+          /* A removal forgets the sign-in of its address. When the app's address shares it, as
+             `https://mcp.stripe.com/` does with `https://mcp.stripe.com`, the app is saved on the old row instead. */
+          const sharesSignIn = replaced !== undefined && sameSignInAddress(replaced.url, connected.url);
+          if (replaced && !sharesSignIn)
+            setServers(await calls().mcp.removeMcpServer({ mcpServerId: replaced.id }, serverId));
+          const saved = replaced && sharesSignIn ? { ...connected, id: replaced.id } : connected;
+          setServers(await calls().mcp.saveMcpServer({ config: saved }, serverId));
         }
       } catch (cause) {
         await undoSkills(agentId, addedSkills);
