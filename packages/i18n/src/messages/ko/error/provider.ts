@@ -342,6 +342,8 @@ export const messages = {
     "Gemini가 브라우저에서 로그인 페이지를 열 수 없었어요. 기본 브라우저를 확인한 후 다시 연결하세요.",
   "error.provider.acpSignInFailed": "로그인이 완료되지 않았어요.",
   "error.provider.acpSignInFailedReason": "로그인이 완료되지 않았어요: {reason}",
+  "error.provider.acpSignInNetwork":
+    "로그인 중 제공업체 서버에 연결하지 못했어요. OpenBot을 실행하는 컴퓨터의 네트워크 연결과 DNS 설정을 확인한 다음 다시 시도하세요.",
   "error.provider.acpSignOutFailed": "로그아웃이 완료되지 않았어요.",
   "error.provider.acpSignOutFailedReason": "로그아웃이 완료되지 않았어요: {reason}",
   "error.provider.acpSignInMethodMissing":

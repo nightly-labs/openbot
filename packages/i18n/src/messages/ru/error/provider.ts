@@ -339,6 +339,8 @@ export const messages = {
     "Gemini не удалось открыть страницу входа в браузере. Проверьте браузер по умолчанию и подключитесь снова.",
   "error.provider.acpSignInFailed": "Вход не завершён.",
   "error.provider.acpSignInFailedReason": "Вход не завершён: {reason}",
+  "error.provider.acpSignInNetwork":
+    "Не удалось связаться с сервером провайдера при входе. Проверьте подключение к сети и настройки DNS компьютера, на котором работает OpenBot, и повторите попытку.",
   "error.provider.acpSignOutFailed": "Выход не завершён.",
   "error.provider.acpSignOutFailedReason": "Выход не завершён: {reason}",
   "error.provider.acpSignInMethodMissing":

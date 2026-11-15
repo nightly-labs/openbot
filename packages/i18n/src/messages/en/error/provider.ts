@@ -334,6 +334,8 @@ export const messages = defineMessages("error.provider", {
     "Gemini could not open the sign-in page in your browser. Check your default browser, then connect again.",
   "error.provider.acpSignInFailed": "The sign-in did not complete.",
   "error.provider.acpSignInFailedReason": "The sign-in did not complete: {reason}",
+  "error.provider.acpSignInNetwork":
+    "The sign-in could not reach the provider's server. Check the network connection and the DNS settings of the computer that runs OpenBot, then try again.",
   "error.provider.acpSignOutFailed": "The sign-out did not complete.",
   "error.provider.acpSignOutFailedReason": "The sign-out did not complete: {reason}",
   "error.provider.acpSignInMethodMissing":

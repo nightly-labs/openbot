@@ -323,6 +323,8 @@ export const messages = {
     "تعذّر على Gemini فتح صفحة تسجيل الدخول في متصفحك. تحقق من متصفحك الافتراضي، ثم اتصل مرة أخرى.",
   "error.provider.acpSignInFailed": "لم يكتمل تسجيل الدخول.",
   "error.provider.acpSignInFailedReason": "لم يكتمل تسجيل الدخول: {reason}",
+  "error.provider.acpSignInNetwork":
+    "تعذّر على تسجيل الدخول الوصول إلى خادم المزوّد. تحقّق من اتصال الشبكة وإعدادات DNS في الكمبيوتر الذي يشغّل OpenBot، ثم حاول مرة أخرى.",
   "error.provider.acpSignOutFailed": "لم يكتمل تسجيل الخروج.",
   "error.provider.acpSignOutFailedReason": "لم يكتمل تسجيل الخروج: {reason}",
   "error.provider.acpSignInMethodMissing":

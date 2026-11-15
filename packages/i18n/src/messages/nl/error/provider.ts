@@ -345,6 +345,8 @@ export const messages = {
     "Gemini kon de inlogpagina niet in je browser openen. Controleer je standaardbrowser en verbind daarna opnieuw.",
   "error.provider.acpSignInFailed": "Het inloggen is niet voltooid.",
   "error.provider.acpSignInFailedReason": "Het inloggen is niet voltooid: {reason}",
+  "error.provider.acpSignInNetwork":
+    "Het inloggen kon de server van de provider niet bereiken. Controleer de netwerkverbinding en de DNS-instellingen van de computer waarop OpenBot draait en probeer het opnieuw.",
   "error.provider.acpSignOutFailed": "Het uitloggen is niet voltooid.",
   "error.provider.acpSignOutFailedReason": "Het uitloggen is niet voltooid: {reason}",
   "error.provider.acpSignInMethodMissing":

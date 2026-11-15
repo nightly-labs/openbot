@@ -309,6 +309,8 @@ export const messages = {
   "error.provider.geminiBrowserOpenFailed": "Gemini 无法在浏览器中打开登录页面。请检查默认浏览器，然后重新连接。",
   "error.provider.acpSignInFailed": "登录未完成。",
   "error.provider.acpSignInFailedReason": "登录未完成：{reason}",
+  "error.provider.acpSignInNetwork":
+    "登录时无法连接到提供方的服务器。请检查运行 OpenBot 的电脑的网络连接和 DNS 设置，然后重试。",
   "error.provider.acpSignOutFailed": "退出登录未完成。",
   "error.provider.acpSignOutFailedReason": "退出登录未完成：{reason}",
   "error.provider.acpSignInMethodMissing": "该服务商在这台电脑上不提供该登录方式。请更新服务商后重试。",
