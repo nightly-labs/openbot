@@ -3711,6 +3711,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     // the model to go back to.
     const queueable = queueWhileBusy && previous !== undefined && !input.leaveUsageLimit;
     const runtimeOnly = Object.keys(input).every((key) => RUNTIME_UPDATE_KEYS.has(key));
+    // The provider checks access and resets fast mode, so a provider change with them is refused while
+    // work runs, as before, and does not apply them to the provider that the agent leaves.
+    const providerBound = Object.keys(input).some((key) => PROVIDER_BOUND_UPDATE_KEYS.has(key));
     const pinnedAccountId = this.#accountPin(
       input,
       move,
@@ -3736,7 +3739,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     // An effort that the queued model does not support becomes the model's default.
     const queuedEffort = (effort: AgentReasoningEffort, model = requestedModel) =>
       model && !model.supportedReasoningEfforts.includes(effort) ? model.defaultReasoningEffort : effort;
-    if (queueable && previous && requestedProvider && runtimeFields && handoverNeeded && idleRefusal(previous)) {
+    if (
+      queueable &&
+      !providerBound &&
+      previous &&
+      requestedProvider &&
+      runtimeFields &&
+      handoverNeeded &&
+      idleRefusal(previous)
+    ) {
       yield* this.#providers.ensureProvider(requestedProvider);
       if (input.provider || input.model)
         yield* lifecycleStep("check provider switch", () => this.#providers.requireProviderOn(requestedProvider));
@@ -7004,9 +7015,13 @@ const RUNTIME_UPDATE_KEYS: ReadonlySet<string> = new Set([
   "leaveUsageLimit",
 ]);
 
+/** Fields that depend on the agent's provider, so they do not apply now while a provider change waits. */
+const PROVIDER_BOUND_UPDATE_KEYS: ReadonlySet<string> = new Set(["access", "fastMode", "ultrafast"]);
+
 /** `update` without the fields of `RUNTIME_UPDATE_KEYS`, which a provider change during work queues. */
 function withoutRuntimeFields(update: AgentUpdate): AgentUpdate {
-  const { provider, model, reasoningEffort, providerAccountId, leaveUsageLimit, ...fields } = update;
+  const fields: AgentUpdate = { ...update };
+  for (const key of RUNTIME_UPDATE_KEYS) if (key !== "agentId") Reflect.deleteProperty(fields, key);
   return fields;
 }
 
