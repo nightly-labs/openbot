@@ -1,4 +1,5 @@
 import { agentProviderName, isAgentProvider } from "@openbot/contracts/ipc";
+import { matchingSourceKeys } from "@openbot/i18n";
 import { redactText } from "@openbot/logging";
 import { currentText } from "@openbot/ui/text";
 
@@ -10,6 +11,17 @@ const ERROR_DETAILS_LIMIT = 2_000;
 // them so one outage shows one toast instead of one per retry.
 const ERROR_TOAST_DEDUPE_MS = 30_000;
 const lastErrorToastAt = new Map<string, number>();
+/** The notices that the provider tries a request again. The turn goes on, so they are not a failure. */
+const RETRY_NOTICE_KEYS: ReadonlySet<string> = new Set([
+  "error.backend.providerRetrying",
+  "error.backend.providerRetryingLargeContext",
+  "error.backend.providerModelAtCapacity",
+]);
+
+/** True for a host's notice that the provider tries a request again (#9725). */
+export function isProviderRetryNotice(message: string): boolean {
+  return matchingSourceKeys(message).some((key) => RETRY_NOTICE_KEYS.has(key));
+}
 
 /** One sentence a reader can act on, whichever surface shows it. */
 export function readableAgentError(message: string): string {

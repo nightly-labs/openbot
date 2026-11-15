@@ -30,7 +30,13 @@ import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 import { useSidebar } from "../sidebar/sidebar-context";
 import { readDictatedReplies } from "../speech/speech-replies";
-import { agentErrorDetails, claimErrorToast, providerErrorTitle, readableAgentError } from "./agent-error-text";
+import {
+  agentErrorDetails,
+  claimErrorToast,
+  isProviderRetryNotice,
+  providerErrorTitle,
+  readableAgentError,
+} from "./agent-error-text";
 import { createAgentEventSounds } from "./agent-event-sounds";
 import {
   attentionAgentId,
@@ -74,6 +80,23 @@ export function AgentEventBridge() {
     applyOwnAgentLevels,
   } = useAgents();
   const { setConversationErrors, setConversationErrorRuns } = useConversationController();
+  /**
+   * The retry notice that each chat's banner shows, keyed like `conversationErrors`. The provider then
+   * tries again and often succeeds, so the notice goes at the agent's next output or at the end of the
+   * turn. It stayed as a red error after the agent had continued (#9725).
+   */
+  const retryNotices = new Map<string, string>();
+  function clearRetryNotice(agentId: string): void {
+    const key = composerDraftKey({ agentId, serverId: activeServerId() });
+    const notice = retryNotices.get(key);
+    if (notice === undefined) return;
+    retryNotices.delete(key);
+    setConversationErrors((current) => {
+      if (current[key] !== notice) return current;
+      const { [key]: _cleared, ...next } = current;
+      return next;
+    });
+  }
   const { setUiErrors } = useUiErrors();
   const agentTasks = useAgentTasks();
   const {
@@ -218,6 +241,7 @@ export function AgentEventBridge() {
         return;
       case "conversation-delta":
         applyConversationDelta(event);
+        clearRetryNotice(event.agentId);
         return;
       case "turn-progress":
         setTurnProgress((current) => ({
@@ -273,6 +297,7 @@ export function AgentEventBridge() {
         return;
       case "turn-completed":
         completedTurnByAgent.set(event.agentId, event.turnId);
+        clearRetryNotice(event.agentId);
         setTurnProgress((current) =>
           current[event.agentId]?.turnId === event.turnId ? withoutAgent(current, event.agentId) : current,
         );
@@ -420,6 +445,9 @@ export function AgentEventBridge() {
           // reader one line whatever its length, and dismissing it clears the whole run.
           const key = composerDraftKey({ agentId, serverId: activeServerId() });
           const message = readableAgentError(event.message);
+          const notice = isProviderRetryNotice(event.message);
+          if (notice) retryNotices.set(key, message);
+          else retryNotices.delete(key);
           setConversationErrors((current) => ({ ...current, [key]: message }));
           // The provider and model above the error let the user report which run failed (#2858).
           const provider = event.provider ? providerDisplayName(event.provider) : null;
@@ -430,10 +458,16 @@ export function AgentEventBridge() {
           // The general sentence hides the cause, so the user can copy it into a report (#6410).
           const details = agentErrorDetails(event.message, message);
           setConversationErrorRuns((current) => {
-            if (run || link || details)
+            if (run || link || details || notice)
               return {
                 ...current,
-                [key]: { message, run, ...(link ? { link } : {}), ...(details ? { details } : {}) },
+                [key]: {
+                  message,
+                  run,
+                  ...(link ? { link } : {}),
+                  ...(details ? { details } : {}),
+                  ...(notice ? { notice } : {}),
+                },
               };
             if (!(key in current)) return current;
             const { [key]: _replaced, ...next } = current;

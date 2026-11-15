@@ -1331,12 +1331,15 @@ export class TurnLifecycle {
         }
         // Codex retries on its own and reports the final failure again without `willRetry`.
         if (isRecord(params) && params.willRetry === true) {
+          const details = getString(error, "additionalDetails");
           this.#providerRetried(
             agentId,
             threadId,
             getString(params, "turnId"),
             source.provider,
-            modelAtCapacity(error, getString(error, "additionalDetails")),
+            modelAtCapacity(error, details),
+            message,
+            details,
           );
           return;
         }
@@ -1507,6 +1510,8 @@ export class TurnLifecycle {
     turnId: string | null,
     provider: AgentClient["provider"],
     atCapacity: boolean,
+    message: string,
+    details: string | null,
   ): void {
     if (!agentId || !threadId || !turnId || !this.#runningTurns.has(turnId)) return;
     const attempts = (this.#turnRetries.get(turnId) ?? 0) + 1;
@@ -1516,6 +1521,10 @@ export class TurnLifecycle {
       attempts,
       atCapacity,
       usedPercent: this.#compaction.usedPercent(threadId),
+      // The notice names no cause, so the log keeps the provider's reason for each try (#9725). Codex
+      // puts the cause in `additionalDetails`, after a "Reconnecting... 2/5" message.
+      message: this.#hooks.redactMcp(message),
+      details: details === null ? null : this.#hooks.redactMcp(details),
     });
     if (atCapacity) {
       if (this.#capacityNotices.has(turnId)) return;

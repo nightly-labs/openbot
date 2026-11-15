@@ -284,6 +284,14 @@ try {
       entry.retries.map((retry) => retry !== reset),
       `${entry.name}: the log has the wrong cause`,
     );
+    // The notice names no cause, so the log keeps the provider's reason for each try (#9725).
+    assert.deepEqual(
+      result.retryLogLines.map((line, index) =>
+        line.includes(`"details":${JSON.stringify(entry.retries[index]?.details ?? null)}`),
+      ),
+      entry.retries.map(() => true),
+      `${entry.name}: the log does not keep the provider's reason`,
+    );
     assert.deepEqual(
       result.errorEvents,
       entry.notices.map((message) => ({ code: "agent_warning", message })),

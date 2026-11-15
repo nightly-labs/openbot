@@ -169,10 +169,10 @@ export function createStableConversationState(
   /**
    * The provider and model of the run behind each conversation error, the page that fixes the
    * account (#2419), and the provider's text behind a general sentence (#6410), keyed like
-   * `conversationErrors`.
+   * `conversationErrors`. `notice` marks a notice that the provider tries again, not a failure (#9725).
    */
   const [conversationErrorRuns, setConversationErrorRuns] = createSignal<
-    Record<string, { message: string; run: string | null; link?: string; details?: string }>
+    Record<string, { message: string; run: string | null; link?: string; details?: string; notice?: boolean }>
   >({});
   createEffect(
     () => {
