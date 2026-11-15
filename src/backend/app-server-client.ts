@@ -71,10 +71,13 @@ const WINDOWS_SANDBOX_FAILURE =
  * AppArmor limits on user namespaces. Codex 0.169.0 gives the stderr of `bwrap` as the output of the
  * failed command, for example `bwrap: Failed to make / slave: Operation not permitted` (#9694). The
  * other texts are the user namespace failures that Codex's own check knows
- * (`codex-rs/sandboxing/src/bwrap.rs`). Codex uses this sandbox only for a Workspace only agent.
+ * (`codex-rs/sandboxing/src/bwrap.rs`), the same failure in the words of bubblewrap before 0.11.1
+ * (`creating new namespace`, which Ubuntu 24.04 ships), and the namespace and `pivot_root` failures
+ * of a container. Codex uses this sandbox only for a Workspace only agent. Only the start of the
+ * output counts, so a command that prints such a line itself does not show the warning.
  */
 const LINUX_SANDBOX_FAILURE =
-  /^bwrap: (?:Failed to make \/ slave|setting up uid map: Permission denied|No permissions to create a new namespace|loopback: Failed RTM_NEW(?:ADDR|LINK))/mu;
+  /^\s*bwrap: (?:Failed to make \/ slave|setting up uid map|No permissions to creat(?:e a new|ing new) namespace|Creating new namespace failed|pivot_root\b|loopback: Failed RTM_NEW(?:ADDR|LINK))/u;
 /**
  * Selects the sandbox path of the installed Codex Windows app (Codex 0.169.0,
  * `windows-sandbox-rs/src/app_package.rs`). Codex keeps it in the commands that it runs, so an
