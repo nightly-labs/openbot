@@ -123,7 +123,7 @@ export class McpOAuthProxy {
   #secret: string | null = null;
   /**
    * The paths whose last `initialize` did not give the provider a good answer, and whether
-   * `takeFailedStart` already reported that failure.
+   * `reportedFailedStart` already marked that failure.
    */
   readonly #failedStarts = new Map<string, boolean>();
   /** How many times each path was handed out again after a failed `initialize`. */
@@ -159,18 +159,18 @@ export class McpOAuthProxy {
   });
 
   /**
-   * Whether a provider's last `initialize` on `route`, for any agent, failed after its last hand-off.
-   * Each failure is reported once, so a path that is not handed out again does not make each later
-   * test refresh the agents.
+   * Whether a provider's last `initialize` on `route`, for any agent, failed after its last hand-off
+   * and `reportedFailedStart` was not called for it. A path that is not handed out again thus does
+   * not make each later test refresh the agents.
    */
-  takeFailedStart(route: string): boolean {
-    let found = false;
-    for (const [path, reported] of this.#failedStarts)
-      if (!reported && (path === route || path.startsWith(`${route}/`))) {
-        this.#failedStarts.set(path, true);
-        found = true;
-      }
-    return found;
+  failedStart(route: string): boolean {
+    for (const [path, reported] of this.#failedStarts) if (!reported && onRoute(path, route)) return true;
+    return false;
+  }
+
+  /** Marks the failed starts on `route` as handled, after the agents were refreshed for them. */
+  reportedFailedStart(route: string): void {
+    for (const path of this.#failedStarts.keys()) if (onRoute(path, route)) this.#failedStarts.set(path, true);
   }
 
   /**
@@ -375,6 +375,11 @@ export class McpOAuthProxy {
     yield* discard(second);
     return { challengeError: challengeError(second), renewed: true };
   });
+}
+
+/** Whether `path`, a route with or without an agent key, belongs to `route`. */
+function onRoute(path: string, route: string): boolean {
+  return path === route || path.startsWith(`${route}/`);
 }
 
 /** The bearer of one route: a keyed digest, so no table of bearers is kept or written anywhere. */
