@@ -3,9 +3,10 @@ import type { LicenseTier } from "@openbot/contracts/license";
 import { Effect } from "effect";
 import type { BillingAction, PlanEndReason } from "./account-analytics";
 import { billingCall } from "./billing-errors";
+import { type StripeSubscription, subscriptionPeriodEnd } from "./stripe-client";
 
-/** The key of a purchase claim in `billing_webhook_events`. No Stripe event id has it. */
-const PURCHASE_CLAIM_PREFIX = "openbot_purchase:";
+/** The keys of the start and end claims in `billing_webhook_events`. No Stripe event id has them. */
+const CLAIM_PREFIX = { started: "openbot_purchase:", ended: "openbot_purchase_end:" } as const;
 
 /**
  * The changes of a subscription that the operator gets: its start, the cancel of its renewal, the
@@ -22,7 +23,7 @@ export function purchaseEvent(action: BillingAction | null): PurchaseEvent | nul
 
 interface PurchaseTerms {
   event: PurchaseEvent;
-  /** The end of the paid period, in milliseconds. A cancelled renewal ends the subscription then. */
+  /** When a cancelled renewal ends the subscription, in milliseconds (`subscriptionEnd`). */
   periodEnd: number | null;
   /** Why an ended subscription ended. */
   endReason?: PlanEndReason;
@@ -42,6 +43,13 @@ export type BillingPurchaseDetails =
 /** A started, cancelled or ended subscription with the email of its account, for the operator message. */
 export type BillingPurchase = BillingPurchaseDetails & { email: string };
 
+/** The cancel date that Stripe has for the subscription, or the end of its paid period. In milliseconds. */
+export function subscriptionEnd(subscription: StripeSubscription): number | null {
+  return typeof subscription.cancel_at === "number"
+    ? subscription.cancel_at * 1_000
+    : subscriptionPeriodEnd(subscription);
+}
+
 export interface PurchaseReport {
   database: D1Database;
   now: () => number;
@@ -51,31 +59,38 @@ export interface PurchaseReport {
 
 /**
  * Gives a subscription change to `send`. Stripe sends the events of a new subscription at the same
- * time, and each one can see the start, so only the event that adds the claim reports a start. The claim
- * is kept as long as the webhook events. Each other change comes from the one sync that stored it.
- * A failure skips the message, not the sync.
+ * time, and each one can see the start, so only the event that adds the claim reports a start. An end
+ * has a claim too: a refund and the Stripe event of the end can store it at the same time. The claims
+ * are kept as long as the webhook events. A cancelled or resumed renewal has no claim, because a
+ * subscription can have many. A failure skips the message, not the sync.
  */
 export const reportPurchase = Effect.fn("reportPurchase")(
   function* (report: PurchaseReport, subscriptionId: string, userId: string, details: BillingPurchaseDetails) {
     const send = report.send;
     if (!send) return;
-    if (details.event === "started") {
+    // The read is before the claim, so a failed read leaves the start for the next event.
+    const account = yield* billingCall(() =>
+      report.database.prepare("SELECT email FROM users WHERE id = ?").bind(userId).first<{ email: string }>(),
+    );
+    if (!account) {
+      console.warn("billing: purchase message skipped: the account is gone");
+      return;
+    }
+    if (details.event === "started" || details.event === "ended") {
+      const prefix = CLAIM_PREFIX[details.event];
       const claim = yield* billingCall(() =>
         report.database
           .prepare("INSERT OR IGNORE INTO billing_webhook_events(event_id, type, received_at) VALUES (?, ?, ?)")
-          .bind(`${PURCHASE_CLAIM_PREFIX}${subscriptionId}`, "purchase", report.now())
+          .bind(`${prefix}${subscriptionId}`, "purchase", report.now())
           .run(),
       );
       if (claim.meta.changes !== 1) return;
     }
-    const account = yield* billingCall(() =>
-      report.database.prepare("SELECT email FROM users WHERE id = ?").bind(userId).first<{ email: string }>(),
-    );
-    if (account) send({ ...details, email: account.email });
+    send({ ...details, email: account.email });
   },
   (operation) =>
     operation.pipe(
-      Effect.catch(() => Effect.sync(() => console.warn("billing: purchase message skipped: the read failed"))),
+      Effect.catch(() => Effect.sync(() => console.warn("billing: purchase message skipped: the database failed"))),
     ),
 );
 

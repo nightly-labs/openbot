@@ -60,7 +60,7 @@ import {
   stripeFailure,
   stripeRequest,
 } from "./billing-errors";
-import { type BillingPurchase, purchaseEvent, reportPurchase } from "./billing-purchase";
+import { type BillingPurchase, purchaseEvent, reportPurchase, subscriptionEnd } from "./billing-purchase";
 import { type BillingSales, type BillingSalesSynced, type PaymentReversal, paymentReversal } from "./billing-sales";
 import type { HostedFailure } from "./hosted-server-service";
 import {
@@ -1179,7 +1179,7 @@ export class BillingService {
         ownerId,
         {
           event,
-          periodEnd: subscriptionPeriodEnd(subscription),
+          periodEnd: subscriptionEnd(subscription),
           ...(event === "ended" ? { endReason: planEndReason(previous) } : {}),
           product: "server",
           plan: key.plan,

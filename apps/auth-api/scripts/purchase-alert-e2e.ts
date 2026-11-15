@@ -143,7 +143,7 @@ async function run(alertUrl: string | undefined) {
     await Promise.all(work.splice(0));
   };
   /** Changes a subscription in the fake Stripe API, as a cancel in the Customer Portal does. */
-  const change = (id: string, patch: { cancel_at_period_end?: boolean; status?: string }) =>
+  const change = (id: string, patch: { cancel_at_period_end?: boolean; cancel_at?: number; status?: string }) =>
     stored.set(id, { ...stored.get(id), ...patch });
   return { database, alerts, deliver, change };
 }
@@ -207,16 +207,17 @@ async function purchasesAlertTheOperator() {
   );
 
   const licenseTerms = `for \`${LICENSE_BUYER.email}\`: team, 7 users, ${amount} (PLN) for 1 year.`;
-  change("sub_license", { cancel_at_period_end: true });
+  // A cancel date from the Dashboard is not the end of the paid period.
+  change("sub_license", { cancel_at: Date.UTC(2027, 0, 31) / 1000 });
   await deliver("customer.subscription.updated", { id: "sub_license" });
   change("sub_license", { status: "past_due" });
   await deliver("customer.subscription.updated", { id: "sub_license" });
   change("sub_license", { status: "canceled" });
   await deliver("customer.subscription.deleted", { id: "sub_license" });
   check(
-    "a license sends one message for its cancelled renewal and one for its end after a failed payment",
+    "a license sends one message for its cancel date and one for its end after a failed payment",
     alerts.length === 7 &&
-      alerts[5] === `Cancelled renewal of the license ${licenseTerms} It ends on 2026-12-15.` &&
+      alerts[5] === `Cancelled renewal of the license ${licenseTerms} It ends on 2027-01-31.` &&
       alerts[6] === `Ended license ${licenseTerms} Reason: not paid.`,
     alerts,
   );
@@ -225,10 +226,9 @@ async function purchasesAlertTheOperator() {
     .prepare("SELECT event_id FROM billing_webhook_events WHERE type = 'purchase' ORDER BY event_id")
     .all();
   check(
-    "each subscription has one purchase claim",
-    claims.length === 2 &&
-      claims[0]?.event_id === "openbot_purchase:sub_license" &&
-      claims[1]?.event_id === "openbot_purchase:sub_server",
+    "each subscription has one start claim and one end claim",
+    claims.map((claim) => claim.event_id).join() ===
+      "openbot_purchase:sub_license,openbot_purchase:sub_server,openbot_purchase_end:sub_license,openbot_purchase_end:sub_server",
     claims,
   );
 }

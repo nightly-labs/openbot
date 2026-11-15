@@ -47,7 +47,7 @@ import {
   stripeFailure,
   stripeRequest,
 } from "./billing-errors";
-import { type BillingPurchase, purchaseEvent, reportPurchase } from "./billing-purchase";
+import { type BillingPurchase, purchaseEvent, reportPurchase, subscriptionEnd } from "./billing-purchase";
 import type { BillingSales } from "./billing-sales";
 import type { LicenseEmailInput } from "./email-templates";
 import type { RemoteFailure } from "./remote-control-plane";
@@ -949,7 +949,7 @@ export class LicenseService {
             ownerId,
             {
               event,
-              periodEnd,
+              periodEnd: subscriptionEnd(subscription),
               ...(change.endReason ? { endReason: change.endReason } : {}),
               product: "license",
               tier: plan.tier,

@@ -1757,12 +1757,16 @@ A pool message has no account, email or name. A purchase message (the last 5 row
 the account, on a developer decision, so keep the webhook in a private channel. Its amount is the list
 amount of one period, before a discount. A license at the bundle price adds `bundle price`, and a
 subscription that starts with a trial adds `It starts with a free trial.` Each new subscription sends
-one start message: a claim in `billing_webhook_events` (`openbot_purchase:<subscription ID>`) stops a
-second one. Each other message goes out with the one sync that stores the change, so a repeated event
-sends nothing. A change of plan or users and a renewal payment send nothing. A server order with a
-license sends two messages, one for each subscription. A subscription that ends after its owner
-cancelled the renewal sends the cancel message and, later, the end message. A deleted server, a full
-refund and a dispute end the plan at once, with the reason `cancelled`. The boat message goes out only after the Worker stores the
+one start message, and each ended subscription one end message: a claim in `billing_webhook_events`
+(`openbot_purchase:<subscription ID>`, `openbot_purchase_end:<subscription ID>`) stops a second one.
+A cancel or resume message goes out with the sync that stores the change, so a repeated event sends
+nothing. A cancel date that Stripe has for the subscription (`cancel_at`) is the date of the cancel
+message. One sync sends one message: a cancel that Stripe stores together with a change of plan or
+users sends no cancel message. A change of plan or users and a renewal payment send nothing. A server
+order with a license sends two messages, one for each subscription. A subscription that ends after its
+owner cancelled the renewal sends the cancel message and, later, the end message. A deleted server, a
+full refund and a dispute end the plan at once. The reason is `not paid` when the last payment of the
+plan had failed, and `cancelled` in each other case. The boat message goes out only after the Worker stores the
 boat start, so a lost race, a retry of a boat attempt, or a pool change whose answer was lost sends
 nothing. A failed send logs one line and is not sent again. Without the secret there are no messages.
 The encrypted `apps/auth-api/.env.production` holds the URL, and `bun run api:deploy` sets it. The CI

@@ -13,8 +13,8 @@ export type HostedPoolAlert = (text: string) => Effect.Effect<void>;
 
 /**
  * A Discord webhook (`HOSTED_POOL_ALERT_WEBHOOK_URL`) that tells the operator when a purchase starts on
- * boat or a pool group is almost empty, and of each new server plan and license
- * (docs/hosted-servers.md#pool-alerts). Without the URL, or with a
+ * boat or a pool group is almost empty, and when a server plan or a license starts, ends, or has its
+ * renewal cancelled or resumed (docs/hosted-servers.md#pool-alerts). Without the URL, or with a
  * URL that is not HTTPS, there is no alert. A failed send logs one line with no URL and is not sent again.
  */
 export function createHostedPoolAlert(webhookUrl: string | undefined, fetch: BoatFetch): HostedPoolAlert | null {
