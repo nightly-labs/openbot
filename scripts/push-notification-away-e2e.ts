@@ -20,6 +20,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { AgentEvent, AgentRuntimeSnapshot, AgentSummary } from "@openbot/contracts/ipc";
 import type { LiveActivityRelayPush } from "@openbot/contracts/live-activity-relay";
+import { PUSH_NOTIFICATION_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/push-notification-threads-v1";
 import { createOpenBotLogger } from "@openbot/logging";
 import { encodeLiveActivityBytes, LIVE_ACTIVITY_SECRET_BYTES } from "@openbot/team-client/live-activity-seal";
 import { pushNotificationKeys } from "@openbot/team-client/push-notification-seal";
@@ -182,10 +183,10 @@ function opened(request: NotificationRelayRequest): string {
   return `${content.kind} ${content.agentId}`;
 }
 
-function registerAndroid(away: boolean): void {
+function registerAndroid(away: boolean, capabilities: string[] = []): void {
   phones.register(
     ANDROID,
-    { memberId: MEMBER, protocol: 7, capabilities: new Set() },
+    { memberId: MEMBER, protocol: 7, capabilities: new Set(capabilities) },
     {
       platform: "android",
       value: {
@@ -237,12 +238,17 @@ const reply = (agentId: string, turnId: string, origin: "user" | "agent" = "user
   origin,
 });
 /** A reply in another thread of the agent: the host does not know whether the member read it. */
-const sideReply = (agentId: string, turnId: string): AgentEvent => ({
+const sideReply = (
+  agentId: string,
+  turnId: string,
+  origin: "user" | "agent" = "user",
+): Extract<AgentEvent, { type: "turn-completed" }> => ({
   type: "turn-completed",
   agentId,
   threadId: `${agentId}-side`,
   turnId,
   status: "completed",
+  origin,
 });
 const failure = (agentId: string, turnId: string, origin: "user" | "agent" = "user"): AgentEvent => ({
   type: "turn-completed",
@@ -341,17 +347,29 @@ try {
     return { said };
   });
 
-  await step("a turn that a teammate's message started stays quiet, a failed one goes out", async () => {
-    // The phone is away, so each event that notifies goes out at once.
-    const from = sent.length;
-    state.unread.set(AGENT_A, 1);
-    events.emit("event", reply(AGENT_A, "turn-teammate", "agent"));
-    state.failedTurns = [{ agentId: AGENT_B, turnId: "turn-teammate-failed" }];
-    events.emit("event", failure(AGENT_B, "turn-teammate-failed", "agent"));
-    const said = await sendsUntil(ANDROID, from, `failed ${AGENT_B}`);
-    assert.deepEqual(said, [`failed ${AGENT_B}`], "The answer of work between agents went out.");
-    return { said };
-  });
+  await step(
+    "a turn that a teammate's message started stays quiet, a task result and a failed turn go out",
+    async () => {
+      // The phone is away, so each event that notifies goes out at once. It can open a task thread.
+      registerAndroid(true, [PUSH_NOTIFICATION_THREADS_CAPABILITY]);
+      const from = sent.length;
+      state.unread.set(AGENT_B, 1);
+      events.emit("event", reply(AGENT_B, "turn-teammate", "agent"));
+      // A task that the agent started sends its brief to itself, so its turn has the same origin. Its
+      // result is for the user.
+      events.emit("event", {
+        type: "thread-turn-completed",
+        taskId: "task-1",
+        routine: false,
+        turn: sideReply(AGENT_A, "turn-task", "agent"),
+      });
+      state.failedTurns = [{ agentId: AGENT_B, turnId: "turn-teammate-failed" }];
+      events.emit("event", failure(AGENT_B, "turn-teammate-failed", "agent"));
+      const said = await sendsUntil(ANDROID, from, `failed ${AGENT_B}`);
+      assert.deepEqual(said, [`reply ${AGENT_A}`, `failed ${AGENT_B}`]);
+      return { said };
+    },
+  );
 
   await step("a Live Activity replaces the notification only of an event that it shows", async () => {
     phones.register(

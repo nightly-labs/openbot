@@ -87,7 +87,9 @@ A completed turn that a teammate's message started (`origin: "agent"`: a request
 or its answer) is work between agents. Its answer shows in the chat and counts as unread, but the
 desktop, the web client and the phone show no notification for it and play no completion sound
 (`teammateTurnCompleted` in `packages/team-client/src/agent-notifications.ts`). A prompt, an
-approval, a browser step and a failed turn still notify. The clients decide this from the released
+approval, a browser step and a failed turn still notify. So does the result of a task: its turn has
+the same origin, because the agent sends the brief to itself, but it arrives as
+`thread-turn-completed`. The clients decide this from the released
 `origin` field, so it needs no capability and also applies with an older host. The host decides it
 for the phone push.
 
