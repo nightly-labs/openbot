@@ -215,6 +215,12 @@ const GEMINI_PROMPT_LOG = "Sending user message to conversation ";
  * the CLI's own log names the tool, in `<Gemini home>/<app data>/log/acp-server-<time>-<pid>.log`.
  */
 const GEMINI_REFUSED_TOOL = /\bbuilding toolbox: tool "(mcp_[^"]+)" advertises an invalid parameter schema\b/gu;
+/**
+ * The Antigravity CLI 1.5.9 answer for the same refused tool schema. It names the tool, so the log is
+ * not read. The 1.5.9 CLI no longer answers "Agent execution terminated due to error." (#9568).
+ */
+const GEMINI_REFUSED_TOOL_ANSWER =
+  /^\s*(?:\u26A0 )?agent executor error: building toolbox: tool "(mcp_[^"]+)" advertises an invalid parameter schema\b/u;
 /** A log that the CLI wrote in this time can hold the failure of the prompt that just ended. */
 const GEMINI_LOG_RECENT_MS = 10 * 60_000;
 /** The end of a log that is read. The failure comes a few lines after the line of its prompt. */
@@ -232,12 +238,15 @@ function logTail(file: string, size: number): string {
 }
 
 /**
- * The tools that the CLI refused after the last prompt of the session. Each session has a process,
- * and so a log, of its own. A session that opened again on a new process has an older log too, so
- * only the newest log with a prompt of the session counts. A log that cannot be read gives no tools:
- * the turn then fails as before.
+ * The tools that the CLI refused after the last prompt of the session. The 1.5.9 answer names the
+ * tool. An older CLI names it only in its log. Each session has a process, and so a log, of its own.
+ * A session that opened again on a new process has an older log too, so only the newest log with a
+ * prompt of the session counts. A log that cannot be read gives no tools: the turn then fails as
+ * before.
  */
 function antigravityRefusedMcpTools(text: string, argv: readonly string[], sessionId: string): string[] {
+  const answered = GEMINI_REFUSED_TOOL_ANSWER.exec(text)?.[1];
+  if (answered) return [answered];
   if (!GEMINI_TERMINATED_ANSWER.test(text)) return [];
   const home = flagValue(argv, GEMINI_DIR_FLAG);
   const appData = flagValue(argv, APP_DATA_DIR_FLAG);
