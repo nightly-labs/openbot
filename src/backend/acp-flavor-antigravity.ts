@@ -104,6 +104,10 @@ const GEMINI_REQUEST_FAILURES = [
     "error.provider.antigravityModelAtCapacity",
     /\bMODEL_CAPACITY_EX(?:HAUSTED|CEEDED)\b|\b[Nn]o capacity available for model\b/u,
   ],
+  // Google's text for a spent plan quota: "Individual quota reached. Please upgrade your subscription
+  // to increase your limits. Resets in 152h1m7s." It resets in days, so "wait a few minutes" is
+  // wrong for it, and before this it showed with no advice (#9675).
+  ["error.provider.antigravityQuotaReached", /\bquota\b.{0,40}\breached\b/iu],
   ["error.provider.antigravityRateLimited", /\bRESOURCE_EXHAUSTED\b/u],
   [
     "error.provider.antigravityRateLimited",
