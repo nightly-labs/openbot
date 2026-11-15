@@ -42,7 +42,12 @@ import {
 } from "./mcp-provider-shapes";
 import { redactMcpSecrets, redactMcpValues } from "./mcp-redaction";
 
-const MCP_PROBE_TIMEOUT_MS = 10_000;
+/**
+ * The deadline for an http server, from the handshake to the last tool page. A hosted server can
+ * need more than 10 seconds to start (#9625). Codex gives each MCP step 30 seconds, so a server that
+ * passes this test also starts in a Codex turn.
+ */
+const MCP_PROBE_TIMEOUT_MS = 30_000;
 
 /**
  * The deadline for a stdio server. Its first start can download the package and all its
