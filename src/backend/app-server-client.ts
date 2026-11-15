@@ -66,6 +66,16 @@ const STDERR_END_WAIT_MS = 250;
 const WINDOWS_SANDBOX_FAILURE =
   /^(?:execution error|Failed to create unified exec process): .*\b(?:CryptUnprotectData failed|registered Core)\b/su;
 /**
+ * The output of a command that the Codex Linux sandbox (bubblewrap) could not start because the
+ * host does not let it make a user namespace or mount in one: a Docker container, or a host with
+ * AppArmor limits on user namespaces. Codex 0.169.0 gives the stderr of `bwrap` as the output of the
+ * failed command, for example `bwrap: Failed to make / slave: Operation not permitted` (#9694). The
+ * other texts are the user namespace failures that Codex's own check knows
+ * (`codex-rs/sandboxing/src/bwrap.rs`). Codex uses this sandbox only for a Workspace only agent.
+ */
+const LINUX_SANDBOX_FAILURE =
+  /^bwrap: (?:Failed to make \/ slave|setting up uid map: Permission denied|No permissions to create a new namespace|loopback: Failed RTM_NEW(?:ADDR|LINK))/mu;
+/**
  * Selects the sandbox path of the installed Codex Windows app (Codex 0.169.0,
  * `windows-sandbox-rs/src/app_package.rs`). Codex keeps it in the commands that it runs, so an
  * OpenBot that a Codex app command started has it too. The Codex that OpenBot starts is not that app,
@@ -119,7 +129,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
    * not have saved the blocks of that turn, so the next turn sends them again.
    */
   readonly #openTurns = new Set<string>();
-  /** The turn of each thread that showed the Windows sandbox warning, so that a turn shows it once. */
+  /** The turn of each thread that showed the sandbox warning, so that a turn shows it once. */
   readonly #sandboxWarnings = new Map<string, string>();
   #process: ChildProcessWithoutNullStreams | null = null;
   /** The end of a process that failed. `stop` waits for it, because `#process` no longer holds it. */
@@ -503,8 +513,8 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     if (failed || compacted) this.#turnContext.resend(params.threadId);
   }
 
-  /** Tells the user once in a turn what to do when the Windows sandbox cannot start the agent's commands. */
-  #warnWindowsSandbox(method: string, params: unknown): void {
+  /** Tells the user once in a turn what to do when the Codex sandbox cannot start the agent's commands. */
+  #warnSandboxFailure(method: string, params: unknown): void {
     if (!isRecord(params) || !isString(params.threadId)) return;
     const { threadId } = params;
     if (method === "turn/completed") {
@@ -520,7 +530,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
       item.type !== "commandExecution" ||
       item.status !== "failed" ||
       !isString(item.aggregatedOutput) ||
-      !WINDOWS_SANDBOX_FAILURE.test(item.aggregatedOutput) ||
+      !(WINDOWS_SANDBOX_FAILURE.test(item.aggregatedOutput) || LINUX_SANDBOX_FAILURE.test(item.aggregatedOutput)) ||
       this.#sandboxWarnings.get(threadId) === params.turnId
     )
       return;
@@ -595,7 +605,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
         }
         this.#observeTurnContext(message.method, message.params);
         this.emit("notification", { method: message.method, params: message.params });
-        this.#warnWindowsSandbox(message.method, message.params);
+        this.#warnSandboxFailure(message.method, message.params);
       }
       return;
     }
