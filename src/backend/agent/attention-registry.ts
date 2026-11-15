@@ -140,12 +140,17 @@ interface PendingPrompt {
    */
   detached?: LateAnswerTarget;
   /**
-   * A Codex subagent asked it, in the chat and turn of its parent agent. Its call waits in the
-   * subagent's own turn, which can outlive the parent turn (#9727). The parent turn's normal end thus
-   * keeps it. The end of the subagent's turn aborts the call, which expires it, and so do a Stop, a
-   * failure or a lost process.
+   * A Codex subagent asked it, in the chat and turn of its parent agent (`AppServerRequest.subagent`).
+   * Its call waits in the subagent's own turn, which can outlive the parent turn (#9727). The parent
+   * turn's normal end thus keeps it. The end of the subagent's turn aborts the call, which expires it,
+   * and so do a Stop, a failure or a lost process.
    */
   subagent?: true;
+}
+
+/** A detached question, or a subagent's question: the normal end of its turn keeps the card. */
+function outlivesTurn(pending: PendingPrompt): boolean {
+  return pending.detached !== undefined || pending.subagent === true;
 }
 
 /** The chat that a new message reaches: a task of the agent, or its own chat without `taskId`. */
@@ -713,8 +718,8 @@ export class AttentionRegistry {
       threadId: pending.publicThreadId,
       turnId: pending.turnId,
       questions: pending.questions.map(compactRuntimeQuestion),
-      // A subagent's question also stays after its turn ends, so a client keeps its card.
-      ...(pending.detached || pending.subagent ? { detached: true as const } : {}),
+      // A client keeps the card when the turn ends.
+      ...(outlivesTurn(pending) ? { detached: true as const } : {}),
     }));
     remainingAttention -= pendingPrompts.length;
     const pendingApprovals = [...this.#approvals.values()]
@@ -1766,6 +1771,7 @@ export class AttentionRegistry {
       turnId,
       messageId,
       questions,
+      ...(request.subagent ? { subagent: true as const } : {}),
     };
     // A secret answer must not show in a chat message, so a secret question waits in its call.
     const target =
@@ -1785,6 +1791,7 @@ export class AttentionRegistry {
       agentId,
       threadId: publicThreadId,
       turnId,
+      ...(request.subagent ? { detached: true as const } : {}),
       questions,
     });
   }
@@ -1793,15 +1800,13 @@ export class AttentionRegistry {
    * Shows an `ask_ui` block and waits for its answer. The block is a question prompt: its fallback
    * questions let a client that does not know `uiBlock` answer it through `respondToPrompt`. The
    * caller has checked the spec and refused a channel. With `autoAnswer`, the host answers that action
-   * itself after `afterMs` when nobody answered first. With `subagent`, a Codex subagent asks in the
-   * parent's chat and turn (see `PendingPrompt.subagent`).
+   * itself after `afterMs` when nobody answered first.
    */
   surfaceUiBlock(
     client: AgentClient,
     request: AppServerRequest,
     block: SurfacedUiBlock,
     autoAnswer?: { actionId: string; afterMs: number },
-    subagent = false,
   ): void {
     const threadId = getString(request.params, "threadId");
     const turnId = getString(request.params, "turnId");
@@ -1857,7 +1862,7 @@ export class AttentionRegistry {
       questions,
       uiBlock: block,
       ...(autoAnswerTimer ? { autoAnswer: autoAnswerTimer } : {}),
-      ...(subagent ? { subagent: true as const } : {}),
+      ...(request.subagent ? { subagent: true as const } : {}),
     });
     this.#routines.markNeedsAttention(turnId);
     this.#emit({
@@ -1866,7 +1871,7 @@ export class AttentionRegistry {
       agentId,
       threadId: publicThreadId,
       turnId,
-      ...(subagent ? { detached: true as const } : {}),
+      ...(request.subagent ? { detached: true as const } : {}),
       questions,
     });
   }
@@ -2021,8 +2026,7 @@ export class AttentionRegistry {
     for (const [requestId, pending] of this.#prompts) {
       const pendingThreadId = getString(pending.params, "threadId");
       const pendingTurnId = getString(pending.params, "turnId");
-      const outlivesTurn = pending.detached !== undefined || pending.subagent === true;
-      if (pendingThreadId !== threadId || pendingTurnId !== turnId || (completed && outlivesTurn)) continue;
+      if (pendingThreadId !== threadId || pendingTurnId !== turnId || (completed && outlivesTurn(pending))) continue;
       this.#expirePrompt(requestId, pending);
     }
     for (const [requestId, pending] of this.#approvals) {
@@ -2077,7 +2081,7 @@ export class AttentionRegistry {
   expireDetached(agentId: string | null, publicThreadId: string | null): void {
     let changed = false;
     for (const [requestId, pending] of this.#prompts) {
-      if (!pending.detached && !pending.subagent) continue;
+      if (!outlivesTurn(pending)) continue;
       if (agentId !== null && pending.agentId !== agentId) continue;
       if (publicThreadId !== null && pending.publicThreadId !== publicThreadId) continue;
       this.#expirePrompt(requestId, pending);

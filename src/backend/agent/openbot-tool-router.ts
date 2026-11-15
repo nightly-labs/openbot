@@ -626,7 +626,6 @@ export class OpenBotToolRouter {
         case "item/tool/call": {
           if (!isDynamicToolCall(request.params)) throw new Error("Invalid dynamic tool request.");
           let params = this.#asSubagentParent(request.params);
-          // A Codex subagent's call runs in the parent's chat and turn, but waits in the subagent's turn.
           const fromSubagent = params.threadId !== request.params.threadId;
           if (params.namespace === "openbot") {
             const deferredMcp = this.#deferredMcpNote(client, params.threadId);
@@ -761,8 +760,13 @@ export class OpenBotToolRouter {
               );
             return;
           }
-          // Keep the transport identifiers and abort signal; enter the original dispatch below.
-          const toolRequest = { ...request, params };
+          // Keep the transport identifiers and abort signal; enter the original dispatch below. A card of
+          // a subagent's call then waits for the end of the subagent's turn, not of the parent's (#9727).
+          const toolRequest: AppServerRequest & { params: DynamicToolCallParams } = {
+            ...request,
+            params,
+            ...(fromSubagent ? { subagent: true as const } : {}),
+          };
           if (toolRequest.params.namespace === OPENBOT_BROWSER_NAMESPACE) {
             const agentId = this.#conversation.agentForThread(toolRequest.params.threadId);
             if (!agentId) throw new Error("The browsing OpenBot agent is unknown.");
@@ -868,7 +872,7 @@ export class OpenBotToolRouter {
             }
             // Every provider gets ask_ui, Claude too: its call arrives here through the SDK MCP server.
             if (toolRequest.params.tool === "ask_ui") {
-              this.#askUi(client, toolRequest, toolRequest.params, fromSubagent);
+              this.#askUi(client, toolRequest, toolRequest.params);
               return;
             }
             if (toolRequest.params.tool === "acknowledge_request") {
@@ -989,9 +993,8 @@ export class OpenBotToolRouter {
   /**
    * Checks an `ask_ui` call and shows its block. Like `ask_user`, it answers the call only when the
    * person answers or the turn ends. The agent can correct a refused block, so it gets the reason.
-   * A Codex subagent's block waits for the end of the subagent's turn, not of its parent's (#9727).
    */
-  #askUi(client: AgentClient, request: AppServerRequest, params: DynamicToolCallParams, fromSubagent: boolean): void {
+  #askUi(client: AgentClient, request: AppServerRequest, params: DynamicToolCallParams): void {
     const refuse = (message: string) => client.respond(request.id, openBotToolFailure(message));
     const parsed = askUiToolSchema.safeParse(params.arguments);
     if (!parsed.success) {
@@ -1007,7 +1010,7 @@ export class OpenBotToolRouter {
       );
       return;
     }
-    this.#attention.surfaceUiBlock(client, request, { blockId, spec }, undefined, fromSubagent);
+    this.#attention.surfaceUiBlock(client, request, { blockId, spec });
   }
 
   /**
