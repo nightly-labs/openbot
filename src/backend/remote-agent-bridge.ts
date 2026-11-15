@@ -110,7 +110,7 @@ function isLinkRow(value: unknown): value is LinkRow {
     typeof value.peer_name === "string" &&
     typeof value.peer_reach === "string" &&
     typeof value.peer_token_hash === "string" &&
-    value.token_ciphertext instanceof Buffer &&
+    (Buffer.isBuffer(value.token_ciphertext) || value.token_ciphertext instanceof Uint8Array) &&
     typeof value.created_at === "string" &&
     (value.revoked_at === null || typeof value.revoked_at === "string")
   );

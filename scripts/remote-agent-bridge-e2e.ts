@@ -56,8 +56,10 @@ function inviteFields(body: unknown): { code: string; inviteId: string } {
 }
 
 function linkTokenFromRow(row: unknown): string {
-  assert.ok(isDynamicRecord(row) && row.token_ciphertext instanceof Buffer);
-  const token = Buffer.from(row.token_ciphertext).toString("utf8");
+  assert.ok(isDynamicRecord(row));
+  const bytes = row.token_ciphertext;
+  assert.ok(Buffer.isBuffer(bytes) || bytes instanceof Uint8Array);
+  const token = Buffer.from(bytes).toString("utf8");
   remember(token);
   return token;
 }
