@@ -1785,25 +1785,28 @@ export class BrowserCdpEngine {
             );
           }
           const dragData = yield* Deferred.await(interceptedDragData);
-          if (!dragData) return yield* browserFailure(new Error("The source did not start a native drag operation."));
-          yield* send("Input.dispatchDragEvent", { type: "dragEnter", x: to.x, y: to.y, data: dragData }, sessionId);
-          yield* send("Input.dispatchDragEvent", { type: "dragOver", x: to.x, y: to.y, data: dragData }, sessionId);
-          // The wait only helps the page. The drop still goes, before the deadline, when no frame comes.
-          const frameWaitMs =
-            deadline === undefined
-              ? DROP_FRAME_WAIT_MS
-              : Math.min(DROP_FRAME_WAIT_MS, deadline - Date.now() - SETTLE_RESERVE_MS);
-          if (frameWaitMs > 0) {
-            yield* Effect.gen(function* () {
-              const contextId = yield* automationContextId(send, sessionId);
-              yield* send(
-                "Runtime.evaluate",
-                { expression: DROP_FRAME_SCRIPT, contextId, awaitPromise: true },
-                sessionId,
-              );
-            }).pipe(Effect.timeoutOrElse({ duration: frameWaitMs, orElse: () => Effect.void }), Effect.ignore);
+          // A page that drags with pointer events (a slider, a canvas) starts no native drag.
+          // The press and the moves already reached it, and the release below ends its drag.
+          if (dragData) {
+            yield* send("Input.dispatchDragEvent", { type: "dragEnter", x: to.x, y: to.y, data: dragData }, sessionId);
+            yield* send("Input.dispatchDragEvent", { type: "dragOver", x: to.x, y: to.y, data: dragData }, sessionId);
+            // The wait only helps the page. The drop still goes, before the deadline, when no frame comes.
+            const frameWaitMs =
+              deadline === undefined
+                ? DROP_FRAME_WAIT_MS
+                : Math.min(DROP_FRAME_WAIT_MS, deadline - Date.now() - SETTLE_RESERVE_MS);
+            if (frameWaitMs > 0) {
+              yield* Effect.gen(function* () {
+                const contextId = yield* automationContextId(send, sessionId);
+                yield* send(
+                  "Runtime.evaluate",
+                  { expression: DROP_FRAME_SCRIPT, contextId, awaitPromise: true },
+                  sessionId,
+                );
+              }).pipe(Effect.timeoutOrElse({ duration: frameWaitMs, orElse: () => Effect.void }), Effect.ignore);
+            }
+            yield* send("Input.dispatchDragEvent", { type: "drop", x: to.x, y: to.y, data: dragData }, sessionId);
           }
-          yield* send("Input.dispatchDragEvent", { type: "drop", x: to.x, y: to.y, data: dragData }, sessionId);
           yield* send(
             "Input.dispatchMouseEvent",
             { type: "mouseReleased", x: to.x, y: to.y, button: "left", clickCount: 1 },
