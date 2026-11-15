@@ -645,7 +645,7 @@
   max-width: var(--message-wide-bubble-width);
 }
 
-.message-entry-agent .ui-bubble:has(.message-data-table-scroll) > .ui-bubble-content {
+.message-entry-agent .ui-bubble:has(:is(.message-data-table-scroll, .message-code-block)) > .ui-bubble-content {
   width: 100%;
 }
 
