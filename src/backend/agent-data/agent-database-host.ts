@@ -115,6 +115,14 @@ function authorize(action: number, first: string | null, second: string | null):
       return tableOwnedByAnother(first);
     case constants.SQLITE_ALTER_TABLE:
       return tableOwnedByAnother(second);
+    // A trigger runs inside every write to its table, also the owner record's own writes, which run
+    // with `provisioning` set. So adding or removing one reshapes the table as ALTER does. All four
+    // actions name the table in the second argument.
+    case constants.SQLITE_CREATE_TRIGGER:
+    case constants.SQLITE_CREATE_TEMP_TRIGGER:
+    case constants.SQLITE_DROP_TRIGGER:
+    case constants.SQLITE_DROP_TEMP_TRIGGER:
+      return tableOwnedByAnother(second);
     default:
       return constants.SQLITE_OK;
   }
@@ -307,7 +315,7 @@ function toFailure(error: unknown, request: AgentDatabaseStatement): AgentDataba
     return {
       kind: "not-authorized",
       message:
-        "SQLite refused part of this statement. ATTACH, DETACH, PRAGMA, VACUUM, and extensions are not available, and a table another agent created cannot be dropped or altered.",
+        "SQLite refused part of this statement. ATTACH, DETACH, PRAGMA, VACUUM, and extensions are not available, and a table another agent created cannot be dropped, altered, or given a trigger.",
       ...(code === undefined ? {} : { sqliteCode: code }),
     };
   }

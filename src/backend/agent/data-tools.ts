@@ -29,7 +29,7 @@ export const DATA_TOOL_DEFINITIONS = [
   {
     name: "execute_data",
     description:
-      "Run one INSERT, UPDATE, DELETE, CREATE TABLE, or other write against the shared database. One statement per call, with values passed in params. Keep structured information here rather than in a JSON or CSV file. Write many rows in one call with one multi-row statement such as INSERT INTO people (name, email) VALUES (?, ?), (?, ?) rather than one call per row. Give each table a primary key and a UNIQUE natural key, and write with INSERT ... ON CONFLICT DO UPDATE so re-running a task updates a row instead of duplicating it. You become the owner of a table you create; you can change the rows of any table, but you can drop or alter only your own. Transactions, ATTACH, PRAGMA, and VACUUM are unavailable.",
+      "Run one INSERT, UPDATE, DELETE, CREATE TABLE, or other write against the shared database. One statement per call, with values passed in params. Keep structured information here rather than in a JSON or CSV file. Write many rows in one call with one multi-row statement such as INSERT INTO people (name, email) VALUES (?, ?), (?, ?) rather than one call per row. Give each table a primary key and a UNIQUE natural key, and write with INSERT ... ON CONFLICT DO UPDATE so re-running a task updates a row instead of duplicating it. You become the owner of a table you create; you can change the rows of any table, but you can drop, alter, or add triggers to only your own. Transactions, ATTACH, PRAGMA, and VACUUM are unavailable.",
     shape: dataStatementSchema.shape,
   },
   {
