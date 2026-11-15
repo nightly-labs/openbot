@@ -22,13 +22,26 @@ interface ScannedStatement {
 // Where a statement ends, as SQLite's own `sqlite3_complete` decides it (`src/complete.c`, public
 // domain). Only `CREATE [TEMP] TRIGGER` has a `;` inside its one statement: its body ends at
 // `; END`, and the statement at the next `;`. A `CASE ... END` holds no `;`, so it needs no count.
+// Token numbers are the columns of `TRANSITIONS`. Whitespace and comments are skipped before the
+// table, so its WS column (1) is never read; it stays so the table matches SQLite's.
 const SEMI = 0;
 const OTHER = 2;
-const KEYWORD_TOKENS: Record<string, number> = { explain: 3, create: 4, temp: 5, temporary: 5, trigger: 6, end: 7 };
+const EXPLAIN = 3;
+const CREATE = 4;
+const TEMP = 5;
+const TRIGGER = 6;
+const END = 7;
+const KEYWORD_TOKENS: Record<string, number> = {
+  explain: EXPLAIN,
+  create: CREATE,
+  temp: TEMP,
+  temporary: TEMP,
+  trigger: TRIGGER,
+  end: END,
+};
 /** The state between two statements. Every `;` that ends a statement leads here. */
 const START = 1;
 // Rows are states, columns are tokens: SEMI, WS, OTHER, EXPLAIN, CREATE, TEMP, TRIGGER, END.
-// Whitespace and comments are skipped before this table, so the WS column is never read.
 const TRANSITIONS: readonly (readonly number[])[] = [
   [1, 0, 2, 3, 4, 2, 2, 2], // nothing yet
   [1, 1, 2, 3, 4, 2, 2, 2], // START
@@ -117,9 +130,11 @@ function scanStatement(sql: string): ScannedStatement {
       index += 1;
       continue;
     }
-    if (character !== undefined && /[A-Za-z_]/.test(character)) {
+    // As in SQLite, every character above ASCII is an identifier character, so that a part of a
+    // non-ASCII name is never read as END or TRIGGER.
+    if (character !== undefined && /[A-Za-z_\u0080-\uffff]/.test(character)) {
       let end = index;
-      while (end < sql.length && /[A-Za-z0-9_$]/.test(sql.charAt(end))) end += 1;
+      while (end < sql.length && /[A-Za-z0-9_$\u0080-\uffff]/.test(sql.charAt(end))) end += 1;
       const word = sql.slice(index, end).toLowerCase();
       see(KEYWORD_TOKENS[word] ?? OTHER);
       if (depth === 0) words.push(word);
