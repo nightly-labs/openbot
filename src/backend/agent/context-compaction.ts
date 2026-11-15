@@ -578,6 +578,7 @@ export class ContextCompaction {
     const client = agent ? this.#providers.clientForAgent(agent) : null;
     if (
       budget?.phase !== "requested" ||
+      !agent ||
       !client ||
       !compactsOnRequest(client.contextCompaction) ||
       !this.#providers.isReady()
@@ -617,7 +618,7 @@ export class ContextCompaction {
           return client
             .request(
               "thread/compact/start",
-              { threadId },
+              { threadId, ...(runsInRequest ? { cwd: agent.workspacePath } : {}) },
               decodeRecordResponse,
               runsInRequest ? this.#runTimeoutMs : undefined,
             )
