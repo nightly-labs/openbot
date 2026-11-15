@@ -117,7 +117,7 @@ export const probeModels = Effect.fn("ModelServerProbe.probe")(function* (
             () => new InvalidModelList({ message: sourceText("error.provider.discoveryInvalid", { host }) }),
           ),
         );
-        return parseModelList(envelope.data);
+        return yield* withLmStudioContext(parseModelList(envelope.data), target.baseUrl, headers, controller.signal);
       }).pipe(
         Effect.timeoutOrElse({
           duration: timeoutMs,
@@ -146,6 +146,71 @@ const readLimited = Effect.fn("ModelServerProbe.readLimited")(function* (respons
   );
   return body.toString("utf8");
 });
+
+/**
+ * LM Studio's native model list, beside its OpenAI-compatible `/v1`: `http://host:1234/v1` gives
+ * `http://host:1234/api/v0/models`. Null for a base URL that does not end in `/v1`.
+ */
+function lmStudioModelsUrl(baseUrl: string): URL | null {
+  const url = URL.parse(baseUrl);
+  if (!url) return null;
+  const path = url.pathname.replace(/\/+$/, "");
+  if (!path.endsWith("/v1")) return null;
+  url.pathname = `${path.slice(0, -"/v1".length)}/api/v0/models`;
+  return url;
+}
+
+/**
+ * The context window that an LM Studio `/api/v0/models` entry gives: the length the model is loaded
+ * with, or else the most it can be loaded with. A loaded model answers only within its loaded
+ * length, which can be far below its maximum.
+ */
+function lmStudioContextWindow(entry: unknown): number | undefined {
+  if (!isDynamicRecord(entry)) return undefined;
+  const loaded = entry.state === "loaded" ? entry.loaded_context_length : undefined;
+  return [loaded, entry.max_context_length].find(isCustomProviderContextWindow);
+}
+
+/** Fills in the context windows of models that came without one from LM Studio's native list. */
+function mergeLmStudioContext(models: readonly DetectedModel[], entries: readonly unknown[]): DetectedModel[] {
+  const windows = new Map<string, number>();
+  for (const entry of entries) {
+    if (!isDynamicRecord(entry) || !isString(entry.id)) continue;
+    const contextWindow = lmStudioContextWindow(entry);
+    if (contextWindow !== undefined) windows.set(entry.id.trim(), contextWindow);
+  }
+  return models.map((model) => {
+    const contextWindow = model.contextWindow ?? windows.get(model.id);
+    return contextWindow === undefined ? model : { ...model, contextWindow };
+  });
+}
+
+/**
+ * LM Studio, and apps built on it such as Bionic, list no limits on `/v1/models`. Without a context
+ * window, a saved model gets the runtime's default token limits, which are far below what a local
+ * model is loaded with. Their native `/api/v0/models` names the context length, so a list in which
+ * no model has a window asks it once. A server that gives windows is not LM Studio. This is best
+ * effort: any failure keeps the list as it is.
+ */
+const withLmStudioContext = (
+  models: DetectedModel[],
+  baseUrl: string,
+  headers: Headers,
+  signal: AbortSignal,
+): Effect.Effect<DetectedModel[]> => {
+  const url = lmStudioModelsUrl(baseUrl);
+  if (!url || models.length === 0 || models.some((model) => model.contextWindow !== undefined)) {
+    return Effect.succeed(models);
+  }
+  return Effect.gen(function* () {
+    const response = yield* Effect.tryPromise(() => fetch(url, { method: "GET", headers, redirect: "manual", signal }));
+    if (!response.ok) return models;
+    const body = yield* readLimitedBody(response, MODEL_LIST_BODY_LIMIT, () => "unreadable" as const);
+    const parsed = yield* Effect.try((): unknown => JSON.parse(body.toString("utf8")));
+    if (!isDynamicRecord(parsed) || !Array.isArray(parsed.data)) return models;
+    return mergeLmStudioContext(models, parsed.data);
+  }).pipe(Effect.orElseSucceed(() => models));
+};
 
 /** Skip unusable entries, deduplicate ids, and stop at the public limit. */
 function parseModelList(entries: readonly unknown[]): DetectedModel[] {

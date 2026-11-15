@@ -4,7 +4,8 @@
 // storage, which exists only in Electron. It also scans a folder that holds a file named like a known
 // agent, and proves that the scan never starts it. A model list in the models.dev, OpenRouter and
 // vLLM shapes gives each model's input kinds, context window and max output (#3946). A list with
-// model names only gets each model's limits from the models.dev copy of OpenCode (#3946, #5789).
+// model names only gets each model's limits from the models.dev copy of OpenCode (#3946, #5789). An
+// LM Studio server gets each model's context window from its native `/api/v0/models` list.
 // `bun scripts/provider-detection-e2e.ts`. Writes .openbot-build/provider-detection-e2e/report.json.
 import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
@@ -99,6 +100,30 @@ interface Report {
   headers?: Record<string, boolean>;
   disabled?: { requestsSent: number; savedAcrossRestart: boolean };
   catalog?: unknown[];
+  lmStudio?: unknown[];
+}
+
+/**
+ * An LM Studio server: `/v1/models` gives names only, and `/api/v0/models` gives `native` as it is,
+ * so a test can send a list that is not JSON.
+ */
+async function fakeLmStudio(names: string[], native: string): Promise<FakeServer> {
+  const seen: Seen[] = [];
+  const server: Server = createServer((request: IncomingMessage, response) => {
+    const path = request.url ?? "";
+    seen.push({ path, authorization: request.headers.authorization ?? null, team: null });
+    response.writeHead(200, { "content-type": "application/json" });
+    if (path === "/api/v0/models") response.end(native);
+    else response.end(JSON.stringify({ object: "list", data: names.map((id) => ({ id, object: "model" })) }));
+  });
+  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+  const address = server.address();
+  assert.ok(address && typeof address === "object", "The fake LM Studio server listens on a port.");
+  return {
+    baseUrl: `http://127.0.0.1:${address.port}/v1`,
+    seen,
+    close: () => new Promise((done) => server.close(() => done())),
+  };
 }
 
 const cipher: CustomProviderCipher = {
@@ -186,7 +211,12 @@ try {
     ["llama-3.1-8b", "qwen2.5-coder"],
   );
   assert.ok(!found.some((server) => server.baseUrl === redirecting.baseUrl), "A redirect is not a server.");
-  assert.equal(primary.seen.length, 1, "The redirect target gets only the direct request.");
+  // A list with names only also asks LM Studio's native list on the same origin (6d).
+  assert.deepEqual(
+    primary.seen.map((request) => request.path),
+    ["/v1/models", "/api/v0/models"],
+    "The redirect target gets only the direct requests.",
+  );
   assert.equal(primary.seen[0]?.authorization, null, "A scan sends no key.");
   const agents = await Effect.runPromise(detection.scanAgents());
   const goose = agents.find((agent) => agent.command === join(agentFolder, "goose"));
@@ -418,6 +448,42 @@ try {
     { id: "unknown-model" },
     { id: "local/big-model", contextWindow: 32_768 },
   ]);
+
+  // 6d. LM Studio and Bionic list names only on `/v1/models`. Their native `/api/v0/models` gives the
+  // loaded context length of a loaded model, or else the maximum. A model that it does not give a
+  // length keeps none, and a native list that is not JSON keeps the list as it is.
+  const lmStudio = await fakeLmStudio(
+    ["google/gemma-4-12b", "gpt-oss-20b", "audio-model"],
+    JSON.stringify({
+      data: [
+        { id: "google/gemma-4-12b", state: "loaded", loaded_context_length: 8_192, max_context_length: 262_144 },
+        { id: "gpt-oss-20b", state: "not-loaded", loaded_context_length: 4_096, max_context_length: 131_072 },
+        { id: "audio-model", state: "loaded" },
+      ],
+    }),
+  );
+  servers.push(lmStudio);
+  const local = await Effect.runPromise(
+    detection.discoverModels({ baseUrl: lmStudio.baseUrl, apiKey: null, headers: [] }),
+  );
+  report.lmStudio = local.models;
+  assert.ok(isDiscoverModelsResult(local), "The preload decoder accepts the LM Studio list.");
+  assert.deepEqual(local.models, [
+    { id: "google/gemma-4-12b", contextWindow: 8_192 },
+    { id: "gpt-oss-20b", contextWindow: 131_072 },
+    { id: "audio-model" },
+  ]);
+  assert.deepEqual(
+    lmStudio.seen.map((request) => request.path),
+    ["/v1/models", "/api/v0/models"],
+    "The probe asks the native list once, beside /v1.",
+  );
+  const brokenLmStudio = await fakeLmStudio(["google/gemma-4-12b"], "not json");
+  servers.push(brokenLmStudio);
+  const kept = await Effect.runPromise(
+    detection.discoverModels({ baseUrl: brokenLmStudio.baseUrl, apiKey: null, headers: [] }),
+  );
+  assert.deepEqual(kept.models, [{ id: "google/gemma-4-12b" }], "A native list that is not JSON keeps the list.");
 
   // 7. Detection off: nothing is probed.
   const before = primary.seen.length;
