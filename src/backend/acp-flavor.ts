@@ -11,6 +11,7 @@ import type { CauseCode } from "@openbot/telemetry";
 import type { GeneratedMediaKind } from "./agent/image-generation";
 import { enableCursorMcpServers } from "./cursor-mcp-disabled";
 import { grokMediaItem, grokMediaKind, grokMediaToolKind } from "./grok-media";
+import { grokMcpServerName } from "./mcp-provider-shapes";
 import { isRecord, type ThreadItem } from "./protocol";
 
 /** The custom endpoint that serves a model, as a turn's error names it. Never a credential itself. */
@@ -252,6 +253,11 @@ export interface AcpFlavor {
    */
   mcpServerFailure?(method: string, params: DynamicRecord): AcpMcpServerFailure | null;
   /**
+   * The agent's own rule for an MCP server name, applied after `providerMcpServerName`. The agent
+   * skips each tool of a server whose name breaks the rule, with no error.
+   */
+  mcpServerName?(name: string): string;
+  /**
    * The MCP server names in the agent's own files for `cwd`. The agent starts its own entry in place
    * of a session server with the same name, so that server travels as `openbot_<name>`. `argv` is
    * the command line of the agent's process, which can name the folder of those files.
@@ -390,6 +396,7 @@ export const GROK_ACP_FLAVOR: AcpFlavor = {
   // The chat then showed no answer and no error (#6529).
   emptyAnswerFailure: noAnswerUnlessPlanOrCompaction,
   mcpServerFailure: grokMcpServerFailure,
+  mcpServerName: grokMcpServerName,
   // Grok CLI 1.0.77 keeps a session in a folder named by its working directory. A resume of a session
   // that is not in the folder of the workspace, such as after the workspace moved, fails with "Path
   // not found." and `data.code` `FS_NOT_FOUND`, which Grok also sends for any other missing file. The
