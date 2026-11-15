@@ -29,7 +29,7 @@ export function VideoStage(props: {
 }) {
   let stage: HTMLDivElement | undefined;
   // In full screen the player is in the top layer, so the menu must open in the player.
-  const menuMount = () => stage?.querySelector<HTMLElement>(":popover-open") ?? undefined;
+  const menuMount = () => stage?.querySelector<HTMLElement>(":popover-open") ?? document.body;
   const stageClass = () => ["media-generation-stage", props.class].filter(Boolean).join(" ");
   return (
     <ContextMenu.Root modal={false}>
