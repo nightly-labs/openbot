@@ -781,6 +781,8 @@ export interface ApplicationServices {
   routineFeed: RoutineFeedServer;
   events: HostEventsService;
   eventsRuntime: HostEventsRuntime;
+  /** Who the webhook routes belong to now: the signed-in account, or the machine token of a server on this computer. */
+  webhookPrincipal: () => string | null;
   /** The terminal control of a self-hosted server. Null in every other build. */
   serverMode: ServerMode | null;
   customProviders: CustomProviderStore;
@@ -2257,6 +2259,7 @@ export async function createApplicationServices({
     agentCursorDrawn: drawsComputerUseHighlight,
     // An agent display of its own is X11, where the driver records video.
     computerUseOnWayland: agentsShareDisplay && cuaDriverDrivesWayland(process.platform),
+    computerUseInputRefused: () => agentsShareDisplay && cuaDriver.waylandInputRefused(),
     requestTimeoutMs: 30_000,
     offProviders: providerUse.off(),
     providerAccounts,
@@ -2911,6 +2914,16 @@ export async function createApplicationServices({
         );
     },
   });
+  // The webhook routes belong to the signed-in account. A server on this computer has no account: its
+  // routes follow the machine token that the desktop app gives it, as the Signal ingress does (#9716).
+  const webhookPrincipal = (): string | null => {
+    if (localServerChild) {
+      const hostId = teamStore.getIdentity()?.serverId;
+      return hostId && centralAuth.hostSiteCredential(hostId) ? hostId : null;
+    }
+    const state = centralAuth.getState();
+    return state.status === "signed_in" ? state.user.id : null;
+  };
   // Analytics starts later in this function. A request before then is not reported.
   let reportWebhookDelivery: ((report: WebhookDeliveryReport) => void) | null = null;
   const events = new HostEventsService({
@@ -2921,10 +2934,7 @@ export async function createApplicationServices({
     },
     cipher: secretCipher,
     relay: webhookRelay,
-    accountPrincipal: () => {
-      const state = centralAuth.getState();
-      return state.status === "signed_in" ? state.user.id : null;
-    },
+    accountPrincipal: webhookPrincipal,
     onDelivery: (report) => reportWebhookDelivery?.(report),
   });
   const eventsRuntime = new HostEventsRuntime(events);
@@ -4093,6 +4103,9 @@ export async function createApplicationServices({
               centralAuth.useHostCredential(serverId, machineToken);
               // The Signal socket of the Slack, Discord and Telegram connections opens with this token.
               signalIngress.reconnect();
+              // The webhook routes register with it too, also again after the account changed.
+              eventsRuntime.setAccountPrincipal(webhookPrincipal());
+              eventsRuntime.syncRoutes({ all: true });
               return host.publishLocalServer();
             }),
           unpublish: () =>
@@ -4101,6 +4114,7 @@ export async function createApplicationServices({
                 Effect.sync(() => {
                   const serverId = teamStore.getIdentity()?.serverId;
                   if (serverId) centralAuth.useHostCredential(serverId, null);
+                  eventsRuntime.setAccountPrincipal(webhookPrincipal());
                   signalIngress.reconnect();
                 }),
               ),
@@ -4642,6 +4656,7 @@ export async function createApplicationServices({
     routineFeed,
     events,
     eventsRuntime,
+    webhookPrincipal,
     serverMode,
     customProviders,
     customProviderChanges,

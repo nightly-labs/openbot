@@ -325,6 +325,14 @@ const AWAKE_TAB_GRACE_MS = 2 * 60_000;
 const IDLE_UNLOAD_NOTE =
   "Note: this tab was not used for some time, so its page was unloaded to free memory and loaded again from its address. Scripts that you injected, page variables, form input and the tab history from before are gone. Set them up again if you need them. An idle tab unloads sooner when several other tabs are open: close the tabs that you no longer need.";
 /**
+ * What the agent reads on a call on a tab that its own page closed (`window.close()`). Without it the
+ * agent reads only "Unknown browser tab", and thinks that the browser loses its tabs (#9713).
+ */
+const PAGE_CLOSED_TAB_ERROR = (tabId: string) =>
+  `Browser tab ${tabId} is closed: the page in it closed its own tab (a script of the site called window.close()). The browser did not fail. Open the address again if you need the page. A site that closes its tab each time does not let an automated browser use it.`;
+/** How many self-closed tabs `#pageClosedTabs` remembers. */
+const PAGE_CLOSED_TAB_LIMIT = 32;
+/**
  * The page load errors that say the proxy of the tab did not answer or refused it, and why, with
  * their Chromium codes. A failed load can give only the code, with no name.
  */
@@ -685,6 +693,11 @@ export class BrowserHost {
   #persistLock = Semaphore.makeUnsafe(1);
   readonly #scope = Scope.makeUnsafe();
   #destroying: Deferred.Deferred<void, BrowserOperationError> | null = null;
+  /** The owners of the last agent tabs whose own page closed them, by tab id. See `PAGE_CLOSED_TAB_ERROR`. */
+  readonly #pageClosedTabs = new Map<
+    string,
+    { ownerThreadId: string | null; ownerAgentId: string | null; sharedThreadIds: ReadonlySet<string> }
+  >();
   /** Whether the machine is too low on memory for one more tab. Only a server has a reading. */
   readonly #memoryLow: () => boolean;
   readonly #idleTabSweep: NodeJS.Timeout;
@@ -3737,6 +3750,8 @@ export class BrowserHost {
     contents.on("close", () => {
       // `#closeRenderer` closes the old contents of a tab that stays open.
       if (tab.contents !== contents) return;
+      // `close` removes the tab before it closes the contents, so a tab that is still here closes by its own page.
+      if (!tab.closing && !this.#destroying && this.#tabs.get(tab.id) === tab) this.#notePageClosedTab(tab);
       tab.closing = true;
       tab.focusedAtPageClose = contents.isFocused();
     });
@@ -4462,6 +4477,11 @@ export class BrowserHost {
   /** `dialogTool` is true for a tool that works while a page dialog is open: `handle_dialog` and `close_tab`. */
   #requireToolTab(params: DynamicToolCallParams, tabId: string, dialogTool = false): void {
     const tab = this.listTabs().find((candidate) => candidate.id === tabId);
+    if (!tab) {
+      const closed = this.#pageClosedTabs.get(tabId);
+      if (closed && this.#canUseToolTab(params, { ...closed, id: tabId }))
+        throw new Error(PAGE_CLOSED_TAB_ERROR(tabId));
+    }
     if (!tab || !this.#canUseToolTab(params, tab)) throw new Error(`Unknown browser tab: ${tabId}`);
     // The user holds this tab. `AgentService` already refuses an agent's browser tools while its own
     // takeover is outstanding, but that check is agent-wide and only covers callers that go through
@@ -4489,11 +4509,27 @@ export class BrowserHost {
    * The owner thread can use its tab. Another thread of the same agent can use it after a person shared
    * it with that thread. A tab with no owner agent is never shared.
    */
-  #canUseToolTab(params: DynamicToolCallParams, tab: BrowserTab): boolean {
+  #canUseToolTab(
+    params: DynamicToolCallParams,
+    tab: Pick<BrowserTab, "id" | "ownerThreadId" | "ownerAgentId"> & { sharedThreadIds?: ReadonlySet<string> },
+  ): boolean {
     const ownerAgentId = params.ownerAgentId ?? null;
     if (tab.ownerThreadId === params.threadId) return tab.ownerAgentId === null || tab.ownerAgentId === ownerAgentId;
     if (tab.ownerAgentId === null || tab.ownerAgentId !== ownerAgentId) return false;
-    return this.#tabs.get(tab.id)?.sharedThreadIds?.has(params.threadId) ?? false;
+    return (tab.sharedThreadIds ?? this.#tabs.get(tab.id)?.sharedThreadIds)?.has(params.threadId) ?? false;
+  }
+
+  /** Only an agent's tab is kept: a person sees their tab close. The oldest record goes first. */
+  #notePageClosedTab(tab: BrowserHostTab): void {
+    if (tab.ownerThreadId === null && tab.ownerAgentId === null) return;
+    logger.info("A page closed its own browser tab.", { tabId: tab.id, host: logUrlHost(tab.requestedUrl) });
+    this.#pageClosedTabs.set(tab.id, {
+      ownerThreadId: tab.ownerThreadId,
+      ownerAgentId: tab.ownerAgentId,
+      sharedThreadIds: new Set(tab.sharedThreadIds),
+    });
+    const oldest = this.#pageClosedTabs.keys().next().value;
+    if (this.#pageClosedTabs.size > PAGE_CLOSED_TAB_LIMIT && oldest !== undefined) this.#pageClosedTabs.delete(oldest);
   }
 
   /**

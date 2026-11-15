@@ -24,6 +24,7 @@ import { causeHelpers } from "./effect-boundary";
 import {
   isLoopback,
   MCP_CLIENT_NAME,
+  MCP_TOKEN_TIMEOUT_MS,
   type McpOAuthAuthority,
   type McpSignIn,
   namesAuthorizationServer,
@@ -169,7 +170,7 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
     seen.challenge = next;
   };
   const failure = (error: unknown, signedIn = false): McpProbeOutcome => {
-    const described = describeProbeFailure(error, config, timeoutMs, signIn, seen.challenge, signInPlace, signedIn);
+    const described = describeProbeFailure(error, config, signIn, seen.challenge, signInPlace, signedIn);
     return {
       toolCount: 0,
       error: boundedError(redactMcpValues(described, probeSecrets(server, signIn))),
@@ -193,7 +194,11 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
     return Result.isFailure(retry) ? failure(retry.failure.cause, true) : found(retry.success);
   });
   const startedAt = Date.now();
-  const first = yield* Effect.result(connectAndCountEffect(server, timeoutMs, signIn, record));
+  // In a sign-in, the SDK answers a 401 inside this connection: it reads the OAuth documents and
+  // registers OpenBot before the page address exists. That start gets the time `begin` gives it, on
+  // top of the server's own, or a slow host ends the sign-in before any page opens (#9741).
+  const firstTimeoutMs = signIn ? timeoutMs + MCP_TOKEN_TIMEOUT_MS : timeoutMs;
+  const first = yield* Effect.result(connectAndCountEffect(server, firstTimeoutMs, signIn, record));
   if (Result.isSuccess(first)) {
     // The user pressed Sign in, and the server answered without a sign-in: it can still want one
     // to run a tool. Its sign-in starts here, or the press ends with nothing opened and nothing said.
@@ -249,7 +254,6 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
 function describeProbeFailure(
   error: unknown,
   config: McpServerConfig,
-  timeoutMs: number,
   signIn: McpSignIn | null,
   challenge: McpChallenge | null,
   signInPlace: McpSignInPlace | null,
@@ -269,7 +273,7 @@ function describeProbeFailure(
     const described = describeSignInChallenge(config.url, challenge.url, signInPlace);
     if (described) return described;
   }
-  return describeMcpError(error, config, timeoutMs);
+  return describeMcpError(error, config);
 }
 
 /**
@@ -569,17 +573,18 @@ class McpTimeout extends Error {
 }
 
 /** The failure, in the words the panel shows. Secrets are removed before the text leaves here. */
-function describeMcpError(error: unknown, config: McpServerConfig, timeoutMs: number): string {
-  const described = describeMcpErrorText(error, config, timeoutMs);
+function describeMcpError(error: unknown, config: McpServerConfig): string {
+  const described = describeMcpErrorText(error, config);
   // A bridge that never answers is the case the native connection replaces: say where to go.
   const bridgeUrl = mcpRemoteBridgeUrl(config);
   if (bridgeUrl === null || !(error instanceof McpTimeout || isConnectionClosed(error))) return described;
   return sourceText("error.backend.mcpRemoteBridge", { reason: described, url: bridgeUrl });
 }
 
-function describeMcpErrorText(error: unknown, config: McpServerConfig, timeoutMs: number): string {
+function describeMcpErrorText(error: unknown, config: McpServerConfig): string {
+  // The deadline that ran out: a sign-in's first connection has a longer one than the test.
   if (error instanceof McpTimeout)
-    return sourceText("error.backend.mcpServerNoAnswer", { seconds: Math.round(timeoutMs / 1000) });
+    return sourceText("error.backend.mcpServerNoAnswer", { seconds: Math.round(error.timeoutMs / 1000) });
   // Only a sign-in reaches this: without an `authProvider` the transport reports the raw 401 below.
   if (error instanceof UnauthorizedError) return sourceText("error.backend.mcpSignInNotAccepted");
   // The child exited before the handshake: the process failed to start, not the network.

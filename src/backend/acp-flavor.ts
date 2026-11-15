@@ -117,6 +117,13 @@ export interface AcpFlavor {
    * lost turns of a session. OpenBot never sends a prompt again that the agent took.
    */
   lostTurns?: { refusal: RegExp; unsent: RegExp; discard(sessionId: string): readonly string[] };
+  /**
+   * Whether a failed prompt is a refusal after which the agent's process can refuse each prompt
+   * until it ends. OpenBot then ends a process that answered a prompt before, when no other turn
+   * runs on it, so the next message starts a new process. A process that refuses from its first
+   * prompt is not ended again.
+   */
+  refusesUntilRestart?(error: unknown): boolean;
   /** A failed model refresh keeps the last list that the agent gave. */
   keepModelsOnRefreshFailure?: true;
   /**
@@ -124,6 +131,11 @@ export interface AcpFlavor {
    * to it. A set of the model the process already runs on is not sent again.
    */
   processWideModel?: true;
+  /**
+   * A model or effort that the session already has is not sent again before a turn. Each set makes
+   * the agent do slow work of its own, and a set that does not answer in time fails the turn.
+   */
+  setsConfigOnlyOnChange?: true;
   /**
    * A `session/set_model` failure after which the session already runs on the new model. The agent
    * changes the session first and then fails to save the model as its default.
@@ -443,9 +455,24 @@ const HERMES_LOST_TURNS: NonNullable<AcpFlavor["lostTurns"]> = {
  * before the error. The chat showed "Internal error: admitted_turn_failed" (#6395).
  */
 function hermesTurnFailure(error: unknown, detail: string): string {
-  return isRecord(error) && isRecord(error.data) && error.data.details === "admitted_turn_failed"
-    ? sourceText("error.provider.hermesTurnFailed")
-    : detail;
+  if (isRecord(error) && isRecord(error.data) && error.data.details === "admitted_turn_failed")
+    return sourceText("error.provider.hermesTurnFailed");
+  return hermesRefusal(error) ? sourceText("error.provider.hermesRefused") : detail;
+}
+
+/**
+ * Hermes Agent 0.23.1 fails a prompt that its gateway refuses with an internal error and only
+ * `invalid_params` in `data.details`. It keeps the refused field in its own `gateway.log`. The
+ * chat showed "Internal error: invalid_params" on each message to each agent for a day, until
+ * OpenBot started again (#9718).
+ */
+function hermesRefusal(error: unknown): boolean {
+  return (
+    error instanceof RequestError &&
+    error.code === -32603 &&
+    isRecord(error.data) &&
+    error.data.details === "invalid_params"
+  );
 }
 
 /**
@@ -469,6 +496,10 @@ export const HERMES_ACP_FLAVOR: AcpFlavor = {
   loadInsteadOfResume: { missing: (response) => response.modes == null },
   sessionNotFound: hermesSessionNotFound,
   lostTurns: HERMES_LOST_TURNS,
+  refusesUntilRestart: hermesRefusal,
+  // Hermes Agent sends each set to its gateway, which reads the full session for it. A set before
+  // each turn failed every turn when the gateway was slow (#9738).
+  setsConfigOnlyOnChange: true,
   // Hermes Agent 0.23.0 streams the answer, and then sends all of it again when a plugin rewrote it
   // (`transform_llm_output`). The rewrite has the streamed message's ID, so the answer showed two
   // times in one message (#6433).
@@ -601,11 +632,14 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
   omp: OMP_ACP_FLAVOR,
   // Hermes Agent added as a custom agent (`hermes acp`) keeps the custom rules. Its missing session
   // is found, its lost turns are discarded, its answer sent again replaces the streamed one, and its
-  // failed turn is explained, as for the Hermes provider.
+  // failed turn is explained, a process that starts to refuse each prompt ends, and an unchanged
+  // model or effort is not sent again, as for the Hermes provider (#9718, #9738).
   hermes: {
     ...CUSTOM_ACP_FLAVOR,
     sessionNotFound: (error, sessionId) => hermesSessionNotFound(error) ?? ompSessionNotFound(error, sessionId),
     lostTurns: HERMES_LOST_TURNS,
+    refusesUntilRestart: hermesRefusal,
+    setsConfigOnlyOnChange: true,
     resendsAnswer: true,
     turnFailure: hermesTurnFailure,
   },
