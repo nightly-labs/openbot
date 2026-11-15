@@ -53,6 +53,7 @@ export function ConversationHeader() {
     replyJump,
     toggleSidePanel,
     moveThreadToPanel,
+    startNewThread,
   } = useConversationViewScope();
   const runningThreads = () => props.threads?.running ?? 0;
   /** While a side thread is open, the agent's name goes back to the agent's own chat. */
@@ -189,7 +190,7 @@ export function ConversationHeader() {
       }
       threads={
         <Show when={props.threads}>
-          {(threads) => <ThreadHeader {...threads().header} onMoveToSide={moveThreadToPanel} />}
+          {(threads) => <ThreadHeader {...threads().header} onNew={startNewThread} onMoveToSide={moveThreadToPanel} />}
         </Show>
       }
       pinnedMessages={pinnedMessages()}
