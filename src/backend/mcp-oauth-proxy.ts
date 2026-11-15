@@ -121,8 +121,11 @@ export class McpOAuthProxy {
   #server: HttpServer | null = null;
   #port: number | null = null;
   #secret: string | null = null;
-  /** The paths whose last `initialize` did not give the provider a good answer. */
-  readonly #failedStarts = new Set<string>();
+  /**
+   * The paths whose last `initialize` did not give the provider a good answer, and whether
+   * `takeFailedStart` already reported that failure.
+   */
+  readonly #failedStarts = new Map<string, boolean>();
   /** How many times each path was handed out again after a failed `initialize`. */
   readonly #attempts = new Map<string, number>();
 
@@ -155,10 +158,19 @@ export class McpOAuthProxy {
     return { url: `http://127.0.0.1:${port}/mcp/${path}${attempt > 0 ? `?attempt=${attempt}` : ""}`, bearer };
   });
 
-  /** Whether a provider's last `initialize` on `route`, for any agent, failed after its last hand-off. */
-  failedStart(route: string): boolean {
-    for (const path of this.#failedStarts) if (path === route || path.startsWith(`${route}/`)) return true;
-    return false;
+  /**
+   * Whether a provider's last `initialize` on `route`, for any agent, failed after its last hand-off.
+   * Each failure is reported once, so a path that is not handed out again does not make each later
+   * test refresh the agents.
+   */
+  takeFailedStart(route: string): boolean {
+    let found = false;
+    for (const [path, reported] of this.#failedStarts)
+      if (!reported && (path === route || path.startsWith(`${route}/`))) {
+        this.#failedStarts.set(path, true);
+        found = true;
+      }
+    return found;
   }
 
   /**
@@ -176,6 +188,8 @@ export class McpOAuthProxy {
     this.#server = null;
     this.#port = null;
     this.#secret = null;
+    this.#failedStarts.clear();
+    this.#attempts.clear();
     if (!server) return;
     yield* Effect.callback<void>((resume) => {
       server.close(() => resume(Effect.void));
@@ -269,8 +283,9 @@ export class McpOAuthProxy {
     // The query is the `attempt` of `route`: each address of a path has the same bearer.
     const [, route, agentKey] =
       /^\/mcp\/([0-9a-f]{32})(?:\/([0-9a-f]{32}))?(?:\?[^#]*)?$/u.exec(request.url ?? "") ?? [];
+    if (!route) return refuse(response, 403);
     const path = agentKey ? `${route}/${agentKey}` : route;
-    if (!route || !path || !authorized(request, routeBearer(secret, path))) return refuse(response, 403);
+    if (!authorized(request, routeBearer(secret, path))) return refuse(response, 403);
     const method = request.method ?? "";
     if (method !== "POST" && method !== "GET" && method !== "DELETE") {
       response.writeHead(405, { allow: "POST, GET, DELETE" });
@@ -279,26 +294,22 @@ export class McpOAuthProxy {
     }
     const read = method === "POST" ? yield* readBody(request) : null;
     if (read === "too-large") return refuse(response, 413);
-    const relay = this.#relay(request, response, method, read, route, agentKey ?? null, controller);
-    if (!read || initializeRequest(read, request) === null) return yield* Effect.asVoid(relay);
-    // A start that ends in any other way, the provider's own timeout included, is a failed start.
-    let started = false;
+    // A start counts when the server answered it with a 2xx. One that ends in any other way, the
+    // provider's own timeout included, is a failed start.
+    const start = { answered: false };
+    const relay = this.#relay(request, response, method, read, route, agentKey ?? null, controller, start);
+    if (!read || initializeRequest(read, request) === null) return yield* relay;
     yield* relay.pipe(
-      Effect.tap((answered) =>
-        Effect.sync(() => {
-          started = answered;
-        }),
-      ),
       Effect.ensuring(
         Effect.sync(() => {
-          if (started) this.#failedStarts.delete(path);
-          else this.#failedStarts.add(path);
+          if (start.answered) this.#failedStarts.delete(path);
+          else this.#failedStarts.set(path, false);
         }),
       ),
     );
   });
 
-  /** Sends one request upstream and its answer back. `true` when the server's answer reached the provider. */
+  /** Sends one request upstream and its answer back. `start.answered`: the server answered with a 2xx. */
   readonly #relay = Effect.fn("McpOAuthProxy.relay")(function* (
     this: McpOAuthProxy,
     request: IncomingMessage,
@@ -308,12 +319,10 @@ export class McpOAuthProxy {
     route: string,
     agentKey: string | null,
     controller: AbortController,
-  ): Effect.fn.Return<boolean, McpOperationError> {
+    start: { answered: boolean },
+  ): Effect.fn.Return<void, McpOperationError> {
     const target = yield* this.#options.target(route);
-    if (!target) {
-      refuseRequests(response, method, read, sourceText("error.backend.mcpOAuthSignInNeeded"));
-      return false;
-    }
+    if (!target) return refuseRequests(response, method, read, sourceText("error.backend.mcpOAuthSignInNeeded"));
     const client = this.#options.client;
     const body = read && client ? yield* mcpSync(() => withClientInfo(read, request, client, agentKey)) : read;
     const upstream = yield* this.#forward(target, request, method, body, controller);
@@ -329,8 +338,7 @@ export class McpOAuthProxy {
       const message = active
         ? sourceText("error.backend.mcpOAuthRequestRefused")
         : sourceText("error.backend.mcpOAuthSignInNeeded");
-      refuseRequests(response, method, body, message);
-      return false;
+      return refuseRequests(response, method, body, message);
     }
     const headers: Record<string, string> = {};
     for (const name of FORWARDED_RESPONSE_HEADERS) {
@@ -339,13 +347,13 @@ export class McpOAuthProxy {
     }
     response.writeHead(upstream.status, headers);
     response.flushHeaders();
+    start.answered = upstream.ok;
     if (!upstream.body) {
       response.end();
-      return upstream.ok;
+      return;
     }
     const stream = upstream.body;
     yield* mcpCall(() => pipeBody(stream, response, controller.signal));
-    return upstream.ok;
   });
 
   /** The upstream answer, with one renewed token after a 401, or the last 401 when no token was taken. */

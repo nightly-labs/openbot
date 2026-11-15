@@ -426,7 +426,9 @@ export class McpGateway {
     // A provider whose start through the proxy failed keeps the server without tools until its
     // session gets the new address (`McpOAuthProxy.route`), also when the tools did not change (#9526).
     const failedStart =
-      saved !== undefined && this.#proxied(saved) && this.#proxy.failedStart(mcpOAuthProxyRoute(saved.id, saved.url));
+      saved !== undefined &&
+      this.#proxied(saved) &&
+      this.#proxy.takeFailedStart(mcpOAuthProxyRoute(saved.id, saved.url));
     if (this.#testedTools.get(key) === tools && !failedStart) return;
     // Recorded after the refresh, so a refresh that fails is tried again at the next test.
     yield* this.#hooks.refreshAllAgentRuntimes();
