@@ -1,4 +1,4 @@
-/* The Tasks page in TasksPage.tsx: one calm column, and the task panel beside it. */
+/* The Tasks page in TasksPage.tsx: one calm column or a board, and the task panel beside it. */
 .tasks-page {
   display: flex;
   height: 100%;
@@ -383,8 +383,131 @@
   color: var(--openbot-text-muted);
 }
 
-li[data-arrived] > .tasks-page-row {
+li[data-arrived] > :is(.tasks-page-row, .tasks-board-card) {
   animation: tasks-page-arrive 1600ms var(--openbot-ease-out);
+}
+
+/* The list keeps its sections in the column; the wrapper adds no box. */
+.tasks-page-sections {
+  display: contents;
+}
+
+/* The switch between the list and the board, at the end of the row above the tasks. */
+.tasks-page-layout {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--openbot-space-1);
+}
+
+/*
+ * The board: the page takes the whole width, a column for each section, and the cards in it. The
+ * header, the composer and the switch keep the width of the list, so they do not move.
+ */
+.tasks-page[data-layout="board"] .tasks-page-column {
+  max-width: none;
+}
+
+.tasks-page[data-layout="board"]
+  :is(.tasks-page-header, .tasks-page-composer.composer-wrap, .tasks-page-took-slot, .tasks-page-layout) {
+  width: 100%;
+  max-width: 36rem;
+  margin-inline: auto;
+}
+
+.tasks-board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(14rem, 1fr));
+  align-items: start;
+  gap: var(--openbot-space-3);
+  overflow-x: auto;
+  padding-bottom: var(--openbot-space-2);
+}
+
+.tasks-board .tasks-page-section + .tasks-page-section {
+  margin-top: 0;
+}
+
+.tasks-board-column {
+  min-width: 0;
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-sidebar);
+  padding: var(--openbot-space-1) var(--openbot-space-2) var(--openbot-space-2);
+}
+
+.tasks-board-list {
+  display: flex;
+  min-height: var(--openbot-control-lg);
+  flex-direction: column;
+  gap: var(--openbot-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tasks-board-card.ui-button {
+  display: grid;
+  width: 100%;
+  height: auto;
+  justify-content: stretch;
+  gap: var(--openbot-space-2);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-canvas);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-regular);
+  text-align: start;
+  white-space: normal;
+  --task-list-glyph: 14px;
+}
+
+.tasks-board-card[data-selected] {
+  border-color: var(--openbot-border-strong);
+  background: var(--openbot-bg-control-active);
+}
+
+.tasks-page-section[data-closed] .tasks-board-card:not([data-selected]) {
+  opacity: 0.55;
+}
+
+.tasks-board-card-head {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: start;
+  gap: var(--openbot-space-2);
+}
+
+.tasks-board-card-title {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.tasks-board-card-foot {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
+/* A narrow card keeps the agent name, up to half the card, and shortens the state. */
+.tasks-board-card-agent {
+  max-width: 50%;
+  flex: 0 0 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tasks-board-card-foot .tasks-page-status {
+  flex: 0 1 auto;
+  margin-inline-start: auto;
 }
 
 /*
@@ -608,7 +731,7 @@ html.panel-resizing .tasks-page-side {
 @media (prefers-reduced-motion: reduce) {
   .tasks-page-took,
   .tasks-page-agent-face[data-entering],
-  li[data-arrived] > .tasks-page-row,
+  li[data-arrived] > :is(.tasks-page-row, .tasks-board-card),
   .tasks-page-side-content[data-entering],
   .tasks-page-empty-row {
     animation: none;
