@@ -965,6 +965,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   start(): void {
     if (this.running) return;
     this.#scope = Scope.makeUnsafe();
+    this.#promptAnswered = false;
     this.#transport.start();
   }
 
@@ -2779,12 +2780,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       }
       yield* this.#completeTurn(thread, turn, turn.stopped ? "interrupted" : "failed", turn.stopped ? null : failure);
       // A process that answered before and now refuses can refuse each prompt until it ends (#9718).
-      // A turn of another session must not end with it.
+      // A turn of another session, also one that still opens, must not end with it.
       if (
         !turn.stopped &&
         !transport &&
         this.#promptAnswered &&
         this.#flavor.refusesUntilRestart?.(failure) &&
+        this.#startingThreads.size === 0 &&
+        ![...this.#openingTurns.keys()].some((id) => id !== thread.id) &&
         ![...this.#threads.ids()].some((id) => id !== thread.id && this.#threads.get(id)?.activeTurn)
       ) {
         this.#promptAnswered = false;

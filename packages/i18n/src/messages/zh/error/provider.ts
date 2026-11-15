@@ -280,7 +280,7 @@ export const messages = {
   "error.provider.hermesTurnFailed":
     "Hermes 未能完成本轮。如果它的回复说明了原因，请按回复操作。如果没有，此智能体的某个 MCP 服务器可能不可用：请在 服务器设置 › MCP 中检查，然后重新发送消息。",
   "error.provider.hermesRefused":
-    "Hermes 在开始前拒绝了这条消息。请重新发送。如果 Hermes 拒绝每条消息，请重新启动 OpenBot。",
+    "Hermes 在开始前拒绝了这条消息。请重新发送。如果 Hermes 拒绝每条消息，请在运行此智能体的计算机上重新启动 OpenBot。",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot 无法使用此模型：模型不接受其思考设置。请为此 Agent 选择其他模型，然后重新发送消息。",
   "error.provider.usageLimitReached": "该账号已达到用量上限。",

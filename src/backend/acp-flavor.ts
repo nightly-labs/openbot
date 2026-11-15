@@ -624,11 +624,13 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
   omp: OMP_ACP_FLAVOR,
   // Hermes Agent added as a custom agent (`hermes acp`) keeps the custom rules. Its missing session
   // is found, its lost turns are discarded, its answer sent again replaces the streamed one, and its
-  // failed turn is explained, as for the Hermes provider.
+  // failed turn is explained, and a process that starts to refuse each prompt ends, as for the Hermes
+  // provider (#9718).
   hermes: {
     ...CUSTOM_ACP_FLAVOR,
     sessionNotFound: (error, sessionId) => hermesSessionNotFound(error) ?? ompSessionNotFound(error, sessionId),
     lostTurns: HERMES_LOST_TURNS,
+    refusesUntilRestart: hermesRefusal,
     resendsAnswer: true,
     turnFailure: hermesTurnFailure,
   },
