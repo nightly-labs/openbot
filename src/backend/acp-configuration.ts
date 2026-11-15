@@ -87,6 +87,8 @@ export interface AcpConfigurationOptions {
   discoveryCwd?: (() => string) | undefined;
   /** `AcpFlavor.processWideModel`. */
   processWideModel?: boolean;
+  /** `AcpFlavor.setsConfigOnlyOnChange`. */
+  setsConfigOnlyOnChange?: boolean;
   /** `AcpFlavor.modelSetUnsaved`. */
   modelSetUnsaved?: ((error: RequestError) => boolean) | undefined;
   /** `AcpFlavor.configSetUnsaved`. */
@@ -409,6 +411,11 @@ export class AcpConfiguration {
       const listed = values.some((candidate) => candidate.value === wanted);
       const selected = listed ? wanted : unlisted && option.id === "model" ? value : undefined;
       if (!selected) continue;
+      // The session's options follow the agent's `config_option_update`, so they hold its value.
+      if (this.options.setsConfigOnlyOnChange && listed && option.currentValue === selected) {
+        if (category === "model") thread.currentModelId = selected;
+        continue;
+      }
       for (const [configId, configValue] of listed ? [] : Object.entries(unlisted?.config ?? {})) {
         const required = thread.configOptions.find((candidate) => candidate.id === configId);
         if (required?.type !== "select" || required.currentValue === configValue) continue;
@@ -530,8 +537,24 @@ export class AcpConfiguration {
     return providerCall(request).pipe(
       Effect.timeoutOrElse({
         duration: this.options.requestTimeoutMs,
+        // The chat shows this text, so the protocol method goes to the log only (#9738).
         orElse: () =>
-          Effect.fail(providerFailure(new TimeoutError(`${this.options.label()} request timed out: ${method}`))),
+          Effect.sync(() =>
+            logger.warn("An agent did not answer a configuration request in time.", {
+              provider: this.options.provider,
+              method,
+            }),
+          ).pipe(
+            Effect.andThen(
+              Effect.fail(
+                providerFailure(
+                  new TimeoutError(
+                    sourceText("error.provider.acpSettingsTimedOut", { provider: this.options.label() }),
+                  ),
+                ),
+              ),
+            ),
+          ),
       }),
     );
   }

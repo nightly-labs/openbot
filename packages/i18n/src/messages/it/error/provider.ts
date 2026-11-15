@@ -12,6 +12,7 @@ export const messages = {
     "{provider} ha perso l’accesso, quindi OpenBot ha terminato il suo processo. Invia di nuovo il messaggio.",
   "error.provider.acpRefusedUntilRestart":
     "{provider} ha rifiutato un messaggio, quindi OpenBot ha terminato il suo processo. Invia di nuovo il messaggio.",
+  "error.provider.acpSettingsTimedOut": "{provider} non ha risposto in tempo. Riprova tra un momento.",
   "error.provider.acpPlanUsedUp":
     "{provider} segnala che il tuo piano è esaurito. Scegli un altro modello o passa a un piano {provider} superiore.",
   "error.provider.acpMcpNotLoaded":
