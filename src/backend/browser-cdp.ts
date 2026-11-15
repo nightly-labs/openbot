@@ -252,24 +252,33 @@ const PASTE_APPLY_WAIT_MS = 1000;
  * and its text or selection changed, so it took the text. False for a field, for a page that lets the
  * paste through (a synthetic paste inserts nothing), and for an editor that stopped the paste but
  * shows no change in time: the caller then inserts the text.
+ *
+ * A paste-bin editor moves focus and the selection to a hidden element on paste, for the browser to
+ * paste into. A synthetic paste pastes nothing there, so focus and the selection go back to where the
+ * caller put them before the text is inserted.
  */
 const PASTE_TEXT_FUNCTION = `function(text) {
   if ('value' in this || !this.isContentEditable) return false;
   let host = this;
   while (host.parentElement?.isContentEditable) host = host.parentElement;
   const root = host.getRootNode();
-  const state = () => {
-    const selection = typeof root.getSelection === 'function' ? root.getSelection() : host.ownerDocument.getSelection();
-    return JSON.stringify([host.textContent, selection?.toString() ?? '']);
-  };
+  const selection = () => typeof root.getSelection === 'function' ? root.getSelection() : host.ownerDocument.getSelection();
+  const state = () => JSON.stringify([host.textContent, selection()?.toString() ?? '']);
   const before = state();
+  const focused = root.activeElement;
+  const range = selection()?.rangeCount ? selection().getRangeAt(0).cloneRange() : null;
+  const notTaken = () => {
+    if (root.activeElement !== focused) focused?.focus({ preventScroll: true });
+    if (range) { selection()?.removeAllRanges(); selection()?.addRange(range); }
+    return false;
+  };
   const data = new DataTransfer();
   data.setData('text/plain', text);
   const event = new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true, composed: true });
-  if (this.dispatchEvent(event)) return false;
+  if (this.dispatchEvent(event)) return notTaken();
   if (state() !== before) return true;
   return new Promise((resolve) => {
-    const finish = () => { observer.disconnect(); clearTimeout(timer); resolve(state() !== before); };
+    const finish = () => { observer.disconnect(); clearTimeout(timer); resolve(state() !== before || notTaken()); };
     const observer = new MutationObserver(() => { if (state() !== before) finish(); });
     const timer = setTimeout(finish, ${PASTE_APPLY_WAIT_MS});
     observer.observe(host, { childList: true, subtree: true, characterData: true });
@@ -1154,10 +1163,16 @@ export class BrowserCdpEngine {
         // inserted text as one paragraph, so the line breaks in it are lost. The editor splits pasted
         // text into paragraphs, and a paste cannot submit a chat message as an Enter key can. A field,
         // and an editor that does not take the paste, gets the text inserted as before.
+        const multiline = /[\n\r]/.test(text);
         const pasted =
-          /[\n\r]/.test(text) &&
+          multiline &&
           (yield* this.#callOnNode(send, resolved.backendNodeId, PASTE_TEXT_FUNCTION, [text], resolved.sessionId)) ===
             true;
+        if (multiline && !pasted) {
+          // The paste can wait for the editor, and its handler can move focus.
+          yield* checkFocus("error.backend.browserTypingFocusMoved");
+          yield* browserSync(() => assertBeforeDeadline(deadline));
+        }
         if (!pasted)
           yield* dispatchText(send, text, resolved.sessionId, {
             keyArrived,
