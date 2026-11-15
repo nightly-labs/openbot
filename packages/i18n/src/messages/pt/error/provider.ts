@@ -346,6 +346,8 @@ export const messages = {
     "O Gemini não conseguiu abrir a página de login no seu navegador. Verifique o navegador padrão e conecte novamente.",
   "error.provider.acpSignInFailed": "O login não foi concluído.",
   "error.provider.acpSignInFailedReason": "O login não foi concluído: {reason}",
+  "error.provider.acpSignInNetwork":
+    "O login não conseguiu acessar o servidor do provedor. Verifique a conexão de rede e as configurações de DNS do computador que executa o OpenBot e tente novamente.",
   "error.provider.acpSignOutFailed": "O logout não foi concluído.",
   "error.provider.acpSignOutFailedReason": "O logout não foi concluído: {reason}",
   "error.provider.acpSignInMethodMissing":

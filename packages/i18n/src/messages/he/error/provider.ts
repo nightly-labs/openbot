@@ -321,6 +321,8 @@ export const messages = {
     "Gemini לא הצליח לפתוח את דף ההתחברות בדפדפן שלך. יש לבדוק את דפדפן ברירת המחדל ואז להתחבר שוב.",
   "error.provider.acpSignInFailed": "ההתחברות לא הושלמה.",
   "error.provider.acpSignInFailedReason": "ההתחברות לא הושלמה: {reason}",
+  "error.provider.acpSignInNetwork":
+    "ההתחברות לא הצליחה להגיע לשרת של הספק. בדקו את חיבור הרשת ואת הגדרות ה-DNS של המחשב שמריץ את OpenBot, ואז נסו שוב.",
   "error.provider.acpSignOutFailed": "ההתנתקות לא הושלמה.",
   "error.provider.acpSignOutFailedReason": "ההתנתקות לא הושלמה: {reason}",
   "error.provider.acpSignInMethodMissing":

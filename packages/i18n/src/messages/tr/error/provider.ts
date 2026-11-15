@@ -348,6 +348,8 @@ export const messages = {
     "Gemini oturum açma sayfasını tarayıcınızda açamadı. Varsayılan tarayıcınızı kontrol edin, ardından yeniden bağlanın.",
   "error.provider.acpSignInFailed": "Oturum açma tamamlanmadı.",
   "error.provider.acpSignInFailedReason": "Oturum açma tamamlanmadı: {reason}",
+  "error.provider.acpSignInNetwork":
+    "Oturum açma, sağlayıcının sunucusuna ulaşamadı. OpenBot'u çalıştıran bilgisayarın ağ bağlantısını ve DNS ayarlarını kontrol edip yeniden deneyin.",
   "error.provider.acpSignOutFailed": "Oturum kapatma tamamlanmadı.",
   "error.provider.acpSignOutFailedReason": "Oturum kapatma tamamlanmadı: {reason}",
   "error.provider.acpSignInMethodMissing":

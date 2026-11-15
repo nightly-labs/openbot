@@ -337,6 +337,8 @@ export const messages = {
     "Gemini nie otworzył strony logowania w przeglądarce. Sprawdź domyślną przeglądarkę, a potem połącz się ponownie.",
   "error.provider.acpSignInFailed": "Logowanie nie zostało ukończone.",
   "error.provider.acpSignInFailedReason": "Logowanie nie zostało ukończone: {reason}",
+  "error.provider.acpSignInNetwork":
+    "Logowanie nie mogło połączyć się z serwerem dostawcy. Sprawdź połączenie sieciowe i ustawienia DNS komputera, na którym działa OpenBot, a następnie spróbuj ponownie.",
   "error.provider.acpSignOutFailed": "Wylogowanie nie zostało ukończone.",
   "error.provider.acpSignOutFailedReason": "Wylogowanie nie zostało ukończone: {reason}",
   "error.provider.acpSignInMethodMissing":

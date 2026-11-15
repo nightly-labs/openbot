@@ -346,6 +346,8 @@ export const messages = {
     "Gemini non è riuscito ad aprire la pagina di accesso nel browser. Controlla il browser predefinito, poi connettiti di nuovo.",
   "error.provider.acpSignInFailed": "L'accesso non è stato completato.",
   "error.provider.acpSignInFailedReason": "L'accesso non è stato completato: {reason}",
+  "error.provider.acpSignInNetwork":
+    "L'accesso non è riuscito a raggiungere il server del provider. Controlla la connessione di rete e le impostazioni DNS del computer che esegue OpenBot, poi riprova.",
   "error.provider.acpSignOutFailed": "La disconnessione non è stata completata.",
   "error.provider.acpSignOutFailedReason": "La disconnessione non è stata completata: {reason}",
   "error.provider.acpSignInMethodMissing":

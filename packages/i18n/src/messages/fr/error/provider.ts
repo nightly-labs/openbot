@@ -363,6 +363,8 @@ export const messages = {
     "Gemini n’a pas pu ouvrir la page de connexion dans votre navigateur. Vérifiez votre navigateur par défaut, puis reconnectez-vous.",
   "error.provider.acpSignInFailed": "La connexion n’a pas abouti.",
   "error.provider.acpSignInFailedReason": "La connexion n’a pas abouti : {reason}",
+  "error.provider.acpSignInNetwork":
+    "La connexion n’a pas pu joindre le serveur du fournisseur. Vérifiez la connexion réseau et les réglages DNS de l’ordinateur qui exécute OpenBot, puis réessayez.",
   "error.provider.acpSignOutFailed": "La déconnexion n’a pas abouti.",
   "error.provider.acpSignOutFailedReason": "La déconnexion n’a pas abouti : {reason}",
   "error.provider.acpSignInMethodMissing":

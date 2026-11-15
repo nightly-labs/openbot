@@ -354,6 +354,8 @@ export const messages = {
     "Gemini はブラウザーでサインインページを開けませんでした。既定のブラウザーを確認してから、もう一度接続してください。",
   "error.provider.acpSignInFailed": "サインインが完了しませんでした。",
   "error.provider.acpSignInFailedReason": "サインインが完了しませんでした: {reason}",
+  "error.provider.acpSignInNetwork":
+    "サインインでプロバイダーのサーバーに接続できませんでした。OpenBot を実行しているコンピューターのネットワーク接続と DNS 設定を確認してから、もう一度お試しください。",
   "error.provider.acpSignOutFailed": "サインアウトが完了しませんでした。",
   "error.provider.acpSignOutFailedReason": "サインアウトが完了しませんでした: {reason}",
   "error.provider.acpSignInMethodMissing":

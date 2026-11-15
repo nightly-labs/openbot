@@ -350,6 +350,8 @@ export const messages = {
     "Gemini no pudo abrir la página de inicio de sesión en tu navegador. Revisa tu navegador predeterminado y vuelve a conectarte.",
   "error.provider.acpSignInFailed": "El inicio de sesión no se completó.",
   "error.provider.acpSignInFailedReason": "El inicio de sesión no se completó: {reason}",
+  "error.provider.acpSignInNetwork":
+    "El inicio de sesión no pudo llegar al servidor del proveedor. Revisa la conexión de red y la configuración DNS del equipo que ejecuta OpenBot y vuelve a intentarlo.",
   "error.provider.acpSignOutFailed": "El cierre de sesión no se completó.",
   "error.provider.acpSignOutFailedReason": "El cierre de sesión no se completó: {reason}",
   "error.provider.acpSignInMethodMissing":
