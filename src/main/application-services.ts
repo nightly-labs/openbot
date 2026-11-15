@@ -32,6 +32,7 @@ import { type AgentDefaultsSettingsService, createAgentDefaultsSettings } from "
 import { agentDisplayEnvironment, hasSeparateAgentDisplay } from "./agent-display";
 import { type AgentFolders, createAgentFolders } from "./agent-folders";
 import { type AgentHostSettingsService, createAgentHostSettings } from "./agent-host-settings";
+import { fitImageForAgent } from "./agent-image-fit";
 import { type AgentInstructionsFiles, createAgentInstructionsFiles } from "./agent-instructions-files";
 import {
   type BrowserProfileService,
@@ -2184,6 +2185,7 @@ export async function createApplicationServices({
       if (!clearFlatBackground(pixels, size.width, size.height)) return null;
       return nativeImage.createFromBitmap(pixels, size).toPNG();
     },
+    fitImage: fitImageForAgent,
     videoReader: new VideoReader({
       runtimeDirectory: join(app.getPath("userData"), "runtimes", "yt-dlp"),
       target: runtimeTarget(process.platform, process.arch),
