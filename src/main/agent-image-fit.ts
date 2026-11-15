@@ -4,10 +4,11 @@ import type { ImageFitResult } from "../backend/agent/image-reader";
 /** The longest side that `read_image` gives the model. Codex sends no more than 2048 px at high detail. */
 const MAX_EDGE = 2048;
 /**
- * The largest file that `read_image` keeps as it is. In Code Mode, Codex drops an image whose data URL
- * is over 8 MiB (#9522); base64 makes 4 MiB about 5.3 MiB.
+ * The largest image that `read_image` gives as it is, and the size a PNG must fit to stay a PNG. Base64
+ * makes 3 MiB 4 MiB: under the 5 MB image limit of the Anthropic API, and under the 8 MiB that Codex
+ * Code Mode keeps from one `exec` (#9522).
  */
-const MAX_KEPT_BYTES = 4 * 1024 * 1024;
+const MAX_KEPT_BYTES = 3 * 1024 * 1024;
 /**
  * The decode runs in this process, and a small file can say that it has a very large size. 120 million
  * pixels is about 480 MB decoded, more than a 108-megapixel phone photo.
@@ -38,8 +39,9 @@ export function fitImageForAgent(bytes: Uint8Array): ImageFitResult {
   const png = file.length >= 24 && file.subarray(0, 8).equals(PNG_SIGNATURE);
   if (!jpeg && !png) return "unsupported";
   const facts = jpeg ? jpegFacts(file) : { orientation: 1, pixels: file.readUInt32BE(16) * file.readUInt32BE(20) };
-  // A JPEG with no frame header that the scan finds could hide any size from the check.
-  if (facts.pixels > MAX_PIXELS || facts.pixels === 0) return "tooLarge";
+  if (facts.pixels > MAX_PIXELS) return "tooLarge";
+  // A JPEG with no frame header that the scan finds is damaged, or could hide any size from the check.
+  if (facts.pixels === 0) return "unsupported";
   const source = nativeImage.createFromBuffer(file);
   if (source.isEmpty()) return "unsupported";
   const { width, height } = source.getSize();
