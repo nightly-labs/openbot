@@ -3106,7 +3106,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             this.#mailbox.storeGeneratedAttachment({
               sourcePath: savedPath,
               kind: input.kind,
-              name: input.kind === "video" ? generatedVideoName(savedPath) : generatedImageName(savedPath),
+              name:
+                input.kind === "video" ? generatedVideoName(savedPath, input.prompt) : generatedImageName(savedPath),
             }),
           )
         : null;
