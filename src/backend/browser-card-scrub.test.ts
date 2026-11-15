@@ -103,6 +103,14 @@ describe("CardValueScrub", () => {
     expect(scrub.text(password)).toBe(password);
   });
 
+  it("hides a password in a form-encoded address and a code only as a whole number", () => {
+    const scrub = new CardValueScrub();
+    scrub.addDocumentSecret("my pass!word");
+    expect(scrub.text("/verify?p=my+pass%21word")).toBe("/verify?p=•••");
+    scrub.addDocumentSecret("4829");
+    expect(scrub.text("Code 4829, order 1482903")).toBe("Code •••, order 1482903");
+  });
+
   it("hides a short typed password only where it stands alone", () => {
     const scrub = new CardValueScrub();
     scrub.addDocumentSecret("a1");

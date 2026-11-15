@@ -1901,7 +1901,7 @@ export class BrowserHost {
       throw new Error(`${action} is unavailable while the page shows a filled card. Use snapshots until it navigates.`);
     if (tab.secretShown)
       throw new Error(
-        `${action} is unavailable while the page can show a password that OpenBot typed. Use snapshots until it navigates.`,
+        `${action} is unavailable while the page can show a password or code that OpenBot typed. Use snapshots until it navigates.`,
       );
   }
 
@@ -4635,11 +4635,17 @@ export class BrowserHost {
       if (input.type !== "mouseDown" || !("x" in input) || !("y" in input)) return;
       const { x, y } = input;
       if (typeof x !== "number" || typeof y !== "number" || !records()) return;
-      const place = stepPlace(contents.getURL());
+      const place = stepPlace(tab.engine.scrubText(contents.getURL()));
       if (!place) return;
       void readClickTarget(contents, x, y).then((target) => {
         // The tab can change hands while the page answers.
-        if (target) this.#recordUserStep(tab, { kind: "click", ...place, ...target });
+        if (target)
+          this.#recordUserStep(tab, {
+            kind: "click",
+            ...place,
+            ...target,
+            ...(target.name === undefined ? {} : { name: tab.engine.scrubText(target.name) }),
+          });
       });
     });
   }

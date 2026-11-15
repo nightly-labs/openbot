@@ -187,11 +187,12 @@ export function toPublicTab(tab: BrowserHostTab): BrowserTab {
       : tab.environment;
   return {
     id: tab.id,
-    // A page can put a typed card value or password in its title or address.
+    // A page can put a typed card value or password in its title. The address stays as it is: the
+    // app loads it again and looks up saved logins with it.
     title: tab.secret
       ? "Secure authentication"
       : restoredTabTitle(tab) || tab.engine.scrubText(tab.contents.getTitle()) || "New tab",
-    url: tab.secret?.origin ?? tab.engine.scrubText(currentTabUrl(tab)),
+    url: tab.secret?.origin ?? currentTabUrl(tab),
     loading: tab.contents.isLoading(),
     ownerThreadId: tab.ownerThreadId,
     ownerAgentId: tab.ownerAgentId,

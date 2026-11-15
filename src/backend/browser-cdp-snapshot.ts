@@ -993,15 +993,20 @@ export class CardValueScrub {
   }
 
   /**
-   * Hides a password that `submit_secret` typed, as the page or its address can show it, until the
-   * document goes. A value of one to three characters is hidden only where it stands alone, so it
-   * does not hide parts of other words and numbers.
+   * Hides a password or code that `submit_secret` typed, as the page or its address can show it,
+   * until the document goes. A code is hidden only as a whole number, and a value of one to three
+   * characters only where it stands alone, so neither hides parts of other words and numbers.
    */
   addDocumentSecret(secret: string): void {
-    for (const value of new Set([secret, encodeURIComponent(secret)])) {
+    const forms = [secret, encodeURIComponent(secret), new URLSearchParams({ v: secret }).toString().slice(2)];
+    for (const value of new Set(forms)) {
       if (!value || this.#documentValues.has(value)) continue;
       const escaped = value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
-      const pattern = value.length < 4 ? `(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])` : escaped;
+      const pattern = /^[0-9]+$/u.test(value)
+        ? `(?<![0-9])${escaped}(?![0-9])`
+        : value.length < 4
+          ? `(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`
+          : escaped;
       this.#documentValues.set(value, new RegExp(pattern, "gu"));
     }
   }
