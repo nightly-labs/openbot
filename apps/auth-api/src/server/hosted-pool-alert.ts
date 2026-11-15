@@ -5,12 +5,16 @@ const SEND_TIMEOUT_MS = 10_000;
 /** Each request makes the service again, so a bad URL warns once for each Worker isolate. */
 let warnedBadUrl = false;
 
-/** Sends one operator message about the server pool. The caller keeps it free of accounts and emails. */
+/**
+ * Sends one operator message. A pool message has no account, email or name. A purchase message
+ * (`purchaseAlertText`) has the email of the account, on a developer decision.
+ */
 export type HostedPoolAlert = (text: string) => Effect.Effect<void>;
 
 /**
  * A Discord webhook (`HOSTED_POOL_ALERT_WEBHOOK_URL`) that tells the operator when a purchase starts on
- * boat or a pool group is almost empty (docs/hosted-servers.md#pool-alerts). Without the URL, or with a
+ * boat or a pool group is almost empty, and of each new server plan and license
+ * (docs/hosted-servers.md#pool-alerts). Without the URL, or with a
  * URL that is not HTTPS, there is no alert. A failed send logs one line with no URL and is not sent again.
  */
 export function createHostedPoolAlert(webhookUrl: string | undefined, fetch: BoatFetch): HostedPoolAlert | null {

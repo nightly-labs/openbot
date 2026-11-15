@@ -60,6 +60,7 @@ import {
   stripeFailure,
   stripeRequest,
 } from "./billing-errors";
+import { type BillingPurchase, purchaseEvent, reportPurchase } from "./billing-purchase";
 import { type BillingSales, type BillingSalesSynced, type PaymentReversal, paymentReversal } from "./billing-sales";
 import type { HostedFailure } from "./hosted-server-service";
 import {
@@ -179,6 +180,12 @@ export interface BillingServiceOptions {
   onFirstPlanStarted?: (start: FirstPlanStart) => void;
   /** Runs once for each license email (`LicenseServiceOptions`). It must not throw or wait. */
   onLicenseEmail?: LicenseServiceOptions["onLicenseEmail"];
+  /**
+   * Runs once for each subscription, a server plan or a license, that starts, ends, or cancels or
+   * resumes its renewal, with the email of its account.
+   * It must not throw or wait: the operator message goes after the webhook answers.
+   */
+  onPurchase?: (purchase: BillingPurchase) => void;
 }
 
 /** The first plan of an account, for its welcome email. */
@@ -247,6 +254,7 @@ export class BillingService {
   readonly #analytics: AccountAnalytics;
   readonly #sales: BillingSales | null;
   readonly #onFirstPlanStarted: ((start: FirstPlanStart) => void) | null;
+  readonly #onPurchase: ((purchase: BillingPurchase) => void) | null;
   /** The commercial license. It shares the Stripe customer and the webhook with the server plans. */
   readonly license: LicenseService;
 
@@ -260,6 +268,7 @@ export class BillingService {
     this.#analytics = options.analytics ?? NO_ACCOUNT_ANALYTICS;
     this.#sales = options.sales ?? null;
     this.#onFirstPlanStarted = options.onFirstPlanStarted ?? null;
+    this.#onPurchase = options.onPurchase ?? null;
     this.#layer = Layer.succeed(BillingDependencies, {
       database,
       stripe,
@@ -278,6 +287,7 @@ export class BillingService {
       sales: this.#sales,
       ...(options.onLicenseChanged ? { onLicenseChanged: options.onLicenseChanged } : {}),
       ...(options.onLicenseEmail ? { onLicenseEmail: options.onLicenseEmail } : {}),
+      ...(options.onPurchase ? { onPurchase: options.onPurchase } : {}),
     });
   }
 
@@ -1161,6 +1171,25 @@ export class BillingService {
         !others.some((row) => isOneOf(BILLING_SUBSCRIPTION_STATUSES, row.status) && isOpenBillingStatus(row.status))
       : undefined;
     if (action) this.#trackChange(action, previous, current, reactivated);
+    const event = purchaseEvent(action);
+    if (event) {
+      yield* reportPurchase(
+        { database: dependencies.database, now: dependencies.now, send: this.#onPurchase },
+        subscription.id,
+        ownerId,
+        {
+          event,
+          periodEnd: subscriptionPeriodEnd(subscription),
+          ...(event === "ended" ? { endReason: planEndReason(previous) } : {}),
+          product: "server",
+          plan: key.plan,
+          interval: key.interval,
+          currency,
+          amount,
+          trial: subscription.status === "trialing",
+        },
+      );
+    }
     // A subscription starts once, so the first plan of an account starts once.
     if (others?.length === 0 && serverId) yield* this.#firstPlanStarted(ownerId, serverId, key.plan);
     const onSubscriptionSynced = dependencies.onSubscriptionSynced;

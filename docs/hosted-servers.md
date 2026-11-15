@@ -1747,8 +1747,22 @@ sends the operator one message:
 | A purchase takes a machine and leaves 0 or 1 free machines of that product in that location | `Pool <location> <product>: <n> free machines left.` | Buy and `prepare` machines. |
 | A server starts on boat: no ready machine, the pool query failed, or its pool machine did not start it | `A <plan> server (<currency>, <server ID prefix>) starts on boat: <reason>.` | `move` it when a machine is ready. `leaseweb-pool.ts boat` lists it. |
 | A pool start is lost (no sign-in in 4 minutes) | `A <plan> server (<server ID prefix>) did not start on pool machine <host ID>. Prepare the machine again.` | `prepare --reinstall` the machine. |
+| A server plan starts (a new subscription) | ``New server plan for `<email>`: <plan>, <amount> (<currency>) for 1 <month or year>.`` | None. |
+| A license starts (a new subscription) | ``New license for `<email>`: <tier>, <n> users, <amount> (<currency>) for 1 <month or year>.`` | None. |
+| The owner cancels the renewal of a server plan or a license | ``Cancelled renewal of the <server plan or license> for `<email>`: <product>, <amount> (<currency>) for 1 <month or year>. It ends on <date>.`` | None. |
+| The owner resumes that renewal | ``Resumed renewal of the <server plan or license> for `<email>`: <product>, <amount> (<currency>) for 1 <month or year>.`` | None. |
+| A server plan or a license ends | ``Ended <server plan or license> for `<email>`: <product>, <amount> (<currency>) for 1 <month or year>. Reason: <cancelled or not paid>.`` | None. |
 
-A message has no account, email or name. The boat message goes out only after the Worker stores the
+A pool message has no account, email or name. A purchase message (the last 5 rows) has the email of
+the account, on a developer decision, so keep the webhook in a private channel. Its amount is the list
+amount of one period, before a discount. A license at the bundle price adds `bundle price`, and a
+subscription that starts with a trial adds `It starts with a free trial.` Each new subscription sends
+one start message: a claim in `billing_webhook_events` (`openbot_purchase:<subscription ID>`) stops a
+second one. Each other message goes out with the one sync that stores the change, so a repeated event
+sends nothing. A change of plan or users and a renewal payment send nothing. A server order with a
+license sends two messages, one for each subscription. A subscription that ends after its owner
+cancelled the renewal sends the cancel message and, later, the end message. A deleted server, a full
+refund and a dispute end the plan at once, with the reason `cancelled`. The boat message goes out only after the Worker stores the
 boat start, so a lost race, a retry of a boat attempt, or a pool change whose answer was lost sends
 nothing. A failed send logs one line and is not sent again. Without the secret there are no messages.
 The encrypted `apps/auth-api/.env.production` holds the URL, and `bun run api:deploy` sets it. The CI
@@ -1758,7 +1772,8 @@ deploy keeps the value that the Worker has. To set only the secret:
 cd apps/auth-api && bunx wrangler secret put HOSTED_POOL_ALERT_WEBHOOK_URL
 ```
 
-`bun run test:hosted-pool-assignment` checks the messages.
+`bun run test:hosted-pool-assignment` checks the pool messages, and `bun run test:purchase-alert` checks
+the purchase messages.
 
 ## Not confirmed
 
