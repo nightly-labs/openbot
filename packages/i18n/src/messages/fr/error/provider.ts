@@ -346,6 +346,8 @@ export const messages = {
     "Le modèle n'a pas accepté une image de ce chat, car l'image est trop grande. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez.",
   "error.provider.imageCountLimit":
     "Le modèle n'a pas accepté ce chat, car il contient trop d'images. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez.",
+  "error.provider.imageUnreadable":
+    "Le modèle n'a pas pu lire une image de ce chat. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez. Si vous avez envoyé une image, envoyez-en une autre.",
   "error.provider.opencodeSessionRejected":
     "OpenCode a refusé la requête sans en donner la cause. Cela peut arriver dans une longue conversation ou après un changement de modèle. OpenBot a démarré une nouvelle session OpenCode avec l’historique de la conversation. Réessayez. Si l’erreur continue, choisissez un autre modèle ou un effort plus faible.",
   "error.provider.opencodeCompactionFailed":

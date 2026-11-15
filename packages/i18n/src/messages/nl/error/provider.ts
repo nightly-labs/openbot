@@ -326,6 +326,8 @@ export const messages = {
     "Het model accepteerde een afbeelding in deze chat niet, omdat de afbeelding te groot is. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.imageCountLimit":
     "Het model accepteerde deze chat niet, omdat de chat te veel afbeeldingen bevat. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
+  "error.provider.imageUnreadable":
+    "Het model kon een afbeelding in deze chat niet lezen. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Stuurde je een afbeelding, stuur dan een andere.",
   "error.provider.opencodeSessionRejected":
     "OpenCode heeft het verzoek geweigerd zonder de oorzaak te geven. Dit kan gebeuren in een lange chat of na een modelwijziging. OpenBot heeft een nieuwe OpenCode-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Blijft de fout, kies dan een ander model of een lager niveau.",
   "error.provider.opencodeCompactionFailed":

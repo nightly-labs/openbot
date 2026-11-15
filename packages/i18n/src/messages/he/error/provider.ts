@@ -304,6 +304,8 @@ export const messages = {
     "המודל לא קיבל תמונה בצ'אט הזה כי התמונה גדולה מדי. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
   "error.provider.imageCountLimit":
     "המודל לא קיבל את הצ'אט הזה כי יש בו יותר מדי תמונות. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
+  "error.provider.imageUnreadable":
+    "המודל לא הצליח לקרוא תמונה בצ'אט הזה. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב. אם שלחת תמונה, שלח תמונה אחרת.",
   "error.provider.opencodeSessionRejected":
     "OpenCode דחה את הבקשה ולא מסר את הסיבה. זה יכול לקרות בצ'אט ארוך או אחרי החלפת מודל. OpenBot התחיל סשן חדש של OpenCode עם היסטוריית הצ'אט. יש לנסות שוב. אם השגיאה נמשכת, יש לבחור מודל אחר או רמת מאמץ נמוכה יותר.",
   "error.provider.opencodeCompactionFailed":

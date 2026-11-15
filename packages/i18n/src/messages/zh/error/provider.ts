@@ -291,6 +291,8 @@ export const messages = {
     "图片太大，模型未接受此聊天中的一张图片。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
   "error.provider.imageCountLimit":
     "此聊天中的图片太多，模型未接受此聊天。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
+  "error.provider.imageUnreadable":
+    "模型无法读取此聊天中的一张图片。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。如果你发送了图片，请换一张图片。",
   "error.provider.opencodeSessionRejected":
     "OpenCode 拒绝了这次请求，但没有给出原因。长对话或更换模型之后可能出现这种情况。OpenBot 已带着聊天记录开启新的 OpenCode 会话，请重试。如果仍然报错，请换一个模型或调低推理强度。",
   "error.provider.opencodeCompactionFailed":

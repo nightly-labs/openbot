@@ -363,6 +363,17 @@ export function isImageTooLargeDiagnostic(message: string): boolean {
 }
 
 /**
+ * Whether Google's Gemini API refused an image in the request because it cannot read it:
+ * INVALID_ARGUMENT "Unable to process input image. Please retry or report in ...". The Antigravity
+ * CLI 1.5.9 keeps the image in the session and sends it on each turn, so each later message failed
+ * with the same 400 until a new chat (#9593). Not Google's other INVALID_ARGUMENT texts: a refused
+ * API key or tool schema fails a new session too.
+ */
+export function isImageUnreadableDiagnostic(message: string): boolean {
+  return /\bUnable to process input image\b/iu.test(message);
+}
+
+/**
  * Whether a model endpoint refused the request because it holds more images than the endpoint
  * accepts in one request. The provider session sends each image of the chat again on each turn, so
  * each turn fails the same way until a new session (#6702). vLLM and Venice write "At most 10

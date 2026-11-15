@@ -315,6 +315,8 @@ export const messages = defineMessages("error.provider", {
     "The model did not accept an image in this chat because the image is too large. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.imageCountLimit":
     "The model did not accept this chat because the chat has too many images. OpenBot started a new {provider} session with the chat history. Try again.",
+  "error.provider.imageUnreadable":
+    "The model could not read an image in this chat. OpenBot started a new {provider} session with the chat history. Try again. If you sent an image, send a different one.",
   "error.provider.opencodeSessionRejected":
     "OpenCode refused the request and did not give the cause. This can occur in a long chat or after a model change. OpenBot started a new OpenCode session with the chat history. Try again. If the error continues, select a different model or a lower effort.",
   "error.provider.opencodeCompactionFailed":

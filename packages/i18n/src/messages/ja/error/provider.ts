@@ -337,6 +337,8 @@ export const messages = {
     "画像が大きすぎるため、モデルはこのチャットの画像を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.imageCountLimit":
     "画像が多すぎるため、モデルはこのチャットを受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
+  "error.provider.imageUnreadable":
+    "モデルはこのチャット内の画像を読み取れませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。画像を送った場合は、別の画像を送ってください。",
   "error.provider.opencodeSessionRejected":
     "OpenCode がリクエストを拒否しましたが、原因は示されていません。長いチャットやモデルの変更後に起こることがあります。OpenBot はチャット履歴を引き継いだ新しい OpenCode セッションを開始しました。もう一度お試しください。エラーが続く場合は、別のモデルを選ぶか推論レベルを下げてください。",
   "error.provider.opencodeCompactionFailed":
