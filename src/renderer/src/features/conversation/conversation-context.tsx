@@ -774,12 +774,15 @@ const Conversation = createSimpleContext({
         // messages between would be out of view with no sign: a window around an old message keeps
         // its place, and loaded messages that the page does not meet give way to the page.
         const mappedIds = new Set(pageMessages.map((message) => message.id));
-        const tail = merge === "latest" && page.pageInfo.hasOlder && conversation.page !== undefined;
+        // A trimmed chat has no cursor of its own, so it takes the page's.
+        const tail = merge === "latest" && page.pageInfo.hasOlder && Boolean(conversation.page?.olderCursor);
         const keepsWindow = tail && conversation.windowMode === "around";
         const apart = tail && !keepsWindow && !currentMessages.some((message) => mappedIds.has(message.id));
         const kept = currentMessages.filter((message) => !pageItemIds.has(message.id));
         conversation.messages = keepsWindow
-          ? windowedSnapshotMessages(kept, pageMessages, { mode: "around", capped: true })
+          ? windowedSnapshotMessages(currentMessages, pageMessages, { mode: "around", capped: true }).filter(
+              (message) => mappedIds.has(message.id) || !pageItemIds.has(message.id),
+            )
           : mergeConversationPage(kept, pageMessages, apart ? "replace" : merge);
         const first = conversation.messages[0];
         /** The loaded messages start before the page, so the cursor of the older pages is still theirs. */
