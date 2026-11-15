@@ -815,19 +815,37 @@ export function createConversationViewScope(props: ConversationProps) {
         ])
       : new Set<string>(),
   );
-  // Filtered here as well as settled below, so the two rows never stand together for a frame. A send
-  // made while the agent works goes to the queue panel; drawn here first, it would jump there.
-  // A send behind a failed one waits for Retry or Dismiss, and the host does not have it yet, so the
-  // queue panel cannot show it: the chat shows it, queued or not.
+  // Filtered here as well as settled below, so the two rows never stand together for a frame.
+  // A send made while the agent works goes to the queue panel. The panel shows only what the host
+  // reports, so the chat shows a failed send, and a send that the host is slow to answer (`late`),
+  // until the host has it: a message is never out of view while a slow host answers, or while an
+  // earlier send of the chat is in flight.
+  // The host can report the queue before it answers the send. The send has no id then, so its row in
+  // the panel is found by its text.
   const pendingMessages = createMemo(() => {
     const sends = currentPendingSends();
-    const firstFailed = sends.findIndex((send) => send.state === "failed");
+    const unanswered = sends.some((send) => send.queued && send.state === "sending");
+    const panelTexts = unanswered
+      ? presentedQueueDeliveries().flatMap((delivery) =>
+          delivery.sender.kind === "user" ? [delivery.text.trim()] : [],
+        )
+      : [];
     return sends
       .filter((send) => {
         const messageId = sentMessageId(send);
         return !(messageId && drawnHostIds().has(messageId));
       })
-      .filter((send) => !send.queued || (firstFailed !== -1 && sends.indexOf(send) >= firstFailed))
+      .filter((send) => {
+        if (!send.queued) return true;
+        if (send.state === "sent") return false;
+        if (send.state === "failed") return true;
+        if (!send.late) return false;
+        if (send.state !== "sending") return true;
+        const index = panelTexts.indexOf(send.text.trim());
+        if (index < 0) return true;
+        panelTexts.splice(index, 1);
+        return false;
+      })
       .map(pendingSendMessage);
   });
   /** The pending send a timeline row draws, by the row's message id. */
