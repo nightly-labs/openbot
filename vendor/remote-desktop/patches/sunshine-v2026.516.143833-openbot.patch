@@ -3362,10 +3362,10 @@ index 00000000..3821983e
 +}
 diff --git a/src/platform/macos/openbot_setup.mm b/src/platform/macos/openbot_setup.mm
 new file mode 100644
-index 00000000..e42489af
+index 00000000..1bbf9950
 --- /dev/null
 +++ b/src/platform/macos/openbot_setup.mm
-@@ -0,0 +1,177 @@
+@@ -0,0 +1,192 @@
 +// OpenBot additions to Sunshine, distributed under GPL-3.0.
 +#import <AppKit/AppKit.h>
 +#import <CoreGraphics/CoreGraphics.h>
@@ -3377,8 +3377,7 @@ index 00000000..e42489af
 +namespace {
 +  std::mutex input_mutex;
 +  bool test_mode = false;
-+  int64_t event_tag = 0;
-+  CGRect test_bounds = CGRectZero;
++  int64_t test_id = 0;
 +  bool clicked = false;
 +  bool typed = false;
 +  NSString *code = @"";
@@ -3407,34 +3406,44 @@ index 00000000..e42489af
 +  [[NSString stringWithFormat:@"Then type: %@", code] drawAtPoint:NSMakePoint(24, 70) withAttributes:attributes];
 +  [(typed ? @"Keyboard received" : [NSString stringWithFormat:@"Input: %@", entered]) drawAtPoint:NSMakePoint(24, 30) withAttributes:attributes];
 +}
-+- (BOOL)remoteEvent:(NSEvent *)event {
-+  CGEventRef native = event.CGEvent;
-+  std::lock_guard<std::mutex> lock(input_mutex);
-+  return test_mode && native && CGEventGetIntegerValueField(native, kCGEventSourceUserData) == event_tag &&
-+    CGEventGetIntegerValueField(native, kCGEventSourceUnixProcessID) == getpid();
-+}
-+- (void)acceptMouse:(NSEvent *)event point:(NSPoint)point {
-+  if ([self remoteEvent:event] && NSPointInRect(point, NSMakeRect(24, 110, 390, 60))) {
++// Only openbot_test_input calls these, so input from this Mac cannot pass the test.
++- (void)acceptClick:(NSPoint)point {
++  if (NSPointInRect(point, NSMakeRect(24, 110, 390, 60))) {
 +    clicked = true;
-+    [self.window makeFirstResponder:self];
 +    self.needsDisplay = YES;
 +  }
 +}
-+- (void)mouseDown:(NSEvent *)event {
-+  [self acceptMouse:event point:[self convertPoint:event.locationInWindow fromView:nil]];
-+}
-+- (void)acceptKey:(NSEvent *)event characters:(NSString *)characters {
-+  if (![self remoteEvent:event] || !clicked) return;
-+  if (characters.length != 1 || [characters rangeOfCharacterFromSet:[[NSCharacterSet decimalDigitCharacterSet] invertedSet]].location != NSNotFound) return;
-+  entered = [entered stringByAppendingString:characters];
++- (void)acceptDigit:(int)digit {
++  if (!clicked) return;
++  entered = [entered stringByAppendingFormat:@"%d", digit];
 +  if (entered.length > 4) entered = [entered substringFromIndex:entered.length - 4];
 +  typed = [entered isEqualToString:code];
 +  self.needsDisplay = YES;
 +}
-+- (void)keyDown:(NSEvent *)event {
-+  [self acceptKey:event characters:event.charactersIgnoringModifiers];
-+}
 +@end
++
++namespace {
++  // The digit keys 0 to 9 of the main keyboard, by macOS key code.
++  constexpr int64_t digit_keys[] = {29, 18, 19, 20, 21, 23, 22, 26, 28, 25};
++
++  int digit_for_key(int64_t key) {
++    for (int digit = 0; digit < 10; ++digit) {
++      if (digit_keys[digit] == key) return digit;
++    }
++    return -1;
++  }
++
++  // Runs on the main thread, and only while the test that received the input is open.
++  void on_test(int64_t test, void (^operation)(OpenBotTestView *view)) {
++    dispatch_async(dispatch_get_main_queue(), ^{
++      {
++        std::lock_guard<std::mutex> lock(input_mutex);
++        if (!test_mode || test_id != test) return;
++      }
++      if (panel) operation((OpenBotTestView *) panel.contentView);
++    });
++  }
++}
 +
 +namespace platf {
 +  nlohmann::json openbot_setup_status() {
@@ -3475,7 +3484,6 @@ index 00000000..e42489af
 +        expires = nil;
 +        std::lock_guard<std::mutex> lock(input_mutex);
 +        test_mode = false;
-+        event_tag = 0;
 +        return;
 +      }
 +      if (panel) return;
@@ -3498,28 +3506,35 @@ index 00000000..e42489af
 +      [NSApp activateIgnoringOtherApps:YES];
 +      expires = [NSDate dateWithTimeIntervalSinceNow:120];
 +      std::lock_guard<std::mutex> lock(input_mutex);
-+      event_tag = ((int64_t)arc4random() << 20) | arc4random_uniform(1 << 20);
-+      const auto frame = panel.frame;
-+      const auto main_height = NSScreen.screens.firstObject.frame.size.height;
-+      test_bounds = CGRectMake(frame.origin.x, main_height - NSMaxY(frame), frame.size.width, frame.size.height);
++      ++test_id;
 +      test_mode = true;
 +    });
 +  }
 +
++  // During a test, no remote input reaches the system. The test panel reads the click and the digit
++  // keys here. It does not post them back to this process: AppKit gives a posted click only to the
++  // window that the event names, and keys only to the key window of an active application.
 +  bool openbot_test_input(CGEventRef event) {
 +    std::lock_guard<std::mutex> lock(input_mutex);
 +    if (!test_mode) return false;
-+    auto type = CGEventGetType(event);
-+    if (type == kCGEventKeyDown || type == kCGEventKeyUp) {
-+      auto key = CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode);
-+      // Only the ten digit keys; shortcuts cannot reach another application.
-+      if (key != 18 && key != 19 && key != 20 && key != 21 && key != 23 && key != 22 && key != 26 && key != 28 && key != 25 && key != 29) return true;
-+    } else if (type == kCGEventLeftMouseDown || type == kCGEventLeftMouseUp || type == kCGEventMouseMoved) {
-+      if (!CGRectContainsPoint(test_bounds, CGEventGetLocation(event))) return true;
-+    } else return true;
-+    CGEventSetFlags(event, 0);
-+    CGEventSetIntegerValueField(event, kCGEventSourceUserData, event_tag);
-+    CGEventPostToPid(getpid(), event);
++    const auto test = test_id;
++    const auto type = CGEventGetType(event);
++    if (type == kCGEventLeftMouseDown) {
++      const auto location = CGEventGetLocation(event);
++      on_test(test, ^(OpenBotTestView *view) {
++        // Quartz points start at the top left of the main display, AppKit points at the bottom left.
++        const auto main_height = NSScreen.screens.firstObject.frame.size.height;
++        const auto point = [panel convertPointFromScreen:NSMakePoint(location.x, main_height - location.y)];
++        [view acceptClick:[view convertPoint:point fromView:nil]];
++      });
++    } else if (type == kCGEventKeyDown) {
++      const auto digit = digit_for_key(CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode));
++      if (digit >= 0) {
++        on_test(test, ^(OpenBotTestView *view) {
++          [view acceptDigit:digit];
++        });
++      }
++    }
 +    return true;
 +  }
 +
@@ -4850,63 +4865,81 @@ index 00000000..9e539d1e
 +}
 diff --git a/tests/unit/test_openbot_setup.mm b/tests/unit/test_openbot_setup.mm
 new file mode 100644
-index 00000000..7972aebd
+index 00000000..8b7b9ccc
 --- /dev/null
 +++ b/tests/unit/test_openbot_setup.mm
-@@ -0,0 +1,55 @@
+@@ -0,0 +1,73 @@
 +// OpenBot additions to Sunshine, distributed under GPL-3.0.
 +#import <AppKit/AppKit.h>
 +#include <stdexcept>
 +#include "../../src/platform/macos/openbot_setup.mm"
 +namespace platf { bool is_screen_capture_allowed() { return false; } }
 +#define require(condition) do { if (!(condition)) throw std::runtime_error(#condition); } while (false)
++
++// Runs the panel work that openbot_test_input queued. The main queue keeps its order, so that work
++// is done when the marker runs.
++static void drain() {
++  __block bool done = false;
++  dispatch_async(dispatch_get_main_queue(), ^{ done = true; });
++  while (!done) CFRunLoopRunInMode(kCFRunLoopDefaultMode, 1, true);
++}
++
++// The Quartz screen point, as Sunshine gives it, of a point in the test view.
++static CGPoint screen_point(NSPoint point) {
++  const auto screen = [panel convertPointToScreen:[panel.contentView convertPoint:point toView:nil]];
++  return CGPointMake(screen.x, NSScreen.screens.firstObject.frame.size.height - screen.y);
++}
++
++static CGEventRef click(CGPoint point) {
++  return CGEventCreateMouseEvent(nullptr, kCGEventLeftMouseDown, point, kCGMouseButtonLeft);
++}
++
++static CGEventRef key(int digit) {
++  return CGEventCreateKeyboardEvent(nullptr, (CGKeyCode) digit_keys[digit], true);
++}
++
++// Gives the event to the test as Sunshine's input thread does. True when the test keeps it.
++static bool deliver(CGEventRef event, bool wait = true) {
++  const bool kept = platf::openbot_test_input(event);
++  CFRelease(event);
++  if (wait) drain();
++  return kept;
++}
++
++static void type_code() {
++  for (NSUInteger i = 0; i < code.length; i++) require(deliver(key([code characterAtIndex:i] - '0')));
++}
++
 +int main() {
 +  @autoreleasepool {
 +    [NSApplication sharedApplication];
 +    [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
 +    [NSApp finishLaunching];
++    require(!deliver(click(CGPointZero)));
 +    platf::openbot_test_action("start");
 +    require(platf::openbot_test_status()["active"] == true);
 +    require(!panel.movable);
-+    auto view = (OpenBotTestView *)panel.contentView;
-+    CGEventRef native = CGEventCreateKeyboardEvent(nullptr, 18, true);
-+    NSEvent *event = [NSEvent eventWithCGEvent:native];
-+    require(![view remoteEvent:event]);
-+    [view keyDown:event];
++    type_code();
 +    require(platf::openbot_test_status()["keyboard"] == false);
-+    CGEventSetIntegerValueField(native, kCGEventSourceUserData, event_tag);
-+    event = [NSEvent eventWithCGEvent:native];
-+    require([view remoteEvent:event]);
-+    CGEventSetIntegerValueField(native, kCGEventSourceUnixProcessID, getpid() + 1);
-+    event = [NSEvent eventWithCGEvent:native];
-+    require(![view remoteEvent:event]);
-+    CFRelease(native);
-+    CGEventRef mouse = CGEventCreateMouseEvent(nullptr, kCGEventLeftMouseDown, CGPointZero, kCGMouseButtonLeft);
-+    NSEvent *click = [NSEvent eventWithCGEvent:mouse];
-+    [view acceptMouse:click point:NSMakePoint(50, 130)];
-+    require(!clicked);
-+    CGEventSetIntegerValueField(mouse, kCGEventSourceUserData, event_tag);
-+    click = [NSEvent eventWithCGEvent:mouse];
-+    [view acceptMouse:click point:NSMakePoint(0, 0)];
-+    require(!clicked);
-+    [view acceptMouse:click point:NSMakePoint(50, 130)];
-+    require(clicked);
-+    CGEventRef key = CGEventCreateKeyboardEvent(nullptr, 18, true);
-+    for (NSUInteger i = 0; i < code.length; i++) {
-+      [view acceptKey:[NSEvent eventWithCGEvent:key] characters:[code substringWithRange:NSMakeRange(i, 1)]];
-+    }
-+    require(!typed);
-+    CGEventSetIntegerValueField(key, kCGEventSourceUserData, event_tag);
-+    for (NSUInteger i = 0; i < code.length; i++) {
-+      [view acceptKey:[NSEvent eventWithCGEvent:key] characters:[code substringWithRange:NSMakeRange(i, 1)]];
-+    }
-+    require(typed);
-+    CFRelease(mouse);
-+    CFRelease(key);
++    require(deliver(click(screen_point(NSMakePoint(10, 10)))));
++    require(platf::openbot_test_status()["mouse"] == false);
++    require(deliver(click(screen_point(NSMakePoint(50, 130)))));
++    require(platf::openbot_test_status()["mouse"] == true);
++    require(deliver(CGEventCreateKeyboardEvent(nullptr, 0, true)));
++    type_code();
++    require(platf::openbot_test_status()["keyboard"] == true);
 +    platf::openbot_test_action("stop");
 +    require(platf::openbot_test_status()["active"] == false);
 +    require(!test_mode);
-+    puts("Native test: local input rejected; marked Sunshine input recognized; panel cleanup passed.");
++    require(!deliver(click(CGPointZero)));
++    platf::openbot_test_action("start");
++    require(deliver(click(screen_point(NSMakePoint(50, 130))), false));
++    platf::openbot_test_action("stop");
++    platf::openbot_test_action("start");
++    drain();
++    require(platf::openbot_test_status()["mouse"] == false);
++    platf::openbot_test_action("stop");
++    puts("Native test: remote click and code recognized without event routing; stale input ignored; panel cleanup passed.");
 +  }
 +}
 diff --git a/tests/unit/test_stream.cpp b/tests/unit/test_stream.cpp
