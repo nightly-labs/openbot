@@ -1324,8 +1324,8 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     mark(key, true);
     const analytics = desktopAnalytics.scope();
     const installed = await run(async () => {
-      /* Asked before the skills and the sign-in, so a cancel changes nothing. A replaced row keeps only
-         its id: its address, keys and headers belong to the other server. */
+      /* Asked before the skills and the sign-in, so a cancel changes nothing. The other row is removed
+         only after the app connected, as Remove server does: its sign-in, access and owner go with it. */
       const replacing = new Map<string, string>();
       for (const app of plugin.apps) {
         const other = otherRowNamed(app);
@@ -1342,7 +1342,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
         }
         for (const app of plugin.apps) {
           const replacedId = replacing.get(app.id);
-          const config = replacedId ? { ...createPluginAppConfig(app), id: replacedId } : pluginAppConfig(app);
+          const config = replacedId ? createPluginAppConfig(app) : pluginAppConfig(app);
           const invalid = Object.values(mcpConfigErrors(config))[0];
           if (invalid) throw new Error(t("marketplace.error.appInvalid", { name: app.name, reason: invalid }));
           /* What is saved is the configuration that connected, not the one the listing describes:
@@ -1353,6 +1353,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
             await undoSkills(agentId, addedSkills);
             return false;
           }
+          if (replacedId) setServers(await calls().mcp.removeMcpServer({ mcpServerId: replacedId }, serverId));
           setServers(await calls().mcp.saveMcpServer({ config: connected }, serverId));
         }
       } catch (cause) {
