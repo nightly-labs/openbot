@@ -249,9 +249,10 @@ const SAVE_TYPED_TEXT_FUNCTION = `function() {
 const PASTE_APPLY_WAIT_MS = 1000;
 /**
  * Sends `text` to an editable element as a plain-text paste. True when the editor stopped the paste
- * and its text or selection changed, so it took the text. False for a field, for a page that lets the
- * paste through (a synthetic paste inserts nothing), and for an editor that stopped the paste but
- * shows no change in time: the caller then inserts the text.
+ * and its text or selection changed, so it took the text, or the page added an element outside the
+ * editor, as a chat composer that shows a long paste as an attachment does. False for a field, for a
+ * page that lets the paste through (a synthetic paste inserts nothing), and for an editor that
+ * stopped the paste but shows no change in time: the caller then inserts the text.
  *
  * A paste-bin editor moves focus and the selection to a hidden element on paste, for the browser to
  * paste into. A synthetic paste pastes nothing there, so focus and the selection go back to where the
@@ -272,16 +273,23 @@ const PASTE_TEXT_FUNCTION = `function(text) {
     if (range) { selection()?.removeAllRanges(); selection()?.addRange(range); }
     return false;
   };
+  let elsewhere = false;
+  const taken = (records) => {
+    elsewhere ||= records.some((record) => !host.contains(record.target) && [...record.addedNodes].some((node) => node.nodeType === 1));
+    return elsewhere || state() !== before;
+  };
+  let finish = () => {};
+  const observer = new MutationObserver((records) => { if (taken(records)) finish(); });
+  observer.observe(host, { childList: true, subtree: true, characterData: true });
+  observer.observe(host.ownerDocument, { childList: true, subtree: true });
   const data = new DataTransfer();
   data.setData('text/plain', text);
   const event = new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true, composed: true });
-  if (this.dispatchEvent(event)) return notTaken();
-  if (state() !== before) return true;
+  const stopped = !this.dispatchEvent(event);
+  if (!stopped || taken(observer.takeRecords())) { observer.disconnect(); return stopped || notTaken(); }
   return new Promise((resolve) => {
-    const finish = () => { observer.disconnect(); clearTimeout(timer); resolve(state() !== before || notTaken()); };
-    const observer = new MutationObserver(() => { if (state() !== before) finish(); });
-    const timer = setTimeout(finish, ${PASTE_APPLY_WAIT_MS});
-    observer.observe(host, { childList: true, subtree: true, characterData: true });
+    const timer = setTimeout(() => finish(), ${PASTE_APPLY_WAIT_MS});
+    finish = () => { observer.disconnect(); clearTimeout(timer); resolve(taken(observer.takeRecords()) || notTaken()); };
   });
 }`;
 /**
