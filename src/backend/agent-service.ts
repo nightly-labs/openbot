@@ -3544,6 +3544,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   /**
+   * The fields of `input` other than its runtime, applied now while its provider change waits for
+   * the next turn. The declared type lets `#applyAgentUpdate` call it.
+   */
+  #applyFieldsNow(
+    input: AgentUpdate,
+    initiatingAgentId: string | undefined,
+  ): Effect.Effect<AgentSummary, AgentLifecycleFailed> {
+    return this.#applyAgentUpdate(withoutRuntimeFields(input), initiatingAgentId).pipe(
+      Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "updateAgent", cause: failure.cause })),
+    );
+  }
+
+  /**
    * `move` is "return" for the move back to the model a usage limit or a provider error made the
    * agent leave, "provider-error" for the move away from a model that failed a turn, and "next-turn"
    * for a queued `pendingRuntime` that applies before the next turn. `queueWhileBusy` is set for a
@@ -3694,14 +3707,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       input.model !== undefined ||
       input.reasoningEffort !== undefined ||
       input.providerAccountId !== undefined;
-    // Only an update of the runtime alone waits for the next turn. An update with other fields is
-    // refused while work runs, as before, and so is a move to a backup model: `pendingRuntime` does
-    // not keep the model to go back to.
-    const queueable =
-      queueWhileBusy &&
-      previous !== undefined &&
-      !input.leaveUsageLimit &&
-      Object.keys(input).every((key) => RUNTIME_UPDATE_KEYS.has(key));
+    // A move to a backup model is refused while work runs, as before: `pendingRuntime` does not keep
+    // the model to go back to.
+    const queueable = queueWhileBusy && previous !== undefined && !input.leaveUsageLimit;
+    const runtimeOnly = Object.keys(input).every((key) => RUNTIME_UPDATE_KEYS.has(key));
     const pinnedAccountId = this.#accountPin(
       input,
       move,
@@ -3731,6 +3740,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       yield* this.#providers.ensureProvider(requestedProvider);
       if (input.provider || input.model)
         yield* lifecycleStep("check provider switch", () => this.#providers.requireProviderOn(requestedProvider));
+      // The other fields of the same update apply now, as they do without a runtime change; only the
+      // handover waits (#9628). They are written after the checks above, so a refused provider change
+      // leaves them unchanged.
+      if (!runtimeOnly) yield* this.#applyFieldsNow(input, initiatingAgentId);
       return yield* queue({
         provider: requestedProvider,
         model: requestedModel?.id ?? previous.model,
@@ -3747,6 +3760,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const queued = previous?.pendingRuntime;
     if (
       queueable &&
+      runtimeOnly &&
       queued &&
       !handoverNeeded &&
       input.provider === undefined &&
@@ -6989,6 +7003,12 @@ const RUNTIME_UPDATE_KEYS: ReadonlySet<string> = new Set([
   "providerAccountId",
   "leaveUsageLimit",
 ]);
+
+/** `update` without the fields of `RUNTIME_UPDATE_KEYS`, which a provider change during work queues. */
+function withoutRuntimeFields(update: AgentUpdate): AgentUpdate {
+  const { provider, model, reasoningEffort, providerAccountId, leaveUsageLimit, ...fields } = update;
+  return fields;
+}
 
 const MODEL_SWITCH_TEXT = {
   "usage-limit": "status.agent.modelSwitchedForLimit",
