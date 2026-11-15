@@ -1,3 +1,4 @@
+import { sourceText } from "@openbot/i18n/source";
 import { Cause, Effect, Schema } from "effect";
 import type { AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
@@ -60,7 +61,9 @@ export interface BootRecoveryOptions {
  *   assuming, and conservatively keeps `interrupted` on any doubt — never
  *   repeats uncertain side effects. A delivery is orphaned when the process
  *   that ran it is gone: the previous OpenBot run, or a provider CLI that
- *   exited. Any other unsettled delivery is a live turn of this run.
+ *   exited. Any other unsettled delivery is a live turn of this run. A
+ *   provider exit that cut the agent's text fails the delivery instead, so
+ *   the chat says that the answer is not complete (#9729).
  * - `backfillProviderHistory` merges provider-side turns that happened while
  *   OpenBot was down into the persisted conversation.
  *
@@ -189,7 +192,7 @@ export class BootRecovery {
       terminal: "interrupted" as const,
       reason: "OpenBot restarted before this delivery reached a confirmed terminal state.",
     };
-    const { terminal, reason } = yield* Effect.gen({ self: this }, function* () {
+    const recovered = yield* Effect.gen({ self: this }, function* () {
       const { agent, client, session } = yield* recoveryStep(() => {
         const agent = this.#store.list().find((candidate) => candidate.id === delivery.recipientAgentId);
         const client = agent ? this.#providers.clientForAgent(agent) : null;
@@ -248,23 +251,40 @@ export class BootRecovery {
       }
       return interrupted;
     }).pipe(Effect.catch(() => Effect.succeed(interrupted)));
-    // A failed provider read keeps the conservative interrupted result; never replay side effects.
-    yield* this.#mailbox.markTerminal(delivery.id, terminal, reason).pipe(toBootRecoveryFailed);
-    yield* recoveryStep(() => {
+    const target = yield* recoveryStep(() => {
       const agent = this.#store.list().find((candidate) => candidate.id === delivery.recipientAgentId);
       const threadId = this.#hooks.deliveryThreadId?.(delivery.id) ?? agent?.threadId;
-      if (agent && threadId) {
-        const recoveryTurnId =
-          delivery.turnId ?? this.#store.database.readConversationRuntime(agent.id, threadId).activeTurnId;
-        const changedMessages = this.#store.database
-          .readConversationRecoveryMessages(agent.id, threadId, recoveryTurnId)
-          .filter((message) => message.turnId === recoveryTurnId && message.status === "streaming")
-          .map((message) => {
-            const changed = structuredClone(message);
-            changed.status = terminal;
-            markIncompleteMediaGeneration(changed, terminal);
-            return changed;
-          });
+      if (!agent || !threadId) return null;
+      const recoveryTurnId =
+        delivery.turnId ?? this.#store.database.readConversationRuntime(agent.id, threadId).activeTurnId;
+      const streaming = this.#store.database
+        .readConversationRecoveryMessages(agent.id, threadId, recoveryTurnId)
+        .filter((message) => message.turnId === recoveryTurnId && message.status === "streaming");
+      return { agent, threadId, streaming };
+    });
+    // Only a provider that exited during this run leaves agent text streaming: a restart marks it
+    // interrupted before this. The chat showed the first words of that text as a whole message, with
+    // no error (#9729), so the turn fails and says that the answer is not complete.
+    const cut =
+      recovered.terminal === "interrupted" &&
+      target?.streaming.some((message) => message.author === "assistant" && message.text.trim() !== "") === true;
+    const { terminal, reason } = cut
+      ? { terminal: "failed" as const, reason: sourceText("error.agent.answerCutOff") }
+      : recovered;
+    // A failed provider read keeps the conservative interrupted result; never replay side effects.
+    yield* this.#mailbox.markTerminal(delivery.id, terminal, reason).pipe(toBootRecoveryFailed);
+    // The agent's own chat shows the error above its composer, as other failed turns do.
+    if (cut && target && target.threadId === target.agent.threadId)
+      this.#hooks.emitError("agent_error", reason, target.agent.id);
+    yield* recoveryStep(() => {
+      if (target) {
+        const { agent, threadId } = target;
+        const changedMessages = target.streaming.map((message) => {
+          const changed = structuredClone(message);
+          changed.status = terminal;
+          markIncompleteMediaGeneration(changed, terminal);
+          return changed;
+        });
         const revision = this.#store.database.persistConversationChanges({
           agentId: agent.id,
           threadId,

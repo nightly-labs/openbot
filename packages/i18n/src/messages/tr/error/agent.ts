@@ -87,6 +87,7 @@ export const messages = {
     "{provider} yanıt vermeyi bıraktı, bu yüzden OpenBot bu turu bitirdi. Mesajı yeniden gönderin veya başka bir model seçin.",
   "error.agent.toolLoopStopped":
     "{provider} başarısız bir adımı birçok kez tekrarladı, bu yüzden OpenBot bu turu durdurdu. Mesajı yeniden gönderin veya başka bir model seçin.",
+  "error.agent.answerCutOff": "Ajan yanıtını bitirmeden durdu, bu yüzden yanıt eksik. Mesajı yeniden gönderin.",
   "error.agent.compactionConnectionLost":
     "Ajan bağlamını sıkıştırırken bağlantı kesildi, bu yüzden görev durdu. İnternet bağlantınızı kontrol edin, ardından devam etmek için bir mesaj gönderin.",
   "error.agent.compactionLoopStopped":
