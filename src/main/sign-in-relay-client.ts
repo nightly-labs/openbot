@@ -6,6 +6,7 @@ import {
   loopbackCallback,
   type McpSignInRelayPage,
   relayCallbackQuery,
+  relayPageUrl,
   type SignInRelayStatus,
 } from "@openbot/contracts/ipc";
 import { SIGN_IN_RELAY_ROUTES } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
@@ -182,7 +183,7 @@ export class SignInRelayClient {
       // user only opens it, and the host's sign-in finishes by itself.
       if (!state && !callback) {
         wait({
-          page: { authorizeHost: page.host, listening: false, pasteable: false },
+          page: { authorizeHost: page.host, url: relayPageUrl(page), listening: false, pasteable: false },
           url: page.toString(),
           state: null,
           receive: () => undefined,
@@ -209,7 +210,7 @@ export class SignInRelayClient {
         (callback !== null &&
           (listener !== null || (own?.port === callback.port && own.paths.includes(callback.path))));
       wait({
-        page: { authorizeHost: page.host, listening: routed, pasteable: true },
+        page: { authorizeHost: page.host, url: relayPageUrl(page), listening: routed, pasteable: true },
         url: page.toString(),
         state,
         receive: (value) => Deferred.doneUnsafe(query, Effect.succeed(value)),

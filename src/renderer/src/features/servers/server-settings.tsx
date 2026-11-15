@@ -650,7 +650,12 @@ const ServerSettings = createSimpleContext({
             .catch(() => null);
           if (!waiting()) return;
           const current = serverSettingsMcpSignInRelays()[url];
-          if (current?.authorizeHost !== page?.authorizeHost || current?.listening !== page?.listening) set(page);
+          if (
+            current?.authorizeHost !== page?.authorizeHost ||
+            current?.url !== page?.url ||
+            current?.listening !== page?.listening
+          )
+            set(page);
           await new Promise((resolve) => setTimeout(resolve, MCP_SIGN_IN_PAGE_POLL_MS));
         }
       } finally {

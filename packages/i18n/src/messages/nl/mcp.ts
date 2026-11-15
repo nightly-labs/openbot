@@ -151,6 +151,7 @@ export const messages = {
   "mcp.signIn.relayDeviceDescription":
     "Log in je browser in op {page} en rond het daar af. {host} ziet de login vanzelf.",
   "mcp.signIn.relayOpen": "Inlogpagina openen",
+  "mcp.signIn.relayCopy": "Link kopiëren",
   "mcp.signIn.relayPasteHint":
     "Als de browser niet terugkeert naar OpenBot, kopieer dan het adres dat hij toont en plak het hier.",
   "mcp.signIn.relayPasteRequired":

@@ -160,6 +160,7 @@ export const messages = {
     "سجّل الدخول على {page} في متصفحك. عند الانتهاء، الصق هنا العنوان الذي يعرضه المتصفح. ثم يرسل OpenBot تسجيل الدخول إلى {host}.",
   "mcp.signIn.relayDeviceDescription": "سجّل الدخول على {page} في متصفحك وأكمل هناك. يرى {host} تسجيل الدخول بنفسه.",
   "mcp.signIn.relayOpen": "فتح صفحة تسجيل الدخول",
+  "mcp.signIn.relayCopy": "نسخ الرابط",
   "mcp.signIn.relayPasteHint": "إذا لم يعد المتصفح إلى OpenBot، فانسخ العنوان الذي يعرضه والصقه هنا.",
   "mcp.signIn.relayPasteRequired":
     "لا يمكن لـ OpenBot الحصول على تسجيل الدخول من المتصفح بنفسه. عند الانتهاء، انسخ العنوان الذي يعرضه المتصفح والصقه هنا.",

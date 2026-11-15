@@ -199,7 +199,12 @@ export const RelayDevice: Story = {
     state: {
       phase: "relay",
       hostName: "Cloud server",
-      page: { authorizeHost: "auth.openai.com", listening: false, pasteable: false },
+      page: {
+        authorizeHost: "auth.openai.com",
+        url: "https://auth.openai.com/codex/device",
+        listening: false,
+        pasteable: false,
+      },
     },
     onOpenRelayPage: fn(),
     onPasteRelayAddress: fn(),
@@ -213,7 +218,12 @@ export const RelayPaste: Story = {
     state: {
       phase: "relay",
       hostName: "Cloud server",
-      page: { authorizeHost: "claude.com", listening: false, pasteable: true },
+      page: {
+        authorizeHost: "claude.com",
+        url: "https://claude.com/cai/oauth/authorize?state=example",
+        listening: false,
+        pasteable: true,
+      },
     },
     onOpenRelayPage: fn(),
     onPasteRelayAddress: fn(),
