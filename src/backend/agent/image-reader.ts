@@ -15,7 +15,7 @@ export const readImageToolShape = {
 export const readImageToolSchema = z.strictObject(readImageToolShape);
 
 /** The picture that `read_image` gives the model, upright, and the upright size of the file. */
-export interface FittedImage {
+interface FittedImage {
   dataUrl: string;
   width: number;
   height: number;
