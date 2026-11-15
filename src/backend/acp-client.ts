@@ -3000,10 +3000,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
    * The server that OpenBot gave whose failure ended the turn, and the reason for the user. A server
    * that did not start is named in the failure text. A tool schema that the agent refused is named
    * as the tool `mcp_<server>_<tool>`, in the agent's log (#7228) or, since CLI 1.5.9, in the
-   * failure text (#9568). A server name can hold `_`,
-   * so the longest name wins, also against the agent's own servers: a tool of the user's
-   * `github_enterprise` does not leave out OpenBot's `github`. `started`: the server started, as a
-   * server with tools did.
+   * failure text (#9568). A server name can hold `_`, so the longest name wins, also against the
+   * agent's own servers: a tool of the user's `github_enterprise` does not leave out OpenBot's
+   * `github`. `started`: the server started, as a server with tools did.
    */
   #failedMcpServer(
     thread: AcpThread,

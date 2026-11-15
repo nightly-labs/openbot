@@ -5,7 +5,8 @@
 // after a resume without them. This fake does the same: a session with the server `resend` refuses
 // `mcp_resend_get-contact`, and a prompt with `REFUSE_TOOL=<tool>` refuses that tool, as for a server from the
 // user's own `mcp_config.json`. A prompt with `CLI_1_5_9` gets the answer of the CLI 1.5.9, which names
-// the tool, and no log line (#9568).
+// the tool (#9568). The real 1.5.9 also logs the line; this fake does not, so only the answer can
+// name the tool.
 import { appendFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { type AcpHandler, type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
