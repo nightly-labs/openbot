@@ -15,6 +15,7 @@ import type {
   CustomAgentUsage,
   CustomProviderHarness,
   CustomProviderRestart,
+  ProviderAccountCodeLoginStatus,
   ProviderAccountPool,
   ProviderAccountStatus,
   ProviderCodeLoginStart,
@@ -2017,6 +2018,37 @@ export class ProviderRuntime implements ProviderPort {
     );
     if (error) return yield* new ProviderOperationFailed({ cause: new Error(error) });
   }).bind(this);
+
+  /**
+   * Signs a provider account after the first in with a code or a link that the user finishes on any
+   * device: a new one when `accountId` is null. Answers with what the provider's CLI printed.
+   * `providerAccountCodeLoginStatus` tells how it ends, and `cancelProviderAccountSignIn` stops it.
+   */
+  readonly startProviderAccountCodeLogin = Effect.fn("ProviderRuntime.startProviderAccountCodeLogin")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+    accountId: string | null,
+  ) {
+    yield* providerStep(() => this.requireProviderOn(provider));
+    const accounts = yield* this.#requireAccounts(provider);
+    return yield* accounts.connectWithCode(provider, accountId).pipe(toProviderOperationFailed);
+  }).bind(this);
+
+  /** See `ProviderAccounts.submitCode`. Throws when the provider has no account that waits for a code. */
+  submitProviderAccountCodeLogin(provider: AgentProvider, accountId: string, code: string): void {
+    const accounts = this.#providerAccounts;
+    if (!accounts || provider === "acp") throw new Error(sourceText("error.provider.codeLoginNotWaiting"));
+    accounts.submitCode(accountId, code);
+  }
+
+  /** See `ProviderAccounts.codeSignInStatus`. */
+  providerAccountCodeLoginStatus(provider: AgentProvider, accountId: string): ProviderAccountCodeLoginStatus {
+    const accounts = this.#providerAccounts;
+    if (accounts && provider !== "acp") return accounts.codeSignInStatus(provider, accountId);
+    return {
+      result: { error: sourceText("error.provider.accountsUnsupported", { provider: providerLabel(provider) }) },
+    };
+  }
 
   /** Stops the sign-in of an account. A new account goes with its folder; another one shows as signed out. */
   readonly cancelProviderAccountSignIn = Effect.fn("ProviderRuntime.cancelProviderAccountSignIn")(function* (

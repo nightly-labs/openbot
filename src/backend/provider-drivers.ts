@@ -165,6 +165,14 @@ export interface ProviderHomeAccountSupport {
   readonly homeVariable: string;
   /** Signs a new, empty home folder in through the browser: a CLI command, or an ACP `authenticate`. */
   readonly signIn: ProviderCliCommand | AcpAuthenticateSignIn;
+  /**
+   * Signs the home folder in with a code or a link that the user finishes on any device, for a
+   * computer whose browser callback cannot arrive. The CLI prints it (`startCliCodeLogin`). A
+   * `paste` sign-in gives a code that the user copies back, on a computer where
+   * `pasteCodeLoginSupported` only. The descriptor's `accountCodeSignIn` mirrors it; keep the two in
+   * step.
+   */
+  readonly codeSignIn?: { readonly flow: "device" | "paste" | "link"; readonly command: ProviderCliCommand };
   /** Signs the account out before its folder is removed, for a CLI that keeps a credential outside it. */
   readonly signOut?: ProviderCliCommand;
   /** False for a CLI version that ignores `homeVariable`. Absent when every version reads it. */
@@ -963,6 +971,11 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     accounts: {
       homeVariable: "CODEX_HOME",
       signIn: { argv: ["login"], env: () => ({}), timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+      // The app-server's device code signs in the default home folder only, so an account uses the CLI's.
+      codeSignIn: {
+        flow: "device",
+        command: { argv: ["login", "--device-auth"], env: () => ({}), timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+      },
       signOut: { argv: ["logout"], env: () => ({}), timeoutMs: 30_000 },
     },
     catalog: { paged: true, modelFields: serviceTierFields },
@@ -1008,6 +1021,11 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     accounts: {
       homeVariable: "CLAUDE_CONFIG_DIR",
       signIn: CLAUDE_SIGN_IN,
+      // As the provider's own `codeSignIn`, in the folder of the account.
+      codeSignIn: {
+        flow: "paste",
+        command: { argv: ["auth", "login", "--claudeai"], env: CLAUDE_COMMAND_ENV, timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+      },
       signOut: { argv: ["auth", "logout"], env: CLAUDE_COMMAND_ENV, timeoutMs: 30_000 },
     },
     // `claudeModelName` says why Claude Code's own model names are not used.
@@ -1057,6 +1075,14 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         argv: ["--no-auto-update", "login"],
         env: () => ({ GROK_OAUTH2_REFERRER: "openbot" }),
         timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+      },
+      codeSignIn: {
+        flow: "device",
+        command: {
+          argv: ["--no-auto-update", "login", "--device-auth"],
+          env: () => ({ GROK_OAUTH2_REFERRER: "openbot" }),
+          timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+        },
       },
     },
     // Only for the own sign-in: an account folder is removed without it.

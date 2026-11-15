@@ -205,6 +205,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "Kan niet opnieuw verbinden.",
   "provider.account.add": "Account toevoegen",
   "provider.account.addLabel": "Nog een {name}-account toevoegen",
+  "provider.account.addWithCode": "Account toevoegen met code",
   "provider.account.count": { one: "{count} account", other: "{count} accounts" },
   "provider.account.numbered": "Account {number}",
   "provider.account.apiKey": "API-sleutel",

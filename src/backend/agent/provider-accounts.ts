@@ -7,6 +7,8 @@ import {
   agentProviderDescriptor,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   MAX_PROVIDER_ACCOUNTS,
+  type ProviderAccountCodeLoginStart,
+  type ProviderAccountCodeLoginStatus,
   type ProviderAccountState,
   type ProviderAccountStatus,
   type ProviderUsageResetOutcome,
@@ -16,7 +18,7 @@ import {
 import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
-import { Cause, Effect, Exit, Fiber, Schema, type Scope } from "effect";
+import { Cause, Deferred, Effect, Exit, Fiber, Schema, type Scope } from "effect";
 import { googleSignInByOpenBot, startAcpAuthentication } from "./../acp-sign-in";
 import type { AgentClient } from "./../agent-client";
 import { type AgentCliInfo, cliPathEnvironment, cliSpawnTarget } from "./../cli";
@@ -33,6 +35,7 @@ import { shortenDiagnostic } from "./../stderr-diagnostics";
 import { stopProcessTree } from "../windows-process-tree";
 import { usageWindowResetSince } from "./account-usage";
 import { captureBrowser, signInPageByOpenBot } from "./browser-capture";
+import { type CliCodeLogin, type CliCodePrompt, pasteCodeLoginSupported, startCliCodeLogin } from "./cli-code-login";
 import type { ProviderAccountStore, StoredProviderAccount } from "./provider-account-store";
 import { ProviderProcessFailed, waitForSuccessfulProcess } from "./provider-status";
 import { providerLabel } from "./thread-items";
@@ -128,6 +131,10 @@ export class ProviderAccounts {
   readonly #signIns = new Map<string, Fiber.Fiber<string | null>>();
   /** Accounts whose first sign-in runs. A cancel removes them with their folder. */
   readonly #added = new Set<string>();
+  /** How the last code sign-in of each provider ended. A canceled one leaves nothing. */
+  readonly #codeResults = new Map<AgentProviderId, { accountId: string; error: string | null }>();
+  /** The CLI of each account whose sign-in waits for a pasted code. `submitCode` types the code into it. */
+  readonly #pasteLogins = new Map<string, CliCodeLogin>();
   readonly #checks = new Map<string, Fiber.Fiber<void>>();
   /** The last usage reading of each account, with the usage reset credits it counted. */
   readonly #usage = new Map<string, { limit: AccountUsageLimit; resetCredits: number | null | undefined }>();
@@ -237,6 +244,8 @@ export class ProviderAccounts {
     accountId: string | null,
     openExternal: (url: string) => Promise<void>,
     onHost: boolean,
+    /** Runs the code sign-in of the driver, and gets what its CLI printed. Only `connectWithCode` gives it. */
+    code?: Deferred.Deferred<CliCodePrompt | null>,
   ) {
     const support = this.#support(provider);
     const name = providerLabel(provider);
@@ -246,6 +255,11 @@ export class ProviderAccounts {
       return yield* accountFailure(sourceText("error.provider.accountNeedsKey", { provider: name }));
     const cli = this.#host.cli(provider);
     if (!cli) return yield* accountFailure(sourceText("error.provider.accountNeedsConnection", { provider: name }));
+    if (code && !support.codeSignIn)
+      return yield* accountFailure(sourceText("error.provider.noCodeSignIn", { provider: name }));
+    // Refused before a new account gets its folder.
+    if (code && support.codeSignIn?.flow === "paste" && !pasteCodeLoginSupported())
+      return yield* accountFailure(sourceText("error.provider.codeLoginUnsupported"));
     let account: StoredProviderAccount;
     const added = accountId === null;
     if (added) {
@@ -266,7 +280,8 @@ export class ProviderAccounts {
       account = stored;
     }
     const command = support.signIn;
-    if (!added && "kind" in command) {
+    const codeSignIn = code ? support.codeSignIn : undefined;
+    if (!added && !codeSignIn && "kind" in command) {
       // The sign-out removes the token that the account's processes use.
       if (this.#host.isAccountBusy(provider, account.id))
         return yield* accountFailure(sourceText("error.provider.cliBusyReconnect", { provider: name }));
@@ -274,9 +289,30 @@ export class ProviderAccounts {
     }
     yield* this.#interrupt(account.id);
     if (added) this.#added.add(account.id);
+    if (code) this.#codeResults.delete(provider);
     this.#setState(account.id, { state: "connecting", message: null });
     const signIn = Effect.scoped(
       Effect.gen({ self: this }, function* () {
+        if (code && codeSignIn) {
+          // The account's saved sign-in, if it has one, stays until the CLI saves the new one.
+          const login = yield* startCliCodeLogin({
+            flow: codeSignIn.flow,
+            executable: cli.executable,
+            argv: codeSignIn.command.argv,
+            env: { ...cliPathEnvironment(cli), ...codeSignIn.command.env(cli), ...this.environment(account) },
+            timeoutMs: codeSignIn.command.timeoutMs,
+            ...(codeSignIn.command.closeInput ? { closeInput: true } : {}),
+          }).pipe(Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })));
+          const prompt = yield* login.prompt.pipe(
+            Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })),
+          );
+          if (prompt?.flow === "paste") {
+            this.#pasteLogins.set(account.id, login);
+            yield* Effect.addFinalizer(() => Effect.sync(() => this.#pasteLogins.delete(account.id)));
+          }
+          yield* Deferred.succeed(code, prompt);
+          return yield* login.done.pipe(Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })));
+        }
         if ("kind" in command) {
           // A Reconnect signs the account out first: its saved token would answer with no browser page.
           // The server prints Google's page, which a host shows and this computer opens itself, except
@@ -337,6 +373,11 @@ export class ProviderAccounts {
       ),
       Effect.as<string | null>(null),
       Effect.catch((error) => Effect.succeed(this.#message(provider, error))),
+      Effect.tap((error) =>
+        Effect.sync(() => {
+          if (code) this.#codeResults.set(provider, { accountId: account.id, error });
+        }),
+      ),
       Effect.ensuring(
         Effect.sync(() => {
           this.#signIns.delete(account.id);
@@ -349,6 +390,66 @@ export class ProviderAccounts {
     if (fiber.pollUnsafe() === undefined) this.#signIns.set(account.id, fiber);
     return { accountId: account.id, signIn: fiber, ended: Fiber.join(fiber) };
   }).bind(this);
+
+  /**
+   * Signs an account in with a code or a link that the user finishes on any device: a new account
+   * when `accountId` is null. Answers when the CLI has printed it. `codeSignInStatus` and the account
+   * row tell how the sign-in ends, and `cancel` stops it. A new account that does not finish is
+   * removed with its folder.
+   */
+  readonly connectWithCode = Effect.fn("ProviderAccounts.connectWithCode")(function* (
+    this: ProviderAccounts,
+    provider: AgentProviderId,
+    accountId: string | null,
+  ): Effect.fn.Return<ProviderAccountCodeLoginStart, ProviderAccountFailed> {
+    const prompt = Deferred.makeUnsafe<CliCodePrompt | null>();
+    const signIn = yield* this.connect(provider, accountId, () => Promise.resolve(), false, prompt);
+    const support = this.#support(provider);
+    const timeoutMs = support && !isKeyAccountSupport(support) ? (support.codeSignIn?.command.timeoutMs ?? 0) : 0;
+    const expiresAt = Date.now() + timeoutMs;
+    // The sign-in can end before it prints anything: its error is then the answer.
+    const first = yield* Effect.raceFirst(
+      Deferred.await(prompt).pipe(Effect.map((printed) => ({ printed, error: null }))),
+      signIn.ended.pipe(Effect.map((error) => ({ printed: null, error }))),
+    );
+    if (first.error) return yield* accountFailure(first.error);
+    const printed = first.printed;
+    if (printed === null) return { accountId: signIn.accountId, start: { kind: "connected" } };
+    if (printed.flow !== "device")
+      return {
+        accountId: signIn.accountId,
+        start: { kind: printed.flow, verificationUrl: printed.verificationUrl, expiresAt },
+      };
+    return {
+      accountId: signIn.accountId,
+      start: {
+        kind: "code",
+        userCode: printed.userCode,
+        verificationUrl: printed.verificationUrl,
+        ...(printed.verificationUrlComplete ? { verificationUrlComplete: printed.verificationUrlComplete } : {}),
+        expiresAt,
+      },
+    };
+  }).bind(this);
+
+  /**
+   * Types the code that the provider's page showed into the CLI of the account's sign-in. The code
+   * is a credential: it goes to the CLI's stdin and nowhere else. `codeSignInStatus` tells how the
+   * sign-in ends. Throws when no sign-in of the account waits for a code.
+   */
+  submitCode(accountId: string, code: string): void {
+    const login = this.#pasteLogins.get(accountId);
+    if (!login) throw new Error(sourceText("error.provider.codeLoginNotWaiting"));
+    login.submit(code);
+  }
+
+  /** Whether the code sign-in of an account goes on, and how it ended. */
+  codeSignInStatus(provider: AgentProviderId, accountId: string): ProviderAccountCodeLoginStatus {
+    if (this.#signIns.has(accountId)) return { result: null };
+    const ended = this.#codeResults.get(provider);
+    if (ended?.accountId === accountId) return { result: { error: ended.error } };
+    return { result: { error: sourceText("error.provider.hostSignInEnded", { provider: providerLabel(provider) }) } };
+  }
 
   /**
    * Gives an account its API key and checks it: a new account when `accountId` is null. Answers when

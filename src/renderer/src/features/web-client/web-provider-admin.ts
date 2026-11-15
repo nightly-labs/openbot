@@ -22,6 +22,7 @@ import {
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
+import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
 import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
@@ -56,6 +57,7 @@ import { PROVIDERS_V8_CAPABILITY, PROVIDERS_V8_ROUTES } from "@openbot/contracts
 import { runTeamEffect } from "@openbot/team-client";
 import {
   type CustomProviderRoutes,
+  cancelProviderAccountCodeLogin,
   cancelProviderAccountSignIn,
   cancelProviderCodeLogin,
   cancelProviderHostSignIn,
@@ -76,6 +78,7 @@ import {
   listProviderAccountsWithModels,
   type ProviderCodeLoginRoutes,
   type ProviderRuntimeRoutes,
+  providerAccountCodeLoginStatus,
   providerAccountSignInStatus,
   providerAccountUsage,
   providerHostSignInStatus,
@@ -90,9 +93,11 @@ import {
   setProviderApiKey,
   setProviderUse,
   signOutProvider,
+  startProviderAccountCodeLogin,
   startProviderAccountSignIn,
   startProviderCodeLogin,
   startProviderHostSignIn,
+  submitProviderAccountCodeLogin,
   submitProviderCodeLogin,
   updateCustomProvider,
 } from "@openbot/team-client/team-admin-requests";
@@ -277,6 +282,22 @@ function webProviderAdmin(
       ),
     connectAccountKey: async (input, serverId) =>
       runTeamEffect(connectProviderAccountKey(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+    startAccountCodeLogin: async (input, serverId) =>
+      runTeamEffect(
+        startProviderAccountCodeLogin(request(serverId), input).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    submitAccountCodeLogin: async (input, serverId) =>
+      runTeamEffect(
+        submitProviderAccountCodeLogin(request(serverId), input).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    accountCodeLoginStatus: async (input, serverId) =>
+      runTeamEffect(
+        providerAccountCodeLoginStatus(request(serverId), input).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    cancelAccountCodeLogin: async (input, serverId) =>
+      runTeamEffect(
+        cancelProviderAccountCodeLogin(request(serverId), input).pipe(Effect.mapError((error) => error.cause)),
+      ),
     renameAccount: async (input, serverId) =>
       runTeamEffect(renameProviderAccount(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
     removeAccount: async (input, serverId) =>
@@ -510,6 +531,7 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
         },
         ...(accountsServerId() ? { accountSignIn: accountSignIn(accountsServerId() ?? "") } : {}),
         ...(relayed ? { accountRelay: accountRelay(accountsServerId() ?? "", relayed) } : {}),
+        ...(accountCodeServerId() ? { accountCode: accountCode(accountCodeServerId() ?? "") } : {}),
         relay: {
           hostName: options.server()?.name ?? "",
           start: (provider: AgentProviderId) => admin.startRelaySignIn(provider, id ?? ""),
@@ -543,6 +565,33 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
         await admin.cancelAccountSignIn(provider, id);
         await hostAccounts.refresh().catch(() => undefined);
         return status();
+      },
+    };
+  }
+  /** The joined server whose host signs a provider account in with a code (`provider-account-code-v1`). */
+  const accountCodeServerId = () => {
+    const id = accountsServerId();
+    return id && remoteAdminServer(options.server(), PROVIDER_ACCOUNT_CODE_CAPABILITY)?.id === id ? id : undefined;
+  };
+  /** As on desktop: the accounts are read again when an account's code sign-in starts and when it ends. */
+  function accountCode(id: string) {
+    const refresh = () => hostAccounts.refresh().catch(() => undefined);
+    return {
+      start: async (provider: AgentProviderId, accountId: string | null) => {
+        const started = await admin.startAccountCodeLogin({ provider, accountId }, id);
+        await refresh();
+        return started;
+      },
+      submit: (provider: AgentProviderId, accountId: string, code: string) =>
+        admin.submitAccountCodeLogin({ provider, accountId, code }, id),
+      status: async (provider: AgentProviderId, accountId: string) => {
+        const result = await admin.accountCodeLoginStatus({ provider, accountId }, id);
+        if (result.result) await refresh();
+        return result;
+      },
+      cancel: async (provider: AgentProviderId, accountId: string) => {
+        await admin.cancelAccountCodeLogin({ provider, accountId }, id);
+        await refresh();
       },
     };
   }
@@ -600,6 +649,14 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
         ? {
             setPool: (provider: AgentProviderId, enabled: boolean, leftOut: readonly string[]) =>
               changed(admin.setAccountPool({ provider, enabled, leftOut: [...leftOut] }, id)),
+          }
+        : {}),
+      ...(accountCodeServerId() === id
+        ? {
+            connectWithCode: async (provider: AgentProviderId, accountId: string | null) =>
+              connection.connectAccountWithCode(provider, accountId),
+            // Only a host that can run a pasted code advertises `providers-v3`.
+            pasteCodeSignIn: serverSupportsCapability(options.server(), "providers-v3"),
           }
         : {}),
       ...(remoteAdminServer(options.server(), PROVIDER_ACCOUNT_KEYS_CAPABILITY)?.id === id

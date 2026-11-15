@@ -77,6 +77,8 @@ import type {
   McpTestResult,
   MessagePinner,
   PinnedMessagesSnapshot,
+  ProviderAccountCodeLoginStart,
+  ProviderAccountCodeLoginStatus,
   ProviderCodeLoginStart,
   ProviderUsageResets,
   QueuedMessageReceipt,
@@ -5077,6 +5079,30 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           (failure) => new AgentLifecycleFailed({ operation: "connectProviderAccount", cause: failure.cause }),
         ),
       );
+  }
+
+  /** See `ProviderRuntime.startProviderAccountCodeLogin`. */
+  startProviderAccountCodeLogin(
+    provider: AgentProvider,
+    accountId: string | null,
+  ): Effect.Effect<ProviderAccountCodeLoginStart, AgentLifecycleFailed> {
+    return this.#providers
+      .startProviderAccountCodeLogin(provider, accountId)
+      .pipe(
+        Effect.mapError(
+          (failure) => new AgentLifecycleFailed({ operation: "connectProviderAccount", cause: failure.cause }),
+        ),
+      );
+  }
+
+  /** See `ProviderRuntime.submitProviderAccountCodeLogin`. */
+  submitProviderAccountCodeLogin(provider: AgentProvider, accountId: string, code: string): void {
+    this.#providers.submitProviderAccountCodeLogin(provider, accountId, code);
+  }
+
+  /** See `ProviderRuntime.providerAccountCodeLoginStatus`. */
+  providerAccountCodeLoginStatus(provider: AgentProvider, accountId: string): ProviderAccountCodeLoginStatus {
+    return this.#providers.providerAccountCodeLoginStatus(provider, accountId);
   }
 
   /** See `ProviderRuntime.connectProviderAccountKey`. */
