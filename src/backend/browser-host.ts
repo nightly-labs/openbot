@@ -2345,7 +2345,7 @@ export class BrowserHost {
     const protection = tab.secret;
     if (protection?.submitted && !protection.running && this.#takeoverTabIds.has(tabId))
       yield* this.#reloadProtected(tab, protection).pipe(Effect.ignore);
-    else if (tab.secretShown && this.#takeoverTabIds.has(tabId))
+    else if (tab.secretShown && (this.#takeoverTabIds.has(tabId) || this.#userControlTabIds.has(tabId)))
       yield* this.#reloadShownSecret(tab).pipe(Effect.ignore);
     if (tab.secret?.submitted)
       return yield* browserFailure(new Error(sourceText("error.backend.browserViewProtected")));
