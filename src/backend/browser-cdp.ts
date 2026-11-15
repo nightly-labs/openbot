@@ -249,10 +249,11 @@ const SAVE_TYPED_TEXT_FUNCTION = `function() {
 const PASTE_APPLY_WAIT_MS = 1000;
 /**
  * Sends `text` to an editable element as a plain-text paste. True when the editor stopped the paste
- * and its text or selection changed, so it took the text, or the page added an element outside the
- * editor, as a chat composer that shows a long paste as an attachment does. False for a field, for a
- * page that lets the paste through (a synthetic paste inserts nothing), and for an editor that
- * stopped the paste but shows no change in time: the caller then inserts the text.
+ * and its text or selection changed, so it took the text, or the editor's form got a new element, as
+ * a chat composer that shows a long paste as an attachment does. Elements that the page adds outside
+ * the form, such as a notice or a feed, do not count, so that a blocked paste does not lose the text.
+ * False for a field, for a page that lets the paste through (a synthetic paste inserts nothing), and
+ * for an editor that stopped the paste but shows no change in time: the caller then inserts the text.
  *
  * A paste-bin editor moves focus and the selection to a hidden element on paste, for the browser to
  * paste into. A synthetic paste pastes nothing there, so focus and the selection go back to where the
@@ -281,7 +282,8 @@ const PASTE_TEXT_FUNCTION = `function(text) {
   let finish = () => {};
   const observer = new MutationObserver((records) => { if (taken(records)) finish(); });
   observer.observe(host, { childList: true, subtree: true, characterData: true });
-  observer.observe(host.ownerDocument, { childList: true, subtree: true });
+  const form = host.closest('form');
+  if (form) observer.observe(form, { childList: true, subtree: true });
   const data = new DataTransfer();
   data.setData('text/plain', text);
   const event = new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true, composed: true });
