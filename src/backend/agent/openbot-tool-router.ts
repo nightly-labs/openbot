@@ -2768,9 +2768,9 @@ export class OpenBotToolRouter {
       // model does not support, is an error the calling agent can correct, never a silent default.
       const named = requestedToolModel(args, listed);
       if (named) requireRunnableProvider(named, this.#hooks.providerStatuses());
-      // A request that names no provider and no model gives the new agent the caller's own model, so
-      // a team that one agent recruits runs where that agent runs. When the caller's provider no
-      // longer lists that model, the new agent starts where one the user creates does.
+      // A request that names no provider and no model gives the new agent the caller's own model and
+      // account, so a team that one agent recruits runs where that agent runs (#9701). When the caller's
+      // provider no longer lists that model, the new agent starts where one the user creates does.
       const inherited =
         named === null
           ? (listed.find((model) => model.provider === caller.provider && model.id === caller.model) ?? null)
@@ -2800,6 +2800,7 @@ export class OpenBotToolRouter {
                   provider: requested.provider,
                   model: requested.id,
                   ...(reasoningEffort ? { reasoningEffort } : {}),
+                  ...(inherited && caller.providerAccountId ? { providerAccountId: caller.providerAccountId } : {}),
                 }
               : {}),
           },
