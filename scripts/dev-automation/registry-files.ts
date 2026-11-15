@@ -65,32 +65,41 @@ const WINDOWS_WRITE_RIGHTS = "0x500D0156";
 // names: names are localized. The path goes through the environment, so
 // PowerShell never parses it. An ACL that cannot be read fails closed, like a
 // foreign one.
+const WINDOWS_ACL_QUERY =
+  "$sid = [System.Security.Principal.SecurityIdentifier]; " +
+  "$acl = Get-Acl -LiteralPath $env:OPENBOT_REGISTRY_DIRECTORY; " +
+  "$acl.GetOwner($sid).Value; " +
+  "[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value; " +
+  "$acl.GetAccessRules($true, $true, $sid) | Where-Object { " +
+  "$_.AccessControlType -eq 'Allow' -and " +
+  `([int]$_.FileSystemRights -band ${WINDOWS_WRITE_RIGHTS}) } | ForEach-Object { $_.IdentityReference.Value }`;
+
+/** Windows PowerShell 5.x started from Bun on some setups cannot autoload `Get-Acl`; PowerShell 7 does. */
+function readWindowsAclLines(directory: string): string[] {
+  const env = { ...process.env, OPENBOT_REGISTRY_DIRECTORY: directory };
+  const shells = ["pwsh", "powershell.exe"];
+  let lastError: unknown;
+  for (const shell of shells) {
+    try {
+      return execFileSync(shell, ["-NoProfile", "-NonInteractive", "-Command", WINDOWS_ACL_QUERY], {
+        encoding: "utf8",
+        env,
+        timeout: 5_000,
+        stdio: ["ignore", "pipe", "ignore"],
+      })
+        .trim()
+        .split(/\s+/);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
+}
+
 function assertWindowsOwnerOnlyDirectory(directory: string): void {
   let lines: string[];
   try {
-    lines = execFileSync(
-      "powershell.exe",
-      [
-        "-NoProfile",
-        "-NonInteractive",
-        "-Command",
-        "$sid = [System.Security.Principal.SecurityIdentifier]; " +
-          "$acl = Get-Acl -LiteralPath $env:OPENBOT_REGISTRY_DIRECTORY; " +
-          "$acl.GetOwner($sid).Value; " +
-          "[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value; " +
-          "$acl.GetAccessRules($true, $true, $sid) | Where-Object { " +
-          "$_.AccessControlType -eq 'Allow' -and " +
-          `([int]$_.FileSystemRights -band ${WINDOWS_WRITE_RIGHTS}) } | ForEach-Object { $_.IdentityReference.Value }`,
-      ],
-      {
-        encoding: "utf8",
-        env: { ...process.env, OPENBOT_REGISTRY_DIRECTORY: directory },
-        timeout: 5_000,
-        stdio: ["ignore", "pipe", "ignore"],
-      },
-    )
-      .trim()
-      .split(/\s+/);
+    lines = readWindowsAclLines(directory);
   } catch (error) {
     throw new Error(
       `Could not read the permissions of ${directory}, so dev instances will not be published there. ` +
