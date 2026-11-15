@@ -694,7 +694,10 @@ export class BrowserHost {
   readonly #scope = Scope.makeUnsafe();
   #destroying: Deferred.Deferred<void, BrowserOperationError> | null = null;
   /** The owners of the last agent tabs whose own page closed them, by tab id. See `PAGE_CLOSED_TAB_ERROR`. */
-  readonly #pageClosedTabs = new Map<string, { ownerThreadId: string | null; ownerAgentId: string | null }>();
+  readonly #pageClosedTabs = new Map<
+    string,
+    { ownerThreadId: string | null; ownerAgentId: string | null; sharedThreadIds: ReadonlySet<string> }
+  >();
   /** Whether the machine is too low on memory for one more tab. Only a server has a reading. */
   readonly #memoryLow: () => boolean;
   readonly #idleTabSweep: NodeJS.Timeout;
@@ -4508,19 +4511,23 @@ export class BrowserHost {
    */
   #canUseToolTab(
     params: DynamicToolCallParams,
-    tab: Pick<BrowserTab, "id" | "ownerThreadId" | "ownerAgentId">,
+    tab: Pick<BrowserTab, "id" | "ownerThreadId" | "ownerAgentId"> & { sharedThreadIds?: ReadonlySet<string> },
   ): boolean {
     const ownerAgentId = params.ownerAgentId ?? null;
     if (tab.ownerThreadId === params.threadId) return tab.ownerAgentId === null || tab.ownerAgentId === ownerAgentId;
     if (tab.ownerAgentId === null || tab.ownerAgentId !== ownerAgentId) return false;
-    return this.#tabs.get(tab.id)?.sharedThreadIds?.has(params.threadId) ?? false;
+    return (tab.sharedThreadIds ?? this.#tabs.get(tab.id)?.sharedThreadIds)?.has(params.threadId) ?? false;
   }
 
   /** Only an agent's tab is kept: a person sees their tab close. The oldest record goes first. */
   #notePageClosedTab(tab: BrowserHostTab): void {
     if (tab.ownerThreadId === null && tab.ownerAgentId === null) return;
     logger.info("A page closed its own browser tab.", { tabId: tab.id, host: logUrlHost(tab.requestedUrl) });
-    this.#pageClosedTabs.set(tab.id, { ownerThreadId: tab.ownerThreadId, ownerAgentId: tab.ownerAgentId });
+    this.#pageClosedTabs.set(tab.id, {
+      ownerThreadId: tab.ownerThreadId,
+      ownerAgentId: tab.ownerAgentId,
+      sharedThreadIds: new Set(tab.sharedThreadIds),
+    });
     const oldest = this.#pageClosedTabs.keys().next().value;
     if (this.#pageClosedTabs.size > PAGE_CLOSED_TAB_LIMIT && oldest !== undefined) this.#pageClosedTabs.delete(oldest);
   }
