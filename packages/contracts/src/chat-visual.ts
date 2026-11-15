@@ -353,6 +353,11 @@ const BASE_STYLE = [
  * listener that runs last, and the image click waits a task, so each sees whether the page used
  * the key or the click first.
  *
+ * Media that starts with no click in the page pauses while the page is out of view or the window is
+ * hidden, and plays again when it comes back (#9595). The app sets no autoplay rule, so without this
+ * a looping video keeps the processor busy and keeps the computer awake. Media that the user started
+ * plays on, as in a browser.
+ *
  * Keep it plain ES2020 and without dependencies: it runs inside the page.
  */
 const BOOTSTRAP = `(()=>{
@@ -461,6 +466,23 @@ const scheduleSelection=()=>{if(!selectionFrame)selectionFrame=requestAnimationF
 document.addEventListener("selectionchange",scheduleSelection);
 addEventListener("scroll",()=>{if(selected)scheduleSelection();},true);
 addEventListener("resize",()=>{if(selected)scheduleSelection();});
+const unasked=new WeakSet(),held=new Set();
+let inView=true;
+const away=()=>document.hidden||!inView;
+const rest=()=>{
+if(away()){for(const media of document.querySelectorAll("video,audio"))if(unasked.has(media)&&!media.paused){held.add(media);media.pause();}return;}
+for(const media of held)if(media.isConnected&&media.paused)media.play().catch(()=>{});
+held.clear();
+};
+document.addEventListener("play",(event)=>{
+const media=event.target;
+if(!(media instanceof HTMLMediaElement))return;
+if(navigator.userActivation&&navigator.userActivation.isActive){unasked.delete(media);held.delete(media);return;}
+unasked.add(media);
+if(away()){held.add(media);media.pause();}
+},true);
+new IntersectionObserver((entries)=>{inView=entries[entries.length-1].isIntersecting;rest();}).observe(root);
+document.addEventListener("visibilitychange",rest);
 })();`;
 
 /** Options for a host that cannot give the theme in the URL fragment, such as a `srcdoc` frame. */
