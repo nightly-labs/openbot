@@ -1559,8 +1559,9 @@ export class BrowserHost {
     if (this.#tabs.get(tabId) !== tab || !current || !sameUserControlHolder(current, holder))
       return yield* browserFailure(new Error(sourceText("error.backend.browserTabNotFound")));
     this.#teachRecordings.set(tabId, { holder: current, startedAt: Date.now(), steps: [] });
-    const place = stepPlace(tab.contents.getURL());
-    const title = stepText(tab.contents.getTitle());
+    // A page can put a typed card value or password in its title or address.
+    const place = stepPlace(tab.engine.scrubText(tab.contents.getURL()));
+    const title = stepText(tab.engine.scrubText(tab.contents.getTitle()));
     if (place) this.#recordTeachStep(tab, { kind: "page", ...place, ...(title ? { title } : {}) });
   }).bind(this);
 
@@ -1751,6 +1752,7 @@ export class BrowserHost {
             protection.running = true;
             this.#syncAttachedView();
             let kept = false;
+            let shown = false;
             let leaked = false;
             // A blocked navigation ends the wait for one, so the user gets the tab at once.
             let stopWaiting = () => {};
@@ -1795,8 +1797,9 @@ export class BrowserHost {
                       });
                     }
                     if (!protection.replaced) {
-                      // A reload would restart a single-page sign-in at its first step. Keep the
-                      // document when its fields are empty and nothing a snapshot reads shows the value.
+                      // A reload would restart a single-page sign-in at its first step, or close the
+                      // dialog that holds it. Keep the document. When the page still shows the value,
+                      // snapshots hide it and no image of the tab is taken until it navigates.
                       const cleared = yield* boundEngineOperation(
                         tab,
                         entry.clear(secret),
@@ -1804,7 +1807,11 @@ export class BrowserHost {
                         "Authentication field cleanup timed out.",
                         keepQueueBlocked,
                       ).pipe(Effect.catch(() => Effect.succeed(false)));
-                      if (cleared && !protection.replaced) kept = true;
+                      if (!protection.replaced && (cleared || !leaked)) {
+                        entry.hide(secret);
+                        kept = true;
+                        shown = !cleared;
+                      }
                     }
                     if (!protection.replaced && !kept) {
                       // Load with GET rather than replaying a possible form POST. Keep capture
@@ -1832,6 +1839,7 @@ export class BrowserHost {
                     this.#syncAttachedView();
                   } else if (kept) {
                     tab.secretDocument = true;
+                    if (shown) tab.secretShown = true;
                     tab.secret = undefined;
                     this.#syncAttachedView();
                   }
@@ -1887,10 +1895,14 @@ export class BrowserHost {
       );
   }
 
-  /** A filled card shows on the page, so no image of the tab leaves the host until it navigates. */
+  /** A filled card or a typed password shows on the page, so no image of the tab leaves the host until it navigates. */
   #requireNoFilledCard(tab: BrowserHostTab, action: string): void {
     if (tab.filledCard)
       throw new Error(`${action} is unavailable while the page shows a filled card. Use snapshots until it navigates.`);
+    if (tab.secretShown)
+      throw new Error(
+        `${action} is unavailable while the page can show a password that OpenBot typed. Use snapshots until it navigates.`,
+      );
   }
 
   #cacheTainted(target: Session): Set<string> {
@@ -2062,6 +2074,15 @@ export class BrowserHost {
           if (current.secret !== protection) return;
           yield* untilStopped(current, reloadWithGet(current));
         }),
+      true,
+    );
+  }
+
+  /** Loads a kept page that can show a typed password again, so a person on another computer can see the tab. */
+  #reloadShownSecret(tab: BrowserHostTab) {
+    return this.#enqueue(
+      tab.id,
+      (current) => (current.secretShown ? untilStopped(current, reloadWithGet(current)) : Effect.void),
       true,
     );
   }
@@ -2324,6 +2345,8 @@ export class BrowserHost {
     const protection = tab.secret;
     if (protection?.submitted && !protection.running && this.#takeoverTabIds.has(tabId))
       yield* this.#reloadProtected(tab, protection).pipe(Effect.ignore);
+    else if (tab.secretShown && this.#takeoverTabIds.has(tabId))
+      yield* this.#reloadShownSecret(tab).pipe(Effect.ignore);
     if (tab.secret?.submitted)
       return yield* browserFailure(new Error(sourceText("error.backend.browserViewProtected")));
     yield* browserSync(() => this.#requireNoFilledCard(tab, "Browser view"));
@@ -2358,7 +2381,8 @@ export class BrowserHost {
           ...(viewport ? { viewport } : {}),
         },
         (frame) => {
-          if (!tab.secret?.submitted && !tab.filledCard && tab.captureGeneration === generation) onFrame(frame);
+          if (!tab.secret?.submitted && !tab.filledCard && !tab.secretShown && tab.captureGeneration === generation)
+            onFrame(frame);
         },
         (error) => {
           tab.viewInvalidations.delete(invalidate);
@@ -2478,7 +2502,7 @@ export class BrowserHost {
               undefined,
               (read) =>
                 Effect.gen(function* () {
-                  const recommended = mode === "auto" && read.recommendImage && !tab.filledCard;
+                  const recommended = mode === "auto" && read.recommendImage && !tab.filledCard && !tab.secretShown;
                   // A screenshot or snapshot image just before this one shows the same page.
                   const imageCurrent = hasCurrentImage(tab);
                   if (mode !== "always" && (!recommended || imageCurrent)) {
@@ -3925,6 +3949,7 @@ export class BrowserHost {
       this.#releaseScriptedDocument(tab);
       if (tab.secretDocument) {
         tab.secretDocument = false;
+        tab.secretShown = false;
         contents.navigationHistory.clear();
       }
       // The next document has no card in its fields. History would bring the filled page back.
@@ -4596,9 +4621,9 @@ export class BrowserHost {
     const contents = tab.contents;
     const records = () => this.#teachRecordings.has(tab.id) || this.#userBrowsingAgent(tab) !== null;
     const recordPage = () => {
-      const place = records() ? stepPlace(contents.getURL()) : null;
+      const place = records() ? stepPlace(tab.engine.scrubText(contents.getURL())) : null;
       if (!place) return;
-      const title = stepText(contents.getTitle());
+      const title = stepText(tab.engine.scrubText(contents.getTitle()));
       this.#recordUserStep(tab, { kind: "page", ...place, ...(title ? { title } : {}) });
     };
     contents.on("did-finish-load", recordPage);

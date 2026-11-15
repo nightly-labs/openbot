@@ -971,11 +971,13 @@ const HIDDEN_SECURITY_CODE = "•••";
  * titles and URLs, and the text of a target or a wait. A page can copy a field anywhere, so every
  * string goes through it. The number stays hidden for the life of the tab. A security code is three
  * or four digits and also hides prices and dates, so it stays hidden only until the filled document
- * goes. Logs do not use it: the main process registers the number with the log redaction.
+ * goes. A password that `submit_secret` typed into a page that stays is hidden the same way, until its
+ * document goes. Logs do not use it: the main process registers the number with the log redaction.
  */
 export class CardValueScrub {
   readonly #numbers = new Map<string, { pattern: RegExp; replacement: string }>();
-  #securityCodes = new Map<string, RegExp>();
+  /** Values of the current document only: security codes and typed passwords. */
+  #documentValues = new Map<string, RegExp>();
 
   add(number: string, securityCode: string): void {
     const digits = number.replace(/[^0-9]/gu, "");
@@ -986,23 +988,37 @@ export class CardValueScrub {
         replacement: `•••• ${digits.slice(-4)}`,
       });
     }
-    if (/^[0-9]{3,4}$/u.test(securityCode) && !this.#securityCodes.has(securityCode))
-      this.#securityCodes.set(securityCode, new RegExp(`(?<![0-9])${securityCode}(?![0-9])`, "gu"));
+    if (/^[0-9]{3,4}$/u.test(securityCode) && !this.#documentValues.has(securityCode))
+      this.#documentValues.set(securityCode, new RegExp(`(?<![0-9])${securityCode}(?![0-9])`, "gu"));
+  }
+
+  /**
+   * Hides a password that `submit_secret` typed, as the page or its address can show it, until the
+   * document goes. A value of one to three characters is hidden only where it stands alone, so it
+   * does not hide parts of other words and numbers.
+   */
+  addDocumentSecret(secret: string): void {
+    for (const value of new Set([secret, encodeURIComponent(secret)])) {
+      if (!value || this.#documentValues.has(value)) continue;
+      const escaped = value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+      const pattern = value.length < 4 ? `(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])` : escaped;
+      this.#documentValues.set(value, new RegExp(pattern, "gu"));
+    }
   }
 
   /** The filled document was replaced: its security code is no longer on the page. */
   endDocument(): void {
-    this.#securityCodes = new Map();
+    this.#documentValues = new Map();
   }
 
   get active(): boolean {
-    return this.#numbers.size > 0 || this.#securityCodes.size > 0;
+    return this.#numbers.size > 0 || this.#documentValues.size > 0;
   }
 
   text(value: string): string {
     let result = value;
     for (const { pattern, replacement } of this.#numbers.values()) result = result.replace(pattern, replacement);
-    for (const pattern of this.#securityCodes.values()) result = result.replace(pattern, HIDDEN_SECURITY_CODE);
+    for (const pattern of this.#documentValues.values()) result = result.replace(pattern, HIDDEN_SECURITY_CODE);
     return result;
   }
 

@@ -427,6 +427,8 @@ export class BrowserCdpEngine {
     {
       enter: (secret: string) => Effect.Effect<void, BrowserOperationError>;
       clear: (secret: string) => Effect.Effect<boolean, BrowserOperationError>;
+      /** Hides the value from what the agent reads of this tab until the document goes. */
+      hide: (secret: string) => void;
       /**
        * Which secret the fields are built for, so a fill that no user approves goes only there: every
        * field is a password field, or every field asks for a one-time code. A text field that the page
@@ -671,7 +673,8 @@ export class BrowserCdpEngine {
           return !recordValue(scan.exceptionDetails) && recordValue(scan.result)?.value === false;
         }),
       ).pipe(Effect.catch(() => Effect.succeed(false)));
-    return { enter, clear, fields: nodes.fields, servedByWorker: nodes.servedByWorker };
+    const hide = (secret: string) => this.#cardScrub.addDocumentSecret(secret);
+    return { enter, clear, hide, fields: nodes.fields, servedByWorker: nodes.servedByWorker };
   });
 
   /**
