@@ -3362,10 +3362,10 @@ index 00000000..3821983e
 +}
 diff --git a/src/platform/macos/openbot_setup.mm b/src/platform/macos/openbot_setup.mm
 new file mode 100644
-index 00000000..1bbf9950
+index 00000000..d7091612
 --- /dev/null
 +++ b/src/platform/macos/openbot_setup.mm
-@@ -0,0 +1,192 @@
+@@ -0,0 +1,199 @@
 +// OpenBot additions to Sunshine, distributed under GPL-3.0.
 +#import <AppKit/AppKit.h>
 +#import <CoreGraphics/CoreGraphics.h>
@@ -3378,6 +3378,9 @@ index 00000000..1bbf9950
 +  std::mutex input_mutex;
 +  bool test_mode = false;
 +  int64_t test_id = 0;
++  // Sunshine takes a click's location from the real cursor, which stays still during a test.
++  bool has_pointer = false;
++  CGPoint pointer = CGPointZero;
 +  bool clicked = false;
 +  bool typed = false;
 +  NSString *code = @"";
@@ -3507,6 +3510,7 @@ index 00000000..1bbf9950
 +      expires = [NSDate dateWithTimeIntervalSinceNow:120];
 +      std::lock_guard<std::mutex> lock(input_mutex);
 +      ++test_id;
++      has_pointer = false;
 +      test_mode = true;
 +    });
 +  }
@@ -3519,8 +3523,11 @@ index 00000000..1bbf9950
 +    if (!test_mode) return false;
 +    const auto test = test_id;
 +    const auto type = CGEventGetType(event);
-+    if (type == kCGEventLeftMouseDown) {
-+      const auto location = CGEventGetLocation(event);
++    if (type == kCGEventMouseMoved || type == kCGEventLeftMouseDragged) {
++      has_pointer = true;
++      pointer = CGEventGetLocation(event);
++    } else if (type == kCGEventLeftMouseDown) {
++      const auto location = has_pointer ? pointer : CGEventGetLocation(event);
 +      on_test(test, ^(OpenBotTestView *view) {
 +        // Quartz points start at the top left of the main display, AppKit points at the bottom left.
 +        const auto main_height = NSScreen.screens.firstObject.frame.size.height;
@@ -4865,10 +4872,10 @@ index 00000000..9e539d1e
 +}
 diff --git a/tests/unit/test_openbot_setup.mm b/tests/unit/test_openbot_setup.mm
 new file mode 100644
-index 00000000..8b7b9ccc
+index 00000000..4b171da5
 --- /dev/null
 +++ b/tests/unit/test_openbot_setup.mm
-@@ -0,0 +1,73 @@
+@@ -0,0 +1,86 @@
 +// OpenBot additions to Sunshine, distributed under GPL-3.0.
 +#import <AppKit/AppKit.h>
 +#include <stdexcept>
@@ -4890,7 +4897,12 @@ index 00000000..8b7b9ccc
 +  return CGPointMake(screen.x, NSScreen.screens.firstObject.frame.size.height - screen.y);
 +}
 +
-+static CGEventRef click(CGPoint point) {
++static CGEventRef move(CGPoint point) {
++  return CGEventCreateMouseEvent(nullptr, kCGEventMouseMoved, point, kCGMouseButtonLeft);
++}
++
++// Like Sunshine, gives the click the location of the real cursor, which a test does not move.
++static CGEventRef click(CGPoint point = CGPointZero) {
 +  return CGEventCreateMouseEvent(nullptr, kCGEventLeftMouseDown, point, kCGMouseButtonLeft);
 +}
 +
@@ -4921,9 +4933,16 @@ index 00000000..8b7b9ccc
 +    require(!panel.movable);
 +    type_code();
 +    require(platf::openbot_test_status()["keyboard"] == false);
-+    require(deliver(click(screen_point(NSMakePoint(10, 10)))));
-+    require(platf::openbot_test_status()["mouse"] == false);
 +    require(deliver(click(screen_point(NSMakePoint(50, 130)))));
++    require(platf::openbot_test_status()["mouse"] == true);
++    platf::openbot_test_action("stop");
++    platf::openbot_test_action("start");
++    require(deliver(move(screen_point(NSMakePoint(50, 130)))));
++    require(deliver(move(screen_point(NSMakePoint(10, 10)))));
++    require(deliver(click(screen_point(NSMakePoint(50, 130)))));
++    require(platf::openbot_test_status()["mouse"] == false);
++    require(deliver(move(screen_point(NSMakePoint(50, 130)))));
++    require(deliver(click()));
 +    require(platf::openbot_test_status()["mouse"] == true);
 +    require(deliver(CGEventCreateKeyboardEvent(nullptr, 0, true)));
 +    type_code();
@@ -4933,7 +4952,8 @@ index 00000000..8b7b9ccc
 +    require(!test_mode);
 +    require(!deliver(click(CGPointZero)));
 +    platf::openbot_test_action("start");
-+    require(deliver(click(screen_point(NSMakePoint(50, 130))), false));
++    require(deliver(move(screen_point(NSMakePoint(50, 130)))));
++    require(deliver(click(), false));
 +    platf::openbot_test_action("stop");
 +    platf::openbot_test_action("start");
 +    drain();

@@ -313,7 +313,7 @@
       "licenseSha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
       "patch": {
         "path": "vendor/remote-desktop/patches/sunshine-v2026.516.143833-openbot.patch",
-        "sha256": "343052b0f34eb4125831608989e250858bb6370cea5c2ee1e58df95cd308316b"
+        "sha256": "605a960cf9f38d334cdae4a14625ff3ca964df1a8865a687731fed0828a458d5"
       },
       "overrides": [],
       "submodules": {
