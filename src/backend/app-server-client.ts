@@ -61,9 +61,18 @@ const STDERR_END_WAIT_MS = 250;
  * CryptUnprotectData failed: 2148073483" })`, and an `exec_command` call with `Failed to create
  * unified exec process: …`. Codex uses this sandbox only for a Workspace only agent, and it does not
  * repair the password. The turn continues, so the user saw only failed commands (#9310).
+ * A `registered Core …` failure is the sandbox path of the installed Codex Windows app (#9548).
  */
 const WINDOWS_SANDBOX_FAILURE =
-  /^(?:execution error|Failed to create unified exec process): .*\bCryptUnprotectData failed\b/su;
+  /^(?:execution error|Failed to create unified exec process): .*\b(?:CryptUnprotectData failed|registered Core)\b/su;
+/**
+ * Selects the sandbox path of the installed Codex Windows app (Codex 0.169.0,
+ * `windows-sandbox-rs/src/app_package.rs`). Codex keeps it in the commands that it runs, so an
+ * OpenBot that a Codex app command started has it too. The Codex that OpenBot starts is not that app,
+ * so with it each command of a Workspace only agent failed with `registered Core launch requires an
+ * installed app` (#9548). Without it, Codex uses its usual Windows sandbox.
+ */
+const CODEX_APP_SANDBOX_ENV = "CODEX_WINDOWS_REGISTERED_CORE";
 /** The page of `thread/backgroundTerminals/list`. Only the count matters to OpenBot. */
 const decodeBackgroundTerminals = Schema.decodeUnknownSync(Schema.Struct({ data: Schema.Array(Schema.Unknown) }));
 
@@ -149,7 +158,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     const target = cliSpawnTarget(this.#executable, ["app-server", "--listen", "stdio://"]);
     const child = spawn(target.command, target.args, {
       stdio: ["pipe", "pipe", "pipe"],
-      env: this.#extraEnv ? { ...process.env, ...this.#extraEnv } : process.env,
+      env: codexEnvironment(this.#extraEnv),
       windowsVerbatimArguments: target.windowsVerbatimArguments,
       windowsHide: true,
       detached: PROVIDER_PROCESS_GROUP,
@@ -676,6 +685,13 @@ interface HistoryTurnPage {
 interface HistoryItemPage {
   data: Array<{ turnId: string; item: ThreadItem }>;
   nextCursor: string | null;
+}
+
+/** The environment of the Codex process. Windows compares variable names without case. */
+function codexEnvironment(extraEnv: Readonly<Record<string, string>> | undefined): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env, ...extraEnv };
+  for (const key of Object.keys(env)) if (key.toUpperCase() === CODEX_APP_SANDBOX_ENV) delete env[key];
+  return env;
 }
 
 /** The params without the fields that `ThreadLifecycle` adds for a client with `turnContext`. */
