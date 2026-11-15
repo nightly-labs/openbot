@@ -263,6 +263,8 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
           () => {
             if (generation !== codeLoginGeneration) return;
             codeLoginExpiry = undefined;
+            // A code that the CLI checks now can still sign the account in: the status ends the dialog.
+            if (!isWaitingPhase(codeLoginState())) return;
             void accountCode.cancel(provider, account.accountId).catch(() => undefined);
             endProviderCodeLogin(provider, { kind: "expired" });
           },

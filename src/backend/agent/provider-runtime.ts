@@ -2038,7 +2038,7 @@ export class ProviderRuntime implements ProviderPort {
   submitProviderAccountCodeLogin(provider: AgentProvider, accountId: string, code: string): void {
     const accounts = this.#providerAccounts;
     if (!accounts || provider === "acp") throw new Error(sourceText("error.provider.codeLoginNotWaiting"));
-    accounts.submitCode(accountId, code);
+    accounts.submitCode(provider, accountId, code);
   }
 
   /** See `ProviderAccounts.codeSignInStatus`. */

@@ -131,8 +131,11 @@ export class ProviderAccounts {
   readonly #signIns = new Map<string, Fiber.Fiber<string | null>>();
   /** Accounts whose first sign-in runs. A cancel removes them with their folder. */
   readonly #added = new Set<string>();
-  /** How the last code sign-in of each provider ended. A canceled one leaves nothing. */
-  readonly #codeResults = new Map<AgentProviderId, { accountId: string; error: string | null }>();
+  /**
+   * How the last code sign-in of each account ended. A canceled one leaves nothing. Two accounts of
+   * one provider can sign in at the same time, so the result is not one for each provider.
+   */
+  readonly #codeResults = new Map<string, { error: string | null }>();
   /** The CLI of each account whose sign-in waits for a pasted code. `submitCode` types the code into it. */
   readonly #pasteLogins = new Map<string, CliCodeLogin>();
   readonly #checks = new Map<string, Fiber.Fiber<void>>();
@@ -289,7 +292,7 @@ export class ProviderAccounts {
     }
     yield* this.#interrupt(account.id);
     if (added) this.#added.add(account.id);
-    if (code) this.#codeResults.delete(provider);
+    if (code) this.#codeResults.delete(account.id);
     this.#setState(account.id, { state: "connecting", message: null });
     const signIn = Effect.scoped(
       Effect.gen({ self: this }, function* () {
@@ -375,7 +378,7 @@ export class ProviderAccounts {
       Effect.catch((error) => Effect.succeed(this.#message(provider, error))),
       Effect.tap((error) =>
         Effect.sync(() => {
-          if (code) this.#codeResults.set(provider, { accountId: account.id, error });
+          if (code) this.#codeResults.set(account.id, { error });
         }),
       ),
       Effect.ensuring(
@@ -437,8 +440,9 @@ export class ProviderAccounts {
    * is a credential: it goes to the CLI's stdin and nowhere else. `codeSignInStatus` tells how the
    * sign-in ends. Throws when no sign-in of the account waits for a code.
    */
-  submitCode(accountId: string, code: string): void {
-    const login = this.#pasteLogins.get(accountId);
+  submitCode(provider: AgentProviderId, accountId: string, code: string): void {
+    // The account must be one of this provider: the code must not reach the CLI of another provider.
+    const login = this.account(provider, accountId) ? this.#pasteLogins.get(accountId) : undefined;
     if (!login) throw new Error(sourceText("error.provider.codeLoginNotWaiting"));
     login.submit(code);
   }
@@ -446,8 +450,8 @@ export class ProviderAccounts {
   /** Whether the code sign-in of an account goes on, and how it ended. */
   codeSignInStatus(provider: AgentProviderId, accountId: string): ProviderAccountCodeLoginStatus {
     if (this.#signIns.has(accountId)) return { result: null };
-    const ended = this.#codeResults.get(provider);
-    if (ended?.accountId === accountId) return { result: { error: ended.error } };
+    const ended = this.#codeResults.get(accountId);
+    if (ended && (ended.error !== null || this.account(provider, accountId))) return { result: { error: ended.error } };
     return { result: { error: sourceText("error.provider.hostSignInEnded", { provider: providerLabel(provider) }) } };
   }
 
