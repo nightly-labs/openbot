@@ -785,8 +785,9 @@ const Conversation = createSimpleContext({
             )
           : mergeConversationPage(kept, pageMessages, apart ? "replace" : merge);
         const first = conversation.messages[0];
-        /** The loaded messages start before the page, so the cursor of the older pages is still theirs. */
-        const keepsOlder = tail && first !== undefined && !mappedIds.has(first.id);
+        // The loaded messages start before the page, so the cursor of the older pages is still theirs.
+        // A window that starts in the page dropped the page's messages before it, so it keeps its cursor too.
+        const keepsOlder = keepsWindow || (tail && first !== undefined && !mappedIds.has(first.id));
         conversation.references = {
           ...(merge === "replace" ? {} : conversation.references),
           ...Object.fromEntries(
