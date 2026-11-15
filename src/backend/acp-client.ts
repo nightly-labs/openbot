@@ -195,6 +195,18 @@ const ACP_BACKGROUND_POLL_MS = 2_000;
 const ACP_BACKGROUND_WATCH_MS = 30 * 60_000;
 
 /**
+ * How often OpenBot asks `session/list` whether a session that keeps its process for running work
+ * (`AcpThread.workHold`) changed. Each change keeps the process `ACP_BACKGROUND_WATCH_MS` more.
+ */
+const ACP_WORK_HOLD_POLL_MS = 60_000;
+
+/** The longest time that running work keeps a session's process, also when the session changes. */
+const ACP_WORK_HOLD_MAX_MS = 4 * 60 * 60_000;
+
+/** Running work that did not change the session for this long ends with its process at low memory. */
+const ACP_WORK_HOLD_QUIET_RELEASE_MS = 10 * 60_000;
+
+/**
  * How long a turn that the agent started for a finished background task may stay unchanged, with
  * no tool call open, before OpenBot ends it. The agent's store changes when that turn ends, but it
  * can also stay unchanged while the model writes a long step.
@@ -358,6 +370,13 @@ interface AcpThread {
   backgroundSkipUntil: number;
   /** A background replay that runs. A prompt waits for it, so that its updates do not mix. */
   backgroundReplay: Deferred.Deferred<void> | null;
+  /**
+   * Set when a turn ended with tool calls that still ran (`AcpFlavor.wakesAfterPromptEnds`). The
+   * agent reports no end of that work, and closing the session's process would stop it (#9551). No
+   * idle release closes the session until `ACP_BACKGROUND_WATCH_MS` after the last change of the
+   * session, or `ACP_WORK_HOLD_MAX_MS` after the turn. `changedAt` starts as the end of the turn.
+   */
+  workHold: { since: number; changedAt: number } | null;
 }
 
 /**
@@ -642,8 +661,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // An agent that cannot close a session and load it again would keep its MCP servers or lose it.
     // A session with a process of its own closes when that process ends.
     // A watched session stays open: a closed one would not report the end of its background task.
+    // A session with running work stays open: its process runs that work.
     canRelease: (thread) =>
-      this.#loadsSessions && (thread.transport !== null || this.#closesSessions) && thread.backgroundUntil === 0,
+      this.#loadsSessions &&
+      (thread.transport !== null || this.#closesSessions) &&
+      thread.backgroundUntil === 0 &&
+      thread.workHold === null,
     snapshot: ({
       cwd,
       developerInstructions,
@@ -1031,9 +1054,36 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return this.#threads.releaseIdle();
   }
 
-  /** A non-resumable ACP session must keep its process and in-memory context. */
+  /**
+   * Closes each session that running work holds (`AcpThread.workHold`) and that did not change for
+   * `ACP_WORK_HOLD_QUIET_RELEASE_MS`. The memory guard calls it only while memory is low: the work
+   * then ends with the process. Its next turn opens the session again.
+   */
+  readonly releaseQuietBackgroundThreads = Effect.fn("AcpAgentClient.releaseQuietBackgroundThreads")(function* (
+    this: AcpAgentClient,
+  ): Effect.fn.Return<void, ProviderClientOperationError> {
+    if (!this.#loadsSessions) return;
+    const now = Date.now();
+    const closed = yield* this.#threads.releaseWhere(
+      (thread) =>
+        thread.workHold !== null &&
+        (thread.transport !== null || this.#closesSessions) &&
+        now - thread.workHold.changedAt >= ACP_WORK_HOLD_QUIET_RELEASE_MS,
+    );
+    for (const thread of closed)
+      logger.warn("Closed an ACP session with quiet running work, because memory is low.", {
+        provider: this.provider,
+        threadId: thread.id,
+      });
+  });
+
+  /**
+   * A non-resumable ACP session must keep its process and in-memory context. A session with running
+   * work (`AcpThread.workHold`) keeps the process that runs it.
+   */
   canReleaseProcess(): boolean {
     if (this.#threads.ids().next().done) return true;
+    for (const id of this.#threads.ids()) if (this.#threads.get(id)?.workHold) return false;
     return this.#supportsSessionResume || this.#loadsSessions;
   }
 
@@ -1908,6 +1958,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               backgroundUpdatedAt: null,
               backgroundSkipUntil: 0,
               backgroundReplay: null,
+              workHold: null,
             };
             threadRef = thread;
             providerResult(
@@ -3868,6 +3919,13 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       this.#forgetMissingSession(thread.id);
     }
     this.#completeThought(thread, turn);
+    // The agent ended its prompt while it still ran tools, such as a long or daemon command or a
+    // subagent. That work goes on in the session's process (`AcpFlavor.wakesAfterPromptEnds`).
+    const workRuns =
+      this.#flavor.wakesAfterPromptEnds === true &&
+      status === "completed" &&
+      !turn.stopped &&
+      [...turn.toolItems.values()].some((item) => item.status === "in_progress");
     for (const item of turn.toolItems.values()) {
       // A stopped stream cannot provide another tool result. Preserve its last output without
       // reporting successful execution. A normal completion can leave background tasks active.
@@ -3941,8 +3999,49 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       params: { threadId: thread.id, turn: { id: turn.id, status } },
     });
     thread.activeTurn = null;
-    if (this.#threads.get(thread.id) === thread) yield* this.#threads.markIdle(thread);
+    if (this.#threads.get(thread.id) !== thread) return;
+    if (workRuns) this.#holdForWork(thread);
+    yield* this.#threads.markIdle(thread);
   }, Effect.uninterruptible);
+
+  /** Keeps the session's process for the work that its turn left running (`AcpThread.workHold`). */
+  #holdForWork(thread: AcpThread): void {
+    const watching = thread.workHold !== null;
+    const now = Date.now();
+    thread.workHold = { since: now, changedAt: now };
+    if (!watching) Effect.runFork(this.#watchHeldWork(thread).pipe(Effect.forkIn(this.#scope)));
+  }
+
+  /**
+   * Ends the hold of running work when the session did not change for `ACP_BACKGROUND_WATCH_MS`, or
+   * after `ACP_WORK_HOLD_MAX_MS`. The agent writes the session when it wakes its model for finished
+   * work, so a change shows that the work goes on. The session is then idle as after any turn.
+   */
+  readonly #watchHeldWork = Effect.fn("AcpAgentClient.watchHeldWork")(function* (
+    this: AcpAgentClient,
+    thread: AcpThread,
+  ) {
+    let before: string | null | undefined;
+    for (;;) {
+      yield* Effect.sleep(ACP_WORK_HOLD_POLL_MS);
+      const hold = thread.workHold;
+      if (hold === null || this.#threads.get(thread.id) !== thread) return;
+      // A turn's own prompt changes the session; that turn holds the process by itself.
+      if (thread.activeTurn) before = undefined;
+      else {
+        const read = yield* Effect.result(this.#sessionUpdatedAt(thread));
+        if (Result.isSuccess(read)) {
+          if (before !== undefined && read.success !== before) hold.changedAt = Date.now();
+          before = read.success;
+        }
+      }
+      const now = Date.now();
+      if (now - hold.changedAt < ACP_BACKGROUND_WATCH_MS && now - hold.since < ACP_WORK_HOLD_MAX_MS) continue;
+      thread.workHold = null;
+      if (!thread.activeTurn) yield* this.#threads.markIdle(thread);
+      return;
+    }
+  });
 
   /**
    * Follows the edits that the user approved (`AcpFlavor.approvedEditSweep`). Tells whether this

@@ -325,6 +325,10 @@ OpenBot unloads a session that has no turn, keeps its identity, and resumes it a
 
 - Claude closes the `claude` process of an idle thread, and each ACP client closes an idle session
   (`IdleThreadPool` in `src/backend/idle-thread-pool.ts`). The client opens it again from the session.
+  An Antigravity turn that ends while one of its tool calls still runs, such as a daemon command, holds
+  the session's process (`AcpThread.workHold`, #9551). No idle release closes it, and the provider
+  process stays, until the session does not change for 30 minutes, or for 4 hours at most. When memory
+  is low, `releaseQuietBackgroundThreads` closes a held session that did not change for 10 minutes.
 - One Codex app server holds every thread of its account, and stops the MCP servers of a thread only
   when it unloads that thread. `CodexIdleSessions` (`src/backend/agent/codex-idle-sessions.ts`)
   releases an agent session 5 minutes after its last turn ends. When a turn ends, it releases at once
