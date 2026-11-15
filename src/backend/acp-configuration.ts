@@ -536,13 +536,37 @@ export class AcpConfiguration {
     }
     // A Cursor model value such as `composer-2.5[fast=false]` is the base model plus the parameters
     // the parameterized picker lists apart from it. The model option takes the base. Each other
-    // parameter is its own option. Reasoning stays on the effort above: a value saved from the old
-    // one-variant id still carries it, and applying it here would undo the effort the user chose.
-    if (!resolved) return;
-    for (const [id, value] of resolved.params) {
-      if (id === "reasoning" || id === "effort") continue;
-      yield* this.#applyModelParameter(thread, id, value);
+    // parameter is its own option. A `reasoning` value saved inside an older id is not applied:
+    // the effort argument below is the one the user chose.
+    if (resolved) {
+      for (const [id, value] of resolved.params) {
+        if (id === "reasoning" || id === "effort") continue;
+        yield* this.#applyModelParameter(thread, id, value);
+      }
     }
+    yield* this.#applyCursorReasoningParameter(thread, model, effort, models);
+  });
+
+  /**
+   * Cursor publishes each model's efforts as a `reasoning` or `effort` select, not as `thought_level`.
+   * The value is the effort of this turn. An id that still contains `reasoning` does not override it.
+   */
+  readonly #applyCursorReasoningParameter = Effect.fn("AcpConfiguration.applyCursorReasoningParameter")(function* (
+    this: AcpConfiguration,
+    thread: AcpConfigurationState,
+    model: string | null,
+    effort: string | null,
+    models: AcpModel[],
+  ): Effect.fn.Return<void, ProviderClientOperationError> {
+    if (this.options.provider !== "cursor" || !model || !effort) return;
+    if (thoughtLevelOption(thread.configOptions)) return;
+    const row = models.find((candidate) => candidate.id === model);
+    if (!row?.reasoningEffortConfigurable) return;
+    const listed = listedEffort(effort, (level) => row.reasoningEffortWireValues.has(level));
+    const wire = listed ? row.reasoningEffortWireValues.get(listed) : undefined;
+    if (!wire) return;
+    yield* this.#applyModelParameter(thread, "reasoning", wire);
+    yield* this.#applyModelParameter(thread, "effort", wire);
   });
 
   /** The process cache, not the session copy: another session on this process can change the option. */
@@ -703,7 +727,9 @@ function isAdditionalSetting(option: SessionConfigOption): boolean {
         value === "mode" ||
         value === "fast" ||
         value === "context" ||
-        value === "thinking",
+        value === "thinking" ||
+        value === "reasoning" ||
+        value === "effort",
     )
   )
     return false;
@@ -808,25 +834,51 @@ function modelsFromConfig(options: SessionConfigOption[]): AcpModel[] {
   }));
 }
 
+function thoughtLevelOption(
+  options: readonly SessionConfigOption[],
+): Extract<SessionConfigOption, { type: "select" }> | undefined {
+  return selectOption(options, (option) => option.category === "thought_level");
+}
+
+/** True when a Cursor model id already names one effort, as the one-variant catalog does. */
+function modelIdFixesReasoning(id: string): boolean {
+  const params = parseModelParameters(id)?.params;
+  return params?.has("reasoning") === true || params?.has("effort") === true;
+}
+
+function selectOption(
+  options: readonly SessionConfigOption[],
+  match: (option: SessionConfigOption) => boolean,
+): Extract<SessionConfigOption, { type: "select" }> | undefined {
+  return options.find(
+    (option): option is Extract<SessionConfigOption, { type: "select" }> => option.type === "select" && match(option),
+  );
+}
+
 function reasoningFromConfig(
   options: SessionConfigOption[],
 ): Pick<
   AcpModel,
   "defaultReasoningEffort" | "supportedReasoningEfforts" | "reasoningEffortConfigurable" | "reasoningEffortWireValues"
 > {
-  const thought = options.find((option) => option.category === "thought_level" && option.type === "select");
+  // `thought_level` wins. Cursor's parameterized picker has no such option: it publishes `reasoning`,
+  // or `effort`, after the model is selected.
+  const selected =
+    thoughtLevelOption(options) ??
+    selectOption(options, (option) => option.id === "reasoning") ??
+    selectOption(options, (option) => option.id === "effort");
   const wireValues = reasoningEffortWireValues(
-    thought && thought.type === "select" ? selectValues(thought).map((option) => option.value) : ["medium"],
+    selected ? selectValues(selected).map((option) => option.value) : ["medium"],
   );
   const supported = [...wireValues.keys()];
-  const currentEffort =
-    thought && thought.type === "select" ? (normalizeEffort(thought.currentValue) ?? "medium") : "medium";
+  const currentEffort = selected ? (normalizeEffort(selected.currentValue) ?? "medium") : "medium";
   return {
     defaultReasoningEffort: supported.includes(currentEffort) ? currentEffort : (supported[0] ?? "medium"),
     supportedReasoningEfforts: supported.length > 0 ? supported : ["medium"],
-    // With no effort option, `medium` only keeps the catalog shape that older clients read. OpenCode
-    // has none for Big Pickle, Kimi or MiMo, and the user reads "Medium" where the agent decides.
-    reasoningEffortConfigurable: thought?.type === "select" && supported.length > 0,
+    // With no effort option, or none that names a known level, `medium` only keeps the catalog shape
+    // that older clients read. OpenCode has none for Big Pickle, Kimi or MiMo, and the user reads
+    // "Medium" where the agent decides.
+    reasoningEffortConfigurable: selected !== undefined && supported.length > 0,
     reasoningEffortWireValues: wireValues.size > 0 ? wireValues : new Map([["medium", "medium"]]),
   };
 }
