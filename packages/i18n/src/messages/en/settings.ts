@@ -64,6 +64,8 @@ export const messages = defineMessages("settings", {
   // The Settings window, General tab.
   "settings.appBehavior.title": "App behavior",
   "settings.conversations.title": "Conversations",
+  "settings.openTasksOnStartup.title": "Open Tasks on startup",
+  "settings.openTasksOnStartup.description": "Start the main OpenBot window on Tasks on this device.",
   "settings.launchAtLogin.title": "Launch OpenBot at login",
   "settings.launchAtLogin.description": "Open the app when you sign in to this computer.",
   "settings.keepRunning.title": "Keep OpenBot running in the background",

@@ -237,6 +237,13 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
               />
             </ItemActions>
           </Item>
+          <SwitchField
+            data-settings-row="settings.openTasksOnStartup.title"
+            checked={layout.openTasksOnStartup()}
+            onChange={layout.setOpenTasksOnStartup}
+            label={i18n.t("settings.openTasksOnStartup.title")}
+            description={i18n.t("settings.openTasksOnStartup.description")}
+          />
           <Item data-settings-row="sidebar.order.title" class="settings-modal-row">
             <ItemContent>
               <ItemTitle>{i18n.t("sidebar.order.title")}</ItemTitle>

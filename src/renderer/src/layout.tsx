@@ -19,6 +19,7 @@ import {
   LEFT_PANEL_STORAGE_KEY,
   MAC_SERVER_RAIL_WIDTH,
   NARROW_SERVER_RAIL_WIDTH,
+  OPEN_TASKS_ON_STARTUP_STORAGE_KEY,
   RAIL_PINS_STORAGE_KEY,
   SERVER_RAIL_WIDTH,
   SERVER_VIEW_STORAGE_KEY,
@@ -128,6 +129,9 @@ const Layout = createSimpleContext({
     const [sidebarView, setSidebarViewSignal] = createSignal<SidebarView>(
       window.localStorage.getItem(SIDEBAR_VIEW_STORAGE_KEY) === "routines" ? "routines" : "agents",
     );
+    const [openTasksOnStartup, setOpenTasksOnStartupSignal] = createSignal(
+      window.localStorage.getItem(OPEN_TASKS_ON_STARTUP_STORAGE_KEY) === "true",
+    );
     const [sidebarChatOrder, setSidebarChatOrderSignal] = createSignal<SidebarChatOrder>(readSidebarChatOrder());
     const [railPinChoices, setRailPinChoices] = createSignal<RailPinChoices>(readRailPinChoices());
     const railPinned = createMemo(() => {
@@ -201,6 +205,11 @@ const Layout = createSimpleContext({
       window.localStorage.setItem(SIDEBAR_VIEW_STORAGE_KEY, view);
     }
 
+    function setOpenTasksOnStartup(enabled: boolean): void {
+      window.localStorage.setItem(OPEN_TASKS_ON_STARTUP_STORAGE_KEY, String(enabled));
+      setOpenTasksOnStartupSignal(enabled);
+    }
+
     function setSidebarChatOrder(order: SidebarChatOrder): void {
       setSidebarChatOrderSignal(order);
       try {
@@ -241,6 +250,8 @@ const Layout = createSimpleContext({
       serverRailVisible,
       sidebarView,
       setSidebarView,
+      openTasksOnStartup,
+      setOpenTasksOnStartup,
       sidebarChatOrder,
       setSidebarChatOrder,
       railPinned,

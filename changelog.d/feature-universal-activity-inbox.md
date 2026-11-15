@@ -5,3 +5,4 @@
   open the existing task approval controls. The native turn index deduplicates replays and
   can link an explicitly requested follow-up to its result. The mobile Tasks screen exposes
   the native task report feed.
+- Desktop users can choose to open Tasks by default in Settings. The preference persists on the device.

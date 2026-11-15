@@ -1,5 +1,8 @@
+import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
 import type { SettingsPageBack, SettingsPagePlacement } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { createEffect, createMemo, createSignal, untrack } from "solid-js";
+import { useLayout } from "../../layout";
+import { usePlatform } from "../../platform";
 import { createSimpleContext } from "../../simple-context";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
@@ -62,7 +65,10 @@ const context = createSimpleContext({
     const settings = useSettings();
     const serverSettings = useServerSettings();
     const usage = useUsage();
-    const { activeServerId } = useServers();
+    const { activeServer, activeServerId, activeServerSupportsCapability } = useServers();
+    const { openTasksOnStartup } = useLayout();
+    const startInTasks = untrack(openTasksOnStartup);
+    const { chatWindow } = usePlatform();
     /** The elements of the settings page that the settings panel shows in. The page sets them. */
     const [settingsMounts, setSettingsMounts] = createSignal<SettingsPagePlacement | undefined>();
     /** The search of the server settings page. The server settings show only the sections that match it. */
@@ -98,6 +104,19 @@ const context = createSimpleContext({
       return usage.state.serverId ? usage.state.view : "agents";
     });
     const page = createMemo<WindowPage>(() => (pricingLeave() ? "pricing" : basePage()));
+
+    // Apply the saved choice once, after the selected server is known.
+    if (startInTasks && !chatWindow) {
+      let applied = false;
+      createEffect(activeServer, (server) => {
+        if (!server || applied) return;
+        applied = true;
+        if (untrack(basePage) !== "agents") return;
+        if (server.kind === "local" || untrack(() => activeServerSupportsCapability(AGENT_TASKS_CAPABILITY))) {
+          usage.openTasks(server.id, null);
+        }
+      });
+    }
 
     // Any other page that opens closes the pricing page.
     createEffect(basePage, (_next, previous) => {

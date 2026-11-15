@@ -10,6 +10,7 @@ export const LEFT_PANEL_COLLAPSED_STORAGE_KEY = "openbot:left-panel-collapsed";
 export const LEFT_PANEL_CLOSED_STORAGE_KEY = "openbot:left-panel-closed";
 export const SERVER_VIEW_STORAGE_KEY = "openbot:server-view";
 /** Whether the middle shows the open agent's chat or its routines. */
+export const OPEN_TASKS_ON_STARTUP_STORAGE_KEY = "openbot:open-tasks-on-startup";
 export const SIDEBAR_VIEW_STORAGE_KEY = "openbot:sidebar-view";
 /** How the sidebar orders its chats: a `SidebarChatOrder`. */
 export const SIDEBAR_CHAT_ORDER_STORAGE_KEY = "openbot:sidebar-chat-order";
