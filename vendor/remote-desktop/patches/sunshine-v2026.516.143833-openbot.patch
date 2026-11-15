@@ -3362,10 +3362,10 @@ index 00000000..3821983e
 +}
 diff --git a/src/platform/macos/openbot_setup.mm b/src/platform/macos/openbot_setup.mm
 new file mode 100644
-index 00000000..d7091612
+index 00000000..c31c8cf0
 --- /dev/null
 +++ b/src/platform/macos/openbot_setup.mm
-@@ -0,0 +1,199 @@
+@@ -0,0 +1,201 @@
 +// OpenBot additions to Sunshine, distributed under GPL-3.0.
 +#import <AppKit/AppKit.h>
 +#import <CoreGraphics/CoreGraphics.h>
@@ -3378,7 +3378,8 @@ index 00000000..d7091612
 +  std::mutex input_mutex;
 +  bool test_mode = false;
 +  int64_t test_id = 0;
-+  // Sunshine takes a click's location from the real cursor, which stays still during a test.
++  // Sunshine takes a click's location from the real cursor, which stays still during a test. A
++  // click before the first remote move has no remote location, so it does not count.
 +  bool has_pointer = false;
 +  CGPoint pointer = CGPointZero;
 +  bool clicked = false;
@@ -3426,12 +3427,13 @@ index 00000000..d7091612
 +@end
 +
 +namespace {
-+  // The digit keys 0 to 9 of the main keyboard, by macOS key code.
++  // The digit keys 0 to 9 of the main keyboard and of the keypad, by macOS key code.
 +  constexpr int64_t digit_keys[] = {29, 18, 19, 20, 21, 23, 22, 26, 28, 25};
++  constexpr int64_t keypad_keys[] = {82, 83, 84, 85, 86, 87, 88, 89, 91, 92};
 +
 +  int digit_for_key(int64_t key) {
 +    for (int digit = 0; digit < 10; ++digit) {
-+      if (digit_keys[digit] == key) return digit;
++      if (digit_keys[digit] == key || keypad_keys[digit] == key) return digit;
 +    }
 +    return -1;
 +  }
@@ -3526,8 +3528,8 @@ index 00000000..d7091612
 +    if (type == kCGEventMouseMoved || type == kCGEventLeftMouseDragged) {
 +      has_pointer = true;
 +      pointer = CGEventGetLocation(event);
-+    } else if (type == kCGEventLeftMouseDown) {
-+      const auto location = has_pointer ? pointer : CGEventGetLocation(event);
++    } else if (type == kCGEventLeftMouseDown && has_pointer) {
++      const auto location = pointer;
 +      on_test(test, ^(OpenBotTestView *view) {
 +        // Quartz points start at the top left of the main display, AppKit points at the bottom left.
 +        const auto main_height = NSScreen.screens.firstObject.frame.size.height;
@@ -4872,10 +4874,10 @@ index 00000000..9e539d1e
 +}
 diff --git a/tests/unit/test_openbot_setup.mm b/tests/unit/test_openbot_setup.mm
 new file mode 100644
-index 00000000..4b171da5
+index 00000000..ee8c32dd
 --- /dev/null
 +++ b/tests/unit/test_openbot_setup.mm
-@@ -0,0 +1,86 @@
+@@ -0,0 +1,90 @@
 +// OpenBot additions to Sunshine, distributed under GPL-3.0.
 +#import <AppKit/AppKit.h>
 +#include <stdexcept>
@@ -4906,8 +4908,8 @@ index 00000000..4b171da5
 +  return CGEventCreateMouseEvent(nullptr, kCGEventLeftMouseDown, point, kCGMouseButtonLeft);
 +}
 +
-+static CGEventRef key(int digit) {
-+  return CGEventCreateKeyboardEvent(nullptr, (CGKeyCode) digit_keys[digit], true);
++static CGEventRef key(int digit, bool keypad) {
++  return CGEventCreateKeyboardEvent(nullptr, (CGKeyCode) (keypad ? keypad_keys : digit_keys)[digit], true);
 +}
 +
 +// Gives the event to the test as Sunshine's input thread does. True when the test keeps it.
@@ -4918,8 +4920,8 @@ index 00000000..4b171da5
 +  return kept;
 +}
 +
-+static void type_code() {
-+  for (NSUInteger i = 0; i < code.length; i++) require(deliver(key([code characterAtIndex:i] - '0')));
++static void type_code(bool keypad = false) {
++  for (NSUInteger i = 0; i < code.length; i++) require(deliver(key([code characterAtIndex:i] - '0', keypad)));
 +}
 +
 +int main() {
@@ -4934,9 +4936,7 @@ index 00000000..4b171da5
 +    type_code();
 +    require(platf::openbot_test_status()["keyboard"] == false);
 +    require(deliver(click(screen_point(NSMakePoint(50, 130)))));
-+    require(platf::openbot_test_status()["mouse"] == true);
-+    platf::openbot_test_action("stop");
-+    platf::openbot_test_action("start");
++    require(platf::openbot_test_status()["mouse"] == false);
 +    require(deliver(move(screen_point(NSMakePoint(50, 130)))));
 +    require(deliver(move(screen_point(NSMakePoint(10, 10)))));
 +    require(deliver(click(screen_point(NSMakePoint(50, 130)))));
@@ -4946,6 +4946,12 @@ index 00000000..4b171da5
 +    require(platf::openbot_test_status()["mouse"] == true);
 +    require(deliver(CGEventCreateKeyboardEvent(nullptr, 0, true)));
 +    type_code();
++    require(platf::openbot_test_status()["keyboard"] == true);
++    platf::openbot_test_action("stop");
++    platf::openbot_test_action("start");
++    require(deliver(move(screen_point(NSMakePoint(50, 130)))));
++    require(deliver(click()));
++    type_code(true);
 +    require(platf::openbot_test_status()["keyboard"] == true);
 +    platf::openbot_test_action("stop");
 +    require(platf::openbot_test_status()["active"] == false);
@@ -4959,7 +4965,7 @@ index 00000000..4b171da5
 +    drain();
 +    require(platf::openbot_test_status()["mouse"] == false);
 +    platf::openbot_test_action("stop");
-+    puts("Native test: remote click and code recognized without event routing; stale input ignored; panel cleanup passed.");
++    puts("Native test: remote pointer, click and code recognized without event routing; stale input ignored; panel cleanup passed.");
 +  }
 +}
 diff --git a/tests/unit/test_stream.cpp b/tests/unit/test_stream.cpp
