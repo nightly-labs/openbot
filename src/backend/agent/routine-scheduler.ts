@@ -1292,7 +1292,6 @@ export class RoutineScheduler implements RoutineDueSource {
     return { run: updated, message };
   }
 
-  /** `test_routine` does not test a webhook routine; the user does it in Routines settings. */
   /**
    * The routine that a routine tool names. A wrong id, such as the trigger.id from list_routines, gets
    * an error that names the id and the field to use: with "This routine no longer exists.", an agent
@@ -1309,6 +1308,7 @@ export class RoutineScheduler implements RoutineDueSource {
     );
   }
 
+  /** `test_routine` does not test a webhook routine; the user does it in Routines settings. */
   #refuseWebhookTest(agentId: string, routineId: string): void {
     if (this.#routines.getRecord(agentId, routineId)?.trigger.kind !== "webhook") return;
     throw new RoutineInputError(
