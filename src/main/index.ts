@@ -1629,7 +1629,8 @@ if (!hasSingleInstanceLock) {
             return;
         }
       };
-      // Routes belong to the signed-in account. A token refresh does not change them.
+      // Routes belong to the signed-in account, or, on a server on this computer, to the machine token
+      // that the desktop app gives it (`webhookPrincipal`). A token refresh does not change them.
       let webhookPrincipalId = built.webhookPrincipal();
       built.eventsRuntime.setAccountPrincipal(webhookPrincipalId);
       const refreshWebhookRoutes = (): void => {
