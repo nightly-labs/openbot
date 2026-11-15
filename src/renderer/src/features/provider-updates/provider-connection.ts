@@ -48,7 +48,7 @@ interface ProviderCodeLoginTarget {
  * How the computer that runs the providers signs one account in with a code: a new account when
  * `accountId` is null. The start names the account; its status and its cancel take that name.
  */
-export interface ProviderAccountCodeTarget {
+interface ProviderAccountCodeTarget {
   start: (provider: AgentProviderId, accountId: string | null) => Promise<ProviderAccountCodeLoginStart>;
   /** Sends the code that the page of a `paste` sign-in showed. */
   submit: (provider: AgentProviderId, accountId: string, code: string) => Promise<void>;
