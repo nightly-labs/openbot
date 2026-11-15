@@ -357,6 +357,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "Solo se pueden abrir en el navegador enlaces de inicio de sesión HTTPS.",
   "error.provider.geminiKeyRefused":
     "Gemini rechazó la clave de API guardada. Reemplaza o elimina la clave en Ajustes y vuelve a conectar.",
+  "error.provider.geminiKeyRateLimited":
+    "Gemini rechazó la solicitud porque tu clave de API de Gemini guardada alcanzó un límite de frecuencia o su cuota. La clave se usa en lugar de tu plan de Google. Espera unos minutos o elige otro modelo y vuelve a intentarlo. Para usar tu plan de Google, elimina la clave en Ajustes.\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "Tu clave de API de Gemini guardada no tiene cuota para este modelo. La clave se usa en lugar de tu plan de Google. Elige otro modelo o elimina la clave en Ajustes para usar tu plan de Google.\n{detail}",
   "error.provider.geminiAccountSettingsUnreadable":
     "Gemini no puede abrir el archivo de ajustes de esta cuenta, así que no puede iniciar sesión. Elimina esta cuenta y vuelve a añadirla.",
   "error.provider.geminiSettingsUnreadable":

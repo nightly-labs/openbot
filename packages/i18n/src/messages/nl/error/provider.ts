@@ -350,6 +350,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "Alleen HTTPS-inloglinks kunnen in de browser worden geopend.",
   "error.provider.geminiKeyRefused":
     "Gemini heeft de opgeslagen API-sleutel geweigerd. Vervang of verwijder de sleutel in Instellingen en verbind opnieuw.",
+  "error.provider.geminiKeyRateLimited":
+    "Gemini heeft het verzoek geweigerd, omdat je opgeslagen Gemini API-sleutel een limiet op het aantal verzoeken of zijn quotum heeft bereikt. De sleutel wordt gebruikt in plaats van je Google-abonnement. Wacht een paar minuten of kies een ander model, en probeer het opnieuw. Verwijder de sleutel in Instellingen om je Google-abonnement te gebruiken.\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "Je opgeslagen Gemini API-sleutel heeft geen quotum voor dit model. De sleutel wordt gebruikt in plaats van je Google-abonnement. Kies een ander model, of verwijder de sleutel in Instellingen om je Google-abonnement te gebruiken.\n{detail}",
   "error.provider.geminiAccountSettingsUnreadable":
     "Gemini kan het instellingenbestand van dit account niet openen en kan dus niet inloggen. Verwijder dit account en voeg het opnieuw toe.",
   "error.provider.geminiSettingsUnreadable":

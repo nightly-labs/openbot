@@ -347,6 +347,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "브라우저에서는 HTTPS 로그인 링크만 열 수 있어요.",
   "error.provider.geminiKeyRefused":
     "Gemini가 저장된 API 키를 거부했어요. 설정에서 키를 교체하거나 제거한 후 다시 연결하세요.",
+  "error.provider.geminiKeyRateLimited":
+    "저장된 Gemini API 키가 속도 제한 또는 할당량에 도달해서 Gemini가 요청을 거부했어요. 이 키는 Google 요금제 대신 사용돼요. 몇 분 기다리거나 다른 모델을 선택한 후 다시 시도해 주세요. Google 요금제를 사용하려면 설정에서 키를 제거하세요.\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "저장된 Gemini API 키에는 이 모델의 할당량이 없어요. 이 키는 Google 요금제 대신 사용돼요. 다른 모델을 선택하거나, Google 요금제를 사용하려면 설정에서 키를 제거하세요.\n{detail}",
   "error.provider.geminiAccountSettingsUnreadable":
     "Gemini가 이 계정의 설정 파일을 열 수 없어서 로그인할 수 없어요. 이 계정을 제거한 후 다시 추가하세요.",
   "error.provider.geminiSettingsUnreadable":

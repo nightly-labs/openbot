@@ -328,6 +328,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "רק קישורי התחברות מסוג HTTPS יכולים להיפתח בדפדפן.",
   "error.provider.geminiKeyRefused":
     "Gemini דחה את מפתח ה-API השמור. יש להחליף או להסיר את המפתח בהגדרות, ואז להתחבר שוב.",
+  "error.provider.geminiKeyRateLimited":
+    "Gemini דחה את הבקשה כי מפתח ה-API השמור של Gemini הגיע למגבלת קצב או למכסה שלו. המפתח משמש במקום תוכנית Google שלך. יש להמתין כמה דקות או לבחור מודל אחר, ואז לנסות שוב. כדי להשתמש בתוכנית Google, יש להסיר את המפתח בהגדרות.\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "למפתח ה-API השמור של Gemini אין מכסה למודל הזה. המפתח משמש במקום תוכנית Google שלך. יש לבחור מודל אחר, או להסיר את המפתח בהגדרות כדי להשתמש בתוכנית Google.\n{detail}",
   "error.provider.geminiAccountSettingsUnreadable":
     "Gemini לא יכול לפתוח את קובץ ההגדרות של החשבון הזה, ולכן אינו יכול להתחבר. יש להסיר את החשבון ולהוסיף אותו שוב.",
   "error.provider.geminiSettingsUnreadable":

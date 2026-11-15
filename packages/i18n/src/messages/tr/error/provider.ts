@@ -355,6 +355,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "Tarayıcıda yalnızca HTTPS oturum açma bağlantıları açılabilir.",
   "error.provider.geminiKeyRefused":
     "Gemini kayıtlı API anahtarını reddetti. Ayarlar'da anahtarı değiştirin veya kaldırın, ardından yeniden bağlanın.",
+  "error.provider.geminiKeyRateLimited":
+    "Kayıtlı Gemini API anahtarınız bir hız sınırına veya kotasına ulaştığı için Gemini isteği reddetti. Anahtar, Google planınızın yerine kullanılıyor. Birkaç dakika bekleyin ya da başka bir model seçin, sonra yeniden deneyin. Google planınızı kullanmak için Ayarlar'da anahtarı kaldırın.\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "Kayıtlı Gemini API anahtarınızın bu model için kotası yok. Anahtar, Google planınızın yerine kullanılıyor. Başka bir model seçin ya da Google planınızı kullanmak için Ayarlar'da anahtarı kaldırın.\n{detail}",
   "error.provider.geminiAccountSettingsUnreadable":
     "Gemini bu hesabın ayar dosyasını açamıyor, bu yüzden oturum açamıyor. Bu hesabı kaldırın ve yeniden ekleyin.",
   "error.provider.geminiSettingsUnreadable":

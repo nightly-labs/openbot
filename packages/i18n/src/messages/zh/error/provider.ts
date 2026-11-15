@@ -312,6 +312,10 @@ export const messages = {
   "error.provider.acpSignInMethodMissing": "该服务商在这台电脑上不提供该登录方式。请更新服务商后重试。",
   "error.provider.httpsSignInLinkOnly": "只有 HTTPS 登录链接才能在浏览器中打开。",
   "error.provider.geminiKeyRefused": "Gemini 拒绝了已保存的 API 密钥。请在设置中更换或移除该密钥，然后重新连接。",
+  "error.provider.geminiKeyRateLimited":
+    "由于已保存的 Gemini API 密钥触发速率限制或用尽配额，Gemini 拒绝了该请求。该密钥正在代替你的 Google 套餐使用。请等待几分钟或改用其他模型后重试。如需使用 Google 套餐，请在设置中移除该密钥。\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "已保存的 Gemini API 密钥没有此模型的配额。该密钥正在代替你的 Google 套餐使用。请改用其他模型，或在设置中移除该密钥以使用 Google 套餐。\n{detail}",
   "error.provider.geminiAccountSettingsUnreadable":
     "Gemini 无法打开此账号的设置文件，因此无法登录。请移除此账号，然后重新添加。",
   "error.provider.geminiSettingsUnreadable":

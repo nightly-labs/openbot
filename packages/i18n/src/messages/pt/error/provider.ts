@@ -353,6 +353,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "Somente links de login HTTPS podem abrir no navegador.",
   "error.provider.geminiKeyRefused":
     "O Gemini recusou a chave de API salva. Substitua ou remova a chave nas Configurações e conecte novamente.",
+  "error.provider.geminiKeyRateLimited":
+    "O Gemini recusou a solicitação porque sua chave de API do Gemini salva atingiu um limite de requisições ou a cota dela. A chave é usada no lugar do seu plano do Google. Aguarde alguns minutos ou escolha outro modelo e tente novamente. Para usar seu plano do Google, remova a chave nas Configurações.\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "Sua chave de API do Gemini salva não tem cota para este modelo. A chave é usada no lugar do seu plano do Google. Escolha outro modelo ou remova a chave nas Configurações para usar seu plano do Google.\n{detail}",
   "error.provider.geminiAccountSettingsUnreadable":
     "O Gemini não consegue abrir o arquivo de configurações desta conta, então não consegue entrar. Remova esta conta e adicione-a novamente.",
   "error.provider.geminiSettingsUnreadable":

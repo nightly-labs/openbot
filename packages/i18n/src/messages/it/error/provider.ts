@@ -353,6 +353,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "Solo i link di accesso HTTPS possono aprirsi nel browser.",
   "error.provider.geminiKeyRefused":
     "Gemini ha rifiutato la chiave API salvata. Sostituisci o rimuovi la chiave nelle Impostazioni, poi connettiti di nuovo.",
+  "error.provider.geminiKeyRateLimited":
+    "Gemini ha rifiutato la richiesta perché la chiave API di Gemini salvata ha raggiunto un limite di richieste o la sua quota. La chiave viene usata al posto del tuo piano Google. Attendi qualche minuto o scegli un altro modello, poi riprova. Per usare il tuo piano Google, rimuovi la chiave nelle Impostazioni.\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "La chiave API di Gemini salvata non ha quota per questo modello. La chiave viene usata al posto del tuo piano Google. Scegli un altro modello, oppure rimuovi la chiave nelle Impostazioni per usare il tuo piano Google.\n{detail}",
   "error.provider.geminiAccountSettingsUnreadable":
     "Gemini non riesce ad aprire il file delle impostazioni di questo account, quindi non può accedere. Rimuovi questo account e aggiungilo di nuovo.",
   "error.provider.geminiSettingsUnreadable":
