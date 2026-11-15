@@ -1,5 +1,6 @@
 // Checks that a phone gets the notifications of events that came while it only looked on screen, and
-// that a Live Activity replaces a notification only when it shows that event.
+// that a Live Activity replaces a notification only when it shows that event. A completed turn that a
+// teammate's message started sends nothing.
 //
 // iOS can suspend the app before its `away` registration goes out, and the host sees the lost path
 // about 30 s later. Events in that time were lost: the host counted the app as on screen. The host
@@ -227,12 +228,13 @@ function sendsUntil(sessionId: string, from: number, last: string): Promise<stri
   });
 }
 
-const reply = (agentId: string, turnId: string): AgentEvent => ({
+const reply = (agentId: string, turnId: string, origin: "user" | "agent" = "user"): AgentEvent => ({
   type: "turn-completed",
   agentId,
   threadId: agentId,
   turnId,
   status: "completed",
+  origin,
 });
 /** A reply in another thread of the agent: the host does not know whether the member read it. */
 const sideReply = (agentId: string, turnId: string): AgentEvent => ({
@@ -242,12 +244,13 @@ const sideReply = (agentId: string, turnId: string): AgentEvent => ({
   turnId,
   status: "completed",
 });
-const failure = (agentId: string, turnId: string): AgentEvent => ({
+const failure = (agentId: string, turnId: string, origin: "user" | "agent" = "user"): AgentEvent => ({
   type: "turn-completed",
   agentId,
   threadId: agentId,
   turnId,
   status: "failed",
+  origin,
 });
 const prompt = (requestId: number): AgentEvent => ({
   type: "prompt",
@@ -335,6 +338,18 @@ try {
     const said = await sendsUntil(ANDROID, from, `input ${AGENT_A}`);
     assert.equal(failNextSend, false);
     assert.deepEqual(said, [`input ${AGENT_A}`]);
+    return { said };
+  });
+
+  await step("a turn that a teammate's message started stays quiet, a failed one goes out", async () => {
+    // The phone is away, so each event that notifies goes out at once.
+    const from = sent.length;
+    state.unread.set(AGENT_A, 1);
+    events.emit("event", reply(AGENT_A, "turn-teammate", "agent"));
+    state.failedTurns = [{ agentId: AGENT_B, turnId: "turn-teammate-failed" }];
+    events.emit("event", failure(AGENT_B, "turn-teammate-failed", "agent"));
+    const said = await sendsUntil(ANDROID, from, `failed ${AGENT_B}`);
+    assert.deepEqual(said, [`failed ${AGENT_B}`], "The answer of work between agents went out.");
     return { said };
   });
 

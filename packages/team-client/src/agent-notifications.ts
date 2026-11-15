@@ -125,6 +125,16 @@ export function notificationRequestKey(serverId: string, event: AgentEvent): str
   }
 }
 
+/**
+ * Whether a teammate's message started the turn that ended: a request from another agent, or its
+ * answer. Such a turn is work between agents, so its answer stays in the chat and shows no
+ * notification and plays no sound. A prompt, an approval, a browser step and a failed turn still
+ * notify, because the user must act or the work stopped.
+ */
+export function teammateTurnCompleted(event: AgentEvent): boolean {
+  return event.type === "turn-completed" && event.status === "completed" && event.origin === "agent";
+}
+
 /** Whether the event waits for the user, so that the "needs-me" level keeps it. */
 export function agentEventNeedsUser(event: AgentEvent): boolean {
   return event.type === "prompt" || event.type === "approval" || event.type === "browser-takeover-requested";
@@ -245,6 +255,7 @@ function notificationSubject(
   // A quiet routine run posted nothing, so there is nothing to look at. A turn that continues its
   // plan is not the end of the request.
   if (event.type !== "turn-completed" || event.quiet || event.continues) return null;
+  if (teammateTurnCompleted(event)) return null;
   const { agentId, threadId } = event;
   if (event.status === "completed") {
     // Redact before the cut and the Markdown change the shape of a secret.
