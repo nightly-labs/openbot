@@ -148,7 +148,7 @@ import {
 import { ensureMacApplicationPresence, secondLaunchResponse } from "./main-window-state";
 import { MessageLinkRelay, openHttpLink } from "./message-link-relay";
 import { recoverFromNewerDatabase } from "./newer-database-recovery";
-import { startMainLog } from "./provider-log";
+import { flushMainLog, startMainLog } from "./provider-log";
 import { notifyRemoteControlStarted } from "./remote-control-question";
 import { watchRemoteHostDirectory } from "./remote-server-host-directory";
 import { createRendererForwarders } from "./renderer-forwarders";
@@ -1720,7 +1720,7 @@ if (!hasSingleInstanceLock) {
       updater.on("status", (status) => {
         if (!shutdownStarted || status.errorCode !== "install_failed") return;
         logger.error("OpenBot update install failed after shutdown preparation and will exit now.");
-        app.exit(0);
+        exitAfterLogFlush();
       });
       built.requestedUpdate.on("preference", forwardUpdatePreference);
       updater.start();
@@ -2077,8 +2077,23 @@ function forceExitAfterShutdownDeadline(deadlineMs: number): void {
   setTimeout(() => {
     logger.error(`OpenBot did not quit within ${deadlineMs} ms and will exit now.`);
     runMarker?.quitTimedOut();
-    app.exit(0);
+    exitAfterLogFlush();
   }, deadlineMs);
+}
+
+/** Short, because the user waits: the window is already closed. */
+const LOG_FLUSH_DEADLINE_MS = 2_000;
+
+/**
+ * `app.exit` stops the log writes that are not done. An exit at once after a failed update install
+ * lost the error of the installer from `main.log` and `install_failed` from `update.log` (#5039).
+ */
+function exitAfterLogFlush(): void {
+  void Effect.runPromise(
+    Effect.all([flushMainLog(), services ? services.updater.flushLog() : Effect.void], {
+      concurrency: "unbounded",
+    }).pipe(Effect.timeoutOption(LOG_FLUSH_DEADLINE_MS)),
+  ).finally(() => app.exit(0));
 }
 
 /**
