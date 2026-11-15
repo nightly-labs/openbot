@@ -365,6 +365,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "Im Browser können nur HTTPS-Anmeldelinks geöffnet werden.",
   "error.provider.geminiKeyRefused":
     "Gemini hat den gespeicherten API-Schlüssel abgelehnt. Ersetze oder entferne den Schlüssel in den Einstellungen und verbinde dich dann erneut.",
+  "error.provider.geminiKeyRateLimited":
+    "Gemini hat die Anfrage abgelehnt, weil dein gespeicherter Gemini-API-Schlüssel ein Ratenlimit oder sein Kontingent erreicht hat. Der Schlüssel wird statt deines Google-Tarifs verwendet. Warte ein paar Minuten oder wähle ein anderes Modell und versuche es dann erneut. Um deinen Google-Tarif zu verwenden, entferne den Schlüssel in den Einstellungen.\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "Dein gespeicherter Gemini-API-Schlüssel hat kein Kontingent für dieses Modell. Der Schlüssel wird statt deines Google-Tarifs verwendet. Wähle ein anderes Modell oder entferne den Schlüssel in den Einstellungen, um deinen Google-Tarif zu verwenden.\n{detail}",
   "error.provider.geminiAccountSettingsUnreadable":
     "Gemini kann die Einstellungsdatei dieses Kontos nicht öffnen und sich deshalb nicht anmelden. Entferne dieses Konto und füge es erneut hinzu.",
   "error.provider.geminiSettingsUnreadable":

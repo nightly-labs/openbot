@@ -24,7 +24,12 @@ import {
   KIMI_ACP_FLAVOR,
   MISTRAL_ACP_FLAVOR,
 } from "./acp-flavor";
-import { ANTIGRAVITY_ACP_FLAVOR, antigravityGeminiHome, GEMINI_DIR_FLAG } from "./acp-flavor-antigravity";
+import {
+  ANTIGRAVITY_ACP_FLAVOR,
+  antigravityGeminiHome,
+  GEMINI_DIR_FLAG,
+  geminiSavedKeyLimitFailure,
+} from "./acp-flavor-antigravity";
 import { OPENCODE_ACP_FLAVOR } from "./acp-flavor-opencode";
 import type { AcpArgv, AcpExtensionMethod } from "./acp-sign-in";
 import { readMuseAccount } from "./agent/muse-login";
@@ -311,6 +316,8 @@ function antigravityKeyOptions(context: ProviderClientContext, agentEnvironment:
         ? providerCall(() => connection.authenticate({ methodId: GEMINI_API_KEY_METHOD })).pipe(Effect.asVoid)
         : Effect.void,
     savedKeyRefusedMessage: () => (key() ? sourceText("error.provider.geminiKeyRefused") : null),
+    savedKeyLimitMessage: (detail: string, error?: unknown) =>
+      key() ? geminiSavedKeyLimitFailure(detail, error) : null,
     authBlockedMessage: () =>
       antigravitySettingsUnreadable(antigravityAppDataDir({ ...process.env, ...account }))
         ? sourceText(

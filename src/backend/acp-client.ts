@@ -559,6 +559,12 @@ export interface AcpProviderOptions {
    */
   savedKeyRefusedMessage?: () => string | null;
   /**
+   * The message of a failed turn whose rate limit or quota is the saved key's, from the failure text
+   * and, for a failed request, its error. `null` without a key or for another failure: the flavor's
+   * message applies then.
+   */
+  savedKeyLimitMessage?: (detail: string, error?: unknown) => string | null;
+  /**
    * The message for a refused sign-in that a new sign-in cannot repair, or `null`. Such a refusal
    * must say what to do: the sign-in succeeds, and the next process is refused again.
    */
@@ -2672,7 +2678,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           if (!((turn.receivedOutput || turn.answerOptional) && sdkHarness.emptyOutputFailure?.test(detail))) {
             turn.accountLink = sdkHarness.accountLink?.(detail) ?? null;
             turn.failureCause = turn.accountLink ? "authentication" : classifyFailure(detail);
-            turn.providerError = this.#mcpLoadFailureMessage(thread, detail) ?? sdkHarness.turnFailure(detail);
+            turn.providerError =
+              this.#mcpLoadFailureMessage(thread, detail) ??
+              this.options.savedKeyLimitMessage?.(detail) ??
+              sdkHarness.turnFailure(detail);
             turn.sessionLost = sdkHarness.sessionLost?.test(detail) === true;
           }
         }
@@ -3875,6 +3884,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (status === "failed" && error) {
       const detail = this.#redact(failureText(error));
       const message =
+        this.options.savedKeyLimitMessage?.(detail, error) ??
         this.#flavor.turnFailure?.(
           error,
           detail,
@@ -3882,7 +3892,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           (text) => this.emit("diagnostic", this.#redact(text)),
           thread.currentModelId,
           this.options.customEndpoint?.(thread.currentModelId) ?? null,
-        ) ?? detail;
+        ) ??
+        detail;
       // A fixed code, so analytics and failover need not read the cause again from the sentence.
       const causeCode = turn.failureCause ?? acpFailureCause(error, this.#flavor, message);
       this.emit("notification", {

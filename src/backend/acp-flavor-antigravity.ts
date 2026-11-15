@@ -137,10 +137,36 @@ function geminiTurnFailure(answer: string): string {
   return key ? sourceText(key, { detail: shownFailureDetail(text) }) : shownFailureDetail(text);
 }
 
+/** The prefix that the ACP SDK puts before the server's text of a failed request. */
+const GEMINI_INTERNAL_ERROR_PREFIX = /^(?:RequestError:\s*)?Internal error:\s*/u;
+/**
+ * Google's quota of 0 for the model, such as a free-tier key on a paid model: "Quota exceeded for
+ * metric: ..._free_tier_requests, limit: 0". Waiting does not help. Not "limit: 0.5" or "limit: 05".
+ */
+const GEMINI_ZERO_LIMIT = /\blimit:\s*0(?!\d|\.\d)/u;
+
+/**
+ * The message of a rate limit or quota refusal while a saved Gemini API key serves the turns, or
+ * `null` for another failure. The key's quota is not the Google plan's, so the plan's text misled
+ * the user, and for a quota of 0 its advice to wait never helped (#9517). The same failure texts as
+ * the flavor's, from the answer (`error` is absent) or from a failed request.
+ */
+export function geminiSavedKeyLimitFailure(text: string, error?: unknown): string | null {
+  if (error !== undefined && !(error instanceof RequestError)) return null;
+  const reason = text.replace(GEMINI_WARNING_ANSWER, "").replace(GEMINI_INTERNAL_ERROR_PREFIX, "");
+  if (geminiAccountLink(reason) !== null || GEMINI_CONNECTION_LOST_ANSWER.test(reason)) return null;
+  const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
+  if (key !== "error.provider.antigravityRateLimited") return null;
+  return sourceText(
+    GEMINI_ZERO_LIMIT.test(reason) ? "error.provider.geminiKeyQuotaZero" : "error.provider.geminiKeyRateLimited",
+    { detail: shownFailureDetail(reason) },
+  );
+}
+
 /** Only a failure the server answered with: a local failure is not Google's to explain. */
 function geminiRequestFailure(error: unknown, detail: string): string {
   if (!(error instanceof RequestError)) return detail;
-  const reason = detail.replace(/^(?:RequestError:\s*)?Internal error:\s*/u, "");
+  const reason = detail.replace(GEMINI_INTERNAL_ERROR_PREFIX, "");
   const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
   return key ? sourceText(key, { detail: shownFailureDetail(reason) }) : detail;
 }

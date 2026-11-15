@@ -941,6 +941,9 @@ also runs share another limit, so `accountUsageCoversModel` keeps them out of th
 A saved Gemini API key comes before the Google sign-in, so the provider
 status sets `apiKeyInUse`, and the API key section of the Gemini provider page says that the key,
 not the plan, serves the turns. The dock shows no Gemini row then, because it has no reading.
+A rate limit or quota refusal on the saved key says that the key reached it and that removing the
+key gives back the plan (`savedKeyLimitMessage`, `geminiSavedKeyLimitFailure`). A quota of 0 for the
+model, such as a free-tier key on Gemini 4 Argon (`limit: 0`), does not say to wait (#9517).
 
 A limit failure stays a turn error even though the descriptor sets `reportsUsage: true`, because
 many Gemini setups have no reading to explain it. `GEMINI_REQUEST_FAILURES` in

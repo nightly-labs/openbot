@@ -361,6 +361,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "ブラウザーで開けるのは HTTPS のサインインリンクだけです。",
   "error.provider.geminiKeyRefused":
     "Gemini は保存された API キーを拒否しました。設定でキーを置き換えるか削除してから、もう一度接続してください。",
+  "error.provider.geminiKeyRateLimited":
+    "保存された Gemini API キーがレート制限または割り当てに達したため、Gemini がリクエストを拒否しました。このキーは Google のプランの代わりに使われています。数分待つか別のモデルを選んでから、もう一度お試しください。Google のプランを使うには、設定でキーを削除してください。\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "保存された Gemini API キーには、このモデルの割り当てがありません。このキーは Google のプランの代わりに使われています。別のモデルを選ぶか、Google のプランを使うために設定でキーを削除してください。\n{detail}",
   "error.provider.geminiAccountSettingsUnreadable":
     "Gemini がこのアカウントの設定ファイルを開けないため、サインインできません。このアカウントを削除してから、もう一度追加してください。",
   "error.provider.geminiSettingsUnreadable":

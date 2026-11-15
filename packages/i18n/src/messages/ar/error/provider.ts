@@ -328,6 +328,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "لا يمكن فتح سوى روابط تسجيل الدخول HTTPS في المتصفح.",
   "error.provider.geminiKeyRefused":
     "رفض Gemini مفتاح API المحفوظ. استبدل المفتاح أو أزله في الإعدادات، ثم اتصل مرة أخرى.",
+  "error.provider.geminiKeyRateLimited":
+    "رفض Gemini الطلب لأن مفتاح Gemini API المحفوظ بلغ حد المعدل أو حصته. يُستخدم المفتاح بدلًا من خطة Google. انتظر بضع دقائق أو اختر نموذجًا آخر، ثم أعد المحاولة. لاستخدام خطة Google، أزل المفتاح في الإعدادات.\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "ليس لمفتاح Gemini API المحفوظ حصة لهذا النموذج. يُستخدم المفتاح بدلًا من خطة Google. اختر نموذجًا آخر، أو أزل المفتاح في الإعدادات لاستخدام خطة Google.\n{detail}",
   "error.provider.geminiAccountSettingsUnreadable":
     "لا يستطيع Gemini فتح ملف إعدادات هذا الحساب، لذا لا يمكنه تسجيل الدخول. أزل هذا الحساب ثم أضفه مرة أخرى.",
   "error.provider.geminiSettingsUnreadable":

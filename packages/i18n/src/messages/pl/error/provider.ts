@@ -344,6 +344,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "W przeglądarce można otworzyć tylko linki logowania HTTPS.",
   "error.provider.geminiKeyRefused":
     "Gemini odrzucił zapisany klucz API. Zastąp lub usuń klucz w Ustawieniach, a następnie połącz ponownie.",
+  "error.provider.geminiKeyRateLimited":
+    "Gemini odrzucił żądanie, ponieważ zapisany klucz API Gemini osiągnął limit zapytań lub swój limit użycia. Klucz jest używany zamiast Twojego planu Google. Zaczekaj kilka minut lub wybierz inny model, a potem spróbuj ponownie. Aby używać planu Google, usuń klucz w Ustawieniach.\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "Zapisany klucz API Gemini nie ma limitu użycia dla tego modelu. Klucz jest używany zamiast Twojego planu Google. Wybierz inny model lub usuń klucz w Ustawieniach, aby używać planu Google.\n{detail}",
   "error.provider.geminiAccountSettingsUnreadable":
     "Gemini nie może otworzyć pliku ustawień tego konta, więc nie może się zalogować. Usuń to konto i dodaj je ponownie.",
   "error.provider.geminiSettingsUnreadable":

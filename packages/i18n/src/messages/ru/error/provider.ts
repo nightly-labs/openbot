@@ -344,6 +344,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "В браузере можно открыть только ссылки для входа по HTTPS.",
   "error.provider.geminiKeyRefused":
     "Gemini отклонил сохранённый ключ API. Замените или удалите ключ в настройках, затем подключитесь снова.",
+  "error.provider.geminiKeyRateLimited":
+    "Gemini отклонил запрос: сохранённый ключ Gemini API достиг лимита частоты запросов или своей квоты. Ключ используется вместо вашего тарифа Google. Подождите несколько минут или выберите другую модель и повторите попытку. Чтобы использовать тариф Google, удалите ключ в настройках.\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "У сохранённого ключа Gemini API нет квоты для этой модели. Ключ используется вместо вашего тарифа Google. Выберите другую модель или удалите ключ в настройках, чтобы использовать тариф Google.\n{detail}",
   "error.provider.geminiAccountSettingsUnreadable":
     "Gemini не может открыть файл настроек этого аккаунта, поэтому не может войти. Удалите этот аккаунт и добавьте его снова.",
   "error.provider.geminiSettingsUnreadable":

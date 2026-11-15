@@ -339,6 +339,10 @@ export const messages = defineMessages("error.provider", {
   "error.provider.httpsSignInLinkOnly": "Only HTTPS sign-in links can open in the browser.",
   "error.provider.geminiKeyRefused":
     "Gemini refused the saved API key. Replace or remove the key in Settings, then connect again.",
+  "error.provider.geminiKeyRateLimited":
+    "Gemini refused the request because your saved Gemini API key reached a rate limit or its quota. The key is used instead of your Google plan. Wait a few minutes or choose another model, then try again. To use your Google plan, remove the key in Settings.\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "Your saved Gemini API key has no quota for this model. The key is used instead of your Google plan. Choose another model, or remove the key in Settings to use your Google plan.\n{detail}",
   "error.provider.geminiAccountSettingsUnreadable":
     "Gemini cannot open the settings file of this account, so it cannot sign in. Remove this account and add it again.",
   "error.provider.geminiSettingsUnreadable":
