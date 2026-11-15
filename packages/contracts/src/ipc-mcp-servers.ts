@@ -413,7 +413,7 @@ export function decodeMcpSignInRelayPage(value: unknown): McpSignInRelayPage | n
   if (
     !isDynamicRecord(value) ||
     !isBounded(value.authorizeHost, INPUT_LIMITS.mcpUrl) ||
-    (value.url !== null && !isBounded(value.url, INPUT_LIMITS.signInPageUrl)) ||
+    (value.url !== null && !isBounded(value.url, INPUT_LIMITS.signInRelayAddress)) ||
     !isBoolean(value.listening) ||
     !isBoolean(value.pasteable)
   )
@@ -429,7 +429,7 @@ export function decodeMcpSignInRelayPage(value: unknown): McpSignInRelayPage | n
 /** The address of a relayed sign-in page as `McpSignInRelayPage.url` carries it. */
 export function relayPageUrl(page: URL): string | null {
   const address = page.toString();
-  return address.length <= INPUT_LIMITS.signInPageUrl ? address : null;
+  return address.length <= INPUT_LIMITS.signInRelayAddress ? address : null;
 }
 
 /** The host tab that shows a remote sign-in page, or `null` while there is none. */

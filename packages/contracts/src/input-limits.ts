@@ -128,8 +128,6 @@ export const INPUT_LIMITS = {
   mcpHeaders: 32,
   mcpHeaderValue: 8_192,
   mcpUrl: 2_048,
-  // The whole address of a sign-in page, with its query. Longer than `mcpUrl`: the query holds the scopes.
-  signInPageUrl: 8_192,
   mcpToolCount: 10_000,
   mcpErrorText: 2_000,
   // A sign-in app (`mcp-sign-in-app-v1`). Generous for every provider checked; the wire codec keeps
