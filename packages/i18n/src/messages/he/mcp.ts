@@ -148,6 +148,7 @@ export const messages = {
   "mcp.signIn.relayDeviceDescription":
     "יש לוודא שדף ההתחברות נמצא ב-{page}, ואז לפתוח אותו בדפדפן ולסיים שם. {host} רואה את ההתחברות בעצמו.",
   "mcp.signIn.relayOpen": "פתיחת דף ההתחברות",
+  "mcp.signIn.relayCopy": "העתקת קישור",
   "mcp.signIn.relayPasteHint": "אם הדפדפן לא חוזר ל-OpenBot, יש להעתיק את הכתובת שהוא מציג ולהדביק אותה כאן.",
   "mcp.signIn.relayPasteRequired":
     "OpenBot לא יכול לקבל את ההתחברות מהדפדפן בעצמו. כשמסיימים, יש להעתיק את הכתובת שהדפדפן מציג ולהדביק אותה כאן.",

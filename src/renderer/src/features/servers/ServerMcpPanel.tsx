@@ -415,6 +415,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
       equals: (previous, next) =>
         previous?.tabId === next?.tabId &&
         previous?.relay?.authorizeHost === next?.relay?.authorizeHost &&
+        previous?.relay?.url === next?.relay?.url &&
         previous?.relay?.listening === next?.relay?.listening,
     },
   );

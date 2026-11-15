@@ -146,6 +146,11 @@ export interface CompleteMcpSignInRelayInput {
  */
 export interface McpSignInRelayPage {
   authorizeHost: string;
+  /**
+   * The whole address of the page, so the user can copy it and open it in another browser or on
+   * another device. It holds no grant. `null` for an address that is too long to send.
+   */
+  url: string | null;
   listening: boolean;
   pasteable: boolean;
 }
@@ -408,11 +413,23 @@ export function decodeMcpSignInRelayPage(value: unknown): McpSignInRelayPage | n
   if (
     !isDynamicRecord(value) ||
     !isBounded(value.authorizeHost, INPUT_LIMITS.mcpUrl) ||
+    (value.url !== null && !isBounded(value.url, INPUT_LIMITS.signInRelayAddress)) ||
     !isBoolean(value.listening) ||
     !isBoolean(value.pasteable)
   )
     throw new Error("Invalid MCP server response.");
-  return { authorizeHost: value.authorizeHost, listening: value.listening, pasteable: value.pasteable };
+  return {
+    authorizeHost: value.authorizeHost,
+    url: value.url,
+    listening: value.listening,
+    pasteable: value.pasteable,
+  };
+}
+
+/** The address of a relayed sign-in page as `McpSignInRelayPage.url` carries it. */
+export function relayPageUrl(page: URL): string | null {
+  const address = page.toString();
+  return address.length <= INPUT_LIMITS.signInRelayAddress ? address : null;
 }
 
 /** The host tab that shows a remote sign-in page, or `null` while there is none. */

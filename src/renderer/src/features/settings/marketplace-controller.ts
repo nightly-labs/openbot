@@ -1223,7 +1223,11 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
         const page = await relay.page(url, serverId).catch(() => null);
         if (!waiting()) return;
         const current = relayed();
-        if (current?.page.authorizeHost !== page?.authorizeHost || current?.page.listening !== page?.listening)
+        if (
+          current?.page.authorizeHost !== page?.authorizeHost ||
+          current?.page.url !== page?.url ||
+          current?.page.listening !== page?.listening
+        )
           setRelayed(page ? { url, page } : null);
         await new Promise((resolve) => setTimeout(resolve, SIGN_IN_RELAY_POLL_MS));
       }
