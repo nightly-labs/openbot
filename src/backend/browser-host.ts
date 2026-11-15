@@ -3484,9 +3484,14 @@ export class BrowserHost {
     const proxy = this.#tabProxy(tab);
     const proxyError = proxyErrorInText(String(failure.cause));
     if (proxyError === undefined) return failure;
-    // A tab without a profile proxy uses the proxy settings of the computer, such as `HTTPS_PROXY` on a
-    // server. Chromium gives only a failed tunnel when that proxy refuses its sign-in, so one message covers both.
-    if (proxy === null) return browserFailure(new Error(sourceText("error.backend.browserSystemProxyFailed")));
+    if (proxy === null) {
+      // A tab without a profile proxy uses the proxy settings of the computer, such as `HTTPS_PROXY` on a
+      // server. Chromium gives only a failed tunnel when that proxy refuses its sign-in, so one message covers
+      // both. A profile whose new proxy did not apply has no entry and keeps the rules of its old proxy.
+      const computerProxy =
+        tab.tabSession?.kind !== "profile" || this.#appliedProxies.has(browserTabPartition(tab.tabSession));
+      return computerProxy ? browserFailure(new Error(sourceText("error.backend.browserSystemProxyFailed"))) : failure;
+    }
     if (proxy.kind === "computer")
       return browserFailure(
         new Error(
