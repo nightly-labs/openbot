@@ -3483,7 +3483,10 @@ export class BrowserHost {
   #proxyLoadFailure(tab: BrowserHostTab, failure: BrowserOperationError): BrowserOperationError {
     const proxy = this.#tabProxy(tab);
     const proxyError = proxyErrorInText(String(failure.cause));
-    if (proxy === null || proxyError === undefined) return failure;
+    if (proxyError === undefined) return failure;
+    // A tab without a profile proxy uses the proxy settings of the computer, such as `HTTPS_PROXY` on a
+    // server. Chromium gives only a failed tunnel when that proxy refuses its sign-in, so one message covers both.
+    if (proxy === null) return browserFailure(new Error(sourceText("error.backend.browserSystemProxyFailed")));
     if (proxy.kind === "computer")
       return browserFailure(
         new Error(
