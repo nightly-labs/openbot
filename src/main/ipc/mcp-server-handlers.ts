@@ -138,7 +138,7 @@ interface McpServerIpcDependencies {
   /** Opens the page of a joined server's sign-in in this computer's browser, and relays the callback. */
   relay: Pick<SignInRelayClient, "run" | "page" | "open" | "paste" | "receivesDeepLink">;
   /** Puts text on this computer's clipboard. */
-  writeClipboard: (text: string) => void;
+  writeClipboard: (text: string) => Promise<void>;
 }
 
 /** How long a connection test waits for the managed runtimes before probing without them. */
@@ -379,7 +379,7 @@ export function mcpServerIpcHandlers({
         local: (parsed) => {
           const link = service.mcpSignInLink(parsed);
           if (!link) throw new Error(sourceText("error.mcp.signInLinkNotReady"));
-          writeClipboard(link);
+          return writeClipboard(link);
         },
         // A joined server's page opens in the host's browser or through the relay, which has its own
         // controls, and the host sends no client the address of its sign-in.
