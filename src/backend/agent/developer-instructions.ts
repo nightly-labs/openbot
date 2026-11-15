@@ -504,7 +504,7 @@ export function developerInstructions(
       // Codex 0.167 and later keeps no more than 8 MiB of image data URL from one `exec`, and `view_image`
       // gives the whole file, so a phone photo did not reach the model (#9522).
       agent.provider === "codex"
-        ? " In exec, ALL_TOOLS does not list the openbot and openbot_browser tools; call them directly. To look at a local PNG or JPEG image, such as a photo, call openbot.read_image with openbot.tool_call: view_image in exec drops an image file over about 6 MB."
+        ? " In exec, ALL_TOOLS does not list the openbot and openbot_browser tools; call them directly. For a local photo, call openbot.read_image: view_image in exec drops a file over 6 MB."
         : // OpenCode Code Mode puts only the direct tools under `tools.openbot`. A model that read
           // `openbot.create_agent` called `tools.openbot.create_agent`, which OpenCode refuses (#6309).
           agent.provider === "opencode"

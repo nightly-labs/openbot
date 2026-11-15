@@ -365,7 +365,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "read_image",
     description:
-      "Look at a local PNG or JPEG image, such as a photo, to see what it shows. OpenBot makes a large image smaller and turns a phone photo upright first. Returns the image and its width and height.",
+      "Look at a local PNG or JPEG image, such as a photo. Returns it upright, made smaller when large, with its size.",
     shape: readImageToolShape,
   },
   {
