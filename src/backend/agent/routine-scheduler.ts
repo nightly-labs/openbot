@@ -809,6 +809,9 @@ export class RoutineScheduler implements RoutineDueSource {
         hasUpdate = true;
       }
       if (!hasUpdate) throw new RoutineInputError("At least one routine update is required.");
+      if (this.#requireToolRoutine(input.agentId, input.routineId).trigger.kind === "webhook") {
+        throw new RoutineInputError(`Routine ${input.routineId} is a webhook routine. Use update_webhook_routine.`);
+      }
       return openBotToolResult(this.update(input, this.#toolMutationOptions(input.agentId, senderAgentId, params)));
     }
 
@@ -821,7 +824,7 @@ export class RoutineScheduler implements RoutineDueSource {
         INPUT_LIMITS.identifier,
         "routineId is required.",
       );
-      if (this.#routines.getRecord(agentId, routineId)?.trigger.kind === "webhook") {
+      if (this.#requireToolRoutine(agentId, routineId).trigger.kind === "webhook") {
         yield* this.#webhookTool(requestedByPerson).delete({ agentId, routineId });
       } else {
         yield* this.delete({ agentId, routineId }, agentId === senderAgentId ? { turnId: params.turnId } : {});
@@ -838,6 +841,7 @@ export class RoutineScheduler implements RoutineDueSource {
         INPUT_LIMITS.identifier,
         "routineId is required.",
       );
+      this.#requireToolRoutine(agentId, routineId);
       this.#refuseWebhookTest(agentId, routineId);
       return openBotToolResult(yield* this.test({ agentId, routineId }));
     }
@@ -1289,6 +1293,22 @@ export class RoutineScheduler implements RoutineDueSource {
   }
 
   /** `test_routine` does not test a webhook routine; the user does it in Routines settings. */
+  /**
+   * The routine that a routine tool names. A wrong id, such as the trigger.id from list_routines, gets
+   * an error that names the id and the field to use: with "This routine no longer exists.", an agent
+   * thought that the routine was deleted and could not correct its call (#9680).
+   */
+  #requireToolRoutine(agentId: string, routineId: string): OwnedRoutineRecord {
+    const routine = this.#routines.getRecord(agentId, routineId);
+    if (routine) return routine;
+    const owner = this.#routines.list(agentId).find((candidate) => candidate.trigger.id === routineId);
+    throw new RoutineInputError(
+      owner
+        ? `${routineId} is the trigger.id of routine "${owner.name}", not a routineId. Use its routineId ${owner.id}.`
+        : `No routine of agent ${agentId} has routineId ${routineId}. Call list_routines and use the id of the routine, not its trigger.id.`,
+    );
+  }
+
   #refuseWebhookTest(agentId: string, routineId: string): void {
     if (this.#routines.getRecord(agentId, routineId)?.trigger.kind !== "webhook") return;
     throw new RoutineInputError(
