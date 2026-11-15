@@ -35,11 +35,6 @@ function serverText(error: unknown): string | null {
   return typeof text === "string" ? text : null;
 }
 
-/** The server's reason for a refused call, redacted and short, or `null` when it gave none. */
-function serverReason(error: unknown): string | null {
-  return signInReason(serverText(error));
-}
-
 /**
  * A server text that says the server could not reach the provider's service: a failed DNS lookup,
  * or a connection that did not open. Go servers (Antigravity) write `lookup <host> on <dns>: server
@@ -234,8 +229,9 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
           return;
         }
         if (message.error !== undefined && (message.id === 1 || message.id === 2 || message.id === 3)) {
-          const reason = serverReason(message.error);
           const text = serverText(message.error);
+          // The reason that the user and the log see: redacted and short.
+          const reason = signInReason(text);
           // A refused sign-out keeps the server's reason, such as a token that the CLI did not save.
           if (options.logoutOnly && reason)
             return fail(
