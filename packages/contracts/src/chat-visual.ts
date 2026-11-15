@@ -353,10 +353,11 @@ const BASE_STYLE = [
  * listener that runs last, and the image click waits a task, so each sees whether the page used
  * the key or the click first.
  *
- * Media that starts with no click in the page pauses while the page is out of view or the window is
- * hidden, and plays again when it comes back (#9595). The app sets no autoplay rule, so without this
- * a looping video keeps the processor busy and keeps the computer awake. Media that the user started
- * plays on, as in a browser.
+ * Media that starts with no click in the page pauses while it is out of view or the window is hidden,
+ * and plays again when it comes back (#9595). A video is in view when its own box is; audio, which
+ * often has no box, when the page is. The app sets no autoplay rule, so without this a looping video
+ * keeps the processor busy and keeps the computer awake. Media that the user started plays on, as in
+ * a browser.
  *
  * Keep it plain ES2020 and without dependencies: it runs inside the page.
  */
@@ -466,22 +467,24 @@ const scheduleSelection=()=>{if(!selectionFrame)selectionFrame=requestAnimationF
 document.addEventListener("selectionchange",scheduleSelection);
 addEventListener("scroll",()=>{if(selected)scheduleSelection();},true);
 addEventListener("resize",()=>{if(selected)scheduleSelection();});
-const unasked=new WeakSet(),held=new Set();
-let inView=true;
-const away=()=>document.hidden||!inView;
+const unasked=new WeakSet(),resumed=new WeakSet(),held=new Set(),shown=new WeakMap();
+const away=(media)=>document.hidden||shown.get(media instanceof HTMLVideoElement?media:root)===false;
 const rest=()=>{
-if(away()){for(const media of document.querySelectorAll("video,audio"))if(unasked.has(media)&&!media.paused){held.add(media);media.pause();}return;}
-for(const media of held)if(media.isConnected&&media.paused)media.play().catch(()=>{});
-held.clear();
+for(const media of document.querySelectorAll("video,audio")){
+if(!unasked.has(media))continue;
+if(away(media)){if(!media.paused){held.add(media);media.pause();}}
+else if(held.delete(media)&&media.paused){resumed.add(media);media.play().catch(()=>{});}
+}
 };
+const watcher=new IntersectionObserver((entries)=>{for(const entry of entries)shown.set(entry.target,entry.isIntersecting);rest();});
+watcher.observe(root);
 document.addEventListener("play",(event)=>{
 const media=event.target;
-if(!(media instanceof HTMLMediaElement))return;
+if(!(media instanceof HTMLMediaElement)||resumed.delete(media))return;
 if(navigator.userActivation&&navigator.userActivation.isActive){unasked.delete(media);held.delete(media);return;}
-unasked.add(media);
-if(away()){held.add(media);media.pause();}
+if(!unasked.has(media)){unasked.add(media);if(media instanceof HTMLVideoElement)watcher.observe(media);}
+if(away(media)){held.add(media);media.pause();}
 },true);
-new IntersectionObserver((entries)=>{inView=entries[entries.length-1].isIntersecting;rest();}).observe(root);
 document.addEventListener("visibilitychange",rest);
 })();`;
 
