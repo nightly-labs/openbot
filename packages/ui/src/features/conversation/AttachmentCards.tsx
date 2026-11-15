@@ -46,6 +46,9 @@ export interface AttachmentDownloads {
   retry(attachment: AttachmentSummary): void;
 }
 
+/** The address of a file on a joined server. The desktop gets such a file whole, not in ranges. */
+const REMOTE_PREVIEW_URL = /^openbot-remote-attachment:/;
+
 export function AttachmentCards(props: {
   attachments: AttachmentSummary[];
   mediaSource?: AttachmentMediaSource | undefined;
@@ -64,6 +67,10 @@ export function AttachmentCards(props: {
   const markMissing = (attachment: AttachmentSummary) => setMissing((current) => new Set(current).add(attachment.id));
   const [loadingMedia, setLoadingMedia] = createSignal<ReadonlySet<string>>(new Set());
   const [playRequested, setPlayRequested] = createSignal<ReadonlySet<string>>(new Set());
+  // A video that cannot play or load goes back to its card, which has its name and its buttons.
+  const [unplayable, setUnplayable] = createSignal<ReadonlySet<string>>(new Set());
+  const markUnplayable = (attachment: AttachmentSummary) =>
+    setUnplayable((current) => new Set(current).add(attachment.id));
   const sourceUrl = (attachment: AttachmentSummary) =>
     attachment.previewUrl ? undefined : props.mediaSource?.url(attachment.id);
   const imageUrl = (attachment: AttachmentSummary) => attachment.previewUrl ?? sourceUrl(attachment);
@@ -77,7 +84,8 @@ export function AttachmentCards(props: {
   const showsPlayer = (attachment: AttachmentSummary) =>
     !isMissing(attachment) &&
     (Boolean(imageUrl(attachment)) || (mediaKind(attachment) === "video" && canLoadMedia(attachment)));
-  const showsVideo = (attachment: AttachmentSummary) => mediaKind(attachment) === "video" && showsPlayer(attachment);
+  const showsVideo = (attachment: AttachmentSummary) =>
+    mediaKind(attachment) === "video" && showsPlayer(attachment) && !unplayable().has(attachment.id);
   const download = (attachment: AttachmentSummary) => props.downloads?.state(attachment.id);
   const downloading = (attachment: AttachmentSummary) => {
     const state = download(attachment);
@@ -96,12 +104,20 @@ export function AttachmentCards(props: {
       });
     return format.fileSize(attachment.size);
   };
+  // Sound keeps its old rule. A video shows its first frame, but not from a joined server: that file
+  // arrives whole, so the player gets nothing before Play.
+  const mediaPreload = (attachment: AttachmentSummary) => {
+    if (mediaKind(attachment) === "video")
+      return REMOTE_PREVIEW_URL.test(attachment.previewUrl ?? "") ? "none" : "metadata";
+    return attachment.previewUrl ? "none" : "metadata";
+  };
   const loadMedia = async (attachment: AttachmentSummary) => {
     const source = props.mediaSource;
     if (!source || loadingMedia().has(attachment.id)) return;
     setLoadingMedia((current) => new Set(current).add(attachment.id));
     try {
       if (await source.load(attachment)) setPlayRequested((current) => new Set(current).add(attachment.id));
+      else markUnplayable(attachment);
     } finally {
       setLoadingMedia((current) => {
         const next = new Set(current);
@@ -148,11 +164,12 @@ export function AttachmentCards(props: {
               src={imageUrl(attachment)}
               name={attachment.name}
               class="attachment-media-player"
-              preload={attachment.previewUrl ? "none" : "metadata"}
+              preload={mediaPreload(attachment)}
               autoplay={playRequested().has(attachment.id)}
               attachmentId={attachment.id}
               loading={loadingMedia().has(attachment.id)}
               onLoad={() => void loadMedia(attachment)}
+              onError={() => markUnplayable(attachment)}
               menu={videoMenu()}
             />
           );

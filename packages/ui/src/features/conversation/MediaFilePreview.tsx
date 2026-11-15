@@ -22,6 +22,8 @@ export function MediaFilePreview(props: {
   loading?: boolean | undefined;
   /** Gets the video when the user presses Play before there is a `src`, as in the web client. */
   onLoad?: (() => void) | undefined;
+  /** The video cannot play, as with a format that the app does not know. */
+  onError?: (() => void) | undefined;
   /** The details of a video, on hover, and its actions, on a right click. */
   menu?: VideoStageMenu | undefined;
 }) {
@@ -63,8 +65,10 @@ export function MediaFilePreview(props: {
             src={props.src}
             label={props.name}
             autoplay={props.autoplay}
+            preload={props.preload}
             loading={props.loading}
             onLoad={props.onLoad}
+            onError={props.onError}
             fullControls
             onMetadata={(video) => {
               const next = { width: video.videoWidth, height: video.videoHeight };

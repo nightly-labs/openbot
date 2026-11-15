@@ -48,7 +48,7 @@ export function generatedVideoName(savedPath: string, prompt?: string | null): s
     (prompt ?? "")
       .normalize("NFKC")
       .toLowerCase()
-      .match(/[\p{L}\p{N}]+/gu) ?? [];
+      .match(/[\p{L}\p{M}\p{N}]+/gu) ?? [];
   const stem = words.slice(0, VIDEO_NAME_WORDS).join("-").slice(0, VIDEO_NAME_LENGTH).replace(/-+$/, "");
   return `${stem || "generated-video"}.${extension}`;
 }

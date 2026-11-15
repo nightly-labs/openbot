@@ -13,6 +13,8 @@ export interface VideoPlayerProps {
   /** The length to show until the video gives its own. */
   durationSeconds?: number | undefined;
   autoplay?: boolean | undefined;
+  /** "none" gets nothing before Play, for a file that arrives whole. The default is "metadata". */
+  preload?: "none" | "metadata" | undefined;
   /** True while `onLoad` gets the file. */
   loading?: boolean | undefined;
   /** Gets the file when the user presses Play before there is a `src`, as in the web client. */
@@ -127,7 +129,7 @@ export function VideoPlayer(props: VideoPlayerProps) {
             }}
             src={url()}
             playsinline
-            preload="metadata"
+            preload={props.preload ?? "metadata"}
             autoplay={props.autoplay}
             aria-label={props.label}
             onPlay={() => setPlaying(true)}
