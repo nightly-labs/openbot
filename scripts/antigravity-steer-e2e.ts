@@ -305,7 +305,8 @@ try {
   await Promise.all(laterPids.slice(0, 2).map((pid) => waitForExit(pid)));
   const daemonRuns = isRunning(await sessionPid(held.log, "daemon", 0));
   assert.ok(daemonRuns, "The idle limit closed the session whose daemon command runs.");
-  report.heldWork = { status: daemon.status, releasable, closedSessions: 2, daemonRuns };
+  const closedSessions = laterPids.filter((pid) => !isRunning(pid)).length;
+  report.heldWork = { status: daemon.status, releasable, closedSessions, daemonRuns };
 
   report.passed = true;
 } catch (error) {
