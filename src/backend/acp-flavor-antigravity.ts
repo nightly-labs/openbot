@@ -266,7 +266,8 @@ function antigravityRefusedMcpTools(text: string, argv: readonly string[], sessi
  * The page where the user verifies the account that failed the turn. The CLI 1.5.6 and later sends
  * only "Verification Required" as the answer, and keeps Google's 403 with its `validation_url` in its
  * own log (#9508). A JSON encoder can write the `&`, `=` and `/` of the link as `\u0026`, `\u003d` and
- * `\/`; Go's writes each `&` as `\u0026`.
+ * `\/`; Go's writes each `&` as `\u0026`. A body that is logged as a JSON string has one more
+ * backslash for each escape, and its quotes as `\"`.
  */
 function antigravityAccountLink(text: string, argv: readonly string[], sessionId: string): string | null {
   const link = geminiAccountLink(text);
@@ -275,9 +276,10 @@ function antigravityAccountLink(text: string, argv: readonly string[], sessionId
   if (log === null || !log.includes("VALIDATION_REQUIRED")) return null;
   return geminiAccountLink(
     log
-      .replace(/\\u0026/gu, "&")
-      .replace(/\\u003d/gu, "=")
-      .replace(/\\\//gu, "/"),
+      .replace(/\\+u0026/gu, "&")
+      .replace(/\\+u003d/gu, "=")
+      .replace(/\\+\//gu, "/")
+      .replace(/\\+"/gu, '"'),
   );
 }
 
