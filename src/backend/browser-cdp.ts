@@ -245,6 +245,36 @@ const TYPED_KEY_ARRIVED_FUNCTION = `function(expected) {
 const SAVE_TYPED_TEXT_FUNCTION = `function() {
   if (globalThis.openbotTypedKeys) globalThis.openbotTypedKeys.text = 'value' in this ? String(this.value) : this.textContent;
 }`;
+/** How long an editor that stopped the paste has to show the pasted text before the text is inserted. */
+const PASTE_APPLY_WAIT_MS = 1000;
+/**
+ * Sends `text` to an editable element as a plain-text paste. True when the editor stopped the paste
+ * and its text or selection changed, so it took the text. False for a field, for a page that lets the
+ * paste through (a synthetic paste inserts nothing), and for an editor that stopped the paste but
+ * shows no change in time: the caller then inserts the text.
+ */
+const PASTE_TEXT_FUNCTION = `function(text) {
+  if ('value' in this || !this.isContentEditable) return false;
+  let host = this;
+  while (host.parentElement?.isContentEditable) host = host.parentElement;
+  const root = host.getRootNode();
+  const state = () => {
+    const selection = typeof root.getSelection === 'function' ? root.getSelection() : host.ownerDocument.getSelection();
+    return JSON.stringify([host.textContent, selection?.toString() ?? '']);
+  };
+  const before = state();
+  const data = new DataTransfer();
+  data.setData('text/plain', text);
+  const event = new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true, composed: true });
+  if (this.dispatchEvent(event)) return false;
+  if (state() !== before) return true;
+  return new Promise((resolve) => {
+    const finish = () => { observer.disconnect(); clearTimeout(timer); resolve(state() !== before); };
+    const observer = new MutationObserver(() => { if (state() !== before) finish(); });
+    const timer = setTimeout(finish, ${PASTE_APPLY_WAIT_MS});
+    observer.observe(host, { childList: true, subtree: true, characterData: true });
+  });
+}`;
 /**
  * True when this node holds focus in its own document: every shadow root on the way up names it or
  * its host as active. It starts inside the node, so a closed shadow root does not hide it.
@@ -1120,22 +1150,31 @@ export class BrowserCdpEngine {
           // A handler that removed the target after the key shows that the key arrived.
           Effect.catch(() => Effect.succeed(true)),
         );
-        yield* dispatchText(send, text, resolved.sessionId, {
-          keyArrived,
-          saveText: this.#callOnNode(
-            send,
-            resolved.backendNodeId,
-            SAVE_TYPED_TEXT_FUNCTION,
-            [],
-            resolved.sessionId,
-          ).pipe(Effect.asVoid),
-          // Short text arrives one key at a time. The deadline can pass, or a key handler can move focus
-          // to another element, after the page already has part of the text.
-          beforeNext: (typed, total) =>
-            browserSync(() => assertTypingProgressBeforeDeadline(deadline, typed, total)).pipe(
-              Effect.andThen(checkFocus("error.backend.browserTypingFocusMovedWhileTyping")),
-            ),
-        });
+        // A rich-text editor, such as Naver SmartEditor or Lexical, keeps its own document and takes one
+        // inserted text as one paragraph, so the line breaks in it are lost. The editor splits pasted
+        // text into paragraphs, and a paste cannot submit a chat message as an Enter key can. A field,
+        // and an editor that does not take the paste, gets the text inserted as before.
+        const pasted =
+          /[\n\r]/.test(text) &&
+          (yield* this.#callOnNode(send, resolved.backendNodeId, PASTE_TEXT_FUNCTION, [text], resolved.sessionId)) ===
+            true;
+        if (!pasted)
+          yield* dispatchText(send, text, resolved.sessionId, {
+            keyArrived,
+            saveText: this.#callOnNode(
+              send,
+              resolved.backendNodeId,
+              SAVE_TYPED_TEXT_FUNCTION,
+              [],
+              resolved.sessionId,
+            ).pipe(Effect.asVoid),
+            // Short text arrives one key at a time. The deadline can pass, or a key handler can move focus
+            // to another element, after the page already has part of the text.
+            beforeNext: (typed, total) =>
+              browserSync(() => assertTypingProgressBeforeDeadline(deadline, typed, total)).pipe(
+                Effect.andThen(checkFocus("error.backend.browserTypingFocusMovedWhileTyping")),
+              ),
+          });
         // Submitting is part of typing rather than a second action, because it has to reach the node
         // this lease already resolved. Re-resolving a snapshot ref here would fingerprint the element
         // against its pre-typing text, so a contenteditable would fail with "The target changed after
