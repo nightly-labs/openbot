@@ -626,6 +626,8 @@ export class OpenBotToolRouter {
         case "item/tool/call": {
           if (!isDynamicToolCall(request.params)) throw new Error("Invalid dynamic tool request.");
           let params = this.#asSubagentParent(request.params);
+          // A Codex subagent's call runs in the parent's chat and turn, but waits in the subagent's turn.
+          const fromSubagent = params.threadId !== request.params.threadId;
           if (params.namespace === "openbot") {
             const deferredMcp = this.#deferredMcpNote(client, params.threadId);
             const invalid = deferredMcp
@@ -866,7 +868,7 @@ export class OpenBotToolRouter {
             }
             // Every provider gets ask_ui, Claude too: its call arrives here through the SDK MCP server.
             if (toolRequest.params.tool === "ask_ui") {
-              this.#askUi(client, toolRequest, toolRequest.params);
+              this.#askUi(client, toolRequest, toolRequest.params, fromSubagent);
               return;
             }
             if (toolRequest.params.tool === "acknowledge_request") {
@@ -987,8 +989,9 @@ export class OpenBotToolRouter {
   /**
    * Checks an `ask_ui` call and shows its block. Like `ask_user`, it answers the call only when the
    * person answers or the turn ends. The agent can correct a refused block, so it gets the reason.
+   * A Codex subagent's block waits for the end of the subagent's turn, not of its parent's (#9727).
    */
-  #askUi(client: AgentClient, request: AppServerRequest, params: DynamicToolCallParams): void {
+  #askUi(client: AgentClient, request: AppServerRequest, params: DynamicToolCallParams, fromSubagent: boolean): void {
     const refuse = (message: string) => client.respond(request.id, openBotToolFailure(message));
     const parsed = askUiToolSchema.safeParse(params.arguments);
     if (!parsed.success) {
@@ -1004,7 +1007,7 @@ export class OpenBotToolRouter {
       );
       return;
     }
-    this.#attention.surfaceUiBlock(client, request, { blockId, spec });
+    this.#attention.surfaceUiBlock(client, request, { blockId, spec }, undefined, fromSubagent);
   }
 
   /**

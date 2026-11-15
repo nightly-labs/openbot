@@ -139,6 +139,13 @@ interface PendingPrompt {
    * stays until the user answers it, and the answer reaches the agent as a new message in this chat.
    */
   detached?: LateAnswerTarget;
+  /**
+   * A Codex subagent asked it, in the chat and turn of its parent agent. Its call waits in the
+   * subagent's own turn, which can outlive the parent turn (#9727). The parent turn's normal end thus
+   * keeps it. The end of the subagent's turn aborts the call, which expires it, and so do a Stop, a
+   * failure or a lost process.
+   */
+  subagent?: true;
 }
 
 /** The chat that a new message reaches: a task of the agent, or its own chat without `taskId`. */
@@ -706,7 +713,8 @@ export class AttentionRegistry {
       threadId: pending.publicThreadId,
       turnId: pending.turnId,
       questions: pending.questions.map(compactRuntimeQuestion),
-      ...(pending.detached ? { detached: true as const } : {}),
+      // A subagent's question also stays after its turn ends, so a client keeps its card.
+      ...(pending.detached || pending.subagent ? { detached: true as const } : {}),
     }));
     remainingAttention -= pendingPrompts.length;
     const pendingApprovals = [...this.#approvals.values()]
@@ -1785,13 +1793,15 @@ export class AttentionRegistry {
    * Shows an `ask_ui` block and waits for its answer. The block is a question prompt: its fallback
    * questions let a client that does not know `uiBlock` answer it through `respondToPrompt`. The
    * caller has checked the spec and refused a channel. With `autoAnswer`, the host answers that action
-   * itself after `afterMs` when nobody answered first.
+   * itself after `afterMs` when nobody answered first. With `subagent`, a Codex subagent asks in the
+   * parent's chat and turn (see `PendingPrompt.subagent`).
    */
   surfaceUiBlock(
     client: AgentClient,
     request: AppServerRequest,
     block: SurfacedUiBlock,
     autoAnswer?: { actionId: string; afterMs: number },
+    subagent = false,
   ): void {
     const threadId = getString(request.params, "threadId");
     const turnId = getString(request.params, "turnId");
@@ -1847,6 +1857,7 @@ export class AttentionRegistry {
       questions,
       uiBlock: block,
       ...(autoAnswerTimer ? { autoAnswer: autoAnswerTimer } : {}),
+      ...(subagent ? { subagent: true as const } : {}),
     });
     this.#routines.markNeedsAttention(turnId);
     this.#emit({
@@ -1855,6 +1866,7 @@ export class AttentionRegistry {
       agentId,
       threadId: publicThreadId,
       turnId,
+      ...(subagent ? { detached: true as const } : {}),
       questions,
     });
   }
@@ -2002,13 +2014,15 @@ export class AttentionRegistry {
    * A turn ending expires its questions, drops its approvals and cancels its takeovers. Each removal
    * emits its resolved event: a compaction turn sends no `turn-completed`, so a client learns about
    * the removal only from that event. A detached question stays when the turn `completed`: its answer
-   * starts the next turn. A Stop or a failure expires it.
+   * starts the next turn. A subagent's question stays too: its subagent still waits for the answer.
+   * A Stop or a failure expires both.
    */
   clearForTurn(threadId: string, turnId: string, completed: boolean): void {
     for (const [requestId, pending] of this.#prompts) {
       const pendingThreadId = getString(pending.params, "threadId");
       const pendingTurnId = getString(pending.params, "turnId");
-      if (pendingThreadId !== threadId || pendingTurnId !== turnId || (completed && pending.detached)) continue;
+      const outlivesTurn = pending.detached !== undefined || pending.subagent === true;
+      if (pendingThreadId !== threadId || pendingTurnId !== turnId || (completed && outlivesTurn)) continue;
       this.#expirePrompt(requestId, pending);
     }
     for (const [requestId, pending] of this.#approvals) {
@@ -2055,14 +2069,15 @@ export class AttentionRegistry {
   }
 
   /**
-   * Expires the detached questions of an agent, of one thread, or of both. Call it when a task closes or
-   * is deleted, or when the agent is deleted: no message can reach them there, and a hidden question
-   * would block duplication and plan continuation.
+   * Expires the detached questions of an agent, of one thread, or of both, and the subagent questions
+   * that outlived their turn. Call it when a task closes or is deleted, or when the agent is deleted:
+   * no message can reach them there, and a hidden question would block duplication and plan
+   * continuation.
    */
   expireDetached(agentId: string | null, publicThreadId: string | null): void {
     let changed = false;
     for (const [requestId, pending] of this.#prompts) {
-      if (!pending.detached) continue;
+      if (!pending.detached && !pending.subagent) continue;
       if (agentId !== null && pending.agentId !== agentId) continue;
       if (publicThreadId !== null && pending.publicThreadId !== publicThreadId) continue;
       this.#expirePrompt(requestId, pending);
