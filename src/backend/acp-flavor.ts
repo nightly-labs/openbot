@@ -156,10 +156,13 @@ export interface AcpFlavor {
     /** The message of a turn that failed in this way, from the failure text. */
     turnFailure(text: string): string;
     /**
-     * The https link in the failure text that the user must open to fix their account, or `null`.
-     * The turn fails as a sign-in failure, and the error banner opens the link.
+     * The https link that the user must open to fix their account, from the failure text or, for a
+     * text that names no link, from the agent's own log, or `null`. The turn fails as a sign-in
+     * failure, and the error banner opens the link.
      */
-    accountLink?(text: string): string | null;
+    accountLink?(text: string, argv: readonly string[], sessionId: string): string | null;
+    /** A failure text that asks the user to verify their account: the turn fails as a sign-in failure. */
+    accountVerification?: RegExp;
     /** The message of an answer chunk that reports an exhausted quota, or `null`. */
     quota(text: string): string | null;
     /** The MCP server whose failed start ended the turn, from the failure text, or `null`. */
