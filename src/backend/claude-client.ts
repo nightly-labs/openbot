@@ -273,7 +273,7 @@ const claudeFlagSettings = Effect.fn("claudeFlagSettings")(function* (
       ? { env: { ENABLE_TOOL_SEARCH: "true" } }
       : {}),
   };
-  return settings;
+  return { settings, firstPartyApi };
 });
 
 /** The variables that send Claude requests to an API other than the Anthropic API. */
@@ -477,6 +477,8 @@ interface ActiveTurn {
 
 interface ThreadRuntime {
   id: string;
+  /** No gateway, Bedrock or Vertex in the environment or the settings files: requests go to the Anthropic API. */
+  firstPartyApi: boolean;
   usageCounterId: string;
   usageCost: number;
   /**
@@ -1287,10 +1289,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     return Boolean({ ...claudeEnvironment(this.#cli), ...this.#environment(this.#onApiKey) }.ANTHROPIC_API_KEY);
   }
 
-  /** Whether the CLI sends its requests to an API other than the Anthropic API, such as Bedrock or a gateway. */
-  #usesOtherApi(): boolean {
-    const environment = { ...claudeEnvironment(this.#cli), ...this.#environment(this.#onApiKey) };
-    return CLAUDE_OTHER_API_VARIABLES.some((name) => Boolean(environment[name]));
+  /**
+   * Whether the CLI's last sign-in status of this folder is a Claude account sign-in, not a Console
+   * sign-in or a key. Read from the cache: each status read can spend the sign-in's refresh token (#4831).
+   */
+  #onClaudeAccount(): boolean {
+    const last = lastAuthStatuses.get(this.#environment(false).CLAUDE_CONFIG_DIR ?? "");
+    return last?.loggedIn === true && last.authMethod === "claude.ai";
   }
 
   /** The agent environment, with the saved key when `withApiKey`. */
@@ -1441,8 +1446,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       ...this.#environment(this.#onApiKey),
     };
     // A profile generation has no tools and no skills, so it needs none of the OpenBot settings.
-    const openBotSettings: Settings = config.profileGeneration
-      ? {}
+    const { settings: openBotSettings, firstPartyApi } = config.profileGeneration
+      ? { settings: {}, firstPartyApi: CLAUDE_OTHER_API_VARIABLES.every((name) => !cliEnvironment[name]) }
       : yield* claudeFlagSettings(userSettingsFile, configDirectory, config.cwd, settingSources, cliEnvironment);
     const flagSettings: Settings = {
       ...openBotSettings,
@@ -1572,6 +1577,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     ).pipe(Effect.onError(() => removeQueryFiles));
     const runtime: ThreadRuntime = {
       id: threadId,
+      firstPartyApi,
       usageCounterId: randomUUID(),
       usageCost: 0,
       resumedUsage: resume,
@@ -2580,12 +2586,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       // all CLI texts, such as "Credit balance is too low", so the client names them.
       const signInFailed = turn.authenticationFailed || CLAUDE_NOT_LOGGED_IN.test(String(error));
       const billing = turn.billingFailed || (turn.balanceSpent && isBalanceDiagnostic(String(error)));
+      const apiKey = this.#usesApiKey();
       this.emit("notification", {
         method: "error",
         params: {
           threadId: runtime.id,
           turnId: turn.id,
-          message: claudeTurnError(error, this.#usesApiKey(), this.#usesOtherApi()),
+          message: claudeTurnError(error, apiKey, !apiKey && runtime.firstPartyApi && this.#onClaudeAccount()),
           ...(signInFailed ? { causeCode: "authentication" } : billing ? { causeCode: "billing" } : {}),
         },
       });
@@ -3023,11 +3030,12 @@ const CLAUDE_SANDBOX_UNAVAILABLE = /Sandbox required but unavailable: (.+?)\.? S
  * The CLI's report of an Anthropic API key with no API credit: "Credit balance is too low", from the
  * API's "Your credit balance is too low to access the Anthropic API" (Claude Code 2.1.309). A Claude
  * plan does not pay for API key requests, and a plan subscriber read it as a fault (#5550). Only a
- * turn on a key gets the key text. A plan's usage credits can send the same words; the plan text
- * names the Claude account, because the CLI text names no provider (#9710). A turn on another API
- * (`CLAUDE_OTHER_API_VARIABLES`) keeps the CLI text: OpenBot does not know that account. Both texts
- * keep "credit balance … too low", so `isUsageLimitDiagnostic` still moves the turn to a backup
- * model (#4616).
+ * turn on a key gets the key text. A plan's usage credits can send the same words; a turn of a
+ * Claude account sign-in on the Anthropic API gets the account text, because the CLI text names no
+ * provider (#9710). Another sign-in, such as a Console account, and a turn on another API
+ * (`CLAUDE_OTHER_API_VARIABLES`) keep the CLI text: OpenBot does not know whose credit it is. Both
+ * texts keep "credit balance … too low", so `isUsageLimitDiagnostic` still moves the turn to a
+ * backup model (#4616).
  */
 const CLAUDE_API_CREDIT_EMPTY = /\bcredit balance (?:is )?too low\b/iu;
 
@@ -3064,10 +3072,10 @@ function claudeFastModeWarning(reason: string): string | null {
   }
 }
 
-function claudeTurnError(error: unknown, apiKey: boolean, otherApi: boolean): string {
+function claudeTurnError(error: unknown, apiKey: boolean, claudeAccount: boolean): string {
   const text = String(error);
   if (apiKey && CLAUDE_API_CREDIT_EMPTY.test(text)) return sourceText("error.provider.claudeApiKeyNoCredit");
-  if (!otherApi && CLAUDE_API_CREDIT_EMPTY.test(text)) return sourceText("error.provider.claudeAccountNoCredit");
+  if (claudeAccount && CLAUDE_API_CREDIT_EMPTY.test(text)) return sourceText("error.provider.claudeAccountNoCredit");
   // With an API key there is no sign-in to renew, so the key turn keeps the CLI text.
   if (!apiKey && CLAUDE_NOT_LOGGED_IN.test(text))
     return sourceText("error.provider.signInExpired", { provider: agentProviderName("claude") });
