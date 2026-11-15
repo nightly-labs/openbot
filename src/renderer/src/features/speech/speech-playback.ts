@@ -89,6 +89,12 @@ interface Reading {
   lastPartAsked: boolean;
 }
 
+/** The audio of one part of a reading, and how long its synthesis took. */
+interface SpokenPart {
+  audio: SpeechAudio;
+  synthesisMs: number | undefined;
+}
+
 /** A text that is read aloud after the reading of now. */
 export interface UpcomingReading {
   text: string;
@@ -349,16 +355,20 @@ export async function readAloud(
   });
   const voice = speechPort().voice;
   const preparedFirst = prepared?.text === text && prepared.language === language ? prepared.first : undefined;
+  // The time from a request to its answer is the synthesis time of the part. A prepared part was asked
+  // for before this reading, so it has no synthesis time.
+  const ask = (part: string): Promise<SpokenPart> => {
+    const askedAt = performance.now();
+    return voice.speak({ text: part, language }).then((audio) => ({ audio, synthesisMs: performance.now() - askedAt }));
+  };
   // A prepared part that failed is asked for again, as it was before the reading started.
-  let next: Promise<SpeechAudio> | undefined = preparedFirst
-    ? preparedFirst.catch(() => voice.speak({ text: first, language }))
-    : voice.speak({ text: first, language });
+  let next: Promise<SpokenPart> | undefined = preparedFirst
+    ? preparedFirst.then((audio) => ({ audio, synthesisMs: undefined })).catch(() => ask(first))
+    : ask(first);
   let part = first;
-  // A prepared part was asked for before this reading, so the time until its answer is not its synthesis time.
-  let askedAt: number | undefined = preparedFirst ? undefined : performance.now();
   try {
     while (next) {
-      const audio = await next;
+      const { audio, synthesisMs } = await next;
       if (own.stopped) return result;
       const seconds = audio.pcm.byteLength / 2 / audio.sampleRate;
       const current = part;
@@ -367,11 +377,9 @@ export async function readAloud(
         draft.reading.part = current;
       });
       // The next part must be ready before this part ends, so its length fits the speed of this computer.
-      const budget =
-        askedAt === undefined ? undefined : partBudget(current, seconds, performance.now() - askedAt, replyRate);
+      const budget = synthesisMs === undefined ? undefined : partBudget(current, seconds, synthesisMs, replyRate);
       const following = parts.next(budget);
-      askedAt = performance.now();
-      next = following === undefined ? undefined : voice.speak({ text: following, language });
+      next = following === undefined ? undefined : ask(following);
       // A reading that stops before this part plays never reads its answer.
       next?.catch(() => undefined);
       if (!next) {
