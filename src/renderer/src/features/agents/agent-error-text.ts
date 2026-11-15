@@ -18,9 +18,35 @@ const RETRY_NOTICE_KEYS: ReadonlySet<string> = new Set([
   "error.backend.providerModelAtCapacity",
 ]);
 
-/** True for a host's notice that the provider tries a request again (#9725). */
-export function isProviderRetryNotice(message: string): boolean {
-  return matchingSourceKeys(message).some((key) => RETRY_NOTICE_KEYS.has(key));
+/**
+ * The retry notice that each chat's banner shows, keyed like `conversationErrors`. The provider then
+ * tries again and often succeeds, so the notice goes at the agent's next output or at the end of the
+ * turn. It stayed as a red error after the agent had continued (#9725).
+ */
+export function createRetryNotices(
+  setConversationErrors: (update: (current: Record<string, string>) => Record<string, string>) => void,
+) {
+  const shown = new Map<string, string>();
+  return {
+    /** Records the banner text `message` of `key`. True when the host's text `source` is a retry notice. */
+    note(key: string, source: string, message: string): boolean {
+      const notice = matchingSourceKeys(source).some((sourceKey) => RETRY_NOTICE_KEYS.has(sourceKey));
+      if (notice) shown.set(key, message);
+      else shown.delete(key);
+      return notice;
+    },
+    /** Removes the banner of `key` while it still shows the retry notice. */
+    clear(key: string): void {
+      const notice = shown.get(key);
+      if (notice === undefined) return;
+      shown.delete(key);
+      setConversationErrors((current) => {
+        if (current[key] !== notice) return current;
+        const { [key]: _cleared, ...next } = current;
+        return next;
+      });
+    },
+  };
 }
 
 /** One sentence a reader can act on, whichever surface shows it. */

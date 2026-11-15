@@ -33,7 +33,7 @@ import { readDictatedReplies } from "../speech/speech-replies";
 import {
   agentErrorDetails,
   claimErrorToast,
-  isProviderRetryNotice,
+  createRetryNotices,
   providerErrorTitle,
   readableAgentError,
 } from "./agent-error-text";
@@ -80,23 +80,9 @@ export function AgentEventBridge() {
     applyOwnAgentLevels,
   } = useAgents();
   const { setConversationErrors, setConversationErrorRuns } = useConversationController();
-  /**
-   * The retry notice that each chat's banner shows, keyed like `conversationErrors`. The provider then
-   * tries again and often succeeds, so the notice goes at the agent's next output or at the end of the
-   * turn. It stayed as a red error after the agent had continued (#9725).
-   */
-  const retryNotices = new Map<string, string>();
-  function clearRetryNotice(agentId: string): void {
-    const key = composerDraftKey({ agentId, serverId: activeServerId() });
-    const notice = retryNotices.get(key);
-    if (notice === undefined) return;
-    retryNotices.delete(key);
-    setConversationErrors((current) => {
-      if (current[key] !== notice) return current;
-      const { [key]: _cleared, ...next } = current;
-      return next;
-    });
-  }
+  const retryNotices = createRetryNotices(setConversationErrors);
+  const clearRetryNotice = (agentId: string) =>
+    retryNotices.clear(composerDraftKey({ agentId, serverId: activeServerId() }));
   const { setUiErrors } = useUiErrors();
   const agentTasks = useAgentTasks();
   const {
@@ -445,9 +431,7 @@ export function AgentEventBridge() {
           // reader one line whatever its length, and dismissing it clears the whole run.
           const key = composerDraftKey({ agentId, serverId: activeServerId() });
           const message = readableAgentError(event.message);
-          const notice = isProviderRetryNotice(event.message);
-          if (notice) retryNotices.set(key, message);
-          else retryNotices.delete(key);
+          const notice = retryNotices.note(key, event.message, message);
           setConversationErrors((current) => ({ ...current, [key]: message }));
           // The provider and model above the error let the user report which run failed (#2858).
           const provider = event.provider ? providerDisplayName(event.provider) : null;
