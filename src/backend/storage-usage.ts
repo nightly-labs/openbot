@@ -82,7 +82,8 @@ export class StorageNotFoundError extends Error {}
 const STORAGE_WALK_ENTRY_LIMIT = 100_000;
 const STAT_BATCH = 64;
 const LOG_FILE = /\.log(\.\d+)?$/;
-const CACHE_TTL_MS = 60_000;
+/** How long a scan is kept. A file stored after a scan is not in it until the next scan. */
+export const STORAGE_SCAN_TTL_MS = 60_000;
 
 const yieldToEventLoop = Effect.callback<void>((resume) => {
   const pending = setImmediate(() => resume(Effect.void));
@@ -566,7 +567,8 @@ export class StorageUsageService {
       Effect.gen({ self: this }, function* () {
         const key = scopeKey(input);
         const cached = this.#cache.get(key);
-        if (!input.force && cached && this.#now() - cached.at < CACHE_TTL_MS) return Effect.succeed(cached.usage);
+        if (!input.force && cached && this.#now() - cached.at < STORAGE_SCAN_TTL_MS)
+          return Effect.succeed(cached.usage);
         const running = this.#running.get(key);
         if (running) return Fiber.join(running.fiber);
         const generation = this.#generation;

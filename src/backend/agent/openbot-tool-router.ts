@@ -1941,15 +1941,10 @@ export class OpenBotToolRouter {
       const args = listLibraryFoldersToolSchema.parse(params.arguments ?? {}, { reportInput: true });
       const libraryFolders = this.#libraryFolders;
       if (!libraryFolders) return openBotToolFailure("Library folders are not available on this OpenBot.");
-      const fileAgents = yield* libraryFileAgents(libraryFolders);
+      const storedFiles = this.#mailbox.listStoredFiles();
+      const fileAgents = yield* libraryFileAgents(libraryFolders, storedFiles);
       return openBotToolResult(
-        listLibraryFolders(
-          libraryFolders.getSnapshot(),
-          this.#mailbox.listStoredFiles(),
-          fileAgents,
-          senderAgentId,
-          args.folder,
-        ),
+        listLibraryFolders(libraryFolders.getSnapshot(), storedFiles, fileAgents, senderAgentId, args.folder),
       );
     }
 
@@ -1957,7 +1952,9 @@ export class OpenBotToolRouter {
       const args = organizeLibraryToolSchema.parse(params.arguments ?? {}, { reportInput: true });
       const libraryFolders = this.#libraryFolders;
       if (!libraryFolders) return openBotToolFailure("Library folders are not available on this OpenBot.");
-      return openBotToolResult(yield* organizeLibrary(libraryFolders, senderAgentId, args));
+      return openBotToolResult(
+        yield* organizeLibrary(libraryFolders, senderAgentId, args, this.#mailbox.listStoredFiles()),
+      );
     }
 
     if (params.tool === "list_agents") {

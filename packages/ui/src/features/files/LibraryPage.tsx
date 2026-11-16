@@ -57,6 +57,7 @@ import { LibraryPathHead } from "./LibraryPathHead";
 import { type LibraryBatchAction, type LibraryPillStep, LibrarySelectionPill } from "./LibrarySelectionPill";
 import { createLibraryFolderDrag, type LibraryDragItem, type LibraryDropTarget } from "./library-folder-drag";
 import {
+  AGENTS_SECTION,
   ALL_FILES,
   agentKey,
   canHoldFolder,
@@ -239,7 +240,7 @@ export function LibraryPage(props: LibraryPageProps) {
   /** The folder that "+" made and that has no name from the user yet. Escape removes it. */
   const [unnamed, setUnnamed] = createSignal<string | null>(null);
   /** A new folder that took files: the toast of the move waits for its name. `from`: the folders before. */
-  const [filled, setFilled] = createSignal<{ id: string; count: number; from: FileOrigins } | null>(null);
+  const [filled, setFilled] = createSignal<{ id: string; name: string; count: number; from: FileOrigins } | null>(null);
   /** The rows that hide their folders: an agent by its key, a folder by its id. */
   const [collapsed, setCollapsed] = createSignal<ReadonlySet<string>>(new Set(untrack(() => props.initialCollapsed)));
   const isCollapsed = (key: string) => collapsed().has(key);
@@ -460,9 +461,13 @@ export function LibraryPage(props: LibraryPageProps) {
     });
   }
 
-  /** Opens the agent, the folder and each folder above it, so the folders in that folder show. */
+  /** Opens the Agents section, the agent, the folder and each folder above it, so the folders in that folder show. */
   function reveal(agentId: string, folderId: string | undefined): void {
-    const keys = new Set([agentKey(agentId), ...libraryFolderPath(folderList(), folderId).map((folder) => folder.id)]);
+    const keys = new Set([
+      AGENTS_SECTION,
+      agentKey(agentId),
+      ...libraryFolderPath(folderList(), folderId).map((folder) => folder.id),
+    ]);
     setCollapsed((current) => {
       const next = new Set([...current].filter((key) => !keys.has(key)));
       return next.size === current.size ? current : next;
@@ -502,13 +507,15 @@ export function LibraryPage(props: LibraryPageProps) {
     for (const fileIds of rest) send({ type: "place", fileIds, folderId: id });
     reveal(agentId, parentId);
     announceFilled();
-    if (targets.length > 0) setFilled({ id, count: targets.length, from: fileOrigins(targets) });
+    if (targets.length > 0) setFilled({ id, name, count: targets.length, from: fileOrigins(targets) });
     return id;
   }
 
-  /** The tiles of the place show the folders of this parent. */
-  function tilesHold(agentId: string, parentId: string | undefined): boolean {
-    const at = place();
+  /**
+   * The tiles of the place show the folders of this parent. A caller that has just called `go` gives the
+   * new place: the place memo shows it only after the next flush.
+   */
+  function tilesHold(agentId: string, parentId: string | undefined, at = place()): boolean {
     if (at.kind === "folder") return at.folderId === parentId;
     if (at.kind === "agent") return at.agentId === agentId && parentId === undefined;
     return at.kind === "all" && parentId === undefined;
@@ -518,11 +525,11 @@ export function LibraryPage(props: LibraryPageProps) {
    * The new folder shows below its agent or its parent with its name field open: in the side panel, or
    * on its tile when the control was on the page.
    */
-  function newFolder(agentId: string, parentId: string | undefined, field: RenameField): void {
+  function newFolder(agentId: string, parentId: string | undefined, field: RenameField, at = place()): void {
     if (busy() || !canCreateFolder()) return;
     const id = createFolder(agentId, parentId, []);
     setUnnamed(id);
-    setRenaming({ id, field: field === "tile" && tilesHold(agentId, parentId) ? "tile" : "side" });
+    setRenaming({ id, field: field === "tile" && tilesHold(agentId, parentId, at) ? "tile" : "side" });
   }
 
   /** "New folder" on the page: in the folder of the place, or at the top level of its agent. */
@@ -534,14 +541,16 @@ export function LibraryPage(props: LibraryPageProps) {
 
   /** "New folder" on a tile opens the folder, then makes the new folder in it. */
   function newFolderIn(folder: LibraryFolder): void {
-    go({ kind: "folder", agentId: folder.agentId, folderId: folder.id });
-    newFolder(folder.agentId, folder.id, "tile");
+    const next: LibraryLocation = { kind: "folder", agentId: folder.agentId, folderId: folder.id };
+    go(next);
+    newFolder(folder.agentId, folder.id, "tile", next);
   }
 
   /** "New folder" at all files, at recent or at the files in no folder: the agent of the folder is picked first. */
   function newFolderForAgent(agentId: string): void {
-    go({ kind: "agent", agentId });
-    newFolder(agentId, undefined, "tile");
+    const next: LibraryLocation = { kind: "agent", agentId };
+    go(next);
+    newFolder(agentId, undefined, "tile", next);
   }
 
   /** Shows the toast of the files in a new folder, with the name of the folder. */
@@ -549,8 +558,8 @@ export function LibraryPage(props: LibraryPageProps) {
     const done = filled();
     if (!done) return;
     setFilled(null);
-    const folderName = name ?? folderById().get(done.id)?.name;
-    if (!folderName) return;
+    // The folder list can come after the user leaves the place: the folder then has the name it was made with.
+    const folderName = name ?? folderById().get(done.id)?.name ?? done.name;
     // Undo puts the files back and removes the folder that the drop made.
     toast.success(t("files.folder.filesMoved", { count: done.count, name: folderName }), {
       action: {

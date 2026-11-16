@@ -12,6 +12,7 @@ import { Effect } from "effect";
 import { z } from "zod";
 import type { LibraryFoldersStore } from "../library-folders-store";
 import type { MailboxStoredFile } from "../mailbox-store";
+import { STORAGE_SCAN_TTL_MS } from "../storage-usage";
 import { StoredStateFailure } from "../stored-state-effects";
 
 /** What the agent tools use of the Library folders of this host. */
@@ -219,6 +220,8 @@ export function organizeLibrary(
   libraryFolders: AgentLibraryFolders,
   agentId: string,
   args: OrganizeLibraryArguments,
+  storedFiles: readonly MailboxStoredFile[],
+  now = Date.now(),
 ): Effect.Effect<OrganizedLibrary, StoredStateFailure> {
   return Effect.gen(function* () {
     const snapshot = libraryFolders.getSnapshot();
@@ -242,11 +245,21 @@ export function organizeLibrary(
     const ownFiles = Effect.fn("LibraryFolders.ownFiles")(function* () {
       const fileIds = [...new Set(required(args.files, "files"))];
       if (fileIds.length === 0) throw new Error(`${args.action} needs at least one file id in files.`);
-      const fileAgents = yield* libraryFolders.fileAgents(fileIds);
+      const stored = new Map(storedFiles.map((file) => [file.attachment.id, file]));
+      const unknown = (fileId: string) =>
+        new Error(`No Library file has the id "${fileId}". list_library_folders gives the ids of your files.`);
+      const missing = fileIds.find((fileId) => !stored.has(fileId));
+      if (missing !== undefined) throw unknown(missing);
+      // A generated file has no stored time, so it can also be newer than the scan.
+      const fileAgents = yield* libraryFolders.fileAgents(
+        fileIds.filter((fileId) => {
+          const file = stored.get(fileId);
+          return file !== undefined && (file.createdAt === null || storedAfterScan(file, now));
+        }),
+      );
       for (const fileId of fileIds) {
         const fileAgent = fileAgents.get(fileId);
-        if (fileAgent === undefined)
-          throw new Error(`No Library file has the id "${fileId}". list_library_folders gives the ids of your files.`);
+        if (fileAgent === undefined) throw unknown(fileId);
         if (fileAgent !== agentId) throw new Error(`The file "${fileId}" is not one of your Library files.`);
       }
       const context: LibraryFolderContext = {
@@ -313,9 +326,24 @@ function safeFailure(failure: StoredStateFailure): StoredStateFailure {
   return new StoredStateFailure({ cause: new Error(refusalReason(failure.cause)) });
 }
 
-/** The agent of each file that the Library shows, for `list_library_folders`. */
+/**
+ * A file stored after the last host scan is not in it: the scan is kept for a short time. Only such a
+ * file starts a new scan, so an old file that the scan leaves out (it lists the largest files only)
+ * does not start one on each call.
+ */
+function storedAfterScan(file: MailboxStoredFile, now: number): boolean {
+  return file.createdAt !== null && now - Date.parse(file.createdAt) < STORAGE_SCAN_TTL_MS;
+}
+
+/**
+ * The agent of each file that the Library shows, for `list_library_folders`. A file that an agent
+ * attached a moment ago is in it too.
+ */
 export function libraryFileAgents(
   libraryFolders: AgentLibraryFolders,
+  storedFiles: readonly MailboxStoredFile[],
+  now = Date.now(),
 ): Effect.Effect<ReadonlyMap<string, string | null>, StoredStateFailure> {
-  return libraryFolders.fileAgents([]).pipe(Effect.mapError(safeFailure));
+  const recent = storedFiles.filter((file) => storedAfterScan(file, now)).map((file) => file.attachment.id);
+  return libraryFolders.fileAgents(recent).pipe(Effect.mapError(safeFailure));
 }
