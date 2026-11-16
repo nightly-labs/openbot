@@ -42,6 +42,7 @@ import {
   withSteeringModels,
   withWhatsAppStatusReactions,
   withWhatsAppWorkingMessages,
+  withWorkspaceOnlyLimit,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
@@ -192,6 +193,7 @@ import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "@openbot/contracts/team-pro
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-github-v1";
 import { WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-v1";
+import { WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/workspace-only-process-limit-v1";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { sourceText } from "@openbot/i18n/source";
 import { readHostAnalytics } from "@openbot/team-client";
@@ -1225,7 +1227,10 @@ export function createHostRequestActions({
           ? request("POST", MODEL_STEERING_ROUTES.list, decodeAgentSteeringModels, {}, serverId).catch(() => [])
           : [],
       ]);
-      return withSteeringModels(withFastServiceTiers(options, fast), steering);
+      return withWorkspaceOnlyLimit(
+        withSteeringModels(withFastServiceTiers(options, fast), steering),
+        has(serverId, WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY),
+      );
     },
     loadAgentMemorySelection: (agentId, serverId) =>
       runTeamRequest(

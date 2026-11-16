@@ -89,6 +89,7 @@ import {
   withModelListings,
   withSteeringModels,
   withUsageCredits,
+  withWorkspaceOnlyLimit,
 } from "@openbot/contracts/ipc";
 import { guardedListDecoder, optionalHistoryExtent, requiredString } from "@openbot/contracts/ipc-decoding";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
@@ -198,6 +199,7 @@ import {
   WORKSPACE_DIRECTORY_CAPABILITY,
   WORKSPACE_DIRECTORY_ROUTES,
 } from "@openbot/contracts/team-protocol/workspace-directory-v1";
+import { WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/workspace-only-process-limit-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import { bytesToBase64 } from "@openbot/team-client/base64";
 import { createRemoteBrowserView, type RemoteBrowserView } from "@openbot/team-client/browser-view";
@@ -1730,7 +1732,10 @@ export function createWebWorkspaceRuntime(
           ? request("POST", MODEL_STEERING_ROUTES.list, {}).then(decodeAgentSteeringModels, () => [])
           : [],
       ]);
-      return withSteeringModels(withModelListings(withFastServiceTiers(models, fast), listings), steering);
+      return withWorkspaceOnlyLimit(
+        withSteeringModels(withModelListings(withFastServiceTiers(models, fast), listings), steering),
+        capabilities.includes(WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY),
+      );
     },
     async status() {
       const value = await request("GET", TEAM_API_ROUTES.agents.status);

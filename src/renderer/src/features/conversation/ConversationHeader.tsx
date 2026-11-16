@@ -167,6 +167,7 @@ export function ConversationHeader() {
         disabledReason: t("conversation.header.modelsUnavailable"),
         accountChoice: true,
         providerAccountId: props.agent ? agentNextProviderAccountId(props.agent) : undefined,
+        workspaceOnly: props.agent?.access === "workspace",
         accountUsage: props.accountUsage,
         onChange: (model, provider, accountId, effort) =>
           void selectAndConfirmModel(model, provider, accountId, effort),

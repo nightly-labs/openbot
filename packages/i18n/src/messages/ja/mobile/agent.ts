@@ -318,6 +318,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "このプロバイダーで利用できるモデルはありません。",
   "mobile.agent.runtime.searchModels": "モデルを検索",
   "mobile.agent.runtime.noMatches": "検索に一致するモデルはありません。",
+  "mobile.agent.runtime.workspaceOnlyUnavailable":
+    "このプロバイダーは、Windows と Linux では「ワークスペースのみ」で動作しません。使うには、先に「権限」を変更してください。",
   "mobile.agent.runtime.usageLimit": "使用量の上限に達しました",
   "mobile.agent.runtime.usageLimitWindow": "{window}の上限",
   "mobile.agent.runtime.usageLimitResets": "{limit} · {time} にリセット",

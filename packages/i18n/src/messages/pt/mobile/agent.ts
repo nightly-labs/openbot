@@ -318,6 +318,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "Nenhum modelo disponível para este provedor.",
   "mobile.agent.runtime.searchModels": "Buscar modelos",
   "mobile.agent.runtime.noMatches": "Nenhum modelo corresponde à sua busca.",
+  "mobile.agent.runtime.workspaceOnlyUnavailable":
+    "Este provedor não funciona com “Somente o espaço de trabalho” no Windows e no Linux. Para usá-lo, altere primeiro as “Permissões”.",
   "mobile.agent.runtime.usageLimit": "Limite de uso atingido",
   "mobile.agent.runtime.usageLimitWindow": "Limite ({window})",
   "mobile.agent.runtime.usageLimitResets": "{limit} · Renova em {time}",

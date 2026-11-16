@@ -203,6 +203,7 @@
     "./team-protocol/workflows-media-transparent-v1": "./src/team-protocol/workflows-media-transparent-v1.ts",
     "./team-protocol/workflows-v1": "./src/team-protocol/workflows-v1.ts",
     "./team-protocol/crm-v1": "./src/team-protocol/crm-v1.ts",
+    "./team-protocol/workspace-only-process-limit-v1": "./src/team-protocol/workspace-only-process-limit-v1.ts",
     "./team-protocol/vault-import-v1": "./src/team-protocol/vault-import-v1.ts",
     "./team-protocol/vault-v1": "./src/team-protocol/vault-v1.ts",
     "./team-protocol/vault-v2": "./src/team-protocol/vault-v2.ts",

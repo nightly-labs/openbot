@@ -304,6 +304,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "该服务商没有可用模型。",
   "mobile.agent.runtime.searchModels": "搜索模型",
   "mobile.agent.runtime.noMatches": "没有匹配的模型。",
+  "mobile.agent.runtime.workspaceOnlyUnavailable":
+    "在 Windows 和 Linux 上，此提供商无法以“仅工作区”运行。要使用它，请先更改“权限”。",
   "mobile.agent.runtime.usageLimit": "已达用量上限",
   "mobile.agent.runtime.usageLimitWindow": "{window}上限",
   "mobile.agent.runtime.usageLimitResets": "{limit} · {time} 重置",

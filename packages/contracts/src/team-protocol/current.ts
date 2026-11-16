@@ -207,6 +207,7 @@ import { WORKFLOWS_MEDIA_CAPABILITY } from "./workflows-media-v1";
 import { WORKFLOWS_SUNRA_CAPABILITY } from "./workflows-sunra-v1";
 import { WORKFLOWS_CAPABILITY } from "./workflows-v1";
 import { WORKSPACE_DIRECTORY_CAPABILITY } from "./workspace-directory-v1";
+import { WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY } from "./workspace-only-process-limit-v1";
 
 export const TEAM_SEMANTIC_TAGS_CAPABILITY = "installed-skills";
 export const TEAM_AGENT_ACTIVITY_CAPABILITY = "agent-activity";
@@ -455,6 +456,7 @@ export {
   WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
   WORKFLOWS_SUNRA_CAPABILITY,
   WORKSPACE_DIRECTORY_CAPABILITY,
+  WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY,
 };
 
 export const TEAM_CURRENT_CAPABILITIES = [
@@ -686,6 +688,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
   WHATSAPP_STATUS_REACTIONS_CAPABILITY,
   CRM_CAPABILITY,
+  WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -932,7 +935,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== PROVIDER_ENVIRONMENT_CAPABILITY &&
     capability !== CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY &&
     capability !== WHATSAPP_STATUS_REACTIONS_CAPABILITY &&
-    capability !== CRM_CAPABILITY,
+    capability !== CRM_CAPABILITY &&
+    capability !== WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -1055,6 +1059,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
   WHATSAPP_STATUS_REACTIONS_CAPABILITY,
   CRM_CAPABILITY,
+  WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1260,6 +1265,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== PROVIDER_ENVIRONMENT_CAPABILITY &&
       capability !== CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY &&
       capability !== WHATSAPP_STATUS_REACTIONS_CAPABILITY &&
-      capability !== CRM_CAPABILITY,
+      capability !== CRM_CAPABILITY &&
+      capability !== WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY,
   );
 }

@@ -1382,6 +1382,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   disabledReason={t("agentSettings.runtime.modelUnavailable")}
                   accountChoice
                   providerAccountId={agentNextProviderAccountId(props.agent)}
+                  workspaceOnly={props.agent.access === "workspace"}
                   onChange={(nextModel, provider, accountId, effort) =>
                     void selectModel(nextModel, provider, accountId, effort)
                   }
