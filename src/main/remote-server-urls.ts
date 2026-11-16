@@ -60,7 +60,7 @@ function remoteAttachmentPreviewUrl(serverId: string, attachmentId: string, size
 
 /** The size that `addRemotePreviewUrls` puts on a media preview URL, or undefined. */
 export function remoteAttachmentPreviewSize(url: URL): number | undefined {
-  const size = Number(url.searchParams.get("size") ?? Number.NaN);
+  const size = Number(url.searchParams.get("size"));
   return Number.isSafeInteger(size) && size > 0 ? size : undefined;
 }
 
