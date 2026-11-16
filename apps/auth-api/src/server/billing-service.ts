@@ -61,7 +61,13 @@ import {
   stripeRequest,
 } from "./billing-errors";
 import { type BillingPurchase, purchaseEvent, reportPurchase, subscriptionEnd } from "./billing-purchase";
-import { type BillingSales, type BillingSalesSynced, type PaymentReversal, paymentReversal } from "./billing-sales";
+import {
+  type BillingSales,
+  type BillingSalesSynced,
+  type PaymentReversal,
+  paymentReversal,
+  withoutTax,
+} from "./billing-sales";
 import type { HostedFailure } from "./hosted-server-service";
 import {
   type FailedLicenseInvoice,
@@ -1051,7 +1057,10 @@ export class BillingService {
       ...(synced.kind === "license" ? { users: synced.users } : { plan: synced.plan }),
       interval: synced.interval,
       currency: synced.currency,
-      amount: currency === synced.currency && isBillingAmount(amount) ? amount : null,
+      amount:
+        currency === synced.currency && isBillingAmount(amount)
+          ? withoutTax(amount, object.total, object.total_excluding_tax)
+          : null,
     });
   });
 
