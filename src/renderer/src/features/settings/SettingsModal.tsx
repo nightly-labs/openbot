@@ -32,7 +32,11 @@ import { createBillingStore } from "@openbot/ui/features/billing/billing-store";
 import { LicenseSection } from "@openbot/ui/features/billing/LicenseSection";
 import { createLicenseStore } from "@openbot/ui/features/billing/license-store";
 import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
-import { SettingsDialogShell, type SettingsPagePlacement } from "@openbot/ui/features/settings/SettingsDialogShell";
+import {
+  SettingsDialogShell,
+  SettingsNavGroupLabel,
+  type SettingsPagePlacement,
+} from "@openbot/ui/features/settings/SettingsDialogShell";
 import { SettingsMobileConnectTab } from "@openbot/ui/features/settings/SettingsMobileConnectTab";
 import { SettingsProfileTab } from "@openbot/ui/features/settings/SettingsProfileTab";
 import { SettingsUpdatesTab } from "@openbot/ui/features/settings/SettingsUpdatesTab";
@@ -206,6 +210,8 @@ export function SettingsModal(props: SettingsModalProps) {
     onChange(value: string) {
       if (
         value === "general" ||
+        value === "appearance" ||
+        value === "app-behavior" ||
         value === "notifications" ||
         value === "voice" ||
         (value === "dynamic-island" && dynamicIslandShown()) ||
@@ -267,17 +273,21 @@ export function SettingsModal(props: SettingsModalProps) {
         onContentElement={(element) => (modalElement = element)}
         sidebar={
           <Tabs.List class="settings-modal-nav" aria-label={i18n.t("settings.sections.label")}>
-            {visibleNavItems().map((item) => {
+            {visibleNavItems().map((item, index, items) => {
               const NavIcon = item.icon;
+              const group = item.group !== items[index - 1]?.group ? item.group : undefined;
               return (
-                <Tabs.Trigger
-                  class="settings-modal-nav-item"
-                  value={item.value}
-                  aria-current={activeTab() === item.value ? "page" : undefined}
-                >
-                  <NavIcon aria-hidden="true" />
-                  <span>{i18n.t(item.titleKey)}</span>
-                </Tabs.Trigger>
+                <>
+                  {group ? <SettingsNavGroupLabel label={i18n.t(group)} /> : null}
+                  <Tabs.Trigger
+                    class="settings-modal-nav-item"
+                    value={item.value}
+                    aria-current={activeTab() === item.value ? "page" : undefined}
+                  >
+                    <NavIcon aria-hidden="true" />
+                    <span>{i18n.t(item.titleKey)}</span>
+                  </Tabs.Trigger>
+                </>
               );
             })}
           </Tabs.List>
@@ -286,6 +296,37 @@ export function SettingsModal(props: SettingsModalProps) {
         <Tabs.Content value="general" class="settings-modal-tab-panel" data-tab="general">
           {preferencesLoadError()}
           <SettingsGeneralTab
+            part="general"
+            value={props.value}
+            variant={props.appInfo?.variant ?? "production"}
+            platform={props.appInfo?.platform}
+            onUpdateSetting={updateSetting}
+            onUpdateSettings={updateSettings}
+            selectMount={modalElement}
+            chatColor={props.account.chatColor ?? null}
+            onSetChatColor={props.onSetChatColor}
+          />
+        </Tabs.Content>
+
+        <Tabs.Content value="appearance" class="settings-modal-tab-panel" data-tab="appearance">
+          {preferencesLoadError()}
+          <SettingsGeneralTab
+            part="appearance"
+            value={props.value}
+            variant={props.appInfo?.variant ?? "production"}
+            platform={props.appInfo?.platform}
+            onUpdateSetting={updateSetting}
+            onUpdateSettings={updateSettings}
+            selectMount={modalElement}
+            chatColor={props.account.chatColor ?? null}
+            onSetChatColor={props.onSetChatColor}
+          />
+        </Tabs.Content>
+
+        <Tabs.Content value="app-behavior" class="settings-modal-tab-panel" data-tab="app-behavior">
+          {preferencesLoadError()}
+          <SettingsGeneralTab
+            part="app-behavior"
             value={props.value}
             variant={props.appInfo?.variant ?? "production"}
             platform={props.appInfo?.platform}

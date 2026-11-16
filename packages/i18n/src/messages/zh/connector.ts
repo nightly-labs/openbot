@@ -277,6 +277,7 @@ export const messages = {
   "connector.telegram.helpRelayUnavailableHost":
     "{host} 上的 OpenBot 无法接收 Telegram 消息。请在 {host} 上登录，在服务器设置中为该服务器命名，并保持 OpenBot 开着。",
   "connector.telegram.helpError": "OpenBot 无法连接到该聊天。请重新连接，或断开该聊天。",
+  "connector.telegram.helpNotLinked": "此聊天未关联到此服务器。选择“重新连接”进行关联。",
   "connector.telegram.retryAt": "Telegram 要求 OpenBot 等待，将于 {time} 重试。",
   "connector.telegram.pause": "暂停",
   "connector.telegram.resume": "恢复",
@@ -356,6 +357,7 @@ export const messages = {
   "connector.whatsapp.helpLoggedOut": "WhatsApp 已把这台电脑从已关联的设备中移除。请重新关联该号码。",
   "connector.whatsapp.helpLoggedOutHost": "WhatsApp 已把这台服务器从已关联的设备中移除。请重新关联该号码。",
   "connector.whatsapp.helpError": "OpenBot 无法通过该号码连接 WhatsApp。请重新连接，或断开该号码。",
+  "connector.whatsapp.helpKeysUnreadable": "OpenBot 无法读取该号码已保存的密钥。请重新关联该号码。",
   "connector.whatsapp.retryAt": "WhatsApp 要求 OpenBot 等待，将于 {time} 重试。",
   "connector.whatsapp.pause": "暂停",
   "connector.whatsapp.resume": "恢复",

@@ -49,6 +49,8 @@ export const messages = {
   "sidebar.section.nameUnique": "文件夹名称不能重复。",
   "sidebar.section.saveFailed": "无法保存该文件夹，请重试。",
   "sidebar.section.unassigned": "未分组",
+  "sidebar.section.chatCount": { one: "{count} 个聊天", other: "{count} 个聊天" },
+  "sidebar.section.count": { one: "({count})", other: "({count})" },
   "sidebar.section.people": "成员",
   "sidebar.section.fallback": "文件夹",
   "sidebar.folder.newInside": "新建子文件夹",

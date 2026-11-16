@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { attachmentFileExtension, attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
+import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import { ATTACHMENT_LIMITS } from "@openbot/contracts/input-limits";
 import { type FilePreview, filePreviewKindForFile } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
@@ -25,8 +25,7 @@ export const localFilePreview = Effect.fn("FilePreview.local")(function* (
   generation: number,
   maxBytes: number = ATTACHMENT_LIMITS.fileBytes,
 ) {
-  const extension = attachmentFileExtension(name);
-  const mimeType = extension === "html" || extension === "htm" ? "text/html" : mimeTypeForName(name);
+  const mimeType = mimeTypeForName(name);
   // A file over the limit is not read. The panel still opens, reveals and saves it by its path.
   const kind = size > Math.min(maxBytes, ATTACHMENT_LIMITS.fileBytes) ? "none" : filePreviewKindForFile(name, mimeType);
   const bytes = kind === "none" ? null : new Uint8Array(yield* attachmentCall(() => readFile(path)));

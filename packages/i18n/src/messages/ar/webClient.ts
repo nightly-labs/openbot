@@ -19,6 +19,12 @@ export const messages = {
   "webClient.pane.chat": "الدردشة",
   "webClient.pane.routines": "المهام الدورية",
   "webClient.pane.workspace": "مساحة العمل",
+  "webClient.phoneApp.title": "استخدم تطبيق OpenBot",
+  "webClient.phoneApp.description":
+    "على الهاتف، يعمل OpenBot بشكل أفضل في التطبيق. سجّل الدخول بالبريد الإلكتروني نفسه.",
+  "webClient.phoneApp.ios": "تنزيل لـ iPhone",
+  "webClient.phoneApp.android": "تنزيل لـ Android",
+  "webClient.phoneApp.continue": "المتابعة في المتصفح",
   "webClient.notice.connecting": "جارٍ الاتصال بخادمك",
   "webClient.notice.findingHosts": "جارٍ البحث عن خوادمك",
   "webClient.notice.hostsFailed": "تعذّر تحميل خوادمك",

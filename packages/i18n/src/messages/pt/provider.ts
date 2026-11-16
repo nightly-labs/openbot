@@ -167,6 +167,12 @@ export const messages = {
   "provider.claudeKey.description":
     'Salve uma chave de API da Anthropic no host. A Anthropic cobra cada solicitação no crédito de API da chave, não no seu plano do Claude. Para usá-la em um agente, selecione a conta "Chave de API" no menu de modelos do agente. Quando o Claude não está conectado, todos os agentes usam a chave.',
   "provider.claudeKey.label": "Chave de API da Anthropic",
+  "provider.cursorKey.title": "Chave de API do Cursor",
+  "provider.cursorKey.description":
+    "Cada conta do Cursor depois da primeira usa uma chave de API. Crie uma chave no painel do Cursor, em Integrations, e cole aqui. A chave é salva neste computador.",
+  "provider.cursorKey.descriptionHost":
+    "Cada conta do Cursor depois da primeira usa uma chave de API. Crie uma chave no painel do Cursor, em Integrations, e cole aqui. A chave é salva no computador anfitrião.",
+  "provider.cursorKey.label": "Chave de API do Cursor",
   "provider.inceptionKey.title": "Chave de API da Inception",
   "provider.inceptionKey.description":
     "Salve uma chave de API da Inception neste computador para usar os modelos Mercury. O OpenBot os executa na CLI do Pi que ele baixa.",
@@ -200,6 +206,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "Não foi possível reconectar.",
   "provider.account.add": "Adicionar conta",
   "provider.account.addLabel": "Adicionar outra conta de {name}",
+  "provider.account.addWithCode": "Adicionar conta com código",
   "provider.account.count": { one: "{count} conta", other: "{count} contas" },
   "provider.account.numbered": "Conta {number}",
   "provider.account.apiKey": "Chave de API",

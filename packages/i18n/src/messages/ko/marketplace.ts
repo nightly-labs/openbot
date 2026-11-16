@@ -107,6 +107,10 @@ export const messages = {
   "marketplace.app.remove.action": "제거",
   "marketplace.app.remove.confirmTitle": "{name}을(를) 제거할까요?",
   "marketplace.app.remove.keep": "유지",
+  "marketplace.app.replace.title": "{server}을(를) 바꿀까요?",
+  "marketplace.app.replace.description":
+    "{server}(이)라는 서버가 이미 있지만 {name}이(가) 아닙니다. {name}(으)로 바꿀까요? 주소와 저장된 키가 삭제됩니다.",
+  "marketplace.app.replace.action": "바꾸기",
   "marketplace.app.connection": "연결",
   "marketplace.app.access.use": "사용 가능",
   "marketplace.app.access.noAgents": "에이전트 없음",

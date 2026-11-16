@@ -1,5 +1,5 @@
 import type { OpenBotDesktopApi, VoiceLiveEvent } from "@openbot/contracts/ipc";
-import type { VoicePanelPhase } from "@openbot/ui/features/conversation/VoicePanel";
+import type { VoicePhase } from "@openbot/ui/features/conversation/VoicePill";
 import { currentText } from "@openbot/ui/text";
 import { createStore, onCleanup } from "solid-js";
 import { SPEECH_LEVEL_COUNT } from "../../speech/speech-playback";
@@ -25,8 +25,6 @@ type LiveStep = "starting" | "listening" | "thinking" | "speaking";
 interface LiveState {
   step: LiveStep;
   muted: boolean;
-  heard: string;
-  said: string;
   error: string | null;
   levels: number[];
 }
@@ -56,8 +54,6 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
   const [state, setState] = createStore<LiveState>({
     step: "starting",
     muted: false,
-    heard: "",
-    said: "",
     error: null,
     levels: quietLevels(),
   });
@@ -119,12 +115,7 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
     if (event.type === "ended") {
       sessionId = null;
       failEnded(event.error);
-      return;
     }
-    setState((draft) => {
-      if (event.role === "user") draft.heard = event.final ? event.text : draft.heard + event.text;
-      else draft.said = event.final ? event.text : draft.said + event.text;
-    });
   });
 
   /** The realtime v3 turns give the phase: who speaks, and when the model thinks. */
@@ -144,9 +135,6 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
       silenceNextReply = false;
       if (silencedTurn === null) reply.muted = false;
       setStep("listening");
-      setState((draft) => {
-        draft.heard = "";
-      });
     } else if (event.type === "turn.done" && turn.role === "user") {
       if (step !== "speaking") setStep("thinking");
     } else if (event.type === "turn.created" && turn.role === "assistant") {
@@ -157,9 +145,6 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
         return;
       }
       setStep("speaking");
-      setState((draft) => {
-        draft.said = "";
-      });
     } else if (event.type === "turn.done" && turn.role === "assistant") {
       if (silencedTurn === turn.id) {
         silencedTurn = null;
@@ -309,13 +294,11 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
 
   void start();
 
-  const phase = (): VoicePanelPhase => state.step;
+  const phase = (): VoicePhase => state.step;
   return {
     phase,
     muted: () => state.muted,
-    heard: () => state.heard,
     error: () => state.error,
-    said: () => state.said,
     levels: () => state.levels,
     toggleMute,
     interrupt,

@@ -88,6 +88,18 @@ export const messages = {
   "browser.secret.submitting": "제출 중…",
   "browser.secret.takeOver": "직접 제어",
   "browser.secret.failed": "요청을 완료할 수 없어요. 연결을 확인한 후 다시 시도해 주세요.",
+  "browser.secret.vaultSkip.agentScript":
+    "에이전트가 이 페이지에서 스크립트를 실행해서 OpenBot이 저장된 로그인 정보를 사용하지 않았어요. 사용하려면 에이전트에게 페이지를 새로고침하고 다시 시도해 달라고 요청하세요.",
+  "browser.secret.vaultSkip.fieldKind":
+    "에이전트가 페이지에서 잘못된 입력란을 선택해서 OpenBot이 저장된 로그인 정보를 사용하지 않았어요.",
+  "browser.secret.vaultSkip.loginChoice":
+    "에이전트가 이 사이트에 저장된 로그인 정보 중 하나를 선택하지 않아서 OpenBot이 저장된 로그인 정보를 사용하지 않았어요. 어떤 계정을 사용할지 에이전트에게 알려 주세요.",
+  "browser.secret.vaultSkip.noPassword":
+    "저장된 로그인 정보에 이 사이트의 비밀번호가 없어서 OpenBot이 사용하지 않았어요.",
+  "browser.secret.vaultSkip.noAuthenticatorKey":
+    "저장된 로그인 정보에 인증 앱 키가 없어서 OpenBot이 사용하지 않았어요.",
+  "browser.secret.vaultSkip.vaultUnreadable":
+    "비밀번호 관리자를 읽을 수 없어서 OpenBot이 저장된 로그인 정보를 사용하지 않았어요.",
   "browser.error.openAddress": "이 탭에서 주소를 열 수 없어요.",
   "browser.error.channelNoBrowserMember": "이 채널에서는 새 탭을 열 수 있는 멤버가 없어요.",
   "browser.error.closeTab": "브라우저 탭을 닫을 수 없어요.",

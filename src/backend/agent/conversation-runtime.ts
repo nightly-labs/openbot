@@ -698,7 +698,7 @@ export class ConversationRuntime {
     }
     if (snapshot.threadId) {
       const cached = this.#cachedSnapshot(snapshot);
-      const changedMessages = this.#changedMessages(snapshot);
+      const changedMessages = this.#changedMessages(snapshot, snapshot.threadId);
       const removedMessageIds = this.#removedMessageIds(snapshot);
       if (
         cached &&
@@ -752,9 +752,12 @@ export class ConversationRuntime {
     return undefined;
   }
 
-  #changedMessages(snapshot: ConversationSnapshot): ConversationMessage[] {
+  #changedMessages(snapshot: ConversationSnapshot, threadId: string): ConversationMessage[] {
     const cached = this.#cachedSnapshot(snapshot);
-    if (!cached) return structuredClone(snapshot.messages);
+    // A caller can keep a snapshot while a provider read, an eviction or another thread replaces the
+    // cached one. Write only what stores differently: writing it whole put every unchanged message in
+    // the event log again (#8166).
+    if (!cached) return this.#store.database.changedConversationMessages(threadId, snapshot.messages);
     const changed = new Set<ConversationMessage>();
     const untracked: ConversationMessage[] = [];
     for (const message of snapshot.messages) {
@@ -765,10 +768,7 @@ export class ConversationRuntime {
     if (untracked.length === 0) return [...changed];
     // A message the cache does not hold can be a stored row that a limit dropped and a sync added
     // back. Write it only when it stores differently, so the same row is never written again.
-    for (const message of snapshot.threadId
-      ? this.#store.database.changedConversationMessages(snapshot.threadId, untracked)
-      : untracked)
-      changed.add(message);
+    for (const message of this.#store.database.changedConversationMessages(threadId, untracked)) changed.add(message);
     return snapshot.messages.filter((message) => changed.has(message));
   }
 

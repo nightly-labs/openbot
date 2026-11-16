@@ -17,6 +17,8 @@
 //   protocol 7 or 8 client gets the nearest released level, and the frozen v7 decoder reads it.
 // - usage-tertiary-v1: a protocol 9 client that asks for it gets the third usage window on the usage
 //   route, the event socket and a WebRTC event; any other client gets the released limits (#7689).
+// - browser-vault-skip-v1: a protocol 9 client that asks for it gets why a saved login was not filled on
+//   the event socket and a WebRTC event; any other client gets the released takeover request (#7262).
 // Run: `bun scripts/team-api-legacy-clients-e2e.ts`.
 // Writes .openbot-build/team-api-legacy-clients-e2e/report.json.
 import assert from "node:assert/strict";
@@ -65,7 +67,10 @@ import {
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
-import { TEAM_USAGE_TERTIARY_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import {
+  BROWSER_VAULT_SKIP_CAPABILITY,
+  TEAM_USAGE_TERTIARY_CAPABILITY,
+} from "@openbot/contracts/team-protocol/current";
 import {
   TEAM_REASONING_EFFORTS,
   TEAM_REASONING_EFFORTS_CAPABILITY,
@@ -1054,6 +1059,90 @@ try {
   } finally {
     Object.defineProperty(hostAgents, "getUsage", { value: getUsage, configurable: true });
   }
+
+  // --- browser-vault-skip-v1: why a saved login was not filled ---
+
+  const takeover = {
+    requestId: "vault-skip-request",
+    agentId: source.id,
+    threadId: "vault-skip-thread",
+    turnId: "vault-skip-turn",
+    tabId: "vault-skip-tab",
+    secret: { method: "password" as const, origin: "https://app.example.com", digits: 6 },
+    vaultSkip: "agent-script" as const,
+  };
+  const withoutVaultSkip = (protocol: number) =>
+    teamCapabilitiesForProtocol(protocol).filter((capability) => capability !== BROWSER_VAULT_SKIP_CAPABILITY);
+
+  /** The first `browser-takeover-requested` event on the event socket of a client that declares `capabilities`. */
+  async function currentTakeoverEvent(capabilities: readonly string[]): Promise<JsonObject> {
+    const opened = new WebSocket(`ws://127.0.0.1:${port}/v1/events`, [
+      TEAM_PROTOCOL_V1_WEBSOCKET,
+      `openbot-token.${member.token}`,
+    ]);
+    await new Promise<void>((resolveOpen, reject) => {
+      opened.addEventListener("open", () => resolveOpen(), { once: true });
+      opened.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+    });
+    const scoped = nextMessage(opened, (value) =>
+      isRecord(value) && value.type === "runtime-snapshot" ? value : null,
+    );
+    opened.send(
+      encodeTeamProtocolV1CurrentClientEvent({
+        type: "agent-event-scope",
+        includeConversations: false,
+        capabilities: [...capabilities],
+      }),
+    );
+    try {
+      await scoped;
+      const requested = nextMessage(opened, (value) =>
+        isRecord(value) && value.type === "browser-takeover-requested" ? value : null,
+      );
+      hostAgents.emit("event", { type: "browser-takeover-requested", request: takeover });
+      return await requested;
+    } finally {
+      opened.close();
+    }
+  }
+
+  await step("browser-vault-skip-v1: a protocol 9 client that asks for it gets the reason", async () => {
+    const capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9);
+    assert.ok(capabilities.includes(BROWSER_VAULT_SKIP_CAPABILITY), "A v9 client does not ask for it.");
+    assert.ok(
+      !teamCapabilitiesForProtocol(8).includes(BROWSER_VAULT_SKIP_CAPABILITY),
+      "A protocol 8 client asks for browser-vault-skip-v1.",
+    );
+    const wire = await currentTakeoverEvent(capabilities);
+    assert.equal(record(wire.request, "request").vaultSkip, "agent-script", JSON.stringify(wire));
+    const decoded = decodeTeamProtocolV8BaseCurrentEvent(wire);
+    assert.ok(decoded.kind === "known" && decoded.event.type === "browser-takeover-requested", JSON.stringify(wire));
+    assert.equal(decoded.event.request.vaultSkip, "agent-script");
+    assert.equal(decoded.event.request.secret?.origin, "https://app.example.com");
+    return { request: Object.keys(record(wire.request, "request")).sort() };
+  });
+
+  await step("browser-vault-skip-v1: a client without it gets the released takeover request", async () => {
+    const wire = await currentTakeoverEvent(withoutVaultSkip(TEAM_PROTOCOL_V9));
+    const request = record(wire.request, "request");
+    assert.ok(!Object.hasOwn(request, "vaultSkip"), `A client without it got the reason: ${JSON.stringify(wire)}.`);
+    assert.equal(record(request.secret, "secret").origin, "https://app.example.com");
+    return { request: Object.keys(request).sort() };
+  });
+
+  await step("browser-vault-skip-v1: a WebRTC event follows the capability; a bad value fails closed", async () => {
+    const wire = await currentTakeoverEvent(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9));
+    const relayed = decodeTeamProtocolV8CurrentEvent(
+      createTeamProtocolV8Event(1, wire, { preserveBrowserSecrets: true, browserVaultSkip: true }),
+    );
+    assert.ok(relayed.status === "known" && relayed.event.type === "browser-takeover-requested");
+    assert.equal(relayed.event.request.vaultSkip, "agent-script");
+    const without = createTeamProtocolV8Event(2, wire, { preserveBrowserSecrets: true });
+    assert.ok(without.type === "event" && !JSON.stringify(without.payload).includes("vaultSkip"));
+    const malformed = { ...wire, request: { ...record(wire.request, "request"), vaultSkip: "stolen-password" } };
+    assert.equal(decodeTeamProtocolV8BaseCurrentEvent(malformed).kind, "invalid");
+    return { relayed: relayed.status, malformed: "invalid" };
+  });
 
   // --- v2 over WebRTC frames ---
 

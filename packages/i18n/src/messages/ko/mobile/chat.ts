@@ -159,6 +159,7 @@ export const messages = {
   "mobile.chat.composer.send": "메시지 보내기",
   "mobile.chat.composer.stop": "{name} 중지",
   "mobile.chat.composer.dictate": "음성으로 메시지 입력",
+  "mobile.chat.composer.voiceSettings": "음성 설정",
   "mobile.chat.composer.stopDictation": "음성 입력 중지",
   "mobile.chat.composer.mention": "{name} 멘션",
   "mobile.chat.composer.skills": "스킬",
@@ -339,6 +340,18 @@ export const messages = {
   "mobile.chat.browserSecret.done": "완료",
   "mobile.chat.browserSecret.submitOnce": "{origin}에 한 번만 제출해요. 이 값은 채팅에 추가되지 않아요.",
   "mobile.chat.browserSecret.submitFailed": "요청을 완료할 수 없어요. 연결을 확인한 후 다시 시도해 주세요.",
+  "mobile.chat.browserSecret.vaultSkip.agentScript":
+    "에이전트가 이 페이지에서 스크립트를 실행해서 OpenBot이 저장된 로그인 정보를 사용하지 않았어요. 사용하려면 에이전트에게 페이지를 새로고침하고 다시 시도해 달라고 요청하세요.",
+  "mobile.chat.browserSecret.vaultSkip.fieldKind":
+    "에이전트가 페이지에서 잘못된 입력란을 선택해서 OpenBot이 저장된 로그인 정보를 사용하지 않았어요.",
+  "mobile.chat.browserSecret.vaultSkip.loginChoice":
+    "에이전트가 이 사이트에 저장된 로그인 정보 중 하나를 선택하지 않아서 OpenBot이 저장된 로그인 정보를 사용하지 않았어요. 어떤 계정을 사용할지 에이전트에게 알려 주세요.",
+  "mobile.chat.browserSecret.vaultSkip.noPassword":
+    "저장된 로그인 정보에 이 사이트의 비밀번호가 없어서 OpenBot이 사용하지 않았어요.",
+  "mobile.chat.browserSecret.vaultSkip.noAuthenticatorKey":
+    "저장된 로그인 정보에 인증 앱 키가 없어서 OpenBot이 사용하지 않았어요.",
+  "mobile.chat.browserSecret.vaultSkip.vaultUnreadable":
+    "비밀번호 관리자를 읽을 수 없어서 OpenBot이 저장된 로그인 정보를 사용하지 않았어요.",
   "mobile.chat.browserSecret.submit": "제출",
   "mobile.chat.browserSecret.takeOver": "직접 제어",
   "mobile.chat.starter.title": "무엇부터 시작할까요?",
@@ -404,7 +417,14 @@ export const messages = {
   "mobile.chat.approval.effect.permissions":
     "허용하면 {name}에게 {server}에서 이 권한을 부여해요. 거부하면 현재 권한이 유지돼요.",
   "mobile.chat.approval.partial":
-    "이 요청은 너무 길어서 휴대폰에 표시할 수 없어요. 허용하려면 {server}에서 OpenBot을 열어 주세요. 여기서는 거부할 수 있어요.",
+    "{server}는 이 요청의 앞부분만 휴대폰으로 보내요. 허용하려면 {server}의 OpenBot을 업데이트하거나 OpenBot 데스크톱 앱에서 이 채팅을 열어 주세요. 여기서는 거부할 수 있어요.",
+  "mobile.chat.approval.loading": "전체 요청을 불러오는 중…",
+  "mobile.chat.approval.loadFailed": "전체 요청을 불러오지 못했어요. 여기서는 거부할 수 있어요.",
+  "mobile.chat.approval.retry": "다시 시도",
+  "mobile.chat.approval.report.bugHeadline": "버그를 찾으셨나요? 고쳐 봅시다.",
+  "mobile.chat.approval.report.ideaHeadline": "아이디어가 있나요? 실현해 봅시다.",
+  "mobile.chat.approval.report.dontSend": "나중에",
+  "mobile.chat.approval.report.send": "OpenBot 팀에 보내기",
   "mobile.chat.approval.allow": "허용",
   "mobile.chat.approval.deny": "거부",
   "mobile.chat.approval.reconnect": "이 요청에 응답하려면 {server}에 연결해 주세요.",

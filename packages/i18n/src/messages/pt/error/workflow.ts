@@ -19,6 +19,14 @@ export const messages = {
   "error.workflow.agentStepEnded": "A mensagem ao agente foi removida antes da resposta.",
   "error.workflow.conditionUnclear": "O modelo não respondeu sim ou não.",
   "error.workflow.modelFailed": "O modelo não conseguiu responder. Execute a etapa novamente.",
+  "error.workflow.modelTimedOut":
+    "O modelo não respondeu a tempo. Escolha um esforço menor ou um modelo mais rápido para esta etapa e execute-a novamente.",
+  "error.workflow.modelToolUse":
+    "O modelo tentou usar uma ferramenta, mas esta etapa só pode responder com texto. Execute a etapa novamente ou escolha outro modelo para ela.",
+  "error.workflow.modelUnavailable": "O modelo desta etapa não está disponível. Escolha outro modelo para esta etapa.",
+  "error.workflow.providerBusy": "O provedor está ocupado. Aguarde alguns minutos e execute a etapa novamente.",
+  "error.workflow.providerOffline":
+    "O OpenBot não conseguiu acessar o provedor. Verifique a conexão com a internet e execute a etapa novamente.",
   "error.workflow.modelBusy": "Outra solicitação ao modelo está em andamento. Execute a etapa novamente em breve.",
   "error.workflow.mediaFailed": "O modelo não conseguiu criar a imagem ou o vídeo. Execute a etapa novamente.",
   "error.workflow.pictureMissing": "A imagem não está mais no servidor. Envie-a novamente.",

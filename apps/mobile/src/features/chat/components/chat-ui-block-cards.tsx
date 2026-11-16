@@ -116,6 +116,12 @@ export function PromptStatus({ controller, canSend }: { controller: QuestionProm
 }
 
 const PREVIEW_CLIP = { maxHeight: PREVIEW_MAX_HEIGHT };
+const MAX_KNOWN_CUT_OFF = 100;
+/**
+ * Whether each draft that a card showed was cut off. The list draws a card again each time its row
+ * scrolls into view; the card then has "Show all" from its first layout and keeps one height.
+ */
+const knownCutOff = new Map<string, boolean>();
 
 /**
  * A long draft stops at a fixed height. It does not scroll, so the chat is the only part that
@@ -125,11 +131,18 @@ const PREVIEW_CLIP = { maxHeight: PREVIEW_MAX_HEIGHT };
  */
 function ConfirmPreview({ markdown, title }: { markdown: string; title: string }) {
   const { t } = useText();
-  const [cutOff, setCutOff] = useState(false);
+  const [cutOff, setCutOff] = useState(() => knownCutOff.get(markdown) ?? false);
   return (
     <View className="gap-1">
       <View className="overflow-hidden" style={PREVIEW_CLIP} accessibilityLabel={t("mobile.chat.question.preview")}>
-        <View onLayout={(event) => setCutOff(event.nativeEvent.layout.height > PREVIEW_MAX_HEIGHT)}>
+        <View
+          onLayout={(event) => {
+            const cut = event.nativeEvent.layout.height > PREVIEW_MAX_HEIGHT;
+            if (knownCutOff.size >= MAX_KNOWN_CUT_OFF) knownCutOff.clear();
+            knownCutOff.set(markdown, cut);
+            setCutOff(cut);
+          }}
+        >
           <ChatMarkdown
             body={markdown}
             color={undefined}

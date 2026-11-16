@@ -86,6 +86,8 @@ export function MarketplaceOverlay(props: {
   macOS?: boolean | undefined;
   /** Opens the form that adds a custom MCP server to the server with this ID. */
   onAddServer?: ((serverId: string) => void) | undefined;
+  /** Opens the form that edits one custom MCP server of the server with this ID. */
+  onEditServer?: ((serverId: string, mcpServerId: string) => void) | undefined;
 }) {
   const controller = useConversationController();
   const manage = createMemo(() => serverCanAdminister(props.server, "skills-admin-v1"));
@@ -110,6 +112,13 @@ export function MarketplaceOverlay(props: {
     const open = props.onAddServer;
     if (serverId === undefined || !open) return undefined;
     return () => open(serverId);
+  };
+  /** Edit on a custom server's page, for a user who can change the servers of the host. */
+  const editServer = () => {
+    const serverId = pluginServerId();
+    const open = props.onEditServer;
+    if (serverId === undefined || !open) return undefined;
+    return (mcpServerId: string) => open(serverId, mcpServerId);
   };
   /* What both example controls need: a managed agent whose composer is free to take another line. */
   const composerFree = createMemo(
@@ -172,6 +181,7 @@ export function MarketplaceOverlay(props: {
           pluginServerId={pluginServerId()}
           pluginsBlocked={pluginsBlocked()}
           onAddServer={addServer()}
+          onEditServer={editServer()}
           pluginHostName={
             props.server?.kind === "remote" && serverCanManageMcp(props.server) ? props.server.name : undefined
           }

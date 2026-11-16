@@ -1,4 +1,10 @@
-import { BILLING_CURRENCIES, BILLING_METADATA, type BillingCurrency } from "@openbot/contracts/billing";
+import {
+  BILLING_CURRENCIES,
+  BILLING_METADATA,
+  type BillingCurrency,
+  type BillingStorageTier,
+  parseStorageTierPrice,
+} from "@openbot/contracts/billing";
 import { LICENSE_LOOKUP_KEYS, LICENSE_METADATA, LICENSE_METADATA_KIND } from "@openbot/contracts/license";
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import { Effect, Option, Result, Schema } from "effect";
@@ -85,6 +91,8 @@ const subscriptionSchema = Schema.Struct({
   trial_end: Schema.optional(Schema.NullOr(Schema.Int)),
   discounts: Schema.optional(Schema.NullOr(Schema.Array(expandable))),
   latest_invoice: Schema.optional(Schema.NullOr(expandable)),
+  /** Stripe Tax on the invoices. Subscriptions from before VAT collection have it off. */
+  automatic_tax: Schema.optional(Schema.Struct({ enabled: Schema.Boolean })),
   default_payment_method: Schema.optional(Schema.NullOr(expandable)),
   items: Schema.Struct({
     data: Schema.Array(
@@ -112,6 +120,8 @@ const invoicePaymentListSchema = Schema.Struct({ data: Schema.Array(Schema.Struc
 const invoiceSchema = Schema.Struct({
   id: Schema.String,
   billing_reason: Schema.optional(Schema.NullOr(Schema.String)),
+  total: Schema.optional(Schema.NullOr(Schema.Number)),
+  total_excluding_tax: Schema.optional(Schema.NullOr(Schema.Number)),
   parent: Schema.optional(
     Schema.NullOr(
       Schema.Struct({
@@ -134,6 +144,9 @@ const eventSchema = Schema.Struct({
   data: Schema.Struct({ object: Schema.Record(Schema.String, Schema.Unknown) }),
 });
 export type StripeEvent = typeof eventSchema.Type;
+
+/** The largest number of `lookup_keys[]` that Stripe takes in one Price list request. */
+const PRICE_LOOKUP_KEYS_PER_REQUEST = 10;
 
 export function isBillingCurrency(value: unknown): value is BillingCurrency {
   return isOneOf(BILLING_CURRENCIES, value);
@@ -240,16 +253,59 @@ export class StripeClient {
     );
   }).bind(this);
 
-  /** The active Prices with these lookup keys, with the amount in each currency. */
+  /**
+   * Adds the storage add-on to a subscription, or moves its storage item to `priceId`. Stripe invoices the
+   * prorated amount now and refuses the change when that payment fails (402), so a server never gets a
+   * larger disk unpaid. The idempotency key makes a repeated request one change.
+   */
+
+  readonly setStorageItem = Effect.fn("StripeClient.setStorageItem")(function* (
+    this: StripeClient,
+    input: { subscriptionId: string; itemId: string | null; priceId: string },
+    idempotencyKey: string,
+  ): Effect.fn.Return<StripeSubscription, StripeRequestError | StripeTransportError> {
+    const body = new URLSearchParams({
+      "items[0][price]": input.priceId,
+      "items[0][quantity]": "1",
+      proration_behavior: "always_invoice",
+      payment_behavior: "error_if_incomplete",
+      "expand[]": "items.data.price.currency_options",
+    });
+    if (input.itemId) body.set("items[0][id]", input.itemId);
+    return yield* this.#requestEffect(
+      "POST",
+      `/v1/subscriptions/${encodeURIComponent(input.subscriptionId)}`,
+      body,
+      subscriptionSchema,
+      idempotencyKey,
+    );
+  }).bind(this);
+
+  /**
+   * The active Prices with these lookup keys, with the amount in each currency. Stripe takes at most 10
+   * lookup keys in one request, so a longer list is read in parts.
+   */
 
   readonly listPricesByLookupKeys = Effect.fn("StripeClient.listPricesByLookupKeys")(function* (
     this: StripeClient,
     lookupKeys: readonly string[],
   ): Effect.fn.Return<StripePrice[], StripeRequestError | StripeTransportError> {
-    const query = new URLSearchParams({ active: "true", limit: "100" });
-    for (const key of lookupKeys) query.append("lookup_keys[]", key);
-    query.append("expand[]", "data.currency_options");
-    return [...(yield* this.#requestEffect("GET", `/v1/prices?${query}`, null, priceListSchema)).data];
+    const chunks: (readonly string[])[] = [];
+    for (let start = 0; start < lookupKeys.length; start += PRICE_LOOKUP_KEYS_PER_REQUEST) {
+      chunks.push(lookupKeys.slice(start, start + PRICE_LOOKUP_KEYS_PER_REQUEST));
+    }
+    // The requests run at the same time, so a cold catalog waits for one Stripe call, not one per chunk.
+    const pages = yield* Effect.forEach(
+      chunks,
+      (keys) => {
+        const query = new URLSearchParams({ active: "true", limit: "100" });
+        for (const key of keys) query.append("lookup_keys[]", key);
+        query.append("expand[]", "data.currency_options");
+        return this.#requestEffect("GET", `/v1/prices?${query}`, null, priceListSchema);
+      },
+      { concurrency: "unbounded" },
+    );
+    return pages.flatMap((page) => page.data);
   }).bind(this);
 
   /** The same idempotency key gives the same customer, so two requests at once make one customer. */
@@ -321,6 +377,27 @@ export class StripeClient {
       currency: input.currency,
       // Card collection stays on, so a plan that a code discounts only at the start can still renew.
       allow_promotion_codes: "true",
+      // `hosted` is the name of `hosted_page` before API version 2026-03-25.dahlia.
+      ui_mode: "hosted",
+      origin_context: "web",
+      submit_type: "auto",
+      payment_method_collection: "always",
+      billing_address_collection: "auto",
+      "phone_number_collection[enabled]": "false",
+      // Stripe Tax adds VAT on top of the Price (`tax_behavior: exclusive`) where the account is
+      // registered: an individual in the EU pays it, and a company with an EU tax ID from another
+      // country pays no VAT (reverse charge). Outside the EU, no registration applies and the tax is 0.
+      "automatic_tax[enabled]": "true",
+      "tax_id_collection[enabled]": "true",
+      "tax_id_collection[required]": "never",
+      // Stripe refuses tax ID collection for an existing customer without these two.
+      "customer_update[name]": "auto",
+      "customer_update[address]": "auto",
+      "consent_collection[terms_of_service]": "required",
+      // No `name_collection[business]`: with it, Checkout hides the "I'm purchasing as a business"
+      // checkbox, and thus the tax ID field, until the buyer types a business name.
+      "name_collection[individual][enabled]": "true",
+      "name_collection[individual][optional]": "true",
       success_url: input.successUrl,
       cancel_url: input.cancelUrl,
       expires_at: String(input.nowSeconds + CHECKOUT_LIFETIME_SECONDS),
@@ -397,6 +474,11 @@ export class StripeClient {
       currency: BillingCurrency;
       anchorSeconds: number;
       trial?: boolean;
+      /**
+       * Stripe Tax on the invoices, as on the subscription that this one comes from. Sent only when true, so
+       * the retry of a split that started before Stripe Tax keeps the body of its idempotency key.
+       */
+      automaticTax: boolean;
       paymentMethodId: string | null;
       metadata: Readonly<Record<string, string>>;
     },
@@ -412,6 +494,7 @@ export class StripeClient {
         : { billing_cycle_anchor: String(input.anchorSeconds), proration_behavior: "none" }),
       "expand[]": "items.data.price.currency_options",
     });
+    if (input.automaticTax) body.set("automatic_tax[enabled]", "true");
     if (input.paymentMethodId) body.set("default_payment_method", input.paymentMethodId);
     for (const [key, value] of Object.entries(input.metadata)) body.set(`metadata[${key}]`, value);
     return yield* this.#requestEffect("POST", "/v1/subscriptions", body, subscriptionSchema, idempotencyKey);
@@ -469,15 +552,22 @@ export class StripeClient {
   }).bind(this);
 
   /**
-   * The invoice that a PaymentIntent paid, the subscription of that invoice and why Stripe made it. Null for
-   * a payment of no subscription invoice. From API version 2025-03-31 a charge does not name its invoice.
+   * The invoice that a PaymentIntent paid, the subscription of that invoice, why Stripe made it, and its
+   * total with and without tax. Null for a payment of no subscription invoice. From API version
+   * 2025-03-31 a charge does not name its invoice.
    */
 
   readonly getPaymentInvoice = Effect.fn("StripeClient.getPaymentInvoice")(function* (
     this: StripeClient,
     paymentIntentId: string,
   ): Effect.fn.Return<
-    { invoiceId: string; subscriptionId: string; billingReason: string | null } | null,
+    {
+      invoiceId: string;
+      subscriptionId: string;
+      billingReason: string | null;
+      total: number | null;
+      totalExcludingTax: number | null;
+    } | null,
     StripeRequestError | StripeTransportError
   > {
     const query = new URLSearchParams({
@@ -497,6 +587,8 @@ export class StripeClient {
       invoiceId,
       subscriptionId: typeof subscription === "string" ? subscription : subscription.id,
       billingReason: invoiceRecord.billing_reason ?? null,
+      total: invoiceRecord.total ?? null,
+      totalExcludingTax: invoiceRecord.total_excluding_tax ?? null,
     };
   }).bind(this);
 
@@ -570,9 +662,25 @@ export function subscriptionLicenseItem(subscription: StripeSubscription): Strip
   return subscription.items.data.find((item) => isLicensePrice(item.price)) ?? null;
 }
 
-/** The item of a subscription that is not the license: the server plan. */
+/** True for a Price of the storage add-on of a hosted server. */
+function isStoragePrice(price: { lookup_key: string | null; metadata: Readonly<Record<string, string>> }) {
+  return parseStorageTierPrice(price) !== null;
+}
+
+/** The item of a subscription that is not the license or the storage add-on: the server plan. */
 export function subscriptionServerItem(subscription: StripeSubscription): StripeSubscriptionItem | null {
-  return subscription.items.data.find((item) => !isLicensePrice(item.price)) ?? null;
+  return subscription.items.data.find((item) => !isLicensePrice(item.price) && !isStoragePrice(item.price)) ?? null;
+}
+
+/** The storage add-on item of a server plan, or null when the server has the plan storage only. */
+export function subscriptionStorageItem(subscription: StripeSubscription): StripeSubscriptionItem | null {
+  return subscription.items.data.find((item) => isStoragePrice(item.price)) ?? null;
+}
+
+/** The storage tier that a subscription pays for: the tier of its storage item, or 0 with no such item. */
+export function subscriptionStorageTier(subscription: StripeSubscription): BillingStorageTier {
+  const item = subscriptionStorageItem(subscription);
+  return item ? (parseStorageTierPrice(item.price)?.tier ?? 0) : 0;
 }
 
 /** The item that names the product of a subscription: the server plan when there is one, else the license. */
@@ -587,14 +695,25 @@ export function subscriptionPeriodEnd(subscription: StripeSubscription): number 
 }
 
 /**
- * The list price of one period in the subscription's currency, in minor units. A multi-currency Price
- * holds its base currency amount in `unit_amount` and the other currencies in `currency_options`.
- * Null for a Price with no fixed amount, such as a tiered Price.
+ * The list price of one period in the subscription's currency, in minor units: the plan, and the storage
+ * add-on of a server plan. A multi-currency Price holds its base currency amount in `unit_amount` and the
+ * other currencies in `currency_options`. Null for a Price with no fixed amount, such as a tiered Price.
  */
 export function subscriptionAmount(subscription: StripeSubscription): number | null {
   const item = subscriptionMainItem(subscription);
   if (!item) return null;
   const currency = subscription.currency.toLowerCase();
+  const storage = subscriptionServerItem(subscription) ? subscriptionStorageItem(subscription) : null;
+  let amount = 0;
+  for (const part of storage ? [item, storage] : [item]) {
+    const partAmount = itemAmount(part, currency);
+    if (partAmount === null) return null;
+    amount += partAmount;
+  }
+  return Number.isSafeInteger(amount) ? amount : null;
+}
+
+function itemAmount(item: StripeSubscriptionItem, currency: string): number | null {
   const unitAmount =
     item.price.currency.toLowerCase() === currency
       ? item.price.unit_amount

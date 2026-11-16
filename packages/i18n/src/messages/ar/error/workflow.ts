@@ -17,6 +17,14 @@ export const messages = {
   "error.workflow.agentStepEnded": "أُزيلت رسالة الوكيل لهذه الخطوة قبل أن يجيب.",
   "error.workflow.conditionUnclear": "لم يجب النموذج بـ «نعم» أو «لا».",
   "error.workflow.modelFailed": "تعذّر على النموذج الإجابة. شغّل الخطوة مرة أخرى.",
+  "error.workflow.modelTimedOut":
+    "لم يُجب النموذج في الوقت المحدد. اختر جهدًا أقل أو نموذجًا أسرع لهذه الخطوة، ثم شغّلها مرة أخرى.",
+  "error.workflow.modelToolUse":
+    "حاول النموذج استخدام أداة، لكن هذه الخطوة لا تجيب إلا بنص. شغّل الخطوة مرة أخرى، أو اختر نموذجًا آخر لها.",
+  "error.workflow.modelUnavailable": "نموذج هذه الخطوة غير متاح. اختر نموذجًا آخر لهذه الخطوة.",
+  "error.workflow.providerBusy": "المزوّد مشغول. انتظر بضع دقائق، ثم شغّل الخطوة مرة أخرى.",
+  "error.workflow.providerOffline":
+    "تعذّر على OpenBot الوصول إلى المزوّد. تحقّق من الاتصال بالإنترنت، ثم شغّل الخطوة مرة أخرى.",
   "error.workflow.modelBusy": "يجري تنفيذ طلب نموذج آخر. شغّل الخطوة مرة أخرى بعد قليل.",
   "error.workflow.mediaFailed": "تعذّر على النموذج إنشاء الصورة أو الفيديو. شغّل الخطوة مرة أخرى.",
   "error.workflow.pictureMissing": "الصورة لم تعد على الخادم. أرسلها مرة أخرى.",

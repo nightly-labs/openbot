@@ -136,7 +136,12 @@ router builds a `form` UI block with one required secret field (`apiKeyFormSpec`
 contract changed. When the Vault is ready, the form also has a segmented "Save for" field: "All agents
 (Vault)", which is selected first, or "Only this agent". For the Vault, `AttentionRegistry` saves the
 value with `VaultItems.saveApiKey` and deletes the asking agent's own key with that name, as
-`save_api_key` does; every agent then reads the `.vault/<NAME>` file. Otherwise, `AttentionRegistry` saves the value with
+`save_api_key` does; `AgentApiKeys.list` then writes the key to `.vault/<agentId>/<NAME>` for each
+agent that can use it. A key for every agent also goes to `.vault/<NAME>`, the path of versions
+before 0.70.0, because scripts, MCP servers and provider configs read it (#8983); a key for chosen
+agents never does. "Only this agent" saves a Vault key for the asking agent. All agents run as
+the same system user, so an agent can read the key files of other agents: the scope controls which
+agents OpenBot gives a key to, not which agents can read it. The Vault text says this. Otherwise, `AttentionRegistry` saves the value with
 `AgentApiKeys` (`src/backend/agent-api-keys.ts`) before the prompt resolves, as
 `<userData>/agent-api-keys/<agentId>/<NAME>`: a 0600 file in a 0700 folder, outside every workspace,
 and not encrypted. A failed save leaves the form open. The agent gets only the name and the path, and

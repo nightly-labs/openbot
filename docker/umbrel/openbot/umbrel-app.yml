@@ -1,0 +1,48 @@
+manifestVersion: 1
+id: __APP_ID__
+storage:
+  dataRoot: data
+category: ai
+name: OpenBot
+version: "__VERSION__"
+tagline: A server for your AI agents
+icon: https://openbot.run/icon-512x512.png
+description: >-
+  OpenBot runs your AI agents on your Umbrel. Each agent has its own workspace, conversation and
+  memory, and keeps working when your computer is off.
+
+
+  After the install, open the app and sign in with your OpenBot account. Then use the server from the
+  OpenBot desktop app, the OpenBot phone app or openbot.run/app with the same account, and connect a
+  provider such as Claude Code or Codex.
+
+
+  Your conversations, files and agent workspaces stay on your Umbrel. OpenBot connects out to the
+  account service, to the providers that you connect, and to the relay that lets your devices
+  reach the server.
+
+
+  - **Persistent agents** - Agents keep their workspace, conversation and identity across restarts.
+
+  - **Many providers** - Claude Code, Codex, Gemini, OpenCode, Hermes Agent and more.
+
+  - **Browser and computer use** - Agents use a browser and a virtual display in the app sandbox.
+
+  - **Teams** - Invite members to the server and work with the same agents.
+releaseNotes: ""
+
+developer: Synthetify Labs
+website: https://openbot.run
+dependencies: []
+repo: https://github.com/nightly-labs/openbot
+support: https://github.com/nightly-labs/openbot/issues
+
+port: 4180
+gallery: []
+path: ""
+
+defaultUsername: ""
+defaultPassword: ""
+
+submitter: Synthetify Labs
+submission: ""

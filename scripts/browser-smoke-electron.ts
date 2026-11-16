@@ -406,6 +406,12 @@ const server = createServer((request, response) => {
     response.end("console.error('external diagnostic marker');");
     return;
   }
+  // The document stops after its doctype, so a navigation that times out leaves no root element.
+  if (url.pathname === "/stalled-document") {
+    response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    response.write("<!doctype html>");
+    return;
+  }
   if (url.pathname === "/slow-document") {
     slowDocumentVersion += 1;
     const version = slowDocumentVersion;
@@ -1782,6 +1788,23 @@ async function main(): Promise<void> {
       releaseActionNavigation();
     }
     await runCauseEffect(browser.close(actionNavigationTab.id));
+    // A document with no root element draws no frame. A snapshot of it must not wait for an image.
+    const { tab: stalledTab } = await openTabWithContents(browser, origin, "smoke-thread", "smoke-bot");
+    const stalledNavigation = await callBrowserTool(browser, "navigate", {
+      tabId: stalledTab.id,
+      url: `${origin}/stalled-document`,
+      timeoutMs: 500,
+    });
+    if (stalledNavigation.success) throw new Error("V2 stalled navigation did not time out.");
+    const stalledSnapshotStartedAt = Date.now();
+    const stalledSnapshot = await callBrowserTool(browser, "snapshot", { tabId: stalledTab.id });
+    const stalledSnapshotMs = Date.now() - stalledSnapshotStartedAt;
+    if (!stalledSnapshot.success || stalledSnapshotMs > 2_000) {
+      throw new Error(
+        `V2 snapshot of a document with no root element waited for an image: ${stalledSnapshotMs} ms, ${stalledSnapshot.success ? "success" : toolError(stalledSnapshot)}.`,
+      );
+    }
+    await runCauseEffect(browser.close(stalledTab.id));
     const { tab: waitTab, contents: waitContents } = await openTabWithContents(
       browser,
       origin,

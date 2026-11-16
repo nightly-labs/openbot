@@ -78,6 +78,8 @@ export const messages = {
   "error.backend.channelWaitBeforeDeleteHistory": "请等此频道中的工作停止后再删除其历史记录。",
   "error.backend.channelCompactUnavailable":
     "此频道现在没有成员可以压缩上下文。成员必须先在频道中回答,且其提供方必须支持压缩。",
+  "error.backend.channelCompactNoSession": "此频道的成员还没有可压缩的对话。请在成员于频道中回答后再压缩。",
+  "error.backend.channelCompactNotSupported": "此频道没有成员可以按需压缩。支持的成员会在上下文快满时自动压缩。",
   "error.backend.channelArchived": "请先恢复该频道，再发送消息或更改任务。",
   "error.backend.channelReferenceUnavailable": "引用的频道消息不可用。",
   "error.backend.channelTaskNotFound": "未找到该频道任务。",
@@ -107,6 +109,7 @@ export const messages = {
   "error.backend.memoryOperationFailed": "记忆操作失败，请重试。",
   "error.backend.memoryGone": "该记忆已不存在。",
   "error.backend.routineGone": "该自动化任务已不存在。",
+  "error.backend.routineRunGone": "该自动化任务的此次运行已不存在。",
   "error.backend.turnNotStarted": "服务商未启动本轮对话。",
   "error.backend.routineResultConnectionOff": "该消息连接已关闭或已移除，请另选投递位置。",
   "error.backend.routineResultNoDelivery": "本次运行没有可再次发送的回答。",
@@ -180,6 +183,8 @@ export const messages = {
   "error.backend.routineRunNoSession": "由于服务商会话不可用，OpenBot 无法中断正在进行中的自动化任务运行。",
   "error.backend.interruptSelf": "助手不能中断自己。",
   "error.backend.interruptOtherWork": "该助手正在处理非你的消息发起的任务，只有用户或该任务的发送者才能停止它。",
+  "error.backend.interruptSharedWork":
+    "该助手的这一轮在处理你的消息，同时也在处理来自用户或其他助手的消息。只有用户可以在该助手的聊天中用“停止助手”停止它。",
   "error.backend.interruptStarting": "该助手仍在启动对话，请等对话开始后再试。",
   "error.backend.interruptNoSession": "由于服务商会话不可用，OpenBot 无法中断该助手。",
   "error.backend.memoryTextRequired": "需要填写记忆内容。",
@@ -241,6 +246,10 @@ export const messages = {
     "{provider} 无法使用 MCP 服务器 {name}，因为该服务器要求登录。请打开 MCP 设置并选择“登录”。",
   "error.backend.mcpServerFailedForProvider":
     "{provider} 无法启动 MCP 服务器 {name}。请打开 MCP 设置并选择“测试连接”查看原因。",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider} 无法启动 MCP 服务器 {name}，{provider} 无法使用它的工具。{provider} 会自行启动服务器，因此 OpenBot 中的连接测试可能会成功。请开始新的聊天后再试一次。",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider} 无法启动 MCP 服务器 {name}，因为服务器没有及时响应。请开始新的聊天后再试一次。",
   "error.backend.mcpOAuthProxyUnavailable": "OpenBot 无法为这台服务器建立本地登录连接。请重启 OpenBot 后再试一次。",
   "error.backend.mcpOAuthSignInNeeded": "该 MCP 服务器的登录已结束。用户需要在 OpenBot 中重新登录。",
   "error.backend.mcpServerUnreachable": "OpenBot 无法连接该服务器。请检查地址与网络。",
@@ -325,6 +334,8 @@ export const messages = {
   "error.backend.browserProxyChanged": "此代理在你打开后已被更改。请重新查看，然后再试一次。",
   "error.backend.browserProxyUnreachable": "代理 {name} 没有响应，因此页面没有打开。",
   "error.backend.browserProxySignInRefused": "代理 {name} 拒绝了登录，因此页面没有打开。",
+  "error.backend.browserSystemProxyFailed":
+    "运行 OpenBot 的计算机设置中的代理没有响应或拒绝了连接，因此页面没有打开。请检查该计算机的代理设置。",
   "error.backend.browserProxyComputerUnreachable": "此配置文件使用的计算机没有响应，因此页面没有打开。",
   "error.backend.browserProxyComputerLocalAddress":
     "此配置文件使用的计算机只打开公共网站。它不打开本地网络上的地址，因此页面没有打开。",
@@ -347,6 +358,8 @@ export const messages = {
   "error.backend.browserInputProtected": "验证期间浏览器输入受保护。",
   "error.backend.mcpServerHttpCredentials": "服务器返回 {status}。请检查 API 密钥或其他凭据。",
   "error.backend.mcpServerHttpUrl": "服务器返回 {status}。请检查地址，链接可能错误、过期或已删除。",
+  "error.backend.mcpServerBearerKey":
+    "此服务器使用 API 密钥，而不是登录。在“请求头”中，将键设为 Authorization，将值设为 Bearer、一个空格和你的 API 密钥。",
   "error.backend.mcpSignInAppUrl": "登录应用需要有效的服务器地址。",
   "error.backend.mcpSignInAppClientId": "请输入登录应用的客户端 ID。",
   "error.backend.mcpSignInAppIssuerChanged":

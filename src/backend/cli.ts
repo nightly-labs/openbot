@@ -1330,9 +1330,19 @@ export function cliSpawnTarget(
 /**
  * A busy computer can take many seconds to start a CLI, so the limit is generous. A timeout is
  * reported apart from a failure: the CLI is not broken, and reinstalling it does not help. The
- * provider runtime tries again later, so this limit only has to cover one slow answer.
+ * provider runtime tries again later, with `SLOW_CLI_VERSION_TIMEOUT_MS`.
  */
 const CLI_VERSION_TIMEOUT_MS = 10_000;
+/**
+ * The limit of a version read after a read of the same CLI timed out. The first read from a cold disk
+ * cache took 85 s, and 3 reads with `CLI_VERSION_TIMEOUT_MS` in a row stopped the provider (#8548). The
+ * longer limit stays after a read in time: the files can leave the disk cache again. A read that also
+ * times out with this limit is from a CLI that does not answer, and the next read has the short limit
+ * again: a hung CLI does not hold a start for 2 minutes each time.
+ */
+const SLOW_CLI_VERSION_TIMEOUT_MS = 120_000;
+/** The executables whose next version read waits `SLOW_CLI_VERSION_TIMEOUT_MS`. */
+const slowVersionReads = new Set<string>();
 
 /**
  * A busy computer makes every candidate slow, so the resolvers report the first timeout and do not
@@ -1355,36 +1365,44 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
   const launchPath = yield* cliLaunchPath(candidate, source);
   const launch = launchPath ? { launchPath } : {};
   const target = process.platform === "win32" && [".bat", ".cmd"].includes(extname(candidate).toLowerCase());
-  const timeout = providerCheckTimeoutMs(CLI_VERSION_TIMEOUT_MS);
-  const output = yield* providerCall(() =>
-    target
-      ? execFileAsync(
-          process.env.ComSpec?.trim() || "cmd.exe",
-          ["/d", "/s", "/c", `""${candidate.replaceAll("%", "%%")}" ${args.join(" ")}"`],
-          {
+  const slow = slowVersionReads.has(candidate);
+  const timeout = providerCheckTimeoutMs(slow ? SLOW_CLI_VERSION_TIMEOUT_MS : CLI_VERSION_TIMEOUT_MS);
+  // The signal stops the process when the start that waits for it ends.
+  const output = yield* Effect.tryPromise({
+    try: (signal) =>
+      target
+        ? execFileAsync(
+            process.env.ComSpec?.trim() || "cmd.exe",
+            ["/d", "/s", "/c", `""${candidate.replaceAll("%", "%%")}" ${args.join(" ")}"`],
+            {
+              signal,
+              timeout,
+              maxBuffer: 64 * 1024,
+              windowsHide: true,
+              windowsVerbatimArguments: true,
+            },
+          )
+        : execFileAsync(candidate, [...args], {
+            signal,
             timeout,
             maxBuffer: 64 * 1024,
-            windowsHide: true,
-            windowsVerbatimArguments: true,
-          },
-        )
-      : execFileAsync(candidate, [...args], {
-          timeout,
-          maxBuffer: 64 * 1024,
-          windowsHide: process.platform === "win32",
-          env: { ...process.env, ...cliPathEnvironment(launch) },
-        }),
-  ).pipe(
-    Effect.mapError((failure) =>
-      isDynamicRecord(failure.cause) && failure.cause.killed === true
-        ? providerFailure(
-            new CodexCliError(
-              sourceText("error.provider.cliTimedOutRefresh", { provider: agentProviderName(provider) }),
-              "timeout",
-            ),
-          )
-        : failure,
-    ),
+            windowsHide: process.platform === "win32",
+            env: { ...process.env, ...cliPathEnvironment(launch) },
+          }),
+    catch: providerFailure,
+  }).pipe(
+    Effect.mapError((failure) => {
+      if (!(isDynamicRecord(failure.cause) && failure.cause.killed === true)) return failure;
+      // The timeout changes the limit of the next read (`SLOW_CLI_VERSION_TIMEOUT_MS`).
+      if (slow) slowVersionReads.delete(candidate);
+      else slowVersionReads.add(candidate);
+      return providerFailure(
+        new CodexCliError(
+          sourceText("error.provider.cliTimedOutRefresh", { provider: agentProviderName(provider) }),
+          "timeout",
+        ),
+      );
+    }),
   );
   return { stdout: output.stdout, launch };
 });

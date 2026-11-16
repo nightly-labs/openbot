@@ -160,6 +160,7 @@ export const messages = {
   "mobile.chat.composer.send": "Enviar mensagem",
   "mobile.chat.composer.stop": "Parar {name}",
   "mobile.chat.composer.dictate": "Ditar mensagem",
+  "mobile.chat.composer.voiceSettings": "Ajustes de voz",
   "mobile.chat.composer.stopDictation": "Parar ditado",
   "mobile.chat.composer.mention": "Mencionar {name}",
   "mobile.chat.composer.skills": "Habilidades",
@@ -346,6 +347,18 @@ export const messages = {
   "mobile.chat.browserSecret.submitOnce": "Envie uma vez para {origin}. Este valor não é adicionado ao chat.",
   "mobile.chat.browserSecret.submitFailed":
     "Não foi possível concluir a solicitação. Verifique a conexão e tente novamente.",
+  "mobile.chat.browserSecret.vaultSkip.agentScript":
+    "O OpenBot não usou seu login salvo porque o agente executou um script nesta página. Para usá-lo, peça ao agente que recarregue a página e tente de novo.",
+  "mobile.chat.browserSecret.vaultSkip.fieldKind":
+    "O OpenBot não usou seu login salvo porque o agente escolheu o campo errado na página.",
+  "mobile.chat.browserSecret.vaultSkip.loginChoice":
+    "O OpenBot não usou nenhum login salvo porque o agente não escolheu nenhum dos logins salvos para este site. Diga ao agente qual conta usar.",
+  "mobile.chat.browserSecret.vaultSkip.noPassword":
+    "O OpenBot não usou seu login salvo porque ele não tem senha para este site.",
+  "mobile.chat.browserSecret.vaultSkip.noAuthenticatorKey":
+    "O OpenBot não usou seu login salvo porque ele não tem chave do autenticador.",
+  "mobile.chat.browserSecret.vaultSkip.vaultUnreadable":
+    "O OpenBot não usou nenhum login salvo porque não conseguiu ler seu gerenciador de senhas.",
   "mobile.chat.browserSecret.submit": "Enviar",
   "mobile.chat.browserSecret.takeOver": "Assumir",
   "mobile.chat.starter.title": "No que vamos trabalhar primeiro?",
@@ -414,7 +427,14 @@ export const messages = {
   "mobile.chat.approval.effect.permissions":
     "Permitir dá a {name} estas permissões em {server}. Negar mantém as permissões atuais.",
   "mobile.chat.approval.partial":
-    "Esta solicitação é longa demais para aparecer no celular. Para permiti-la, abra o OpenBot em {server}. Você pode negá-la aqui.",
+    "{server} envia ao celular só o início desta solicitação. Para permiti-la, atualize o OpenBot em {server} ou abra este chat no app do OpenBot para computador. Você pode negá-la aqui.",
+  "mobile.chat.approval.loading": "Carregando a solicitação completa…",
+  "mobile.chat.approval.loadFailed": "Não foi possível carregar a solicitação completa. Você pode negá-la aqui.",
+  "mobile.chat.approval.retry": "Tentar de novo",
+  "mobile.chat.approval.report.bugHeadline": "Encontrou um erro? Vamos corrigi-lo.",
+  "mobile.chat.approval.report.ideaHeadline": "Tem uma ideia? Vamos torná-la real.",
+  "mobile.chat.approval.report.dontSend": "Agora não",
+  "mobile.chat.approval.report.send": "Enviar para a equipe do OpenBot",
   "mobile.chat.approval.allow": "Permitir",
   "mobile.chat.approval.deny": "Negar",
   "mobile.chat.approval.reconnect": "Conecte-se a {server} para responder a esta solicitação.",

@@ -176,6 +176,7 @@ export const messages = {
   "mobile.chat.composer.send": "Wyślij wiadomość",
   "mobile.chat.composer.stop": "Zatrzymaj: {name}",
   "mobile.chat.composer.dictate": "Dyktuj wiadomość",
+  "mobile.chat.composer.voiceSettings": "Ustawienia głosu",
   "mobile.chat.composer.stopDictation": "Zatrzymaj dyktowanie",
   "mobile.chat.composer.mention": "Oznacz: {name}",
   "mobile.chat.composer.skills": "Umiejętności",
@@ -368,6 +369,18 @@ export const messages = {
   "mobile.chat.browserSecret.done": "Gotowe",
   "mobile.chat.browserSecret.submitOnce": "Wyślij jednorazowo do {origin}. Ta wartość nie trafi do czatu.",
   "mobile.chat.browserSecret.submitFailed": "Nie udało się zrealizować żądania. Sprawdź połączenie i spróbuj ponownie.",
+  "mobile.chat.browserSecret.vaultSkip.agentScript":
+    "OpenBot nie użył Twoich zapisanych danych logowania, ponieważ agent uruchomił skrypt na tej stronie. Aby ich użyć, poproś agenta o ponowne załadowanie strony i ponowną próbę.",
+  "mobile.chat.browserSecret.vaultSkip.fieldKind":
+    "OpenBot nie użył Twoich zapisanych danych logowania, ponieważ agent wybrał niewłaściwe pole na stronie.",
+  "mobile.chat.browserSecret.vaultSkip.loginChoice":
+    "OpenBot nie użył zapisanych danych logowania, ponieważ agent nie wybrał żadnych z danych logowania zapisanych dla tej witryny. Powiedz agentowi, którego konta ma użyć.",
+  "mobile.chat.browserSecret.vaultSkip.noPassword":
+    "OpenBot nie użył Twoich zapisanych danych logowania, ponieważ nie zawierają hasła do tej witryny.",
+  "mobile.chat.browserSecret.vaultSkip.noAuthenticatorKey":
+    "OpenBot nie użył Twoich zapisanych danych logowania, ponieważ nie zawierają klucza aplikacji uwierzytelniającej.",
+  "mobile.chat.browserSecret.vaultSkip.vaultUnreadable":
+    "OpenBot nie użył zapisanych danych logowania, ponieważ nie mógł odczytać Twojego menedżera haseł.",
   "mobile.chat.browserSecret.submit": "Wyślij",
   "mobile.chat.browserSecret.takeOver": "Przejmij",
   "mobile.chat.starter.title": "Od czego zaczniemy?",
@@ -450,7 +463,14 @@ export const messages = {
   "mobile.chat.approval.effect.permissions":
     "„Zezwól” daje agentowi {name} te uprawnienia na serwerze {server}. „Odmów” zachowuje obecne uprawnienia.",
   "mobile.chat.approval.partial":
-    "To żądanie jest zbyt długie, aby pokazać je na telefonie. Aby na nie zezwolić, otwórz OpenBot na serwerze {server}. Odmówić możesz tutaj.",
+    "{server} wysyła na telefon tylko początek tego żądania. Aby na nie zezwolić, zaktualizuj OpenBot na serwerze {server} albo otwórz ten czat w aplikacji OpenBot na komputerze. Odmówić możesz tutaj.",
+  "mobile.chat.approval.loading": "Wczytywanie całego żądania…",
+  "mobile.chat.approval.loadFailed": "Nie udało się wczytać całego żądania. Odmówić możesz tutaj.",
+  "mobile.chat.approval.retry": "Spróbuj ponownie",
+  "mobile.chat.approval.report.bugHeadline": "Znalazłeś błąd? Naprawmy go.",
+  "mobile.chat.approval.report.ideaHeadline": "Masz pomysł? Zróbmy to.",
+  "mobile.chat.approval.report.dontSend": "Nie teraz",
+  "mobile.chat.approval.report.send": "Wyślij do zespołu OpenBot",
   "mobile.chat.approval.allow": "Zezwól",
   "mobile.chat.approval.deny": "Odmów",
   "mobile.chat.approval.reconnect": "Połącz się z serwerem {server}, aby odpowiedzieć na to żądanie.",

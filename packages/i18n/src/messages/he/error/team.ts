@@ -78,6 +78,7 @@ export const messages = {
   "error.team.usageLimitUnsupported": "החיבור הזה אינו יכול להציג או לשנות את מגבלות השימוש של סוכנים.",
   "error.team.hermesImportUnsupported": "החיבור הזה אינו יכול לייבא פרופילי Hermes מהשרת.",
   "error.team.providerDetectionUnsupported": "החיבור הזה אינו יכול למצוא את שרתי המודלים והסוכנים של השרת.",
+  "error.team.routineFlowStopUnsupported": "החיבור הזה לא יכול לעצור הרצה של שגרה.",
   "error.team.sidebarFoldersUnsupported": "תיקיות בתוך תיקיות אינן נתמכות בחיבור הזה.",
   "error.team.libraryFoldersUnsupported": "תיקיות הספרייה אינן נתמכות בחיבור הזה.",
   "error.team.agentNotificationLevelsUnsupported":
@@ -178,6 +179,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "אף סוכן בשרת הזה לא הציג את קישור ההתחברות הזה.",
   "error.team.hostPersonalityUnsupported": "אישיות השרת אינה נתמכת בחיבור הזה.",
   "error.team.agentWaitsUnsupported": "החיבור הזה לא תומך בהמתנות פתוחות.",
+  "error.team.pendingApprovalUnsupported": "החיבור הזה לא תומך בקריאת בקשת אישור מלאה.",
   "error.team.messagePinsUnsupported": "החיבור הזה אינו תומך בהודעות מוצמדות.",
   "error.team.queuedMessageThreadUnsupported": "החיבור הזה לא תומך בהרצת הודעה מהתור כשרשור חדש.",
   "error.team.backgroundProcessesUnsupported": "החיבור הזה לא תומך בתהליכי רקע.",

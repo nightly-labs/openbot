@@ -43,6 +43,8 @@ function browserGuidance(tool: string, options: ToolGuidanceOptions): string[] {
   const core = [
     "Describe only a tool whose inputSchema you lack.",
     "openbot_browser is OpenBot's private persistent browser. Prefer revision-bound refs and unique role/name targets, then text, CSS, and coordinates. Input actions return a short status, not a snapshot. Tabs stay open across turns and restarts, at most 25: close a tab with close_tab when the task no longer needs it, unless the user wants to keep or see it. After navigation, a layout change, or a covered-target error, take a fresh snapshot and resolve the target again; do not reuse old coordinates or repeat coordinate clicks.",
+    // The images of snapshot and screenshot reach only the model; a saved file can go to the chat (#6271).
+    "The user does not see your page images. To show the user a page, call screenshot with save: true, then attach the saved path with openbot.attach_files_to_response.",
     "After a submit, booking, or other change on a site, read a fresh snapshot or wait_for the expected result before you report the outcome. Current confirmation of the requested item, such as a success message or a cancel control, wins over a list that did not update; a waitlist place is not a booking. When it stays unclear, say what you saw; do not submit again.",
     // `bun run bench:browser-tools` (2026-11-10, Haiku, 10 tasks x 3): the turn cost and the bans on
     // lone or confirming snapshots cut mean input tokens by 18% and tool calls from 3.6 to 2.8.
@@ -92,6 +94,7 @@ function openbotGuidance(namespace: string, tool: string): string {
     case "create_agent":
     case "update_profile":
     case "update_agents":
+    case "set_browser_profile":
     case "read_agent":
     case "list_models":
     case "list_local_skills":
@@ -101,8 +104,9 @@ function openbotGuidance(namespace: string, tool: string): string {
     case "uninstall_skill":
       return [
         "Use openbot.create_agent when the user asks for a new persistent teammate: take its name, title, description, and optional generated avatar from the request, and give its first task. Keep create_agent simple and configure the agent after it exists. When the new agent needs scheduled work, create that routine yourself with openbot.create_routine and the new agent's id; do not ask the new agent to schedule it. For a specific provider, model, or reasoning effort, call openbot.list_models and pass only values that it lists; otherwise omit them, and the new agent uses yours.",
-        "Call openbot.read_agent (without agentId for yourself) before you change an agent: it shows the profile, model, account, backup models, access, Computer Use, notifications, auto-approve, skills, routines, and MCP servers. openbot.update_profile changes a local agent's name, title, description, avatar, provider, model, reasoning effort, account, and backup models; pass only the values and account ids that openbot.list_models lists. You see account ids and labels, never credentials. For the same change on several agents, call openbot.update_agents once, then report which agents failed and why. Change another agent only when the user's request calls for it.",
-        "For an avatar image, pass avatarPath, absolute or relative to your workspace. When needed, make a square PNG, JPEG, or WebP copy, best 512 by 512 pixels and up to 512 KB, and do not change the original. Do not combine avatarPath with avatarSeed or avatarHue; use those to go back to a generated avatar.",
+        "Call openbot.read_agent (without agentId for yourself) before you change an agent: it shows the profile, model, account, backup models, access, Computer Use, notifications, auto-approve, browser profile, skills, routines, and MCP servers. openbot.update_profile changes a local agent's name, title, description, avatar, provider, model, reasoning effort, account, and backup models; pass only the values and account ids that openbot.list_models lists. You see account ids and labels, never credentials. For the same change on several agents, call openbot.update_agents once, then report which agents failed and why. Change another agent only when the user's request calls for it.",
+        "For an avatar color, pass avatarHue; never make an image for a color. Pass avatarPath only for an image that the user gives or asks for: make a square PNG, JPEG, or WebP copy if needed, best 512 by 512 pixels, up to 512 KB; keep the original. avatarSeed or avatarHue goes back to a generated avatar.",
+        "To keep the sign-ins of clients or teams apart when the user asks, put each team on one browser profile with openbot.set_browser_profile. Reuse a name from read_agent's browserProfileNames. Do not suggest another browser.",
         "To give an agent a local skill, call openbot.list_local_skills, then openbot.install_local_skill with its agentId. Use openbot.set_skill_enabled and openbot.uninstall_skill with the skillId from read_agent. update_profile can limit access to the workspace, turn Computer Use off, or change notifications. Only the user can give Full access, turn Computer Use on, or change auto-approve, so say when a task needs that. MCP servers apply to every agent: change them with the MCP server tools, and only when the user asks.",
       ].join("\n");
     case "list_sections":
@@ -138,7 +142,7 @@ function openbotGuidance(namespace: string, tool: string): string {
       return [
         "Read a workflow before a change. Make all changes in one openbot.edit_workflow call: give each new node a ref. add with from also connects. To insert a step, disconnect, add it with from, connect it to the next. The host lays out nodes: send no at; move if asked; tidy cleans up. The result maps refs to ids; do not read again.",
         "Fields by kind: trigger trigger (manual, schedule, webhook, github, discord, telegram, slack), schedule as {kind:daily|weekdays,time:HH:mm}, {kind:weekly,weekday:0-6,time}, {kind:hourly,minute}, {kind:custom,expression:cron}; agent agentId (openbot.list_agents), task; llm prompt, system; condition rule, a yes/no question, edges need branch yes|no; both take provider, model, effort only if asked; approval question; output target notify, chat-channel channelId, channel connectionId, placeId (openbot.messaging_list_places), github, discord, telegram, slack; prompt text. text, note and shape take no edges.",
-        "Only the person's message can change, delete or run a workflow; OpenBot confirms a delete; do not ask in chat. Run one only when asked or to test a build. No tool waits for a run: read it once, then report what ran and what runs.",
+        "Only a person-started turn can change, delete or run a workflow; OpenBot confirms a delete; do not ask in chat. Run one only if asked or to test a build. No tool waits for a run: read it once, then report what ran and what runs.",
       ].join("\n");
     case "html_render":
     case "html_preview":

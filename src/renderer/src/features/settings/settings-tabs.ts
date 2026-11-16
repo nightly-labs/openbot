@@ -6,8 +6,10 @@ import {
   CreditCard,
   Mic,
   MousePointer2,
+  Palette,
   PanelRight,
   PanelTop,
+  Power,
   Server,
   Settings,
   Smartphone,
@@ -16,6 +18,8 @@ import {
 
 export type SettingsTab =
   | "general"
+  | "appearance"
+  | "app-behavior"
   | "notifications"
   | "voice"
   | "dynamic-island"
@@ -53,9 +57,12 @@ type SettingsNavItem = {
   titleKey: AppTextKey;
   descriptionKey: AppTextKey;
   icon: typeof Settings;
+  /** The label of the group of the tab. The first tabs, which most users need, have no group. */
+  group?: AppTextKey;
   rows: ReadonlyArray<SettingsRow>;
 };
 
+/** The tabs in the order of the section list. The tabs that most users need come first. */
 export const navItems: ReadonlyArray<SettingsNavItem> = [
   {
     value: "general",
@@ -63,13 +70,6 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
     descriptionKey: "settings.tab.general.description",
     icon: Settings,
     rows: [
-      { titleKey: "settings.language.title", descriptionKey: "settings.language.description" },
-      { titleKey: "settings.interfaceSize.title", descriptionKey: "settings.interfaceSize.description" },
-      { titleKey: "settings.interfaceFont.title", descriptionKey: "settings.interfaceFont.description" },
-      { titleKey: "settings.codeFont.title", descriptionKey: "settings.codeFont.description" },
-      { titleKey: "settings.logoColor.title", descriptionKey: "settings.logoColor.description" },
-      { titleKey: "settings.chatColor.title", descriptionKey: "settings.chatColor.description" },
-      { titleKey: "settings.chatBackground.title", descriptionKey: "settings.chatBackground.description" },
       { titleKey: "settings.sendShortcut.title", descriptionKey: "settings.sendShortcut.description" },
       { titleKey: "sidebar.order.title", descriptionKey: "settings.chatOrder.description" },
       { titleKey: "settings.showAgentSteps.title", descriptionKey: "settings.showAgentSteps.description" },
@@ -78,25 +78,29 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
         descriptionKey: "settings.compactMessageActions.description",
       },
       { titleKey: "settings.externalLinks.title", descriptionKey: "settings.externalLinks.description" },
-      { titleKey: "settings.launchAtLogin.title", descriptionKey: "settings.launchAtLogin.description" },
-      { titleKey: "settings.keepRemoteSessions.title", descriptionKey: "settings.keepRemoteSessions.description" },
-      { titleKey: "settings.keepRunning.title", descriptionKey: "settings.keepRunning.description", macOS: false },
-      { titleKey: "settings.menuBar.title", descriptionKey: "settings.menuBar.description", macOS: true },
-      { titleKey: "settings.keepAwake.title", descriptionKey: "settings.keepAwake.description" },
-      { titleKey: "settings.keepAwakeOnBattery.title", descriptionKey: "settings.keepAwakeOnBattery.description" },
-      { titleKey: "settings.restoreWorkspace.title", descriptionKey: "settings.restoreWorkspace.description" },
-      { titleKey: "settings.quitGuard.title", descriptionKey: "settings.quitGuard.description", macOS: true },
       { titleKey: "settings.analytics.title", descriptionKey: "settings.analytics.description" },
     ],
   },
   {
-    value: "profile",
-    titleKey: "settings.tab.profile.title",
-    descriptionKey: "settings.tab.profile.description",
-    icon: UserRound,
+    value: "appearance",
+    titleKey: "settings.appearance.title",
+    descriptionKey: "settings.tab.appearance.description",
+    icon: Palette,
     rows: [
-      { titleKey: "settings.profile.email.title", descriptionKey: "settings.profile.email.description" },
-      { titleKey: "settings.profile.sessions.title", descriptionKey: "settings.profile.sessions.description" },
+      { titleKey: "settings.appearance.theme.title", descriptionKey: "settings.appearance.theme.description" },
+      {
+        titleKey: "settings.appearance.transparentWindow.title",
+        descriptionKey: "settings.appearance.transparentWindow.description",
+        macOS: true,
+      },
+      { titleKey: "settings.logoColor.title", descriptionKey: "settings.logoColor.description" },
+      { titleKey: "settings.chatColor.title", descriptionKey: "settings.chatColor.description" },
+      { titleKey: "settings.bubbleStyle.title", descriptionKey: "settings.bubbleStyle.description" },
+      { titleKey: "settings.chatBackground.title", descriptionKey: "settings.chatBackground.description" },
+      { titleKey: "settings.language.title", descriptionKey: "settings.language.description" },
+      { titleKey: "settings.interfaceSize.title", descriptionKey: "settings.interfaceSize.description" },
+      { titleKey: "settings.interfaceFont.title", descriptionKey: "settings.interfaceFont.description" },
+      { titleKey: "settings.codeFont.title", descriptionKey: "settings.codeFont.description" },
     ],
   },
   {
@@ -134,10 +138,66 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
     ],
   },
   {
+    value: "profile",
+    titleKey: "settings.tab.profile.title",
+    descriptionKey: "settings.tab.profile.description",
+    icon: UserRound,
+    group: "settings.sections.group.account",
+    rows: [
+      { titleKey: "settings.profile.email.title", descriptionKey: "settings.profile.email.description" },
+      { titleKey: "settings.profile.sessions.title", descriptionKey: "settings.profile.sessions.description" },
+    ],
+  },
+  {
+    value: "billing",
+    titleKey: "settings.tab.billing.title",
+    descriptionKey: "settings.tab.billing.description",
+    icon: CreditCard,
+    group: "settings.sections.group.account",
+    rows: [],
+  },
+  {
+    value: "mobile-connect",
+    titleKey: "settings.tab.mobileConnect.title",
+    descriptionKey: "settings.tab.mobileConnect.description",
+    icon: Smartphone,
+    group: "settings.sections.group.account",
+    rows: [
+      {
+        titleKey: "settings.mobileConnect.phones.title",
+        descriptionKey: "settings.mobileConnect.phones.description",
+      },
+      { titleKey: "settings.mobileConnect.phones.add", descriptionKey: "settings.mobileConnect.add.question" },
+      { titleKey: "settings.mobileConnect.link.title", descriptionKey: "settings.mobileConnect.link.cardHint" },
+      {
+        titleKey: "settings.mobileConnect.route.title",
+        descriptionKey: "settings.mobileConnect.route.description",
+      },
+    ],
+  },
+  {
+    value: "app-behavior",
+    titleKey: "settings.appBehavior.title",
+    descriptionKey: "settings.tab.appBehavior.description",
+    icon: Power,
+    group: "settings.sections.group.thisComputer",
+    rows: [
+      { titleKey: "settings.launchAtLogin.title", descriptionKey: "settings.launchAtLogin.description" },
+      { titleKey: "settings.restoreWorkspace.title", descriptionKey: "settings.restoreWorkspace.description" },
+      { titleKey: "settings.keepRemoteSessions.title", descriptionKey: "settings.keepRemoteSessions.description" },
+      { titleKey: "settings.quitGuard.title", descriptionKey: "settings.quitGuard.description", macOS: true },
+      { titleKey: "settings.keepRunning.title", descriptionKey: "settings.keepRunning.description", macOS: false },
+      { titleKey: "settings.menuBar.title", descriptionKey: "settings.menuBar.description", macOS: true },
+      { titleKey: "settings.keepAwake.title", descriptionKey: "settings.keepAwake.description" },
+      { titleKey: "settings.keepAwakeOnBattery.title", descriptionKey: "settings.keepAwakeOnBattery.description" },
+    ],
+  },
+  {
     value: "dynamic-island",
     titleKey: "settings.tab.dynamicIsland.title",
     descriptionKey: "settings.tab.dynamicIsland.description",
     icon: PanelTop,
+    group: "settings.sections.group.thisComputer",
     rows: [
       { titleKey: "settings.notch.show.title", descriptionKey: "settings.notch.show.description", macOS: true },
       {
@@ -157,6 +217,7 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
     titleKey: "settings.tab.agentDock.title",
     descriptionKey: "settings.tab.agentDock.description",
     icon: PanelRight,
+    group: "settings.sections.group.thisComputer",
     rows: [
       { titleKey: "settings.agentDock.show.title", descriptionKey: "settings.agentDock.show.description" },
       { titleKey: "settings.agentDock.placement.title", descriptionKey: "settings.agentDock.placement.description" },
@@ -170,38 +231,15 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
     titleKey: "settings.tab.computerUse.title",
     descriptionKey: "settings.tab.computerUse.description",
     icon: MousePointer2,
+    group: "settings.sections.group.thisComputer",
     rows: [{ titleKey: "computerUse.permissions.title", descriptionKey: "computerUse.permissions.description" }],
-  },
-  {
-    value: "billing",
-    titleKey: "settings.tab.billing.title",
-    descriptionKey: "settings.tab.billing.description",
-    icon: CreditCard,
-    rows: [],
-  },
-  {
-    value: "mobile-connect",
-    titleKey: "settings.tab.mobileConnect.title",
-    descriptionKey: "settings.tab.mobileConnect.description",
-    icon: Smartphone,
-    rows: [
-      {
-        titleKey: "settings.mobileConnect.phones.title",
-        descriptionKey: "settings.mobileConnect.phones.description",
-      },
-      { titleKey: "settings.mobileConnect.phones.add", descriptionKey: "settings.mobileConnect.add.question" },
-      { titleKey: "settings.mobileConnect.link.title", descriptionKey: "settings.mobileConnect.link.cardHint" },
-      {
-        titleKey: "settings.mobileConnect.route.title",
-        descriptionKey: "settings.mobileConnect.route.description",
-      },
-    ],
   },
   {
     value: "updates",
     titleKey: "settings.tab.updates.title",
     descriptionKey: "settings.tab.updates.description",
     icon: CircleArrowDown,
+    group: "settings.sections.group.thisComputer",
     rows: [
       { titleKey: "settings.updates.track.title", descriptionKey: "settings.updates.track.description" },
       { titleKey: "settings.updates.idleRestart.title" },

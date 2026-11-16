@@ -17,6 +17,7 @@ import { AgentAvatar } from "../agents/AgentAvatar";
 import { agentAccessLockLabel } from "../agents/agent-access";
 import { SidebarAgentContextMenu } from "./SidebarAgentContextMenu";
 import { SidebarAgentIndicator, SidebarWaitChip, SidebarWaitTooltip } from "./SidebarAgentIndicator";
+import { SidebarNameTooltip } from "./SidebarNameTooltip";
 import { sidebarAgentStateLabel, sidebarMessageTime, sidebarUsageResetTime } from "./sidebar-filtering";
 import { useSidebarScope } from "./sidebar-scope";
 
@@ -78,7 +79,8 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
       : "";
   };
   const routineLabel = () => (state()?.kind === "routine" || limit() ? stateLabel() : "");
-  // Only a waiting row has a tooltip, so the rows in the sections do not each carry one.
+  // In the full sidebar, only a waiting row has a tooltip, so the rows in the sections do not each
+  // carry one. The compact sidebar shows only the avatar, so each row names its agent.
   const row = (): JSX.Element => (
     <ContextMenu.Root modal={false} onOpenChange={setMenuOpen}>
       <ContextMenu.Trigger
@@ -93,7 +95,7 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
           },
         ]}
         aria-label={`${rowProps.agent.name}${title() ? `, ${title()}` : ""}${accessLabel()}${windowLabel()}${labelDetail()}${stateLabel() ? `. ${stateLabel()}` : ""}`}
-        title={routineLabel() || undefined}
+        title={props.compact ? undefined : routineLabel() || undefined}
         aria-pressed={props.activeAgentId === rowProps.agent.id ? "true" : "false"}
         data-cuelume-navigate=""
         onClick={(event: MouseEvent) => {
@@ -183,9 +185,26 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
       onDragStart={(event: DragEvent & { currentTarget: HTMLElement }) => startChatDragging(event, rowProps.agent.id)}
       onDragEnd={endChatDragging}
     >
-      <Show when={wait()} fallback={row()}>
+      <Show
+        when={wait()}
+        fallback={
+          <SidebarNameTooltip
+            name={rowProps.agent.name}
+            title={title()}
+            preview={detail()}
+            detail={routineLabel()}
+            menuOpen={menuOpen()}
+          >
+            {row()}
+          </SidebarNameTooltip>
+        }
+      >
         {(current) => (
-          <SidebarWaitTooltip wait={current()} menuOpen={menuOpen()}>
+          <SidebarWaitTooltip
+            wait={current()}
+            menuOpen={menuOpen()}
+            name={props.compact ? rowProps.agent.name : undefined}
+          >
             {row()}
           </SidebarWaitTooltip>
         )}

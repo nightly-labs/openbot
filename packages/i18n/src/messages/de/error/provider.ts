@@ -11,6 +11,9 @@ export const messages = {
     "{provider} hat nicht rechtzeitig geantwortet, daher hat OpenBot den Prozess beendet.",
   "error.provider.acpSignInLost":
     "{provider} hat seine Anmeldung verloren, daher hat OpenBot den Prozess beendet. Sende deine Nachricht erneut.",
+  "error.provider.acpRefusedUntilRestart":
+    "{provider} hat eine Nachricht abgelehnt, daher hat OpenBot den Prozess beendet. Sende deine Nachricht erneut.",
+  "error.provider.acpSettingsTimedOut": "{provider} hat nicht rechtzeitig geantwortet. Versuche es gleich noch einmal.",
   "error.provider.acpPlanUsedUp":
     "{provider} meldet, dass dein Tarif aufgebraucht ist. Wähle ein anderes Modell oder wechsle zu einem höheren {provider}-Tarif.",
   "error.provider.acpMcpNotLoaded":
@@ -216,6 +219,8 @@ export const messages = {
     "Der Endpunkt „{provider}“ braucht einen API-Schlüssel. Füge den Schlüssel in Servereinstellungen → Anbieter hinzu und versuche es dann erneut.",
   "error.provider.opencodeKeyExpired":
     "Dein OpenCode-API-Schlüssel ist abgelaufen. Erstelle in der OpenCode Console einen neuen Schlüssel, füge ihn in den OpenCode-Einstellungen ein und versuche es dann erneut.",
+  "error.provider.opencodeKeyRefused":
+    "OpenCode Go hat deinen gespeicherten API-Schlüssel abgelehnt. Der Schlüssel ist vielleicht abgelaufen. Erstelle in der OpenCode Console einen neuen Schlüssel, füge ihn in den OpenCode-Einstellungen ein und versuche es dann erneut.",
   "error.provider.opencodeServiceFailure":
     "OpenCode konnte diesen Durchlauf nicht abschließen, da sein lokaler Dienst fehlgeschlagen ist. Versuche es erneut. Falls der Fehler weiter auftritt, verbinde OpenCode in den Einstellungen erneut.",
   "error.provider.opencodeRateLimited":
@@ -225,13 +230,17 @@ export const messages = {
   "error.provider.opencodeInvalidUpload":
     "Der Modellanbieter von OpenCode hat eine ungültige Upload-Anfrage gemeldet. Wähle ein anderes Modell und fahre fort. Prüfe gespeicherte Routinen, bevor du sie erneut erstellst.\n{detail}",
   "error.provider.opencodeUnreadableContent":
-    "Dieses Modell kann eine Datei oder ein Bild in diesem Chat nicht lesen. Wähle ein Modell, das Dateien lesen kann, und sende deine Nachricht dann erneut.",
+    "Dieses Modell kann eine Datei oder ein Bild in diesem Chat nicht lesen. OpenBot hat eine neue OpenCode-Sitzung mit dem Chatverlauf gestartet. Sende deine Nachricht ohne die Datei erneut oder wähle ein Modell, das Dateien lesen kann. Wenn du dieses Modell zu einem eigenen Anbieter hinzugefügt hast, entferne in seinen Einstellungen bei „Akzeptiert“ die Auswahl „Bilder“.",
+  "error.provider.opencodeContextTooSmall":
+    "Dieser Chat passt nicht in das Kontextfenster des Modells. Lade das Modell in Ollama oder LM Studio mit einer größeren Kontextlänge und trage dasselbe Fenster in OpenBot in den Einstellungen seines Anbieters ein. Oder wähle ein größeres Modell.",
   "error.provider.opencodeFreeLimit":
     "Die kostenlosen OpenCode-Modelle haben ihr Nutzungslimit erreicht. Alle kostenlosen Modelle teilen sich dieses Limit. Um weiterzumachen, füge einen OpenCode-Go-Schlüssel in den OpenCode-Einstellungen ein oder wähle ein Modell eines anderen Anbieters.",
   "error.provider.opencodeProviderFailed":
     "Beim Modellanbieter ist ein Fehler aufgetreten. Deine Verbindung ist nicht die Ursache. Versuche es später erneut oder wähle ein anderes Modell.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "Die Antwort des Modells wurde abgebrochen oder war ungültig. Sende deine Nachricht erneut oder wähle ein anderes Modell.\n{detail}",
+  "error.provider.opencodeReasoningOverlap":
+    "OpenCode konnte das Denken dieses Modells bei diesem Aufwand nicht lesen. Wähle einen geringeren Aufwand oder ein anderes Modell und sende deine Nachricht dann erneut.",
   "error.provider.opencodeNetwork":
     "OpenCode konnte keine Verbindung zum Modellanbieter herstellen. Prüfe die Netzwerkverbindung des Computers, auf dem OpenBot läuft, und versuche es erneut.\n{detail}",
   "error.provider.codexStateBusy":
@@ -270,6 +279,8 @@ export const messages = {
     "Der Gemini-Server in OPENBOT_ANTIGRAVITY_PATH fehlt oder ist nicht ausführbar. Korrigiere den Pfad oder entferne die Variable und starte OpenBot dann neu.",
   "error.provider.antigravityVersionUnreadable": "Die Version des Gemini-Servers konnte nicht gelesen werden.",
   "error.provider.antigravitySignIn": "Melde dich mit Google an, um Gemini zu verwenden.",
+  "error.provider.antigravityModelAtCapacity":
+    "Google hat für dieses Gemini-Modell gerade keine freie Kapazität. Das Kontingent deines Tarifs ist nicht die Ursache. Versuche es in ein paar Minuten erneut oder wähle ein anderes Modell.\n{detail}",
   "error.provider.antigravityRateLimited":
     "Gemini hat die Anfrage abgelehnt, weil ein Ratenlimit oder das Kontingent des Tarifs erreicht ist. Warte ein paar Minuten oder wähle ein anderes Modell und versuche es dann erneut.\n{detail}",
   "error.provider.antigravityQuotaReached":
@@ -280,8 +291,14 @@ export const messages = {
     "Der Gemini-Dienst von Google hat die Anfrage nicht abgeschlossen. Versuche es in ein paar Minuten erneut.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini hat diese Anfrage abgelehnt. Wähle ein anderes Modell und sende deine Nachricht erneut. Wenn es wieder fehlschlägt, starte einen neuen Chat.\n{detail}",
+  "error.provider.antigravityLocationUnsupported":
+    "Google lässt Gemini am Netzwerkstandort des Computers, auf dem dieser Agent läuft, nicht arbeiten. Nutze Gemini auf einem anderen Computer oder wähle einen anderen Anbieter für diesen Agenten.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini hat die Verbindung zu seinem Agenten verloren und wurde beendet. Sende eine Nachricht, um fortzufahren.",
+  "error.provider.grokServiceFailure":
+    "Der Grok-Dienst ist ausgelastet oder hat einen Fehler. Versuche es in ein paar Minuten erneut oder wähle ein anderes Modell.",
+  "error.provider.grokConnectionFailed":
+    "Grok kann keine Verbindung zu seinem Dienst herstellen. Prüfe deine Internetverbindung und sende die Nachricht dann erneut.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "Auf einem Windows-Host öffnet Gemini die Google-Seite auf dem Host selbst. Verbinde Gemini auf dem Host-Computer.",
   "error.provider.cursorArchivePath": "Das Cursor-Archiv enthält eine unerwartete Datei.",
@@ -320,11 +337,17 @@ export const messages = {
     "Melde dich mit Nous Portal an oder führe `hermes setup` in einem Terminal aus, um Hermes zu verwenden.",
   "error.provider.hermesTurnFailed":
     "Hermes konnte diesen Durchlauf nicht abschließen. Wenn die Antwort einen Grund nennt, folge ihm. Sonst ist vielleicht ein MCP-Server dieses Agenten nicht erreichbar: Prüfe ihn unter Servereinstellungen › MCP und sende deine Nachricht erneut.",
+  "error.provider.hermesRefused":
+    "Hermes hat diese Nachricht abgelehnt, bevor sie begann. Sende sie erneut. Wenn Hermes jede Nachricht ablehnt, starte OpenBot auf dem Computer neu, auf dem dieser Agent läuft.",
+  "error.provider.copilotThinkingRejected":
+    "GitHub Copilot konnte dieses Modell nicht verwenden: Das Modell hat die Denk-Einstellung nicht akzeptiert. Wähle ein anderes Modell für diesen Agenten und sende deine Nachricht erneut.",
   "error.provider.usageLimitReached": "Das Konto hat sein Nutzungslimit erreicht.",
   "error.provider.claudeContextFull":
     "Dieser Chat ist für Claude zu lang geworden. OpenBot hat eine neue Claude-Code-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.claudeApiKeyNoCredit":
     "Der Anthropic-API-Schlüssel hat kein API-Guthaben. Ein Claude-Abo bezahlt keine Anfragen mit einem API-Schlüssel. Lade Guthaben in der Anthropic Console auf, oder melde dich in den Einstellungen bei Claude an und wähle das Claude-Konto im Modellmenü des Agenten.",
+  "error.provider.claudeServiceBlocked":
+    "Der Claude-Dienst hat diese Anfrage blockiert. Das ist meist ein kurzes Problem bei Claude, kein Problem mit deinem Konto. Sende die Nachricht in ein paar Minuten noch einmal.",
   "error.provider.foreignReasoning":
     "{provider} hat die früheren Überlegungen in diesem Chat nicht akzeptiert, da ein anderes Konto oder ein anderer API-Schlüssel sie erhalten hat. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.imageTooSmall":
@@ -333,8 +356,12 @@ export const messages = {
     "Das Modell hat ein Bild in diesem Chat nicht akzeptiert, weil das Bild zu groß ist. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.imageCountLimit":
     "Das Modell hat diesen Chat nicht akzeptiert, weil er zu viele Bilder enthält. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
+  "error.provider.requestTooLarge":
+    "Dieser Chat ist zu groß geworden, um ihn an das Modell zu senden. Oft sind Bilder im Chat die Ursache. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.opencodeSessionRejected":
     "OpenCode hat die Anfrage abgelehnt und keinen Grund genannt. Das kann in einem langen Chat oder nach einem Modellwechsel passieren. OpenBot hat eine neue OpenCode-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut. Wenn der Fehler bleibt, wähle ein anderes Modell oder einen niedrigeren Aufwand.",
+  "error.provider.opencodeCompactionFailed":
+    "Das Modell konnte diesen langen Chat nicht zusammenfassen, um Platz im Kontextfenster zu schaffen. OpenBot hat eine neue OpenCode-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut. Wenn der Fehler bleibt, wähle ein stärkeres Modell.",
   "error.provider.museMcpStartupFault":
     "Muse konnte einen MCP-Server nicht starten und hat MCP in dieser Sitzung gesperrt. OpenBot hat eine neue Muse-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut. Wenn der Fehler bleibt, schalte Computersteuerung oder den fehlerhaften MCP-Server für diesen Agenten aus.",
   "error.provider.claudeSessionMissing":
@@ -348,6 +375,8 @@ export const messages = {
     "Gemini konnte die Anmeldeseite nicht in deinem Browser öffnen. Prüfe deinen Standardbrowser und verbinde dich dann erneut.",
   "error.provider.acpSignInFailed": "Die Anmeldung wurde nicht abgeschlossen.",
   "error.provider.acpSignInFailedReason": "Die Anmeldung wurde nicht abgeschlossen: {reason}",
+  "error.provider.acpSignInNetwork":
+    "Die Anmeldung konnte den Server des Anbieters nicht erreichen. Prüfe die Netzwerkverbindung und die DNS-Einstellungen des Computers, auf dem OpenBot läuft, und versuche es dann erneut.",
   "error.provider.acpSignOutFailed": "Die Abmeldung wurde nicht abgeschlossen.",
   "error.provider.acpSignOutFailedReason": "Die Abmeldung wurde nicht abgeschlossen: {reason}",
   "error.provider.acpSignInMethodMissing":
@@ -355,12 +384,22 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "Im Browser können nur HTTPS-Anmeldelinks geöffnet werden.",
   "error.provider.geminiKeyRefused":
     "Gemini hat den gespeicherten API-Schlüssel abgelehnt. Ersetze oder entferne den Schlüssel in den Einstellungen und verbinde dich dann erneut.",
+  "error.provider.geminiKeyRateLimited":
+    "Gemini hat die Anfrage abgelehnt, weil dein gespeicherter Gemini-API-Schlüssel ein Ratenlimit oder sein Kontingent erreicht hat. Der Schlüssel wird statt deines Google-Tarifs verwendet. Warte ein paar Minuten oder wähle ein anderes Modell und versuche es dann erneut. Um deinen Google-Tarif zu verwenden, entferne den Schlüssel in den Einstellungen.\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "Dein gespeicherter Gemini-API-Schlüssel hat kein Kontingent für dieses Modell. Der Schlüssel wird statt deines Google-Tarifs verwendet. Wähle ein anderes Modell oder entferne den Schlüssel in den Einstellungen, um deinen Google-Tarif zu verwenden.\n{detail}",
+  "error.provider.geminiAccountSettingsUnreadable":
+    "Gemini kann die Einstellungsdatei dieses Kontos nicht öffnen und sich deshalb nicht anmelden. Entferne dieses Konto und füge es erneut hinzu.",
+  "error.provider.geminiSettingsUnreadable":
+    "Gemini kann seine Einstellungsdatei auf diesem Computer nicht öffnen und sich deshalb nicht anmelden. Beende die anderen Apps, die Gemini verwenden, und starte OpenBot dann neu.",
   "error.provider.geminiVerificationRequired":
     "Google muss dein Konto bestätigen, bevor Gemini antworten kann. Bestätige dein Google-Konto in einem Browser und sende deine Nachricht dann erneut.",
   "error.provider.keyProviderRefused":
     "{provider} hat den gespeicherten API-Schlüssel abgelehnt. Ersetze oder entferne den Schlüssel in den Einstellungen und versuche es dann erneut.",
   "error.provider.keyProviderNoBalance":
     "Das {provider}-Konto des gespeicherten API-Schlüssels hat kein Guthaben. Lade Guthaben auf das Konto und versuche es dann erneut.",
+  "error.provider.keyProviderLowCredit":
+    "Das {provider}-Konto des gespeicherten API-Schlüssels hat nicht genug Guthaben für eine Antwort dieses Modells. Lade Guthaben auf das Konto oder wähle ein anderes Modell und versuche es dann erneut.",
   "error.provider.modelServiceRefused":
     "Der Modelldienst hat die Anfrage abgelehnt. Wähle ein anderes Modell oder prüfe deinen Zugriff auf dieses Modell beim Dienst.",
   "error.provider.modelServiceRefusedReason":
@@ -420,6 +459,14 @@ export const messages = {
   "error.provider.accountDefault": "Das erste {provider}-Konto kann nicht entfernt werden.",
   "error.provider.accountUsesKey":
     "Dieses {provider}-Konto verwendet den gespeicherten API-Schlüssel und hat keine Anmeldung. Ändere den Schlüssel in Servereinstellungen → Anbieter.",
+  "error.provider.accountNeedsKey":
+    "Ein neues {provider}-Konto braucht einen API-Schlüssel. Aktualisiere OpenBot auf diesem Gerät und füge das Konto dann erneut hinzu.",
+  "error.provider.accountKeyRefused":
+    "{provider} hat diesen API-Schlüssel nicht akzeptiert. Prüfe den Schlüssel und versuche es erneut.",
+  "error.provider.accountKeyUnreachable":
+    "OpenBot konnte {provider} nicht erreichen, um den API-Schlüssel zu prüfen. Prüfe die Internetverbindung und versuche es erneut.",
+  "error.provider.accountKeySignedOut":
+    "{provider} akzeptiert den API-Schlüssel dieses Kontos nicht mehr. Gib dem Konto einen neuen Schlüssel.",
   "error.provider.accountInUse":
     "Ein Agent mit diesem Konto arbeitet gerade. Versuche es erneut, wenn der Agent anhält.",
   "error.provider.accountsReadOnly":
@@ -440,6 +487,8 @@ export const messages = {
   "error.provider.piResumeCancelled": "Pi hat das Fortsetzen der Sitzung abgebrochen. Versuche es erneut.",
   "error.provider.piSessionIdentity":
     "Pi hat eine andere Sitzung zurückgegeben. Die gespeicherte Sitzung wurde nicht ersetzt.",
+  "error.provider.piExtensionFailed":
+    "Pi wurde beendet, weil eine Erweiterung nicht geladen werden konnte. Entferne oder aktualisiere diese Erweiterung und versuche es erneut. {detail}",
   "error.provider.piModelInvalid": "Wähle ein Pi-Modell, das seinen Anbieter enthält.",
   "error.provider.piToolInvalid": "Das Werkzeug hat ein ungültiges Ergebnis zurückgegeben.",
   "error.provider.piSignIn":

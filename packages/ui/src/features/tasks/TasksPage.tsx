@@ -525,6 +525,7 @@ function TasksComposer(props: TasksPageProps) {
                     elapsedSeconds={voice().elapsedSeconds}
                     onCancel={() => voice().onCancel()}
                     onFinish={() => voice().onFinish()}
+                    onSend={start}
                     send={send()}
                   >
                     <Button

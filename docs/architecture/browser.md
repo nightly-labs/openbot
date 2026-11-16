@@ -15,7 +15,8 @@ search and channel creation - are prop-driven views in `WorkspaceOverlayViews.ts
 host connection, so what an overlay decides from its server is decided in one place.
 The web client gives `PlatformProvider` a fixed `appInfo` in place of the main-process answer.
 There is no separate web dashboard.
-Small screens switch between the same conversation and workspace components. The shared browser
+On a phone, `WebPhoneAppScreen` first points to the phone app. After "Continue in browser", small
+screens switch between the same conversation and workspace components. The shared browser
 panel receives the web live-view runtime and hides unsupported native controls. `BrowserLiveView`
 accepts an explicit runtime; desktop and the existing preview still default to the preload-compatible
 API. The web Storybook runtime uses
@@ -120,7 +121,8 @@ The browser session and service-worker fallback remove the `OpenBot/` and `Elect
 tokens. They keep the installed Chromium major version and host platform, and give the other version
 parts as `0.0.0` (`Chrome/156.0.0.0`), as Chrome does: some bot checks refuse the full version that
 Electron sends. The `Accept-Language` header adds the base language of each regional language
-(`en-GB,en;q=0.9`), also as Chrome does. Requests to `accounts.google.com`
+(`en-GB,en;q=0.9`), also as Chrome does. The session sets it, not the request hook, so a value that
+a page sets on its own request stays: a site can sign that header. Requests to `accounts.google.com`
 keep the `Electron/` token because Google rejects the account identifier step without it. This
 exception does not change the page identity or the identity sent to other sites.
 Electron provides native `navigator.userAgentData` but no client-hint request headers. On HTTPS and
@@ -135,6 +137,19 @@ load after a restart is as a first visit. Windows sends no platform version: the
 contract version that the host cannot compute. The focused check is
 `bun run test:browser --scenario=identity`; add `--google-live` for the Google identifier check.
 The local identity report is `.openbot-build/browser-identity.json`.
+The tab preload (`src/preload/browser-page.ts`) makes page values agree with Chrome: the outer size,
+the screen position, `window.chrome` and the passkey dialog. Each replaced function is a Proxy that
+reads as native code. Its `setPrototypeOf` trap throws `Cyclic __proto__ value` as a native function
+does, because V8 stops that check at a Proxy and bot checks find a Proxy that way. CDP calls do not
+turn on the `Runtime` domain: while it is on, Chromium formats each console argument for DevTools,
+and DataDome and other bot checks see that from the page (`Error.prepareStackTrace` runs). On a
+Linux server with no GPU, WebGL runs on SwiftShader, which bot checks read as headless Chrome. There,
+the WebGL vendor and renderer names in each tab are those of a common Intel laptop GPU; the
+rendering, the limits and the extensions stay those of SwiftShader. The preload does not run in a
+worker, so WebGL on an `OffscreenCanvas` in a worker still names SwiftShader. A computer with a GPU
+keeps its real names. The check is `bun scripts/browser-fingerprint-e2e.ts`; on Linux it uses the server GPU
+switches, so CI checks the SwiftShader case. Its report is
+`.openbot-build/browser-fingerprint-e2e/report.json`.
 Website popups are adopted into managed `WebContentsView` tabs through Electron's window creation
 hook. Native guests retain their opener, request body, and the browser session of the opener. Local tab and
 agent tool results expose `openerTabId` while that relationship is live. Independent `noopener`
@@ -231,7 +246,7 @@ one failed), as a site memory, and a class of task as a skill. The review drops 
 host and keeps the fact. The browser guidance has no site memory text: the agent context budget
 (`tools/agent-context/budget.json`) leaves no space for it, and the review saves these steps.
 
-"Learn from my browsing" (Server settings → General → Agents, off by default, `browsing-memory-v1`)
+"Learn from my browsing" (Server settings → Memory, off by default, `browsing-memory-v1`)
 lets the review also learn from what a person does in an agent's tab. `BrowserHost` records steps only
 while a person holds the tab (takeover or Take control), so no step is the agent's own. It skips a
 secret tab, a private sign-in, a tab without an owner agent, and a page that is not http(s). A step is
