@@ -131,6 +131,12 @@ const SESSION_FAILURE_LIMIT = 2;
  * with no update, until the stall watch fails the finished run (#8629).
  */
 const QUIET_END_MS = 30_000;
+/**
+ * The longest time that provider events, such as thinking, keep a quiet turn after its no-update
+ * call. A Devin model wrote "I should stop now" as thinking for 27 minutes, and each event reset the
+ * silence of `QUIET_END_MS` (#9831).
+ */
+const QUIET_END_MAX_MS = 2 * 60_000;
 /** How often OpenBot checks again for the end of a quiet turn that called the no-update tool again. */
 const QUIET_REPEAT_POLL_MS = 1_000;
 /** How long before a turn's start its usage records can be, as in host analytics. */
@@ -1616,7 +1622,8 @@ export class TurnLifecycle {
    * such as thinking, keeps the turn. A Stop of the user and a reported failure keep their own end.
    * A second no-update call shows that the model does not end its turn: Kimi called the tool again
    * every 2 s for an hour, and each call reset the silence (#9375). OpenBot then ends the turn when no
-   * tool step, approval or question is open, without the silence.
+   * tool step, approval or question is open, without the silence. Provider events keep the turn for
+   * at most `QUIET_END_MAX_MS` after the call (#9831).
    */
   #armQuietEnd(agentId: string, turnId: string): void {
     const armed = this.#quietEndTimers.get(turnId);
@@ -1643,15 +1650,18 @@ export class TurnLifecycle {
         wait(repeated ? QUIET_REPEAT_POLL_MS : QUIET_END_MS);
         return;
       }
-      if (silentFor < quietFor) {
-        wait(quietFor - silentFor);
+      const sinceCall = Date.now() - calledAt;
+      if (silentFor < quietFor && sinceCall < QUIET_END_MAX_MS) {
+        wait(Math.min(quietFor - silentFor, QUIET_END_MAX_MS - sinceCall));
         return;
       }
       this.#quietStops.add(turnId);
       logger.info(
         repeated
           ? "A quiet turn called the no-update tool again; OpenBot ends it."
-          : "A quiet turn sent nothing after its no-update call; OpenBot ends it.",
+          : silentFor < quietFor
+            ? "A quiet turn did not end in time after its no-update call; OpenBot ends it."
+            : "A quiet turn sent nothing after its no-update call; OpenBot ends it.",
         { agentId, turnId, provider: client.provider },
       );
       Effect.runFork(client.request("turn/interrupt", { threadId, turnId }, decodeRecordResponse).pipe(Effect.ignore));
