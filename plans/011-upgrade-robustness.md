@@ -54,8 +54,29 @@ desktop profile (the developer's), 2026-11-17:
 | `conversation.snapshot-updated` events | 3,822 rows, 186 MB of payload |
 | `turn.started` events | 330 rows, 96 MB of payload (about 290 KB each) |
 
-Not confirmed: the size distribution of other users, and of hosted servers (fixed-size ext4 data
-image; no reflink). Only one database was measured.
+Hosted servers on `openbot-core` (8 customer containers, read-only check, 2026-11-17):
+
+| Server | `openbot.db` | Free on its data volume |
+|---|---|---|
+| huskytail | 17.0 GB | 676 GB |
+| hello | 905 MB | 99 GB |
+| sylwester-2 | 184 MB | 101 GB |
+| enzo | 184 MB | 521 GB |
+| sylwester | 21 MB | 535 GB |
+| rayanalmaliki96 | 12 MB | 105 GB |
+| apple-review, apliksns | about 1.2 MB | 41 GB |
+
+The 17 GB database (huskytail): `orchestration_events` 11.9 GB (70%), of which
+`conversation.snapshot-updated` is 9.0 GB (712,589 rows) and `conversation.mailbox-reconciled`
+1.6 GB (112,501 rows). `provider_history_staging` is 2.9 GB (277,979 rows). The free list is
+empty, so `VACUUM` gives nothing back. Consequences:
+
+- Item 15: every volume has space for 2 copies, but a 17 GB copy adds start time (estimate: about
+  20 s at the measured 1.2 s/GB; not measured on this host) and 34 GB of disk.
+- Item 23 is the real size fix: snapshot payloads are more than half of the largest database.
+- New item 25: find out why `provider_history_staging` keeps 2.9 GB, and clear staged rows after use.
+
+Not confirmed: desktop users other than the developer (no central source).
 
 ## Phase 1: fix what can fail now
 
@@ -170,7 +191,8 @@ send new user data (`PRIVACY.md` if outbound data changes).
 | 14 | Projection check command, invariants, and a sweep of the transfers folder | TODO |
 | 16 | Typed update state machine and one runtime state file | TODO |
 | 17 | Remove `LATEST_SCHEMA_SQL` (after item 8) | TODO |
-| 23 | Event payloads keep no full snapshot copies (85% of the measured database) | TODO |
+| 23 | Event payloads keep no full snapshot copies (53% to 85% of the measured databases) | TODO |
+| 25 | `provider_history_staging` does not grow without limit (2.9 GB on one server) | TODO |
 
 ## Phase 4: longer term
 
