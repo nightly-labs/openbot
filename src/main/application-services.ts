@@ -60,6 +60,7 @@ import { MAC_PERMISSION_URLS } from "./mac-permission-urls";
 import { PushNotificationStore } from "./push-notification-store";
 import { DESKTOP_USE_MS } from "./push-notifications";
 import { RemoteWorkflowError, toRemoteWorkflowError } from "./remote-service-effects";
+import { sizeWorkflowPicture } from "./workflow-picture-size";
 /**
  * The composition root. Every long-lived service the desktop app owns is built here, in one
  * function, in dependency order, and handed back as a single record.
@@ -82,7 +83,7 @@ import { RemoteWorkflowError, toRemoteWorkflowError } from "./remote-service-eff
  */
 
 import { existsSync } from "node:fs";
-import { readdir, rm } from "node:fs/promises";
+import { readdir, readFile, rm } from "node:fs/promises";
 import { homedir, hostname, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
@@ -2626,6 +2627,27 @@ export async function createApplicationServices({
         service.generateWorkflowMedia(request).pipe(
           Effect.mapError((failure) => ({
             message: failure.cause instanceof Error ? failure.cause.message : sourceText("error.workflow.mediaFailed"),
+          })),
+        ),
+      // The new PNG replaces the picture that the model made, so Storage keeps one file for the step.
+      sizePicture: (attachmentId, size) =>
+        Effect.gen(function* () {
+          const file = yield* mailbox.resolveAttachment(attachmentId);
+          if (!file) return yield* Effect.fail(new Error("The generated picture is gone."));
+          const source = yield* Effect.tryPromise(() => readFile(file.path));
+          // A throw from the image decoder fails the crop, so the step keeps the model's picture.
+          const bytes = yield* Effect.try(() => sizeWorkflowPicture(source, size));
+          if (!bytes) return yield* Effect.fail(new Error("The generated picture could not be decoded."));
+          const stored = yield* mailbox.storeGeneratedAttachment({
+            bytes,
+            name: "generated-image.png",
+            mimeType: "image/png",
+          });
+          yield* mailbox.deleteStoredFile(attachmentId).pipe(Effect.ignore);
+          return stored.id;
+        }).pipe(
+          Effect.mapError((failure) => ({
+            message: failure instanceof Error ? failure.message : String(failure),
           })),
         ),
       mediaProviders: () => service.workflowMediaProviders(),
