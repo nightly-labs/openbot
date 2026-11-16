@@ -160,6 +160,19 @@ function isRejectedOpenCodeRequest(provider: AgentProvider, message: string): bo
 }
 
 /**
+ * Google's generic 400 INVALID_ARGUMENT that names no field, through Antigravity. The CLI keeps the
+ * refused item in the session and sends it on each turn, so each later message failed with the same
+ * 400 until a new chat (#9593). An image that the agent's own tool opened gives this text, not
+ * "Unable to process input image". Gemini CLI's reports show the same text for other items in the
+ * history: an SVG in tool output, and a tool answer that does not match its call. A new session,
+ * given the OpenBot transcript, recovers. A cause outside the history, such as a tool schema, fails
+ * the one retry too, and the text then tells the user to choose another model (#7116).
+ */
+function isRejectedAntigravityRequest(provider: AgentProvider, message: string): boolean {
+  return provider === "antigravity" && /\bRequest contains an invalid argument\b/iu.test(message);
+}
+
+/**
  * OpenCode 2.2.5 to 2.3.0 compacts a chat near its model's window with a summary from the model. A
  * weak local model can answer with a tool call or with no summary headings, and OpenCode then fails
  * the turn. The session stays too long, so each later turn compacts and fails again (#6006). Only a
@@ -218,6 +231,7 @@ export function refusedSessionFailure(provider: AgentProvider, message: string):
   if (provider === "opencode" && isUnreadableContentDiagnostic(message))
     return sourceText("error.provider.opencodeUnreadableContent");
   if (isRejectedOpenCodeRequest(provider, message)) return sourceText("error.provider.opencodeSessionRejected");
+  if (isRejectedAntigravityRequest(provider, message)) return sourceText("error.provider.antigravitySessionRejected");
   if (isFailedOpenCodeCompaction(provider, message)) return sourceText("error.provider.opencodeCompactionFailed");
   if (isMuseMcpStartupFault(provider, message)) return sourceText("error.provider.museMcpStartupFault");
   if (isMissingClaudeSession(provider, message)) return sourceText("error.provider.claudeSessionMissing");

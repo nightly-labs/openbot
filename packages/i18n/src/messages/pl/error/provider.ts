@@ -267,6 +267,8 @@ export const messages = {
     "Usługa Gemini od Google nie ukończyła żądania. Spróbuj ponownie za kilka minut.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini odrzucił to żądanie. Wybierz inny model i wyślij wiadomość ponownie. Jeśli znów się nie uda, rozpocznij nowy czat.\n{detail}",
+  "error.provider.antigravitySessionRejected":
+    "Gemini odrzucił to żądanie i nie podał przyczyny. Może to powodować element historii czatu, na przykład obraz otwarty przez agenta. OpenBot rozpoczął nową sesję Gemini z historią czatu. Spróbuj ponownie. Jeśli błąd się powtarza, wybierz inny model.",
   "error.provider.antigravityConnectionLost":
     "Gemini utracił połączenie ze swoim agentem i się zatrzymał. Wyślij wiadomość, aby kontynuować.",
   "error.provider.antigravityRemoteWindowsSignIn":

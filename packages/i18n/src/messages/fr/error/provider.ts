@@ -289,6 +289,8 @@ export const messages = {
     "Le service Gemini de Google n’a pas terminé la requête. Réessayez dans quelques minutes.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini a refusé cette requête. Choisissez un autre modèle, puis renvoyez votre message. Si l’erreur revient, commencez une nouvelle discussion.\n{detail}",
+  "error.provider.antigravitySessionRejected":
+    "Gemini a refusé cette requête sans en donner la cause. Un élément de l’historique de la conversation peut en être la cause, comme une image que l’agent a ouverte. OpenBot a démarré une nouvelle session Gemini avec l’historique de la conversation. Réessayez. Si l’erreur continue, choisissez un autre modèle.",
   "error.provider.antigravityConnectionLost":
     "Gemini a perdu la connexion avec son agent et s’est arrêté. Envoyez un message pour continuer.",
   "error.provider.antigravityRemoteWindowsSignIn":

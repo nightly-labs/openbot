@@ -275,6 +275,8 @@ export const messages = {
     "Google'ın Gemini hizmeti isteği tamamlamadı. Birkaç dakika sonra yeniden deneyin.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini bu isteği reddetti. Başka bir model seçin, sonra mesajınızı yeniden gönderin. Yine başarısız olursa yeni bir sohbet başlatın.\n{detail}",
+  "error.provider.antigravitySessionRejected":
+    "Gemini bu isteği reddetti ve nedenini belirtmedi. Buna sohbet geçmişindeki bir öğe, örneğin ajanın açtığı bir görsel neden olabilir. OpenBot, sohbet geçmişiyle yeni bir Gemini oturumu başlattı. Yeniden deneyin. Hata sürerse başka bir model seçin.",
   "error.provider.antigravityConnectionLost":
     "Gemini, aracısıyla bağlantısını kaybetti ve durdu. Devam etmek için bir mesaj gönderin.",
   "error.provider.antigravityRemoteWindowsSignIn":

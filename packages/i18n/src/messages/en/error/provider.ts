@@ -263,6 +263,8 @@ export const messages = defineMessages("error.provider", {
     "Google's Gemini service did not complete the request. Try again in a few minutes.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini refused this request. Choose another model, then send your message again. If it fails again, start a new chat.\n{detail}",
+  "error.provider.antigravitySessionRejected":
+    "Gemini refused this request and did not give the cause. An item in the chat history can cause this, such as an image that the agent opened. OpenBot started a new Gemini session with the chat history. Try again. If the error continues, choose another model.",
   "error.provider.antigravityConnectionLost":
     "Gemini lost the connection to its agent and stopped. Send a message to continue.",
   "error.provider.antigravityRemoteWindowsSignIn":
