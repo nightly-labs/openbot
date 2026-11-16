@@ -47,6 +47,7 @@ import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
 import { useTurns } from "../../turns";
 import { useAuth } from "../account/account-context";
+import { useAgentTasks } from "../agent-tasks/agent-tasks-context";
 import { createAgentActivity } from "../agents/agent-activity";
 import { attentionKey } from "../agents/agent-runtime-snapshot";
 import { useAgents } from "../agents/agents-context";
@@ -170,6 +171,7 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
   const { conversations, markAgentMessagesRead, loadLatestAgentMessages, clearRecentReply, presentPromptResolution } =
     useConversation();
   const { workingTurns, agentStates, agentMoods } = createAgentActivity();
+  const agentTasks = useAgentTasks();
   const { sidebarLayout, pinnedSidebarItems } = useSidebar();
   const channels = useChannels();
   const {
@@ -627,6 +629,21 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
       // The main window keeps the latest page of every agent it has opened; another agent loads it here.
       if (seat?.kind === "agent" && !conversations[seat.id]?.messages?.length) void loadLatestAgentMessages(seat.id);
     },
+    /**
+     * The thread tab that the main window opens for an agent of the dock. When the seat's badge comes
+     * only from new replies in side threads, the dock chat cannot show them, so the main window opens
+     * the newest of those threads. Its tab reads the replies, and the badge goes. Otherwise the agent
+     * opens as before.
+     */
+    mainTabOf(agentId: string): string | undefined {
+      const state = agentStates()[agentId];
+      if (state?.kind !== "unread" || state.count > 0) return undefined;
+      let newest: { id: string; updatedAt: string } | undefined;
+      for (const task of agentTasks.snapshot(agentId)?.tasks ?? []) {
+        if (agentTasks.unreadCount(task) > 0 && (!newest || task.updatedAt > newest.updatedAt)) newest = task;
+      }
+      return newest?.id;
+    },
     add(seat: AgentDockSeatRef) {
       if (!seated(seat)) saveSeats([...seatRefs(), { kind: seat.kind, id: seat.id }]);
     },
@@ -769,7 +786,9 @@ function WindowAgentDock(props: { serverId: string }) {
           ? dock.sendToChannel(seat.id, text)
           : sendMessage(text, [], null, { agentId: seat.id, serverId: props.serverId })
       }
-      onOpenInMain={(seat) => (seat.kind === "channel" ? void channels.open(seat.id) : selectAgent(seat.id))}
+      onOpenInMain={(seat) =>
+        seat.kind === "channel" ? void channels.open(seat.id) : selectAgent(seat.id, dock.mainTabOf(seat.id))
+      }
       onOpenWindow={(agentId) => void appPort().openChatWindow({ serverId: props.serverId, agentId })}
       answers={answers}
       voice={voice}
@@ -888,7 +907,7 @@ function ScreenAgentDock(props: { serverId: string }) {
           dock.move(action.seat, action.before);
           return;
         case "open-agent":
-          selectAgent(action.agentId);
+          selectAgent(action.agentId, dock.mainTabOf(action.agentId));
           return;
         case "open-channel":
           void channels.open(action.channelId);
