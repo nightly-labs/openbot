@@ -164,11 +164,13 @@ function isCodexUnstoredItem(provider: AgentProvider, message: string): boolean 
  * same history on each turn, so each later turn failed the same way, in about 2 seconds, until a new
  * chat (#9915). A new session, given the OpenBot transcript, sends different bytes. Only the bare
  * body matches: a `detail` that names a cause, such as "Instructions are not valid", does not.
+ * Codex sends a 400 of a turn as the body only. Its other form is `unexpected status 400 Bad
+ * Request: <body>, url: …`, with the cf-ray and request id after the url.
  */
 function isCodexBareBadRequest(provider: AgentProvider, message: string): boolean {
   return (
     provider === "codex" &&
-    /^(?:[^{]*\b400 Bad Request:\s*)?\{\s*"detail"\s*:\s*"Bad Request"\s*\}$/.test(message.trim())
+    /^(?:[^{]*\b400 Bad Request:\s*)?\{\s*"detail"\s*:\s*"Bad Request"\s*\}(?:,\s*url:.*)?$/.test(message.trim())
   );
 }
 
