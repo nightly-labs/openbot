@@ -953,7 +953,9 @@ export class BrowserHost {
       tab.filledCard === true ||
       this.#takeoverTabIds.has(tab.id) ||
       this.#userControlTabIds.has(tab.id) ||
-      tab.contents.isCurrentlyAudible()
+      // Chromium counts a muted page as audible. Nobody hears a muted tab, so its sound is not a use:
+      // a hidden video or live stream must still pause and unload (#9913).
+      (tab.contents.isCurrentlyAudible() && !tab.contents.isAudioMuted())
     );
   }
 
