@@ -4,11 +4,12 @@
 // running, so no provider, app, account or network is started.
 //
 // It builds a workflow with refs in one call (trigger, agent, condition, output), moves, changes and
-// removes nodes, reads it back, runs it and reads the run, and checks the failures that the model must
+// removes nodes, reads it back, runs it with the input of one case and reads the run, and checks the failures that the model must
 // correct: an edge that a rule refuses, an unknown agent and a locked node. The report keeps the byte
 // size of each tool result, so the context cost is visible. It also checks that a search says to run
 // the tools with tool_call, that tool_call accepts the name as `tool`, that each delete asks the
 // user and a decline keeps the workflow, and that the change event names the agent that built it.
+// The run input goes from the trigger to the agent step, and a run from one node refuses it.
 //
 // Run: bun scripts/workflow-agent-tools-e2e.ts
 // Writes .openbot-build/workflow-agent-tools-e2e/report.json and exits non-zero on a failure.
@@ -67,7 +68,13 @@ const laidOut = z.object({
 const runStarted = z.object({ runId: z.string() });
 const runRead = z.object({
   steps: z.array(
-    z.object({ nodeId: z.string(), status: z.string(), kind: z.string().optional(), label: z.string().optional() }),
+    z.object({
+      nodeId: z.string(),
+      status: z.string(),
+      kind: z.string().optional(),
+      label: z.string().optional(),
+      output: z.string().optional(),
+    }),
   ),
 });
 
@@ -99,6 +106,9 @@ const params = (tool: string, args: unknown): DynamicToolCallParams => ({
 const directory = await mkdtemp(join(tmpdir(), "openbot-workflow-agent-tools-"));
 const database = new OpenBotDatabase(directory);
 let workflows: WorkflowsHandle | null = null;
+
+/** The text of each agent step that a run sent to its agent. */
+const handoffs: string[] = [];
 
 /** The titles that a delete asked the user about, and the user's next answer. */
 const deleteAsked: string[] = [];
@@ -173,7 +183,11 @@ try {
       // Each delivery stays running, so the run waits on the agent step.
       delivery: () => ({ status: "running", turnId: null, error: null }),
       turnAnswer: () => null,
-      sendHandoff: () => Effect.succeed(`delivery-${crypto.randomUUID()}`),
+      sendHandoff: (handoff) =>
+        Effect.sync(() => {
+          handoffs.push(handoff.text);
+          return `delivery-${crypto.randomUUID()}`;
+        }),
       stopDelivery: () => Effect.void,
       generateText: () => Effect.fail({ message: "No model step runs in this test." }),
       notify: () => {},
@@ -462,10 +476,23 @@ try {
   });
 
   // 6. Run and read the run.
-  const run = await call("run", "run_workflow", { workflowId }, "run-call");
+  const caseInput = "Shipment 4417: review the packet from the supplier in Gdansk.";
+  const fromNode = await call("failure-run-from-node", "run_workflow", {
+    workflowId,
+    fromNodeId: ids.news,
+    input: caseInput,
+  });
+  check(
+    "run_workflow refuses input with fromNodeId and starts no run",
+    !fromNode.ok &&
+      JSON.stringify(fromNode.value).includes("full run") &&
+      (await runCauseEffect(workflows.runs({ workflowId, limit: 1 }))).runs.length === 0,
+    fromNode.value,
+  );
+  const run = await call("run", "run_workflow", { workflowId, input: caseInput }, "run-call");
   check("run_workflow starts a run", run.ok, run.value);
   const { runId } = runStarted.parse(run.value);
-  const repeated = await call("run-repeated", "run_workflow", { workflowId }, "run-call");
+  const repeated = await call("run-repeated", "run_workflow", { workflowId, input: caseInput }, "run-call");
   check(
     "a repeated run_workflow call starts no second run",
     repeated.ok && runStarted.parse(repeated.value).runId === runId,
@@ -481,6 +508,16 @@ try {
     runs = await call("runs", "read_workflow_runs", { workflowId, runId });
   }
   check("read_workflow_runs shows the agent step running", runs.ok, runs.value);
+  check(
+    "the trigger of a run gives the run input as its output",
+    runRead.parse(runs.value).steps.some((step) => step.nodeId === ids.start && step.output === caseInput),
+    runs.value,
+  );
+  check(
+    "the agent step after the trigger gets the run input",
+    handoffs.length === 1 && handoffs[0]?.includes(caseInput) === true,
+    handoffs,
+  );
   check(
     "each step of a run read gives its kind and label",
     runRead
