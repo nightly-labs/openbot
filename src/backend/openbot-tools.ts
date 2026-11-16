@@ -19,9 +19,11 @@ import { z } from "zod";
 import pluginCatalog from "../../resources/plugin-catalog/catalog.json";
 import { advertisedJsonSchema } from "./agent/advertised-json-schema";
 import { interruptAgentToolSchema } from "./agent/agent-interrupt-tool";
+import { setBrowserProfileToolSchema } from "./agent/browser-profile-tool";
 import { createChannelToolSchema, listChannelsToolSchema, updateChannelToolSchema } from "./agent/channel-agent-tools";
 import { DATA_TOOL_DEFINITIONS } from "./agent/data-tools";
 import { HISTORY_TOOL_DEFINITIONS } from "./agent/history-tools";
+import { readImageToolShape } from "./agent/image-reader";
 import { libraryFolderArgument, listLibraryFoldersToolSchema } from "./agent/library-folder-tools";
 import { MCP_SERVER_TOOL_DEFINITIONS } from "./agent/mcp-tools";
 import { MEMORY_RECALL_TOOL_DEFINITIONS } from "./agent/memory-tool-inputs";
@@ -361,6 +363,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     shape: readVideoToolShape,
   },
   {
+    name: "read_image",
+    description:
+      "Look at a local PNG or JPEG image, such as a photo. Returns it upright, made smaller when large, with its size.",
+    shape: readImageToolShape,
+  },
+  {
     name: "list_sections",
     description:
       "List sidebar sections (folders), their stable ids, and agent assignments before choosing message recipients or grouping agents.",
@@ -432,19 +440,19 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "read_agent",
     description:
-      "Read the setup of one local OpenBot agent, or your own when you omit agentId: profile, provider, model, reasoning effort, account, backup models, the model it returns to after a usage limit or a provider error, access, permissions, Computer Use, notifications, installed skills, routines, and the MCP servers it gets. Read-only. Call it before you change another agent.",
+      "Read the setup of one local OpenBot agent, or your own when you omit agentId: profile, provider, model, reasoning effort, account, backup models, the model it returns to after a usage limit or a provider error, access, permissions, Computer Use, notifications, browser profile, installed skills, routines, and the MCP servers it gets. Read-only. Call it before you change another agent.",
     shape: readAgentToolSchema.shape,
   },
   {
     name: "create_agent",
     description:
-      "Create a persistent local OpenBot agent when the user asks for a new teammate. Choose its profile from the user's request and supply its first task. The new agent gets your provider, model, and reasoning effort. Set provider, model, or reasoningEffort only when the user asks for different ones; call list_models first. Use update_profile for an existing agent. After it exists, add skills with install_local_skill and routines with create_routine as needed. A new agent gets your own access and Computer Use limits.",
+      "Create a persistent local OpenBot agent when the user asks for a new teammate. Choose its profile from the user's request and supply its first task. The new agent gets your provider, model, effort and account. Set provider, model, or reasoningEffort only when the user asks for different ones; call list_models first. Use update_profile for an existing agent. After it exists, add skills with install_local_skill and routines with create_routine as needed. A new agent gets your own access and Computer Use limits.",
     shape: createAgentToolSchema.shape,
   },
   {
     name: "update_profile",
     description:
-      "Update a local OpenBot agent’s name, title, description, avatar, provider, model, reasoning effort, account, backup models, access, Computer Use, or notifications from the user’s request. You can restrict access to workspace and turn Computer Use off; only the user can widen them again. For an uploaded or local image, use avatarPath. Prepare a PNG, JPEG, or WebP copy up to 512 KB with your tools if needed. Call list_models before you change a model, an account, or the backup models. A new model applies from the agent's next turn. A provider or account change fails while the agent has a turn or queued messages; try again when it is ready. backupModels replaces the whole list. To give several agents the same settings, use update_agents.",
+      "Update a local OpenBot agent’s name, title, description, avatar, provider, model, reasoning effort, account, backup models, access, Computer Use, or notifications from the user’s request. You can restrict access to workspace and turn Computer Use off; only the user can widen them again. For an avatar color, use avatarHue. For an image, use avatarPath with a PNG, JPEG, or WebP copy up to 512 KB. Call list_models before you change a model, an account, or the backup models. A new model, provider or account applies from the agent's next turn; other fields apply now. While it works, access with a provider change fails. backupModels replaces the whole list. To give several agents the same settings, use update_agents.",
     shape: updateProfileToolSchema.shape,
   },
   {
@@ -452,6 +460,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     description:
       "Give several local OpenBot agents the same provider, model, reasoning effort, access, Computer Use, or notifications setting in one call, from the user's request. Each agent gets the checks of update_profile and its own change, one after the other. A failure for one agent does not stop the others and does not undo the earlier changes. The result has updated and failed counts and, for each agent id, ok with its new settings or the error. A provider or model that list_models does not list fails the whole call. Tell the user which agents failed and why. You can restrict access to workspace and turn Computer Use off; only the user can widen them again. Call list_models before you change a model.",
     shape: updateAgentsToolSchema.shape,
+  },
+  {
+    name: "set_browser_profile",
+    description:
+      "Move local agents to one browser profile when the user asks. A profile holds sign-ins and cookies, which its agents share. The owner approves each change on a card. Moved agents lose their open tabs.",
+    shape: setBrowserProfileToolSchema.shape,
   },
   {
     name: "start_new_chat",

@@ -116,6 +116,10 @@ export interface ServerMcpPanelProps {
   addRequest?: boolean | undefined;
   /** Called once the panel opened the requested form, so it does not open again. */
   onAddRequestHandled?: (() => void) | undefined;
+  /** A row whose form opens as soon as the list holds it: the user pressed Edit on its Marketplace page. */
+  editRequest?: string | null | undefined;
+  /** Called once the panel opened the requested form, so it does not open again. */
+  onEditRequestHandled?: (() => void) | undefined;
 }
 
 export interface McpPanelSignIn {
@@ -302,7 +306,9 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
 
   /** Sign in is offered for an http server, where this computer or the joined host can sign in. */
   const canSignIn = (config: McpServerConfig) => Boolean(props.signIn) && config.transport === "http";
-  const testMessage = (test: McpTestState) => mcpTestMessage(test, t, props.signIn?.remote?.hostName);
+  // A relayed sign-in opens its page in this computer's browser, so only an older host names itself.
+  const testMessage = (test: McpTestState) =>
+    mcpTestMessage(test, t, props.signIn?.remote?.relay ? undefined : props.signIn?.remote?.hostName);
 
   /**
    * Counts each row's tests and sign-ins. A row can start a second one while the first still waits
@@ -413,6 +419,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
       equals: (previous, next) =>
         previous?.tabId === next?.tabId &&
         previous?.relay?.authorizeHost === next?.relay?.authorizeHost &&
+        previous?.relay?.url === next?.relay?.url &&
         previous?.relay?.listening === next?.relay?.listening,
     },
   );
@@ -451,6 +458,19 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
       // A user who cannot add a server ends the request, so the form does not open later unasked.
       props.onAddRequestHandled?.();
       if (props.canManage) openForm(null);
+    },
+  );
+
+  createEffect(
+    () => {
+      const id = props.editRequest;
+      return id ? props.servers.find((candidate) => candidate.id === id) : undefined;
+    },
+    (config) => {
+      if (!config) return;
+      // A user who cannot change a server ends the request, so the form does not open later unasked.
+      props.onEditRequestHandled?.();
+      if (props.canManage) openForm(config);
     },
   );
 

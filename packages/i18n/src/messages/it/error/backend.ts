@@ -209,6 +209,8 @@ export const messages = {
   "error.backend.interruptSelf": "Un agente non può interrompere se stesso.",
   "error.backend.interruptOtherWork":
     "Questo agente sta lavorando a un'attività che il tuo messaggio non ha avviato. Solo l'utente o chi ha inviato quell'attività può fermarla.",
+  "error.backend.interruptSharedWork":
+    "Il turno di questo agente lavora sul tuo messaggio e anche su un messaggio dell'utente o di un altro agente. Solo l'utente può fermarlo, con Ferma l'agente nella chat di quell'agente.",
   "error.backend.interruptStarting": "Questo agente sta ancora avviando un turno. Riprova dopo l'avvio del turno.",
   "error.backend.interruptNoSession":
     "OpenBot non può interrompere questo agente perché la sua sessione del provider non è disponibile.",
@@ -370,6 +372,8 @@ export const messages = {
   "error.backend.browserProxyUnreachable": "Il proxy {name} non risponde, quindi la pagina non si è aperta.",
   "error.backend.browserProxySignInRefused":
     "Il proxy {name} ha rifiutato l’accesso, quindi la pagina non si è aperta.",
+  "error.backend.browserSystemProxyFailed":
+    "Il proxy nelle impostazioni del computer che esegue OpenBot non risponde o ha rifiutato la connessione, quindi la pagina non si è aperta. Controlla le impostazioni proxy di quel computer.",
   "error.backend.browserProxyComputerUnreachable":
     "Il computer di questo profilo non risponde, quindi la pagina non si è aperta.",
   "error.backend.browserProxyComputerLocalAddress":

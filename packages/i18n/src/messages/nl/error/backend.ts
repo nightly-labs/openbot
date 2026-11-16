@@ -208,6 +208,8 @@ export const messages = {
   "error.backend.interruptSelf": "Een agent kan zichzelf niet onderbreken.",
   "error.backend.interruptOtherWork":
     "Deze agent werkt aan een taak die jouw bericht niet heeft gestart. Alleen de gebruiker of de afzender van die taak kan deze stoppen.",
+  "error.backend.interruptSharedWork":
+    "De beurt van deze agent werkt aan je bericht en ook aan een bericht van de gebruiker of een andere agent. Alleen de gebruiker kan hem stoppen, met Agent stoppen in de chat van die agent.",
   "error.backend.interruptStarting": "Deze agent start nog een beurt. Probeer het opnieuw als de beurt is gestart.",
   "error.backend.interruptNoSession":
     "OpenBot kan deze agent niet onderbreken, omdat de sessie bij de aanbieder niet beschikbaar is.",
@@ -375,6 +377,8 @@ export const messages = {
   "error.backend.browserProxyUnreachable": "De proxy {name} reageert niet, dus de pagina is niet geopend.",
   "error.backend.browserProxySignInRefused":
     "De proxy {name} heeft de aanmelding geweigerd, dus de pagina is niet geopend.",
+  "error.backend.browserSystemProxyFailed":
+    "De proxy in de instellingen van de computer waarop OpenBot draait reageert niet of heeft de verbinding geweigerd, dus de pagina is niet geopend. Controleer de proxy-instellingen van die computer.",
   "error.backend.browserProxyComputerUnreachable":
     "De computer van dit profiel reageert niet, dus de pagina is niet geopend.",
   "error.backend.browserProxyComputerLocalAddress":

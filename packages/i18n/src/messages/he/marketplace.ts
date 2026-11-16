@@ -140,6 +140,10 @@ export const messages = {
   "marketplace.app.remove.action": "הסרה",
   "marketplace.app.remove.confirmTitle": "להסיר את {name}?",
   "marketplace.app.remove.keep": "שמירה",
+  "marketplace.app.replace.title": "להחליף את {server}?",
+  "marketplace.app.replace.description":
+    "כבר יש לך שרת בשם {server}, אבל הוא לא {name}. להחליף אותו ב-{name}? הכתובת והמפתחות השמורים שלו יימחקו.",
+  "marketplace.app.replace.action": "החלפה",
   "marketplace.app.connection": "חיבור",
   "marketplace.app.access.use": "יכול להשתמש",
   "marketplace.app.access.noAgents": "אין סוכנים",

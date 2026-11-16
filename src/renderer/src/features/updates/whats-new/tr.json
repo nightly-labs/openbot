@@ -1,5 +1,43 @@
 [
   {
+    "version": "0.71.0",
+    "date": "2026-11-14",
+    "notices": [
+      "Katıldığınız her sunucuyu da bu sürüme güncelleyin. Bir sunucuda rutin çalıştırmaları için Durdur, ajanların metinsiz gönderdiği dosyalar ve eski yoldaki API anahtarları yalnızca sunucuda bu sürüm varsa çalışır."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Dokunmatik yüzeyde ya da dokunmatik ekranda parmaklarınızla çimdikleyerek işaretçinin altındaki alanı yakınlaştırın. Diyagramlar, tuvaller ve görsel görüntüleyici kendi yakınlaştırmasını korur.",
+          "Rutinler tuvalinden bir rutin çalıştırmasını durdurun: üst çubukta ya da rutin ayrıntılarında Durdur'u seçin. Çalıştırma İptal edildi olarak biter.",
+          "Ajanlar, WhatsApp, Telegram, Slack veya Discord sohbetine metin olmadan dosya ya da görsel gönderebilir.",
+          "Bir Starter barındırılan sunucuyu yeniden satın alın. 25 GB depolama alanı vardır.",
+          "Cline ajanlarıyla bir ClinePass aboneliği kullanın. Model menüsü ClinePass modellerini gösterir."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Tuvalde bir notu, serbest metni, şekli ya da adımı metninden sürükleyin. Metne tıklamak metin imlecini tıkladığınız yere koyar.",
+          "Bir Antigravity ajanı çalışırken gönderdiğiniz mesaj, çalışan turun içine girer. Bunun için Antigravity CLI 1.5.0 veya daha yeni bir sürüm gerekir.",
+          "Görevinde iş bitince durmasını söyleyen bir rutin artık kendi kendini duraklatır. Rutinlerinizin listesinden yeniden açın.",
+          "Vault artık her ajanın diğer ajanların API anahtarı dosyalarını okuyabildiğini bildirir, çünkü tüm ajanlar aynı sistem kullanıcısı olarak çalışır."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Vault API anahtarlarını dosyalarından okuyan betikler, MCP sunucuları ve sağlayıcı ayarları 0.70.0 güncellemesinden sonra yeniden çalışır.",
+          "Claude Code varsayılan modelini değiştirdiğinde bir Claude ajanı profilindeki modeli korur.",
+          "Claude bir turu aylık harcama sınırında durdurduğunda, yedek modelleri olan bir ajan bir sonraki modelinde devam eder.",
+          "Ajanlar, YouTube videosu gibi altyazılı bir videonun tam dökümünü alır.",
+          "OpenBot daha az CPU kullanır: görmediğiniz tarayıcı sekmeleri yavaşlar ve bir ajanın etkinlik satırındaki hareketli ışık daha hafiftir."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.70.0",
     "date": "2026-11-13",
     "notices": [

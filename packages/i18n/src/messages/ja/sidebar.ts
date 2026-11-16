@@ -49,6 +49,8 @@ export const messages = {
   "sidebar.section.nameUnique": "フォルダー名は重複できません。",
   "sidebar.section.saveFailed": "このフォルダーを保存できませんでした。もう一度お試しください。",
   "sidebar.section.unassigned": "未割り当て",
+  "sidebar.section.chatCount": { other: "チャット {count} 件" },
+  "sidebar.section.count": { other: "({count})" },
   "sidebar.section.people": "メンバー",
   "sidebar.section.fallback": "フォルダー",
   "sidebar.folder.newInside": "新しいサブフォルダー",

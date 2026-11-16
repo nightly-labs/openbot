@@ -11,7 +11,7 @@
  */
 
 import { readFile, stat } from "node:fs/promises";
-import { extname, isAbsolute, relative, resolve } from "node:path";
+import { isAbsolute, relative, resolve } from "node:path";
 import { CHAT_VISUAL_PAGE_LIMIT, isChatVisualMimeType } from "@openbot/contracts/chat-visual";
 import { LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
@@ -19,6 +19,7 @@ import { app, session } from "electron";
 import type { AgentService } from "../backend/agent-service";
 import { runCauseEffect } from "../backend/effect-boundary";
 import type { MailboxStore } from "../backend/mailbox-store";
+import { applicationContentType } from "./application-content-type";
 import { attachmentCorsHeaders, attachmentDocumentHeaders, chatVisualResponse } from "./chat-visual-protocol";
 import { buildContentSecurityPolicy, readSelfHostedSignalOrigin } from "./content-security-policy";
 import { filePreviewPages } from "./file-preview-pages";
@@ -265,35 +266,4 @@ export function configureApplicationProtocol(): void {
       return new Response("Not found", { status: 404 });
     }
   });
-}
-
-function applicationContentType(
-  path: string,
-):
-  | "text/html; charset=utf-8"
-  | "text/javascript; charset=utf-8"
-  | "text/css; charset=utf-8"
-  | "image/svg+xml"
-  | "image/png"
-  | "image/webp"
-  | "font/woff2"
-  | "application/octet-stream" {
-  switch (extname(path).toLowerCase()) {
-    case ".html":
-      return "text/html; charset=utf-8";
-    case ".js":
-      return "text/javascript; charset=utf-8";
-    case ".css":
-      return "text/css; charset=utf-8";
-    case ".svg":
-      return "image/svg+xml";
-    case ".png":
-      return "image/png";
-    case ".webp":
-      return "image/webp";
-    case ".woff2":
-      return "font/woff2";
-    default:
-      return "application/octet-stream";
-  }
 }

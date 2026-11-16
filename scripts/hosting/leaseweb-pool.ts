@@ -6,6 +6,10 @@
 //   bun scripts/hosting/leaseweb-pool.ts status
 //       Read only. The machines of each location and product, how many are free and how many are ready
 //       for a new server, each free machine that is not ready, and the work that `sync` does.
+//   bun scripts/hosting/leaseweb-pool.ts boat
+//       Read only. Each server that is still on boat and has a paid plan that does not end: `move` it.
+//       Also the number of servers on boat whose plan ends, is past due, or ended. A customer who takes
+//       back a cancel, or pays a past-due plan, comes back on this list.
 //   bun scripts/hosting/leaseweb-pool.ts free
 //       Read only. Each VPS with no reference on the four Leaseweb accounts, such as a VPS just bought.
 //   bun scripts/hosting/leaseweb-pool.ts add <VPS ID>... [--apply]
@@ -28,7 +32,7 @@
 //       (docs/hosted-servers.md#a-new-server-on-a-pool-machine). A free machine that has the data of a
 //       server (a first start that failed, or a move that went back) is not changed; with
 //       `--reinstall`, the script erases its disk first.
-//   bun scripts/hosting/leaseweb-pool.ts move <server ID> <VPS ID | auto> [--keys=<file>] [--units=<unit>,...] [--docker] [--apply]
+//   bun scripts/hosting/leaseweb-pool.ts move <server ID> <VPS ID | auto> [--keys=<file>] [--units=<unit>,...] [--docker] [--folders=<folder>,...] [--apply]
 //       Moves one server from its boat sandbox to a free machine of the pool, as
 //       docs/hosted-servers.md#move-a-server-from-boat says. The machine takes no new server from then
 //       on. `auto` selects the machine when the move starts: a free machine of the plan, in the order of the
@@ -37,7 +41,10 @@
 //       that an operator moves by hand, and the move then continues. It refuses a sandbox whose stop at
 //       boat is failing, and stops before the downtime when the sandbox has Docker containers. `--docker`
 //       says that an operator moves the containers by hand (stopped before the move, so the boat stop can
-//       save the sandbox), and the move then continues.
+//       save the sandbox), and the move then continues. It also stops when files of the customer are in
+//       folders outside the home that the move does not copy, such as `/srv/vaults`. `--folders` names
+//       the folders that the move then copies too: `/srv/<name>`, `/mnt/<name>`, `/media/<name>` or a
+//       new top-level folder, which the machine must not have. A server with another such folder stays on boat.
 //   bun scripts/hosting/leaseweb-pool.ts custom <VPS ID> --owner=<email> --customer=<word> \
 //       --name=<server name> --keys=<file> [--apply]
 //       Sets up a VPS with no reference as the server of one customer, not in the pool
@@ -61,6 +68,9 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { BILLING_PLAN_IDS, type BillingPlanId } from "@openbot/contracts/billing";
+import { HOSTED_PLAN_SIZE, HOSTED_SERVER_SIZE_NAMES } from "@openbot/contracts/hosted-servers";
+import { isOneOf } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { z } from "zod";
 
@@ -98,7 +108,7 @@ const SANDBOX_PATTERN = /^bx_[a-z0-9]{4,40}$/u;
 const STATE_PATTERN = /^[a-z_]{1,32}$/u;
 const VERSION_PATTERN = /^\d+\.\d+\.\d+$/u;
 /** The machine of each plan that moves. */
-const PRODUCT_OF_PLAN: Record<string, string> = { starter: "VPS01", standard: "VPS02", pro: "VPS03" };
+const PRODUCT_OF_PLAN: Record<BillingPlanId, string> = { starter: "VPS01", standard: "VPS02", pro: "VPS03" };
 const AUTH_API_URL = {
   production: "https://api.openbot.run",
   test: "https://openbot-auth-api-test.internal9671.workers.dev",
@@ -190,6 +200,7 @@ type WorkRow = z.infer<typeof workRowSchema>;
 
 const moveRowSchema = z.object({
   plan: z.string(),
+  size: z.enum(HOSTED_SERVER_SIZE_NAMES),
   desired_state: z.string(),
   observed_state: z.string().regex(STATE_PATTERN),
   observed_error: z.string().nullable(),
@@ -304,10 +315,21 @@ const SANDBOX_SSH = `ssh -i "$d/key" -o IdentitiesOnly=yes -o BatchMode=yes -o S
   -o UserKnownHostsFile="$d/known-hosts" -o ConnectTimeout=20 -o ServerAliveInterval=15`;
 
 /** Runs in the sandbox as root. Sends the archive to the machine; the key of the move can only write it there. */
+/** True for a folder that `--folders` can name: the same rule as `movable_folder` of move-from-boat.sh. */
+function movableFolder(folder: string) {
+  return (
+    /^\/(?:srv\/|mnt\/|media\/)?[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*$/u.test(folder) &&
+    folder !== "/srv/openbot-hosted" &&
+    !/^\/(?:bin|boot|cdrom|dev|etc|gnu|home|initrd.*|lib.*|lost\+found|media|mnt|nix|opt|proc|root|run|sbin|snap|srv|swap.*|sys|tmp|usr|var)$/u.test(
+      folder,
+    )
+  );
+}
+
 const RUN_EXPORT = `#!/bin/bash
 set -o pipefail
 d=${SANDBOX_MOVE}
-bash "$d/move-from-boat.sh" export - 2>"$d/export.log" | ${SANDBOX_SSH} "root@$1"
+bash "$d/move-from-boat.sh" export - "\${@:2}" 2>"$d/export.log" | ${SANDBOX_SSH} "root@$1"
 echo "$?" >"$d/status"
 `;
 
@@ -471,6 +493,34 @@ class Pool {
   /** SQL: the machine `p` has a token and asked the account service a short time ago. */
   #readySql() {
     return `(p.assign_token_hash IS NOT NULL AND COALESCE(p.seen_at, 0) > ${literal(Date.now() - POOL_SEEN_WITHIN_MS)})`;
+  }
+
+  boat() {
+    const onBoat = `h.operator_host IS NULL AND h.provider_sandbox_id IS NOT NULL AND h.deleted_at IS NULL
+      AND h.desired_state != 'deleted'`;
+    const subscription = (condition: string) =>
+      `EXISTS(SELECT 1 FROM billing_subscriptions b WHERE b.server_id = h.server_id AND ${condition})`;
+    const paid = subscription("b.status IN ('active', 'trialing') AND b.cancel_at_period_end = 0");
+    const toMove = this.#rows(
+      `SELECT h.server_id, h.plan, h.currency, h.observed_state FROM hosted_servers h WHERE ${onBoat} AND ${paid}
+       ORDER BY h.created_at`,
+      z.object({ server_id: z.string(), plan: z.string(), currency: z.string(), observed_state: z.string() }),
+    );
+    for (const row of toMove) {
+      logger.info(`Move ${row.server_id}: ${row.plan}, ${row.currency}, ${row.observed_state} on boat.`);
+    }
+    if (toMove.length === 0) logger.info("No server with a paid plan is on boat.");
+    const [others] = this.#rows(
+      `SELECT
+         SUM(${subscription("b.status IN ('active', 'trialing') AND b.cancel_at_period_end = 1")}) AS ending,
+         SUM(${subscription("b.status IN ('past_due', 'unpaid')")}) AS past_due,
+         SUM(NOT ${subscription("b.status IN ('active', 'trialing', 'past_due', 'unpaid')")}) AS ended
+       FROM hosted_servers h WHERE ${onBoat} AND NOT ${paid}`,
+      z.object({ ending: z.number().nullable(), past_due: z.number().nullable(), ended: z.number().nullable() }),
+    );
+    logger.info(
+      `Also on boat: ${others?.ending ?? 0} whose plan ends, ${others?.past_due ?? 0} past due, ${others?.ended ?? 0} with no plan.`,
+    );
   }
 
   status() {
@@ -1435,8 +1485,19 @@ exit "$status"`;
     throw new Error(`The pool has no free ${product} for this server. Add a machine first.`);
   }
 
-  async move(serverId: string, vpsArg: string, unitsMovedByHand: readonly string[] = [], dockerMovedByHand = false) {
+  async move(
+    serverId: string,
+    vpsArg: string,
+    unitsMovedByHand: readonly string[] = [],
+    dockerMovedByHand = false,
+    foldersToCopy: readonly string[] = [],
+  ) {
     if (!SERVER_ID_PATTERN.test(serverId)) throw new Error(`Not a server ID: ${serverId}`);
+    // The same check as `movable_folder` of move-from-boat.sh. The names also go into shell commands.
+    for (const folder of foldersToCopy) {
+      if (!movableFolder(folder)) throw new Error(`The move cannot copy ${folder}, so this server stays on boat.`);
+    }
+    const folderArgs = foldersToCopy.map((folder) => `'${folder}'`).join(" ");
     if (vpsArg !== "auto" && !VPS_ID_PATTERN.test(vpsArg)) throw new Error(`Not a VPS ID: ${vpsArg}`);
     const started = Date.now();
     let last = started;
@@ -1446,14 +1507,17 @@ exit "$status"`;
       last = now;
     };
     const [row] = this.#rows(
-      `SELECT h.plan, h.desired_state, h.observed_state, h.observed_error, h.provider_sandbox_id, h.operator_host,
+      `SELECT h.plan, h.size, h.desired_state, h.observed_state, h.observed_error, h.provider_sandbox_id, h.operator_host,
          h.currency, u.email FROM hosted_servers h JOIN users u ON u.id = h.owner_user_id
        WHERE h.server_id = ${literal(serverId, SERVER_ID_PATTERN)}`,
       moveRowSchema,
     );
     if (!row) throw new Error(`There is no server ${serverId}.`);
+    if (!isOneOf(BILLING_PLAN_IDS, row.plan)) {
+      throw new Error(`Server ${serverId} has the plan ${row.plan}. No machine is set for this plan.`);
+    }
     const product = PRODUCT_OF_PLAN[row.plan];
-    if (!product) throw new Error(`Server ${serverId} has the plan ${row.plan}. No machine is set for this plan.`);
+    const planSize = HOSTED_PLAN_SIZE[row.plan];
     if (row.desired_state !== "running" && row.desired_state !== "idle") {
       throw new Error(`Server ${serverId} is ${row.desired_state}. Move only a server that is running or idle.`);
     }
@@ -1523,11 +1587,13 @@ exit "$status"`;
     const machineState = state;
     lap("Machine prepared");
 
-    // 2. The row. From here the Worker sends no call to boat for the server.
+    // 2. The row. From here the Worker sends no call to boat for the server. The size becomes the plan's
+    // machine: a Starter sandbox is `default` (HOSTED_BOAT_PLAN_SIZE), and its VPS 1 is `small`.
     const host = literal(`leaseweb:${vpsId}`, HOST_ID_PATTERN);
     const server = literal(serverId, SERVER_ID_PATTERN);
     const changes = this.#write(
       `UPDATE hosted_servers SET operator_host = ${host}, retired_sandbox_id = provider_sandbox_id,
+         size = ${literal(planSize, STATE_PATTERN)},
          provider_sandbox_id = NULL, desired_state = 'running', observed_state = 'running', observed_error = NULL,
          updated_at = ${literal(Date.now())}
        WHERE server_id = ${server} AND provider_sandbox_id = ${literal(sandbox, SANDBOX_PATTERN)} AND operator_host IS NULL
@@ -1593,6 +1659,8 @@ if ids=$(docker ps -aq 2>/dev/null); then
   echo "docker_restart=$restart"
 fi
 bash "$d/move-from-boat.sh" packages`,
+        // `packages` searches the disk outside the home for files of the customer.
+        600,
       );
       const values = keyValues(output);
       packages = output.split("\n").filter((line) => /^apt=[a-z0-9][a-z0-9+.-]+$/u.test(line));
@@ -1606,6 +1674,30 @@ bash "$d/move-from-boat.sh" packages`,
         throw new Error(
           `The sandbox has systemd units of the customer that the move does not copy: ${units.join(", ")}.`,
         );
+      }
+      // The move copies only the home and the directories that `added_trees` finds. A server with files of
+      // the customer in other folders, such as vaults in /srv, stays on boat unless `--folders` names each:
+      // the move then copies them.
+      const folders = output
+        .split("\n")
+        .flatMap((line) => /^folder=(\/\S.*)$/u.exec(line)?.[1] ?? [])
+        .filter((folder) => !foldersToCopy.includes(folder));
+      if (folders.length > 0) {
+        throw new Error(
+          `The sandbox has files of the customer in folders that the move does not copy: ${folders.join(", ")}. ` +
+            "With --folders, the move copies /srv/<name>, /mnt/<name>, /media/<name> and a new top-level folder. " +
+            "A server with another such folder stays on boat.",
+        );
+      }
+      if (foldersToCopy.length > 0) {
+        // The import makes each folder new. Check the machine before the downtime, not during it.
+        const present = this.#remote(
+          machine,
+          `for f in ${folderArgs}; do if [ -e "$f" ] || [ -L "$f" ]; then echo "$f"; fi; done`,
+          { capture: true },
+        ).trim();
+        if (present !== "")
+          throw new Error(`The machine has these folders already: ${present.split("\n").join(", ")}.`);
       }
       // The VPS has no Docker, and the move does not copy containers or images. A container that restarts
       // also makes the stop at boat fail. So a server with a container stays on boat.
@@ -1672,7 +1764,7 @@ bash "$d/move-from-boat.sh" packages`,
       await this.#sandboxRun(
         sandbox,
         `systemctl reset-failed openbot-move-export.service 2>/dev/null || true
-systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/run-export.sh ${machine.address}`,
+systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/run-export.sh ${machine.address} ${folderArgs}`,
       );
       const deadline = Date.now() + EXPORT_WAIT_MS;
       let status = "";
@@ -1722,7 +1814,7 @@ systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/ru
       // the sandbox. `archiving` is not enough: boat can cancel the stop after it, and the sandbox then runs
       // and starts OpenBot again.
       await this.#boat("POST", `/sandboxes/${sandbox}/stop`, {});
-      this.#remote(machine, `bash ${MACHINE_HOSTING}/move-from-boat.sh import ${MACHINE_ARCHIVE}`);
+      this.#remote(machine, `bash ${MACHINE_HOSTING}/move-from-boat.sh import ${MACHINE_ARCHIVE} ${folderArgs}`);
       lap("Import");
       const stopped = await this.#waitForSandbox(
         sandbox,
@@ -1780,6 +1872,7 @@ systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/ru
       row.observed_error !== null && STATE_PATTERN.test(row.observed_error) ? `'${row.observed_error}'` : "NULL";
     const changes = this.#write(
       `UPDATE hosted_servers SET provider_sandbox_id = retired_sandbox_id, retired_sandbox_id = NULL, operator_host = NULL,
+         size = ${literal(row.size, STATE_PATTERN)},
          desired_state = ${literal(row.desired_state, STATE_PATTERN)}, observed_state = ${literal(row.observed_state, STATE_PATTERN)},
          observed_error = ${error}, updated_at = ${literal(Date.now())}
        WHERE server_id = ${literal(serverId, SERVER_ID_PATTERN)} AND operator_host = ${literal(`leaseweb:${vpsId}`, HOST_ID_PATTERN)}
@@ -1794,7 +1887,7 @@ systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/ru
 }
 
 const USAGE =
-  "Usage: leaseweb-pool.ts status | free | add <VPS ID>... | remove <VPS ID>... | sync | prepare <VPS ID>... --keys=<file> [--reinstall] | move <server ID> <VPS ID | auto> [--keys=<file>] [--units=<unit>,...] [--docker] | custom <VPS ID> --owner=<email> --customer=<word> --name=<server name> --keys=<file> [--apply] [--env=test]";
+  "Usage: leaseweb-pool.ts status | boat | free | add <VPS ID>... | remove <VPS ID>... | sync | prepare <VPS ID>... --keys=<file> [--reinstall] | move <server ID> <VPS ID | auto> [--keys=<file>] [--units=<unit>,...] [--docker] [--folders=<folder>,...] | custom <VPS ID> --owner=<email> --customer=<word> --name=<server name> --keys=<file> [--apply] [--env=test]";
 
 async function main(args: string[]) {
   const [command, ...operands] = args.filter((arg) => !arg.startsWith("--"));
@@ -1802,13 +1895,23 @@ async function main(args: string[]) {
   const keys = option("keys");
   const pool = new Pool(args.includes("--apply"), args.includes("--env=test"), process.env, keys);
   if (command === "status") pool.status();
+  else if (command === "boat") pool.boat();
   else if (command === "free") await pool.free();
   else if (command === "add" && operands.length > 0) await pool.add(operands);
   else if (command === "remove" && operands.length > 0) pool.remove(operands);
   else if (command === "sync") await pool.sync();
   else if (command === "prepare" && operands.length > 0) await pool.prepare(operands, args.includes("--reinstall"));
   else if (command === "move" && operands.length === 2 && operands[0] && operands[1])
-    await pool.move(operands[0], operands[1], option("units")?.split(",").filter(Boolean), args.includes("--docker"));
+    await pool.move(
+      operands[0],
+      operands[1],
+      option("units")?.split(",").filter(Boolean),
+      args.includes("--docker"),
+      option("folders")
+        ?.split(",")
+        .map((folder) => folder.replace(/(?<=.)\/+$/u, ""))
+        .filter(Boolean),
+    );
   else if (command === "custom" && operands.length === 1 && operands[0])
     await pool.custom(operands[0], {
       owner: option("owner") ?? "",

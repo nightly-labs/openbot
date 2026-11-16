@@ -196,6 +196,8 @@ export const messages = {
   "error.backend.interruptSelf": "에이전트는 자기 자신을 중단할 수 없어요.",
   "error.backend.interruptOtherWork":
     "이 에이전트는 회원님의 메시지로 시작되지 않은 작업을 하고 있어요. 사용자 또는 해당 작업을 보낸 쪽만 중지할 수 있어요.",
+  "error.backend.interruptSharedWork":
+    "이 에이전트의 턴은 회원님의 메시지와 함께 사용자 또는 다른 에이전트의 메시지도 처리하고 있어요. 사용자만 해당 에이전트 채팅의 에이전트 중지로 멈출 수 있어요.",
   "error.backend.interruptStarting": "이 에이전트가 아직 턴을 시작하는 중이에요. 턴이 시작된 후 다시 시도해 주세요.",
   "error.backend.interruptNoSession": "제공자 세션을 사용할 수 없어서 OpenBot이 이 에이전트를 중단할 수 없어요.",
   "error.backend.memoryTextRequired": "메모리 내용이 필요해요.",
@@ -349,6 +351,8 @@ export const messages = {
   "error.backend.browserProxyChanged": "이 프록시를 연 뒤에 변경되었어요. 다시 확인한 다음 다시 시도해 주세요.",
   "error.backend.browserProxyUnreachable": "프록시 {name}이(가) 응답하지 않아 페이지를 열지 못했어요.",
   "error.backend.browserProxySignInRefused": "프록시 {name}이(가) 로그인을 거부해 페이지를 열지 못했어요.",
+  "error.backend.browserSystemProxyFailed":
+    "OpenBot을 실행하는 컴퓨터 설정의 프록시가 응답하지 않거나 연결을 거부해 페이지를 열지 못했어요. 그 컴퓨터의 프록시 설정을 확인하세요.",
   "error.backend.browserProxyComputerUnreachable":
     "이 프로필이 사용하는 컴퓨터가 응답하지 않아 페이지를 열지 못했어요.",
   "error.backend.browserProxyComputerLocalAddress":

@@ -16,7 +16,12 @@ import {
   readDevInstanceRecords,
   removeDevInstanceRecord,
 } from "./dev-automation/instance-registry";
-import { isProcessGroupAlive, type RecordedProcessState, verifyRecordedProcess } from "./dev-automation/registry-files";
+import {
+  isProcessAlive,
+  isProcessGroupAlive,
+  type RecordedProcessState,
+  verifyRecordedProcess,
+} from "./dev-automation/registry-files";
 import {
   type DevStackPort,
   type DevStackRecord,
@@ -134,14 +139,18 @@ async function stopDevStack(record: DevStackRecord): Promise<boolean> {
     pid: record.supervisorPid,
     startedAt: record.startedAt,
   });
-  if (supervisor === "live") {
-    // "process", not its group: the supervisor sits in whatever group the
-    // shell or `bun run` that started it leads, so a group signal would go to
-    // that job instead of to the runner.
-    await stopOwnedProcesses([ownedProcess(record.supervisorPid)], "SIGTERM", { scope: "process", timeoutMs: 5_000 });
-  } else if (supervisor === "unverified") {
-    refuse(record.supervisorPid, "the runner");
-  }
+  // "process", not its group: the supervisor sits in whatever group the
+  // shell or `bun run` that started it leads, so a group signal would go to
+  // that job instead of to the runner.
+  const stopSupervisor = (): Promise<void> =>
+    stopOwnedProcesses([ownedProcess(record.supervisorPid)], "SIGTERM", { scope: "process", timeoutMs: 5_000 });
+  // Windows runs no SIGTERM handler: a signal ends the supervisor at once, without its cleanup, and a
+  // launcher can then end and leave its tree with no parent, where `taskkill /T` cannot find it. So on
+  // Windows the service trees stop first, while they are whole, and the supervisor then sees its
+  // services exit and cleans up itself. Elsewhere the supervisor stops its own services.
+  const windows = process.platform === "win32";
+  if (supervisor === "live" && !windows) await stopSupervisor();
+  else if (supervisor === "unverified") refuse(record.supervisorPid, "the runner");
 
   const groups: OwnedProcess[] = [];
   for (const entry of record.processes) {
@@ -165,6 +174,13 @@ async function stopDevStack(record: DevStackRecord): Promise<boolean> {
   if (groups.length > 0) {
     logger.info(`Stopping ${groups.length} process group(s) the supervisor left behind.`);
     await stopOwnedProcesses(groups, "SIGTERM", { scope: "group", timeoutMs: 5_000 });
+  }
+  if (supervisor === "live" && windows) {
+    const deadline = Date.now() + 5_000;
+    while (isProcessAlive(record.supervisorPid) && Date.now() < deadline) {
+      await new Promise((resolveDelay) => setTimeout(resolveDelay, 100));
+    }
+    if (isProcessAlive(record.supervisorPid)) await stopSupervisor();
   }
 
   // Last, and only when nothing was left unresolved: while this record exists,

@@ -698,6 +698,19 @@ keeps the other pairs of that origin, and loads the tab again when it set a cook
 desktop uses this route when the server advertises the capability, and `browser-sign-in` with
 cookies only for an older server. The host never sends the values back or records them.
 
+`browser-vault-skip-v1` (protocol 9 only) adds `vaultSkip` beside the frozen takeover projection, in
+the `browser-takeover-requested` event and in `pendingBrowserTakeovers`. The host sets it on a password
+or code card when the host did not fill a saved login (#7262): `agent-script` or `field-kind` when
+the agent named a saved login, `login-choice` when several fit or the named one is not for the site,
+`no-secret` when the login has no password or authenticator key, and `vault-unreadable` when a password
+manager could not be read. It names no login, account or value. With no saved login for the site, the
+card has no reason, because asking the user is the usual step. The host does not read the vault only
+to choose a reason: a password manager sync would delay the card.
+The host adds the field only for a client with the capability. A client decodes a present value and
+refuses an unknown one. The secret card on the desktop, the web client and mobile shows one line that
+says why; an older host or client shows the card with no reason. The agent still gets its own
+`vaultSkipped` text in the tool result.
+
 ### Skill events
 
 `skills-events-v1` adds one optional event, `skills-changed { agentId }`. The host sends it after

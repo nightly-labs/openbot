@@ -1,4 +1,3 @@
-import { fileQuoteId } from "@openbot/contracts/chat-tag-references";
 import { chatVisualReply } from "@openbot/contracts/chat-visual";
 import type { AgentApproval, ConversationMessageSender, MessageReaction } from "@openbot/contracts/ipc";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
@@ -22,7 +21,6 @@ import { type ChatMessageAuthor, ChatMessageRow } from "@openbot/ui/features/con
 import { ChatRowBoundary } from "@openbot/ui/features/conversation/ChatRowBoundary";
 import { ChatScrollRail, createChatScrollRail } from "@openbot/ui/features/conversation/ChatScrollRail";
 import { ChatSearch } from "@openbot/ui/features/conversation/ChatSearch";
-import { ChatVisual } from "@openbot/ui/features/conversation/ChatVisual";
 import { ContextCompactionMarker, type ContextCompactionView } from "@openbot/ui/features/conversation/ContextUsage";
 import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
 import { markdownPlainText } from "@openbot/ui/features/conversation/MarkdownMessageText";
@@ -35,6 +33,7 @@ import {
   type MessageMenuItemsProps,
 } from "@openbot/ui/features/conversation/MessageRendering";
 import { countableTimelineMessage } from "@openbot/ui/features/conversation/new-message-tally";
+import { ownMessageAuthor } from "@openbot/ui/features/conversation/own-bubble";
 import { PendingSendStatus } from "@openbot/ui/features/conversation/PendingSendStatus";
 import { SubagentDock, SubagentGroup } from "@openbot/ui/features/conversation/Subagents";
 import { TaskList } from "@openbot/ui/features/conversation/TaskList";
@@ -43,11 +42,12 @@ import { UnreadMessagesBanner, UnreadMessagesDivider } from "@openbot/ui/feature
 import { VoicePlayer } from "@openbot/ui/features/conversation/VoicePlayer";
 import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, For, Loading, onCleanup, onSettled, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Loading, onSettled, Show, untrack } from "solid-js";
 import { useShowAgentSteps } from "../../agent-steps-preference";
 import { planItems, planTitle } from "../../app-message-projection";
+import { useChatBubbleStyle } from "../../chat-bubble-style-preference";
 import { useCompactMessageActions } from "../../compact-message-actions-preference";
-import { currentDevicePlatform, deviceQuoteShortcut } from "../../send-shortcut-preference";
+import { currentDevicePlatform } from "../../send-shortcut-preference";
 import { remoteRoutineRecovery, serverCanAdminister } from "../servers/server-capabilities";
 import { speechModelReady } from "../speech/speech-model";
 import { recordingGone, speechReading, spokenReply } from "../speech/speech-playback";
@@ -62,12 +62,11 @@ import {
 import { cycleSpeechSpeed, speechSpeed } from "../speech/speech-speed";
 import { agentInstructionsCalls } from "./agent-folders-port";
 import { groupedMessageIds } from "./agent-message-timeline";
+import { ChatVisualReply, shownVisualReply } from "./ChatVisualReply";
 import { ConversationBrowserTakeover } from "./ConversationBrowserTakeover";
 import { ConversationQuestionPrompt } from "./ConversationQuestionPrompt";
 import { continuesSenderRun } from "./chat-grouping";
 import { chatSearchCanOpen, chatSearchOpensMessage } from "./chat-search";
-import { isChatVisualAppShortcut } from "./chat-visual-shortcuts";
-import { chatVisualPageUrl } from "./chat-visual-url";
 import { ApprovalCard, preloadConversationCards, QuestionPromptBubble, UiBlockPrompt } from "./conversation-cards";
 import { isIncomingAgentMessage } from "./conversation-read-state";
 import { conversationRuntime } from "./conversation-runtime";
@@ -697,6 +696,7 @@ export function ConversationTimeline() {
   });
   const showAgentSteps = useShowAgentSteps();
   const compactActions = useCompactMessageActions();
+  const bubbleStyle = useChatBubbleStyle();
   const traceKeyboard = currentDevicePlatform() === "darwin" ? "mac" : "pc";
   /** The trace that the steps row of an answer opens. A channel names the agent that answered. */
   const traceAbove = (messageId: string | undefined, agentName?: string): AgentStepsTrace => ({
@@ -951,8 +951,14 @@ export function ConversationTimeline() {
                   const current = message();
                   const sender = otherSender(current);
                   if (sender) return memberAuthor(sender);
+                  // In an agent chat, Settings › Appearance › Your bubbles can give them the agent's color.
                   if (current?.author === "you")
-                    return { kind: "you", name: t("chat.message.you"), chatColor: ownChatColor() };
+                    return ownMessageAuthor({
+                      name: t("chat.message.you"),
+                      style: channel ? "classic" : bubbleStyle(),
+                      agent: props.agent,
+                      chatColor: ownChatColor(),
+                    });
                   if (channel && current) return channel.author(current);
                   // The profile gives the row the agent's color, for the name and the bubble tint.
                   return {
@@ -1376,36 +1382,8 @@ export function ConversationTimeline() {
                     </div>
                   );
                 }
-                const initialVisual = untrack(() => chatVisualReply(initialMessage));
-                // The desktop loads the page from its own scheme. The web client has no page URL: it
-                // reads the HTML and shows it as `srcdoc`. Another client shows the title and file.
-                const loadPage = runtime.visualPage;
-                if (initialVisual && (chatVisualPageUrl(initialVisual.attachment.previewUrl) || loadPage)) {
-                  // A visual reply is the agent's page. It shows above the final reply, with no bubble.
-                  const visual = () => chatVisualReply(message() ?? initialMessage) ?? initialVisual;
-                  const pageUrl = () => chatVisualPageUrl(visual().attachment.previewUrl);
-                  // The page quotes as its file, as in the side panel, so the quote chip opens the page.
-                  const pageQuoteId = () =>
-                    fileQuoteId({
-                      source: "attachment",
-                      attachmentId: visual().attachment.id,
-                      name: visual().attachment.name,
-                    });
-                  const [page, setPage] = createSignal<{ html?: string; failed?: boolean }>({});
-                  if (loadPage && !pageUrl()) {
-                    let mounted = true;
-                    onCleanup(() => {
-                      mounted = false;
-                    });
-                    void loadPage(initialVisual.attachment).then(
-                      (html) => {
-                        if (mounted) setPage({ html });
-                      },
-                      () => {
-                        if (mounted) setPage({ failed: true });
-                      },
-                    );
-                  }
+                const initialVisual = untrack(() => shownVisualReply(initialMessage, runtime.visualPage));
+                if (initialVisual) {
                   return (
                     <div
                       data-index={virtualRow.index}
@@ -1446,20 +1424,12 @@ export function ConversationTimeline() {
                             "chat-visual-with-author": Boolean(channel) && author().kind === "agent",
                           }}
                         >
-                          <ChatVisual
-                            src={pageUrl()}
-                            html={page().html}
-                            failed={pageUrl() === undefined && (!loadPage || page().failed === true)}
-                            title={(message() ?? initialMessage).body}
-                            height={visual().height}
-                            onOpenLink={(url) => void openExternalMessageUrl(url)}
+                          <ChatVisualReply
+                            message={message() ?? initialMessage}
+                            initial={initialVisual}
                             onMessage={addPageText}
                             onContext={(text) => setPageContext(message() ?? initialMessage, text)}
-                            onQuote={(text) => quoteSelection(pageQuoteId(), text)}
-                            quoteShortcut={deviceQuoteShortcut(props.platform)}
-                            onOpenInSidePanel={() => void previewAttachment(visual().attachment)}
-                            isAppShortcut={isChatVisualAppShortcut}
-                            macWindowControls={props.platform === "darwin"}
+                            onQuote={quoteSelection}
                           />
                         </article>
                       </ChatRowBoundary>

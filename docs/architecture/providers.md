@@ -187,7 +187,7 @@ memory. `ThreadLifecycle` reads `memoryReview()` at each start and resume of a s
 measured the correction turn at about 20,000 input tokens in one request, against about 63,000 in
 five requests when the agent saved the memory itself.
 
-The number of turns is a setting of the server that runs the agents: Server settings > General >
+The number of turns is a setting of the server that runs the agents: Server settings > Memory >
 Memory review, with 10, 20 (the default) or 40 turns, or Off. An owner or admin of a joined server sets
 it through `memory-review-v1` (see [servers.md](servers.md)). Main owns
 `openbot-memory-review-v1.json` (`MemoryReviewPreferenceStore`) and passes
@@ -236,7 +236,7 @@ a new skill has a class-level name, and environment failures, claims that a tool
 errors that went away, tasks done once and attempts that never worked are not skills. The review
 suggests at most one skill, and only when a signal fired.
 
-Skill learning is a setting of the server that runs the agents: Server settings > General > Agents >
+Skill learning is a setting of the server that runs the agents: Server settings > Memory >
 Skill learning, with Automatic (the default), Ask first, or Off. An owner or admin of a joined server
 sets it through `skill-learning-v1` (see [servers.md](servers.md)). Main owns
 `openbot-skill-learning-v1.json` (`SkillLearningPreferenceStore`) and passes `skillLearning()` to
@@ -325,6 +325,10 @@ OpenBot unloads a session that has no turn, keeps its identity, and resumes it a
 
 - Claude closes the `claude` process of an idle thread, and each ACP client closes an idle session
   (`IdleThreadPool` in `src/backend/idle-thread-pool.ts`). The client opens it again from the session.
+  An Antigravity turn that ends while one of its tool calls still runs, such as a daemon command, holds
+  the session's process (`AcpThread.workHold`, #9551). No idle release closes it, and the provider
+  process stays, until the session does not change for 30 minutes, or for 4 hours at most. When memory
+  is low, `releaseQuietBackgroundThreads` closes a held session that did not change for 10 minutes.
 - One Codex app server holds every thread of its account, and stops the MCP servers of a thread only
   when it unloads that thread. `CodexIdleSessions` (`src/backend/agent/codex-idle-sessions.ts`)
   releases an agent session 5 minutes after its last turn ends. When a turn ends, it releases at once
@@ -620,6 +624,12 @@ configuration and model discovery. `src/backend/acp-client.ts` owns session star
 streamed messages, permissions, tool bridging, and cancellation. `grok-client.ts` supplies xAI
 login and billing hooks. The OpenCode driver starts `opencode acp` on the runtime OpenBot pins and
 downloads, or on a CLI the user installed. Profile clients deny tool permissions.
+
+OpenCode 2.x keeps the MCP servers of a session for its directory after `session/close`, so the
+stdio servers that each chat and subagent started stayed until OpenCode stopped (#9254). OpenBot
+starts each stdio server itself (`mcp-stdio-relay.ts`) and gives OpenCode a Streamable HTTP URL on
+127.0.0.1 with a bearer token. The sessions of one directory share the relay of each server, and the
+last of them to close stops it and its process group.
 
 OpenCode adds its own system prompt, tools, skill listing and Code Mode catalog to each request of an
 agent. `opencode-agent-defaults.ts` denies the parts that an OpenBot agent does not use: the
@@ -935,6 +945,9 @@ also runs share another limit, so `accountUsageCoversModel` keeps them out of th
 A saved Gemini API key comes before the Google sign-in, so the provider
 status sets `apiKeyInUse`, and the API key section of the Gemini provider page says that the key,
 not the plan, serves the turns. The dock shows no Gemini row then, because it has no reading.
+A rate limit or quota refusal on the saved key says that the key reached it and that removing the
+key gives back the plan (`savedKeyLimitMessage`, `geminiSavedKeyLimitFailure`). A quota of 0 for the
+model, such as a free-tier key on Gemini 4 Argon (`limit: 0`), does not say to wait (#9517).
 
 A limit failure stays a turn error even though the descriptor sets `reportsUsage: true`, because
 many Gemini setups have no reading to explain it. `GEMINI_REQUEST_FAILURES` in
@@ -1507,6 +1520,27 @@ adds it. A limit from an event has no flag, so `keepUsageCredits` keeps the last
 a client's own quota changes, `ProviderRuntime.#noteCredits` sends `usage-credits-changed`, an event
 with no data that only `usage-credits-v1` peers get, and the client reads the usage again. A host
 without the capability gives no flag, and the client shows **Usage limit reached** as before.
+
+### Account code sign-in
+
+An account after the first of Codex, Grok or Claude can also sign in with a code (`accountCodeSignIn` in the
+descriptor, `accounts.codeSignIn` in `provider-drivers.ts`). The browser sign-in of a second account
+is not always possible, for example when the browser stays signed in to the first account.
+`ProviderAccounts.connectWithCode` runs the CLI's device sign-in
+(`codex login --device-auth`, `grok login --device-auth`) in the home folder of the account and gives
+the page and the code; the person types the code on any device. The client reads
+`codeSignInStatus` until the sign-in ends. A new account whose sign-in fails, expires or is
+cancelled is removed. This computer always has it. A joined server offers it with
+`provider-account-code-v1` (start, submit, status, cancel; owner or admin), and the desktop and the web
+client hide "Add account with code" and "Log in with code" on a host that does not have it.
+
+Claude has a `paste` sign-in (`claude auth login --claudeai`): the page shows a code after the
+sign-in, the person pastes it into the dialog, and `ProviderAccounts.submitCode` types it into the
+CLI. The code is a credential: it goes to the CLI's stdin only, and no reply or log line has it. As
+for Claude's own sign-in, only a Linux computer can run it (`pasteCodeSignInSupported`), so the
+clients offer it for Claude only there: on this computer by its platform, and on a joined server by
+`providers-v3`, which only a host that can run a pasted code advertises. Mobile
+does not offer it yet: the phone signs an account in on the page that the host relays.
 
 ### Disconnect the own sign-in
 

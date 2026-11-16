@@ -200,6 +200,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.interruptSelf": "An agent cannot interrupt itself.",
   "error.backend.interruptOtherWork":
     "This agent works on a task that your message did not start. Only the user or the sender of that task can stop it.",
+  "error.backend.interruptSharedWork":
+    "This agent's turn works on your message and also on a message from the user or another agent. Only the user can stop it, with Stop agent in that agent's chat.",
   "error.backend.interruptStarting": "This agent is still starting a turn. Try again after the turn starts.",
   "error.backend.interruptNoSession":
     "OpenBot cannot interrupt this agent because its provider session is unavailable.",
@@ -368,6 +370,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserProxyChanged": "This proxy changed after you opened it. Look at it again, then try again.",
   "error.backend.browserProxyUnreachable": "The proxy {name} does not answer, so the page did not open.",
   "error.backend.browserProxySignInRefused": "The proxy {name} refused the sign-in, so the page did not open.",
+  "error.backend.browserSystemProxyFailed":
+    "The proxy in the settings of the computer that runs OpenBot does not answer or refused the connection, so the page did not open. Check the proxy settings of that computer.",
   "error.backend.browserProxyComputerUnreachable":
     "The computer that this profile uses does not answer, so the page did not open.",
   "error.backend.browserProxyComputerLocalAddress":

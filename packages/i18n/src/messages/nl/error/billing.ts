@@ -9,6 +9,9 @@ export const messages = {
   "error.billing.restartUnavailable": "Deze server kan niet vanaf hier herstarten. Neem contact op met support.",
   "error.billing.planRequired": "Het abonnement van deze server is afgelopen. Verleng het om de server te starten.",
   "error.billing.planSoldOut": "Dit abonnement is uitverkocht. Kies een ander abonnement.",
+  "error.billing.storageUnavailable": "Deze opslag is niet beschikbaar voor deze server.",
+  "error.billing.storagePaymentFailed":
+    "De betaling voor de opslag is mislukt. Werk de betaalmethode bij en probeer het opnieuw.",
   "error.billing.licenseExists": "Dit account heeft al een licentie. Wijzig in plaats daarvan de gebruikers.",
   "error.billing.licenseCurrency": "De licentie moet de valuta van je andere abonnementen gebruiken.",
   "error.billing.licenseUsersInUse":

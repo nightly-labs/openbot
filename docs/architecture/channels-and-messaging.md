@@ -639,6 +639,12 @@ the answer. Every answer comes from OpenBot.
   one ticket lifetime after it starts it asks the Worker (`/v2/remote/slack-route/validate`, signed
   like `/v2/remote/resume/validate`) which links of each ticket D1 still has. The host trusts a delivery because Signal checked the signature; no host has the
   signing secret.
+- **Not linked.** The account service names the workspace IDs beside the ticket, and the host keeps
+  them for the open socket (`SignalIngress.onLinkedRoutes`). A workspace connection that is not in them
+  reports `not_linked`, not `connected`: Signal sends its events to another host, such as after the
+  workspace moved or the saved settings were copied to a new server. It is not fatal and unlinks
+  nothing. Reconnect opens the Slack install page, which links the workspace to this host. A new
+  workspace opens a new socket before its connection starts, so an older list does not judge it.
 
 Telegram uses the same socket with one difference: one OpenBot bot serves every user, so its token
 must not reach any host. Only Signal has it (`TELEGRAM_BOT_TOKENS`), and the contract is
@@ -658,7 +664,9 @@ must not reach any host. Only Signal has it (`TELEGRAM_BOT_TOKENS`), and the con
   callback query ID, and sends `telegram-delivery` to the socket that holds the chat. It always
   answers 200: Telegram would hold back the bot's other chats behind one offline host. The Telegram
   route ticket (`telegramRoute` in the hello, audience `openbot-telegram-route`, the Slack route key)
-  and `telegram-route-revoked` work as the Slack ones do.
+  and `telegram-route-revoked` work as the Slack ones do. A chat that is not in the ticket's chat list
+  reports `not_linked` as a Slack workspace does, and Reconnect opens a new link for the chat. A chat
+  that Signal links on the open socket joins the socket's list at once.
 - **Calls.** The host sends `telegram-call` only to a Signal whose `ready` names the `telegram`
   capability, because Signal closes a socket on a frame it does not know. Signal accepts only the
   methods and parameters of `TelegramCallParams`, as strict objects, only for a chat routed to that
@@ -866,6 +874,17 @@ is one linked number (`workspace_id` is the number in digits).
   before it hands it on and joins a burst of short messages of one person. A crash replays the journal;
   the mailbox idempotency key drops a copy. Approvals are numbered text answers (`1`, `2`), matched to
   the quoted menu or the newest one of the conversation.
+- **Saved history.** WhatsApp sends no history to a linked device. `WhatsAppArchive` saves each
+  message of an allowed chat, also one that does not mention the number, in
+  `projection_messaging_history` (migration 62, `MessagingHistoryStore`), and downloads its file one at
+  a time to `<userData>/whatsapp/files/<connection id>/`. `seq` keeps the arrival order. The context of
+  a conversation, `messaging_history` and its `query` and `before` filter read the table, and a turn's
+  download copies the saved file, and waits for the download at arrival when it did not finish. A
+  download stops after 10 minutes or when the connection closes. The copies of one connection stay
+  under 2 GB (`trimFiles`, the oldest first, by the size on disk). A delete for everyone deletes the row
+  and its copy, and an edit changes the text, only when the sender is the saved `author_id`: the sender
+  chooses the message id. A group admin's delete of another person's message is not followed. `MessagingService` deletes the rows and copies older than 90 days at start and
+  each hour, also those of a number that is off; a disconnect deletes all of them for the connection.
 - **Not on joined servers.** `connectors-v1` and `routine-results-v1` stay as released: a host leaves
   WhatsApp out of both, and the desktop IPC endpoints `messaging:*-whatsapp-*` are local only.
 

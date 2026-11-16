@@ -211,6 +211,8 @@ export const messages = {
   "error.backend.interruptSelf": "エージェントは自分自身を中断できません。",
   "error.backend.interruptOtherWork":
     "このエージェントは、あなたのメッセージで開始されていないタスクを実行中です。そのタスクを停止できるのは、ユーザーまたはそのタスクの送信者だけです。",
+  "error.backend.interruptSharedWork":
+    "このエージェントのターンは、あなたのメッセージに加えて、ユーザーまたは別のエージェントからのメッセージも処理しています。停止できるのはユーザーだけで、そのエージェントのチャットの「エージェントを停止」を使います。",
   "error.backend.interruptStarting":
     "このエージェントはまだターンを開始中です。ターンが始まってからもう一度お試しください。",
   "error.backend.interruptNoSession":
@@ -372,6 +374,8 @@ export const messages = {
     "このプロキシは開いた後に変更されました。もう一度確認してから、やり直してください。",
   "error.backend.browserProxyUnreachable": "プロキシ {name} が応答しないため、ページを開けませんでした。",
   "error.backend.browserProxySignInRefused": "プロキシ {name} がサインインを拒否したため、ページを開けませんでした。",
+  "error.backend.browserSystemProxyFailed":
+    "OpenBot を実行しているコンピューターの設定にあるプロキシが応答しないか接続を拒否したため、ページを開けませんでした。そのコンピューターのプロキシ設定を確認してください。",
   "error.backend.browserProxyComputerUnreachable":
     "このプロファイルが使うコンピューターが応答しないため、ページを開けませんでした。",
   "error.backend.browserProxyComputerLocalAddress":

@@ -200,6 +200,8 @@ export const messages = {
   "error.backend.interruptSelf": "Bir ajan kendi kendini kesintiye uğratamaz.",
   "error.backend.interruptOtherWork":
     "Bu ajan mesajınızın başlatmadığı bir görev üzerinde çalışıyor. Yalnızca kullanıcı veya o görevin göndereni görevi durdurabilir.",
+  "error.backend.interruptSharedWork":
+    "Bu ajanın turu mesajınız ve ayrıca kullanıcıdan ya da başka bir ajandan gelen bir mesaj üzerinde çalışıyor. Onu yalnızca kullanıcı, o ajanın sohbetindeki Ajanı durdur ile durdurabilir.",
   "error.backend.interruptStarting": "Bu ajan hâlâ bir tur başlatıyor. Tur başladıktan sonra tekrar deneyin.",
   "error.backend.interruptNoSession": "OpenBot sağlayıcı oturumu kullanılamadığı için bu ajanı kesintiye uğratamıyor.",
   "error.backend.memoryTextRequired": "Bellek metni gereklidir.",
@@ -352,6 +354,8 @@ export const messages = {
   "error.backend.browserProxyChanged": "Bu proxy siz açtıktan sonra değişti. Yeniden kontrol edip tekrar deneyin.",
   "error.backend.browserProxyUnreachable": "{name} proxy'si yanıt vermiyor, bu yüzden sayfa açılmadı.",
   "error.backend.browserProxySignInRefused": "{name} proxy'si oturum açmayı reddetti, bu yüzden sayfa açılmadı.",
+  "error.backend.browserSystemProxyFailed":
+    "OpenBot'u çalıştıran bilgisayarın ayarlarındaki proxy yanıt vermiyor veya bağlantıyı reddetti, bu yüzden sayfa açılmadı. O bilgisayarın proxy ayarlarını kontrol edin.",
   "error.backend.browserProxyComputerUnreachable":
     "Bu profilin kullandığı bilgisayar yanıt vermiyor, bu yüzden sayfa açılmadı.",
   "error.backend.browserProxyComputerLocalAddress":

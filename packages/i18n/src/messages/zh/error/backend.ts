@@ -183,6 +183,8 @@ export const messages = {
   "error.backend.routineRunNoSession": "由于服务商会话不可用，OpenBot 无法中断正在进行中的自动化任务运行。",
   "error.backend.interruptSelf": "助手不能中断自己。",
   "error.backend.interruptOtherWork": "该助手正在处理非你的消息发起的任务，只有用户或该任务的发送者才能停止它。",
+  "error.backend.interruptSharedWork":
+    "该助手的这一轮在处理你的消息，同时也在处理来自用户或其他助手的消息。只有用户可以在该助手的聊天中用“停止助手”停止它。",
   "error.backend.interruptStarting": "该助手仍在启动对话，请等对话开始后再试。",
   "error.backend.interruptNoSession": "由于服务商会话不可用，OpenBot 无法中断该助手。",
   "error.backend.memoryTextRequired": "需要填写记忆内容。",
@@ -328,6 +330,8 @@ export const messages = {
   "error.backend.browserProxyChanged": "此代理在你打开后已被更改。请重新查看，然后再试一次。",
   "error.backend.browserProxyUnreachable": "代理 {name} 没有响应，因此页面没有打开。",
   "error.backend.browserProxySignInRefused": "代理 {name} 拒绝了登录，因此页面没有打开。",
+  "error.backend.browserSystemProxyFailed":
+    "运行 OpenBot 的计算机设置中的代理没有响应或拒绝了连接，因此页面没有打开。请检查该计算机的代理设置。",
   "error.backend.browserProxyComputerUnreachable": "此配置文件使用的计算机没有响应，因此页面没有打开。",
   "error.backend.browserProxyComputerLocalAddress":
     "此配置文件使用的计算机只打开公共网站。它不打开本地网络上的地址，因此页面没有打开。",

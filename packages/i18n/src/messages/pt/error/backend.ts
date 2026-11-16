@@ -212,6 +212,8 @@ export const messages = {
   "error.backend.interruptSelf": "Um agente não pode interromper a si mesmo.",
   "error.backend.interruptOtherWork":
     "Este agente trabalha em uma tarefa que sua mensagem não iniciou. Somente o usuário ou quem enviou a tarefa pode interrompê-lo.",
+  "error.backend.interruptSharedWork":
+    "O turno deste agente trabalha na sua mensagem e também numa mensagem do usuário ou de outro agente. Só o usuário pode pará-lo, com Parar agente no chat desse agente.",
   "error.backend.interruptStarting":
     "Este agente ainda está iniciando um turno. Tente novamente após o início do turno.",
   "error.backend.interruptNoSession":
@@ -378,6 +380,8 @@ export const messages = {
     "Este proxy mudou depois que você o abriu. Verifique-o novamente e tente de novo.",
   "error.backend.browserProxyUnreachable": "O proxy {name} não responde, por isso a página não abriu.",
   "error.backend.browserProxySignInRefused": "O proxy {name} recusou o início de sessão, por isso a página não abriu.",
+  "error.backend.browserSystemProxyFailed":
+    "O proxy nas configurações do computador que executa o OpenBot não responde ou recusou a conexão, por isso a página não abriu. Verifique as configurações de proxy desse computador.",
   "error.backend.browserProxyComputerUnreachable":
     "O computador que este perfil usa não responde, por isso a página não abriu.",
   "error.backend.browserProxyComputerLocalAddress":

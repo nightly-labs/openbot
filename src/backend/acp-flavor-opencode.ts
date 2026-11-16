@@ -1,7 +1,13 @@
-import { RequestError } from "@agentclientprotocol/sdk";
+import {
+  type ClientSideConnection,
+  type ContentBlock,
+  type InitializeResponse,
+  RequestError,
+} from "@agentclientprotocol/sdk";
 import { isFreeOpencodeModel } from "@openbot/contracts/ipc";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import type { CauseCode } from "@openbot/telemetry";
+import { Effect } from "effect";
 import { type AcpCustomEndpoint, type AcpFlavor, shownFailureDetail } from "./acp-flavor";
 import {
   isImageCountDiagnostic,
@@ -10,7 +16,8 @@ import {
   isUnreadableContentDiagnostic,
   isUsageLimitDiagnostic,
 } from "./agent/provider-diagnostics";
-import { isRecord } from "./protocol";
+import { getString, isRecord } from "./protocol";
+import { providerCall, providerFailure } from "./provider-client-effects";
 
 /** OpenCode 2's error for a request that its service cannot answer yet, such as at start (#57204). */
 function isOpenCodeStarting(error: unknown): boolean {
@@ -21,6 +28,32 @@ function isOpenCodeStarting(error: unknown): boolean {
     error.data.errorName === "ServiceUnavailableError"
   );
 }
+
+/**
+ * Whether this OpenCode has the `_session/steering` request. OpenCode 2.2.6 does not have it, and a
+ * later release reports it in the `_meta` of `initialize` (anomalyco/opencode#53042, #8231).
+ */
+export function openCodeSteers(initialization: InitializeResponse): boolean {
+  const steering = isRecord(initialization._meta) ? initialization._meta.steering : null;
+  return isRecord(steering) && steering.supported === true;
+}
+
+/**
+ * OpenCode's `_session/steering` puts a message in the running turn, and the agent reads it after its
+ * current tool call or model step. The blocks are those of a `session/prompt`. OpenCode answers
+ * `promptRequired` when the session runs no turn: it did not keep the message, which then waits in
+ * the queue. Each other answer means that OpenCode kept it, so the message must not go a second time.
+ */
+export const steerOpenCode = Effect.fn("OpenCode.steer")(function* (
+  connection: ClientSideConnection,
+  message: { sessionId: string; blocks: ContentBlock[] },
+) {
+  const answer = yield* providerCall(() =>
+    connection.extMethod("_session/steering", { sessionId: message.sessionId, prompt: message.blocks }),
+  );
+  if (getString(answer, "outcome") === "promptRequired")
+    return yield* providerFailure(new Error(sourceText("error.backend.steerTurnChanged")));
+});
 
 /**
  * OpenCode's wrapper error for a failed call to its internal server. It carries no cause: OpenCode
@@ -247,6 +280,9 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
   // OpenCode 2.1.4 adds each session's MCP servers to the session's directory under their names. A
   // second chat of the agent replaced the `openbot` token, and closing it left the first refused.
   mcpServersPerDirectory: true,
+  // OpenCode 2.3.0 keeps a session's MCP servers for its directory after `session/close`. Each new
+  // chat or subagent added more stdio servers that nothing stopped (#9254). OpenBot starts and ends them.
+  relayStdioMcpServers: true,
   // OpenCode 2.2.5 sends each subagent's session as `opencode/session/child_update` when the client
   // asks. Without it, the subagent's tool calls showed as the parent's, and nothing told when it ended.
   childSessionUpdates: true,

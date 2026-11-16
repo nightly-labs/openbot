@@ -156,8 +156,43 @@
 /* The card opens, closes and moves with the tooltip motion, not with the transition of the usage
  * popover. A transition would cover the motion. */
 .account-usage-popover.window-rail-usage-card {
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
   transition: none;
   transform-origin: var(--kb-tooltip-content-transform-origin);
+}
+
+.window-rail-usage-card .account-usage-popover-header {
+  flex: none;
+}
+
+/* With many accounts, the list scrolls under the header. A fade shows at each edge that has more rows. */
+.window-rail-usage-card .account-usage-providers {
+  --window-rail-usage-fade-top: 0px;
+  --window-rail-usage-fade-bottom: 0px;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  mask-image: linear-gradient(
+    to bottom,
+    var(--openbot-transparent),
+    var(--openbot-text-primary) var(--window-rail-usage-fade-top),
+    var(--openbot-text-primary) calc(100% - var(--window-rail-usage-fade-bottom)),
+    var(--openbot-transparent)
+  );
+}
+
+.window-rail-usage-card .account-usage-providers::-webkit-scrollbar {
+  display: none;
+}
+
+.window-rail-usage-card .account-usage-providers.scroll-fade-top {
+  --window-rail-usage-fade-top: calc(var(--openbot-space-1) * 6);
+}
+
+.window-rail-usage-card .account-usage-providers.scroll-fade-bottom {
+  --window-rail-usage-fade-bottom: calc(var(--openbot-space-1) * 6);
 }
 
 /* Usage rings: the provider logo inside one ring per limit window. The hover fill is a circle around
@@ -196,6 +231,14 @@
 
 .window-rail-usage-arc[data-usage-tone="critical"] {
   stroke: var(--openbot-danger);
+}
+
+/* The "+N" ring: an empty track with the number of rings that do not fit. */
+.window-rail-usage-more .window-rail-usage-count {
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+  font-variant-numeric: tabular-nums;
 }
 
 /* The usage of a custom agent: its logo with no ring, at the size of a rail icon. The hover card

@@ -130,7 +130,6 @@ export const messages = {
   "conversation.voice.phase.thinking": "חושב",
   "conversation.voice.phase.speaking": "מדבר",
   "conversation.voice.phase.offline": "לא מחובר",
-  "conversation.voice.speakNow": "אפשר לדבר",
   "conversation.voice.mute": "השתקת המיקרופון",
   "conversation.voice.interrupt": "הפסקה",
   "conversation.voice.start": "התחלת שיחה קולית",

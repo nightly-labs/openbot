@@ -203,6 +203,8 @@ export const messages = {
   "error.backend.interruptSelf": "Агент не может прервать сам себя.",
   "error.backend.interruptOtherWork":
     "Этот агент работает над задачей, которую начало не ваше сообщение. Остановить её могут только пользователь или отправитель этой задачи.",
+  "error.backend.interruptSharedWork":
+    "Ход этого агента обрабатывает ваше сообщение, а также сообщение пользователя или другого агента. Остановить его может только пользователь кнопкой «Остановить агента» в чате этого агента.",
   "error.backend.interruptStarting": "Этот агент ещё начинает ход. Повторите попытку, когда ход начнётся.",
   "error.backend.interruptNoSession":
     "OpenBot не может прервать этого агента, потому что сессия его провайдера недоступна.",
@@ -362,6 +364,8 @@ export const messages = {
     "Этот прокси изменился после того, как вы его открыли. Проверьте его ещё раз и повторите попытку.",
   "error.backend.browserProxyUnreachable": "Прокси {name} не отвечает, поэтому страница не открылась.",
   "error.backend.browserProxySignInRefused": "Прокси {name} отклонил вход, поэтому страница не открылась.",
+  "error.backend.browserSystemProxyFailed":
+    "Прокси в настройках компьютера, на котором работает OpenBot, не отвечает или отклонил подключение, поэтому страница не открылась. Проверьте настройки прокси этого компьютера.",
   "error.backend.browserProxyComputerUnreachable":
     "Компьютер этого профиля не отвечает, поэтому страница не открылась.",
   "error.backend.browserProxyComputerLocalAddress":

@@ -47,6 +47,7 @@ import {
   type RemoteMemberRole,
   type RemoteTicketClaims,
 } from "@openbot/contracts/signal-protocol/ticket";
+import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { referenceFrom, safeReference } from "@openbot/user-errors";
@@ -123,6 +124,20 @@ const logger = createOpenBotLogger("central-auth");
 
 /** The step of a session file read or write that failed, for the account log. */
 type StoredSessionStage = "read" | "decrypt" | "decode" | "encrypt" | "write";
+
+/**
+ * A Slack or Telegram route ticket, and the workspace or chat IDs that the account service names beside
+ * it. The host reads the IDs to show a connection that Signal does not route here. Null without IDs.
+ */
+function decodeLinkedRoute(
+  value: unknown,
+  label: string,
+  field: "teams" | "chats",
+): { ticket: string; ids: string[] | null } {
+  const record = decodeRecord(value, label);
+  const ids = record[field];
+  return { ticket: requiredString(record, "ticket"), ids: Array.isArray(ids) && ids.every(isString) ? ids : null };
+}
 
 /**
  * The stage, error name and system code only. A decode message can quote the decrypted text, and a
@@ -828,12 +843,12 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     function* (
       this: CentralAuthManager,
       hostId: string,
-    ): Effect.fn.Return<string, CentralAuthOperationError, CentralAuthTransport> {
+    ): Effect.fn.Return<{ ticket: string; ids: string[] | null }, CentralAuthOperationError, CentralAuthTransport> {
       const machineToken = yield* this.#hostMachineToken(hostId);
       return yield* this.#requestEffect(
         `/v2/remote/hosts/${encodeURIComponent(hostId)}/slack-route`,
         { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ machineToken }) },
-        (value) => requiredString(decodeRecord(value, "Slack route"), "ticket"),
+        (value) => decodeLinkedRoute(value, "Slack route", "teams"),
       );
     },
     (operation) => this.#owned(operation),
@@ -912,12 +927,12 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     function* (
       this: CentralAuthManager,
       hostId: string,
-    ): Effect.fn.Return<string, CentralAuthOperationError, CentralAuthTransport> {
+    ): Effect.fn.Return<{ ticket: string; ids: string[] | null }, CentralAuthOperationError, CentralAuthTransport> {
       const machineToken = yield* this.#hostMachineToken(hostId);
       return yield* this.#requestEffect(
         `/v2/remote/hosts/${encodeURIComponent(hostId)}/telegram-route`,
         { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ machineToken }) },
-        (value) => requiredString(decodeRecord(value, "Telegram route"), "ticket"),
+        (value) => decodeLinkedRoute(value, "Telegram route", "chats"),
       );
     },
     (operation) => this.#owned(operation),
@@ -1341,6 +1356,28 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
           body: Buffer.from(image.bytes),
         },
         (value) => requiredString(decodeRecord(value, "remote host logo"), "logoKey"),
+      );
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  /** Copies the server plush look (`host-appearance-v1`) to the host list. `null` clears it. */
+  readonly updateRemoteHostAppearance = Effect.fn("CentralAuth.updateRemoteHostAppearance")(
+    function* (
+      this: CentralAuthManager,
+      hostId: string,
+      appearance: ServerAppearance | null,
+    ): Effect.fn.Return<void, CentralAuthOperationError, CentralAuthTransport> {
+      yield* this.#authorizedRequestEffect(
+        `/v2/remote/hosts/${encodeURIComponent(hostId)}/appearance`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ appearance }),
+        },
+        (value) => {
+          decodeRecord(value, "remote host appearance");
+        },
       );
     },
     (operation) => this.#owned(operation),
@@ -1973,6 +2010,11 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     },
     (operation) => this.#owned(operation),
   ).bind(this);
+
+  /** True while this device has a session, also when the account service has not confirmed it yet. */
+  hasSession(): boolean {
+    return this.#sessionToken !== null;
+  }
 
   /** False when the session can live only in memory, so it would be lost at the next start. */
   canPersistSession(): boolean {

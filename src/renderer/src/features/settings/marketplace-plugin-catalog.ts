@@ -871,6 +871,47 @@ const SENTRY: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/sentry",
 };
 
+const APPSIGNAL: MarketplacePluginDetail = {
+  id: "plugin-appsignal",
+  slug: "appsignal",
+  name: "AppSignal",
+  tagline: "Errors, performance and logs",
+  description:
+    "AppSignal lets agents search error incidents and stack traces, find slow actions and traces, read logs, metrics, check-ins and uptime monitors, and build dashboards. Each user signs in to their own AppSignal account through the browser. The sign-in gives all read and write tools, so agents can also change the state, severity and assignee of an incident and add notes.",
+  category: "coding",
+  creatorName: "AppSignal",
+  iconUrl: "https://www.appsignal.com/favicon.ico",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-new-errors", text: "Which new errors did my production app get since the last deploy?" },
+    { id: "prompt-slow-actions", text: "Which actions were the slowest this week, and why?" },
+    { id: "prompt-uptime", text: "Did any uptime monitor or check-in fail in the last 24 hours?" },
+  ],
+  apps: [
+    {
+      id: "app-appsignal-mcp",
+      name: "AppSignal",
+      description:
+        "Error incidents, performance, logs, metrics and dashboards, over AppSignal's MCP server with browser sign-in.",
+      iconUrl: "https://www.appsignal.com/favicon.ico",
+      server: {
+        name: "appsignal",
+        transport: "http",
+        url: "https://appsignal.com/api/mcp",
+        auth: [{ id: "appsignal-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://www.appsignal.com",
+  privacyPolicyUrl: "https://www.appsignal.com/privacy-policy",
+  termsUrl: "https://www.appsignal.com/terms",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-11-10T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/appsignal",
+};
+
 const GITLAB: MarketplacePluginDetail = {
   id: "plugin-gitlab",
   slug: "gitlab",
@@ -1253,6 +1294,47 @@ const RENDER: MarketplacePluginDetail = {
   featured: false,
   updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/render",
+};
+
+const CLOUD66: MarketplacePluginDetail = {
+  id: "plugin-cloud66",
+  slug: "cloud66",
+  name: "Cloud 66",
+  tagline: "Applications, deploys and servers",
+  description:
+    "Cloud 66 lets agents list accounts, applications, servers and clouds, read deployments and their logs, start deployments, manage deployment profiles, and create Deploy v3 clusters. Each user signs in to their own Cloud 66 account through the browser and selects the permissions on the consent page. Agents cannot do more than the user's Cloud 66 role permits. Deploying and creating servers can cost money. To delete an application or a deployment profile, or to add a cloud, Cloud 66 asks the agent to show a confirmation link. When the chat cannot show it, do these actions in the Cloud 66 dashboard.",
+  category: "coding",
+  creatorName: "Cloud 66",
+  iconUrl: "https://app.cloud66.com/favicon.ico",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-applications", text: "Which applications are in my Cloud 66 accounts?" },
+    { id: "prompt-failed-deploy", text: "Why did the last deployment of my app fail? Read its logs." },
+    { id: "prompt-deploy", text: "Deploy my staging application and tell me when it is done." },
+  ],
+  apps: [
+    {
+      id: "app-cloud66-mcp",
+      name: "Cloud 66",
+      description:
+        "Applications, deployments, servers, clouds and clusters, over Cloud 66's MCP server with browser sign-in.",
+      iconUrl: "https://app.cloud66.com/favicon.ico",
+      server: {
+        name: "cloud66",
+        transport: "http",
+        url: "https://app.cloud66.com/mcp",
+        auth: [{ id: "cloud66-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://www.cloud66.com",
+  privacyPolicyUrl: "https://www.cloud66.com/privacy",
+  termsUrl: "https://www.cloud66.com/terms",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-11-10T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/cloud66",
 };
 
 const CONTEXT7: MarketplacePluginDetail = {
@@ -5536,11 +5618,11 @@ const HIGHLEVEL: MarketplacePluginDetail = {
   name: "HighLevel",
   tagline: "CRM and marketing workspace",
   description:
-    "HighLevel lets agents read and update contacts, conversations, opportunities, and calendars in the signed-in HighLevel sub-account. Each user signs in to their own HighLevel account through the browser.",
+    "HighLevel lets agents read and update contacts, conversations, opportunities, and calendars in one HighLevel sub-account. Each user connects with a Private Integration token and the location ID of their own sub-account.",
   category: "productivity",
   creatorName: "HighLevel",
   iconUrl: "https://storage.googleapis.com/msgsndr/knES3eSWYIsc5YSZ3YLl/media/62b48689c85eccb36ca941fc.png",
-  version: "1.0.0",
+  version: "1.1.0",
   prompts: [
     { id: "prompt-new-leads", text: "List the contacts that were added this week." },
     { id: "prompt-pipeline", text: "Summarize the opportunities in my sales pipeline by stage." },
@@ -5551,13 +5633,37 @@ const HIGHLEVEL: MarketplacePluginDetail = {
       id: "app-highlevel-mcp",
       name: "HighLevel",
       description:
-        "Contact, conversation, opportunity, and calendar access, over HighLevel's MCP server with browser sign-in.",
+        "Contact, conversation, opportunity, and calendar access, over HighLevel's MCP server with a Private Integration token.",
       iconUrl: "https://storage.googleapis.com/msgsndr/knES3eSWYIsc5YSZ3YLl/media/62b48689c85eccb36ca941fc.png",
       server: {
         name: "highlevel",
         transport: "http",
         url: "https://services.leadconnectorhq.com/mcp",
-        auth: [{ id: "highlevel-oauth", kind: "link", label: "Sign in" }],
+        auth: [
+          {
+            id: "highlevel-key",
+            kind: "key",
+            label: "Private Integration token",
+            fields: [
+              {
+                id: "token",
+                label: "Private Integration token",
+                header: "Authorization",
+                prefix: "Bearer ",
+                placeholder: "pit-…",
+                hint: "In your HighLevel sub-account, open Settings > Private Integrations and create a token.",
+              },
+              {
+                id: "location-id",
+                label: "Location ID",
+                header: "locationId",
+                hint: "In your HighLevel sub-account, open Settings > Business Profile and copy the Location ID.",
+              },
+            ],
+            docsUrl: "https://marketplace.gohighlevel.com/docs/Authorization/PrivateIntegrationsToken/index.html",
+            docsLabel: "Create a token",
+          },
+        ],
       },
     },
   ],
@@ -7093,46 +7199,6 @@ const MONDAY: MarketplacePluginDetail = {
   featured: false,
   updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/monday",
-};
-
-const MONGODB: MarketplacePluginDetail = {
-  id: "plugin-mongodb",
-  slug: "mongodb",
-  name: "MongoDB Atlas",
-  tagline: "Atlas clusters and databases",
-  description:
-    "MongoDB Atlas lets agents list projects and clusters, inspect databases and collections, and run queries, in read-only or read-write mode as the organization owner allows. Each user signs in to their own MongoDB Atlas account through the browser.",
-  category: "coding",
-  creatorName: "MongoDB",
-  iconUrl: "https://avatars.githubusercontent.com/u/45120?s=256&v=4",
-  version: "1.0.0",
-  prompts: [
-    { id: "prompt-clusters", text: "List the clusters in my Atlas projects and their status." },
-    { id: "prompt-schema", text: "Describe the schema of the orders collection." },
-    { id: "prompt-query", text: "Find the ten most recent orders with a status of pending." },
-  ],
-  apps: [
-    {
-      id: "app-mongodb-mcp",
-      name: "MongoDB Atlas",
-      description: "Cluster, database, and collection access, over MongoDB's MCP server with browser sign-in.",
-      iconUrl: "https://avatars.githubusercontent.com/u/45120?s=256&v=4",
-      server: {
-        name: "mongodb",
-        transport: "http",
-        url: "https://mcp.mongodb.com",
-        auth: [{ id: "mongodb-oauth", kind: "link", label: "Sign in" }],
-      },
-    },
-  ],
-  websiteUrl: "https://www.mongodb.com",
-  privacyPolicyUrl: "https://www.mongodb.com/legal/privacy/privacy-policy",
-  termsUrl: "https://www.mongodb.com/legal/terms-of-use",
-  skills: [],
-  installs: 0,
-  featured: false,
-  updatedAt: "2026-11-10T00:00:00.000Z",
-  shareUrl: "https://openbot.run/plugins/mongodb",
 };
 
 const MOOMOO: MarketplacePluginDetail = {
@@ -10498,6 +10564,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   ELEVENLABS,
   APPLE_APPS,
   SENTRY,
+  APPSIGNAL,
   GITLAB,
   VERCEL,
   CLOUDFLARE,
@@ -10507,6 +10574,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   NETLIFY,
   RAILWAY,
   RENDER,
+  CLOUD66,
   CONTEXT7,
   HUGGINGFACE,
   STRIPE,
@@ -10648,7 +10716,6 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   MOBBIN,
   MONARCH,
   MONDAY,
-  MONGODB,
   MOOMOO,
   MURAL,
   NAVAN,

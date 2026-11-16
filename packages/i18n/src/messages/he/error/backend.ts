@@ -191,6 +191,8 @@ export const messages = {
   "error.backend.interruptSelf": "סוכן אינו יכול להפסיק את עצמו.",
   "error.backend.interruptOtherWork":
     "הסוכן הזה עובד על משימה שההודעה שלך לא התחילה. רק המשתמש או שולח המשימה יכולים לעצור אותה.",
+  "error.backend.interruptSharedWork":
+    "התור של הסוכן הזה עובד על ההודעה שלך וגם על הודעה מהמשתמש או מסוכן אחר. רק המשתמש יכול לעצור אותו, באמצעות עצירת הסוכן בצ'אט של הסוכן הזה.",
   "error.backend.interruptStarting": "הסוכן הזה עדיין מתחיל תור. יש לנסות שוב אחרי שהתור יתחיל.",
   "error.backend.interruptNoSession": "OpenBot אינו יכול להפסיק את הסוכן הזה כי סשן הספק שלו אינו זמין.",
   "error.backend.memoryTextRequired": "נדרש טקסט לזיכרון.",
@@ -340,6 +342,8 @@ export const messages = {
   "error.backend.browserProxyChanged": "הפרוקסי הזה השתנה אחרי שפתחת אותו. יש לעיין בו שוב ולנסות שוב.",
   "error.backend.browserProxyUnreachable": "הפרוקסי {name} אינו עונה, ולכן הדף לא נפתח.",
   "error.backend.browserProxySignInRefused": "הפרוקסי {name} דחה את ההתחברות, ולכן הדף לא נפתח.",
+  "error.backend.browserSystemProxyFailed":
+    "הפרוקסי בהגדרות של המחשב שמריץ את OpenBot אינו עונה או דחה את החיבור, ולכן הדף לא נפתח. בדקו את הגדרות הפרוקסי של המחשב הזה.",
   "error.backend.browserProxyComputerUnreachable": "המחשב שהפרופיל הזה משתמש בו אינו עונה, ולכן הדף לא נפתח.",
   "error.backend.browserProxyComputerLocalAddress":
     "המחשב שהפרופיל הזה משתמש בו פותח רק אתרים ציבוריים. הוא לא פותח כתובות ברשת מקומית, ולכן הדף לא נפתח.",

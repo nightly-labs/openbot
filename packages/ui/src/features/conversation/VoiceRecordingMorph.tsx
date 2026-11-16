@@ -22,6 +22,17 @@ export function voiceButtonLabel(phase: VoicePhase): AppTextKey {
   return "composer.voice.start";
 }
 
+/**
+ * Enter sends a recording only when the focus is on the page itself. The microphone control goes
+ * away when the recording starts, so the focus falls to the page; a field or a control that has the
+ * focus keeps its own Enter, and the message box sends the recording itself.
+ */
+function enterSendsRecording(event: KeyboardEvent): boolean {
+  if (event.key !== "Enter" || event.defaultPrevented || event.isComposing || event.repeat) return false;
+  if (event.shiftKey || event.altKey || event.metaKey || event.ctrlKey) return false;
+  return event.target === document.body || event.target === document.documentElement;
+}
+
 function formatVoiceDuration(totalSeconds: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = String(totalSeconds % 60).padStart(2, "0");
@@ -43,6 +54,8 @@ export function VoiceRecordingMorph(props: {
   elapsedSeconds: number;
   onCancel: () => void;
   onFinish: () => void;
+  /** Sends what was said, as the send control does. Enter does this while the focus is on the page. */
+  onSend: () => void;
   /** The microphone control, shown when not recording. */
   children: JSX.Element;
   /** The send control. Finish buds off it. */
@@ -53,6 +66,19 @@ export function VoiceRecordingMorph(props: {
   const remainingSeconds = () => Math.max(0, VOICE_AUDIO_LIMITS.maximumSeconds - props.elapsedSeconds);
   const countingDown = () => remainingSeconds() <= VOICE_LIMIT_COUNTDOWN_SECONDS;
   const warning = () => remainingSeconds() <= VOICE_LIMIT_WARNING_SECONDS;
+  createEffect(
+    () => props.recording,
+    (recording) => {
+      if (!recording) return;
+      // Enter on the page has no default action, so the key stays free for each mounted bar: the main
+      // chat shows a side thread's recording too, and only the bar that owns the recording sends it.
+      const sendOnEnter = (event: KeyboardEvent) => {
+        if (enterSendsRecording(event)) props.onSend();
+      };
+      document.addEventListener("keydown", sendOnEnter);
+      return () => document.removeEventListener("keydown", sendOnEnter);
+    },
+  );
   return (
     <div
       class="voice-morph"
@@ -133,6 +159,8 @@ export function ComposerVoiceControls(props: {
   onStart: () => void;
   onCancel: () => void;
   onFinish: () => void;
+  /** Sends what was said, as the send control does. */
+  onSend: () => void;
   /** The send control. Finish buds off it. */
   send: JSX.Element;
 }): JSX.Element {
@@ -150,6 +178,7 @@ export function ComposerVoiceControls(props: {
         elapsedSeconds={props.elapsedSeconds}
         onCancel={() => props.onCancel()}
         onFinish={() => props.onFinish()}
+        onSend={() => props.onSend()}
         send={props.send}
       >
         <Button

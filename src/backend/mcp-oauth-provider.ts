@@ -195,7 +195,7 @@ export interface McpOAuthOptions {
  * resolve every token before they connect, so an authorization server that accepts a connection
  * but never finishes its response would otherwise stall either past its own deadline.
  */
-const MCP_TOKEN_TIMEOUT_MS = 10_000;
+export const MCP_TOKEN_TIMEOUT_MS = 10_000;
 
 /**
  * An access token is refreshed this long before it is due to expire, so a thread that starts at the
@@ -208,6 +208,12 @@ const TOKEN_REFRESH_MARGIN_MS = 60_000;
  * this bounds only how long a dead endpoint keeps a request open.
  */
 const MCP_REVOCATION_TIMEOUT_MS = 5_000;
+
+/**
+ * What Sign in would do for a server that answered without one: nothing, open a page, or end at
+ * once because the authorization server cannot take OpenBot as a client.
+ */
+export type McpSignInOffer = "none" | "offered" | "refused";
 
 /** One sign-in, from the browser leaving to the token set being stored. */
 export interface McpSignIn {
@@ -287,7 +293,7 @@ export interface McpOAuthAuthority {
   accessToken: (url: string) => Effect.Effect<string | null, McpOperationError>;
   /** A new token after the server refused `rejected`, or `null`. See `McpOAuth.refreshAccessToken`. */
   refreshAccessToken: (url: string, rejected: string) => Effect.Effect<string | null, McpOperationError>;
-  signIn: (url: string, open?: McpSignInOpener) => McpSignIn | null;
+  signIn: (url: string, open?: McpSignInOpener, deepLinkRedirectUrl?: string) => McpSignIn | null;
   /** Ends the sign-in waiting for this URL's browser, if one is. Answers whether one was. */
   cancelSignIn: (url: string) => boolean;
   /** Whether this computer holds a token for this URL. Never the token itself. */
@@ -296,8 +302,8 @@ export interface McpOAuthAuthority {
   needsSignIn: (url: string) => boolean;
   /** Whether this computer keeps a sign-in for this URL: current, expired, or ended by the server. */
   hasSignIn: (url: string) => boolean;
-  /** Whether Sign in would open a page for a server that answered without one. See `McpOAuth.offersSignIn`. */
-  offersSignIn: (url: string) => Effect.Effect<boolean>;
+  /** What Sign in would do for a server that answered without one. See `McpOAuth.signInOffer`. */
+  signInOffer: (url: string) => Effect.Effect<McpSignInOffer>;
   /** Drops the tokens and keeps the sign-in app, so the next sign-in uses the same app. */
   signOut: (url: string) => Effect.Effect<void, McpOperationError>;
   /** Drops everything kept for this URL, the sign-in app included. Used when the row is removed. */
@@ -480,8 +486,12 @@ export class McpOAuth implements McpOAuthAuthority {
     ),
   );
 
-  /** A sign-in the user asked for, or `null` when the URL is not one this can sign in to. */
-  signIn(url: string, open?: McpSignInOpener): McpSignIn | null {
+  /**
+   * A sign-in the user asked for, or `null` when the URL is not one this can sign in to. With `open`,
+   * `deepLinkRedirectUrl` is the link that the computer where the page opens returns to OpenBot on
+   * (`sign-in-relay-deep-link-v1`).
+   */
+  signIn(url: string, open?: McpSignInOpener, deepLinkRedirectUrl?: string): McpSignIn | null {
     const key = mcpOAuthAccountKey(url);
     if (!key) return null;
     this.#attempts.get(key)?.();
@@ -499,7 +509,7 @@ export class McpOAuth implements McpOAuthAuthority {
     let cancelled = false;
     let exchangeFailed = false;
     const resource = mcpOAuthServerUrl(key);
-    const provider = this.#provider(key, state, () => abandoned, open, unanswered);
+    const provider = this.#provider(key, state, () => abandoned, open, unanswered, deepLinkRedirectUrl);
     const abandon = () => {
       // `receiveAuthorizationCode` removes the state when the grant arrives. An attempt that ended
       // before it opened a page keeps the record it was given, for the next attempt.
@@ -644,23 +654,32 @@ export class McpOAuth implements McpOAuthAuthority {
   }
 
   /**
-   * Whether Sign in would open a page for a server that answered without one: no token is on file,
+   * What Sign in would do for a server that answered without one. `offered`: no token is on file,
    * and its metadata names an authorization server. Some servers list their tools to anyone and want
-   * a token only to run one. Public documents only; a read that fails is a no, because nobody
-   * pressed Sign in to see its error.
+   * a token only to run one. `refused`: that authorization server cannot take OpenBot as a new client,
+   * so Sign in would end at once with the refused-registration sentence (#8827). Public documents
+   * only; a read that fails is `none`, because nobody pressed Sign in to see its error.
    */
-  readonly offersSignIn = Effect.fn("McpOAuth.offersSignIn")(function* (this: McpOAuth, url: string) {
+  readonly signInOffer = Effect.fn("McpOAuth.signInOffer")(function* (this: McpOAuth, url: string) {
     const key = mcpOAuthAccountKey(url);
-    if (!key || this.#options.storage.read(key)?.tokens) return false;
+    const record = key === null ? undefined : this.#options.storage.read(key);
+    if (!key || record?.tokens) return "none";
     const controller = new AbortController();
-    return yield* namesAuthorizationServer(mcpOAuthServerUrl(key), this.#fetch(key, controller.signal)).pipe(
-      Effect.timeoutOrElse({
-        duration: this.#options.refreshTimeoutMs ?? MCP_TOKEN_TIMEOUT_MS,
-        orElse: () => Effect.succeed(false),
-      }),
-      Effect.catch(() => Effect.succeed(false)),
-      Effect.ensuring(Effect.sync(() => controller.abort())),
-    );
+    const fetchFn = this.#fetch(key, controller.signal);
+    const timeoutMs = this.#options.refreshTimeoutMs ?? MCP_TOKEN_TIMEOUT_MS;
+    return yield* Effect.gen(function* () {
+      const issuer = yield* namesAuthorizationServer(mcpOAuthServerUrl(key), fetchFn).pipe(
+        Effect.timeoutOrElse({ duration: timeoutMs, orElse: () => Effect.succeed(null) }),
+        Effect.catch(() => Effect.succeed(null)),
+      );
+      if (!issuer) return "none";
+      // A sign-in app, or a registration with this issuer, is the client: nothing has to register.
+      // The SDK drops a registration bound to another issuer and registers again.
+      const client = record?.client;
+      if (record?.app || (client && (typeof client.issuer !== "string" || issuersMatch(client.issuer, issuer))))
+        return "offered";
+      return (yield* acceptsNewClient(issuer, fetchFn, timeoutMs)) ? "offered" : "refused";
+    }).pipe(Effect.ensuring(Effect.sync(() => controller.abort())));
   });
 
   get redirectUrl(): string {
@@ -817,6 +836,7 @@ export class McpOAuth implements McpOAuthAuthority {
     isAbandoned: () => boolean = () => false,
     open?: McpSignInOpener,
     unansweredRedirectUrl?: string,
+    openedDeepLinkRedirectUrl?: string,
   ): McpOAuthClientProvider {
     const generation = this.#generations.get(key) ?? 0;
     const storage = this.#options.storage;
@@ -852,7 +872,8 @@ export class McpOAuth implements McpOAuthAuthority {
       storage: guarded,
       redirectUrl: this.#options.redirectUrl,
       // A page that an opener shows is not in this computer's browser, which is what opens the deep link.
-      deepLinkRedirectUrl: open ? undefined : this.#options.deepLinkRedirectUrl,
+      // A relayed page opens on a computer that can name its own.
+      deepLinkRedirectUrl: open ? () => openedDeepLinkRedirectUrl : this.#options.deepLinkRedirectUrl,
       openExternal: open ?? this.#options.openExternal,
       isAbandoned,
       legacyIssuer: legacyIssuer(stored),
@@ -1619,14 +1640,14 @@ function mcpOAuthServerUrl(key: string): string {
 }
 
 /**
- * Whether the server publishes protected-resource metadata that names an authorization server, or,
- * without such a document, has authorization server metadata at its origin: what a sign-in needs to
- * open a page. Any answer below 500 that is not resource metadata moves to the origin: a
- * 404, a refusal, or a page that is not metadata. No answer, a server error, or a busy server (408,
- * 429) says nothing about the server, so it fails: a sign-in must not end as if the server asked for
- * none, which left the row showing the result of the earlier test, with no page and no words.
+ * The first authorization server that the server's protected-resource metadata names, or, without
+ * such a document, the server's origin when authorization server metadata is there; else `null`. A
+ * sign-in needs one to open a page. Any answer below 500 that is not resource metadata goes on to the
+ * origin: a 404, a refusal, or a page that is not metadata. No answer, a server error, or a busy server
+ * (408, 429) says nothing about the server, so it fails: a sign-in must not end as if the server asked
+ * for none, which left the row showing the result of the earlier test, with no page and no words.
  */
-const namesAuthorizationServer = Effect.fnUntraced(function* (resource: string, fetchFn: FetchLike) {
+export const namesAuthorizationServer = Effect.fnUntraced(function* (resource: string, fetchFn: FetchLike) {
   let metadataStatus: number | null = null;
   const metadataFetch: FetchLike = async (input, init) => {
     metadataStatus = null;
@@ -1643,13 +1664,30 @@ const namesAuthorizationServer = Effect.fnUntraced(function* (resource: string, 
       return Effect.fail(new Error(sourceText("error.backend.mcpSignInMetadataUnreadable")));
     }),
   );
-  if (metadata) return Boolean(metadata.authorization_servers?.length);
+  if (metadata) return metadata.authorization_servers?.[0] ?? null;
   // A server on the 2025-03 MCP authorization spec has no resource metadata: its origin is its
-  // authorization server, where the SDK's sign-in looks too. Only metadata found there counts, so
-  // nothing is guessed. A read that fails is a no, as a missing resource document was (#8733).
-  return yield* mcpCall(() => discoverAuthorizationServerMetadata(new URL("/", resource), { fetchFn })).pipe(
-    Effect.map(Boolean),
-    Effect.catch(() => Effect.succeed(false)),
+  // authorization server, the issuer that the SDK's sign-in uses too. Only metadata found there
+  // counts, so nothing is guessed. A read that fails is a no, as a missing resource document was (#8733).
+  const origin = String(new URL("/", resource));
+  return yield* mcpCall(() => discoverAuthorizationServerMetadata(origin, { fetchFn })).pipe(
+    Effect.map((found) => (found ? origin : null)),
+    Effect.catch(() => Effect.succeed(null)),
+  );
+});
+
+/**
+ * Whether an authorization server can take a client that OpenBot does not have yet, as the SDK
+ * decides it: a registration endpoint, or the client metadata document. Google's has neither, so
+ * Sign in to Gmail or Drive always ends in the refused-registration sentence (#8827). Metadata that
+ * cannot be read is a yes: the SDK then registers at `/register`, and Sign in says what went wrong.
+ */
+const acceptsNewClient = Effect.fnUntraced(function* (issuer: string, fetchFn: FetchLike, timeoutMs: number) {
+  const metadata = yield* mcpCall(() => discoverAuthorizationServerMetadata(issuer, { fetchFn })).pipe(
+    Effect.timeoutOrElse({ duration: timeoutMs, orElse: () => Effect.succeed(undefined) }),
+    Effect.catch(() => Effect.succeed(undefined)),
+  );
+  return (
+    !metadata || Boolean(metadata.registration_endpoint) || metadata.client_id_metadata_document_supported === true
   );
 });
 

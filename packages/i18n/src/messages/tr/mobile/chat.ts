@@ -160,6 +160,7 @@ export const messages = {
   "mobile.chat.composer.send": "Mesaj gönder",
   "mobile.chat.composer.stop": "{name} ajanını durdur",
   "mobile.chat.composer.dictate": "Mesajı sesle yaz",
+  "mobile.chat.composer.voiceSettings": "Ses ayarları",
   "mobile.chat.composer.stopDictation": "Dikteyi durdur",
   "mobile.chat.composer.mention": "{name} ajanından bahset",
   "mobile.chat.composer.skills": "Beceriler",
@@ -344,6 +345,18 @@ export const messages = {
   "mobile.chat.browserSecret.done": "Bitirdim",
   "mobile.chat.browserSecret.submitOnce": "{origin} adresine bir kez gönderin. Bu değer sohbete eklenmez.",
   "mobile.chat.browserSecret.submitFailed": "İstek tamamlanamadı. Bağlantıyı kontrol edip tekrar deneyin.",
+  "mobile.chat.browserSecret.vaultSkip.agentScript":
+    "Ajan bu sayfada bir betik çalıştırdığı için OpenBot kayıtlı oturum bilgilerinizi kullanmadı. Kullanmak için ajandan sayfayı yeniden yüklemesini ve tekrar denemesini isteyin.",
+  "mobile.chat.browserSecret.vaultSkip.fieldKind":
+    "Ajan sayfada yanlış alanı seçtiği için OpenBot kayıtlı oturum bilgilerinizi kullanmadı.",
+  "mobile.chat.browserSecret.vaultSkip.loginChoice":
+    "Ajan bu site için kayıtlı oturum bilgilerinden birini seçmediği için OpenBot kayıtlı bir oturum bilgisi kullanmadı. Ajana hangi hesabı kullanacağını söyleyin.",
+  "mobile.chat.browserSecret.vaultSkip.noPassword":
+    "Kayıtlı oturum bilgilerinizde bu site için şifre olmadığı için OpenBot bunları kullanmadı.",
+  "mobile.chat.browserSecret.vaultSkip.noAuthenticatorKey":
+    "Kayıtlı oturum bilgilerinizde kimlik doğrulayıcı anahtarı olmadığı için OpenBot bunları kullanmadı.",
+  "mobile.chat.browserSecret.vaultSkip.vaultUnreadable":
+    "Şifre yöneticiniz okunamadığı için OpenBot kayıtlı bir oturum bilgisi kullanmadı.",
   "mobile.chat.browserSecret.submit": "Gönder",
   "mobile.chat.browserSecret.takeOver": "Devral",
   "mobile.chat.starter.title": "İlk önce ne üzerinde çalışalım?",

@@ -284,6 +284,14 @@ export const messages = {
   "mobile.server.settings.identityUnsupported":
     "Atualize o OpenBot neste servidor para alterar o nome e o logotipo aqui.",
   "mobile.server.settings.identityOffline": "Conecte-se a este servidor para alterar o nome e o logotipo.",
+  "mobile.server.settings.appearance": "Forma e cor",
+  "mobile.server.settings.appearanceShape": "Forma",
+  "mobile.server.settings.appearanceShapeOption": "Forma {number}",
+  "mobile.server.settings.appearanceColor": "Cor do servidor",
+  "mobile.server.settings.appearanceAutomatic": "Automática",
+  "mobile.server.settings.appearanceReset": "Redefinir",
+  "mobile.server.settings.appearanceSaveFailed":
+    "Não foi possível salvar a forma e a cor do servidor. Tente novamente.",
   "mobile.server.route.cropLogo": "Recortar logotipo",
   "mobile.server.members.remove": "Remover membro",
   "mobile.server.members.invitePeople": "Convidar pessoas",
@@ -775,6 +783,8 @@ export const messages = {
     "O OpenBot não consegue ler os tokens salvos em {host}. Desconecte o espaço de trabalho e conecte-o novamente.",
   "mobile.server.connectors.slack.helpRelay":
     "O OpenBot em {host} não consegue receber eventos do Slack. Em {host}, entre na sua conta, dê um nome ao servidor nas Configurações do servidor e mantenha o OpenBot aberto.",
+  "mobile.server.connectors.slack.helpNotLinked":
+    "Este workspace não está vinculado a {host}. Toque em Reconectar para vinculá-lo.",
   "mobile.server.connectors.slack.orchestratorTitle": "Orquestrador do Slack",
   "mobile.server.connectors.slack.orchestratorDescription":
     "Este agente recebe todas as solicitações do Slack. Ele mesmo responde às curtas, encaminha o restante do trabalho ao agente certo e publica a resposta na conversa.",
@@ -821,6 +831,8 @@ export const messages = {
     "O OpenBot não consegue ler os tokens salvos em {host}. Desconecte o servidor do Discord e conecte-o novamente.",
   "mobile.server.connectors.discord.helpRelay":
     "O OpenBot em {host} não consegue receber eventos do Discord. Em {host}, entre na sua conta, dê um nome ao servidor nas Configurações do servidor e mantenha o OpenBot aberto.",
+  "mobile.server.connectors.discord.helpNotLinked":
+    "Este servidor do Discord não está vinculado a {host}. Toque em Reconectar para vinculá-lo.",
   "mobile.server.connectors.discord.orchestratorTitle": "Orquestrador do Discord",
   "mobile.server.connectors.discord.orchestratorDescription":
     "Este agente recebe todas as solicitações do Discord. Ele mesmo responde às curtas, encaminha o restante do trabalho ao agente certo e responde no canal.",
@@ -856,6 +868,8 @@ export const messages = {
     "O OpenBot em {host} não consegue receber mensagens do Telegram. Em {host}, entre na sua conta, dê um nome ao servidor nas Configurações do servidor e mantenha o OpenBot aberto.",
   "mobile.server.connectors.telegram.helpError":
     "O OpenBot não consegue acessar este chat. Reconecte ou desconecte o chat.",
+  "mobile.server.connectors.telegram.helpNotLinked":
+    "Este chat não está vinculado a {host}. Toque em Reconectar para vinculá-lo.",
   "mobile.server.connectors.telegram.retryAt":
     "O Telegram pediu para o OpenBot aguardar. Ele tentará novamente às {time}.",
   "mobile.server.connectors.telegram.linkTitle": "Vincular um chat",
@@ -897,6 +911,8 @@ export const messages = {
     "O WhatsApp removeu este servidor dos dispositivos conectados. Vincule o número novamente.",
   "mobile.server.connectors.whatsapp.helpError":
     "O OpenBot não consegue acessar o WhatsApp neste número. Reconecte ou desconecte o número.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "O OpenBot não consegue ler as chaves salvas deste número. Vincule o número novamente.",
   "mobile.server.connectors.whatsapp.retryAt":
     "O WhatsApp pediu para o OpenBot aguardar. Ele tentará novamente às {time}.",
   "mobile.server.connectors.whatsapp.linkAgain": "Vincular de novo",

@@ -1,3 +1,5 @@
+import { agentProviderName } from "@openbot/contracts/agent-providers";
+import { isNarrationItemId } from "@openbot/contracts/conversation-narration";
 import {
   type AgentEvent,
   type AgentStepActivity,
@@ -122,6 +124,8 @@ const ENDED_TURN_LIMIT = 256;
  * with no update, until the stall watch fails the finished run (#8629).
  */
 const QUIET_END_MS = 30_000;
+/** How often OpenBot checks again for the end of a quiet turn that called the no-update tool again. */
+const QUIET_REPEAT_POLL_MS = 1_000;
 /** How long before a turn's start its usage records can be, as in host analytics. */
 const TURN_USAGE_MARGIN_MS = 60 * 60 * 1_000;
 /**
@@ -261,8 +265,11 @@ export interface TurnHooks {
   turnStopped(agentId: string, taskId: string | null, turnId: string): boolean;
   /** Whether the agent has an open wait for one of these deliveries. */
   hasOpenWait(agentId: string, deliveryIds: readonly string[]): boolean;
-  /** Ends the provider session of a routine run. Nothing for any other session, or a second time. */
-  closeRoutineSession(externalThreadId: string): Effect.Effect<void>;
+  /**
+   * Ends the provider session of a routine run. Nothing for any other session, or a second time.
+   * `archive` also takes it out of the provider's own thread list.
+   */
+  closeRoutineSession(externalThreadId: string, archive?: boolean): Effect.Effect<void>;
   /** Gives the answer of a routine run in its own session to the session of the agent's chat. */
   routineAnswered(agentId: string, deliveryId: string, answer: string): Effect.Effect<void>;
   /** Attaches the files that a finished answer names by path to it. It never fails the turn. */
@@ -387,6 +394,8 @@ export class TurnLifecycle {
       acted: boolean;
       /** A compaction ran in the turn. Codex can end such a turn with no answer. */
       compacted: boolean;
+      /** The id of the narration that Codex wrote after the turn's last tool step, if any. */
+      narration: string | null;
       /** The tool steps that started and did not end yet. While one is open, the turn works, it does not wait. */
       openTools: Set<string>;
       /** The time of the last provider notification that names this turn. */
@@ -407,9 +416,10 @@ export class TurnLifecycle {
   /**
    * Running turns whose own compaction lost the connection, with the error in plain words. `stalled`:
    * the compaction deadline stopped the turn, so its `interrupted` end is a failure. The end of the
-   * turn continues it once, or shows the error.
+   * turn continues it once, or shows the error. `loop`: OpenBot stopped a turn whose provider
+   * compacted again and again with no use (#8985); it does not continue.
    */
-  readonly #compactionFailures = new Map<string, HeldProviderError & { stalled?: true }>();
+  readonly #compactionFailures = new Map<string, HeldProviderError & { stalled?: true; loop?: true }>();
   /** The deadline of the compaction that runs inside a turn, by provider thread. */
   readonly #compactionDeadlines = new Map<string, NodeJS.Timeout>();
   /**
@@ -433,6 +443,8 @@ export class TurnLifecycle {
   readonly #quietEndTimers = new Map<string, NodeJS.Timeout>();
   /** Quiet turns that OpenBot stopped after their no-update call. Their `interrupted` end completes them. */
   readonly #quietStops = new Set<string>();
+  /** Quiet turns that called the no-update tool again after it told them to end (#9375). */
+  readonly #quietRepeats = new Set<string>();
   /** Running turns whose agent reported that its routine run failed, with the reason. The completion takes it. */
   readonly #reportedFailures = new Map<string, string>();
   /**
@@ -457,6 +469,11 @@ export class TurnLifecycle {
    * the turn ended. Boot recovery stops every subagent, so nothing here outlives the process.
    */
   readonly #subagentTurns = new Map<string, Set<string>>();
+  /**
+   * The routine sessions whose turn ended with no subagent at work. Their close also archives them.
+   * An archive stops the subagents of a Codex session, so a session with one at work stays listed.
+   */
+  readonly #archivableRoutineSessions = new Set<string>();
 
   constructor(options: TurnLifecycleOptions) {
     this.#store = options.store;
@@ -572,6 +589,7 @@ export class TurnLifecycle {
     for (const timer of this.#quietEndTimers.values()) clearTimeout(timer);
     this.#quietEndTimers.clear();
     this.#quietStops.clear();
+    this.#quietRepeats.clear();
     this.#reportedFailures.clear();
     this.#endedTurns.clear();
     this.#refusedRetries.clear();
@@ -680,8 +698,10 @@ export class TurnLifecycle {
 
   /**
    * Whether a completed turn may continue its plan: it served only the user's or the agent's own
-   * messages, the user did not stop it, its last line asks nothing but whether to continue and does not say it waits, opened no wait and holds no question,
-   * approval or takeover, and no other message waits in its lane.
+   * messages, or teammates' answers to the agent's own requests (#9392), the user did not stop it, its
+   * last line asks nothing but whether to continue and does not say it waits, opened no wait and holds no
+   * question, approval or takeover, and no other message waits in its lane. A turn with a teammate's
+   * request or update does not continue, so the end of the turn sends the result to that teammate.
    */
   #planContinues(
     agentId: string,
@@ -696,7 +716,8 @@ export class TurnLifecycle {
         ({ delivery, channelId }) =>
           channelId === undefined &&
           (delivery.sender.kind === "user" ||
-            (delivery.sender.kind === "agent" && delivery.sender.agentId === agentId)),
+            (delivery.sender.kind === "agent" &&
+              (delivery.sender.agentId === agentId || this.#mailbox.answersRequestOf(agentId, delivery.messageId)))),
       )
     )
       return false;
@@ -743,6 +764,31 @@ export class TurnLifecycle {
     this.#compactionDeadlines.set(threadId, timer);
   }
 
+  /**
+   * Stops a turn whose provider compacts again and again with no use: each compaction leaves the
+   * session above the provider's own limit, so the turn makes no progress (#8985). The turn does not
+   * continue, as a turn that lost its connection does: it would compact again.
+   */
+  #stopCompactionLoop(agentId: string, threadId: string, turnId: string, client: AgentClient): void {
+    this.#clearCompactionDeadline(threadId);
+    // Codex can start one more compaction before it handles the first stop.
+    if (this.#compactionFailures.get(turnId)?.loop) return;
+    logger.warn("A provider compacted again and again; OpenBot stops its turn.", { provider: client.provider });
+    this.#holdCompactionFailure(
+      turnId,
+      {
+        causeCode: "context_too_long",
+        provider: client.provider,
+        model: this.#hooks.turnModel(agentId, turnId),
+        turnId,
+        severity: "error",
+      },
+      false,
+      sourceText("error.agent.compactionLoopStopped", { provider: agentProviderName(client.provider) }),
+    );
+    Effect.runFork(client.request("turn/interrupt", { threadId, turnId }, decodeRecordResponse).pipe(Effect.ignore));
+  }
+
   #clearCompactionDeadline(threadId: string): void {
     const timer = this.#compactionDeadlines.get(threadId);
     if (timer) clearTimeout(timer);
@@ -750,11 +796,26 @@ export class TurnLifecycle {
   }
 
   /** Keeps the error of a turn whose compaction lost the connection until the turn ends. */
-  #holdCompactionFailure(turnId: string, context: FailureContext & { causeCode: CauseCode }, stalled: boolean): void {
-    const message = sourceText("error.agent.compactionConnectionLost");
-    // An error that Codex sends after the deadline stopped the turn keeps the turn stopped by it.
-    const stopped = stalled || this.#compactionFailures.get(turnId)?.stalled === true;
-    this.#compactionFailures.set(turnId, { message, context, ...(stopped ? { stalled: true as const } : {}) });
+  #holdCompactionFailure(
+    turnId: string,
+    context: FailureContext & { causeCode: CauseCode },
+    stalled: boolean,
+    loopMessage?: string,
+  ): void {
+    const held = this.#compactionFailures.get(turnId);
+    // An error that Codex sends for the compaction that the loop stop ended keeps the loop's reason.
+    if (held?.loop) return;
+    const loop = loopMessage !== undefined;
+    const message = loopMessage ?? sourceText("error.agent.compactionConnectionLost");
+    // An error that Codex sends after the deadline stopped the turn keeps the turn stopped by it. A
+    // loop stop is always OpenBot's, so its `interrupted` end is a failure too.
+    const stopped = stalled || loop || held?.stalled === true;
+    this.#compactionFailures.set(turnId, {
+      message,
+      context,
+      ...(stopped ? { stalled: true as const } : {}),
+      ...(loop ? { loop: true as const } : {}),
+    });
     // The failed delivery keeps this reason, not the provider's text.
     this.#turnErrors.set(turnId, message);
   }
@@ -772,17 +833,21 @@ export class TurnLifecycle {
   }
 
   /**
-   * Codex ends a turn with no answer and no step as completed. A lead that got its teammates' results
-   * and ended that way stopped the whole team, with no error (#7225). Such a turn fails as an ACP turn
-   * with no answer does, and its end runs it again or shows the error. A turn that wants no answer, a
-   * turn that compacted, a plan and a turn that the user stopped can end empty.
+   * Codex ends a turn with no answer as completed. A lead that got its teammates' results and ended
+   * that way stopped the whole team, with no error (#7225). Such a turn fails as an ACP turn with no
+   * answer does, and its end runs it again or shows the error. A turn that wants no answer, a turn
+   * that compacted, a plan and a turn that the user stopped can end empty.
+   *
+   * Codex can also write its last words as narration and then send an empty answer. Codex itself
+   * takes that narration as the turn's result, so the narration after the last tool step becomes the
+   * answer (#8837). A turn that did a step and wrote no such narration ends as before: its output can
+   * be a file or an image, or teammates or subagents still work for it.
    */
   #holdCodexNoAnswer(agentId: string, threadId: string, turnId: string, source: AgentClient): boolean {
     const running = this.#runningTurns.get(turnId);
     if (
       source.provider !== "codex" ||
       running === undefined ||
-      running.acted ||
       running.compacted ||
       this.#turnErrors.has(turnId) ||
       this.#failoverTurns.has(turnId) ||
@@ -800,13 +865,26 @@ export class TurnLifecycle {
       this.#quietRoutineTurn(agentId, threadId, deliveries, this.#noUpdateTurns.has(turnId))
     )
       return false;
-    const messages = this.#conversation.ensureSnapshot(agentId, threadId).messages;
+    // The agent's own chat is cached under its own thread id, not the provider's. With the provider's
+    // id, the changes below went to a fresh copy that the turn end read again from SQLite (#9422).
+    const snapshot = this.#conversation.ensureSnapshot(agentId, this.#conversation.publicThreadId(agentId, threadId));
+    const { messages } = snapshot;
     if (
       messages.some(
         (message) => message.turnId === turnId && (message.id === `${turnId}:plan` || isAgentAnswer(message)),
       )
     )
       return false;
+    // A channel turn keeps its own rules: text after `channel_result` is a step there, not an answer.
+    if (
+      this.#conversation.channelForThread(snapshot.threadId) === null &&
+      deliveries.every(({ channelId }) => channelId === undefined) &&
+      this.#answerWithNarration(messages, turnId, running.narration)
+    ) {
+      logger.info("A turn's last narration became its answer.", { agentId, turnId, provider: source.provider });
+      return false;
+    }
+    if (running.acted) return false;
     const message = sourceText("error.provider.acpNoAnswer", {
       provider: agentProviderDescriptor(source.provider).displayName,
     });
@@ -821,6 +899,23 @@ export class TurnLifecycle {
     // The failed delivery keeps this reason.
     this.#turnErrors.set(turnId, message);
     this.#failoverTurns.set(turnId, { message, context });
+    return true;
+  }
+
+  /**
+   * Makes the narration that Codex wrote after the turn's last tool step the turn's answer. The
+   * turn's empty rows hold nothing, so they go: the turn-completion write deletes their stored rows.
+   */
+  #answerWithNarration(messages: ConversationMessage[], turnId: string, narrationId: string | null): boolean {
+    const narration = messages.find((message) => message.id === narrationId && message.turnId === turnId);
+    if (narration?.itemType !== "commentary" || !narration.text.trim()) return false;
+    narration.itemType = "final_answer";
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+      // Codex names its answer rows `final_answer`.
+      const row = message?.itemType === "final_answer" ? { ...message, itemType: "agentMessage" } : message;
+      if (isEmptyAttemptText(row, turnId)) messages.splice(index, 1);
+    }
     return true;
   }
 
@@ -899,7 +994,15 @@ export class TurnLifecycle {
         // Each lane of the agent starts its own turns: a task or channel turn takes only the delivery
         // of its own lane.
         const laneId = this.#laneForThread(agentId, threadId);
-        const starting = unprompted ? undefined : this.#mailbox.startingDeliveryForAgent(agentId, laneId)?.delivery;
+        // Codex can answer `turn/start` before it sends `turn/started`. The drain then already marked
+        // the delivery running with this turn, and no delivery is starting. Without this, the channel
+        // took the turn as one that the provider started, and refused its result (#8896).
+        const starting = unprompted
+          ? undefined
+          : (
+              this.#mailbox.findDeliveriesByTurn(agentId, turnId)[0] ??
+              this.#mailbox.startingDeliveryForAgent(agentId, laneId)
+            )?.delivery;
         const sentAt = starting ? Date.parse(starting.createdAt) : Number.NaN;
         const start = starting ? (this.#deliveryStarts.get(starting.id) ?? null) : null;
         // The other deliveries of the batch share this start and start no turn of their own.
@@ -915,6 +1018,7 @@ export class TurnLifecycle {
           produced: false,
           acted: false,
           compacted: false,
+          narration: null,
           openTools: new Set(),
           lastEventAt: Date.now(),
         });
@@ -971,8 +1075,18 @@ export class TurnLifecycle {
         const itemId = getString(item, "id");
         if (itemId) this.#itemTurns.set(itemId, turnId);
         this.#markProduced(turnId, isRepeatedWork(item));
+        const running = this.#runningTurns.get(turnId);
+        if (running && item.type === "agentMessage" && item.phase === "commentary") {
+          if (
+            notification.method === "item/completed" &&
+            itemId !== null &&
+            isNarrationItemId(itemId, source.provider) &&
+            isString(item.text) &&
+            item.text.trim()
+          )
+            running.narration = itemId;
+        } else if (running && isRepeatedWork(item)) running.narration = null;
         if (item.type === "contextCompaction") {
-          const running = this.#runningTurns.get(turnId);
           if (running) running.compacted = true;
           // A memory change can mark the session for reload while its current client compacts it.
           if (this.#conversation.openClientFor(threadId) !== source) return;
@@ -983,9 +1097,11 @@ export class TurnLifecycle {
             source.contextCompaction === "events" &&
             this.#runningTurns.has(turnId) &&
             !this.#compaction.isCompactionTurn(threadId, turnId)
-          )
-            this.#armCompactionDeadline(agentId, threadId, turnId, source);
-          else this.#clearCompactionDeadline(threadId);
+          ) {
+            if (this.#compaction.repeatsCompaction(threadId))
+              this.#stopCompactionLoop(agentId, threadId, turnId, source);
+            else this.#armCompactionDeadline(agentId, threadId, turnId, source);
+          } else this.#clearCompactionDeadline(threadId);
           if (!this.#compaction.isCompactionTurn(threadId, turnId))
             this.#compaction.observeCompaction(
               threadId,
@@ -1475,9 +1591,19 @@ export class TurnLifecycle {
    * Stops a quiet turn that sends nothing for `QUIET_END_MS` after its no-update call, and its end
    * completes it. An open tool step, an open approval or question, or a provider event of the turn,
    * such as thinking, keeps the turn. A Stop of the user and a reported failure keep their own end.
+   * A second no-update call shows that the model does not end its turn: Kimi called the tool again
+   * every 2 s for an hour, and each call reset the silence (#9375). OpenBot then ends the turn when no
+   * tool step, approval or question is open, without the silence.
    */
   #armQuietEnd(agentId: string, turnId: string): void {
-    if (this.#quietEndTimers.has(turnId)) return;
+    const armed = this.#quietEndTimers.get(turnId);
+    if (armed) {
+      if (this.#quietRepeats.has(turnId)) return;
+      this.#quietRepeats.add(turnId);
+      clearTimeout(armed);
+    }
+    const repeated = armed !== undefined;
+    const quietFor = repeated ? 0 : QUIET_END_MS;
     const calledAt = Date.now();
     const check = () => {
       this.#quietEndTimers.delete(turnId);
@@ -1491,19 +1617,20 @@ export class TurnLifecycle {
         return;
       const silentFor = Date.now() - Math.max(calledAt, running.lastEventAt);
       if (running.openTools.size > 0 || this.#attention.hasAttentionForTurn(threadId, turnId)) {
-        wait(QUIET_END_MS);
+        wait(repeated ? QUIET_REPEAT_POLL_MS : QUIET_END_MS);
         return;
       }
-      if (silentFor < QUIET_END_MS) {
-        wait(QUIET_END_MS - silentFor);
+      if (silentFor < quietFor) {
+        wait(quietFor - silentFor);
         return;
       }
       this.#quietStops.add(turnId);
-      logger.info("A quiet turn sent nothing after its no-update call; OpenBot ends it.", {
-        agentId,
-        turnId,
-        provider: client.provider,
-      });
+      logger.info(
+        repeated
+          ? "A quiet turn called the no-update tool again; OpenBot ends it."
+          : "A quiet turn sent nothing after its no-update call; OpenBot ends it.",
+        { agentId, turnId, provider: client.provider },
+      );
       Effect.runFork(client.request("turn/interrupt", { threadId, turnId }, decodeRecordResponse).pipe(Effect.ignore));
     };
     const wait = (ms: number) => {
@@ -1511,7 +1638,7 @@ export class TurnLifecycle {
       timer.unref?.();
       this.#quietEndTimers.set(turnId, timer);
     };
-    wait(QUIET_END_MS);
+    wait(quietFor);
   }
 
   #clearQuietEnd(turnId: string): void {
@@ -1519,6 +1646,7 @@ export class TurnLifecycle {
     if (timer) clearTimeout(timer);
     this.#quietEndTimers.delete(turnId);
     this.#quietStops.delete(turnId);
+    this.#quietRepeats.delete(turnId);
   }
 
   /** Whether the channel shows the answers of this running channel routine turn as steps (#7166). */
@@ -1650,7 +1778,9 @@ export class TurnLifecycle {
       // channel turn would then end on the agent's own chat, so its task kept running (#6596).
       const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
       this.#browser.endControl(publicThreadId, turnId);
-      const snapshot = this.#conversation.ensureSnapshot(agentId, threadId);
+      // With the provider's id, the agent's own chat was read again from SQLite, and lost the answer
+      // that `#holdCodexNoAnswer` made from the turn's narration (#9422).
+      const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
       // A routine run in its own session ends in the chat's snapshot, where a later turn can still
       // run, such as one the provider started itself. That turn stays active. Cleared, the queue saw an
       // idle chat and asked the busy provider for a turn again and again. An id of a turn that no
@@ -1677,6 +1807,7 @@ export class TurnLifecycle {
       // continues, and shows no error. A second such stop shows the error (#5822).
       const compactionContinuation =
         compactionFailure !== undefined &&
+        !compactionFailure.loop &&
         failover === undefined &&
         status === "failed" &&
         running !== undefined &&
@@ -1786,6 +1917,7 @@ export class TurnLifecycle {
       const subagents = snapshot.messages.find((message) => message.id === `${turnId}:subagents`);
       stopRunningSubagents(subagents?.subagents, new Date().toISOString(), { background: false });
       if (this.#trackSubagents(agentId, turnId, subagents?.subagents)) this.#hooks.emitRuntimeSnapshot();
+      if (routineSession && !this.#subagentsWork(agentId, turnId)) this.#archivableRoutineSessions.add(threadId);
       for (const [childId, parent] of this.#codexChildren)
         if (parent.turnId === turnId) this.#codexChildren.delete(childId);
       for (const message of snapshot.messages) {
@@ -1859,10 +1991,11 @@ export class TurnLifecycle {
       const failure = refusedFailure ?? reportedError;
       if (refused) {
         yield* this.#hooks.dropRefusedSession(agentId, threadId);
-        const taskId = taskTurn ? this.#taskForThread(agentId, threadId) : null;
-        if (taskId !== null && failure !== undefined) {
+        // The task was read before the drop, which unbinds the provider thread. Read after it, the
+        // thread showed its failure with no reason, and the reason went to the agent's own chat (#9219).
+        if (laneTaskId !== null && failure !== undefined) {
           this.#hooks.emitFailure?.({ code: "agent_error", agentId, causeCode: classifyFailure(failure) });
-          this.#hooks.taskFailed(taskId, failure);
+          this.#hooks.taskFailed(laneTaskId, failure);
         } else this.#hooks.emitError("agent_error", failure, agentId);
       }
       if (deliveries.some((delivery) => delivery.delivery.sender.kind === "agent")) {
@@ -2049,7 +2182,7 @@ export class TurnLifecycle {
               this.#completingTurns.delete(turnId);
               this.#quietChannelTurns.delete(turnId);
             }),
-            this.#hooks.closeRoutineSession(threadId),
+            () => this.#hooks.closeRoutineSession(threadId, this.#archivableRoutineSessions.delete(threadId)),
           ),
         ),
       ),
@@ -2150,7 +2283,7 @@ export class TurnLifecycle {
     for (const [itemId, itemTurnId] of this.#itemTurns) if (itemTurnId === turnId) this.#itemTurns.delete(itemId);
     // A routine run's own session ends with its turn. A task or channel turn runs in another session.
     if (runningThreadId && this.#conversation.isRoutineSession(runningThreadId))
-      yield* this.#hooks.closeRoutineSession(runningThreadId);
+      yield* this.#hooks.closeRoutineSession(runningThreadId, !this.#subagentsWork(agentId, turnId));
     yield* turnStep(() => this.#mailboxSync.emitQueue(agentId)).pipe(Effect.catchCause(report));
     yield* turnStep(() => {
       for (const { delivery } of deliveries) {
@@ -2564,6 +2697,13 @@ export class TurnLifecycle {
       if (turns.size === 0) this.#subagentTurns.delete(agentId);
     }
     return true;
+  }
+
+  /** Whether a subagent of the turn still works: a linked Codex child, or a background subagent. */
+  #subagentsWork(agentId: string, turnId: string): boolean {
+    if (this.#subagentTurns.get(agentId)?.has(turnId)) return true;
+    for (const parent of this.#codexChildren.values()) if (parent.turnId === turnId) return true;
+    return false;
   }
 
   /** Codex reports its subagents as tool items of the parent thread. */

@@ -48,6 +48,8 @@ export const messages = defineMessages("sidebar", {
   "sidebar.section.nameUnique": "Folder names must be unique.",
   "sidebar.section.saveFailed": "Could not save this folder. Try again.",
   "sidebar.section.unassigned": "Unassigned",
+  "sidebar.section.chatCount": { one: "{count} chat", other: "{count} chats" },
+  "sidebar.section.count": { one: "({count})", other: "({count})" },
   "sidebar.section.people": "People",
   "sidebar.section.fallback": "Folder",
   "sidebar.folder.newInside": "New folder inside",

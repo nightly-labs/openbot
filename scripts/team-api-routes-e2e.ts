@@ -236,6 +236,13 @@ import {
 import { GITHUB_SKILLS_CAPABILITY, GITHUB_SKILLS_ROUTES } from "@openbot/contracts/team-protocol/github-skills-v1";
 import { HERMES_IMPORT_CAPABILITY, HERMES_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/hermes-import-v1";
 import {
+  HOST_APPEARANCE_CAPABILITY,
+  HOST_APPEARANCE_EVENT,
+  HOST_APPEARANCE_ROUTES,
+  type ServerAppearance,
+  serverAppearanceOrNull,
+} from "@openbot/contracts/team-protocol/host-appearance-v1";
+import {
   HOST_KEY_ROTATION_CAPABILITY,
   HOST_KEY_ROTATION_ROUTES,
 } from "@openbot/contracts/team-protocol/host-key-rotation-v1";
@@ -287,6 +294,10 @@ import {
   PENDING_APPROVAL_CAPABILITY,
   PENDING_APPROVAL_ROUTES,
 } from "@openbot/contracts/team-protocol/pending-approval-v1";
+import {
+  PROVIDER_ACCOUNT_CODE_CAPABILITY,
+  PROVIDER_ACCOUNT_CODE_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-code-v1";
 import {
   PROVIDER_ACCOUNT_KEYS_CAPABILITY,
   PROVIDER_ACCOUNT_KEYS_ROUTES,
@@ -752,12 +763,16 @@ const ARGON_MODEL: AgentModelOption = {
   supportedReasoningEfforts: ["low", "high"],
   listing: "new",
 };
+/** The account that the fake host adds for a code sign-in (`provider-account-code-v1`). */
+const CODE_ACCOUNT = "ac0de000000000001";
 /** The key that the fake host's Cursor refuses (`provider-account-keys-v1`). */
 const REFUSED_ACCOUNT_KEY = "key_e2e_refused";
 const ACCOUNT_KEY = "key_e2e_accepted";
 
 /** The fake host's Gemini pool (`provider-account-pool-v1`): off until the pool update route turns it on. */
 let antigravityPool: ProviderAccountPool | undefined;
+/** The account whose code sign-in runs on the fake host. */
+let codeSignInAccount: string | null = null;
 function accountModelsStatus(): AgentStatus {
   const account = (id: string, models?: AgentModelOption[]) => ({
     id,
@@ -1070,7 +1085,7 @@ const fakeAgents: TeamApiAgents = {
   cancelQueuedMessage: (agentId, deliveryId) => Effect.sync(() => record("cancelQueuedMessage", agentId, deliveryId)),
   steerQueuedMessage: (input) => {
     record("steerQueuedMessage", input);
-    // OpenCode defers steering: the queue keeps the message and refuses the steer.
+    // This agent cannot steer: the queue keeps the message and refuses the steer.
     if (input.agentId === "agent-oc")
       return Effect.fail(
         new AgentLifecycleFailed({ operation: "steerQueuedMessage", cause: new SteerUnsupportedError() }),
@@ -2329,6 +2344,20 @@ try {
       // A stand-in for the server-mode restart, which closes the app under its service manager. This
       // checks the gate and that a refused request never reaches the host.
       restart: { request: (memberId) => record("restartHost", memberId) },
+      // The real team store, as the host service writes it. The host service then sends the new
+      // look to each event socket, so this does the same.
+      identity: {
+        updateIdentity: (input) =>
+          store.updateIdentity(input).pipe(
+            Effect.tap(() =>
+              Effect.sync(() => {
+                record("updateIdentity", input);
+                server?.refreshAppearance();
+              }),
+            ),
+            Effect.asVoid,
+          ),
+      },
       turnLimits: hostTurnLimits,
       // A stand-in for `LocalServers`; `local-servers-e2e.ts` starts real children. This checks the gate
       // and the wire, and that a refused request never reaches the desktop app.
@@ -2642,6 +2671,55 @@ try {
               )
             : Effect.sync(accountModelsStatus);
         },
+        // As the backend: Cursor has no code sign-in; ChatGPT gives a page and a code, and the sign-in
+        // of the new account goes on until a cancel.
+        startProviderAccountCodeLogin: (provider, accountId) => {
+          record("startProviderAccountCodeLogin", { provider, accountId });
+          if (provider === "claude") {
+            codeSignInAccount = accountId ?? CODE_ACCOUNT;
+            return Effect.succeed({
+              accountId: codeSignInAccount,
+              start: {
+                kind: "paste" as const,
+                verificationUrl: "https://claude.ai/oauth/authorize",
+                expiresAt: clock + 900_000,
+              },
+            });
+          }
+          if (provider !== "codex")
+            return Effect.fail(
+              new AgentLifecycleFailed({
+                operation: "connectProviderAccount",
+                cause: new Error(sourceText("error.provider.noCodeSignIn", { provider: "Cursor" })),
+              }),
+            );
+          codeSignInAccount = accountId ?? CODE_ACCOUNT;
+          return Effect.succeed({
+            accountId: codeSignInAccount,
+            start: {
+              kind: "code" as const,
+              userCode: "ABCD-12345",
+              verificationUrl: "https://auth.openai.com/codex/device",
+              expiresAt: clock + 900_000,
+            },
+          });
+        },
+        // As the backend: only a sign-in that waits takes a code, and a refusal can quote the code.
+        submitProviderAccountCodeLogin: (provider, accountId, code) => {
+          record("submitProviderAccountCodeLogin", { provider, accountId, code });
+          if (codeSignInAccount !== accountId) throw new Error(`The provider refused ${code}`);
+        },
+        providerAccountCodeLoginStatus: (provider, accountId) => {
+          record("providerAccountCodeLoginStatus", { provider, accountId });
+          // The error is longer than the wire limit, so the host must shorten it.
+          return codeSignInAccount === accountId ? { result: null } : { result: { error: "e".repeat(2_500) } };
+        },
+        cancelProviderAccountSignIn: (provider, accountId) =>
+          Effect.sync(() => {
+            record("cancelProviderAccountSignIn", { provider, accountId });
+            codeSignInAccount = null;
+            return accountModelsStatus();
+          }),
         renameProviderAccount: unused("providerAccounts.renameProviderAccount"),
         removeProviderAccount: unused("providerAccounts.removeProviderAccount"),
       },
@@ -4058,6 +4136,121 @@ try {
       errorIs(refused, 409, sourceText("error.provider.accountKeyRefused", { provider: "Cursor" })) &&
         !JSON.stringify(refused.body).includes(REFUSED_ACCOUNT_KEY),
       summary(refused),
+    );
+  }
+
+  // ---- Account code sign-in (provider-account-code-v1) ----
+  {
+    const v9 = { capabilities: [PROVIDER_ACCOUNT_CODE_CAPABILITY], protocol: TEAM_PROTOCOL_V9 };
+    const { start, submit, status, cancel } = PROVIDER_ACCOUNT_CODE_ROUTES;
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises provider-account-code-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(PROVIDER_ACCOUNT_CODE_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(PROVIDER_ACCOUNT_CODE_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const body = { provider: "codex", accountId: null };
+    const account = { provider: "codex", accountId: CODE_ACCOUNT };
+    const unsupported = await call("POST", start, { token: adaToken, json: body, protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the account code route without the capability gets 400 providersUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.providersUnsupported")),
+      summary(unsupported),
+    );
+    const starts = callsOf("startProviderAccountCodeLogin").length;
+    const memberStart = await call("POST", start, { token: bobToken, json: body, ...v9 });
+    const memberStatus = await call("POST", status, { token: bobToken, json: account, ...v9 });
+    const memberCancel = await call("POST", cancel, { token: bobToken, json: account, ...v9 });
+    check(
+      "a member cannot start, read or cancel an account code sign-in",
+      [memberStart, memberStatus, memberCancel].every((answer) =>
+        errorIs(answer, 403, sourceText("error.team.adminRequired")),
+      ) &&
+        callsOf("startProviderAccountCodeLogin").length === starts &&
+        callsOf("cancelProviderAccountSignIn").length === 0,
+      [summary(memberStart), summary(memberStatus), summary(memberCancel)],
+    );
+    const badAccount = await call("POST", start, {
+      token: adaToken,
+      json: { ...body, accountId: "not-an-account" },
+      ...v9,
+    });
+    const noAccount = await call("POST", status, { token: adaToken, json: body, ...v9 });
+    check(
+      "an account id that is not one, and a status with no account, get 400",
+      badAccount.status === 400 &&
+        noAccount.status === 400 &&
+        callsOf("startProviderAccountCodeLogin").length === starts,
+      [summary(badAccount), summary(noAccount)],
+    );
+    const noCode = await call("POST", start, { token: adaToken, json: { ...body, provider: "cursor" }, ...v9 });
+    check(
+      "a provider whose accounts have no code sign-in fails with the reason",
+      errorIs(noCode, 409, sourceText("error.provider.noCodeSignIn", { provider: "Cursor" })),
+      summary(noCode),
+    );
+    const started = await call("POST", start, { token: adaToken, json: body, ...v9 });
+    const running = await call("POST", status, { token: adaToken, json: account, ...v9 });
+    check(
+      "an admin starts the code sign-in of a new account: the answer names the account, the page and the code",
+      started.status === 200 &&
+        isDeepStrictEqual(started.body, {
+          accountId: CODE_ACCOUNT,
+          start: {
+            kind: "code",
+            userCode: "ABCD-12345",
+            verificationUrl: "https://auth.openai.com/codex/device",
+            expiresAt: clock + 900_000,
+          },
+        }) &&
+        isDeepStrictEqual(running.body, { result: null }),
+      [summary(started), summary(running)],
+    );
+    const cancelled = await call("POST", cancel, { token: adaToken, json: account, ...v9 });
+    const ended = await call("POST", status, { token: adaToken, json: account, ...v9 });
+    const endedError = field(ended.body, "result", "error");
+    check(
+      "an admin cancels the sign-in; the status then holds a result with a bounded error",
+      cancelled.status === 200 &&
+        isDeepStrictEqual(cancelled.body, {}) &&
+        isDeepStrictEqual(callsOf("cancelProviderAccountSignIn"), [[{ provider: "codex", accountId: CODE_ACCOUNT }]]) &&
+        ended.status === 200 &&
+        typeof endedError === "string" &&
+        endedError.length === 2_000,
+      [summary(cancelled), `status ${ended.status}`],
+    );
+    // A `paste` sign-in (Claude): the page shows a code, and `submit` sends it to the host.
+    const pasteCode = "paste-code-e2e-0123456789";
+    const claude = { provider: "claude", accountId: CODE_ACCOUNT };
+    const memberSubmit = await call("POST", submit, { token: bobToken, json: { ...claude, code: pasteCode }, ...v9 });
+    const idle = await call("POST", submit, { token: adaToken, json: { ...claude, code: pasteCode }, ...v9 });
+    check(
+      "a member cannot submit a code, and a refusal does not quote the code",
+      errorIs(memberSubmit, 403, sourceText("error.team.adminRequired")) &&
+        idle.status === 409 &&
+        !JSON.stringify(idle.body).includes(pasteCode) &&
+        callsOf("submitProviderAccountCodeLogin").length === 1,
+      [summary(memberSubmit), summary(idle)],
+    );
+    const pasteStarted = await call("POST", start, {
+      token: adaToken,
+      json: { provider: "claude", accountId: null },
+      ...v9,
+    });
+    const submitted = await call("POST", submit, { token: adaToken, json: { ...claude, code: pasteCode }, ...v9 });
+    check(
+      "an admin starts a paste sign-in and submits the code: the host gets it, and no answer carries it",
+      isDeepStrictEqual(pasteStarted.body, {
+        accountId: CODE_ACCOUNT,
+        start: { kind: "paste", verificationUrl: "https://claude.ai/oauth/authorize", expiresAt: clock + 900_000 },
+      }) &&
+        submitted.status === 200 &&
+        isDeepStrictEqual(submitted.body, {}) &&
+        isDeepStrictEqual(callsOf("submitProviderAccountCodeLogin").at(-1), [{ ...claude, code: pasteCode }]),
+      [summary(pasteStarted), summary(submitted)],
     );
   }
 
@@ -12092,6 +12285,109 @@ try {
         callsOf("restartHost")[1]?.[0] !== adaId,
       [summary(adminRestart), summary(ownerRestart), callsOf("restartHost")],
     );
+  }
+
+  // ---- Server shape and colour (host-appearance-v1) ----
+  {
+    const capabilities = [HOST_APPEARANCE_CAPABILITY];
+    const identityUpdates = () => callsOf("updateIdentity").length;
+    const storedAppearance = () => store.getIdentity()?.appearance;
+    const set = (token: string, json: Json, use: { capabilities?: string[] } = { capabilities }) =>
+      call("POST", HOST_APPEARANCE_ROUTES.appearance, { ...use, token, json });
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises host-appearance-v1 to a protocol 9 peer and not to a protocol 8 peer",
+      list(field(compatibility.body, "capabilities")).includes(HOST_APPEARANCE_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(HOST_APPEARANCE_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+
+    // A socket that declares the capability gets the look at once, and again after each change.
+    const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
+      TEAM_PROTOCOL_V1_WEBSOCKET,
+      `openbot-token.${bobToken}`,
+    ]);
+    const looks: Array<ServerAppearance | null> = [];
+    const waiters = new Set<() => void>();
+    socket.addEventListener("message", (message) => {
+      const value = JSON.parse(String(message.data));
+      if (!isDynamicRecord(value) || value.type !== HOST_APPEARANCE_EVENT || value.serverId !== serverId) return;
+      looks.push(value.appearance === null ? null : serverAppearanceOrNull(value.appearance));
+      for (const wake of waiters) wake();
+    });
+    await new Promise<void>((resolveOpen, reject) => {
+      socket.addEventListener("open", () => resolveOpen(), { once: true });
+      socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+    });
+    const until = (count: number) =>
+      new Promise<boolean>((resolveReady) => {
+        if (looks.length >= count) return resolveReady(true);
+        const timer = setTimeout(() => {
+          waiters.delete(wake);
+          resolveReady(false);
+        }, 5_000);
+        const wake = () => {
+          if (looks.length < count) return;
+          clearTimeout(timer);
+          waiters.delete(wake);
+          resolveReady(true);
+        };
+        waiters.add(wake);
+      });
+    socket.send(JSON.stringify({ type: "agent-event-scope", includeConversations: false, capabilities }));
+    const atConnect = await until(1);
+    check(
+      "a member's event socket that declares host-appearance-v1 gets the automatic look at once",
+      atConnect && looks.length === 1 && looks[0] === null && storedAppearance() === null,
+      looks,
+    );
+
+    const look: ServerAppearance = { shape: "hexagone", color: "#3b82f6" };
+    // The same look as the request body sends it.
+    const sent: Json = { shape: "hexagone", color: "#3b82f6" };
+    const member = await set(bobToken, { appearance: sent });
+    const noCapability = await set(adaToken, { appearance: sent }, {});
+    const invalid = await set(adaToken, { appearance: { shape: "star", color: "#3b82f6" } });
+    const badColor = await set(adaToken, { appearance: { shape: "hexagone", color: "blue" } });
+    check(
+      "a member gets 403, a client without the capability gets 400, a bad look gets 400, and the look does not change",
+      errorIs(member, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(noCapability, 400, sourceText("error.team.hostIdentityUnsupported")) &&
+        invalid.status === 400 &&
+        badColor.status === 400 &&
+        identityUpdates() === 0 &&
+        storedAppearance() === null,
+      [summary(member), summary(noCapability), summary(invalid), summary(badColor)],
+    );
+
+    const admin = await set(adaToken, { appearance: sent });
+    const changed = await until(2);
+    check(
+      "an admin sets the look: 200, the store keeps it, and the member's socket gets it",
+      admin.status === 200 &&
+        isDeepStrictEqual(admin.body, {}) &&
+        isDeepStrictEqual(storedAppearance(), look) &&
+        changed &&
+        isDeepStrictEqual(looks[1], look),
+      [summary(admin), storedAppearance(), looks],
+    );
+
+    const reset = await set(owner.sessionToken, { appearance: null });
+    const resetSent = await until(3);
+    check(
+      "the owner sends null: the server has the automatic look again, and the socket gets null",
+      reset.status === 200 &&
+        storedAppearance() === null &&
+        resetSent &&
+        looks[2] === null &&
+        isDeepStrictEqual(
+          callsOf("updateIdentity").map(([input]) => input),
+          [{ appearance: look }, { appearance: null }],
+        ),
+      [summary(reset), storedAppearance(), looks, callsOf("updateIdentity")],
+    );
+    socket.close();
   }
 
   // ---- Library folders (library-folders-v1) ----

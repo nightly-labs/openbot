@@ -1,5 +1,43 @@
 [
   {
+    "version": "0.71.0",
+    "date": "2026-11-14",
+    "notices": [
+      "Aktualisiere auch jeden verbundenen Server auf diese Version. Auf einem Server funktionieren Stoppen für Routinen-Läufe, Dateien ohne Text, die Agenten senden, und API-Schlüssel unter dem alten Pfad nur, wenn der Server diese Version hat."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Spreize zwei Finger auf einem Trackpad oder Touchscreen, um den Bereich unter dem Zeiger zu vergrößern. Diagramme, Canvas und der Bildbetrachter behalten ihren eigenen Zoom.",
+          "Stoppe einen Routinen-Lauf auf der Routinen-Zeichenfläche: Wähle Stoppen in der oberen Leiste oder in den Routinendetails. Der Lauf endet mit dem Status Abgebrochen.",
+          "Agenten können eine Datei oder ein Bild ohne Text an einen WhatsApp-, Telegram-, Slack- oder Discord-Chat senden.",
+          "Kaufe wieder einen gehosteten Starter-Server. Er hat 25 GB Speicher.",
+          "Nutze ein ClinePass-Abo mit Cline-Agenten. Das Modellmenü zeigt die ClinePass-Modelle."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Ziehe auf dem Canvas eine Notiz, einen freien Text, eine Form oder einen Schritt am Text. Ein Klick auf den Text setzt den Textcursor dorthin, wo du geklickt hast.",
+          "Eine Nachricht, die du sendest, während ein Antigravity-Agent arbeitet, geht in den laufenden Durchlauf. Dafür brauchst du Antigravity CLI 1.5.0 oder neuer.",
+          "Eine Routine, deren Aufgabe vorgibt, nach getaner Arbeit zu stoppen, pausiert jetzt von selbst. Schalte sie in deiner Routinenliste wieder ein.",
+          "Der Vault sagt jetzt, dass jeder Agent die API-Schlüsseldateien der anderen Agenten lesen kann, weil alle Agenten als derselbe Systembenutzer laufen."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Skripte, MCP-Server und Anbieter-Einstellungen, die Vault-API-Schlüssel aus ihren Dateien lesen, funktionieren nach dem Update auf 0.70.0 wieder.",
+          "Ein Claude-Agent behält das Modell in seinem Profil, wenn Claude Code sein Standardmodell ändert.",
+          "Wenn Claude einen Durchlauf am monatlichen Ausgabenlimit stoppt, setzt ein Agent mit Ersatzmodellen seine Arbeit mit dem nächsten Modell fort.",
+          "Agenten erhalten das vollständige Transkript eines Videos mit Untertiteln, etwa eines YouTube-Videos.",
+          "OpenBot braucht weniger CPU: Browser-Tabs, die du nicht siehst, werden langsamer, und das bewegte Licht in der Aktivitätszeile eines Agenten braucht weniger Leistung."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.70.0",
     "date": "2026-11-13",
     "notices": [

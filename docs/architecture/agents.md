@@ -83,6 +83,16 @@ for its turn either (`answeredRequestId`, #8364). Such a turn ends quiet only af
 `routine_no_update`: without the call its answer is a result and shows. The answer to a Test run's
 request always shows.
 
+A completed turn that a teammate's message started (`origin: "agent"`: a request from another agent,
+or its answer) is work between agents. Its answer shows in the chat and counts as unread, but the
+desktop, the web client and the phone show no notification for it and play no completion sound
+(`teammateTurnCompleted` in `packages/team-client/src/agent-notifications.ts`). A prompt, an
+approval, a browser step and a failed turn still notify. So does the result of a task: its turn has
+the same origin, because the agent sends the brief to itself, but it arrives as
+`thread-turn-completed`. The clients decide this from the released
+`origin` field, so it needs no capability and also applies with an older host. The host decides it
+for the phone push.
+
 `quiet` reaches remote clients too, through the optional `quiet-turn-v1` capability
 (`packages/contracts/src/team-protocol/quiet-turn-v1.ts`). The host sends a client with the
 capability a `quiet-turn-completed` event in place of `turn-completed`. The client transport changes
@@ -315,7 +325,9 @@ changed, on this computer and on a joined host.
   `read_workflow`, `edit_workflow`, `delete_workflow`, `run_workflow` and `read_workflow_runs`. They
   are not in the visible set, so before `tool_search` finds them they cost only their names. A search
   word `workflow` or `workflows` gives the schemas of all six, and no other schema or guidance, so one
-  search covers a build, a run and a delete. A read gives only the runtime fields of each node and no
+  search covers a build, a run and a delete. The release notes call the Workflows board the Canvas, so
+  `canvas` or `canvases` also gives the six schemas, but keeps the other results: the word can also
+  mean the Routines canvas or a canvas on a web page. A read gives only the runtime fields of each node and no
   positions, unless the agent asks for the layout; then each node has its position and card size. A run read gives each step's kind and a short label
   (the agent id, prompt, rule or question), so the agent does not read the workflow again.
   `edit_workflow` takes a list of operations (add, update, move, remove, connect, disconnect) and saves
@@ -802,15 +814,28 @@ A thread turn never moves to a backup, so it always runs once more on the same m
 does the turn of an external chat conversation, such as WhatsApp (#8573); a channel task does not.
 `MessagingThreads` keeps the conversation's status post while the turn's messages wait in the queue,
 so the conversation gets no "Stopped." before the answer. The turn did no step, so it repeats
-nothing. A second empty run, or an empty turn from the person, shows the error. `scripts/codex-empty-lead-turn-e2e.ts` checks these paths.
+nothing. A second empty run, or an empty turn from the person, shows the error.
+
+Codex can also write its last words as narration (a `msg_` commentary item) and then send an empty
+answer (#8837). Codex takes that narration as the turn's result, so `TurnLifecycle` makes the
+narration after the turn's last tool step the answer, and removes the empty rows. Outside a channel,
+this applies whether the turn did a step or not. A turn that did a step and wrote no such narration
+ends as before: its output can be a file or an image, or teammates or subagents still work for it. A
+teammate's such turn sends the note of its work (#8214). A channel turn keeps the rule above, since
+text after `channel_result` is a step there. Voice on the desktop does not read the answer again when
+it read that narration as a progress update.
+`scripts/codex-empty-lead-turn-e2e.ts` checks these paths.
 
 A message to an agent that runs a turn follows the busy-message mode: "steer" takes it into the
 running turn, "queue" starts it after the turn. The default is "steer" (`DEFAULT_BUSY_MESSAGE_MODE`).
 Server Settings > Agents changes the app default, and each agent can set its own mode. The preference file
 exists only after the user changes the setting, so a stored "queue" stays "queue". A remote client
 reads the host's default from `agent-host-settings-v1`, so a host on an older version keeps its
-"queue" default. A provider that cannot steer natively (the ACP agents) queues the message in both
-modes.
+"queue" default. A provider that cannot steer natively (an ACP agent with no steer request of its
+own) queues the message in both modes. OpenCode steers through its `_session/steering` ACP extension
+(`steerOpenCode`). An OpenCode release before the extension does not report
+`_meta.steering.supported` at `initialize`, so `AcpAgentClient` refuses the steer and the message
+waits in the queue. `scripts/opencode-steer-e2e.ts` checks both.
 
 A steered message joins work that the model already does, and a model that gets it as plain user
 text can drop that work. `QueueControls.steer` therefore puts the `<openbot_steer>` block

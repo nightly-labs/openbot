@@ -194,6 +194,7 @@ import type {
   SaveEventRoutineResult,
   WebhookSecret,
 } from "@openbot/contracts/ipc-events";
+import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import type { LiveVoiceSessionResponse, LiveVoiceStartRequest } from "@openbot/contracts/team-protocol/live-voice-v1";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { RemoteConnectionFailure, RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
@@ -239,6 +240,11 @@ export interface MobileServer {
   name: string;
   /** The logo version in the account directory, or null when the server has no logo. */
   logoKey: string | null;
+  /**
+   * The shape and colour of the plush that the server shows with no logo (`host-appearance-v1`).
+   * Null or absent keeps the flat tile with the initials.
+   */
+  appearance?: ServerAppearance | null;
   kind: MobileServerKind;
   state: MobileServerState;
   initialConnectionPending: boolean;
@@ -447,6 +453,8 @@ export interface MobileWorkspaceContextValue {
   knownServerChecks: (serverId: string) => ServerChecks | null;
   /** An owner or admin of an online host that serves `host-admin-v1`. The host checks the role again. */
   canEditServerIdentity: (serverId: string) => boolean;
+  /** An owner or admin of an online host that serves `host-appearance-v1`. The host checks the role again. */
+  canEditServerAppearance: (serverId: string) => boolean;
   /**
    * An online host that sends notifications to this phone: `push-notifications-v1` for an iPhone,
    * `push-notifications-android-v1` for an Android phone.
@@ -480,6 +488,8 @@ export interface MobileWorkspaceContextValue {
     serverId: string,
     input: { serverName?: string; logo?: AvatarImageInput | null },
   ) => Promise<void>;
+  /** Saves the plush of a server with no logo. `null` gives the automatic look. */
+  setServerAppearance: (serverId: string, appearance: ServerAppearance | null) => Promise<void>;
   /** The owner of an online host that serves `host-key-rotation-v1`. The host checks the role again. */
   canRotateServerKey: (serverId: string) => boolean;
   /**
@@ -1276,6 +1286,7 @@ export type MobileWorkspaceCapabilityCheck =
 type ServerCheckKey =
   | Exclude<MobileWorkspaceCapabilityCheck, "browserViewSupport">
   | "canEditServerIdentity"
+  | "canEditServerAppearance"
   | "canRotateServerKey"
   | "canCreateLocalServers"
   | "canRestartServerItself"

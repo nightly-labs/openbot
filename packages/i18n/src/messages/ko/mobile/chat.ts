@@ -159,6 +159,7 @@ export const messages = {
   "mobile.chat.composer.send": "메시지 보내기",
   "mobile.chat.composer.stop": "{name} 중지",
   "mobile.chat.composer.dictate": "음성으로 메시지 입력",
+  "mobile.chat.composer.voiceSettings": "음성 설정",
   "mobile.chat.composer.stopDictation": "음성 입력 중지",
   "mobile.chat.composer.mention": "{name} 멘션",
   "mobile.chat.composer.skills": "스킬",
@@ -339,6 +340,18 @@ export const messages = {
   "mobile.chat.browserSecret.done": "완료",
   "mobile.chat.browserSecret.submitOnce": "{origin}에 한 번만 제출해요. 이 값은 채팅에 추가되지 않아요.",
   "mobile.chat.browserSecret.submitFailed": "요청을 완료할 수 없어요. 연결을 확인한 후 다시 시도해 주세요.",
+  "mobile.chat.browserSecret.vaultSkip.agentScript":
+    "에이전트가 이 페이지에서 스크립트를 실행해서 OpenBot이 저장된 로그인 정보를 사용하지 않았어요. 사용하려면 에이전트에게 페이지를 새로고침하고 다시 시도해 달라고 요청하세요.",
+  "mobile.chat.browserSecret.vaultSkip.fieldKind":
+    "에이전트가 페이지에서 잘못된 입력란을 선택해서 OpenBot이 저장된 로그인 정보를 사용하지 않았어요.",
+  "mobile.chat.browserSecret.vaultSkip.loginChoice":
+    "에이전트가 이 사이트에 저장된 로그인 정보 중 하나를 선택하지 않아서 OpenBot이 저장된 로그인 정보를 사용하지 않았어요. 어떤 계정을 사용할지 에이전트에게 알려 주세요.",
+  "mobile.chat.browserSecret.vaultSkip.noPassword":
+    "저장된 로그인 정보에 이 사이트의 비밀번호가 없어서 OpenBot이 사용하지 않았어요.",
+  "mobile.chat.browserSecret.vaultSkip.noAuthenticatorKey":
+    "저장된 로그인 정보에 인증 앱 키가 없어서 OpenBot이 사용하지 않았어요.",
+  "mobile.chat.browserSecret.vaultSkip.vaultUnreadable":
+    "비밀번호 관리자를 읽을 수 없어서 OpenBot이 저장된 로그인 정보를 사용하지 않았어요.",
   "mobile.chat.browserSecret.submit": "제출",
   "mobile.chat.browserSecret.takeOver": "직접 제어",
   "mobile.chat.starter.title": "무엇부터 시작할까요?",

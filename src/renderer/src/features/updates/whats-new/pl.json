@@ -1,5 +1,43 @@
 [
   {
+    "version": "0.71.0",
+    "date": "2026-11-14",
+    "notices": [
+      "Zaktualizuj do tej wersji także każdy serwer, do którego dołączyłeś. Na serwerze Zatrzymaj dla uruchomień rutyn, pliki, które agenci wysyłają bez tekstu, i klucze API w starej ścieżce działają tylko wtedy, gdy serwer ma tę wersję."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Przybliż gestem szczypania na gładziku lub ekranie dotykowym obszar pod wskaźnikiem. Diagramy, kanwy i przeglądarka obrazów mają własne przybliżenie.",
+          "Zatrzymaj uruchomienie rutyny na kanwie Rutyny: wybierz Zatrzymaj na górnym pasku lub w szczegółach rutyny. Uruchomienie kończy się jako Anulowano.",
+          "Agenci mogą wysłać plik albo obraz bez tekstu do czatu w WhatsApp, Telegram, Slack lub Discord.",
+          "Kup ponownie hostowany serwer Starter. Ma 25 GB pamięci.",
+          "Użyj subskrypcji ClinePass z agentami Cline. Menu modeli pokazuje modele ClinePass."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Na kanwie przeciągnij notatkę, wolny tekst, kształt lub krok za tekst. Kliknięcie w tekst ustawia kursor tam, gdzie kliknąłeś.",
+          "Wiadomość wysłana podczas pracy agenta Antigravity trafia do bieżącej tury. Wymaga Antigravity CLI 1.5.0 lub nowszego.",
+          "Rutyna, której zadanie mówi, by zatrzymać się po wykonaniu pracy, teraz wstrzymuje się sama. Włącz ją ponownie z listy rutyn.",
+          "Sejf informuje teraz, że każdy agent może czytać pliki kluczy API innych agentów, bo wszyscy agenci działają jako ten sam użytkownik systemu."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Skrypty, serwery MCP i ustawienia dostawców, które czytają z plików klucze API z Sejfu, działają znów po aktualizacji do 0.70.0.",
+          "Agent Claude zachowuje model w swoim profilu, gdy Claude Code zmienia swój model domyślny.",
+          "Gdy Claude zatrzyma turę na miesięcznym limicie wydatków, agent z modelami zapasowymi kontynuuje na następnym modelu.",
+          "Agenci dostają pełną transkrypcję filmu z napisami, na przykład filmu z YouTube.",
+          "OpenBot zużywa mniej CPU: karty przeglądarki, których nie widzisz, działają wolniej, a ruchome światło na linii aktywności agenta jest lżejsze."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.70.0",
     "date": "2026-11-13",
     "notices": [

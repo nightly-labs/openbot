@@ -161,6 +161,7 @@ export const messages = {
   "mobile.chat.composer.send": "メッセージを送信",
   "mobile.chat.composer.stop": "{name} を停止",
   "mobile.chat.composer.dictate": "メッセージを音声入力",
+  "mobile.chat.composer.voiceSettings": "音声設定",
   "mobile.chat.composer.stopDictation": "音声入力を停止",
   "mobile.chat.composer.mention": "{name} をメンション",
   "mobile.chat.composer.skills": "スキル",
@@ -346,6 +347,18 @@ export const messages = {
   "mobile.chat.browserSecret.submitOnce": "{origin} に一度だけ送信します。この値はチャットに追加されません。",
   "mobile.chat.browserSecret.submitFailed":
     "リクエストを完了できませんでした。接続を確認して、もう一度お試しください。",
+  "mobile.chat.browserSecret.vaultSkip.agentScript":
+    "エージェントがこのページでスクリプトを実行したため、OpenBot は保存したログイン情報を使いませんでした。使うには、ページを再読み込みしてもう一度試すようにエージェントに頼んでください。",
+  "mobile.chat.browserSecret.vaultSkip.fieldKind":
+    "エージェントがページ上の違う欄を選んだため、OpenBot は保存したログイン情報を使いませんでした。",
+  "mobile.chat.browserSecret.vaultSkip.loginChoice":
+    "エージェントがこのサイトの保存済みログイン情報を選ばなかったため、OpenBot は保存したログイン情報を使いませんでした。どのアカウントを使うかエージェントに伝えてください。",
+  "mobile.chat.browserSecret.vaultSkip.noPassword":
+    "このサイトのパスワードがないため、OpenBot は保存したログイン情報を使いませんでした。",
+  "mobile.chat.browserSecret.vaultSkip.noAuthenticatorKey":
+    "認証アプリのキーがないため、OpenBot は保存したログイン情報を使いませんでした。",
+  "mobile.chat.browserSecret.vaultSkip.vaultUnreadable":
+    "パスワードマネージャーを読み取れなかったため、OpenBot は保存したログイン情報を使いませんでした。",
   "mobile.chat.browserSecret.submit": "送信",
   "mobile.chat.browserSecret.takeOver": "操作を引き継ぐ",
   "mobile.chat.starter.title": "何から始めますか？",
