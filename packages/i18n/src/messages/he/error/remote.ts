@@ -21,6 +21,8 @@ export const messages = {
   "error.remote.testActive": "בדיקת שולחן עבודה מרוחק פעילה. יש לנסות שוב כשהיא תסתיים.",
   "error.remote.screenRecordingDenied":
     "המארח לא אישר ל-OpenBot להקליט את המסך שלו. יש לאשר הקלטת מסך במארח ולנסות שוב.",
+  "error.remote.windowsSessionDisconnected":
+    "הסשן של Windows במארח מנותק, ולכן אין מסך לשיתוף. יש להיכנס ל-Windows במסך של המארח ולנסות שוב.",
   "error.remote.teamSessionExpired": "הסשן של הצוות פג.",
   "error.remote.finishTestBeforeSwitch": "יש לסיים את בדיקת שולחן העבודה המרוחק לפני החלפת תצוגות.",
   "error.remote.displayNotFound": "התצוגה המרוחקת לא נמצאה.",

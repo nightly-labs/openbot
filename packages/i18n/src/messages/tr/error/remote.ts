@@ -22,6 +22,8 @@ export const messages = {
   "error.remote.testActive": "Bir uzak masaüstü testi etkin. Bittiğinde tekrar deneyin.",
   "error.remote.screenRecordingDenied":
     "Ana makine OpenBot'un ekranını kaydetmesine izin vermedi. Ana makinede ekran kaydı izni verin, ardından tekrar deneyin.",
+  "error.remote.windowsSessionDisconnected":
+    "Ana makinedeki Windows oturumunun bağlantısı kesik, bu yüzden paylaşılacak ekran yok. Ana makinenin ekranında Windows'ta oturum açın, ardından tekrar deneyin.",
   "error.remote.teamSessionExpired": "Ekip oturumunun süresi doldu.",
   "error.remote.finishTestBeforeSwitch": "Ekranları değiştirmeden önce uzak masaüstü testini tamamlayın.",
   "error.remote.displayNotFound": "Uzak ekran bulunamadı.",

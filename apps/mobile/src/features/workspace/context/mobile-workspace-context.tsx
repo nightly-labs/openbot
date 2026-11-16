@@ -13,6 +13,7 @@ import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-
 import { AGENT_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { agentColorsEvent } from "@openbot/contracts/team-protocol/agent-colors-v1";
+import { AGENT_DEFAULTS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-defaults-v1";
 import { AGENT_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_HOST_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
 import { AGENT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v1";
@@ -24,6 +25,7 @@ import { AGENT_PLAN_CARD_CAPABILITY } from "@openbot/contracts/team-protocol/age
 import { AGENT_PUBLISH_CAPABILITY } from "@openbot/contracts/team-protocol/agent-publish-v1";
 import { AGENT_TASK_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { AGENT_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-update-v1";
+import { BACKGROUND_PROCESSES_CAPABILITY } from "@openbot/contracts/team-protocol/background-processes-v1";
 import { BITWARDEN_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/bitwarden-connector-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
@@ -38,10 +40,12 @@ import {
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { FOCUS_USE_CAPABILITY, FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
 import { HOST_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/host-admin-v1";
+import { HOST_APPEARANCE_CAPABILITY } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { HOST_KEY_ROTATION_CAPABILITY } from "@openbot/contracts/team-protocol/host-key-rotation-v1";
 import { HOST_MEMBER_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-member-update-v1";
 import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
 import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-release-v1";
+import { HOST_RESTART_CAPABILITY } from "@openbot/contracts/team-protocol/host-restart-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "@openbot/contracts/team-protocol/host-timezone-v1";
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
@@ -54,6 +58,7 @@ import { MCP_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-acce
 import { MEMORY_REVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "@openbot/contracts/team-protocol/password-managers-v1";
+import { PENDING_APPROVAL_CAPABILITY } from "@openbot/contracts/team-protocol/pending-approval-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v1";
 import { PUSH_NOTIFICATION_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/push-notification-threads-v1";
@@ -77,6 +82,7 @@ import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9
 import { VAULT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
+import { VAULT_V3_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v3";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
 import { sourceText } from "@openbot/i18n/source";
 import {
@@ -97,6 +103,7 @@ import { verifyEd25519Base64Url } from "@openbot/team-client/ed25519";
 import { createFocusUsePing } from "@openbot/team-client/focus-use";
 import { createHostedServerWake, WAKE_RECONNECT_DELAY_MS } from "@openbot/team-client/hosted-server-wake";
 import type { RemoteFileUpload, RemoteLargeDownload, RemoteTeamEvent } from "@openbot/team-client/remote-peer";
+import { withWholeApproval } from "@openbot/team-client/runtime-attention";
 import {
   createHostLocalServer,
   deleteHostLocalServer,
@@ -105,6 +112,7 @@ import {
   readSidebarPins,
   rotateHostKey,
   seedSidebarPins,
+  setHostAppearance,
   setSidebarPins,
   updateHostIdentity,
 } from "@openbot/team-client/team-admin-requests";
@@ -112,6 +120,7 @@ import {
   deleteAgent,
   discardAttachmentDraft,
   interruptAgentTurn,
+  readPendingApproval,
   respondToApproval,
   respondToBrowserSecret,
   respondToBrowserTakeover,
@@ -138,6 +147,7 @@ import { useSyncedNotificationLevelsLoader } from "@/features/push-notifications
 import { QuickActionsSync } from "@/features/quick-actions/quick-actions-sync";
 import { setSyncedNotificationLevels } from "@/features/settings/model/notification-levels";
 import { ShareExtensionSync } from "@/features/share/share-extension-sync";
+import { ShortcutsSync } from "@/features/shortcuts/shortcuts-sync";
 import { fetch } from "@/features/support/model/logged-fetch";
 import { supportLog } from "@/features/support/model/support-log";
 import type { RemoteTeamTransportRef } from "@/features/workspace/components/remote-team-transport";
@@ -1045,10 +1055,51 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     channelStore,
   ]);
 
+  /** The reads of loaded open requests that a latest page left out. A change during a read reads it again. */
+  const openExchangeReads = useRef(new Map<string, { again: boolean }>());
+  const refreshOpenExchanges = useCallback(
+    (agentId: string, serverId = activeServerIdRef.current) => {
+      for (const messageId of conversationStore.openExchangesBeforeLatest(agentId)) {
+        const key = `${agentId}\0${messageId}`;
+        const running = openExchangeReads.current.get(key);
+        if (running) {
+          running.again = true;
+          continue;
+        }
+        const read = { again: true };
+        openExchangeReads.current.set(key, read);
+        const generation = loadGeneration.current;
+        const isCurrent = () =>
+          generation === loadGeneration.current && Boolean(serverId) && !removedServers.current.has(serverId ?? "");
+        void (async () => {
+          try {
+            while (read.again && isCurrent()) {
+              read.again = false;
+              // The page around the request holds its whole turn at least, with the request as the host has it.
+              const page = await request(
+                "GET",
+                `${TEAM_API_ROUTES.agent.conversationPage(agentId)}?limit=1&around=${encodeURIComponent(messageId)}`,
+                decodeConversationPage,
+                undefined,
+                serverId,
+              );
+              if (isCurrent() && page.agentId === agentId) conversationStore.replaceMessage(page, messageId);
+            }
+          } finally {
+            // In the same step as the last check, so a later page starts a new read and is not lost.
+            openExchangeReads.current.delete(key);
+          }
+        })()
+          // The next latest page reads it again.
+          .catch(() => undefined);
+      }
+    },
+    [request, conversationStore],
+  );
   const loadConversation = useCallback(
     async (agentId: string, serverId = activeServerIdRef.current, refresh = false, attach = false) => {
       const generation = loadGeneration.current;
-      return conversationStore.loadLatest(
+      const page = await conversationStore.loadLatest(
         agentId,
         () =>
           request(
@@ -1062,8 +1113,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         refresh,
         attach,
       );
+      refreshOpenExchanges(agentId, serverId);
+      return page;
     },
-    [request, conversationStore],
+    [request, conversationStore, refreshOpenExchanges],
   );
   // A stable function: an open chat reloads its history when this changes.
   const loadLatestMessages = useCallback(
@@ -1663,7 +1716,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           readRefresh.invalidate(serverId);
           applyConversationReads({ [event.page.agentId]: readState });
         } else void refreshConversationReads(serverId).catch(() => undefined);
-        if (conversationStore.get(event.page.agentId)) conversationStore.applyPage(event.page);
+        if (conversationStore.get(event.page.agentId)) {
+          conversationStore.applyPage(event.page);
+          refreshOpenExchanges(event.page.agentId, serverId);
+        }
       } else if (event.type === "conversation-invalidated") {
         // A read cursor change sends the revision that the phone already has.
         if (
@@ -1684,6 +1740,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             server.id === serverId ? { ...server, name: event.serverName, logoKey: event.logoVersion } : server,
           ),
         );
+      } else if (event.type === "host-appearance") {
+        // The host sends its plush when the phone connects and after each change.
+        const { appearance } = event;
+        setServers((current) => current.map((server) => (server.id === serverId ? { ...server, appearance } : server)));
       }
     },
     [
@@ -1694,6 +1754,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       applyHostHidden,
       applyHostColors,
       loadConversation,
+      refreshOpenExchanges,
       replaceServerAgents,
       conversationStore,
       refreshConversationReads,
@@ -1887,6 +1948,25 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           throw new Error(currentText().t("mobile.workspace.error.approvalOffline"));
         await sendApproval(serverId, input);
       },
+      readsWholeApprovals: (serverId) =>
+        hasCapability(serverCapabilities.current, serverId, PENDING_APPROVAL_CAPABILITY),
+      readWholeApproval: async (serverId, approval) => {
+        if (!hasCapability(serverCapabilities.current, serverId, PENDING_APPROVAL_CAPABILITY)) return;
+        const whole = await runTeamRequest(
+          readPendingApproval(teamApi(serverId), { agentId: approval.agentId, requestId: approval.requestId }),
+        ).catch((error: unknown) => {
+          // Another device answered it, or its turn ended. The request is gone on the host too.
+          if (error instanceof InactiveRequestError)
+            liveState.update("approvalRequests", (current) => dropApproval(current, serverId, approval.requestId));
+          throw error;
+        });
+        liveState.update("approvalRequests", (current) => {
+          const previous = current[serverId];
+          if (!previous) return current;
+          const next = withWholeApproval(previous, whole);
+          return next === previous ? current : { ...current, [serverId]: next };
+        });
+      },
       respondToBrowserTakeover: (serverId, input) => runTeamRequest(respondToBrowserTakeover(teamApi(serverId), input)),
       respondToBrowserSecret: (serverId, input) => runTeamRequest(respondToBrowserSecret(teamApi(serverId), input)),
       selectServer: (id) => {
@@ -1934,6 +2014,22 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         // A new generation drops a directory read that started before the save, and the refresh
         // reads again after it. The change is saved, so a failed read must not report a failure.
         await refreshMemberships().catch(() => undefined);
+      },
+      setServerAppearance: async (serverId, appearance) => {
+        const server = serversRef.current.find((candidate) => candidate.id === serverId);
+        if (!server || !canAdministerServer(server.role))
+          throw new Error(currentText().t("mobile.server.settings.identityNotAllowed"));
+        requireCapability(
+          serverCapabilities.current,
+          serverId,
+          HOST_APPEARANCE_CAPABILITY,
+          "mobile.server.settings.identityUnsupported",
+        );
+        await runTeamRequest(setHostAppearance(teamApi(serverId), appearance));
+        // The host also sends `host-appearance`; this shows the choice at once.
+        setServers((current) =>
+          current.map((candidate) => (candidate.id === serverId ? { ...candidate, appearance } : candidate)),
+        );
       },
       rotateServerKey: async (serverId) => {
         const server = serversRef.current.find((candidate) => candidate.id === serverId);
@@ -2441,12 +2537,14 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       return {
         ...createHostRequestChecks(capabilities),
         canEditServerIdentity: (serverId) => administers(serverId, HOST_ADMIN_CAPABILITY),
+        canEditServerAppearance: (serverId) => administers(serverId, HOST_APPEARANCE_CAPABILITY),
         canRotateServerKey: (serverId) =>
           servers.find((candidate) => candidate.id === serverId)?.role === "owner" &&
           administers(serverId, HOST_KEY_ROTATION_CAPABILITY),
         canCreateLocalServers: (serverId) =>
           servers.find((candidate) => candidate.id === serverId)?.role === "owner" &&
           administers(serverId, LOCAL_SERVERS_CAPABILITY),
+        canRestartServerItself: (serverId) => administers(serverId, HOST_RESTART_CAPABILITY),
         canManageServerTimezone: (serverId) => administers(serverId, HOST_TIMEZONE_CAPABILITY),
         canReadMachineMetrics: (serverId) => administers(serverId, MACHINE_RESOURCES_CAPABILITY),
         canManageAgentMemoryLimit: (serverId) => administers(serverId, AGENT_MEMORY_LIMIT_CAPABILITY),
@@ -2484,6 +2582,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           hasCapability(capabilities, serverId, AGENT_IMPORT_CAPABILITY),
         canTransferServer: (serverId) => administers(serverId, INSTANCE_TRANSFER_CAPABILITY),
         canManageVaultApiKeys: (serverId) => administers(serverId, VAULT_V2_CAPABILITY),
+        canManageVaultTwoStep: (serverId) => administers(serverId, VAULT_V3_CAPABILITY),
         canManageBrowserProfiles: (serverId) => administers(serverId, BROWSER_PROFILES_CAPABILITY),
         canManageBrowserProxies: (serverId) => administers(serverId, BROWSER_PROXIES_CAPABILITY),
         // The same rule as the Updates section of the desktop Server Settings.
@@ -2523,6 +2622,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         canManageAgentTaskLimit: (serverId) => administers(serverId, AGENT_TASK_LIMIT_CAPABILITY),
         canManageAgentNewChat: (serverId) => administers(serverId, AGENT_NEW_CHAT_CAPABILITY),
         canManageAgentPlanCard: (serverId) => administers(serverId, AGENT_PLAN_CARD_CAPABILITY),
+        canManageAgentDefaults: (serverId) => administers(serverId, AGENT_DEFAULTS_CAPABILITY),
+        canManageBackgroundProcesses: (serverId) => administers(serverId, BACKGROUND_PROCESSES_CAPABILITY),
         canManageAgentInstructions: (serverId) => administers(serverId, AGENT_INSTRUCTIONS_CAPABILITY),
         canPublishAgent: (serverId) => administers(serverId, AGENT_PUBLISH_CAPABILITY),
         canManageProviderAccounts: (serverId) => administers(serverId, PROVIDER_ACCOUNTS_CAPABILITY),
@@ -2610,6 +2711,14 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             servers={orderedServers}
             serversReady={serverDirectoryState === "ready"}
             agents={agents}
+          />
+          <ShortcutsSync
+            apiUrl={session.apiUrl}
+            userId={session.user.id}
+            servers={orderedServers}
+            serversReady={serverDirectoryState === "ready"}
+            agents={agents}
+            preferences={visiblePreferences}
           />
           <NotificationAvatarSync servers={servers} serversReady={serverDirectoryState === "ready"} agents={agents} />
           {servers.map((server) => (

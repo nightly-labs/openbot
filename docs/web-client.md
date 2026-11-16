@@ -16,8 +16,13 @@ Invitations use the existing Add remote server dialog.
 The conversation accepts an explicit `ConversationRuntime`. Desktop calls still use preload;
 the web adapter uses the authenticated host connection. Browser drafts remain in memory.
 Native-only actions are hidden. Remote browser transport uses the shared desktop browser
-panel through an explicit runtime. Small screens switch between the existing conversation
-and workspace panes. Desktop layout remains unchanged. Browser ownership and stream recovery
+panel through an explicit runtime. On a phone (touch pointer, and a narrow screen or a landscape
+height), the client first shows `WebPhoneAppScreen`, which links to the phone app in the App Store
+and Google Play. A link or a return in the address (invitation, plugin, billing, sign-in) skips
+that screen, because the client removes the link from the address when it reads it. After
+"Continue in browser", which the browser keeps, small screens switch between the existing
+conversation and workspace panes. That phone layout is kept, not extended. Desktop layout remains
+unchanged. Browser ownership and stream recovery
 still require the release checks below.
 
 ## Review scopes
@@ -46,7 +51,7 @@ mock. The separate web preview implements the browser runtime with that same moc
   session start/ticket/end, invitation preview/accept and email, host member and invite
   administration, and the account's display name, avatar, and session list/revoke
   (`v1/me/profile`, `v1/me/avatar`, `v1/me/sessions`), and billing (`v1/me/billing`,
-  `v1/me/billing/portal`), and hosted servers (`v2/hosting/servers` list and create with
+  `v1/me/billing/portal`, `v1/me/billing/storage`), and hosted servers (`v2/hosting/servers` list and create with
   `{name, plan, interval, currency}`, `v2/hosting/plans`, `v2/hosting/servers/:id` delete, and
   `v2/hosting/servers/:id/wake`, `/restart`, `/status`, `/lifecycle` and `/checkout`), and the
   account's hosted site list/delete

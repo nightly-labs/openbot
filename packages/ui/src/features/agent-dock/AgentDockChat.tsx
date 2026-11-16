@@ -15,6 +15,7 @@ import {
   IconButton,
   Maximize2,
   PanelRight,
+  Plus,
   X,
 } from "@openbot/ui";
 import { createMemo, For, onCleanup, Show } from "solid-js";
@@ -117,6 +118,8 @@ export function AgentDockChat(props: {
   onSend: () => void;
   onClose: () => void;
   onRemove: () => void;
+  /** Puts a temporary seat on the dock. */
+  onAdd: () => void;
   onOpenInMain: () => void;
   /** The ⋯ menu shows "Open in new window" only when it is set. */
   onOpenWindow?: (() => void) | undefined;
@@ -295,10 +298,20 @@ export function AgentDockChat(props: {
                 )}
               </Show>
               <DropdownMenu.Separator />
-              <DropdownMenu.Item onSelectAfterClose={() => props.onRemove()}>
-                <PanelRight aria-hidden="true" />
-                {t("agent.dock.remove")}
-              </DropdownMenu.Item>
+              <Show
+                when={props.seat.temporary}
+                fallback={
+                  <DropdownMenu.Item onSelectAfterClose={() => props.onRemove()}>
+                    <PanelRight aria-hidden="true" />
+                    {t("agent.dock.remove")}
+                  </DropdownMenu.Item>
+                }
+              >
+                <DropdownMenu.Item onSelectAfterClose={() => props.onAdd()}>
+                  <Plus aria-hidden="true" />
+                  {t("agent.dock.add")}
+                </DropdownMenu.Item>
+              </Show>
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>

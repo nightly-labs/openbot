@@ -220,7 +220,7 @@ export function createSettingsVoiceStore(active: () => boolean) {
     setState((draft) => {
       draft.speech.settings = next;
     });
-    // In series with the speed saves of the voice panel and the players, so that no save loses another.
+    // In series with the speed saves of the voice pill and the players, so that no save loses another.
     return updateSpeechSettings(voicePort().voice, patch)
       .then((saved) => {
         setState((draft) => {
@@ -388,7 +388,7 @@ export function createSettingsVoiceStore(active: () => boolean) {
           ...(saved ? {} : { failure_code: "update_failed" }),
         }),
       ),
-    /** The speed of replies, shared with the voice panel and the players of spoken replies. */
+    /** The speed of replies, shared with the voice pill and the players of spoken replies. */
     speechSpeed,
     setSpeechSpeed: changeSpeechSpeed,
     listen,

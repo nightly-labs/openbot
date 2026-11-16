@@ -36,15 +36,18 @@ import { ACP_REGISTRY_CAPABILITY } from "@openbot/contracts/team-protocol/acp-re
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { AGENT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-colors-v1";
+import { AGENT_DEFAULTS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-defaults-v1";
 import { AGENT_FAST_MODE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-hidden-v1";
 import { AGENT_INSTRUCTIONS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-instructions-v1";
 import { AGENT_NEW_CHAT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-new-chat-v1";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
+import { AGENT_PENDING_RUNTIME_CAPABILITY } from "@openbot/contracts/team-protocol/agent-pending-runtime-v1";
 import { AGENT_PLAN_CARD_CAPABILITY } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
 import { AGENT_QUEUE_TASK_CAPABILITY } from "@openbot/contracts/team-protocol/agent-queue-task-v1";
 import { AGENT_SESSION_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
+import { AGENT_SPEED_CAPABILITY } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import { AGENT_TASK_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { AGENT_TASK_UI_BLOCKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-task-ui-blocks-v1";
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
@@ -88,6 +91,7 @@ import {
   CHANNEL_PICTURE_CAPABILITY,
   CHANNEL_SEEN_SUBTASKS_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
+  CHANNEL_TASK_WAITS_CAPABILITY,
   COMPUTER_ACTIVITY_CAPABILITY,
   CONNECTORS_CAPABILITY,
   DISCORD_ACCESS_CAPABILITY,
@@ -97,7 +101,9 @@ import {
   HOST_KEY_ROTATION_CAPABILITY,
   HOST_MEMBER_UPDATE_CAPABILITY,
   HOST_RELEASE_CAPABILITY,
+  HOST_RESTART_CAPABILITY,
   HOST_TIMEZONE_CAPABILITY,
+  HOST_TURN_LIMITS_CAPABILITY,
   HOST_UPDATE_CAPABILITY,
   HOSTED_SITES_CAPABILITY,
   INSTANCE_TRANSFER_CAPABILITY,
@@ -132,12 +138,14 @@ import {
   PUSH_NOTIFICATION_THREADS_CAPABILITY,
   PUSH_NOTIFICATIONS_CAPABILITY,
   QUIET_TURN_CAPABILITY,
+  ROUTINE_FLOW_STOP_CAPABILITY,
   ROUTINE_FLOWS_CAPABILITY,
   ROUTINE_RECOVERY_CAPABILITY,
   ROUTINE_RESULTS_CAPABILITY,
   ROUTINE_RUN_PLACE_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
   SIGN_IN_RELAY_CAPABILITY,
+  SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
   SKILL_LEARNING_CAPABILITY,
   SKILLS_ADMIN_CAPABILITY,
   SKILLS_EVENTS_CAPABILITY,
@@ -151,6 +159,7 @@ import {
   TEAM_PROMPT_MULTI_SELECT_CAPABILITY,
   TEAM_SUBAGENTS_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
+  TEAM_USAGE_TERTIARY_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
   type TeamCurrentCapability,
   teamCapabilitiesVisibleToProtocol,
@@ -158,6 +167,7 @@ import {
   VAULT_IMPORT_CAPABILITY,
   VAULT_V2_CAPABILITY,
   VAULT_V3_CAPABILITY,
+  VAULT_V4_CAPABILITY,
   WEBHOOK_SENDER_SECRET_CAPABILITY,
   WEBHOOK_TESTS_CAPABILITY,
   WHATSAPP_CONNECTOR_CAPABILITY,
@@ -166,6 +176,8 @@ import {
   WORKFLOWS_CHANNELS_CAPABILITY,
   WORKFLOWS_CHATS_CAPABILITY,
   WORKFLOWS_GITHUB_CAPABILITY,
+  WORKFLOWS_MEDIA_CAPABILITY,
+  WORKFLOWS_SUNRA_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { CUSTOM_AGENTS_CAPABILITY } from "@openbot/contracts/team-protocol/custom-agents-v1";
 import { CUSTOM_PROVIDER_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
@@ -173,6 +185,11 @@ import { CUSTOM_PROVIDER_HARNESS_CAPABILITY } from "@openbot/contracts/team-prot
 import { FOCUS_USE_INTERVAL_MS } from "@openbot/contracts/team-protocol/focus-use-v1";
 import { GITHUB_SKILLS_CAPABILITY } from "@openbot/contracts/team-protocol/github-skills-v1";
 import { HERMES_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/hermes-import-v1";
+import {
+  HOST_APPEARANCE_CAPABILITY,
+  HOST_APPEARANCE_EVENT,
+  type HostAppearanceEvent,
+} from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
 import {
   HOST_RESTART_EVENT,
@@ -180,6 +197,7 @@ import {
   type HostRestartState,
 } from "@openbot/contracts/team-protocol/host-update-v1";
 import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
+import { LIBRARY_FOLDERS_EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/library-folders-events-v1";
 import { LIBRARY_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/library-folders-v1";
 import { LIVE_VOICE_CAPABILITY } from "@openbot/contracts/team-protocol/live-voice-v1";
 import {
@@ -191,6 +209,8 @@ import { MCP_MANY_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/mc
 import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mistral-code-sign-in-v1";
 import { type OptionalTeamEvent, optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
+import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-code-v1";
+import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
 import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import { PROVIDER_DETECTION_CAPABILITY } from "@openbot/contracts/team-protocol/provider-detection-v1";
@@ -209,6 +229,7 @@ import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sideba
 import { withSkillSuggestionNames } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { STORAGE_CHANNEL_CAPABILITY } from "@openbot/contracts/team-protocol/storage-channel-v1";
 import { STORAGE_DISK_CAPABILITY } from "@openbot/contracts/team-protocol/storage-disk-v1";
+import { STORAGE_USER_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/storage-user-files-v1";
 import {
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
   withUiBlockAutoAnswers,
@@ -217,6 +238,7 @@ import {
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
   withUiBlockVaultRequests,
 } from "@openbot/contracts/team-protocol/ui-block-vault-v1";
+import { USAGE_CREDITS_CAPABILITY } from "@openbot/contracts/team-protocol/usage-credits-v1";
 import {
   TEAM_APP_VERSION_HEADER,
   TEAM_PROTOCOL_V1,
@@ -281,10 +303,12 @@ import { routeAgentAccess } from "./team-api/route-agent-access";
 import {
   routeAgentAdmin,
   routeAgentBackupModels,
+  routeAgentDefaults,
   routeAgentFastMode,
   routeAgentHostSettings,
   routeAgentNewChat,
   routeAgentPlanCard,
+  routeAgentSpeed,
   routeAgentTaskLimit,
 } from "./team-api/route-agent-admin";
 import { agentColorsOf, routeAgentColors, visibleAgentColors } from "./team-api/route-agent-colors";
@@ -296,10 +320,11 @@ import { routeAgentInstructions } from "./team-api/route-agent-instructions";
 import { routeAgentMemoryPage } from "./team-api/route-agent-memories";
 import { routeAgentMemoryLimit } from "./team-api/route-agent-memory-limit";
 import { routeAgentNotificationLevels } from "./team-api/route-agent-notification-levels";
+import { routeAgentPendingRuntime } from "./team-api/route-agent-pending-runtime";
 import { routeAgentPublish } from "./team-api/route-agent-publish";
 import { routeAgentQueueTask } from "./team-api/route-agent-queue-task";
 import { routeAgentSessionSettings } from "./team-api/route-agent-session-settings";
-import { routeAgentTasks } from "./team-api/route-agent-tasks";
+import { agentTasksWireSnapshot, routeAgentTasks } from "./team-api/route-agent-tasks";
 import { routeAgentThreadQueue } from "./team-api/route-agent-thread-queue";
 import {
   routeAgentThreadBranches,
@@ -338,9 +363,12 @@ import { routeFocusUse } from "./team-api/route-focus-use";
 import { routeGithubSkills } from "./team-api/route-github-skills";
 import { routeHermesImport } from "./team-api/route-hermes-import";
 import { routeHostAdmin } from "./team-api/route-host-admin";
+import { routeHostAppearance } from "./team-api/route-host-appearance";
 import { routeHostKeyRotation } from "./team-api/route-host-key-rotation";
 import { routeHostPersonality } from "./team-api/route-host-personality";
+import { routeHostRestart } from "./team-api/route-host-restart";
 import { routeHostTimezone } from "./team-api/route-host-timezone";
+import { routeHostTurnLimits } from "./team-api/route-host-turn-limits";
 import { routeHostUpdate } from "./team-api/route-host-update";
 import { routeHostedSites } from "./team-api/route-hosted-sites";
 import { routeInstanceTransfer } from "./team-api/route-instance-transfer";
@@ -360,8 +388,11 @@ import { routeMessagePins } from "./team-api/route-message-pins";
 import { routeModelVisibility } from "./team-api/route-model-visibility";
 import { routeOnePasswordConnector } from "./team-api/route-onepassword-connector";
 import { routePasswordManagers } from "./team-api/route-password-managers";
+import { routePendingApproval } from "./team-api/route-pending-approval";
 import { routePromptCacheTtl } from "./team-api/route-prompt-cache-ttl";
 import {
+  routeProviderAccountCode,
+  routeProviderAccountKeys,
   routeProviderAccountModels,
   routeProviderAccountPool,
   routeProviderAccounts,
@@ -392,6 +423,7 @@ import { routeSkillsAdmin } from "./team-api/route-skills-admin";
 import { routeStorage } from "./team-api/route-storage";
 import { routeTeam } from "./team-api/route-team";
 import { routeThreadMessageSearch } from "./team-api/route-thread-message-search";
+import { routeUsageCredits } from "./team-api/route-usage-credits";
 import { routeVault } from "./team-api/route-vault";
 import { routeVaultImport } from "./team-api/route-vault-import";
 import { routeWhatsAppConnector } from "./team-api/route-whatsapp-connector";
@@ -791,6 +823,26 @@ export class TeamApiServer {
     for (const [client, connection] of this.#eventClients) this.#sendHostRestart(client, connection);
   }
 
+  /**
+   * Tells every member with `host-appearance-v1` the shape and colour of this server. It is outside
+   * the frozen event vocabulary, so it bypasses the encoders like `host-restart` does.
+   */
+  refreshAppearance(): void {
+    for (const [client, connection] of this.#eventClients) this.#sendHostAppearance(client, connection);
+  }
+
+  #sendHostAppearance(client: Ws.WebSocket, connection: EventClientState): void {
+    if (!connection.capabilities.has(HOST_APPEARANCE_CAPABILITY)) return;
+    const identity = this.#options.store.getIdentity();
+    if (!identity || client.readyState !== webSockets.WebSocket.OPEN) return;
+    const event: HostAppearanceEvent = {
+      type: HOST_APPEARANCE_EVENT,
+      serverId: identity.serverId,
+      appearance: identity.appearance,
+    };
+    client.send(JSON.stringify(event));
+  }
+
   #sendHostRestart(client: Ws.WebSocket, connection: EventClientState): void {
     if (
       !connection.capabilities.has(HOST_UPDATE_CAPABILITY) &&
@@ -1158,7 +1210,11 @@ export class TeamApiServer {
       if ((await routeProviderAccounts(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderAccountModels(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderAccountPool(context, this.#options.providerAccounts)) === "handled") return;
+      if ((await routeProviderAccountKeys(context, this.#options.providerAccounts)) === "handled") return;
+      if ((await routeProviderAccountCode(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderUsageReset(context, this.#options.providerUsageResets)) === "handled") return;
+      if ((await routeUsageCredits(context, this.#options.agents, this.#options.providerAccounts)) === "handled")
+        return;
       if ((await routeProviderSignOut(context, this.#options.providerSignOut)) === "handled") return;
       if (
         (await routeStorage(
@@ -1180,7 +1236,9 @@ export class TeamApiServer {
       if ((await routeAgentTaskLimit(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentNewChat(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentPlanCard(context, this.#options.admin, hidden)) === "handled") return;
+      if ((await routeAgentDefaults(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentFastMode(context, this.#options.admin, hidden)) === "handled") return;
+      if ((await routeAgentSpeed(context, this.#options.admin, hidden)) === "handled") return;
       if (
         (await routeBrowserProfiles(context, this.#options.browserProfiles, this.#options.browser, hidden)) ===
         "handled"
@@ -1232,6 +1290,7 @@ export class TeamApiServer {
       if ((await routeAgentThreadQueue(context, this.#options.agentTasks, this.#options.agents, hidden)) === "handled")
         return;
       if ((await routeAgentUsageLimit(context, this.#options.agents, hidden)) === "handled") return;
+      if ((await routeAgentPendingRuntime(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeAgentThreads(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentThreadReads(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentThreadFiles(context, this.#options.agentTasks, hidden)) === "handled") return;
@@ -1248,8 +1307,11 @@ export class TeamApiServer {
       if ((await routeProviders(context, this.#options.admin)) === "handled") return;
       if ((await routeProviderUse(context, this.#options.admin)) === "handled") return;
       if ((await routeHostAdmin(context, this.#options.admin)) === "handled") return;
+      if ((await routeHostAppearance(context, this.#options.admin)) === "handled") return;
       if ((await routeHostUpdate(context, this.#options.admin)) === "handled") return;
       if ((await routeHostTimezone(context, this.#options.admin)) === "handled") return;
+      if ((await routeHostTurnLimits(context, this.#options.admin)) === "handled") return;
+      if ((await routeHostRestart(context, this.#options.admin)) === "handled") return;
       if ((await routeHostPersonality(context, this.#options.admin)) === "handled") return;
       if ((await routeHostKeyRotation(context, this.#options.admin)) === "handled") return;
       if ((await routeLocalServers(context, this.#options.admin)) === "handled") return;
@@ -1281,6 +1343,7 @@ export class TeamApiServer {
       if ((await routeContextReset(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeContextCompact(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeAgentWaits(context, this.#options.agents, hidden)) === "handled") return;
+      if ((await routePendingApproval(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeMessagePins(context, this.#options.agents, this.#options.agentTasks, hidden)) === "handled")
         return;
       if ((await routeMessageDelete(context, this.#options.agents, this.#options.channels, hidden)) === "handled")
@@ -1509,6 +1572,8 @@ export class TeamApiServer {
         // Only the V8 encoder reads them.
         browserSignIn: capabilities.has(BROWSER_SIGN_IN_CAPABILITY),
         contextUsage: capabilities.has(TEAM_CONTEXT_USAGE_CAPABILITY),
+        usageTertiary: capabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
+        agentPendingRuntime: capabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
         // Only the V7 and V8 encoders read them.
         uiBlocks: capabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
         subagents: capabilities.has(TEAM_SUBAGENTS_CAPABILITY),
@@ -1704,7 +1769,9 @@ export class TeamApiServer {
                         ...event,
                         snapshot: conversationSnapshotForCapabilities(event.snapshot, connection.capabilities),
                       }
-                    : event,
+                    : event.type === "agent-tasks-changed"
+                      ? { ...event, snapshot: agentTasksWireSnapshot(event.snapshot) }
+                      : event,
                   { agentTaskUiBlocks: connection.capabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY) },
                 );
       } catch (error) {
@@ -1980,6 +2047,7 @@ export class TeamApiServer {
             const machineAlertsWereSent = connection.capabilities.has(MACHINE_RESOURCES_CAPABILITY);
             const colorsWereSent = connection.capabilities.has(AGENT_COLORS_CAPABILITY);
             const chatColorsWereSent = connection.capabilities.has(CHAT_COLORS_CAPABILITY);
+            const appearanceWasSent = connection.capabilities.has(HOST_APPEARANCE_CAPABILITY);
             connection.capabilities = new Set(event.capabilities.filter(isTeamCurrentCapability));
             if (connection.capabilities.has("agent-runtime-snapshots") && !snapshotsWereEnabled) {
               this.#sendRuntimeSnapshot(client, connection, false);
@@ -1998,6 +2066,8 @@ export class TeamApiServer {
               this.#sendChatColors(client, connection, this.#chatColors(), true);
             // An alert that came while the member had no device online.
             if (!machineAlertsWereSent) this.#sendPendingMachineAlerts(client, connection);
+            // The shape and colour can change while a client has no event connection.
+            if (!appearanceWasSent) this.#sendHostAppearance(client, connection);
           }
           connection.includeConversationEvents = event.includeConversations;
           return;
@@ -2284,12 +2354,15 @@ export class TeamApiServer {
       channelPicture: route.capabilities.has(CHANNEL_PICTURE_CAPABILITY),
       channelBrowser: route.capabilities.has(CHANNEL_BROWSER_CAPABILITY),
       channelSeenSubtasks: route.capabilities.has(CHANNEL_SEEN_SUBTASKS_CAPABILITY),
+      channelTaskWaits: route.capabilities.has(CHANNEL_TASK_WAITS_CAPABILITY),
       mcpManyServers: route.capabilities.has(MCP_MANY_SERVERS_CAPABILITY),
       agentTaskUiBlocks: route.capabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY),
       uiBlocks: route.capabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
       subagents: route.capabilities.has(TEAM_SUBAGENTS_CAPABILITY),
       promptMultiSelect: route.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
       videoGeneration: route.capabilities.has(TEAM_VIDEO_GENERATION_CAPABILITY),
+      usageTertiary: route.capabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
+      agentPendingRuntime: route.capabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
     };
     // The body is encoded before the head is written. A response the negotiated protocol cannot
     // represent - a route its frozen adapter does not classify - makes the encoder throw, and with
@@ -2520,7 +2593,7 @@ export class TeamApiServer {
             return this.#options.mcpServers !== undefined && this.#options.mcpAccess !== undefined;
           if (capability === MCP_SIGN_IN_APP_CAPABILITY)
             return this.#options.mcpServers !== undefined && this.#options.mcpSignIns !== undefined;
-          if (capability === SIGN_IN_RELAY_CAPABILITY)
+          if (capability === SIGN_IN_RELAY_CAPABILITY || capability === SIGN_IN_RELAY_DEEP_LINK_CAPABILITY)
             return this.#options.mcpServers !== undefined && this.#options.signInRelay !== undefined;
           if (capability === PROVIDER_ACCOUNT_RELAY_CAPABILITY || capability === PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY)
             return (
@@ -2540,15 +2613,20 @@ export class TeamApiServer {
           if (capability === VAULT_IMPORT_CAPABILITY) return this.#options.vault !== undefined;
           if (capability === VAULT_V2_CAPABILITY) return this.#options.vault !== undefined;
           if (capability === VAULT_V3_CAPABILITY) return this.#options.vault !== undefined;
+          if (capability === VAULT_V4_CAPABILITY) return this.#options.vault !== undefined;
           if (capability === PROVIDER_HOST_SIGN_IN_CAPABILITY) return this.#options.providerHostSignIns !== undefined;
           if (capability === PROVIDER_ACCOUNTS_CAPABILITY) return this.#options.providerAccounts !== undefined;
           if (capability === PROVIDER_ACCOUNT_MODELS_CAPABILITY) return this.#options.providerAccounts !== undefined;
           if (capability === PROVIDER_ACCOUNT_POOL_CAPABILITY) return this.#options.providerAccounts !== undefined;
+          if (capability === PROVIDER_ACCOUNT_KEYS_CAPABILITY) return this.#options.providerAccounts !== undefined;
+          if (capability === PROVIDER_ACCOUNT_CODE_CAPABILITY) return this.#options.providerAccounts !== undefined;
           if (capability === PROVIDER_USAGE_RESET_CAPABILITY) return this.#options.providerUsageResets !== undefined;
           if (capability === PROVIDER_SIGN_OUT_CAPABILITY) return this.#options.providerSignOut !== undefined;
           if (capability === STORAGE_CAPABILITY) return this.#options.storage !== undefined;
           if (capability === STORAGE_DISK_CAPABILITY) return this.#options.storage !== undefined;
-          if (capability === LIBRARY_FOLDERS_CAPABILITY) return this.#options.libraryFolders !== undefined;
+          if (capability === STORAGE_USER_FILES_CAPABILITY) return this.#options.storage !== undefined;
+          if (capability === LIBRARY_FOLDERS_CAPABILITY || capability === LIBRARY_FOLDERS_EVENTS_CAPABILITY)
+            return this.#options.libraryFolders !== undefined;
           if (capability === STORAGE_CHANNEL_CAPABILITY)
             return this.#options.storage !== undefined && this.#options.channels !== undefined;
           if (capability === MACHINE_RESOURCES_CAPABILITY) return this.#options.machine !== undefined;
@@ -2584,7 +2662,9 @@ export class TeamApiServer {
           if (capability === AGENT_TASK_LIMIT_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
           if (capability === AGENT_NEW_CHAT_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
           if (capability === AGENT_PLAN_CARD_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
+          if (capability === AGENT_DEFAULTS_CAPABILITY) return this.#options.admin?.agentDefaults !== undefined;
           if (capability === AGENT_FAST_MODE_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
+          if (capability === AGENT_SPEED_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
           if (
             capability === BROWSER_PROFILES_CAPABILITY ||
             capability === BROWSER_PROFILES_EVENTS_CAPABILITY ||
@@ -2623,8 +2703,11 @@ export class TeamApiServer {
           if (capability === PROVIDERS_SIGN_IN_V3_CAPABILITY)
             return this.#options.admin?.providers?.pasteSignIn === true;
           if (capability === HOST_ADMIN_CAPABILITY) return this.#options.admin?.identity !== undefined;
+          if (capability === HOST_APPEARANCE_CAPABILITY) return this.#options.admin?.identity !== undefined;
           if (capability === HOST_RELEASE_CAPABILITY) return this.#options.admin?.release !== undefined;
           if (capability === HOST_TIMEZONE_CAPABILITY) return this.#options.admin?.timezone !== undefined;
+          if (capability === HOST_TURN_LIMITS_CAPABILITY) return this.#options.admin?.turnLimits !== undefined;
+          if (capability === HOST_RESTART_CAPABILITY) return this.#options.admin?.restart !== undefined;
           if (capability === HOST_PERSONALITY_CAPABILITY) return this.#options.admin?.personality !== undefined;
           if (capability === HOST_KEY_ROTATION_CAPABILITY) return this.#options.admin?.hostKey !== undefined;
           if (capability === LOCAL_SERVERS_CAPABILITY) return this.#options.admin?.localServers !== undefined;
@@ -2660,8 +2743,11 @@ export class TeamApiServer {
             return this.#options.instanceTransfer !== undefined;
           if (capability === LIVE_ACTIVITY_PUSH_CAPABILITY) return this.#options.liveActivityPush !== undefined;
           if (capability === ROUTINE_FLOWS_CAPABILITY) return this.#options.routineFlows !== undefined;
+          if (capability === ROUTINE_FLOW_STOP_CAPABILITY) return this.#options.routineFlows !== undefined;
           if (capability === WORKFLOWS_CAPABILITY) return this.#options.workflows !== undefined;
           if (capability === WORKFLOWS_GITHUB_CAPABILITY) return this.#options.workflows?.github !== undefined;
+          if (capability === WORKFLOWS_MEDIA_CAPABILITY) return this.#options.workflows !== undefined;
+          if (capability === WORKFLOWS_SUNRA_CAPABILITY) return this.#options.workflows !== undefined;
           // The workflow store posts a chat-channel output into this host's channels.
           if (capability === WORKFLOWS_CHANNELS_CAPABILITY) return this.#options.workflows !== undefined;
           // The chats and workspaces of Telegram and Slack nodes come from the routine-results options.
@@ -2842,6 +2928,8 @@ function eventCapability(event: AgentEvent): TeamCurrentCapability | null {
   if (event.type === "workflows-changed") return WORKFLOWS_CAPABILITY;
   if (event.type === "vault-changed") return VAULT_CAPABILITY;
   if (event.type === "browser-profiles-changed") return BROWSER_PROFILES_EVENTS_CAPABILITY;
+  if (event.type === "library-folders-changed") return LIBRARY_FOLDERS_EVENTS_CAPABILITY;
+  if (event.type === "usage-credits-changed") return USAGE_CREDITS_CAPABILITY;
   if (event.type === "turn-progress") return TEAM_AGENT_ACTIVITY_CAPABILITY;
   if (event.type === "runtime-snapshot") return "agent-runtime-snapshots";
   if (event.type === "sidebar-layout-changed") return "sidebar-layout";

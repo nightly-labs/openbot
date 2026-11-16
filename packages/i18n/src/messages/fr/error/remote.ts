@@ -25,6 +25,8 @@ export const messages = {
   "error.remote.testActive": "Un test du bureau à distance est en cours. Réessayez quand il sera terminé.",
   "error.remote.screenRecordingDenied":
     "L’hôte n’a pas autorisé OpenBot à enregistrer son écran. Autorisez l’enregistrement de l’écran sur l’hôte, puis réessayez.",
+  "error.remote.windowsSessionDisconnected":
+    "La session Windows de l’hôte est déconnectée : elle n’a aucun écran à partager. Connectez-vous à Windows sur l’écran de l’hôte, puis réessayez.",
   "error.remote.teamSessionExpired": "La session de l’équipe a expiré.",
   "error.remote.finishTestBeforeSwitch": "Terminez le test du bureau à distance avant de changer d’écran.",
   "error.remote.displayNotFound": "Écran distant introuvable.",

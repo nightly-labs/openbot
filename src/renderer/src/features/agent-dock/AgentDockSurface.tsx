@@ -250,8 +250,19 @@ export function AgentDockSurface() {
     (presentation()?.seats ?? []).map(
       (seat): AgentDockSeat =>
         seat.kind === "agent"
-          ? { kind: "agent", agent: seat.agent, mood: seat.mood, state: seat.state ?? undefined }
-          : { kind: "channel", channel: uiChannel(seat.channel), state: seat.state ?? undefined },
+          ? {
+              kind: "agent",
+              agent: seat.agent,
+              mood: seat.mood,
+              state: seat.state ?? undefined,
+              temporary: seat.temporary,
+            }
+          : {
+              kind: "channel",
+              channel: uiChannel(seat.channel),
+              state: seat.state ?? undefined,
+              temporary: seat.temporary,
+            },
     ),
   );
   const availableChannels = createMemo(() => (presentation()?.availableChannels ?? []).map(uiChannel));

@@ -70,6 +70,18 @@ const Navigation = createSimpleContext({
      */
     function selectAgent(agentId: string, tabId?: string): boolean {
       if (agentSetupOpen() && creatingAgent()) return false;
+      return openAgent(agentId, tabId);
+    }
+
+    /**
+     * Opens the agent that the setup form just made. The form is still open and creating until the
+     * update ends, so the guard of `selectAgent` would stop this open.
+     */
+    function openCreatedAgent(agentId: string): boolean {
+      return openAgent(agentId);
+    }
+
+    function openAgent(agentId: string, tabId?: string): boolean {
       // The tab is written first, so a chat window that opens for the agent reads it.
       if (tabId !== undefined) agentThreads.open(agentId, tabId);
       // A chat window shows its one chat, and main marks that chat in the sidebar. Another agent
@@ -302,6 +314,7 @@ const Navigation = createSimpleContext({
 
     return {
       selectAgent,
+      openCreatedAgent,
       selectDirectMember,
       openAgentMessage,
       messageFocusRequest,

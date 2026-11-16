@@ -251,6 +251,7 @@ export const messages = {
     "서버가 중지된 후 다시 시작돼요. 약 1분 정도 걸려요. 실행 중인 에이전트 턴이 중지되고, 서버가 돌아올 때까지 멤버의 연결이 끊겨요. 파일과 채팅은 그대로 유지돼요.",
   "mobile.server.settings.restartConfirm": "다시 시작",
   "mobile.server.settings.restarted": "{name}을(를) 다시 시작하는 중이에요",
+  "mobile.server.settings.restartUnsupported": "여기에서 다시 시작하려면 이 서버의 OpenBot을 업데이트해 주세요.",
   "mobile.server.settings.leaveTitle": "{name}에서 나갈까요?",
   "mobile.server.settings.leaveBody": "다시 참여하려면 새 초대가 필요해요.",
   "mobile.server.settings.leave": "서버 나가기",
@@ -274,6 +275,13 @@ export const messages = {
   "mobile.server.settings.identityUnsupported":
     "여기에서 이름과 로고를 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
   "mobile.server.settings.identityOffline": "서버 이름과 로고를 변경하려면 이 서버에 연결하세요.",
+  "mobile.server.settings.appearance": "모양과 색상",
+  "mobile.server.settings.appearanceShape": "모양",
+  "mobile.server.settings.appearanceShapeOption": "모양 {number}",
+  "mobile.server.settings.appearanceColor": "서버 색상",
+  "mobile.server.settings.appearanceAutomatic": "자동",
+  "mobile.server.settings.appearanceReset": "초기화",
+  "mobile.server.settings.appearanceSaveFailed": "서버 모양과 색상을 저장하지 못했어요. 다시 시도해 주세요.",
   "mobile.server.route.cropLogo": "로고 자르기",
   "mobile.server.members.remove": "멤버 삭제",
   "mobile.server.members.invitePeople": "사람 초대",
@@ -365,6 +373,34 @@ export const messages = {
   "mobile.server.library.noMatches": "일치하는 파일이 없어요",
   "mobile.server.library.showInChat": "채팅에서 보기",
   "mobile.server.library.share": "공유",
+  "mobile.server.library.folders.title": "폴더",
+  "mobile.server.library.folders.allFiles": "모든 파일",
+  "mobile.server.library.folders.removedAgents": "삭제된 에이전트",
+  "mobile.server.library.folders.notInFolder": "폴더 없음",
+  "mobile.server.library.folders.path": "폴더: {path}",
+  "mobile.server.library.folders.pathHint": "폴더를 표시합니다",
+  "mobile.server.library.folders.new": "새 폴더",
+  "mobile.server.library.folders.name": "폴더 이름",
+  "mobile.server.library.folders.inFolder": "{name} 안",
+  "mobile.server.library.folders.create": "만들기",
+  "mobile.server.library.folders.rename": "이름 변경",
+  "mobile.server.library.folders.renameTitle": "폴더 이름 변경",
+  "mobile.server.library.folders.save": "저장",
+  "mobile.server.library.folders.delete": "폴더 삭제",
+  "mobile.server.library.folders.deleteTitle": "‘{name}’을(를) 삭제할까요?",
+  "mobile.server.library.folders.deleteBody": "안에 있는 폴더도 삭제됩니다. 파일은 에이전트에 남습니다.",
+  "mobile.server.library.folders.moveTo": "폴더로 이동",
+  "mobile.server.library.folders.actions": "{name} 작업",
+  "mobile.server.library.folders.expand": "{name} 폴더 표시",
+  "mobile.server.library.folders.collapse": "{name} 폴더 숨기기",
+  "mobile.server.library.folders.emptyTitle": "이 폴더에 파일이 없습니다",
+  "mobile.server.library.folders.emptyBody": "{agent}은(는) 폴더 경로 {path}로 여기에 파일을 저장할 수 있습니다.",
+  "mobile.server.library.folders.loadFailed": "폴더를 불러올 수 없습니다",
+  "mobile.server.library.folders.changeFailed": "폴더를 변경할 수 없어요",
+  "mobile.server.library.folders.gone": "이 폴더는 더 이상 서버에 없습니다.",
+  "mobile.server.library.folders.fileGone": "이 파일은 더 이상 서버에 없거나 이동할 수 없습니다.",
+  "mobile.server.library.folders.unsupported":
+    "이 서버의 라이브러리에는 폴더가 없습니다. 사용하려면 서버를 업데이트하세요.",
   "mobile.server.route.providers": "제공자",
   "mobile.server.route.provider": "제공자",
   "mobile.server.route.providerModels": "모델",
@@ -706,6 +742,8 @@ export const messages = {
     "OpenBot이 {host}에 저장된 토큰을 읽을 수 없어요. 워크스페이스 연결을 해제한 다음 다시 연결해 주세요.",
   "mobile.server.connectors.slack.helpRelay":
     "{host}의 OpenBot이 Slack 이벤트를 받을 수 없어요. {host}에서 로그인하고, 서버 설정에서 서버 이름을 지정한 다음 OpenBot을 계속 실행해 두세요.",
+  "mobile.server.connectors.slack.helpNotLinked":
+    "이 워크스페이스는 {host}에 연결되어 있지 않습니다. 연결하려면 다시 연결을 누르세요.",
   "mobile.server.connectors.slack.orchestratorTitle": "Slack Orchestrator",
   "mobile.server.connectors.slack.orchestratorDescription":
     "이 에이전트가 Slack의 모든 요청을 받아요. 짧은 요청은 직접 답변하고, 다른 작업은 알맞은 에이전트에게 맡긴 다음 스레드에 답변을 게시해요.",
@@ -748,6 +786,8 @@ export const messages = {
     "OpenBot이 {host}에 저장된 토큰을 읽을 수 없어요. Discord 서버 연결을 해제한 다음 다시 연결해 주세요.",
   "mobile.server.connectors.discord.helpRelay":
     "{host}의 OpenBot이 Discord 이벤트를 받을 수 없어요. {host}에서 로그인하고, 서버 설정에서 서버 이름을 지정한 다음 OpenBot을 계속 실행해 두세요.",
+  "mobile.server.connectors.discord.helpNotLinked":
+    "이 Discord 서버는 {host}에 연결되어 있지 않습니다. 연결하려면 다시 연결을 누르세요.",
   "mobile.server.connectors.discord.orchestratorTitle": "Discord Orchestrator",
   "mobile.server.connectors.discord.orchestratorDescription":
     "이 에이전트가 Discord의 모든 요청을 받아요. 짧은 요청은 직접 답변하고, 다른 작업은 알맞은 에이전트에게 맡긴 다음 채널에 답장으로 답변해요.",
@@ -780,6 +820,8 @@ export const messages = {
     "{host}의 OpenBot이 Telegram 메시지를 받을 수 없어요. {host}에서 로그인하고, 서버 설정에서 서버 이름을 지정한 다음 OpenBot을 계속 실행해 두세요.",
   "mobile.server.connectors.telegram.helpError":
     "OpenBot이 이 채팅에 접근할 수 없어요. 다시 연결하거나 채팅 연결을 해제하세요.",
+  "mobile.server.connectors.telegram.helpNotLinked":
+    "이 채팅은 {host}에 연결되어 있지 않습니다. 연결하려면 다시 연결을 누르세요.",
   "mobile.server.connectors.telegram.retryAt": "Telegram이 OpenBot에 대기를 요청했어요. {time}에 다시 시도해요.",
   "mobile.server.connectors.telegram.linkTitle": "채팅 연결",
   "mobile.server.connectors.telegram.linkAnother": "다른 채팅 연결",
@@ -816,6 +858,8 @@ export const messages = {
     "WhatsApp이 연결된 기기에서 이 서버를 삭제했어요. 번호를 다시 연결해 주세요.",
   "mobile.server.connectors.whatsapp.helpError":
     "OpenBot이 이 번호로 WhatsApp에 접근할 수 없어요. 다시 연결하거나 번호 연결을 해제해 주세요.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "OpenBot이 이 번호에 저장된 키를 읽을 수 없어요. 번호를 다시 연결해 주세요.",
   "mobile.server.connectors.whatsapp.retryAt": "WhatsApp이 OpenBot에 기다리라고 요청했어요. {time}에 다시 시도해요.",
   "mobile.server.connectors.whatsapp.linkAgain": "다시 연결",
   "mobile.server.connectors.whatsapp.ownNumber": "개인 번호",
@@ -999,6 +1043,13 @@ export const messages = {
   "mobile.server.providers.status.ready": "설치됨",
   "mobile.server.providers.status.notInstalled": "설치 안 됨",
   "mobile.server.providers.status.checking": "확인 중",
+  "mobile.server.providers.accountsKeyHint":
+    "에이전트마다 계정 하나를 사용해요. 에이전트 설정에서 선택하세요. 새 계정에는 해당 계정의 API 키가 필요해요.",
+  "mobile.server.providers.accountChangeKey": "키 변경",
+  "mobile.server.providers.accountKeyHint":
+    "{provider} 계정의 API 키를 붙여넣으세요. 키는 서버로 전송돼요. 이 휴대폰에는 저장되지 않아요.",
+  "mobile.server.providers.accountKeyChecking": "키 확인 중…",
+  "mobile.server.providers.accountKeyAddFailed": "계정을 추가하지 못했어요. 다시 시도해 주세요.",
   "mobile.server.providers.pool": "계정 풀 사용",
   "mobile.server.providers.poolHint":
     "에이전트는 사용량 한도에 가까워질 때까지 한 계정을 쓰고, 그다음 한도가 가장 먼저 초기화되는 계정을 써요.",
@@ -1444,6 +1495,7 @@ export const messages = {
   "mobile.server.route.transfer": "이전",
   "mobile.server.route.transferExport": "내보내기",
   "mobile.server.route.transferImport": "가져오기",
+  "mobile.server.route.transferCopy": "다른 서버로 복사",
   "mobile.server.transfer.unsupported": "여기서 이전하려면 이 서버의 OpenBot을 업데이트하세요.",
   "mobile.server.transfer.unavailable": "이전하려면 소유자나 관리자로 이 서버에 연결하세요.",
   "mobile.server.transfer.title": "이 서버를 다른 컴퓨터로 옮기기",
@@ -1505,4 +1557,17 @@ export const messages = {
     "이 제공자들은 다른 서버에서 로그인되어 있었지만 여기서는 로그인되어 있지 않아요. 서버 설정 › 제공자에서 로그인하세요.",
   "mobile.server.transfer.notImported": "가져오지 않음",
   "mobile.server.transfer.warnings": "확인 필요",
+  "mobile.server.transfer.copy": "다른 서버로 복사",
+  "mobile.server.transfer.copyNote": "에이전트를 내 다른 서버로 보내요.",
+  "mobile.server.transfer.copyTo": "받을 곳",
+  "mobile.server.transfer.copyNoAgents": "이 서버에는 에이전트가 없어요.",
+  "mobile.server.transfer.copyNotMoved":
+    "에이전트의 채널과 공유 폴더도 복사돼요. API 키, 로그인, 커넥터, 채팅 기록은 복사되지 않아요. 다른 서버에서 다시 설정하세요.",
+  "mobile.server.transfer.copySubmit": { other: "에이전트 {count}개 복사" },
+  "mobile.server.transfer.copying": "복사하는 중…",
+  "mobile.server.transfer.copyFailed": "복사를 완료하지 못했어요.",
+  "mobile.server.transfer.copied": { other: "에이전트 {count}개를 {server}에 복사했어요." },
+  "mobile.server.transfer.copyAgents": "복사할 에이전트",
+  "mobile.server.transfer.copyNext": "복사한 에이전트는 {server}의 승인 규칙을 사용해요.",
+  "mobile.server.transfer.copyNoServer": "에이전트를 복사하려면 소유자나 관리자로 다른 서버에 연결하세요.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -8,7 +8,11 @@ export const messages = {
   "status.agent.instructionsChanged": "Zaktualizował swoje instrukcje",
   "status.agent.modelSwitchedForLimit": "Osiągnięto limit użycia. Przełączono na {model}.",
   "status.agent.modelReturnedAfterLimit": "Limit użycia już nie obowiązuje. Przełączono z powrotem na {model}.",
+  "status.agent.routineSkippedRunOpen": "Pominięto: poprzednie uruchomienie jeszcze się nie zakończyło",
+  "status.agent.routineSkippedUsageLimit": "Pominięto: osiągnięto limit użycia",
   "status.agent.modelSwitchedForError": "Błąd dostawcy. Przełączono na {model}.",
+  "status.agent.modelSwitchedForSpentBalance":
+    "{previous} nie ma już kredytów. Przełączono na {model}. Aby znowu go używać, dodaj kredyty, a potem go wybierz.",
   "status.agent.modelReturnedAfterError": "Po błędzie dostawcy przełączono z powrotem na {model}.",
   "status.agent.marketplaceSuggested": "Zaproponowano aplikację z Marketplace: {app}.",
   "status.agent.channelMemberAdded": "Agent {agent} dodał {member} do kanału. Prośba od: {person}.",
@@ -35,6 +39,14 @@ export const messages = {
   "status.agent.serverInstallCommand":
     "Utwórz jednorazowe polecenie, które instaluje OpenBot na innym komputerze jako serwer {name} i loguje go do Twojego konta. Agent uruchamia je tam.",
   "status.agent.serverInstallCard": "Polecenie instalacji dla serwera {name}",
+  "status.agent.browserProfileNamed":
+    "Przenieś {agents} do profilu przeglądarki {profile}. Otrzymają jego logowania i pliki cookie. Ich otwarte karty zostaną zamknięte.",
+  "status.agent.browserProfileNew":
+    "Utwórz nowy profil przeglądarki {profile} i przenieś do niego {agents}. Nie ma w nim logowań. Ich otwarte karty zostaną zamknięte.",
+  "status.agent.browserProfileShared":
+    "Przenieś {agents} do wspólnego profilu przeglądarki. Otrzymają jego logowania i pliki cookie. Ich otwarte karty zostaną zamknięte.",
+  "status.agent.browserProfileOwn":
+    "Daj każdemu z {agents} własny profil przeglądarki. Ich otwarte karty zostaną zamknięte.",
   "status.agent.feedbackSending": "Wysyłanie opinii do zespołu OpenBot…",
   "status.agent.workflowDelete":
     "Usuń przepływ pracy {title} razem z jego uruchomieniami i wersjami. Jego otwarte kroki zostaną zatrzymane.",
@@ -86,6 +98,7 @@ export const messages = {
   "status.agent.memoryChanges": "Wspomnienia: zapisane {saved}, zaktualizowane {updated}, zapomniane {forgotten}.",
   "status.agent.memoryChangesWithConflicts":
     "Wspomnienia: zapisane {saved}, zaktualizowane {updated}, zapomniane {forgotten}, niezmienione {notChanged}, bo inny wątek zmienił je wcześniej.",
+  "status.agent.mcpToolCall": "Uruchomić narzędzie {tool} serwera MCP {name}.",
   "status.agent.nextStepContinues": "Agent zatrzymał się przed następnym krokiem. Kontynuuje ({current} z {limit}).",
   "status.agent.planContinues": "Plan ma otwarte kroki. Agent kontynuuje ({current} z {limit}).",
   "status.agent.compactionContinues": "Połączenie przerwało się, gdy agent kompaktował kontekst. Agent kontynuuje.",

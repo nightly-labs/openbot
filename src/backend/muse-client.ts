@@ -505,9 +505,9 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
         id,
         tools,
         () => this.#threads.get(id)?.turn?.id ?? null,
-        (call, signal) =>
+        (call, signal, detachAfterMs) =>
           this.#requests
-            .call("item/tool/call", call, signal)
+            .call("item/tool/call", call, signal, detachAfterMs)
             .pipe(
               Effect.flatMap((value) =>
                 isToolResult(value)

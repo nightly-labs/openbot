@@ -299,6 +299,7 @@ export const messages = {
     "Сервер остановится и запустится снова. Это займёт около минуты. Текущие ходы агентов остановятся, а участники потеряют соединение, пока сервер не вернётся. Файлы и чаты сохранятся.",
   "mobile.server.settings.restartConfirm": "Перезапустить",
   "mobile.server.settings.restarted": "{name} перезапускается",
+  "mobile.server.settings.restartUnsupported": "Обновите OpenBot на этом сервере, чтобы перезапускать его отсюда.",
   "mobile.server.settings.leaveTitle": "Покинуть «{name}»?",
   "mobile.server.settings.leaveBody": "Чтобы присоединиться снова, понадобится новое приглашение.",
   "mobile.server.settings.leave": "Покинуть сервер",
@@ -323,6 +324,13 @@ export const messages = {
   "mobile.server.settings.identityUnsupported":
     "Обновите OpenBot на этом сервере, чтобы менять его название и логотип здесь.",
   "mobile.server.settings.identityOffline": "Подключитесь к серверу, чтобы изменить его название и логотип.",
+  "mobile.server.settings.appearance": "Форма и цвет",
+  "mobile.server.settings.appearanceShape": "Форма",
+  "mobile.server.settings.appearanceShapeOption": "Форма {number}",
+  "mobile.server.settings.appearanceColor": "Цвет сервера",
+  "mobile.server.settings.appearanceAutomatic": "Автоматически",
+  "mobile.server.settings.appearanceReset": "Сбросить",
+  "mobile.server.settings.appearanceSaveFailed": "Не удалось сохранить форму и цвет сервера. Повторите попытку.",
   "mobile.server.route.cropLogo": "Кадрирование логотипа",
   "mobile.server.members.remove": "Удалить участника",
   "mobile.server.members.invitePeople": "Пригласить людей",
@@ -427,6 +435,34 @@ export const messages = {
   "mobile.server.library.noMatches": "Подходящих файлов нет",
   "mobile.server.library.showInChat": "Показать в чате",
   "mobile.server.library.share": "Поделиться",
+  "mobile.server.library.folders.title": "Папки",
+  "mobile.server.library.folders.allFiles": "Все файлы",
+  "mobile.server.library.folders.removedAgents": "Удалённые агенты",
+  "mobile.server.library.folders.notInFolder": "Вне папок",
+  "mobile.server.library.folders.path": "Папка: {path}",
+  "mobile.server.library.folders.pathHint": "Показывает папки",
+  "mobile.server.library.folders.new": "Новая папка",
+  "mobile.server.library.folders.name": "Имя папки",
+  "mobile.server.library.folders.inFolder": "В папке {name}",
+  "mobile.server.library.folders.create": "Создать",
+  "mobile.server.library.folders.rename": "Переименовать",
+  "mobile.server.library.folders.renameTitle": "Переименовать папку",
+  "mobile.server.library.folders.save": "Сохранить",
+  "mobile.server.library.folders.delete": "Удалить папку",
+  "mobile.server.library.folders.deleteTitle": "Удалить «{name}»?",
+  "mobile.server.library.folders.deleteBody": "Вложенные папки тоже будут удалены. Файлы останутся у агента.",
+  "mobile.server.library.folders.moveTo": "Переместить в папку",
+  "mobile.server.library.folders.actions": "Действия для {name}",
+  "mobile.server.library.folders.expand": "Показать папки {name}",
+  "mobile.server.library.folders.collapse": "Скрыть папки {name}",
+  "mobile.server.library.folders.emptyTitle": "В этой папке нет файлов",
+  "mobile.server.library.folders.emptyBody": "{agent} может сохранять сюда файлы по пути {path}.",
+  "mobile.server.library.folders.loadFailed": "Не удалось загрузить папки",
+  "mobile.server.library.folders.changeFailed": "Не удалось изменить папки",
+  "mobile.server.library.folders.gone": "Этой папки больше нет на сервере.",
+  "mobile.server.library.folders.fileGone": "Этого файла больше нет на сервере, или вы не можете его переместить.",
+  "mobile.server.library.folders.unsupported":
+    "На этом сервере нет папок в Библиотеке. Обновите сервер, чтобы ими пользоваться.",
   "mobile.server.route.providers": "Провайдеры",
   "mobile.server.route.provider": "Провайдер",
   "mobile.server.route.providerModels": "Модели",
@@ -835,6 +871,8 @@ export const messages = {
     "OpenBot не может прочитать сохранённые токены на {host}. Отключите рабочее пространство и подключите его снова.",
   "mobile.server.connectors.slack.helpRelay":
     "OpenBot на {host} не может получать события Slack. На {host} войдите в аккаунт, задайте серверу имя в настройках сервера и не закрывайте OpenBot.",
+  "mobile.server.connectors.slack.helpNotLinked":
+    "Это рабочее пространство не связано с {host}. Нажмите «Переподключить», чтобы связать его.",
   "mobile.server.connectors.slack.orchestratorTitle": "Оркестратор Slack",
   "mobile.server.connectors.slack.orchestratorDescription":
     "Этот агент получает все запросы из Slack. Короткие он обрабатывает сам, остальную работу передаёт нужному агенту и публикует ответ в ветке.",
@@ -882,6 +920,8 @@ export const messages = {
     "OpenBot не может прочитать сохранённые токены на {host}. Отключите сервер Discord и подключите его снова.",
   "mobile.server.connectors.discord.helpRelay":
     "OpenBot на {host} не может получать события Discord. На {host} войдите в аккаунт, задайте серверу имя в настройках сервера и не закрывайте OpenBot.",
+  "mobile.server.connectors.discord.helpNotLinked":
+    "Этот сервер Discord не связан с {host}. Нажмите «Переподключить», чтобы связать его.",
   "mobile.server.connectors.discord.orchestratorTitle": "Оркестратор Discord",
   "mobile.server.connectors.discord.orchestratorDescription":
     "Этот агент получает все запросы из Discord. Короткие он обрабатывает сам, остальную работу передаёт нужному агенту и отвечает в канале.",
@@ -917,6 +957,8 @@ export const messages = {
     "OpenBot на {host} не может получать сообщения Telegram. На {host} войдите в аккаунт, задайте серверу имя в настройках сервера и не закрывайте OpenBot.",
   "mobile.server.connectors.telegram.helpError":
     "OpenBot не может связаться с этим чатом. Подключите его заново или отключите чат.",
+  "mobile.server.connectors.telegram.helpNotLinked":
+    "Этот чат не связан с {host}. Нажмите «Переподключить», чтобы связать его.",
   "mobile.server.connectors.telegram.retryAt": "Telegram попросил OpenBot подождать. Следующая попытка в {time}.",
   "mobile.server.connectors.telegram.linkTitle": "Привязать чат",
   "mobile.server.connectors.telegram.linkAnother": "Привязать ещё один чат",
@@ -960,6 +1002,8 @@ export const messages = {
     "WhatsApp удалил этот сервер из связанных устройств. Привяжите номер заново.",
   "mobile.server.connectors.whatsapp.helpError":
     "OpenBot не может связаться с WhatsApp на этом номере. Переподключите или отключите номер.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "OpenBot не может прочитать сохранённые ключи этого номера. Привяжите номер заново.",
   "mobile.server.connectors.whatsapp.retryAt": "WhatsApp попросил OpenBot подождать. Следующая попытка в {time}.",
   "mobile.server.connectors.whatsapp.linkAgain": "Привязать заново",
   "mobile.server.connectors.whatsapp.ownNumber": "Личный номер",
@@ -1153,6 +1197,13 @@ export const messages = {
   "mobile.server.providers.status.ready": "Установлено",
   "mobile.server.providers.status.notInstalled": "Не установлено",
   "mobile.server.providers.status.checking": "Проверка",
+  "mobile.server.providers.accountsKeyHint":
+    "Каждый агент использует один аккаунт. Выберите его в настройках агента. Новому аккаунту нужен API-ключ этого аккаунта.",
+  "mobile.server.providers.accountChangeKey": "Сменить ключ",
+  "mobile.server.providers.accountKeyHint":
+    "Вставьте API-ключ аккаунта {provider}. Ключ передаётся на сервер. Этот телефон его не хранит.",
+  "mobile.server.providers.accountKeyChecking": "Проверка ключа…",
+  "mobile.server.providers.accountKeyAddFailed": "Не удалось добавить аккаунт. Повторите попытку.",
   "mobile.server.providers.pool": "Объединить аккаунты",
   "mobile.server.providers.poolHint":
     "Агенты используют один аккаунт, пока он не приблизится к лимиту, а затем аккаунт, чей лимит сбросится раньше всех.",
@@ -1680,6 +1731,7 @@ export const messages = {
   "mobile.server.route.transfer": "Перенос",
   "mobile.server.route.transferExport": "Экспорт",
   "mobile.server.route.transferImport": "Импорт",
+  "mobile.server.route.transferCopy": "Копировать на другой сервер",
   "mobile.server.transfer.unsupported": "Обновите OpenBot на этом сервере, чтобы выполнить перенос отсюда.",
   "mobile.server.transfer.unavailable":
     "Подключитесь к этому серверу как владелец или администратор, чтобы выполнить перенос.",
@@ -1754,4 +1806,28 @@ export const messages = {
     "Вход в этих провайдеров был выполнен на другом сервере, но не здесь. Войдите в них в разделе Настройки сервера › Провайдеры.",
   "mobile.server.transfer.notImported": "Не импортировано",
   "mobile.server.transfer.warnings": "Проверьте",
+  "mobile.server.transfer.copy": "Копировать на другой сервер",
+  "mobile.server.transfer.copyNote": "Отправьте агентов на другой ваш сервер.",
+  "mobile.server.transfer.copyTo": "Куда",
+  "mobile.server.transfer.copyNoAgents": "На этом сервере нет агентов.",
+  "mobile.server.transfer.copyNotMoved":
+    "Их каналы и общая папка тоже копируются. Ключи API, входы в аккаунты, коннекторы и история чатов не копируются. Настройте их заново на другом сервере.",
+  "mobile.server.transfer.copySubmit": {
+    one: "Копировать {count} агента",
+    few: "Копировать {count} агентов",
+    many: "Копировать {count} агентов",
+    other: "Копировать {count} агента",
+  },
+  "mobile.server.transfer.copying": "Копирование…",
+  "mobile.server.transfer.copyFailed": "Копирование не завершено.",
+  "mobile.server.transfer.copied": {
+    one: "{count} агент скопирован на {server}.",
+    few: "{count} агента скопированы на {server}.",
+    many: "{count} агентов скопированы на {server}.",
+    other: "{count} агента скопированы на {server}.",
+  },
+  "mobile.server.transfer.copyAgents": "Агенты для копирования",
+  "mobile.server.transfer.copyNext": "Скопированные агенты используют правила подтверждения сервера {server}.",
+  "mobile.server.transfer.copyNoServer":
+    "Подключитесь к другому серверу как владелец или администратор, чтобы скопировать на него агентов.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -257,6 +257,7 @@ export const messages = {
     "Il server si arresta e si avvia di nuovo. Ci vuole circa un minuto. I turni degli agenti in corso si interrompono e i membri perdono la connessione finché il server non torna disponibile. File e chat restano.",
   "mobile.server.settings.restartConfirm": "Riavvia",
   "mobile.server.settings.restarted": "{name} si sta riavviando",
+  "mobile.server.settings.restartUnsupported": "Aggiorna OpenBot su questo server per riavviarlo da qui.",
   "mobile.server.settings.leaveTitle": "Uscire da {name}?",
   "mobile.server.settings.leaveBody": "Ti servirà un altro invito per unirti di nuovo.",
   "mobile.server.settings.leave": "Esci dal server",
@@ -281,6 +282,13 @@ export const messages = {
   "mobile.server.settings.identityUnsupported":
     "Aggiorna OpenBot su questo server per cambiarne qui il nome e il logo.",
   "mobile.server.settings.identityOffline": "Connettiti a questo server per cambiarne il nome e il logo.",
+  "mobile.server.settings.appearance": "Forma e colore",
+  "mobile.server.settings.appearanceShape": "Forma",
+  "mobile.server.settings.appearanceShapeOption": "Forma {number}",
+  "mobile.server.settings.appearanceColor": "Colore del server",
+  "mobile.server.settings.appearanceAutomatic": "Automatico",
+  "mobile.server.settings.appearanceReset": "Ripristina",
+  "mobile.server.settings.appearanceSaveFailed": "Impossibile salvare la forma e il colore del server. Riprova.",
   "mobile.server.route.cropLogo": "Ritaglia logo",
   "mobile.server.members.remove": "Rimuovi membro",
   "mobile.server.members.invitePeople": "Invita persone",
@@ -374,6 +382,35 @@ export const messages = {
   "mobile.server.library.noMatches": "Nessun file corrispondente",
   "mobile.server.library.showInChat": "Mostra nella chat",
   "mobile.server.library.share": "Condividi",
+  "mobile.server.library.folders.title": "Cartelle",
+  "mobile.server.library.folders.allFiles": "Tutti i file",
+  "mobile.server.library.folders.removedAgents": "Agenti eliminati",
+  "mobile.server.library.folders.notInFolder": "In nessuna cartella",
+  "mobile.server.library.folders.path": "Cartella: {path}",
+  "mobile.server.library.folders.pathHint": "Mostra le cartelle",
+  "mobile.server.library.folders.new": "Nuova cartella",
+  "mobile.server.library.folders.name": "Nome della cartella",
+  "mobile.server.library.folders.inFolder": "In {name}",
+  "mobile.server.library.folders.create": "Crea",
+  "mobile.server.library.folders.rename": "Rinomina",
+  "mobile.server.library.folders.renameTitle": "Rinomina cartella",
+  "mobile.server.library.folders.save": "Salva",
+  "mobile.server.library.folders.delete": "Elimina cartella",
+  "mobile.server.library.folders.deleteTitle": "Eliminare «{name}»?",
+  "mobile.server.library.folders.deleteBody":
+    "Vengono eliminate anche le cartelle al suo interno. I file restano con l’agente.",
+  "mobile.server.library.folders.moveTo": "Sposta in una cartella",
+  "mobile.server.library.folders.actions": "Azioni per {name}",
+  "mobile.server.library.folders.expand": "Mostra le cartelle di {name}",
+  "mobile.server.library.folders.collapse": "Nascondi le cartelle di {name}",
+  "mobile.server.library.folders.emptyTitle": "Nessun file in questa cartella",
+  "mobile.server.library.folders.emptyBody": "{agent} può salvare file qui con il percorso di cartella {path}.",
+  "mobile.server.library.folders.loadFailed": "Impossibile caricare le cartelle",
+  "mobile.server.library.folders.changeFailed": "Impossibile modificare le cartelle",
+  "mobile.server.library.folders.gone": "Questa cartella non è più sul server.",
+  "mobile.server.library.folders.fileGone": "Questo file non è più sul server, oppure non puoi spostarlo.",
+  "mobile.server.library.folders.unsupported":
+    "Questo server non ha cartelle nella Libreria. Aggiorna il server per usarle.",
   "mobile.server.route.providers": "Provider",
   "mobile.server.route.provider": "Provider",
   "mobile.server.route.providerModels": "Modelli",
@@ -737,6 +774,8 @@ export const messages = {
     "OpenBot non riesce a leggere i token salvati su {host}. Disconnetti il workspace, poi connettilo di nuovo.",
   "mobile.server.connectors.slack.helpRelay":
     "OpenBot su {host} non riesce a ricevere gli eventi di Slack. Su {host}, accedi, dai un nome al server nelle impostazioni del server e tieni OpenBot aperto.",
+  "mobile.server.connectors.slack.helpNotLinked":
+    "Questo workspace non è collegato a {host}. Tocca Riconnetti per collegarlo.",
   "mobile.server.connectors.slack.orchestratorTitle": "Slack Orchestrator",
   "mobile.server.connectors.slack.orchestratorDescription":
     "Questo agente riceve ogni richiesta da Slack. Risponde da solo a quelle brevi, passa il resto all'agente giusto e pubblica la risposta nel thread.",
@@ -782,6 +821,8 @@ export const messages = {
     "OpenBot non riesce a leggere i token salvati su {host}. Disconnetti il server Discord, poi connettilo di nuovo.",
   "mobile.server.connectors.discord.helpRelay":
     "OpenBot su {host} non riesce a ricevere gli eventi di Discord. Su {host}, accedi, dai un nome al server nelle impostazioni del server e tieni OpenBot aperto.",
+  "mobile.server.connectors.discord.helpNotLinked":
+    "Questo server Discord non è collegato a {host}. Tocca Riconnetti per collegarlo.",
   "mobile.server.connectors.discord.orchestratorTitle": "Discord Orchestrator",
   "mobile.server.connectors.discord.orchestratorDescription":
     "Questo agente riceve ogni richiesta da Discord. Risponde da solo a quelle brevi, passa il resto all'agente giusto e invia la risposta nel canale.",
@@ -816,6 +857,8 @@ export const messages = {
     "OpenBot su {host} non può ricevere i messaggi di Telegram. Su {host}, accedi, dai un nome al server nelle impostazioni del server e tieni OpenBot aperto.",
   "mobile.server.connectors.telegram.helpError":
     "OpenBot non riesce a raggiungere questa chat. Riconnettiti, oppure disconnetti la chat.",
+  "mobile.server.connectors.telegram.helpNotLinked":
+    "Questa chat non è collegata a {host}. Tocca Riconnetti per collegarla.",
   "mobile.server.connectors.telegram.retryAt":
     "Telegram ha chiesto a OpenBot di aspettare. Nuovo tentativo alle {time}.",
   "mobile.server.connectors.telegram.linkTitle": "Collega una chat",
@@ -857,6 +900,8 @@ export const messages = {
     "WhatsApp ha rimosso questo server dai dispositivi collegati. Collega di nuovo il numero.",
   "mobile.server.connectors.whatsapp.helpError":
     "OpenBot non riesce a raggiungere WhatsApp su questo numero. Riconnettiti, oppure disconnetti il numero.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "OpenBot non riesce a leggere le chiavi salvate di questo numero. Collega di nuovo il numero.",
   "mobile.server.connectors.whatsapp.retryAt":
     "WhatsApp ha chiesto a OpenBot di aspettare. Nuovo tentativo alle {time}.",
   "mobile.server.connectors.whatsapp.linkAgain": "Ricollega",
@@ -1048,6 +1093,13 @@ export const messages = {
   "mobile.server.providers.status.ready": "Installato",
   "mobile.server.providers.status.notInstalled": "Non installato",
   "mobile.server.providers.status.checking": "Controllo",
+  "mobile.server.providers.accountsKeyHint":
+    "Ogni agente usa un account. Sceglilo nelle impostazioni dell'agente. Un nuovo account richiede una chiave API di quell'account.",
+  "mobile.server.providers.accountChangeKey": "Cambia chiave",
+  "mobile.server.providers.accountKeyHint":
+    "Incolla una chiave API dell'account {provider}. La chiave va al server. Questo telefono non la conserva.",
+  "mobile.server.providers.accountKeyChecking": "Verifica della chiave…",
+  "mobile.server.providers.accountKeyAddFailed": "Impossibile aggiungere l'account. Riprova.",
   "mobile.server.providers.pool": "Raggruppa account",
   "mobile.server.providers.poolHint":
     "Gli agenti usano un account finché non si avvicina a un limite di utilizzo, poi l'account il cui limite si azzera per primo.",
@@ -1502,6 +1554,7 @@ export const messages = {
   "mobile.server.route.transfer": "Trasferimento",
   "mobile.server.route.transferExport": "Esporta",
   "mobile.server.route.transferImport": "Importa",
+  "mobile.server.route.transferCopy": "Copia su un altro server",
   "mobile.server.transfer.unsupported": "Aggiorna OpenBot su questo server per trasferirlo da qui.",
   "mobile.server.transfer.unavailable":
     "Connettiti a questo server come proprietario o amministratore per trasferirlo.",
@@ -1566,4 +1619,21 @@ export const messages = {
     "Avevi effettuato l'accesso a questi provider sull'altro server, ma non qui. Accedi in Impostazioni server › Provider.",
   "mobile.server.transfer.notImported": "Non importati",
   "mobile.server.transfer.warnings": "Da controllare",
+  "mobile.server.transfer.copy": "Copia su un altro server",
+  "mobile.server.transfer.copyNote": "Invia agenti a un altro dei tuoi server.",
+  "mobile.server.transfer.copyTo": "A",
+  "mobile.server.transfer.copyNoAgents": "Questo server non ha agenti.",
+  "mobile.server.transfer.copyNotMoved":
+    "Vengono copiati anche i loro canali e la cartella condivisa. Chiavi API, accessi, connettori e cronologia delle chat non vengono copiati. Configurali di nuovo sull'altro server.",
+  "mobile.server.transfer.copySubmit": { one: "Copia {count} agente", other: "Copia {count} agenti" },
+  "mobile.server.transfer.copying": "Copia in corso…",
+  "mobile.server.transfer.copyFailed": "La copia non è terminata.",
+  "mobile.server.transfer.copied": {
+    one: "{count} agente copiato su {server}.",
+    other: "{count} agenti copiati su {server}.",
+  },
+  "mobile.server.transfer.copyAgents": "Agenti da copiare",
+  "mobile.server.transfer.copyNext": "Gli agenti copiati usano le regole di approvazione di {server}.",
+  "mobile.server.transfer.copyNoServer":
+    "Connettiti a un altro server come proprietario o amministratore per copiarvi gli agenti.",
 } as const satisfies PartialTranslation<typeof source>;

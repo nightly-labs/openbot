@@ -76,7 +76,8 @@ export class HostedServerDesktopService {
   /**
    * `onRunning` gets each running server from a list, so the caller can refresh the joined servers
    * when a new server is ready and does not wait for the next directory poll. `onWake` gets each server
-   * that starts after a wake request, with the reply, so the caller reconnects to it soon.
+   * that starts after a wake request, with the reply, so the caller reconnects to it soon. `onClaim`
+   * gets the expiry of each new install command, so the caller can watch for its server.
    */
   constructor(
     auth: HostedServerAuthClient,
@@ -84,6 +85,7 @@ export class HostedServerDesktopService {
     private readonly now: () => number = Date.now,
     private readonly onRunning: (serverId: string) => void = () => {},
     private readonly onWake: (serverId: string, server: HostedServerSummary) => void = () => {},
+    private readonly onClaim: (expiresAt: number) => void = () => {},
   ) {
     this.#platform = AccountServicePlatform.layer(auth, openExternal);
     const wake = createHostedServerWake(
@@ -134,7 +136,10 @@ export class HostedServerDesktopService {
   createServerClaim(): Effect.Effect<ServerClaim, AccountServiceFailure> {
     return AccountServicePlatform.use((platform) =>
       platform.request("/v2/server-claims", { method: "POST" }, decodeServerClaim),
-    ).pipe(Effect.provide(this.#platform));
+    ).pipe(
+      Effect.tap((claim) => Effect.sync(() => this.onClaim(claim.expiresAt))),
+      Effect.provide(this.#platform),
+    );
   }
 
   create(input: CreateHostedServerInput): Effect.Effect<HostedServerSummary, AccountServiceFailure> {

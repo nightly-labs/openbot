@@ -52,6 +52,7 @@ import {
   notificationForAgentEvent,
   notificationForUsageLimit,
   notificationRequestKey,
+  teammateTurnCompleted,
 } from "@openbot/team-client/agent-notifications";
 import {
   channelForThread,
@@ -373,6 +374,8 @@ export function createRendererForwarders({
     // A turn of a side thread that is not a routine thread shows no desktop notification, as before.
     // The phone notifies about it (`PushNotificationService`).
     if (received.type === "thread-turn-completed" && !received.routine) return;
+    // Work between agents stays in the chat and does not call the user.
+    if (teammateTurnCompleted(received)) return;
     // A routine thread's turn notifies as a turn of the chat does. Its answer is in the routine thread.
     const routineTaskId = received.type === "thread-turn-completed" ? received.taskId : null;
     const event = received.type === "thread-turn-completed" ? received.turn : received;
@@ -516,7 +519,10 @@ export function createRendererForwarders({
     }
   }
 
-  /** A workflow step that waits for the user, or a workflow output. A click shows the main window. */
+  /**
+   * A workflow step that waits for the user, or a workflow output. A click shows the main window with
+   * the workflow, where the user approves the step or reads the output.
+   */
   function forwardWorkflowNotice(notice: WorkflowNotice): void {
     if (!desktopNotificationsEnabled()) return;
     const translate = getTranslate();
@@ -532,7 +538,13 @@ export function createRendererForwarders({
     const notification = new Notification({ title: notice.workflowTitle, body });
     notification.on("click", () => {
       const current = getMainWindow();
-      if (current && !current.isDestroyed()) showMainWindow(current);
+      if (!current || current.isDestroyed()) return;
+      showMainWindow(current);
+      // Workflows run on the host of this computer.
+      sendToRenderer(current, IPC_ENDPOINTS.notifications.workflowOpened, {
+        serverId: LOCAL_SERVER_ID,
+        workflowId: notice.workflowId,
+      });
     });
     showRetainedNotification(notification);
   }

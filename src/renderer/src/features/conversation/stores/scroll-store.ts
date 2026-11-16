@@ -25,7 +25,7 @@ import { formatMessageTime } from "../../../app-message-projection";
 import { groupAgentMessageMarkers, markOpenAgentMessages, teammateUpdateAnswers } from "../agent-message-timeline";
 import type { ConversationProps, ConversationTarget } from "../conversation-types";
 import { summarizeHostedSiteMessages } from "../hosted-site-timeline";
-import { narrationRows, placeTurnRowsByTime } from "../narration-rows";
+import { narrationRows, placeTurnRowsByTime, placeUpdatesAfterSteers } from "../narration-rows";
 import {
   expandRoutineRunGroups,
   groupRoutineRunMarkers,
@@ -131,13 +131,32 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   /** The agents that write in the channel now. Their text that still arrives waits until it is complete. */
   const channelWriters = createMemo(() => new Set(deps.props.channel?.workers().map((worker) => worker.id) ?? []));
   /*
+   * An agent chat can keep an answer "streaming" after its turn ends, as when a joined server misses
+   * a refresh (#5847). The chat shows that text when the agent has had no turn for a short time. A
+   * joined server sends the final copy after the turn ends, so the final copy usually comes first.
+   */
+  const [turnSettled, setTurnSettled] = createSignal(untrack(() => !deps.props.activeTurnId));
+  createEffect(
+    () => Boolean(deps.props.activeTurnId),
+    (turnActive) => {
+      if (turnActive) {
+        setTurnSettled(false);
+        return;
+      }
+      const timer = setTimeout(() => setTurnSettled(true), STALE_STREAM_MS);
+      return () => clearTimeout(timer);
+    },
+  );
+  /*
    * Only the text of a member that works waits. A view keeps the copy of an older message that it
    * loaded, so a copy loaded while it streamed can stay "streaming" after its task ends (#4846), and
    * it must not stay hidden.
    */
   const held = (message: AgentMessage): boolean =>
     heldWhileWritten(message) &&
-    (!deps.props.channel || (message.senderAgentId !== undefined && channelWriters().has(message.senderAgentId)));
+    (deps.props.channel
+      ? message.senderAgentId !== undefined && channelWriters().has(message.senderAgentId)
+      : Boolean(deps.props.activeTurnId) || !turnSettled());
   /* The quiet answers of a teammate update show under its marker, so they have no row of their own. */
   const updateAnswers = createMemo(() => teammateUpdateAnswers(deps.props.messages));
   const foldedAnswerIds = createMemo(
@@ -145,22 +164,24 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   );
   const shownMessages = createMemo(() => {
     const progressUpdates = deps.props.responseStyle === "natural";
-    const channelTurnRows: AgentMessage[][] = [];
+    const turnRowsList: AgentMessage[][] = [];
     const listed = deps.props.messages.flatMap((message) => {
       if (message.kind === "thinking") {
         const rows = progressUpdates ? progressRows(message) : [];
         const showsSteps =
           message.turnId && !thinkingRowHiddenTurns().has(message.turnId) && message.items?.some((item) => item.trim());
         const turnRows = showsSteps ? [...rows, message] : rows;
-        if (!deps.props.channel) return turnRows;
-        channelTurnRows.push(turnRows);
-        return [];
+        turnRowsList.push(turnRows);
+        return deps.props.channel ? [] : turnRows;
       }
       if (message.kind === "memory-changes" && answeredTurns().has(message.turnId)) return [];
       return silentAgentAnswer(message) || foldedAnswerIds().has(message.id) ? [] : [message];
     });
-    // Members of a channel work at the same time, so each update goes where its time puts it.
-    const shown = deps.props.channel ? placeTurnRowsByTime(listed, channelTurnRows) : listed;
+    // Members of a channel work at the same time, so each update goes where its time puts it. An agent
+    // chat keeps a turn's updates together, except those written after a steer.
+    const shown = deps.props.channel
+      ? placeTurnRowsByTime(listed, turnRowsList)
+      : placeUpdatesAfterSteers(listed, turnRowsList);
     // Natural shows an agent's text once it is complete, as one bubble, while the activity line
     // names the step. A bubble that grows as the text arrives moves the chat at each line.
     const complete = progressUpdates ? shown.filter((message) => !held(message)) : shown;
@@ -295,7 +316,12 @@ export function createScrollStore(deps: ScrollStoreDeps) {
       !deps.props.loadingOlder &&
       !deps.props.olderError,
     (needsOlderPage) => {
-      if (needsOlderPage) deps.props.onLoadOlder?.();
+      if (!needsOlderPage) return;
+      // Rows that just arrived, as when a chat opens, have not measured the boundary again: it still
+      // holds the value of the chat before them. Measure before asking for a page. A signal read in
+      // this callback still gives the value from before the write, so use the measured value.
+      if (untrack(() => timelineMessages().length) > 0 && !updateHistoryBoundary()) return;
+      deps.props.onLoadOlder?.();
     },
   );
 
@@ -327,8 +353,28 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   });
 
   /* One writer for the boundary: the row the virtualizer renders first, read where the reader is. */
-  function updateHistoryBoundary(element = deps.elements.scrollElement()): void {
-    setAtHistoryBoundary(chatHistoryBoundaryReached(element, firstRenderedIndex));
+  function updateHistoryBoundary(element = deps.elements.scrollElement()): boolean {
+    const followsLatest = deps.sticky.getStickToLatest();
+    const reached =
+      chatHistoryBoundaryReached(element, firstRenderedIndex, followsLatest) &&
+      (!followsLatest || currentRowsRendered(element));
+    setAtHistoryBoundary(reached);
+    return reached;
+  }
+
+  /**
+   * Rows that arrive lay out a frame or more after the messages change. Until then the transcript
+   * shows the rows from before, such as the chat that is opening, and its height says nothing about
+   * the new rows. The last row on screen tells which chat the transcript shows. Some rows have no
+   * message mark, such as a question that waits for its answer, so the last mark can be a row above it.
+   */
+  function currentRowsRendered(element: HTMLElement | undefined): boolean {
+    const messages = untrack(timelineMessages);
+    if (!element || messages.length === 0) return true;
+    const marks = element.querySelectorAll("[data-chat-search-message]");
+    const lastId = marks[marks.length - 1]?.getAttribute("data-chat-search-message");
+    if (!lastId) return element.querySelector(".virtual-chat-row") !== null;
+    return messages.findLastIndex((message) => message.id === lastId) !== -1;
   }
 
   function updateScrollFade(element = deps.elements.scrollElement()) {
@@ -454,6 +500,9 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     jumpToLatestMessage,
   };
 }
+
+/** How long an agent chat waits after a turn ends before it shows text that is still marked "streaming". */
+const STALE_STREAM_MS = 3_000;
 
 /** Agent text that the host still writes. A plan, the subagents, a card and an image show while they run. */
 function heldWhileWritten(message: AgentMessage): boolean {
