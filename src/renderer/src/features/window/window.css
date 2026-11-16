@@ -889,8 +889,9 @@
     display: none;
   }
 
-  /* The page spans the sidebar, so the line at the end of the sidebar does not show. */
-  .app-frame-edge[data-window-page-kind="titled"] > .sidebar::before {
+  /* The page spans the sidebar, so the line at the end of the sidebar does not show. The section list of a
+   * settings page has its own line, at a minimum width, so a narrow sidebar would show a second line. */
+  .app-frame-edge:not([data-window-page-kind="agents"]) > .sidebar::before {
     display: none;
   }
 

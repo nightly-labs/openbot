@@ -142,13 +142,13 @@ export function createSidebarDataStore(deps: {
    * while the pointer is there, so that a row does not move away under the pointer when the user reads
    * it. When the pointer leaves the list, the read chat goes back to its section. Without this, a chat
    * that the user reads and keeps open stays in the unread set until the user opens another chat. The
-   * manual order has none.
+   * manual and recent activity orders have none.
    *
    * The key is a string and holds still during a drag, for the same reasons as `waitingKey`.
    */
   let heldUnreadKey = "";
   const unreadKey = createMemo(() => {
-    if (chatOrder() === "manual") {
+    if (chatOrder() === "manual" || chatOrder() === "recent") {
       heldUnreadKey = "";
       return "";
     }
@@ -226,7 +226,7 @@ export function createSidebarDataStore(deps: {
     });
   }
   /**
-   * The last activity of each chat, for the unread orders. The key holds still during a drag, for the
+   * The last activity of each chat, for the orders other than "manual". The key holds still during a drag, for the
    * same reasons as `waitingKey`: a reply that arrives during a drag must not move the rows.
    */
   let heldActivityKey = "";
@@ -259,12 +259,14 @@ export function createSidebarDataStore(deps: {
     return [...items].sort((left, right) => (activity.get(right.id) ?? 0) - (activity.get(left.id) ?? 0));
   };
   /**
-   * The chats in the sections. In the "unread first" order, each section shows its unread chats first
-   * and then the others, both by their last activity. The saved `agentOrder` does not change.
+   * The chats in the sections. In the "recent activity" order, each section shows its chats by their
+   * last activity. In the "unread first" order, each section shows its unread chats first and then the
+   * others, both by their last activity. The saved `agentOrder` does not change.
    */
   const filteredChats = createChatItems(
     () => ({ channels: filteredChannels(), agents: filteredAgents() }),
     (items) => {
+      if (chatOrder() === "recent") return byRecent(items);
       if (chatOrder() !== "unread-first") return items;
       const recent = byRecent(items);
       return [

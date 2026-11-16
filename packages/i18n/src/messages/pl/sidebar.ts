@@ -17,6 +17,7 @@ export const messages = {
   "sidebar.markAllRead": "Oznacz wszystko jako przeczytane",
   "sidebar.order.title": "Sortuj czaty",
   "sidebar.order.manual": "Ręcznie",
+  "sidebar.order.recent": "Ostatnia aktywność",
   "sidebar.order.unreadGroup": "Nieprzeczytane w grupie",
   "sidebar.order.unreadFirst": "Nieprzeczytane najpierw w folderach",
   "sidebar.topbar.openSettings": "Otwórz ustawienia: {name}",
