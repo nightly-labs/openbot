@@ -361,7 +361,11 @@ export async function routeModelSteering(
     throw new HttpError(400, sourceText("error.team.modelVisibilityUnsupported"));
   // `readJson` runs the empty body through the model-steering wire codec.
   await readJson(request);
-  return json(200, { models: settings.listSteeringModels() });
+  const models = settings.listSteeringModels();
+  // A member does not read a model that the server's model picker hides.
+  const visibility = admin?.modelVisibility;
+  const listed = visibility ? await runCauseEffect(visibility.picker(models)) : models;
+  return json(200, { models: listed.map(({ provider, id }) => ({ provider, id })) });
 }
 
 /**

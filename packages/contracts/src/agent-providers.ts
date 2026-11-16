@@ -701,8 +701,10 @@ export function providerSteersTurns(provider: AgentProviderRef): boolean {
 
 /**
  * Whether an agent on this provider and model can take a queued message into its running turn. A
- * `reported` provider steers only when its model in `models` has `steersTurns`: a model that is not
- * listed, or a host without `model-steering-v1`, does not.
+ * `reported` provider steers only when `models` has a model with `steersTurns` from the same custom
+ * agent: the agent process reports it, not one model, so a saved model that the list no longer has, or
+ * that model visibility hides, still counts. An agent with no listed model, or a host without
+ * `model-steering-v1`, does not steer.
  */
 export function agentSteersTurns(
   runtime: { provider: AgentProviderRef; model: string },
@@ -710,8 +712,12 @@ export function agentSteersTurns(
 ): boolean {
   if (!isKnownAgentProvider(runtime.provider) || agentProviderDescriptor(runtime.provider).steer !== "reported")
     return providerSteersTurns(runtime.provider);
+  const agentId = customAgentIdOfModel(runtime.model);
   return models.some(
-    (model) => model.provider === runtime.provider && model.id === runtime.model && model.steersTurns === true,
+    (model) =>
+      model.provider === runtime.provider &&
+      model.steersTurns === true &&
+      (agentId === null ? model.id === runtime.model : customAgentIdOfModel(model.id) === agentId),
   );
 }
 

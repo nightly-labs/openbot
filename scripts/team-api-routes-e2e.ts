@@ -1209,7 +1209,7 @@ const fakeAgents: TeamApiAgents = {
     }),
   getAnalytics: unused("getAnalytics"),
   getHostAnalytics: unused("getHostAnalytics"),
-  listModels: unused("listModels"),
+  listModels: () => FAST_MODE_MODELS,
   sidebarChatIds: unused("sidebarChatIds"),
   listConversationReads: unused("listConversationReads"),
   generateProfile: unused("generateProfile"),
@@ -5282,6 +5282,18 @@ try {
       json: {},
       capabilities: [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, MODEL_STEERING_CAPABILITY],
     });
+    // A released client reads the model list with no `steersTurns`: only this capability gives it.
+    const released = await call("GET", TEAM_API_ROUTES.agents.models, {
+      token: bobToken,
+      capabilities: [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, MODEL_STEERING_CAPABILITY],
+    });
+    check(
+      "the released model list does not carry steersTurns",
+      released.status === 200 &&
+        list(released.body).some((model) => field(model, "id") === "steering-agent/default") &&
+        list(released.body).every((model) => field(model, "steersTurns") === undefined),
+      summary(released),
+    );
     check(
       "a member reads only the custom agent models that steer",
       steering.status === 200 &&

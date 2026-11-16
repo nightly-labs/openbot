@@ -181,10 +181,16 @@ try {
   assert.equal(steers("steering"), true, "The model of an agent with the request must steer.");
   assert.equal(steers("idle"), true, "The model of an agent with the request must steer.");
   assert.equal(steers("plain"), false, "The model of an agent without the request must not steer.");
+  // The agent process reports steering, so a saved model that its list no longer has still steers.
+  assert.equal(
+    agentSteersTurns({ provider: "acp", model: "steering/removed" }, models),
+    true,
+    "Each model of an agent with the request must steer.",
+  );
   assert.equal(
     agentSteersTurns({ provider: "acp", model: "unknown/default" }, models),
     false,
-    "A model that the catalog does not list must not steer.",
+    "A model of an agent that the catalog does not list must not steer.",
   );
 
   const open = (agent: AgentId) =>

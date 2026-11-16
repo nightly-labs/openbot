@@ -841,11 +841,12 @@ A custom agent (`acp`) uses the same extension (#4977). Its descriptor has `stee
 agent process reports at `initialize` whether it steers, so the provider alone does not tell.
 `AcpAgentClient` adds `steersTurns` to its `model/list` answer, `CustomAcpAgentsClient` puts it on
 each model of that agent, and the catalog keeps it as `AgentModelOption.steersTurns`.
-`agentSteersTurns(runtime, models)` reads it for the agent's model: the host gates
+`agentSteersTurns(runtime, models)` reads it for any listed model of the same custom agent, so a
+saved model that the list no longer has, or that model visibility hides, still counts: the host gates
 (`#steerWhenBusy`, `QueueControls.steer`) and the composer, the queue and the agent settings use it.
 A custom agent that does not steer keeps "Send now", and a steer stays in the queue with the reason.
 A remote client reads the steering models from `model-steering-v1`, because the released model list
-does not carry the flag. A host before it does not advertise the capability, so the client keeps
+does not carry the flag. The route leaves out a model that the server's model picker hides. A host before it does not advertise the capability, so the client keeps
 "Send now" and the host queues the message. `scripts/custom-agent-steer-e2e.ts` checks the catalog,
 a steer, a `promptRequired` answer and an agent without the extension.
 
