@@ -3081,6 +3081,7 @@ export async function createApplicationServices({
   browserProxyStatusChanged = () => service.notifyBrowserProfilesChanged();
   agentBrowserProfiles = browserProfiles;
   // A computer that comes online or goes offline changes the proxy list.
+  browserEgress.on("online", (memberId) => browser.forgetComputerFailures(memberId));
   browserEgress.on("changed", () => service.notifyBrowserProfilesChanged());
   const customProviderChanges = createCustomProviderChanges({ service, customProviders, providerRuntimes });
   const customAgentChanges = createCustomAgentChanges({ service, customAgents });
