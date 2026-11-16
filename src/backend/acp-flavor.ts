@@ -4,6 +4,7 @@ import {
   type NewSessionRequest,
   type PromptResponse,
   RequestError,
+  type SessionUpdate,
 } from "@agentclientprotocol/sdk";
 import { agentProviderName } from "@openbot/contracts/agent-providers";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
@@ -284,6 +285,14 @@ export interface AcpFlavor {
    * session update does, and the chat shows the retry.
    */
   retryNotice?: (method: string, params: DynamicRecord) => AcpRetryNotice | null;
+  /**
+   * Whether a session update reports a retry of a model request: a retry that the agent schedules, or
+   * the end of a retried attempt. The agent waits for a model as long as OpenBot's stall limit, then
+   * retries, so OpenBot waited exactly as long and ended each such turn as the retry started (#9941).
+   * For such an agent OpenBot waits `ACP_MODEL_RETRY_GRACE` times the limit, and only the first retry
+   * notice after the last output counts as activity: one retry gets the whole limit, not all of them.
+   */
+  modelRetryUpdate?: (update: SessionUpdate) => boolean;
   /**
    * The tools that run a subagent and send no events of it, as the tool name or `<name>: <description>`.
    * Each call shows as a subagent with its task, state, and report.

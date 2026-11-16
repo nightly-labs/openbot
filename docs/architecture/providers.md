@@ -791,6 +791,18 @@ command that runs in the background does the same when it ends (#7713). The flag
 The watch is in memory. A background task that ends while OpenBot is closed, or after OpenBot
 loaded the session again, shows only in OpenCode's own store.
 
+#### Model retries and the stall limit
+
+OpenCode 2.2.7 waits 300 s for a model's response headers (`headerTimeout`; 30 minutes for a custom
+endpoint), the same time as OpenBot's stall limit, and then sends the request again, up to three
+times for a timeout. It reports each retry as a `session_info_update` with
+`_meta["opencode/retry"]`, and a failed retried attempt as the same key with null. OpenBot ended
+the turn as stalled at the moment when the retry started (#9941). `modelRetryUpdate` of
+`OPENCODE_ACP_FLAVOR` makes OpenBot wait 1.2 times the limit, so the retry notice comes first. Only
+the first retry notice after other output counts as activity: a model that also does not answer
+the retry fails the turn after about 11 minutes, with the stall message, and not after all four
+attempts with OpenCode's raw error text.
+
 #### Text of two steps
 
 OpenCode 2.2.0 gives the message of each step its own ACP `messageId`. With `messagePerId`, text of a

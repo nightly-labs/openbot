@@ -252,6 +252,11 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
   // OpenCode 2.2.7 loads a session from its own store with all of its messages. Each idle release
   // added one more copy of the instructions to a long chat (#7171).
   reopenKeepsPrompts: true,
+  // OpenCode 2.2.7 waits 300 s for a model's response headers, the stall limit, then retries. It
+  // reports each retry as `_meta["opencode/retry"]` on a `session_info_update`, and a failed retried
+  // attempt as the same key with null (#9941).
+  modelRetryUpdate: (update) =>
+    update.sessionUpdate === "session_info_update" && isRecord(update._meta) && "opencode/retry" in update._meta,
   // OpenCode 2.2.0 gives each step's message its own ID. Text of two steps was joined into one line.
   messagePerId: true,
   // OpenCode 2.1.4 adds each session's MCP servers to the session's directory under their names. A
