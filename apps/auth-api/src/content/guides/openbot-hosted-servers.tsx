@@ -1,4 +1,6 @@
 import { Link } from "@tanstack/solid-router";
+import { ArticleImage } from "../../components/content/ArticleMedia";
+import pricing from "./media/openbot-hosted-servers/pricing.png";
 
 export function OpenBotHostedServers() {
   return (
@@ -49,6 +51,13 @@ export function OpenBotHostedServers() {
         larger teams or heavier workloads, especially those involving more browser-based work.
       </p>
       <p>You can pay monthly or yearly. The yearly option saves 20%.</p>
+      <ArticleImage
+        src={pricing}
+        alt="Starter, Standard, and Pro plans with monthly prices in US dollars, billed yearly."
+        width={1158}
+        height={444}
+        caption="Prices are in US dollars and billed yearly. The pricing screen shows 25 GB, 50 GB, and 100 GB for a boat sandbox. On Leaseweb, Starter has 25 GB, Standard has 75 GB, and Pro has 150 GB."
+      />
       <p>
         Work at a company also needs a commercial license. A Starter license for one user costs €10 a month, and a Team
         license costs €25 a month for two users and €15 for each extra user, up to 10 users. With a hosted server, the
