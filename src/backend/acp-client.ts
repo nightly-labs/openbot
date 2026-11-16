@@ -58,6 +58,7 @@ import {
 import type { GeneratedMediaKind } from "./agent/image-generation";
 import { acpPlanSteps, PLAN_UPDATED_METHOD } from "./agent/plan-updates";
 import { elicitationFieldQuestions, elicitationValue } from "./agent/prompts";
+import { ROUTINE_NO_UPDATE_TOOL } from "./agent/routine-quiet-runs";
 import {
   endSubagentTurn,
   newSubagentState,
@@ -295,6 +296,8 @@ interface AcpTurn {
   approvedEditsRan: Set<string>;
   /** The last failed tool call (name, arguments and error), and how many times in a row it failed. */
   repeatedFailure: { key: string; count: number } | null;
+  /** The last no-update call of this turn ended it quiet, so a repeated call needs no card (#10078). */
+  quietNoUpdate: boolean;
   /** The user stopped the turn. */
   stopped: boolean;
   /** Aborts when the user stops the turn: a permission request that waits gets its answer then. */
@@ -2681,6 +2684,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       approvedEditRuns: new Map(),
       approvedEditsRan: new Set(),
       repeatedFailure: null,
+      quietNoUpdate: false,
       stopped: false,
       stop: new AbortController(),
       completing: false,
@@ -4404,14 +4408,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // own tools is not a step outside that limit. The tools ask the user themselves where they must,
     // and a Claude agent at Workspace only runs them without a card, too (#7086). Only once: an "always"
     // answer stays in the agent's own state, also after the user chooses Ask first.
+    // The no-update tool also runs without a card when it already ended this turn quiet and the model
+    // calls it again. The call changes nothing, and OpenBot ends a quiet turn that repeats it only while
+    // no card is open: a card for each call kept a Gemini agent at Ask first waiting again and again (#10078).
     if (
-      this.options.confine &&
       kind === "permissions" &&
       thread &&
       turn &&
       !turn.stopped &&
       !turn.completing &&
-      callsBridgeTool(thread, params.toolCall.title)
+      ((this.options.confine && callsBridgeTool(thread, params.toolCall.title)) ||
+        (turn.quietNoUpdate && callsNoUpdateTool(thread, params.toolCall.title)))
     ) {
       const option = params.options.find((candidate) => candidate.kind === "allow_once");
       if (option) return { outcome: { outcome: "selected", optionId: option.optionId } };
@@ -4568,6 +4575,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       .pipe(toProviderClientOperationError);
     if (!isDynamicToolResult(result))
       return yield* providerFailure(new Error("OpenBot returned an invalid dynamic tool result."));
+    if (turn?.id === params.turnId && params.tool === ROUTINE_NO_UPDATE_TOOL) turn.quietNoUpdate = endsQuiet(result);
     return yield* providerSync(() => result);
   });
 
@@ -4705,6 +4713,31 @@ function callsBridgeTool(thread: AcpThread, title: string | null | undefined): b
   return thread.dynamicTools.some((namespace) =>
     namespace.tools.some((tool) => title === `${namespace.name}__${tool.name}`),
   );
+}
+
+/**
+ * Whether a permission request names the no-update tool of a bridge server: `<server>__<tool>` as Grok
+ * names it, or `Run mcp_<server>_<tool>` as the Antigravity CLI 1.5.9 titles it.
+ */
+function callsNoUpdateTool(thread: AcpThread, title: string | null | undefined): boolean {
+  return thread.dynamicTools.some(
+    (namespace) =>
+      namespace.tools.some((tool) => tool.name === ROUTINE_NO_UPDATE_TOOL) &&
+      (title === `${namespace.name}__${ROUTINE_NO_UPDATE_TOOL}` ||
+        title === `Run mcp_${namespace.name}_${ROUTINE_NO_UPDATE_TOOL}`),
+  );
+}
+
+/** Whether a no-update result ends the turn quiet (`status: "quiet"`), not only shown. */
+function endsQuiet(result: DynamicToolResult): boolean {
+  const [first] = result.contentItems;
+  if (first?.type !== "inputText") return false;
+  try {
+    const value = JSON.parse(first.text);
+    return isRecord(value) && value.status === "quiet";
+  } catch {
+    return false;
+  }
 }
 
 function isDynamicToolResult(value: unknown): value is DynamicToolResult {
