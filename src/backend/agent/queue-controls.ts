@@ -15,7 +15,7 @@ import type { AgentStore } from "../agent-store";
 import type { ChannelAssignment } from "../channel-store";
 import { promptMessage } from "../conversation-snapshots";
 import { causeHelpers } from "../effect-boundary";
-import type { MailboxStore } from "../mailbox-store";
+import { type MailboxStore, QUEUE_EDIT_HOLD_MS } from "../mailbox-store";
 import { decodeRecordResponse } from "../protocol";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { CustomEndpoints } from "./custom-endpoints";
@@ -68,6 +68,8 @@ export class QueueControls {
   readonly #drain: DrainScheduler;
   readonly #routines: RoutineScheduler;
   readonly #hooks: QueueControlsHooks;
+  /** The wakes for the end of edit holds. `dispose` clears them, so none runs after a stop. */
+  readonly #holdWakes = new Set<ReturnType<typeof setTimeout>>();
 
   constructor(options: QueueControlsOptions) {
     this.#store = options.store;
@@ -95,6 +97,24 @@ export class QueueControls {
     // The requester may hold the other answers until this request ends.
     if (sender?.kind === "agent") this.#drain.scheduleDrain(sender.agentId);
   }, Effect.uninterruptible);
+
+  /**
+   * An edit that nobody saves or cancels stops holding the queue after `QUEUE_EDIT_HOLD_MS`, and this
+   * starts the queue then, also when no other change wakes the agent.
+   */
+  wakeAfterEditHold(agentId: string): void {
+    const timer = setTimeout(() => {
+      this.#holdWakes.delete(timer);
+      this.#drain.scheduleDrain(agentId);
+    }, QUEUE_EDIT_HOLD_MS + 1_000);
+    timer.unref();
+    this.#holdWakes.add(timer);
+  }
+
+  dispose(): void {
+    for (const timer of this.#holdWakes) clearTimeout(timer);
+    this.#holdWakes.clear();
+  }
 
   readonly edit = Effect.fn("QueueControls.edit")(function* (
     this: QueueControls,
@@ -148,9 +168,10 @@ export class QueueControls {
     }
     if (this.#hooks.channelAssignment(input.deliveryId))
       return yield* new QueueOperationFailed({ cause: new Error(sourceText("error.backend.useChannelTaskControls")) });
-    if (input.action === "begin")
+    if (input.action === "begin") {
       yield* queueStep(() => this.#mailbox.beginQueueEdit(agentId, input.deliveryId, input.editId));
-    else {
+      this.wakeAfterEditHold(agentId);
+    } else {
       if (input.action === "retain-attachments")
         yield* queueStep(() =>
           this.#mailbox.retainQueueEditAttachments(agentId, input.deliveryId, input.editId, input.attachmentDraftIds),

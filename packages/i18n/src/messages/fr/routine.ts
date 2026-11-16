@@ -233,6 +233,10 @@ export const messages = {
   "routine.calendar.entryMeta": "{when} · {schedule} · {status}",
   "routine.calendar.openAgent": "Ouvrir {name}",
   "routine.calendar.completed": "Terminée",
+  "routine.calendar.new": "Nouvelle routine",
+  "routine.calendar.newOn": "Nouvelle routine le {day}",
+  "routine.calendar.agent": "Agent",
+  "routine.calendar.agentChoice": "Agent : {name}",
 
   "routine.settings.loadFailed": "Impossible de charger les routines.",
   "routine.settings.loadRunsFailed": "Impossible de charger l’historique des exécutions.",

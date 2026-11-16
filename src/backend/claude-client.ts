@@ -43,6 +43,7 @@ import {
   startClaudePlanTurn,
 } from "./agent/plan-updates";
 import { isBalanceDiagnostic, isPlanLimitDiagnostic } from "./agent/provider-diagnostics";
+import { ROUTINE_NO_UPDATE_TOOL } from "./agent/routine-quiet-runs";
 import {
   endSubagentTurn,
   foldClaudeSubagentCall,
@@ -329,26 +330,42 @@ const OPENBOT_CLAUDE_CLIENT = {
  * more text. When a step ends with no text, Claude Code asks the model for a visible answer, and the agent
  * wrote its channel result again (#6923). The CLI does not ask after a successful call of a tool in
  * `CLAUDE_CODE_TERMINAL_MCP_TOOLS` (2.1.309 and 2.1.322). A refused call is a failed call
- * (`terminalChannelRefusal`), so after a refusal the CLI still asks. The CLI knows only the direct
+ * (`terminalToolRefusal`), so after a refusal the CLI still asks. The CLI knows only the direct
  * name of a tool, not a call through `tool_call`, so a channel thread gets these tools directly.
  */
 const CLAUDE_TERMINAL_CHANNEL_TOOLS: readonly string[] = [
   "mcp__openbot__channel_result",
   "mcp__openbot__channel_reply",
 ];
+/**
+ * The no-update tool ends a quiet turn in the same way: its `quiet` result tells the agent to end the
+ * turn. Without it in `CLAUDE_CODE_TERMINAL_MCP_TOOLS`, the CLI asked again, and after a teammate's
+ * request the agent wrote its result once more in the user's chat (#7465). Every thread has the tool.
+ * Any other result is a failed call (`terminalToolRefusal`), so the CLI still asks for the answer.
+ */
+const CLAUDE_TERMINAL_NO_UPDATE_TOOL = `mcp__openbot__${ROUTINE_NO_UPDATE_TOOL}`;
+
+/** The tools that end a Claude turn: the no-update tool, and in a channel thread the channel tools. */
+function claudeTerminalTools(channelTools: boolean): readonly string[] {
+  return channelTools
+    ? [CLAUDE_TERMINAL_NO_UPDATE_TOOL, ...CLAUDE_TERMINAL_CHANNEL_TOOLS]
+    : [CLAUDE_TERMINAL_NO_UPDATE_TOOL];
+}
 
 /**
- * A refused call of a tool in `CLAUDE_TERMINAL_CHANNEL_TOOLS` (`accepted: false`). The agent still
- * has work to do, so Claude gets the refusal as a failed call, and the CLI asks for an answer when the
- * turn then ends empty, as before #6923. The other providers keep the refusal as a result.
+ * A refused call of a tool in `CLAUDE_TERMINAL_CHANNEL_TOOLS` (`accepted: false`), or a no-update call
+ * that does not end the turn quiet (`shown`: someone waits for the answer). The agent still has work to
+ * do, so Claude gets it as a failed call, and the CLI asks for an answer when the turn then ends empty,
+ * as before #6923. The other providers keep the result as it is.
  */
-function terminalChannelRefusal(namespace: string, name: string, content: CallToolResult["content"]): boolean {
-  if (namespace !== "openbot" || !CLAUDE_TERMINAL_CHANNEL_TOOLS.includes(`mcp__openbot__${name}`)) return false;
+function terminalToolRefusal(namespace: string, name: string, content: CallToolResult["content"]): boolean {
+  if (namespace !== "openbot" || !claudeTerminalTools(true).includes(`mcp__openbot__${name}`)) return false;
   const [first] = content;
   if (first?.type !== "text") return false;
   try {
     const value = JSON.parse(first.text);
-    return isRecord(value) && value.accepted === false;
+    if (!isRecord(value)) return false;
+    return name === ROUTINE_NO_UPDATE_TOOL ? value.status !== "quiet" : value.accepted === false;
   } catch {
     return false;
   }
@@ -678,6 +695,24 @@ const readClaudeSettingsFile = Effect.fn("readClaudeSettingsFile")(function* (pa
   const record: DynamicRecord = isDynamicRecord(parsed) ? parsed : {};
   return record;
 });
+
+/**
+ * The copied user `env` without the variables that choose the API and its credential, when OpenBot
+ * gives the process a gateway of its own: the provider's variables set `ANTHROPIC_BASE_URL`, with a
+ * token or a key. The flag settings come before the process environment, so the copy would send the
+ * requests to the user's own gateway. With the user setup the user settings file loads as it is, and
+ * its values still win.
+ */
+function withoutReplacedGateway(
+  settings: Settings,
+  environment: Readonly<Record<string, string>> | undefined,
+): Settings {
+  if (!environment?.ANTHROPIC_BASE_URL || !settings.env) return settings;
+  const replaced = new Set<string>([...CLAUDE_OTHER_API_VARIABLES, "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY"]);
+  const env = Object.fromEntries(Object.entries(settings.env).filter(([name]) => !replaced.has(name)));
+  const { env: _copied, ...rest } = settings;
+  return Object.keys(env).length > 0 ? { ...rest, env } : rest;
+}
 
 /**
  * The sign-in part of the user settings, for a query that does not load the user settings: the
@@ -1408,7 +1443,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     // The user setup brings the whole user settings file. A profile generation loads no settings
     // files, but it still needs the sign-in keys: without them a gateway set in `env` is lost (#6025).
     const userSettingsFile = yield* readClaudeSettingsFile(join(configDirectory, "settings.json"));
-    const signInSettings: Settings = userSetup ? {} : claudeSignInSettings(userSettingsFile);
+    const signInSettings: Settings = userSetup
+      ? {}
+      : withoutReplacedGateway(claudeSignInSettings(userSettingsFile), this.#agentEnvironment?.());
     const homeSkillPlugin =
       stateDirectory && userSetup
         ? yield* claudeHomeSkillPlugin(stateDirectory, configDirectory, config.cwd).pipe(
@@ -1572,9 +1609,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             // kept a second store under `~/.claude/projects` that the app cannot see, and its rules
             // took about 0.7k tokens in each request. The files stay on disk.
             CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1",
-            ...(config.channelTools && handoff
-              ? { CLAUDE_CODE_TERMINAL_MCP_TOOLS: CLAUDE_TERMINAL_CHANNEL_TOOLS.join(",") }
-              : {}),
+            ...(handoff ? { CLAUDE_CODE_TERMINAL_MCP_TOOLS: claudeTerminalTools(config.channelTools).join(",") } : {}),
           },
         },
       }),
@@ -2822,7 +2857,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     if (Array.isArray(result.contentItems)) {
       for (const item of result.contentItems) content.push(...dynamicContent(item));
     }
-    return { content, isError: result.success === false || terminalChannelRefusal(namespace, name, content) };
+    return { content, isError: result.success === false || terminalToolRefusal(namespace, name, content) };
   });
 
   readonly #requestUserInputEffect = Effect.fn("ClaudeAgentClient.requestUserInput")(function* (

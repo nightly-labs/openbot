@@ -114,7 +114,7 @@ export const messages = {
   "settings.sendShortcut.title": "קיצור שליחה",
   "settings.sendShortcut.description": "בחירת המקשים ששולחים הודעה במכשיר ובדפדפן הזה.",
   "settings.chatOrder.description":
-    "בחרו היכן סרגל הצד מציג צ'אטים שלא נקראו במכשיר הזה. ידני מכבה את הקבוצה לא נקראו.",
+    "בחרו איך סרגל הצד ממיין צ'אטים במכשיר הזה. ידני ופעילות אחרונה מכבים את הקבוצה לא נקראו.",
   "settings.sendShortcut.enter": "Enter לשליחה",
   "settings.sendShortcut.modEnterMac": "⌘Enter לשליחה",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter לשליחה",

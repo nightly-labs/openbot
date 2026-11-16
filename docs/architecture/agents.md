@@ -76,12 +76,26 @@ turn. Its prompt names `routine_no_update`, because a provider such as Claude Co
 write a visible answer, and without the tool each update put filler in the user's chat (#6821). A turn
 of only quiet routine runs and teammate updates settles as above, also on the empty-answer error
 path and in the history import. The desktop chat shows its quiet answers under the marker of the
-last update of the turn, which starts closed (`teammateUpdateAnswers`).
+last update or request of the turn, which starts closed (`teammateTurnAnswers`).
 
 A teammate's answer to a request that a quiet routine run sent continues that run, so nobody waits
 for its turn either (`answeredRequestId`, #8364). Such a turn ends quiet only after a call to
 `routine_no_update`: without the call its answer is a result and shows. The answer to a Test run's
 request always shows.
+
+A teammate's request that does not reply to a message of the agent ends quiet in the same way after
+the agent sent its result to that teammate with `send_message` (`quietTeammateTurnDelivery`, #7465).
+The turn does not need `routine_no_update`, and the prompt does not name it: Claude often does not
+load the tool, which waits behind its tool search. When only answered requests started the turn and
+its answers are text alone, that text repeats the reply, so it becomes quiet answers as after the tool
+call. A file, an image or a question keeps the whole turn in the chat. The tool still accepts a
+request: before the reply it answers that the agent must send the result first, but only when the
+missing reply is all that keeps the turn from a quiet end. Only the agent's own reply from the turn
+that ran the request counts (`MailboxStore.hasOwnReplyFrom`): the result that OpenBot relays when the
+turn ends, the note for a failed request and a reply from a later turn do not count, so the turn
+completion and the history import decide the same. The import also reads the stored file and question
+messages of the turn, because the provider history does not hold them. A reply to a message of the
+agent can hold the result that the user asked for, so it is never quiet.
 
 A completed turn that a teammate's message started (`origin: "agent"`: a request from another agent,
 or its answer) is work between agents. Its answer shows in the chat and counts as unread, but the
@@ -967,6 +981,19 @@ Computer Use, or notifications setting in one call. Each agent gets the checks o
 and its own `updateAgent` write, in order. A failure for one agent does not stop or undo the others,
 and the result reports `ok` with the new settings, or the error, for each agent id. A provider or
 model that is not listed fails the whole call before any write.
+`openbot.delete_agent` deletes up to 20 other local agents in one call, with their chats and files,
+through the same steps as the app's Delete agent: `AgentService.deleteAgent`, then the sidebar and
+Library places. A deletion cannot be undone, so the tool asks the owner on one owner-only card
+that names the agents, also when the agent has Full access, and a member cannot answer it. Only a
+person's message can start it: a routine, a channel task, an external chat, another agent or a
+team member's message gets an error and no card. The Team API lets an admin delete an agent from
+the app; the tool is stricter and asks only the owner. The tool refuses the caller's own id and an
+unknown id. Before the card it checks that each agent is idle; when one is not, it names each such
+agent and shows no card. The card adds the id to a name that another agent also has. After an
+accept it deletes the agents one after the other and reports `ok` or the error for each id. When
+the sidebar or Library cleanup fails after an agent is deleted, the tool logs it and reports the
+agent as deleted; the next start removes the places of agents that are gone. `scripts/agent-delete-tool-e2e.ts`
+checks these rules.
 An agent can only restrict access and Computer Use, for itself or a teammate. The router writes
 only a restriction, so a user change between its check and the write is never undone. Only the
 user widens them again, and only the user moves an agent between Ask first and Full access, and changes local script runs. An agent changes MCP servers only with the MCP server tools, after the user's request and approval. A new agent gets
@@ -979,9 +1006,10 @@ argument shapes used by both declarations. It reuses the profile, section, and r
 Claude uses the SDK’s `AskUserQuestion` flow instead of the `ask_user` MCP tool.
 There is no separate prompt-generation button or review dialog.
 
-Agents can organize teammates into flat sidebar sections through `list_sections`, `create_section`,
-`rename_section`, `delete_section`, and `assign_agent_section`. Assignment accepts a null section
-to ungroup an agent; deleting a section also ungroups its agents without deleting them. These tools
+Agents can organize teammates and channels into sidebar sections through `list_sections`,
+`create_section`, `rename_section`, `delete_section`, and `assign_agent_section`. Assignment takes an
+agent or channel id as `agentId` (the store files both under one key), and accepts a null section
+to ungroup it; deleting a section also ungroups its agents and channels without deleting them. These tools
 use the same `SidebarLayoutStore` as manual sidebar edits, including persistence, validation,
 and change events delivered to desktop and connected clients.
 

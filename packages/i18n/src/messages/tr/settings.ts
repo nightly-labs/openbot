@@ -117,7 +117,7 @@ export const messages = {
   "settings.sendShortcut.title": "Gönderme kısayolu",
   "settings.sendShortcut.description": "Bu cihazda ve tarayıcıda mesaj gönderen tuşları seçin.",
   "settings.chatOrder.description":
-    "Kenar çubuğunun okunmamış sohbetleri bu cihazda nerede göstereceğini seçin. Elle, Okunmamış grubunu kapatır.",
+    "Kenar çubuğunun sohbetleri bu cihazda nasıl sıralayacağını seçin. Elle ve Son etkinlik, Okunmamış grubunu kapatır.",
   "settings.sendShortcut.enter": "Göndermek için Enter",
   "settings.sendShortcut.modEnterMac": "Göndermek için ⌘Enter",
   "settings.sendShortcut.modEnterWin": "Göndermek için Ctrl+Enter",

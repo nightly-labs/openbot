@@ -49,6 +49,7 @@ export const messages = {
   "status.agent.browserProfileOwn": "امنح كل واحد من {agents} ملف تعريف متصفح خاصًا به. تُغلق علاماتهم المفتوحة.",
   "status.agent.feedbackSending": "جارٍ إرسال ملاحظاتك إلى فريق OpenBot…",
   "status.agent.workflowDelete": "احذف سير العمل {title} مع عمليات تشغيله وإصداراته. تتوقف خطواته المفتوحة.",
+  "status.agent.deleteAgents": "احذف {agents} مع محادثاتهم وملفاتهم. لا يمكنك التراجع عن ذلك.",
   "status.agent.vaultCardFillFrames": "حقول البطاقة موجودة في إطارات من {origins}.",
   "status.agent.linkCardFill":
     "تعبئة بطاقة Link لمرة واحدة {card} في {site}. وافقت على هذا الدفع في Link لصالح {merchant}.",

@@ -5,6 +5,7 @@ import {
   isAgentProvider,
   isInstallerProvider,
   isKeyOnlyProvider,
+  isProviderEnvironmentProvider,
   PROMPT_CACHE_TTLS,
   type PromptCacheTtl,
   type ProviderAccountPool,
@@ -32,6 +33,7 @@ import Star from "lucide-react-native/icons/star";
 import UserPlus from "lucide-react-native/icons/user-plus";
 import UserRound from "lucide-react-native/icons/user-round";
 import Users from "lucide-react-native/icons/users";
+import Variable from "lucide-react-native/icons/variable";
 import X from "lucide-react-native/icons/x";
 import { useRef, useState } from "react";
 import { Alert, View } from "react-native";
@@ -440,6 +442,18 @@ export function ServerProviderScreen() {
               />
             </SettingsRow>
           ) : null}
+        </SettingsSection>
+      ) : null}
+      {!off && admin.environment && isProviderEnvironmentProvider(provider) ? (
+        <SettingsSection title={t("mobile.server.environment.title")}>
+          <SettingsRow
+            leading={<RowIcon icon={Variable} />}
+            onPress={() =>
+              router.push({ pathname: "/server-settings/provider-environment", params: { serverId, provider } })
+            }
+          >
+            <Typography.Paragraph>{t("mobile.server.environment.row")}</Typography.Paragraph>
+          </SettingsRow>
         </SettingsSection>
       ) : null}
       {provider === "claude" && !off && admin.promptCache ? (

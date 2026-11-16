@@ -15,6 +15,7 @@ import {
   type BrowseAgentFoldersInput,
   type ChatColors,
   type ClaudeCompactWindowSetting,
+  DEFAULT_CUSTOM_PROVIDER_HARNESS,
   type DiscordAccess,
   type DiscordRoleList,
   decodeAgentAccessSnapshot,
@@ -39,6 +40,9 @@ import {
   isWhatsAppGroupList,
   isWhatsAppWorkingMessageList,
   type MessagingWorkspaceInput,
+  type ProviderEnvironment,
+  type ProviderEnvironmentProvider,
+  type ProviderEnvironmentUpdate,
   type RemoveWhatsAppSenderInput,
   type ResetAgentSessionSettingInput,
   type ServerAuditLog,
@@ -78,7 +82,8 @@ import {
   decodeClaudeCompactWindowResponse,
 } from "@openbot/contracts/team-protocol/claude-compact-window-v1";
 import { CUSTOM_AGENTS_ROUTES } from "@openbot/contracts/team-protocol/custom-agents-v1";
-import type { CUSTOM_PROVIDER_EDIT_ROUTES } from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
+import { CUSTOM_PROVIDER_EDIT_ROUTES } from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
+import { CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES } from "@openbot/contracts/team-protocol/custom-provider-harness-choice-v1";
 import type { CUSTOM_PROVIDER_HARNESS_ROUTES } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import { DISCORD_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/discord-access-v1";
 import { HOST_APPEARANCE_ROUTES, type ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
@@ -93,6 +98,10 @@ import { MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-re
 import { MODEL_VISIBILITY_ROUTES } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { PROMPT_CACHE_TTL_ROUTES } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
 import { PROVIDER_DEFAULT_ROUTES } from "@openbot/contracts/team-protocol/provider-default-v1";
+import {
+  decodeProviderEnvironmentResponse,
+  PROVIDER_ENVIRONMENT_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-environment-v1";
 import type { PROVIDERS_V5_ROUTES } from "@openbot/contracts/team-protocol/providers-v5";
 import { PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-v8";
 import { SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
@@ -1039,6 +1048,29 @@ export function setHostClaudeCompactWindow(
   );
 }
 
+/** `provider-environment-v1`: the variables of one provider of the host. A sensitive value has an empty `value`. */
+export function getHostProviderEnvironment(
+  request: TeamApiRequest,
+  provider: ProviderEnvironmentProvider,
+): Effect.Effect<ProviderEnvironment, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", PROVIDER_ENVIRONMENT_ROUTES.settings, decodeProviderEnvironmentResponse, { provider }),
+  );
+}
+
+/** `provider-environment-v1`: replaces the variables of one provider. `value: null` keeps a stored sensitive value. */
+export function setHostProviderEnvironment(
+  request: TeamApiRequest,
+  update: ProviderEnvironmentUpdate,
+): Effect.Effect<ProviderEnvironment, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", PROVIDER_ENVIRONMENT_ROUTES.update, decodeProviderEnvironmentResponse, {
+      provider: update.provider,
+      variables: update.variables.map(({ name, value, sensitive }) => ({ name, value, sensitive })),
+    }),
+  );
+}
+
 /** `model-visibility-v1`: every model of one provider of the host, and the ones its model picker shows. */
 export function getHostModelVisibility(
   request: TeamApiRequest,
@@ -1699,11 +1731,13 @@ export function checkProviderRuntimeUpdates(
 }
 
 /**
- * The custom endpoint routes of a host: `custom-provider-edit-v1` also names the header names of each
- * endpoint and can edit one, `custom-provider-harness-v1` names the harness of each endpoint, and
- * `providers-v1` does neither. The caller picks by the host's capabilities.
+ * The custom endpoint routes of a host: `custom-provider-harness-choice-v1` also lets a save or an
+ * edit name the harness, `custom-provider-edit-v1` also names the header names of each endpoint and
+ * can edit one, `custom-provider-harness-v1` names the harness of each endpoint, and `providers-v1`
+ * does neither. The caller picks by the host's capabilities.
  */
 export type CustomProviderRoutes =
+  | typeof CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES
   | typeof CUSTOM_PROVIDER_EDIT_ROUTES
   | typeof CUSTOM_PROVIDER_HARNESS_ROUTES
   | typeof PROVIDERS_ADMIN_ROUTES;
@@ -1725,29 +1759,37 @@ export function saveCustomProvider(
       ...input,
       models: input.models.map(({ id, name }) => ({ id, name })),
       headers: input.headers.map(({ name, value }) => ({ name, value })),
+      // The harness choice route needs a harness; with none, the endpoint runs on the default one.
+      ...(routes === CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES
+        ? { harness: input.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS }
+        : {}),
     }),
   );
 }
 
 /**
  * `custom-provider-edit-v1`: changes a saved endpoint in place. An absent key or header list keeps the
- * saved one, and a header with a `null` value keeps its saved value. The host keeps the harness and
- * the model settings, so neither goes on the wire.
+ * saved one, and a header with a `null` value keeps its saved value. The host keeps the model
+ * settings, so they do not go on the wire. With `custom-provider-harness-choice-v1`, an edit that
+ * names a harness moves the endpoint to it; otherwise the endpoint keeps its harness.
  */
 export function updateCustomProvider(
   request: TeamApiRequest,
   input: UpdateCustomProviderInput,
-  routes: typeof CUSTOM_PROVIDER_EDIT_ROUTES,
+  routes: typeof CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES | typeof CUSTOM_PROVIDER_EDIT_ROUTES,
 ): Effect.Effect<CustomProviderResult, TeamAdminRequestError> {
+  const body = {
+    id: input.id,
+    name: input.name,
+    baseUrl: input.baseUrl,
+    models: input.models.map(({ id, name }) => ({ id, name })),
+    ...(input.apiKey !== undefined ? { apiKey: input.apiKey } : {}),
+    ...(input.headers !== undefined ? { headers: input.headers.map(({ name, value }) => ({ name, value })) } : {}),
+  };
   return adminCall(() =>
-    request("POST", routes.customUpdate, decodeCustomProviderResult, {
-      id: input.id,
-      name: input.name,
-      baseUrl: input.baseUrl,
-      models: input.models.map(({ id, name }) => ({ id, name })),
-      ...(input.apiKey !== undefined ? { apiKey: input.apiKey } : {}),
-      ...(input.headers !== undefined ? { headers: input.headers.map(({ name, value }) => ({ name, value })) } : {}),
-    }),
+    routes === CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES && input.harness !== undefined
+      ? request("POST", routes.customUpdate, decodeCustomProviderResult, { ...body, harness: input.harness })
+      : request("POST", CUSTOM_PROVIDER_EDIT_ROUTES.customUpdate, decodeCustomProviderResult, body),
   );
 }
 

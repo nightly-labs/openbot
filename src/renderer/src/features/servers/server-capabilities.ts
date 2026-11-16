@@ -79,6 +79,7 @@ export function serverSupportsCapability(
       capability === "providers-v5" ||
       capability === "custom-provider-harness-v1" ||
       capability === "custom-provider-edit-v1" ||
+      capability === "custom-provider-harness-choice-v1" ||
       capability === "agent-session-settings-v1" ||
       capability === "acp-registry-v1" ||
       capability === "host-admin-v1" ||
@@ -155,6 +156,7 @@ export function serverSupportsCapability(
       capability === "routine-run-command-v1" ||
       capability === "claude-user-setup-v1" ||
       capability === "claude-compact-window-v1" ||
+      capability === "provider-environment-v1" ||
       capability === "agent-usage-limit-v1" ||
       capability === "hermes-import-v1" ||
       capability === "provider-detection-v1") &&

@@ -599,6 +599,8 @@ function ServerSettings() {
     openServerSettings,
     serverSettingsTarget,
     serverSettingsSection,
+    setServerSettingsShownSection,
+    serverSettingsOpenRequest,
     serverSettingsOpen,
     setServerSettingsOpen,
     serverSettingsRestoreTarget,
@@ -749,6 +751,9 @@ function ServerSettings() {
           serverSupportsCapability(server, "custom-provider-edit-v1") &&
           endpoints.customProviders().every((provider) => provider.headerNames !== undefined);
         return editable ? endpoints.updateCustomProvider : undefined;
+      },
+      get customProviderHarnessChoice() {
+        return !local && serverSupportsCapability(server, "custom-provider-harness-choice-v1");
       },
       get providerKeys() {
         return providerRuntimeDownloadsAvailable() ? providerKeys() : undefined;
@@ -962,12 +967,15 @@ function ServerSettings() {
           hostPromptCacheTtl={{}}
           claudeUserSetup={{}}
           claudeCompactWindow={{}}
+          providerEnvironment={{}}
           hostModelVisibility={{}}
           hostDefaultProvider={{}}
           agentAccess={{ listAgents: () => appPort().agent.listAgents(server().id) }}
           serverAudit={{ listAgents: () => appPort().agent.listAgents(server().id) }}
           agentDefaults={{ listAgents: () => appPort().agent.listAgents(server().id) }}
           initialSection={serverSettingsSection()}
+          initialSectionRequest={serverSettingsOpenRequest()}
+          onSectionChange={setServerSettingsShownSection}
           // Any member imports into this computer or a remote host with `agent-import-v1`.
           agentImport={
             serverSupportsCapability(server(), "agent-import-v1")

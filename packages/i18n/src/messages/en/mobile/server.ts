@@ -1426,6 +1426,22 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.providers.compactWindowDefault": "Claude Code default",
   "mobile.server.providers.compactWindowTokens": "{size} tokens",
   "mobile.server.providers.compactWindowLoadFailed": "Could not load the compaction size of this server.",
+  "mobile.server.environment.row": "Variables",
+  "mobile.server.environment.title": "Environment",
+  "mobile.server.environment.hint":
+    "API keys, base URLs and other settings that each {name} process gets. A change applies when the current turns end.",
+  "mobile.server.environment.codexHint":
+    "OPENAI_BASE_URL, with OPENAI_API_KEY as its key, sends the model requests of ChatGPT to that address.",
+  "mobile.server.environment.shellNote": "The commands that agents run can read these values.",
+  "mobile.server.environment.add": "Add variable",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "Value",
+  "mobile.server.environment.saved": "Saved",
+  "mobile.server.environment.sensitive": "Sensitive",
+  "mobile.server.environment.remove": "Remove",
+  "mobile.server.environment.save": "Save",
+  "mobile.server.environment.loadFailed": "Could not load the variables of {name}.",
+  "mobile.server.environment.invalid": "Correct the names first.",
   "mobile.server.providers.disconnect": "Disconnect",
   "mobile.server.providers.disconnectTitle": "Disconnect {name}?",
   "mobile.server.providers.disconnectBody":

@@ -95,6 +95,7 @@ function openbotGuidance(namespace: string, tool: string): string {
     case "update_profile":
     case "update_agents":
     case "set_browser_profile":
+    case "delete_agent":
     case "read_agent":
     case "list_models":
     case "list_local_skills":
@@ -103,9 +104,10 @@ function openbotGuidance(namespace: string, tool: string): string {
     case "set_skill_enabled":
     case "uninstall_skill":
       return [
-        "Use openbot.create_agent when the user asks for a new persistent teammate: take its name, title, description, and optional generated avatar from the request, and give its first task. Keep create_agent simple and configure the agent after it exists. When the new agent needs scheduled work, create that routine yourself with openbot.create_routine and the new agent's id; do not ask the new agent to schedule it. For a specific provider, model, or reasoning effort, call openbot.list_models and pass only values that it lists; otherwise omit them, and the new agent uses yours.",
+        "Use openbot.create_agent when the user asks for a new persistent teammate: take its name, title, description, and optional generated avatar from the request, and give its first task. Keep create_agent simple and configure the agent after it exists. When the new agent needs scheduled work, create that routine yourself with openbot.create_routine and the new agent's id; do not ask the new agent to schedule it. For a specific provider, model, or reasoning effort, call openbot.list_models and pass only values that it lists; otherwise omit them, and the new agent uses yours. OpenBot can use any OpenAI-compatible API (a gateway or a local model server) as a custom provider: the user adds it in Server settings > Providers > Custom provider, and list_models shows it in customProviders. Never say that OpenBot cannot use such an API.",
         "Call openbot.read_agent (without agentId for yourself) before you change an agent: it shows the profile, model, account, backup models, access, Computer Use, notifications, auto-approve, browser profile, skills, routines, and MCP servers. openbot.update_profile changes a local agent's name, title, description, avatar, provider, model, reasoning effort, account, and backup models; pass only the values and account ids that openbot.list_models lists. You see account ids and labels, never credentials. For the same change on several agents, call openbot.update_agents once, then report which agents failed and why. Change another agent only when the user's request calls for it.",
         "For an avatar color, pass avatarHue; never make an image for a color. Pass avatarPath only for an image that the user gives or asks for: make a square PNG, JPEG, or WebP copy if needed, best 512 by 512 pixels, up to 512 KB; keep the original. avatarSeed or avatarHue goes back to a generated avatar.",
+        "To delete agents, call openbot.delete_agent once with all their ids; the owner approves one card. First move what the user wants to keep to an agent that stays. The user deletes you from your sidebar menu.",
         "To keep the sign-ins of clients or teams apart when the user asks, put each team on one browser profile with openbot.set_browser_profile. Reuse a name from read_agent's browserProfileNames. Do not suggest another browser.",
         "To give an agent a local skill, call openbot.list_local_skills, then openbot.install_local_skill with its agentId. Use openbot.set_skill_enabled and openbot.uninstall_skill with the skillId from read_agent. update_profile can limit access to the workspace, turn Computer Use off, or change notifications. Only the user can give Full access, turn Computer Use on, or change auto-approve, so say when a task needs that. MCP servers apply to every agent: change them with the MCP server tools, and only when the user asks.",
       ].join("\n");
@@ -116,7 +118,7 @@ function openbotGuidance(namespace: string, tool: string): string {
     case "delete_section":
       return [
         RECIPIENT_RULE,
-        `openbot.list_sections shows the sidebar sections (folders), their agents, and the parentId of a nested folder, up to ${SIDEBAR_FOLDER_LEVELS} levels. Only the user nests folders, in the sidebar. To group agents, reuse a matching section or call openbot.create_section, then call openbot.assign_agent_section for each agent id from openbot.list_agents; sectionId null ungroups an agent. openbot.delete_section keeps the agents.`,
+        `openbot.list_sections shows the sidebar sections (folders), their agents and channels, and the parentId of nested folders, up to ${SIDEBAR_FOLDER_LEVELS} levels. Only the user nests folders. To group them, reuse a matching one or call openbot.create_section, then call openbot.assign_agent_section for each id from openbot.list_agents or openbot.list_channels; sectionId null ungroups it. openbot.delete_section keeps them.`,
       ].join("\n");
     case "list_routines":
     case "create_routine":
@@ -151,7 +153,7 @@ function openbotGuidance(namespace: string, tool: string): string {
         "When a chart, a table, a diagram, an image collage, or a mockup needs scripts or a CDN library, publish a self-contained page with openbot.html_render before your final answer. OpenBot shows it above the answer, so do not announce or repeat it; add only what it does not say.",
       ].join("\n");
     case "set_backdrop":
-      return "When the user asks you to set or change the backdrop, write one full-screen page and call openbot.set_backdrop; check it with openbot.html_preview first when you can. Give bubbles colors that match the scene, unless the user asks for the page only. To change it again, send the whole new page and its colors. Do not describe the scene again in your reply.";
+      return "Check the page with openbot.html_preview first when you can. Give matching bubbles colors unless the user wants the page only.";
     case "react_to_user_message":
       return "React to clear emotional moments. Wins, affection, gratitude, playful humor, sadness, disappointment, frustration, loneliness, and strong approval normally get one fitting reaction; do not skip them. Negative emotions get an empathetic reaction, such as ❤️, 😔, or 🫂. An emoji in your answer is not a reaction: when you use one for the user's emotion, also react. Skip neutral, informational, or routine messages, and do not react on every turn.";
     case "pin_message":

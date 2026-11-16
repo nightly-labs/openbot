@@ -22,6 +22,7 @@ import { interruptAgentToolSchema } from "./agent/agent-interrupt-tool";
 import { setBrowserProfileToolSchema } from "./agent/browser-profile-tool";
 import { createChannelToolSchema, listChannelsToolSchema, updateChannelToolSchema } from "./agent/channel-agent-tools";
 import { DATA_TOOL_DEFINITIONS } from "./agent/data-tools";
+import { deleteAgentToolSchema } from "./agent/delete-agent-tool";
 import { HISTORY_TOOL_DEFINITIONS } from "./agent/history-tools";
 import { readImageToolShape } from "./agent/image-reader";
 import { libraryFolderArgument, listLibraryFoldersToolSchema } from "./agent/library-folder-tools";
@@ -109,15 +110,15 @@ export const htmlRenderToolSchema = z.object({
 const backdropBubbleColor = z.string().regex(/^#[0-9a-fA-F]{6}$/u, "Use a #rrggbb color.");
 
 export const setBackdropToolSchema = z.object({
-  html: z.string().min(1).max(CHAT_VISUAL_HTML_LIMIT).describe("A complete, self-contained HTML document."),
-  title: z.string().trim().min(1).max(CHAT_VISUAL_TITLE_LIMIT).describe("A short name for the scene."),
+  html: z.string().min(1).max(CHAT_VISUAL_HTML_LIMIT).describe("A full self-contained HTML document."),
+  title: z.string().trim().min(1).max(CHAT_VISUAL_TITLE_LIMIT).describe("A short scene name."),
   bubbles: z
     .object({
-      yours: backdropBubbleColor.optional().describe("The color of the user's own chat bubbles."),
-      agents: backdropBubbleColor.optional().describe("The color of the agents' chat bubbles."),
+      yours: backdropBubbleColor.optional().describe("The user's bubbles."),
+      agents: backdropBubbleColor.optional().describe("Your bubbles."),
     })
     .optional()
-    .describe("Chat bubble colors that match the scene. They show only while this backdrop shows."),
+    .describe("Bubble colors that match the scene."),
 });
 
 const CHAT_VISUAL_PREVIEW_MIN_WIDTH = 240;
@@ -348,7 +349,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   },
   {
     name: "set_backdrop",
-    description: `Put an HTML page behind the user's whole OpenBot window, as a full-screen animated scene or picture. Use it when the user asks you to set, change or animate the backdrop; do not use it unasked. To change the scene later, call it again with the whole new page: it replaces the page that you set before. The page runs in the same sandbox as an html_render page and gets no clicks or keys, so do not build controls. Fill the whole frame (html and body at 100% width and height, or a fixed full-screen canvas that follows resize). Keep the center calm and dark or plain, because the chat shows over it, and do not draw text. Use requestAnimationFrame for motion, and stop motion when prefers-reduced-motion is set. For a full theme, give bubbles colors that match the scene: yours colors the user's bubbles, and agents colors the bubbles of your replies. A new backdrop shows on each device that shows this chat and replaces what the user chose; the user can undo it. Your reply must not repeat the page.`,
+    description: `Put a full-screen HTML scene behind the user's whole OpenBot window. Use it only when the user asks to set or change the backdrop. Each call replaces your last page, so send the whole new page. It runs in the html_render sandbox with no clicks or keys: build no controls. Fill the frame and follow resize. Keep the center plain because the chat shows over it, and draw no text. Animate with requestAnimationFrame and stop for prefers-reduced-motion. The user can undo it. Do not repeat the page in your reply.`,
     shape: setBackdropToolSchema.shape,
   },
   {
@@ -390,13 +391,13 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "list_sections",
     description:
-      "List sidebar sections (folders), their stable ids, and agent assignments before choosing message recipients or grouping agents.",
+      "List sidebar sections (folders), their stable ids, and assigned agents and channels before choosing message recipients or grouping.",
     shape: {},
   },
   {
     name: "create_section",
     description:
-      "Create a sidebar section (folder) to group existing agents. List sections first and reuse an existing matching section.",
+      "Create a sidebar section (folder) to group agents and channels. List sections first; reuse a matching one.",
     shape: createSectionToolSchema.shape,
   },
   {
@@ -411,7 +412,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   },
   {
     name: "assign_agent_section",
-    description: "Move an existing agent into a sidebar section. Pass null for sectionId to ungroup it.",
+    description: "Move an agent or channel (id as agentId) into a sidebar section. Null sectionId ungroups it.",
     shape: assignAgentSectionToolSchema.shape,
   },
   {
@@ -485,6 +486,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     description:
       "Move local agents to one browser profile when the user asks. A profile holds sign-ins and cookies, which its agents share. The owner approves each change on a card. Moved agents lose their open tabs.",
     shape: setBrowserProfileToolSchema.shape,
+  },
+  {
+    name: "delete_agent",
+    description:
+      "Delete other local agents with their chats and files when the user asks. The owner approves each call on a card; it cannot be undone. A busy agent cannot be deleted. The result gives ok or the error for each agent.",
+    shape: deleteAgentToolSchema.shape,
   },
   {
     name: "start_new_chat",

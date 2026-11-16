@@ -53,6 +53,7 @@ export const messages = {
   "status.agent.feedbackSending": "フィードバックを OpenBot チームに送信しています…",
   "status.agent.workflowDelete":
     "ワークフロー {title} を実行履歴とバージョンごと削除します。実行中のステップは停止します。",
+  "status.agent.deleteAgents": "{agents} をチャットとファイルごと削除します。元に戻せません。",
   "status.agent.screenCaptureProgress": "画面のキャプチャを要求しています…",
   "status.agent.screenCaptureReviewing": "画面のキャプチャを確認しています…",
   "status.agent.browserOpening": "Web ページを開いています…",

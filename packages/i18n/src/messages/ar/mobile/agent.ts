@@ -670,6 +670,7 @@ export const messages = {
   "mobile.agent.home.markAllRead": "تعليم الكل كمقروء",
   "mobile.agent.home.sort.title": "ترتيب الدردشات",
   "mobile.agent.home.sort.manual": "يدوي",
+  "mobile.agent.home.sort.recent": "النشاط الأخير",
   "mobile.agent.home.sort.unreadGroup": "غير المقروءة في مجموعة",
   "mobile.agent.home.sort.unreadFirst": "غير المقروءة أولًا في المجلدات",
   "mobile.agent.route.appearance": "المظهر",

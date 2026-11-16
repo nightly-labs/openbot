@@ -6,6 +6,7 @@ import type {
   AgentProviderStatus,
   AgentReasoningEffort,
   AgentSummary,
+  CustomProviderHarness,
   ProviderAccountStatus,
   UpdateAgentInput,
 } from "@openbot/contracts/ipc";
@@ -125,6 +126,71 @@ export interface ListModelsRequest {
   query?: string | undefined;
   /** The models that agents on this computer use now, as their model or as a backup model. */
   inUse?: readonly Pick<AgentModelChoice, "provider" | "model">[];
+  /** The custom endpoints that the user saved, so an agent can find their models (#6471). */
+  customEndpoints?: readonly ListedCustomEndpoint[];
+}
+
+/** A saved custom endpoint as `list_models` reads it: no base URL, key or headers. */
+export interface ListedCustomEndpoint {
+  id: string;
+  name: string;
+  /** The provider that runs the endpoint. Its models are listed under it as `<id>/<model>`. */
+  provider: CustomProviderHarness;
+  /** True while the provider has not read the last save: it reads it after its current task stops. */
+  loading: boolean;
+}
+
+/** Where the user adds or changes a custom endpoint. An agent cannot do it. */
+const CUSTOM_PROVIDER_SETTINGS = `${FIX_IN} > Custom provider`;
+
+interface CustomEndpointModels {
+  id: string;
+  name: string;
+  provider: CustomProviderHarness;
+  /** The first model ids, as `update_profile` and `create_agent` take them. */
+  models: string[];
+  omittedModels?: number;
+  /** Why the endpoint lists no model now. */
+  message?: string;
+}
+
+/**
+ * The saved endpoints with their first model ids. Agents did not find these models among the many
+ * models of OpenCode, and told the user that OpenBot cannot use an OpenAI-compatible service (#6471).
+ */
+function customEndpointModels(
+  endpoints: readonly ListedCustomEndpoint[],
+  models: readonly AgentModelOption[],
+  statuses: readonly ProviderStatusRow[],
+  words: readonly string[],
+): CustomEndpointModels[] {
+  return endpoints.flatMap((endpoint) => {
+    const runner = providerLabel(endpoint.provider);
+    // A provider that cannot run lists no model, also when the catalogue keeps some (#7866).
+    const canRun = providerCanRun(endpoint.provider, statuses);
+    const own = canRun
+      ? models.filter((model) => model.provider === endpoint.provider && model.id.startsWith(`${endpoint.id}/`))
+      : [];
+    // A query keeps only the matching models, as it does in `providers`.
+    const matching = words.length > 0 ? own.filter((model) => matchesQuery(model, words)) : own;
+    const listed = matching.slice(0, SHORT_LIST_LENGTH).map((model) => model.id);
+    let message: string | undefined;
+    if (!canRun) message = `${runner} runs this endpoint and cannot run now. The user fixes it in ${FIX_IN}.`;
+    else if (endpoint.loading)
+      message = `${runner} reads the last change of this endpoint after its current task stops.`;
+    else if (own.length === 0)
+      message = `${runner} lists no model of this endpoint. The user checks it in ${CUSTOM_PROVIDER_SETTINGS}.`;
+    // An endpoint with models but no match for the query is left out, so the agent does not read it as empty.
+    if (listed.length === 0 && message === undefined) return [];
+    return {
+      id: endpoint.id,
+      name: endpoint.name,
+      provider: endpoint.provider,
+      models: listed,
+      ...(matching.length > listed.length ? { omittedModels: matching.length - listed.length } : {}),
+      ...(message === undefined ? {} : { message }),
+    };
+  });
 }
 
 /**
@@ -158,6 +224,8 @@ function matchesQuery(model: AgentModelOption, words: readonly string[]): boolea
  * A provider that the request names is there in each state in which it has no model, also when it is
  * off or not downloaded: a CLI of the user's own on `PATH` does not make it available, and the agent
  * got an empty list with no reason (#7647). A list of all providers leaves those rows out.
+ * `customProviders` names each saved custom endpoint, its first model ids, and where the user changes
+ * it, or why it lists no model (#6471).
  */
 export function listModelsPayload(
   models: AgentModelOption[],
@@ -176,6 +244,7 @@ export function listModelsPayload(
     message?: string;
     fixIn: string;
   }[];
+  customProviders?: { settings: string; endpoints: CustomEndpointModels[] };
 } {
   const words = request.query?.toLowerCase().split(/\s+/).filter(Boolean) ?? [];
   let resultRoom = QUERY_RESULT_LIMIT;
@@ -235,7 +304,24 @@ export function listModelsPayload(
         ]
       : [],
   );
-  return { preferredProvider, providers, ...(unavailableProviders.length > 0 ? { unavailableProviders } : {}) };
+  const endpoints = customEndpointModels(
+    (request.customEndpoints ?? []).filter(
+      (endpoint) => request.provider === undefined || endpoint.provider === request.provider,
+    ),
+    models,
+    statuses,
+    words,
+  );
+  return {
+    preferredProvider,
+    providers,
+    ...(unavailableProviders.length > 0 ? { unavailableProviders } : {}),
+    ...(endpoints.length > 0
+      ? {
+          customProviders: { settings: CUSTOM_PROVIDER_SETTINGS, endpoints },
+        }
+      : {}),
+  };
 }
 
 /** The account and backup models of an agent as `read_agent` and `update_profile` report them. */
