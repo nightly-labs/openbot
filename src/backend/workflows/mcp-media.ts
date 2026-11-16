@@ -26,6 +26,18 @@ export interface McpMediaSignIn {
   refresh: (rejected: string) => Effect.Effect<string | null, unknown>;
 }
 
+/** What a media service needs from the host: its sign-in, the input pictures, and Storage. */
+export interface McpMediaDependencies {
+  signIn: () => McpMediaSignIn | null;
+  resolveAttachment: (attachmentId: string) => Effect.Effect<{ path: string; mimeType: string } | null, unknown>;
+  store: (input: {
+    bytes: Uint8Array;
+    kind: WorkflowMediaKind;
+    name: string;
+    mimeType: string;
+  }) => Effect.Effect<{ id: string }, unknown>;
+}
+
 /** A failure whose `message` the user reads. It never holds a token. */
 export class McpMediaFailed extends Schema.TaggedError<McpMediaFailed>()("McpMediaFailed", {
   message: Schema.String,
@@ -33,6 +45,23 @@ export class McpMediaFailed extends Schema.TaggedError<McpMediaFailed>()("McpMed
 
 export const mediaFail = (message: string) => new McpMediaFailed({ message });
 export const mediaFailed = () => mediaFail(sourceText("error.workflow.mediaFailed"));
+
+/** Finds the file of each input picture. A missing file or a file that is not a picture fails the step. */
+export const resolveMediaInputs = Effect.fnUntraced(function* <Role>(
+  dependencies: McpMediaDependencies,
+  images: readonly { role: Role; attachmentId: string }[],
+) {
+  const files: { role: Role; path: string; mimeType: string }[] = [];
+  for (const image of images) {
+    const file = yield* dependencies
+      .resolveAttachment(image.attachmentId)
+      .pipe(Effect.mapError(() => mediaFail(sourceText("error.workflow.mediaInputMissing"))));
+    if (!file) return yield* mediaFail(sourceText("error.workflow.mediaInputMissing"));
+    if (!file.mimeType.startsWith("image/")) return yield* mediaFail(sourceText("error.workflow.mediaInputNotImage"));
+    files.push({ role: image.role, ...file });
+  }
+  return files;
+});
 
 /** The longest reason from a service that an error quotes. */
 const REASON_LIMIT = 300;
@@ -134,7 +163,7 @@ function toolValue(result: unknown): { value: DynamicRecord | null; error: strin
 }
 
 /** One value in the arguments of a tool call. An absent value is left out of the JSON. */
-export type McpToolValue =
+type McpToolValue =
   | string
   | number
   | boolean

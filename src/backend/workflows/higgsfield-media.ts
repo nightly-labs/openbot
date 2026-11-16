@@ -21,6 +21,7 @@ import {
   creditCount,
   downloadMedia,
   isHttps,
+  type McpMediaDependencies,
   type McpMediaFailed,
   type McpMediaSignIn,
   type McpToolArguments,
@@ -29,6 +30,7 @@ import {
   mediaReason,
   mediaText,
   pictureExtension,
+  resolveMediaInputs,
   uploadToService,
 } from "./mcp-media";
 import type { MediaImageRole } from "./workflow-walk";
@@ -90,17 +92,6 @@ export interface HiggsfieldMediaRequest {
   prompt: string;
   specs: WorkflowMediaSpecs;
   images: readonly { role: MediaImageRole; attachmentId: string }[];
-}
-
-export interface HiggsfieldMediaDependencies {
-  signIn: () => McpMediaSignIn | null;
-  resolveAttachment: (attachmentId: string) => Effect.Effect<{ path: string; mimeType: string } | null, unknown>;
-  store: (input: {
-    bytes: Uint8Array;
-    kind: WorkflowMediaKind;
-    name: string;
-    mimeType: string;
-  }) => Effect.Effect<{ id: string }, unknown>;
 }
 
 const notSignedIn = () => mediaFail(sourceText("error.workflow.higgsfieldSignIn"));
@@ -285,21 +276,13 @@ const waitForFile = Effect.fnUntraced(function* (client: Client, job: string, ki
  * Makes one file with Higgsfield and keeps it in Storage. Answers the id of the stored attachment.
  */
 export const generateHiggsfieldMedia = Effect.fn("generateHiggsfieldMedia")(function* (
-  dependencies: HiggsfieldMediaDependencies,
+  dependencies: McpMediaDependencies,
   request: HiggsfieldMediaRequest,
 ) {
   const signIn = dependencies.signIn();
   if (!signIn) return yield* notSignedIn();
   const inputs = HIGGSFIELD_INPUTS[request.model] ?? { references: 0, frames: request.kind === "video" };
-  const files: { role: MediaImageRole; path: string; mimeType: string }[] = [];
-  for (const image of request.images) {
-    const file = yield* dependencies
-      .resolveAttachment(image.attachmentId)
-      .pipe(Effect.mapError(() => mediaFail(sourceText("error.workflow.mediaInputMissing"))));
-    if (!file) return yield* mediaFail(sourceText("error.workflow.mediaInputMissing"));
-    if (!file.mimeType.startsWith("image/")) return yield* mediaFail(sourceText("error.workflow.mediaInputNotImage"));
-    files.push({ role: image.role, ...file });
-  }
+  const files = yield* resolveMediaInputs(dependencies, request.images);
   const made = yield* Effect.scoped(
     Effect.gen(function* () {
       const client = yield* connectSignedIn(signIn, notSignedIn);

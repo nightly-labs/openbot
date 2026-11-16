@@ -21,6 +21,7 @@ import {
   creditCount,
   downloadMedia,
   isHttps,
+  type McpMediaDependencies,
   type McpMediaFailed,
   type McpMediaSignIn,
   type McpToolArguments,
@@ -29,6 +30,7 @@ import {
   mediaReason,
   mediaText,
   pictureExtension,
+  resolveMediaInputs,
   uploadToService,
 } from "./mcp-media";
 import type { MediaImageRole } from "./workflow-walk";
@@ -64,17 +66,6 @@ export interface SunraMediaRequest {
   prompt: string;
   specs: WorkflowMediaSpecs;
   images: readonly { role: MediaImageRole; attachmentId: string }[];
-}
-
-export interface SunraMediaDependencies {
-  signIn: () => SunraSignIn | null;
-  resolveAttachment: (attachmentId: string) => Effect.Effect<{ path: string; mimeType: string } | null, unknown>;
-  store: (input: {
-    bytes: Uint8Array;
-    kind: WorkflowMediaKind;
-    name: string;
-    mimeType: string;
-  }) => Effect.Effect<{ id: string }, unknown>;
 }
 
 /** The error for a refusal or a failed job, from the words of Sunra. */
@@ -194,20 +185,12 @@ const download = (url: string, kind: WorkflowMediaKind) =>
  * Makes one file with Sunra and keeps it in Storage. Answers the id of the stored attachment.
  */
 export const generateSunraMedia = Effect.fn("generateSunraMedia")(function* (
-  dependencies: SunraMediaDependencies,
+  dependencies: McpMediaDependencies,
   request: SunraMediaRequest,
 ) {
   const signIn = dependencies.signIn();
   if (!signIn) return yield* notSignedIn();
-  const files: { role: MediaImageRole; path: string; mimeType: string }[] = [];
-  for (const image of request.images) {
-    const file = yield* dependencies
-      .resolveAttachment(image.attachmentId)
-      .pipe(Effect.mapError(() => mediaFail(sourceText("error.workflow.mediaInputMissing"))));
-    if (!file) return yield* mediaFail(sourceText("error.workflow.mediaInputMissing"));
-    if (!file.mimeType.startsWith("image/")) return yield* mediaFail(sourceText("error.workflow.mediaInputNotImage"));
-    files.push({ role: image.role, ...file });
-  }
+  const files = yield* resolveMediaInputs(dependencies, request.images);
   const made = yield* Effect.scoped(
     Effect.gen(function* () {
       const client = yield* connectSignedIn(signIn, notSignedIn);

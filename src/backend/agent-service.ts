@@ -2982,28 +2982,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (this.#stopping) return { sunra: null, higgsfield: null } satisfies WorkflowMediaCredits;
     const sunraSignIn = only === "higgsfield" ? null : this.#mcp.serviceSignIn(SUNRA_MCP_HOST);
     const higgsfieldSignIn = only === "sunra" ? null : this.#mcp.serviceSignIn(HIGGSFIELD_MCP_HOST);
+    const orNull = <A>(read: Effect.Effect<A, { readonly message: string }>, service: string) =>
+      read.pipe(
+        Effect.catch((failure) =>
+          Effect.sync(() => {
+            logger.warn("Could not read the media credits.", { service, error: failure.message });
+            return null;
+          }),
+        ),
+      );
     const [sunra, higgsfield] = yield* Effect.all(
       [
-        sunraSignIn
-          ? readSunraCredits(sunraSignIn).pipe(
-              Effect.catch((failure) =>
-                Effect.sync(() => {
-                  logger.warn("Could not read the Sunra credits.", { error: failure.message });
-                  return null;
-                }),
-              ),
-            )
-          : Effect.succeed(null),
-        higgsfieldSignIn
-          ? readHiggsfieldCredits(higgsfieldSignIn).pipe(
-              Effect.catch((failure) =>
-                Effect.sync(() => {
-                  logger.warn("Could not read the Higgsfield credits.", { error: failure.message });
-                  return null;
-                }),
-              ),
-            )
-          : Effect.succeed(null),
+        sunraSignIn ? orNull(readSunraCredits(sunraSignIn), "sunra") : Effect.succeed(null),
+        higgsfieldSignIn ? orNull(readHiggsfieldCredits(higgsfieldSignIn), "higgsfield") : Effect.succeed(null),
       ],
       { concurrency: "unbounded" },
     );
