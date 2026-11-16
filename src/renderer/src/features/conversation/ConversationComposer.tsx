@@ -1,4 +1,4 @@
-import { type AgentProviderId, isKnownAgentProvider, providerSteersTurns } from "@openbot/contracts/agent-providers";
+import { type AgentProviderId, agentSteersTurns, isKnownAgentProvider } from "@openbot/contracts/agent-providers";
 import { supportedAttachmentExtensions } from "@openbot/contracts/attachment-files";
 import {
   type AccountUsageLimit,
@@ -307,8 +307,11 @@ export function ConversationComposer() {
       );
     return undefined;
   };
-  /** An ACP provider has no steer request, so its queued messages wait for the turn to end (#3689). */
-  const steers = () => !props.agent || providerSteersTurns(props.agent.provider);
+  /**
+   * An ACP provider has no steer request, so its queued messages wait for the turn to end (#3689). A
+   * custom agent steers when its model reports it (#4977).
+   */
+  const steers = () => !props.agent || agentSteersTurns(props.agent, props.modelOptions);
   /** Steer for a provider that can steer; else Send now, which stops the turn and runs the message next. */
   const sendQueued = () => (steers() ? props.onSteerQueuedMessage : props.onSendQueuedMessageNow);
   /** Tab sends the draft into the running turn, in place of Send and then Steer on its queue row. */

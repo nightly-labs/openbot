@@ -2,7 +2,12 @@ import { createHash, randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { AGENT_PROVIDERS, agentProviderDescriptor, customAgentIdOfModel } from "@openbot/contracts/agent-providers";
+import {
+  AGENT_PROVIDERS,
+  agentProviderDescriptor,
+  agentSteersTurns,
+  customAgentIdOfModel,
+} from "@openbot/contracts/agent-providers";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import { developmentStartingModel } from "@openbot/contracts/development-defaults";
 import type { FeedbackFacts } from "@openbot/contracts/feedback";
@@ -6673,7 +6678,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     // These reasons come first, so the sender is not told to select Steer when Steer would not help.
     // Only a message sent to steer gets a reason on its row.
     const steers = (agent.busyMessageMode ?? this.#busyMessageMode()) === "steer";
-    if (agentProviderDescriptor(providerForAgent(agent)).steer !== "native") {
+    // A custom agent steers only when its process reported `_session/steering` (`steersTurns`).
+    const model = this.#drain.modelForTurn(agent.id, steerTurnId) ?? agent.model;
+    if (!agentSteersTurns({ provider: providerForAgent(agent), model }, this.#endpoints.available())) {
       if (explain && steers) yield* this.#markSteerFallback(agent.id, deliveryId, "provider-unsupported");
       return "provider-unsupported";
     }

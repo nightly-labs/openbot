@@ -121,6 +121,7 @@ import { TEAM_MESSAGE_CLIENT_ID_CAPABILITY } from "./message-client-id-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "./message-delete-v1";
 import { MESSAGE_PINS_CAPABILITY } from "./message-pins-v1";
 import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "./mistral-code-sign-in-v1";
+import { MODEL_STEERING_CAPABILITY } from "./model-steering-v1";
 import { MODEL_VISIBILITY_CAPABILITY } from "./model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "./onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "./password-managers-v1";
@@ -360,6 +361,7 @@ export {
   MEMORY_REVIEW_CAPABILITY,
   MESSAGE_DELETE_CAPABILITY,
   MESSAGE_PINS_CAPABILITY,
+  MODEL_STEERING_CAPABILITY,
   MODEL_VISIBILITY_CAPABILITY,
   ONEPASSWORD_CONNECTOR_CAPABILITY,
   PASSWORD_MANAGERS_CAPABILITY,
@@ -665,6 +667,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
   PROVIDER_ACCOUNT_CODE_CAPABILITY,
   BROWSER_VAULT_SKIP_CAPABILITY,
+  MODEL_STEERING_CAPABILITY,
   TEAM_MEMORY_CHANGES_CAPABILITY,
 ] as const;
 
@@ -905,6 +908,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== HOST_APPEARANCE_CAPABILITY &&
     capability !== SIGN_IN_RELAY_DEEP_LINK_CAPABILITY &&
     capability !== BROWSER_VAULT_SKIP_CAPABILITY &&
+    capability !== MODEL_STEERING_CAPABILITY &&
     capability !== TEAM_MEMORY_CHANGES_CAPABILITY,
 );
 /**
@@ -1020,6 +1024,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
   PROVIDER_ACCOUNT_CODE_CAPABILITY,
   BROWSER_VAULT_SKIP_CAPABILITY,
+  MODEL_STEERING_CAPABILITY,
   TEAM_MEMORY_CHANGES_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
@@ -1219,6 +1224,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== HOST_APPEARANCE_CAPABILITY &&
       capability !== SIGN_IN_RELAY_DEEP_LINK_CAPABILITY &&
       capability !== BROWSER_VAULT_SKIP_CAPABILITY &&
+      capability !== MODEL_STEERING_CAPABILITY &&
       capability !== TEAM_MEMORY_CHANGES_CAPABILITY,
   );
 }
