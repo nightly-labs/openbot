@@ -1526,12 +1526,6 @@ export class OpenBotToolRouter {
   }
 
   /**
-   * `create_server_install_command`: a one-time command that installs OpenBot on another computer and
-   * signs it in to this account. The claim gives that computer a session of the account, so only the
-   * owner approves it, and only for a person's request. The claim goes only to the agent, which runs
-   * it over SSH; logs redact it, and the chat card holds only the name and the expiry.
-   */
-  /**
    * A card with only a reason that only the owner answers, also for an agent with Full access. For
    * `set_browser_profile`, whose profile holds sign-ins of other agents, and `delete_agent`, which
    * cannot be undone.
@@ -1562,6 +1556,12 @@ export class OpenBotToolRouter {
     );
   }
 
+  /**
+   * `create_server_install_command`: a one-time command that installs OpenBot on another computer and
+   * signs it in to this account. The claim gives that computer a session of the account, so only the
+   * owner approves it, and only for a person's request. The claim goes only to the agent, which runs
+   * it over SSH; logs redact it, and the chat card holds only the name and the expiry.
+   */
   readonly #serverInstallCommand = Effect.fn("OpenBotToolRouter.serverInstallCommand")(function* (
     this: OpenBotToolRouter,
     client: AgentClient,
