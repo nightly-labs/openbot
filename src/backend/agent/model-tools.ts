@@ -162,17 +162,18 @@ function customEndpointModels(
   endpoints: readonly ListedCustomEndpoint[],
   models: readonly AgentModelOption[],
   statuses: readonly ProviderStatusRow[],
+  words: readonly string[],
 ): CustomEndpointModels[] {
   return endpoints.map((endpoint) => {
     const runner = providerLabel(endpoint.provider);
     // A provider that cannot run lists no model, also when the catalogue keeps some (#7866).
     const canRun = providerCanRun(endpoint.provider, statuses);
     const own = canRun
-      ? models
-          .filter((model) => model.provider === endpoint.provider && model.id.startsWith(`${endpoint.id}/`))
-          .map((model) => model.id)
+      ? models.filter((model) => model.provider === endpoint.provider && model.id.startsWith(`${endpoint.id}/`))
       : [];
-    const listed = own.slice(0, SHORT_LIST_LENGTH);
+    // A query keeps only the matching models, as it does in `providers`.
+    const matching = words.length > 0 ? own.filter((model) => matchesQuery(model, words)) : own;
+    const listed = matching.slice(0, SHORT_LIST_LENGTH).map((model) => model.id);
     let message: string | undefined;
     if (!canRun) message = `${runner} runs this endpoint and cannot run now. The user fixes it in ${FIX_IN}.`;
     else if (endpoint.loading)
@@ -184,7 +185,7 @@ function customEndpointModels(
       name: endpoint.name,
       provider: endpoint.provider,
       models: listed,
-      ...(own.length > listed.length ? { omittedModels: own.length - listed.length } : {}),
+      ...(matching.length > listed.length ? { omittedModels: matching.length - listed.length } : {}),
       ...(message === undefined ? {} : { message }),
     };
   });
@@ -312,7 +313,7 @@ export function listModelsPayload(
       ? {
           customProviders: {
             settings: CUSTOM_PROVIDER_SETTINGS,
-            endpoints: customEndpointModels(endpoints, models, statuses),
+            endpoints: customEndpointModels(endpoints, models, statuses, words),
           },
         }
       : {}),
