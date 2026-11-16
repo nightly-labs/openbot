@@ -3441,13 +3441,24 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
 
   // ACP cannot identify final text while streaming. A later step boundary assigns its phase.
   // Antigravity also publishes provisional answer text because its prompt can wait on background work.
-  #completeMessage(thread: AcpThread, turn: AcpTurn, phase: "commentary" | "final_answer"): void {
+  #completeMessage(
+    thread: AcpThread,
+    turn: AcpTurn,
+    phase: "commentary" | "final_answer",
+    failureReport = false,
+  ): void {
     if (phase === "final_answer") {
       if (!turn.text.trim() && turn.interruptedAnswer) turn.text = turn.interruptedAnswer;
       turn.interruptedAnswer = null;
     }
     if (!turn.text) return;
-    const item = { id: turn.itemId, type: "agentMessage", phase, text: turn.text } satisfies ThreadItem;
+    const item = {
+      id: turn.itemId,
+      type: "agentMessage",
+      phase,
+      text: turn.text,
+      ...(failureReport ? { failureReport: true } : {}),
+    } satisfies ThreadItem;
     turn.messages.push(item);
     this.emit("notification", { method: "item/completed", params: { threadId: thread.id, turnId: turn.id, item } });
     turn.text = "";
@@ -4065,7 +4076,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // A turn that started no subagent sends no change, so its thread entry is removed here.
     if (!this.#subagents.turns.has(turn.id)) this.#subagentThreads.delete(turn.id);
     this.#dropStreamedCopy(turn);
-    this.#completeMessage(thread, turn, "final_answer");
+    // The answer of a failed turn can be the agent's report of the failure, with its reason
+    // (`AcpFlavor.failureCause`, `AcpFlavor.failureReport`).
+    const answer = turn.text;
+    const failureReport = status === "failed" && this.#flavor.failureReport?.test(answer) === true;
+    this.#completeMessage(thread, turn, "final_answer", failureReport);
     if (status === "failed" && error) {
       const detail = this.#redact(failureText(error));
       const message =
@@ -4081,7 +4096,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         ) ??
         detail;
       // A fixed code, so analytics and failover need not read the cause again from the sentence.
-      const causeCode = turn.failureCause ?? acpFailureCause(error, this.#flavor, message);
+      const causeCode = turn.failureCause ?? acpFailureCause(error, this.#flavor, message, answer);
       this.emit("notification", {
         method: "error",
         params: {
@@ -4610,9 +4625,9 @@ function failureDetail(error: RequestError): string | null {
  * those name none. The flavor's sentence counts after the raw text: a flavor can read a field that
  * the generic rules do not know, such as Antigravity's `code: 429`.
  */
-function acpFailureCause(error: unknown, flavor: AcpFlavor, sentence: string): CauseCode {
-  if (error instanceof RequestError) return acpRequestCause(error, flavor, sentence);
-  const flavored = flavor.failureCause?.(error) ?? null;
+function acpFailureCause(error: unknown, flavor: AcpFlavor, sentence: string, answer: string): CauseCode {
+  if (error instanceof RequestError) return acpRequestCause(error, flavor, sentence, answer);
+  const flavored = flavor.failureCause?.(error, answer) ?? null;
   if (flavored) return flavored;
   // The stop reasons of a turn that ended before the model answered in full.
   if (error === "max_tokens" || error === "max_turn_requests") return "turn_limit";
@@ -4621,10 +4636,10 @@ function acpFailureCause(error: unknown, flavor: AcpFlavor, sentence: string): C
   return cause === "unknown" && error instanceof AgentProcessExitError ? "provider_exited" : cause;
 }
 
-function acpRequestCause(error: RequestError, flavor: AcpFlavor, sentence: string): CauseCode {
+function acpRequestCause(error: RequestError, flavor: AcpFlavor, sentence: string, answer: string): CauseCode {
   if (error.code === -32000) return "authentication";
   const status = dataHttpStatus(error.data);
-  const structured = flavor.failureCause?.(error) ?? (status === null ? null : httpStatusCause(status));
+  const structured = flavor.failureCause?.(error, answer) ?? (status === null ? null : httpStatusCause(status));
   const cause = structuredCause(structured, textCause(classifyFailure(failureText(error)), sentence));
   if (cause !== "unknown") return cause;
   if (error.code === -32600 || error.code === -32601 || error.code === -32602) return "invalid_request";

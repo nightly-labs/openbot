@@ -95,9 +95,15 @@ export interface AcpFlavor {
   /**
    * The cause of a turn's failure that the agent names in a structured field, such as an error name
    * in the error's data or a stop reason that means another thing for this agent. `null` gives the
-   * decision to the protocol's rules. It is a fixed code; it never carries the error's text.
+   * decision to the protocol's rules. It is a fixed code; it never carries the error's text. `answer`
+   * is the answer text that the turn ended with, for an agent that gives the reason only there.
    */
-  failureCause?(error: unknown): CauseCode | null;
+  failureCause?(error: unknown, answer: string): CauseCode | null;
+  /**
+   * The whole answer text of a failed turn that is the agent's own report of the failure, not text
+   * of the model. The turn did not start to answer, so a backup model can take it.
+   */
+  failureReport?: RegExp;
   /**
    * The message of a turn that ended with no answer text, or `null` when that turn succeeds.
    * Absent: such a turn succeeds.
@@ -558,6 +564,42 @@ function hermesRefusal(error: unknown): boolean {
   );
 }
 
+/** The cause codes of Hermes Agent (`FailoverReason`) that have an OpenBot cause. */
+const HERMES_FAILURE_REASONS: Readonly<Partial<Record<string, CauseCode>>> = {
+  auth: "authentication",
+  auth_permanent: "authentication",
+  billing: "billing",
+  rate_limit: "rate_limit",
+  upstream_rate_limit: "rate_limit",
+  overloaded: "provider_unavailable",
+  server_error: "provider_unavailable",
+  timeout: "timeout",
+};
+
+/**
+ * The failure summary of Hermes Agent: one paragraph of Hermes, then the provider's own error. Text
+ * of the model before it does not match, so a turn that started to answer keeps its cause.
+ */
+const HERMES_FAILURE_SUMMARY = /^\s*[^\n]+\n\nProvider said: ([^\n]+)/u;
+
+/**
+ * The cause of a Hermes turn that failed with only `admitted_turn_failed`: a backup model did not
+ * take a turn that a usage limit failed (#8293). A newer Hermes names the cause in
+ * `data.failure_reason`, with its summary in `data.message`. Hermes Agent 0.23.1 sends the summary
+ * only as the answer text, which then counted as an answer, so the turn did not run again
+ * (`AcpFlavor.failureReport`). The "Provider said:" line of the summary decides. A failure with no
+ * summary, such as an MCP server that did not connect, keeps its cause.
+ */
+function hermesFailureCause(error: unknown, answer: string): CauseCode | null {
+  if (!isRecord(error) || !isRecord(error.data) || error.data.details !== "admitted_turn_failed") return null;
+  const { failure_reason: reason, message } = error.data;
+  const named = typeof reason === "string" ? HERMES_FAILURE_REASONS[reason] : undefined;
+  if (named) return named;
+  const said = HERMES_FAILURE_SUMMARY.exec(typeof message === "string" && message ? message : answer)?.[1];
+  const cause = said ? classifyFailure(said) : "unknown";
+  return cause === "unknown" ? null : cause;
+}
+
 /**
  * Hermes Agent 0.23 runs ACP through its gateway. A prompt, load or resume of a session that the
  * process does not hold fails with an internal error and only `not_found` in `data.details`, not with
@@ -590,6 +632,8 @@ export const HERMES_ACP_FLAVOR: AcpFlavor = {
   // Its `delegate_task` call is titled `delegate_task: <goal>`, and its subagents send no events.
   subagentTools: ["delegate_task"],
   turnFailure: hermesTurnFailure,
+  failureCause: hermesFailureCause,
+  failureReport: HERMES_FAILURE_SUMMARY,
   // Hermes Agent 0.23.1 defers all MCP tools behind its own tool_search, also with the default
   // `tools.tool_search.enabled: auto`, and a session cannot turn it off.
   catalogAsMcpTools: true,
@@ -738,6 +782,8 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
     setsConfigOnlyOnChange: true,
     resendsAnswer: true,
     turnFailure: hermesTurnFailure,
+    failureCause: hermesFailureCause,
+    failureReport: HERMES_FAILURE_SUMMARY,
     catalogAsMcpTools: true,
   },
   // Kimi Code added as a custom agent (`kimi acp`) keeps the custom rules and the tools of its first
