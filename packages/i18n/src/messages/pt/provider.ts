@@ -111,6 +111,8 @@ export const messages = {
   "provider.picker.download": "Download de {name}",
   "provider.picker.search": "Buscar modelos",
   "provider.picker.noMatches": "Nenhum modelo corresponde à sua busca.",
+  "provider.picker.workspaceOnlyUnavailable":
+    "Estes modelos não funcionam com “Espaço de trabalho” no Windows e no Linux. Para usá-los, altere “Permissões” nas configurações do agente.",
   "provider.picker.olderModels": "Modelos anteriores",
   "provider.picker.olderModelsList": "Modelos anteriores de {name}",
   "provider.picker.noModels": "Nenhum modelo de {name} está disponível.",

@@ -327,6 +327,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "Bu sağlayıcı için kullanılabilir model yok.",
   "mobile.agent.runtime.searchModels": "Modellerde ara",
   "mobile.agent.runtime.noMatches": "Aramanızla eşleşen model yok.",
+  "mobile.agent.runtime.workspaceOnlyUnavailable":
+    'Bu sağlayıcı Windows ve Linux\'ta "Yalnızca çalışma alanı" ile çalışmaz. Kullanmak için önce "İzinler"i değiştirin.',
   "mobile.agent.runtime.usageLimit": "Kullanım sınırına ulaşıldı",
   "mobile.agent.runtime.usageLimitWindow": "{window} sınırı",
   "mobile.agent.runtime.usageLimitResets": "{limit} · {time} tarihinde sıfırlanır",

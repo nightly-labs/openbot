@@ -343,6 +343,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "لا نماذج متاحة لهذا المزوّد.",
   "mobile.agent.runtime.searchModels": "البحث في النماذج",
   "mobile.agent.runtime.noMatches": "لا نماذج تطابق بحثك.",
+  "mobile.agent.runtime.workspaceOnlyUnavailable":
+    "لا يعمل هذا المزوّد مع «مساحة العمل فقط» على Windows وLinux. لاستخدامه، غيّر «الأذونات» أولًا.",
   "mobile.agent.runtime.usageLimit": "تم بلوغ حد الاستخدام",
   "mobile.agent.runtime.usageLimitWindow": "حد {window}",
   "mobile.agent.runtime.usageLimitResets": "{limit} · يُعاد التعيين {time}",

@@ -40,6 +40,7 @@ import {
   type UpdateAgentAdminSettingsInput,
   type UpdateAgentInput,
   widensAgentPermission,
+  workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
@@ -1407,6 +1408,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   disabledReason={t("agentSettings.runtime.modelUnavailable")}
                   accountChoice
                   providerAccountId={agentNextProviderAccountId(props.agent)}
+                  workspaceOnly={workspaceAccessEnforced(props.agent)}
                   onChange={(nextModel, provider, accountId, effort) =>
                     void selectModel(nextModel, provider, accountId, effort)
                   }
