@@ -18,6 +18,8 @@ export const messages = {
     "OpenBot 找不到 1Password CLI。请安装它并在 1Password 应用中开启集成，或改用服务账号令牌。",
   "error.connector.onePasswordCliInstallFailed": "OpenBot 无法安装 1Password CLI，请检查网络连接后重试。",
   "error.connector.onePasswordCliSignedOut": "1Password CLI 未登录。请在 1Password 应用中开启集成后重新连接。",
+  "error.connector.onePasswordAppUnreachable":
+    "OpenBot 无法连接到 1Password 应用。请打开 1Password 并解锁。在“设置 > 开发者”中确认已开启“与 1Password CLI 集成”，然后重试。",
   "error.connector.onePasswordCliFailed": "1Password CLI 执行失败：{detail}",
   "error.connector.onePasswordUnexpected": "1Password 返回了意外的响应：{detail}",
   "error.connector.onePasswordTokenRejected": "1Password 未接受该服务账号令牌。",

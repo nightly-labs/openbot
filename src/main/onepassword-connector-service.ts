@@ -14,7 +14,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText, registerSecretValue, toLogValue } from "@openbot/logging";
-import { Deferred, Effect, Exit, Scope } from "effect";
+import { Deferred, Effect, Exit, Schedule, Scope, Semaphore } from "effect";
 import { z } from "zod";
 import {
   type PasswordVault,
@@ -41,6 +41,14 @@ const CLI_TIMEOUT_MS = 2 * 60_000;
 const SETUP_CHECK_TIMEOUT_MS = 15_000;
 /** Where Open 1Password goes when the app is not installed. */
 const ONEPASSWORD_DOWNLOAD_URL = "https://1password.com/downloads/";
+/**
+ * The 1Password app serves one CLI client at a time. A CLI that cannot reach it at once fails with this
+ * line, also when the app is open and unlocked (#10205).
+ */
+const APP_UNREACHABLE = /cannot connect to 1Password app/i;
+/** How often a CLI call that could not reach the 1Password app runs again: after 0.25, 0.5 and 1 second. */
+const APP_UNREACHABLE_RETRIES = 3;
+const APP_UNREACHABLE_FIRST_WAIT = "250 millis";
 /** Service accounts have hourly read limits, so the list of logins is read again only this often. */
 const INDEX_MAX_AGE_MS = 5 * 60_000;
 /** A page that opens reads a list older than this again, so the count follows the user's changes. */
@@ -133,6 +141,9 @@ function accountLabel(account: z.infer<typeof accountListSchema>[number]): strin
 /** A failure whose message is already a `sourceText` sentence for the user. */
 class OnePasswordConnectError extends Error {}
 
+/** The CLI could not reach the 1Password app. The next try can work, so `#run` tries again. */
+class OnePasswordAppUnreachableError extends OnePasswordConnectError {}
+
 function connectFailure(message: string): OnePasswordOperationError {
   return new OnePasswordOperationError({ cause: new OnePasswordConnectError(message) });
 }
@@ -184,6 +195,13 @@ const runOnePasswordCli: OnePasswordCliRunner = async (executable, args, signal)
           reject(error);
           return;
         }
+        if (APP_UNREACHABLE.test(String(stderr))) {
+          logger.warn("The 1Password CLI could not reach the 1Password app", {
+            detail: redactText(String(stderr).trim()),
+          });
+          reject(new OnePasswordAppUnreachableError(sourceText("error.connector.onePasswordAppUnreachable")));
+          return;
+        }
         const detail = redactText(String(stderr).trim().split("\n").at(-1) || error.message);
         reject(new OnePasswordConnectError(sourceText("error.connector.onePasswordCliFailed", { detail })));
       },
@@ -225,6 +243,8 @@ export class OnePasswordConnectorService implements PasswordVault {
   readonly #listeners = new Set<(status: OnePasswordConnectorStatus) => void>();
   /** Owns the login list reads that run in the background. Dispose stops them. */
   readonly #scope = Scope.makeUnsafe();
+  /** Lets one `op` process run at a time. See `#run`. */
+  readonly #cliTurn = Semaphore.makeUnsafe(1);
   /** The CLI that the last setup check found, or null. */
   #cliPath: string | null = null;
   #setup: OnePasswordSetup;
@@ -550,7 +570,7 @@ export class OnePasswordConnectorService implements PasswordVault {
   ): Effect.fn.Return<void> {
     let found: { path: string; version: string } | null = null;
     for (const path of yield* this.#findCli()) {
-      const version = yield* this.#run(path, ["--version"], AbortSignal.timeout(SETUP_CHECK_TIMEOUT_MS)).pipe(
+      const version = yield* this.#run(path, ["--version"], { timeoutMs: SETUP_CHECK_TIMEOUT_MS }).pipe(
         Effect.map((output) => output.trim()),
         Effect.orElseSucceed(() => null),
       );
@@ -562,11 +582,9 @@ export class OnePasswordConnectorService implements PasswordVault {
     this.#cliPath = found?.path ?? null;
     // No account means the app integration is off: the CLI then has no session to create anything with.
     const appIntegration = found
-      ? yield* this.#run(
-          found.path,
-          ["account", "list", "--format", "json"],
-          AbortSignal.timeout(SETUP_CHECK_TIMEOUT_MS),
-        ).pipe(
+      ? yield* this.#run(found.path, ["account", "list", "--format", "json"], {
+          timeoutMs: SETUP_CHECK_TIMEOUT_MS,
+        }).pipe(
           Effect.flatMap(cliJson(accountListSchema)),
           Effect.map((accounts) => accounts.length > 0),
           Effect.orElseSucceed(() => false),
@@ -581,9 +599,40 @@ export class OnePasswordConnectorService implements PasswordVault {
     this.#emitStatus();
   });
 
-  /** Runs one CLI executable. An interrupt stops the process, as `signal` does. */
-  #run(executable: string, args: string[], signal: AbortSignal): Effect.Effect<string, OnePasswordOperationError> {
-    return onePasswordCall((interrupted) => this.#runCli(executable, args, AbortSignal.any([signal, interrupted])));
+  /**
+   * Runs one CLI executable. An interrupt stops the process, as `signal` does. `timeoutMs` starts when
+   * this run gets its turn, not while it waits for the run before it.
+   *
+   * The `op` calls of this service run one at a time. The setup check runs when the page opens and
+   * each time the window gets the focus back, also while Connect runs. When two `op` processes run
+   * together, the 1Password app serves one, and the other fails at once with "cannot connect to
+   * 1Password app" (#10205).
+   *
+   * Only that one error runs again, a few times with a short wait, while this call keeps its turn: the
+   * app was busy and did not refuse anything. This is not a general retry policy; other failures,
+   * such as a refused request or a stopped call, end the call at once.
+   */
+  #run(
+    executable: string,
+    args: string[],
+    { signal, timeoutMs }: { signal?: AbortSignal; timeoutMs?: number },
+  ): Effect.Effect<string, OnePasswordOperationError> {
+    return this.#cliTurn.withPermit(
+      Effect.suspend(() => {
+        const stops = [signal, timeoutMs === undefined ? undefined : AbortSignal.timeout(timeoutMs)].filter(
+          (stop) => stop !== undefined,
+        );
+        return onePasswordCall((interrupted) =>
+          this.#runCli(executable, args, AbortSignal.any([...stops, interrupted])),
+        ).pipe(
+          Effect.retry({
+            times: APP_UNREACHABLE_RETRIES,
+            schedule: Schedule.exponential(APP_UNREACHABLE_FIRST_WAIT),
+            while: ({ cause }) => cause instanceof OnePasswordAppUnreachableError,
+          }),
+        );
+      }),
+    );
   }
 
   /** Runs the CLI that the setup check found, looking again when there is none yet. */
@@ -594,7 +643,7 @@ export class OnePasswordConnectorService implements PasswordVault {
   ): Effect.fn.Return<string, OnePasswordOperationError> {
     if (!this.#cliPath) yield* this.checkSetup();
     if (!this.#cliPath) return yield* connectFailure(sourceText("error.connector.onePasswordCliMissing"));
-    return yield* this.#run(this.#cliPath, args, signal);
+    return yield* this.#run(this.#cliPath, args, { signal });
   });
 
   /** The new token, or null when the user must first choose an account. */

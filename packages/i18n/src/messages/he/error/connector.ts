@@ -27,6 +27,8 @@ export const messages = {
     "OpenBot לא הצליח להתקין את ה-CLI של 1Password. יש לבדוק את החיבור לאינטרנט ולנסות שוב.",
   "error.connector.onePasswordCliSignedOut":
     "ה-CLI של 1Password לא מחובר. יש להפעיל את האינטגרציה שלו באפליקציית 1Password ולהתחבר שוב.",
+  "error.connector.onePasswordAppUnreachable":
+    "OpenBot לא מצליח להתחבר לאפליקציית 1Password. יש לפתוח את 1Password ולבטל את הנעילה. בהגדרות > מפתחים יש לוודא ש״Integrate with 1Password CLI״ מופעל. לאחר מכן יש לנסות שוב.",
   "error.connector.onePasswordCliFailed": "ה-CLI של 1Password נכשל: {detail}",
   "error.connector.onePasswordUnexpected": "1Password שלח תשובה לא צפויה: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password לא קיבל את האסימון של חשבון השירות.",
