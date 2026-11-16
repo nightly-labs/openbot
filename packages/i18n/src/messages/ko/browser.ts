@@ -40,6 +40,7 @@ export const messages = {
   "browser.tab.closeUnnamed": "브라우저 탭 닫기",
   "browser.newTab": "새 브라우저 탭",
   "browser.hide": "브라우저 숨기기",
+  "browser.backToChat": "채팅으로 돌아가기",
   "browser.goBack": "뒤로",
   "browser.goForward": "앞으로",
   "browser.reload": "페이지 새로고침",

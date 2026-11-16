@@ -40,6 +40,7 @@ export const messages = {
   "browser.tab.closeUnnamed": "Chiudi la scheda del browser",
   "browser.newTab": "Nuova scheda del browser",
   "browser.hide": "Nascondi il browser",
+  "browser.backToChat": "Torna alla chat",
   "browser.goBack": "Indietro",
   "browser.goForward": "Avanti",
   "browser.reload": "Ricarica la pagina",

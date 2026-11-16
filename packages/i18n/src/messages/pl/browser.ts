@@ -40,6 +40,7 @@ export const messages = {
   "browser.tab.closeUnnamed": "Zamknij kartę przeglądarki",
   "browser.newTab": "Nowa karta przeglądarki",
   "browser.hide": "Ukryj przeglądarkę",
+  "browser.backToChat": "Wróć do czatu",
   "browser.goBack": "Wstecz",
   "browser.goForward": "Dalej",
   "browser.reload": "Odśwież stronę",
