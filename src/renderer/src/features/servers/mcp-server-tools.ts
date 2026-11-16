@@ -53,7 +53,7 @@ export interface McpServerSignIn {
   app?: McpPanelSignInApp | undefined;
 }
 
-export interface McpServerRelay {
+interface McpServerRelay {
   hostName: string;
   /** The relayed sign-in page of the address it signs in to, while it waits. */
   page: (url: string) => McpSignInRelaySource | undefined;
