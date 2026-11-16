@@ -27,8 +27,8 @@
 //    the answer: it runs next in the side thread, and A's own chat does not get it.
 // 12. The same, but A archives the side thread. The answer goes to A's own chat.
 // 13. B steers busy messages and runs a turn in a new own chat. A notice from A (expectsReply false)
-//    goes into that running turn. A request from A waits and runs in a turn of its own. It needs a
-//    provider that steers natively.
+//    goes into that running turn. A request from A also goes into it, and its result comes back to
+//    A's own chat. It needs a provider that steers natively.
 // 14. B asks A's side thread a question back without replyToMessageId. The question and the answer
 //    come to the side thread, not to A's own chat.
 // At the end it stops and deletes each thread that it started.
@@ -659,9 +659,9 @@ try {
     assert.equal(details.threadHasAnswer, false, "The archived side thread also shows the answer.");
   });
 
-  // 13. A notice joins the running turn of a recipient that steers busy messages. A request does not:
-  //     it asks for a result, so it waits for a turn of its own.
-  await step("notice steers the recipient's running turn, request waits", async (details) => {
+  // 13. A notice and a request join the running turn of a recipient that steers busy messages, and
+  //     the result of the request comes back to the sender.
+  await step("notice and request steer the recipient's running turn", async (details) => {
     const provider = toAgentInfo.provider;
     if (!isAgentProvider(provider) || agentProviderDescriptor(provider).steer !== "native") {
       details.skipped = `${provider} cannot steer a running turn.`;
@@ -714,30 +714,29 @@ try {
       details.noticeJoinedRunningTurn = joined?.turnId === turnId;
       assert.equal(details.noticeJoinedRunningTurn, true, "The notice waited for a new turn of B.");
       await waitFor(page, "A's own chat is idle", () => bridge.main(from), idle, TURN_MS);
-      await bridge.send(from, ask(word, "What is 7+7?", toAgentInfo.name));
-      const waiting = await waitFor(
+      // The notice holds 14 and the run id can hold 17, so the result is a message from B with 17.
+      const result = (m: ConversationMessage) => m.senderAgentId === to && m.text.replaceAll(run, "").includes("17");
+      const resultsBefore = count(await bridge.main(from), result);
+      await bridge.send(from, ask(word, "What is 9+8?", toAgentInfo.name));
+      const joinedRequest = await waitFor(
         page,
-        "B gets the request",
+        "the request leaves B's queue",
         () => fromA(word),
-        (entry) => entry !== null,
+        (entry) => entry !== null && entry.status !== "queued",
         TURN_MS,
       );
-      details.requestStatusOnArrival = waiting?.status;
-      details.turnRanOnArrival = (await bridge.main(to)).activeTurnId === turnId;
-      assert.equal(details.turnRanOnArrival, true, "B finished before the request; the step proves nothing.");
-      assert.equal(waiting?.status, "queued", "The request did not wait in B's queue.");
-      const ran = await waitFor(
-        page,
-        "the request gets a turn",
-        () => fromA(word),
-        // A delivery that starts has no turn ID until the provider gives one.
-        (entry) => Boolean(entry?.turnId),
-        TURN_MS,
-      );
-      details.requestStatus = ran?.status;
-      details.requestRanInOwnTurn = ran?.turnId !== turnId;
-      assert.equal(details.requestRanInOwnTurn, true, "The request went into B's running turn.");
+      details.requestStatus = joinedRequest?.status;
+      details.requestJoinedRunningTurn = joinedRequest?.turnId === turnId;
+      assert.equal(details.requestJoinedRunningTurn, true, "The request waited for a new turn of B.");
       await waitFor(page, "B's turn ends", () => bridge.main(to), idle, TURN_MS);
+      await waitFor(
+        page,
+        "A gets the result in its own chat",
+        () => bridge.main(from),
+        (s) => count(s, result) > resultsBefore,
+        TURN_MS,
+      );
+      details.resultInSenderChat = true;
     } finally {
       await mode(settings.busyMessageMode);
     }

@@ -953,22 +953,30 @@ correction applies from this point, and the unfinished work continues unless the
 The block is a text item of its own, as the turn context blocks are, so the history readers remove
 it and the chat shows only the sender's text. Claude Code and Grok Build tell their model the same
 with a note of their own, so `steerNoteFor` gives them no block; Grok also reads only the first text
-block of a steer. A routine run gets no block. A slash command from the person gets none, as at the
+block of a steer. Claude Code shows a steer to its model next to the result of the running tool. With
+the header and rules of a teammate prompt, Claude Haiku took a steered teammate message for text in
+the tool result and ignored it. For Claude, `QueueControls.steer` therefore sets `steerFramedAsUser`,
+and `deliveryPromptInput` sends a teammate message as plain words (`userFramedTeammateText`): the
+sender, the text, and for a request the `send_message` reply rule. The steer's uuid is the delivery
+ID, so the history import finds the delivery without `teammatePrompts`. A routine run gets no block. A slash command from the person gets none, as at the
 start of a turn, so the command stays at the start of the input. `scripts/pi-steer-e2e.ts` checks the
 block.
 
-A message from another agent that only gives information follows the recipient's busy-message mode,
-as a message from the person does: an answer, a requested result, or a notice (`expectsReply` false).
-When the mode is "steer", the provider steers natively and the recipient runs a chat turn,
-`send_message` and the result relay take the message into that turn
-(`AgentService.#steerAgentMessage`). A request (a message that expects a reply) never joins a running
-turn automatically, in each mode: it asks for work and a result, and in a running turn that result
-and the answer to the person would be one message. It waits for a turn of its own, and `send_message`
-tells the sender `queuedBecause: "own-turn"`. Routine runs, channel work and messages from Slack,
-Telegram or WhatsApp also do not steer automatically: each starts a turn of its own. Channel,
-messaging and task work, and each answer to a request that went to two or more teammates, stay
-queued (`MailboxStore.chatTurnSteer`), so those answers still start together. A message from an
-agent that cannot steer gets no fallback reason on its row.
+A message from another agent follows the recipient's busy-message mode, as a message from the person
+does: a request, an answer, a requested result, or a notice. When the mode is "steer", the provider
+steers natively and the recipient runs a chat turn, `send_message` and the result relay take the
+message into that turn (`AgentService.#steerAgentMessage`). A request that joins a running turn keeps
+its result separate from the answer to the person: the request text tells the recipient to send the
+result with `send_message`. The turn's answer is for the person or another request, so the turn end
+never relays it for a steered request, and sends no "no reply" note: Claude can still answer a late
+steer in a turn of its own (`moveSteerToTurn`). When the turn ends as interrupted before a reply (a
+stop, or an exit of the provider process), the sender gets an OpenBot note (`MailboxStore.answerFailedRequest`), and does not wait for a result that
+never comes. Routine runs, channel work and messages from Slack, Telegram or
+WhatsApp do not steer automatically: each starts a turn of its own. A question back (a reply that
+expects a reply) asks for no `send_message` reply, so it stays queued and its own turn's answer goes
+back. Channel, messaging and task work, and each answer to a request that went to two or more teammates, stay queued
+(`MailboxStore.joinsChatTurn`), so those answers still start together. A message from an agent that
+cannot steer gets no fallback reason on its row.
 The person can steer any queued answer into the running turn from the waiting block on desktop, the
 web and mobile; it has no other queue action. That is the person's choice, so it can take one answer
 of a group before the others.
