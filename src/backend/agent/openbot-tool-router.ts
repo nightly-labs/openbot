@@ -405,7 +405,12 @@ export interface OpenBotToolRouterHooks {
    * Records a no-update tool call for the turn; null when no routine run started the turn.
    * `channelRun` is a turn that owns a main task of a channel routine's request.
    */
-  requestNoUpdate(agentId: string, threadId: string, turnId: string, channelRun: boolean): "quiet" | "shown" | null;
+  requestNoUpdate(
+    agentId: string,
+    threadId: string,
+    turnId: string,
+    channelRun: boolean,
+  ): "quiet" | "shown" | "unanswered" | null;
   /**
    * Records the reason a routine run failed for the turn; false when no routine run started the turn.
    * `channelRun` is a turn that owns a main task of a channel routine's request.
@@ -2093,7 +2098,12 @@ export class OpenBotToolRouter {
           : this.#hooks.requestNoUpdate(senderAgentId, executionThreadId, params.turnId, channelRun?.part === "owner");
       if (outcome === null)
         return openBotToolFailure(
-          "Use this tool only in a routine run, or for a teammate's message that wants no answer.",
+          "Use this tool only in a routine run, or for a teammate's message: an update that wants no answer, or a request after your reply to it.",
+        );
+      // A teammate's request ends quiet only after its result went back to that teammate (#7465).
+      if (outcome === "unanswered")
+        return openBotToolFailure(
+          "Send your result to the teammate who asked with openbot.send_message first, then call this tool again.",
         );
       return openBotToolResult(
         outcome === "quiet"

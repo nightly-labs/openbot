@@ -184,6 +184,7 @@ import {
 } from "@openbot/contracts/team-protocol/current";
 import { CUSTOM_AGENTS_CAPABILITY } from "@openbot/contracts/team-protocol/custom-agents-v1";
 import { CUSTOM_PROVIDER_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
+import { CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY } from "@openbot/contracts/team-protocol/custom-provider-harness-choice-v1";
 import { CUSTOM_PROVIDER_HARNESS_CAPABILITY } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import { FOCUS_USE_INTERVAL_MS } from "@openbot/contracts/team-protocol/focus-use-v1";
 import { GITHUB_SKILLS_CAPABILITY } from "@openbot/contracts/team-protocol/github-skills-v1";
@@ -2706,7 +2707,8 @@ export class TeamApiServer {
             capability === PROVIDERS_V8_CAPABILITY ||
             capability === PROVIDER_USE_CAPABILITY ||
             capability === CUSTOM_PROVIDER_HARNESS_CAPABILITY ||
-            capability === CUSTOM_PROVIDER_EDIT_CAPABILITY
+            capability === CUSTOM_PROVIDER_EDIT_CAPABILITY ||
+            capability === CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY
           )
             return this.#options.admin?.providers !== undefined;
           if (

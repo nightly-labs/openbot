@@ -6,7 +6,8 @@
 // that a later queue change keeps it failed, that a run with no call succeeds, that a provider failure
 // still wins, that a failed script run is never quiet, that the tool fails outside a routine run, that
 // a teammate's update that wants no answer can end quiet (#6821), that a teammate's answer to a
-// request of a quiet run can end quiet and the answer to a Test run's request cannot (#8364), that
+// request of a quiet run can end quiet and the answer to a Test run's request cannot (#8364), that a
+// teammate's request can end quiet only after the agent sent its result to that teammate (#7465), that
 // a flow skips the agents after a failed owner or linked step, and that a result destination gets the
 // answer of a reported failure but not of a provider failure.
 // `bun scripts/routine-report-failure-e2e.ts`. Writes .openbot-build/routine-report-failure-e2e/report.json.
@@ -88,7 +89,11 @@ const replyCalls = (...items: FakeCall[]) => `<<REPLY${JSON.stringify(items)}REP
  * (#8629). `QUIET-LOOP` calls \`routine_no_update\` again after each result until a \`turn/interrupt\`, as
  * Kimi does (#9375). An input with
  * `TEAMMATE-QUIET` and no calls calls `routine_no_update`. A turn that reads a teammate's answer
- * makes the calls in `<<REPLY[...]REPLY>>` when its input names them.
+ * makes the calls in `<<REPLY[...]REPLY>>` when its input names them. An input with `TEAMMATE-REQUEST`
+ * and no calls calls `routine_no_update`, sends the result to the teammate who asked, then calls
+ * `routine_no_update` again. With `TEAMMATE-REQUEST-TEXT` it only sends that result and then writes text, as
+ * Claude does when it does not load the no-update tool. With `TEAMMATE-REQUEST-NOREPLY` it makes no call
+ * and writes text.
  */
 const FAKE_CODEX = `#!/usr/bin/env node
 const { appendFileSync } = require("node:fs");
@@ -171,8 +176,12 @@ const answer = (message) => {
       const answered = text.includes("This replies to message:") ? /<<REPLY([\\s\\S]*?)REPLY>>/.exec(task) : null;
       const named = answered || /<<CALLS([\\s\\S]*?)CALLS>>/.exec(task);
       const next = /<<NEXT([\\s\\S]*?)NEXT>>/.exec(task);
-      const turnCalls = named ? JSON.parse(named[1]) : task.includes("TEAMMATE-QUIET") ? [{ tool: "routine_no_update", arguments: {} }] : [];
-      const reply = next ? "Relay report <<CALLS" + next[1] + "CALLS>>" : turnCalls.length ? ${JSON.stringify(FAILED_ANSWER)} : "All good.";
+      // The sender and the message ID of a teammate's request, from the delivery prompt.
+      const request = !named && task.includes("TEAMMATE-REQUEST") ? /Message from OpenBot teammate .*? \\(([^()\\s]+)\\)\\.\\nMessage ID: (\\S+)/.exec(task) : null;
+      const requestReply = request && { tool: "send_message", arguments: { recipientAgentIds: [request[1]], replyToMessageId: request[2], text: "Status: done\\nResult: The build passed.\\nEvidence: none", expectsReply: false } };
+      const textOnly = task.includes("TEAMMATE-REQUEST-TEXT");
+      const turnCalls = named ? JSON.parse(named[1]) : task.includes("TEAMMATE-REQUEST-NOREPLY") ? [] : textOnly ? [requestReply] : requestReply ? [{ tool: "routine_no_update", arguments: {} }, requestReply, { tool: "routine_no_update", arguments: {} }] : task.includes("TEAMMATE-QUIET") ? [{ tool: "routine_no_update", arguments: {} }] : [];
+      const reply = next ? "Relay report <<CALLS" + next[1] + "CALLS>>" : textOnly ? "The result went to the teammate." : turnCalls.length ? ${JSON.stringify(FAILED_ANSWER)} : "All good.";
       return callNext({ threadId: params.threadId, turnId, calls: turnCalls, reply, providerFail: task.includes("PROVIDER-FAIL"), emptyAnswer: task.includes("EMPTY-ANSWER"), quietHang: task.includes("QUIET-HANG"), quietLoop: task.includes("QUIET-LOOP"), loops: 0 });
     }
     case "turn/interrupt": {
@@ -499,6 +508,90 @@ try {
       updateAnswers.every((message) => message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE) &&
       latestTurnAnswer(updateAnswers, updateTurnId) === undefined,
     { sendResult, quietResult, quietEvent, updateAnswers },
+  );
+
+  // A teammate's request: the recipient sends its result with send_message, and then its turn can end
+  // quiet. Before the reply, the no-update tool asks for the reply first (#7465).
+  const ask: FakeCall = {
+    tool: "send_message",
+    arguments: { recipientAgentIds: [checker.id], text: "Check the release build. TEAMMATE-REQUEST" },
+  };
+  await runCauseEffect(agents.sendMessage({ agentId: relay.id, text: `Ask for a check. ${calls(ask)}` }));
+  const requestTurn = await waitFor("the request's turn", () =>
+    fakeEntries().find(
+      (entry) =>
+        entry.method === "turn/start" &&
+        entry.text?.includes("Check the release build.") === true &&
+        !entry.text.includes("<<CALLS"),
+    ),
+  );
+  const requestEvent = await waitFor("the request's turn-completed", () =>
+    events.find((event) => event.type === "turn-completed" && event.turnId === requestTurn.turnId),
+  );
+  const [earlyResult, lateResult] = toolResults(requestTurn.turnId, "routine_no_update").map((entry) => entry.result);
+  const replyResult = toolResults(requestTurn.turnId, "send_message")[0]?.result;
+  const requestAnswers = store.database.readTurnAssistantMessages(checker.id, requestTurn.turnId);
+  pass(
+    "A teammate's request ends quiet after its result went back to the teammate",
+    earlyResult?.success === false &&
+      earlyResult.contentItems.some((item) => item.text.includes("send_message first")) &&
+      replyResult?.success === true &&
+      lateResult?.success === true &&
+      lateResult.contentItems.some((item) => item.text.includes('"quiet"')) &&
+      requestEvent.type === "turn-completed" &&
+      requestEvent.quiet === true &&
+      requestAnswers.length > 0 &&
+      requestAnswers.every((message) => message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE) &&
+      latestTurnAnswer(requestAnswers, requestTurn.turnId) === undefined,
+    { earlyResult, replyResult, lateResult, requestEvent, requestAnswers },
+  );
+  const requestMessageId = /Message ID: (\S+)/.exec(requestTurn.text ?? "")?.[1];
+  const repliesToRelay = agents
+    .listQueue(relay.id)
+    .deliveries.filter(
+      (delivery) =>
+        delivery.sender.kind === "agent" &&
+        delivery.sender.agentId === checker.id &&
+        delivery.replyToMessageId === requestMessageId,
+    );
+  pass("The teammate who asked gets the one reply and no second result", repliesToRelay.length === 1, repliesToRelay);
+
+  // The same request when the model writes text after its reply and does not call the no-update tool,
+  // as Claude does when it does not load that tool: the reply makes the turn quiet (#7465). Without a
+  // reply, the text stays in the chat, because then the teammate has nothing yet.
+  const requestTurnOf = async (text: string) => {
+    const ask: FakeCall = { tool: "send_message", arguments: { recipientAgentIds: [checker.id], text } };
+    await runCauseEffect(agents.sendMessage({ agentId: relay.id, text: `Ask again. ${calls(ask)}` }));
+    const turn = await waitFor(`the turn of "${text}"`, () =>
+      fakeEntries().find(
+        (entry) =>
+          entry.method === "turn/start" && entry.text?.includes(text) === true && !entry.text.includes("<<CALLS"),
+      ),
+    );
+    const event = await waitFor(`the turn-completed of "${text}"`, () =>
+      events.find((candidate) => candidate.type === "turn-completed" && candidate.turnId === turn.turnId),
+    );
+    return { turn, event, answers: store.database.readTurnAssistantMessages(checker.id, turn.turnId) };
+  };
+  const textRequest = await requestTurnOf("Check the docs build. TEAMMATE-REQUEST-TEXT");
+  pass(
+    "An answered teammate request ends quiet without the no-update tool",
+    toolResults(textRequest.turn.turnId, "send_message")[0]?.result?.success === true &&
+      toolResults(textRequest.turn.turnId, "routine_no_update").length === 0 &&
+      textRequest.event.type === "turn-completed" &&
+      textRequest.event.quiet === true &&
+      textRequest.answers.some((message) => message.text === "The result went to the teammate.") &&
+      textRequest.answers.every((message) => message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE) &&
+      latestTurnAnswer(textRequest.answers, textRequest.turn.turnId) === undefined,
+    textRequest,
+  );
+  const unanswered = await requestTurnOf("Check the site build. TEAMMATE-REQUEST-NOREPLY");
+  pass(
+    "A teammate request with no reply keeps its answer in the chat",
+    unanswered.event.type === "turn-completed" &&
+      unanswered.event.quiet !== true &&
+      latestTurnAnswer(unanswered.answers, unanswered.turn.turnId)?.text === "All good.",
+    unanswered,
   );
 
   // A Test run that reports a failure.
