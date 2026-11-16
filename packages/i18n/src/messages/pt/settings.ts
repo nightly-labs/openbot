@@ -679,6 +679,10 @@ export const messages = {
   "settings.voice.language.parakeetUnifiedEnglishOnly":
     "O Parakeet Unified reconhece só inglês. Para definir um idioma, use o Whisper, o Cohere ou o ElevenLabs.",
   "settings.voice.language.automatic": "Automático",
+  "settings.voice.pause.title": "Pausa antes de enviar",
+  "settings.voice.pause.description":
+    "Em uma conversa por voz, o OpenBot envia suas palavras quando você para de falar por esse tempo. Escolha uma pausa maior se você fala devagar ou para para pensar. A voz ao vivo do Codex encontra o fim sozinha.",
+  "settings.voice.pause.seconds": "{seconds} s",
   "settings.voice.loadFailed": "Não foi possível ler os modelos de voz.",
   "settings.voice.saveFailed": "Não foi possível salvar a configuração de voz. Tente de novo.",
   "settings.voice.downloadFailed": "Não foi possível iniciar o download. Tente de novo.",

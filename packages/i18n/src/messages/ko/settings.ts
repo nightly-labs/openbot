@@ -662,6 +662,10 @@ export const messages = {
   "settings.voice.language.parakeetUnifiedEnglishOnly":
     "Parakeet Unified는 영어만 인식해요. 언어를 지정하려면 Whisper, Cohere 또는 ElevenLabs를 사용해 주세요.",
   "settings.voice.language.automatic": "자동",
+  "settings.voice.pause.title": "보내기 전 멈춤",
+  "settings.voice.pause.description":
+    "음성 대화에서 이 시간 동안 말하지 않으면 OpenBot이 말을 보냅니다. 천천히 말하거나 생각하려고 멈춘다면 더 긴 멈춤을 선택하세요. Codex 라이브 음성은 끝을 스스로 찾습니다.",
+  "settings.voice.pause.seconds": "{seconds}초",
   "settings.voice.loadFailed": "음성 모델을 읽을 수 없어요.",
   "settings.voice.saveFailed": "음성 설정을 저장할 수 없어요. 다시 시도해 주세요.",
   "settings.voice.downloadFailed": "다운로드를 시작할 수 없어요. 다시 시도해 주세요.",

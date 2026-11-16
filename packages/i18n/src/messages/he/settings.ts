@@ -663,6 +663,10 @@ export const messages = {
   "settings.voice.language.parakeetUnifiedEnglishOnly":
     "Parakeet Unified מזהה אנגלית בלבד. כדי להגדיר שפה, יש להשתמש ב-Whisper, ב-Cohere או ב-ElevenLabs.",
   "settings.voice.language.automatic": "אוטומטי",
+  "settings.voice.pause.title": "השהיה לפני שליחה",
+  "settings.voice.pause.description":
+    "בשיחה קולית, OpenBot שולח את המילים שלך כשמפסיקים לדבר למשך הזמן הזה. מומלץ לבחור השהיה ארוכה יותר אם מדברים לאט או עוצרים לחשוב. הקול החי של Codex מזהה את הסוף בעצמו.",
+  "settings.voice.pause.seconds": "{seconds} שנ'",
   "settings.voice.loadFailed": "לא ניתן לקרוא את מודלי הקול.",
   "settings.voice.saveFailed": "לא ניתן לשמור את הגדרת הקול. יש לנסות שוב.",
   "settings.voice.downloadFailed": "לא ניתן להתחיל את ההורדה. יש לנסות שוב.",

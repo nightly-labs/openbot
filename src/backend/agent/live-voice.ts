@@ -91,7 +91,9 @@ const VOICE_NAME_LIMIT = 80;
  * The first message in the voice conversation. The voice model reads it as the user's. It is in English,
  * so without the language rule the voice says its own words, such as an acknowledgment, in English (#6871).
  * The voice model also ignores Codex's prompt on a ChatGPT login, so this message gives it the agent's name:
- * without the name, it says that it is ChatGPT (#9825).
+ * without the name, it says that it is ChatGPT (#9825). OpenAI ends the user's turn at a short pause, and
+ * each request goes to the chat as a message: so the voice waits for the rest of a sentence that stops in
+ * the middle, and does not give the agent the parts as separate requests (#9960).
  */
 const relayVoiceRule = (name: string) =>
   (name
@@ -99,6 +101,8 @@ const relayVoiceRule = (name: string) =>
       "Never say that you are ChatGPT, Codex or another OpenAI assistant. "
     : "") +
   "From now on, give every request of mine to the background agent, even simple questions and small talk. " +
+  "When I stop in the middle of a sentence to think, wait silently for the rest, " +
+  "and then give the complete request to the agent in one piece. " +
   "Never answer from your own knowledge. Wait for the agent's result before you give an answer. " +
   "Say only what the result says, and add no facts of your own. " +
   "Always speak the language that I speak, also for your own short words such as greetings and acknowledgments. " +
