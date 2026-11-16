@@ -369,6 +369,18 @@ export const ManyAgents: Story = {
   render: () => <AgentDockStory seats={agentSeats(...AGENTS.map((agent) => agent.id))} />,
 };
 
+/** Every agent and channel is on the dock. The + menu shows that nothing is left to add. */
+export const AllOnDock: Story = {
+  render: () => (
+    <AgentDockStory
+      seats={[
+        ...agentSeats(...AGENTS.map((agent) => agent.id)),
+        ...CHANNELS.map((channel) => ({ kind: "channel" as const, id: channel.id })),
+      ]}
+    />
+  ),
+};
+
 /** No agent on the dock yet: only the + button. */
 export const Empty: Story = {
   render: () => <AgentDockStory seats={[]} />,

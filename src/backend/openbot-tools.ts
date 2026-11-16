@@ -111,6 +111,20 @@ export const htmlRenderToolSchema = z.object({
     ),
 });
 
+const backdropBubbleColor = z.string().regex(/^#[0-9a-fA-F]{6}$/u, "Use a #rrggbb color.");
+
+export const setBackdropToolSchema = z.object({
+  html: z.string().min(1).max(CHAT_VISUAL_HTML_LIMIT).describe("A full self-contained HTML document."),
+  title: z.string().trim().min(1).max(CHAT_VISUAL_TITLE_LIMIT).describe("A short scene name."),
+  bubbles: z
+    .object({
+      yours: backdropBubbleColor.optional().describe("The user's bubbles."),
+      agents: backdropBubbleColor.optional().describe("Your bubbles."),
+    })
+    .optional()
+    .describe("Bubble colors that match the scene."),
+});
+
 const CHAT_VISUAL_PREVIEW_MIN_WIDTH = 240;
 const CHAT_VISUAL_PREVIEW_MAX_WIDTH = 1_600;
 /** The width of the reply column in a desktop chat. */
@@ -342,6 +356,11 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     name: "html_render",
     description: `Show a finished HTML page (chart, table, diagram, collage, mockup) in this conversation, above your final text reply; call it before you write that reply. The user already sees the page, so the reply must not announce it or restate it: add only what the page does not say. In a channel, each member who reads the channel sees it. OpenBot fits the frame to the page height. A height lower than the page caps the frame, and the rest scrolls in it. ${VISUAL_PAGE_RULES} ${VISUAL_PAGE_ACTIONS}`,
     shape: htmlRenderToolSchema.shape,
+  },
+  {
+    name: "set_backdrop",
+    description: `Put a full-screen HTML scene behind the user's whole OpenBot window. Use it only when the user asks to set or change the backdrop. Each call replaces your last page, so send the whole new page. It runs in the html_render sandbox with no clicks or keys: build no controls. Fill the frame and follow resize. Keep the center plain because the chat shows over it, and draw no text. Animate with requestAnimationFrame and stop for prefers-reduced-motion. The user can undo it. Do not repeat the page in your reply.`,
+    shape: setBackdropToolSchema.shape,
   },
   {
     name: "list_capture_sources",

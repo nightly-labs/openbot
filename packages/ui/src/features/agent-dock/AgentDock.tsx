@@ -1390,7 +1390,9 @@ export function AgentDock(props: AgentDockProps) {
                         onScroll={addFades.measure}
                       >
                         <Show when={addEmpty()}>
-                          <DropdownMenu.Item disabled>{addEmptyText()}</DropdownMenu.Item>
+                          <DropdownMenu.Item class="agent-dock-add-empty" disabled>
+                            {addEmptyText()}
+                          </DropdownMenu.Item>
                         </Show>
                         <For each={addMatches()}>
                           {(agent) => (
