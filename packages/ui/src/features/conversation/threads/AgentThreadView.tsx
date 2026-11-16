@@ -219,7 +219,7 @@ export interface AgentThreadViewProps {
    * shows as a marker, as in the agent's own chat. Without it, the message shows as a row.
    */
   onSelectAgent?: ((agentId: string, tabId?: string) => void) | undefined;
-  /** The actions of a skill or instruction change line, as in the agent's own chat. */
+  /** The actions of a skill or instruction change line. An instruction change has View, not Undo. */
   changeMarkerActions?: ChangeMarkerActions | undefined;
   onPreview: (attachment: AttachmentSummary) => void;
   onAttachmentAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
@@ -856,7 +856,6 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                           agents={props.agents}
                           onSelectAgent={(agentId, tabId) => props.onSelectAgent?.(agentId, tabId)}
                           onOpenSkill={props.changeMarkerActions?.onOpenSkill}
-                          instructions={props.changeMarkerActions?.instructions}
                           onOpenInstructions={props.changeMarkerActions?.onOpenInstructions}
                         />
                       </article>
