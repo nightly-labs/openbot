@@ -7,7 +7,8 @@
 // removes nodes, reads it back, runs it with the input of one case and reads the run, and checks the failures that the model must
 // correct: an edge that a rule refuses, an unknown agent and a locked node. The report keeps the byte
 // size of each tool result, so the context cost is visible. It also checks that a search says to run
-// the tools with tool_call, that tool_call accepts the name as `tool`, that each delete asks the
+// the tools with tool_call, that tool_call accepts the name as `tool` and gives a number or boolean
+// sent as text the type of the tool's schema, that each delete asks the
 // user and a decline keeps the workflow, and that the change event names the agent that built it.
 // The run input goes from the trigger to the agent step. A run from a trigger takes it, and a run
 // from a later node refuses it.
@@ -67,6 +68,7 @@ const laidOut = z.object({
   edges: z.array(z.object({ from: z.string(), to: z.string() })),
 });
 const runStarted = z.object({ runId: z.string() });
+const runList = z.object({ runs: z.array(z.object({})) });
 const runRead = z.object({
   steps: z.array(
     z.object({
@@ -299,6 +301,35 @@ try {
   const read = await call("read", "read_workflow", { workflowId });
   const graph = workflowRead.parse(read.value);
   check("read_workflow has the 6 nodes and 4 edges", graph.nodes.length === 6 && graph.edges.length === 4, graph);
+  // Some model paths see the untyped values of `tool_call.arguments` as text, so their models send
+  // `true` as "true" and `1` as "1" (#9980). The value gets the type of the target's schema.
+  const textBoolean = await call("read-layout-text", "read_workflow", { workflowId, layout: "true" });
+  check(
+    "tool_call gives a boolean sent as text its type",
+    laidOut.safeParse(textBoolean.value).success,
+    textBoolean.value,
+  );
+  const typed = resolveDeferredTool(
+    params("tool_call", {
+      name: "openbot.read_workflow_runs",
+      arguments: { workflowId: "12", runId: "true", limit: "1" },
+    }),
+    "codex",
+  );
+  check(
+    "tool_call keeps text where the schema takes text, and makes a number of an integer sent as text",
+    JSON.stringify(typed?.arguments) === JSON.stringify({ workflowId: "12", runId: "true", limit: 1 }),
+    typed?.arguments,
+  );
+  const untyped = resolveDeferredTool(
+    params("tool_call", { name: "openbot.read_workflow_runs", arguments: { workflowId, limit: "1.5", x: "2" } }),
+    "codex",
+  );
+  check(
+    "tool_call keeps text that is not an integer, and a key that the schema does not have",
+    JSON.stringify(untyped?.arguments) === JSON.stringify({ workflowId, limit: "1.5", x: "2" }),
+    untyped?.arguments,
+  );
   check(
     "the output gets the notify target, and the condition edge its branch",
     graph.nodes.some((node) => node.id === ids.tell && node.fields.target === "notify") &&
@@ -543,6 +574,13 @@ try {
     await new Promise((done) => setImmediate(done));
     triggerRun = await call("runs-from-trigger", "read_workflow_runs", { workflowId, runId: triggerRunId });
   }
+  // The workflow has two runs now, and a read without a limit gives one.
+  const textLimit = await call("runs-limit-text", "read_workflow_runs", { workflowId, limit: "2" });
+  check(
+    "tool_call gives an integer sent as text its type",
+    runList.safeParse(textLimit.value).data?.runs.length === 2,
+    textLimit.value,
+  );
   check(
     "the trigger of a run from that trigger gives the run input as its output",
     runRead.parse(triggerRun.value).steps.some((step) => step.nodeId === ids.start && step.output === triggerInput),
