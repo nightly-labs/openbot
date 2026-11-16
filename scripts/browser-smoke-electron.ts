@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { constants } from "node:fs";
-import { mkdir, mkdtemp, open, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, open, readFile, rm, utimes, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
@@ -3756,6 +3756,18 @@ async function runStagedUploadScenario(
     if (missing.success) throw new Error("V2 staged upload reported success for a missing file.");
     const staged = await upload({ kind: "css", selector: 'input[aria-label="Files"]' }, [uploadPath]);
     if (!staged.success) throw new Error(`V2 staged upload failed: ${toolError(staged)}`);
+    // An unchanged file reuses its kept copy at the same path. The retry must still reach the page.
+    const settled = new Date(Date.now() - 60_000);
+    await utimes(uploadPath, settled, settled);
+    for (const attempt of ["first", "retry"]) {
+      await contents.executeJavaScript("document.querySelector('output').textContent = 'retry pending'", true);
+      const repeated = await upload({ kind: "css", selector: 'input[aria-label="Files"]' }, [uploadPath]);
+      if (!repeated.success) throw new Error(`V2 repeated staged upload failed: ${toolError(repeated)}`);
+      const repeatedOutput = await contents.executeJavaScript("document.querySelector('output').textContent", true);
+      if (repeatedOutput !== basename(uploadPath)) {
+        throw new Error(`V2 ${attempt} upload of an unchanged file did not reach the page: ${String(repeatedOutput)}`);
+      }
+    }
     await contents.executeJavaScript("document.querySelector('output').textContent = 'staged chooser pending'", true);
     const stagedChooser = await upload({ kind: "role", role: "button", name: "Attach files", exact: true }, [
       uploadPath,
