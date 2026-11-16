@@ -15,6 +15,10 @@ const AGENT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 // Not an agent id, so `registerSaved` and the move into the Vault never read it.
 const VAULT_FOLDER = ".vault";
 
+// The names of the key files that OpenBot wrote in a Vault key folder, one on each line. It starts with
+// a dot, so it is never a key name and never an agent id.
+const WRITTEN_KEYS_FILE = ".openbot-keys";
+
 export interface SavedApiKey {
   name: string;
   path: string;
@@ -48,7 +52,8 @@ export type AgentApiKeyVault = Pick<
  * can use to `<root>/.vault/<agentId>/<NAME>` when the agent asks for them, and `syncVault` rewrites or
  * removes those files when the Vault changes. Both run one at a time and read the Vault inside their
  * turn, so a key that the user deleted, or took from the agent, is never written again after its
- * removal. The Vault registers its values for redaction itself.
+ * removal. The Vault registers its values for redaction itself. Each folder records the key names that
+ * OpenBot wrote there, and only those files are removed (#10077).
  *
  * Before agent scope (0.70.0), `list` wrote each Vault key to `<root>/.vault/<NAME>`, and scripts, MCP
  * servers and provider configs read that path (#8983). `list` still writes the keys for every agent
@@ -342,16 +347,38 @@ export class AgentApiKeys {
 }
 
 /**
- * Removes each key file in `folder` that `keys` does not keep, and the temporary file of a stopped write:
- * no write runs now. Every other file stays.
+ * Removes each key file in `folder` that OpenBot wrote and that `keys` does not keep, and the temporary
+ * file of a stopped write: no write runs now. Then records the names of `keys`, which the caller writes
+ * next. Every other file stays, also a file with a key name that an agent put there by hand (#10077).
+ * A folder from before the record has none, so the first sync removes no key file there: earlier
+ * versions removed the file of a stale key at each Vault change and start.
  */
 function removeKeyFiles(folder: string, keys: ReadonlyMap<string, string>): Effect.Effect<void, AgentApiKeyFailed> {
   return Effect.gen(function* () {
     const names = yield* Effect.tryPromise({ try: () => folderFiles(folder), catch: failed });
+    const written = yield* readWrittenKeys(folder);
     for (const name of names) {
-      const stale = API_KEY_NAME_PATTERN.test(name) ? !keys.has(name) : isStoppedWrite(name);
+      const stale = API_KEY_NAME_PATTERN.test(name) ? written.has(name) && !keys.has(name) : isStoppedWrite(name);
       if (stale) yield* removeFile(join(folder, name));
     }
+    // After the removals: when one fails, the old record stays, and the next sync removes the file.
+    const next = [...keys.keys()].sort();
+    if (next.length === written.size && next.every((name) => written.has(name))) return;
+    yield* writeFileAtomically(join(folder, WRITTEN_KEYS_FILE), next.map((name) => `${name}\n`).join(""), {
+      createDirectory: true,
+    }).pipe(Effect.mapError(failed));
+  });
+}
+
+/** The names in the record of `folder`; none when there is no record. */
+function readWrittenKeys(folder: string): Effect.Effect<ReadonlySet<string>, AgentApiKeyFailed> {
+  return Effect.tryPromise({
+    try: () =>
+      readFile(join(folder, WRITTEN_KEYS_FILE), "utf8").then(
+        (text) => new Set(text.split("\n").filter((name) => API_KEY_NAME_PATTERN.test(name))),
+        (error: unknown) => (isMissingFileError(error) ? new Set<string>() : Promise.reject(error)),
+      ),
+    catch: failed,
   });
 }
 
@@ -424,10 +451,10 @@ function writeIfChanged(path: string, value: string): Effect.Effect<void, AgentA
   );
 }
 
-/** The temporary file that `writeFileAtomically` makes for a key: `<NAME>.<uuid>.tmp`. */
+/** The temporary file that `writeFileAtomically` makes for a key or the record: `<NAME>.<uuid>.tmp`. */
 function isStoppedWrite(name: string): boolean {
-  const match = /^([^.]+)\.[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\.tmp$/u.exec(name);
-  return match?.[1] !== undefined && API_KEY_NAME_PATTERN.test(match[1]);
+  const match = /^(.+)\.[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\.tmp$/u.exec(name);
+  return match?.[1] !== undefined && (match[1] === WRITTEN_KEYS_FILE || API_KEY_NAME_PATTERN.test(match[1]));
 }
 
 /** The names of the files in a folder, not of its folders; none when the folder is missing. */
