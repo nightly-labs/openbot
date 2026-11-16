@@ -164,7 +164,7 @@ export function SkillsMarketplace() {
   const { selectAgent } = useNavigation();
   const { activeServer } = useServers();
   const { openInstalledMarketplaceAgent } = useServerSelection();
-  const { openMcpAdd } = useServerSettings();
+  const { openMcpAdd, openMcpEdit } = useServerSettings();
   const connectors = useConnectors();
   const platform = usePlatform();
   const { remoteDesktopWorkspaceVisible, hideRemoteDesktopWorkspace } = useRemoteDesktop();
@@ -197,6 +197,10 @@ export function SkillsMarketplace() {
       onAddServer={(serverId) => {
         setSkillsMarketplaceOpen(false);
         openMcpAdd(serverId, null);
+      }}
+      onEditServer={(serverId, mcpServerId) => {
+        setSkillsMarketplaceOpen(false);
+        openMcpEdit(serverId, mcpServerId);
       }}
     />
   );
@@ -600,6 +604,7 @@ function ServerSettings() {
     serverSettingsError,
     refreshServerSettings,
     saveServerIdentity,
+    saveServerAppearance,
     recheckScreenRecording,
     rotateHostKey,
     setServerPublished,
@@ -615,6 +620,8 @@ function ServerSettings() {
     clearMcpSignInRequest,
     serverSettingsMcpAddRequest,
     clearMcpAddRequest,
+    serverSettingsMcpEditRequest,
+    clearMcpEditRequest,
     serverSettingsMcpSignInPages,
     serverSettingsMcpSignInRelays,
     openMcpSignInRelay,
@@ -930,6 +937,7 @@ function ServerSettings() {
           loadError={serverSettingsError()}
           onRetry={() => refreshServerSettings(server().id)}
           onSaveIdentity={saveServerIdentity}
+          onSaveAppearance={saveServerAppearance}
           onSetPublished={setServerPublished}
           onRotateHostKey={serverRotatesHostKey(server()) ? rotateHostKey : undefined}
           onCreateInvite={createServerInvite}
@@ -957,6 +965,8 @@ function ServerSettings() {
           onTestMcpServer={testMcpServer}
           mcpAddRequest={serverSettingsMcpAddRequest()}
           onMcpAddRequestHandled={clearMcpAddRequest}
+          mcpEditRequest={serverSettingsMcpEditRequest()}
+          onMcpEditRequestHandled={clearMcpEditRequest}
           // A remote host with `sign-in-relay-v1` opens the page in this computer's browser. An older
           // host's page shows here through the live view, which streams the active server only.
           mcpSignInRequest={serverSettingsMcpSignInRequest()}

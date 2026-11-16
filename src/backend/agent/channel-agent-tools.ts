@@ -13,6 +13,7 @@ import { z } from "zod";
 import type { ChannelService } from "../channel-service";
 import type { DynamicToolCallParams } from "../protocol";
 import { loadAvatarFile } from "./avatar-file";
+import { profileToolErrorMessage } from "./profile-tools";
 import { openBotToolResult } from "./routine-tools";
 import { toolCallIdempotencyKey } from "./tool-call-idempotency";
 import { ToolOperationFailed, toToolOperationFailed } from "./tool-operation";
@@ -98,6 +99,26 @@ export const updateChannelToolSchema = z
     ({ channelId: _channelId, ...change }) => Object.values(change).some((value) => value !== undefined),
     "At least one channel change is required.",
   );
+
+const CREATE_CHANNEL_FIELDS = Object.keys(createChannelToolSchema.shape);
+const UPDATE_CHANNEL_FIELDS = Object.keys(updateChannelToolSchema.shape);
+const ICON_FIELDS = Object.keys(channelFields.icon.shape);
+
+/**
+ * Describe a failed `create_channel` or `update_channel` call. A field that the tool does not take
+ * gets the names of the fields that it takes, never the name that the call sent (#1354, #8627).
+ */
+export function channelAgentToolErrorMessage(tool: string, error: unknown): string {
+  return profileToolErrorMessage(error, (path) => {
+    if (path.length === 0) {
+      const fields = tool === "create_channel" ? CREATE_CHANNEL_FIELDS : UPDATE_CHANNEL_FIELDS;
+      return `Remove the fields that ${tool} does not take. It takes: ${fields.join(", ")}.`;
+    }
+    if (path.length === 1 && path[0] === "icon")
+      return `Remove the fields that icon does not take. It takes: ${ICON_FIELDS.join(", ")}.`;
+    return `Remove the fields that ${path.map(String).join(".")} does not take.`;
+  });
+}
 
 type CreateChannelArgs = z.infer<typeof createChannelToolSchema>;
 type UpdateChannelArgs = z.infer<typeof updateChannelToolSchema>;

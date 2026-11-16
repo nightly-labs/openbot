@@ -56,6 +56,7 @@ export function encodeTeamProtocolV8WebRtcHttpResponse(
     promptMultiSelect?: boolean;
     videoGeneration?: boolean;
     usageTertiary?: boolean;
+    agentPendingRuntime?: boolean;
   } = {},
 ) {
   if (status === 204) return {};
@@ -82,6 +83,7 @@ export function createTeamProtocolV8Event(
     videoGeneration?: boolean;
     contextUsage?: boolean;
     usageTertiary?: boolean;
+    agentPendingRuntime?: boolean;
   } = {},
 ): TeamProtocolV2EventFrame {
   const decoded = decodeTeamProtocolV8BaseCurrentEvent(value);

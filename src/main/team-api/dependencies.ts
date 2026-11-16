@@ -189,6 +189,7 @@ type TeamApiAgentMethods = Pick<
   | "compactAgentContext"
   | "compactTaskContext"
   | "agentIdForRequest"
+  | "pendingApproval"
   | "respondToPrompt"
   | "respondToApproval"
   | "respondToBrowserSecret"
@@ -301,6 +302,11 @@ export type TeamApiProviderAccounts = Pick<
   | "startSignIn"
   | "signInStatus"
   | "cancelSignIn"
+  | "connectKey"
+  | "startCodeSignIn"
+  | "submitCodeSignIn"
+  | "codeSignInStatus"
+  | "cancelCodeSignIn"
   | "rename"
   | "remove"
   | "setAgentAccount"
@@ -431,7 +437,7 @@ export type TeamApiInstanceTransfer = Pick<
  */
 export type TeamApiRoutineFlows = Pick<
   RoutineFlowsHandle,
-  "canvas" | "savePosition" | "removePosition" | "connect" | "disconnect" | "updateLink" | "agentsOf"
+  "canvas" | "savePosition" | "removePosition" | "connect" | "disconnect" | "updateLink" | "agentsOf" | "stopRun"
 >;
 
 /**
@@ -674,7 +680,7 @@ export type TeamApiBrowser = Pick<
   | "stopTeach"
   // Behind `browser-page-state`.
   | "stop"
-  // Behind `browser-sign-in`.
+  // Behind `browser-sign-in` and `browser-sign-in-storage-v1`.
   | "importSignIn"
   // The live view, behind `browser-view`. `browser-view-gateway.ts` is what reaches these; a route
   // cannot, because frames outlive the request that asked for them.

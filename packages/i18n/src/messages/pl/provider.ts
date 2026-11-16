@@ -190,6 +190,12 @@ export const messages = {
   "provider.claudeKey.description":
     "Zapisz klucz API Anthropic na hoście. Anthropic nalicza każde zapytanie ze środków API klucza, nie z planu Claude. Aby użyć go dla agenta, wybierz konto „Klucz API” w menu modeli agenta. Gdy Claude nie jest zalogowany, wszyscy agenci używają klucza.",
   "provider.claudeKey.label": "Klucz API Anthropic",
+  "provider.cursorKey.title": "Klucz API Cursor",
+  "provider.cursorKey.description":
+    "Każde konto Cursor po pierwszym używa klucza API. Utwórz klucz w panelu Cursor, w sekcji Integrations, i wklej go tutaj. Klucz jest zapisywany na tym komputerze.",
+  "provider.cursorKey.descriptionHost":
+    "Każde konto Cursor po pierwszym używa klucza API. Utwórz klucz w panelu Cursor, w sekcji Integrations, i wklej go tutaj. Klucz jest zapisywany na hoście.",
+  "provider.cursorKey.label": "Klucz API Cursor",
   "provider.inceptionKey.title": "Klucz API Inception",
   "provider.inceptionKey.description":
     "Zapisz klucz API Inception na tym komputerze, aby używać modeli Mercury. OpenBot uruchamia je w pobranym Pi CLI.",
@@ -223,6 +229,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "Nie udało się połączyć ponownie.",
   "provider.account.add": "Dodaj konto",
   "provider.account.addLabel": "Dodaj kolejne konto {name}",
+  "provider.account.addWithCode": "Dodaj konto kodem",
   "provider.account.count": {
     one: "{count} konto",
     few: "{count} konta",

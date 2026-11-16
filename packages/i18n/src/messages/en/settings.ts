@@ -20,6 +20,7 @@ export const messages = defineMessages("settings", {
   "settings.interfaceFont.title": "Interface font",
   "settings.interfaceFont.description": "The font of menus, chats and settings.",
   "settings.interfaceFont.default": "Default (Inter)",
+  "settings.interfaceFont.defaultSystem": "System font",
   "settings.codeFont.title": "Code font",
   "settings.codeFont.description": "The font of code, terminals and file paths.",
   "settings.codeFont.default": "Default",
@@ -61,6 +62,11 @@ export const messages = defineMessages("settings", {
   "settings.chatColor.red": "Red",
   "settings.chatColor.green": "Green",
   "settings.chatColor.blue": "Blue",
+  "settings.bubbleStyle.title": "Your bubbles",
+  "settings.bubbleStyle.description": "In a chat with an agent, your bubbles take the agent's color. Only you see it.",
+  "settings.bubbleStyle.solid": "Solid",
+  "settings.bubbleStyle.tint": "Tint",
+  "settings.bubbleStyle.classic": "Classic",
   // The Settings window, General tab.
   "settings.appBehavior.title": "App behavior",
   "settings.conversations.title": "Conversations",
@@ -287,7 +293,7 @@ export const messages = defineMessages("settings", {
     "On: usage and reliability metadata goes to OpenBot’s self-hosted analytics with your account ID and email. Off: the same metadata goes with a random install ID only. Chats, files and prompts are never sent. This setting applies to this browser.",
   // The Settings window shell: its tab list, headers and save bar.
   "settings.tab.general.title": "General",
-  "settings.tab.general.description": "Control how OpenBot behaves on this computer.",
+  "settings.tab.general.description": "Choose how chats work and what OpenBot shares.",
   "settings.tab.agents.title": "Agents",
   "settings.tab.agents.description":
     "Choose what the agents on this computer can do when you do not set it for an agent.",
@@ -313,6 +319,15 @@ export const messages = defineMessages("settings", {
   "settings.tab.billing.description": "License, server plans, payment method and invoices.",
   "settings.tab.hostedServers.title": "Hosted servers",
   "settings.tab.hostedServers.description": "Create OpenBot servers that run when this computer is off.",
+  "settings.tab.appearance.description": "Choose the theme, colors, language and fonts.",
+  "settings.tab.appBehavior.description": "Choose how OpenBot starts and runs on this computer.",
+  "settings.appearance.colorsTitle": "Colors",
+  "settings.appearance.textTitle": "Language and text",
+  "settings.appBehavior.startTitle": "Start and quit",
+  "settings.appBehavior.backgroundTitle": "Background",
+  // The labels of the groups in the section list of the user settings.
+  "settings.sections.group.account": "Account",
+  "settings.sections.group.thisComputer": "This computer",
   "settings.sections.label": "Settings sections",
   "settings.panel.resize": "Resize right panel",
   // A failed read or save of the app preferences on the General, Notifications, Dynamic Island and Updates tabs.

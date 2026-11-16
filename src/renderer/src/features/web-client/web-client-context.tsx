@@ -30,13 +30,14 @@ import type {
   TeamPresenceSnapshot,
   TeamRealtimeEvent,
 } from "@openbot/contracts/ipc";
-import { canAdministerServer } from "@openbot/contracts/ipc";
+import { canAdministerServer, openExchangesOutside } from "@openbot/contracts/ipc";
 import {
   AGENT_COLORS_CAPABILITY,
   AGENT_HIDDEN_CAPABILITY,
   CHAT_COLORS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_CAPABILITY } from "@openbot/contracts/team-protocol/focus-use-v1";
+import { HOST_APPEARANCE_CAPABILITY, type ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
@@ -48,7 +49,12 @@ import {
   isSafeConnectionError,
   type RemoteRecoveryStatus,
 } from "@openbot/team-client/remote-recovery";
-import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
+import {
+  approvalIsCut,
+  keepWholeApprovals,
+  reconcilePendingRequests,
+  withWholeApproval,
+} from "@openbot/team-client/runtime-attention";
 import { markRemoteSync } from "@openbot/team-client/sync-profile";
 import { duplicateSection as duplicateSectionWith } from "@openbot/ui/features/sidebar/duplicate-section";
 import { currentText } from "@openbot/ui/text";
@@ -417,6 +423,34 @@ export function createWebWorkspace(
     },
   });
   const hostNoticeListeners = new Set<(hostId: string, event: WebHostNotice, agents: ClientAgentSummary[]) => void>();
+  // A runtime snapshot cuts the long texts of an approval. The whole copy is read once for each cut
+  // request. Until it comes, and from a host without `pending-approval-v1`, the card offers only Deny.
+  const wholeApprovalReads = new Set<string>();
+  function readWholeApprovals(): void {
+    const read = runtime.readPendingApproval;
+    if (!read) return;
+    const current = generation;
+    for (const approval of state.approvals.filter(approvalIsCut)) {
+      const key = JSON.stringify([hostId, approval.agentId, approval.turnId, approval.requestId]);
+      if (wholeApprovalReads.has(key)) continue;
+      wholeApprovalReads.add(key);
+      void read({ agentId: approval.agentId, requestId: approval.requestId }).then(
+        (whole) => {
+          if (disposed) return;
+          // A read that a reconnect made stale, or that an older host refused, tries again at the next snapshot.
+          if (!whole || current !== generation) {
+            wholeApprovalReads.delete(key);
+            return;
+          }
+          setState((draft) => {
+            draft.approvals = [...withWholeApproval(draft.approvals, whole)];
+          });
+        },
+        // The next snapshot tries again.
+        () => wholeApprovalReads.delete(key),
+      );
+    }
+  }
   const runtime = (props.createRuntime ?? createWebWorkspaceRuntime)(
     props.accountId,
     {
@@ -546,13 +580,16 @@ export function createWebWorkspace(
           setState((draft) => {
             draft.hostRestart = event.state === "none" ? null : { state: event.state, version: event.version };
           });
+        // The host sends it at connect and after each change (`host-appearance-v1`).
+        if (event.type === "host-appearance") setHostAppearance(id, event.appearance);
         if (event.type === "status") hooks.onStatus?.(event.status);
         if (event.type === "runtime-snapshot") {
           const { attentionComplete } = event.snapshot;
           setState((draft) => {
+            // The snapshot cuts long texts. A whole copy from an `approval` event or a read stays in its place.
             draft.approvals = reconcilePendingRequests(
               draft.approvals,
-              event.snapshot.pendingApprovals,
+              keepWholeApprovals(draft.approvals, event.snapshot.pendingApprovals),
               attentionComplete,
             );
             draft.prompts = reconcilePendingRequests(
@@ -573,6 +610,7 @@ export function createWebWorkspace(
               (event.snapshot.threadContextStates ?? []).map((context) => [context.threadId, context]),
             );
           });
+          readWholeApprovals();
         } else if (event.type === "prompt") {
           setState((draft) => {
             draft.prompts = [...draft.prompts.filter((item) => item.requestId !== event.requestId), event];
@@ -991,6 +1029,14 @@ export function createWebWorkspace(
       };
     });
   }
+  /** Shows the plush look of a host in the server list and on the connected host. */
+  function setHostAppearance(id: string, appearance: ServerAppearance | null): void {
+    setState((draft) => {
+      if (draft.host?.hostId === id) draft.host.appearance = appearance;
+      const listed = draft.hosts.find((host) => host.hostId === id);
+      if (listed) listed.appearance = appearance;
+    });
+  }
   function refreshHosts(): Promise<void> {
     if (hostsRefreshPromise) return hostsRefreshPromise;
     const refreshGeneration = generation;
@@ -1066,6 +1112,10 @@ export function createWebWorkspace(
           if (connected && draft.host?.hostId === connected.hostId) {
             draft.host.name = connected.name;
             draft.host.logoKey = connected.logoKey;
+            // A host with `host-appearance-v1` sends its look itself; the account copy can be older.
+            // An account server from before `host-appearance-v1` lists none.
+            if (connected.appearance !== undefined && !draft.capabilities.includes(HOST_APPEARANCE_CAPABILITY))
+              draft.host.appearance = connected.appearance;
           }
           draft.hosts = hosts;
           draft.hostsLoaded = true;
@@ -1596,13 +1646,21 @@ export function createWebWorkspace(
             prompt.threadId !== page.threadId ||
             !resolvedRequests.has(String(prompt.requestId)),
         );
+        // A latest page that does not meet the loaded messages, after a long time with no connection,
+        // replaces them: joined end to end, the two would hide the messages between with no sign.
+        const pageIds = new Set(page.messages.map((message) => message.id));
+        const apart =
+          merge === "latest" &&
+          !around &&
+          page.pageInfo.hasOlder &&
+          !(old?.messages ?? []).some((message) => pageIds.has(message.id));
         item.page = {
           ...page,
           messages: around
             ? windowedSnapshotMessages(old?.messages ?? [], page.messages, { mode: "around", capped: true })
-            : mergeConversationPage(old?.messages ?? [], page.messages, merge),
+            : mergeConversationPage(old?.messages ?? [], page.messages, apart ? "replace" : merge),
           references: merge === "replace" ? page.references : { ...old?.references, ...page.references },
-          pageInfo: merge === "latest" ? (old?.pageInfo ?? page.pageInfo) : page.pageInfo,
+          pageInfo: merge === "latest" && !apart ? (old?.pageInfo ?? page.pageInfo) : page.pageInfo,
           // An older page has the thread's current revision but not its newest messages. The loaded
           // newest messages keep their revision, so a delta held during this read still applies.
           revision: older && old ? old.revision : page.revision,
@@ -1619,6 +1677,9 @@ export function createWebWorkspace(
         item.error = null;
         item.olderError = null;
       });
+      if (!older)
+        for (const messageId of openExchangesOutside(state.conversations[id]?.page?.messages ?? [], page.messages))
+          refreshOpenExchange(id, messageId);
     } catch (error) {
       if (!disposed && current === generation && !blockAccess(error))
         setState((draft) => {
@@ -1832,6 +1893,45 @@ export function createWebWorkspace(
     } catch (error) {
       if (current === generation) report(error);
     }
+  }
+  /** The reads of loaded open requests that a latest page left out. A change during a read reads it again. */
+  const openExchangeReads = new Map<string, { again: boolean }>();
+  /** Puts the host's current copy of one loaded request in place. The rest of the chat stays as it is. */
+  function refreshOpenExchange(id: string, messageId: string) {
+    const readAround = runtime.conversationAround;
+    // A host without pages sends the whole chat in each read, so its copy is never left behind.
+    if (!readAround || !state.capabilities.includes("conversation-pagination")) return;
+    const key = `${id}\0${messageId}`;
+    const running = openExchangeReads.get(key);
+    if (running) {
+      running.again = true;
+      return;
+    }
+    const read = { again: true };
+    openExchangeReads.set(key, read);
+    const current = generation;
+    void (async () => {
+      try {
+        while (read.again && !disposed && current === generation) {
+          read.again = false;
+          // The page around the request holds its whole turn at least, with the request as the host has it.
+          const page = await readAround(id, messageId, 1);
+          const message = page.messages.find((candidate) => candidate.id === messageId);
+          if (disposed || current !== generation || !message) return;
+          setState((draft) => {
+            const loaded = draft.conversations[id]?.page;
+            if (!loaded || loaded.threadId !== page.threadId || page.revision < loaded.revision) return;
+            const index = loaded.messages.findIndex((candidate) => candidate.id === messageId);
+            if (index >= 0) loaded.messages[index] = message;
+          });
+        }
+      } finally {
+        // In the same step as the last check, so a later page starts a new read and is not lost.
+        openExchangeReads.delete(key);
+      }
+    })()
+      // The next latest page reads it again.
+      .catch(() => undefined);
   }
   // Coalesce event bursts; an event during a read schedules one further authoritative read.
   async function refresh() {
@@ -2065,6 +2165,7 @@ export function createWebWorkspace(
     },
     run,
     refreshHosts,
+    setHostAppearance,
     leaveHost,
     removeOwnedHost,
     retryHosts,

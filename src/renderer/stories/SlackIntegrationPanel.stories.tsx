@@ -91,6 +91,9 @@ export const Paused: Story = { args: args([workspace({ enabled: false, state: "p
 
 export const Uninstalled: Story = { args: args([workspace({ state: "invalid_token" })]) };
 
+/** Signal sends the workspace's events to a different server: Reconnect links it to this one. */
+export const NotLinked: Story = { args: args([workspace({ state: "not_linked" })]) };
+
 export const MissingPermissions: Story = {
   args: args([workspace({ state: "missing_scope", missingScopes: ["files:read"] })]),
 };

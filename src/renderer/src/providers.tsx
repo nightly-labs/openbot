@@ -1,4 +1,8 @@
-import { isKeyOnlyProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
+import {
+  isKeyOnlyProvider,
+  type ManagedProviderId,
+  pasteCodeSignInSupported,
+} from "@openbot/contracts/agent-providers";
 import {
   type AgentProviderId,
   type AgentStatus,
@@ -11,6 +15,8 @@ import {
 import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import { CODEX_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/codex-api-key-v1";
 import { CUSTOM_PROVIDER_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
+import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-code-v1";
+import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import {
   type ProviderAccountRelay,
@@ -221,7 +227,6 @@ const Providers = createSimpleContext({
     }
 
     async function startBrowserSignIn(provider: AgentProviderId, start: () => Promise<AgentStatus>): Promise<void> {
-      if (refreshingProviders()) return;
       const analytics = beginProviderConnection(provider, "browser");
       try {
         const status = await start();
@@ -380,6 +385,14 @@ const Providers = createSimpleContext({
     const accountPoolServerId = createMemo(
       () => remoteAdminServer(activeServer(), PROVIDER_ACCOUNT_POOL_CAPABILITY)?.id,
     );
+    /** The joined server whose host signs a provider account in with a code (`provider-account-code-v1`). */
+    const accountCodeServerId = createMemo(
+      () => remoteAdminServer(activeServer(), PROVIDER_ACCOUNT_CODE_CAPABILITY)?.id,
+    );
+    /** The joined server whose host takes an API key as a provider account (`provider-account-keys-v1`). */
+    const accountKeysServerId = createMemo(
+      () => remoteAdminServer(activeServer(), PROVIDER_ACCOUNT_KEYS_CAPABILITY)?.id,
+    );
 
     /**
      * The accounts of the providers of this computer, or of a joined server's host that serves
@@ -395,8 +408,10 @@ const Providers = createSimpleContext({
         return {
           connect: async (provider, accountId) => connection.connectAccount(provider, accountId),
           // The host runs one account sign-in for each provider, so the released cancel names only the provider.
-          cancel: async (provider) => {
+          // It does not stop a code sign-in, which the code route stops by its account.
+          cancel: async (provider, accountId) => {
             await accountSignIn(hostServerId).cancel(provider);
+            if (accountCodeServerId() === hostServerId) await accountCode(hostServerId).cancel(provider, accountId);
           },
           rename: (provider, accountId, label) =>
             changed(providerAdmin().renameAccount({ provider, accountId, label }, hostServerId)),
@@ -422,6 +437,20 @@ const Providers = createSimpleContext({
                   changed(providerAdmin().setAccountPool({ provider, enabled, leftOut: [...leftOut] }, hostServerId)),
               }
             : {}),
+          ...(accountCodeServerId() === hostServerId
+            ? {
+                connectWithCode: async (provider: AgentProviderId, accountId: string | null) =>
+                  connection.connectAccountWithCode(provider, accountId),
+                // Only a host that can run a pasted code advertises `providers-v3`.
+                pasteCodeSignIn: serverSupportsCapability(activeServer(), "providers-v3"),
+              }
+            : {}),
+          ...(accountKeysServerId() === hostServerId
+            ? {
+                connectKey: (provider: AgentProviderId, accountId: string | null, key: string) =>
+                  changed(providerAdmin().connectAccountKey({ provider, accountId, key }, hostServerId)),
+              }
+            : {}),
         };
       }
       if (activeServer()?.kind !== "local") return undefined;
@@ -436,6 +465,10 @@ const Providers = createSimpleContext({
         connect: async (provider, accountId) => {
           await providersPort().connectProviderAccount({ provider, accountId });
         },
+        connectWithCode: async (provider, accountId) => connection.connectAccountWithCode(provider, accountId),
+        pasteCodeSignIn: pasteCodeSignInSupported(appInfo()?.platform ?? ""),
+        connectKey: (provider, accountId, key) =>
+          apply(providersPort().connectProviderAccountKey({ provider, accountId, key })),
         cancel: async (provider, accountId) => {
           await providersPort().cancelProviderAccountSignIn({ provider, accountId });
         },
@@ -513,6 +546,35 @@ const Providers = createSimpleContext({
     }
 
     /**
+     * The code sign-in of an account, on this computer or on a joined server's host
+     * (`provider-account-code-v1`). The host's status does not carry its accounts, so they are read
+     * again when the sign-in starts and when it ends.
+     */
+    function accountCode(serverId: string) {
+      const refresh = () =>
+        serverId === LOCAL_SERVER_ID ? Promise.resolve() : refreshHostAccounts().catch(() => undefined);
+      return {
+        start: async (provider: AgentProviderId, accountId: string | null) => {
+          const started = await providerAdmin().startAccountCodeLogin({ provider, accountId }, serverId);
+          // The code is shown at once: the code lives for a short time only.
+          void refresh();
+          return started;
+        },
+        submit: (provider: AgentProviderId, accountId: string, code: string) =>
+          providerAdmin().submitAccountCodeLogin({ provider, accountId, code }, serverId),
+        status: async (provider: AgentProviderId, accountId: string) => {
+          const status = await providerAdmin().accountCodeLoginStatus({ provider, accountId }, serverId);
+          if (status.result) await refresh();
+          return status;
+        },
+        cancel: async (provider: AgentProviderId, accountId: string) => {
+          await providerAdmin().cancelAccountCodeLogin({ provider, accountId }, serverId);
+          await refresh();
+        },
+      };
+    }
+
+    /**
      * An account sign-in that the host relays to this computer's browser (`provider-account-relay-v1`
      * or `-v2`). The other relay requests run it by its provider, and the accounts are read again when
      * it ends.
@@ -567,6 +629,7 @@ const Providers = createSimpleContext({
               },
               ...(accountsAdminServerId() === serverId ? { accountSignIn: accountSignIn(serverId) } : {}),
               ...(relayed ? { accountRelay: accountRelay(serverId, relayed) } : {}),
+              ...(accountCodeServerId() === serverId ? { accountCode: accountCode(serverId) } : {}),
               relay: {
                 hostName: activeServer()?.name ?? "",
                 start: (provider) => providerAdmin().startRelaySignIn(provider, serverId),
@@ -580,6 +643,7 @@ const Providers = createSimpleContext({
               start: (provider) => providersPort().startProviderCodeLogin(provider),
               submit: (provider, code) => providerAdmin().submitCodeLogin({ provider, code }, LOCAL_SERVER_ID),
               cancel: (provider) => providersPort().cancelProviderCodeLogin(provider),
+              accountCode: accountCode(LOCAL_SERVER_ID),
             };
       },
       // A member of a joined server cannot connect its providers. This computer's own are connected here.

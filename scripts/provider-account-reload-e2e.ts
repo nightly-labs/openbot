@@ -255,6 +255,32 @@ require("node:readline").createInterface({ input: process.stdin }).on("line", (l
       runtime = undefined;
     }
 
+    // An account that lost its login after its check: the start of an agent on it must say so and
+    // change the row, which stayed "connected" (#8277).
+    const lostLogin = new ProviderAccountStore(accountsPath, accountsRoot);
+    await runCauseEffect(lostLogin.load());
+    runtime = createRuntime(lostLogin);
+    await runCauseEffect(runtime.start());
+    await waitForAccounts(runtime, "connected");
+    await runCauseEffect(agents.initialize());
+    const agent = await runCauseEffect(
+      agents.createAgent({ name: "Writer", description: "", avatarSeed: "account-a", avatarHue: null }),
+    );
+    for (const account of lostLogin.list()) await saveAccount(lostLogin.home(account), null);
+    for (const provider of providersToCheck) {
+      const accountId = lostLogin.list(provider)[0]?.id;
+      assert.ok(accountId);
+      await assert.rejects(
+        runCauseEffect(runtime.ensureAgentClient({ ...agent, provider, providerAccountId: accountId })),
+        /account is signed out\. Sign in again\./,
+      );
+    }
+    await waitForAccounts(runtime, "signed-out");
+    for (const account of lostLogin.list()) await saveAccount(lostLogin.home(account), "restored@example.invalid");
+    results.push({ name: "an agent start that finds no login marks the account signed out", passed: true });
+    await stop(runtime);
+    runtime = undefined;
+
     // A provider that reports no account must finish its check without removing the saved account.
     const signedOut = new ProviderAccountStore(accountsPath, accountsRoot);
     await runCauseEffect(signedOut.load());

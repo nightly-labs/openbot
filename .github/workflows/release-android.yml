@@ -204,6 +204,9 @@ jobs:
     uses: ./.github/workflows/release-android-apk.yml
     with:
       version_code: ${{ needs.release.outputs.build }}
+    # A called workflow gets no secret without this line, also not the secrets of the environment
+    # that its job names: run 43258435511 had an empty Google Play key there.
+    secrets: inherit
     permissions:
       contents: write
 

@@ -269,6 +269,12 @@ export interface AccountUsageLimit {
    * rail then shows the ring of that provider alone. The Team API does not send this field.
    */
   sharedQuotaWith?: AgentProviderId;
+  /**
+   * Codex: whether the account can keep working on credits when a plan window is spent. Absent when
+   * the provider sends no credit state. The released usage routes do not send it: a joined server
+   * reads it with `usage-credits-v1`, and a reading without it keeps the last one (`keepUsageCredits`).
+   */
+  creditsAvailable?: boolean;
 }
 
 export interface AccountUsage {
@@ -291,9 +297,61 @@ export function isAccountUsage(value: unknown): value is AccountUsage {
           (Array.isArray(limit.groups) &&
             limit.groups.length <= MAX_USAGE_GROUPS &&
             limit.groups.every(isAccountUsageGroup))) &&
-        (limit.sharedQuotaWith === undefined || isAgentProvider(limit.sharedQuotaWith)),
+        (limit.sharedQuotaWith === undefined || isAgentProvider(limit.sharedQuotaWith)) &&
+        (limit.creditsAvailable === undefined || typeof limit.creditsAvailable === "boolean"),
     )
   );
+}
+
+/** One row of a `usage-credits-v1` list: whether a provider account of the host can work on credits. */
+export interface UsageCredits {
+  provider: AgentProviderId;
+  /** `DEFAULT_PROVIDER_ACCOUNT_ID` for the provider's own sign-in. */
+  accountId: string;
+  available: boolean;
+}
+
+/** The `accounts` of a `usage-credits-v1` list. A provider this client does not know is left out. */
+export function decodeUsageCredits(value: unknown): UsageCredits[] {
+  const invalid = () => new Error("Invalid usage credits.");
+  if (!Array.isArray(value)) throw invalid();
+  return value.flatMap((row: unknown) => {
+    if (!isDynamicRecord(row) || !isProviderAccountId(row.accountId) || typeof row.available !== "boolean")
+      throw invalid();
+    return isAgentProvider(row.provider)
+      ? [{ provider: row.provider, accountId: row.accountId, available: row.available }]
+      : [];
+  });
+}
+
+/** A joined server's reading with the credit state that its host gave on `usage-credits-v1`. */
+export function withUsageCredits(usage: AccountUsage, credits: readonly UsageCredits[]): AccountUsage {
+  const byAccount = new Map(credits.map((row) => [JSON.stringify([row.provider, row.accountId]), row.available]));
+  return {
+    limits: usage.limits.map((limit) => {
+      const available = byAccount.get(JSON.stringify([limit.id, limit.accountId ?? DEFAULT_PROVIDER_ACCOUNT_ID]));
+      return available === undefined ? limit : { ...limit, creditsAvailable: available };
+    }),
+  };
+}
+
+/**
+ * The credit state of the last reading, for a limit of a new one that has none. The released usage
+ * routes and the `usage-changed` event of a joined server do not carry it, and a Codex reading on this
+ * computer always does, so a limit without it keeps the last one.
+ */
+export function keepUsageCredits(previous: AccountUsageLimit | undefined, next: AccountUsageLimit): AccountUsageLimit {
+  return next.creditsAvailable !== undefined || previous?.creditsAvailable === undefined
+    ? next
+    : { ...next, creditsAvailable: previous.creditsAvailable };
+}
+
+/**
+ * A limit that an event updated while a read ran, with the credit state of that read. The event is
+ * newer for the windows, but its credit state is only the one that `keepUsageCredits` kept.
+ */
+export function withReadCredits(read: AccountUsageLimit | undefined, limit: AccountUsageLimit): AccountUsageLimit {
+  return read?.creditsAvailable === undefined ? limit : { ...limit, creditsAvailable: read.creditsAvailable };
 }
 
 /** The most groups in one reading, and the most models in one group. */
@@ -357,6 +415,14 @@ export interface SetProviderApiKeyInput {
 export interface ConnectProviderAccountInput {
   provider: AgentProviderId;
   accountId: string | null;
+}
+
+/**
+ * Gives a provider account its API key: a new account when `accountId` is null, or a new key for one
+ * that exists. For a provider whose accounts are keys (`accountSignIn: "key"`).
+ */
+export interface ConnectProviderAccountKeyInput extends ConnectProviderAccountInput {
+  key: string;
 }
 
 /** A null label returns the account to its email. */
@@ -435,6 +501,11 @@ export interface SubmitProviderCodeLoginInput {
   code: string;
 }
 
+/** As `SubmitProviderCodeLoginInput`, for the `paste` sign-in of one account of a provider. */
+export interface SubmitProviderAccountCodeLoginInput extends SubmitProviderCodeLoginInput {
+  accountId: string;
+}
+
 /**
  * Whether a key is stored. `unreadable` is a key file OpenBot could not decrypt or parse: the
  * provider then runs with no key, and the file stays on disk until the user replaces or removes it.
@@ -487,6 +558,20 @@ export type ProviderCodeLoginStart =
       expiresAt: number;
     }
   | { kind: "connected" };
+
+/**
+ * A started code sign-in of one account of a provider. `accountId` is the account that signs in: a
+ * new one when the request named none. Its status and its cancel name it.
+ */
+export interface ProviderAccountCodeLoginStart {
+  accountId: string;
+  start: ProviderCodeLoginStart;
+}
+
+/** The code sign-in of one account of a provider: `result` is `null` while it goes on. */
+export interface ProviderAccountCodeLoginStatus {
+  result: { error: string | null } | null;
+}
 
 /**
  * A sign-in that a joined server's host runs in its own browser (`provider-host-sign-in-v1`). `tabId`

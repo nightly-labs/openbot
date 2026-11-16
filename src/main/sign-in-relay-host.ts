@@ -102,17 +102,18 @@ export class SignInRelayHost {
   }
 
   /** Starts the MCP sign-in of `input` with no tab, and returns its flow at once. */
-  startMcp(memberId: string, input: TestMcpServerInput) {
-    return this.#startMcp(memberId, input);
+  startMcp(memberId: string, input: TestMcpServerInput, deepLinkRedirectUrl?: string) {
+    return this.#startMcp(memberId, input, deepLinkRedirectUrl);
   }
 
   readonly #startMcp = Effect.fn("SignInRelayHost.startMcp")(function* (
     this: SignInRelayHost,
     memberId: string,
     input: TestMcpServerInput,
+    deepLinkRedirectUrl?: string,
   ) {
     const { mcp, receiveMcpGrant } = this.#dependencies;
-    yield* mcp.startRelay(input);
+    yield* mcp.startRelay(input, deepLinkRedirectUrl);
     const url = input.config.url;
     return this.#open(memberId, {
       key: `mcp\n${url}`,

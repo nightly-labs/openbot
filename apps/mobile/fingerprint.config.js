@@ -6,7 +6,8 @@
 // builds at prebuild. An update cannot change it, so its sources change `runtimeVersion` too. A change in
 // `@openbot/team-client` reaches the extension with the next build.
 //
-// A config plugin copies the Notification Service Extension source (`plugins/notification-service`)
+// A config plugin copies the Notification Service Extension source (`plugins/notification-service`),
+// the App Intents of the shortcuts (`plugins/shortcuts`)
 // and the notification sounds (`assets/sounds`) into the native project, and the build puts the update
 // signing certificate (`certs`) into the binary. The fingerprint hashes the plugin files and the app
 // config, but not the files that they name, so these folders are listed here. Without them, a change
@@ -25,6 +26,7 @@ module.exports = {
   extraSources: [
     { type: "dir", filePath: "plugins/share-extension", reasons: ["shareExtension"] },
     { type: "dir", filePath: "plugins/notification-service", reasons: ["notificationService"] },
+    { type: "dir", filePath: "plugins/shortcuts", reasons: ["shortcuts"] },
     { type: "dir", filePath: "assets/sounds", reasons: ["notificationSounds"] },
     { type: "dir", filePath: "certs", reasons: ["updateSigningCertificate"] },
     { type: "file", filePath: "../../packages/contracts/src/app-logo-color.ts", reasons: ["appIcons"] },

@@ -53,6 +53,8 @@ export const messages = {
   "error.skill.localRevisionNotFound":
     "Ta lokalna umiejętność nie ma wersji {revision}. Jej najnowsza wersja to {latest}.",
   "error.skill.localNameTaken": "Lokalna umiejętność o tej nazwie już istnieje. Zamiast tego ją zmień.",
+  "error.skill.localNameClash":
+    "Ta nazwa i lokalna umiejętność „{name}” dają tę samą wartość „{slug}”. Aby zmienić tę umiejętność, popraw ją. Aby dodać nową umiejętność, zmień litery łacińskie lub cyfry w tej nazwie.",
   "error.skill.localKeepName": "Nie zmieniaj nazwy umiejętności podczas jej poprawiania.",
   "error.skill.localRelativeFolder": "Użyj względnego folderu umiejętności w bieżącym obszarze roboczym agenta.",
   "error.skill.localSourceOutside": "Źródło umiejętności musi być w obszarze roboczym agenta.",

@@ -2,6 +2,7 @@ import { decodeAgentAnalytics } from "../ipc-agent-analytics";
 import { BROWSER_SECRET_RESPONSE_PATH, parseBrowserSecretResponse } from "../ipc-browser-secret";
 import { decodeHostAnalytics } from "../ipc-host-analytics";
 import { isBoolean, isDynamicRecord, isOneOf, isString } from "../runtime-values";
+import { isAgentListRoute, withAgentPendingRuntimes } from "./agent-pending-runtime-v1";
 import { decodeAnalyticsV1Response } from "./analytics-v1";
 import {
   decodeBrowserDisplayResponse,
@@ -218,8 +219,9 @@ export function decodeTeamProtocolV8CurrentHttpRequest(
  * negotiated prompt-multi-select-v1 capability: only then does a prompt question carry `multiSelect`.
  * `videoGeneration` is the negotiated video-generation-v1 capability: only then does a conversation
  * message carry its `videoGeneration`. `usageTertiary` is the negotiated usage-tertiary-v1 capability:
- * only then does a usage limit carry its `tertiary` window. Without them the output is the released
- * projection.
+ * only then does a usage limit carry its `tertiary` window. `agentPendingRuntime` is the negotiated
+ * agent-pending-runtime-v1 capability: only then does an agent of the agent list carry its
+ * `pendingRuntime`. Without them the output is the released projection.
  */
 export function encodeTeamProtocolV8CurrentHttpResponse(
   method: string,
@@ -234,9 +236,19 @@ export function encodeTeamProtocolV8CurrentHttpResponse(
     promptMultiSelect?: boolean;
     videoGeneration?: boolean;
     usageTertiary?: boolean;
+    agentPendingRuntime?: boolean;
   } = {},
 ): string {
-  const { historyExtent, uiBlocks, subagents, promptMultiSelect, videoGeneration, usageTertiary, ...frozen } = options;
+  const {
+    historyExtent,
+    uiBlocks,
+    subagents,
+    promptMultiSelect,
+    videoGeneration,
+    usageTertiary,
+    agentPendingRuntime,
+    ...frozen
+  } = options;
   const encoded = encodeFrozenResponse(method, path, status, value, frozen);
   if (status >= 400) return encoded;
   const withUsage = usageTertiary && isUsageRoute(method, path);
@@ -245,7 +257,9 @@ export function encodeTeamProtocolV8CurrentHttpResponse(
   const withSubagents = subagents && isConversationRoute(method, path);
   const withMultiSelect = promptMultiSelect && isConversationRoute(method, path);
   const withVideo = videoGeneration && isConversationRoute(method, path);
-  if (!withUsage && !withExtent && !withBlocks && !withSubagents && !withMultiSelect && !withVideo) return encoded;
+  const withPending = agentPendingRuntime && isAgentListRoute(method, path);
+  if (!withUsage && !withExtent && !withBlocks && !withSubagents && !withMultiSelect && !withVideo && !withPending)
+    return encoded;
   let output: TeamProtocolV8BaseJsonValue = JSON.parse(encoded);
   if (withUsage) output = withUsageTertiary(output, value, true);
   if (withExtent) output = withPageHistoryExtent(output, value);
@@ -253,6 +267,7 @@ export function encodeTeamProtocolV8CurrentHttpResponse(
   if (withSubagents) output = withConversationSubagents(output, value);
   if (withMultiSelect) output = withConversationPromptMultiSelect(output, value);
   if (withVideo) output = withConversationVideoGeneration(output, value);
+  if (withPending) output = withAgentPendingRuntimes(output, value, true);
   return JSON.stringify(output);
 }
 
@@ -330,6 +345,7 @@ export function decodeTeamProtocolV8CurrentHttpResponse(
 ): TeamProtocolV8BaseJsonValue {
   const decoded = decodeFrozenResponse(method, path, status, value);
   if (status >= 400) return decoded;
+  if (isAgentListRoute(method, path)) return withAgentPendingRuntimes(decoded, value);
   const withUsage = isUsageRoute(method, path) ? withUsageTertiary(decoded, value) : decoded;
   // The conversation page route carries all three.
   const withExtent = isHistoryExtentRoute(method, path) ? withPageHistoryExtent(withUsage, value) : withUsage;

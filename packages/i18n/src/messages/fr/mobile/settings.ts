@@ -146,6 +146,9 @@ export const messages = {
     "Les résultats et les messages de la recherche apparaissent et disparaissent avec un léger flou quand ils changent. Quand les mouvements sont réduits, ils passent seulement en fondu. Si cette option est désactivée, ils changent immédiatement.",
   "mobile.settings.feedback.footer": "Retour tactile pour les actions de l’app sur cet appareil.",
   "mobile.settings.feedback.haptics": "Retour haptique",
+  "mobile.settings.feedback.replies": "Haptique des réponses",
+  "mobile.settings.feedback.repliesFooter":
+    "Vibrations pendant l'affichage de la réponse d'un agent dans un chat. Les autres vibrations restent actives.",
   "mobile.settings.feedback.retry": "Réessayer d’enregistrer le réglage haptique",
   "mobile.settings.liveActivities.title": "Activités en direct",
   "mobile.settings.liveActivities.footer":
@@ -229,6 +232,9 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Télécharger les gros fichiers automatiquement",
   "mobile.settings.conversations.largeFilesFooter":
     "Les images, vidéos et fichiers audio de plus de {small} ne se téléchargent que lorsque vous les touchez. Activez cette option pour les télécharger directement, jusqu’à {large}. Cela peut utiliser beaucoup de données mobiles.",
+  "mobile.settings.conversations.fullQualityPhotos": "Envoyer les photos en qualité maximale",
+  "mobile.settings.conversations.fullQualityPhotosFooter":
+    "Si cette option est désactivée, l’app envoie une copie plus petite de chaque photo, jusqu’à 2048 pixels sur le grand côté. Elle arrive plus vite sur une connexion lente. Activez-la pour envoyer la photo d’origine.",
   "mobile.settings.profile.nameUnsafe": "Retirez les sauts de ligne et les caractères de contrôle de votre nom.",
   "mobile.settings.profile.nameLength": "Utilisez 3 à 20 caractères pour votre nom affiché.",
   "mobile.settings.profile.saveFailed": "Impossible d’enregistrer les modifications. Réessayez.",
@@ -496,4 +502,23 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "Impossible d’arrêter le processus.",
   "mobile.settings.agents.processes.stopTitle": "Arrêter ce programme ?",
   "mobile.settings.agents.processes.stopLabel": "Arrêter le processus {pid}",
+  "mobile.settings.shortcuts.title": "Raccourcis",
+  "mobile.settings.shortcuts.agent": "Agent",
+  "mobile.settings.shortcuts.none": "Aucun",
+  "mobile.settings.shortcuts.unsupported": "Les raccourcis nécessitent iOS 26 ou une version ultérieure.",
+  "mobile.settings.shortcuts.card.agents": "Agents",
+  "mobile.settings.shortcuts.card.noAgents": "Aucun agent pour l’instant",
+  "mobile.settings.shortcuts.card.setUp.title": "Ouvrez OpenBot pour configurer les raccourcis",
+  "mobile.settings.shortcuts.card.setUp.action": "Ouvrir OpenBot",
+  "mobile.settings.shortcuts.card.noAgent.title": "Choisissez un agent pour les raccourcis",
+  "mobile.settings.shortcuts.card.noAgent.detail": "Les raccourcis envoient à un seul agent.",
+  "mobile.settings.shortcuts.card.noAgent.action": "Choisir un agent",
+  "mobile.settings.shortcuts.card.locked.title": "OpenBot est verrouillé",
+  "mobile.settings.shortcuts.card.locked.action": "Ouvrir OpenBot",
+  "mobile.settings.shortcuts.footer": "Send Message dans l’app Raccourcis envoie à cet agent. L’app ne s’ouvre pas.",
+  "mobile.settings.shortcuts.send.sent": "Envoyé",
+  "mobile.settings.shortcuts.send.failed": "OpenBot n’a pas pu envoyer ce message.",
+  "mobile.settings.shortcuts.send.unconfirmed": "Pas de réponse du serveur. Le message est peut-être dans le chat.",
+  "mobile.settings.shortcuts.send.inApp": "Envoyer dans OpenBot",
+  "mobile.settings.shortcuts.send.openChat": "Ouvrir le chat",
 } as const satisfies PartialTranslation<typeof source>;

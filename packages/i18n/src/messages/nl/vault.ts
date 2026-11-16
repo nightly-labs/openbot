@@ -4,9 +4,9 @@ import type { messages as source } from "../en/vault";
 export const messages = {
   "vault.items.title": "Opgeslagen items",
   "vault.items.description":
-    "Elke agent op deze server kan deze items gebruiken. OpenBot typt wachtwoorden, kaartnummers en beveiligingscodes zelf in de pagina, zodat agents ze nooit zien.",
+    "Elke agent op deze server kan deze items gebruiken. OpenBot typt wachtwoorden, kaartnummers en beveiligingscodes zelf in de pagina, zodat agents ze nooit zien. Agents lezen API-sleutels uit een bestand, niet uit de chat.",
   "vault.items.scopedDescription":
-    "Elk item is voor de agents die je kiest. OpenBot typt wachtwoorden, kaartnummers en beveiligingscodes zelf in de pagina, zodat agents ze nooit zien.",
+    "Elk item is voor de agents die je kiest. OpenBot typt wachtwoorden, kaartnummers en beveiligingscodes zelf in de pagina, zodat agents ze nooit zien. Agents lezen API-sleutels uit een bestand, niet uit de chat. Alle agents draaien als dezelfde systeemgebruiker, dus een agent kan ook een API-sleutelbestand lezen dat voor andere agents is.",
   "vault.agents.label": "Agents",
   "vault.agents.all": "Alle agents",
   "vault.agents.some": "{chosen} van {total}",

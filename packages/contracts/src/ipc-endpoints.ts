@@ -32,7 +32,7 @@ import type { AppAppearancePreference, SetAppAppearancePreferenceInput } from ".
 import type { AppInterfaceSizePreference, SetAppInterfaceSizePreferenceInput } from "./app-interface-size";
 import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app-language";
 import type { AppLogoColorPreference, SetAppLogoColorPreferenceInput } from "./app-logo-color";
-import type { BillingPortalRequest, BillingState } from "./billing";
+import type { BillingPortalRequest, BillingState, BillingStorageRequest } from "./billing";
 import type {
   CreateHostedServerInput,
   DeleteHostedServerInput,
@@ -116,8 +116,11 @@ import type {
   AgentProviderId,
   AgentStatus,
   ConnectProviderAccountInput,
+  ConnectProviderAccountKeyInput,
   HostProviderAccounts,
   PasteProviderRelaySignInInput,
+  ProviderAccountCodeLoginStart,
+  ProviderAccountCodeLoginStatus,
   ProviderApiKeyState,
   ProviderCodeLoginStart,
   ProviderHostSignInStatus,
@@ -129,6 +132,7 @@ import type {
   ResetProviderUsageInput,
   SetProviderAccountPoolInput,
   SetProviderApiKeyInput,
+  SubmitProviderAccountCodeLoginInput,
   SubmitProviderCodeLoginInput,
 } from "./ipc-agent-status";
 import type {
@@ -201,7 +205,9 @@ import type {
 } from "./ipc-app-auth";
 import type { AppBehaviorPreference, AppBehaviorPreferenceChange } from "./ipc-app-behavior";
 import type {
+  AgentApproval,
   ApprovalAutomationPreference,
+  ReadPendingApprovalInput,
   RespondToApprovalInput,
   RespondToBrowserTakeoverInput,
 } from "./ipc-approvals";
@@ -493,6 +499,7 @@ import type {
   RoutineFlowCanvas,
   RoutineFlowLink,
   SaveRoutineFlowPositionInput,
+  StopRoutineFlowRunInput,
   UpdateRoutineFlowLinkInput,
 } from "./ipc-routine-flows";
 import type {
@@ -901,6 +908,13 @@ export const IPC_ENDPOINTS = {
      * `connecting` account cancels its sign-in.
      */
     connectProviderAccount: request<ConnectProviderAccountInput, AgentStatus>()("app:connect-provider-account"),
+    /**
+     * Adds one more account of a provider from an API key, or gives an account a new key. It answers
+     * when the provider accepted the key, and fails with the reason when it did not.
+     */
+    connectProviderAccountKey: request<ConnectProviderAccountKeyInput, AgentStatus>()(
+      "app:connect-provider-account-key",
+    ),
     /** Stops a `connecting` account's sign-in: a new account goes, another one shows as signed out. */
     cancelProviderAccountSignIn: request<RemoveProviderAccountInput, AgentStatus>()(
       "app:cancel-provider-account-sign-in",
@@ -1187,6 +1201,27 @@ export const IPC_ENDPOINTS = {
       "provider-admin:account-sign-in-status",
     ),
     cancelAccountSignIn: scopedRequest<AgentProviderId, void, "required">()("provider-admin:cancel-account-sign-in"),
+    // An account of a joined server's host that is an API key (`provider-account-keys-v1`).
+    connectAccountKey: scopedRequest<ConnectProviderAccountKeyInput, void, "required">()(
+      "provider-admin:connect-account-key",
+    ),
+    // A code sign-in of an account: the provider's CLI gives a page and a code, and the person opens
+    // the page on any device. This computer runs it for its own accounts; a joined server's host
+    // needs `provider-account-code-v1`. `start` adds an account when `accountId` is null and answers
+    // with its id. `submitAccountCodeLogin` sends the code of a `paste` sign-in.
+    // `accountCodeLoginStatus` tells how the sign-in ended.
+    startAccountCodeLogin: scopedRequest<ConnectProviderAccountInput, ProviderAccountCodeLoginStart, "required">()(
+      "provider-admin:start-account-code-login",
+    ),
+    submitAccountCodeLogin: scopedRequest<SubmitProviderAccountCodeLoginInput, void, "required">()(
+      "provider-admin:submit-account-code-login",
+    ),
+    accountCodeLoginStatus: scopedRequest<RemoveProviderAccountInput, ProviderAccountCodeLoginStatus, "required">()(
+      "provider-admin:account-code-login-status",
+    ),
+    cancelAccountCodeLogin: scopedRequest<RemoveProviderAccountInput, void, "required">()(
+      "provider-admin:cancel-account-code-login",
+    ),
     // The provider that a new agent of a joined server's host starts on (`provider-default-v1`).
     // This computer's own is `app.saveSetup`.
     hostDefaultProvider: scopedQuery<HostDefaultProvider, "required">()("provider-admin:host-default-provider"),
@@ -1586,6 +1621,7 @@ export const IPC_ENDPOINTS = {
   billing: {
     getState: request<undefined, BillingState>()("billing:get-state"),
     openPortal: request<BillingPortalRequest, void>()("billing:open-portal"),
+    buyStorage: request<BillingStorageRequest, BillingState>()("billing:buy-storage"),
   },
   // The commercial license of the account. Main opens the Checkout page; the renderer never sends a URL.
   license: {
@@ -1831,6 +1867,9 @@ export const IPC_ENDPOINTS = {
     compactTaskContext: scopedRequest<AgentTaskInput, void>()("agent:tasks:compact-context"),
     respondToPrompt: scopedRequest<RespondToPromptInput, void>()("agent:respond-to-prompt"),
     respondToApproval: scopedRequest<RespondToApprovalInput, void>()("agent:respond-to-approval"),
+    // The whole copy of an approval that a runtime snapshot cut, or null when the server cannot send it.
+    // A joined server takes it through `pending-approval-v1`.
+    readPendingApproval: scopedRequest<ReadPendingApprovalInput, AgentApproval | null>()("agent:read-pending-approval"),
     respondToBrowserSecret: scopedRequest<LocalBrowserSecretResponse, void>()("agent:respond-to-browser-secret"),
     respondToBrowserTakeover: scopedRequest<RespondToBrowserTakeoverInput, void>()("agent:respond-to-browser-takeover"),
     scopedEvent: event<ScopedAgentEvent>()("agent:event"),
@@ -1893,6 +1932,8 @@ export const IPC_ENDPOINTS = {
     connect: scopedRequest<ConnectRoutineFlowInput, RoutineFlowLink>()("routine-flows:connect"),
     disconnect: scopedRequest<DisconnectRoutineFlowInput, void>()("routine-flows:disconnect"),
     updateLink: scopedRequest<UpdateRoutineFlowLinkInput, RoutineFlowLink>()("routine-flows:update-link"),
+    /** Stops a run that has not ended. A joined server answers through `routine-flow-stop-v1`. */
+    stopRun: scopedRequest<StopRoutineFlowRunInput, void>()("routine-flows:stop-run"),
   },
   /**
    * Workflows: graphs of steps drawn on a canvas, their versions and their runs. The agent event

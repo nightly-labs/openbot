@@ -14,6 +14,12 @@
 // Microsoft 365 (#7812) has no protected-resource metadata and names no scope in its challenge, and
 // Microsoft refuses a sign-in page with no scope: OpenBot must ask for the scopes that its
 // authorization server lists. A resource with metadata keeps the scope it names, or none.
+// Dropbox (#8025) answers a registration with 403 `registration_not_supported` unless its loopback
+// path is one that it knows, such as `/callback`, and registers its loopback addresses with no port:
+// OpenBot must register the `/callback` form, send it, and use that registration again.
+// TradingView (#9209) blocks a sign-in page that returns to `127.0.0.1` or `localhost`. A joined
+// server's relayed sign-in for a client that opens `openbot://mcp-auth` must register and send that
+// link after two pages got no grant back. A relay for a client without the link keeps the loopback names.
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
@@ -49,6 +55,8 @@ interface FakeServer {
   toolLists: boolean[];
   /** One entry for each authorization page that the sign-in opened. */
   pagesOpened: string[];
+  /** The `redirect_uri` of each registration and token request, in order. */
+  redirects: string[];
   close: () => Promise<void>;
 }
 
@@ -62,6 +70,8 @@ interface Case {
   tokenRequestsWithSecret: boolean[];
   toolLists: boolean[];
   pagesOpened: number;
+  /** The `redirect_uri` of each registration, sign-in page and token request, in order. */
+  redirects: string[];
   storedClient: boolean;
   signedIn: boolean;
   failures: string[];
@@ -91,6 +101,17 @@ const REGISTRATION_REFUSALS = {
 } as const;
 type RegistrationRefusal = keyof typeof REGISTRATION_REFUSALS;
 
+/** Dropbox's 403 body, word for word. `dropbox` accepts `/callback`; `forbidden` accepts no path. */
+const REGISTRATION_FORBIDDEN = {
+  error: "registration_not_supported",
+  error_description:
+    "Dynamic client registration is not supported. Only pre-registered MCP trusted partners are allowed.",
+};
+type RegistrationForbidden = "dropbox" | "forbidden";
+
+/** The loopback addresses that Dropbox registers, whatever the registration asked for. */
+const DROPBOX_REDIRECTS = ["http://localhost/callback", "http://127.0.0.1/callback", "http://127.0.0.1"];
+
 /** The `scopes_supported` of each metadata document. */
 interface ScopeMetadata {
   /** Of the protected-resource metadata. `null` answers that document with 404. */
@@ -109,6 +130,7 @@ async function fakeServer(
   secretAccepted: boolean,
   registrationRefused: RegistrationRefusal | null,
   scopes: ScopeMetadata = {},
+  registrationForbidden: RegistrationForbidden | null = null,
 ): Promise<FakeServer> {
   const state: Omit<FakeServer, "url" | "close"> = {
     registrations: [],
@@ -116,6 +138,7 @@ async function fakeServer(
     tokenRequestsWithSecret: [],
     toolLists: [],
     pagesOpened: [],
+    redirects: [],
   };
   let base = "";
   const server: Server = createServer((request, response) => {
@@ -146,6 +169,17 @@ async function fakeServer(
         state.registrations.push(asked.token_endpoint_auth_method ?? null);
         state.registrationScopes.push(asked.scope ?? null);
         const id = `e2e-client-${state.registrations.length}`;
+        state.redirects.push(`register ${asked.redirect_uris.join(" ")}`);
+        if (registrationForbidden) {
+          const path = URL.parse(asked.redirect_uris[0] ?? "")?.pathname;
+          if (registrationForbidden === "forbidden" || path !== "/callback")
+            return json(response, 403, REGISTRATION_FORBIDDEN);
+          return json(response, 201, {
+            client_id: id,
+            token_endpoint_auth_method: "none",
+            redirect_uris: DROPBOX_REDIRECTS,
+          });
+        }
         // RFC 7591: a registration that names no method asks for `client_secret_basic`.
         const method = asked.token_endpoint_auth_method ?? "client_secret_basic";
         if (registrationRefused) return json(response, 400, REGISTRATION_REFUSALS[registrationRefused]);
@@ -164,6 +198,7 @@ async function fakeServer(
       }
       if (request.method === "POST" && path === "/token") {
         const form = new URLSearchParams(await body(request));
+        state.redirects.push(`token ${form.get("redirect_uri")}`);
         const withSecret = request.headers.authorization !== undefined || form.has("client_secret");
         state.tokenRequestsWithSecret.push(withSecret);
         const secretInBody = request.headers.authorization === undefined && form.get("client_secret") === CLIENT_SECRET;
@@ -250,15 +285,35 @@ async function runCase(
     secretAccepted = false,
     registrationRefused = null,
     scopes = {},
+    registrationForbidden = null,
+    storedClient = null,
+    relayDeepLink,
   }: {
     storedDiscovery?: boolean;
     secretAccepted?: boolean;
     registrationRefused?: RegistrationRefusal | null;
     scopes?: ScopeMetadata;
+    registrationForbidden?: RegistrationForbidden | null;
+    /** A Dropbox registration already on file, with no tokens. */
+    storedClient?: string | null;
+    /**
+     * A relayed sign-in: the page opens on the member's computer, which returns on this link (`null`
+     * for none). The firewall blocks each page but the last, and the member cancels it.
+     */
+    relayDeepLink?: string | null;
   } = {},
 ): Promise<Case> {
-  const server = await fakeServer(authMethods, secretAccepted, registrationRefused, scopes);
+  const server = await fakeServer(authMethods, secretAccepted, registrationRefused, scopes, registrationForbidden);
   const records = new Map<string, McpOAuthRecord>();
+  if (storedClient)
+    records.set(server.url, {
+      client: {
+        client_id: storedClient,
+        token_endpoint_auth_method: "none",
+        redirect_uris: DROPBOX_REDIRECTS,
+        issuer: new URL(server.url).origin,
+      },
+    });
   if (storedDiscovery)
     records.set(server.url, {
       discovery: {
@@ -275,6 +330,7 @@ async function runCase(
     // The browser: the authorization server sends the grant straight back.
     openExternal: async (page) => {
       server.pagesOpened.push(page);
+      server.redirects.push(`page ${new URL(page).searchParams.get("redirect_uri")}`);
       const state = new URL(page).searchParams.get("state");
       assert.ok(state, "the page has a state");
       setTimeout(() => oauth.receiveAuthorizationCode(state, "e2e-grant"), 50);
@@ -282,13 +338,25 @@ async function runCase(
     redirectUrl: "http://127.0.0.1:28417/mcp-auth",
     signInTimeoutMs: 10_000,
   });
+  let attempt = 0;
+  const relayed = async (page: string) => {
+    server.pagesOpened.push(page);
+    server.redirects.push(`page ${new URL(page).searchParams.get("redirect_uri")}`);
+    const state = new URL(page).searchParams.get("state");
+    assert.ok(state, "the page has a state");
+    setTimeout(() => {
+      if (attempt < attempts - 1) oauth.cancelSignIn(server.url);
+      else oauth.receiveAuthorizationCode(state, "e2e-grant");
+    }, 50);
+  };
   try {
     const authority = {
       accessToken: (url: string) => oauth.accessToken(url),
-      signIn: (url: string) => oauth.signIn(url),
+      signIn: (url: string) =>
+        relayDeepLink === undefined ? oauth.signIn(url) : oauth.signIn(url, relayed, relayDeepLink ?? undefined),
     };
     const results: Case["attempts"] = [];
-    for (let attempt = 0; attempt < attempts; attempt++)
+    for (attempt = 0; attempt < attempts; attempt++)
       results.push(await runCauseEffect(testMcpServer(httpConfig(server.url), 10_000, undefined, authority, "here")));
     return {
       name,
@@ -299,6 +367,7 @@ async function runCase(
       tokenRequestsWithSecret: [...server.tokenRequestsWithSecret],
       toolLists: [...server.toolLists],
       pagesOpened: server.pagesOpened.length,
+      redirects: [...server.redirects],
       storedClient: records.get(server.url)?.client !== undefined,
       signedIn: oauth.signedIn(server.url),
       failures: [],
@@ -419,6 +488,58 @@ async function main(): Promise<void> {
     check(badMetadata, !badMetadata.signedIn, "a token is stored after a refused registration");
     report.cases.push(badMetadata);
 
+    // Dropbox refuses `/mcp-auth` with 403. OpenBot registers the `/callback` form once more and
+    // sends it on the page and in the token request, although the registration names no port.
+    const callback = "http://127.0.0.1:28417/callback";
+    const dropbox = await runCase("registration-forbidden-except-callback", ["none"], 1, {
+      registrationForbidden: "dropbox",
+    });
+    check(dropbox, dropbox.attempts[0]?.error === null, `the sign-in failed: ${dropbox.attempts[0]?.error}`);
+    check(dropbox, dropbox.attempts[0]?.toolCount === 1, "the tools were not listed after the sign-in");
+    check(
+      dropbox,
+      dropbox.redirects.join() ===
+        [
+          "register http://127.0.0.1:28417/mcp-auth",
+          `register ${callback}`,
+          `page ${callback}`,
+          `token ${callback}`,
+        ].join(),
+      `the addresses were ${dropbox.redirects.join()}`,
+    );
+    check(dropbox, dropbox.storedClient, "no client is stored after the sign-in");
+    check(dropbox, dropbox.signedIn, "no token is stored after the sign-in");
+    report.cases.push(dropbox);
+
+    // The next sign-in uses the Dropbox registration on file, which names no port, and registers nothing.
+    const dropboxStored = await runCase("registration-with-no-port-used-again", ["none"], 1, {
+      registrationForbidden: "dropbox",
+      storedClient: "e2e-dropbox-client",
+    });
+    check(
+      dropboxStored,
+      dropboxStored.attempts[0]?.error === null,
+      `the sign-in failed: ${dropboxStored.attempts[0]?.error}`,
+    );
+    check(
+      dropboxStored,
+      dropboxStored.redirects.join() === [`page ${callback}`, `token ${callback}`].join(),
+      `the addresses were ${dropboxStored.redirects.join()}`,
+    );
+    check(dropboxStored, dropboxStored.signedIn, "no token is stored after the sign-in");
+    report.cases.push(dropboxStored);
+
+    // A server that refuses every registration with 403 still gets the sentence that it does not accept OpenBot.
+    const forbidden = await runCase("registration-forbidden", ["none"], 1, { registrationForbidden: "forbidden" });
+    check(
+      forbidden,
+      forbidden.attempts[0]?.error === registrationRefused,
+      `the attempt reported: ${forbidden.attempts[0]?.error}`,
+    );
+    check(forbidden, forbidden.pagesOpened === 0, "a sign-in page opened with no registered client");
+    check(forbidden, !forbidden.signedIn, "a token is stored after a refused registration");
+    report.cases.push(forbidden);
+
     // Microsoft 365 (#7812): the challenge names a resource metadata address that answers 404, and
     // only the authorization server lists scopes. The page and the registration ask for that list.
     const entraScopes = ["api://e2e-resource/.default", "offline_access", "openid", "email"];
@@ -437,6 +558,38 @@ async function main(): Promise<void> {
       { name: "no-scope-in-resource-metadata", scopes: { resource: [], server: entraScopes }, expected: null },
       { name: "no-scope-anywhere", scopes: { resource: null }, expected: null },
     ];
+    // A joined server's relay (#9209). The host's own system does not open `openbot://`.
+    const loopback = "http://127.0.0.1:28417/mcp-auth";
+    const localhost = "http://localhost:28417/mcp-auth";
+    const deepLink = "openbot://mcp-auth";
+    const pages = (entry: Case) =>
+      entry.redirects.filter((line) => line.startsWith("page ")).map((line) => line.slice("page ".length));
+    const relayed = await runCase("relay-with-deep-link", ["none"], 3, { relayDeepLink: deepLink });
+    check(
+      relayed,
+      pages(relayed).join(" ") === [loopback, localhost, deepLink].join(" "),
+      `the pages returned to ${pages(relayed).join(", ")}`,
+    );
+    check(relayed, relayed.redirects.includes(`register ${deepLink}`), "the deep link was not registered");
+    check(relayed, relayed.redirects.at(-1) === `token ${deepLink}`, "the token request did not name the link");
+    check(relayed, relayed.attempts[2]?.error === null, `the third sign-in failed: ${relayed.attempts[2]?.error}`);
+    check(relayed, relayed.signedIn, "no token is stored after the sign-in");
+    report.cases.push(relayed);
+    // An older desktop client, the web client and the phone cannot open the link.
+    const relayedLoopback = await runCase("relay-without-deep-link", ["none"], 3, { relayDeepLink: null });
+    check(
+      relayedLoopback,
+      pages(relayedLoopback).join(" ") === [loopback, localhost, loopback].join(" "),
+      `the pages returned to ${pages(relayedLoopback).join(", ")}`,
+    );
+    check(
+      relayedLoopback,
+      !relayedLoopback.redirects.some((line) => line.includes(deepLink)),
+      "a client without the link got it",
+    );
+    check(relayedLoopback, relayedLoopback.signedIn, "no token is stored after the sign-in");
+    report.cases.push(relayedLoopback);
+
     for (const { name, scopes, expected } of scopeCases) {
       const entry = await runCase(name, ["none"], 1, { scopes });
       check(entry, entry.attempts[0]?.error === null, `the sign-in failed: ${entry.attempts[0]?.error}`);

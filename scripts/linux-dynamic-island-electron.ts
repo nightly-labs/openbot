@@ -190,6 +190,7 @@ async function start(): Promise<void> {
     getDisplays: () => screen.getAllDisplays(),
     getPrimaryDisplay: () => screen.getPrimaryDisplay(),
     getMainWindow: () => mainWindow,
+    getFocusedWindow: () => BrowserWindow.getFocusedWindow(),
     presentMainWindow: () => undefined,
     performHaptic: () => undefined,
     // A reply or an answer reaches no agent in this test. The handler records each action.

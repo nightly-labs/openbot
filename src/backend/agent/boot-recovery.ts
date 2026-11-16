@@ -12,6 +12,7 @@ import { conversationContentSignature } from "./delivery-content";
 import { markIncompleteMediaGeneration } from "./image-generation";
 import type { MailboxSync } from "./mailbox-sync";
 import type { ProviderRuntime } from "./provider-runtime";
+import { answeredRequestId } from "./routine-quiet-runs";
 import { stopRunningSubagents } from "./subagent-updates";
 import { isCodexMissingRollout, isCodexRolloutPending, providerForAgent } from "./thread-items";
 import type { ThreadLifecycle } from "./thread-lifecycle";
@@ -31,6 +32,8 @@ export interface BootRecoveryHooks {
    * routine, whose record is gone. A Test, script or webhook run cannot.
    */
   quietRoutineDelivery(deliveryId: string): boolean;
+  /** Whether this routine delivery has a run record that can end quiet, as the turn completion asks. */
+  quietRunDelivery(deliveryId: string): boolean;
   /** Whether this thread is a routine's side thread, where a turn can end quiet. */
   isRoutineThread(threadId: string): boolean;
   emitError(code: string, error: unknown, agentId?: string): void;
@@ -375,6 +378,11 @@ export class BootRecovery {
             quietRoutineDelivery: (deliveryId) => this.#hooks.quietRoutineDelivery(deliveryId),
             quietTeammateThread:
               !this.#conversation.isExecutionThread(publicThreadId) || this.#hooks.isRoutineThread(publicThreadId),
+            continuesQuietRun: (delivery) => {
+              const requestId = answeredRequestId(delivery);
+              const run = requestId ? this.#mailbox.routineDeliveryOfRequest(agent.id, requestId) : null;
+              return run !== null && this.#hooks.quietRunDelivery(run.delivery.id);
+            },
           }).pipe(toBootRecoveryFailed);
           yield* recoveryStep(() => this.#refreshBackfilledConversation(agent.id, publicThreadId));
         }).pipe(

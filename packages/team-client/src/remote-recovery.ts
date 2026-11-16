@@ -342,7 +342,8 @@ export function createRemoteConnectionRecovery(
         if (running) return;
         else if (retryAt !== null) scheduleRetry();
         else {
-          checkOnReturn = online;
+          // A refresh asked for while inactive, such as after lost events, still loads everything.
+          checkOnReturn = online && !refreshRequested;
           startRun();
         }
       }
