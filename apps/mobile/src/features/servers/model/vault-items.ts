@@ -13,7 +13,7 @@ import type { MobileTextKey } from "@openbot/i18n/mobile";
 import type { MobileText } from "@/shared/lib/text";
 
 /** The host name of a login's website, as the desktop Vault lists it. */
-export function vaultLoginTitle(login: VaultLoginSummary): string {
+export function vaultLoginTitle(login: Pick<VaultLoginSummary, "website">): string {
   const website = login.website.trim();
   try {
     return new URL(website.includes("://") ? website : `https://${website}`).hostname || website;
@@ -203,6 +203,11 @@ export interface VaultDraft extends VaultContactFields {
   /** The environment variable name of an API key. */
   name: string;
   key: string;
+  /**
+   * The two-step key of a login: null keeps the saved key, "" removes it, and other text is a new
+   * setup key or `otpauth://totp/` link. The host never sends a saved key.
+   */
+  twoStepKey: string | null;
 }
 
 const EMPTY_CONTACT: VaultContactFields = {
@@ -234,6 +239,7 @@ export function vaultDraft(item: VaultItemSummary | undefined): VaultDraft {
     fillSites: [],
     name: "",
     key: "",
+    twoStepKey: null,
   };
   switch (item?.kind) {
     case "login":
@@ -280,6 +286,8 @@ export function vaultSaveInput(kind: VaultItemKind, id: string | null, draft: Va
         username: draft.username.trim(),
         notes: draft.notes.trim(),
         password: secret(draft.password),
+        // Only a `vault-v3` host takes the field. The form sets it only for such a host.
+        ...(draft.twoStepKey === null ? {} : { twoStepKey: draft.twoStepKey }),
       };
     }
     case "card": {

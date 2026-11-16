@@ -25,6 +25,7 @@ import { MCP_SERVERS_SCHEMA_SQL } from "./mcp-schema";
 import {
   MESSAGING_ALLOWED_ROLES_SCHEMA_SQL,
   MESSAGING_ALLOWED_SENDERS_SCHEMA_SQL,
+  MESSAGING_HISTORY_SCHEMA_SQL,
   MESSAGING_MEMORY_SCHEMA_SQL,
   MESSAGING_PINGS_SCHEMA_SQL,
   MESSAGING_SCHEMA_SQL,
@@ -654,7 +655,8 @@ const LATEST_SCHEMA_SQL =
   AGENT_SKILL_LOADS_SCHEMA_SQL +
   MESSAGING_PINGS_SCHEMA_SQL +
   V60_AGENT_MEMORY_SITE_INDEX_SQL +
-  PINNED_THREAD_MESSAGES_SCHEMA_SQL;
+  PINNED_THREAD_MESSAGES_SCHEMA_SQL +
+  MESSAGING_HISTORY_SCHEMA_SQL;
 
 /** The end of the thread message table with the migration 40 columns before its PRIMARY KEY constraint. */
 function withThreadMessageOrderColumns(tableEnd: string): string {
@@ -1028,6 +1030,12 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
     // Only creates a table, so no foreign-key pause and no vacuum. No message was pinned before it,
     // so the table starts empty and every thread shows its messages as before.
     up: (db) => db.exec(PINNED_THREAD_MESSAGES_SCHEMA_SQL),
+  },
+  {
+    version: 62,
+    // Only creates a table and its indexes, so no foreign-key pause and no vacuum. No WhatsApp message
+    // was saved before it, so the table starts empty and each number saves what it sees from then on.
+    up: (db) => db.exec(MESSAGING_HISTORY_SCHEMA_SQL),
   },
 ];
 

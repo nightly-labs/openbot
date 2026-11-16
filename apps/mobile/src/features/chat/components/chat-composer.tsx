@@ -1,6 +1,6 @@
 import { rankAgentMentions } from "@openbot/contracts/agent-mention-rank";
 import { GlassView } from "expo-glass-effect";
-import { useIsFocused } from "expo-router";
+import { router, useIsFocused } from "expo-router";
 import { Button, Spinner, Typography } from "heroui-native";
 import ArrowUp from "lucide-react-native/icons/arrow-up";
 import AudioLines from "lucide-react-native/icons/audio-lines";
@@ -73,7 +73,7 @@ import type { VoicePalette } from "../model/voice-palette";
 import { attachmentTypeLabel, shareLocalAttachment } from "./attachment-preview";
 import { AttachmentPreviewSheet } from "./attachment-preview-sheet";
 import { ComposerAttachmentTile, localPreviewUri } from "./composer-attachment-tile";
-import { DictationMic, DictationStrip } from "./composer-dictation";
+import { DictationMic, DictationStrip, LONG_PRESS_MS } from "./composer-dictation";
 import { ComposerPasteTarget, type PastedFiles } from "./composer-paste-target";
 import type { ComposerVoice } from "./composer-voice";
 import type { ChatAttachments } from "./use-chat-attachments";
@@ -902,6 +902,12 @@ export const ChatComposer = memo(function ChatComposer({
     else if (action === "send") onSend(latestTextRef.current);
   }
 
+  // Return on a hardware keyboard. The field still has focus, so it sends the native text, as a submit does.
+  function submitKey(text: string): void {
+    if (control.mode !== "send" || !controlReady || voiceOpen) return;
+    if (sendGate.submit()) onSend(editMentionDraft(latestTextRef.current, text));
+  }
+
   function pressControl(): void {
     switch (control.mode) {
       case "stop":
@@ -917,6 +923,16 @@ export const ChatComposer = memo(function ChatComposer({
         requestSend();
     }
   }
+
+  // A press and hold on the mic or the waveform opens the voice settings over the chat.
+  const openVoiceSettings = useCallback(() => {
+    // A Stop just before the hold must not open the keyboard behind Settings > Voice.
+    editAfterDictation.current = false;
+    void haptics.selection();
+    inputRef.current?.blur();
+    router.push("/settings/voice");
+  }, []);
+  const voiceSettingsLabel = t("mobile.chat.composer.voiceSettings");
 
   const controlLabel = {
     send: sendLabel ?? t("mobile.chat.composer.send"),
@@ -1281,7 +1297,7 @@ export const ChatComposer = memo(function ChatComposer({
                 <Animated.View
                   style={[{ position: "absolute", left: FIELD_INSET, right: FIELD_INSET, bottom: 0 }, fieldSlideStyle]}
                 >
-                  <ComposerPasteTarget onPasteFiles={pasteFiles}>
+                  <ComposerPasteTarget onPasteFiles={pasteFiles} onSubmitKey={submitKey}>
                     <TextInput
                       ref={inputRef}
                       nativeID="chat-composer-input"
@@ -1478,6 +1494,8 @@ export const ChatComposer = memo(function ChatComposer({
                         label={t(dictating ? "mobile.chat.composer.stopDictation" : "mobile.chat.composer.dictate")}
                         foreground={String(foreground)}
                         onPress={toggleDictation}
+                        onLongPress={openVoiceSettings}
+                        longPressLabel={voiceSettingsLabel}
                       />
                     </Animated.View>
                   ) : null}
@@ -1525,6 +1543,19 @@ export const ChatComposer = memo(function ChatComposer({
                         opacity: disabled || controlReady ? 1 : 0.45,
                       }}
                       onPress={pressControl}
+                      onLongPress={control.mode === "dictate" ? openVoiceSettings : undefined}
+                      delayLongPress={LONG_PRESS_MS}
+                      accessibilityActions={
+                        control.mode === "dictate" && controlReady
+                          ? [{ name: "activate" }, { name: "longpress", label: voiceSettingsLabel }]
+                          : undefined
+                      }
+                      onAccessibilityAction={({ nativeEvent }) => {
+                        if (!controlReady) return;
+                        if (nativeEvent.actionName === "activate") pressControl();
+                        else if (nativeEvent.actionName === "longpress" && control.mode === "dictate")
+                          openVoiceSettings();
+                      }}
                     >
                       {control.spinner ? (
                         <Spinner size="sm" color={accentGlyph} />

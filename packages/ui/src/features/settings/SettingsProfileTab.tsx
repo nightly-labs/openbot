@@ -150,7 +150,7 @@ export function SettingsProfileTab(props: SettingsProfileTabProps) {
               </Text>
               <Show when={props.onSignOut}>
                 {(onSignOut) => (
-                  <Button variant="outline" disabled={signingOut()} onClick={() => void signOut(onSignOut())}>
+                  <Button variant="outline" size="sm" disabled={signingOut()} onClick={() => void signOut(onSignOut())}>
                     {signingOut() ? t("account.menu.signingOut") : t("account.menu.signOut")}
                   </Button>
                 )}
@@ -167,6 +167,7 @@ export function SettingsProfileTab(props: SettingsProfileTabProps) {
         >
           <Button
             variant="outline"
+            size="sm"
             disabled={props.store.state.sessions.loading || Boolean(props.store.state.sessions.revokingId)}
             onClick={() => void props.store.refreshSessions()}
           >
@@ -206,6 +207,7 @@ export function SettingsProfileTab(props: SettingsProfileTabProps) {
                     <Show when={!session.current} fallback={<Badge>{t("settings.profile.sessions.thisDevice")}</Badge>}>
                       <Button
                         variant="outline"
+                        size="sm"
                         aria-label={t("settings.profile.sessions.disconnectLabel", {
                           name: session.name,
                           signedIn: sessionTime(session.connectedAt),

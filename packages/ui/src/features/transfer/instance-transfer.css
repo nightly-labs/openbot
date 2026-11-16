@@ -133,6 +133,54 @@
   color: var(--openbot-text-muted);
 }
 
+/* Export: the size of the workspace files in the file, and the two presets. */
+.instance-transfer-meter {
+  display: grid;
+  gap: var(--openbot-space-2);
+}
+
+.instance-transfer-meter-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--openbot-space-2);
+}
+
+.instance-transfer-meter-total {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-xl);
+  font-weight: var(--openbot-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.instance-transfer-meter-of {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.instance-transfer-presets {
+  margin-inline-start: auto;
+}
+
+.instance-transfer-preset-custom {
+  display: none;
+}
+
+/* A custom choice: the pill fades out where it is, then moves. A preset after that: the pill is at
+   its place at once and fades in. */
+.instance-transfer-presets[data-pill="none"] .ui-sliding-tabs-pill {
+  opacity: 0;
+  transition:
+    opacity 120ms var(--openbot-ease-out),
+    transform 0s 120ms,
+    width 0s 120ms;
+}
+
+.instance-transfer-presets[data-pill="appear"] .ui-sliding-tabs-pill {
+  transition: opacity 150ms var(--openbot-ease-out);
+}
+
 .instance-transfer-not-moved {
   display: flex;
   align-items: flex-start;
@@ -150,9 +198,112 @@
   margin-top: 2px;
 }
 
+/* A third tile, "Copy to another server", shows when the user has another server. */
+.instance-transfer-tiles:has(> :nth-child(3)) {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* Server settings > Transfer > Copy to another server. */
+.ui-dialog-content.ui-confirm-dialog.copy-agents-dialog {
+  width: min(840px, 100%);
+}
+
+.copy-agents-main {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: var(--openbot-space-4);
+  overflow-y: auto;
+  padding: var(--openbot-space-6);
+}
+
+.copy-agents-panes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--openbot-space-3);
+}
+
+.copy-agents-pane {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--openbot-space-2);
+}
+
+.copy-agents-side-label {
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.copy-agents-arrow {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: none;
+  margin-top: 36px;
+  color: var(--openbot-text-muted);
+}
+
+.copy-agents-arrow:dir(rtl) {
+  transform: scaleX(-1);
+}
+
+.copy-agents-trigger {
+  width: 100%;
+}
+
+.copy-agents-server {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.copy-agents-server .server-settings-plush {
+  --server-plush-logo-size: 24px;
+}
+
+.copy-agents-server .server-settings-logo {
+  width: 24px;
+  height: 24px;
+}
+
+.copy-agents-server-name,
+.copy-agents-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.copy-agents-name {
+  flex: 1 1 auto;
+}
+
+.copy-agents-list {
+  height: 320px;
+  overflow-y: auto;
+}
+
+.copy-agents-status {
+  color: var(--openbot-text-muted);
+}
+
+.copy-agents-done {
+  margin: 0;
+}
+
 @media (max-width: 640px) {
   .instance-transfer-tiles,
-  .instance-transfer-summary {
+  .instance-transfer-tiles:has(> :nth-child(3)),
+  .instance-transfer-summary,
+  .copy-agents-panes {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .copy-agents-arrow {
+    margin: 0 auto;
+    transform: rotate(90deg);
   }
 }

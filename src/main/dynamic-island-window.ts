@@ -68,6 +68,8 @@ export interface DynamicIslandWindowControllerOptions {
   getDisplays: () => Display[];
   getPrimaryDisplay: () => Display;
   getMainWindow: () => BrowserWindow | null;
+  /** The OpenBot window that has the keyboard, if one has it. */
+  getFocusedWindow: () => BrowserWindow | null;
   ensureMainWindow?: () => Promise<BrowserWindow>;
   presentMainWindow: (window: BrowserWindow) => void;
   performHaptic: () => void;
@@ -91,6 +93,8 @@ export class DynamicIslandWindowController {
   readonly #collapseTimers = new Map<number, ReturnType<typeof setTimeout>>();
   /** X11: the parts of each window that the island renderer reported last. */
   readonly #inputRegions = new Map<number, AgentDockInputRect[]>();
+  /** macOS: for each display whose panel has the keyboard, the OpenBot window that had it before. */
+  readonly #keyboardReturn = new Map<number, BrowserWindow | null>();
   readonly #preferenceMutation = Semaphore.makeUnsafe(1);
   readonly #windowReconciliation = Semaphore.makeUnsafe(1);
   #destroyed = false;
@@ -200,9 +204,35 @@ export class DynamicIslandWindowController {
     // focusable only while a text field on it needs key input. A panel becomes key without
     // activating the app, so the main window stays where it is.
     const wantsKeyboard = interactive && keyboard;
+    if (wantsKeyboard && this.#options.windowKind === "panel" && !this.#keyboardReturn.has(displayId)) {
+      const focused = this.#options.getFocusedWindow();
+      // The island of another display had the keyboard: the window that it got the keyboard from gets it back.
+      const island = [...this.#windows].find(([, candidate]) => candidate === focused);
+      this.#keyboardReturn.set(displayId, island ? (this.#keyboardReturn.get(island[0]) ?? null) : focused);
+    }
+    const keyboardReturn = interactive ? undefined : this.#keyboardReturn.get(displayId);
+    if (!interactive) this.#keyboardReturn.delete(displayId);
     window.setFocusable(wantsKeyboard);
     if (wantsKeyboard && !window.isFocused()) window.focus();
-    if (interactive || !bounds) return;
+    if (!interactive && bounds) this.#scheduleCollapse(displayId, window);
+    // On macOS, a panel that is no longer focusable keeps the keyboard, so typing went nowhere (#9450).
+    // When the island closes, the OpenBot window that had the keyboard gets it back. Not before: the
+    // island renderer ends its interaction when its window loses focus, and the pointer can still be on
+    // it. When another app had the keyboard, the panel keeps it: hiding the panel can bring an OpenBot
+    // window to the front (electron/electron#35483, #3497).
+    if (
+      keyboardReturn &&
+      keyboardReturn !== window &&
+      !keyboardReturn.isDestroyed() &&
+      keyboardReturn.isVisible() &&
+      !keyboardReturn.isMinimized() &&
+      window.isFocused()
+    ) {
+      keyboardReturn.focus();
+    }
+  }
+
+  #scheduleCollapse(displayId: number, window: BrowserWindow): void {
     this.#collapseTimers.set(
       displayId,
       setTimeout(() => {
@@ -361,6 +391,7 @@ export class DynamicIslandWindowController {
       this.#interactiveDisplays.delete(displayId);
       this.#notchSizes.delete(displayId);
       this.#inputRegions.delete(displayId);
+      this.#keyboardReturn.delete(displayId);
       this.#cancelCollapse(displayId);
       if (!window.isDestroyed()) window.destroy();
     }
@@ -476,6 +507,7 @@ export class DynamicIslandWindowController {
         this.#interactiveDisplays.delete(display.id);
         this.#notchSizes.delete(display.id);
         this.#inputRegions.delete(display.id);
+        this.#keyboardReturn.delete(display.id);
         this.#cancelCollapse(display.id);
       }
     });
@@ -516,6 +548,7 @@ export class DynamicIslandWindowController {
     this.#interactiveDisplays.clear();
     this.#notchSizes.clear();
     this.#inputRegions.clear();
+    this.#keyboardReturn.clear();
     for (const window of windows) {
       if (!window.isDestroyed()) window.destroy();
     }

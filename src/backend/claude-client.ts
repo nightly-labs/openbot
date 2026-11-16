@@ -107,7 +107,7 @@ import {
   mcpAgentParam,
   usableMcpServers,
 } from "./mcp-provider-shapes";
-import { untakenRunId } from "./message-run-ids";
+import { MAX_RUNS, untakenRunId } from "./message-run-ids";
 import { PendingServerRequests } from "./pending-server-requests";
 import {
   type AccountRateLimitsReadResult,
@@ -228,18 +228,32 @@ const CLAUDE_NAME_ONLY_SKILLS = [
  * Flag settings come before the user, project and local settings, so a value of OpenBot would
  * replace a value that the user set. The query leaves out each skill override whose name is a skill
  * of the user or the project that the query loads, and each key that a settings file it loads sets.
+ * The exception is an automatic `ENABLE_TOOL_SEARCH` mode: see `isClaudeAutoToolSearch`.
  */
 const claudeFlagSettings = Effect.fn("claudeFlagSettings")(function* (
+  userSettings: DynamicRecord,
   configDirectory: string,
   cwd: string,
   sources: NonNullable<Options["settingSources"]>,
+  processEnvironment: NodeJS.ProcessEnv,
 ) {
-  const files = [
-    ...(sources.includes("user") ? [join(configDirectory, "settings.json")] : []),
+  const projectFiles = [
     ...(sources.includes("project") ? [join(cwd, ".claude", "settings.json")] : []),
     ...(sources.includes("local") ? [join(cwd, ".claude", "settings.local.json")] : []),
   ];
-  const ownSettings = yield* Effect.forEach(files, readClaudeSettingsFile);
+  const projectSettings = yield* Effect.forEach(projectFiles, readClaudeSettingsFile);
+  const ownSettings = [...(sources.includes("user") ? [userSettings] : []), ...projectSettings];
+  // A settings `env` value replaces the process value, and a later file replaces an earlier one.
+  // Without the user setup, `claudeSignInSettings` copies the user `env` into the flag settings,
+  // which come before the project and local settings.
+  const envFiles = sources.includes("user") ? [userSettings, ...projectSettings] : [...projectSettings, userSettings];
+  const environmentValue = (name: string) =>
+    envFiles
+      .map((file) => (isDynamicRecord(file.env) ? file.env[name] : undefined))
+      .filter(isString)
+      .at(-1) ?? processEnvironment[name];
+  // On Bedrock, Vertex or a gateway, the CLI can choose a different tool search default than `true`.
+  const firstPartyApi = CLAUDE_OTHER_API_VARIABLES.every((name) => !environmentValue(name));
   const ownSkills = new Set([
     ...(sources.includes("user") ? yield* skillFolderNames(join(configDirectory, "skills")) : []),
     ...(sources.includes("project") ? yield* skillFolderNames(join(cwd, ".claude", "skills")) : []),
@@ -255,9 +269,43 @@ const claudeFlagSettings = Effect.fn("claudeFlagSettings")(function* (
     ...(ownAttribution ? {} : { attribution: { commit: "", pr: "" } }),
     disableRemoteControl: true,
     skillOverrides: Object.fromEntries(overrides.filter(([skill]) => !ownSkills.has(skill) && !ownOverride(skill))),
+    ...(firstPartyApi && isClaudeAutoToolSearch(environmentValue("ENABLE_TOOL_SEARCH"))
+      ? { env: { ENABLE_TOOL_SEARCH: "true" } }
+      : {}),
   };
   return settings;
 });
+
+/** The variables that send Claude requests to an API other than the Anthropic API. */
+const CLAUDE_OTHER_API_VARIABLES = [
+  "ANTHROPIC_BASE_URL",
+  "CLAUDE_CODE_USE_BEDROCK",
+  "CLAUDE_CODE_USE_VERTEX",
+  "CLAUDE_CODE_USE_FOUNDRY",
+  "CLAUDE_CODE_USE_GATEWAY",
+  "CLAUDE_CODE_USE_ANTHROPIC_AWS",
+  "CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD",
+  "CLAUDE_CODE_USE_MANTLE",
+];
+
+/**
+ * Whether an `ENABLE_TOOL_SEARCH` value is an automatic mode: `auto`, or `auto:N` with N between 0
+ * and 100. Then the CLI sends each tool schema in full while the schemas fit under N% (10% for
+ * `auto`) of the context window, and a late MCP server changes the cached tool list
+ * (pingdotgg/t3code#24654). The OpenBot tools (about 26k tokens) fit under 10% of a 1M context:
+ * `scripts/claude-mcp-cache-bench.ts` measured 39k prompt tokens per request there, 13k with tool
+ * search. OpenBot sets `true`, the CLI default on the Anthropic API, for these modes. It does not
+ * change the mode on another API backend (`CLAUDE_OTHER_API_VARIABLES`). `false`, `auto:0` and
+ * `auto:100` stay as the user set them. The CLI clamps N to 0–100 and reads a value that is not a
+ * number as `auto`. A thread that ran in an automatic mode writes its prompt cache again once, at
+ * its first request with tool search.
+ */
+function isClaudeAutoToolSearch(value: string | undefined): boolean {
+  if (value === "auto") return true;
+  if (!value?.startsWith("auto:")) return false;
+  const percent = Number.parseInt(value.slice("auto:".length), 10);
+  return Number.isNaN(percent) || (percent > 0 && percent < 100);
+}
 
 /** The longest tool description the activity line shows. The model writes about 5 to 10 words. */
 const TOOL_DESCRIPTION_LIMIT = 120;
@@ -375,6 +423,8 @@ interface ActiveTurn {
   /** The segment published last, which a message contradicting it can still put right. */
   lastNarration: { id: string; text: string } | null;
   narrationCount: number;
+  /** A Stop hook blocked the held reply. The next message is the redo, so it closes the step (#8080). */
+  stopHookBlocked: boolean;
   thinking: string;
   thinkingStarted: boolean;
   /**
@@ -407,10 +457,22 @@ interface ActiveTurn {
    * credits. Switch to another model to continue.", so a backup model can take it (#7127).
    */
   balanceSpent: boolean;
+  /**
+   * The CLI refused the turn with `billing_error`, such as "Claude Code can't use your Claude
+   * subscription, usually because a payment is past due", so a backup model can take it (#7491).
+   */
+  billingFailed: boolean;
   /** Set by an `api_retry` until the next reply frame, which shows that the request got through. */
   retrying: boolean;
   /** The CLI started this turn itself, with no message from OpenBot, such as after a background task ended. */
   unprompted: boolean;
+  /**
+   * The message that started the turn, and the id that OpenBot asked for. The CLI skips a uuid that
+   * its saved session holds and ends no turn, so the message goes again with a new uuid (#9270).
+   */
+  prompt: { requestedId: string | null; message: SDKUserMessage; retries: number } | null;
+  /** The CLI started the prompt, or sent a frame of the turn. */
+  promptStarted: boolean;
 }
 
 interface ThreadRuntime {
@@ -498,6 +560,15 @@ const CLAUDE_STOP_CONFIRM_MS = 10_000;
 /** How many message uuids a process keeps to give a message that runs again a new one (#6676). */
 const TAKEN_PROMPT_LIMIT = 1_000;
 
+/**
+ * How many times a turn sends its message again after the CLI skipped it (#9270): each run id of the
+ * message, and then one random uuid, which no saved session can hold.
+ */
+const SKIPPED_PROMPT_RETRIES = MAX_RUNS + 1;
+
+/** The start of the user message in which Claude Code gives a blocking Stop hook's reason to the model. */
+const CLAUDE_STOP_HOOK_FEEDBACK = "Stop hook feedback:\n";
+
 interface ClaudeStreamMessage {
   type: string;
   parent_tool_use_id?: string | null;
@@ -520,9 +591,16 @@ interface ClaudeStreamMessage {
   is_error?: boolean;
   /** Why an assistant message is a refusal, such as `rate_limit`. */
   error?: string;
+  /** Why an API error refused the request, such as `usage_limit_reached`. The SDK types do not declare it. */
+  api_error?: string;
+  /** The details of `api_error`, such as the `rate_limit_info` of a usage limit. */
+  api_error_params?: unknown;
   rate_limit_info?: unknown;
   /** `background_tasks_changed`: every live background task. */
   tasks?: unknown;
+  /** `command_lifecycle`: the uuid of the message that OpenBot sent, and its state, such as `started` or `completed`. */
+  command_uuid?: unknown;
+  state?: unknown;
   /** The uuid of the user message that the turn answers, on the turn's first stream event and assistant message. */
   user_message_uuid?: string;
   /** Set when the turn runs an interrupted turn again, and `user_message_uuid` names that turn's prompt. */
@@ -596,10 +674,9 @@ const readClaudeSettingsFile = Effect.fn("readClaudeSettingsFile")(function* (pa
  * account and API backend keys, which cost no prompt tokens. The sign-in probe reads the whole file,
  * so without them an agent turn could use another account or backend than the provider settings
  * show: Bedrock, Vertex or a gateway set in `env`, or an `apiKeyHelper`. They go in as flag settings.
- * A missing or unreadable file gives nothing. The file can hold secrets, so no value of it is logged.
+ * The file can hold secrets, so no value of it is logged.
  */
-const claudeSignInSettings = Effect.fn("claudeSignInSettings")(function* (configDirectory: string) {
-  const parsed = yield* readClaudeSettingsFile(join(configDirectory, "settings.json"));
+function claudeSignInSettings(parsed: DynamicRecord): Settings {
   const stringSetting = (key: string): string | null => {
     const value = parsed[key];
     return isString(value) ? value : null;
@@ -627,7 +704,7 @@ const claudeSignInSettings = Effect.fn("claudeSignInSettings")(function* (config
     ...(Object.keys(env).length > 0 ? { env } : {}),
   };
   return settings;
-});
+}
 
 /**
  * The model ids that a model list of any sign-in reported. A client for one generation or an agent's
@@ -639,6 +716,7 @@ const CLAUDE_LISTED_MODELS = new Set<string>();
 export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly contextCompaction = "native";
   readonly turnContext = true;
+  readonly userInputNote = true;
   #queryRestarts = 0;
   readonly provider: AgentProvider = "claude";
   readonly #cli: ClaudeCliInfo;
@@ -678,6 +756,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     dispose: (runtime) => this.#closeRuntime(runtime),
     reopen: (threadId, config) => this.#startThread(threadId, config, true),
   });
+  /**
+   * The message uuids that each thread's processes took. A process that resumes the saved session
+   * keeps them: the CLI skips a uuid that the session holds, so a message that the limit put back
+   * in the queue got no answer after an idle close (#9270).
+   */
+  readonly #takenPrompts = new Map<string, Set<string>>();
   readonly #serverRequests = new PendingServerRequests((request) => this.emit("request", request));
   readonly #modelEffortCapabilities = new Map<string, ClaudeEffortCapability>();
   readonly #modelSdkValues = new Map<string, string>();
@@ -803,6 +887,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     return [...this.#threads.ids()].every((id) => !this.#threads.get(id)?.backgroundTasks);
   }
 
+  /** A background subagent or command of this thread ends when its query closes. */
+  holdsBackgroundWork(threadId: string): Effect.Effect<boolean, ProviderClientOperationError> {
+    return Effect.sync(() => (this.#threads.get(threadId)?.backgroundTasks ?? 0) > 0);
+  }
+
   /**
    * Closes one thread runtime and keeps the rest of the client. The SDK query owns the MCP servers
    * of that thread, so the close is what ends those child processes. The caller releases an idle
@@ -817,7 +906,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     this.#threads.forget(threadId);
     // `--resume` opens the same conversation, which holds the memories and section-mates that its
     // turns were sent. They went again on each turn after a runtime reload.
-    if (!resumes) this.#turnContext.forget(threadId);
+    if (!resumes) {
+      this.#turnContext.forget(threadId);
+      this.#takenPrompts.delete(threadId);
+    }
     const runtime = this.#threads.get(threadId);
     if (!runtime) return;
     yield* this.#threads.close(runtime).pipe(toProviderClientOperationError);
@@ -1037,7 +1129,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             ? null
             : { supported: supportedReasoningEfforts, defaultEffort: defaultReasoningEffort },
         );
-        sdkValues.set(id, model.value.trim() || id);
+        // `default` follows Claude Code's own default, which can change, such as at a usage limit,
+        // while the agent keeps its model. Its resolved id names the model that the agent chose (#9071).
+        sdkValues.set(id, model.value.trim() === "default" ? id : model.value.trim() || id);
         return {
           model: id,
           displayName: model.displayName,
@@ -1303,7 +1397,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     );
     // The user setup brings the whole user settings file. A profile generation loads no settings
     // files, but it still needs the sign-in keys: without them a gateway set in `env` is lost (#6025).
-    const signInSettings: Settings = userSetup ? {} : yield* claudeSignInSettings(configDirectory);
+    const userSettingsFile = yield* readClaudeSettingsFile(join(configDirectory, "settings.json"));
+    const signInSettings: Settings = userSetup ? {} : claudeSignInSettings(userSettingsFile);
     const homeSkillPlugin =
       stateDirectory && userSetup
         ? yield* claudeHomeSkillPlugin(stateDirectory, configDirectory, config.cwd).pipe(
@@ -1337,11 +1432,24 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     // the flag settings, whose `env` the CLI gives to the Bash tool and its hooks.
     const nodeOptionsSettings: Settings = nodeOptions ? { env: { NODE_OPTIONS: nodeOptions } } : {};
     const settingSources = claudeSettingSources(config, userSetup);
+    const cliEnvironment: NodeJS.ProcessEnv = {
+      ...claudeEnvironment(this.#cli),
+      // The login shell's `PATH`, so the Bash tool and hooks find Homebrew and `~/.local/bin`
+      // tools when Finder starts OpenBot. An `env.PATH` in the Claude settings still wins.
+      ...(launchPath ? { PATH: launchPath } : {}),
+      ...this.#environment(this.#onApiKey),
+    };
     // A profile generation has no tools and no skills, so it needs none of the OpenBot settings.
     const openBotSettings: Settings = config.profileGeneration
       ? {}
-      : yield* claudeFlagSettings(configDirectory, config.cwd, settingSources);
-    const flagSettings: Settings = { ...openBotSettings, ...nodeOptionsSettings };
+      : yield* claudeFlagSettings(userSettingsFile, configDirectory, config.cwd, settingSources, cliEnvironment);
+    const flagSettings: Settings = {
+      ...openBotSettings,
+      ...nodeOptionsSettings,
+      ...(openBotSettings.env || nodeOptionsSettings.env
+        ? { env: { ...openBotSettings.env, ...nodeOptionsSettings.env } }
+        : {}),
+    };
     const sandbox = config.workspaceOnly
       ? claudeWorkspaceSandbox(config.additionalDirectories, config.excludedFolders)
       : null;
@@ -1354,7 +1462,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           ? yield* writeClaudeFlagSettings(stateDirectory, threadId, {
               ...signInSettings,
               ...openBotSettings,
-              env: { ...signInSettings.env, ...nodeOptionsSettings.env },
+              env: { ...signInSettings.env, ...openBotSettings.env, ...nodeOptionsSettings.env },
               ...(sandbox ? { sandbox } : {}),
             }).pipe(
               Effect.catch((error) =>
@@ -1437,13 +1545,16 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           ...(plugins.length ? { plugins } : {}),
           mcpServers,
           env: {
-            ...withClaudeClientLabels({
-              ...claudeEnvironment(this.#cli),
-              // The login shell's `PATH`, so the Bash tool and hooks find Homebrew and `~/.local/bin`
-              // tools when Finder starts OpenBot. An `env.PATH` in the Claude settings still wins.
-              ...(launchPath ? { PATH: launchPath } : {}),
-              ...this.#environment(this.#onApiKey),
-            }),
+            ...withClaudeClientLabels(cliEnvironment),
+            // The CLI connects MCP servers in the background. On a resume, the first request could
+            // go out before a slow server was ready: the CLI told the agent that the server had
+            // disconnected and added its tools again on a later request (pingdotgg/t3code#34822).
+            // A resume waits for the servers, up to `MCP_CONNECT_TIMEOUT_MS` (5 s by default). CLI
+            // 2.1.322 already holds the first turn of a query until they connect, so this guards
+            // other CLI versions. A new session does not wait. A value of the user wins.
+            ...(resume && cliEnvironment.MCP_CONNECTION_NONBLOCKING === undefined
+              ? { MCP_CONNECTION_NONBLOCKING: "0" }
+              : {}),
             // Without a terminal, the CLI gives the newer models no TodoWrite or task tools, so the
             // agent has no plan for OpenBot to show as a task list.
             CLAUDE_CODE_ENABLE_TODO_TOOLS: "1",
@@ -1480,7 +1591,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       subagents: newSubagentState(),
       backgroundTasks: 0,
       lastOutputAt: Date.now(),
-      promptIds: new Set<string>(),
+      promptIds: (resume && this.#takenPrompts.get(threadId)) || new Set<string>(),
       nextTurnId: null,
       streamMessage: { id: null, thinkingBlocks: new Map<number, string>() },
       mcpConfigFile,
@@ -1496,6 +1607,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         this.#scope,
       );
     this.#threads.add(runtime);
+    // Only a saved session can be resumed.
+    if (config.persistSession) this.#takenPrompts.set(threadId, runtime.promptIds);
   });
 
   readonly #startTurnEffect = Effect.fn("ClaudeAgentClient.startTurn")(function* (
@@ -1567,13 +1680,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     if (runtime.activeTurn) return yield* providerFailure(this.#turnActiveError(runtime.activeTurn));
     // Only now: a model or effort change that fails above leaves the idle timer armed, so the
     // pool can still release the thread.
-    this.#beginTurn(runtime, turnId, false);
+    const turn = this.#beginTurn(runtime, turnId, false);
     // Blocks of their own, so that history readers can tell them from the text of the turn. A slash
     // command gets none: the CLI can drop the blocks before it, and `/clear` empties the context,
     // so the next turn sends the full blocks.
     const context = this.#turnContext.take(threadId, text.startsWith("/"));
     takePrompt(runtime, turnId);
-    runtime.input.push({
+    const message: SDKUserMessage = {
       type: "user",
       message: {
         role: "user",
@@ -1585,7 +1698,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       parent_tool_use_id: null,
       uuid: turnId,
       session_id: threadId,
-    });
+    };
+    turn.prompt = { requestedId: requestedTurnId ?? null, message, retries: 0 };
+    runtime.input.push(message);
     return { turn: { id: turnId, status: "inProgress" } };
   });
 
@@ -1606,6 +1721,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       publishedText: "",
       lastNarration: null,
       narrationCount: 0,
+      stopHookBlocked: false,
       thinking: "",
       thinkingStarted: false,
       thinkingBlocks: new Map<string, string>(),
@@ -1617,8 +1733,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       usageLimit: null,
       authenticationFailed: false,
       balanceSpent: false,
+      billingFailed: false,
       retrying: false,
       unprompted,
+      prompt: null,
+      promptStarted: false,
     };
     runtime.activeTurn = turn;
     runtime.nextTurnId = null;
@@ -1667,6 +1786,42 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       session_id: threadId,
     });
     return { turnId: runtime.activeTurn.id };
+  });
+
+  /**
+   * The CLI ends a message whose uuid its saved session holds as `completed` with no `started`, and
+   * starts no turn for it. The turn then waited with no end (#9270), so the message goes again with
+   * the next uuid of its run, which history import maps back to the same message.
+   */
+  readonly #promptLifecycle = Effect.fn("ClaudeAgentClient.promptLifecycle")(function* (
+    this: ClaudeAgentClient,
+    runtime: ThreadRuntime,
+    uuid: unknown,
+    state: unknown,
+  ) {
+    const turn = runtime.activeTurn;
+    const prompt = turn?.prompt;
+    if (!turn || !prompt || uuid !== prompt.message.uuid) return;
+    if (state === "started") turn.promptStarted = true;
+    if (state !== "completed" || turn.promptStarted) return;
+    if (prompt.retries >= SKIPPED_PROMPT_RETRIES) {
+      queryLogger.warn("Claude skipped a message with each new id.", { threadId: runtime.id, retries: prompt.retries });
+      yield* this.#completeTurn(runtime, "failed", sourceText("error.provider.acpNoAnswer", { provider: "Claude" }));
+      return;
+    }
+    const retryId = promptUuid(runtime, prompt.requestedId ?? turn.id);
+    takePrompt(runtime, retryId);
+    prompt.message = { ...prompt.message, uuid: retryId };
+    prompt.retries += 1;
+    queryLogger.warn("Claude skipped a message that its session holds, so it goes again with a new id.", {
+      threadId: runtime.id,
+      retries: prompt.retries,
+    });
+    try {
+      runtime.input.push(prompt.message);
+    } catch {
+      // The query closes, and its turn ends with it.
+    }
   });
 
   readonly #consume = Effect.fn("ClaudeAgentClient.consume")(function* (
@@ -1725,6 +1880,17 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     message: ClaudeStreamMessage,
   ) {
     runtime.lastOutputAt = Date.now();
+    if (message.type === "command_lifecycle") {
+      yield* this.#promptLifecycle(runtime, message.command_uuid, message.state);
+      return;
+    }
+    // A frame of a background subagent does not show that the CLI took the turn's message.
+    if (
+      runtime.activeTurn &&
+      message.parent_tool_use_id === null &&
+      (message.type === "stream_event" || message.type === "assistant")
+    )
+      runtime.activeTurn.promptStarted = true;
     if (message.type === "assistant") {
       // Each content block repeats its request's message; the last copy has the final count.
       const id = getString(message.message, "id");
@@ -1851,6 +2017,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       const delta = isRecord(event) ? event.delta : null;
       const block = isRecord(event) ? event.content_block : null;
       if (isRecord(event) && event.type === "message_start") {
+        this.#closeBlockedReply(runtime);
         runtime.streamMessage = { id: getString(event.message, "id"), thinkingBlocks: new Map<number, string>() };
       } else if (
         isRecord(event) &&
@@ -1892,19 +2059,23 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       const turn = this.#outputTurn(runtime);
       const text = messageText(message.message);
       if (message.error === "rate_limit") {
+        const refusal = claudeUsageLimitRefusal(message);
         // A spent balance does not reset, so it is not held: the turn fails with its own text.
         if (isBalanceDiagnostic(text)) {
           turn.usageLimit = null;
           turn.balanceSpent = true;
-        } else if (turn.usageLimit || isPlanLimitDiagnostic(text)) {
-          turn.usageLimit = { resetsAt: turn.usageLimit?.resetsAt ?? null, text: text || null };
+        } else if (turn.usageLimit || refusal || isPlanLimitDiagnostic(text)) {
+          turn.usageLimit = { resetsAt: refusal?.resetsAt ?? turn.usageLimit?.resetsAt ?? null, text: text || null };
           return;
         }
       }
       // The CLI's own report of a failed request, such as "Invalid API key · Please run /login", is not
       // an answer. The result after it carries the same text and fails the turn.
       if (message.error === "authentication_failed") turn.authenticationFailed = true;
+      if (message.error === "billing_error") turn.billingFailed = true;
       if (message.error && message.error !== "max_output_tokens") return;
+      // Without stream events, the redo's first message is the first sign of it.
+      this.#closeBlockedReply(runtime);
       const thinking = messageThinking(message.message);
       /* The message's own order is all there is to say what came before its thinking. Text the
          message placed there is narration, and only that much may go. */
@@ -1955,6 +2126,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     if (message.type === "user") {
       const turn = runtime.activeTurn;
       if (!turn) return;
+      /* A blocking Stop hook gives its reason to Claude in this message, and Claude writes the reply
+         again with no tool call between. The blocked text is not the answer. It stays the answer only
+         when no redo comes, as when the hook also ends the turn. */
+      if (!message.parent_tool_use_id && messageText(message.message).startsWith(CLAUDE_STOP_HOOK_FEEDBACK))
+        turn.stopHookBlocked = true;
       for (const { id: toolCallId, text, isError } of messageToolResults(message.message)) {
         // A subagent's task ids are its own, so only the main agent's results name a plan task.
         if (!message.parent_tool_use_id) {
@@ -2143,6 +2319,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           isRecord(input) &&
           typeof input.file_path === "string"
             ? [input.file_path]
+            : undefined,
+        // The folder that a finished search worked in, so a chip that names a file from its result finds it.
+        folderPaths:
+          completed && failure === null && ["Glob", "Grep", "LS"].includes(name) && isRecord(input)
+            ? [input.path].filter((path) => typeof path === "string")
             : undefined,
         item: {
           id,
@@ -2335,6 +2516,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     });
   }
 
+  /** Move a reply that a Stop hook blocked to the thinking disclosure, as a tool call would, before its redo. */
+  #closeBlockedReply(runtime: ThreadRuntime): void {
+    const turn = runtime.activeTurn;
+    if (!turn?.stopHookBlocked) return;
+    turn.stopHookBlocked = false;
+    this.#reconcileText(runtime, [...turn.assistantMessages.values()].join(""));
+    this.#flushNarration(runtime);
+  }
+
   /** Publish held text as the thinking disclosure, which is what a step boundary proves it was. */
   #flushNarration(runtime: ThreadRuntime): void {
     const turn = runtime.activeTurn;
@@ -2390,17 +2580,27 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     });
     if (status === "failed" && error) {
       // A sign-in failure moves the turn to a backup model, as an invalid key does, and so do spent
-      // usage credits. The shared classifier does not find these causes in the CLI text, so the
-      // client names them.
-      const signInFailed = turn.authenticationFailed || CLAUDE_NOT_LOGGED_IN.test(String(error));
-      const balanceSpent = turn.balanceSpent && isBalanceDiagnostic(String(error));
+      // usage credits and a billing refusal. The shared classifier does not find these causes in
+      // all CLI texts, such as "Credit balance is too low", so the client names them.
+      // Cloudflare's block page in front of the Claude API arrives as `authentication_failed`, but the
+      // request never reached Claude, so the sign-in is not the cause (#8811).
+      const blocked = CLAUDE_CLOUDFLARE_BLOCK.test(String(error));
+      if (blocked) queryLogger.warn("Cloudflare blocked a Claude request.", { error: redactText(String(error)) });
+      const signInFailed = !blocked && (turn.authenticationFailed || CLAUDE_NOT_LOGGED_IN.test(String(error)));
+      const billing = turn.billingFailed || (turn.balanceSpent && isBalanceDiagnostic(String(error)));
       this.emit("notification", {
         method: "error",
         params: {
           threadId: runtime.id,
           turnId: turn.id,
           message: claudeTurnError(error, this.#usesApiKey()),
-          ...(signInFailed ? { causeCode: "authentication" } : balanceSpent ? { causeCode: "billing" } : {}),
+          ...(blocked
+            ? { causeCode: "provider_unavailable" }
+            : signInFailed
+              ? { causeCode: "authentication" }
+              : billing
+                ? { causeCode: "billing" }
+                : {}),
         },
       });
     }
@@ -2614,11 +2814,14 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       })
       .pipe(toProviderClientOperationError);
     const responseAnswers = isRecord(result) && isRecord(result.answers) ? result.answers : {};
+    // The question closed without an answer, and the note says why, such as a new message from the user.
+    // Claude reads the answers alone, so the note takes the place of the blank answer (#9199).
+    const note = isRecord(result) && isString(result.note) ? result.note : "";
     const answers = Object.fromEntries(
       questions.map((question) => {
         const entry = responseAnswers[question.id];
         const values = isRecord(entry) && Array.isArray(entry.answers) ? entry.answers : [];
-        return [question.question, values.filter((value): value is string => isString(value)).join(", ")];
+        return [question.question, values.filter((value): value is string => isString(value)).join(", ") || note];
       }),
     );
     return { behavior: "allow", updatedInput: { questions: input.questions, answers } };
@@ -2849,6 +3052,14 @@ const CLAUDE_API_CREDIT_EMPTY = /\bcredit balance (?:is )?too low\b/iu;
 const CLAUDE_NOT_LOGGED_IN = /\bnot logged in\b\s*·\s*please run \/login\b/iu;
 
 /**
+ * A 403 that Cloudflare, not Claude, sent: "Failed to authenticate. API Error: 403 Attention
+ * Required! | Cloudflare" (Claude Code 2.1.323, #8811). Only a 403 with a block marker matches, so
+ * any other 403 stays a sign-in failure.
+ */
+const CLAUDE_CLOUDFLARE_BLOCK =
+  /\b403\b[\s\S]*(?:attention required!? \| cloudflare|sorry, you have been blocked|cf-browser-verification|__cf_chl|cdn-cgi\/challenge-platform)/iu;
+
+/**
  * The chat text for a fast mode turn that Claude Code ran at the standard speed. `pending` and
  * `sdk_opt_in_required` are states of the client itself, so only the log keeps them.
  */
@@ -2876,6 +3087,7 @@ function claudeFastModeWarning(reason: string): string | null {
 function claudeTurnError(error: unknown, apiKey: boolean): string {
   const text = String(error);
   if (apiKey && CLAUDE_API_CREDIT_EMPTY.test(text)) return sourceText("error.provider.claudeApiKeyNoCredit");
+  if (CLAUDE_CLOUDFLARE_BLOCK.test(text)) return sourceText("error.provider.claudeServiceBlocked");
   // With an API key there is no sign-in to renew, so the key turn keeps the CLI text.
   if (!apiKey && CLAUDE_NOT_LOGGED_IN.test(text))
     return sourceText("error.provider.signInExpired", { provider: agentProviderName("claude") });
@@ -3074,6 +3286,20 @@ function claudeUsageWindow(value: unknown, windowDurationMins: number): AccountR
     windowDurationMins,
     resetsAt: Number.isFinite(resetMilliseconds) ? resetMilliseconds / 1_000 : null,
   };
+}
+
+/**
+ * The usage limit that refused a request, as the CLI's assistant error frame names it, or null.
+ * Claude Code marks a spent plan window or spend cap with `api_error: "usage_limit_reached"` and
+ * `api_error_params.rate_limit_info`. A turn can get no rejected `rate_limit_event`, and the text,
+ * such as "You've hit your monthly spend limit · your 5-hour limit resets 3:20pm", can name a limit
+ * that no text rule knows (#8998). An older CLI sends neither field.
+ */
+function claudeUsageLimitRefusal(message: ClaudeStreamMessage): { resetsAt: number | null } | null {
+  const params = isDynamicRecord(message.api_error_params) ? message.api_error_params : null;
+  const info = params && isDynamicRecord(params.rate_limit_info) ? params.rate_limit_info : null;
+  if (message.api_error !== "usage_limit_reached" && info?.status !== "rejected") return null;
+  return { resetsAt: claudeResetSeconds(info?.resetsAt) };
 }
 
 /** Claude reports a reset in epoch seconds. A value in milliseconds is converted, so both read the same. */
@@ -3356,6 +3582,8 @@ function claudeStepTarget(name: string, input: unknown): Record<string, string> 
 function completedToolInput(input: unknown): Record<string, string> {
   const kept: Record<string, string> = {};
   if (!isRecord(input)) return kept;
-  for (const key of ["skill", "command", "file_path"]) if (typeof input[key] === "string") kept[key] = input[key];
+  // `path` is the folder of a Glob or Grep search, for the thread's work folders.
+  for (const key of ["skill", "command", "file_path", "path"])
+    if (typeof input[key] === "string") kept[key] = input[key];
   return kept;
 }

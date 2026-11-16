@@ -274,6 +274,8 @@ export const messages = {
   "connector.telegram.helpRelayUnavailableHost":
     "O OpenBot em {host} não consegue receber mensagens do Telegram. Em {host}, entre na sua conta, dê um nome ao servidor nas Configurações do servidor e mantenha o OpenBot aberto.",
   "connector.telegram.helpError": "O OpenBot não consegue acessar este chat. Reconecte ou desconecte o chat.",
+  "connector.telegram.helpNotLinked":
+    "Este chat não está vinculado a este servidor. Selecione Reconectar para vinculá-lo.",
   "connector.telegram.retryAt": "O Telegram pediu para o OpenBot aguardar. Ele tentará novamente às {time}.",
   "connector.telegram.pause": "Pausar",
   "connector.telegram.resume": "Retomar",
@@ -360,6 +362,8 @@ export const messages = {
     "O WhatsApp removeu este servidor dos dispositivos conectados. Vincule o número novamente.",
   "connector.whatsapp.helpError":
     "O OpenBot não consegue acessar o WhatsApp neste número. Reconecte ou desconecte o número.",
+  "connector.whatsapp.helpKeysUnreadable":
+    "O OpenBot não consegue ler as chaves salvas deste número. Vincule o número novamente.",
   "connector.whatsapp.retryAt": "O WhatsApp pediu para o OpenBot aguardar. Ele tentará novamente às {time}.",
   "connector.whatsapp.pause": "Pausar",
   "connector.whatsapp.resume": "Retomar",

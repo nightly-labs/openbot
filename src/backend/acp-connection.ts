@@ -55,6 +55,7 @@ export class AcpConnection {
   #connection: ClientSideConnection | null = null;
   #ended: Deferred.Deferred<ProcessEnd> | null = null;
   #stopping = false;
+  #lastOutputAt = 0;
   readonly #stoppedProcesses = new WeakSet<ChildProcessWithoutNullStreams>();
   constructor(private readonly options: AcpConnectionOptions) {}
   get running(): boolean {
@@ -62,6 +63,10 @@ export class AcpConnection {
   }
   get ended(): Deferred.Deferred<ProcessEnd> | null {
     return this.#ended;
+  }
+  /** `Date.now()` when the process last wrote to its output or its error stream, or when it started. */
+  get lastOutputAt(): number {
+    return this.#lastOutputAt;
   }
   get connection(): ClientSideConnection | null {
     return this.#connection;
@@ -91,6 +96,12 @@ export class AcpConnection {
       }),
     );
     this.#process = child;
+    this.#lastOutputAt = Date.now();
+    const wrote = () => {
+      this.#lastOutputAt = Date.now();
+    };
+    child.stdout.on("data", wrote);
+    child.stderr.on("data", wrote);
     registerProviderProcess(child, this.options.provider);
     // A start that times out says nothing of the process. These lines show whether it ran, how long
     // it took to write anything, and how it ended, such as a Windows server that unpacks itself (#2311).

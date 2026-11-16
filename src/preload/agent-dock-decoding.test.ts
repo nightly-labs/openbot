@@ -41,8 +41,8 @@ const PRESENTATION: AgentDockPresentation = {
   sizePercent: 85,
   offsets: [{ displayId: 69733382, offset: 0 }],
   seats: [
-    { kind: "agent", agent: AGENT, mood: "working", state: { kind: "unread", count: 2 } },
-    { kind: "channel", channel: CHANNEL, state: null },
+    { kind: "agent", agent: AGENT, mood: "working", state: { kind: "unread", count: 2 }, temporary: false },
+    { kind: "channel", channel: CHANNEL, state: null, temporary: false },
   ],
   available: [],
   availableChannels: [CHANNEL],
@@ -104,11 +104,29 @@ describe("agent dock decoding", () => {
     );
   });
 
+  it("accepts a temporary seat and rejects a seat that does not say whether it is temporary", () => {
+    const temporary: AgentDockPresentation = {
+      ...PRESENTATION,
+      seats: [{ kind: "agent", agent: AGENT, mood: "idle", state: { kind: "unread", count: 1 }, temporary: true }],
+    };
+    expect(decodeAgentDockPresentation(temporary)).toEqual(temporary);
+    const unmarked = [{ kind: "agent", agent: AGENT, mood: "idle", state: null }];
+    expect(() => decodeAgentDockPresentation({ ...PRESENTATION, seats: unmarked })).toThrow(
+      "Invalid agent dock presentation.",
+    );
+  });
+
   it("rejects a presentation over its limits", () => {
     const seats = Array.from({ length: AGENT_DOCK_LIMITS.seats + 1 }, () => PRESENTATION.seats[0]);
     expect(() => decodeAgentDockPresentation({ ...PRESENTATION, seats })).toThrow("Invalid agent dock presentation.");
     const badCount = [
-      { kind: "agent", agent: AGENT, mood: "idle", state: { kind: "unread", count: AGENT_DOCK_LIMITS.count + 1 } },
+      {
+        kind: "agent",
+        agent: AGENT,
+        mood: "idle",
+        state: { kind: "unread", count: AGENT_DOCK_LIMITS.count + 1 },
+        temporary: false,
+      },
     ];
     expect(() => decodeAgentDockPresentation({ ...PRESENTATION, seats: badCount })).toThrow(
       "Invalid agent dock presentation.",

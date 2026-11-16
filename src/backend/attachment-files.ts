@@ -491,6 +491,8 @@ export class AttachmentFiles {
     input: {
       sourcePath?: string;
       bytes?: Uint8Array;
+      /** Names the size error. Absent: an image. */
+      kind?: "image" | "video";
       name?: string;
       mimeType?: string;
       ownerAgentId?: string;
@@ -506,8 +508,10 @@ export class AttachmentFiles {
     const inputBytes = input.bytes;
     const bytes = inputBytes === undefined ? null : yield* attachmentSync(() => normalizeBytes(inputBytes));
     const size = source?.size ?? bytes?.byteLength ?? 0;
-    if (size > MAX_FILE_BYTES)
-      return yield* attachmentFailure(new Error(sourceText("error.backend.generatedImageTooLarge")));
+    const tooLargeText = sourceText(
+      input.kind === "video" ? "error.backend.generatedVideoTooLarge" : "error.backend.generatedImageTooLarge",
+    );
+    if (size > MAX_FILE_BYTES) return yield* attachmentFailure(new Error(tooLargeText));
 
     const name = sanitizeName(input.name ?? (source ? basename(source.path) : "generated-image.png"));
     const generatedRoot = join(this.#transfersRoot, "generated", id);
@@ -524,7 +528,7 @@ export class AttachmentFiles {
           yield* attachmentCall(() => writeFile(targetPath, bytes, { mode: 0o600 })).pipe(Effect.uninterruptible);
         else throw new Error("Generated image bytes are missing.");
         const stored = yield* attachmentCall(() => stat(targetPath));
-        if (stored.size > MAX_FILE_BYTES) throw new Error(sourceText("error.backend.generatedImageTooLarge"));
+        if (stored.size > MAX_FILE_BYTES) throw new Error(tooLargeText);
         const generatedAttachment: StoredGeneratedAttachment = {
           ...attachmentRecord(
             id,

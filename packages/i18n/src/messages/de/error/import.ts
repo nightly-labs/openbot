@@ -70,6 +70,21 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name}: Das Modell „{model}“ ist hier noch nicht verfügbar, daher verwendet der Agent das Standardmodell. Wähle das Modell erneut, sobald sein Anbieter bereit ist.",
   "error.import.transferSettingSkipped": "{name} wird nicht importiert. {reason}",
+  "error.import.transferRunsSkipped": "{name}: Der Ausführungsverlauf der Routine „{routine}“ wird nicht importiert.",
+  "error.import.transferSharedSkillsSkipped":
+    "Die gemeinsamen Fähigkeiten konnten nicht gelesen werden und sind daher nicht in der Datei.",
+  "error.import.transferSharedSkillsNotAdded":
+    "Die geteilten Skills in der Datei konnten nicht zu diesem Server hinzugefügt werden.",
+  "error.import.transferMemberPreferencesSkipped": {
+    one: "Die Auswahl von {count} Mitglied konnte nicht gespeichert werden.",
+    other: "Die Auswahl von {count} Mitgliedern konnte nicht gespeichert werden.",
+  },
+  "error.import.transferSharedSkillExists":
+    "Auf diesem Server gibt es bereits eine gemeinsame Fähigkeit mit diesem Namen und anderen Dateien.",
+  "error.import.transferServerPreferencesSkipped": {
+    one: "{count} Serverpräferenz in der Datei ist hier nicht gültig und wird daher nicht importiert.",
+    other: "{count} Serverpräferenzen in der Datei sind hier nicht gültig und werden daher nicht importiert.",
+  },
   "error.import.transferRoutineFlowSkipped": "Der Import hat einen Routinenablauf ausgelassen. {reason}",
   "error.import.transferCustomAgentCommand":
     "{name}: Eigene Agenten werden nicht importiert, da sie einen Befehl ausführen. Prüfe den Befehl „{command}“ und füge den Agenten in den Einstellungen erneut hinzu.",

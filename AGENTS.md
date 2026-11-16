@@ -118,6 +118,22 @@ tokens and contracts; it does not render SolidJS DOM components.
 
 Read [packages/ui/AGENTS.md](packages/ui/AGENTS.md) before changing shared UI.
 
+## Phone screens
+
+Phones use the native app (`apps/mobile`). The desktop renderer, the web client and `packages/ui`
+are designed for a computer screen only.
+
+- Do not design, style, write stories or take screenshots for these surfaces at a phone width, and
+  do not list phone gaps in reports. A narrow desktop window and the compact sidebar stay in scope.
+  The narrowest window is the `minWidth` in `src/main/main-window.ts`: 960 px for the main window
+  and 380 px for a separate chat window. Design the web client for 960 px and wider too.
+- On a phone (narrow screen and touch pointer), the web client opens on `WebPhoneAppScreen`, which
+  links to the App Store and Google Play. "Continue in browser" keeps the old phone layout
+  (`WebMobileNavigation` and the `max-width: 720px` rules in `web-client.css`). Keep it working;
+  do not add to it.
+- Put a phone feature in `apps/mobile`. [Joined servers](#joined-servers) says when one is needed.
+- The public site (`apps/auth-api` pages other than `/app`) stays responsive: phone visitors read it.
+
 ## Interface text
 
 Text that a user reads comes from `@openbot/i18n` catalog keys, on desktop, web and mobile. Do not
@@ -201,8 +217,26 @@ State which surfaces a change touches. Check all affected consumers and reverse 
   Load it with `bunx @dotenvx/dotenvx@2.38.2 run -f apps/auth-api/.env.dev -fk <root>/.env.keys --
   <command>`; `bun run dev` does not pass it on. Never print it. Ask before a benchmark or a run of many
   turns: the token budget is small.
+- For development and manual tests, the team has one test Google account. `apps/auth-api/.env.dev`
+  holds `DEV_TEST_GMAIL_ADDRESS` and `DEV_TEST_GMAIL_PASSWORD`. Use it to sign in to Gmail and to
+  third-party services ("Sign in with Google") for development and smoke checks, never for a
+  personal or production account. Load it the same way as `INCEPTION_API_KEY`, and never print it.
+  Its X account uses the same email and password. A Google sign-in from a new browser gets a phone
+  check that only the developer can do. To skip it, load the saved session into a new browser
+  context (Playwright `storageState`) from `~/.config/openbot/test-google-account.storage.json` on
+  the developer's Mac. For the OpenBot browser, open a tab over CDP and set the same cookies with
+  `Network.setCookies` on that tab: agents share that session. If that session has expired, ask the
+  developer to do the phone check, then save the session again.
 
 See [account service setup](apps/auth-api/README.md) for loading and deployment details.
+
+### Leaseweb servers
+
+Take only a Leaseweb VPS that has no reference, and set its reference before any other work on it.
+Never take a VPS that has a reference, also `pool`. The reference scheme is in
+[Leaseweb references](docs/hosted-servers.md#leaseweb-references). To set up a VPS as the server of one
+customer, use the [custom-server](.agents/skills/custom-server/SKILL.md) skill. The customer is the
+owner, through a server claim; never sign the server in to an operator account.
 
 ### Local processes
 

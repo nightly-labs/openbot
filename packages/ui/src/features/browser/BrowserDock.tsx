@@ -165,7 +165,7 @@ export function BrowserDock(props: BrowserDockProps) {
   );
   /**
    * The user hid the box to reach the page under it. The glass of the field shrinks into a tab at the
-   * bottom edge, on the side of the box, and grows back out of it. The tab tells what the agent does. A
+   * bottom centre, in the middle of the box, and grows back out of it. The tab tells what the agent does. A
    * question, a code or an approval shows the box again, and the user can hide it again.
    */
   const [phase, setPhase] = createSignal<DockPhase>("open");
@@ -362,7 +362,7 @@ export function BrowserDock(props: BrowserDockProps) {
   const agentActs = () => props.island?.kind === "activity" && props.island.control === "agent";
   const unread = () => props.island?.kind === "reply" || needsAnswer(props.island);
 
-  // The tab changes its width with a spring when its text changes. It stays at the bottom edge.
+  // The tab changes its width with a spring when its text changes. It stays at the bottom centre.
   let tabWidth = 0;
   createEffect(tabLabel, () => {
     const current = tab;

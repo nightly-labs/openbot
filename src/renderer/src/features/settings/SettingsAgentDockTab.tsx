@@ -190,6 +190,14 @@ export function SettingsAgentDockTab(props: { model: AgentDockSettingsModel; sel
             label={i18n.t("settings.agentDock.results.title")}
             description={i18n.t("settings.agentDock.results.description")}
           />
+          <SwitchField
+            data-settings-row="settings.agentDock.activeSeats.title"
+            checked={preference().activeSeats}
+            disabled={!preference().shown}
+            onChange={(activeSeats) => setAgentDockPreference({ activeSeats })}
+            label={i18n.t("settings.agentDock.activeSeats.title")}
+            description={i18n.t("settings.agentDock.activeSeats.description")}
+          />
         </ItemGroup>
       </SettingsSection>
 

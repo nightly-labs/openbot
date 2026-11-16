@@ -1,3 +1,4 @@
+import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   MCP_TRANSPORTS,
@@ -9,7 +10,10 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { z } from "zod";
-import type { McpProbeOutcome } from "../mcp-probe";
+import type { McpSignInOffer } from "../mcp-oauth-provider";
+import type { McpProbeOutcome, McpToolArguments, McpToolCallResult } from "../mcp-probe";
+import { providerMcpServerName } from "../mcp-provider-shapes";
+import type { DynamicToolResult } from "../protocol";
 import type { McpGateway, McpGatewayFailed } from "./mcp-gateway";
 import { profileToolErrorMessage } from "./profile-tools";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "./routine-tools";
@@ -108,10 +112,62 @@ export interface AgentMcpServers {
    * so a saved server with new tools refreshes the sessions.
    */
   inspect(config: McpServerConfig, tested?: boolean): Effect.Effect<McpProbeOutcome, ToolOperationFailed>;
-  /** Whether an http server that answered without a sign-in offers one. Public documents only. */
-  offersSignIn(config: McpServerConfig): Effect.Effect<boolean>;
+  /** What Sign in would do for an http server that answered without a sign-in. Public documents only. */
+  signInOffer(config: McpServerConfig): Effect.Effect<McpSignInOffer>;
   /** Masks the MCP secret values in a text that goes back to the agent. */
   redact(text: string): string;
+  /** The saved, enabled http servers that the agent gets. */
+  forAgent(agentId: string): McpServerConfig[];
+  /** Runs one tool of a saved server, silent like `inspect`: its result, or the failure sentence. */
+  callTool(
+    config: McpServerConfig,
+    name: string,
+    args: McpToolArguments,
+  ): Effect.Effect<{ result: McpToolCallResult } | { error: string }, ToolOperationFailed>;
+}
+
+/**
+ * The saved server and the tool that a `tool_call` name gives: `<server>.<tool>`, with the server as
+ * the agent's instructions name it. A provider changes a name such as "My Server" to `My_Server`, and
+ * Antigravity gets `openbot_<name>` when its own files use the name, so each form matches. The
+ * provider's own `mcp_<server>_<tool>` is not read: with servers `foo` and `foo_bar` it names two
+ * tools. The longest server name wins.
+ */
+export function findAgentMcpTool(
+  configs: readonly McpServerConfig[],
+  name: string,
+): { config: McpServerConfig; tool: string } | null {
+  let found: { config: McpServerConfig; tool: string; length: number } | null = null;
+  for (const config of configs) {
+    const provider = providerMcpServerName(config.name);
+    for (const server of [config.name, provider, `openbot_${provider}`]) {
+      const prefix = `${server}.`;
+      if (!name.startsWith(prefix) || name.length === prefix.length) continue;
+      if (!found || prefix.length > found.length)
+        found = { config, tool: name.slice(prefix.length), length: prefix.length };
+    }
+  }
+  return found && { config: found.config, tool: found.tool };
+}
+
+/**
+ * An MCP tool result as a dynamic tool result: text and images as they are, other content as JSON. The
+ * server's answer is decoded here; an answer in the old `toolResult` form is given as JSON.
+ */
+export function mcpToolCallResponse(answer: McpToolCallResult): DynamicToolResult {
+  const decoded = CallToolResultSchema.safeParse(answer);
+  if (!decoded.success) return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(answer) }] };
+  const result = decoded.data;
+  const contentItems: DynamicToolResult["contentItems"] = result.content.map((item) =>
+    item.type === "text"
+      ? { type: "inputText", text: item.text }
+      : item.type === "image"
+        ? { type: "inputImage", imageUrl: `data:${item.mimeType};base64,${item.data}` }
+        : { type: "inputText", text: JSON.stringify(item) },
+  );
+  if (contentItems.length === 0)
+    contentItems.push({ type: "inputText", text: JSON.stringify(result.structuredContent ?? {}) });
+  return { success: result.isError !== true, contentItems };
 }
 
 /**
@@ -121,6 +177,7 @@ export interface AgentMcpServers {
 export function mcpServersFromGateway(
   gateway: McpGateway,
   prepareTest?: (config: McpServerConfig) => Effect.Effect<void, unknown>,
+  forAgent: (agentId: string) => McpServerConfig[] = () => [],
 ): AgentMcpServers {
   const toToolFailure = Effect.mapError(
     (failure: McpGatewayFailed) => new ToolOperationFailed({ cause: failure.cause }),
@@ -137,8 +194,10 @@ export function mcpServersFromGateway(
         Effect.mapError((cause) => new ToolOperationFailed({ cause })),
         Effect.andThen(gateway.inspect(config, tested).pipe(toToolFailure)),
       ),
-    offersSignIn: (config) => gateway.offersSignIn(config),
+    signInOffer: (config) => gateway.signInOffer(config),
     redact: (text) => gateway.redact(text),
+    forAgent,
+    callTool: (config, name, args) => gateway.callTool(config, name, args).pipe(toToolFailure),
   };
 }
 
@@ -242,7 +301,18 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
       const outcome = yield* servers.inspect(config, true);
       // A server can list its tools to anyone and want a sign-in only to run one: the test passes
       // and those tools fail. Only a test the agent asks for reads the metadata, not each search.
-      if (outcome.error === null && (yield* servers.offersSignIn(config))) {
+      const offer = outcome.error === null ? yield* servers.signInOffer(config) : "none";
+      // A Sign in card that can only fail would come back after each test (#8827).
+      if (offer === "refused")
+        return openBotToolResult({
+          status: "ready",
+          server: describeServer(config, servers.signIns()),
+          toolCount: outcome.toolCount,
+          tools: outcome.tools,
+          error: sourceText("error.backend.mcpRegistrationRefused"),
+          next: "The tools that need a sign-in fail, and a sign-in cannot fix it. Tell the user what the error says, in plain words. Do not offer a Sign in card or ask the user to sign in.",
+        });
+      if (offer === "offered") {
         yield* call.requestSignIn(config);
         return openBotToolResult({
           status: "ready",
@@ -271,6 +341,17 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
       const reason = servers.redact(sourceText(key, { name: config.name, target: serverTarget(config) }));
       if (!(yield* call.approve(reason, config.transport === "stdio" ? config.workingDirectory || null : null)))
         return openBotToolFailure(sourceText("error.agent.mcpServerDeclined"));
+      // A server that is off goes to no agent, so it is saved without a test. A test starts another
+      // copy of a stdio server, which a server that allows one copy refuses while an agent runs it (#7531).
+      if (!config.enabled) {
+        yield* servers.save(config);
+        const saved = servers.list().find((candidate) => candidate.name === config.name) ?? config;
+        return openBotToolResult({
+          status: "disabled",
+          server: describeServer(saved, servers.signIns()),
+          appliesFrom: "the next turn of each agent",
+        });
+      }
       // A server that does not answer is not saved, so no agent is given a broken entry. A server that
       // needs a sign-in or a key is saved: the sign-in and the key belong to a saved row.
       const outcome = yield* servers.inspect(config);

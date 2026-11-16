@@ -53,6 +53,8 @@ export const messages = {
   "error.skill.localRevisionNotFound":
     "Ta lokalna umiejętność nie ma wersji {revision}. Jej najnowsza wersja to {latest}.",
   "error.skill.localNameTaken": "Lokalna umiejętność o tej nazwie już istnieje. Zamiast tego ją zmień.",
+  "error.skill.localNameClash":
+    "Ta nazwa i lokalna umiejętność „{name}” dają tę samą wartość „{slug}”. Aby zmienić tę umiejętność, popraw ją. Aby dodać nową umiejętność, zmień litery łacińskie lub cyfry w tej nazwie.",
   "error.skill.localKeepName": "Nie zmieniaj nazwy umiejętności podczas jej poprawiania.",
   "error.skill.localRelativeFolder": "Użyj względnego folderu umiejętności w bieżącym obszarze roboczym agenta.",
   "error.skill.localSourceOutside": "Źródło umiejętności musi być w obszarze roboczym agenta.",
@@ -60,4 +62,13 @@ export const messages = {
   "error.skill.localMissingSkillFile": "Folder umiejętności wymaga pliku SKILL.md w katalogu głównym.",
   "error.skill.pathSymlink": "Ścieżki umiejętności nie mogą zawierać dowiązań symbolicznych.",
   "error.skill.folderNotRead": "{provider} nie czyta folderu {folder}. Skopiuj ten folder do {target}.",
+  "error.skill.githubLinkInvalid": "Wklej link do repozytorium lub folderu w GitHub.",
+  "error.skill.githubNotFound": "OpenBot nie może otworzyć {repository}. Repozytorium jest prywatne albo nie istnieje.",
+  "error.skill.githubNoSkills": "W {folder} nie ma pliku SKILL.md.",
+  "error.skill.githubUnavailable": "OpenBot nie może teraz odczytać GitHub. Spróbuj ponownie później.",
+  "error.skill.githubRateLimited":
+    "GitHub ogranicza, jak często OpenBot może go odczytać bez konta. Spróbuj ponownie za godzinę.",
+  "error.skill.githubTooLarge": "OpenBot nie może odczytać wszystkich plików {repository}. Repozytorium jest za duże.",
+  "error.skill.githubHostTooOld": "Zaktualizuj ten serwer, aby dodawać umiejętności z GitHub.",
+  "error.skill.publishGithub": "{name} pochodzi z GitHub. Możesz publikować tylko umiejętności, które utworzysz.",
 } as const satisfies PartialTranslation<typeof source>;

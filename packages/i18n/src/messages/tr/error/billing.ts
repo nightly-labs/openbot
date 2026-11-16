@@ -8,6 +8,9 @@ export const messages = {
   "error.billing.restartUnavailable": "Bu sunucu buradan yeniden başlatılamıyor. Destek ekibine ulaşın.",
   "error.billing.planRequired": "Bu sunucunun planı sona erdi. Sunucuyu başlatmak için planı yenileyin.",
   "error.billing.planSoldOut": "Bu plan tükendi. Başka bir plan seçin.",
+  "error.billing.storageUnavailable": "Bu depolama alanı bu sunucu için kullanılamaz.",
+  "error.billing.storagePaymentFailed":
+    "Depolama alanının ödemesi başarısız oldu. Ödeme yöntemini güncelleyip tekrar deneyin.",
   // Masaüstü ve web istemcilerinin oluşturduğu faturalandırma hataları.
   "error.billing.licenseExists": "Bu hesabın zaten bir lisansı var. Bunun yerine kullanıcı sayısını değiştirin.",
   "error.billing.licenseCurrency": "Lisans, diğer planlarınızın para birimini kullanmalıdır.",

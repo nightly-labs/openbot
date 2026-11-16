@@ -22,6 +22,8 @@ export const messages = {
   "error.remote.testActive": "Ein Remote-Desktop-Test ist aktiv. Versuche es nach seinem Abschluss erneut.",
   "error.remote.screenRecordingDenied":
     "Der Host hat OpenBot keine Bildschirmaufnahme erlaubt. Erlaube die Bildschirmaufnahme auf dem Host und versuche es erneut.",
+  "error.remote.windowsSessionDisconnected":
+    "Die Windows-Sitzung auf dem Host ist getrennt und hat keinen Bildschirm zum Teilen. Melde dich am Bildschirm des Hosts bei Windows an und versuche es erneut.",
   "error.remote.teamSessionExpired": "Die Teamsitzung ist abgelaufen.",
   "error.remote.finishTestBeforeSwitch": "Beende den Remote-Desktop-Test, bevor du den Bildschirm wechselst.",
   "error.remote.displayNotFound": "Remote-Bildschirm nicht gefunden.",

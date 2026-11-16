@@ -23,6 +23,11 @@ const config: KnipConfig = {
   ignoreBinaries: [
     // Opens the interactive provider sign-in CLI on Linux.
     "xterm",
+    // Read and forget the SSH host keys of a reinstalled pool machine, and read the operator keys of the
+    // SSH agent, in `leaseweb-pool.ts`.
+    "ssh-keygen",
+    "ssh-keyscan",
+    "ssh-add",
     // Builds the remote desktop runtime.
     "cmake",
     // Rewrite and inspect macOS dylib load paths.

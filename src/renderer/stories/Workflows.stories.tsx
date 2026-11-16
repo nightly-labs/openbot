@@ -211,14 +211,59 @@ export const ImageStory: Story = {
   ),
 };
 
+/** A cut-out PNG: a figure on clear pixels, with a soft shadow that is half clear. */
+function cutOutPicture(): string {
+  const canvas = document.createElement("canvas");
+  canvas.width = 480;
+  canvas.height = 600;
+  const context = canvas.getContext("2d");
+  if (!context) return "";
+  context.fillStyle = "rgba(0, 0, 0, 0.35)";
+  context.beginPath();
+  context.ellipse(240, 560, 150, 26, 0, 0, Math.PI * 2);
+  context.fill();
+  const body = context.createLinearGradient(0, 80, 0, 540);
+  body.addColorStop(0, "#f0b35a");
+  body.addColorStop(1, "#d95926");
+  context.fillStyle = body;
+  context.beginPath();
+  context.roundRect(90, 80, 300, 460, 150);
+  context.fill();
+  context.fillStyle = "#ffffff";
+  for (const x of [190, 290]) {
+    context.beginPath();
+    context.ellipse(x, 250, 34, 46, 0, 0, Math.PI * 2);
+    context.fill();
+  }
+  context.fillStyle = "#1b1b1f";
+  for (const x of [198, 298]) {
+    context.beginPath();
+    context.arc(x, 262, 18, 0, Math.PI * 2);
+    context.fill();
+  }
+  return canvas.toDataURL("image/png");
+}
+
 export const Asset: Story = {
-  render: () => (
-    <NodeGallery selected="image">
-      <AssetNode id="empty" />
-      <AssetNode id="image" file="moodboard-01.jpg" />
-      <AssetNode id="file" file="pricing-sources.pdf" />
-    </NodeGallery>
-  ),
+  render: () => {
+    const base = STORY_IMAGES[0];
+    const cutOut = base && {
+      ...base,
+      id: "cut-out",
+      name: "cut-out.png",
+      mimeType: "image/png",
+      previewUrl: cutOutPicture(),
+    };
+    const catalogs = cutOut ? { ...STORY_CATALOGS, files: [...STORY_CATALOGS.files, cutOut] } : STORY_CATALOGS;
+    return (
+      <NodeGallery selected="image" catalogs={catalogs}>
+        <AssetNode id="empty" />
+        <AssetNode id="image" file="moodboard-01.jpg" />
+        <AssetNode id="file" file="pricing-sources.pdf" />
+        <AssetNode id="clear" file="cut-out.png" />
+      </NodeGallery>
+    );
+  },
 };
 
 export const Trigger: Story = {

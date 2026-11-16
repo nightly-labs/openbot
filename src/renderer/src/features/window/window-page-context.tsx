@@ -16,18 +16,31 @@ export type WindowPage =
   | "library"
   | "marketplace"
   | "settings"
-  | "server-settings";
+  | "server-settings"
+  | "pricing";
 
 /**
  * How a page sits in the window. The tasks page shows in the middle pane, as the agents do, with the
  * agent list beside it. A settings page starts below the top row. The title of a schedule, workflows
- * or usage page goes in the top row after the buttons of the frame.
+ * or usage page goes in the top row after the buttons of the frame, as does the title of the pricing page.
  */
 export type WindowPageKind = "agents" | "settings" | "titled";
 
 export function windowPageKind(page: WindowPage): WindowPageKind {
   if (page === "settings" || page === "server-settings") return "settings";
   return page === "agents" || page === "tasks" ? "agents" : "titled";
+}
+
+/**
+ * The pricing page of the add-server flow, as a page of the window. The flow owns the page and its state; the
+ * window gives it the place in the card and tells it to leave when the user opens another page.
+ */
+export interface PricingPagePlacement {
+  /** The element in the card that the page shows in, or nothing until the card is on screen. */
+  mount: () => HTMLElement | undefined;
+  /** Shows the page. The window calls `leave` when the user opens another page. */
+  open: (leave: () => void) => void;
+  close: () => void;
 }
 
 /** The settings pages: the settings of the user, or the settings of one server. */
@@ -57,16 +70,44 @@ const context = createSimpleContext({
     /** Each Enter in the server settings search adds one. The server settings then open the first match. */
     const [openFirstServerSectionRequest, setOpenFirstServerSectionRequest] = createSignal(0);
 
-    const page = createMemo<WindowPage>(() => {
+    /** Set while the pricing page shows: it closes the add-server flow. */
+    const [pricingLeave, setPricingLeave] = createSignal<(() => void) | null>(null);
+    const [pricingMount, setPricingMount] = createSignal<HTMLElement | undefined>();
+    /** Closes the pricing page when another page opens. It covers the page below it, so that page stays as it was. */
+    function leavePricing() {
+      const leave = untrack(pricingLeave);
+      if (!leave) return;
+      setPricingLeave(null);
+      setPricingMount(undefined);
+      leave();
+    }
+    const pricing: PricingPagePlacement = {
+      mount: pricingMount,
+      open: (leave) => setPricingLeave(() => leave),
+      close: () => {
+        setPricingLeave(null);
+        setPricingMount(undefined);
+      },
+    };
+
+    /** The page below the pricing page. */
+    const basePage = createMemo<WindowPage>(() => {
       if (serverSettings.serverSettingsOpen()) return "server-settings";
       if (settings.appSettingsOpen()) return "settings";
       if (settings.skillsMarketplaceOpen()) return "marketplace";
       return usage.state.serverId ? usage.state.view : "agents";
     });
+    const page = createMemo<WindowPage>(() => (pricingLeave() ? "pricing" : basePage()));
+
+    // Any other page that opens closes the pricing page.
+    createEffect(basePage, (_next, previous) => {
+      if (previous !== undefined) leavePricing();
+    });
 
     // Opening the user settings closes the server settings, the Marketplace and the host pane.
     createEffect(settings.appSettingsOpenRequest, (request, previous) => {
       if (previous === undefined || request === previous) return;
+      leavePricing();
       usage.dismissUsage();
       if (untrack(settings.skillsMarketplaceOpen)) settings.setSkillsMarketplaceOpen(false);
       if (untrack(serverSettings.serverSettingsOpen)) serverSettings.setServerSettingsOpen(false);
@@ -75,6 +116,7 @@ const context = createSimpleContext({
     // Opening the server settings closes the user settings, the Marketplace and the host pane.
     createEffect(serverSettings.serverSettingsOpenRequest, (request, previous) => {
       if (previous === undefined || request === previous) return;
+      leavePricing();
       usage.dismissUsage();
       if (untrack(settings.skillsMarketplaceOpen)) settings.setSkillsMarketplaceOpen(false);
       if (untrack(settings.appSettingsOpen)) settings.setAppSettingsOpen(false);
@@ -139,34 +181,45 @@ const context = createSimpleContext({
       openFirstServerSectionRequest,
       openFirstServerSection: () => setOpenFirstServerSectionRequest((request) => request + 1),
       pageBack,
+      pricing,
+      setPricingMount: (element: HTMLElement | undefined) => setPricingMount(element),
+      leavePricing,
       /** Shows the agents and closes the other pages. */
       showAgents() {
+        leavePricing();
         settings.setAppSettingsOpen(false);
         serverSettings.setServerSettingsOpen(false);
         settings.setSkillsMarketplaceOpen(false);
         usage.dismissUsage();
       },
       openTasks(source: HTMLElement | null) {
+        leavePricing();
         const serverId = activeServerId();
         if (serverId) usage.openTasks(serverId, source);
       },
       openSchedule(source: HTMLElement | null) {
+        leavePricing();
         const serverId = activeServerId();
         if (serverId) usage.openSchedule(serverId, source);
       },
-      openWorkflows(source: HTMLElement | null) {
-        const serverId = activeServerId();
-        if (serverId) usage.openWorkflows(serverId, source);
+      /** Opens the workflows page of the active server, or on `workflow` when it is given. */
+      openWorkflows(source: HTMLElement | null, workflow?: { serverId: string; workflowId: string }) {
+        leavePricing();
+        const serverId = workflow?.serverId ?? activeServerId();
+        if (serverId) usage.openWorkflows(serverId, source, workflow?.workflowId);
       },
       openUsage(source: HTMLElement | null) {
+        leavePricing();
         const serverId = activeServerId();
         if (serverId) usage.openUsage(serverId, source);
       },
       openLibrary(source: HTMLElement | null) {
+        leavePricing();
         const serverId = activeServerId();
         if (serverId) usage.openLibrary(serverId, source);
       },
       openSettings(source: HTMLElement | null) {
+        leavePricing();
         settings.openAppSettings(source);
       },
     };

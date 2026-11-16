@@ -93,6 +93,10 @@ export function parseWorkflowId(value: unknown): string {
   return requireString(value, "workflowId", INPUT_LIMITS.identifier);
 }
 
+export function parseWorkflowDraftId(value: unknown): string {
+  return requireString(value, "draftId", INPUT_LIMITS.identifier);
+}
+
 export function parseWorkflowStepId(value: unknown): string {
   return requireString(value, "stepId", INPUT_LIMITS.identifier);
 }

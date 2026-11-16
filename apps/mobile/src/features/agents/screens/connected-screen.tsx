@@ -1,4 +1,5 @@
 import type { ChannelSummary, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
+import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { GlassView } from "expo-glass-effect";
 import { type Href, router, Stack } from "expo-router";
 import { Button, Typography } from "heroui-native";
@@ -32,7 +33,7 @@ import {
 } from "@/features/agents/components/agent-list-reveal";
 import { AgentListRow } from "@/features/agents/components/agent-list-row";
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
-import { AgentWaitingGroupHeader } from "@/features/agents/components/agent-wait-badge";
+import { AgentUnreadGroupHeader, AgentWaitingGroupHeader } from "@/features/agents/components/agent-wait-badge";
 import {
   ChatDragProvider,
   type ChatDragScreen,
@@ -65,6 +66,7 @@ import { setHomeSearchUnavailable } from "@/features/search/model/home-search-re
 import { useAppDrawer } from "@/features/servers/components/app-drawer-shell";
 import { PlanLimitsHeaderButton } from "@/features/servers/components/plan-limits-header-button";
 import { usePlanLimits } from "@/features/servers/model/plan-limits";
+import { saveChatOrderPreference, useChatOrderPreference } from "@/features/settings/model/chat-order";
 import { ConnectionHeaderStatus } from "@/features/workspace/components/connection-header-status";
 import { useWaitingAgentIds } from "@/features/workspace/components/use-agent-activity";
 import { useHomeThreadState } from "@/features/workspace/components/use-home-thread-state";
@@ -79,8 +81,11 @@ import { canAddChatPin } from "@/features/workspace/model/agent-pins";
 import type { DropChange } from "@/features/workspace/model/chat-drag";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import {
+  MOBILE_CHAT_ORDERS,
+  type MobileChatOrder,
   type MobileSidebarItem,
   mobileSidebarItems,
+  mobileUnreadItems,
   mobileWaitingItems,
 } from "@/features/workspace/model/sidebar-layout";
 import { SplitPaneLayers, useSplitLayout } from "@/shared/components/adaptive-split";
@@ -260,6 +265,22 @@ function applyChatDrop(workspace: MobileWorkspaceActions, serverId: string, chan
   });
 }
 
+/** The name of each chat order in the chat options menu. */
+const CHAT_ORDER_LABEL = {
+  manual: "mobile.agent.home.sort.manual",
+  "unread-group": "mobile.agent.home.sort.unreadGroup",
+  "unread-first": "mobile.agent.home.sort.unreadFirst",
+} as const satisfies Record<MobileChatOrder, MobileTextKey>;
+
+/** Saves the order on this phone. A failed write keeps the order until the app restarts. */
+function changeChatOrder(order: MobileChatOrder): void {
+  if (order === useChatOrderPreference.getState().order) return;
+  void haptics.selection();
+  void saveChatOrderPreference(order).catch(() => undefined);
+}
+
+const NO_CHAT_IDS: ReadonlySet<string> = new Set();
+
 function listItemKey(item: MobileSidebarItem) {
   return `${item.kind}:${item.id}`;
 }
@@ -387,7 +408,9 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     (serverDirectoryState === "loading" && servers.length === 0) ||
     (hasSelectedServer && activeServer.initialConnectionPending && channelAgents.size === 0);
   // The list comes in as the loader starts to roll up, so the two overlap instead of waiting in turn.
-  const listReady = !showLoader && !isLoaderPresent;
+  // The list also waits for the saved chat order, so that it does not show in one order and then move.
+  const chatOrderReady = useChatOrderPreference((state) => state.ready);
+  const listReady = !showLoader && !isLoaderPresent && chatOrderReady;
   // A new account gets the first-run flow in place of the empty home. The flow shows its own
   // connection state, so the loader does not cover it.
   const onboarding = useHomeOnboarding();
@@ -462,22 +485,61 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   const sidebar = sidebarByServer[activeServer.id];
   // A waiting agent leaves its section for "Needs you". A pinned agent stays in its tile, which shows the same badge.
   const waitingAgentIds = useWaitingAgentIds();
-  const items = useMemo(
-    () => [
+  // This phone's own choice. "Unread in a group" takes the unread chats out of their sections, under
+  // "Needs you"; "Unread first in folders" puts them first in each section. Neither changes the layout.
+  const chatOrder = useChatOrderPreference((state) => state.order);
+  // The manual order does not read the unread state, so a read does not build the list again.
+  const unreadChatIds = useMemo(
+    () =>
+      chatOrder === "manual"
+        ? NO_CHAT_IDS
+        : new Set<string>([
+            ...unreadAgentIds,
+            ...openChannels.filter((channel) => channel.unreadCount > 0).map((channel) => channel.id),
+          ]),
+    [chatOrder, unreadAgentIds, openChannels],
+  );
+  const [dragging, setDragging] = useState(false);
+  // As on the desktop, an unread order holds still during a drag: a reply then does not move the rows
+  // under the finger. The list takes the new order when the drag ends.
+  const heldItems = useRef<MobileSidebarItem[] | null>(null);
+  const items = useMemo(() => {
+    if (dragging && chatOrder !== "manual" && heldItems.current) return heldItems.current;
+    const layout = sidebar?.layout ?? null;
+    const listedAgents = unpinnedAgents.filter((agent) => !waitingAgentIds.has(agent.id));
+    const listedChannels = openChannels.filter((channel) => !pinnedChannelIds.includes(channel.id));
+    const unread = unreadChatIds;
+    const grouped = chatOrder === "unread-group";
+    const next = [
       ...mobileWaitingItems(
-        sidebar?.layout ?? null,
+        layout,
         unpinnedAgents.filter((agent) => waitingAgentIds.has(agent.id)),
       ),
-      ...mobileSidebarItems(
-        sidebar?.layout ?? null,
-        unpinnedAgents.filter((agent) => !waitingAgentIds.has(agent.id)),
-        openChannels.filter((channel) => !pinnedChannelIds.includes(channel.id)),
-        undefined,
-        t,
-      ),
-    ],
-    [sidebar?.layout, unpinnedAgents, waitingAgentIds, openChannels, pinnedChannelIds, t],
-  );
+      ...(grouped
+        ? mobileUnreadItems(
+            layout,
+            listedAgents.filter((agent) => unread.has(agent.id)),
+            listedChannels.filter((channel) => unread.has(channel.id)),
+          )
+        : []),
+      ...mobileSidebarItems(layout, listedAgents, listedChannels, undefined, t, {
+        unreadFirst: chatOrder === "unread-first" ? unread : null,
+        aside: grouped ? unread : null,
+      }),
+    ];
+    heldItems.current = next;
+    return next;
+  }, [
+    sidebar?.layout,
+    unpinnedAgents,
+    waitingAgentIds,
+    openChannels,
+    pinnedChannelIds,
+    chatOrder,
+    unreadChatIds,
+    dragging,
+    t,
+  ]);
   const visibleSectionIds = useMemo(
     () => items.filter((item) => item.kind === "section").map((item) => item.id),
     [items],
@@ -544,7 +606,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     const ids = new Set<string>();
     let sectionCollapsed = false;
     for (const item of items) {
-      if (item.kind === "waiting") sectionCollapsed = false;
+      if (item.kind === "waiting" || item.kind === "unread") sectionCollapsed = false;
       else if (item.kind === "section") {
         const hidden = item.ancestorIds.some((ancestorId) => collapsedSectionIds.has(ancestorId));
         if (hidden) ids.add(item.id);
@@ -567,7 +629,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     const counts = new Map<string, number>();
     let folderIds: readonly string[] = [];
     for (const item of items) {
-      if (item.kind === "waiting") folderIds = [];
+      if (item.kind === "waiting" || item.kind === "unread") folderIds = [];
       else if (item.kind === "section")
         folderIds = [...item.ancestorIds, item.id].filter((id) => collapsedSectionIds.has(id));
       else {
@@ -599,6 +661,10 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
       item.kind === "waiting" ? (
         <AgentListRowReveal index={index + rowOffset} reveal={listReveal}>
           <AgentWaitingGroupHeader count={item.count} />
+        </AgentListRowReveal>
+      ) : item.kind === "unread" ? (
+        <AgentListRowReveal index={index + rowOffset} reveal={listReveal}>
+          <AgentUnreadGroupHeader count={item.count} />
         </AgentListRowReveal>
       ) : item.kind === "section" ? (
         <CollapsingRow collapsed={collapsedRowIds.has(item.id)}>
@@ -649,7 +715,6 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
       visibleSectionIds,
     ],
   );
-  const [dragging, setDragging] = useState(false);
   const listRef = useRef<FlatList>(null);
   /** The scroll of the list while a drag scrolls it. The user cannot scroll during a drag. */
   const dragScroll = useRef({ offset: 0, content: 0, viewport: 0 });
@@ -664,7 +729,8 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
         ...pinnedChannels.map((channel) => ({ kind: "channel" as const, id: channel.id })),
       ],
       collapsedSectionIds,
-      sections: sidebarLayout !== null,
+      // The unread-first order is not manual, so a drag in the list does not reorder it. Pins still work.
+      sections: sidebarLayout !== null && chatOrder !== "unread-first",
       canPin: canAddChatPin(pinCount),
       scrollInsets: { top: headerHeight, bottom: insets.bottom + HOME_SEARCH_HEIGHT },
       beginScroll: () => {
@@ -683,7 +749,8 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
       onDraggingChange: setDragging,
       onDrop: (_dragged, _target, change) => applyChatDrop(workspace(), serverId, change),
       readPins: () => workspace().readChatPins(serverId),
-      layout: () => sidebarLayout,
+      // Without manual sections, a drop in the list only unpins: it does not move the chat in the layout.
+      layout: () => (chatOrder === "unread-first" ? null : sidebarLayout),
     }),
     [
       items,
@@ -691,6 +758,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
       pinnedChannels,
       collapsedSectionIds,
       sidebarLayout,
+      chatOrder,
       pinCount,
       headerHeight,
       insets.bottom,
@@ -706,6 +774,17 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     const chatActions: MenuAction[] = [
       ...(hasSelectedServer
         ? [
+            {
+              id: "sort",
+              title: t("mobile.agent.home.sort.title"),
+              subactions: MOBILE_CHAT_ORDERS.map(
+                (order): MenuAction => ({
+                  id: `sort:${order}`,
+                  title: t(CHAT_ORDER_LABEL[order]),
+                  state: order === chatOrder ? "on" : "off",
+                }),
+              ),
+            } satisfies MenuAction,
             {
               id: "mark-all-read",
               title: t("mobile.agent.home.markAllRead"),
@@ -729,7 +808,16 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
       },
       ...(chatActions.length > 0 ? [{ id: "chats", title: "", displayInline: true, subactions: chatActions }] : []),
     ];
-  }, [hasHiddenChats, hasDeletedChannels, hasSelectedServer, canMarkAllRead, channels.supported, sidebar?.layout, t]);
+  }, [
+    hasHiddenChats,
+    hasDeletedChannels,
+    hasSelectedServer,
+    canMarkAllRead,
+    channels.supported,
+    sidebar?.layout,
+    chatOrder,
+    t,
+  ]);
 
   const onPressOption = (event: string) => {
     if (event === "add-section") router.push({ pathname: "/section-form", params: { serverId: activeServer.id } });
@@ -738,6 +826,8 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     if (event === "hidden-chats") router.push("/hidden-chats");
     if (event === "deleted-chats") router.push({ pathname: "/deleted-chats", params: { serverId: activeServer.id } });
     if (event === "mark-all-read") markAllChatsRead();
+    const order = MOBILE_CHAT_ORDERS.find((candidate) => event === `sort:${candidate}`);
+    if (order) changeChatOrder(order);
   };
   // The bar buttons that the screen draws: the Android header of the screen, and the bar of the pane.
   // In the pane, the status takes the room that the buttons leave: the pane can be 320 pt wide.
@@ -1101,6 +1191,19 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
               </Stack.Toolbar.Menu>
               {hasSelectedServer || hasHiddenChats || hasDeletedChannels ? (
                 <Stack.Toolbar.Menu inline>
+                  {hasSelectedServer ? (
+                    <Stack.Toolbar.Menu icon="arrow.up.arrow.down" title={t("mobile.agent.home.sort.title")}>
+                      {MOBILE_CHAT_ORDERS.map((order) => (
+                        <Stack.Toolbar.MenuAction
+                          key={order}
+                          isOn={order === chatOrder}
+                          onPress={() => changeChatOrder(order)}
+                        >
+                          {t(CHAT_ORDER_LABEL[order])}
+                        </Stack.Toolbar.MenuAction>
+                      ))}
+                    </Stack.Toolbar.Menu>
+                  ) : null}
                   {hasSelectedServer ? (
                     <Stack.Toolbar.MenuAction
                       icon="envelope.open"

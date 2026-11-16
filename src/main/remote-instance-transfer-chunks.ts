@@ -17,8 +17,10 @@ import {
   INSTANCE_TRANSFER_CHUNK_BYTES,
   INSTANCE_TRANSFER_CHUNKS_ROUTES,
 } from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
+import { INSTANCE_TRANSFER_FULL_COPY_ROUTES } from "@openbot/contracts/team-protocol/instance-transfer-full-copy-v1";
 import { INSTANCE_TRANSFER_REMOTE_BYTES } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { decodeInstanceTransferExportState, fullCopyExportBody } from "@openbot/team-client/team-api-requests";
 import { Effect, Schedule } from "effect";
 import { type ArchiveOperationError, archiveCall, archiveFailure } from "./archive-effects";
 import { readFully, sha256Hex, writeFully } from "./instance-transfer-chunks";
@@ -47,8 +49,6 @@ interface ExportState {
   warnings: string[];
 }
 
-const SHA256 = /^[0-9a-f]{64}$/u;
-
 function isCount(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
@@ -75,31 +75,13 @@ function decodeUploadState(value: unknown): UploadState {
   return { uploadId: value.uploadId, chunkBytes: value.chunkBytes, received: value.received };
 }
 
+/** The team client's check of the answer, with the error of this module. */
 function decodeExportState(value: unknown): ExportState {
-  if (
-    !isDynamicRecord(value) ||
-    !isString(value.exportId) ||
-    !isCount(value.size) ||
-    value.size === 0 ||
-    value.size > INSTANCE_TRANSFER_LIMITS.archiveBytes ||
-    !isString(value.sha256) ||
-    !SHA256.test(value.sha256) ||
-    !isPartSize(value.chunkBytes) ||
-    !Array.isArray(value.chunks) ||
-    value.chunks.length !== Math.ceil(value.size / value.chunkBytes) ||
-    !value.chunks.every((chunk) => isString(chunk) && SHA256.test(chunk)) ||
-    !Array.isArray(value.warnings) ||
-    !value.warnings.every(isString)
-  )
+  try {
+    return decodeInstanceTransferExportState(value);
+  } catch {
     throw protocolError();
-  return {
-    exportId: value.exportId,
-    size: value.size,
-    sha256: value.sha256,
-    chunkBytes: value.chunkBytes,
-    chunks: value.chunks.filter(isString),
-    warnings: value.warnings.filter(isString),
-  };
+  }
 }
 
 /** A host that answers a request and refuses it gets the same request again only from the user. */
@@ -179,16 +161,30 @@ export const uploadTransferInParts = Effect.fn("RemoteInstanceTransfer.upload")(
   }).pipe(Effect.ensuring(archiveCall(() => handle.close()).pipe(Effect.ignore)));
 });
 
+/**
+ * The export start that a host takes: with `instance-transfer-full-copy-v1` each part is a field of
+ * its own; without it, the chunks codec keeps only the fields it knows, and the channel messages
+ * follow `includeHistory`.
+ */
+function transferExportBegin(input: ExportInstanceInput, fullCopy: boolean) {
+  return fullCopy
+    ? { route: INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin, body: fullCopyExportBody(input) }
+    : { route: INSTANCE_TRANSFER_CHUNKS_ROUTES.exportBegin, body: input };
+}
+
 /** Writes the host's transfer file to `destination`. The file appears only when it is complete. */
 export const downloadTransferInParts = Effect.fn("RemoteInstanceTransfer.download")(function* (
   remote: Remote,
   serverId: string,
   input: ExportInstanceInput,
   destination: string,
+  /** The host serves `instance-transfer-full-copy-v1`. */
+  fullCopy = false,
 ): Effect.fn.Return<{ warnings: string[] }, TransferError> {
-  const file = yield* remote.request(serverId, INSTANCE_TRANSFER_CHUNKS_ROUTES.exportBegin, decodeExportState, {
+  const begin = transferExportBegin(input, fullCopy);
+  const file = yield* remote.request(serverId, begin.route, decodeExportState, {
     method: "POST",
-    body: input,
+    body: begin.body,
     timeoutMs: AGENT_IMPORT_UPLOAD_TIMEOUT_MS,
   });
   const part = `${destination}.part`;

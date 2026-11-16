@@ -3,6 +3,8 @@
 
 import {
   API_KEY_NAME_PATTERN,
+  VAULT_AGENT_ID_LIMIT,
+  VAULT_AGENT_SCOPE_LIMIT,
   VAULT_API_KEY_LIMIT,
   VAULT_FILL_SITE_LIMIT,
   VAULT_NOTES_LIMIT,
@@ -10,6 +12,7 @@ import {
   VAULT_TEXT_LIMIT,
   type VaultContactFields,
   type VaultSaveInput,
+  type VaultSaveScope,
   type VaultSecretField,
   type VaultSecretRequest,
 } from "@openbot/contracts/ipc";
@@ -122,12 +125,30 @@ function vaultTwoStepKey(value: unknown): string | undefined {
 }
 
 /**
+ * The agents of an item: undefined keeps the saved choice, null is every agent, and a list names the
+ * agents by id, without repeats. An empty list is refused: an item that no agent can use is not kept.
+ */
+function scope(value: unknown): VaultSaveScope {
+  if (value === undefined) return {};
+  if (value === null) return { agents: null };
+  if (!Array.isArray(value) || value.length > VAULT_AGENT_SCOPE_LIMIT) throw new Error("agents is invalid.");
+  const agents = [...new Set(value.map((agent) => rawText(agent, "agents", VAULT_AGENT_ID_LIMIT)))];
+  if (agents.some((agent) => !agent)) throw new Error("agents is invalid.");
+  if (agents.length === 0) throw userError("error.vault.agentsRequired");
+  return { agents };
+}
+
+/**
  * The item to save. A login's website must be HTTPS; a card number must pass the Luhn check, and its
  * security code has 3 or 4 digits. An API key's name is an environment variable name. A null secret
  * keeps the saved value.
  */
 export function decodeVaultSaveInput(value: unknown): VaultSaveInput {
   if (!isObject(value)) throw new Error("Invalid Vault item.");
+  return { ...decodeItem(value), ...scope(value.agents) };
+}
+
+function decodeItem(value: DynamicRecord): VaultSaveInput {
   const itemId = id(value.id);
   switch (value.kind) {
     case "login": {
