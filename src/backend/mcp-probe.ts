@@ -218,6 +218,8 @@ interface McpChallenge {
    * in the `Authorization` header, not a sign-in. Laravel's MCP server with Sanctum answers so (#9176).
    */
   keyOnly?: boolean;
+  /** A 403 whose Bearer challenge is `insufficient_scope`: the token needs a scope that a new sign-in asks for. */
+  insufficientScope?: boolean;
   /** Where the request ended up after any redirect. */
   url: string;
 }
@@ -236,7 +238,7 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
     seen.challenge = next;
   };
   const failure = (error: unknown, signedIn = false): McpProbeOutcome => {
-    const accountRefused = refusesSignedInAccount(error, server, signedIn);
+    const accountRefused = refusesSignedInAccount(error, server, signIn, seen.challenge, signedIn);
     const described = describeProbeFailure(error, config, signIn, seen.challenge, signInPlace, accountRefused);
     return {
       toolCount: 0,
@@ -370,9 +372,19 @@ function describeProbeFailure(
  * the account itself, not a key. GitLab answers so to a saved sign-in (#9372), and Adobe Analytics
  * to an account with no access to an organization of its product (#9232). A key the user pasted
  * into a header is theirs to fix, as before.
+ *
+ * Two 403s are not the account's: one from the token endpoint, which refused the grant before any
+ * account was checked, and an `insufficient_scope` challenge, which a new sign-in with the scope
+ * answers. The SDK starts that sign-in itself when Sign in sends the saved token.
  */
-function refusesSignedInAccount(error: unknown, server: UsableMcpServer, signedIn: boolean): boolean {
-  if (httpStatus(error) !== 403) return false;
+function refusesSignedInAccount(
+  error: unknown,
+  server: UsableMcpServer,
+  signIn: McpSignIn | null,
+  challenge: McpChallenge | null,
+  signedIn: boolean,
+): boolean {
+  if (httpStatus(error) !== 403 || signIn?.exchangeFailed() || challenge?.insufficientScope) return false;
   return signedIn || (Boolean(server.authorization) && !hasCredentialHeader(server.config));
 }
 
@@ -618,11 +630,17 @@ function challengeRecordingFetch(onChallenge: (challenge: McpChallenge) => void)
     const response = await fetch(input, init);
     if (response.status === 401 || response.status === 403) {
       const challenge = response.headers.get("www-authenticate") ?? "";
+      const bearer = /(?:^|,)\s*bearer\b/iu.test(challenge);
+      // A step-up challenge (RFC 6750) asks for a token with more scope, which only a sign-in gives.
+      const insufficientScope =
+        response.status === 403 && bearer && /\berror\s*=\s*"?insufficient_scope\b/iu.test(challenge);
       onChallenge({
         status: response.status,
         // `Headers.get` joins several challenges with commas, so Bearer may follow another scheme.
-        // A 403 that names Bearer can refuse a key as well: only the server's metadata decides it.
-        bearer: response.status === 401 && /(?:^|,)\s*bearer\b/iu.test(challenge),
+        // A 403 that names Bearer can refuse a key as well: only the server's metadata decides it,
+        // except a step-up challenge.
+        bearer: (response.status === 401 && bearer) || insufficientScope,
+        insufficientScope,
         resourceMetadata: /\bresource_metadata\s*=/iu.test(challenge),
         url: response.url || input.toString(),
       });

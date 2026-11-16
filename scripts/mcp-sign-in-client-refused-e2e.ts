@@ -22,7 +22,9 @@
 // link after two pages got no grant back. A relay for a client without the link keeps the loopback names.
 // GitLab (#9372) answers 403 to the token of an account that may not use its MCP server, after the
 // sign-in and at each Test with the saved sign-in: the refusal must say that the server refused the
-// account, not "Check the API key", and must ask for neither a key nor a sign-in.
+// account, not "Check the API key", and must ask for neither a key nor a sign-in. A 403 step-up
+// challenge (`insufficient_scope`) asks for a sign-in instead, and a 403 from the token endpoint
+// says that the server did not accept the sign-in: neither one checked the account.
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
@@ -116,6 +118,8 @@ const REGISTRATION_FORBIDDEN = {
     "Dynamic client registration is not supported. Only pre-registered MCP trusted partners are allowed.",
 };
 type RegistrationForbidden = "dropbox" | "forbidden";
+/** How the MCP endpoint answers a valid token: GitLab's plain 403, or a 403 step-up challenge. */
+type AccountRefusal = "forbidden" | "insufficientScope";
 
 /** The loopback addresses that Dropbox registers, whatever the registration asked for. */
 const DROPBOX_REDIRECTS = ["http://localhost/callback", "http://127.0.0.1/callback", "http://127.0.0.1"];
@@ -139,8 +143,10 @@ async function fakeServer(
   registrationRefused: RegistrationRefusal | null,
   scopes: ScopeMetadata = {},
   registrationForbidden: RegistrationForbidden | null = null,
-  /** GitLab: the token is valid, and the account may not use the server. */
-  accountRefused = false,
+  /** How the MCP endpoint refuses a valid token, or `null` when it answers. */
+  accountRefused: AccountRefusal | null = null,
+  /** The token endpoint answers 403 with a body that is not an OAuth error. */
+  tokenForbidden = false,
 ): Promise<FakeServer> {
   const state: Omit<FakeServer, "url" | "close"> = {
     registrations: [],
@@ -215,6 +221,7 @@ async function fakeServer(
         // Railway: the secret it issued is refused. Make: the secret must come in the body.
         if (secretAccepted ? !secretInBody : withSecret)
           return json(response, 401, { error: "invalid_client", error_description: "client authentication failed" });
+        if (tokenForbidden) return json(response, 403, { message: "403 Forbidden" });
         if (form.get("code") !== "e2e-grant") return json(response, 400, { error: "invalid_grant" });
         return json(response, 200, { access_token: ACCESS_TOKEN, token_type: "Bearer", expires_in: 3600 });
       }
@@ -226,7 +233,16 @@ async function fakeServer(
           { error: "unauthorized" },
           { "www-authenticate": `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource/mcp"` },
         );
-      if (accountRefused) return json(response, 403, { message: "403 Forbidden" });
+      if (accountRefused === "forbidden") return json(response, 403, { message: "403 Forbidden" });
+      if (accountRefused === "insufficientScope")
+        return json(
+          response,
+          403,
+          { error: "insufficient_scope" },
+          {
+            "www-authenticate": `Bearer error="insufficient_scope", scope="mcp", resource_metadata="${base}/.well-known/oauth-protected-resource/mcp"`,
+          },
+        );
       const message = rpcRequest.parse(JSON.parse(await body(request)));
       if (message.id === undefined) {
         response.writeHead(202).end();
@@ -299,7 +315,9 @@ async function runCase(
     registrationForbidden = null,
     storedClient = null,
     relayDeepLink,
-    accountRefused = false,
+    accountRefused = null,
+    tokenForbidden = false,
+    storedTokens = false,
   }: {
     storedDiscovery?: boolean;
     secretAccepted?: boolean;
@@ -313,8 +331,11 @@ async function runCase(
      * for none). The firewall blocks each page but the last, and the member cancels it.
      */
     relayDeepLink?: string | null;
-    /** The server refuses the signed-in account with 403, and a silent Test follows the attempts. */
-    accountRefused?: boolean;
+    /** The server refuses a valid token with 403, and a silent Test follows the attempts. */
+    accountRefused?: AccountRefusal | null;
+    tokenForbidden?: boolean;
+    /** A sign-in already on file, with a valid token, as a sign-in in an earlier run leaves it. */
+    storedTokens?: boolean;
   } = {},
 ): Promise<Case> {
   const server = await fakeServer(
@@ -324,6 +345,7 @@ async function runCase(
     scopes,
     registrationForbidden,
     accountRefused,
+    tokenForbidden,
   );
   const records = new Map<string, McpOAuthRecord>();
   if (storedClient)
@@ -333,6 +355,16 @@ async function runCase(
         token_endpoint_auth_method: "none",
         redirect_uris: DROPBOX_REDIRECTS,
         issuer: new URL(server.url).origin,
+      },
+    });
+  if (storedTokens)
+    records.set(server.url, {
+      client: { client_id: "e2e-client", token_endpoint_auth_method: "none", redirect_uris: [] },
+      tokens: { access_token: ACCESS_TOKEN, token_type: "Bearer", expires_in: 3600 },
+      obtainedAt: Date.now(),
+      discovery: {
+        authorizationServerUrl: new URL(server.url).origin,
+        resourceMetadataUrl: `${new URL(server.url).origin}/.well-known/oauth-protected-resource/mcp`,
       },
     });
   if (storedDiscovery)
@@ -515,7 +547,7 @@ async function main(): Promise<void> {
 
     // GitLab refuses the signed-in account with 403, after the sign-in and at the Test that follows.
     const accountRefused = sourceText("error.backend.mcpSignInAccountRefused");
-    const gitlab = await runCase("account-refused-after-sign-in", ["none"], 1, { accountRefused: true });
+    const gitlab = await runCase("account-refused-after-sign-in", ["none"], 1, { accountRefused: "forbidden" });
     const [signInAttempt] = gitlab.attempts;
     check(gitlab, signInAttempt?.error === accountRefused, `the sign-in reported: ${signInAttempt?.error}`);
     check(gitlab, gitlab.signedIn, "no token is stored after the sign-in");
@@ -526,6 +558,31 @@ async function main(): Promise<void> {
     );
     check(gitlab, gitlab.silentTest?.needs === null, `the Test asked for: ${gitlab.silentTest?.needs}`);
     report.cases.push(gitlab);
+
+    // A step-up challenge on a saved sign-in: the token needs a scope, which Sign in asks for.
+    const stepUp = await runCase("account-scope-step-up", ["none"], 0, {
+      accountRefused: "insufficientScope",
+      storedTokens: true,
+    });
+    const signInRequired = sourceText("error.backend.mcpSignInRequired");
+    check(
+      stepUp,
+      stepUp.silentTest?.error === signInRequired,
+      `the Test with the saved sign-in reported: ${stepUp.silentTest?.error}`,
+    );
+    check(stepUp, stepUp.silentTest?.needs === "sign_in", `the Test asked for: ${stepUp.silentTest?.needs}`);
+    report.cases.push(stepUp);
+
+    // The token endpoint refuses the grant with 403: the sign-in failed before any account was checked.
+    const tokenRefused = await runCase("token-endpoint-forbidden", ["none"], 1, { tokenForbidden: true });
+    const notAccepted = sourceText("error.backend.mcpSignInNotAccepted");
+    check(
+      tokenRefused,
+      tokenRefused.attempts[0]?.error === notAccepted,
+      `the sign-in reported: ${tokenRefused.attempts[0]?.error}`,
+    );
+    check(tokenRefused, !tokenRefused.signedIn, "a token is stored after a refused grant");
+    report.cases.push(tokenRefused);
 
     // Dropbox refuses `/mcp-auth` with 403. OpenBot registers the `/callback` form once more and
     // sends it on the page and in the token request, although the registration names no port.
