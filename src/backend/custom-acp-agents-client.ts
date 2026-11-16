@@ -264,6 +264,13 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     return config !== undefined && customAgentFlavor(config.command).mcpToolsFixedAtStart === true;
   };
 
+  /** The rule of the custom agent that `model` names, from its command, as its process uses. */
+  readonly catalogAsMcpTools = (model: string): boolean => {
+    const agentId = customAgentIdOfModel(model);
+    const config = agentId ? this.#source().find((candidate) => candidate.id === agentId) : undefined;
+    return config !== undefined && customAgentFlavor(config.command).catalogAsMcpTools === true;
+  };
+
   readonly releaseThread = Effect.fn("CustomAcp.releaseThread")(function* (
     this: CustomAcpAgentsClient,
     externalThreadId: string,

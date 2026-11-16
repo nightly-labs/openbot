@@ -1503,6 +1503,7 @@ export class ThreadLifecycle {
           : client.provider === "opencode"
             ? openCodeMcpServers(mcpServers).map((config) => config.name)
             : [],
+      catalogAsMcpTools: client.catalogAsMcpTools?.(agent.model) === true,
       instructionsFileName: instructionsFile.fileName,
       instructionsFile: instructionsFile.file,
     };

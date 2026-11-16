@@ -3,6 +3,7 @@ import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { z } from "zod";
 import { BROWSER_DYNAMIC_TOOLS, BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
+import type { DynamicToolNamespace } from "../local-mcp-bridge";
 import { OPENBOT_DYNAMIC_TOOLS, OPENBOT_TOOL_DEFINITIONS } from "../openbot-tools";
 import { type DynamicToolCallParams, isRecord } from "../protocol";
 import { advertisedJsonSchema } from "./advertised-json-schema";
@@ -200,6 +201,69 @@ export function visibleToolDefinitions(provider: AgentProviderId) {
 export function visibleDynamicTools(provider: AgentProviderId) {
   if (provider === "kimi") return KIMI_DYNAMIC_TOOLS;
   return OWN_WEB_SEARCH_PROVIDERS.has(provider) ? OWN_WEB_SEARCH_DYNAMIC_TOOLS : ALL_DYNAMIC_TOOLS;
+}
+
+/**
+ * The guidance of every browser tool. The first browser result brings it (`browserToolsPrimer`), so
+ * the browser schemas do not each repeat its 2 KB.
+ */
+const BROWSER_CORE_GUIDANCE: ReadonlySet<string> = new Set(toolGuidance(OPENBOT_BROWSER_NAMESPACE, "snapshot"));
+
+/**
+ * The catalog tools as MCP tools. The guidance that tool_describe gives goes in the root description of
+ * the schema, which an agent's own tool_describe shows: in the tool description, it put channel_result
+ * fourth in a Hermes search for its own name, and list_agents out of the results for "list agents".
+ */
+function mcpCatalogTools(
+  catalog: typeof BUILTIN_TOOL_CATALOG,
+): Array<{ namespace: string; tool: DynamicToolNamespace["tools"][number] }> {
+  return catalog.map((entry) => {
+    const guidance = toolGuidance(entry.namespace, entry.tool)
+      .filter((section) => !BROWSER_CORE_GUIDANCE.has(section))
+      .join("\n");
+    return {
+      namespace: entry.namespace,
+      tool: {
+        type: "function" as const,
+        name: entry.tool,
+        description: entry.description,
+        // Each catalog schema is a `z.strictObject`, so its type is already "object".
+        inputSchema: { ...entry.inputSchema, type: "object", ...(guidance ? { description: guidance } : {}) },
+      },
+    };
+  });
+}
+
+const MCP_CATALOG_TOOLS = mcpCatalogTools(BUILTIN_TOOL_CATALOG);
+const OWN_WEB_SEARCH_MCP_CATALOG_TOOLS = mcpCatalogTools(OWN_WEB_SEARCH_CATALOG);
+
+/**
+ * OpenBot's search and describe, which an agent with its own search does not get. Their catalog put
+ * openbot.tool_search in most Hermes searches, and its result sends the model to openbot.tool_call.
+ */
+const OWN_SEARCH_TOOLS: ReadonlySet<string> = new Set(["tool_search", "tool_describe"]);
+
+/**
+ * `namespaces` with each catalog tool of `provider` in its namespace, for an agent that hides MCP tools
+ * behind its own search (`AcpFlavor` `catalogAsMcpTools`). Its search then finds each tool, and its
+ * tool_call runs it. OpenBot's tool_call stays, so `openbot.tool_call` in channel rules still works.
+ */
+export function withCatalogTools(
+  namespaces: readonly DynamicToolNamespace[],
+  provider: AgentProviderId,
+): DynamicToolNamespace[] {
+  const catalog = OWN_WEB_SEARCH_PROVIDERS.has(provider) ? OWN_WEB_SEARCH_MCP_CATALOG_TOOLS : MCP_CATALOG_TOOLS;
+  return namespaces.map((namespace) => {
+    const tools =
+      namespace.name === OPENBOT_DYNAMIC_TOOLS.name
+        ? namespace.tools.filter((tool) => !OWN_SEARCH_TOOLS.has(tool.name))
+        : namespace.tools;
+    const listed = new Set(tools.map((tool) => tool.name));
+    const added = catalog
+      .filter((entry) => entry.namespace === namespace.name && !listed.has(entry.tool.name))
+      .map((entry) => entry.tool);
+    return { ...namespace, tools: [...tools, ...added] };
+  });
 }
 
 /**
