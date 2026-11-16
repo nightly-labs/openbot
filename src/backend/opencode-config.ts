@@ -41,6 +41,7 @@ export function customProvidersOn(source: CustomProviderSource, harness: CustomP
  * prompt for more than OpenCode's 5 minutes before its first token, and more so while the computer
  * does other work (#3823, #7330). Two limits get this value: OpenCode's wait for the response
  * headers (`headerTimeout`, 300,000 ms by default in OpenCode 2.2.7) and OpenBot's own stall limit.
+ * OpenBot waits a little longer than OpenCode, so OpenCode's retry after its wait can start (#9941).
  */
 export const CUSTOM_ENDPOINT_SILENCE_MS = 30 * 60_000;
 

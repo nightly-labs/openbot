@@ -161,6 +161,12 @@ const ACP_PROMPT_AUDIO_BASE64_BYTES = 19 * 1024 * 1024;
 const ACP_TURN_STALL_MS = 5 * 60_000;
 
 /**
+ * How many times the stall limit OpenBot waits for an agent that waits as long for a model and then
+ * retries (`AcpFlavor.modelRetryUpdate`), so that the agent's retry notice comes first (#9941).
+ */
+const ACP_MODEL_RETRY_GRACE = 1.2;
+
+/**
  * How long an agent that keeps a silent prompt open for background tasks
  * (`AcpFlavor.promptOpenForBackgroundTasks`) may send nothing at all for a prompt. Its turn is not
  * ended as stalled, so a prompt that Antigravity lost showed as thinking until the user stopped it
@@ -299,6 +305,8 @@ interface AcpTurn {
   readonly steerReplies: Deferred.Deferred<Result.Result<PromptResponse, ProviderClientOperationError>>[];
   /** When the agent last sent an update for this turn, or the user last answered it. */
   lastActivityAt: number;
+  /** The model retry notices since the agent's last other update (`AcpFlavor.modelRetryUpdate`). */
+  modelRetries: number;
   /** The agent sent an update, a question or a tool call for the prompt that it has now. */
   answered: boolean;
   /** The chat shows a retry of a failed model request (`AcpFlavor.retryNotice`), and no output came after it. */
@@ -1447,6 +1455,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           });
         else yield* this.#steerByPrompt(thread, turn, blocks);
         turn.lastActivityAt = Date.now();
+        // A steer can start a new model request, and its first retry gets the whole limit again.
+        turn.modelRetries = 0;
         return yield* providerSync(() => decoder({ turnId: turn.id }));
       }
       case "turn/interrupt": {
@@ -2673,6 +2683,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       task: null,
       steerReplies: [],
       lastActivityAt: Date.now(),
+      modelRetries: 0,
       answered: false,
       waitingOnUser: 0,
       abandoned: false,
@@ -3253,8 +3264,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
     const thread = this.#threads.get(notification.sessionId);
     if (!thread) return;
-    if (thread.activeTurn) thread.activeTurn.lastActivityAt = Date.now();
     const update = notification.update;
+    const active = thread.activeTurn;
+    if (active && !this.#flavor.modelRetryUpdate?.(update)) {
+      active.lastActivityAt = Date.now();
+      active.modelRetries = 0;
+    } else if (active && ++active.modelRetries === 1) {
+      // Only the first retry gets the whole limit: a model that does not answer it fails the turn.
+      active.lastActivityAt = Date.now();
+    }
     if (update.sessionUpdate === "config_option_update") {
       thread.configOptions = update.configOptions;
       this.#publishSessionSettings(thread);
@@ -3634,11 +3652,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     turn: AcpTurn,
   ) {
     const agentLimit = this.options.turnStallMs ?? ACP_TURN_STALL_MS;
+    const grace = this.#flavor.modelRetryUpdate ? ACP_MODEL_RETRY_GRACE : 1;
     let answeredAt = 0;
     // A stopped turn ends by its stop, as interrupted, and not as a stall.
     while (thread.activeTurn === turn && !turn.completing && !turn.stopped) {
       // Read on each pass: the model of the thread can change while the turn runs.
-      const limit = this.options.customEndpoint?.(thread.currentModelId)?.stallMs ?? agentLimit;
+      const limit = (this.options.customEndpoint?.(thread.currentModelId)?.stallMs ?? agentLimit) * grace;
       if (this.#flavor.promptOpenForBackgroundTasks) {
         const silentFor = Date.now() - Math.max(turn.lastActivityAt, answeredAt);
         if (silentFor < limit) {
