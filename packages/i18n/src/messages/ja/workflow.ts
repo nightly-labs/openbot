@@ -24,6 +24,7 @@ export const messages = {
   "workflow.board.refusal.noOutput": "{type}の出力がありません",
   "workflow.board.live.connected": "{from} を {to} に接続しました。",
   "workflow.board.live.connectedLoop": "{from} を {to} に接続しました。ループになります。",
+  "workflow.board.live.connectedMany": { other: "{count} 個のノードを接続しました。" },
   "workflow.board.live.disconnected": "接続を削除しました。",
   "workflow.board.live.deleted": "{name} を削除しました。",
   "workflow.board.live.deletedMany": { other: "{count} 個のノードを削除しました。" },

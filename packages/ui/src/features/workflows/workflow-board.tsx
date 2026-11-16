@@ -682,6 +682,9 @@ export function createBoard(options: BoardOptions) {
     };
   };
 
+  /** While true, `connect` joins the undo step that is open, so one connection to many nodes is one undo. */
+  let joined = false;
+
   /**
    * Connects an output to an input. `slot` names the input, as the first frame of a video: its field
    * then holds the source, and a source that held it before loses its connection.
@@ -692,7 +695,7 @@ export function createBoard(options: BoardOptions) {
     const held = heldSlots(to, from, type);
     if (exists && (slot === undefined ? held.length === 0 : held.includes(slot))) return;
     const loop = reaches(to, from);
-    options.beforeChange?.();
+    if (!joined) options.beforeChange?.();
     const fromName = nameOf(ports.get(portKey(from, "out", type, branch))?.element);
     const toName = nameOf(ports.get(portKey(to, "in", type, slot))?.element);
     const edge: WfnEdge = { id: `${from}${branch ? `.${branch}` : ""}>${to}:${type}`, from, to, type };
@@ -722,9 +725,47 @@ export function createBoard(options: BoardOptions) {
     });
   };
 
+  /**
+   * The same port on the other selected nodes, when the port is on a node of a selection of two or
+   * more. A connection from it also goes from each of them, so that many pictures go into one input.
+   */
+  const companions = (start: PortRef): PortRef[] => {
+    if (state.selection.length < 2 || !state.selection.includes(start.node)) return [];
+    return state.selection.flatMap((node) =>
+      node !== start.node &&
+      !state.removed.includes(node) &&
+      ports.has(portKey(node, start.side, start.type, start.branch))
+        ? [{ node, side: start.side, type: start.type, branch: start.branch }]
+        : [],
+    );
+  };
+
+  /** The companions that can end on a port. A named input, as the first frame of a video, takes one source. */
+  const companionsTo = (start: PortRef, end: PortRef): PortRef[] =>
+    end.side === "in" && end.branch !== undefined
+      ? []
+      : companions(start).filter((port) => port.node !== end.node && refusal(port, end) === null);
+
   const link = (start: PortRef, end: PortRef) => {
+    const others = companionsTo(start, end);
     const [from, to] = orient(start, end);
-    connect(from.node, to.node, from.type, from.branch, to.branch);
+    if (others.length === 0) {
+      connect(from.node, to.node, from.type, from.branch, to.branch);
+      return;
+    }
+    options.beforeChange?.();
+    joined = true;
+    try {
+      for (const port of [start, ...others]) {
+        const [source, target] = orient(port, end);
+        connect(source.node, target.node, source.type, source.branch, target.branch);
+      }
+    } finally {
+      joined = false;
+    }
+    setState((draft) => {
+      draft.message = t("workflow.board.live.connectedMany", { count: others.length + 1 });
+    });
   };
 
   const cancelDraft = () => {
@@ -737,8 +778,15 @@ export function createBoard(options: BoardOptions) {
 
   /** Connects an open connection to a node that the canvas added at its drop point. */
   const attach = (start: PortRef, node: string) => {
-    if (start.side === "out") connect(start.node, node, start.type, start.branch);
-    else connect(node, start.node, start.type, undefined, start.branch);
+    const starts = start.side === "out" ? [start, ...companions(start)] : [start];
+    for (const port of starts) {
+      if (port.side === "out") connect(port.node, node, port.type, port.branch);
+      else connect(node, port.node, port.type, undefined, port.branch);
+    }
+    if (starts.length > 1)
+      setState((draft) => {
+        draft.message = t("workflow.board.live.connectedMany", { count: starts.length });
+      });
     cancelDraft();
   };
 
@@ -957,8 +1005,12 @@ export function createBoard(options: BoardOptions) {
         const slots = slotsOf(edge);
         return branch === undefined ? slots.length === 0 : slots.includes(branch);
       }),
-    armed: (node, side, type, branch) =>
-      state.pending !== null && samePort(state.pending, { node, side, type, branch }),
+    armed: (node, side, type, branch) => {
+      const pending = state.pending;
+      if (pending === null) return false;
+      const port = { node, side, type, branch };
+      return samePort(pending, port) || companions(pending).some((other) => samePort(other, port));
+    },
     accepts: (node, side, type, branch) => accepts({ node, side, type, branch }),
     refused: (node, side, type, branch) => {
       const target = state.target;
@@ -1264,6 +1316,20 @@ export function createBoard(options: BoardOptions) {
       const end = (port && point(port.node, port.side, port.type, port.branch)) ?? pointer;
       return pending.side === "out" ? diagramEdgePath(anchor, end) : diagramEdgePath(end, anchor);
     };
+    /** The lines from the other selected nodes, which connect with the dragged one. */
+    const companionPaths = () => {
+      const pending = state.pending;
+      const pointer = state.draft;
+      if (!pending || !pointer) return [];
+      const port = state.target?.reason === null ? state.target.port : null;
+      const end = (port && point(port.node, port.side, port.type, port.branch)) ?? pointer;
+      const others = port ? companionsTo(pending, port) : companions(pending);
+      return others.flatMap((other) => {
+        const anchor = point(other.node, other.side, other.type, other.branch);
+        if (!anchor) return [];
+        return [other.side === "out" ? diagramEdgePath(anchor, end) : diagramEdgePath(end, anchor)];
+      });
+    };
     const draftState = () => {
       const target = state.target;
       if (!target) return undefined;
@@ -1322,6 +1388,9 @@ export function createBoard(options: BoardOptions) {
           <Show when={draftPath()}>
             {(path) => <path class="wfn-edge-draft" data-state={draftState()} d={path()} />}
           </Show>
+          <For each={companionPaths()}>
+            {(path) => <path class="wfn-edge-draft" data-state={draftState()} d={path} />}
+          </For>
         </svg>
         <Show when={draftNote()}>
           {(note) => (

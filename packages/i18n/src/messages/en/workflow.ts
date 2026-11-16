@@ -23,6 +23,7 @@ export const messages = defineMessages("workflow", {
   "workflow.board.refusal.noOutput": "No {type} output",
   "workflow.board.live.connected": "Connected {from} to {to}.",
   "workflow.board.live.connectedLoop": "Connected {from} to {to}. This makes a loop.",
+  "workflow.board.live.connectedMany": { one: "Connected {count} node.", other: "Connected {count} nodes." },
   "workflow.board.live.disconnected": "Connection removed.",
   "workflow.board.live.deleted": "Deleted {name}.",
   "workflow.board.live.deletedMany": { one: "Deleted {count} node.", other: "Deleted {count} nodes." },

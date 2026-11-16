@@ -24,6 +24,12 @@ export const messages = {
   "workflow.board.refusal.noOutput": "Brak wyjścia: {type}",
   "workflow.board.live.connected": "Połączono: {from} → {to}.",
   "workflow.board.live.connectedLoop": "Połączono: {from} → {to}. Powstała pętla.",
+  "workflow.board.live.connectedMany": {
+    one: "Połączono {count} węzeł.",
+    few: "Połączono {count} węzły.",
+    many: "Połączono {count} węzłów.",
+    other: "Połączono {count} węzła.",
+  },
   "workflow.board.live.disconnected": "Usunięto połączenie.",
   "workflow.board.live.deleted": "Usunięto: {name}.",
   "workflow.board.live.deletedMany": {
