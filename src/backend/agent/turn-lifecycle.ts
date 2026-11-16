@@ -136,6 +136,11 @@ const QUIET_REPEAT_POLL_MS = 1_000;
 /** How long before a turn's start its usage records can be, as in host analytics. */
 const TURN_USAGE_MARGIN_MS = 60 * 60 * 1_000;
 /**
+ * How long before a turn that Claude started by itself a background subagent can have ended and still
+ * be the one whose report the turn reads. Claude starts that turn right after the subagent ends.
+ */
+const BACKGROUND_REPORT_WINDOW_MS = 60_000;
+/**
  * The provider errors that move an agent set to switch without asking to its next backup model. Each
  * one can pass on another provider, account or model; a request the model refuses fails on each.
  * A usage limit that the usage-limit gate does not hold comes here too, such as a spent Gemini quota (#4368).
@@ -416,6 +421,8 @@ export class TurnLifecycle {
       failureReports: Set<string>;
       /** The time of the last provider notification that names this turn. */
       lastEventAt: number;
+      /** The provider started this turn itself, such as Claude after a background subagent ended. */
+      unprompted: boolean;
     }
   >();
   /** The drain's start of each starting delivery, until its turn starts. */
@@ -962,6 +969,43 @@ export class TurnLifecycle {
     );
   }
 
+  /**
+   * The finished requests of this thread whose background subagents ended just before the turn
+   * `turnId` started, as one limit continuation that carries the subagents' reports. Null when there
+   * is none, such as for a turn that a scheduled wakeup started.
+   */
+  #backgroundWork(
+    agentId: string,
+    turnId: string,
+    snapshot: ConversationSnapshot,
+    startedAt: number,
+  ): { deliveries: DeliveryContext[]; continuation: UsageLimitContinuation } | null {
+    const turnIds: string[] = [];
+    const reports: string[] = [];
+    for (const message of snapshot.messages) {
+      const ended = (message.subagents ?? []).filter(
+        (subagent) =>
+          subagent.background === true &&
+          subagent.endedAt !== null &&
+          Date.parse(subagent.endedAt) >= startedAt - BACKGROUND_REPORT_WINDOW_MS,
+      );
+      if (ended.length === 0 || message.turnId === undefined || message.turnId === turnId) continue;
+      turnIds.push(message.turnId);
+      for (const subagent of ended) {
+        const report = subagent.steps.findLast((step) => step.id === `${subagent.id}:result`)?.text ?? subagent.error;
+        reports.push(`Background subagent "${subagent.title}" ${subagent.status}${report ? `: ${report}` : "."}`);
+      }
+    }
+    const deliveries = turnIds
+      .flatMap((id) => this.#mailbox.completedDeliveriesOfTurn(agentId, id))
+      .filter(({ channelId }) => channelId === undefined);
+    if (deliveries.length === 0) return null;
+    return {
+      deliveries,
+      continuation: { turnId, previousTurnIds: [...turnIds, turnId], workSteps: reports.join("\n\n").slice(-6000) },
+    };
+  }
+
   /** Passes over the model that a held provider error failed. A spent balance names no reset (#5220). */
   #markFailed(agentId: string, model: string | null, failover: HeldProviderError): void {
     const resetDelayMs = providerResetDelayMs(failover.message);
@@ -1041,6 +1085,7 @@ export class TurnLifecycle {
           openTools: new Set(),
           failureReports: new Set(),
           lastEventAt: Date.now(),
+          unprompted,
         });
         this.#traces.begin(turnId, new Date().toISOString());
         const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
@@ -1886,6 +1931,13 @@ export class TurnLifecycle {
       }
       const repeatable = limited && running !== undefined && (!running.acted || continuing) && deliveries.length > 0;
       const requeue = repeatable && (!channelTurn || continuing);
+      // Claude starts a turn by itself to read the report of a background subagent, so no delivery
+      // carries it. When a plan limit refuses that turn, the request that started the subagent goes back
+      // to the queue with the report, so a backup or the reset continues the work (#9493).
+      const resumed =
+        limited && running?.unprompted === true && deliveries.length === 0 && !channelTurn && !routineSession
+          ? this.#backgroundWork(agentId, turnId, snapshot, running.startedAt)
+          : null;
       // The limit belongs to the model the turn ran on, which the agent may have left since.
       const model = this.#hooks.turnModel(agentId, turnId);
       // The same for a provider error, when the agent moves to a backup model. The agent's own chat
@@ -1964,12 +2016,27 @@ export class TurnLifecycle {
       for (const message of snapshot.messages) {
         if (this.#itemTurns.get(message.id) !== turnId || message.status !== "streaming") continue;
         message.status = normalizeCompletionStatus(
-          repeatable || failedOver || runsAgainHere || compactionContinuation ? "interrupted" : status,
+          repeatable || resumed || failedOver || runsAgainHere || compactionContinuation ? "interrupted" : status,
         );
         markIncompleteMediaGeneration(message, message.status);
       }
       // Only this loop reads the map, so the finished turn's items go, or it holds every item ever seen.
       for (const [itemId, itemTurnId] of this.#itemTurns) if (itemTurnId === turnId) this.#itemTurns.delete(itemId);
+      if (resumed) {
+        yield* this.#requeueTurn(
+          agentId,
+          threadId,
+          turnId,
+          snapshot,
+          resumed.deliveries,
+          resumed.continuation,
+          undefined,
+          true,
+        );
+        yield* this.#usageLimits.reached(agentId, resetsAt, model);
+        this.#hooks.scheduleDrain(agentId);
+        return;
+      }
       if (requeue) {
         yield* this.#requeueTurn(
           agentId,
@@ -2416,6 +2483,8 @@ export class TurnLifecycle {
     deliveries: readonly DeliveryContext[],
     resumeAfterUsageLimit?: UsageLimitContinuation,
     failureReports?: ReadonlySet<string>,
+    /** The deliveries finished in an earlier turn, as the request of a background subagent did. */
+    finished = false,
   ) {
     // With no continuation, the next attempt runs with this turn ID and writes its text into this
     // attempt's empty rows, which keep this attempt's time. The answer then shows above the messages
@@ -2444,7 +2513,7 @@ export class TurnLifecycle {
               .slice(-6000),
           }
         : undefined;
-      yield* this.#mailbox.requeueRefused(delivery.id, continuation).pipe(toTurnOperationFailed);
+      yield* this.#mailbox.requeueRefused(delivery.id, continuation, finished).pipe(toTurnOperationFailed);
       this.#mailboxSync.syncDeliveryMessage(snapshot, delivery.id);
     }
     this.#conversation.emitConversation(snapshot, "turn.completed", { turnId, status: "interrupted" });
