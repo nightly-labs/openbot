@@ -153,7 +153,14 @@ import { HistoryTools, historyCursorThread, isHistoryBrowse, MAIN_CHAT_TASK_ID }
 import type { HostedSiteCoordinator } from "./hosted-site-coordinator";
 import { isHostedSiteMutationTool } from "./hosted-site-events";
 import { type ImageFitter, READ_IMAGE_MAX_FILE_BYTES, readImageToolSchema } from "./image-reader";
-import { type AgentLibraryFolders, listLibraryFolders, listLibraryFoldersToolSchema } from "./library-folder-tools";
+import {
+  type AgentLibraryFolders,
+  libraryFileAgents,
+  listLibraryFolders,
+  listLibraryFoldersToolSchema,
+  organizeLibrary,
+  organizeLibraryToolSchema,
+} from "./library-folder-tools";
 import type { MailboxSync } from "./mailbox-sync";
 import {
   type AgentMcpServers,
@@ -1010,6 +1017,7 @@ export class OpenBotToolRouter {
               tool === "attach_files_to_response" ||
               tool === "read_image" ||
               tool === "list_library_folders" ||
+              tool === "organize_library" ||
               tool === "send_message" ||
               tool === "messaging_post" ||
               tool === "web_search" ||
@@ -2053,10 +2061,21 @@ export class OpenBotToolRouter {
 
     if (params.tool === "list_library_folders") {
       const args = listLibraryFoldersToolSchema.parse(params.arguments ?? {}, { reportInput: true });
-      const store = this.#libraryFolders;
-      if (!store) return openBotToolFailure("Library folders are not available on this OpenBot.");
+      const libraryFolders = this.#libraryFolders;
+      if (!libraryFolders) return openBotToolFailure("Library folders are not available on this OpenBot.");
+      const storedFiles = this.#mailbox.listStoredFiles();
+      const fileAgents = yield* libraryFileAgents(libraryFolders, storedFiles);
       return openBotToolResult(
-        listLibraryFolders(store.getSnapshot(), this.#mailbox.listStoredFiles(), senderAgentId, args.folder),
+        listLibraryFolders(libraryFolders.getSnapshot(), storedFiles, fileAgents, senderAgentId, args.folder),
+      );
+    }
+
+    if (params.tool === "organize_library") {
+      const args = organizeLibraryToolSchema.parse(params.arguments ?? {}, { reportInput: true });
+      const libraryFolders = this.#libraryFolders;
+      if (!libraryFolders) return openBotToolFailure("Library folders are not available on this OpenBot.");
+      return openBotToolResult(
+        yield* organizeLibrary(libraryFolders, senderAgentId, args, this.#mailbox.listStoredFiles()),
       );
     }
 

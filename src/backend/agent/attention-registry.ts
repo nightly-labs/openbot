@@ -428,6 +428,8 @@ interface PendingBrowserTakeover {
   vaultSkipped?: string;
   /** The person selected Done after they used the page. A secret that OpenBot entered is not this. */
   personCompleted?: true;
+  /** A member selected Done on another device, not in the window of this computer. */
+  memberCompleted?: true;
   params: DynamicToolCallParams;
   request: BrowserTakeoverRequest;
   resolve: (result: DynamicToolResult) => void;
@@ -469,6 +471,8 @@ export interface AttentionBrowserHost {
   listTabs(): BrowserTab[];
   beginTakeover(tabId: string): Effect.Effect<void, BrowserOperationError>;
   endTakeover(tabId: string, completed?: boolean): void;
+  /** A member's device sent a sign-in to the tab while its takeover waited. */
+  takeoverSignInArrived?(tabId: string): boolean;
 }
 
 /** What the registry reads of the conversation runtime, so a test can give it a small one. */
@@ -1013,14 +1017,17 @@ export class AttentionRegistry {
   }
 
   readonly respondToBrowserTakeover = Effect.fn("AttentionRegistry.respondToBrowserTakeover")(
-    (input: RespondToBrowserTakeoverInput) =>
+    (input: RespondToBrowserTakeoverInput, fromMember = false) =>
       attentionStep(() => {
         const pending = this.#takeovers.get(input.requestId);
         if (!pending) throw new Error(sourceText("error.backend.takeoverInactive"));
         if (pending.submitting) throw new Error(sourceText("error.backend.authSubmitting"));
         pending.secret?.cancel();
         this.#routines.markRunningForTurn(pending.request.turnId);
-        if (input.decision === "complete") pending.personCompleted = true;
+        if (input.decision === "complete") {
+          pending.personCompleted = true;
+          if (fromMember) pending.memberCompleted = true;
+        }
         this.#resolveBrowserTakeover(input.requestId, pending, input.decision);
       }),
   ).bind(this);
@@ -2506,6 +2513,14 @@ export class AttentionRegistry {
     pending.secret?.cancel();
     this.#routines.markRunningForTurn(pending.request.turnId);
     this.#takeovers.delete(requestId);
+    // A phone or a web browser cannot send the sign-in of a site that refused the server, so Done
+    // there does not sign the tab in (#9783). Done in the window of this computer is a sign-in in the
+    // tab itself. Read it before `endTakeover` forgets it.
+    const signInMissing =
+      decision === "complete" &&
+      pending.memberCompleted === true &&
+      pending.request.reason === "sign-in-blocked" &&
+      this.#browser.takeoverSignInArrived?.(pending.request.tabId) === false;
     // `surfaceBrowserTakeover` refuses a second request for the same tab, so this is belt and braces --
     // but returning control while another request still waits on the tab would be the worse mistake.
     if (![...this.#takeovers.values()].some((candidate) => candidate.request.tabId === pending.request.tabId)) {
@@ -2517,7 +2532,7 @@ export class AttentionRegistry {
       agentId: pending.request.agentId,
     });
     this.#emitRuntimeSnapshot();
-    pending.resolve(browserTakeoverResult(decision, vault, pending.vaultSkipped));
+    pending.resolve(browserTakeoverResult(decision, vault, pending.vaultSkipped, signInMissing));
   }
 
   #persistQuestionPrompt(

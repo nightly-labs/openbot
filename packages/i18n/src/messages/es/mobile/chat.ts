@@ -368,6 +368,9 @@ export const messages = {
   "mobile.chat.browserSecret.oneTimeCode": "Código de un solo uso",
   "mobile.chat.browserSecret.takeoverTitle": "Control del navegador",
   "mobile.chat.browserSecret.takeoverBody": "Completa este paso en el navegador del equipo que ejecuta OpenBot.",
+  "mobile.chat.browserSecret.signInBlockedTitle": "Inicia sesión en tu ordenador",
+  "mobile.chat.browserSecret.signInBlockedBody":
+    "Este sitio no acepta un inicio de sesión desde el servidor. Abre este chat en la aplicación de escritorio de OpenBot en tu ordenador e inicia sesión allí.",
   "mobile.chat.browserSecret.takeoverReload": "Después, vuelve a cargar la página antes de elegir «He terminado».",
   "mobile.chat.browserSecret.takeoverFailed": "No se pudo completar la solicitud.",
   "mobile.chat.browserSecret.done": "He terminado",

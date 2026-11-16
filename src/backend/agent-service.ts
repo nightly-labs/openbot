@@ -430,7 +430,7 @@ export interface AgentServiceOptions {
   /** The CRM, for the `crm_*` tools; null until it starts. */
   crm?: (() => CrmHandle | null) | undefined;
   sidebarLayout?: AgentSidebar | null;
-  /** The Library folders of this host, for the `folder` of an attach call and `list_library_folders`. */
+  /** The Library folders of this host, for the `folder` of an attach call, `list_library_folders` and `organize_library`. */
   libraryFolders?: AgentLibraryFolders | null;
   /**
    * What a spawned CLI is given beyond its own binary: the stored keys, and the user's own model
@@ -7104,9 +7104,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
-  respondToBrowserTakeover(input: RespondToBrowserTakeoverInput): Effect.Effect<void, AgentLifecycleFailed> {
+  /** `fromMember`: the answer came from a member's device through the Team API. */
+  respondToBrowserTakeover(
+    input: RespondToBrowserTakeoverInput,
+    fromMember = false,
+  ): Effect.Effect<void, AgentLifecycleFailed> {
     return this.#attention
-      .respondToBrowserTakeover(input)
+      .respondToBrowserTakeover(input, fromMember)
       .pipe(
         Effect.mapError(
           (failure) => new AgentLifecycleFailed({ operation: "respondToBrowserTakeover", cause: failure.cause }),

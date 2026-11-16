@@ -218,7 +218,14 @@ const agents = new AgentService({
   mailbox,
   browser,
   sidebarLayout: sidebar,
-  libraryFolders: library,
+  // The agent view of the store. This test moves no files, so no file has a known agent.
+  libraryFolders: {
+    getSnapshot: () => library.getSnapshot(),
+    placeInPath: (agentId, names, fileIds, context) => library.placeInPath(agentId, names, fileIds, context),
+    mutate: (action, context) => library.mutate(action, context),
+    removeAgent: (agentId) => library.removeAgent(agentId),
+    fileAgents: () => Effect.succeed(new Map<string, string | null>()),
+  },
   preferredProvider: "codex",
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
   timezone: () => "UTC",

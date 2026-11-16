@@ -679,6 +679,8 @@ export class BrowserHost {
   /** True while `#syncAttachedView` shows `#attachedView`. On Linux the views in the background window are all shown. */
   #attachedViewShown = false;
   readonly #takeoverTabIds = new Set<string>();
+  /** The takeover tabs that got a sign-in from a member's own device, so the agent learns whether one came. */
+  readonly #takeoverSignInTabIds = new Set<string>();
   /** The tabs that a person controls, with who took each one, so a closed session releases its own. */
   readonly #userControlTabIds = new Map<string, BrowserUserControlHolder>();
   /**
@@ -1406,6 +1408,7 @@ export class BrowserHost {
           )
         : 0;
     if (count === 0 && stored === 0) return { cookies: 0, storage: 0 };
+    if (this.#takeoverTabIds.has(tabId)) this.#takeoverSignInTabIds.add(tabId);
     // The sign-in is set. A page that does not load again shows its own error in the tab.
     yield* this.reload(tabId).pipe(Effect.ignore);
     return { cookies: count, storage: stored };
@@ -1443,6 +1446,7 @@ export class BrowserHost {
       .filter((child) => child.openerTabId === tabId || (signInSession && child.privateSession === signInSession))
       .map((child) => this.close(child.id));
     this.#takeoverTabIds.delete(tabId);
+    this.#takeoverSignInTabIds.delete(tabId);
     this.#userControlTabIds.delete(tabId);
     this.#teachRecordings.delete(tabId);
     this.#completeUserControlWaiters(tabId);
@@ -1503,6 +1507,7 @@ export class BrowserHost {
     if (!tab) return yield* browserFailure(new Error(sourceText("error.backend.browserTabNotFound")));
     tab.engine.invalidateReferences();
     this.#takeoverTabIds.add(tabId);
+    this.#takeoverSignInTabIds.delete(tabId);
     stopCookieBanners(tab.contents);
     this.#syncAttachedView();
     tab.diagnostics.clearDiagnostics();
@@ -2098,6 +2103,11 @@ export class BrowserHost {
     return connected;
   }
 
+  /** A member's device sent a sign-in to the tab while its takeover waited. */
+  takeoverSignInArrived(tabId: string): boolean {
+    return this.#takeoverSignInTabIds.has(tabId);
+  }
+
   /** `completed`: the person selected Done, so a bot check that was on the page is one they could not pass. */
   endTakeover(tabId: string, completed = false): void {
     const tab = this.#tabs.get(tabId);
@@ -2107,6 +2117,7 @@ export class BrowserHost {
       if (completed && tab.checkOrigin) tab.checkAfterTakeover = tab.checkOrigin;
     }
     this.#takeoverTabIds.delete(tabId);
+    this.#takeoverSignInTabIds.delete(tabId);
     this.#syncAttachedView();
     this.#emitChanged();
     // A failed submission can leave the secret in a page that never loads a new document, such as a

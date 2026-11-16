@@ -26,7 +26,11 @@ import { DATA_TOOL_DEFINITIONS } from "./agent/data-tools";
 import { deleteAgentToolSchema } from "./agent/delete-agent-tool";
 import { HISTORY_TOOL_DEFINITIONS } from "./agent/history-tools";
 import { readImageToolShape } from "./agent/image-reader";
-import { libraryFolderArgument, listLibraryFoldersToolSchema } from "./agent/library-folder-tools";
+import {
+  libraryFolderArgument,
+  listLibraryFoldersToolSchema,
+  organizeLibraryToolSchema,
+} from "./agent/library-folder-tools";
 import { MCP_SERVER_TOOL_DEFINITIONS } from "./agent/mcp-tools";
 import { MEMORY_RECALL_TOOL_DEFINITIONS } from "./agent/memory-tool-inputs";
 import {
@@ -336,8 +340,14 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "list_library_folders",
     description:
-      "List your Library folders by path, with the id, name and stored path of each file in them, and the count of your files in no folder. Pass folder to list one folder and the folders in it. To put a file in a folder, pass folder to attach_files_to_response.",
+      "List your Library folders by path, with the id, name and stored path of each file in them, and your files in no folder. Pass folder to list one folder and the folders in it. Change folders and move files with organize_library.",
     shape: listLibraryFoldersToolSchema.shape,
+  },
+  {
+    name: "organize_library",
+    description:
+      'Organize your Library folders and their files, by the folder paths and file ids from list_library_folders, such as "Reports/2026". create makes folder and each missing level, and puts files in it. rename gives folder the new name. move puts folder and its subfolders into to, or at the top level with no to. delete removes folder and its subfolders; their files stay in the Library, in no folder. place puts files into to, and makes a missing folder; with no to, it takes files out of their folders. No action changes a file on disk. Delete or rename only a folder that the user asked you to change.',
+    shape: organizeLibraryToolSchema.shape,
   },
   {
     name: "html_preview",
