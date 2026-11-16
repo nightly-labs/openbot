@@ -1,5 +1,6 @@
 import { chatVisualReply } from "@openbot/contracts/chat-visual";
 import type { AgentApproval, ConversationMessageSender, MessageReaction } from "@openbot/contracts/ipc";
+import { FEEDBACK_WITHDRAW_CAPABILITY } from "@openbot/contracts/team-protocol/feedback-withdraw-v1";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
 import { feedbackApproval } from "@openbot/team-client/feedback-approval";
 import { Button } from "@openbot/ui";
@@ -48,7 +49,7 @@ import { planItems, planTitle } from "../../app-message-projection";
 import { useChatBubbleStyle } from "../../chat-bubble-style-preference";
 import { useCompactMessageActions } from "../../compact-message-actions-preference";
 import { currentDevicePlatform } from "../../send-shortcut-preference";
-import { remoteRoutineRecovery, serverCanAdminister } from "../servers/server-capabilities";
+import { remoteRoutineRecovery, serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import { speechModelReady } from "../speech/speech-model";
 import { recordingGone, speechReading, spokenReply } from "../speech/speech-playback";
 import {
@@ -386,13 +387,17 @@ export function ConversationTimeline() {
     return serverId === undefined ? undefined : agentInstructionsCalls(serverId, webInstructionsApi());
   });
   /**
-   * Remove on a thank-you card. The report went out with the account of this computer, so only the
-   * desktop's own agents have it; the agent of a joined server removes it with `withdraw_feedback`.
+   * Remove on a thank-you card. The host whose account sent the report removes it: this computer, or
+   * a joined server with `feedback-withdraw-v1`. On an older server, the card asks the agent in the
+   * composer, and the agent removes the report with `withdraw_feedback`.
    */
   const withdrawFeedback = createMemo(() => {
     const agentId = props.agent?.id;
     const server = props.server;
-    if (props.runtime || channel || !agentId || server?.kind !== "local") return undefined;
+    if (channel || !agentId) return undefined;
+    const remove = props.runtime?.withdrawFeedback;
+    if (remove) return (messageId: string) => remove({ agentId, messageId }).then(({ status }) => status);
+    if (props.runtime || !server || !serverSupportsCapability(server, FEEDBACK_WITHDRAW_CAPABILITY)) return undefined;
     return (messageId: string) =>
       conversationPort()
         .agent.withdrawFeedback({ agentId, messageId }, server.id)

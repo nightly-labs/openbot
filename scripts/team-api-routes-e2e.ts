@@ -239,6 +239,11 @@ import {
   CUSTOM_PROVIDER_HARNESS_CODECS,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
+import {
+  decodeFeedbackWithdrawResult,
+  FEEDBACK_WITHDRAW_CAPABILITY,
+  FEEDBACK_WITHDRAW_ROUTES,
+} from "@openbot/contracts/team-protocol/feedback-withdraw-v1";
 import { GITHUB_SKILLS_CAPABILITY, GITHUB_SKILLS_ROUTES } from "@openbot/contracts/team-protocol/github-skills-v1";
 import { HERMES_IMPORT_CAPABILITY, HERMES_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/hermes-import-v1";
 import {
@@ -1239,6 +1244,10 @@ const fakeAgents: TeamApiAgents = {
   saveSkillSuggestion: (input) => {
     record("saveSkillSuggestion", input);
     return Effect.succeed({ saved: input.messageId === "suggestion-1" });
+  },
+  withdrawFeedback: (input) => {
+    record("withdrawFeedback", input);
+    return Effect.succeed({ status: input.messageId === "feedback-card-1" ? "withdrawn" : "notYours" });
   },
   saveProfile: unused("saveProfile"),
   createAgent: unused("createAgent"),
@@ -13298,6 +13307,79 @@ try {
         without: withoutEvents.events.map((event) => event.type),
         folders: stored().folders.length,
       },
+    );
+  }
+
+  // ---- Remove on a feedback thank-you card (feedback-withdraw-v1) ----
+  {
+    const capabilities = [FEEDBACK_WITHDRAW_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises feedback-withdraw-v1 on protocol 9 only",
+      list(field(compatibility.body, "capabilities")).includes(FEEDBACK_WITHDRAW_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(FEEDBACK_WITHDRAW_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: bobToken,
+      json: { agentId: "agent-ada", messageId: "feedback-card-1" },
+    });
+    const malformed = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: bobToken,
+      json: { agentId: "agent-ada", messageId: "" },
+      capabilities,
+    });
+    // Protocol 6 does not know Pi, so the host hides `agent-pi`.
+    const hidden = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: bobToken,
+      protocol: 6,
+      json: { agentId: "agent-pi", messageId: "feedback-card-1" },
+      capabilities,
+    });
+    const missing = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: bobToken,
+      json: { agentId: "agent-gone", messageId: "feedback-card-1" },
+      capabilities,
+    });
+    accessLevels = { revision: 37, everyone: { "agent-ada": "view" }, roles: [] };
+    const viewer = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: bobToken,
+      json: { agentId: "agent-ada", messageId: "feedback-card-1" },
+      capabilities,
+    });
+    accessLevels = { revision: 38, everyone: {}, roles: [] };
+    check(
+      "a feedback removal without the capability, with a bad body, to a hidden or missing agent, or from a viewer reaches no agent",
+      errorIs(unsupported, 400, sourceText("error.backend.feedbackWithdrawRemoteUnsupported")) &&
+        malformed.status === 400 &&
+        errorIs(hidden, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        viewer.status === 403 &&
+        callsOf("withdrawFeedback").length === 0,
+      [summary(unsupported), summary(malformed), summary(hidden), summary(missing), summary(viewer)],
+    );
+    const removed = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: bobToken,
+      json: { agentId: "agent-ada", messageId: "feedback-card-1" },
+      capabilities,
+    });
+    const refused = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: bobToken,
+      json: { agentId: "agent-ada", messageId: "feedback-card-2" },
+      capabilities,
+    });
+    check(
+      "a member with chat level removes a report; the host gets the agent and card, and the client decodes each result",
+      removed.status === 200 &&
+        isDeepStrictEqual(decodeFeedbackWithdrawResult(removed.body), { status: "withdrawn" }) &&
+        refused.status === 200 &&
+        isDeepStrictEqual(decodeFeedbackWithdrawResult(refused.body), { status: "notYours" }) &&
+        isDeepStrictEqual(callsOf("withdrawFeedback"), [
+          [{ agentId: "agent-ada", messageId: "feedback-card-1" }],
+          [{ agentId: "agent-ada", messageId: "feedback-card-2" }],
+        ]),
+      [summary(removed), summary(refused)],
     );
   }
 

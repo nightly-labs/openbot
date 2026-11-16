@@ -120,6 +120,7 @@ type TeamApiAgentMethods = Pick<
   | "generateProfile"
   | "askSideQuestion"
   | "saveSkillSuggestion"
+  | "withdrawFeedback"
   | "saveProfile"
   | "createAgent"
   | "committedAgentDuplication"

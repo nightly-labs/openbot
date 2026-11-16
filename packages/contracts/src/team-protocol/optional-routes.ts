@@ -65,6 +65,7 @@ import { CUSTOM_PROVIDER_HARNESS_CHOICE_CODECS } from "./custom-provider-harness
 import { CUSTOM_PROVIDER_HARNESS_CODECS } from "./custom-provider-harness-v1";
 import { DISCORD_ACCESS_CODECS } from "./discord-access-v1";
 import { EVENTS_CODECS } from "./events-v1";
+import { FEEDBACK_WITHDRAW_CODECS } from "./feedback-withdraw-v1";
 import { FOCUS_USE_CODECS } from "./focus-use-v1";
 import { GITHUB_SKILLS_CODECS } from "./github-skills-v1";
 import { HERMES_IMPORT_CODECS } from "./hermes-import-v1";
@@ -177,6 +178,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...CUSTOM_PROVIDER_HARNESS_CODECS,
   ...CUSTOM_PROVIDER_EDIT_CODECS,
   ...CUSTOM_PROVIDER_HARNESS_CHOICE_CODECS,
+  ...FEEDBACK_WITHDRAW_CODECS,
   ...CUSTOM_AGENTS_CODECS,
   ...AGENT_SESSION_SETTINGS_CODECS,
   ...ACP_REGISTRY_CODECS,
