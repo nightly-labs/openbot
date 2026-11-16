@@ -129,7 +129,8 @@ function swallowNextClick(): void {
  * `data-library-new` (the parent folder id, or empty) makes a new folder for dropped files, and
  * `data-library-out` takes dropped files out of their folders. A list with `data-library-autoscroll`
  * scrolls while the drag is at its top or bottom edge, and a closed part with `data-library-spring`
- * (its collapse key) opens when the drag stays on it. A place of another agent tells why it does not
+ * (its collapse key) opens when the drag stays on it. After a drag opened a place, the part of the page
+ * with `data-library-here` takes the drop into that place. A place of another agent tells why it does not
  * take the drop. Touch scrolls, so only a mouse or a pen drags. Escape stops the drag.
  */
 export function createLibraryFolderDrag(options: LibraryFolderDragOptions) {
@@ -144,6 +145,8 @@ export function createLibraryFolderDrag(options: LibraryFolderDragOptions) {
   });
   let press: { item: LibraryDragItem; x: number; y: number } | null = null;
   let dragging: LibraryDragItem | null = null;
+  /** The place that this drag opened, when it stayed on a folder tile or a step of the path. */
+  let opened: { agentId: string; folderId: string | null } | null = null;
   let probed: DragProbe = NO_PROBE;
   let pressOnItem = false;
   let scrollFrame = 0;
@@ -173,11 +176,33 @@ export function createLibraryFolderDrag(options: LibraryFolderDragOptions) {
     }
     const row = under?.closest("[data-library-agent]");
     const agentId = row?.getAttribute("data-library-agent");
-    if (!row || !agentId)
+    if (!row || !agentId) {
+      // The page that the drag opened takes the drop, so the drag does not need a tile in it.
+      if (opened && under?.closest("[data-library-here]"))
+        return { target: openedTarget(item, opened), blocked: null, spring: null };
       return { target: null, blocked: null, spring: spring && options.isCollapsed(spring) ? spring : null };
+    }
     if (agentId !== item.agentId)
       return { target: null, blocked: item.agentId === null ? "mixed" : "agent", spring: null };
     return { target: dropTargetIn(item, row, agentId, y), blocked: null, spring: null };
+  }
+
+  /** The drop into the place that the drag opened. The drag only opens a place of the agent of the item. */
+  function openedTarget(
+    item: LibraryDragItem,
+    place: { agentId: string; folderId: string | null },
+  ): LibraryDropTarget | null {
+    const into: LibraryDropTarget = { kind: "into", agentId: place.agentId, folderId: place.folderId, goes: false };
+    if (item.kind === "files") {
+      const moves = item.ids.some((id) => options.folderIdOfFile(id) !== (place.folderId ?? undefined));
+      return moves ? into : null;
+    }
+    const moved = folderById(item.folderId);
+    if (!moved || (moved.parentId ?? null) === place.folderId) return null;
+    if (place.folderId === null) return into;
+    const folders = options.folders();
+    if (libraryFolderBranch(folders, moved.id).has(place.folderId)) return null;
+    return canHoldFolder(folders, place.folderId, moved.id) ? into : null;
   }
 
   function dropTargetIn(item: LibraryDragItem, row: Element, agentId: string, y: number): LibraryDropTarget | null {
@@ -287,6 +312,7 @@ export function createLibraryFolderDrag(options: LibraryFolderDragOptions) {
     const shown = dragging !== null;
     press = null;
     dragging = null;
+    opened = null;
     probed = NO_PROBE;
     if (!shown) return;
     setState((draft) => {
@@ -390,6 +416,7 @@ export function createLibraryFolderDrag(options: LibraryFolderDragOptions) {
           options.onOpen(wait.key);
           return;
         }
+        opened = { agentId: wait.agentId, folderId: wait.folderId };
         options.onGo(wait.agentId, wait.folderId);
         // The new place has other tiles under the pointer.
         requestAnimationFrame(retarget);

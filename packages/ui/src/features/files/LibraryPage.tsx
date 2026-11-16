@@ -1107,6 +1107,7 @@ export function LibraryPage(props: LibraryPageProps) {
       <div
         class="library-page"
         data-library-autoscroll
+        data-library-here
         ref={(element) => {
           marquee.attach(element);
           pictures.attach(element);

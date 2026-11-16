@@ -19,8 +19,8 @@
 - The "Agents" section of the Library shows the agents with the newest files first. "All agents"
   opens a list with search, so a team with many agents stays easy to use.
 - In the Library, you can drop files and folders on a folder tile and on a folder of the path at the
-  top. When you hold a drag on a folder for a short time, the folder opens. The list scrolls when you
-  drag near its top or bottom edge.
+  top. When you hold a drag on a folder for a short time, the folder opens, and you can drop the item
+  anywhere on it. The list scrolls when you drag near its top or bottom edge.
 - While you drag in the Library, the label at the pointer shows where the item goes, or why it cannot
   go there. Folders and agents that cannot take the item are dim, and the counts stay visible. The
   place that takes the drop flashes once. A closed section of the side panel opens when you hold a
