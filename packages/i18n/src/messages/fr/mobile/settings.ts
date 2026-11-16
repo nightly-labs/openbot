@@ -128,6 +128,9 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "Réduire l’activité des routines",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Les événements de routines consécutifs d’une discussion s’affichent sur une seule ligne réduite. Touchez la ligne pour les afficher.",
+  "mobile.settings.appearance.fullVisuals": "Afficher les aperçus visuels en entier",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "Un visuel d’un agent s’affiche dans le chat sur toute sa hauteur. Si cette option est désactivée, un visuel haut est coupé ; touchez-le pour le voir en entier.",
   "mobile.settings.animations.title": "Animations",
   "mobile.settings.animations.footer":
     "Désactivez « Animations » pour réduire les mouvements dans toute l’app. Quand « Réduire les animations » est activé dans les réglages du téléphone, l’app réduit aussi les mouvements. Les animations ci-dessous restent alors désactivées.",

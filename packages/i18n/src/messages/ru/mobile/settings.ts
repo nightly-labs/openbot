@@ -136,6 +136,9 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "Сворачивать активность регулярных задач",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Идущие подряд события регулярных задач в чате показываются одной свёрнутой строкой. Коснитесь строки, чтобы показать их.",
+  "mobile.settings.appearance.fullVisuals": "Показывать визуальные превью полностью",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "Визуальный ответ агента показывается в чате на всю высоту. Если выключено, высокий ответ обрезается; нажмите на него, чтобы увидеть всё.",
   "mobile.settings.animations.title": "Анимации",
   "mobile.settings.animations.footer":
     "Выключите «Анимации», чтобы убрать движение во всём приложении. Если в настройках телефона включено «Уменьшение движения», приложение тоже уменьшает движение, и анимации ниже остаются выключенными.",

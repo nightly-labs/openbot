@@ -131,6 +131,9 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "Contraer actividad de rutinas",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Los eventos de rutinas consecutivos de un chat se muestran como una fila contraída. Toca la fila para verlos.",
+  "mobile.settings.appearance.fullVisuals": "Mostrar vistas visuales completas",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "Un visual de un agente se muestra en el chat con toda su altura. Si está desactivado, un visual alto se recorta y puedes tocarlo para verlo entero.",
   "mobile.settings.animations.title": "Animaciones",
   "mobile.settings.animations.footer":
     "Desactiva «Animaciones» para reducir el movimiento en toda la aplicación. Cuando «Reducir movimiento» está activado en los ajustes de tu teléfono, la aplicación también reduce el movimiento. En ese caso, las animaciones de abajo se mantienen desactivadas.",
