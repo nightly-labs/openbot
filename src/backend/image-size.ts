@@ -10,19 +10,26 @@ export interface ImageSize {
 
 /**
  * The width and height of a PNG, JPEG or WebP file, read from its header without decoding it, or null.
- * Baileys reads them only with an image library that OpenBot does not ship, and WhatsApp crops an
- * image without them in the chat. The size is as stored: a JPEG rotation in its EXIF data is not applied.
+ * OpenBot ships no image library: WhatsApp needs the size to show an image without a crop, and the
+ * chat shows the size of a generated image. The size is as stored: a JPEG rotation in its EXIF data
+ * is not applied.
  */
 export async function imageSize(path: string): Promise<ImageSize | null> {
   const file = await open(path, "r");
   try {
     const buffer = Buffer.alloc(HEADER_BYTES);
     const { bytesRead } = await file.read(buffer, 0, HEADER_BYTES, 0);
-    const size = headerSize(buffer.subarray(0, bytesRead));
-    return size && size.width > 0 && size.height > 0 ? size : null;
+    return imageSizeOfBytes(buffer.subarray(0, bytesRead));
   } finally {
     await file.close();
   }
+}
+
+/** The width and height of PNG, JPEG or WebP data, or null. */
+export function imageSizeOfBytes(bytes: Uint8Array): ImageSize | null {
+  const data = Buffer.from(bytes.buffer, bytes.byteOffset, Math.min(bytes.byteLength, HEADER_BYTES));
+  const size = headerSize(data);
+  return size && size.width > 0 && size.height > 0 ? size : null;
 }
 
 function headerSize(data: Buffer): ImageSize | null {

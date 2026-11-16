@@ -271,6 +271,8 @@ export const messages = {
   "error.backend.mcpSignInAppRefused":
     "Der Anmeldeserver hat die Anmelde-App dieses Servers nicht akzeptiert. Prüfe die Client-ID und das Client-Secret der Anmelde-App und melde dich dann erneut an.",
   "error.backend.mcpCommandNotFound": "Befehl nicht gefunden: {command}",
+  "error.backend.mcpProviderLimit":
+    "Dieser Agent kann nur eine begrenzte Anzahl von MCP-Servern nutzen. Um diesen Server zu nutzen, schalte einen MCP-Server aus, den der Agent nicht braucht.",
   "error.backend.mcpRegistrationRefused":
     "Der Anmeldeserver akzeptiert OpenBot noch nicht als Anwendung. Dein Konto ist nicht die Ursache. Verwende eine andere Verbindungsmethode, etwa einen lokalen MCP-Server.",
   "error.backend.mcpSignInAbandonedGeneric": "Die Anmeldung wurde abgebrochen.",

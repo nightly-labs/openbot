@@ -424,9 +424,12 @@ function AppPage({
   const { t } = useText();
   const canManage = useMobileWorkspaceSelector((workspace) => workspace.canManageMcpServers(serverId));
   const canRelay = useMobileWorkspaceSelector((workspace) => workspace.canRelayMcpSignIn(serverId));
-  const block = useInstallBlock(serverId, canManage);
+  const macUnavailable = useMobileWorkspaceSelector((workspace) => workspace.macAppsUnavailable(serverId));
   const installed = useMarketplaceInstalled(serverId);
   const app = plugin.apps[0] ?? null;
+  // An app that drives Apple apps does not run on a host that is not a Mac, so it is not offered there.
+  const needsMac = macUnavailable && plugin.apps.some((entry) => entry.needsMac);
+  const block = useInstallBlock(serverId, canManage) ?? (needsMac ? t("mobile.marketplace.app.needsMac") : null);
   const method = app ? pluginConnectMethod(app, canRelay) : null;
   const connect = usePluginConnect(serverId, app, method);
   const connected = connect.state.phase === "done" || installed.installed(listing);
@@ -449,8 +452,9 @@ function AppPage({
     plugin.privacyPolicyUrl ? { label: t("mobile.marketplace.app.privacy"), url: plugin.privacyPolicyUrl } : null,
     plugin.termsUrl ? { label: t("mobile.marketplace.app.terms"), url: plugin.termsUrl } : null,
   ].filter((link) => link !== null);
-  const access =
-    method?.kind === "key"
+  const access = needsMac
+    ? t("mobile.marketplace.facts.accessMac")
+    : method?.kind === "key"
       ? t("mobile.marketplace.facts.accessKey")
       : method?.kind === "link" || method?.kind === "relayUnsupported"
         ? t("mobile.marketplace.facts.accessSignIn")

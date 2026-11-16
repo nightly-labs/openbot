@@ -128,6 +128,7 @@ export const messages = {
     "{host}의 OpenBot 버전이 오래되어 앱을 연결할 수 없습니다. {host}의 OpenBot을 업데이트하거나 소유자에게 업데이트를 요청하세요.",
   "marketplace.app.blocked.member":
     "{host}에서는 소유자나 관리자만 앱을 연결할 수 있습니다. 이들에게 {name} 연결을 요청하거나, 멤버도 앱을 연결할 수 있도록 {host}의 OpenBot 업데이트를 요청하세요.",
+  "marketplace.app.blocked.mac": "{name}은(는) OpenBot을 실행하는 Mac에서만 작동합니다.",
   "marketplace.app.connectAgain": "다시 연결",
   "marketplace.app.automation.askOnInstall": "설치할 때 macOS에 접근 요청",
   "marketplace.app.automation.title": "Apple 앱 접근",

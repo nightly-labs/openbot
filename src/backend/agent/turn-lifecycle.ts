@@ -908,7 +908,8 @@ export class TurnLifecycle {
    * Codex ends a turn with no answer as completed. A lead that got its teammates' results and ended
    * that way stopped the whole team, with no error (#7225). Such a turn fails as an ACP turn with no
    * answer does, and its end runs it again or shows the error. A turn that wants no answer, a turn
-   * that compacted, a plan and a turn that the user stopped can end empty.
+   * that compacted, a plan, a turn that the user stopped and the first turn of an agent that another
+   * agent made can end empty.
    *
    * Codex can also write its last words as narration and then send an empty answer. Codex itself
    * takes that narration as the turn's result, so the narration after the last tool step becomes the
@@ -957,6 +958,9 @@ export class TurnLifecycle {
       return false;
     }
     if (running.acted) return false;
+    // The first message that another agent gave a new agent can ask it to wait. The agent that made
+    // it already has the new agent's id, so nobody waits for an answer (#10009).
+    if (deliveries.every(({ delivery }) => this.#mailbox.isAgentSetupDelivery(delivery.id))) return false;
     const message = sourceText("error.provider.acpNoAnswer", {
       provider: agentProviderDescriptor(source.provider).displayName,
     });

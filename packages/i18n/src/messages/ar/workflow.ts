@@ -24,6 +24,22 @@ export const messages = {
   "workflow.board.refusal.noOutput": "لا يوجد مخرج {type}",
   "workflow.board.live.connected": "تم وصل {from} بـ {to}.",
   "workflow.board.live.connectedLoop": "تم وصل {from} بـ {to}. هذا يُنشئ حلقة.",
+  "workflow.board.live.connectedMany": {
+    zero: "لم تُوصَل أي عقدة.",
+    one: "تم وصل عقدة واحدة.",
+    two: "تم وصل عقدتين.",
+    few: "تم وصل {count} عقد.",
+    many: "تم وصل {count} عقدة.",
+    other: "تم وصل {count} عقدة.",
+  },
+  "workflow.board.live.connectedManyLoop": {
+    zero: "لم تُوصَل أي عقدة.",
+    one: "تم وصل عقدة واحدة. يُنشئ هذا حلقة.",
+    two: "تم وصل عقدتين. يُنشئ هذا حلقة.",
+    few: "تم وصل {count} عقد. يُنشئ هذا حلقة.",
+    many: "تم وصل {count} عقدة. يُنشئ هذا حلقة.",
+    other: "تم وصل {count} عقدة. يُنشئ هذا حلقة.",
+  },
   "workflow.board.live.disconnected": "تمت إزالة الاتصال.",
   "workflow.board.live.deleted": "تم حذف {name}.",
   "workflow.board.live.deletedMany": {

@@ -24,6 +24,8 @@ export const messages = {
   "workflow.board.refusal.noOutput": "{type} 출력 없음",
   "workflow.board.live.connected": "{from}을(를) {to}에 연결했어요.",
   "workflow.board.live.connectedLoop": "{from}을(를) {to}에 연결했어요. 순환이 생겼어요.",
+  "workflow.board.live.connectedMany": { other: "노드 {count}개를 연결했어요." },
+  "workflow.board.live.connectedManyLoop": { other: "노드 {count}개를 연결했어요. 루프가 생겨요." },
   "workflow.board.live.disconnected": "연결을 제거했어요.",
   "workflow.board.live.deleted": "{name}을(를) 삭제했어요.",
   "workflow.board.live.deletedMany": { other: "노드 {count}개를 삭제했어요." },

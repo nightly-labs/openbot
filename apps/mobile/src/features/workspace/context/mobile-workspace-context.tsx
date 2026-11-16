@@ -53,6 +53,7 @@ import { INSTANCE_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/i
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "@openbot/contracts/team-protocol/live-activity-push-v1";
 import { LIVE_VOICE_EVENT } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { LOCAL_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/local-servers-v1";
+import { MAC_APPS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/mac-apps-limit-v1";
 import { MACHINE_RESOURCES_CAPABILITY } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MCP_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-access-v1";
 import { MEMORY_REVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/memory-review-v1";
@@ -2639,6 +2640,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         canManageMcpServers: managesMcp,
         canRelayMcpSignIn: (serverId) =>
           managesMcp(serverId) && hasCapability(capabilities, serverId, SIGN_IN_RELAY_CAPABILITY),
+        macAppsUnavailable: (serverId) => hasCapability(capabilities, serverId, MAC_APPS_LIMIT_CAPABILITY),
         canManageMcpAccess: (serverId) => administers(serverId, MCP_ACCESS_CAPABILITY),
         canAddMarketplaceAgents: (serverId) => administers(serverId, AGENT_INSTALL_CAPABILITY),
         canUpdateMarketplaceAgents: (serverId) => administers(serverId, AGENT_UPDATE_CAPABILITY),

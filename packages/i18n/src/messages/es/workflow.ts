@@ -24,6 +24,11 @@ export const messages = {
   "workflow.board.refusal.noOutput": "Sin salida de {type}",
   "workflow.board.live.connected": "{from} conectado con {to}.",
   "workflow.board.live.connectedLoop": "{from} conectado con {to}. Esto crea un bucle.",
+  "workflow.board.live.connectedMany": { one: "{count} nodo conectado.", other: "{count} nodos conectados." },
+  "workflow.board.live.connectedManyLoop": {
+    one: "{count} nodo conectado. Esto crea un bucle.",
+    other: "{count} nodos conectados. Esto crea un bucle.",
+  },
   "workflow.board.live.disconnected": "Conexión quitada.",
   "workflow.board.live.deleted": "{name} eliminado.",
   "workflow.board.live.deletedMany": { one: "{count} nodo eliminado.", other: "{count} nodos eliminados." },

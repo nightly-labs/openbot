@@ -24,6 +24,11 @@ export const messages = {
   "workflow.board.refusal.noOutput": "Geen uitvoer voor {type}",
   "workflow.board.live.connected": "{from} verbonden met {to}.",
   "workflow.board.live.connectedLoop": "{from} verbonden met {to}. Dit maakt een lus.",
+  "workflow.board.live.connectedMany": { one: "{count} node verbonden.", other: "{count} nodes verbonden." },
+  "workflow.board.live.connectedManyLoop": {
+    one: "{count} node verbonden. Dit maakt een lus.",
+    other: "{count} nodes verbonden. Dit maakt een lus.",
+  },
   "workflow.board.live.disconnected": "Verbinding verwijderd.",
   "workflow.board.live.deleted": "{name} verwijderd.",
   "workflow.board.live.deletedMany": { one: "{count} node verwijderd.", other: "{count} nodes verwijderd." },
