@@ -35,6 +35,7 @@ import { mcpAccountFragment, mcpAccountUrl } from "@openbot/contracts/mcp-accoun
 import { type McpConnectFlow, mcpFlowFields, savedKeyFlow } from "@openbot/contracts/mcp-connect-flows";
 import { createPluginShareUrl } from "@openbot/contracts/plugin-links";
 import { TOAST_DURATION, toast } from "@openbot/ui";
+import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
 import { connectorSummary } from "@openbot/ui/features/connectors/ConnectorDetailPanel";
 import { CONNECTOR_LISTINGS } from "@openbot/ui/features/connectors/connector-catalog";
 import { isConnectorId } from "@openbot/ui/features/connectors/connectors";
@@ -122,6 +123,11 @@ export interface MarketplaceControllerProps {
   pluginHostName?: string | undefined;
   /** The joined server in `pluginServerId` relays its sign-ins to this computer (`sign-in-relay-v1`). */
   pluginSignInRelay?: boolean | undefined;
+  /**
+   * The live view of the joined server in `pluginServerId`, for a sign-in page that only the host can
+   * reach (`mcp-sign-in-v1`, `browser-view`). Absent: this client cannot show the host's tab.
+   */
+  pluginHostView?: { runtime: BrowserViewRuntime; clipboard: boolean } | undefined;
   /** The server in `pluginServerId` keeps a separate sign-in for each account of an app (`mcp-accounts-v1`). */
   pluginAccounts?: boolean | undefined;
   /** This account sets who gets each MCP server of `pluginServerId` (`mcp-access-v1`, owner or admin). */
@@ -1209,6 +1215,8 @@ export function createMarketplaceController(
   /** The relay of a joined server, when both sides can relay a sign-in. */
   const signInRelay = () => (props.pluginSignInRelay ? calls().signInRelay : undefined);
   const [relayed, setRelayed] = createSignal<MarketplaceSignInRelayState | null>(null);
+  /** The host tab of a sign-in whose page only the joined server can reach, while it waits. */
+  const [hostTabbed, setHostTabbed] = createSignal<{ url: string; tabId: string } | null>(null);
   /** Ends the sign-in that waits now, on the server and for the address that it started with. */
   let stopSignIn: (() => void) | undefined;
 
@@ -1226,6 +1234,9 @@ export function createMarketplaceController(
     const stop = () => void mcp.cancelMcpSignIn({ url: config.url }, serverId).catch(() => undefined);
     stopSignIn = stop;
     if (relay) void followSignInRelay(relay, config.url, serverId, () => waiting);
+    // A page that only the host can reach opens in the host's own tab instead of the relay.
+    if (relay?.hostTab && props.pluginHostView)
+      void followSignInHostTab(relay.hostTab, config.url, serverId, () => waiting);
     return signIn.finally(() => {
       waiting = false;
       if (stopSignIn === stop) stopSignIn = undefined;
@@ -1253,6 +1264,25 @@ export function createMarketplaceController(
       }
     } finally {
       setRelayed(null);
+    }
+  }
+
+  async function followSignInHostTab(
+    hostTab: NonNullable<MarketplaceSignInRelay["hostTab"]>,
+    url: string,
+    serverId: string,
+    waiting: () => boolean,
+  ): Promise<void> {
+    try {
+      while (waiting()) {
+        const tabId = await hostTab(url, serverId).catch(() => null);
+        if (!waiting()) return;
+        const current = hostTabbed();
+        if (current?.url !== url || current.tabId !== tabId) setHostTabbed(tabId ? { url, tabId } : null);
+        await new Promise((resolve) => setTimeout(resolve, SIGN_IN_RELAY_POLL_MS));
+      }
+    } finally {
+      setHostTabbed(null);
     }
   }
 
@@ -1401,6 +1431,19 @@ export function createMarketplaceController(
         },
         open: (url: string) => relay.open(url, mcpServerId()),
         paste: (url: string, address: string) => relay.paste(url, address, mcpServerId()),
+      };
+    },
+    get hostTab() {
+      const view = props.pluginHostView;
+      if (!signInRelay()?.hostTab || !view) return undefined;
+      return {
+        hostName: props.pluginHostName ?? "",
+        page: (url: string) => {
+          const current = hostTabbed();
+          return current?.url === url
+            ? { runtime: view.runtime, tabId: current.tabId, clipboard: view.clipboard }
+            : undefined;
+        },
       };
     },
     get app() {
@@ -2013,6 +2056,12 @@ export function createMarketplaceController(
     testPluginApp,
     signInPluginApp,
     signInRelayed: relayed,
+    /** The host tab of a sign-in whose page only the joined server can reach, while it waits. */
+    signInHostPage: () => {
+      const current = hostTabbed();
+      const view = props.pluginHostView;
+      return current && view ? { runtime: view.runtime, tabId: current.tabId, clipboard: view.clipboard } : null;
+    },
     openSignInRelay,
     pasteSignInRelay,
     cancelSignIn,
