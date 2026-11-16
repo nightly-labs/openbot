@@ -152,6 +152,8 @@ const QUIET_END_MAX_MS = 2 * 60_000;
 const QUIET_REPEAT_POLL_MS = 1_000;
 /** How long before a turn's start its usage records can be, as in host analytics. */
 const TURN_USAGE_MARGIN_MS = 60 * 60 * 1_000;
+/** The time added to a reset that a provider's text names, which rounds down to the minute. */
+const TEXT_RESET_MARGIN_MS = 60_000;
 /**
  * The provider errors that move an agent set to switch without asking to its next backup model. Each
  * one can pass on another provider, account or model; a request the model refuses fails on each.
@@ -1517,7 +1519,15 @@ export class TurnLifecycle {
             isPlanLimitDiagnostic(message) ||
             (error?.codexErrorInfo === "usageLimitExceeded" && !isBalanceDiagnostic(message));
           if (planLimit && notification.method === "error" && errorTurnId && this.#runningTurns.has(errorTurnId)) {
-            this.#limitedTurns.set(errorTurnId, this.#limitedTurns.get(errorTurnId) ?? null);
+            // Cline has no usage reading and names the wait only in its text: "The limit resets in 8h
+            // 30m" (#10674). With no reset, the hold lets one turn try again each 15 minutes. A provider
+            // with a reading gets the exact reset from it. The text rounds down to the minute.
+            const resetDelayMs = agentProviderDescriptor(source.provider).reportsUsage
+              ? null
+              : providerResetDelayMs(message);
+            const namedReset =
+              resetDelayMs === null ? null : Math.ceil((Date.now() + resetDelayMs + TEXT_RESET_MARGIN_MS) / 1_000);
+            this.#limitedTurns.set(errorTurnId, this.#limitedTurns.get(errorTurnId) ?? namedReset);
           }
           const context = {
             turnId: errorTurnId,
