@@ -60,6 +60,7 @@ import {
   stopRevealingFileQuote,
   workspaceAgentOfPath,
 } from "./quoted-text";
+import type { SkillSuggestionSaveResult } from "./SkillSuggestionChatCard";
 import { createActivityStore } from "./stores/activity-store";
 import { createBrowserStore } from "./stores/browser-store";
 import { createComposerActions } from "./stores/composer-actions";
@@ -372,7 +373,7 @@ export function createConversationViewScope(props: ConversationProps) {
    * writes (#7593). `saved` when the host saved the skill, `sent` when the yes went to the agent,
    * and null when the chat cannot send the yes now.
    */
-  async function saveSkillSuggestion(messageId: string, reply: string): Promise<"saved" | "sent" | null> {
+  async function saveSkillSuggestion(messageId: string, reply: string): Promise<SkillSuggestionSaveResult> {
     const target = currentTarget();
     const agentId = props.agent?.id;
     if (agentId) {

@@ -45,6 +45,9 @@ export function skillSuggestionOutcome(
   return turnActive ? "working" : "answered";
 }
 
+/** The result of Save: the host saved the skill, the yes went to the agent, or the chat cannot send now. */
+export type SkillSuggestionSaveResult = "saved" | "sent" | null;
+
 export interface SkillSuggestionChatCardProps {
   messageId: string;
   suggestion: SkillSuggestionEvent;
@@ -54,7 +57,7 @@ export interface SkillSuggestionChatCardProps {
    * this chat when the host saved nothing. `saved` when the host saved the skill, `sent` when the yes
    * went to the agent, and null when the chat cannot send now.
    */
-  onSave?: ((reply: string) => Promise<"saved" | "sent" | null>) | undefined;
+  onSave?: ((reply: string) => Promise<SkillSuggestionSaveResult>) | undefined;
   /** Opens the skill that an update changes. */
   onOpenSkill?: ((skill: { skillId: string }) => void) | undefined;
 }
@@ -95,6 +98,7 @@ export function SkillSuggestionChatCard(props: SkillSuggestionChatCardProps) {
     <MarketplaceSuggestionCard
       kind="skill"
       skillAction={skillAction()}
+      saving={press() === "pending"}
       name={props.suggestion.skillName}
       description={props.suggestion.question}
       fullDescription

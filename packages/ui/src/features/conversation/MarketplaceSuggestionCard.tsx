@@ -32,6 +32,8 @@ export interface MarketplaceSuggestionCardProps {
   fullDescription?: boolean;
   /** The action of a skill card. Install when absent. */
   skillAction?: MarketplaceSuggestionSkillAction;
+  /** The user pressed Save or Update and the skill is written: the busy button says so. */
+  saving?: boolean;
   iconUrl: string | null;
   /** Drawn instead of the icon: the mark of an app with no listing icon, such as GitHub. */
   mark?: JSX.Element | undefined;
@@ -197,8 +199,9 @@ function SuggestionAction(props: MarketplaceSuggestionCardProps & { onStart: () 
   const text = () => {
     if (!app()) {
       // Writing a skill can take minutes, so the busy button says that the work runs.
-      if (skillAction() === "save") return busy() ? t("chat.suggestion.saving") : t("chat.suggestion.save");
-      if (skillAction() === "update") return busy() ? t("chat.suggestion.updating") : t("chat.suggestion.update");
+      const saving = busy() && props.saving === true;
+      if (skillAction() === "save") return saving ? t("chat.suggestion.saving") : t("chat.suggestion.save");
+      if (skillAction() === "update") return saving ? t("chat.suggestion.updating") : t("chat.suggestion.update");
       return t("chat.suggestion.install");
     }
     return props.state === "attention" ? t("marketplace.app.reconnect") : t("marketplace.app.connect");

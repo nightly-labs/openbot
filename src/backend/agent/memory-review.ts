@@ -12,7 +12,7 @@ import {
   skillSuggestionTarget,
 } from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
-import { Effect, Exit, Fiber, Schema, Scope } from "effect";
+import { Deferred, Effect, Exit, Fiber, Schema, Scope } from "effect";
 import type { AgentClient } from "../agent-client";
 import { extractJsonObject } from "../structured-output";
 import type { UserBrowsingLog, UserBrowsingStep } from "../user-browsing-log";
@@ -133,8 +133,8 @@ export class MemoryReview {
   readonly #options: MemoryReviewOptions;
   readonly #conversations = new Map<string, ReviewedConversation>();
   #running: { key: string; agentId: string; fiber: Fiber.Fiber<void> } | null = null;
-  /** The suggestions that a Save writes now, so a second Save does not write the skill again. */
-  readonly #saving = new Set<string>();
+  /** The suggestions that a Save writes now, so a second Save waits and does not write the skill again. */
+  readonly #saving = new Map<string, Deferred.Deferred<void>>();
   /**
    * The suggestions that a Save wrote. Their skill line can wait for the running turn, or fail to
    * append, so the chat alone does not show that the skill is saved.
@@ -243,11 +243,23 @@ export class MemoryReview {
     messageId: string,
   ) {
     const key = `${conversationKey(agentId, threadId)}:${messageId}`;
-    // A second press, as from another client, returns at once: the first one shows the skill line or sends the yes.
-    if (this.#saving.has(key) || this.#saved.has(key)) return true;
-    this.#saving.add(key);
+    // A second press, as from another client, returns true when the first one ends, so its card does
+    // not show Saved before the skill is written. The first one shows the skill line or sends the yes.
+    const running = this.#saving.get(key);
+    if (running) {
+      yield* Deferred.await(running);
+      return true;
+    }
+    if (this.#saved.has(key)) return true;
+    const ended = Deferred.makeUnsafe<void>();
+    this.#saving.set(key, ended);
     return yield* this.#saveSuggestion(agentId, threadId, messageId, () => this.#saved.add(key)).pipe(
-      Effect.ensuring(Effect.sync(() => this.#saving.delete(key))),
+      Effect.ensuring(
+        Effect.sync(() => {
+          this.#saving.delete(key);
+          Deferred.doneUnsafe(ended, Effect.void);
+        }),
+      ),
     );
   }).bind(this);
 
