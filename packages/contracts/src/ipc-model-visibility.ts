@@ -159,11 +159,12 @@ export function withSteeringModels<Model extends { provider: string; id: string;
 export function withWorkspaceOnlyLimit<
   Model extends { provider: AgentProviderRef; workspaceOnlyUnavailable?: boolean },
 >(models: readonly Model[], limited: boolean): Model[] {
-  return models.map((model) => ({
-    ...model,
-    workspaceOnlyUnavailable:
+  return models.map((model) => {
+    const unavailable =
       limited &&
       isKnownAgentProvider(model.provider) &&
-      agentProviderDescriptor(model.provider).workspaceEnforcement === "confined-process",
-  }));
+      agentProviderDescriptor(model.provider).workspaceEnforcement === "confined-process";
+    if (unavailable) return { ...model, workspaceOnlyUnavailable: true };
+    return model.workspaceOnlyUnavailable === undefined ? model : { ...model, workspaceOnlyUnavailable: false };
+  });
 }

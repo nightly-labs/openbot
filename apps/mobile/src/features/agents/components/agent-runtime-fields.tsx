@@ -176,7 +176,7 @@ export function AgentRuntimeFields({
   };
   return (
     <>
-      <SettingsSection title={title} footer={workspaceOnlyNote ?? spentLimit}>
+      <SettingsSection title={title} footer={[workspaceOnlyNote, spentLimit].filter(Boolean).join(" ") || undefined}>
         <SettingsRow
           trailing={
             <SettingsPicker<string>
