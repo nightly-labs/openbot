@@ -26,8 +26,9 @@
 
 ## Support window (developer decision, 2026-11-17)
 
-- **Apps and protocols**: desktop, hosts and the web client support the releases of the last 14
-  days. Mobile has a longer window. A peer outside the window gets "update required". Its adapters,
+- **Apps and protocols**: desktop, hosts and the web client support the releases of the last 2
+  months (60 days; first decided as 14 days, then changed the same day). Mobile has at least 2 months.
+  A peer outside the window gets "update required". Its adapters,
   codecs, fixtures and capabilities can be deleted. The rule is in `AGENTS.md` and
   `packages/contracts/AGENTS.md`; it replaces "Released Team API adapters are permanent".
 - **Migrations**: not in the window. A database from any shipped release still upgrades with no
@@ -36,7 +37,10 @@
   shows a blocking "Update required" screen and installs the update (item 24).
 - **Pre-migration copy**: approved. Item 15 changes the no-backup rule.
 
-All releases since v0.55.0 (2026-10-30) speak protocol 9, so protocols 1 to 8 are outside the window.
+Host protocol by release: V4 from v0.8.0 (2026-09-11), V5 v0.24.0 (09-28), V6 v0.31.0 (10-07), V7 v0.35.0
+(10-10), V8 v0.48.0 (10-22), V9 v0.55.0 (10-30). Mobile 1.4.3 (10-29 to 10-31) is the last protocol 8 mobile
+build, and mobile checks only that the host range includes protocol 3. With 60 days, hosts that read at
+most 64 capabilities (v0.20 to v0.34.1) stay in the window until about 2026-12-09, so item 1 is needed.
 
 ## Database size data (for item 15)
 
@@ -82,8 +86,8 @@ Not confirmed: desktop users other than the developer (no central source).
 
 | # | Item | State |
 |---|---|---|
-| 1 | The bootstrap capability list stays at 64; one size check per protocol | SUPERSEDED by item 2 (PR #10777 closed) |
-| 2 | Minimum protocol 9; delete protocols 1 to 8 and the bootstrap list | TODO |
+| 1 | The bootstrap capability list stays at 64; one size check per protocol | IN REVIEW (#10777, reopened) |
+| 2 | Minimum protocol follows the window; a deletion date per protocol | TODO |
 | 3 | A server stops a start loop and reports the reason through the Team API | TODO |
 | 4 | Desktop start recovery offers only a release that can open the database | TODO |
 | 5 | Versioned JSON stores keep data after a downgrade; agent-data database has a version | TODO |
@@ -106,13 +110,16 @@ STOP: if a bootstrap capability is necessary for a released client, report befor
 
 ### 2. Minimum protocol 9, then protocol 10 with a fixed baseline
 
-Step 1 (now): the host and every client (desktop, web client, mobile) set the minimum protocol to 9.
-A host refuses an older client with `client_update_required`; a client refuses an older host with
-`host_update_required`. Delete the codecs, adapters, fixtures and the bootstrap list of protocols 1
-to 8. Keep the size limit table of PR #10777 if it is still useful.
+Step 1: for each protocol, find the last release of each surface (desktop, host, web client, mobile)
+that speaks it, and the date it leaves the 60-day window. Raise the minimum and delete the codecs,
+adapters and fixtures only for protocols that no release in the window speaks. A host refuses an
+older client with `client_update_required`; a client refuses an older host with
+`host_update_required`. Expected order: protocols 1 to 3 (check the mobile protocol 3 use first),
+then 4 and 5, then 6 and the bootstrap list after about 2026-12-09, then 7 and 8 after about
+2026-12-31 (mobile 1.4.3).
 
-STOP: if a mobile store build in the mobile window, without an over-the-air update, speaks a protocol
-below 9.
+STOP: if a release in the window, or a mobile store build in the mobile window, speaks a protocol
+that the change deletes.
 
 Step 2 (later): protocol 10 makes all capabilities shipped up to then implied by the version. Only
 new capabilities go in the list. When no release in the window speaks protocol 9, delete those
@@ -168,7 +175,7 @@ review findings. Migrations stay irreversible; the copy is a recovery aid, not a
 ### 24. Minimum app version for each surface
 
 The account service publishes a minimum version for desktop, host and mobile. Desktop and hosts use
-the 14-day window; mobile uses a longer one. An app below its minimum shows a blocking "Update
+the 60-day window; mobile uses at least 60 days. An app below its minimum shows a blocking "Update
 required" screen and starts the update. A server installs the staged release. The check must not
 send new user data (`PRIVACY.md` if outbound data changes).
 
