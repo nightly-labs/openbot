@@ -1060,6 +1060,15 @@ accept it deletes the agents one after the other and reports `ok` or the error f
 the sidebar or Library cleanup fails after an agent is deleted, the tool logs it and reports the
 agent as deleted; the next start removes the places of agents that are gone. `scripts/agent-delete-tool-e2e.ts`
 checks these rules.
+`openbot.set_commit_co_author` turns off, or on again, the `commitCoAuthor` agent default: the
+OpenBot co-author trailer that the developer instructions tell each agent to add to its git commits.
+It writes through the same `AgentDefaultsSettings.update` as Server settings › Agent defaults and the
+`agent-defaults-v1` host route, so every agent gets the change. The setting applies to every agent,
+so the tool asks the owner on one owner-only card, also when the agent has Full access. Only a
+person's message can start it, as for `delete_agent`. A request for the current value shows no card.
+While the trailer is on, the instructions name the tool, so that an agent does not
+tell the user that the trailer cannot be turned off (#7579).
+`scripts/agent-commit-co-author-tool-e2e.ts` checks these rules.
 An agent can only restrict access and Computer Use, for itself or a teammate. The router writes
 only a restriction, so a user change between its check and the write is never undone. Only the
 user widens them again, and only the user moves an agent between Ask first and Full access, and changes local script runs. An agent changes MCP servers only with the MCP server tools, after the user's request and approval. A new agent gets

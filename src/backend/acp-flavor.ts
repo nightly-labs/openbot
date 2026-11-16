@@ -312,6 +312,11 @@ export interface AcpFlavor {
   /** Turns OpenBot's servers back on where the agent's own settings for `cwd` turned them off. */
   enableMcpServers?(cwd: string, names: readonly string[]): void;
   /**
+   * The agent stops each MCP tool call after this time, also when OpenBot sends progress, and a
+   * session server cannot change it. A call that waits for the user answers before then (#9689).
+   */
+  mcpToolCallLimitMs?: number;
+  /**
    * The agent keeps the tools that a session has at its first turn. A server that the agent gets
    * later, such as on `session/load` or `session/resume` after the user added it, reaches the model
    * only as a note, and the model cannot call its tools. A changed MCP set must start a new session.

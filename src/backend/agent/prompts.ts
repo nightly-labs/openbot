@@ -611,6 +611,19 @@ export function browserTakeoverResult(
   };
 }
 
+/**
+ * The answer for a takeover call that the provider cannot wait for: it stops each tool call after a
+ * fixed time (#9689). The card stays open, and the next call for the same tab waits on it again. Only
+ * the model reads it.
+ */
+export function browserTakeoverWaitingResult(tool: string, tabId: string): DynamicToolResult {
+  const value = {
+    status: "waiting",
+    next: `The user has not finished yet. The card stays open. Call ${tool} again now with tabId "${tabId}" to keep waiting for it; that call does not show a new card. Do not end your turn: the card closes when the turn ends.`,
+  };
+  return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
+}
+
 /** The answer for a browser tool call that waited while the user controlled its tab. Only the model reads it. */
 export function browserUserControlResult(): DynamicToolResult {
   return {

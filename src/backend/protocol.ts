@@ -81,6 +81,14 @@ export interface AppServerRequest {
    * turn of the parent agent. Its call still waits in the subagent's own turn (#9727).
    */
   subagent?: true;
+  /**
+   * In process only, never on the wire. The provider stops the call after a fixed time, also when
+   * OpenBot sends progress, so OpenBot must answer before this time: Antigravity 1.5.9 stops each MCP
+   * tool call after 180 s. A question detaches as with `detachAfterMs`. A browser takeover answers
+   * that the user has not finished, keeps its card, and the next call for the same tab waits on it
+   * again (#9689).
+   */
+  answerBeforeMs?: number;
 }
 
 /** The account type of Claude's own sign-in when it runs on the saved key, with no claude.ai account. */
