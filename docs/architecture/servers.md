@@ -1378,6 +1378,8 @@ creates them and the Customer Portal settings.
     `VIES_REQUESTER_VAT_ID` (the seller's VAT ID) makes VIES return a consultation number, which the
     customer metadata `openbot_vies_request` keeps as proof.
   - A buyer outside the EU (also the UK, Norway and Switzerland) pays no VAT.
+  - A `PUT` of new details also sets the Tax Rate of each open subscription without Stripe Tax, so
+    that the next invoice of a plan that runs gets the new VAT.
   - A customer with no country gets 409 `billing_country_required`: a client from before this step
     must update. Checkout requires the billing address; when its country differs from the saved
     one, the webhook writes a log line and sends a [pool alert](../hosted-servers.md#pool-alerts)
@@ -1388,7 +1390,8 @@ creates them and the Customer Portal settings.
     EUR 9,000 (`billing_vat_oss_alerts`). It converts other currencies with the ECB rates of
     `BillingUsd`. Refunds do not lower the total.
   - `scripts/stripe-vat-migrate.ts` (a dry run by default; `--apply`, `--live`) moves the existing
-    subscriptions from Stripe Tax to the Tax Rate.
+    subscriptions from Stripe Tax to the Tax Rate. A customer with no country, or in another EU
+    country with an EU VAT ID that no check confirmed, keeps Stripe Tax and is named for a manual check.
 - The change and cancel actions open the Portal flow of one subscription. The Worker first checks
   that the subscription belongs to the account.
 - The server name comes only from a `remote_hosts` row that the same account owns. A plan whose
