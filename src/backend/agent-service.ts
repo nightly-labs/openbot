@@ -4267,9 +4267,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     } catch (error) {
       this.#emitError("model_switch_marker_failed", error, agent.id);
     }
-    // The next message of the chat runs in a turn with its delivery's id. A note outside that turn
-    // showed after the turn's answer, which the new model wrote after the switch. A continuation and a
-    // plan step run in a turn of their own, which starts after the note.
+    // The note goes into the turn of the chat's next message, under its delivery's id until that turn
+    // starts (`MailboxSync.syncDeliveryMessage`). A note outside that turn showed after the turn's
+    // answer, which the new model wrote after the switch. A continuation and a plan step run in a turn
+    // of their own, which starts after the note.
     const next = this.#mailbox.nextQueued(agent.id);
     const turnId = next && !next.resumeAfterUsageLimit && !next.planContinuation ? next.delivery.id : undefined;
     try {

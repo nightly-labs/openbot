@@ -1,11 +1,12 @@
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
-import type {
-  AgentEvent,
-  AgentSummary,
-  ConversationMessage,
-  ConversationSnapshot,
-  QueueHold,
-  QueueSnapshot,
+import {
+  type AgentEvent,
+  type AgentSummary,
+  type ConversationMessage,
+  type ConversationSnapshot,
+  modelSwitchReason,
+  type QueueHold,
+  type QueueSnapshot,
 } from "@openbot/contracts/ipc";
 import { Effect, type Scope } from "effect";
 import { isMailboxMessageCopy } from "../conversation-snapshots";
@@ -66,6 +67,11 @@ export class MailboxSync {
     const turnId = context.planContinuation?.turnIds[0] ?? context.delivery.turnId;
     if (turnId === null) delete message.turnId;
     else message.turnId = turnId;
+    // A switch note waits for this delivery's turn under the delivery's id. A provider that names
+    // its own turn, such as Codex, takes the note into that turn, so it stays above the answer.
+    if (turnId !== null && turnId !== deliveryId)
+      for (const note of snapshot.messages)
+        if (note.turnId === deliveryId && modelSwitchReason(note) !== null) note.turnId = turnId;
     message.delivery = {
       id: context.delivery.id,
       status: context.delivery.status,

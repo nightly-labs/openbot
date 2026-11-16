@@ -382,6 +382,8 @@ export class TurnLifecycle {
       compacted: boolean;
       /** The tool steps that started and did not end yet. While one is open, the turn works, it does not wait. */
       openTools: Set<string>;
+      /** The answer items that are the agent's own report of its failure (`AcpFlavor.failureReport`). */
+      failureReports: Set<string>;
     }
   >();
   /** The drain's start of each starting delivery, until its turn starts. */
@@ -895,6 +897,7 @@ export class TurnLifecycle {
           acted: false,
           compacted: false,
           openTools: new Set(),
+          failureReports: new Set(),
         });
         this.#traces.begin(turnId, new Date().toISOString());
         const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
@@ -948,6 +951,7 @@ export class TurnLifecycle {
         ]);
         const itemId = getString(item, "id");
         if (itemId) this.#itemTurns.set(itemId, turnId);
+        if (itemId && item.failureReport === true) this.#runningTurns.get(turnId)?.failureReports.add(itemId);
         this.#markProduced(turnId, isRepeatedWork(item));
         if (item.type === "contextCompaction") {
           const running = this.#runningTurns.get(turnId);
@@ -1697,6 +1701,7 @@ export class TurnLifecycle {
           snapshot,
           deliveries,
           continuing ? yield* continuedWork : undefined,
+          running?.failureReports,
         );
         // After the requeue, so a routine set to skip finds its run back in the queue.
         yield* this.#usageLimits.reached(agentId, resetsAt, model);
@@ -1716,6 +1721,7 @@ export class TurnLifecycle {
           snapshot,
           deliveries,
           failedOver && mayContinue ? yield* continuedWork : undefined,
+          running?.failureReports,
         );
         // A turn that runs again on the same model keeps it.
         if (failedOver) this.#markFailed(agentId, model, failover);
@@ -2088,13 +2094,18 @@ export class TurnLifecycle {
     snapshot: ConversationSnapshot,
     deliveries: readonly DeliveryContext[],
     resumeAfterUsageLimit?: UsageLimitContinuation,
+    failureReports?: ReadonlySet<string>,
   ) {
     // With no continuation, the next attempt runs with this turn ID and writes its text into this
     // attempt's empty rows, which keep this attempt's time. The answer then shows above the messages
-    // that waited in the queue (#6504). The write deletes the stored rows, as `#clearPlan` does.
+    // that waited in the queue (#6504). The write deletes the stored rows, as `#clearPlan` does. The
+    // agent's report of the failure goes too: the next attempt answers in its place (#8293).
     if (!resumeAfterUsageLimit)
-      for (let index = snapshot.messages.length - 1; index >= 0; index -= 1)
-        if (isEmptyAttemptText(snapshot.messages[index], turnId)) snapshot.messages.splice(index, 1);
+      for (let index = snapshot.messages.length - 1; index >= 0; index -= 1) {
+        const message = snapshot.messages[index];
+        if (isEmptyAttemptText(message, turnId) || (message && failureReports?.has(message.id)))
+          snapshot.messages.splice(index, 1);
+      }
     for (const context of deliveries) {
       const { delivery } = context;
       const continuation = resumeAfterUsageLimit
