@@ -29,6 +29,7 @@ import {
   type ThreadItem,
 } from "../protocol";
 import {
+  GEMINI_INVALID_ARGUMENT,
   isImageCountDiagnostic,
   isImageTooLargeDiagnostic,
   isImageTooSmallDiagnostic,
@@ -170,7 +171,7 @@ function isRejectedOpenCodeRequest(provider: AgentProvider, message: string): bo
  * the one retry too, and the text then tells the user to choose another model (#7116).
  */
 function isRejectedAntigravityRequest(provider: AgentProvider, message: string): boolean {
-  return provider === "antigravity" && /\bRequest contains an invalid argument\b/iu.test(message);
+  return provider === "antigravity" && GEMINI_INVALID_ARGUMENT.test(message);
 }
 
 /**

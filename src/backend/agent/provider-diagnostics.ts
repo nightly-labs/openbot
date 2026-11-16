@@ -376,12 +376,18 @@ export function isImageTooLargeDiagnostic(message: string): boolean {
  * Whether Google's Gemini API refused an image in the request because it cannot read it:
  * INVALID_ARGUMENT "Unable to process input image. Please retry or report in ...". The Antigravity
  * CLI 1.5.9 keeps the image in the session and sends it on each turn, so each later message failed
- * with the same 400 until a new chat (#9593). Not Google's other INVALID_ARGUMENT texts: a refused
- * API key or tool schema fails a new session too.
+ * with the same 400 until a new chat (#9593). For each provider. Google's generic text
+ * (`GEMINI_INVALID_ARGUMENT`) is matched for Antigravity only: a refused tool schema also gives it.
  */
 export function isImageUnreadableDiagnostic(message: string): boolean {
   return /\bUnable to process input image\b/iu.test(message);
 }
+
+/**
+ * Google's text for a 400 INVALID_ARGUMENT that names no field. Not the status name: a refused API
+ * key is also INVALID_ARGUMENT.
+ */
+export const GEMINI_INVALID_ARGUMENT = /\bRequest contains an invalid argument\b/iu;
 
 /**
  * Whether a model endpoint refused the request because it holds more images than the endpoint
