@@ -190,6 +190,8 @@ const ROUTINE_TASK_START = "--- routine task ---";
 const ROUTINE_TASK_END = "--- end of routine task ---";
 const ATTACHED_FILES_HEADER = "\n\nAttached local files:\n";
 const NO_ANSWER_FROM = "No answer comes from ";
+const RESULT_FORMAT =
+  "Reply in three lines: Status: done | partial | blocked, Result: <concrete outcome>, Evidence: <file, test, command, or none>.";
 const NO_ANSWER_REASON = ": the request to them ended before they answered. Do not wait for them.";
 /** The first words of a provider handoff. */
 export const HANDOFF_START = "Continue this OpenBot conversation.";
@@ -283,14 +285,17 @@ function userFramedTeammateText(
     return [
       `${teammate} answered your message through OpenBot:`,
       displayText,
-      "Give the result to the user naturally, starting with the teammate's name.",
+      "Give the result to the user naturally, starting with the teammate's name. Send the teammate no acknowledgement; when the status is partial or blocked, finish or follow up the open part yourself.",
     ].join("\n");
   if (delivery.expectsReply === false)
-    return [`${teammate} sent you this message through OpenBot. It needs no answer:`, displayText].join("\n");
+    return [
+      `${teammate} sent you this message through OpenBot. It needs no answer: send no reply or acknowledgement.`,
+      displayText,
+    ].join("\n");
   return [
     `${teammate} sent you this request through OpenBot:`,
     displayText,
-    `Do it, then send the result to ${senderName} with openbot.send_message: recipientAgentIds ["${senderAgentId}"], replyToMessageId "${delivery.messageId}", expectsReply false. Reply in three lines: Status: done | partial | blocked, Result: <concrete outcome>, Evidence: <file, test, command, or none>.`,
+    `Do it, then send the result to ${senderName} with openbot.send_message: recipientAgentIds ["${senderAgentId}"], replyToMessageId "${delivery.messageId}", expectsReply false. ${RESULT_FORMAT}`,
   ].join("\n");
 }
 
@@ -393,7 +398,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
         : [
             `Finish the whole request, then send a concise result to ${senderName} with openbot.send_message: recipientAgentIds ["${senderAgentId}"], replyToMessageId "${delivery.messageId}", expectsReply false.`,
             "When something fails, find the cause and try other ways first. Status: blocked only when the sender or the user must act.",
-            "Reply in three lines: Status: done | partial | blocked, Result: <concrete outcome>, Evidence: <file, test, command, or none>. When blocked, add Unblock: <the one action that unblocks the task>; when OpenBot has a plugin for the service and it is not in your tools, call openbot.suggest_marketplace_app, and that action is the next field of its result.",
+            `${RESULT_FORMAT} When blocked, add Unblock: <the one action that unblocks the task>; when OpenBot has a plugin for the service and it is not in your tools, call openbot.suggest_marketplace_app, and that action is the next field of its result.`,
             "Never acknowledge without a Status line.",
           ];
     text = [
