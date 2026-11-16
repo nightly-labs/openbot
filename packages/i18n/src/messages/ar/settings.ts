@@ -666,6 +666,11 @@ export const messages = {
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "لعدد كبير من الوكلاء وعمل مكثف في المتصفح.",
   "settings.voice.dictation.section": "الإملاء",
+  "settings.voice.dictationKey.title": "مفتاح الإملاء",
+  "settings.voice.dictationKey.descriptionMac":
+    "اضغط مع الاستمرار على Option الأيمن لتتحدث، وارفع إصبعك لتتوقف. أو اضغط عليه مرتين لتتحدث دون استخدام اليدين، ومرة أخرى لتتوقف.",
+  "settings.voice.dictationKey.descriptionOther":
+    "اضغط مع الاستمرار على Ctrl الأيمن لتتحدث، وارفع إصبعك لتتوقف. أو اضغط عليه مرتين لتتحدث دون استخدام اليدين، ومرة أخرى لتتوقف.",
   "settings.voice.model.parakeet.description": "سريع. يتعرّف على اللغة المنطوقة بنفسه، في 25 لغة أوروبية.",
   "settings.voice.model.parakeetUnified.description":
     "سريع. الإنجليزية فقط. يضع علامات الترقيم، مع أخطاء أقل من Parakeet TDT.",

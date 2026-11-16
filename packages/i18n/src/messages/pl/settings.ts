@@ -667,6 +667,11 @@ export const messages = {
   "settings.hostedServers.plan.pro.summary": "Dla wielu agentów i intensywnej pracy w przeglądarce.",
   // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Dyktowanie",
+  "settings.voice.dictationKey.title": "Klawisz dyktowania",
+  "settings.voice.dictationKey.descriptionMac":
+    "Przytrzymaj prawy Option, aby mówić, i puść, aby zakończyć. Albo naciśnij go dwa razy, aby mówić bez trzymania, i jeszcze raz, aby zakończyć.",
+  "settings.voice.dictationKey.descriptionOther":
+    "Przytrzymaj prawy Ctrl, aby mówić, i puść, aby zakończyć. Albo naciśnij go dwa razy, aby mówić bez trzymania, i jeszcze raz, aby zakończyć.",
   "settings.voice.model.parakeet.description": "Szybki. Sam rozpoznaje język mowy, w 25 językach europejskich.",
   "settings.voice.model.parakeetUnified.description":
     "Szybki. Tylko angielski. Stawia interpunkcję, z mniejszą liczbą błędów niż Parakeet TDT.",

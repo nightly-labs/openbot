@@ -658,6 +658,11 @@ export const messages = defineMessages("settings", {
   "settings.hostedServers.plan.pro.summary": "For many agents and heavy browser work.",
   // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Dictation",
+  "settings.voice.dictationKey.title": "Dictation key",
+  "settings.voice.dictationKey.descriptionMac":
+    "Hold Right Option to speak, and let go to stop. Or press it twice to speak hands-free, and once more to stop.",
+  "settings.voice.dictationKey.descriptionOther":
+    "Hold Right Ctrl to speak, and let go to stop. Or press it twice to speak hands-free, and once more to stop.",
   "settings.voice.model.parakeet.description": "Fast. Finds the spoken language itself, in 25 European languages.",
   "settings.voice.model.parakeetUnified.description":
     "Fast. English only. Writes punctuation, with fewer errors than Parakeet TDT.",

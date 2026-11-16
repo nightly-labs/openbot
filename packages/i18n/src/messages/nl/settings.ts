@@ -634,6 +634,11 @@ export const messages = {
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Voor veel agents en zwaar browserwerk.",
   "settings.voice.dictation.section": "Dicteren",
+  "settings.voice.dictationKey.title": "Dicteertoets",
+  "settings.voice.dictationKey.descriptionMac":
+    "Houd de rechter Option-toets ingedrukt om te spreken en laat los om te stoppen. Of druk twee keer om handsfree te spreken en nog een keer om te stoppen.",
+  "settings.voice.dictationKey.descriptionOther":
+    "Houd de rechter Ctrl-toets ingedrukt om te spreken en laat los om te stoppen. Of druk twee keer om handsfree te spreken en nog een keer om te stoppen.",
   "settings.voice.model.parakeet.description": "Snel. Herkent zelf de gesproken taal, in 25 Europese talen.",
   "settings.voice.model.parakeetUnified.description":
     "Snel. Alleen Engels. Zet leestekens, met minder fouten dan Parakeet TDT.",

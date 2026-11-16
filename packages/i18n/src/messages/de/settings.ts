@@ -655,6 +655,11 @@ export const messages = {
   "settings.hostedServers.plan.pro.summary": "Für viele Agenten und intensive Browserarbeit.",
   // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Diktieren",
+  "settings.voice.dictationKey.title": "Diktiertaste",
+  "settings.voice.dictationKey.descriptionMac":
+    "Halte die rechte Wahltaste gedrückt, um zu sprechen, und lass sie los, um zu stoppen. Oder drücke sie zweimal, um freihändig zu sprechen, und noch einmal, um zu stoppen.",
+  "settings.voice.dictationKey.descriptionOther":
+    "Halte die rechte Strg-Taste gedrückt, um zu sprechen, und lass sie los, um zu stoppen. Oder drücke sie zweimal, um freihändig zu sprechen, und noch einmal, um zu stoppen.",
   "settings.voice.model.parakeet.description":
     "Schnell. Erkennt die gesprochene Sprache selbst, in 25 europäischen Sprachen.",
   "settings.voice.model.parakeetUnified.description":

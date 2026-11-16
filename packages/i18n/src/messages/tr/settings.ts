@@ -641,6 +641,11 @@ export const messages = {
   "settings.hostedServers.plan.pro.summary": "Çok sayıda ajan ve yoğun tarayıcı çalışması için.",
   // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Dikte",
+  "settings.voice.dictationKey.title": "Dikte tuşu",
+  "settings.voice.dictationKey.descriptionMac":
+    "Konuşmak için sağ Option tuşunu basılı tutun, durdurmak için bırakın. Ya da eller serbest konuşmak için iki kez, durdurmak için bir kez daha basın.",
+  "settings.voice.dictationKey.descriptionOther":
+    "Konuşmak için sağ Ctrl tuşunu basılı tutun, durdurmak için bırakın. Ya da eller serbest konuşmak için iki kez, durdurmak için bir kez daha basın.",
   "settings.voice.model.parakeet.description": "Hızlı. Konuşulan dili 25 Avrupa dili arasında kendisi bulur.",
   "settings.voice.model.parakeetUnified.description":
     "Hızlı. Yalnızca İngilizce. Noktalama kullanır ve Parakeet TDT'den daha az hata yapar.",

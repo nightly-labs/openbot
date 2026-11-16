@@ -635,6 +635,11 @@ export const messages = {
   "settings.hostedServers.plan.pro.summary": "多数のエージェントとブラウザーの多用向け。",
   // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "音声入力",
+  "settings.voice.dictationKey.title": "音声入力キー",
+  "settings.voice.dictationKey.descriptionMac":
+    "右 Option キーを押している間に話し、離すと止まります。2 回押すとハンズフリーで話せて、もう 1 回押すと止まります。",
+  "settings.voice.dictationKey.descriptionOther":
+    "右 Ctrl キーを押している間に話し、離すと止まります。2 回押すとハンズフリーで話せて、もう 1 回押すと止まります。",
   "settings.voice.model.parakeet.description": "高速です。ヨーロッパの 25 言語で、話している言語を自動で判別します。",
   "settings.voice.model.parakeetUnified.description":
     "高速です。英語のみ。句読点を付け、Parakeet TDT より誤りが少ないです。",

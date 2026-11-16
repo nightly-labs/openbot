@@ -620,6 +620,11 @@ export const messages = {
   "settings.hostedServers.plan.pro.summary": "适合多个助手和大量浏览器操作。",
   // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "听写",
+  "settings.voice.dictationKey.title": "听写键",
+  "settings.voice.dictationKey.descriptionMac":
+    "按住右侧 Option 键说话，松开即停止。也可以连按两次免手持说话，再按一次停止。",
+  "settings.voice.dictationKey.descriptionOther":
+    "按住右侧 Ctrl 键说话，松开即停止。也可以连按两次免手持说话，再按一次停止。",
   "settings.voice.model.parakeet.description": "速度快，可自动识别语言，支持 25 种欧洲语言。",
   "settings.voice.model.parakeetUnified.description": "速度快，仅支持英语。会加标点，错误比 Parakeet TDT 少。",
   "settings.voice.model.bark.description": "速度快，仅支持英语。输出多为小写，标点很少。",
