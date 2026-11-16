@@ -1,13 +1,14 @@
-// Windows only. The agent dock and the Dynamic Island are topmost windows, but other apps can go above
-// them: a game or a video player that makes its own window topmost when it is in front, or an app that
-// clears the topmost flag of other windows (#7452). Windows sends no event for this. The keeper puts the
-// shown windows at the top of the topmost windows again at a short interval, as a user's script that
-// fixed it did. The call does not activate the window, so it takes no focus and no key input.
+// Windows only. The agent dock and the Dynamic Island are topmost windows. A user found them under other
+// apps with no topmost flag (#7452), and a script that set the flag again at an interval fixed it. Windows
+// sends no event when another process clears the flag, so the keeper reads the flag of the shown windows
+// at a short interval and sets it again only when it is gone. A window that has the flag is not moved: a
+// move to the top at each interval would cover the window's own menus and fight other topmost windows,
+// such as a screen snip or a game. The call does not activate the window, so it takes no focus.
 
 import type { BrowserWindow } from "electron";
 
-/** How long another app can cover a window before it comes back above it. */
-const TOPMOST_REFRESH_MS = 2000;
+/** How long a window can stay without its topmost flag before it gets it again. */
+const TOPMOST_CHECK_MS = 2000;
 
 export class WindowsTopmostKeeper {
   readonly #windows = new Set<BrowserWindow>();
@@ -26,18 +27,18 @@ export class WindowsTopmostKeeper {
     this.#schedule();
   }
 
-  readonly #refresh = (): void => {
+  readonly #check = (): void => {
     for (const window of this.#windows) {
-      // Electron puts a "floating" window behind the taskbar on Windows, where it can lose the topmost
-      // flag. "normal" sets the flag and puts the window at the top of the topmost windows.
-      if (!window.isDestroyed() && window.isVisible()) window.setAlwaysOnTop(true, "normal");
+      // `isAlwaysOnTop` reads the flag of the window, not the last value that OpenBot set. "normal", as
+      // "floating" would put the window behind the taskbar on Windows, where it can lose the flag again.
+      if (!window.isDestroyed() && window.isVisible() && !window.isAlwaysOnTop()) window.setAlwaysOnTop(true, "normal");
     }
   };
 
   /** The timer runs only while a window shows. */
   readonly #schedule = (): void => {
     const active = [...this.#windows].some((window) => !window.isDestroyed() && window.isVisible());
-    if (active && this.#timer === undefined) this.#timer = setInterval(this.#refresh, TOPMOST_REFRESH_MS);
+    if (active && this.#timer === undefined) this.#timer = setInterval(this.#check, TOPMOST_CHECK_MS);
     if (!active && this.#timer !== undefined) {
       clearInterval(this.#timer);
       this.#timer = undefined;

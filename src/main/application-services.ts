@@ -1160,7 +1160,7 @@ export async function createApplicationServices({
   // mouse move of the computer.
   const pointerForwarding =
     windowKind === "tool" ? new PointerForwardingGate(() => screen.getCursorScreenPoint()) : null;
-  // Windows: a game or another app that makes its own window topmost can cover the dock and the island.
+  // Windows: another process can clear the topmost flag of the dock and the island (#7452).
   const topmost = windowKind === "tool" ? new WindowsTopmostKeeper() : null;
   const dynamicIsland = new DynamicIslandWindowController({
     windowKind,

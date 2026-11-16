@@ -60,7 +60,7 @@ export interface AgentDockWindowControllerOptions {
   sendMessage: (action: AgentDockSendAction) => Effect.Effect<void, AgentDockFailed>;
   /** Windows: forwards the pointer moves to a dock window only near the dock. */
   pointerForwarding?: PointerForwardingGate | null;
-  /** Windows: puts the shown windows above other apps again when another app covers them. */
+  /** Windows: sets the topmost flag of the shown windows again when another process clears it. */
   topmost?: WindowsTopmostKeeper | null;
   logger?: Logger;
 }
