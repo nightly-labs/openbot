@@ -274,6 +274,7 @@ export interface TeamApiConnectors {
     | "answerWhatsAppRequest"
     | "setWhatsAppOwnNumber"
     | "setWhatsAppWorkingMessage"
+    | "setWhatsAppStatusReactions"
   >;
 }
 

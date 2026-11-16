@@ -76,6 +76,7 @@ import {
   type MessagingIngress,
   type MessagingTransport,
   type RecentMessages,
+  type StatusReaction,
   TelegramCallError,
   WhatsAppAnswerPartlySent,
   WhatsAppRefusedError,
@@ -471,6 +472,16 @@ export class MessagingService {
     yield* whatsapp.setOwnNumber(workspaceId, ownNumber).pipe(toMessagingOperationFailed);
   }).bind(this);
 
+  /** Turns the status reactions of one WhatsApp number on or off. A request that runs keeps its 👀. */
+  readonly setWhatsAppStatusReactions = Effect.fn("MessagingService.setWhatsAppStatusReactions")(function* (
+    this: MessagingService,
+    workspaceId: string,
+    statusReactions: boolean,
+  ) {
+    const whatsapp = yield* messagingStep(() => this.#requireWhatsApp());
+    yield* whatsapp.setStatusReactions(workspaceId, statusReactions).pipe(toMessagingOperationFailed);
+  }).bind(this);
+
   /** Turns the "Working on it…" post of one WhatsApp number on or off. A request that runs keeps its post. */
   readonly setWhatsAppWorkingMessage = Effect.fn("MessagingService.setWhatsAppWorkingMessage")(function* (
     this: MessagingService,
@@ -549,6 +560,23 @@ export class MessagingService {
   #withoutStatusPost(connectionId: string): boolean {
     // Only a WhatsApp number stores this value, so another platform always reads true here.
     return this.#whatsapp?.workingMessage(connectionId) === false;
+  }
+
+  /**
+   * Sets or takes back the status reaction on a person's message. A WhatsApp number whose owner turned
+   * the reactions off gets none: a request that already has its 👀 keeps it. A failed reaction is
+   * ignored, because the posts still show the state of the request.
+   */
+  #react(
+    live: LiveConnection,
+    target: MessageTarget,
+    messageId: string,
+    reaction: StatusReaction,
+    on: boolean,
+  ): Effect.Effect<void> {
+    // Only a WhatsApp number stores this value, so another platform always reads true here.
+    if (this.#whatsapp?.statusReactions(live.record.connectionId) === false) return Effect.void;
+    return live.adapter.react(target, messageId, reaction, on).pipe(Effect.catch(() => Effect.void));
   }
 
   /**
@@ -1428,9 +1456,7 @@ export class MessagingService {
     }
     if (existing && CANCEL_TEXT.test(message.text) && message.files.length === 0) {
       if (yield* this.#threads.stop(existing.linkId, message.authorId).pipe(toMessagingOperationFailed)) {
-        yield* live.adapter
-          .react(message.target, message.platformMessageId, "stopped", true)
-          .pipe(Effect.catch(() => Effect.void));
+        yield* this.#react(live, message.target, message.platformMessageId, "stopped", true);
         return;
       }
     }
@@ -1625,15 +1651,11 @@ export class MessagingService {
             yield* adapter
               .post(message.target, { text: sourceText("status.messaging.busy") })
               .pipe(toMessagingOperationFailed);
-            yield* adapter
-              .react(message.target, message.platformMessageId, "failed", true)
-              .pipe(Effect.catch(() => Effect.void));
+            yield* this.#react(live, message.target, message.platformMessageId, "failed", true);
             return;
           }
           this.#targets.set(key, message.target);
-          yield* adapter
-            .react(message.target, message.platformMessageId, "received", true)
-            .pipe(Effect.catch(() => Effect.void));
+          yield* this.#react(live, message.target, message.platformMessageId, "received", true);
           // In the same order as the turn's own posts: a turn that already started has its status post.
           if (result.waiting)
             yield* this.#serial(
@@ -2118,10 +2140,8 @@ export class MessagingService {
       if (final.reaction) {
         // `linkId` has no colon, so the rest of the key is the person's message.
         const platformMessageId = key.slice(key.indexOf(":") + 1);
-        yield* adapter.react(post.target, platformMessageId, "received", false).pipe(Effect.catch(() => Effect.void));
-        yield* adapter
-          .react(post.target, platformMessageId, final.reaction, true)
-          .pipe(Effect.catch(() => Effect.void));
+        yield* this.#react(live, post.target, platformMessageId, "received", false);
+        yield* this.#react(live, post.target, platformMessageId, final.reaction, true);
       }
       if (final.answer)
         yield* adapter.postAnswer(post.target, final.text, placeholder).pipe(toMessagingOperationFailed);

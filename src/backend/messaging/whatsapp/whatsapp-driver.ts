@@ -77,6 +77,8 @@ export interface WhatsAppCredentials {
   ownNumber: boolean;
   /** False when the owner turned off the "Working on it…" post: a request then gets only its answer. */
   workingMessage: boolean;
+  /** False when the owner turned off the status reactions: a request then gets no 👀, ✅, ❌ or 🫡. */
+  statusReactions: boolean;
 }
 
 export function whatsAppCredentials(values: Record<string, string>): WhatsAppCredentials {
@@ -85,6 +87,7 @@ export function whatsAppCredentials(values: Record<string, string>): WhatsAppCre
     storeKey: Buffer.from(values.whatsappStoreKey ?? "", "base64"),
     ownNumber: values.ownNumber !== "0",
     workingMessage: values.workingMessage !== "0",
+    statusReactions: values.statusReactions !== "0",
   };
 }
 
