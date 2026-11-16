@@ -7,6 +7,7 @@ import type {
 import type { AgentMessage } from "@openbot/ui/data";
 import {
   AgentDock,
+  type AgentDockChatAnswers,
   type AgentDockChatModel,
   type AgentDockSeat,
   type AgentDockSeatRef,
@@ -281,14 +282,84 @@ export function AgentDockSurface() {
           attachments: message.attachments,
         }),
       );
-      bySeat.set(agentDockSeatKey(chat.seat), { messages, working: chat.working, wait: chat.wait });
+      bySeat.set(agentDockSeatKey(chat.seat), {
+        messages,
+        working: chat.working,
+        wait: chat.wait,
+        approval: chat.approval,
+        prompt: chat.prompt,
+        takeover: chat.takeover,
+        usageLimit: chat.usageLimit,
+      });
     }
     return bySeat;
   });
   const agents = createMemo(() => [...(presentation()?.agents ?? [])]);
   const results = createMemo(() => [...(presentation()?.results ?? [])]);
   const chat = (seat: AgentDockSeatRef): AgentDockChatModel =>
-    chats().get(agentDockSeatKey(seat)) ?? { messages: [], working: false, wait: null };
+    chats().get(agentDockSeatKey(seat)) ?? {
+      messages: [],
+      working: false,
+      wait: null,
+      approval: null,
+      prompt: null,
+      takeover: null,
+      usageLimit: null,
+    };
+  /**
+   * The main renderer answers the requests of the chat. A failed answer comes back as a new attempt of
+   * the same request, so the card shows its controls again. A password or a code goes to main from this
+   * window, and not through the main renderer.
+   */
+  const answersFor = (server: string): AgentDockChatAnswers => ({
+    approval: async (approval, decision) => {
+      await perform({
+        type: "respond-approval",
+        serverId: server,
+        agentId: approval.agentId,
+        requestId: approval.requestId,
+        decision,
+      });
+      return true;
+    },
+    prompt: async (prompt, answers) => {
+      await perform({
+        type: "answer-prompt",
+        serverId: server,
+        agentId: prompt.agentId,
+        threadId: prompt.threadId,
+        requestId: prompt.requestId,
+        answers,
+      });
+      return true;
+    },
+    takeover: async ({ request }, decision) => {
+      await perform({
+        type: "respond-takeover",
+        serverId: server,
+        agentId: request.agentId,
+        threadId: request.threadId,
+        requestId: request.requestId,
+        decision,
+      });
+      return true;
+    },
+    secret: (_takeover, input) => agentDockPort().agent.respondToBrowserSecret(input, server),
+    usageLimitSend: async (limit, option, remember) => {
+      await perform({
+        type: "usage-limit-send",
+        serverId: server,
+        agentId: limit.agentId,
+        optionKey: option.key,
+        remember,
+      });
+      // The result comes with a later presentation: the card goes, or a failure shows it again. Until
+      // then the card stays busy, so this promise does not settle.
+      await new Promise<never>(() => undefined);
+    },
+    usageLimitWait: (limit) =>
+      void perform({ type: "usage-limit-wait", serverId: server, agentId: limit.agentId }).catch(() => undefined),
+  });
 
   const serverId = createMemo(() => presentation()?.serverId ?? null);
   const voice = createAgentDockVoice(() => serverId() ?? "local");
@@ -376,6 +447,7 @@ export function AgentDockSurface() {
             onOpenWindow={(agentId) =>
               void perform({ type: "open-window", serverId: server, agentId }).catch(() => undefined)
             }
+            answers={() => answersFor(server)}
             agents={agents()}
             onSelectAgent={(agentId) =>
               void perform({ type: "open-agent", serverId: server, agentId }).catch(() => undefined)
