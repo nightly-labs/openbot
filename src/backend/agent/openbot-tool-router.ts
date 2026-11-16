@@ -1241,7 +1241,7 @@ export class OpenBotToolRouter {
       name,
       path,
       apps,
-      next: `The MCP app ${apps.join(", ")} does not read the Vault: it keeps its own ${name}, and this save does not change it. Do not say that the app is fixed. Tell the user to change the key in the app: for a Marketplace app, open Marketplace, open the app, and click Change key; for a server that the user added, open Server settings, MCP servers, edit the server, and change ${name} in its environment variables. A member who cannot change it asks the server owner.`,
+      next: `The MCP app ${apps.join(", ")} does not read the Vault: it keeps its own ${name}, and this save does not change it. Do not say that the app is fixed. Tell the user to change the key in the app: for a Marketplace app, open Marketplace, open the app, and click Change key; for a server that the user added, open Marketplace, Apps, open the server, click Edit, and change ${name} in its environment variables. A member who cannot change it asks the server owner.`,
     });
   });
 
@@ -1957,6 +1957,8 @@ export class OpenBotToolRouter {
             ?.activeTurnId ??
           null;
         const { startedAt, lastEventAt } = this.#hooks.turnActivity(agent.id, activeTurnId);
+        // A turn that waits for a person stays open, so status stays "working" and waitingFor says what it waits for.
+        const waitingFor = working ? this.#attention.waitsFor(agent.id) : [];
         // A restart loses the provider clock, so the newest message for the agent stands in for it.
         const lastActivity = deliveries.reduce(
           (latest, delivery) => Math.max(latest, Date.parse(delivery.createdAt) || 0),
@@ -1970,6 +1972,7 @@ export class OpenBotToolRouter {
           status: working ? "working" : queuedMessages > 0 ? "queued" : "ready",
           queuedMessages,
           ...(working && startedAt !== null ? { turnStartedAt: new Date(startedAt).toISOString() } : {}),
+          ...(waitingFor.length > 0 ? { waitingFor } : {}),
           ...(lastActivity > 0 ? { lastActivityAt: new Date(lastActivity).toISOString() } : {}),
           ...(openWaits.has(agent.id) ? { openWaits: openWaits.get(agent.id) } : {}),
         };

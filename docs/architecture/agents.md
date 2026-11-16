@@ -763,12 +763,13 @@ approval of `AttentionRegistry.awaitToolApproval`, which states that every agent
 the tools. Full access answers it, as for other built-in tool approvals. `save_mcp_server` connects
 before it saves (`inspectMcpServer`, the silent Test): a server that does not answer is not saved; a
 server that needs an OAuth sign-in or a key is saved. The tools never take or return a header or
-environment value, and show an address without its query: the user enters a key in Server settings,
-MCP. An edit keeps the row's headers and environment, and an edit that would send them to another
+environment value, and show an address without its query: the user enters a key with Edit on the
+server's page in Marketplace, Apps. An edit keeps the row's headers and environment, and an edit that would send them to another
 transport, origin, command, arguments or folder is refused. The approval masks known secrets in the command line and names
 the folder a stdio server starts in. A sign-in shows an `mcp-sign-in:<id>` card in
-the conversation. Its Sign in opens Server settings, MCP, and starts the row's normal sign-in, so a
-joined server signs in through its relay or live page. Continue sends a message that tells the agent
+the conversation. Its Sign in opens the row's page in Marketplace, Apps, and starts the row's normal sign-in,
+so a joined server signs in through its relay (`sign-in-relay-v1`). A host without the relay shows no
+Sign in on the card. Continue sends a message that tells the agent
 to test again. A saved change reaches the agents from their next turn.
 
 When its own tools fail, the agent checks its teammates. When a teammate reports that it is blocked
@@ -786,7 +787,11 @@ enable the plugin. It can offer to create a specialist teammate, but it creates 
 An agent that delegates work can follow and stop it. `openbot.list_agents` reports each agent's
 description to 300 characters (`read_agent` returns all of it), its
 `status` (a starting delivery and a context compaction count as `working`), `queuedMessages`
-(channel work excluded), `turnStartedAt`, and `lastActivityAt`. The last two come from the provider
+(channel work excluded), `turnStartedAt`, `waitingFor`, and `lastActivityAt`. A turn that waits for
+a person's approval, answer or browser takeover stays open, so its agent stays `working`;
+`waitingFor` names what a turn of the agent waits for, from `AttentionRegistry.waitsFor`. Another
+turn of the agent, such as a channel turn, can still work. A detached question holds no turn, so it
+does not count. `turnStartedAt` and `lastActivityAt` come from the provider
 notifications that `TurnLifecycle` sees; they are in memory only, so after a restart
 `lastActivityAt` falls back to the newest message for the agent. OpenBot does not record which
 files a turn changed. `openbot.interrupt_agent` (`src/backend/agent/agent-interrupt-tool.ts`)

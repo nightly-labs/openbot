@@ -164,6 +164,8 @@ export const messages = {
     "Alleen werkruimte heeft de Codex-sandbox nodig, maar Codex kan die op deze computer niet starten, dus de opdrachten van de agent mislukken. Kies Eerst vragen of Volledige toegang in de instellingen van de agent.",
   "error.agent.claudeSandboxUnavailable":
     "Alleen werkruimte heeft de Claude-sandbox nodig, maar Claude kan die op deze computer niet starten: {reason}. Kies Volledige toegang of een andere aanbieder in de instellingen van de agent.",
+  "error.agent.claudeSandboxBlocked":
+    "Alleen werkruimte heeft de Claude-sandbox nodig, maar Claude kan die op deze computer niet starten, dus de opdrachten van de agent mislukken. Kies Volledige toegang of een andere aanbieder in de instellingen van de agent.",
   "error.agent.screenCaptureOff":
     "Schermopname staat uit voor deze agent. De gebruiker kan Computerbesturing aanzetten in de instellingen van de agent.",
   "error.agent.screenCaptureUnavailable": "Schermopname is niet beschikbaar op deze computer.",
@@ -175,7 +177,7 @@ export const messages = {
   "error.agent.mcpToolDeclined": "De gebruiker heeft deze MCP-toolaanroep niet toegestaan. De tool is niet uitgevoerd.",
   "error.agent.mcpServerNotSaved": "De MCP-server reageerde niet, dus is hij niet opgeslagen. {error}",
   "error.agent.mcpServerKeysMove":
-    "De MCP-server {name} bewaart sleutels voor de huidige server. Vraag de gebruiker om het adres, de opdracht, de argumenten of het transport te wijzigen in Serverinstellingen, MCP.",
+    "De MCP-server {name} bewaart sleutels voor de huidige server. Vraag de gebruiker om het adres, de opdracht, de argumenten of het transport te wijzigen in Marktplaats, Apps, {name}.",
   "error.agent.mcpServerBuiltIn":
     "{name} is een onderdeel van OpenBot, dus de MCP-tools kunnen deze niet testen, aan- of uitzetten of verwijderen. De gebruiker beheert deze op de computer waarop OpenBot draait: de GitHub-koppeling in Marktplaats, Apps, GitHub, en PC-besturing in Instellingen, PC-besturing.",
   "error.agent.mcpServerUnknown": "Er is geen MCP-server met de naam {name}. Roep list_mcp_servers aan voor de namen.",

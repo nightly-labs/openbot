@@ -141,6 +141,8 @@ export const messages = {
     "מצב סביבת עבודה בלבד דורש את ארגז החול של Codex, ש-Codex לא מצליח להפעיל במחשב הזה, ולכן הפקודות של הסוכן נכשלות. יש לבחור לשאול קודם או גישה מלאה בהגדרות הסוכן.",
   "error.agent.claudeSandboxUnavailable":
     "מצב סביבת עבודה בלבד דורש את ארגז החול של Claude, ש-Claude לא מצליח להפעיל במחשב הזה: {reason}. יש לבחור גישה מלאה או ספק אחר בהגדרות הסוכן.",
+  "error.agent.claudeSandboxBlocked":
+    "מצב סביבת עבודה בלבד דורש את ארגז החול של Claude, ש-Claude לא מצליח להפעיל במחשב הזה, ולכן הפקודות של הסוכן נכשלות. יש לבחור גישה מלאה או ספק אחר בהגדרות הסוכן.",
   "error.agent.screenCaptureOff": "צילום מסך כבוי עבור הסוכן הזה. המשתמש יכול להפעיל שליטה במחשב בהגדרות הסוכן.",
   "error.agent.screenCaptureUnavailable": "צילום מסך אינו זמין במחשב הזה.",
   "error.agent.screenCaptureShared":
@@ -150,7 +152,7 @@ export const messages = {
   "error.agent.mcpToolDeclined": "המשתמש לא אישר את הקריאה לכלי MCP הזה. הכלי לא הופעל.",
   "error.agent.mcpServerNotSaved": "שרת ה-MCP לא הגיב, ולכן לא נשמר. {error}",
   "error.agent.mcpServerKeysMove":
-    "שרת ה-MCP {name} מחזיק מפתחות עבור השרת הנוכחי שלו. יש לבקש מהמשתמש לשנות את הכתובת, הפקודה, הארגומנטים או שיטת ההעברה שלו בהגדרות השרת, MCP.",
+    "שרת ה-MCP {name} מחזיק מפתחות עבור השרת הנוכחי שלו. יש לבקש מהמשתמש לשנות את הכתובת, הפקודה, הארגומנטים או שיטת ההעברה שלו בחנות, אפליקציות, {name}.",
   "error.agent.mcpServerBuiltIn":
     "{name} הוא חלק מ-OpenBot, ולכן כלי ה-MCP לא יכולים לבדוק, להפעיל, לכבות או להסיר אותו. המשתמש שולט בו במחשב שמריץ את OpenBot: חיבור GitHub בחנות, אפליקציות, GitHub, ושליטה במחשב בהגדרות, שליטה במחשב.",
   "error.agent.mcpServerUnknown": "אין שרת MCP בשם {name}. אפשר לקרוא ל-list_mcp_servers כדי לראות את השמות.",

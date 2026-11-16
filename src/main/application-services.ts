@@ -2422,6 +2422,7 @@ export async function createApplicationServices({
     catalog: modelReleaseCatalog,
     listModels: () => service.listModels(),
     listAgents: () => service.listAgents(),
+    customEndpoints: () => customProviders.list(),
     modelsChanged: () => service.notifyProviderSettingsChanged(),
   });
   await runCauseEffect(modelVisibility.load());
@@ -2530,7 +2531,7 @@ export async function createApplicationServices({
           })),
         ),
       mediaProviders: () => service.workflowMediaProviders(),
-      mediaCredits: () => service.workflowMediaCredits(),
+      mediaCredits: (only) => service.workflowMediaCredits(only),
       keepPicture: (draftId, types) =>
         mailbox.keepDraft(draftId, types).pipe(Effect.map((kept) => (typeof kept === "string" ? kept : kept.id))),
       notify: forwardWorkflowNotice,
@@ -3106,7 +3107,7 @@ export async function createApplicationServices({
     () => serverTimezone.effective(),
     join(app.getPath("userData"), "agent-import-uploads"),
   );
-  // Hermes profiles become agents through the same services; MCP servers through the MCP settings.
+  // Hermes profiles become agents through the same services; MCP servers through the Marketplace.
   const hermesImport = new HermesImportService(
     {
       listAgents: () => service.listAgents(),

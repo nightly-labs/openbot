@@ -324,7 +324,7 @@ export const messages = {
   "error.provider.hermesVersionUnreadable": "Impossibile leggere la versione di Hermes Agent.",
   "error.provider.hermesSignIn": "Accedi con Nous Portal o esegui `hermes setup` in un terminale per usare Hermes.",
   "error.provider.hermesTurnFailed":
-    "Hermes non è riuscito a completare questo turno. Se la risposta indica un motivo, segui le sue indicazioni. Altrimenti un server MCP di questo agente potrebbe non essere disponibile: controllalo in Impostazioni server › MCP, poi invia di nuovo il messaggio.",
+    "Hermes non è riuscito a completare questo turno. Se la risposta indica un motivo, segui le sue indicazioni. Altrimenti un server MCP di questo agente potrebbe non essere disponibile: controllalo in Marketplace, App, poi invia di nuovo il messaggio.",
   "error.provider.hermesRefused":
     "Hermes ha rifiutato questo messaggio prima di iniziare. Invialo di nuovo. Se Hermes rifiuta ogni messaggio, riavvia OpenBot sul computer che esegue questo agente.",
   "error.provider.copilotThinkingRejected":

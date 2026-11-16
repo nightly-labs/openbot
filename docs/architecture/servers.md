@@ -439,6 +439,19 @@ can use workflows can read it, because those members spend the same credits. The
 shows it as a ring, and reads it again when the window comes to the front. A client of a host
 without the capability shows no Sunra models and no credits.
 
+`workflows-higgsfield-v1` does the same for the Higgsfield models (the ids that start with
+`higgsfield-`). The host calls the tools of Higgsfield's MCP server with the Higgsfield sign-in of an
+enabled Higgsfield row in its Apps (`src/backend/workflows/higgsfield-media.ts`, with the parts it
+shares with Sunra in `mcp-media.ts`), and the credits of that account pay for each file; the host
+always sends `use_unlim: false`. The capability has its own two routes, because a frozen answer cannot
+get a new field: `POST /v1/workflows/media/higgsfield/providers {}` answers `{ higgsfield }`, and
+`POST /v1/workflows/media/higgsfield/credits {}` answers `{ higgsfield: { available, quota } | null }`,
+read with Higgsfield's `balance` tool. `quota` is always null. The Sunra routes keep answering
+`{ sunra }` only. A client of a host without the capability shows no Higgsfield models and no
+Higgsfield credits. The `background` field of `workflows-media-transparent-v1` also applies to
+GPT Image 2.6 and Seedream 5.0 Pro on Higgsfield. A video model that takes no reference pictures
+(Wan 2.7) gets a reference picture as its first frame, or as its last frame when the first one is set.
+
 `workflows-media-account-v1` lets an `image` node choose the account that pays for its file. The node
 reads one more field, `account`: the id of one account of the model's provider, as `provider-accounts-v1`
 lists them. An empty field and `default` mean the provider's own sign-in. When the host does not have

@@ -487,7 +487,6 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
                   editingTools ? t("mobile.server.drawer.doneEditingSidebar") : t("mobile.server.drawer.doneEditing")
                 }
                 color={mutedColor}
-                fallbackVariant="filled"
                 systemName="checkmark"
                 onPress={stopEditing}
               >
@@ -497,7 +496,6 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
               <ServerDrawerIconButton
                 accessibilityLabel={showsPlans ? t("mobile.server.drawer.add") : t("mobile.server.drawer.join")}
                 color={mutedColor}
-                fallbackVariant="filled"
                 systemName="plus"
                 onPress={() =>
                   onNavigate(

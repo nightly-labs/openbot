@@ -94,4 +94,14 @@ export const messages = {
   "error.workflow.sunraFailed": "Sunra kon het bestand niet maken: {reason}",
   "error.workflow.sunraTimeout":
     "Sunra heeft het bestand niet op tijd gemaakt. Kijk in het project OpenBot op sunra.ai voordat je de stap opnieuw uitvoert.",
+  "error.workflow.higgsfieldSignIn": "Meld je aan bij Higgsfield in Apps om Higgsfield-modellen te gebruiken.",
+  "error.workflow.higgsfieldNoCredits":
+    "Je Higgsfield-account heeft niet genoeg tegoed. Voeg tegoed toe op higgsfield.ai/pricing en voer de stap daarna opnieuw uit.",
+  "error.workflow.higgsfieldNeedsPlan":
+    "Dit Higgsfield-model heeft een Higgsfield-abonnement nodig. Kies een abonnement op higgsfield.ai/pricing of selecteer een ander model.",
+  "error.workflow.higgsfieldBlocked":
+    "Higgsfield heeft het bestand niet gemaakt, omdat de inhoudscontrole het heeft gestopt. Wijzig de prompt of de invoerafbeeldingen en voer de stap daarna opnieuw uit.",
+  "error.workflow.higgsfieldFailed": "Higgsfield kon het bestand niet maken: {reason}",
+  "error.workflow.higgsfieldTimeout":
+    "Higgsfield heeft het bestand niet op tijd afgemaakt. Kijk in je geschiedenis op higgsfield.ai voordat je de stap opnieuw uitvoert.",
 } as const satisfies PartialTranslation<typeof source>;
