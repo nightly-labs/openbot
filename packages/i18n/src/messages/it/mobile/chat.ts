@@ -551,6 +551,8 @@ export const messages = {
   "mobile.chat.queue.discardMessage": "Il messaggio in coda mantiene il testo che l'agente ha già.",
   "mobile.chat.queue.discard": "Scarta",
   "mobile.chat.queue.alreadyReceived": "L'agente ha già ricevuto questo messaggio, quindi non si può modificare.",
+  "mobile.chat.queue.alreadyReceivedKept":
+    "L’agente ha già ricevuto questo messaggio, quindi non può essere modificato. Quando chiudi questa schermata, il tuo testo va nella casella del messaggio.",
   "mobile.chat.queue.holding": "Sto trattenendo il messaggio per te…",
   "mobile.chat.queue.holdFailed": "OpenBot non è riuscito a trattenere questo messaggio per la modifica.",
   "mobile.chat.queue.messageLabel": "Messaggio",

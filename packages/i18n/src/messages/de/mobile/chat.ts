@@ -561,6 +561,8 @@ export const messages = {
   "mobile.chat.queue.discard": "Verwerfen",
   "mobile.chat.queue.alreadyReceived":
     "Der Agent hat diese Nachricht bereits erhalten, daher kann sie nicht mehr geändert werden.",
+  "mobile.chat.queue.alreadyReceivedKept":
+    "Der Agent hat diese Nachricht bereits erhalten, daher kann sie nicht mehr geändert werden. Wenn du diesen Bildschirm schließt, kommt dein Text ins Nachrichtenfeld.",
   "mobile.chat.queue.holding": "Die Nachricht wird für dich angehalten…",
   "mobile.chat.queue.holdFailed": "OpenBot konnte diese Nachricht nicht zur Bearbeitung anhalten.",
   "mobile.chat.queue.messageLabel": "Nachricht",

@@ -208,6 +208,7 @@ export const PROFILE_TOOL_NAMES: ReadonlySet<string> = new Set([
   "update_profile",
   "update_agents",
   "set_browser_profile",
+  "delete_agent",
 ]);
 
 /**

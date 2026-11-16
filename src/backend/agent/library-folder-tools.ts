@@ -15,8 +15,12 @@ import type { MailboxStoredFile } from "../mailbox-store";
 import { STORAGE_SCAN_TTL_MS } from "../storage-usage";
 import { StoredStateFailure } from "../stored-state-effects";
 
-/** What the agent tools use of the Library folders of this host. */
-export interface AgentLibraryFolders extends Pick<LibraryFoldersStore, "getSnapshot" | "placeInPath" | "mutate"> {
+/**
+ * What the agent tools use of the Library folders of this host. `delete_agent` uses `removeAgent`, as the
+ * app does after it deletes an agent.
+ */
+export interface AgentLibraryFolders
+  extends Pick<LibraryFoldersStore, "getSnapshot" | "placeInPath" | "mutate" | "removeAgent"> {
   /**
    * The agent of each file of the Library, from the same host scan as the Library: a folder takes only
    * files of its own agent. Null: the file has no agent. A file that is not in the map is unknown. A

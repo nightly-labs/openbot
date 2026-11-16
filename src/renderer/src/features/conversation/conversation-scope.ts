@@ -1236,6 +1236,7 @@ export function createConversationViewScope(props: ConversationProps) {
     openAttachmentPicker,
     editQueuedMessage,
     cancelQueuedMessageEdit,
+    endQueuedMessageEdit,
     reorderPresentedQueue,
     submitComposer,
     steerComposer,
@@ -1247,18 +1248,26 @@ export function createConversationViewScope(props: ConversationProps) {
     editPendingSend,
     dismissPendingSend,
   } = actions;
+  // The edited message left the queue: it started, also when its edit ran out of time, or somebody
+  // deleted it. The edit ends here, so the message box never offers a Save that the host refuses.
   createEffect(
     () => {
       const deliveryId = currentEditingDeliveryId();
-      return (
-        !submitting() &&
-        deliveryId !== null &&
-        props.queue?.agentId === props.agent?.id &&
-        props.queue?.deliveries.some((item) => item.id === deliveryId && item.status === "cancelled")
-      );
+      if (submitting() || deliveryId === null || props.queue?.agentId !== props.agent?.id) return null;
+      const delivery = props.queue?.deliveries.find((item) => item.id === deliveryId);
+      // A pending Save owns the outcome until the host answers it. The host ends the edit of a
+      // message that leaves the queue, so a row that still shows the edit is not trusted to end it.
+      if (
+        !delivery ||
+        delivery.status === "queued" ||
+        delivery.editing ||
+        (delivery.status !== "cancelled" && editingPendingSave())
+      )
+        return null;
+      return delivery;
     },
-    (deleted) => {
-      if (deleted) void cancelQueuedMessageEdit();
+    (ended) => {
+      if (ended) endQueuedMessageEdit(ended);
     },
   );
   const messageActions = createMessageActions({

@@ -538,6 +538,8 @@ export const messages = {
   "mobile.chat.queue.discardMessage": "대기 중인 메시지는 에이전트가 이미 받은 텍스트를 유지해요.",
   "mobile.chat.queue.discard": "버리기",
   "mobile.chat.queue.alreadyReceived": "에이전트가 이미 이 메시지를 받아서 변경할 수 없어요.",
+  "mobile.chat.queue.alreadyReceivedKept":
+    "에이전트가 이미 이 메시지를 받아서 변경할 수 없습니다. 이 화면을 닫으면 입력한 텍스트가 메시지 입력란으로 이동합니다.",
   "mobile.chat.queue.holding": "메시지를 보류하는 중…",
   "mobile.chat.queue.holdFailed": "OpenBot이 편집을 위해 이 메시지를 보류하지 못했어요.",
   "mobile.chat.queue.messageLabel": "메시지",

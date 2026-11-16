@@ -159,6 +159,7 @@ export class LibraryFoldersService {
       getSnapshot: () => store.getSnapshot(),
       placeInPath: (agentId, names, fileIds, context) => store.placeInPath(agentId, names, fileIds, context),
       mutate: (action, context) => store.mutate(action, context),
+      removeAgent: (agentId) => store.removeAgent(agentId),
       fileAgents: (fileIds) => this.fileAgents(fileIds),
     };
   }
