@@ -284,9 +284,11 @@
   scrollbar-width: none;
 }
 
-/* The empty text is longer than the menu is wide. It wraps, so the menu does not cut it. */
+/* The empty text is longer than the menu is wide. It wraps, so the menu does not cut it. A long search
+ * text with no space also breaks. */
 .agent-dock-add-menu.ui-action-menu .agent-dock-add-empty[role="menuitem"] {
   height: auto;
+  overflow-wrap: anywhere;
   white-space: normal;
 }
 
