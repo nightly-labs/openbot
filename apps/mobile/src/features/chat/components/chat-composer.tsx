@@ -73,6 +73,7 @@ import type { VoicePalette } from "../model/voice-palette";
 import { attachmentTypeLabel, shareLocalAttachment } from "./attachment-preview";
 import { AttachmentPreviewSheet } from "./attachment-preview-sheet";
 import { ComposerAttachmentTile, localPreviewUri } from "./composer-attachment-tile";
+import { type ComposerContextMeter, ComposerContextRing } from "./composer-context-ring";
 import { DictationMic, DictationStrip, LONG_PRESS_MS } from "./composer-dictation";
 import { ComposerPasteTarget, type PastedFiles } from "./composer-paste-target";
 import type { ComposerVoice } from "./composer-voice";
@@ -202,6 +203,11 @@ interface ChatComposerProps {
   voiceAvatar?: ReactNode;
   /** The agent's colours for the glow in the call bar. */
   voicePalette?: VoicePalette;
+  /**
+   * How full the chat's context is, for a host that reports it. The ring sits before the dictation
+   * mic while the composer is open; the resting bar does not show it.
+   */
+  contextMeter?: ComposerContextMeter;
 }
 
 const NO_FILES: ChatAttachments["items"] = [];
@@ -313,6 +319,7 @@ export const ChatComposer = memo(function ChatComposer({
   voiceAccent,
   voiceAvatar,
   voicePalette,
+  contextMeter,
 }: ChatComposerProps) {
   const { t, format, sourceText } = useText();
   // A text-only composer has no menu or voice motion of its own; these stay at rest.
@@ -453,7 +460,10 @@ export const ChatComposer = memo(function ChatComposer({
   const lineHeight = 22 * fontScale;
   // Without the plus, the text starts at the card's own inset.
   const leadingInset = attachments ? ROW_CONTROL_INSET : FIELD_INSET;
-  const trailingInset = ROW_CONTROL_INSET + (dictationMic ? CONTROL_SIZE + CONTROL_GAP : 0);
+  // The context ring takes a control's box before the mic, only in the open composer. The resting
+  // bar keeps its own insets, so it is as narrow with the ring as without it.
+  const contextInset = contextMeter ? CONTROL_SIZE + CONTROL_GAP : 0;
+  const trailingInset = ROW_CONTROL_INSET + (dictationMic ? CONTROL_SIZE + CONTROL_GAP : 0) + contextInset;
   const rowTextWidth = barWidth - BAR_INSET * 2 - trailingInset - leadingInset;
   // One reading drives both the shape and the height. Measuring the two widths
   // separately gave the card two targets in two frames, so it animated twice.
@@ -633,6 +643,28 @@ export const ChatComposer = memo(function ChatComposer({
   const dictationMicStyle = useAnimatedStyle(() => ({
     opacity: interpolate(morph.get(), [0, 0.3], [1, 0], Extrapolation.CLAMP),
   }));
+  // The context ring is part of the open composer only. It comes in over the second half of the
+  // opening and leaves in the first half of the closing, on the same progress as the shape, so a
+  // dismissal drags it out frame by frame. It rides with the control row into the smaller bar, and
+  // leaves to the voice mode and to dictation as the mic does.
+  const contextRowWidth = CONTROL_SIZE + (dictationMic ? CONTROL_SIZE + CONTROL_GAP : 0);
+  const contextRingStyle = useAnimatedStyle(() => {
+    const progress = expansion.get();
+    const x = interpolate(progress, [0, 1], [restControlShift, 0]);
+    const y = interpolate(progress, [0, 1], [restControlOffset, 0]);
+    const scale = interpolate(progress, [0, 1], [REST_CONTROL_SCALE, 1]);
+    // The control row scales about its centre, so its start edge moves in by half of what it loses.
+    // The ring keeps the scaled gap to that edge.
+    const follow =
+      x + micSlack * (1 - scale) + (contextRowWidth + CONTROL_SIZE) * ((1 - scale) / 2) + CONTROL_GAP * (1 - scale);
+    return {
+      opacity:
+        interpolate(progress, [0.5, 1], [0, 1], Extrapolation.CLAMP) *
+        interpolate(morph.get(), [0, 0.3], [1, 0], Extrapolation.CLAMP) *
+        (1 - dictationPresence.get()),
+      transform: [{ translateX: END_X * follow }, { translateY: y }, { scale }],
+    };
+  });
   // With Liquid Glass the round button stays glass, so the glow under it shows
   // through and spreads on it. Without glass the card is opaque, so the agent's
   // colour fills it while it listens. Continue is the card again.
@@ -838,6 +870,8 @@ export const ChatComposer = memo(function ChatComposer({
   // never reach it. `focused` and `hasDraft` are the React mirror of the two
   // things that open the composer, and both change once per interaction.
   const restingPlus = resizes && !hasDraft && !focused && !replyActive;
+  // The React mirror of the ring's visibility, for touch and for a screen reader.
+  const contextRingEnabled = !restingPlus && !voiceOpen && !dictating;
   const plusDrawn = CONTROL_SIZE * (restingPlus ? REST_CONTROL_SCALE : 1);
   const plusInset = (CONTROL_SIZE - plusDrawn) / 2;
   // `left` is from the start edge: React Native swaps it in a right-to-left layout.
@@ -1420,7 +1454,8 @@ export const ChatComposer = memo(function ChatComposer({
                       {
                         position: "absolute",
                         left: FIELD_INSET,
-                        right: trailingInset,
+                        // The resting bar shows no ring, so its placeholder does not leave room for one.
+                        right: trailingInset - (restingPlus ? contextInset : 0),
                         top: 0,
                         bottom: 0,
                         justifyContent: "center",
@@ -1474,6 +1509,14 @@ export const ChatComposer = memo(function ChatComposer({
                     foreground={String(foreground)}
                     accent={accentFill}
                   />
+                ) : null}
+                {contextMeter ? (
+                  <Animated.View
+                    style={[{ marginEnd: CONTROL_GAP }, contextRingStyle]}
+                    pointerEvents={contextRingEnabled ? "auto" : "none"}
+                  >
+                    <ComposerContextRing meter={contextMeter} enabled={contextRingEnabled} />
+                  </Animated.View>
                 ) : null}
                 <Animated.View
                   style={[{ flexDirection: "row", alignItems: "center", gap: CONTROL_GAP }, controlStyle]}

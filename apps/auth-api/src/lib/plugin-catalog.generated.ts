@@ -835,6 +835,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "c54e87442750f3536c4ec39dbf6deba4638fa6943528ba5371190ee06e3819aa",
     },
     {
+      slug: "hubspot",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "efb708a2f13a17c7dc7f7879b190f9e550949b7ac95737d04d589f21fbaefbb1",
+    },
+    {
       slug: "ibkr",
       version: "1.0.0",
       featured: false,
@@ -6514,6 +6520,59 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://www.hostinger.com",
     privacyPolicyUrl: "https://www.hostinger.com/legal/privacy-policy",
     termsUrl: "https://www.hostinger.com/legal/universal-terms-of-service-agreement",
+    skills: [],
+  },
+  hubspot: {
+    slug: "hubspot",
+    name: "HubSpot",
+    tagline: "CRM records, deals and notes",
+    description:
+      "HubSpot lets agents search and read contacts, companies, deals and tickets, and create or update records, associations, notes and tasks. HubSpot's own local server runs with a service key from your HubSpot account. The scopes of the key set what agents can read and change. The server has no delete tools.",
+    category: "productivity",
+    creatorName: "HubSpot",
+    iconUrl: "https://www.hubspot.com/hubfs/HubSpot_Logos/HubSpot-Inversed-Favicon.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-deals", text: "Summarize my open deals by stage and amount." },
+      { id: "prompt-contact", text: "What do we know about the contacts at this company?" },
+      { id: "prompt-note", text: "Add a note about today's call to this contact in HubSpot." },
+    ],
+    apps: [
+      {
+        id: "app-hubspot-mcp",
+        name: "HubSpot",
+        description:
+          "CRM search, record and association updates, notes and tasks, over HubSpot's local MCP server with a service key.",
+        iconUrl: "https://www.hubspot.com/hubfs/HubSpot_Logos/HubSpot-Inversed-Favicon.png",
+        server: {
+          name: "hubspot",
+          transport: "stdio",
+          command: "npx",
+          args: ["-y", "@hubspot/mcp-server@0.4.0"],
+          auth: [
+            {
+              id: "hubspot-key",
+              kind: "key",
+              label: "Service key",
+              fields: [
+                {
+                  id: "token",
+                  label: "Service key",
+                  env: "PRIVATE_APP_ACCESS_TOKEN",
+                  hint: "In HubSpot, open Development > Keys > Service keys, create a key with the CRM scopes you need, and copy it. A private app access token also works.",
+                },
+              ],
+              docsUrl:
+                "https://developers.hubspot.com/docs/apps/developer-platform/build-apps/authentication/account-service-keys",
+              docsLabel: "Create a key",
+            },
+          ],
+        },
+      },
+    ],
+    websiteUrl: "https://www.hubspot.com",
+    privacyPolicyUrl: "https://legal.hubspot.com/privacy-policy",
+    termsUrl: "https://legal.hubspot.com/terms-of-service",
     skills: [],
   },
   ibkr: {

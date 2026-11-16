@@ -712,7 +712,7 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
             }),
             Effect.flatMap((response) =>
               customStep(() => {
-                const models = routedModels(config, response.data);
+                const models = routedModels(config, response.data, response.steersTurns === true);
                 this.#lastModels.set(config.id, models);
                 return models;
               }),
@@ -735,21 +735,25 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
 
 /**
  * The agent's models under its id. An agent with no list gets the one model `default`.
+ * `steersTurns` marks each model of an agent that takes a message in its running turn (#4977).
  *
  * ACP lets an agent report any string as a model value, so a value that the contract charset refuses
  * is encoded (see `encodedModelId`), and `forChild` gives the agent its own value back. An id that is
  * still refused, as one too long, is dropped alone.
  */
-function routedModels(config: CustomAgentConfig, data: readonly ModelEntry[]): ModelEntry[] {
+function routedModels(config: CustomAgentConfig, data: readonly ModelEntry[], steersTurns: boolean): ModelEntry[] {
+  const steering = steersTurns ? { steersTurns: true } : {};
   if (data.length === 0) {
-    return [{ model: `${config.id}/${CUSTOM_AGENT_DEFAULT_MODEL}`, displayName: config.name }];
+    return [{ model: `${config.id}/${CUSTOM_AGENT_DEFAULT_MODEL}`, displayName: config.name, ...steering }];
   }
   return data.flatMap((item) => {
     const model = item.model?.trim();
     if (!model) return [];
     const id = encodedModelId(`${config.id}/`, model);
     // `<agent name>/<model name>`, as a custom endpoint's models are named: the picker groups by it.
-    return isAgentModel(id) ? [{ ...item, model: id, displayName: `${config.name}/${item.displayName ?? model}` }] : [];
+    return isAgentModel(id)
+      ? [{ ...item, model: id, displayName: `${config.name}/${item.displayName ?? model}`, ...steering }]
+      : [];
   });
 }
 

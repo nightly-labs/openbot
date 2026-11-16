@@ -124,6 +124,9 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "כיווץ פעילות שגרות",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "אירועי שגרות רצופים בצ'אט מוצגים כשורה מכווצת אחת. הקישו על השורה כדי להציג אותם.",
+  "mobile.settings.appearance.fullVisuals": "הצגת תצוגות חזותיות מלאות",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "תצוגה חזותית של סוכן מוצגת בצ׳אט בגובה המלא שלה. כשהאפשרות כבויה, תצוגה גבוהה נחתכת, ואפשר להקיש עליה כדי לראות את כולה.",
   "mobile.settings.animations.title": "אנימציות",
   "mobile.settings.animations.footer":
     "כיבוי אנימציות מפחית תנועה בכל האפליקציה. כשהפחתת תנועה מופעלת בהגדרות הטלפון, האפליקציה גם מפחיתה תנועה. האנימציות שלהלן נשארות אז כבויות.",

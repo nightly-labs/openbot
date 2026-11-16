@@ -1,13 +1,7 @@
-import {
-  type ClientSideConnection,
-  type ContentBlock,
-  type InitializeResponse,
-  RequestError,
-} from "@agentclientprotocol/sdk";
+import { RequestError } from "@agentclientprotocol/sdk";
 import { isFreeOpencodeModel } from "@openbot/contracts/ipc";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import type { CauseCode } from "@openbot/telemetry";
-import { Effect } from "effect";
 import { type AcpCustomEndpoint, type AcpFlavor, shownFailureDetail } from "./acp-flavor";
 import {
   isImageCountDiagnostic,
@@ -16,8 +10,7 @@ import {
   isUnreadableContentDiagnostic,
   isUsageLimitDiagnostic,
 } from "./agent/provider-diagnostics";
-import { getString, isRecord } from "./protocol";
-import { providerCall, providerFailure } from "./provider-client-effects";
+import { isRecord } from "./protocol";
 
 /** OpenCode 2's error for a request that its service cannot answer yet, such as at start (#57204). */
 function isOpenCodeStarting(error: unknown): boolean {
@@ -28,32 +21,6 @@ function isOpenCodeStarting(error: unknown): boolean {
     error.data.errorName === "ServiceUnavailableError"
   );
 }
-
-/**
- * Whether this OpenCode has the `_session/steering` request. OpenCode 2.2.6 does not have it, and a
- * later release reports it in the `_meta` of `initialize` (anomalyco/opencode#53042, #8231).
- */
-export function openCodeSteers(initialization: InitializeResponse): boolean {
-  const steering = isRecord(initialization._meta) ? initialization._meta.steering : null;
-  return isRecord(steering) && steering.supported === true;
-}
-
-/**
- * OpenCode's `_session/steering` puts a message in the running turn, and the agent reads it after its
- * current tool call or model step. The blocks are those of a `session/prompt`. OpenCode answers
- * `promptRequired` when the session runs no turn: it did not keep the message, which then waits in
- * the queue. Each other answer means that OpenCode kept it, so the message must not go a second time.
- */
-export const steerOpenCode = Effect.fn("OpenCode.steer")(function* (
-  connection: ClientSideConnection,
-  message: { sessionId: string; blocks: ContentBlock[] },
-) {
-  const answer = yield* providerCall(() =>
-    connection.extMethod("_session/steering", { sessionId: message.sessionId, prompt: message.blocks }),
-  );
-  if (getString(answer, "outcome") === "promptRequired")
-    return yield* providerFailure(new Error(sourceText("error.backend.steerTurnChanged")));
-});
 
 /**
  * OpenCode's wrapper error for a failed call to its internal server. It carries no cause: OpenCode
@@ -88,8 +55,17 @@ export function isOpenCodeInternalFailure(error: unknown): boolean {
  * user's country: `opencode run` shows "This model is not available in your country". A free model
  * needs no sign-in, so the text told the user to choose a free model while one was chosen. The ID
  * stands in for the display name: a free ID ends in `-free`, as the name ends in "Free".
+ *
+ * OpenCode 2.2.5 also answers this way for an OpenCode Go key that the service refuses, such as an
+ * expired key. Only OpenCode's log has the reason, so a user with a saved key was told to add a key
+ * (#9095). OpenBot sends its saved key only to OpenCode Go.
  */
-function openCodeAuthRequired(error: unknown, model: string | null, endpoint: AcpCustomEndpoint | null): string | null {
+function openCodeAuthRequired(
+  error: unknown,
+  model: string | null,
+  endpoint: AcpCustomEndpoint | null,
+  savedKey: boolean,
+): string | null {
   if (!(error instanceof RequestError) || error.code !== -32000) return null;
   if (endpoint)
     return sourceText(
@@ -98,6 +74,7 @@ function openCodeAuthRequired(error: unknown, model: string | null, endpoint: Ac
     );
   if (model?.toLowerCase().startsWith("opencode/") && isFreeOpencodeModel(model, model))
     return sourceText("error.provider.opencodeFreeModelRefused");
+  if (savedKey) return sourceText("error.provider.opencodeKeyRefused");
   const provider = model?.includes("/") ? model.slice(0, model.indexOf("/")) : "";
   return provider
     ? sourceText("error.provider.opencodeAuthRequired", { provider })
@@ -233,8 +210,8 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
           (typeof error.data.cwd === "string" &&
             error.message === `Invalid params: session ${sessionId} does not belong to cwd: ${error.data.cwd}`))
       : null,
-  turnFailure: (error, detail, redact, log, model, endpoint) => {
-    const authRequired = openCodeAuthRequired(error, model, endpoint);
+  turnFailure: (error, detail, redact, log, model, endpoint, savedKey) => {
+    const authRequired = openCodeAuthRequired(error, model, endpoint, savedKey);
     if (authRequired) return authRequired;
     // Google answers "API key not valid" (#1388).
     if (/invalid api key|api key not valid|unauthori[sz]ed|token refresh failed|authentication failed/i.test(detail))

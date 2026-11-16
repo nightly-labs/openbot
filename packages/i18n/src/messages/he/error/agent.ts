@@ -11,6 +11,12 @@ export const messages = {
     "הכלי לא רץ. ב-tool_call, arguments חייב להיות אובייקט JSON ולא טקסט. יש לשלוח את הקריאה שוב עם arguments כאובייקט.",
   "error.agent.toolCallDiscoveryTool":
     "הכלי לא רץ. tool_call לא יכול להריץ את openbot.tool_search או את openbot.tool_describe. יש לקרוא להם ישירות עם אותם ארגומנטים.",
+  "error.agent.toolCallEnvelopeKeys":
+    "הכלי לא רץ. tool_call מקבל רק name ו-arguments. יש לשים את הארגומנטים של הכלי ב-arguments, כאובייקט, ולשלוח את הקריאה שוב.",
+  "error.agent.toolCallUnknownTool":
+    "הכלי לא רץ. tool_call לא מצא כלי בשם הזה. יש להשתמש בשם המלא המדויק ש-tool_search מחזיר, למשל openbot_browser.snapshot.",
+  "error.agent.toolCallUnknownToolSuggest":
+    "הכלי לא רץ. tool_call לא מצא כלי בשם הזה. ייתכן שהשם המלא הוא {name}. אם כן, יש לשלוח את הקריאה שוב עם השם הזה.",
   "error.agent.routineScheduleArgumentsInvalid":
     "לוח הזמנים של השגרה אינו תקין: {detail} יש לתקן את לוח הזמנים ולנסות שוב. openbot.tool_describe מחזיר את הסכמה.",
   "error.agent.approvalWhileDeleting": "אי אפשר לתת אישור בזמן שהסוכן נמחק.",

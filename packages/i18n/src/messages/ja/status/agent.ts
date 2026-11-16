@@ -95,6 +95,7 @@ export const messages = {
   "status.agent.memoryChangesWithConflicts":
     "メモリー: {saved} 件保存、{updated} 件更新、{forgotten} 件忘却、{notChanged} 件は別のスレッドが先に変更したため未変更。",
   "status.agent.mcpToolCall": "MCP サーバー {name} のツール {tool} を実行します。",
+  "status.agent.uiBlockClosedByMessage": "新しいメッセージで閉じられました",
   "status.agent.nextStepContinues": "エージェントが次のステップの前で止まりました。続けます（{current}/{limit}）。",
   "status.agent.planContinues": "プランに未完了のステップがあります。エージェントが続けます（{current}/{limit}）。",
   "status.agent.compactionContinues":

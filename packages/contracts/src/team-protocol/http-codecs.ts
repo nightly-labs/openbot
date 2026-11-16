@@ -74,6 +74,8 @@ export interface TeamHttpCodecOptions {
   usageTertiary?: boolean;
   /** Read only by V8 responses: the negotiated agent-pending-runtime-v1 capability. */
   agentPendingRuntime?: boolean;
+  /** Read only by V8 responses, for a protocol 9 peer: the negotiated memory-changes-v1 capability. */
+  memoryChanges?: boolean;
 }
 
 type DecodedRequest =

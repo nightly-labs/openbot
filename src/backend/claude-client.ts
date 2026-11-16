@@ -887,6 +887,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     return [...this.#threads.ids()].every((id) => !this.#threads.get(id)?.backgroundTasks);
   }
 
+  /** A background subagent or command of this thread ends when its query closes. */
+  holdsBackgroundWork(threadId: string): Effect.Effect<boolean, ProviderClientOperationError> {
+    return Effect.sync(() => (this.#threads.get(threadId)?.backgroundTasks ?? 0) > 0);
+  }
+
   /**
    * Closes one thread runtime and keeps the rest of the client. The SDK query owns the MCP servers
    * of that thread, so the close is what ends those child processes. The caller releases an idle
@@ -2315,6 +2320,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           typeof input.file_path === "string"
             ? [input.file_path]
             : undefined,
+        // The folder that a finished search worked in, so a chip that names a file from its result finds it.
+        folderPaths:
+          completed && failure === null && ["Glob", "Grep", "LS"].includes(name) && isRecord(input)
+            ? [input.path].filter((path) => typeof path === "string")
+            : undefined,
         item: {
           id,
           type: "toolCall",
@@ -3572,6 +3582,8 @@ function claudeStepTarget(name: string, input: unknown): Record<string, string> 
 function completedToolInput(input: unknown): Record<string, string> {
   const kept: Record<string, string> = {};
   if (!isRecord(input)) return kept;
-  for (const key of ["skill", "command", "file_path"]) if (typeof input[key] === "string") kept[key] = input[key];
+  // `path` is the folder of a Glob or Grep search, for the thread's work folders.
+  for (const key of ["skill", "command", "file_path", "path"])
+    if (typeof input[key] === "string") kept[key] = input[key];
   return kept;
 }

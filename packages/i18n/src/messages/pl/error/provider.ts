@@ -205,6 +205,8 @@ export const messages = {
     "Endpoint „{provider}” wymaga klucza API. Dodaj klucz w Ustawieniach serwera → Dostawcy, a potem spróbuj ponownie.",
   "error.provider.opencodeKeyExpired":
     "Twój klucz API OpenCode wygasł. Utwórz nowy klucz w OpenCode Console, wklej go w ustawieniach OpenCode, potem spróbuj ponownie.",
+  "error.provider.opencodeKeyRefused":
+    "OpenCode Go odrzucił Twój zapisany klucz API. Klucz mógł wygasnąć. Utwórz nowy klucz w OpenCode Console, wklej go w ustawieniach OpenCode, potem spróbuj ponownie.",
   "error.provider.opencodeServiceFailure":
     "OpenCode nie ukończył tej tury, ponieważ jego lokalna usługa uległa awarii. Spróbuj ponownie. Jeśli błąd się powtarza, połącz ponownie OpenCode w Ustawieniach.",
   "error.provider.opencodeRateLimited":
@@ -274,6 +276,10 @@ export const messages = {
     "Google nie pozwala Gemini działać z lokalizacji sieciowej komputera, na którym działa ten agent. Użyj Gemini na innym komputerze albo wybierz innego dostawcę dla tego agenta.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini utracił połączenie ze swoim agentem i się zatrzymał. Wyślij wiadomość, aby kontynuować.",
+  "error.provider.grokServiceFailure":
+    "Usługa Grok jest przeciążona lub zgłasza błąd. Spróbuj ponownie za kilka minut albo wybierz inny model.",
+  "error.provider.grokConnectionFailed":
+    "Grok nie może połączyć się ze swoją usługą. Sprawdź połączenie z internetem, a potem wyślij wiadomość ponownie.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "Na hoście z Windows Gemini otwiera stronę Google na samym hoście. Połącz Gemini na komputerze hosta.",
   "error.provider.cursorArchivePath": "Archiwum Cursor zawiera nieoczekiwany plik.",

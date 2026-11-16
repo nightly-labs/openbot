@@ -18,6 +18,8 @@ export const messages = {
     "OpenBot は 1Password CLI をインストールできませんでした。インターネット接続を確認してから、もう一度お試しください。",
   "error.connector.onePasswordCliSignedOut":
     "1Password CLI はサインインしていません。1Password アプリで連携をオンにしてから、もう一度接続してください。",
+  "error.connector.onePasswordAppUnreachable":
+    "OpenBot が 1Password アプリに接続できません。1Password を開いてロックを解除してください。「設定」>「開発者」で「1Password CLI と連携」がオンになっていることを確認し、もう一度お試しください。",
   "error.connector.onePasswordCliFailed": "1Password CLI が失敗しました: {detail}",
   "error.connector.onePasswordUnexpected": "1Password から予期しない応答がありました: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password はサービスアカウントのトークンを受け付けませんでした。",

@@ -1,4 +1,4 @@
-import { type AgentProviderId, isKnownAgentProvider, providerSteersTurns } from "@openbot/contracts/agent-providers";
+import { type AgentProviderId, agentSteersTurns, isKnownAgentProvider } from "@openbot/contracts/agent-providers";
 import { supportedAttachmentExtensions } from "@openbot/contracts/attachment-files";
 import {
   type AccountUsageLimit,
@@ -259,14 +259,17 @@ export function ConversationComposer() {
     return status?.state === "sign-in-required" ? status : null;
   });
   /**
-   * An expired OpenCode key is replaced in this server's Providers settings, so its banner opens
-   * them (#2544). The banner holds the error in the reader's language, and that text has no
-   * placeholder, so it is compared whole.
+   * An expired or refused OpenCode key is replaced in this server's Providers settings, so its
+   * banner opens them (#2544, #9095). The banner holds the error in the reader's language, and
+   * these texts have no placeholder, so each is compared whole.
    */
   const updateOpenCodeKey = () => {
     if (props.agent?.provider !== "opencode") return undefined;
-    const expired = localizeSourceText(sourceText("error.provider.opencodeKeyExpired"));
-    return currentChatError() === expired ? props.onManageProviders : undefined;
+    const error = currentChatError();
+    const keyError = (["error.provider.opencodeKeyExpired", "error.provider.opencodeKeyRefused"] as const).some(
+      (key) => error === localizeSourceText(sourceText(key)),
+    );
+    return keyError ? props.onManageProviders : undefined;
   };
   /** The button of the error banner: the fix that the error names, or none. */
   const errorBannerAction = () => {
@@ -304,8 +307,11 @@ export function ConversationComposer() {
       );
     return undefined;
   };
-  /** An ACP provider has no steer request, so its queued messages wait for the turn to end (#3689). */
-  const steers = () => !props.agent || providerSteersTurns(props.agent.provider);
+  /**
+   * An ACP provider has no steer request, so its queued messages wait for the turn to end (#3689). A
+   * custom agent steers when its model reports it (#4977).
+   */
+  const steers = () => !props.agent || agentSteersTurns(props.agent, props.modelOptions);
   /** Steer for a provider that can steer; else Send now, which stops the turn and runs the message next. */
   const sendQueued = () => (steers() ? props.onSteerQueuedMessage : props.onSendQueuedMessageNow);
   /** Tab sends the draft into the running turn, in place of Send and then Steer on its queue row. */

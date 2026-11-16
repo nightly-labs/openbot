@@ -30,7 +30,8 @@ import {
   GEMINI_DIR_FLAG,
   geminiSavedKeyLimitFailure,
 } from "./acp-flavor-antigravity";
-import { OPENCODE_ACP_FLAVOR, openCodeSteers, steerOpenCode } from "./acp-flavor-opencode";
+import { OPENCODE_ACP_FLAVOR } from "./acp-flavor-opencode";
+import { acpSessionSteers, steerAcpSession } from "./acp-session-steering";
 import type { AcpArgv, AcpExtensionMethod } from "./acp-sign-in";
 import { readMuseAccount } from "./agent/muse-login";
 import { claudeModelName, modelsAfterOpenCodeDiscoveryFailure, serviceTierFields } from "./agent/provider-models";
@@ -297,12 +298,14 @@ interface AcpAuthenticateSignIn {
  * `codex-device` is the Codex app-server device code. `muse-device` is the device code a `muse serve`
  * host asks Meta for. `cli` spawns the provider's CLI and reads its link: `device` prints a code the
  * user confirms, `paste` waits for the code the provider's page shows, which the user copies back,
- * and `link` is a page that signs the CLI in by itself.
+ * and `link` is a page that signs the CLI in by itself. `acp-delegated` is an ACP sign-in whose server
+ * gives its page to OpenBot instead of a browser, as a `link`.
  */
 type ProviderCodeSignIn =
   | { kind: "codex-device" }
   | { kind: "muse-device"; timeoutMs: number }
-  | { kind: "cli"; flow: "device" | "paste" | "link"; command: ProviderSignInCommand };
+  | { kind: "cli"; flow: "device" | "paste" | "link"; command: ProviderSignInCommand }
+  | (Omit<AcpAuthenticateSignIn, "kind"> & { readonly kind: "acp-delegated" });
 
 /**
  * The Gemini API key sign-in, the other way in when Google's browser sign-in cannot reach this
@@ -764,7 +767,9 @@ interface ProviderModelCatalog {
   /** The name to show for a model, before the name the CLI gives. Null keeps the CLI's name. */
   modelName?(id: string): string | null;
   /** Fields that only this provider's CLI reports. */
-  modelFields?(model: ModelListResponse["data"][number]): { fastServiceTier?: string; ultrafastServiceTier?: string };
+  modelFields?(
+    model: ModelListResponse["data"][number],
+  ): Pick<AgentModelOption, "fastServiceTier" | "ultrafastServiceTier" | "steersTurns">;
   /**
    * The models to keep when the list failed, timed out or came back empty. Without this hook a
    * failed list keeps the previous models, and an empty list is a real answer.
@@ -1170,6 +1175,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
               }
             : null;
         },
+        // `openCodeConfigEnv` sends the saved key only to OpenCode Go (#7550).
+        savedKey: (modelId) =>
+          Boolean(context.apiKey("opencode")) && (modelId?.toLowerCase().startsWith("opencode-go/") ?? false),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
         reportMcpDrops: context.reportMcpDrops,
@@ -1179,8 +1187,8 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
           readOpenCodeGoUsage(context.apiKey("opencode")).pipe(
             Effect.mapError((failure) => providerFailure(failure.cause)),
           ),
-        steer: steerOpenCode,
-        steers: openCodeSteers,
+        steer: steerAcpSession,
+        steers: acpSessionSteers,
         history: context.history?.("opencode"),
       }),
     createProfileClient: (cli, timeout, context) =>
@@ -1588,6 +1596,15 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       env: MISTRAL_ENV,
       timeoutMs: CLI_LOGIN_TIMEOUT_MS,
     },
+    // A joined server has no browser that the user sees. Vibe 3.1.0's `browser-auth-delegated` gives
+    // the Mistral page to OpenBot, and asks Mistral until the user finishes there, on any device.
+    codeSignIn: {
+      kind: "acp-delegated",
+      methodId: "browser-auth-delegated",
+      argv: MISTRAL_ARGV,
+      env: MISTRAL_ENV,
+      timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+    },
     // The CLI has no sign-out command, and its ACP server has no `logout` method. Its own
     // `_auth/signOut` removes the saved key. A key in the user's environment stays.
     signOut: { argv: MISTRAL_ARGV, env: () => ({ ...MISTRAL_ENV }), timeoutMs: 30_000, acpLogout: "_auth/signOut" },
@@ -1709,7 +1726,13 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     // again in `model/list`: Claude Agent ACP with a few plugins and MCP servers does.
     // Kiro CLI answers a cold `session/new` before its own catalogue loads and lists no models, so
     // the list is read once more after each start.
-    catalog: { slowList: true, partialListAtStart: true, relistAfterStart: true },
+    catalog: {
+      slowList: true,
+      partialListAtStart: true,
+      relistAfterStart: true,
+      // Whether the custom agent that serves the model takes a message in its running turn (#4977).
+      modelFields: (model) => (model.steersTurns ? { steersTurns: true } : {}),
+    },
     resolveCli: () => Effect.succeed(CUSTOM_AGENTS_CLI),
     createClient: (_cli, timeout, context, confinement) =>
       new CustomAcpAgentsClient(
@@ -1775,6 +1798,10 @@ function customAgentChild(
     ...(confinement ? { confine: (target) => confineSpawnTarget(target, confinement, customAgentStatePaths()) } : {}),
     signInMessage: sourceText("error.provider.customAgentSignIn"),
     servesModel: () => savedCustomAgents(context).some((saved) => saved.id === config.id),
+    // A custom agent that reports `_session/steering` takes a message in its running turn (#4977).
+    // Any other one gets no request, and the message waits in the queue.
+    steer: steerAcpSession,
+    steers: acpSessionSteers,
     ...(profileGeneration
       ? {}
       : {

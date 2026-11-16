@@ -23,6 +23,7 @@ import {
   useRoutineCollapsePreference,
 } from "@/features/settings/model/routine-collapse";
 import { saveTextSize, useTextSize } from "@/features/settings/model/text-size";
+import { saveFullVisualPreference, useFullVisualPreference } from "@/features/settings/model/visual-preview";
 import { PauseSlider } from "@/features/voice/components/pause-slider";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
@@ -149,6 +150,7 @@ export function AppearanceSettingsScreen() {
         ) : null}
       </SettingsSection>
       <RoutineCollapseSection dark={theme === "dark"} />
+      <FullVisualSection dark={theme === "dark"} />
     </SettingsContent>
   );
 }
@@ -169,6 +171,32 @@ function RoutineCollapseSection({ dark }: { dark: boolean }) {
           onValueChange={(enabled) => {
             setError(null);
             void saveRoutineCollapsePreference(enabled).catch(() => {
+              setError(t("mobile.settings.saveFailed"));
+              void haptics.notification("error");
+            });
+          }}
+        />
+      </SettingsRow>
+    </SettingsSection>
+  );
+}
+
+/** Whether a visual reply in a chat grows to the full height of its page. */
+function FullVisualSection({ dark }: { dark: boolean }) {
+  const { t } = useText();
+  const preference = useFullVisualPreference();
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <SettingsSection footer={error ?? t("mobile.settings.appearance.fullVisualsFooter")}>
+      <SettingsRow>
+        <SettingsSwitch
+          value={preference.enabled}
+          disabled={!preference.ready || preference.saving}
+          label={t("mobile.settings.appearance.fullVisuals")}
+          dark={dark}
+          onValueChange={(enabled) => {
+            setError(null);
+            void saveFullVisualPreference(enabled).catch(() => {
               setError(t("mobile.settings.saveFailed"));
               void haptics.notification("error");
             });

@@ -16,6 +16,7 @@ import {
   toWireAgentKeys,
   toWireAgentKeysObjectForPath,
 } from "./current-agent-keys";
+import { withConversationMemoryChanges } from "./memory-changes-v1";
 import { eventHasPromptQuestions, withEventPromptMultiSelect } from "./prompt-multi-select-v1";
 import { withConversationSubagents } from "./subagents-v1";
 import { withConversationUiBlocks } from "./ui-blocks-v1";
@@ -66,11 +67,12 @@ export function decodeTeamProtocolV8BaseCurrentEvent(value: unknown): TeamProtoc
         ),
         value,
         // A host sends a UI block only under ui-blocks-v1, the subagents only under subagents-v1, a
-        // video request only under video-generation-v1, a multi-select flag only under
-        // prompt-multi-select-v1, a takeover reason only under browser-sign-in, a vault skip reason only
-        // under browser-vault-skip-v1, context states only
-        // under context-usage-v1, a third usage window only under usage-tertiary-v1, and a pending runtime
-        // only under agent-pending-runtime-v1, so a present one is always kept.
+        // video request only under video-generation-v1, memory changes only under memory-changes-v1,
+        // a multi-select flag only under prompt-multi-select-v1, a takeover reason only under
+        // browser-sign-in, a vault skip reason only under browser-vault-skip-v1, context states only
+        // under context-usage-v1, a third usage window only under usage-tertiary-v1, and a pending
+        // runtime only under agent-pending-runtime-v1, so a present one is always kept.
+        value,
         value,
         value,
         value,
@@ -99,6 +101,7 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
     contextUsage?: boolean;
     usageTertiary?: boolean;
     agentPendingRuntime?: boolean;
+    memoryChanges?: boolean;
   } = {},
 ): string | null {
   // `turn-progress` bypasses the frozen codec, so it needs the vocabulary swap applied by hand.
@@ -137,6 +140,7 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
     options.uiBlocks ? currentValue : null,
     options.subagents ? currentValue : null,
     options.videoGeneration ? currentValue : null,
+    options.memoryChanges ? currentValue : null,
   );
   const withMultiSelect = promptMultiSelect ? withEventPromptMultiSelect(withPlans, currentValue) : withPlans;
   const withContext = contextUsage
@@ -152,9 +156,10 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
 /**
  * Puts the plans and the senders of a conversation event beside its frozen projection, the UI blocks
  * of `uiBlockSource` when it is not null, the subagents of `subagentSource` when it is not null, and
- * the video requests of `videoSource` when it is not null. See `withConversationPlans`,
+ * the video requests of `videoSource` when it is not null, and the memory changes of `memorySource`
+ * when it is not null. See `withConversationPlans`,
  * `withConversationSenders`, `withConversationUiBlocks`, `withConversationSubagents` and
- * `withConversationVideoGeneration`.
+ * `withConversationVideoGeneration` and `withConversationMemoryChanges`.
  */
 function withEventConversationPlans(
   projected: TeamProtocolV8BaseJsonValue,
@@ -162,6 +167,7 @@ function withEventConversationPlans(
   uiBlockSource: unknown,
   subagentSource: unknown,
   videoSource: unknown,
+  memorySource: unknown,
 ): TeamProtocolV8BaseJsonValue {
   if (projected === null || Array.isArray(projected) || typeof projected !== "object") return projected;
   if (!isDynamicRecord(source)) return projected;
@@ -175,11 +181,12 @@ function withEventConversationPlans(
   const withSubagents = isDynamicRecord(subagentSource)
     ? withConversationSubagents(withBlocks, subagentSource[key])
     : withBlocks;
+  const withVideo = isDynamicRecord(videoSource)
+    ? withConversationVideoGeneration(withSubagents, videoSource[key])
+    : withSubagents;
   return {
     ...projected,
-    [key]: isDynamicRecord(videoSource)
-      ? withConversationVideoGeneration(withSubagents, videoSource[key])
-      : withSubagents,
+    [key]: isDynamicRecord(memorySource) ? withConversationMemoryChanges(withVideo, memorySource[key]) : withVideo,
   };
 }
 

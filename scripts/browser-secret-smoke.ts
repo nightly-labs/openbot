@@ -110,6 +110,8 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
   let mirroredPageLoads = 0;
   let modalPageLoads = 0;
   let stuckPageLoads = 0;
+  let lostPageLoads = 0;
+  let lostPageOffline = false;
   await protocol.handle("https", (request) => {
     const url = new URL(request.url);
     if (url.pathname === "/frame-form" && FRAME_HOSTS.includes(url.hostname))
@@ -131,6 +133,14 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
         { headers: { "Content-Type": "text/html" } },
       );
     if (url.pathname === "/stuck") stuckPageLoads += 1;
+    if (url.pathname === "/lost") {
+      lostPageLoads += 1;
+      // The page cannot load again, as when the computer is offline when the card ends (#9883).
+      if (lostPageOffline) return Response.error();
+      return new Response(`<!doctype html><body><label>Password<input id="password" type="password"></label></body>`, {
+        headers: { "Content-Type": "text/html" },
+      });
+    }
     if (url.pathname === "/modal") {
       modalPageLoads += 1;
       // A password step in a dialog that holds more fields (#9643). The page copies the password into
@@ -176,6 +186,12 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
         : `
       <label>Password<input id="password" type="password"></label>
       <label>Code<input id="code" inputmode="numeric"></label>
+      ${
+        url.pathname === "/combined"
+          ? `<label>Authenticator code<input id="combined-code" autocomplete="one-time-code" inputmode="numeric"></label>
+      <button id="combined-submit" onclick="if (document.querySelector('#password').value && /^[0-9]{6}$/.test(document.querySelector('#combined-code').value)) location.href = '/complete'">Sign in with code</button>`
+          : ""
+      }
       ${
         url.pathname === "/login"
           ? `<form method="get" action="/search"><label>Search password<input id="get-password" name="password" type="password"></label></form>
@@ -268,6 +284,63 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
         const snapshot = await runCauseEffect(browser.snapshot(tab.id));
         if (JSON.stringify(snapshot).includes(secret)) throw new Error("Authentication value reached a snapshot.");
         if (!snapshot.url.endsWith("/complete")) throw new Error("Authentication fixture did not complete.");
+      } finally {
+        await runCauseEffect(browser.close(tab.id));
+      }
+    }
+    // A form that sends the password and the authenticator code in one submit gets both from one saved
+    // login. The page goes on only when both fields hold a value at the click, so a fill that empties
+    // the first field before the second one fails here.
+    const combinedPassword = "fixture-combined-password-418";
+    const combinedCode = "604213";
+    {
+      const tab = await runCauseEffect(
+        browser.open("https://authentication.openbot.test/combined", "secret-thread", "secret-agent"),
+      );
+      try {
+        const contents = webContents.getAllWebContents().find((candidate) => candidate.getURL() === tab.url);
+        if (!contents) throw new Error("Missing combined sign-in fixture.");
+        await waitForPresentedFrame(contents);
+        const params = ({ saved = true, codeSelector = "#combined-code" } = {}): DynamicToolCallParams => ({
+          namespace: "openbot_browser",
+          tool: "submit_secret",
+          threadId: "secret-thread",
+          ownerAgentId: "secret-agent",
+          turnId: "secret-turn",
+          callId: "secret-combined",
+          arguments: {
+            tabId: tab.id,
+            method: "password",
+            ...(saved ? { loginId: "combined-login" } : {}),
+            targets: [
+              { kind: "css", selector: "#password" },
+              { kind: "css", selector: codeSelector },
+            ],
+            digits: 6,
+            submission: "click",
+            submitTarget: { kind: "css", selector: "#combined-submit" },
+          },
+        });
+        // A password target with code fields needs a saved login, and a field that does not ask for a
+        // code is not a code field.
+        const refused = await runCauseEffect(browser.prepareSecret(params({ saved: false }))).then(
+          () => false,
+          () => true,
+        );
+        if (!refused) throw new Error("Password and code targets were accepted without a saved login.");
+        const wrongField = await runCauseEffect(browser.prepareSecret(params({ codeSelector: "#code" })));
+        wrongField.cancel();
+        if (wrongField.vaultFillable || !wrongField.withCode)
+          throw new Error("A field that does not ask for a code was classified as a code field.");
+        const handoff = await runCauseEffect(browser.prepareSecret(params()));
+        if (!handoff.vaultFillable || !handoff.withCode)
+          throw new Error("The password and code fields were classified wrongly for a vault fill.");
+        if ((await runCauseEffect(handoff.submit(combinedPassword, true, combinedCode))) !== "submitted")
+          throw new Error("The combined sign-in did not go on: a field was empty at the submit.");
+        const snapshot = await runCauseEffect(browser.snapshot(tab.id));
+        if ([combinedPassword, combinedCode].some((value) => JSON.stringify(snapshot).includes(value)))
+          throw new Error("A combined sign-in value reached a snapshot.");
+        if (!snapshot.url.endsWith("/complete")) throw new Error("Combined sign-in fixture did not complete.");
       } finally {
         await runCauseEffect(browser.close(tab.id));
       }
@@ -760,6 +833,161 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
     } finally {
       await runCauseEffect(browser.close(stuckTab.id));
     }
+    // A saved login that fails keeps the tab protected. When its card ends, by a cancel, a stop or the
+    // end of a routine, the tab must be free again: also when the page cannot load again, and also
+    // when the card ends while the fill still runs. Until then, the agent can still close the tab (#9883).
+    const lostResults: Record<string, { passed: boolean; [detail: string]: boolean | number | string }> = {};
+    for (const ending of ["after-fill", "during-fill"] as const) {
+      lostPageOffline = false;
+      const lostTab = await runCauseEffect(
+        browser.open("https://authentication.openbot.test/lost", "secret-thread", "secret-agent"),
+      );
+      try {
+        const lostContents = webContents.getAllWebContents().find((item) => item.getURL() === lostTab.url);
+        if (!lostContents) throw new Error("Missing failed fill fixture.");
+        const handoff = await runCauseEffect(
+          browser.prepareSecret({
+            namespace: "openbot_browser",
+            tool: "submit_secret",
+            threadId: "secret-thread",
+            ownerAgentId: "secret-agent",
+            turnId: "secret-turn",
+            callId: `lost-${ending}`,
+            arguments: {
+              tabId: lostTab.id,
+              method: "password",
+              targets: [{ kind: "css", selector: "#password" }],
+              submission: "on_input",
+            },
+          }),
+        );
+        // The page renders its field again while the saved login is read, so the fill fails.
+        await lostContents.executeJavaScript("document.querySelector('#password').id = 'rendered-again'", true);
+        const loadsBefore = lostPageLoads;
+        const title = () => browser.listTabs().find((tab) => tab.id === lostTab.id)?.title;
+        let protectedAfterFill = false;
+        if (ending === "after-fill") {
+          await runCauseEffect(handoff.submit("fixture-password-118204", true)).catch(() => undefined);
+          protectedAfterFill = title() === "Secure authentication";
+          lostPageOffline = true;
+          await runCauseEffect(browser.beginTakeover(lostTab.id));
+          browser.endTakeover(lostTab.id);
+        } else {
+          const fill = runCauseEffect(handoff.submit("fixture-password-118204", true)).catch(() => undefined);
+          browser.endTakeover(lostTab.id);
+          await fill;
+          protectedAfterFill = true;
+        }
+        const deadline = Date.now() + 15_000;
+        while (title() === "Secure authentication" && Date.now() < deadline)
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        const released = title() !== "Secure authentication";
+        const snapshotWorks = await runCauseEffect(browser.snapshot(lostTab.id)).then(
+          () => true,
+          () => false,
+        );
+        const closed = await runCauseEffect(
+          browser.handleDynamicTool({
+            namespace: "openbot_browser",
+            tool: "close_tab",
+            threadId: "secret-thread",
+            ownerAgentId: "secret-agent",
+            turnId: "secret-turn",
+            callId: `lost-close-${ending}`,
+            arguments: { tabId: lostTab.id },
+          }),
+        ).then(
+          (result) =>
+            result.success || result.contentItems.map((item) => (item.type === "inputText" ? item.text : "")).join(" "),
+          (error: unknown) => (error instanceof Error ? error.message : String(error)),
+        );
+        lostResults[ending] = {
+          passed: protectedAfterFill && released && snapshotWorks && closed === true,
+          protectedAfterFill,
+          reloadAttempts: lostPageLoads - loadsBefore,
+          released,
+          snapshotWorks,
+          closed,
+        };
+      } finally {
+        await runCauseEffect(browser.close(lostTab.id));
+      }
+    }
+    // A protected tab that nothing releases: the agent can close it, and no other tool reads it.
+    lostPageOffline = false;
+    const heldTab = await runCauseEffect(
+      browser.open("https://authentication.openbot.test/lost", "secret-thread", "secret-agent"),
+    );
+    try {
+      const heldContents = webContents.getAllWebContents().find((item) => item.getURL() === heldTab.url);
+      if (!heldContents) throw new Error("Missing failed fill fixture.");
+      const handoff = await runCauseEffect(
+        browser.prepareSecret({
+          namespace: "openbot_browser",
+          tool: "submit_secret",
+          threadId: "secret-thread",
+          ownerAgentId: "secret-agent",
+          turnId: "secret-turn",
+          callId: "held-fill",
+          arguments: {
+            tabId: heldTab.id,
+            method: "password",
+            targets: [{ kind: "css", selector: "#password" }],
+            submission: "on_input",
+          },
+        }),
+      );
+      const tool = (name: string, args: DynamicToolCallParams["arguments"]) =>
+        runCauseEffect(
+          browser.handleDynamicTool({
+            namespace: "openbot_browser",
+            tool: name,
+            threadId: "secret-thread",
+            ownerAgentId: "secret-agent",
+            turnId: "secret-turn",
+            callId: `held-${name}`,
+            arguments: args,
+          }),
+        ).then(
+          (result) =>
+            result.success || result.contentItems.map((item) => (item.type === "inputText" ? item.text : "")).join(" "),
+          (error: unknown) => (error instanceof Error ? error.message : String(error)),
+        );
+      const protectedError = (result: unknown) =>
+        typeof result === "string" && result.includes("protected during authentication");
+      // While the card is open, the tab stays: a close would leave the card on a tab that is gone.
+      const closeWithCardRefused = protectedError(await tool("close_tab", { tabId: heldTab.id }));
+      await heldContents.executeJavaScript("document.querySelector('#password').id = 'rendered-again'", true);
+      await runCauseEffect(handoff.submit("fixture-password-118204", true)).catch(() => undefined);
+      const held = browser.listTabs().find((tab) => tab.id === heldTab.id)?.title === "Secure authentication";
+      const snapshotRefused = protectedError(await tool("snapshot", { tabId: heldTab.id }));
+      const navigateRefused = protectedError(await tool("navigate", { tabId: heldTab.id, direction: "reload" }));
+      const closed = await tool("close_tab", { tabId: heldTab.id });
+      lostResults.held = {
+        passed:
+          held &&
+          closeWithCardRefused &&
+          snapshotRefused &&
+          navigateRefused &&
+          closed === true &&
+          !browser.listTabs().some((tab) => tab.id === heldTab.id),
+        held,
+        closeWithCardRefused,
+        snapshotRefused,
+        navigateRefused,
+        closed,
+      };
+    } finally {
+      await runCauseEffect(browser.close(heldTab.id));
+    }
+    const lostReport = {
+      status: Object.values(lostResults).every((result) => result.passed) ? "passed" : "issues_found",
+      ...lostResults,
+    };
+    await mkdir(".openbot-build", { recursive: true });
+    await writeFile(".openbot-build/browser-secret-ended-fill.json", JSON.stringify(lostReport, null, 2));
+    if (lostReport.status !== "passed")
+      throw new Error(`A tab stayed locked after its saved login ended: ${JSON.stringify(lostReport)}`);
     await runFrameScenario(browser);
     process.stdout.write("BrowserHost: secure password, OTP and authenticator handoff passed.\n");
   } finally {

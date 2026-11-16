@@ -819,6 +819,12 @@
       "detailSha256": "c54e87442750f3536c4ec39dbf6deba4638fa6943528ba5371190ee06e3819aa"
     },
     {
+      "slug": "hubspot",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "efb708a2f13a17c7dc7f7879b190f9e550949b7ac95737d04d589f21fbaefbb1"
+    },
+    {
       "slug": "ibkr",
       "version": "1.0.0",
       "featured": false,

@@ -240,12 +240,17 @@ export const messages = {
     "登录服务器发送了 OpenBot 无法读取的响应。如果该服务为你提供了 API 密钥或令牌，请将其添加到该服务器的设置中，然后重新测试连接。",
   "error.backend.mcpServerExited": "服务器在响应之前就停止了。请在终端中运行该命令以查看错误。",
   "error.backend.mcpServerFailedToStart": "服务器没有启动：{reason}",
+  "error.backend.mcpServerStartAbandoned": "服务器启动前 {provider} 已停止等待，因此其智能体无法获得此服务器的工具。",
   "error.backend.mcpToolSchemaRefused":
     "它的工具 {tool} 使用了这个提供方无法读取的输入格式。其他提供方的智能体仍会获得这个服务器。",
   "error.backend.mcpServerSignInForProvider":
     "{provider} 无法使用 MCP 服务器 {name}，因为该服务器要求登录。请打开 MCP 设置并选择“登录”。",
   "error.backend.mcpServerFailedForProvider":
     "{provider} 无法启动 MCP 服务器 {name}。请打开 MCP 设置并选择“测试连接”查看原因。",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider} 无法启动 MCP 服务器 {name}，{provider} 无法使用它的工具。{provider} 会自行启动服务器，因此 OpenBot 中的连接测试可能会成功。请开始新的聊天后再试一次。",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider} 无法启动 MCP 服务器 {name}，因为服务器没有及时响应。请开始新的聊天后再试一次。",
   "error.backend.mcpOAuthProxyUnavailable": "OpenBot 无法为这台服务器建立本地登录连接。请重启 OpenBot 后再试一次。",
   "error.backend.mcpOAuthSignInNeeded": "该 MCP 服务器的登录已结束。用户需要在 OpenBot 中重新登录。",
   "error.backend.mcpServerUnreachable": "OpenBot 无法连接该服务器。请检查地址与网络。",
@@ -354,6 +359,8 @@ export const messages = {
   "error.backend.browserInputProtected": "验证期间浏览器输入受保护。",
   "error.backend.mcpServerHttpCredentials": "服务器返回 {status}。请检查 API 密钥或其他凭据。",
   "error.backend.mcpServerHttpUrl": "服务器返回 {status}。请检查地址，链接可能错误、过期或已删除。",
+  "error.backend.mcpServerBearerKey":
+    "此服务器使用 API 密钥，而不是登录。在“请求头”中，将键设为 Authorization，将值设为 Bearer、一个空格和你的 API 密钥。",
   "error.backend.mcpSignInAppUrl": "登录应用需要有效的服务器地址。",
   "error.backend.mcpSignInAppClientId": "请输入登录应用的客户端 ID。",
   "error.backend.mcpSignInAppIssuerChanged":

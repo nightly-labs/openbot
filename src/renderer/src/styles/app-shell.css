@@ -2141,6 +2141,12 @@ textarea {
   grid-template-rows: 1fr;
   padding: 0;
   opacity: 1;
+  transition: grid-template-rows var(--openbot-duration-normal) var(--openbot-ease-out);
+
+  /* The area grows from nothing, so the rows under it slide down instead of jumping. */
+  @starting-style {
+    grid-template-rows: 0fr;
+  }
 }
 
 .sidebar-pinned-group-empty-target .sidebar-pinned-list {

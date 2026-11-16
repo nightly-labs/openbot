@@ -139,6 +139,9 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "طي نشاط المهام الدورية",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "تظهر أحداث المهام الدورية المتتالية في الدردشة كصف واحد مطوي. اضغط على الصف لإظهارها.",
+  "mobile.settings.appearance.fullVisuals": "إظهار المعاينات المرئية كاملة",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "يظهر العرض المرئي من الوكيل في الدردشة بارتفاعه الكامل. عند إيقاف هذا الخيار، يُقص العرض الطويل، ويمكنك النقر عليه لرؤيته كاملًا.",
   "mobile.settings.animations.title": "الحركات",
   "mobile.settings.animations.footer":
     "أوقف «الحركات» لتقليل الحركة في التطبيق كله. عند تشغيل «تقليل الحركة» في إعدادات هاتفك، يقلّل التطبيق الحركة أيضًا، وتبقى الحركات أدناه متوقفة.",

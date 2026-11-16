@@ -184,6 +184,8 @@ export const messages = {
     "端点“{provider}”需要 API 密钥。请在“服务器设置 → 服务商”中添加密钥，然后重试。",
   "error.provider.opencodeKeyExpired":
     "你的 OpenCode API 密钥已过期。请在 OpenCode Console 中创建新密钥，粘贴到 OpenCode 设置中，然后重试。",
+  "error.provider.opencodeKeyRefused":
+    "OpenCode Go 拒绝了你保存的 API 密钥。密钥可能已过期。请在 OpenCode Console 中创建新密钥，粘贴到 OpenCode 设置中，然后重试。",
   "error.provider.opencodeServiceFailure":
     "由于本地服务故障，OpenCode 无法完成本轮对话。请重试；若错误持续，请在设置中重新连接 OpenCode。",
   "error.provider.opencodeRateLimited":
@@ -245,6 +247,8 @@ export const messages = {
   "error.provider.antigravityLocationUnsupported":
     "Google 不允许在运行此助手的电脑所在的网络位置使用 Gemini。请在其他电脑上使用 Gemini，或为此助手选择其他服务商。\n{detail}",
   "error.provider.antigravityConnectionLost": "Gemini 与其代理的连接已断开，已停止。请发送一条消息以继续。",
+  "error.provider.grokServiceFailure": "Grok 服务繁忙或出错。请过几分钟再试，或选择其他模型。",
+  "error.provider.grokConnectionFailed": "Grok 无法连接到其服务。请检查网络连接，然后重新发送消息。",
   "error.provider.antigravityRemoteWindowsSignIn":
     "在 Windows 主机上，Gemini 会在主机本身打开 Google 页面。请在主机电脑上连接 Gemini。",
   "error.provider.cursorArchivePath": "Cursor 压缩包中包含异常文件。",
