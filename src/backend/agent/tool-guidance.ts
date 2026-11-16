@@ -166,7 +166,7 @@ function openbotGuidance(namespace: string, tool: string): string {
     case "send_feedback":
       return "Use it for a problem in OpenBot itself, not the user's project, or for a wanted OpenBot change. When the user complains about OpenBot, first help or give a workaround, then call it unasked: the card asks. Call it once per problem, not again after Not now. Most users are not developers: write the text yourself, in plain words. Do not ask for versions, logs, or settings; OpenBot adds them. Ask one question only when you do not know what went wrong or what they want. Leave out secrets, private paths, and other chat contents. Never send a security problem: give https://github.com/nightly-labs/openbot/security/advisories/new. For a question or a discussion, give https://github.com/nightly-labs/openbot/discussions. Say that the issue is public and does not show their name. Then follow the result's next field. Never open an OpenBot issue with other tools";
     case "suggest_marketplace_app":
-      return "Use the next field of its result for the end of your answer. When no plugin applies, give the needed sign-in or Computer Use setting.";
+      return "Follow the next field of its result. When no plugin applies, give the needed sign-in or Computer Use setting.";
     case "messaging_remember":
     case "messaging_forget_memory":
     case "messaging_history":

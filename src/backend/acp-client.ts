@@ -3730,7 +3730,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       const active = thread.activeTurn;
       // A prompt's own updates show its turn. The replay after it finds nothing new.
       if ((active && !active.unprompted) || this.#openingTurns.has(thread.id)) continue;
-      const updatedAt = yield* this.#sessionUpdatedAt(thread).pipe(Effect.orElseSucceed(() => null));
+      // The change stays until the subagents end: `backgroundUpdatedAt` keeps its value.
+      const updatedAt = this.#backgroundSubagentRuns(thread)
+        ? null
+        : yield* this.#sessionUpdatedAt(thread).pipe(Effect.orElseSucceed(() => null));
       if (updatedAt !== null && updatedAt !== thread.backgroundUpdatedAt) {
         const replayed = yield* this.#replayBackground(thread).pipe(
           Effect.catch((error) =>
@@ -3756,6 +3759,19 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     thread.backgroundUpdatedAt = null;
     if (this.#threads.get(thread.id) === thread && !thread.activeTurn) yield* this.#threads.markIdle(thread);
   });
+
+  /**
+   * A background subagent of the session still runs. A `session/load` then stops OpenCode 2.2.7's
+   * updates of that subagent, and its card and the agent's avatar showed "Working" with no end (#8352).
+   */
+  #backgroundSubagentRuns(thread: AcpThread): boolean {
+    for (const [turnId, threadId] of this.#subagentThreads) {
+      if (threadId !== thread.id) continue;
+      const subagents = this.#subagents.turns.get(turnId)?.subagents ?? [];
+      if (subagents.some((subagent) => subagent.background && subagent.status === "running")) return true;
+    }
+    return false;
+  }
 
   /** The session's `updatedAt` on the first `session/list` page, which lists the latest first. */
   readonly #sessionUpdatedAt = Effect.fn("AcpAgentClient.sessionUpdatedAt")(function* (

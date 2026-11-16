@@ -189,6 +189,7 @@ import {
   jsonStringFit,
   type ModelTextCut,
 } from "./model-text-limit";
+import { websiteMatchesOrigin } from "./password-vault";
 import { allowPinchZoom, blockPinchZoom } from "./pinch-zoom";
 import type { DynamicToolCallParams, DynamicToolResult } from "./protocol";
 import { isRecord } from "./protocol";
@@ -1732,7 +1733,7 @@ export class BrowserHost {
             tab.diagnostics.clearDiagnostics();
             return yield* boundEngineOperation(
               tab,
-              tab.engine.prepareSecret(args.targets, url.origin, args.submission, args.submitTarget),
+              tab.engine.prepareSecret(args.targets, args.submission, args.submitTarget),
               10_000,
               "Authentication target resolution timed out.",
               keepQueueBlocked,
@@ -1740,6 +1741,18 @@ export class BrowserHost {
           }),
         true,
       );
+      // A sign-in form in a frame, as Apple's, gets the secret of the frame's own origin. The frame must
+      // be on the page's site, so the card and the address bar name one site.
+      const fieldOrigin = entry.origin;
+      if (fieldOrigin !== url.origin && !websiteMatchesOrigin({ url: url.origin, autofill: "anywhere" }, fieldOrigin))
+        return yield* browserFailure(
+          new Error("The field target is in a frame of another site. Use browser takeover for this form."),
+        );
+      const requireIsolated = () => {
+        this.#requireIsolatedFromConnectedTabs(tab, url.origin);
+        if (fieldOrigin !== url.origin) this.#requireIsolatedFromConnectedTabs(tab, fieldOrigin);
+      };
+      yield* browserSync(requireIsolated);
       // A second copy of a password goes only to a password field, so no field shows the value.
       const confirmation = args.method === "password" && args.targets.length === 2 && entry.kinds[1]?.password === true;
       const withCode = args.method === "password" && args.targets.length > 1 && !confirmation;
@@ -1756,8 +1769,11 @@ export class BrowserHost {
       const codeFields = args.method === "password" ? args.targets.length - 1 : args.targets.length;
       return {
         // Password cards do not use digits; keep public metadata within its released bounds.
-        request: { method: args.method, origin: url.origin, digits: args.method === "password" ? 6 : args.digits },
-        agentScriptedOrigin: yield* this.#agentCodeCanRead(tab, [url.origin], entry.servedByWorker),
+        request: { method: args.method, origin: fieldOrigin, digits: args.method === "password" ? 6 : args.digits },
+        // A script that the agent ran on the page can reach a frame of the page, as for a card fill.
+        agentScriptedOrigin:
+          this.#agentCodeReaches(tab, [url.origin]) ||
+          (yield* this.#agentCodeCanRead(tab, [fieldOrigin], entry.servedByWorker)),
         vaultFillable: entry.kinds.every((kind, index) =>
           args.method === "password" && (index === 0 || confirmation)
             ? kind.password
@@ -1776,7 +1792,7 @@ export class BrowserHost {
             if (tab.secret !== protection || protection.submitted)
               return yield* browserFailure(new Error(sourceText("error.backend.authExpired")));
             // A connected page can navigate to the secret's site while the card is open.
-            yield* browserSync(() => this.#requireIsolatedFromConnectedTabs(tab, url.origin));
+            yield* browserSync(requireIsolated);
             const length = vault && codeFields === 1 ? "4,12" : args.digits;
             const digits = new RegExp(`^[0-9]{${length}}$`, "u");
             if (
@@ -4536,9 +4552,9 @@ export class BrowserHost {
         throw new Error(PAGE_CLOSED_TAB_ERROR(tabId));
     }
     if (!tab || !this.#canUseToolTab(params, tab)) throw new Error(`Unknown browser tab: ${tabId}`);
-    // The user holds this tab. `AgentService` already refuses an agent's browser tools while its own
-    // takeover is outstanding, but that check is agent-wide and only covers callers that go through
-    // the agent service; this one is per tab and holds for every caller of a tabId-bearing tool.
+    // The user holds this tab. `AgentService` already refuses the browser tools of the chat that waits
+    // on a takeover, but that check only covers callers that go through the agent service; this one
+    // is per tab and holds for every caller of a tabId-bearing tool.
     // A distinct message matters: telling the model the tab vanished, while the user is part-way
     // through a login on it, invites an `open` and a second tab onto the same flow.
     // A close may end only a protection whose fill has ended; an open card or a running fill keeps the tab.

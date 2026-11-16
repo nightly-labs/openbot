@@ -582,6 +582,8 @@ export const messages = {
   "mobile.chat.threads.new": "Neuer Thread",
   "mobile.chat.threads.all": "Alle Threads",
   "mobile.chat.threads.agentInfo": "Agent-Info",
+  "mobile.chat.pullInfo.agent": "Agent-Info",
+  "mobile.chat.pullInfo.channel": "Kanal-Info",
   "mobile.chat.threads.draftNote":
     "Deine erste Nachricht startet einen neuen Thread. Der Haupt-Chat mit {name} bleibt, wie er ist.",
   "mobile.chat.threads.draftPlaceholder": "Neuer Thread mit {name}",

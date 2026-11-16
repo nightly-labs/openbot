@@ -154,6 +154,13 @@ const FAILOVER_CAUSES: ReadonlySet<CauseCode> = new Set([
 ]);
 
 /**
+ * The provider errors after which a backup model continues the work that the turn started, as after a
+ * spent quota: a sign-in that failed, and a provider that does not answer, such as a firewall block
+ * in front of it (#8406). The backup gets the turn's work steps, so it does not do them again.
+ */
+const CONTINUE_CAUSES: ReadonlySet<CauseCode> = new Set(["authentication", "provider_unavailable"]);
+
+/**
  * The provider errors during a turn's own compaction that end the turn but can pass when it continues:
  * a connection that failed or stopped answering (#5822). A server error keeps the provider's text.
  */
@@ -1777,8 +1784,11 @@ export class TurnLifecycle {
       const routineSession = this.#conversation.isRoutineSession(threadId);
       const failedOnProvider = failover !== undefined && !limited && status === "failed" && running !== undefined;
       const mayRunAgain = failedOnProvider && !running.acted;
-      const mayContinue =
-        failedOnProvider && failover.context.causeCode === "usage_limit" && this.#carriesWork(agentId, turnId, running);
+      const stoppedAfterWork = failedOnProvider && this.#carriesWork(agentId, turnId, running);
+      const spentAfterWork = stoppedAfterWork && failover.context.causeCode === "usage_limit";
+      // Only for an agent set to switch without asking: this error is not a limit that the user knows.
+      const failedAfterWork = stoppedAfterWork && CONTINUE_CAUSES.has(failover.context.causeCode);
+      const mayContinue = spentAfterWork || failedAfterWork;
       // A spent quota, a failed compaction and a routine run's own session have their own handling.
       const failingSession =
         running !== undefined &&
@@ -1874,24 +1884,25 @@ export class TurnLifecycle {
       const requeue = repeatable && (!channelTurn || continuing);
       // The limit belongs to the model the turn ran on, which the agent may have left since.
       const model = this.#hooks.turnModel(agentId, turnId);
-      // The same for a provider error, when the agent moves to a backup model. Only the agent's own
-      // chat moves it: a task or a channel task fails as before. A message runs again once for each
-      // provider account and model that failed it, so a move that does not happen cannot run it on
-      // the same one again. A turn that a spent quota ended after work started continues on a backup,
-      // as after a plan limit, also when the agent is set to ask: there is no moment to ask.
+      // The same for a provider error, when the agent moves to a backup model. The agent's own chat
+      // and a thread move it (#8406): a channel task fails as before, because its channel assigns it
+      // and a provider error holds no queue. A message runs again once for each provider account and
+      // model that failed it, so a move that does not happen cannot run it on the same one again. A
+      // turn that a spent quota ended after work started continues on a backup, as after a plan
+      // limit, also when the agent is set to ask: there is no moment to ask. A turn that a failed
+      // sign-in or a provider that does not answer ended after work started continues there too.
       const failedKey = this.#usageLimits.failureKey(agentId, model);
       const failedOver =
         (mayRunAgain || mayContinue) &&
         failedKey !== null &&
         deliveries.length > 0 &&
-        !taskTurn &&
         !channelTurn &&
         deliveries.every(({ delivery }) => !this.#failoverRetries.get(delivery.id)?.has(failedKey)) &&
-        ((mayRunAgain && this.#hooks.mayFailOver(agentId)) ||
-          (mayContinue && this.#hooks.mayContinueOnBackup(agentId)));
+        (((mayRunAgain || failedAfterWork) && this.#hooks.mayFailOver(agentId)) ||
+          (spentAfterWork && this.#hooks.mayContinueOnBackup(agentId)));
       // Teammate results start a lead's turn, and nothing else wakes the team when that turn gives no
-      // answer (#7225). With no backup to take it, the turn runs once more on the same model. A thread
-      // turn never moves to a backup, so it always runs once more here (#8503). So does the turn of an
+      // answer (#7225). With no backup to take it, the turn runs once more on the same model, in a
+      // thread too (#8503). So does the turn of an
       // external chat, whose person waits for the result (#8573); a channel task does not. It did no
       // step, so it repeats nothing. A second empty run shows the error.
       const runsAgainHere =
@@ -1990,7 +2001,7 @@ export class TurnLifecycle {
         this.#hooks.scheduleDrain(agentId);
         return;
       }
-      // A thread turn does not move to a backup, but the agent leaves the failing model before its next turn (#5220).
+      // A thread turn that does not run again still makes the agent leave the failing model before its next turn (#5220).
       if (failover && mayRunAgain && taskTurn && failedKey !== null && this.#hooks.mayFailOver(agentId))
         this.#markFailed(agentId, model, failover);
       // The turn did work that no backup continues, or nothing waits to run again: the error shows as

@@ -573,6 +573,8 @@ export const messages = {
   "mobile.chat.threads.new": "Nuevo hilo",
   "mobile.chat.threads.all": "Todos los hilos",
   "mobile.chat.threads.agentInfo": "Info del agente",
+  "mobile.chat.pullInfo.agent": "Info del agente",
+  "mobile.chat.pullInfo.channel": "Info del canal",
   "mobile.chat.threads.draftNote": "Tu primer mensaje inicia un hilo nuevo. El chat principal con {name} no cambia.",
   "mobile.chat.threads.draftPlaceholder": "Nuevo hilo con {name}",
   "mobile.chat.threads.rename": "Renombrar",

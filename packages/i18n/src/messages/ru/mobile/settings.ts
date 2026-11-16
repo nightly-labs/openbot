@@ -242,6 +242,15 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Скачивать большие файлы автоматически",
   "mobile.settings.conversations.largeFilesFooter":
     "Изображения, видео и аудио больше {small} скачиваются только по нажатию. Включите, чтобы скачивать их сразу, до {large}. Это может расходовать много мобильного трафика.",
+  "mobile.settings.conversations.swipeLeft": "Свайп влево в чате агента",
+  "mobile.settings.conversations.swipeRight": "Свайп вправо в чате агента",
+  "mobile.settings.conversations.swipeThreads": "Ветки",
+  "mobile.settings.conversations.swipeBrowser": "Браузер",
+  "mobile.settings.conversations.swipeFooter":
+    "Свайп в сторону, обратную «Назад», в чате агента открывает это. Свайп по сообщению по-прежнему отвечает на него.",
+  "mobile.settings.conversations.pullInfo": "Потянуть вверх: сведения",
+  "mobile.settings.conversations.pullInfoFooter":
+    "Потяните вверх за последнее сообщение в чате, канале или ветке и отпустите, чтобы открыть сведения.",
   "mobile.settings.conversations.fullQualityPhotos": "Отправлять фото в полном качестве",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "Когда это выключено, приложение отправляет уменьшенную копию каждого фото, до 2048 пикселей по длинной стороне. Она быстрее доходит при медленном соединении. Включите, чтобы отправлять исходное фото.",

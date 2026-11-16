@@ -148,6 +148,29 @@ function connectFailure(message: string): OnePasswordOperationError {
   return new OnePasswordOperationError({ cause: new OnePasswordConnectError(message) });
 }
 
+/** A failed `op` run. `forbidden` is set when 1Password refused the request with a 403. */
+class OnePasswordCliError extends OnePasswordConnectError {
+  readonly forbidden: boolean;
+
+  constructor(message: string, forbidden: boolean) {
+    super(message);
+    this.forbidden = forbidden;
+  }
+}
+
+/**
+ * 1Password refuses `vault create` and `service-account create` with a 403 when the account does not
+ * let this person create vaults or service accounts. The user sees what to do; the log keeps the CLI line.
+ */
+const explainRefusedCreate = Effect.fn("OnePasswordConnector.explainRefusedCreate")(function* (
+  error: OnePasswordOperationError,
+) {
+  const cause = error.cause;
+  if (!(cause instanceof OnePasswordCliError) || !cause.forbidden) return yield* error;
+  logger.warn("1Password refused to create the shared vault or the service account", { detail: cause.message });
+  return yield* connectFailure(sourceText("error.connector.onePasswordCliForbidden"));
+});
+
 /** Parses the JSON that the CLI writes to its standard output. */
 function cliJson<T>(schema: z.ZodType<T>) {
   return (output: string) => onePasswordDecode(() => schema.parse(JSON.parse(output)));
@@ -203,7 +226,8 @@ const runOnePasswordCli: OnePasswordCliRunner = async (executable, args, signal)
           return;
         }
         const detail = redactText(String(stderr).trim().split("\n").at(-1) || error.message);
-        reject(new OnePasswordConnectError(sourceText("error.connector.onePasswordCliFailed", { detail })));
+        const forbidden = /\(403\)|\bforbidden\b/i.test(String(stderr));
+        reject(new OnePasswordCliError(sourceText("error.connector.onePasswordCliFailed", { detail }), forbidden));
       },
     );
   });
@@ -219,6 +243,26 @@ async function createSdkClient(token: string, appVersion: string): Promise<OnePa
       get: (vaultId, itemId) => client.items.get(vaultId, itemId),
     },
   };
+}
+
+/**
+ * The text for a token that did not connect. The SDK names most failures only in their message. A
+ * failure that no pattern matches shows its detail, not a cause that can be wrong.
+ */
+function tokenConnectErrorText(error: unknown): string {
+  if (error instanceof OnePasswordConnectError) return error.message;
+  const message = error instanceof Error ? error.message : String(error);
+  // The SDK is imported only when a client starts, so its error class is known here by name.
+  if (
+    (error instanceof Error && error.constructor.name === "RateLimitExceededError") ||
+    /rate limit exceeded/i.test(message)
+  )
+    return sourceText("error.connector.onePasswordRateLimited");
+  if (/error sending request|request timeout/i.test(message))
+    return sourceText("error.connector.onePasswordUnreachable");
+  if (/(invalid|bad) service account token|create another token|you are not authenticated/i.test(message))
+    return sourceText("error.connector.onePasswordTokenRejected");
+  return sourceText("error.connector.onePasswordUnexpected", { detail: redactText(message) });
 }
 
 /**
@@ -389,12 +433,8 @@ export class OnePasswordConnectorService implements PasswordVault {
         Effect.sync(() => {
           if (this.#connecting !== controller || controller.signal.aborted) return;
           logger.warn("Unable to connect 1Password", { cause: toLogValue(error) });
-          this.#error =
-            error instanceof OnePasswordConnectError
-              ? error.message
-              : sourceText("error.connector.onePasswordUnexpected", {
-                  detail: redactText(error instanceof Error ? error.message : String(error)),
-                });
+          // The new token is saved through the SDK, which can fail as a pasted token does.
+          this.#error = tokenConnectErrorText(error);
         }),
       ),
       Effect.ensuring(this.#finishConnecting(controller)),
@@ -416,10 +456,7 @@ export class OnePasswordConnectorService implements PasswordVault {
         Effect.sync(() => {
           if (this.#connecting !== controller || controller.signal.aborted) return;
           logger.warn("Unable to connect 1Password with a token", { cause: toLogValue(error) });
-          this.#error =
-            error instanceof OnePasswordConnectError
-              ? error.message
-              : sourceText("error.connector.onePasswordTokenRejected");
+          this.#error = tokenConnectErrorText(error);
         }),
       ),
       Effect.ensuring(this.#finishConnecting(controller)),
@@ -684,7 +721,7 @@ export class OnePasswordConnectorService implements PasswordVault {
           "json",
         ],
         signal,
-      ).pipe(Effect.flatMap(cliJson(vaultSchema)))).id;
+      ).pipe(Effect.catch(explainRefusedCreate), Effect.flatMap(cliJson(vaultSchema)))).id;
     const token = (yield* this.#cli(
       [
         "service-account",
@@ -696,7 +733,7 @@ export class OnePasswordConnectorService implements PasswordVault {
         "--raw",
       ],
       signal,
-    )).trim();
+    ).pipe(Effect.catch(explainRefusedCreate))).trim();
     if (!token) return yield* connectFailure(sourceText("error.connector.onePasswordTokenRejected"));
     registerSecretValue(token);
     return token;

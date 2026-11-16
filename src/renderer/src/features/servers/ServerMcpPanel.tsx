@@ -35,7 +35,7 @@ import {
 } from "@openbot/ui/features/settings/McpSignInPage";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createStore, For, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createStore, For, onCleanup, Show, untrack } from "solid-js";
 import { type McpPanelSignInApp, McpSignInAppSection } from "./McpSignInAppSection";
 import {
   emptyMcpConfig,
@@ -293,8 +293,10 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
   }
 
   /** A sign-in, read as a test is. `null` when the user cancelled it: that is not a failure to show. */
-  async function runSignIn(config: McpServerConfig): Promise<SettledTest | null> {
-    const signIn = props.signIn;
+  async function runSignIn(
+    config: McpServerConfig,
+    signIn: ServerMcpPanelProps["signIn"] = props.signIn,
+  ): Promise<SettledTest | null> {
     if (!signIn) return null;
     try {
       const result = await signIn.start(config);
@@ -477,13 +479,19 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
   createEffect(
     () => {
       const id = props.signInRequest;
-      return id ? props.servers.find((candidate) => candidate.id === id) : undefined;
+      const config = id ? props.servers.find((candidate) => candidate.id === id) : undefined;
+      // Read here and not in the callback: `signIn` can be a getter that makes a memo, and a memo made
+      // in an effect callback stops the UI, so a chat card's Sign in did nothing (#6661). Untracked, so
+      // new sign-in states do not start the request again.
+      return config ? { config, signIn: untrack(() => props.signIn) } : undefined;
     },
-    (config) => {
-      if (!config) return;
+    (request) => {
+      if (!request) return;
       // A row this panel cannot sign in to ends the request, so no sign-in starts later unasked.
       props.onSignInRequestHandled?.();
-      if (canSignIn(config)) void signInRow(config);
+      const { config, signIn } = request;
+      if (signIn && config.transport === "http")
+        void runRow(config, "signing-in", (tested) => runSignIn(tested, signIn));
     },
   );
 

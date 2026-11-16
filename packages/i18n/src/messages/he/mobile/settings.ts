@@ -228,6 +228,15 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "הורדה אוטומטית של קבצים גדולים",
   "mobile.settings.conversations.largeFilesFooter":
     "תמונות, סרטונים וקובצי שמע גדולים מ-{small} יורדו רק אחרי הקשה עליהם. אפשר להפעיל כדי להוריד אותם מיד, עד {large}. הפעולה עשויה לצרוך הרבה נתונים סלולריים.",
+  "mobile.settings.conversations.swipeLeft": "החלקה שמאלה בצ׳אט של סוכן",
+  "mobile.settings.conversations.swipeRight": "החלקה ימינה בצ׳אט של סוכן",
+  "mobile.settings.conversations.swipeThreads": "שרשורים",
+  "mobile.settings.conversations.swipeBrowser": "דפדפן",
+  "mobile.settings.conversations.swipeFooter":
+    "החלקה בכיוון ההפוך לחזרה בצ׳אט של סוכן פותחת את זה. החלקה על הודעה עדיין עונה לה.",
+  "mobile.settings.conversations.pullInfo": "משיכה למעלה למידע",
+  "mobile.settings.conversations.pullInfoFooter":
+    "משכו למעלה מעבר להודעה האחרונה בצ׳אט, בערוץ או בשרשור ושחררו כדי לפתוח את המידע שלו.",
   "mobile.settings.conversations.fullQualityPhotos": "שליחת תמונות באיכות מלאה",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "כשהאפשרות כבויה, האפליקציה שולחת עותק קטן יותר של כל תמונה, עד 2048 פיקסלים בצלע הארוכה. הוא מגיע מהר יותר בחיבור איטי. הפעילו אותה כדי לשלוח את התמונה המקורית.",

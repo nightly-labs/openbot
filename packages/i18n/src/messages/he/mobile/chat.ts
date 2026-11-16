@@ -570,6 +570,8 @@ export const messages = {
   "mobile.chat.threads.new": "שרשור חדש",
   "mobile.chat.threads.all": "כל השרשורים",
   "mobile.chat.threads.agentInfo": "מידע על הסוכן",
+  "mobile.chat.pullInfo.agent": "מידע על הסוכן",
+  "mobile.chat.pullInfo.channel": "מידע על הערוץ",
   "mobile.chat.threads.draftNote": "ההודעה הראשונה שלך מתחילה שרשור חדש. הצ'אט הראשי עם {name} לא משתנה.",
   "mobile.chat.threads.draftPlaceholder": "שרשור חדש עם {name}",
   "mobile.chat.threads.rename": "שינוי שם",
