@@ -201,6 +201,8 @@ export const messages = {
   "provider.veniceKey.title": "Venice API 키",
   "provider.veniceKey.description":
     "Venice 모델을 사용하려면 이 컴퓨터에 Venice API 키를 저장하세요. OpenBot은 다운로드한 Pi CLI에서 모델을 실행해요.",
+  "provider.veniceKey.descriptionHost":
+    "Venice 모델을 사용하려면 호스트에 Venice API 키를 저장하세요. OpenBot은 다운로드한 Pi CLI에서 모델을 실행해요.",
   "provider.veniceKey.label": "Venice API 키",
 
   "provider.openCodeKey.title": "OpenCode Go에 로그인",

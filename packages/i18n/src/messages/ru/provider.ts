@@ -216,6 +216,8 @@ export const messages = {
   "provider.veniceKey.title": "Ключ API Venice",
   "provider.veniceKey.description":
     "Сохраните ключ API Venice на этом компьютере, чтобы использовать модели Venice. OpenBot запускает их в загруженном Pi CLI.",
+  "provider.veniceKey.descriptionHost":
+    "Сохраните ключ API Venice на хосте, чтобы использовать модели Venice. OpenBot запускает их в загруженном Pi CLI.",
   "provider.veniceKey.label": "Ключ API Venice",
 
   "provider.openCodeKey.title": "Вход в OpenCode Go",

@@ -204,6 +204,8 @@ export const messages = {
   "provider.veniceKey.title": "מפתח Venice API",
   "provider.veniceKey.description":
     "אפשר לשמור מפתח Venice API במחשב הזה כדי להשתמש במודלים ש-Venice מספקת. OpenBot מריץ אותם ב-Pi CLI שהוא מוריד.",
+  "provider.veniceKey.descriptionHost":
+    "אפשר לשמור מפתח Venice API במארח כדי להשתמש במודלים ש-Venice מספקת. OpenBot מריץ אותם ב-Pi CLI שהוא מוריד.",
   "provider.veniceKey.label": "מפתח Venice API",
   "provider.openCodeKey.title": "התחברות ל-OpenCode Go",
   "provider.openCodeKey.description": "מודלים חינמיים לא דורשים חשבון. מפתח פותח את מודלי Go בתשלום.",

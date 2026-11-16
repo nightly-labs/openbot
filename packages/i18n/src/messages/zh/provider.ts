@@ -207,6 +207,8 @@ export const messages = {
   "provider.veniceKey.title": "Venice API 密钥",
   "provider.veniceKey.description":
     "在这台电脑上保存 Venice API 密钥，即可使用 Venice 提供的模型。OpenBot 会在它下载的 Pi CLI 中运行这些模型。",
+  "provider.veniceKey.descriptionHost":
+    "在主机上保存 Venice API 密钥，即可使用 Venice 提供的模型。OpenBot 会在它下载的 Pi CLI 中运行这些模型。",
   "provider.veniceKey.label": "Venice API 密钥",
 
   // The optional OpenCode Go key dialog.

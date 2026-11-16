@@ -92,6 +92,7 @@ const KEY_TEXT = {
     name: "Venice",
     title: "provider.veniceKey.title",
     description: "provider.veniceKey.description",
+    descriptionHost: "provider.veniceKey.descriptionHost",
     label: "provider.veniceKey.label",
   },
 } as const satisfies Record<string, KeyDialogText>;

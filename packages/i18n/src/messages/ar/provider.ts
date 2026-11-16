@@ -223,6 +223,8 @@ export const messages = {
   "provider.veniceKey.title": "مفتاح Venice API",
   "provider.veniceKey.description":
     "احفظ مفتاح Venice API على هذا الحاسوب لاستخدام النماذج التي يقدمها Venice. يشغّلها OpenBot في Pi CLI الذي ينزّله.",
+  "provider.veniceKey.descriptionHost":
+    "احفظ مفتاح Venice API على المضيف لاستخدام النماذج التي يقدمها Venice. يشغّلها OpenBot في Pi CLI الذي ينزّله.",
   "provider.veniceKey.label": "مفتاح Venice API",
   "provider.openCodeKey.title": "تسجيل الدخول إلى OpenCode Go",
   "provider.openCodeKey.description": "لا تحتاج النماذج المجانية إلى حساب. يفتح المفتاح نماذج Go المدفوعة.",
