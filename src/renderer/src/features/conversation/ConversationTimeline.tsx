@@ -402,19 +402,19 @@ export function ConversationTimeline() {
   /**
    * Fix or remove on a thank-you card puts the request in the composer: the agent removes the report
    * and sends the corrected text with `withdraw_feedback` and `send_feedback`. It is also how a joined
-   * server's report is removed.
+   * server's report is removed. A fix shows a composer notice with Cancel.
    */
   const requestFeedbackChange = createMemo(() => {
     const agentId = props.agent?.id;
     const server = props.server;
     if (channel || !agentId || !server) return undefined;
-    return (request: { number: number; change: "fix" | "remove" }) =>
-      controller.appendPluginPrompt(
-        { serverId: server.id, agentId },
-        t(request.change === "fix" ? "chat.feedbackSent.fixPrompt" : "chat.feedbackSent.removePrompt", {
-          number: String(request.number),
-        }),
-      );
+    return (request: { number: number; change: "fix" | "remove" }) => {
+      const target = { serverId: server.id, agentId };
+      const number = String(request.number);
+      if (request.change === "fix")
+        controller.startFeedbackFix(target, request.number, t("chat.feedbackSent.fixPrompt", { number }));
+      else controller.appendPluginPrompt(target, t("chat.feedbackSent.removePrompt", { number }));
+    };
   });
   /** The agent that asks in a card: in a channel, the working agent whose card shows. */
   const interactionAgentName = () => (channel ? channel.interactionAgentName() : props.agent?.name);

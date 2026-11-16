@@ -48,6 +48,8 @@ import { speechReading } from "../speech/speech-playback";
 import { stopSpokenReply } from "../speech/speech-replies";
 import { copyComposerSelection, readComposerCopy } from "./composer-clipboard";
 import { createComposerResize } from "./composer-resize";
+import { useConversationController } from "./conversation-controller-context";
+import { composerDraftKey } from "./conversation-keys";
 import { useConversationViewScope } from "./conversation-scope";
 import { currentConversationTarget } from "./stores/composer-store";
 
@@ -220,6 +222,14 @@ export function ConversationComposer() {
   const queueOwner = () => {
     const target = currentConversationTarget(props);
     return target && `${target.serverId}:${target.agentId}`;
+  };
+  const controller = useConversationController();
+  /** Fix on a thank-you card put a request in this draft. The notice stays until a send, Cancel or an empty draft. */
+  const feedbackFix = () => {
+    const target = currentConversationTarget(props);
+    if (!target || channel) return undefined;
+    const fix = controller.feedbackFixes()[composerDraftKey(target)];
+    return fix && currentDraft().text.trim() ? { target, fix } : undefined;
   };
   const awaitingVisible = () => awaitingReplies().length > 0;
   const waitItems = createMemo(() => openWaitItems(props.waits ?? [], props.queue));
@@ -597,6 +607,23 @@ export function ConversationComposer() {
                     onClick={() => void cancelQueuedMessageEdit()}
                   >
                     {t("composer.queueEdit.cancel")}
+                  </Button>
+                }
+              />
+            )}
+          </ComposerStackCard>
+          <ComposerStackCard when={feedbackFix()}>
+            {(request) => (
+              <ComposerNotice
+                body={t("composer.feedbackFix.body", { number: String(request().fix.number) })}
+                action={
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    type="button"
+                    onClick={() => controller.cancelFeedbackFix(request().target)}
+                  >
+                    {t("composer.feedbackFix.cancel")}
                   </Button>
                 }
               />

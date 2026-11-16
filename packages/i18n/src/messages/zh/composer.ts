@@ -4,6 +4,8 @@ import type { messages as source } from "../en/composer";
 export const messages = {
   "composer.queueEdit.body": "你正在编辑一条排队中的消息。保存或取消编辑后它才会继续执行。",
   "composer.queueEdit.cancel": "取消编辑",
+  "composer.feedbackFix.body": "正在更正报告 #{number}。发送请求，或取消以保持报告不变。",
+  "composer.feedbackFix.cancel": "取消",
   "composer.providerWait.offlineTitle": "没有网络连接",
   "composer.providerWait.offline": "这台电脑重新联网前，{provider} 无法回复。",
   "composer.providerWait.silent": "{provider} 已有 {duration} 没有更新。",

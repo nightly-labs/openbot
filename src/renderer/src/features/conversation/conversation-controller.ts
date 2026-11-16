@@ -56,6 +56,15 @@ function readBrowserPipBounds(): BrowserBounds | null {
   return values.length === 4 && [x, y, width, height].every(Number.isFinite) ? { x, y, width, height } : null;
 }
 
+/** A request for a corrected feedback report that Fix on a thank-you card put in a composer. */
+export interface FeedbackFix {
+  number: number;
+  /** The draft text before the request. */
+  before: string;
+  /** The draft text just after the request. */
+  after: string;
+}
+
 interface ConversationResources {
   agentActivityLabels: Map<string, { activityId: string; label: AgentActivityLabel }>;
   turnRuntimes: Map<string, TurnRuntime>;
@@ -162,6 +171,22 @@ export function createStableConversationState(
     restoredEdit?.pendingSave ?? null,
   );
   const [composerFocusRequest, setComposerFocusRequest] = createSignal(0);
+  // The corrected-report requests from thank-you cards, by draft key. Only in memory: after a restart,
+  // the text stays in the draft without its notice.
+  const [feedbackFixes, setFeedbackFixes] = createSignal<Record<string, FeedbackFix>>({});
+  // A fix ends when its draft is empty: the user sent the request, or deleted it.
+  createEffect(
+    () => {
+      const current = drafts();
+      return Object.keys(feedbackFixes()).filter((key) => !current[key]?.text.trim());
+    },
+    (ended) => {
+      if (ended.length === 0) return;
+      setFeedbackFixes((current) =>
+        Object.fromEntries(Object.entries(current).filter(([key]) => !ended.includes(key))),
+      );
+    },
+  );
   // A send in flight belongs to the server it was sent to, so it outlives a server switch.
   const pendingSends = createPendingSendStore();
   // A file import belongs to the chat it was started in, so it outlives a server switch, as a send does.
@@ -361,6 +386,34 @@ export function createStableConversationState(
       setDrafts((current) => ({ ...current, [key]: appendDraftText(current[key] ?? EMPTY_DRAFT, prompt) }));
       setComposerFocusRequest((value) => value + 1);
     },
+    /**
+     * Puts the request for a corrected feedback report in the composer, and keeps what the composer had,
+     * so the composer notice can take the request out again.
+     */
+    startFeedbackFix(target: { serverId: string; agentId: string }, number: number, prompt: string) {
+      const key = composerDraftKey(target);
+      const draft = drafts()[key] ?? EMPTY_DRAFT;
+      const next = appendDraftText(draft, prompt);
+      setDrafts((current) => ({ ...current, [key]: next }));
+      setFeedbackFixes((current) => ({
+        ...current,
+        [key]: { number, before: draft.text, after: next.text },
+      }));
+      setComposerFocusRequest((value) => value + 1);
+    },
+    /** Cancel on the notice: the composer gets its text back, unless the user changed the request. */
+    cancelFeedbackFix(target: { serverId: string; agentId: string }) {
+      const key = composerDraftKey(target);
+      const fix = feedbackFixes()[key];
+      if (!fix) return;
+      setDrafts((current) => {
+        const draft = current[key] ?? EMPTY_DRAFT;
+        return draft.text === fix.after ? { ...current, [key]: { ...draft, text: fix.before } } : current;
+      });
+      setFeedbackFixes(({ [key]: _cancelled, ...rest }) => rest);
+      setComposerFocusRequest((value) => value + 1);
+    },
+    feedbackFixes,
     /** Puts a message from another chat into a channel's composer. The user reads it and sends it. */
     appendChannelText(target: { serverId: string; channelId: string }, text: string) {
       const key = composerDraftKey({ serverId: target.serverId, agentId: target.channelId });

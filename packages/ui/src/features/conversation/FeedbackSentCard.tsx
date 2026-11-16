@@ -20,7 +20,8 @@ type Step = "closed" | "choosing" | "confirming";
  * the public issue. It comes in where the offer card was, with a short entrance.
  *
  * With `onFix`, Fix or remove offers two choices. A corrected report goes through the agent: the
- * composer gets the request, and the user completes and sends it. Remove asks in the card first,
+ * composer gets the request, with a notice that can cancel it, and the user completes and sends it.
+ * Remove asks in the card first,
  * because it cannot be undone, then calls `onWithdraw`. Without `onWithdraw`, such as for a joined
  * server, Remove puts a request for the agent in the composer too. A removed report shows a Removed
  * card with no link.
@@ -117,7 +118,10 @@ export function FeedbackSentCard(props: {
                 <Button
                   variant="ghost"
                   class="feedback-sent-choice"
-                  onClick={() => props.onFix && fillComposer(props.onFix)}
+                  onClick={() => {
+                    props.onFix?.();
+                    setStep("closed");
+                  }}
                 >
                   <Pencil aria-hidden="true" />
                   <span class="feedback-sent-choice-text">

@@ -4,6 +4,8 @@ import type { messages as source } from "../en/composer";
 export const messages = {
   "composer.queueEdit.body": "أنت تعدّل رسالة في قائمة الانتظار. احفظ التعديل أو ألغه لتشغيلها.",
   "composer.queueEdit.cancel": "إلغاء التعديل",
+  "composer.feedbackFix.body": "تصحيح البلاغ #{number}. أرسل الطلب، أو ألغِه لإبقاء البلاغ كما هو.",
+  "composer.feedbackFix.cancel": "إلغاء",
   "composer.providerWait.offlineTitle": "لا يوجد اتصال بالإنترنت",
   "composer.providerWait.offline": "لا يمكن لـ {provider} الرد حتى يعود هذا الحاسوب إلى الاتصال.",
   "composer.providerWait.silent": "لم يرسل {provider} أي تحديث منذ {duration}.",
