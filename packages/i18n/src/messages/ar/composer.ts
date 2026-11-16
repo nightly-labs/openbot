@@ -110,6 +110,10 @@ export const messages = {
   "composer.error.holdQueued": "تعذّر تعليق الرسالة في قائمة الانتظار لتعديلها.",
   "composer.error.cancelEdit": "تعذّر إلغاء تعديل قائمة الانتظار. حاول مرة أخرى.",
   "composer.error.updateQueued": "تعذّر تحديث الرسالة في قائمة الانتظار. حاول مرة أخرى.",
+  "composer.queueEdit.received": "تلقى الوكيل هذه الرسالة بالفعل، لذا انتهى تعديلك.",
+  "composer.queueEdit.receivedKept":
+    "تلقى الوكيل هذه الرسالة بالفعل، لذا انتهى تعديلك. لا تزال تغييراتك في مربع الرسالة.",
+  "composer.queueEdit.deletedKept": "حُذفت هذه الرسالة، لذا انتهى تعديلك. لا تزال تغييراتك في مربع الرسالة.",
   "composer.voice.prepareFailed": "تعذّر تجهيز النموذج الصوتي. حاول مرة أخرى.",
   "composer.voice.noSpeechRecorded": "لم يتم تسجيل أي كلام.",
   "composer.voice.noSpeechDetected": "لم يتم اكتشاف أي كلام.",

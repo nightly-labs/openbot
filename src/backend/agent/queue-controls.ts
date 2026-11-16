@@ -96,6 +96,14 @@ export class QueueControls {
     if (sender?.kind === "agent") this.#drain.scheduleDrain(sender.agentId);
   }, Effect.uninterruptible);
 
+  /**
+   * An edit that nobody saves or cancels stops holding the queue after `QUEUE_EDIT_HOLD_MS`, and this
+   * starts the queue then, also when no other change wakes the agent.
+   */
+  wakeAfterEditHold(agentId: string): void {
+    setTimeout(() => this.#drain.scheduleDrain(agentId), QUEUE_EDIT_HOLD_MS + 1_000).unref();
+  }
+
   readonly edit = Effect.fn("QueueControls.edit")(function* (
     this: QueueControls,
     agentId: string,
@@ -150,9 +158,7 @@ export class QueueControls {
       return yield* new QueueOperationFailed({ cause: new Error(sourceText("error.backend.useChannelTaskControls")) });
     if (input.action === "begin") {
       yield* queueStep(() => this.#mailbox.beginQueueEdit(agentId, input.deliveryId, input.editId));
-      // An edit that nobody saves or cancels stops holding the queue at this time, also when no other
-      // change wakes the agent then.
-      setTimeout(() => this.#drain.scheduleDrain(agentId), QUEUE_EDIT_HOLD_MS + 1_000).unref();
+      this.wakeAfterEditHold(agentId);
     } else {
       if (input.action === "retain-attachments")
         yield* queueStep(() =>

@@ -578,6 +578,61 @@ export function createComposerActions(deps: ComposerActionsDeps) {
       deps.setDrafts((current) => ({ ...current, [composerDraftKey(target)]: backup ?? EMPTY_DRAFT }));
       deps.setComposerError(null, target);
     }
+    clearQueueEditState();
+    return true;
+  }
+
+  /**
+   * Ends the edit of a queued message that is no longer queued: it started, or somebody deleted it.
+   * The host has no hold to give back. Changes stay in the message box as a draft, after the draft
+   * from before the edit, so no typed text is lost; with no change, the box gets its draft from
+   * before the edit, as Cancel does. A notice says what happened.
+   */
+  function endQueuedMessageEdit(ended: QueueDelivery): void {
+    const agentId = deps.editingAgentId();
+    const serverId = deps.editingServerId();
+    if (!agentId || !serverId || deps.editingDeliveryId() !== ended.id) return;
+    const target = { agentId, serverId };
+    const backup = deps.editingDraftBackup() ?? EMPTY_DRAFT;
+    const draft = deps.drafts()[composerDraftKey(target)] ?? EMPTY_DRAFT;
+    const originalIds = new Set(deps.editingOriginalAttachmentIds());
+    // The files of the message belong to it. Only files added during the edit can go in a new message.
+    const added = draft.attachments.filter((attachment) => !originalIds.has(attachment.id));
+    const changed =
+      draft.text !== ended.text || added.length > 0 || draft.attachments.length !== ended.attachments.length;
+    let next = backup;
+    if (changed) {
+      const attachments = [...backup.attachments, ...added];
+      for (const attachment of attachments.slice(INPUT_LIMITS.attachments))
+        void conversationRuntime(deps.props).agent.discardDraftAttachment(attachment.id, serverId);
+      next = {
+        text: backup.text.trim() ? `${backup.text}\n\n${draft.text}` : draft.text,
+        attachments: attachments.slice(0, INPUT_LIMITS.attachments),
+        replyToMessageId: backup.text.trim() ? backup.replyToMessageId : draft.replyToMessageId,
+      };
+    } else {
+      for (const attachment of added)
+        void conversationRuntime(deps.props).agent.discardDraftAttachment(attachment.id, serverId);
+    }
+    deps.setDrafts((current) => ({ ...current, [composerDraftKey(target)]: next }));
+    clearQueueEditState();
+    const deleted = ended.status === "cancelled";
+    // A delete with no change ends the edit with no notice, as before.
+    if (deleted && !changed) deps.setComposerError(null, target);
+    else
+      deps.setComposerError(
+        t(
+          deleted
+            ? "composer.queueEdit.deletedKept"
+            : changed
+              ? "composer.queueEdit.receivedKept"
+              : "composer.queueEdit.received",
+        ),
+        target,
+      );
+  }
+
+  function clearQueueEditState(): void {
     deps.setEditingAgentId(null);
     deps.setEditingServerId(null);
     deps.setEditingDeliveryId(null);
@@ -586,7 +641,6 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     clearStoredQueueEdit();
     deps.setEditingDraftBackup(null);
     deps.setEditingOriginalAttachmentIds([]);
-    return true;
   }
 
   async function saveQueuedMessageEdit(
@@ -1054,6 +1108,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     openAttachmentPicker,
     editQueuedMessage,
     cancelQueuedMessageEdit,
+    endQueuedMessageEdit,
     saveQueuedMessageEdit,
     reorderPresentedQueue,
     submitMessage,

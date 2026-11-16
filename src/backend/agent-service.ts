@@ -1013,6 +1013,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             Effect.ensuring(
               Effect.sync(() => {
                 for (const agent of this.#store.list()) this.#drain.scheduleDrain(agent.id);
+                // An edit from before the restart holds its message for a new time.
+                for (const agentId of this.#mailbox.agentsWithEditHolds()) this.#queue.wakeAfterEditHold(agentId);
               }),
             ),
             toProviderOperationFailed,
