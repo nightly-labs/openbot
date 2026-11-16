@@ -255,8 +255,8 @@ const OPEN_REDIRECT_WAIT_MS = 5_000;
 /** A page dialog holds a script. The sign-in then loads the page again with the cookies only. */
 const SIGN_IN_STORAGE_WRITE_TIMEOUT_MS = 5_000;
 /**
- * How long the purge of a site after an agent script waits for the session's loads before it deletes
- * the site's service workers. A fill waits for that purge.
+ * How long OpenBot waits for the loads of a site after an agent script there ends, before it deletes
+ * the site's service workers. A fill does not wait for this.
  */
 const SERVICE_WORKER_CLEAR_WAIT_MS = 10_000;
 /** A site can redirect more than one time before its page stays. */
@@ -2002,9 +2002,18 @@ export class BrowserHost {
     delete tab.workerExposedOrigins;
     // A tab that closed itself has no `contents.session`.
     const target = this.#tabSession(tab);
-    // The next fill on the origin reads the result from `#originPurges`.
-    for (const origin of new Set([...(scripted ?? []), ...(exposed ?? [])]))
-      if (this.#cacheTaintedOrigins.get(target)?.has(origin)) void this.#purgeOrigin(target, origin);
+    // The next fill on the origin reads the result from `#originPurges`. A deleted service worker fails
+    // the requests that it handles, such as those of the page that replaces this one, so the service
+    // workers go when the origin's pages stop loading (#9981). A fill deletes them itself when it needs to.
+    for (const origin of new Set([...(scripted ?? []), ...(exposed ?? [])])) {
+      if (!this.#cacheTaintedOrigins.get(target)?.has(origin)) continue;
+      void this.#purgeOrigin(target, origin, ["cachestorage"]);
+      void this.#originStoppedLoading(target, origin).then(() =>
+        target.clearStorageData({ origin, storages: ["serviceworkers"] }).catch((error: unknown) => {
+          logger.warn("Unable to clear a site's service workers", { origin, error: toLogValue(error) });
+        }),
+      );
+    }
     if (!scripted) return;
     const connected = this.#connectedTabs(tab);
     for (const other of this.#sessionTabs(target)) {
@@ -2073,32 +2082,33 @@ export class BrowserHost {
 
   /**
    * Clears the origin's Cache Storage and service workers after the purge that already runs for it.
-   * A later purge that succeeds clears what an earlier one that failed left. A deleted service worker
-   * fails the requests that it handles, such as those of the page that just replaced a scripted page,
-   * so the service workers go when no page of the session loads (#9981).
+   * A later purge that succeeds clears what an earlier one that failed left.
    */
-  #purgeOrigin(target: Session, origin: string): Promise<boolean> {
+  #purgeOrigin(
+    target: Session,
+    origin: string,
+    storages: ("cachestorage" | "serviceworkers")[] = ["cachestorage", "serviceworkers"],
+  ): Promise<boolean> {
     const purges = this.#originPurges.get(target) ?? new Map<string, Promise<boolean>>();
     this.#originPurges.set(target, purges);
     const purge = (purges.get(origin) ?? Promise.resolve(true)).then(() =>
-      target
-        .clearStorageData({ origin, storages: ["cachestorage"] })
-        .then(() => this.#sessionStoppedLoading(target))
-        .then(() => target.clearStorageData({ origin, storages: ["serviceworkers"] }))
-        .then(
-          () => true,
-          (error: unknown) => {
-            logger.warn("Unable to clear a site's caches", { origin, error: toLogValue(error) });
-            return false;
-          },
-        ),
+      target.clearStorageData({ origin, storages }).then(
+        () => true,
+        (error: unknown) => {
+          logger.warn("Unable to clear a site's caches", { origin, error: toLogValue(error) });
+          return false;
+        },
+      ),
     );
     purges.set(origin, purge);
     return purge;
   }
 
-  /** Settles when no tab of the session loads, or after `SERVICE_WORKER_CLEAR_WAIT_MS`. */
-  #sessionStoppedLoading(target: Session): Promise<void> {
+  /**
+   * Settles when no tab of the session shows a frame of the origin that loads, or after
+   * `SERVICE_WORKER_CLEAR_WAIT_MS`. It does not stop a load, as `waitForLoading` does at its deadline.
+   */
+  #originStoppedLoading(target: Session, origin: string): Promise<void> {
     return new Promise((resolve) => {
       const watched = new Set<WebContents>();
       let settled = false;
@@ -2118,7 +2128,9 @@ export class BrowserHost {
         if (settled) return;
         const loading = this.#sessionTabs(target)
           .map((tab) => tab.contents)
-          .filter((contents) => !contents.isDestroyed() && contents.isLoading());
+          .filter(
+            (contents) => !contents.isDestroyed() && contents.isLoading() && frameOrigins(contents).includes(origin),
+          );
         if (loading.length === 0) {
           finish();
           return;
