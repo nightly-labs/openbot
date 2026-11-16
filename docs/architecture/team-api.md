@@ -506,6 +506,16 @@ client reads both and puts the models on their account: the model picker of that
 them, as on the host. Only owners and admins can use it (else 403). A client that fails to read it
 keeps the accounts without these models. `src/main/team-api/route-provider-accounts.ts` owns it.
 
+The optional `provider-model-source-v1` capability (protocol 9 only) adds
+`POST /v1/providers/model-sources` (empty request). It lists, for each provider whose own settings give
+its models from another source than the provider's own list, that source: `{ kind: "provider", name }`
+for a model provider such as Ollama, or `{ kind: "catalog" }` for a model list file. Today only Codex
+reports it, from `model_provider` and `model_catalog_json` in `config/read` (#9956). The path, address
+and key of the source stay on the host. Every member reads it: it says no more than the model list. The
+released status routes carry no source, so the desktop remote branch and the web client read both and
+put the source on its status row. A client that fails to read it shows no source.
+`src/main/team-api/route-agents.ts` owns it.
+
 The optional `claude-compact-window-v1` capability (protocol 9 only) adds
 `POST /v1/admin/host/claude-compact-window` and `POST /v1/admin/host/claude-compact-window/update`
 (`tokens`: a whole number from 100,000 to 1,000,000, or `null` for Claude Code's own size). They are

@@ -37,6 +37,7 @@ import type {
   InvitePreview,
   LocalBrowserSecretResponse,
   PinnedMessagesSnapshot,
+  ProviderModelSourceEntry,
   QueueSnapshot,
   ReadPendingApprovalInput,
   ReorderQueueInput,
@@ -71,6 +72,7 @@ import {
   decodeAgentFastModels,
   decodeAgentModelListings,
   decodeAgentSteeringModels,
+  decodeProviderModelSources,
   decodeUsageCredits,
   decodeWorkspaceDirectory,
   isAccountUsage,
@@ -87,6 +89,7 @@ import {
   isTeamPresenceSnapshot,
   withFastServiceTiers,
   withModelListings,
+  withModelSources,
   withSteeringModels,
   withUsageCredits,
   withWorkspaceOnlyLimit,
@@ -174,6 +177,10 @@ import {
   PENDING_APPROVAL_ROUTES,
 } from "@openbot/contracts/team-protocol/pending-approval-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
+import {
+  PROVIDER_MODEL_SOURCE_CAPABILITY,
+  PROVIDER_MODEL_SOURCE_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-model-source-v1";
 import {
   ROUTINE_FLOW_STOP_CAPABILITY,
   ROUTINE_FLOW_STOP_ROUTES,
@@ -483,6 +490,11 @@ export interface WebWorkspaceRuntime {
   agentAvatar(agentId: string, avatarUrl: string): Promise<string>;
   models(): Promise<ClientAgentModelOption[]>;
   status(): Promise<AgentStatus>;
+  /**
+   * The model sources alone. A released status event carries none, so the client adds the last ones
+   * to each status event and reads them again after it (#9956).
+   */
+  modelSources?: () => Promise<ProviderModelSourceEntry[]>;
   accountUsage?: () => Promise<AccountUsage>;
   createAgent(input: CreateAgentInput): Promise<ClientAgentSummary>;
   duplicateAgent(agentId: string): Promise<DuplicateAgentResult>;
@@ -802,6 +814,15 @@ export function createWebWorkspaceRuntime(
       : await request("GET", TEAM_API_ROUTES.sidebarLayout.state);
     if (!isSidebarLayoutSnapshot(value)) throw new Error(currentText().t("error.remote.invalidData"));
     return value;
+  }
+  /**
+   * Where each provider's models come from (`provider-model-source-v1`). Optional: an older host, or a
+   * failed read, gives none, and the picker then shows no source.
+   */
+  function readModelSources(): Promise<ProviderModelSourceEntry[]> {
+    return capabilities.includes(PROVIDER_MODEL_SOURCE_CAPABILITY)
+      ? request("POST", PROVIDER_MODEL_SOURCE_ROUTES.list, {}).then(decodeProviderModelSources, () => [])
+      : Promise.resolve([]);
   }
   async function request(
     method: string,
@@ -1738,10 +1759,11 @@ export function createWebWorkspaceRuntime(
       );
     },
     async status() {
-      const value = await request("GET", TEAM_API_ROUTES.agents.status);
+      const [value, sources] = await Promise.all([request("GET", TEAM_API_ROUTES.agents.status), readModelSources()]);
       if (!isAgentStatus(value)) throw new Error(currentText().t("error.remote.invalidData"));
-      return value;
+      return withModelSources(value, sources);
     },
+    modelSources: readModelSources,
     async accountUsage() {
       // Whether an account works on credits is optional: when its read fails, the reading shows as before.
       const [value, credits] = await Promise.all([

@@ -152,6 +152,8 @@ export const messages = {
   "provider.picker.selectEffort": "推論の強さを選択",
   "provider.picker.custom": "カスタム",
   "provider.picker.cliReady": "{cli} 準備完了",
+  "provider.picker.modelSourceProvider": "{cli} の設定にある {name} を使用",
+  "provider.picker.modelSourceCatalog": "{cli} の設定にあるモデル一覧を使用",
   "provider.status.signInRequired": "サインインが必要",
   "provider.model.free": "無料",
   "provider.model.new": "新着",

@@ -185,7 +185,6 @@ import {
   decodeAgentAnalyticsFromHost,
   decodeAgentModelOptions,
   decodeAgentSessionSettingsFromHost,
-  decodeAgentStatusFromHost,
   decodeAgentSummaries,
   decodeAgentSummary,
   decodeHiddenAgentsFromHost,
@@ -256,6 +255,7 @@ import {
   parseWithdrawFeedback,
 } from "./agent-inputs";
 import type { IpcGroupHandlers } from "./define-ipc-group";
+import { readRemoteAgentStatus } from "./remote-agent-status";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 
 /** The fields of a move to another model at a usage limit. */
@@ -436,8 +436,7 @@ export function agentIpcHandlers({
     agent: {
       getStatus: scopedQueryHandler({
         local: () => service.getStatus(),
-        remote: (serverId) =>
-          runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.status, decodeAgentStatusFromHost)),
+        remote: (serverId) => runCauseEffect(readRemoteAgentStatus(remoteServers, serverId)),
       }),
       getRuntimeSnapshot: scopedQueryHandler({
         local: () => service.getRuntimeSnapshot(),

@@ -99,6 +99,7 @@ import { INSTANCE_TRANSFER_CHUNKS_ROUTES } from "@openbot/contracts/team-protoco
 import { INSTANCE_TRANSFER_ROUTES } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import type { LiveVoiceEvent } from "@openbot/contracts/team-protocol/live-voice-v1";
 import type { MachineAlertEvent } from "@openbot/contracts/team-protocol/machine-resources-v1";
+import { PROVIDER_MODEL_SOURCE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-model-source-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import {
   decodeThreadMessageSearchResponse,
@@ -457,6 +458,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         if (this.#presence.has(serverId)) this.emit("presence", serverId, this.getPresence(serverId));
       },
       hasUsageLimits: (serverId) => this.supportsCapability(serverId, AGENT_USAGE_LIMIT_CAPABILITY),
+      hasModelSources: (serverId) => this.supportsCapability(serverId, PROVIDER_MODEL_SOURCE_CAPABILITY),
       emit: (serverId, event, bufferedLive) => {
         // Another device of the user changed their levels: the server list shows the new server level.
         if (event.type === "agent-notification-levels-changed")
