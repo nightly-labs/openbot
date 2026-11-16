@@ -20,7 +20,7 @@ import { isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { extractJsonObject, StructuredOutputError } from "../structured-output";
 import { EXTERNAL_EVENT_END, EXTERNAL_EVENT_START } from "../webhook-trigger";
-import { githubObjectKey, githubTriggerRepositories } from "./github-matching";
+import { githubObjectKey, githubTriggerRepositories, githubTriggerWatches } from "./github-matching";
 import {
   GITHUB_BODY_LIMIT,
   type WorkflowGitHubChange,
@@ -264,9 +264,8 @@ function outputRepository(
   const repository = fieldText(node, "repository");
   if (repository && repository !== "trigger") return isGitHubRepositoryName(repository) ? repository : null;
   const trigger = graph?.nodes.find((candidate) => candidate.id === triggerNodeId);
-  const repositories = trigger ? githubTriggerRepositories(trigger) : [];
-  const eventRepository = runItem?.repository.toLowerCase();
-  return repositories.find((name) => name.toLowerCase() === eventRepository) ?? repositories[0] ?? null;
+  if (trigger && runItem && githubTriggerWatches(trigger, runItem.repository)) return runItem.repository;
+  return (trigger ? githubTriggerRepositories(trigger) : [])[0] ?? null;
 }
 
 /**

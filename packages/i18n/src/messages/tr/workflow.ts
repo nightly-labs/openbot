@@ -276,6 +276,8 @@ export const messages = {
   "workflow.github.noEvents": "Olay yok",
   "workflow.github.chooseRepository": "Depo seç",
   "workflow.github.searchRepositories": "Depolarda ara",
+  "workflow.github.allRepositories": "{owner} hesabının tüm depoları",
+  "workflow.github.allOf": "Tümü: {owner}",
   "workflow.github.events.issues": "Sorunlar",
   "workflow.github.events.pullRequests": "Çekme istekleri",
   "workflow.github.events.both": "Sorunlar ve çekme istekleri",
@@ -309,6 +311,10 @@ export const messages = {
   "workflow.github.alert.missing": "OpenBot, GitHub'da {repository} deposunu göremiyor.",
   "workflow.github.alert.readOnly": "OpenBot, {repository} deposundaki sorunları ve çekme isteklerini değiştiremez.",
   "workflow.github.alert.eventsOff": "GitHub henüz {repository} deposundan olay göndermiyor.",
+  "workflow.github.alert.ownerMissing": "OpenBot, GitHub'da {owner} hesabının hiçbir deposunu göremiyor.",
+  "workflow.github.alert.ownerReadOnly":
+    "OpenBot, {owner} hesabının bazı depolarındaki sorunları ve çekme isteklerini değiştiremez.",
+  "workflow.github.alert.ownerEventsOff": "GitHub henüz {owner} hesabının bazı depolarından olay göndermiyor.",
   "workflow.github.alert.noEvent": "Tetikleyici bir GitHub olayı değil. Bir depo seçin ve numarayı girdiden alın.",
   "workflow.github.alert.pullRequestOnly":
     "“{action}” yalnızca çekme isteklerinde çalışır. Tetikleyici sorunlarda başlar.",

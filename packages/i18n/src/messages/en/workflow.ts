@@ -277,6 +277,8 @@ export const messages = defineMessages("workflow", {
   "workflow.github.noEvents": "No events",
   "workflow.github.chooseRepository": "Choose repository",
   "workflow.github.searchRepositories": "Search repositories",
+  "workflow.github.allRepositories": "All repositories of {owner}",
+  "workflow.github.allOf": "All of {owner}",
   "workflow.github.events.issues": "Issues",
   "workflow.github.events.pullRequests": "Pull requests",
   "workflow.github.events.both": "Issues and pull requests",
@@ -310,6 +312,10 @@ export const messages = defineMessages("workflow", {
   "workflow.github.alert.missing": "OpenBot cannot see {repository} on GitHub.",
   "workflow.github.alert.readOnly": "OpenBot cannot change issues and pull requests in {repository}.",
   "workflow.github.alert.eventsOff": "GitHub does not send events from {repository} yet.",
+  "workflow.github.alert.ownerMissing": "OpenBot cannot see any repository of {owner} on GitHub.",
+  "workflow.github.alert.ownerReadOnly":
+    "OpenBot cannot change issues and pull requests in some repositories of {owner}.",
+  "workflow.github.alert.ownerEventsOff": "GitHub does not send events from some repositories of {owner} yet.",
   "workflow.github.alert.noEvent":
     "The trigger is not a GitHub event. Choose a repository, and take the number from the input.",
   "workflow.github.alert.pullRequestOnly": "{action} works only on pull requests. The trigger starts on issues.",

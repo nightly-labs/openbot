@@ -273,6 +273,8 @@ export const messages = {
   "workflow.github.noEvents": "イベントなし",
   "workflow.github.chooseRepository": "リポジトリを選択",
   "workflow.github.searchRepositories": "リポジトリを検索",
+  "workflow.github.allRepositories": "{owner} のすべてのリポジトリ",
+  "workflow.github.allOf": "{owner} のすべて",
   "workflow.github.events.issues": "Issue",
   "workflow.github.events.pullRequests": "プルリクエスト",
   "workflow.github.events.both": "Issue とプルリクエスト",
@@ -306,6 +308,10 @@ export const messages = {
   "workflow.github.alert.missing": "OpenBot は GitHub 上の {repository} を参照できません。",
   "workflow.github.alert.readOnly": "OpenBot は {repository} の Issue とプルリクエストを変更できません。",
   "workflow.github.alert.eventsOff": "GitHub はまだ {repository} のイベントを送信していません。",
+  "workflow.github.alert.ownerMissing": "OpenBot は GitHub 上で {owner} のリポジトリを 1 つも参照できません。",
+  "workflow.github.alert.ownerReadOnly":
+    "OpenBot は {owner} の一部のリポジトリで Issue と Pull Request を変更できません。",
+  "workflow.github.alert.ownerEventsOff": "GitHub は {owner} の一部のリポジトリからまだイベントを送信していません。",
   "workflow.github.alert.noEvent":
     "トリガーが GitHub イベントではありません。リポジトリを選択し、番号は入力から取得してください。",
   "workflow.github.alert.pullRequestOnly":

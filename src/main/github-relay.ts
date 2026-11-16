@@ -1,3 +1,4 @@
+import { workflowGitHubWatchOwner } from "@openbot/contracts/ipc";
 import type { GitHubDeliveryStatus } from "@openbot/contracts/signal-protocol/github-route";
 import { Effect, Result } from "effect";
 import type { WorkflowsHandle } from "../backend/workflows/workflows";
@@ -11,6 +12,7 @@ interface GitHubRelayAccount {
     hostId: string,
     githubToken: string,
     repositories: readonly string[],
+    owners: readonly string[],
   ): Effect.Effect<GitHubRouteTicket, CentralAuthOperationError>;
 }
 
@@ -25,7 +27,8 @@ export interface GitHubRelayOptions {
 /**
  * Owns the GitHub hold on the ingress socket and the repositories that it watches. The repositories
  * come from the saved GitHub triggers; the account service confirms them with the GitHub sign-in each
- * time the socket opens, and the event bodies go only to this computer.
+ * time the socket opens, and the event bodies go only to this computer. An `owner/*` entry watches each
+ * repository of the owner that the sign-in reaches: the account service names them in the ticket.
  */
 export class GitHubRelay {
   readonly #options: GitHubRelayOptions;
@@ -33,12 +36,14 @@ export class GitHubRelay {
   #release: (() => void) | null = null;
   /** The repositories that the last ticket named, by lowercase `owner/name`. */
   #routed = new Map<string, GitHubRouteTicketRepository>();
+  /** Repositories of a watched owner, by lowercase `owner/name`, that asked for a new ticket once. */
+  #asked = new Set<string>();
 
   constructor(options: GitHubRelayOptions) {
     this.#options = options;
   }
 
-  /** Watches `names`, as `owner/name`. An empty list releases the socket. */
+  /** Watches `names`, as `owner/name` or `owner/*`. An empty list releases the socket. */
   setRepositories(names: readonly string[]): void {
     const next = [...new Set(names.map((name) => name.toLowerCase()))].sort();
     const changed = next.join("\n") !== this.#repositories.join("\n");
@@ -48,6 +53,7 @@ export class GitHubRelay {
       this.#release?.();
       this.#release = null;
       this.#routed = new Map();
+      this.#asked = new Set();
       return;
     }
     if (!this.#release) this.#release = ingress.acquireGitHub();
@@ -64,6 +70,26 @@ export class GitHubRelay {
     return this.#routed.get(fullName.toLowerCase()) ?? null;
   }
 
+  /**
+   * Tells the relay the repositories that the GitHub connection reaches now, as `owner/name`. A repository
+   * of a watched owner that the last ticket did not name, such as one made after it, gets a new ticket.
+   * Each such repository asks once, so one that the account service leaves out does not ask again.
+   */
+  noticeRepositories(names: readonly string[]): void {
+    if (!this.#release || !this.connected()) return;
+    const owners = new Set(this.#repositories.flatMap((value) => workflowGitHubWatchOwner(value) ?? []));
+    if (owners.size === 0) return;
+    let missing = false;
+    for (const name of names) {
+      const key = name.toLowerCase();
+      if (!owners.has(key.slice(0, Math.max(key.indexOf("/"), 0))) || this.#routed.has(key) || this.#asked.has(key))
+        continue;
+      this.#asked.add(key);
+      missing = true;
+    }
+    if (missing) this.#options.ingress().reconnect();
+  }
+
   handle(handler: GitHubIngressHandler | null): void {
     this.#options.ingress().handleGitHub(handler);
   }
@@ -74,13 +100,14 @@ export class GitHubRelay {
   }
 
   readonly issueRoute = Effect.fn("GitHubRelay.issueRoute")(function* (this: GitHubRelay, hostId: string) {
-    const repositories = this.#repositories;
+    const owners = this.#repositories.flatMap((value) => workflowGitHubWatchOwner(value) ?? []);
+    const repositories = this.#repositories.filter((value) => workflowGitHubWatchOwner(value) === null);
     const token = yield* this.#options
       .githubToken()
       .pipe(Effect.mapError((cause) => new RemoteWorkflowError({ cause })));
     if (!token) return yield* new RemoteWorkflowError({ cause: new Error("GitHub is not connected.") });
     const issued = yield* this.#options.account
-      .issueGitHubRoute(hostId, token, repositories)
+      .issueGitHubRoute(hostId, token, repositories, owners)
       .pipe(toRemoteWorkflowError);
     this.#routed = new Map(issued.repositories.map((repository) => [repository.fullName.toLowerCase(), repository]));
     return issued.ticket;

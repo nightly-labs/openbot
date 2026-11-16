@@ -293,6 +293,8 @@ export const messages = {
   "workflow.github.noEvents": "Brak zdarzeń",
   "workflow.github.chooseRepository": "Wybierz repozytorium",
   "workflow.github.searchRepositories": "Szukaj repozytoriów",
+  "workflow.github.allRepositories": "Wszystkie repozytoria {owner}",
+  "workflow.github.allOf": "Wszystkie: {owner}",
   "workflow.github.events.issues": "Zgłoszenia",
   "workflow.github.events.pullRequests": "Pull requesty",
   "workflow.github.events.both": "Zgłoszenia i pull requesty",
@@ -326,6 +328,10 @@ export const messages = {
   "workflow.github.alert.missing": "OpenBot nie widzi {repository} w GitHub.",
   "workflow.github.alert.readOnly": "OpenBot nie może zmieniać zgłoszeń ani pull requestów w {repository}.",
   "workflow.github.alert.eventsOff": "GitHub nie wysyła jeszcze zdarzeń z {repository}.",
+  "workflow.github.alert.ownerMissing": "OpenBot nie widzi w GitHub żadnego repozytorium {owner}.",
+  "workflow.github.alert.ownerReadOnly":
+    "OpenBot nie może zmieniać zgłoszeń ani pull requestów w niektórych repozytoriach {owner}.",
+  "workflow.github.alert.ownerEventsOff": "GitHub nie wysyła jeszcze zdarzeń z niektórych repozytoriów {owner}.",
   "workflow.github.alert.noEvent": "Wyzwalacz nie jest zdarzeniem GitHub. Wybierz repozytorium i weź numer z wejścia.",
   "workflow.github.alert.pullRequestOnly":
     "„{action}” działa tylko dla pull requestów. Wyzwalacz uruchamia się dla zgłoszeń.",

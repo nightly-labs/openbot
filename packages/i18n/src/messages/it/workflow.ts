@@ -276,6 +276,8 @@ export const messages = {
   "workflow.github.noEvents": "Nessun evento",
   "workflow.github.chooseRepository": "Scegli repository",
   "workflow.github.searchRepositories": "Cerca repository",
+  "workflow.github.allRepositories": "Tutti i repository di {owner}",
+  "workflow.github.allOf": "Tutti di {owner}",
   "workflow.github.events.issues": "Issue",
   "workflow.github.events.pullRequests": "Pull request",
   "workflow.github.events.both": "Issue e pull request",
@@ -309,6 +311,10 @@ export const messages = {
   "workflow.github.alert.missing": "OpenBot non vede {repository} su GitHub.",
   "workflow.github.alert.readOnly": "OpenBot non può modificare issue e pull request in {repository}.",
   "workflow.github.alert.eventsOff": "GitHub non invia ancora eventi da {repository}.",
+  "workflow.github.alert.ownerMissing": "OpenBot non vede nessun repository di {owner} su GitHub.",
+  "workflow.github.alert.ownerReadOnly":
+    "OpenBot non può modificare issue e pull request in alcuni repository di {owner}.",
+  "workflow.github.alert.ownerEventsOff": "GitHub non invia ancora eventi da alcuni repository di {owner}.",
   "workflow.github.alert.noEvent":
     "Il trigger non è un evento GitHub. Scegli un repository e prendi il numero dall'input.",
   "workflow.github.alert.pullRequestOnly": "{action} funziona solo sulle pull request. Il trigger parte dalle issue.",

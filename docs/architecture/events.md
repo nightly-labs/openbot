@@ -149,6 +149,15 @@ triggers, and the `ingress` socket sends it to Signal. The account service check
 with the host's GitHub sign-in; D1 keeps none of them. Signal gives each event to every host that
 watches its repository, and the host answers with `github-delivery-result`.
 
+A trigger can also watch all repositories of an owner (its `owners` field, one login a line). The host
+sends these owners in the optional `owners` list of the route request, and the account service adds
+each repository of the owner's App installation that the sign-in can see and that is not archived.
+The ticket still names repositories, at most `GITHUB_ROUTE_REPOSITORIES_LIMIT`, named ones first, so
+Signal does not change. A repository that the owner makes later gets into the ticket when the socket
+connects again: each read of the GitHub catalog lets `GitHubRelay.noticeRepositories` reconnect once
+for a repository of a watched owner that the ticket does not name. An older account service ignores
+`owners`; an older host or client ignores the field and keeps the single repositories.
+
 `Workflows.receiveGitHub` records each delivery in `workflow_github_deliveries`, without the body,
 the newest 50 per trigger (`WORKFLOW_GITHUB_DELIVERY_LIMIT`). A delivery ID that is there already
 records nothing. A delivery is `started`, `waiting` (its item has an open run), or `skipped` with a

@@ -2597,7 +2597,18 @@ export async function createApplicationServices({
     // The files of a Discord mention, which a new issue or a comment keeps in the repository.
     download: (url, maxBytes) => downloadDiscordAttachment(url, maxBytes),
   });
-  const workflowGitHub = workflowGitHubDirectory(() => githubConnector.workflowCatalog(), githubRest);
+  // Each read of the catalog lets the relay see a new repository of an owner that a trigger watches.
+  const githubCatalog = () =>
+    githubConnector
+      .workflowCatalog()
+      .pipe(
+        Effect.tap((catalog) =>
+          Effect.sync(() =>
+            githubRelay.noticeRepositories(catalog.repositories.map((repository) => repository.fullName)),
+          ),
+        ),
+      );
+  const workflowGitHub = workflowGitHubDirectory(githubCatalog, githubRest);
   const workflowRuntime = await Effect.runPromise(
     createWorkflows({
       store: workflowStore,
@@ -2607,6 +2618,8 @@ export async function createApplicationServices({
       // The relay is made with the ingress socket, below; a graph changes only after start.
       watchGitHub: (repositories) => githubRelay.setRepositories(repositories),
       githubApi: githubRest,
+      githubRepositories: () =>
+        githubCatalog().pipe(Effect.map((catalog) => catalog.repositories.map((repository) => repository.fullName))),
       delivery: (deliveryId) => {
         const found = mailbox.getDelivery(deliveryId)?.delivery;
         return found ? { status: found.status, turnId: found.turnId, error: found.error } : null;
