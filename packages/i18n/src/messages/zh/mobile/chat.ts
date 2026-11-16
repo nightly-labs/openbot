@@ -439,6 +439,7 @@ export const messages = {
   "mobile.chat.approval.report.ideaHeadline": "有想法？我们来实现它。",
   "mobile.chat.approval.report.dontSend": "暂不",
   "mobile.chat.approval.report.send": "发送给 OpenBot 团队",
+  "mobile.chat.approval.report.phoneAdds": "这部手机会在报告中附上：",
   "mobile.chat.approval.allow": "允许",
   "mobile.chat.approval.deny": "拒绝",
   "mobile.chat.approval.reconnect": "请连接 {server} 以处理该请求。",

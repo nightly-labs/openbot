@@ -451,6 +451,7 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.approval.report.ideaHeadline": "Have an idea? Let's make it real.",
   "mobile.chat.approval.report.dontSend": "Not now",
   "mobile.chat.approval.report.send": "Send to the OpenBot team",
+  "mobile.chat.approval.report.phoneAdds": "This phone adds to the report:",
   "mobile.chat.approval.allow": "Allow",
   "mobile.chat.approval.deny": "Deny",
   "mobile.chat.approval.reconnect": "Connect to {server} to answer this request.",

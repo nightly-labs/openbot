@@ -64,7 +64,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "Supportprotokoll leeren?",
   "mobile.settings.support.clearBody": "Dies entfernt alle Ereignisse aus dem Protokoll auf diesem Telefon.",
   "mobile.settings.support.logFooter":
-    "Das Protokoll bleibt auf diesem Telefon und wird von OpenBot nicht gesendet. Es erfasst Verbindungsschritte, Anfragen und Fehler. Es erfasst keine Nachrichten oder Dateien und maskiert Passwörter und Tokens. Lies die Datei, bevor du sie teilst.",
+    "Das Protokoll bleibt auf diesem Telefon. OpenBot sendet Zeilen daraus nur mit einem Fehlerbericht zur Telefon-App, den du sendest, und die Berichtskarte zeigt sie vorher an. Es erfasst Verbindungsschritte, Anfragen und Fehler. Es erfasst keine Nachrichten oder Dateien und maskiert Passwörter und Tokens. Lies die Datei, bevor du sie teilst.",
   "mobile.settings.support.saveFailed": "Die Protokolldatei konnte nicht gespeichert werden. Versuche es erneut.",
   "mobile.settings.support.sharingUnavailable": "Teilen ist auf diesem Telefon nicht verfügbar.",
   "mobile.settings.support.newestFirst": "Neueste zuerst.",

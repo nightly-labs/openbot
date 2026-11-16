@@ -31,6 +31,8 @@ export const messages = {
   "prompt.approval.report.ideaHeadline": "아이디어가 있나요? 실현해 봅시다.",
   "prompt.approval.report.dontSend": "나중에",
   "prompt.approval.report.send": "OpenBot 팀에 보내기",
+  "prompt.approval.report.phoneOnly":
+    "OpenBot 휴대폰 앱에서 이 채팅을 열고 거기서 신고를 보내 주세요. 휴대폰이 버전, 시스템 정보, 지원 로그를 추가해요. 휴대폰이 연결되지 않으면 휴대폰 앱에서 설정 > 지원을 열고 GitHub에서 문제를 신고해 주세요.",
   "prompt.approval.title.command": "명령 실행",
   "prompt.approval.title.fileChange": "파일 변경",
   "prompt.approval.title.permissions": "권한 부여",

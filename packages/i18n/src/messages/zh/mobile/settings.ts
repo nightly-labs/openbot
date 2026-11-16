@@ -58,7 +58,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "清空支持日志？",
   "mobile.settings.support.clearBody": "这会删除这台手机上日志中的所有事件。",
   "mobile.settings.support.logFooter":
-    "日志只保存在这台手机上，OpenBot 不会发送它。日志记录连接步骤、请求和错误，不记录消息或文件，并会遮蔽密码与令牌。分享前请先自行查看文件内容。",
+    "日志保存在这台手机上。只有在你发送手机应用的错误报告时，OpenBot 才会随报告发送其中几行，报告卡片会先显示这些内容。日志记录连接步骤、请求和错误，不记录消息或文件，并会遮蔽密码与令牌。分享前请先自行查看文件内容。",
   "mobile.settings.support.saveFailed": "无法保存日志文件，请重试。",
   "mobile.settings.support.sharingUnavailable": "这台手机不支持分享。",
   "mobile.settings.support.newestFirst": "最新的在最前面。",
