@@ -204,7 +204,7 @@ import "katex/contrib/copy-tex";
 import "../../selection-copy";
 import { actionToast } from "../../action-toast";
 import { desktopAnalytics } from "../../analytics";
-import { conversationMessageBody, formatMessageTime, toAgentMessage } from "../../app-message-projection";
+import { collectThreadMessageMatches, formatMessageTime, toAgentMessage } from "../../app-message-projection";
 import { ProviderSignInDialogs } from "../../components/ProviderSignInDialogs";
 import { isGlobalSearchShortcut } from "../../global-search-shortcut";
 import { LayoutProvider, useLayout } from "../../layout";
@@ -932,13 +932,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     return workspace.state.capabilities.includes(CONVERSATION_FILE_SEARCH_CAPABILITY) ? searchAllFiles : undefined;
   }
   /** The side thread messages of the open agent that have the `@` query. */
-  async function searchAgentThreadMessages(query: string): Promise<ComposerThreadMessageMatch[]> {
+  function searchAgentThreadMessages(query: string): Promise<ComposerThreadMessageMatch[]> {
     const id = workspace.state.selectedId;
-    if (!id || workspace.state.status !== "online") return [];
-    const page = await workspace.runtime.search(id, query, undefined, true);
-    return page.results.flatMap((result) =>
-      result.taskId ? [{ threadId: result.taskId, body: conversationMessageBody(result.message) }] : [],
-    );
+    if (!id || workspace.state.status !== "online") return Promise.resolve([]);
+    return collectThreadMessageMatches((cursor) => workspace.runtime.search(id, query, cursor, true));
   }
   /** An older host does not name the thread of a search result, so its `@` list finds thread titles only. */
   function threadSearch() {

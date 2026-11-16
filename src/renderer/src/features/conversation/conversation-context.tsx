@@ -8,6 +8,7 @@ import {
   type ConversationSnapshot,
   openExchangesOutside,
 } from "@openbot/contracts/ipc";
+import { THREAD_MESSAGE_SEARCH_PAGE_LIMIT } from "@openbot/contracts/team-protocol/thread-message-search-v1";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import type { AgentMessage, ComposerThreadMessageMatch } from "@openbot/ui/data";
 import { currentText } from "@openbot/ui/text";
@@ -15,7 +16,7 @@ import { createEffect, createMemo, createStore, onCleanup, untrack } from "solid
 import { desktopAnalytics } from "../../analytics";
 import {
   agentMessagesEqual,
-  conversationMessageBody,
+  collectThreadMessageMatches,
   formatMessageTime,
   retainThinkingMessages,
   toAgentMessage,
@@ -65,7 +66,6 @@ const LATEST_PAGE_SIZE = 50;
  * The newest messages that the `@` thread search reads. The agent's own chat has matches too, and the
  * list shows at most five threads, so this many leave room for them.
  */
-const THREAD_MESSAGE_SEARCH_LIMIT = 50;
 /**
  * How much of a snapshot an agent that is not open converts. Commentary of one turn becomes one
  * message and queued messages none, so a page needs more than a page of the thread.
@@ -926,15 +926,15 @@ const Conversation = createSimpleContext({
     }
 
     /** The side thread messages of the agent that have the `@` query. A message of the agent's own chat names no thread. */
-    async function searchAgentThreadMessages(agentId: string, query: string): Promise<ComposerThreadMessageMatch[]> {
-      const page = await conversationPort().agent.searchConversationMessages({
-        query,
-        agentId,
-        limit: THREAD_MESSAGE_SEARCH_LIMIT,
-        includeSideThreads: true,
-      });
-      return page.results.flatMap((result) =>
-        result.taskId ? [{ threadId: result.taskId, body: conversationMessageBody(result.message) }] : [],
+    function searchAgentThreadMessages(agentId: string, query: string): Promise<ComposerThreadMessageMatch[]> {
+      return collectThreadMessageMatches((cursor) =>
+        conversationPort().agent.searchConversationMessages({
+          query,
+          agentId,
+          ...(cursor ? { cursor } : {}),
+          limit: THREAD_MESSAGE_SEARCH_PAGE_LIMIT,
+          includeSideThreads: true,
+        }),
       );
     }
 
