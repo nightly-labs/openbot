@@ -39,6 +39,7 @@ import { WorkspaceSidebar } from "./features/sidebar/WorkspaceSidebar";
 import { TasksPanel } from "./features/tasks/TasksPanel";
 import { createHostRestartToasts, type HostRestartView, noteServerAgents } from "./features/updates/host-restart-toast";
 import { useUsage } from "./features/usage/usage-context";
+import { WindowBackdrop } from "./features/window/WindowBackdrop";
 import { WindowPageView } from "./features/window/WindowPageView";
 import { WorkspacePageRail } from "./features/window/WorkspacePageRail";
 import { useWindowPage } from "./features/window/window-page-context";
@@ -357,6 +358,7 @@ export function WorkspaceShell(props: {
   return (
     // The overlays and the chat cards show the same connectors.
     <ConnectorsProvider>
+      <WindowBackdrop />
       {/* The page rail sits at the left of the frame. The frame is the card of the page that the rail selects. */}
       <div class="app-window">
         <WorkspacePageRail hidden={chatWindow || remoteDesktopWorkspaceVisible()} />

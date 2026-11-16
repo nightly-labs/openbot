@@ -2070,6 +2070,12 @@ export const IPC_ENDPOINTS = {
     previewWorkspaceFile: scopedRequest<PreviewWorkspaceFileInput, FilePreview>()("agent:preview-workspace-file"),
     /** Releases only this client's temporary HTML bytes, never a file on a host. */
     releaseFilePreview: request<string, void>()("agent:release-file-preview"),
+    /**
+     * Keeps HTML that the renderer already holds, such as a backdrop page saved on this device, as a
+     * temporary page on this client. The answer is its `openbot-visual://preview/...` address, or null
+     * when the page store is full. `releaseFilePreview` releases it.
+     */
+    addPreviewPage: request<string, string | null>()("agent:add-preview-page"),
     listWorkspaceDirectory: scopedRequest<OpenWorkspaceFileInput, WorkspaceDirectory>()(
       "agent:list-workspace-directory",
     ),

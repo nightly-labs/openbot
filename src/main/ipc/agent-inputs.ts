@@ -1,3 +1,4 @@
+import { CHAT_VISUAL_PAGE_LIMIT } from "@openbot/contracts/chat-visual";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AcknowledgeFailedTurnInput,
@@ -127,6 +128,12 @@ export function parseChannelId(value: unknown): string {
 
 export function parseAttachmentId(value: unknown): string {
   return requireString(value, "attachmentId", INPUT_LIMITS.identifier);
+}
+
+/** HTML that the renderer holds. Main bounds it again by bytes when it keeps the page. */
+export function parsePreviewPageHtml(value: unknown): string {
+  if (typeof value !== "string" || value.length > CHAT_VISUAL_PAGE_LIMIT) throw new Error("Invalid preview page.");
+  return value;
 }
 
 export function parseFilePreviewPageUrl(value: unknown): string {

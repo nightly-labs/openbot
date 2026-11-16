@@ -133,6 +133,10 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Светлота",
   "mobile.settings.appearance.messageColorFooter":
     "С цветом агента ваши сообщения в чате с агентом окрашиваются в цвет этого агента. Со своим цветом ваши сообщения во всех чатах окрашиваются в выбранный цвет. Цвет текста меняется, чтобы текст оставался читаемым.",
+  "mobile.settings.appearance.chatBackground": "Фон чата",
+  "mobile.settings.appearance.chatBackgroundDefault": "По умолчанию",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "Каждая тема хранит свой цвет. Цвет, на котором текст трудно читать, становится темнее или светлее.",
   "mobile.settings.appearance.collapseRoutines": "Сворачивать активность регулярных задач",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Идущие подряд события регулярных задач в чате показываются одной свёрнутой строкой. Коснитесь строки, чтобы показать их.",
