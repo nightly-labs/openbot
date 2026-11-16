@@ -33,6 +33,7 @@ import type { AppInterfaceSizePreference, SetAppInterfaceSizePreferenceInput } f
 import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app-language";
 import type { AppLogoColorPreference, SetAppLogoColorPreferenceInput } from "./app-logo-color";
 import type { BillingPortalRequest, BillingState, BillingStorageRequest } from "./billing";
+import type { BillingDetails, BillingDetailsRequest } from "./billing-details";
 import type {
   CreateHostedServerInput,
   DeleteHostedServerInput,
@@ -1657,6 +1658,9 @@ export const IPC_ENDPOINTS = {
     getState: request<undefined, BillingState>()("billing:get-state"),
     openPortal: request<BillingPortalRequest, void>()("billing:open-portal"),
     buyStorage: request<BillingStorageRequest, BillingState>()("billing:buy-storage"),
+    // The billing country and EU VAT ID that decide the VAT of the next plan or license.
+    getDetails: request<undefined, BillingDetails>()("billing:get-details"),
+    setDetails: request<BillingDetailsRequest, BillingDetails>()("billing:set-details"),
   },
   // The commercial license of the account. Main opens the Checkout page; the renderer never sends a URL.
   license: {

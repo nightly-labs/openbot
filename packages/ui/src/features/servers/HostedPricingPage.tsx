@@ -20,6 +20,7 @@ import {
 import type { UserErrorDetails } from "@openbot/user-errors";
 import { type Accessor, createSignal, createUniqueId, Show, untrack } from "solid-js";
 import { useText } from "../../text";
+import { type BillingDetailsDraft, BillingDetailsFields, billingDetailsRequest } from "../billing/BillingDetailsFields";
 import { OrderForm, type OrderFormOrder } from "../billing/OrderForm";
 import { PageHeader, type PageHeaderFrame } from "../window/PageHeader";
 import { AddServerOtherOptions } from "./AddServerDialog";
@@ -72,6 +73,14 @@ export interface HostedPricingPageProps {
   error: UserErrorDetails | null;
   /** The title of the error. Without it, the title says that the server could not be created. */
   errorTitle?: string | undefined;
+  /**
+   * The billing country and EU VAT ID of the form. An order needs a country: it decides the VAT. Without it, the page
+   * does not ask for them.
+   */
+  billingDetails?: BillingDetailsDraft | undefined;
+  /** The first choices, such as the order of the web pricing page. Without it, the page starts with its defaults. */
+  initialOrder?: PricingOrder | undefined;
+  onBillingDetailsChange?: ((details: BillingDetailsDraft) => void) | undefined;
   onSubmit: (order: PricingOrder) => void;
   onClose: () => void;
   onOpenPrivacy: () => void;
@@ -89,9 +98,13 @@ export interface HostedPricingPageProps {
  */
 export function HostedPricingPage(props: HostedPricingPageProps) {
   const { t } = useText();
-  const initialLicense = untrack(() => (props.offerLicense ? FIRST_LICENSE : null));
+  const initialOrder = untrack(() => props.initialOrder);
+  const initialServer = initialOrder ? initialOrder.server : FIRST_SERVER;
+  const initialLicense = untrack(() =>
+    props.offerLicense ? (initialOrder ? (initialOrder.license?.tier ?? null) : FIRST_LICENSE) : null,
+  );
   const [order, setOrder] = createSignal<{ server: BillingPlanId | null; license: LicenseTier | null }>({
-    server: FIRST_SERVER,
+    server: initialServer,
     license: initialLicense,
   });
   // The tick stays when the buyer changes the order.
@@ -113,6 +126,8 @@ export function HostedPricingPage(props: HostedPricingPageProps) {
       busy={props.busy}
       serverBlocked={props.serverLimit != null}
       thisComputer={props.thisComputer}
+      billingDetails={props.billingDetails}
+      onBillingDetailsChange={props.onBillingDetailsChange}
       onSubmit={props.onSubmit}
       onClose={props.onClose}
       onOpenPrivacy={props.onOpenPrivacy}
@@ -210,8 +225,10 @@ export function HostedPricingPage(props: HostedPricingPageProps) {
             currencyLocked={props.currencyLocked}
             used={props.used}
             licenseTrialEnd={props.licenseTrialEnd}
-            initialServer={FIRST_SERVER}
+            initialServer={initialServer}
             initialLicense={initialLicense}
+            initialInterval={initialOrder?.interval}
+            initialUsers={initialOrder?.license?.users}
             noServerTitle={noServerTitle()}
             controlsMount={controlsMount()}
             action={action}
@@ -251,6 +268,8 @@ function OrderAction(props: {
   /** At the server limit, an order with a server cannot go on. */
   serverBlocked: boolean;
   thisComputer: boolean;
+  billingDetails: BillingDetailsDraft | undefined;
+  onBillingDetailsChange: ((details: BillingDetailsDraft) => void) | undefined;
   onSubmit: (order: PricingOrder) => void;
   onClose: () => void;
   onOpenPrivacy: () => void;
@@ -260,7 +279,10 @@ function OrderAction(props: {
   const id = `hosted-pricing-consent-${createUniqueId()}`;
   const buying = () => props.order().server !== null || props.order().license !== null;
   const label = () => (props.order().server === null ? t("billing.order.cta.license") : t("billing.order.cta.server"));
-  const blocked = () => !props.accepted() || props.busy || (props.serverBlocked && props.order().server !== null);
+  const detailsMissing = () =>
+    props.billingDetails !== undefined && billingDetailsRequest(props.billingDetails) === null;
+  const blocked = () =>
+    !props.accepted() || props.busy || detailsMissing() || (props.serverBlocked && props.order().server !== null);
   const keepContent = () =>
     props.thisComputer ? (
       <>
@@ -303,6 +325,15 @@ function OrderAction(props: {
   return (
     <Show when={buying()} fallback={keep()}>
       <div class="hosted-pricing-consent-action">
+        <Show when={props.billingDetails}>
+          {(details) => (
+            <BillingDetailsFields
+              value={details()}
+              disabled={props.busy}
+              onChange={(next) => props.onBillingDetailsChange?.(next)}
+            />
+          )}
+        </Show>
         <div class="hosted-pricing-consent">
           <Checkbox
             id={id}
