@@ -3112,7 +3112,9 @@ function removeClaudeQueryFile(file: string | null): Effect.Effect<void> {
  * The error of a Workspace only query when the CLI cannot make its sandbox (`failIfUnavailable`).
  * It tells the user to set `sandbox.failIfUnavailable=false`, which OpenBot does not show and which
  * would let commands run with no sandbox. Windows gets it on every turn: the Windows sandbox of
- * Claude Code 2.1.309 is behind a feature gate (#4094).
+ * Claude Code 2.1.309 is behind a feature gate (#4094). The chat gives no CLI words, such as the
+ * feature gate or the tools that Linux lacks (#9925); `#consume` writes the reason to the log.
+ * `error.agent.claudeSandboxUnavailable` stays in the catalog for the text of an older host.
  */
 const CLAUDE_SANDBOX_UNAVAILABLE = /Sandbox required but unavailable: (.+?)\.? Set sandbox\.failIfUnavailable=false/s;
 
@@ -3184,8 +3186,7 @@ function claudeTurnError(error: unknown, apiKey: boolean): string {
   // With an API key there is no sign-in to renew, so the key turn keeps the CLI text.
   if (!apiKey && CLAUDE_NOT_LOGGED_IN.test(text))
     return sourceText("error.provider.signInExpired", { provider: agentProviderName("claude") });
-  const reason = CLAUDE_SANDBOX_UNAVAILABLE.exec(text)?.[1];
-  return reason ? sourceText("error.agent.claudeSandboxUnavailable", { reason }) : text;
+  return CLAUDE_SANDBOX_UNAVAILABLE.test(text) ? sourceText("error.agent.claudeNoSandbox") : text;
 }
 
 /**

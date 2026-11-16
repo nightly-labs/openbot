@@ -150,6 +150,8 @@ export const messages = {
     "워크스페이스 전용 모드에는 Codex 샌드박스가 필요하지만 이 컴퓨터에서는 Codex가 샌드박스를 시작할 수 없어서 에이전트의 명령이 실패해요. 에이전트 설정에서 먼저 묻기나 전체 접근을 선택하세요.",
   "error.agent.claudeSandboxUnavailable":
     "워크스페이스 전용 모드에는 Claude 샌드박스가 필요하지만 이 컴퓨터에서는 Claude가 샌드박스를 시작할 수 없어요: {reason}. 에이전트 설정에서 전체 접근 권한이나 다른 제공자를 선택하세요.",
+  "error.agent.claudeNoSandbox":
+    "이 컴퓨터에서는 Claude가 샌드박스를 사용할 수 없어서 워크스페이스 전용 모드가 작동하지 않아요. 에이전트 설정에서 전체 접근 권한이나 다른 제공자를 선택하세요.",
   "error.agent.claudeSandboxBlocked":
     "워크스페이스 전용 모드에는 Claude 샌드박스가 필요하지만 이 컴퓨터에서는 Claude가 샌드박스를 시작할 수 없어서 에이전트의 명령이 실패해요. 에이전트 설정에서 전체 접근 권한이나 다른 제공자를 선택하세요.",
   "error.agent.screenCaptureOff":

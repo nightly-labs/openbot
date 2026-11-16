@@ -163,6 +163,8 @@ export const messages = {
     "Solo workspace richiede la sandbox di Codex, che Codex non riesce ad avviare su questo computer, quindi i comandi dell'agente non riescono. Scegli Chiedi prima o Accesso completo nelle impostazioni dell'agente.",
   "error.agent.claudeSandboxUnavailable":
     "Solo workspace richiede la sandbox di Claude, che Claude non riesce ad avviare su questo computer: {reason}. Scegli Accesso completo o un altro provider nelle impostazioni dell'agente.",
+  "error.agent.claudeNoSandbox":
+    "Claude non può usare una sandbox su questo computer, quindi Solo workspace non funziona con Claude. Scegli Accesso completo o un altro provider nelle impostazioni dell'agente.",
   "error.agent.claudeSandboxBlocked":
     "Solo workspace richiede la sandbox di Claude, che Claude non riesce ad avviare su questo computer, quindi i comandi dell'agente non riescono. Scegli Accesso completo o un altro provider nelle impostazioni dell'agente.",
   "error.agent.screenCaptureOff":
