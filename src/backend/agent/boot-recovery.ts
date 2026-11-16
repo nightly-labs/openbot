@@ -1,3 +1,8 @@
+import {
+  CONVERSATION_PLAN_ITEM_TYPE,
+  type ConversationMessage,
+  PLAN_CONTINUATION_ITEM_TYPE,
+} from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Cause, Effect, Schema } from "effect";
 import type { AgentProvider } from "../agent-client";
@@ -12,6 +17,7 @@ import type { ConversationRuntime } from "./conversation-runtime";
 import { conversationContentSignature } from "./delivery-content";
 import { markIncompleteMediaGeneration } from "./image-generation";
 import type { MailboxSync } from "./mailbox-sync";
+import type { PlanContinuation } from "./plan-continuation";
 import type { ProviderRuntime } from "./provider-runtime";
 import { answeredRequestId } from "./routine-quiet-runs";
 import { stopRunningSubagents } from "./subagent-updates";
@@ -49,6 +55,7 @@ export interface BootRecoveryOptions {
   conversation: ConversationRuntime;
   mailboxSync: MailboxSync;
   threads: ThreadLifecycle;
+  planContinuation: PlanContinuation;
   hooks: BootRecoveryHooks;
 }
 
@@ -80,6 +87,7 @@ export class BootRecovery {
   readonly #conversation: ConversationRuntime;
   readonly #mailboxSync: MailboxSync;
   readonly #threads: ThreadLifecycle;
+  readonly #planContinuation: PlanContinuation;
   readonly #hooks: BootRecoveryHooks;
   /**
    * Readiness also follows a provider restart, and startup readiness can come after the user's
@@ -101,6 +109,7 @@ export class BootRecovery {
     this.#conversation = options.conversation;
     this.#mailboxSync = options.mailboxSync;
     this.#threads = options.threads;
+    this.#planContinuation = options.planContinuation;
     this.#hooks = options.hooks;
   }
 
@@ -266,19 +275,40 @@ export class BootRecovery {
     });
     // Only a provider that exited during this run leaves agent text streaming: a restart marks it
     // interrupted before this. The chat showed the first words of that text as a whole message, with
-    // no error (#9729), so the turn fails and says that the answer is not complete.
+    // no error (#9729).
     const cut =
       recovered.terminal === "interrupted" &&
       target?.streaming.some((message) => message.author === "assistant" && message.text.trim() !== "") === true;
-    const { terminal, reason } = cut
-      ? { terminal: "failed" as const, reason: sourceText("error.agent.answerCutOff") }
-      : recovered;
+    const ownChat = cut && target !== null && target.threadId === target.agent.threadId ? target : null;
+    // The agent's own chat continues once with a note, as a failed compaction does, when no other message
+    // waits: that message would end the continuation with no error. A second cut shows the error.
+    const continuation = yield* recoveryStep(() => {
+      if (!ownChat?.turnId || this.#mailbox.laneQueuedIds(ownChat.agent.id, null).length > 0) return null;
+      const { messages } = this.#conversation.ensureSnapshot(ownChat.agent.id, ownChat.threadId);
+      return this.#planContinuation.afterProviderExit({
+        agentId: ownChat.agent.id,
+        taskId: null,
+        deliveryIds: [delivery.id],
+        plan: messages.find((message) => message.id === `${ownChat.turnId}:plan`)?.plan ?? null,
+        earlierPlan:
+          messages.findLast(
+            (message) => message.itemType === CONVERSATION_PLAN_ITEM_TYPE && message.turnId !== ownChat.turnId,
+          )?.plan ?? null,
+      });
+    });
+    const { terminal, reason } =
+      cut && !continuation
+        ? { terminal: "failed" as const, reason: sourceText("error.agent.answerCutOff") }
+        : recovered;
+    // The drain starts the continuation with this delivery, as for a plan.
+    if (continuation && ownChat?.turnId)
+      yield* this.#mailbox.requeueForPlan(delivery.id, ownChat.turnId).pipe(toBootRecoveryFailed);
     // A failed provider read keeps the conservative interrupted result; never replay side effects.
-    yield* this.#mailbox.markTerminal(delivery.id, terminal, reason).pipe(toBootRecoveryFailed);
+    else yield* this.#mailbox.markTerminal(delivery.id, terminal, reason).pipe(toBootRecoveryFailed);
     // The agent's own chat shows the error above its composer and the failed turn, as other failed turns do.
-    if (cut && target && target.threadId === target.agent.threadId) {
-      this.#hooks.emitError("agent_error", reason, target.agent.id);
-      if (target.turnId) this.#hooks.turnFailed?.(target.agent.id, target.turnId);
+    if (ownChat && !continuation) {
+      this.#hooks.emitError("agent_error", reason, ownChat.agent.id);
+      if (ownChat.turnId) this.#hooks.turnFailed?.(ownChat.agent.id, ownChat.turnId);
     }
     yield* recoveryStep(() => {
       if (target) {
@@ -289,6 +319,19 @@ export class BootRecovery {
           markIncompleteMediaGeneration(changed, terminal);
           return changed;
         });
+        // No `turnId`, as the line of a plan continuation: it shows after the cut answer.
+        const continuationLine: ConversationMessage | null = continuation
+          ? {
+              id: `${target.turnId}:plan-continuation`,
+              author: "system",
+              source: "system",
+              status: "completed",
+              createdAt: new Date().toISOString(),
+              itemType: PLAN_CONTINUATION_ITEM_TYPE,
+              text: sourceText("status.agent.providerExitContinues"),
+            }
+          : null;
+        if (continuationLine) changedMessages.push(continuationLine);
         const revision = this.#store.database.persistConversationChanges({
           agentId: agent.id,
           threadId,
@@ -300,6 +343,7 @@ export class BootRecovery {
         const snapshot = structuredClone(this.#conversation.ensureSnapshot(agent.id, threadId));
         const changedById = new Map(changedMessages.map((message) => [message.id, message]));
         snapshot.messages = snapshot.messages.map((message) => changedById.get(message.id) ?? message);
+        if (continuationLine) snapshot.messages.push(continuationLine);
         snapshot.activeTurnId = null;
         snapshot.revision = revision;
         // Clear the cached turn before queue listeners can read or change the agent.
@@ -307,7 +351,7 @@ export class BootRecovery {
         this.#conversation.publishConversation(snapshot);
       }
       this.#mailboxSync.emitQueue(delivery.recipientAgentId);
-      this.#hooks.deliverySettled?.(delivery.id, terminal);
+      if (!continuation) this.#hooks.deliverySettled?.(delivery.id, terminal);
     });
   });
 
