@@ -16,6 +16,8 @@ import { cx } from "./utils";
 
 export type ToasterProps = ComponentProps<typeof Sonner> & {
   onToastShown?: (metadata: FailureProperties) => void;
+  /** Hides the toasts but keeps them, for example while a native view covers their place. */
+  hidden?: boolean;
 };
 export type ExternalToast = SonnerExternalToast & {
   report?: NotificationMetadata;
@@ -96,7 +98,7 @@ export function Toaster(props: ToasterProps): JSX.Element {
   // The desktop app mounts the Toaster outside its text provider, so it follows the active locale.
   const { t } = currentText();
   const notifications = useSonner();
-  const sonnerProps = omit(props, "onToastShown");
+  const sonnerProps = omit(props, "onToastShown", "hidden");
   createEffect(
     () => notifications.toasts(),
     (toasts) => {
@@ -142,7 +144,7 @@ export function Toaster(props: ToasterProps): JSX.Element {
     };
   });
   return (
-    <div ref={layer} data-kb-top-layer="" class="ui-toast-layer">
+    <div ref={layer} data-kb-top-layer="" class="ui-toast-layer" hidden={props.hidden}>
       <Sonner
         {...sonnerProps}
         class={cx("ui-toaster", (props.closeButton ?? true) && "ui-toaster-closeable", props.class)}
