@@ -801,6 +801,28 @@ try {
     return { taskId: task.id, ran };
   });
 
+  await check("a thread turn that wrote text continues on the backup model", async () => {
+    const threader = await withBackup("Weaver");
+    failing([PRIMARY]);
+    const before = turns().length;
+    const task = await runCauseEffect(service.startTask({ agentId: threader.id, text: "act-then-fail" }));
+    await waitFor("the thread with work to complete on the backup", () =>
+      service.readTask(threader.id, task.id).messages.some((message) => message.text === "Done."),
+    );
+    const order = () =>
+      service
+        .readTask(threader.id, task.id)
+        .messages.filter((message) => message.author !== "system" && message.text.trim())
+        .map((message) => message.text);
+    const expected = ["act-then-fail", "Partial answer.", "Done."];
+    assert.deepEqual(order(), expected, "The thread shows the stopped text, then the backup's answer.");
+    assert.ok(turns().slice(before).at(-1)?.input.includes("Continue the unfinished task"));
+    failing([]);
+    await restart();
+    assert.deepEqual(order(), expected, "The thread keeps the order after a restart.");
+    return { taskId: task.id, order: order() };
+  });
+
   await check("a usage limit after partial work continues on the backup", async () => {
     const attachment = join(root, "requirements.txt");
     await writeFile(attachment, "Finish the last step after the checkpoint.\n");

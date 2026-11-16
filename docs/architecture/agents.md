@@ -811,13 +811,14 @@ by the user. The error waits for the end
 of the turn, also with no backup model. A backup model then runs the turn again, as for a provider
 error. With no backup, a turn that only teammate results started runs once more on the same model.
 A thread turn does the same: a backup model runs it again, and with no backup it runs once more on
-the same model (#8503, #8406). A turn that a failed sign-in or a provider that does not answer ended
-after work started continues on the backup model, with the work steps of the turn, as after a usage
-limit, when the agent is set to switch without asking (#8406). A channel task does not move. So
+the same model (#8503, #8406). So
 does the turn of an external chat conversation, such as WhatsApp (#8573); a channel task does not.
 `MessagingThreads` keeps the conversation's status post while the turn's messages wait in the queue,
 so the conversation gets no "Stopped." before the answer. The turn did no step, so it repeats
 nothing. A second empty run, or an empty turn from the person, shows the error.
+A turn that a failed sign-in or a provider that does not answer ended after work started continues
+on the backup model, with the work steps of the turn, as after a usage limit, when the agent is set
+to switch without asking (#8406).
 
 Codex can also write its last words as narration (a `msg_` commentary item) and then send an empty
 answer (#8837). Codex takes that narration as the turn's result, so `TurnLifecycle` makes the
