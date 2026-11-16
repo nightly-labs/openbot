@@ -4407,28 +4407,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // own tools is not a step outside that limit. The tools ask the user themselves where they must,
     // and a Claude agent at Workspace only runs them without a card, too (#7086). Only once: an "always"
     // answer stays in the agent's own state, also after the user chooses Ask first.
+    // The no-update tool also runs without a card when it already ended this turn quiet and the model
+    // calls it again. The call changes nothing, and OpenBot ends a quiet turn that repeats it only while
+    // no card is open: a card for each call kept a Gemini agent at Ask first waiting again and again (#10078).
     if (
-      this.options.confine &&
       kind === "permissions" &&
       thread &&
       turn &&
       !turn.stopped &&
       !turn.completing &&
-      callsBridgeTool(thread, params.toolCall.title)
-    ) {
-      const option = params.options.find((candidate) => candidate.kind === "allow_once");
-      if (option) return { outcome: { outcome: "selected", optionId: option.optionId } };
-    }
-    // The no-update tool already ended this turn quiet, and the model calls it again. The call changes
-    // nothing, and OpenBot ends a quiet turn that repeats it only while no card is open: a card for each
-    // call kept a Gemini agent at Ask first waiting for the user again and again (#10078).
-    if (
-      kind === "permissions" &&
-      thread &&
-      turn?.quietNoUpdate &&
-      !turn.stopped &&
-      !turn.completing &&
-      callsNoUpdateTool(thread, params.toolCall.title)
+      ((this.options.confine && callsBridgeTool(thread, params.toolCall.title)) ||
+        (turn.quietNoUpdate && callsNoUpdateTool(thread, params.toolCall.title)))
     ) {
       const option = params.options.find((candidate) => candidate.kind === "allow_once");
       if (option) return { outcome: { outcome: "selected", optionId: option.optionId } };
