@@ -329,6 +329,22 @@ export class RoutineScheduler implements RoutineDueSource {
     return routine;
   }
 
+  /**
+   * Turns on again the routine that a run paused before it reported a failure (#9856). Its card joins
+   * the run's turn, as the card of the pause did. False when the routine is gone or the change failed.
+   */
+  resumeAfterFailedRun(agentId: string, routineId: string, params: DynamicToolCallParams): boolean {
+    try {
+      this.update({ agentId, routineId, active: true }, this.#toolMutationOptions(agentId, agentId, params));
+      return true;
+    } catch (error) {
+      logger.warn("A routine that a failed run paused could not be turned on again.", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return false;
+    }
+  }
+
   /** Routines of every trigger kind, for the events surface. */
   listRecords(agentId: string): OwnedRoutineRecord[] {
     this.#conversation.requireKnownAgent(agentId);

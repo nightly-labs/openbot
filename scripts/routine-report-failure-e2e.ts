@@ -8,8 +8,9 @@
 // a teammate's update that wants no answer can end quiet (#6821), that a teammate's answer to a
 // request of a quiet run can end quiet and the answer to a Test run's request cannot (#8364), that a
 // teammate's request can end quiet only after the agent sent its result to that teammate (#7465), that
-// a flow skips the agents after a failed owner or linked step, and that a result destination gets the
-// answer of a reported failure but not of a provider failure.
+// a flow skips the agents after a failed owner or linked step, that a result destination gets the
+// answer of a reported failure but not of a provider failure, and that a failed run does not pause its
+// own routine in either call order (#9856).
 // `bun scripts/routine-report-failure-e2e.ts`. Writes .openbot-build/routine-report-failure-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -60,9 +61,11 @@ const LINK_REASON = "The mirror is down.";
 
 /** A tool call that the fake makes. */
 interface FakeCall {
-  tool: "routine_report_failure" | "routine_no_update" | "list_routines" | "send_message";
+  tool: "routine_report_failure" | "routine_no_update" | "list_routines" | "send_message" | "update_routine";
   arguments: {
     reason?: string;
+    routineId?: string;
+    active?: boolean;
     agentId?: string;
     recipientAgentIds?: string[];
     text?: string;
@@ -74,6 +77,10 @@ const calls = (...items: FakeCall[]) => `<<CALLS${JSON.stringify(items)}CALLS>>`
 const reportFailure = (reason: string): FakeCall => ({ tool: "routine_report_failure", arguments: { reason } });
 const noUpdate: FakeCall = { tool: "routine_no_update", arguments: {} };
 const listRoutines: FakeCall = { tool: "list_routines", arguments: {} };
+const pauseRoutine = (routineId: string): FakeCall => ({
+  tool: "update_routine",
+  arguments: { routineId, active: false },
+});
 /** The calls of the turn that reads a teammate's answer to a request of the routine run. */
 const replyCalls = (...items: FakeCall[]) => `<<REPLY${JSON.stringify(items)}REPLY>>`;
 
@@ -895,6 +902,62 @@ try {
       !linkedPrompt.includes(`routineId "${relayed.id}"`),
     linkedPrompt,
   );
+
+  // A run that pauses its own routine keeps the pause, but a failed run does not stop its routine (#9856).
+  const selfPausing = async (name: string, routineCalls: (routineId: string) => FakeCall[]) => {
+    const routine = createRoutine(checker.id, name, "Check the folders.");
+    agents.updateRoutine({
+      agentId: checker.id,
+      routineId: routine.id,
+      instruction: `Check the folders. ${calls(...routineCalls(routine.id))}`,
+      active: true,
+    });
+    const ran = await settledRun(
+      name,
+      await runCauseEffect(
+        agents.runRoutineFromAutomation({ agentId: checker.id, routineId: routine.id, payload: "" }),
+      ),
+    );
+    const active = agents.listRoutines(checker.id).find((entry) => entry.id === routine.id)?.active;
+    return { ran, active, turnId: ran.delivery.turnId };
+  };
+  const stopped = await selfPausing("Stops when done", (id) => [pauseRoutine(id)]);
+  pass(
+    "A run that pauses its own routine and does not fail keeps the routine paused (#8963)",
+    stopped.active === false && stopped.ran.run.status === "succeeded",
+    { active: stopped.active, run: stopped.ran.run.status },
+  );
+  const pausedThenFailed = await selfPausing("Paused then failed", (id) => [pauseRoutine(id), reportFailure(REASON)]);
+  const resumedResult = toolResults(pausedThenFailed.turnId, "routine_report_failure")[0]?.result;
+  pass(
+    "A run that pauses its own routine and then reports a failure turns the routine on again (#9856)",
+    pausedThenFailed.active === true &&
+      pausedThenFailed.ran.run.status === "failed" &&
+      resumedResult?.contentItems.some((item) => item.text.includes("the routine is on again")) === true,
+    { active: pausedThenFailed.active, run: pausedThenFailed.ran.run.status, resumedResult },
+  );
+  const failedThenPaused = await selfPausing("Failed then paused", (id) => [reportFailure(REASON), pauseRoutine(id)]);
+  const refusedPause = toolResults(failedThenPaused.turnId, "update_routine")[0]?.result;
+  pass(
+    "A run that reported a failure cannot pause its own routine (#9856)",
+    failedThenPaused.active === true &&
+      failedThenPaused.ran.run.status === "failed" &&
+      refusedPause?.success === false &&
+      refusedPause.contentItems.some((item) => item.text.includes("not a stop condition")),
+    { active: failedThenPaused.active, run: failedThenPaused.ran.run.status, refusedPause },
+  );
+  const stopPrompt = fakeEntries().find(
+    (entry) => entry.method === "turn/start" && entry.turnId === stopped.turnId,
+  )?.text;
+  pass(
+    "The run prompt says that a failure is not a stop condition (#9856)",
+    stopPrompt?.includes("is not a stop condition: keep this routine on") === true,
+    stopPrompt,
+  );
+  for (const name of ["Paused then failed", "Failed then paused"]) {
+    const routine = agents.listRoutines(checker.id).find((entry) => entry.name === name);
+    if (routine) agents.updateRoutine({ agentId: checker.id, routineId: routine.id, active: false });
+  }
 
   // A teammate's answer to a request that a quiet run sent continues the run: its turn can end quiet
   // after `routine_no_update`. The answer to a Test run's request shows (#8364).
