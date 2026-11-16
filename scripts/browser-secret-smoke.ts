@@ -763,8 +763,6 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
           },
         }),
       );
-      await heldContents.executeJavaScript("document.querySelector('#password').id = 'rendered-again'", true);
-      await runCauseEffect(handoff.submit("fixture-password-118204", true)).catch(() => undefined);
       const tool = (name: string, args: DynamicToolCallParams["arguments"]) =>
         runCauseEffect(
           browser.handleDynamicTool({
@@ -783,6 +781,10 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
         );
       const protectedError = (result: unknown) =>
         typeof result === "string" && result.includes("protected during authentication");
+      // While the card is open, the tab stays: a close would leave the card on a tab that is gone.
+      const closeWithCardRefused = protectedError(await tool("close_tab", { tabId: heldTab.id }));
+      await heldContents.executeJavaScript("document.querySelector('#password').id = 'rendered-again'", true);
+      await runCauseEffect(handoff.submit("fixture-password-118204", true)).catch(() => undefined);
       const held = browser.listTabs().find((tab) => tab.id === heldTab.id)?.title === "Secure authentication";
       const snapshotRefused = protectedError(await tool("snapshot", { tabId: heldTab.id }));
       const navigateRefused = protectedError(await tool("navigate", { tabId: heldTab.id, direction: "reload" }));
@@ -790,11 +792,13 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
       lostResults.held = {
         passed:
           held &&
+          closeWithCardRefused &&
           snapshotRefused &&
           navigateRefused &&
           closed === true &&
           !browser.listTabs().some((tab) => tab.id === heldTab.id),
         held,
+        closeWithCardRefused,
         snapshotRefused,
         navigateRefused,
         closed,

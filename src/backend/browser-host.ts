@@ -4491,7 +4491,8 @@ export class BrowserHost {
 
   /**
    * `dialogTool` is true for a tool that works while a page dialog is open: `handle_dialog` and `close_tab`.
-   * `closing` is true for `close_tab`: closing reads nothing of the page, so it works on a protected tab.
+   * `closing` is true for `close_tab`: closing reads nothing of the page, so it works on a tab whose
+   * secret was sent and whose fill ended, when no new page came to end the protection (#9883).
    */
   #requireToolTab(params: DynamicToolCallParams, tabId: string, dialogTool = false, closing = false): void {
     const tab = this.listTabs().find((candidate) => candidate.id === tabId);
@@ -4506,7 +4507,9 @@ export class BrowserHost {
     // the agent service; this one is per tab and holds for every caller of a tabId-bearing tool.
     // A distinct message matters: telling the model the tab vanished, while the user is part-way
     // through a login on it, invites an `open` and a second tab onto the same flow.
-    if (!closing && this.#tabs.get(tabId)?.secret)
+    // A close may end only a protection whose fill has ended; an open card or a running fill keeps the tab.
+    const secret = this.#tabs.get(tabId)?.secret;
+    if (secret && !(closing && secret.submitted && !secret.running))
       throw new Error("Browser inspection is protected during authentication. Use takeover.");
     if (this.#takeoverTabIds.has(tabId)) throw new Error(`Browser tab is under user takeover: ${tabId}`);
     if (this.#heldByUser(tabId)) throw new BrowserUserControlHeld(tabId);
