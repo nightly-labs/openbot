@@ -35,7 +35,7 @@ import {
 import { localTimezone } from "../backend/agent/routine-tools";
 import { setDiskRestoreProbe } from "../backend/disk-restore";
 import { runCauseEffect } from "../backend/effect-boundary";
-import { NewerDatabaseError } from "../backend/openbot-database-schema";
+import { LATEST_SCHEMA_VERSION, NewerDatabaseError } from "../backend/openbot-database-schema";
 import { OWNER_NOTIFICATION_KEY } from "./agent-notification-level-store";
 import { watchAppArchive } from "./app-archive-watch";
 import { readAppVariant, resolveAppIconPath, resolveLogoColorIconPath, resolveMenuBarIconPath } from "./app-icon";
@@ -163,6 +163,7 @@ import { applyServerTimezone, SERVER_TIMEZONE_PREFERENCE_FILE } from "./server-t
 import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
 import { OWNER_PIN_KEY } from "./sidebar-pin-store";
 import { StartAttempts, takeForcedStartFailure } from "./start-attempts";
+import { compatiblePreviousRelease, readDatabaseSchemaVersion } from "./start-recovery-release";
 import { openStartRecoveryWindow, type StartRecovery } from "./start-recovery-window";
 import { trustSystemCertificates } from "./system-certificates";
 import { systemHourCycle } from "./system-hour-cycle";
@@ -388,6 +389,7 @@ if (hasSingleInstanceLock) {
       userDataPath: app.getPath("userData"),
       crashDumpsPath: app.getPath("crashDumps"),
       appVersion: app.getVersion(),
+      schemaVersion: LATEST_SCHEMA_VERSION,
       now: Date.now(),
       bootedAt: Date.now() - uptime() * 1_000,
     });
@@ -1209,9 +1211,25 @@ async function recoverFromStartLoop(): Promise<StartRecovery | "quit" | null> {
     return null;
   }
   logger.warn(`OpenBot ${summary.appVersion} is in a start loop. Showing the recovery window.`);
+  // An earlier release that cannot open the data would install this release again over it.
+  const databaseSchemaVersion = readDatabaseSchemaVersion(app.getPath("userData"));
+  const previousRelease = compatiblePreviousRelease({
+    summary,
+    databaseSchemaVersion,
+    appSchemaVersion: LATEST_SCHEMA_VERSION,
+  });
+  logger.info(
+    `Recovery window: database schema ${databaseSchemaVersion ?? "unknown"}, last good version ${summary.lastGoodVersion ?? "none"} (schema ${summary.lastGoodSchemaVersion ?? "unknown"}), offered release: ${previousRelease ?? "latest"}.`,
+  );
   // The saved language is in the database, which this window must not need.
   const locale = resolveLocale("system", app.getLocale());
-  const recovery = openStartRecoveryWindow({ summary, locale, translate: translateFor(locale), iconPath: appIconPath });
+  const recovery = openStartRecoveryWindow({
+    summary,
+    previousRelease,
+    locale,
+    translate: translateFor(locale),
+    iconPath: appIconPath,
+  });
   const choice = await recovery.choice;
   logger.info(`Recovery window choice: ${choice}.`);
   return choice === "quit" ? "quit" : recovery;
@@ -2033,6 +2051,7 @@ if (!hasSingleInstanceLock) {
             window: windowHolder.current,
             translate,
             beforeInstall: prepareForUpdateInstall,
+            loopVersion: startAttempts?.summary().loopVersion ?? null,
           }).catch((recoveryError) => {
             logger.error("The update over newer data failed:", toLogValue(recoveryError));
             app.quit();

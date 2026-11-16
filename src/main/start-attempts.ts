@@ -34,6 +34,17 @@ const StartAttemptsRecord = Schema.Struct({
   lastFailure: Schema.NullOr(StartFailure),
   /** The last version that finished a start, for the link to its download page. */
   lastGoodVersion: Schema.NullOr(Schema.String),
+  /**
+   * The highest database schema version that `lastGoodVersion` can open. Absent in a file of a
+   * version before 0.73 (`released-schema-versions.ts` has those), and that version also removes it.
+   */
+  lastGoodSchemaVersion: Schema.optionalKey(Schema.NullOr(Schema.Int)),
+  /**
+   * A version that did not start `START_FAILURE_LIMIT` times in a row. It stays when another version
+   * starts, so an older version does not install it again over the data (`newer-database-recovery.ts`).
+   * A finished start of this version or of a newer one removes it.
+   */
+  loopVersion: Schema.optionalKey(Schema.NullOr(Schema.String)),
   /** The start that has not finished yet. `null` after a finished start. */
   attempt: Schema.NullOr(
     Schema.Struct({
@@ -63,6 +74,8 @@ interface StartAttemptsOptions {
   /** `app.getPath("crashDumps")`. Only file names and times are read there, never a dump. */
   crashDumpsPath: string;
   appVersion: string;
+  /** The highest database schema version that this build can open. */
+  schemaVersion: number;
   now: number;
   /** When the operating system started, in epoch milliseconds. */
   bootedAt: number;
@@ -74,6 +87,9 @@ export interface StartAttemptsSummary {
   consecutiveFailures: number;
   lastFailure: StartFailure | null;
   lastGoodVersion: string | null;
+  /** `null` when the file does not have it, for example from a version before 0.73. */
+  lastGoodSchemaVersion: number | null;
+  loopVersion: string | null;
   previousOutcome: PreviousStartOutcome;
 }
 
@@ -84,12 +100,19 @@ class StartAttemptsFailure extends Schema.TaggedError<StartAttemptsFailure>()("S
 export class StartAttempts {
   readonly #path: string;
   readonly #previousOutcome: PreviousStartOutcome;
+  readonly #schemaVersion: number;
   #record: StartAttemptsRecord;
 
-  private constructor(path: string, record: StartAttemptsRecord, previousOutcome: PreviousStartOutcome) {
+  private constructor(
+    path: string,
+    record: StartAttemptsRecord,
+    previousOutcome: PreviousStartOutcome,
+    schemaVersion: number,
+  ) {
     this.#path = path;
     this.#record = record;
     this.#previousOutcome = previousOutcome;
+    this.#schemaVersion = schemaVersion;
   }
 
   /**
@@ -109,18 +132,24 @@ export class StartAttempts {
     const counts = previousOutcome === "failed" || previousOutcome === "crashed";
     const sameVersion = previous?.appVersion === options.appVersion;
     const previousFailure = previous?.attempt?.failure ?? (previousOutcome === "crashed" ? "crash" : null);
+    // The failures of the previous version, with its last attempt.
+    const previousFailures = previous ? previous.consecutiveFailures + (counts ? 1 : 0) : 0;
     const attempts = new StartAttempts(
       path,
       {
         version: 1,
         appVersion: options.appVersion,
         // A new version starts from zero. A quit, a kill or an OS restart keeps the count.
-        consecutiveFailures: sameVersion && previous ? previous.consecutiveFailures + (counts ? 1 : 0) : 0,
+        consecutiveFailures: sameVersion ? previousFailures : 0,
         lastFailure: sameVersion && counts ? previousFailure : sameVersion ? (previous?.lastFailure ?? null) : null,
         lastGoodVersion: previous?.lastGoodVersion ?? null,
+        lastGoodSchemaVersion: previous?.lastGoodSchemaVersion ?? null,
+        loopVersion:
+          previous && previousFailures >= START_FAILURE_LIMIT ? previous.appVersion : (previous?.loopVersion ?? null),
         attempt: { startedAt: options.now, state: "starting", failure: null, osShutdown: false },
       },
       sameVersion || !previous ? previousOutcome : "other_version",
+      options.schemaVersion,
     );
     attempts.#write();
     return attempts;
@@ -137,6 +166,8 @@ export class StartAttempts {
       consecutiveFailures: this.#record.consecutiveFailures,
       lastFailure: this.#record.lastFailure,
       lastGoodVersion: this.#record.lastGoodVersion,
+      lastGoodSchemaVersion: this.#record.lastGoodSchemaVersion ?? null,
+      loopVersion: this.#record.loopVersion ?? null,
       previousOutcome: this.#previousOutcome,
     };
   }
@@ -168,10 +199,13 @@ export class StartAttempts {
   /** The main window loaded and the database is open. This resets the count. */
   finished(): void {
     if (!this.#record.attempt) return;
+    const loopVersion = this.#record.loopVersion ?? null;
     this.#update({
       consecutiveFailures: 0,
       lastFailure: null,
       lastGoodVersion: this.#record.appVersion,
+      lastGoodSchemaVersion: this.#schemaVersion,
+      loopVersion: loopVersion && !isNewerVersion(loopVersion, this.#record.appVersion) ? null : loopVersion,
       attempt: null,
     });
   }
@@ -195,6 +229,23 @@ export class StartAttempts {
       }).pipe(Effect.ignore),
     );
   }
+}
+
+/** True when `version` is a newer semver than `than`. Not semver: false. */
+export function isNewerVersion(version: string, than: string): boolean {
+  const left = semverParts(version);
+  const right = semverParts(than);
+  if (!left || !right) return false;
+  for (let index = 0; index < 3; index += 1) {
+    const difference = (left[index] ?? 0) - (right[index] ?? 0);
+    if (difference !== 0) return difference > 0;
+  }
+  return false;
+}
+
+function semverParts(version: string): number[] | null {
+  const match = /^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/.exec(version);
+  return match ? match.slice(1, 4).map((part) => Number.parseInt(part, 10)) : null;
 }
 
 function classify(record: StartAttemptsRecord, options: StartAttemptsOptions): Exclude<PreviousStartOutcome, "none"> {
