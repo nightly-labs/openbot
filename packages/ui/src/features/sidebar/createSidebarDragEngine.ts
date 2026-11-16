@@ -65,8 +65,8 @@ export interface SidebarDragEngineDeps {
 /** A drag that rests this long on a closed folder opens it. */
 const SPRING_OPEN_MS = 700;
 
-/** With no pins, a chat dragged this close to the top of the list opens the empty pin area. */
-const PIN_DROP_EDGE_PX = 24;
+/** A drag aims at nothing until the pointer moves this far from where the drag started. */
+const DRAG_AIM_DISTANCE_PX = 6;
 
 export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
   const {
@@ -100,6 +100,9 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
 
   let dragPoint: SidebarDragPoint | null = null;
 
+  /** Where the drag started, until the pointer moves away from it. */
+  let dragOrigin: SidebarDragPoint | null = null;
+
   let dragTarget: SidebarDropTarget | null = null;
 
   let dragTargetFrame: number | null = null;
@@ -124,6 +127,7 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
     stopSpringOpen();
     dragSession = null;
     dragPoint = null;
+    dragOrigin = null;
     dragTarget = null;
     dragTargetFrame = null;
     dragScrollFrame = null;
@@ -211,6 +215,7 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
     if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
     dragSession = { source: options.source, startScrollTop: deps.getAgentList()?.scrollTop ?? 0 };
     dragPoint = { clientX: event.clientX, clientY: event.clientY };
+    dragOrigin = dragPoint;
     dragTarget = null;
     dragState.beginDrag(options.source);
     measureSidebarDragTargets();
@@ -284,8 +289,17 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
     };
   }
 
+  /**
+   * The empty pin area opens at drag start and pushes every row down under a still pointer. Until the
+   * pointer moves, the drag aims at nothing, so a drop in place keeps the order.
+   */
   function resolveSidebarDropTarget(point: SidebarDragPoint): SidebarDropTarget | null {
     const session = dragSession;
+    if (dragOrigin) {
+      const distance = Math.hypot(point.clientX - dragOrigin.clientX, point.clientY - dragOrigin.clientY);
+      if (distance < DRAG_AIM_DISTANCE_PX) return null;
+      dragOrigin = null;
+    }
     return session ? sidebarDropTargetAt(sidebarDragWorld(session), point) : null;
   }
 
@@ -422,14 +436,7 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
 
   function updateSidebarNativeDrag(event: DragEvent): void {
     if (!dragSession) return;
-    const point = { clientX: event.clientX, clientY: event.clientY };
-    const list = dragGeometry.list;
-    // The empty pin area pushes every row down. Opened at drag start, it moved the rows under a still
-    // pointer, and the drag aimed at a row above the one the user held.
     if (
-      list &&
-      pointInRect(point, list) &&
-      point.clientY < list.top + PIN_DROP_EDGE_PX &&
       !dragState.emptyPinnedDropVisible() &&
       chatPinnedItems().length === 0 &&
       dragSession.source.kind === "chat" &&
@@ -443,7 +450,8 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
         if (dragPoint) scheduleSidebarDragTarget(dragPoint);
       });
     }
-    if (pointInRect(point, list)) {
+    const point = { clientX: event.clientX, clientY: event.clientY };
+    if (pointInRect(point, dragGeometry.list)) {
       event.preventDefault();
       if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
     }
