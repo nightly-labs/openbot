@@ -11,4 +11,5 @@
   Conversations. A tap selects an option and plays a short demonstration of it. The pictures do not
   move when motion is reduced.
 - All switches in the app now use the app's accent color, as the sliders and the selection checks
-  do. Before, iPhone switches were green.
+  do. Before, iPhone switches were green, and some Android switches (agent skills, a routine's
+  "Enabled" and "All day") used the Material default colors.

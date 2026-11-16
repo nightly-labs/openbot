@@ -1,5 +1,5 @@
 import { CHAT_COLOR_PRESETS, type ChatColorPresetId } from "@openbot/brand/chat-colors";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { View } from "react-native";
 import Animated, {
   Easing,
@@ -11,7 +11,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { ScopedTheme } from "uniwind";
 import { useReducedMotion } from "@/shared/lib/motion";
-import { END_X } from "@/shared/lib/text-direction";
+import { END_X, MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 
 // Grey wireframe pictures for the picture choices in Settings. Each one is still until `play` grows,
 // then plays its demonstration once. Reduced motion keeps them still. Colors come from the theme
@@ -23,6 +23,20 @@ const OUT = Easing.out(Easing.cubic);
 const IN_OUT = Easing.inOut(Easing.quad);
 /** A line types out from the start of the reading direction: the left, or the right in RTL. */
 const LINE_START_ORIGIN = END_X === 1 ? "0% 50%" : "100% 50%";
+
+/**
+ * Runs `run` once for each new tap: when `play` grows. A change of reduced motion or of a prop does
+ * not play the demonstration again. With reduced motion, the picture stays still.
+ */
+function useDemonstration(play: number, run: () => void) {
+  const reduced = useReducedMotion();
+  const played = useRef(play);
+  useEffect(() => {
+    if (play === played.current) return;
+    played.current = play;
+    if (!reduced) run();
+  });
+}
 
 function presetColor(id: ChatColorPresetId): string {
   return CHAT_COLOR_PRESETS.find((preset) => preset.id === id)?.value ?? CHAT_COLOR_PRESETS[0].value;
@@ -53,14 +67,13 @@ function Face({ className, eyeStyle }: { className: string; eyeStyle?: ReturnTyp
 
 /** Settings > Animations: an agent face and a reply. With full motion, the face moves and the reply types out. */
 export function MotionPicture({ full, play }: { full: boolean; play: number }) {
-  const reduced = useReducedMotion();
   const lift = useSharedValue(0);
   const blink = useSharedValue(1);
   const line0 = useSharedValue(1);
   const line1 = useSharedValue(1);
   const line2 = useSharedValue(1);
-  useEffect(() => {
-    if (!full || play === 0 || reduced) return;
+  useDemonstration(play, () => {
+    if (!full) return;
     const bob = { duration: 260, easing: IN_OUT };
     lift.value = withSequence(withTiming(-3, bob), withTiming(0, bob), withTiming(-3, bob), withTiming(0, bob));
     blink.value = withDelay(520, withSequence(withTiming(0.1, { duration: 80 }), withTiming(1, { duration: 120 })));
@@ -68,7 +81,7 @@ export function MotionPicture({ full, play }: { full: boolean; play: number }) {
       line.value = 0;
       line.value = withDelay(120 + index * 160, withTiming(1, { duration: 380, easing: OUT }));
     });
-  }, [full, play, reduced, lift, blink, line0, line1, line2]);
+  });
   const faceStyle = useAnimatedStyle(() => ({ transform: [{ translateY: lift.value }] }));
   const eyeStyle = useAnimatedStyle(() => ({ transform: [{ scaleY: blink.value }] }));
   const lineStyles = [
@@ -119,15 +132,14 @@ function ThemeScene() {
  * the picture dark and then light, as the phone does through the day.
  */
 export function ThemePicture({ mode, play }: { mode: "system" | "light" | "dark"; play: number }) {
-  const reduced = useReducedMotion();
   const dark = useSharedValue(0);
   const light = useSharedValue(0);
-  useEffect(() => {
-    if (mode !== "system" || play === 0 || reduced) return;
+  useDemonstration(play, () => {
+    if (mode !== "system") return;
     const fade = { duration: 280, easing: IN_OUT };
     dark.value = withSequence(withTiming(1, fade), withDelay(420, withTiming(0, fade)));
     light.value = withDelay(700, withSequence(withTiming(1, fade), withDelay(420, withTiming(0, fade))));
-  }, [mode, play, reduced, dark, light]);
+  });
   const darkStyle = useAnimatedStyle(() => ({ opacity: dark.value }));
   const lightStyle = useAnimatedStyle(() => ({ opacity: light.value }));
   if (mode !== "system") {
@@ -177,15 +189,14 @@ export function MessageColorPicture({
   customColor: string;
   play: number;
 }) {
-  const reduced = useReducedMotion();
   const second = useSharedValue(0);
   const third = useSharedValue(0);
-  useEffect(() => {
-    if (mode !== "agent" || play === 0 || reduced) return;
+  useDemonstration(play, () => {
+    if (mode !== "agent") return;
     const fade = { duration: 240, easing: IN_OUT };
     second.value = withSequence(withTiming(1, fade), withDelay(900, withTiming(0, fade)));
     third.value = withDelay(660, withSequence(withTiming(1, fade), withDelay(700, withTiming(0, fade))));
-  }, [mode, play, reduced, second, third]);
+  });
   const secondStyle = useAnimatedStyle(() => ({ opacity: second.value }));
   const thirdStyle = useAnimatedStyle(() => ({ opacity: third.value }));
   return (
@@ -226,16 +237,14 @@ const KEYBOARD_HEIGHT = 36;
  * compact field grows into the full field while the keyboard is open.
  */
 export function ComposerPicture({ compact, play }: { compact: boolean; play: number }) {
-  const reduced = useReducedMotion();
   const open = useSharedValue(0);
   const small = useSharedValue(1);
-  useEffect(() => {
-    if (play === 0 || reduced) return;
+  useDemonstration(play, () => {
     const slide = { duration: 300, easing: SLIDE };
     open.value = withSequence(withTiming(1, slide), withDelay(700, withTiming(0, slide)));
     if (compact)
       small.value = withSequence(withTiming(0, { duration: 160 }), withDelay(840, withTiming(1, { duration: 200 })));
-  }, [compact, play, reduced, open, small]);
+  });
   const keyboardStyle = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - open.value) * KEYBOARD_HEIGHT }] }));
   const fieldStyle = useAnimatedStyle(() => ({ transform: [{ translateY: -open.value * KEYBOARD_HEIGHT }] }));
   const smallStyle = useAnimatedStyle(() => ({ opacity: small.value }));
@@ -277,14 +286,12 @@ const PANEL_SHARE = 0.54;
  * chat; the demonstration closes it and opens it again, as a swipe does.
  */
 export function SwipePicture({ target, play }: { target: "threads" | "browser"; play: number }) {
-  const reduced = useReducedMotion();
   const width = useSharedValue(0);
   const shown = useSharedValue(1);
-  useEffect(() => {
-    if (play === 0 || reduced) return;
+  useDemonstration(play, () => {
     const slide = { duration: 320, easing: SLIDE };
     shown.value = withSequence(withTiming(0, slide), withDelay(600, withTiming(1, slide)));
-  }, [play, reduced, shown]);
+  });
   const chatStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: -shown.value * width.value * (PANEL_SHARE - 0.08) }],
   }));
@@ -294,6 +301,8 @@ export function SwipePicture({ target, play }: { target: "threads" | "browser"; 
   return (
     <View
       className="flex-1"
+      // In RTL the swipe goes to the right and the panel opens from the left.
+      style={MIRROR_IN_RTL}
       onLayout={(event) => {
         width.value = event.nativeEvent.layout.width;
       }}

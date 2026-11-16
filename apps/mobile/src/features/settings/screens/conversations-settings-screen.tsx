@@ -28,21 +28,32 @@ import { END_X } from "@/shared/lib/text-direction";
 
 type ConversationSetting = "compactComposer" | "swipe" | "pull" | "largeFiles" | "photoQuality";
 
+function withoutSetting(
+  settings: ReadonlySet<ConversationSetting>,
+  setting: ConversationSetting,
+): ReadonlySet<ConversationSetting> {
+  if (!settings.has(setting)) return settings;
+  const next = new Set(settings);
+  next.delete(setting);
+  return next;
+}
+
 export function ConversationsSettingsScreen() {
   const text = useText();
   const { t } = text;
   const { theme } = useUniwind();
   const dark = theme === "dark";
-  const [failed, setFailed] = useState<ConversationSetting | null>(null);
+  // Each setting keeps its own save error, so a save of one setting does not hide the error of another.
+  const [failed, setFailed] = useState<ReadonlySet<ConversationSetting>>(() => new Set());
   function save(setting: ConversationSetting, write: Promise<void>) {
-    setFailed(null);
+    setFailed((current) => withoutSetting(current, setting));
     void write.catch(() => {
-      setFailed(setting);
+      setFailed((current) => new Set(current).add(setting));
       void haptics.notification("error");
     });
   }
   function footer(setting: ConversationSetting, fallback: string): string {
-    return failed === setting ? t("mobile.settings.saveFailed") : fallback;
+    return failed.has(setting) ? t("mobile.settings.saveFailed") : fallback;
   }
 
   const motion = useMotionPreferences();

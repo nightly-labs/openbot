@@ -65,7 +65,8 @@ export function SettingsPictureChoice<T extends string | boolean>({
                 >
                   {option.picture(play?.value === option.value ? play.count : 0)}
                 </View>
-                <Typography type="body-sm" numberOfLines={1}>
+                {/* Two lines, so a long translation or a large text size stays readable. */}
+                <Typography type="body-sm" numberOfLines={2} className="text-center">
                   {option.label}
                 </Typography>
                 {checked ? (

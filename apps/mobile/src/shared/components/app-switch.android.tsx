@@ -21,13 +21,23 @@ const MIN_INTERACTIVE_SIZE = 48;
 export function AppSwitch({ value, onValueChange, label, disabled, modifiers }: SwitchProps) {
   const accent = String(useCSSVariable("--openbot-accent"));
   const onAccent = String(useCSSVariable("--openbot-text-on-accent"));
+  // A disabled switch that is on keeps the accent at 38% (alpha 0x61), as Material dims a disabled
+  // control. A native color reads `#rrggbbaa`, not `color-mix()`.
+  const disabledAccent = /^#[0-9a-f]{6}$/i.test(accent) ? `${accent}61` : accent;
   const labeled = label != null;
   const toggle = (
     <ComposeSwitch
       value={value}
       onCheckedChange={labeled ? undefined : onValueChange}
       enabled={!disabled}
-      colors={{ checkedTrackColor: accent, checkedBorderColor: accent, checkedThumbColor: onAccent }}
+      colors={{
+        checkedTrackColor: accent,
+        checkedBorderColor: accent,
+        checkedThumbColor: onAccent,
+        disabledCheckedTrackColor: disabledAccent,
+        disabledCheckedBorderColor: disabledAccent,
+        disabledCheckedThumbColor: onAccent,
+      }}
       modifiers={[
         ...(modifiers ?? []),
         ...(labeled ? [defaultMinSize({ minWidth: MIN_INTERACTIVE_SIZE, minHeight: MIN_INTERACTIVE_SIZE })] : []),

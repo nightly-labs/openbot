@@ -47,7 +47,7 @@ const PRESET_LABELS = {
 export function AppearanceSettingsScreen() {
   const { t } = useText();
   const { theme } = useUniwind();
-  const { value, ready, saving } = useAppearance();
+  const { value, ready } = useAppearance();
   const [error, setError] = useState<string | null>(null);
   const messageColor = useMessageColor();
   const [messageColorError, setMessageColorError] = useState<string | null>(null);
@@ -69,7 +69,8 @@ export function AppearanceSettingsScreen() {
         <SettingsPictureChoice<Appearance>
           label={t("mobile.settings.appearance.theme")}
           value={value}
-          disabled={!ready || saving}
+          // saveAppearance ignores a choice while a save runs. Disabling here would dim the pictures at each tap.
+          disabled={!ready}
           options={(
             [
               ["light", t("mobile.settings.appearance.light")],
