@@ -56,6 +56,7 @@ export const messages = {
   "app.rail.usage": "الاستخدام",
   "app.rail.library": "المكتبة",
   "app.rail.providers": "المزوّدون",
+  "app.rail.crm": "CRM",
   "app.rail.marketplace": "المتجر",
   "app.rail.settings": "الإعدادات",
   "app.rail.settingsNotice": "الإعدادات. {notice}",

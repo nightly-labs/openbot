@@ -85,11 +85,19 @@ const RELAY_INSTRUCTIONS =
   SUMMARY_RULES +
   "If the result has no such first line, your reply is the complete result, word for word and nothing else: " +
   "do not shorten it, and do not change its form.";
+/** The longest agent name that the voice gets, in characters. */
+const VOICE_NAME_LIMIT = 80;
 /**
  * The first message in the voice conversation. The voice model reads it as the user's. It is in English,
  * so without the language rule the voice says its own words, such as an acknowledgment, in English (#6871).
+ * The voice model also ignores Codex's prompt on a ChatGPT login, so this message gives it the agent's name:
+ * without the name, it says that it is ChatGPT (#9825).
  */
-const RELAY_VOICE_RULE =
+const relayVoiceRule = (name: string) =>
+  (name
+    ? `You are the voice of my agent "${name}". When I ask who you are, you are ${name}. ` +
+      "Never say that you are ChatGPT, Codex or another OpenAI assistant. "
+    : "") +
   "From now on, give every request of mine to the background agent, even simple questions and small talk. " +
   "Never answer from your own knowledge. Wait for the agent's result before you give an answer. " +
   "Say only what the result says, and add no facts of your own. " +
@@ -241,6 +249,11 @@ export class LiveVoice {
     owner: LiveVoiceOwner | null = null,
   ) {
     const agent = yield* liveStep(() => this.#hooks.agent(input.agentId));
+    // One line without quotes, so that the name cannot change the rule around it.
+    const name = this.#hooks
+      .redact(agent.name.replace(/["\s]+/g, " ").trim())
+      .slice(0, VOICE_NAME_LIMIT)
+      .trim();
     const key = owner?.memberId ?? null;
     for (const session of [...this.#sessions.values()])
       if ((session.owner?.memberId ?? null) === key) yield* this.#stopSession(session);
@@ -343,7 +356,7 @@ export class LiveVoice {
       // The voice model answers small questions itself, and ignores Codex's prompt settings on a ChatGPT login.
       // A control message in the conversation makes it give each request to the agent.
       yield* relay.client
-        .request("thread/realtime/appendText", { threadId, text: RELAY_VOICE_RULE }, decodeRecordResponse)
+        .request("thread/realtime/appendText", { threadId, text: relayVoiceRule(name) }, decodeRecordResponse)
         .pipe(toLiveVoiceFailed);
       return answer;
     }).pipe(

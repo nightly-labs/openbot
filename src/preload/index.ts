@@ -282,6 +282,14 @@ import {
   decodeWithdrawFeedbackResult,
 } from "./conversation-decoding";
 import {
+  decodeCrmActivityPage,
+  decodeCrmApplyResult,
+  decodeCrmCustomerPage,
+  decodeCrmOverview,
+  decodeCrmPaymentPage,
+  decodeCrmSettings,
+} from "./crm-decoding";
+import {
   decodeDynamicIslandAction,
   decodeDynamicIslandGeometry,
   decodeDynamicIslandPreference,
@@ -933,6 +941,18 @@ const openbotApi: OpenBotDesktopApi = {
     keepPicture: decodeWorkflowPictureId,
     mediaProviders: decodeWorkflowMediaProviders,
     mediaCredits: decodeWorkflowMediaCredits,
+  }),
+  crm: bridgeGroup(IPC_ENDPOINTS.crm, {
+    overview: decodeCrmOverview,
+    customers: decodeCrmCustomerPage,
+    payments: decodeCrmPaymentPage,
+    activity: decodeCrmActivityPage,
+    apply: decodeCrmApplyResult,
+    sourceConnect: decodeCrmApplyResult,
+    sourceDisconnect: decodeCrmApplyResult,
+    sourceSync: decodeCrmApplyResult,
+    settings: decodeCrmSettings,
+    setSettings: decodeCrmSettings,
   }),
   routineResults: bridgeGroup(IPC_ENDPOINTS.routineResults, {
     options: decodeRoutineResultOptions,

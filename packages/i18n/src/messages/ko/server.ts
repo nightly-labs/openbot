@@ -320,6 +320,12 @@ export const messages = {
   "server.settings.group.agents": "에이전트",
   "server.settings.group.people": "사용자",
   "server.settings.group.server": "서버",
+  "server.settings.experimentalTitle": "실험적 기능",
+  "server.settings.experimentalDescription": "아직 완성되지 않은 기능을 켭니다.",
+  "server.settings.experimentalFeatures": "기능",
+  "server.settings.experimentalCrm": "CRM",
+  "server.settings.experimentalCrmDescription":
+    "소유자와 관리자에게 CRM 페이지를 보여 주고, 에이전트가 CRM을 읽게 하며, Stripe를 동기화합니다. 끄더라도 데이터는 남습니다.",
   "server.settings.agentDefaultsTitle": "에이전트 기본값",
   "server.settings.threadsCard": "스레드 및 시간대",
   "server.settings.memoryTitle": "메모리",

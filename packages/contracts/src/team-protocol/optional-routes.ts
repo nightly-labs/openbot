@@ -59,6 +59,7 @@ import { CONTEXT_COMPACT_CODECS } from "./context-compact-v1";
 import { CONTEXT_RESET_CODECS } from "./context-reset-v1";
 import { CONVERSATION_FILE_SEARCH_CODECS } from "./conversation-file-search-v1";
 import { CONVERSATION_UNREAD_FROM_CODECS } from "./conversation-unread-from-v1";
+import { CRM_CODECS } from "./crm-v1";
 import { CUSTOM_AGENTS_CODECS } from "./custom-agents-v1";
 import { CUSTOM_PROVIDER_EDIT_CODECS } from "./custom-provider-edit-v1";
 import { CUSTOM_PROVIDER_HARNESS_CHOICE_CODECS } from "./custom-provider-harness-choice-v1";
@@ -310,6 +311,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...LIVE_VOICE_CODECS,
   ...BROWSER_PROFILES_CODECS,
   ...WORKFLOWS_CODECS,
+  ...CRM_CODECS,
   ...WORKFLOWS_GITHUB_CODECS,
   ...WORKFLOWS_MEDIA_CODECS,
   ...WORKFLOWS_SUNRA_CODECS,

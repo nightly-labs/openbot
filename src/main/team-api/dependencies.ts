@@ -75,6 +75,7 @@ import type {
 import type { Logger } from "@openbot/logging";
 import type { AgentService } from "../../backend/agent-service";
 import type { BrowserHost } from "../../backend/browser-host";
+import type { CrmPeopleOperations } from "../../backend/crm/crm-handle";
 import type { MailboxStore } from "../../backend/mailbox-store";
 import type { MessagingService } from "../../backend/messaging/messaging-service";
 import type { RoutineFlowsHandle } from "../../backend/routine-flows/routine-flows";
@@ -482,6 +483,12 @@ export type TeamApiWorkflows = Pick<
     github?: WorkflowGitHubDirectory;
   };
 
+/**
+ * Its presence is what `#protocolSupport` advertises `crm-v1` on. Only owners and admins use it; see
+ * `crm-v1.ts` for the grant.
+ */
+export type TeamApiCrm = CrmPeopleOperations;
+
 /** The setup choice of this computer: the same file and the same service step as the local Settings save. */
 interface TeamApiDefaultProvider {
   get(): Effect.Effect<ProviderDefaultSetting, { readonly cause: unknown }>;
@@ -773,6 +780,7 @@ export interface TeamApiOptions {
   instanceTransfer?: TeamApiInstanceTransfer;
   routineFlows?: TeamApiRoutineFlows;
   workflows?: TeamApiWorkflows;
+  crm?: TeamApiCrm;
   hiddenAgents?: TeamApiHiddenAgents;
   routineRunPlaces?: TeamApiRoutineRunPlaces;
   agentNotificationLevels?: TeamApiAgentNotificationLevels;

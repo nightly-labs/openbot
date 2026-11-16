@@ -52,6 +52,7 @@ export function serverSupportsCapability(
       capability === "password-managers-v1" ||
       capability === "whatsapp-connector-v1" ||
       capability === "vault-v1" ||
+      capability === "crm-v1" ||
       capability === "vault-v2" ||
       capability === "vault-v3" ||
       capability === "browser-secret-vault-v1" ||

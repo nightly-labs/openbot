@@ -103,6 +103,8 @@ export type AgentEvent =
    * Only this computer's event has it: `workflows-v1` sends the workflow id only.
    */
   | { type: "workflows-changed"; workflowId: string; agentId?: string }
+  /** The CRM of this server changed. The CRM page reads it again. */
+  | { type: "crm-changed" }
   /** The Vault of this server changed. Server settings of a joined server read it again. */
   | { type: "vault-changed" }
   /** The named browser profiles of this server, or the profile of one of its agents, changed. */
@@ -304,6 +306,7 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
       return isIdentifier(value.agentId);
     case "workflows-changed":
       return isIdentifier(value.workflowId) && (value.agentId === undefined || isIdentifier(value.agentId));
+    case "crm-changed":
     case "vault-changed":
     case "browser-profiles-changed":
     case "library-folders-changed":

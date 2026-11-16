@@ -82,6 +82,7 @@ import { CONTEXT_RESET_CAPABILITY } from "./context-reset-v1";
 import { TEAM_CONTEXT_USAGE_CAPABILITY } from "./context-usage-v1";
 import { CONVERSATION_FILE_SEARCH_CAPABILITY } from "./conversation-file-search-v1";
 import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "./conversation-unread-from-v1";
+import { CRM_CAPABILITY } from "./crm-v1";
 import { CUSTOM_AGENTS_CAPABILITY } from "./custom-agents-v1";
 import { CUSTOM_PROVIDER_EDIT_CAPABILITY } from "./custom-provider-edit-v1";
 import { CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY } from "./custom-provider-harness-choice-v1";
@@ -335,6 +336,7 @@ export {
   CONTEXT_RESET_CAPABILITY,
   CONVERSATION_FILE_SEARCH_CAPABILITY,
   CONVERSATION_UNREAD_FROM_CAPABILITY,
+  CRM_CAPABILITY,
   CUSTOM_AGENTS_CAPABILITY,
   CUSTOM_PROVIDER_EDIT_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
@@ -686,6 +688,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
   FEEDBACK_WITHDRAW_CAPABILITY,
   WHATSAPP_STATUS_REACTIONS_CAPABILITY,
+  CRM_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -932,7 +935,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== PROVIDER_ENVIRONMENT_CAPABILITY &&
     capability !== CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY &&
     capability !== FEEDBACK_WITHDRAW_CAPABILITY &&
-    capability !== WHATSAPP_STATUS_REACTIONS_CAPABILITY,
+    capability !== WHATSAPP_STATUS_REACTIONS_CAPABILITY &&
+    capability !== CRM_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -1055,6 +1059,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
   FEEDBACK_WITHDRAW_CAPABILITY,
   WHATSAPP_STATUS_REACTIONS_CAPABILITY,
+  CRM_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1260,6 +1265,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== PROVIDER_ENVIRONMENT_CAPABILITY &&
       capability !== CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY &&
       capability !== FEEDBACK_WITHDRAW_CAPABILITY &&
-      capability !== WHATSAPP_STATUS_REACTIONS_CAPABILITY,
+      capability !== WHATSAPP_STATUS_REACTIONS_CAPABILITY &&
+      capability !== CRM_CAPABILITY,
   );
 }

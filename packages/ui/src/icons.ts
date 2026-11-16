@@ -66,6 +66,7 @@ export { default as FileInput } from "lucide-solid/icons/file-input";
 export { default as FileText } from "lucide-solid/icons/file-text";
 export { default as Film } from "lucide-solid/icons/film";
 export { default as Filter } from "lucide-solid/icons/filter";
+export { default as FlaskConical } from "lucide-solid/icons/flask-conical";
 export { default as Folder } from "lucide-solid/icons/folder";
 export { default as FolderInput } from "lucide-solid/icons/folder-input";
 export { default as FolderOpen } from "lucide-solid/icons/folder-open";

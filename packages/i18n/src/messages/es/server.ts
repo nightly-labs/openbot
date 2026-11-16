@@ -306,6 +306,12 @@ export const messages = {
   "server.settings.group.agents": "Agentes",
   "server.settings.group.people": "Personas",
   "server.settings.group.server": "Servidor",
+  "server.settings.experimentalTitle": "Experimental",
+  "server.settings.experimentalDescription": "Activa funciones que aún no están terminadas.",
+  "server.settings.experimentalFeatures": "Funciones",
+  "server.settings.experimentalCrm": "CRM",
+  "server.settings.experimentalCrmDescription":
+    "Muestra la página del CRM a propietarios y administradores, permite que los agentes lean el CRM y sincroniza Stripe. Al desactivarlo, los datos se conservan.",
   "server.settings.agentDefaultsTitle": "Predeterminados de agentes",
   "server.settings.threadsCard": "Hilos y zona horaria",
   "server.settings.memoryTitle": "Memoria",

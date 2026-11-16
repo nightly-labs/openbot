@@ -916,6 +916,13 @@ no review reads are deleted after 30 days. Turning the setting off deletes all r
   `~/Library/Application Support/OpenBot/groq-api-key.json`, encrypted by the operating system's
   secret storage. The app window never receives the key back. Remove key in **Settings → Voice**
   deletes the file. The key is redacted from logs, exports and diagnostics.
+- The restricted Stripe key of the CRM is kept in
+  `~/Library/Application Support/OpenBot/crm-stripe-key.json` on the computer that runs OpenBot (on a
+  joined server, on that server), encrypted by the operating system's secret storage. The app window
+  receives only its last four characters. The customers, plans and payments that the sync copies from
+  Stripe go in the CRM tables of `openbot.db`, as rows that a person adds. Disconnect on the CRM page
+  deletes the key file; the copied rows stay until a person deletes them. The key is redacted from
+  logs, exports and diagnostics.
 - The xAI API key for spoken replies is kept in
   `~/Library/Application Support/OpenBot/xai-api-key.json`, encrypted by the operating system's
   secret storage. The app window never receives the key back. Remove key in **Settings → Voice**
@@ -1154,6 +1161,11 @@ Network traffic can also occur when:
   commit, the file list and each `SKILL.md`, and when the user adds a skill, the files of that skill
   folder. The requests carry the repository, the folder and the commit, and no other user data. The
   skill is kept with the agent like a Marketplace skill;
+- an owner or admin connects Stripe on the CRM page. The computer that runs OpenBot, or the joined
+  server, sends the restricted key to `api.stripe.com` and reads the account name, customers,
+  subscriptions, invoices and products of that Stripe account, when the key is connected,
+  every 5 minutes, and on Sync now. OpenBot only reads: it sends no CRM data to Stripe, and the
+  requests carry no other user data. Disconnect stops the requests;
 - the user presses Install on the 1Password page. OpenBot downloads the 1Password CLI release that it
   pins from `cache.agilebits.com`, checks its SHA-256, and keeps it in
   `~/Library/Application Support/OpenBot/provider-state/1password-cli`. The request carries no user
@@ -1215,7 +1227,7 @@ Network traffic can also occur when:
   OpenAI through the user's own Codex sign-in: the agent's own Codex account for an agent on Codex,
   else the default Codex sign-in. The microphone audio then goes from this computer to OpenAI, and the
   spoken reply comes back, until the pane closes. OpenAI also gets the short relay instructions of
-  OpenBot, but not the agent's chat. Each request that the voice gives to the agent goes to the
+  OpenBot, with the agent's name, but not the agent's chat. Each request that the voice gives to the agent goes to the
   agent's own provider as a text message, as for a typed message, and shows in the chat. The agent's
   text answer then goes to OpenAI to be spoken. OpenBot never reads the Codex credentials. The voice
   transcript is not added to the chat; no recording is kept. OpenAI handles the audio and the text
