@@ -109,6 +109,7 @@ import { PROVIDER_ACCOUNT_RELAY_V2_CODECS } from "./provider-account-relay-v2";
 import { PROVIDER_ACCOUNTS_CODECS } from "./provider-accounts-v1";
 import { PROVIDER_DEFAULT_CODECS } from "./provider-default-v1";
 import { PROVIDER_DETECTION_CODECS } from "./provider-detection-v1";
+import { PROVIDER_ENVIRONMENT_CODECS } from "./provider-environment-v1";
 import { PROVIDER_HOST_SIGN_IN_CODECS } from "./provider-host-sign-in-v1";
 import { PROVIDER_SIGN_OUT_CODECS } from "./provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_CODECS } from "./provider-usage-reset-v1";
@@ -238,6 +239,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...ROUTINE_RUN_COMMAND_CODECS,
   ...CLAUDE_USER_SETUP_CODECS,
   ...CLAUDE_COMPACT_WINDOW_CODECS,
+  ...PROVIDER_ENVIRONMENT_CODECS,
   ...PROVIDER_ACCOUNT_MODELS_CODECS,
   ...PROVIDER_ACCOUNT_POOL_CODECS,
   ...PROVIDER_ACCOUNT_KEYS_CODECS,

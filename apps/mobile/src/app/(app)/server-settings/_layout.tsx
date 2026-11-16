@@ -67,6 +67,8 @@ export default function ServerSettingsLayout() {
       <Stack.Screen name="custom-agent" options={{ title: t("mobile.server.route.provider") }} />
       {/* The page names its endpoint, or says Add custom provider. */}
       <Stack.Screen name="custom-provider" options={{ title: t("mobile.server.route.provider") }} />
+      {/* The page names its provider. */}
+      <Stack.Screen name="provider-environment" options={{ title: t("mobile.server.environment.title") }} />
       <Stack.Screen name="mcp" options={{ title: t("mobile.server.route.mcp") }} />
       <Stack.Screen name="mcp-server" options={{ title: t("mobile.server.route.mcpServer") }} />
       {/* The page names its MCP server. */}

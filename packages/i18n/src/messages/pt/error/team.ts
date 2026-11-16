@@ -132,6 +132,7 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "Esta conexão não oferece suporte à duração do cache de prompts.",
   "error.team.claudeUserSetupUnsupported": "Esta conexão não suporta a opção de configuração do Claude Code.",
   "error.team.claudeCompactWindowUnsupported": "Esta conexão não oferece suporte ao tamanho de compactação do Claude.",
+  "error.team.providerEnvironmentUnsupported": "Esta conexão não oferece suporte a variáveis de provedor.",
   "error.team.modelVisibilityUnsupported": "Esta conexão não oferece suporte à lista de modelos.",
   "error.team.providerDefaultUnsupported": "Esta conexão não oferece suporte ao provedor padrão.",
   "error.team.attachmentNameRequired": "É necessário informar um nome seguro para o anexo.",

@@ -43,6 +43,14 @@ export const messages = defineMessages("error.provider", {
   "error.provider.detectionEntriesTooMany": "There are too many addresses or folders.",
   "error.provider.credentialFileUnreadable": "The provider credential file is unreadable.",
   "error.provider.credentialFileTooLarge": "The provider credential file is too large.",
+  "error.provider.environmentNameInvalid":
+    "{name} is not a valid variable name. Use letters, digits and _, and do not start with a digit.",
+  "error.provider.environmentNameReserved": "OpenBot sets {name} for this provider. Remove this variable.",
+  "error.provider.environmentNameDuplicate": "{name} is in the list more than one time.",
+  "error.provider.environmentValueTooLong": "The value of {name} is too long.",
+  "error.provider.environmentTooMany": "A provider can have at most {limit} variables.",
+  "error.provider.environmentSecretsTooLarge":
+    "The sensitive values are too long together. Save shorter values or fewer of them.",
   "error.provider.archiveSpecialFile": "The runtime archive contains a link or special file.",
   "error.provider.archiveUnsafePath": "The runtime archive contains an unsafe path.",
   "error.provider.runtimeSpecialFile": "The runtime contains a link or special file.",

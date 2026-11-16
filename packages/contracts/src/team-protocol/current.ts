@@ -139,6 +139,7 @@ import { PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY } from "./provider-account-relay-v
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "./provider-accounts-v1";
 import { PROVIDER_DEFAULT_CAPABILITY } from "./provider-default-v1";
 import { PROVIDER_DETECTION_CAPABILITY } from "./provider-detection-v1";
+import { PROVIDER_ENVIRONMENT_CAPABILITY } from "./provider-environment-v1";
 import { PROVIDER_HOST_SIGN_IN_CAPABILITY } from "./provider-host-sign-in-v1";
 import { PROVIDER_SIGN_OUT_CAPABILITY } from "./provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_CAPABILITY } from "./provider-usage-reset-v1";
@@ -677,6 +678,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   TEAM_MEMORY_CHANGES_CAPABILITY,
   PHONE_FEEDBACK_CAPABILITY,
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
+  PROVIDER_ENVIRONMENT_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
 ] as const;
 
@@ -921,6 +923,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== TEAM_MEMORY_CHANGES_CAPABILITY &&
     capability !== PHONE_FEEDBACK_CAPABILITY &&
     capability !== WORKFLOWS_HIGGSFIELD_CAPABILITY &&
+    capability !== PROVIDER_ENVIRONMENT_CAPABILITY &&
     capability !== CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
 );
 /**
@@ -1040,6 +1043,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   TEAM_MEMORY_CHANGES_CAPABILITY,
   PHONE_FEEDBACK_CAPABILITY,
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
+  PROVIDER_ENVIRONMENT_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
@@ -1243,6 +1247,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== TEAM_MEMORY_CHANGES_CAPABILITY &&
       capability !== PHONE_FEEDBACK_CAPABILITY &&
       capability !== WORKFLOWS_HIGGSFIELD_CAPABILITY &&
+      capability !== PROVIDER_ENVIRONMENT_CAPABILITY &&
       capability !== CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
   );
 }
