@@ -80,22 +80,33 @@ export function isHeldTargetError(cause: unknown): boolean {
 }
 
 /** Writes `content` to `path`, readable only by the user, and flushes it to the disk. */
-function writeAndFlush(path: string, content: string | Uint8Array): Effect.Effect<void, AtomicFileWriteError> {
-  return Effect.tryPromise({
-    try: async () => {
-      const handle = await open(path, "w", 0o600);
-      try {
-        await handle.writeFile(content);
-        await handle.sync();
-      } catch (cause) {
-        // A close failure must not replace the write failure.
-        await handle.close().catch(() => undefined);
-        throw cause;
-      }
-      await handle.close();
-    },
-    catch: (cause) => new AtomicFileWriteError({ operation: "write", cause }),
+async function writeAndFlush(path: string, content: string | Uint8Array): Promise<void> {
+  const handle = await open(path, "w", 0o600);
+  try {
+    await handle.writeFile(content);
+    await handle.sync();
+  } catch (cause) {
+    // A close failure must not replace the write failure.
+    await handle.close().catch(() => undefined);
+    throw cause;
+  }
+  await handle.close();
+}
+
+/**
+ * The last in-place write of each path. Two in-place writes to one file at the same time can leave
+ * the end of the longer content after the shorter one, so each write waits for the one before it.
+ */
+const inPlaceWrites = new Map<string, Promise<void>>();
+
+function writeInPlace(path: string, content: string | Uint8Array): Promise<void> {
+  const write = (inPlaceWrites.get(path) ?? Promise.resolve()).then(() => writeAndFlush(path, content));
+  const settled = write.catch(() => undefined);
+  inPlaceWrites.set(path, settled);
+  void settled.then(() => {
+    if (inPlaceWrites.get(path) === settled) inPlaceWrites.delete(path);
   });
+  return write;
 }
 
 /**
@@ -124,7 +135,10 @@ export const writeFileAtomically = Effect.fn("AtomicFile.write")(function* (
     Effect.sync(() => `${path}.${randomUUID()}.tmp`),
     (temporaryPath) =>
       Effect.gen(function* () {
-        yield* writeAndFlush(temporaryPath, content);
+        yield* Effect.tryPromise({
+          try: () => writeAndFlush(temporaryPath, content),
+          catch: (cause) => new AtomicFileWriteError({ operation: "write", cause }),
+        });
         for (let attempt = 0; ; attempt += 1) {
           const renamed = yield* Effect.result(
             Effect.tryPromise({
@@ -136,7 +150,11 @@ export const writeFileAtomically = Effect.fn("AtomicFile.write")(function* (
           if (!isHeldTargetError(renamed.failure.cause)) return yield* renamed.failure;
           const wait = HELD_TARGET_WAITS_MS[attempt];
           // A crash during this write can leave `path` incomplete. Without it, no change is ever saved.
-          if (wait === undefined) return yield* writeAndFlush(path, content);
+          if (wait === undefined)
+            return yield* Effect.tryPromise({
+              try: () => writeInPlace(path, content),
+              catch: (cause) => new AtomicFileWriteError({ operation: "write", cause }),
+            });
           yield* Effect.sleep(wait);
         }
       }),
