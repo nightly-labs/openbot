@@ -62,6 +62,7 @@ export const messages = {
   "mobile.marketplace.facts.accessSignIn": "Inloggen",
   "mobile.marketplace.facts.accessLocal": "Deze computer",
   "mobile.marketplace.facts.accessNone": "Geen inlog",
+  "mobile.marketplace.facts.accessMac": "Alleen Mac",
   "mobile.marketplace.permission.admin": "Alleen eigenaren en beheerders kunnen installeren uit de marktplaats.",
   "mobile.marketplace.permission.unavailable":
     "Deze server is offline, of de OpenBot-versie is hiervoor te oud. Werk OpenBot bij op de computer waarop de server draait.",
@@ -115,6 +116,8 @@ export const messages = {
   "mobile.marketplace.app.linkInvalid": "Gebruik een https-link op {hostname}.",
   "mobile.marketplace.app.docs": "Vraag een sleutel aan",
   "mobile.marketplace.app.local": "Deze app draait op de computer met OpenBot. Stel de app in op die computer.",
+  "mobile.marketplace.app.needsMac":
+    "Deze app werkt alleen op een Mac waarop OpenBot draait, en deze server is geen Mac.",
   "mobile.marketplace.app.relayUnsupported":
     "Voor deze app moet je inloggen in een browser. Werk OpenBot bij op de server, of verbind de app op de computer.",
   "mobile.marketplace.app.waiting": "Wachten op de inlogpagina…",

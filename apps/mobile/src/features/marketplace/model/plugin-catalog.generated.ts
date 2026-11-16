@@ -52,6 +52,8 @@ export interface MobilePluginApp {
   name: string;
   description: string;
   server: MobilePluginServer;
+  /** The app drives Apple apps, so it runs only on a host that is a Mac. */
+  needsMac?: true;
 }
 
 export interface MobilePlugin {
@@ -720,6 +722,7 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
         description:
           "Mail, Calendar, Contacts, Reminders, Notes, Messages and Safari, over the local mcp-icloud server. Needs macOS and Automation access.",
         server: { name: "apple-apps", transport: "stdio", command: "npx", args: ["-y", "mcp-icloud@2.1.4"] },
+        needsMac: true,
       },
     ],
   },

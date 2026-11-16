@@ -209,7 +209,7 @@ export function SkillsMarketplace() {
       marketplaceListing={pendingMarketplaceListing()}
       onMarketplaceListingConsumed={() => setPendingMarketplaceListing(null)}
       connectors={connectors.active}
-      macOS={platform.appInfo()?.platform === "darwin"}
+      macOS={platform.appInfo() ? platform.appInfo()?.platform === "darwin" : undefined}
       mcpToolRuntimeNote={mcpRuntimeNote()}
       mcpSignInRequest={pendingMcpSignIn()}
       onMcpSignInRequestHandled={() => setPendingMcpSignIn(null)}

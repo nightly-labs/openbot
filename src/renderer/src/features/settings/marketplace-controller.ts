@@ -55,6 +55,7 @@ import type {
   MarketplaceSkillRef,
   SkillRead,
 } from "@openbot/ui/features/marketplace/marketplace-model";
+import { pluginNeedsMac } from "@openbot/ui/features/marketplace/marketplace-model";
 import { serverAddress } from "@openbot/ui/features/marketplace/marketplace-view";
 import type { McpConnectSubject } from "@openbot/ui/features/settings/McpConnectShell";
 import {
@@ -147,6 +148,8 @@ export interface MarketplaceControllerProps {
   calls?: MarketplaceCalls | undefined;
   /** This computer runs macOS, so an app that drives Apple apps can ask for their Automation access. */
   macOS?: boolean | undefined;
+  /** The host of the apps is not a Mac, so an app that drives Apple apps does not connect there. */
+  macAppsUnavailable?: boolean | undefined;
   /** The server in `pluginServerId` keeps a pre-registered OAuth app for an MCP server (`mcp-sign-in-app-v1`). */
   pluginSignInApp?: boolean | undefined;
   /**
@@ -1505,6 +1508,10 @@ export function createMarketplaceController(
    * and keeps the grant itself. False, with the error shown, when one of `apps` cannot connect here.
    */
   function canConnectHere(plugin: MarketplacePluginDetail, apps: readonly MarketplacePluginApp[]): boolean {
+    if (pluginNeedsMac(props, { apps })) {
+      setError(t("marketplace.app.blocked.mac", { name: plugin.name }));
+      return false;
+    }
     const hostOnly = apps.find((app) => (app.server.auth ?? []).length > 0 && flowsHere(app).length === 0);
     if (!hostOnly) return true;
     const key =
@@ -2015,6 +2022,9 @@ export function createMarketplaceController(
     },
     get macAutomation() {
       return requestMacAutomation() ? macAutomation : undefined;
+    },
+    get macAppsUnavailable() {
+      return props.macAppsUnavailable;
     },
     disconnectApp: (app) => setUninstalling(app.plugin),
     removeServer,
