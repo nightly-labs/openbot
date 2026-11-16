@@ -4286,8 +4286,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         before = read.success;
         continue;
       }
-      // A message can start while `session/list` runs.
+      // A message can start, and the session can close, while `session/list` runs.
       if (this.#selfWakes.get(thread) !== wake || thread.activeTurn || this.#openingTurns.has(thread.id)) return;
+      if (this.#threads.get(thread.id) !== thread || thread.needsResume) break;
       wake.left -= 1;
       const turn = this.#beginTurn(thread, randomUUID(), { unprompted: false, answerOptional: true, wake: true });
       turn.task = yield* Effect.forkIn(
