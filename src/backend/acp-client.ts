@@ -286,7 +286,7 @@ interface AcpTurn {
   readonly stop: AbortController;
   completing: boolean;
   task: Fiber.Fiber<void, ProviderClientOperationError> | null;
-  /** The replies to the prompts that steered this turn (`AcpFlavor.steerByPromptSince`), in the order sent. */
+  /** The replies to the prompts that steered this turn (`#steerByPrompt`), in the order sent. */
   readonly steerReplies: Deferred.Deferred<Result.Result<PromptResponse, ProviderClientOperationError>>[];
   /** When the agent last sent an update for this turn, or the user last answered it. */
   lastActivityAt: number;
@@ -1721,8 +1721,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return this.#initialization && steers(this.#initialization) ? steer : undefined;
   }
 
-  /** Whether a second prompt joins the running turn (`AcpFlavor.steerByPromptSince`). */
+  /** Whether a second prompt joins the running turn (`AcpFlavor.steerByPromptSince`, `steerByPromptCapability`). */
   get #steersByPrompt(): boolean {
+    const capability = this.#flavor.steerByPromptCapability;
+    const meta = this.#initialization?.agentCapabilities?._meta;
+    if (capability !== undefined && isRecord(meta) && meta[capability] === true) return true;
     const since = this.#flavor.steerByPromptSince;
     const version = this.#initialization?.agentInfo?.version;
     return (
@@ -2680,11 +2683,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       let staleWake = false;
       for (;;) {
         // A steer by prompt ends the prompt before it with `end_turn`, and the work goes on under the
-        // steer's prompt. The turn ends with the reply to the last one.
+        // steer's prompt. The turn ends with the reply to the last one. A reply that ends the same run
+        // as the next one carries the same usage (`AcpFlavor.promptRun`), so only the last one reports it.
         for (let steer = turn.steerReplies.shift(); steer; steer = turn.steerReplies.shift()) {
-          this.#reportPromptUsage(thread, turn, response);
+          const run = this.#flavor.promptRun?.(response);
+          if (run === undefined) this.#reportPromptUsage(thread, turn, response);
+          const previous = response;
           response = providerResult(yield* Deferred.await(steer));
           if (thread.activeTurn !== turn || turn.completing) return;
+          if (run !== undefined && this.#flavor.promptRun?.(response) !== run)
+            this.#reportPromptUsage(thread, turn, previous);
         }
         // A command still runs in the background (`AcpFlavor.wakesAfterPromptEnds`). The turn stays
         // open until the session changes, and a prompt then connects the agent's wake-up to it.
@@ -2879,8 +2887,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   });
 
   /**
-   * Sends a message into the running turn as a second `session/prompt` (`AcpFlavor.steerByPromptSince`).
-   * The agent answers the prompt before it at once, and `#consumePrompt` then waits for this reply.
+   * Sends a message into the running turn as a second `session/prompt` (`AcpFlavor.steerByPromptSince`,
+   * `steerByPromptCapability`). The agent answers the prompt before it with `end_turn`: Antigravity at
+   * once, Devin when the run ends. `#consumePrompt` then waits for this reply.
    * The request returns when the prompt is sent: its reply comes at the end of the turn.
    */
   readonly #steerByPrompt = Effect.fn("AcpAgentClient.steerByPrompt")(function* (
