@@ -80,6 +80,7 @@ import { followsServerUpdate } from "../servers/server-update-flow";
 import { createSidebarPreferences } from "../sidebar/sidebar-preferences";
 import { defaultSidebarLayout } from "../sidebar/sidebar-sections";
 import { createHostRestartToasts, type HostRestartView } from "../updates/host-restart-toast";
+import { deleteCachedWorkflows, keepCachedWorkflows } from "../workflows/workflow-cache";
 import {
   agentPictureMark,
   deleteSavedAgentPictures,
@@ -1052,12 +1053,16 @@ export function createWebWorkspace(
         const hosts = await runtime.listHosts();
         markRemoteSync("hosts");
         if (disposed) return;
-        // A server that left the list takes its frame with it.
+        // A server that left the list takes its frame, pictures and cached workflows with it.
         deleteRemoteWorkspaceFrames(
           props.accountId,
           hosts.map((host) => host.hostId),
         );
         void deleteSavedAgentPictures(
+          props.accountId,
+          hosts.map((host) => host.hostId),
+        );
+        keepCachedWorkflows(
           props.accountId,
           hosts.map((host) => host.hostId),
         );
@@ -1197,6 +1202,7 @@ export function createWebWorkspace(
     if (hostId) {
       deleteRemoteWorkspaceFrame(props.accountId, hostId);
       void deleteSavedServerPictures(props.accountId, hostId);
+      deleteCachedWorkflows(hostId);
     }
     generation += 1;
     selectedId = null;

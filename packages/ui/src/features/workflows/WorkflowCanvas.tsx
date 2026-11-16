@@ -570,8 +570,11 @@ const fillMenu = (t: AppTranslate): readonly PickerGroup<CanvasColor>[] => [
 const asSaved = (graph: WorkflowGraph) => graphFromSnapshot(snapshotFromGraph(graph));
 const savedJson = (graph: WorkflowGraph) => stableJson(asSaved(graph));
 
-/** The saves that the canvas remembers until the host sends them back. */
-const SENT_LIMIT = 20;
+/**
+ * The saves that the canvas remembers until the host sends them back. The canvas sends each change, and
+ * the host saves only the last one before the pause, so many changes can come before an echo.
+ */
+const SENT_LIMIT = 200;
 
 /**
  * The workflow canvas.

@@ -37,6 +37,7 @@ import { AnalyticsConsentRow, ConsentNotice } from "../onboarding/AnalyticsConse
 import { createOnboardingTeam, onboardingSessionSeed } from "../onboarding/onboarding-avatars";
 import { deleteRemoteWorkspaceFrames } from "../servers/remote-workspace-frame";
 import { WindowBackdropBubbles } from "../window/backdrop-bubbles";
+import { keepCachedWorkflows } from "../workflows/workflow-cache";
 import { WebLanguageStep } from "./WebLanguageStep";
 import { phoneAppScreenWanted, WebPhoneAppScreen } from "./WebPhoneAppScreen";
 import type { WebWorkspace } from "./WebWorkspace";
@@ -274,6 +275,7 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
     if (ended) {
       deleteRemoteWorkspaceFrames(null);
       void deleteSavedAgentPictures(null);
+      keepCachedWorkflows(null);
     }
     sessionGeneration += 1;
     setState((draft) => {
