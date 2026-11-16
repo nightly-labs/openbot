@@ -47,7 +47,7 @@ export interface BootRecoveryHooks {
   /** Shows a failed turn of the agent's own chat in the sidebar and the runtime work. */
   turnFailed?(agentId: string, turnId: string): void;
   /** Whether a turn of the agent's own chat that a provider exit cut may continue, as a plan does. */
-  continuesAfterProviderExit?(agentId: string, turnId: string, deliveryId: string): boolean;
+  continuesAfterProviderExit?(agentId: string, turnId: string, deliveryIds: readonly string[]): boolean;
 }
 
 export interface BootRecoveryOptions {
@@ -282,17 +282,30 @@ export class BootRecovery {
       recovered.terminal === "interrupted" &&
       target?.streaming.some((message) => message.author === "assistant" && message.text.trim() !== "") === true;
     const ownChat = cut && target !== null && target.threadId === target.agent.threadId ? target : null;
+    // All deliveries of a cut turn end together, as at the end of a turn: only the first one that is
+    // reconciled finds the agent's text streaming.
+    const deliveryIds = yield* recoveryStep(() => {
+      const ids = new Set([delivery.id]);
+      if (!cut || !target?.turnId) return [...ids];
+      for (const context of this.#mailbox.findDeliveriesByTurn(target.agent.id, target.turnId))
+        ids.add(context.delivery.id);
+      for (const id of batchIds ?? []) {
+        const status = this.#mailbox.getDelivery(id)?.delivery.status;
+        if (status === "starting" || status === "running") ids.add(id);
+      }
+      return [...ids];
+    });
     // The agent's own chat continues once with a note, as a failed compaction does, with the checks of a
     // plan continuation: no Stop, no requested new chat, and no other message that waits, which would end
     // the continuation with no error. A second cut shows the error.
     const continuation = yield* recoveryStep(() => {
-      if (!ownChat?.turnId || !this.#hooks.continuesAfterProviderExit?.(ownChat.agent.id, ownChat.turnId, delivery.id))
+      if (!ownChat?.turnId || !this.#hooks.continuesAfterProviderExit?.(ownChat.agent.id, ownChat.turnId, deliveryIds))
         return null;
       const { messages } = this.#conversation.ensureSnapshot(ownChat.agent.id, ownChat.threadId);
       return this.#planContinuation.afterProviderExit({
         agentId: ownChat.agent.id,
         taskId: null,
-        deliveryIds: [delivery.id],
+        deliveryIds,
         plan: messages.find((message) => message.id === `${ownChat.turnId}:plan`)?.plan ?? null,
         earlierPlan:
           messages.findLast(
@@ -304,11 +317,15 @@ export class BootRecovery {
       cut && !continuation
         ? { terminal: "failed" as const, reason: sourceText("error.agent.answerCutOff") }
         : recovered;
-    // The drain starts the continuation with this delivery, as for a plan.
-    if (continuation && ownChat?.turnId)
-      yield* this.#mailbox.requeueForPlan(delivery.id, ownChat.turnId).pipe(toBootRecoveryFailed);
-    // A failed provider read keeps the conservative interrupted result; never replay side effects.
-    else yield* this.#mailbox.markTerminal(delivery.id, terminal, reason).pipe(toBootRecoveryFailed);
+    for (const id of deliveryIds) {
+      // The drain starts the continuation with these deliveries, as for a plan.
+      if (continuation && ownChat?.turnId)
+        yield* this.#mailbox.requeueForPlan(id, ownChat.turnId).pipe(toBootRecoveryFailed);
+      // A failed provider read keeps the conservative interrupted result; never replay side effects.
+      else yield* this.#mailbox.markTerminal(id, terminal, reason).pipe(toBootRecoveryFailed);
+      // Settled with this one, so the next deliveries of this pass do not run a recovery of their own.
+      if (id !== delivery.id) this.#orphanedDeliveryIds.delete(id);
+    }
     // The agent's own chat shows the error above its composer and the failed turn, as other failed turns do.
     if (ownChat && !continuation) {
       this.#hooks.emitError("agent_error", reason, ownChat.agent.id);
@@ -355,7 +372,7 @@ export class BootRecovery {
         this.#conversation.publishConversation(snapshot);
       }
       this.#mailboxSync.emitQueue(delivery.recipientAgentId);
-      if (!continuation) this.#hooks.deliverySettled?.(delivery.id, terminal);
+      if (!continuation) for (const id of deliveryIds) this.#hooks.deliverySettled?.(id, terminal);
     });
   });
 
