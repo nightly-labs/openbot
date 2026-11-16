@@ -70,7 +70,7 @@ export class ProviderEnvironmentRefused extends Error {
   }
 }
 
-export class ProviderEnvironmentChangeFailed extends Schema.TaggedError<ProviderEnvironmentChangeFailed>()(
+class ProviderEnvironmentChangeFailed extends Schema.TaggedError<ProviderEnvironmentChangeFailed>()(
   "ProviderEnvironmentChangeFailed",
   { cause: Schema.Defect() },
 ) {}
@@ -90,7 +90,7 @@ export type ProviderEnvironmentControl = ReturnType<typeof providerEnvironmentCo
  */
 export function providerEnvironmentControl(
   store: ProviderEnvironmentPreferenceStore,
-  credentials: Pick<ProviderCredentialStore, "secret" | "setSecret">,
+  credentials: Pick<ProviderCredentialStore, "secret" | "setSecrets">,
   changed: (provider: ProviderEnvironmentProvider) => Effect.Effect<void>,
 ) {
   // One change at a time: the names and the sensitive values are two files, and each change reads both.
@@ -131,11 +131,12 @@ export function providerEnvironmentControl(
           const next = yield* Effect.try({ try: () => checked(update, previous, secret), catch: fail });
           // New sensitive values first: a failed save of the names then leaves an unused value, never a
           // name without its value.
-          for (const variable of next)
-            if (variable.sensitive && variable.value !== null)
-              yield* credentials
-                .setSecret(providerEnvironmentSecret(provider, variable.name), variable.value)
-                .pipe(Effect.mapError(fail));
+          const written = next.flatMap((variable) =>
+            variable.sensitive && variable.value !== null
+              ? [[providerEnvironmentSecret(provider, variable.name), variable.value] as const]
+              : [],
+          );
+          if (written.length > 0) yield* credentials.setSecrets(written).pipe(Effect.mapError(fail));
           const list: StoredVariable[] = next.map((variable) =>
             variable.sensitive
               ? { name: variable.name, sensitive: true }
@@ -143,11 +144,12 @@ export function providerEnvironmentControl(
           );
           yield* store.set({ providers: { ...store.get().providers, [provider]: list } }).pipe(Effect.mapError(fail));
           const keep = new Set(next.filter((variable) => variable.sensitive).map((variable) => variable.name));
-          for (const variable of previous)
-            if (variable.sensitive && !keep.has(variable.name))
-              yield* credentials
-                .setSecret(providerEnvironmentSecret(provider, variable.name), null)
-                .pipe(Effect.mapError(fail));
+          const removed = previous.flatMap((variable) =>
+            variable.sensitive && !keep.has(variable.name)
+              ? [[providerEnvironmentSecret(provider, variable.name), null] as const]
+              : [],
+          );
+          if (removed.length > 0) yield* credentials.setSecrets(removed).pipe(Effect.mapError(fail));
           if (JSON.stringify(before) !== JSON.stringify(resolve(provider))) yield* changed(provider);
           return get(provider);
         }),

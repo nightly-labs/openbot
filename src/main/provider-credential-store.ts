@@ -135,15 +135,27 @@ export class ProviderCredentialStore {
     return this.#keys.get(name) ?? null;
   }
 
-  /** Saves a key of `secret`, or removes it when `value` is null. */
-  setSecret(name: OpenBotSecretName, value: string | null): Effect.Effect<void, CredentialStoreFailure> {
+  /**
+   * Saves the keys of `secret`, or removes the ones whose value is null, as one write of the file, so a
+   * change of many keys encrypts and writes the envelope one time.
+   */
+  setSecrets(
+    changes: readonly (readonly [OpenBotSecretName, string | null])[],
+  ): Effect.Effect<void, CredentialStoreFailure> {
     return this.#edit((keys) => {
-      if (value === null) return keys.delete(name);
-      // As an account key: a save into a file that could not be read would replace every provider key.
-      if (this.#loadError) throw new Error(sourceText("error.provider.credentialFileUnreadable"));
-      registerSecretValue(value);
-      keys.set(name, value);
-      return true;
+      let changed = false;
+      for (const [name, value] of changes) {
+        if (value === null) {
+          changed = keys.delete(name) || changed;
+          continue;
+        }
+        // As an account key: a save into a file that could not be read would replace every provider key.
+        if (this.#loadError) throw new Error(sourceText("error.provider.credentialFileUnreadable"));
+        registerSecretValue(value);
+        keys.set(name, value);
+        changed = true;
+      }
+      return changed;
     });
   }
 

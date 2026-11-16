@@ -80,7 +80,7 @@ import {
   X,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Show, untrack } from "solid-js";
 import { ProviderAccountRenameField } from "../../components/ProviderAccountList";
 import type { ProviderPickerOption } from "../../components/ProviderPicker";
 import {
@@ -2085,18 +2085,22 @@ function EnvironmentSection(props: {
   let addButton: HTMLButtonElement | undefined;
   const snapshot = (rows: readonly EnvironmentRow[]) =>
     JSON.stringify(rows.map(({ name, value, sensitive, stored }) => ({ name, value, sensitive, stored })));
-  // Each answer of the host starts the draft again from what the host keeps.
+  const kept = () => draft().filter((row) => !leaving().has(row.id));
+  const dirty = () => snapshot(kept()) !== baseline();
+  // An answer of the host starts the draft again from what the host keeps, but not while the user has
+  // a change: each status event reads the variables again, also while the user types. The answer to a
+  // save of this page does start it again.
   createEffect(
     () => props.control.value,
     (environment) => {
+      const keep = untrack(() => dirty() && !(saved() && !props.control.error));
+      if (keep) return;
       const rows = rowsOf(environment);
       setLeaving(new Set<number>());
       setDraft(rows);
       setBaseline(snapshot(rows));
     },
   );
-  const kept = () => draft().filter((row) => !leaving().has(row.id));
-  const dirty = () => snapshot(kept()) !== baseline();
   const busy = () => Boolean(props.disabled || props.control.pending || props.control.value === null);
   const keptNames = () => kept().map((row) => row.name.trim());
   const problem = (row: EnvironmentRow): string | null => {
@@ -2221,7 +2225,8 @@ function EnvironmentSection(props: {
                     aria-label={t("provider.settings.environmentNameLabel", { index: index() + 1 })}
                     disabled={busy()}
                     value={row().name}
-                    onValueChange={(value) => update(row().id, { name: value.toUpperCase() })}
+                    // A new name needs its own value: the stored one belongs to the old name.
+                    onValueChange={(value) => update(row().id, { name: value, stored: false })}
                   />
                   <Input
                     size="sm"

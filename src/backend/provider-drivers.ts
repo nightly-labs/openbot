@@ -733,8 +733,10 @@ function withAccountEnvironment(
  *
  * A compaction size sets `CLAUDE_CODE_AUTO_COMPACT_WINDOW`. The CLI reads it before the
  * `autoCompactWindow` of the Claude settings, and lowers it to the context window of a smaller model.
- * The default sets nothing, so the user's own Claude settings and environment still apply. An agent's
- * own environment values come after both, so they still win.
+ * The default sets nothing, so the user's own Claude settings and environment still apply. The agent
+ * environment and the account's folder come after both. The provider's variables of this server come
+ * last, so a variable that an admin set wins over a value of the same name; the host refuses the names
+ * of the account folders.
  */
 function claudeAgentEnvironment(
   context: ProviderClientContext,

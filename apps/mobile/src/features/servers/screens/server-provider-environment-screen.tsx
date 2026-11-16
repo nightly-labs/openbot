@@ -37,6 +37,11 @@ const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const ROW_EXIT = FadeOut.duration(150).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
 const ROW_LAYOUT = LinearTransition.duration(200).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
 
+/** The content of a list, to tell whether the user changed it. */
+function snapshot(list: readonly Omit<Row, "id">[]): string {
+  return JSON.stringify(list.map(({ name, value, sensitive, stored }) => ({ name, value, sensitive, stored })));
+}
+
 interface Row {
   /** A key for the list, so a typed character does not make the card again. */
   id: number;
@@ -89,9 +94,19 @@ function EnvironmentForm({
   const locked = useRef(false);
   const name = agentProviderName(provider);
   const loaded = current.data;
-  // The form starts from the host's answer.
+  /** The answer that the rows started from, so a new answer does not replace a change of the user. */
+  const lastLoaded = useRef<string | null>(null);
+  // The form starts from the host's answer. A status event reads the variables again; the rows that the
+  // user changed stay.
   useEffect(() => {
-    if (loaded) setRows(loaded.variables.map((variable) => ({ ...variable, id: nextId.current++ })));
+    if (!loaded) return;
+    const previous = lastLoaded.current;
+    lastLoaded.current = snapshot(loaded.variables);
+    setRows((list) =>
+      previous === null || snapshot(list) === previous
+        ? loaded.variables.map((variable) => ({ ...variable, id: nextId.current++ }))
+        : list,
+    );
   }, [loaded]);
 
   if (!loaded)
@@ -105,8 +120,6 @@ function EnvironmentForm({
       </SettingsContent>
     );
 
-  const snapshot = (list: readonly Omit<Row, "id">[]) =>
-    JSON.stringify(list.map(({ name: key, value, sensitive, stored }) => ({ key, value, sensitive, stored })));
   const dirty = snapshot(rows) !== snapshot(loaded.variables);
   const names = rows.map((row) => row.name.trim());
   const problem = (row: Row): string | null => {
@@ -201,12 +214,13 @@ function EnvironmentForm({
               appearance="soft"
               label={t("mobile.server.environment.namePlaceholder")}
               placeholder={t("mobile.server.environment.namePlaceholder")}
-              autoCapitalize="characters"
+              autoCapitalize="none"
               autoCorrect={false}
               editable={!saving}
               maxLength={PROVIDER_ENVIRONMENT_LIMITS.name}
               value={row.name}
-              onChangeText={(value) => update(row.id, { name: value.toUpperCase() })}
+              // A new name needs its own value: the stored one belongs to the old name.
+              onChangeText={(value) => update(row.id, { name: value, stored: false })}
             />
             <SheetFormField
               hideLabel
