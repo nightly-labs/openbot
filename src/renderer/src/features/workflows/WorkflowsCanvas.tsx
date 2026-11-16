@@ -1,4 +1,5 @@
 import { WORKFLOW_MEDIA_MODELS } from "@openbot/contracts/ipc";
+import { Skeleton } from "@openbot/ui";
 import { providerAvailability, providerTurnedOff } from "@openbot/ui/components/provider-model-options";
 import { WorkflowCanvas } from "@openbot/ui/features/workflows/WorkflowCanvas";
 import {
@@ -160,7 +161,7 @@ export function WorkflowsCanvas(props: {
   });
   // The canvas is a direct child of the window page, which gives it the height of the pane.
   return (
-    <Show when={workflows.detail()}>
+    <Show when={workflows.detail()} fallback={<WorkflowCanvasLoading error={workflows.loadError()} />}>
       {(workflow) => (
         <WorkflowCanvas
           workflow={workflow()}
@@ -174,5 +175,26 @@ export function WorkflowsCanvas(props: {
         />
       )}
     </Show>
+  );
+}
+
+function WorkflowCanvasLoading(props: { error?: boolean }) {
+  return (
+    <main
+      class="window-page workflow-page-loading"
+      role={props.error ? "alert" : "status"}
+      aria-busy={props.error ? undefined : "true"}
+      aria-label={currentText().t(props.error ? "workflow.page.failed" : "common.loading")}
+    >
+      <Show when={props.error} fallback={
+        <div class="workflow-page-loading-content" aria-hidden="true">
+          <Skeleton class="workflow-page-loading-title" />
+          <Skeleton class="workflow-page-loading-line" />
+          <Skeleton class="workflow-page-loading-line workflow-page-loading-line-short" />
+        </div>
+      }>
+        <p>{currentText().t("workflow.page.failed")}</p>
+      </Show>
+    </main>
   );
 }

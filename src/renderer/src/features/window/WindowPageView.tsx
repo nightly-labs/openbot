@@ -1,3 +1,4 @@
+import { Skeleton } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { Loading, Match, Show, Switch } from "solid-js";
 import { AgentUsagePanel, LibraryPanel, WorkflowsPage } from "../../lazy-views";
@@ -57,7 +58,7 @@ export function WindowPageView() {
               <SchedulePanel serverId={serverId()} hostName={hostName(serverId())} onBack={usage.closeUsage} />
             </Match>
             <Match when={usage.state.view === "workflows"}>
-              <Loading>
+              <Loading fallback={<WorkflowsLoading />}>
                 <WorkflowsPage serverId={serverId()} />
               </Loading>
             </Match>
@@ -70,5 +71,18 @@ export function WindowPageView() {
         )}
       </Show>
     </Show>
+  );
+}
+
+function WorkflowsLoading() {
+  const { t } = useText();
+  return (
+    <main class="window-page workflow-page-loading" role="status" aria-busy="true" aria-label={t("common.loading")}>
+      <div class="workflow-page-loading-content" aria-hidden="true">
+        <Skeleton class="workflow-page-loading-title" />
+        <Skeleton class="workflow-page-loading-line" />
+        <Skeleton class="workflow-page-loading-line workflow-page-loading-line-short" />
+      </div>
+    </main>
   );
 }

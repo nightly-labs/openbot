@@ -118,6 +118,7 @@ export function createWorkflowsController(
     });
 
   /** The open workflow as the host has it. Replaced whole after each read. */
+  const [loadError, setLoadError] = createSignal(false);
   const [stored, setStored] = createSignal<{
     detail: WorkflowDetail;
     runs: WorkflowRunView;
@@ -286,8 +287,16 @@ export function createWorkflowsController(
   const load = async (workflowId: string) => {
     current = workflowId;
     limit = RUN_PAGE;
-    const next = await read(workflowId);
-    if (next) base = { workflowId, revision: next.revision };
+    try {
+      const next = await read(workflowId);
+      if (next) {
+        setLoadError(false);
+        base = { workflowId, revision: next.revision };
+      }
+    } catch (error) {
+      if (!stored()) setLoadError(true);
+      throw error;
+    }
   };
 
   /** Starts the save of the edit that waits. */
@@ -617,6 +626,7 @@ export function createWorkflowsController(
 
   return {
     detail: () => stored()?.detail,
+    loadError,
     places,
     channels,
     discord,
