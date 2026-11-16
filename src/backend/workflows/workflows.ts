@@ -248,10 +248,15 @@ export interface WorkflowsDependencies {
     run: { id: string; routineId: string; routineName: string; scheduledFor: string };
     agentId: string;
     text: string;
-    /** The files of the image and asset steps before an agent step, which the message carries. */
-    attachmentIds: readonly string[];
+    /** The files of the image and asset steps before an agent step, which the message carries as copies. */
+    sourcePaths: readonly string[];
     idempotencyKey: string;
   }): Effect.Effect<string, { readonly cause: unknown }>;
+  /**
+   * The path of a stored file of this host, or null when Storage no longer has it. Absent where this
+   * host keeps no files: an agent step with files before it then fails.
+   */
+  filePath?: (attachmentId: string) => Effect.Effect<string | null, { readonly cause: unknown }>;
   /** Ends a delivery: cancels it while it waits, or interrupts the turn that answers it. */
   stopDelivery(agentId: string, deliveryId: string): Effect.Effect<void, { readonly cause: unknown }>;
   /** One tool-less generation; the failure is a message the user can read. */
@@ -507,6 +512,25 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           const attachmentIds = graph
             ? agentFileInputs(graph, step.nodeId, run ? latestSteps(run.id) : runs.latestDone(step.workflowId))
             : [];
+          if (attachmentIds.length > INPUT_LIMITS.attachments) {
+            settle(step, {
+              status: "failed",
+              error: sourceText("error.backend.attachLimit", { limit: INPUT_LIMITS.attachments }),
+            });
+            return;
+          }
+          const sourcePaths: string[] = [];
+          for (const attachmentId of attachmentIds) {
+            const path = dependencies.filePath
+              ? yield* dependencies.filePath(attachmentId).pipe(Effect.orElseSucceed(() => null))
+              : null;
+            // A file deleted in Storage fails the step: the agent must not do the step without its picture.
+            if (!path) {
+              settle(step, { status: "failed", error: sourceText("error.workflow.mediaInputMissing") });
+              return;
+            }
+            sourcePaths.push(path);
+          }
           const sent = yield* dependencies
             .sendHandoff({
               run: {
@@ -517,7 +541,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               },
               agentId: step.agentId,
               text: step.input,
-              attachmentIds,
+              sourcePaths,
               idempotencyKey: `workflow-step:${step.id}`,
             })
             .pipe(Effect.exit);

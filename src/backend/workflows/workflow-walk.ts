@@ -15,7 +15,9 @@
  * can see that a branch is missing. A node that was skipped because a node before it failed or was
  * stopped gives that reason too; a node after the branch that a condition did not choose gives none.
  * The other steps get only the answers: an output posts its input, and a condition or an approval
- * hands its input on to the nodes after it, outputs too.
+ * hands its input on to the nodes after it, outputs too. The files of image and asset steps are not
+ * text inputs: an image step and an agent step get them as files, and a failed image step before a
+ * join gives no reason.
  *
  * A loop edge (`workflowLoopEdges`) goes back to an earlier node. It does not hold that node back.
  * When it is active and newer than the node's own step, the node is due again with the loop edge's
