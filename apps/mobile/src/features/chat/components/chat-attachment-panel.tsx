@@ -65,6 +65,9 @@ const SURFACE_RADIUS = 28;
 const MORPH = { duration: 320, dampingRatio: 1, reduceMotion: ReduceMotion.System };
 // Room the camera leaves below the top safe area.
 const CAMERA_TOP_GAP = 12;
+// The smallest camera that is still usable. Above a tall composer with the keyboard up, the card
+// moves down over the composer to keep this height, as it did before it opened above the composer.
+const MIN_CAMERA_HEIGHT = 240;
 // The material's own fade. An opacity on the card is what broke the glass, so
 // the card leaves by dissolving its material instead, through the animated
 // style the library itself exposes.
@@ -225,10 +228,21 @@ export function ChatAttachmentPanel({
   // The card already rides the keyboard's lift, so the camera takes the room
   // that is left above it.
   const [keyboardInset] = useState(() => Math.max(0, (Keyboard.metrics()?.height ?? 0) - keyboardOffset));
+  const rowCount = 3 + (onUseSkill ? 1 : 0) + (context ? 1 : 0);
+  // The highest point the card can reach, from the screen's bottom edge, before the keyboard lift.
+  const roomTop = height - insets.top - keyboardInset - CAMERA_TOP_GAP;
   // The card opens above the composer, not over it: the draft, the plus and Send stay in view.
-  const openBottom = anchor.barTop + MENU_GAP;
+  // When a tall composer leaves too little room above it, the card moves down over the composer,
+  // but never below the plus, so the camera and the list stay below the top safe area.
+  const openBottom = Math.max(
+    anchor.bottom,
+    Math.min(
+      anchor.barTop + MENU_GAP,
+      roomTop - Math.max(MIN_CAMERA_HEIGHT, optionsHeight(rowCount, Boolean(context))),
+    ),
+  );
   const rise = openBottom - anchor.bottom;
-  const cameraHeight = Math.min(height * 0.58, height - insets.top - openBottom - keyboardInset - CAMERA_TOP_GAP);
+  const cameraHeight = Math.min(height * 0.58, roomTop - openBottom);
   // The options list takes the composer card's start edge. The camera takes the card's full width
   // and centres between the side insets, so its sides line up with the open composer.
   const optionsShift = anchor.barStart - anchor.left;
@@ -251,7 +265,7 @@ export function ChatAttachmentPanel({
   // out against the card's animated width on every frame. The card starts to
   // grow once the list's height is known, so it grows in one motion.
   const [listWidth, setListWidth] = useState<number | null>(null);
-  const listHeight = useSharedValue(optionsHeight(3 + (onUseSkill ? 1 : 0) + (context ? 1 : 0), Boolean(context)));
+  const listHeight = useSharedValue(optionsHeight(rowCount, Boolean(context)));
   const openedRef = useRef(false);
 
   // Runs once the card has finished leaving, so the heavy part of holding a
