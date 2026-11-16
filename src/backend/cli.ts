@@ -1435,6 +1435,8 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
   const target = process.platform === "win32" && [".bat", ".cmd"].includes(extname(candidate).toLowerCase());
   const slow = slowVersionReads.has(candidate);
   const timeout = providerCheckTimeoutMs(slow ? SLOW_CLI_VERSION_TIMEOUT_MS : CLI_VERSION_TIMEOUT_MS);
+  // A Copilot CLI without `COPILOT_ENV` reports the newest package in its cache (#9888).
+  const providerEnv = provider === "copilot" ? COPILOT_ENV : {};
   // The signal stops the process when the start that waits for it ends.
   const output = yield* Effect.tryPromise({
     try: (signal) =>
@@ -1446,6 +1448,7 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
               signal,
               timeout,
               maxBuffer: 64 * 1024,
+              env: { ...process.env, ...providerEnv },
               windowsHide: true,
               windowsVerbatimArguments: true,
             },
@@ -1455,7 +1458,7 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
             timeout,
             maxBuffer: 64 * 1024,
             windowsHide: process.platform === "win32",
-            env: { ...process.env, ...cliPathEnvironment(launch) },
+            env: { ...process.env, ...providerEnv, ...cliPathEnvironment(launch) },
           }),
     catch: providerFailure,
   }).pipe(
