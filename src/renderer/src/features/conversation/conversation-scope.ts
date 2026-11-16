@@ -640,17 +640,22 @@ export function createConversationViewScope(props: ConversationProps) {
     if (sidePanelOpen()) hideBrowserPanel();
     else showSidePanel();
   }
-  /** Opens the side panel of this chat at its last file, pane or side thread, or at the list of panes. */
-  function showSidePanel() {
+  /**
+   * Opens the side panel of this chat at its last file, pane or side thread, or at the list of panes.
+   * With `startsBrowser` false, a Browser pane with no tab does not open a page: the panel lists the panes.
+   */
+  function showSidePanel(startsBrowser = true) {
     const { panes, selected, files, file } = sidePanel();
-    const pane = selected && panes.includes(selected) ? selected : null;
+    const opens = (pane: SidePanelPane | undefined): pane is SidePanelPane =>
+      pane !== undefined && (startsBrowser || pane !== "browser" || browserTabs().length > 0);
+    const pane = selected && panes.includes(selected) && opens(selected) ? selected : null;
     const thread = shownPanelThreadId() ?? sideThreadIds()[0];
     if (file && files.some((item) => item.key === file)) {
       setActiveRightPanel("side-panel");
       openSidePanelFile(file);
     } else if (pane) openSidePanelPane(pane);
     else if (thread && selected === null) openPanelThread(thread);
-    else if (panes[0]) openSidePanelPane(panes[0]);
+    else if (opens(panes[0])) openSidePanelPane(panes[0]);
     else setActiveRightPanel("side-panel");
   }
   /**
@@ -2142,11 +2147,12 @@ export function createConversationViewScope(props: ConversationProps) {
   /**
    * The side panel stays open or closed when another agent or channel opens. An open panel shows the last tab
    * of the new chat, or the list of panes. The browser full view and picture in picture stay as they are.
+   * The change does not open a browser page: the address is still the one of the previous chat.
    */
   function keepSidePanelShown(agentId: string | undefined, panel: RightPanelMode): void {
     if (!agentId) return;
     if (untrack(sidePanelShown)) {
-      if (panel === "none") showSidePanel();
+      if (panel === "none") showSidePanel(false);
     } else if (isSidePanelMode(panel)) setActiveRightPanel("none", agentId);
   }
 

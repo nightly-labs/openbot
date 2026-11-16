@@ -208,7 +208,10 @@ try {
   await toggle.click();
   await page.locator(".side-panel-header").waitFor({ state: "detached", timeout: WAIT_MS });
   await selectAgent(page, "Research");
-  // `selectAgent` waits for the new chat, and the agent change sets its panel in the same update.
+  // The agent change sets the panel, then asks for the composer focus. After the focus, the panel state is final.
+  await page.waitForFunction(() => document.activeElement?.getAttribute("aria-label") === "Message Research", null, {
+    timeout: WAIT_MS,
+  });
   const researchClosed = (await page.locator(".side-panel-header").count()) === 0;
   await toggle.click();
   const researchReopened = await tabsBecome(page, ["Browser*"]);
