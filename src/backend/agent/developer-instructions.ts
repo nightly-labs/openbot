@@ -426,12 +426,13 @@ export function steerNote(sender: "user" | "teammate"): string {
 const BACKGROUND_WAKE_START = "<openbot_background_wake>";
 
 /**
- * The prompt that connects an agent's wake-up for a finished background command to its open turn
- * (`AcpFlavor.wakesAfterPromptEnds`). The model reads it; the chat does not show it.
+ * The prompt that connects an agent's wake-up for a finished background command or subagent to a turn
+ * (`AcpFlavor.wakesAfterPromptEnds`, `AcpFlavor.backgroundSubagentTools`). The model reads it; the
+ * chat does not show it.
  */
 export const BACKGROUND_WAKE_NOTE = [
   BACKGROUND_WAKE_START,
-  "The session changed while a command that you moved to the background ran. If the command finished, read its result and continue the task. If it still runs, end your turn.",
+  "The session changed while a command or a subagent that you started in the background ran. If it finished, read its result and continue the task. If it still runs, end your turn.",
   "</openbot_background_wake>",
 ].join("\n");
 

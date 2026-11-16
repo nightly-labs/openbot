@@ -754,6 +754,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   readonly #subagentThreads = new Map<string, string>();
   /** OpenCode subagent calls whose child session did not start yet. */
   readonly #openCodeLaunches: OpenCodeLaunches = new Map();
+  /**
+   * How many wake turns each session can still start for background subagents of its turns
+   * (`AcpFlavor.backgroundSubagentTools`). Each turn end sets a new entry, which ends the watch before it.
+   */
+  readonly #subagentWakes = new WeakMap<AcpThread, { left: number }>();
 
   constructor(
     cli: AgentCliInfo,
@@ -2596,7 +2601,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   #beginTurn(
     thread: AcpThread,
     turnId: string,
-    { unprompted, answerOptional }: { unprompted: boolean; answerOptional: boolean },
+    {
+      unprompted,
+      answerOptional,
+      wake = false,
+    }: {
+      unprompted: boolean;
+      answerOptional: boolean;
+      /** OpenBot's own prompt connects the agent's wake-up (`#watchSubagentWake`): no delivery started it. */
+      wake?: boolean;
+    },
   ): AcpTurn {
     const currentSecond = Date.now() / 1_000;
     const startedAt = Math.max(currentSecond, this.#lastTurnStartedAt + 0.001);
@@ -2654,7 +2668,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         threadId: thread.id,
         turn: { id: turn.id, status: "inProgress" },
         // `unprompted` tells the lifecycle that no delivery started this turn.
-        ...(unprompted ? { unprompted } : {}),
+        ...(unprompted || wake ? { unprompted: true } : {}),
       },
     });
     return turn;
@@ -4072,6 +4086,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         });
     }
     turn.toolItems.clear();
+    // The turn started subagents that run on after it (`AcpFlavor.backgroundSubagentTools`).
+    const subagents =
+      this.#flavor.wakesAfterPromptEnds === true && this.#steersByPrompt && status === "completed" && !turn.stopped
+        ? this.#launchedSubagents(turn)
+        : 0;
     this.#emitSubagents(endSubagentTurn(this.#subagents, turn.id, new Date().toISOString()));
     // A turn that started no subagent sends no change, so its thread entry is removed here.
     if (!this.#subagents.turns.has(turn.id)) this.#subagentThreads.delete(turn.id);
@@ -4138,7 +4157,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     });
     thread.activeTurn = null;
     if (this.#threads.get(thread.id) !== thread) return;
-    if (workRuns) this.#holdForWork(thread);
+    // Subagents of earlier turns can still run. A stopped or failed turn ends their wake-ups.
+    const left = status === "completed" && !turn.stopped ? (this.#subagentWakes.get(thread)?.left ?? 0) + subagents : 0;
+    if (left > 0) {
+      const wake = { left };
+      this.#subagentWakes.set(thread, wake);
+      Effect.runFork(this.#watchSubagentWake(thread, wake).pipe(Effect.forkIn(this.#scope)));
+    } else this.#subagentWakes.delete(thread);
+    if (workRuns || left > 0) this.#holdForWork(thread);
     yield* this.#threads.markIdle(thread);
   }, Effect.uninterruptible);
 
@@ -4179,6 +4205,67 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (!thread.activeTurn) yield* this.#threads.markIdle(thread);
       return;
     }
+  });
+
+  /**
+   * How many background subagents a completed turn started (`AcpFlavor.backgroundSubagentTools`): the
+   * length of the call's `Subagents` list, else 1. A failed launch starts none.
+   */
+  #launchedSubagents(turn: AcpTurn): number {
+    const tools = this.#flavor.backgroundSubagentTools;
+    if (!tools) return 0;
+    let count = 0;
+    for (const item of turn.messages) {
+      if (item.type !== "toolCall" || item.toolKind !== "other" || item.status === "failed") continue;
+      if (!isString(item.name) || !tools.test(item.name)) continue;
+      const list = isRecord(item.arguments) ? item.arguments.Subagents : undefined;
+      count += Array.isArray(list) && list.length > 0 ? list.length : 1;
+    }
+    return count;
+  }
+
+  /**
+   * Starts a turn when the agent wakes its model for subagents that a turn started and that ran on
+   * after it (`AcpFlavor.backgroundSubagentTools`). With no prompt open, the agent sends no update and
+   * no approval request for that work, and a prompt connects it. Each subagent allows one wake turn,
+   * so a session that changes for another cause costs at most that many. The next turn ends this
+   * watch, and its end starts a new one. After `ACP_BACKGROUND_WATCH_MS` with no change, it ends.
+   */
+  readonly #watchSubagentWake = Effect.fn("AcpAgentClient.watchSubagentWake")(function* (
+    this: AcpAgentClient,
+    thread: AcpThread,
+    wake: { left: number },
+  ) {
+    const until = Date.now() + ACP_BACKGROUND_WATCH_MS;
+    // The first reading comes one poll after the turn ended, so the agent's own write of that end
+    // is not taken as a wake-up.
+    let before: string | undefined;
+    while (Date.now() < until) {
+      yield* Effect.sleep(ACP_BACKGROUND_POLL_MS);
+      if (this.#subagentWakes.get(thread) !== wake) return;
+      // A message connects the work by itself. A session that must resume first gets no wake prompt.
+      if (thread.activeTurn || this.#openingTurns.has(thread.id)) return;
+      if (this.#threads.get(thread.id) !== thread || thread.needsResume) break;
+      const read = yield* Effect.result(this.#sessionUpdatedAt(thread));
+      if (Result.isFailure(read)) continue;
+      if (read.success === null) break;
+      if (before === undefined || read.success === before) {
+        before = read.success;
+        continue;
+      }
+      // A message can start while `session/list` runs.
+      if (this.#subagentWakes.get(thread) !== wake || thread.activeTurn || this.#openingTurns.has(thread.id)) return;
+      wake.left -= 1;
+      const turn = this.#beginTurn(thread, randomUUID(), { unprompted: false, answerOptional: true, wake: true });
+      turn.task = yield* Effect.forkIn(
+        this.#consumePrompt(thread, turn, [{ type: "text", text: BACKGROUND_WAKE_NOTE }], {}),
+        this.#scope,
+        { startImmediately: true },
+      );
+      yield* Effect.forkIn(this.#watchStall(thread, turn), this.#scope);
+      return;
+    }
+    if (this.#subagentWakes.get(thread) === wake) this.#subagentWakes.delete(thread);
   });
 
   /**
