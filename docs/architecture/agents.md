@@ -405,7 +405,9 @@ does not move the switch.
   and writes nothing.
 - Agents use four `openbot` tools (`agent/crm-tool.ts`): `crm_find`, `crm_customer`,
   `crm_payments` and `crm_propose`. They are not in the visible set. Only agents that an owner or
-  admin let in (`crm_agent_access`) get answers, and a turn from a remote member is refused. An agent
+  admin let in (`crm_agent_access`) get answers. A turn from a remote member is refused, and so is a
+  turn in an external chat (Slack, Telegram, Discord) or a channel thread, whose readers can be people
+  who are not owners or admins. A routine run can read the CRM. An agent
   never writes: `crm_propose` stores a pending proposal, and an owner or admin approves or rejects it
   on the page. An approved proposal applies as the person who approved it, and its activity names
   the agent. Amounts in tool input are decimal text in the customer's currency.

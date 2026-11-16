@@ -228,7 +228,7 @@ export function stripeSource(options: StripeSourceOptions): CrmSourceAdapter {
           const recurring = subscription.items.data[0]?.price.recurring;
           const names: string[] = [];
           for (const item of subscription.items.data) {
-            const name = item.price.nickname || (yield* productName(item.price.product));
+            const name = (item.price.nickname ?? "").trim() || (yield* productName(item.price.product)).trim();
             if (name !== "" && !names.includes(name)) names.push(name);
           }
           const amount = items.reduce((sum, item) => sum + (item.price.unit_amount ?? 0) * (item.quantity ?? 1), 0);

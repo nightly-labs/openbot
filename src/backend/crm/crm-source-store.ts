@@ -74,8 +74,9 @@ export interface SourceStatePatch {
 
 const TABLES = ["crm_customers", "crm_plans", "crm_payments"] as const;
 
+/** Source text as a CRM label: no outer spaces, as the decoders need, and at most `limit` long. */
 function cut(value: string, limit: number): string {
-  return value.length > limit ? value.slice(0, limit) : value;
+  return value.trim().slice(0, limit).trim();
 }
 
 export class CrmSourceStore {
@@ -251,7 +252,10 @@ class SourceSync {
       return match;
     }
     const customerId = this.#write.createCustomer({
-      name: cut(customer.name || customer.email || customer.externalId, CRM_LIMITS.name),
+      name:
+        cut(customer.name, CRM_LIMITS.name) ||
+        cut(customer.email, CRM_LIMITS.name) ||
+        cut(customer.externalId, CRM_LIMITS.name),
       currency: customer.currency,
       statusId: paying ? "customer" : "lead",
       method: "stripe",

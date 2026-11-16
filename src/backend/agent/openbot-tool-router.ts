@@ -2248,6 +2248,14 @@ export class OpenBotToolRouter {
       // The Team API gives the CRM to owners and admins only, so a member's message does not reach it here.
       if (this.#fromRemoteMember(senderAgentId, params.turnId))
         return openBotToolFailure("A team member's message cannot use the CRM. Ask the member to use the CRM page.");
+      // People who are not owners or admins read the replies in an external chat or a channel.
+      if (
+        this.#messaging.store.linkForThread(executionThreadId) ||
+        this.#channels.store.channelForThread(executionThreadId)
+      )
+        return openBotToolFailure(
+          "The CRM does not work in an external chat or a channel. Use it in your own OpenBot chat.",
+        );
       const crmResult = yield* handleCrmTool(
         params.tool,
         params.arguments,

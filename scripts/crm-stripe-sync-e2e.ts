@@ -162,20 +162,21 @@ const customers = new Map<string, StripeObject>(
   [
     { id: "cus_A", name: "Acme in Stripe", email: "ap@acme.example", phone: null, currency: "eur" },
     { id: "cus_B", name: "Beta in Stripe", email: "Billing@Beta.example", phone: null, currency: "eur" },
-    { id: "cus_C", name: "Cobalt", email: "c@cobalt.example", phone: "+1 555 0100", currency: null },
+    // Outer spaces: the CRM trims them, or the page decoders refuse the whole page.
+    { id: "cus_C", name: " Cobalt  ", email: "c@cobalt.example", phone: "+1 555 0100", currency: null },
     { id: "cus_D", name: "Delta", email: "d@delta.example", phone: null, currency: null },
     { id: "cus_E", name: "Iceland ehf", email: "e@iceland.example", phone: null, currency: "isk" },
   ].map((customer) => [customer.id, { object: "customer", ...customer }]),
 );
 const products = new Map<string, StripeObject>([
   ["prod_P", { id: "prod_P", object: "product", name: "Pro" }],
-  ["prod_H", { id: "prod_H", object: "product", name: "Hosting" }],
+  ["prod_H", { id: "prod_H", object: "product", name: "Hosting " }],
 ]);
 const subscriptions = new Map<string, StripeObject>(
   [
     { id: "sub_A", customer: "cus_A", currency: "eur", items: [price("Pro monthly", 4900, "prod_P", "month")] },
     { id: "sub_B", customer: "cus_B", currency: "eur", items: [price("Weekly check", 900, "prod_P", "week")] },
-    { id: "sub_E", customer: "cus_E", currency: "isk", items: [price(null, 1_200_000, "prod_H", "year")] },
+    { id: "sub_E", customer: "cus_E", currency: "isk", items: [price("  ", 1_200_000, "prod_H", "year")] },
   ].map(({ items, ...subscription }) => [
     subscription.id,
     {
