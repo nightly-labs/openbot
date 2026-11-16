@@ -2613,6 +2613,8 @@ export async function createApplicationServices({
       turnAnswer,
       // A workflow step is a routine handoff whose routine is the workflow.
       sendHandoff: (input) => service.enqueueRoutineHandoff(input),
+      filePath: (attachmentId) =>
+        mailbox.resolveAttachment(attachmentId).pipe(Effect.map((file) => file?.path ?? null)),
       stopDelivery: stopHandoff,
       generateText: (request) =>
         service.generateWorkflowText(request).pipe(

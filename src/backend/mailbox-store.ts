@@ -126,6 +126,12 @@ interface StoredMessage {
    * but no chat, queue or preview shows it. Absent on every other message.
    */
   welcome?: true;
+  /**
+   * The first message that another agent gave a new agent with `create_agent`. The agent that made
+   * it already has the result, so the new agent can end that turn with no answer (#10009). Absent
+   * on every other message.
+   */
+  agentSetup?: true;
   createdAt: string;
 }
 
@@ -215,6 +221,8 @@ interface EnqueueInput {
   expectsReply?: boolean | undefined;
   /** The setup message of a new agent, which the user does not see. */
   welcome?: boolean;
+  /** The first message that another agent gave a new agent, which can end with no answer. */
+  agentSetup?: boolean;
   draftIds?: string[];
   /** An audio draft of what the user said. Kept with the message, not sent to the recipient. */
   voiceRecordingDraftId?: string;
@@ -707,6 +715,7 @@ export class MailboxStore {
         replyToMessageId: input.replyToMessageId ?? null,
         ...(input.expectsReply === false ? { expectsReply: false as const } : {}),
         ...(input.welcome ? { welcome: true as const } : {}),
+        ...(input.agentSetup ? { agentSetup: true as const } : {}),
         createdAt,
       };
       const deliveries = recipients.map<StoredDelivery>((recipientAgentId) => ({
@@ -953,10 +962,17 @@ export class MailboxStore {
 
   /** Whether the delivery carries a new agent's setup message (`agent-welcome-v1`). */
   isWelcomeDelivery(deliveryId: string): boolean {
+    return this.#messageOfDelivery(deliveryId)?.welcome === true;
+  }
+
+  /** Whether the delivery carries the first message that another agent gave a new agent. */
+  isAgentSetupDelivery(deliveryId: string): boolean {
+    return this.#messageOfDelivery(deliveryId)?.agentSetup === true;
+  }
+
+  #messageOfDelivery(deliveryId: string): StoredMessage | undefined {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
-    return delivery
-      ? this.#state.messages.some((message) => message.id === delivery.messageId && message.welcome === true)
-      : false;
+    return delivery ? this.#state.messages.find((message) => message.id === delivery.messageId) : undefined;
   }
 
   #taskIdOf(delivery: StoredDelivery, messages?: ReadonlyMap<string, StoredMessage>): string | null {
@@ -3934,6 +3950,7 @@ function isStoredMessage(value: unknown): value is StoredMessage {
     (isString(value.replyToMessageId) || value.replyToMessageId === null) &&
     (value.expectsReply === undefined || value.expectsReply === false) &&
     (value.welcome === undefined || value.welcome === true) &&
+    (value.agentSetup === undefined || value.agentSetup === true) &&
     isString(value.createdAt)
   );
 }
