@@ -224,7 +224,10 @@ export function presentChatMessages(
 }
 
 // The reader decides whether a user message is their own, so a bubble is kept for one reader.
-const projectedBubbles = new WeakMap<ConversationMessage, { readerKey: string; bubble: ChatMessage }>();
+const projectedBubbles = new WeakMap<
+  ConversationMessage,
+  { readerKey: string; replaced: boolean; bubble: ChatMessage }
+>();
 const projectedExchanges = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedQuestions = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedMemoryChanges = new WeakMap<ConversationMessage, ChatMessage>();
@@ -363,11 +366,37 @@ const aliasedMessages = new WeakMap<ChatMessage, ChatMessage>();
 const PLAN_HEADING_LIMIT = 80;
 
 /**
+ * The plan messages that a later turn of the same agent replaced, as on desktop. The work of a stopped
+ * turn goes on in a later turn, for example on a backup model or after a new request, and that turn
+ * does not change the earlier plan. So only a plan with no later turn shows as stopped (#9876).
+ * `agent` is null for a message that no turn of an agent wrote.
+ */
+function replacedPlans(
+  entries: readonly { id: string; message: ConversationMessage; agent: string | null }[],
+): ReadonlySet<string> {
+  const replaced = new Set<string>();
+  const laterTurns = new Map<string, Set<string>>();
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    const entry = entries[index];
+    const turnId = entry?.message.turnId;
+    if (!entry || entry.agent === null || !turnId) continue;
+    const turns = laterTurns.get(entry.agent) ?? new Set<string>();
+    if (
+      entry.message.itemType === CONVERSATION_PLAN_ITEM_TYPE &&
+      (turns.size > 1 || (turns.size === 1 && !turns.has(turnId)))
+    )
+      replaced.add(entry.id);
+    laterTurns.set(entry.agent, turns.add(turnId));
+  }
+  return replaced;
+}
+
+/**
  * The task list of a `plan` message, as desktop shows it. A released host sends only the checklist
  * text, so the plan is read back from it. The last line of a streaming text can be incomplete, so
  * it is left out. Returns null when the text is not a checklist; the message then shows as text.
  */
-function projectPlan(message: ConversationMessage): ChatMessage | null {
+function projectPlan(message: ConversationMessage, replaced: boolean): ChatMessage | null {
   if (message.author !== "assistant" || message.itemType !== CONVERSATION_PLAN_ITEM_TYPE) return null;
   const streaming = message.status === "streaming";
   const lastLine = message.text.lastIndexOf("\n");
@@ -389,7 +418,9 @@ function projectPlan(message: ConversationMessage): ChatMessage | null {
     heading: short ? plan.explanation : null,
     explanation: short ? null : plan.explanation,
     stopped:
-      (message.status === "interrupted" || message.status === "failed") && steps.some((step) => step.state !== "done"),
+      !replaced &&
+      (message.status === "interrupted" || message.status === "failed") &&
+      steps.some((step) => step.state !== "done"),
     steps,
   };
 }
@@ -479,6 +510,13 @@ export function projectChatMessages(
   const sorted = sortedConversationMessages(messages);
   const latestRuns = latestRoutineRunMessages(sorted);
   const answered = progressUpdates ? answerTimes(sorted) : undefined;
+  const replacedIds = replacedPlans(
+    sorted.map((message) => ({
+      id: message.id,
+      message,
+      agent: message.author === "assistant" && !message.exchange ? (message.senderAgentId ?? "") : null,
+    })),
+  );
   for (const message of sorted) {
     // Routine events are system messages, skipped below. Like desktop, a routine instruction shows only as its marker.
     const routine = projectRoutineMarker(message, latestRuns);
@@ -568,12 +606,13 @@ export function projectChatMessages(
       if (update) result.push(projectedMarker(projectedUpdates, message, () => progressBubble(message.id, message)));
     } else {
       const cached = projectedBubbles.get(message);
-      let bubble = cached?.readerKey === readerKey ? cached.bubble : undefined;
+      const replaced = replacedIds.has(message.id);
+      let bubble = cached?.readerKey === readerKey && cached.replaced === replaced ? cached.bubble : undefined;
       if (!bubble) {
         const sender = message.author === "user" ? message.senderMember : undefined;
         const ownSender = sender !== undefined && (sender.id === reader || sender.id === readerAccount);
         const otherMember = sender !== undefined && reader !== null && !ownSender;
-        bubble = projectPlan(message) ??
+        bubble = projectPlan(message, replaced) ??
           projectSubagents(message) ?? {
             id: message.id,
             kind: "message",
@@ -592,7 +631,7 @@ export function projectChatMessages(
             createdAt: message.createdAt,
             reactions: messageReactions(message),
           };
-        projectedBubbles.set(message, { readerKey, bubble });
+        projectedBubbles.set(message, { readerKey, replaced, bubble });
       }
       result.push(bubble);
     }
@@ -901,7 +940,7 @@ export function latestReadBoundaryMessage(messages: ConversationMessage[]) {
 
 const projectedChannelMessages = new WeakMap<
   ChannelMessage,
-  { self: boolean; latest: boolean; progress: boolean; rows: readonly ChatMessage[] }
+  { self: boolean; latest: boolean; progress: boolean; replaced: boolean; rows: readonly ChatMessage[] }
 >();
 
 function projectChannelMessage(
@@ -909,6 +948,7 @@ function projectChannelMessage(
   self: boolean,
   latestRuns: ReadonlySet<string>,
   progress: boolean,
+  replaced: boolean,
 ): ChatMessage | null {
   const routine = routineMarker(entry.message);
   if (routine) {
@@ -959,7 +999,7 @@ function projectChannelMessage(
       };
   }
   // A plan card of channel work shows as in an agent chat.
-  const plan = entry.author.kind === "agent" ? projectPlan(entry.message) : null;
+  const plan = entry.author.kind === "agent" ? projectPlan(entry.message, replaced) : null;
   if (plan) return { ...plan, id: entry.id };
   if (entry.author.kind === "agent" && entry.message.itemType === "commentary" && !entry.superseded) {
     if (progress) return { ...progressBubble(entry.id, entry.message), speaker: entry.author };
@@ -997,6 +1037,13 @@ export function projectChannelMessages(
 ): ChatMessage[] {
   const latestRuns = latestRoutineRunMessages(messages.map((entry) => entry.message));
   const answered = progressUpdates ? answerTimes(messages.map((entry) => entry.message)) : undefined;
+  const replacedIds = replacedPlans(
+    messages.map((entry) => ({
+      id: entry.id,
+      message: entry.message,
+      agent: entry.author.kind === "agent" ? entry.author.id : null,
+    })),
+  );
   const showsUpdate = (entry: ChannelMessage) =>
     Boolean(progressUpdates && answered) &&
     entry.author.kind === "agent" &&
@@ -1018,9 +1065,16 @@ export function projectChannelMessages(
       const cached = projectedChannelMessages.get(entry);
       const latest = latestRuns.has(entry.message.id);
       const progress = showsUpdate(entry);
-      if (cached && cached.self === self && cached.latest === latest && cached.progress === progress)
+      const replaced = replacedIds.has(entry.id);
+      if (
+        cached &&
+        cached.self === self &&
+        cached.latest === latest &&
+        cached.progress === progress &&
+        cached.replaced === replaced
+      )
         return cached.rows;
-      const message = projectChannelMessage(entry, self, latestRuns, progress);
+      const message = projectChannelMessage(entry, self, latestRuns, progress, replaced);
       // A progress update keeps a steps row of its own, so the activity row knows that the member's
       // latest step is this update and does not show an older thought.
       const rows: readonly ChatMessage[] = !message
@@ -1036,7 +1090,7 @@ export function projectChannelMessages(
               },
             ]
           : [message];
-      projectedChannelMessages.set(entry, { self, latest, progress, rows });
+      projectedChannelMessages.set(entry, { self, latest, progress, replaced, rows });
       return rows;
     });
 }

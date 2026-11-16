@@ -44,7 +44,7 @@ import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, For, Loading, onSettled, Show, untrack } from "solid-js";
 import { useShowAgentSteps } from "../../agent-steps-preference";
-import { planItems, planTitle } from "../../app-message-projection";
+import { planItems, planTitle, replacedPlanIds } from "../../app-message-projection";
 import { useChatBubbleStyle } from "../../chat-bubble-style-preference";
 import { useCompactMessageActions } from "../../compact-message-actions-preference";
 import { currentDevicePlatform } from "../../send-shortcut-preference";
@@ -294,6 +294,8 @@ export function ConversationTimeline() {
     if (channel || !props.threads?.onBranch || !branchPoints().has(message.id)) return;
     return () => void branchThread(null, message.id);
   };
+  /** The stopped plans whose work a later turn continued: they do not show as stopped. */
+  const replacedPlans = createMemo(() => replacedPlanIds(timelineMessages()));
   /** The last agent text of each turn the user spoke: it shows a play control at all times. */
   const spokenReplyIds = createMemo(() => {
     const ids = new Set<string>();
@@ -1295,7 +1297,7 @@ export function ConversationTimeline() {
                             {(current) => (
                               <TaskList
                                 items={planItems(current(), message()?.streaming === true)}
-                                title={planTitle(current())}
+                                title={planTitle(current(), replacedPlans().has(initialMessage.id))}
                                 defaultOpen={untrack(() => initialMessage.streaming === true)}
                               />
                             )}
