@@ -250,6 +250,8 @@ export const messages = {
     "أرسل خادم تسجيل الدخول ردًا لا يستطيع OpenBot قراءته. إذا كانت الخدمة تمنحك مفتاح API أو رمزًا، فأضفه إلى إعدادات هذا الخادم، ثم اختبر الاتصال مرة أخرى.",
   "error.backend.mcpServerExited": "توقف الخادم قبل أن يُجيب. شغّل الأمر في الطرفية لرؤية الخطأ.",
   "error.backend.mcpServerFailedToStart": "لم يبدأ الخادم: {reason}",
+  "error.backend.mcpServerStartAbandoned":
+    "توقف {provider} عن الانتظار قبل أن يبدأ الخادم، لذلك لا يحصل وكلاؤه على أدوات هذا الخادم.",
   "error.backend.mcpToolSchemaRefused":
     "أداته {tool} لها صيغة إدخال لا يستطيع هذا المزوّد قراءتها. الوكلاء على مزوّدين آخرين ما زالوا يحصلون على الخادم.",
   "error.backend.mcpServerSignInForProvider":

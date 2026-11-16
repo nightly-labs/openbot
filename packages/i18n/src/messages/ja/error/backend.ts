@@ -280,6 +280,8 @@ export const messages = {
   "error.backend.mcpServerExited":
     "サーバーは応答する前に停止しました。ターミナルでコマンドを実行してエラーを確認してください。",
   "error.backend.mcpServerFailedToStart": "サーバーが起動しませんでした: {reason}",
+  "error.backend.mcpServerStartAbandoned":
+    "サーバーが起動する前に {provider} が待つのをやめたため、{provider} のエージェントはこのサーバーのツールを使えません。",
   "error.backend.mcpToolSchemaRefused":
     "このサーバーのツール {tool} の入力形式を、このプロバイダーは読み取れません。ほかのプロバイダーのエージェントは引き続きこのサーバーを使えます。",
   "error.backend.mcpServerSignInForProvider":

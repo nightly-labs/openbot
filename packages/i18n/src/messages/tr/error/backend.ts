@@ -264,6 +264,8 @@ export const messages = {
   "error.backend.mcpServerExited":
     "Sunucu yanıt vermeden durdu. Hatasını görmek için komutu bir terminalde çalıştırın.",
   "error.backend.mcpServerFailedToStart": "Sunucu başlamadı: {reason}",
+  "error.backend.mcpServerStartAbandoned":
+    "{provider}, sunucu başlamadan beklemeyi bıraktı. Bu yüzden ajanları bu sunucunun araçlarını almıyor.",
   "error.backend.mcpToolSchemaRefused":
     "Sunucunun {tool} aracının giriş biçimini bu sağlayıcı okuyamıyor. Diğer sağlayıcılardaki ajanlar sunucuyu almaya devam ediyor.",
   "error.backend.mcpServerSignInForProvider":
