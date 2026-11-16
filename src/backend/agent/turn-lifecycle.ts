@@ -2718,11 +2718,10 @@ export class TurnLifecycle {
       return;
 
     // A request steered into a turn for other work has no answer of its own: the turn's answer is for
-    // the person or another request. Its sender gets a note instead of that answer.
-    if (this.#mailbox.steeredIntoOtherWork(delivery.delivery.id)) {
-      yield* this.#answerFailedRequest(agentId, delivery.delivery.id);
-      return;
-    }
+    // the person or another request, so it does not go to the sender. The request text asks for a
+    // `send_message` reply. No "no reply" note either: Claude can still answer a late steer in a turn
+    // of its own after this end (`moveSteerToTurn`).
+    if (this.#mailbox.steeredIntoOtherWork(delivery.delivery.id)) return;
     // A result for a request from a side thread runs in that thread, as an answer with send_message does.
     const answerTaskId = this.#mailbox.answerTaskId(agentId, messageId, [recipientAgentId]);
     const taskId = answerTaskId && this.#hooks.taskOpen(answerTaskId) ? answerTaskId : undefined;

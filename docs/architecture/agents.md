@@ -968,9 +968,10 @@ steers natively and the recipient runs a chat turn, `send_message` and the resul
 message into that turn (`AgentService.#steerAgentMessage`). A request that joins a running turn keeps
 its result separate from the answer to the person: the request text tells the recipient to send the
 result with `send_message`. The turn's answer is for the person or another request, so the turn end
-never relays it for a steered request. When the turn ends, or the person stops it, with no reply to
-the request, the sender gets an OpenBot note instead (`MailboxStore.answerFailedRequest`), and does
-not wait for a result that never comes. Routine runs, channel work and messages from Slack, Telegram or
+never relays it for a steered request, and sends no "no reply" note: Claude can still answer a late
+steer in a turn of its own (`moveSteerToTurn`). When the person stops the turn before a reply, the
+sender gets an OpenBot note (`MailboxStore.answerFailedRequest`), and does not wait for a result that
+never comes. Routine runs, channel work and messages from Slack, Telegram or
 WhatsApp do not steer automatically: each starts a turn of its own. Channel, messaging and task
 work, and each answer to a request that went to two or more teammates, stay queued
 (`MailboxStore.joinsChatTurn`), so those answers still start together. A message from an agent that

@@ -2277,8 +2277,8 @@ export class MailboxStore {
    * teammate in the reply format, and the key sends it once. The text is the delivery's error, which
    * `markTerminal` redacted. Returns the agent to wake, or null when no note is due.
    *
-   * A request steered into a turn for other work gets a note too when that turn ends with no reply to
-   * it: the person stopped the turn, or the turn's answer is for the person, not for the request.
+   * A request steered into a turn for other work gets a note too when the person stops that turn
+   * before a reply to it.
    */
   answerFailedRequest = Effect.fn("MailboxStore.answerFailedRequest")(function* (
     this: MailboxStore,
@@ -2289,9 +2289,7 @@ export class MailboxStore {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     const request = delivery && this.#state.messages.find((message) => message.id === delivery.messageId);
     const outcome =
-      delivery?.status === "failed" ||
-      (this.steeredIntoOtherWork(deliveryId) &&
-        (delivery?.status === "interrupted" || delivery?.status === "completed"))
+      delivery?.status === "failed" || (delivery?.status === "interrupted" && this.steeredIntoOtherWork(deliveryId))
         ? delivery.status
         : null;
     if (!delivery || !outcome || request?.sender.kind !== "agent" || request.channelId) return null;
@@ -2317,9 +2315,7 @@ export class MailboxStore {
         "Status: blocked",
         outcome === "failed"
           ? `Result: OpenBot note, not written by this teammate: the request failed before the teammate answered. ${(delivery.error ?? "The provider gave no reason.").slice(0, FAILED_REQUEST_REASON_LIMIT)}`
-          : outcome === "interrupted"
-            ? "Result: OpenBot note, not written by this teammate: the request went into a running turn of the teammate, and the user stopped that turn before the teammate answered."
-            : "Result: OpenBot note, not written by this teammate: the request went into a running turn of the teammate, and that turn ended with no reply to it.",
+          : "Result: OpenBot note, not written by this teammate: the request went into a running turn of the teammate, and the user stopped that turn before the teammate answered.",
         "Evidence: none",
         outcome === "failed"
           ? "Unblock: The user must fix the cause, then ask for the request again."
