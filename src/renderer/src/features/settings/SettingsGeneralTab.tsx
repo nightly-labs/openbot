@@ -128,6 +128,13 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
               label={i18n.t("settings.compactMessageActions.title")}
               description={i18n.t("settings.compactMessageActions.description")}
             />
+            <SwitchField
+              data-settings-row="settings.messagesOnLeft.title"
+              checked={props.value.messagesOnLeft}
+              onChange={(checked) => props.onUpdateSetting("messagesOnLeft", checked)}
+              label={i18n.t("settings.messagesOnLeft.title")}
+              description={i18n.t("settings.messagesOnLeft.description")}
+            />
             <Item data-settings-row="settings.externalLinks.title" class="settings-modal-row">
               <ItemContent>
                 <ItemTitle>{i18n.t("settings.externalLinks.title")}</ItemTitle>

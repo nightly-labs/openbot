@@ -114,6 +114,8 @@ export const messages = {
   "settings.compactMessageActions.title": "Compacte berichtacties",
   "settings.compactMessageActions.description":
     "Toont Reageren, Beantwoorden en Meer naast een bericht, en de tijd tussen berichten. Als dit uit staat, staan alle acties en de tijd onder elk bericht.",
+  "settings.messagesOnLeft.title": "Je berichten links",
+  "settings.messagesOnLeft.description": "Toon je berichten links bij die van de agents, in één kolom, zoals in Slack.",
   "settings.busyMessage.title": "Stuur agents bij terwijl ze werken",
   "settings.busyMessage.description":
     "Nieuwe berichten gaan naar het huidige werk van de agent, niet naar de wachtrij. Bij agents die dit niet kunnen, wachten ze in de wachtrij.",

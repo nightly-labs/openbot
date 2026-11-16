@@ -2218,3 +2218,80 @@ button.chat-action-target:active,
 .media-stage-details .image-generation-spec:nth-child(2)::before {
   content: none;
 }
+
+/*
+ * "Your messages on the left" (`data-openbot-message-align="start"` on the root): the reader's own
+ * messages stand on the left with the agents' messages, as one column. Each rule above that puts a
+ * person's message at the end goes back to the start, and the bubble takes a light fill of its own, so it
+ * stands apart from the agents' bubbles.
+ */
+:root[data-openbot-message-align="start"] .message-entry-user {
+  flex-direction: row;
+}
+
+:root[data-openbot-message-align="start"] .message-entry-user > .ui-message-content {
+  align-items: flex-start;
+}
+
+:root[data-openbot-message-align="start"] .message-entry-user .message-shell {
+  justify-content: flex-start;
+}
+
+:root[data-openbot-message-align="start"] .message-entry-user .message-stack {
+  justify-items: start;
+}
+
+:root[data-openbot-message-align="start"] .message-entry-user .ui-bubble {
+  align-self: flex-start;
+}
+
+:root[data-openbot-message-align="start"]
+  .message-entry-user
+  .ui-bubble-variant-secondary:not(.message-bubble-colored, .message-bubble-solid)
+  > .ui-bubble-content {
+  background: var(--openbot-bg-control-active);
+}
+
+:root[data-openbot-message-align="start"] .message-entry-user .message-author-name {
+  text-align: start;
+}
+
+:root[data-openbot-message-align="start"]
+  .message-entry-user
+  :is(.message-action-row, .message-author-name)
+  > .message-time,
+:root[data-openbot-message-align="start"]
+  .message-entry-user.message-entry-actions-beside
+  .message-stack:not(:has(.message-media-before))
+  + .message-action-row {
+  order: 0;
+}
+
+:root[data-openbot-message-align="start"] .message-entry-user .ui-message-footer {
+  justify-content: flex-start;
+}
+
+:root[data-openbot-message-align="start"] .message-entry-animated.message-entry-user {
+  transform-origin: left bottom;
+}
+
+/* A run of the reader's messages joins on the start side, as a run of an agent's messages does. */
+:root[data-openbot-message-align="start"]
+  .virtual-chat-row[data-grouped="sender"]
+  > .message-entry-user:first-child
+  .message-stack
+  > .ui-bubble:first-child
+  > .ui-bubble-content {
+  border-start-start-radius: var(--openbot-radius-sm);
+  border-start-end-radius: var(--openbot-radius-bubble);
+}
+
+:root[data-openbot-message-align="start"]
+  .virtual-chat-row:has(+ .virtual-chat-row[data-grouped="sender"] > .message-entry-user:first-child)
+  > .message-entry-user:last-child
+  .message-stack
+  > .ui-bubble:last-child
+  > .ui-bubble-content {
+  border-end-start-radius: var(--openbot-radius-sm);
+  border-end-end-radius: var(--openbot-radius-bubble);
+}

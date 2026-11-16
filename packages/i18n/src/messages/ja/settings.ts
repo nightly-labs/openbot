@@ -113,6 +113,9 @@ export const messages = {
   "settings.compactMessageActions.title": "コンパクトなメッセージ操作",
   "settings.compactMessageActions.description":
     "メッセージの横にリアクション、返信、その他を表示し、メッセージの間に時刻を表示します。オフにすると、すべての操作と時刻が各メッセージの下に表示されます。",
+  "settings.messagesOnLeft.title": "自分のメッセージを左に表示",
+  "settings.messagesOnLeft.description":
+    "自分のメッセージをエージェントのメッセージと同じ左側に、Slack のように 1 列で表示します。",
   "settings.busyMessage.title": "作業中のエージェントの方向を修正",
   "settings.busyMessage.description":
     "新しいメッセージはキューに入らず、エージェントの現在の作業に加わります。対応していないエージェントでは、キューで待機します。",

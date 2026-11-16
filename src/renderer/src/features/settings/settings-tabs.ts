@@ -77,6 +77,7 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
         titleKey: "settings.compactMessageActions.title",
         descriptionKey: "settings.compactMessageActions.description",
       },
+      { titleKey: "settings.messagesOnLeft.title", descriptionKey: "settings.messagesOnLeft.description" },
       { titleKey: "settings.externalLinks.title", descriptionKey: "settings.externalLinks.description" },
       { titleKey: "settings.analytics.title", descriptionKey: "settings.analytics.description" },
     ],

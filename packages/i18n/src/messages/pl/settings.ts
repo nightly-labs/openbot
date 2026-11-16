@@ -113,6 +113,9 @@ export const messages = {
   "settings.compactMessageActions.title": "Kompaktowe akcje wiadomości",
   "settings.compactMessageActions.description":
     "Pokazuje Reaguj, Odpowiedz i Więcej obok wiadomości, a godzinę między wiadomościami. Gdy jest wyłączone, wszystkie akcje i godzina są pod każdą wiadomością.",
+  "settings.messagesOnLeft.title": "Twoje wiadomości po lewej",
+  "settings.messagesOnLeft.description":
+    "Pokazuj swoje wiadomości po lewej razem z wiadomościami agentów, w jednej kolumnie, jak w Slacku.",
   "settings.busyMessage.title": "Kieruj agentami podczas pracy",
   "settings.busyMessage.description":
     "Nowe wiadomości dołączają do bieżącej pracy agenta, a nie do kolejki. W przypadku agentów, które tego nie obsługują, czekają w kolejce.",

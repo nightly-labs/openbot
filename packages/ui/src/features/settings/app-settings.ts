@@ -58,6 +58,8 @@ export interface GeneralSettingsValue {
   showAgentSteps: boolean;
   /** A message shows React, Reply and More beside it, and the agent chat shows the time between messages. */
   compactMessageActions: boolean;
+  /** The reader's own messages stand on the left with the agents' messages, as one column. */
+  messagesOnLeft: boolean;
   /** What a message sent to a busy agent does, unless the agent or the message sets its own. */
   busyMessageMode: BusyMessageMode;
   /** What an agent of this computer does when it has no value of its own for the setting. */
@@ -99,6 +101,7 @@ export const DEFAULT_GENERAL_SETTINGS: GeneralSettingsValue = {
   sendShortcut: "enter",
   showAgentSteps: false,
   compactMessageActions: true,
+  messagesOnLeft: false,
   busyMessageMode: DEFAULT_BUSY_MESSAGE_MODE,
   agentDefaults: DEFAULT_AGENT_DEFAULTS,
   agentMemoryLimit: DEFAULT_AGENT_MEMORY_LIMIT,

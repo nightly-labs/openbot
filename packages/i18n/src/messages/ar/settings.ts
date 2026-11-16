@@ -111,6 +111,8 @@ export const messages = {
   "settings.compactMessageActions.title": "إجراءات رسائل مختصرة",
   "settings.compactMessageActions.description":
     "يعرض التفاعل والرد والمزيد بجانب الرسالة، والوقت بين الرسائل. عند إيقافه تظهر كل الإجراءات والوقت تحت كل رسالة.",
+  "settings.messagesOnLeft.title": "رسائلك على اليسار",
+  "settings.messagesOnLeft.description": "اعرض رسائلك على اليسار مع رسائل الوكلاء في عمود واحد، كما في Slack.",
   "settings.busyMessage.title": "توجيه الوكلاء أثناء عملهم",
   "settings.busyMessage.description":
     "تنضم الرسائل الجديدة إلى العمل الحالي للوكيل، لا إلى قائمة الانتظار. مع الوكلاء الذين لا يدعمون ذلك، تنتظر الرسائل في قائمة الانتظار.",

@@ -111,6 +111,8 @@ export const messages = {
   "settings.compactMessageActions.title": "紧凑的消息操作",
   "settings.compactMessageActions.description":
     "在消息旁显示“回应”“回复”和“更多”，并在消息之间显示时间。关闭后，所有操作和时间都显示在每条消息下方。",
+  "settings.messagesOnLeft.title": "我的消息靠左",
+  "settings.messagesOnLeft.description": "像 Slack 一样，把你的消息和助手的消息一起靠左显示在同一列。",
   "settings.busyMessage.title": "助手工作时的消息处理方式",
   "settings.busyMessage.description":
     "新消息会并入助手当前的工作，而不是进入队列。不支持此功能的助手会让消息在队列中等待。",

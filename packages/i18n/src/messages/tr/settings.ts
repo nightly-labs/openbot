@@ -114,6 +114,9 @@ export const messages = {
   "settings.compactMessageActions.title": "Kompakt mesaj işlemleri",
   "settings.compactMessageActions.description":
     "Bir mesajın yanında Tepki ver, Yanıtla ve Daha fazla seçeneklerini, mesajların arasında da saati gösterir. Kapalıyken tüm işlemler ve saat her mesajın altında görünür.",
+  "settings.messagesOnLeft.title": "Mesajlarınız solda",
+  "settings.messagesOnLeft.description":
+    "Mesajlarınızı ajanların mesajlarıyla birlikte solda, Slack'teki gibi tek sütunda gösterin.",
   "settings.busyMessage.title": "Ajanları çalışırken yönlendir",
   "settings.busyMessage.description":
     "Yeni mesajlar kuyruğa değil, ajanın mevcut işine eklenir. Bunu desteklemeyen ajanlarda kuyrukta bekler.",

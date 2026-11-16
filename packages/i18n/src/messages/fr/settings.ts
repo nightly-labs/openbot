@@ -122,6 +122,9 @@ export const messages = {
   "settings.compactMessageActions.title": "Actions de message compactes",
   "settings.compactMessageActions.description":
     "Affiche Réagir, Répondre et Plus à côté d’un message, et l’heure entre les messages. Désactivé, toutes les actions et l’heure s’affichent sous chaque message.",
+  "settings.messagesOnLeft.title": "Vos messages à gauche",
+  "settings.messagesOnLeft.description":
+    "Affichez vos messages à gauche avec ceux des agents, dans une seule colonne, comme dans Slack.",
   "settings.busyMessage.title": "Orienter les agents pendant leur travail",
   "settings.busyMessage.description":
     "Les nouveaux messages rejoignent le travail en cours de l’agent, pas la file. Avec les agents qui ne le permettent pas, ils attendent dans la file.",

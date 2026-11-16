@@ -114,6 +114,9 @@ export const messages = {
   "settings.compactMessageActions.title": "Компактные действия с сообщениями",
   "settings.compactMessageActions.description":
     "Показывает «Реакция», «Ответить» и «Ещё» рядом с сообщением, а время — между сообщениями. Если выключено, все действия и время показываются под каждым сообщением.",
+  "settings.messagesOnLeft.title": "Ваши сообщения слева",
+  "settings.messagesOnLeft.description":
+    "Показывать ваши сообщения слева вместе с сообщениями агентов, в одну колонку, как в Slack.",
   "settings.busyMessage.title": "Направлять агентов, пока они работают",
   "settings.busyMessage.description":
     "Новые сообщения присоединяются к текущей работе агента, а не встают в очередь. У агентов, которые этого не поддерживают, они ждут в очереди.",
